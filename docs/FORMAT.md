@@ -85,6 +85,10 @@ Found by locating the `lea` that references each error string and reading the ad
 
 Practical ceiling is performance, not the parser: largest Workshop map seen is 3,750 items; the game spawns one actor per item (`Ballest.UGC.Playback.ForceFullActors`, spatial bucketing cvars suggest instancing for big maps).
 
+## Which classes the game will spawn (`assets/registry.json`)
+
+The in-game item browser is one table of 11 categories → data assets listing **100** item classes. `DA_UGCPlaybackRecipeRegistry` (the load-time allowlist) references **200** item classes. So ~100 classes are spawnable from a map file but hidden from the in-game browser: raw/fixture point, spot and rect lights, light cards 01–04, laser terminal, orange sign, boost platform/ring/volume, pinball launcher/paddle, circular flexible platform, shape decal, checkpoint strip/disc, shallow bowl, extra bevels. `BP_KillZone` is not an item class and not in the registry. `MP_PlayerStart` is placed by the editor, not the browser. The registry's per-class recipe data needs the game's own usmap and is unread.
+
 ## Load-time validation (from exe strings)
 
 - transform must be finite, rotation normalized
@@ -97,6 +101,8 @@ Practical ceiling is performance, not the parser: largest Workshop map seen is 3
 
 ## Game assets
 
-Pak: `Ballest/Content/Paks/Ballest-Windows.{pak,utoc,ucas}` — IoStore TOC v8, Oodle-compressed, **not encrypted**, 6689 entries. `Paks/~Mods/` exists (mod paks are loadable). Extracting meshes/thumbnails needs a UE 5.8-capable IoStore reader (retoc / CUE4Parse).
+Pak: `Ballest/Content/Paks/Ballest-Windows.{pak,utoc,ucas}` — IoStore TOC v8, Oodle-compressed, signed, indexed, **not encrypted**, 6689 entries. `Paks/~Mods/` exists (mod paks are loadable). Meshes are extracted with CUE4Parse (`GAME_UE5_8`) via `nix run .#extract` — see `tools/extract/README.md`. Even static meshes need a `.usmap` (unversioned properties); we borrow Fortnite's public one, which matches UE 5.8 engine-class layouts. Blueprint component templates parse; class-level defaults and the game's own C++ components need the game's own `.usmap` (Dumper-7, Windows) — that's the only remaining RE gap.
+
+Note: `itemTransform` in a map file is the piece's **Main component** world transform, not the actor transform (e.g. every AirVent item carries Main's scale 0.75,0.75,1).
 
 In-game console (`ballest.editor.*`): `saveprefab`, `spawnprefab`, `listprefabs`, `deleteprefab`, `pivot`.

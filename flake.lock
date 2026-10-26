@@ -1,0 +1,45 @@
+{
+  "nodes": {
+    "cue4parse": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1793039898,
+        "narHash": "sha256-3v4nbIdOFd8mH9ox3DUa09huhT6AWYCuHTE4O2Oa8Ug=",
+        "owner": "FabianFG",
+        "repo": "CUE4Parse",
+        "rev": "df14b992d6d503c9d39e693af415fee5e1961de9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "FabianFG",
+        "repo": "CUE4Parse",
+        "rev": "df14b992d6d503c9d39e693af415fee5e1961de9",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1792773339,
+        "narHash": "sha256-rZLrzrC6i+jnTAlvPZHogKDulY7WWDEv9hJeHieO7Zw=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "cue4parse": "cue4parse",
+        "nixpkgs": "nixpkgs"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

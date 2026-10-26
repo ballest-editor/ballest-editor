@@ -1,0 +1,2880 @@
+{
+  "version": 1,
+  "source": "Ballest-Windows pak: /Game/Core/Input (Enhanced Input), Ballest/Config/DefaultInput.ini, level-editor widgets/controller",
+  "notes": [
+    "priority is not stored in UInputMappingContext; it is chosen at AddMappingContext() time in Blueprint/C++ and is null here.",
+    "modifierSettings/triggerSettings are effective values: UE 5.8 class defaults merged with the cooked overrides. settings=null means the subobject could not be parsed (see error); Ballest* modifier classes are game-native and need the game's own .usmap.",
+    "IMC_LevelEditor, IMC_ModeEditor, IMC_MainMenu, IMC_ModeRace and IMC_Paused are empty in the cooked game, and IA_Translate/IA_Rotate/IA_Scale/IA_Coordinates are not mapped by any context. The level editor's own shortcuts (gizmo modes, snapping, delete, undo...) are handled in native code (SKGMultiplayerLevelEditor C++ plugin; e.g. USKGMLEGizmoDeveloperSettings::ToggleGizmoVisibilityKey) whose defaults are compiled into the exe, not stored in the pak. The [/Script/SKGMultiplayerLevelEditor.SKGMLEDeveloperSettings] section of DefaultGame.ini is empty, so the compiled defaults apply.",
+    "label = PlayerMappableKeySettings.DisplayName (what the Controls page shows; the UI lowercases it). section = the Controls-page header the mapping is listed under (mapping DisplayCategory -> WBP_2_Settings header). sections[].actions order within a section is not stored in the assets (rows are filled at runtime), so it is IMC order.",
+    "cameraPresets come from DT_CameraSettingsPresets (fov in degrees, distance/height in cm). The dropdown also offers 'Custom' (current slider values).",
+    "blueprintKeyEvents are raw key events compiled into Blueprints (InputDebugKey events only fire in non-shipping builds)."
+  ],
+  "sections": [
+    {
+      "name": "mouse and keyboard bindings",
+      "displayCategory": "MNK",
+      "widget": "GameBindings_MNK_VB",
+      "rowSlots": 9,
+      "orderNote": "membership exact (DisplayCategory filter); row order is assigned at runtime, listed here in IMC order",
+      "actions": [
+        {
+          "label": "Jump",
+          "action": "IA_Jump",
+          "key": "SpaceBar",
+          "context": "IMC_Default",
+          "mappingName": "Jump Keyboard"
+        },
+        {
+          "label": "Look",
+          "action": "IA_Look",
+          "key": "Mouse2D",
+          "context": "IMC_Default",
+          "mappingName": "Look MOUSE"
+        },
+        {
+          "label": "Look Right",
+          "action": "IA_Look",
+          "key": "Right",
+          "context": "IMC_Default",
+          "mappingName": "Look Right"
+        },
+        {
+          "label": "Look Left",
+          "action": "IA_Look",
+          "key": "Left",
+          "context": "IMC_Default",
+          "mappingName": "Look Left"
+        },
+        {
+          "label": "Look Up",
+          "action": "IA_Look",
+          "key": "Up",
+          "context": "IMC_Default",
+          "mappingName": "Look Up"
+        },
+        {
+          "label": "Look Down",
+          "action": "IA_Look",
+          "key": "Down",
+          "context": "IMC_Default",
+          "mappingName": "Look Down"
+        },
+        {
+          "label": "Center Camera",
+          "action": "IA_CenterCamera",
+          "key": "C",
+          "context": "IMC_Default",
+          "mappingName": "Center Camera"
+        },
+        {
+          "label": "Forward",
+          "action": "IA_Move",
+          "key": "W",
+          "context": "IMC_Default",
+          "mappingName": "MoveFwdMNK"
+        },
+        {
+          "label": "Left",
+          "action": "IA_Move",
+          "key": "A",
+          "context": "IMC_Default",
+          "mappingName": "MoveLeftMNK"
+        },
+        {
+          "label": "Reverse",
+          "action": "IA_Move",
+          "key": "S",
+          "context": "IMC_Default",
+          "mappingName": "MoveBackMNK"
+        },
+        {
+          "label": "Right",
+          "action": "IA_Move",
+          "key": "D",
+          "context": "IMC_Default",
+          "mappingName": "MoveRightMNK"
+        },
+        {
+          "label": "Toggle Nameplates",
+          "action": "IA_ToggleNamePlate",
+          "key": "LeftAlt",
+          "context": "IMC_Default",
+          "mappingName": "ToggleNameplates_KeyboardPrimary"
+        },
+        {
+          "label": "Restart Checkpoint",
+          "action": "IA_RestartCheckpoint",
+          "key": "R",
+          "context": "IMC_InGame",
+          "mappingName": "RestartCP_Keyboard"
+        },
+        {
+          "label": "Restart Track",
+          "action": "IA_RestartLevel",
+          "key": "BackSpace",
+          "context": "IMC_InGame",
+          "mappingName": "RestartTrack_Keyboard"
+        },
+        {
+          "label": "Toggle Ghosts",
+          "action": "IA_ToggleGhosts",
+          "key": "G",
+          "context": "IMC_InGame",
+          "mappingName": "ToggleGhosts_Keyboard"
+        },
+        {
+          "label": "Toggle Free Camera",
+          "action": "IA_ToggleFreeCam",
+          "key": "T",
+          "context": "IMC_Play",
+          "mappingName": "ToggleFreeCam_Keyboard"
+        },
+        {
+          "label": "Auto Camera",
+          "action": "IA_ToggleAutoCamera",
+          "key": "F",
+          "context": "IMC_Play",
+          "mappingName": "AutoCamera_Keyboard"
+        }
+      ]
+    },
+    {
+      "name": "mouse and keyboard free camera",
+      "displayCategory": "SpectatorMNK",
+      "widget": "SpectatorBindings_MNK_VB",
+      "rowSlots": 9,
+      "orderNote": "membership exact (DisplayCategory filter); row order is assigned at runtime, listed here in IMC order",
+      "actions": [
+        {
+          "label": "Forward",
+          "action": "IA_Pan",
+          "key": "W",
+          "context": "IMC_FreeCam",
+          "mappingName": "PanFwdMNK"
+        },
+        {
+          "label": "Reverse",
+          "action": "IA_Pan",
+          "key": "S",
+          "context": "IMC_FreeCam",
+          "mappingName": "PanReverseMNK"
+        },
+        {
+          "label": "Left",
+          "action": "IA_Pan",
+          "key": "A",
+          "context": "IMC_FreeCam",
+          "mappingName": "PanLeftMNK"
+        },
+        {
+          "label": "Right",
+          "action": "IA_Pan",
+          "key": "D",
+          "context": "IMC_FreeCam",
+          "mappingName": "PanRightMNK"
+        },
+        {
+          "label": "Look",
+          "action": "IA_Camera",
+          "key": "Mouse2D",
+          "context": "IMC_FreeCam",
+          "mappingName": "LookMNK"
+        },
+        {
+          "label": "Up",
+          "action": "IA_Height",
+          "key": "SpaceBar",
+          "context": "IMC_FreeCam",
+          "mappingName": "UpMNK"
+        },
+        {
+          "label": "Down",
+          "action": "IA_Height",
+          "key": "LeftControl",
+          "context": "IMC_FreeCam",
+          "mappingName": "DownMNK"
+        },
+        {
+          "label": "Replay pause",
+          "action": "IA_POV_Pause",
+          "key": "LeftShift",
+          "context": "IMC_GhostPOV",
+          "mappingName": "POV_Pause_Keyboard"
+        },
+        {
+          "label": "Replay back 5 seconds",
+          "action": "IA_POV_SeekBack",
+          "key": "Q",
+          "context": "IMC_GhostPOV",
+          "mappingName": "POV_SeekBack_Keyboard"
+        },
+        {
+          "label": "Replay forward 5 seconds",
+          "action": "IA_POV_SeekForward",
+          "key": "E",
+          "context": "IMC_GhostPOV",
+          "mappingName": "POV_SeekForward_Keyboard"
+        },
+        {
+          "label": "Replay speed",
+          "action": "IA_POV_Rate",
+          "key": "X",
+          "context": "IMC_GhostPOV",
+          "mappingName": "POV_Rate_Keyboard"
+        },
+        {
+          "label": "Exit Replay",
+          "action": "IA_POV_Exit",
+          "key": "Escape",
+          "context": "IMC_GhostPOV",
+          "mappingName": "POV_Exit_Keyboard"
+        },
+        {
+          "label": "Replay Camera Mode",
+          "action": "IA_POV_CameraMode",
+          "key": "T",
+          "context": "IMC_GhostPOV",
+          "mappingName": "POV_CameraMode_Keyboard"
+        }
+      ]
+    },
+    {
+      "name": "gamepad",
+      "displayCategory": "Controller",
+      "widget": "GameBindings_Controller_VB",
+      "rowSlots": 11,
+      "orderNote": "membership exact (DisplayCategory filter); row order is assigned at runtime, listed here in IMC order",
+      "actions": [
+        {
+          "label": "Move",
+          "action": "IA_Move",
+          "key": "Gamepad_Left2D",
+          "context": "IMC_Default",
+          "mappingName": "Move Controller"
+        },
+        {
+          "label": "Jump",
+          "action": "IA_Jump",
+          "key": "Gamepad_FaceButton_Bottom",
+          "context": "IMC_Default",
+          "mappingName": "Jump Gamepad"
+        },
+        {
+          "label": "Look",
+          "action": "IA_Look",
+          "key": "Gamepad_Right2D",
+          "context": "IMC_Default",
+          "mappingName": "Look Controller"
+        },
+        {
+          "label": "Forward",
+          "action": "IA_Move",
+          "key": "Gamepad_RightTriggerAxis",
+          "context": "IMC_Default",
+          "mappingName": "Move FWD Controller"
+        },
+        {
+          "label": "Reverse",
+          "action": "IA_Move",
+          "key": "Gamepad_LeftTriggerAxis",
+          "context": "IMC_Default",
+          "mappingName": "Move BACK Controller"
+        },
+        {
+          "label": "Right",
+          "action": "IA_Move",
+          "key": "Gamepad_RightShoulder",
+          "context": "IMC_Default",
+          "mappingName": "Move RIGHT Controller"
+        },
+        {
+          "label": "Left",
+          "action": "IA_Move",
+          "key": "Gamepad_LeftShoulder",
+          "context": "IMC_Default",
+          "mappingName": "Move LEFT Controller"
+        },
+        {
+          "label": "Center Camera",
+          "action": "IA_CenterCamera",
+          "key": "Gamepad_RightThumbstick",
+          "context": "IMC_Default",
+          "mappingName": "Center Cam Controller"
+        },
+        {
+          "label": "Toggle Nameplates",
+          "action": "IA_ToggleNamePlate",
+          "key": "Gamepad_LeftShoulder",
+          "context": "IMC_Default",
+          "mappingName": "ToggleNameplates_Controller"
+        },
+        {
+          "label": "Restart Checkpoint",
+          "action": "IA_RestartCheckpoint",
+          "key": "Gamepad_FaceButton_Right",
+          "context": "IMC_InGame",
+          "mappingName": "RestartCP_Controller"
+        },
+        {
+          "label": "Restart Track",
+          "action": "IA_RestartLevel",
+          "key": "Gamepad_Special_Left",
+          "context": "IMC_InGame",
+          "mappingName": "RestartTrack_Gamepad"
+        },
+        {
+          "label": "Toggle Ghosts",
+          "action": "IA_ToggleGhosts",
+          "key": "Gamepad_RightShoulder",
+          "context": "IMC_InGame",
+          "mappingName": "ToggleGhosts_Gamepad"
+        },
+        {
+          "label": "Toggle Free Camera",
+          "action": "IA_ToggleFreeCam",
+          "key": "Gamepad_FaceButton_Top",
+          "context": "IMC_Play",
+          "mappingName": "ToggleFreeCam_Controller"
+        },
+        {
+          "label": "Auto Camera",
+          "action": "IA_ToggleAutoCamera",
+          "key": "Gamepad_FaceButton_Left",
+          "context": "IMC_Play",
+          "mappingName": "AutoCamera_Controller"
+        }
+      ]
+    },
+    {
+      "name": "gamepad free camera",
+      "displayCategory": "SpectatorController",
+      "widget": "SpectatorBindings_Controller_VB",
+      "rowSlots": 11,
+      "orderNote": "membership exact (DisplayCategory filter); row order is assigned at runtime, listed here in IMC order",
+      "actions": [
+        {
+          "label": "Pan",
+          "action": "IA_Pan",
+          "key": "Gamepad_Left2D",
+          "context": "IMC_FreeCam",
+          "mappingName": "PanController"
+        },
+        {
+          "label": "Look",
+          "action": "IA_Camera",
+          "key": "Gamepad_Right2D",
+          "context": "IMC_FreeCam",
+          "mappingName": "LookController"
+        },
+        {
+          "label": "Up",
+          "action": "IA_Height",
+          "key": "Gamepad_RightTriggerAxis",
+          "context": "IMC_FreeCam",
+          "mappingName": "UpController"
+        },
+        {
+          "label": "Down",
+          "action": "IA_Height",
+          "key": "Gamepad_LeftTriggerAxis",
+          "context": "IMC_FreeCam",
+          "mappingName": "DownController"
+        },
+        {
+          "label": "Camera Speed Slower",
+          "action": "IA_CameraSpeedSlower",
+          "key": "Gamepad_LeftShoulder",
+          "context": "IMC_FreeCamFilming",
+          "mappingName": "CameraSpeedSlowerController"
+        },
+        {
+          "label": "Camera Speed Faster",
+          "action": "IA_CameraSpeedFaster",
+          "key": "Gamepad_RightShoulder",
+          "context": "IMC_FreeCamFilming",
+          "mappingName": "CameraSpeedFasterController"
+        },
+        {
+          "label": "Replay pause",
+          "action": "IA_POV_Pause",
+          "key": "Gamepad_FaceButton_Bottom",
+          "context": "IMC_GhostPOV",
+          "mappingName": "POV_Pause_Controller"
+        },
+        {
+          "label": "Replay back 5 seconds",
+          "action": "IA_POV_SeekBack",
+          "key": "Gamepad_LeftShoulder",
+          "context": "IMC_GhostPOV",
+          "mappingName": "POV_SeekBack_Controller"
+        },
+        {
+          "label": "Replay forward 5 seconds",
+          "action": "IA_POV_SeekForward",
+          "key": "Gamepad_RightShoulder",
+          "context": "IMC_GhostPOV",
+          "mappingName": "POV_SeekForward_Controller"
+        },
+        {
+          "label": "Exit Replay",
+          "action": "IA_POV_Exit",
+          "key": "Gamepad_FaceButton_Right",
+          "context": "IMC_GhostPOV",
+          "mappingName": "POV_Exit_Controller"
+        },
+        {
+          "label": "Replay Speed",
+          "action": "IA_POV_Rate",
+          "key": "Gamepad_FaceButton_Left",
+          "context": "IMC_GhostPOV",
+          "mappingName": "POV_Rate_Controller"
+        },
+        {
+          "label": "Replay Camera Mode",
+          "action": "IA_POV_CameraMode",
+          "key": "Gamepad_FaceButton_Top",
+          "context": "IMC_GhostPOV",
+          "mappingName": "POV_CameraMode_Controller"
+        }
+      ]
+    }
+  ],
+  "cameraPresets": [
+    {
+      "row": "Default",
+      "label": "Default",
+      "fov": 90,
+      "distance": 350,
+      "height": 65,
+      "pitch": 0
+    },
+    {
+      "row": "WideAngle",
+      "label": "Wide Angle",
+      "fov": 110,
+      "distance": 310,
+      "height": 75,
+      "pitch": 0
+    },
+    {
+      "row": "OverTheShoulder",
+      "label": "Over the Shoulder",
+      "fov": 90,
+      "distance": 150,
+      "height": 60,
+      "pitch": 0
+    },
+    {
+      "row": "Orbital",
+      "label": "Orbital",
+      "fov": 110,
+      "distance": 600,
+      "height": 200,
+      "pitch": 0
+    }
+  ],
+  "contexts": [
+    {
+      "name": "IMC_Default",
+      "path": "/Game/Core/Input/IMC_Default",
+      "priority": null,
+      "description": null,
+      "mappings": [
+        {
+          "action": "IA_Move",
+          "key": "Gamepad_Left2D",
+          "modifiers": [
+            "BallestInputModifierStickDeadzone",
+            "InputModifierScalar",
+            "BallestInputModifierCaptureMove"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "BallestInputModifierStickDeadzone",
+              "settings": {}
+            },
+            {
+              "type": "InputModifierScalar",
+              "settings": {
+                "Scalar": {
+                  "X": 1,
+                  "Y": 1,
+                  "Z": 1
+                }
+              }
+            },
+            {
+              "type": "BallestInputModifierCaptureMove",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_0\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Move Controller",
+            "displayName": "Move",
+            "category": "Controller"
+          },
+          "label": "Move",
+          "section": "gamepad"
+        },
+        {
+          "action": "IA_Jump",
+          "key": "SpaceBar",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Jump Keyboard",
+            "displayName": "Jump",
+            "category": "MNK"
+          },
+          "label": "Jump",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_Jump",
+          "key": "Gamepad_FaceButton_Bottom",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Jump Gamepad",
+            "displayName": "Jump",
+            "category": "Controller"
+          },
+          "label": "Jump",
+          "section": "gamepad"
+        },
+        {
+          "action": "IA_Look",
+          "key": "Mouse2D",
+          "modifiers": [
+            "InputModifierNegate",
+            "InputModifierScalar",
+            "BallestInputModifierLookSensitivity"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierNegate",
+              "settings": {
+                "bX": false,
+                "bY": true,
+                "bZ": false
+              }
+            },
+            {
+              "type": "InputModifierScalar",
+              "settings": {
+                "Scalar": {
+                  "X": 1,
+                  "Y": 1,
+                  "Z": 1
+                }
+              }
+            },
+            {
+              "type": "BallestInputModifierLookSensitivity",
+              "settings": {}
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Look MOUSE",
+            "displayName": "Look",
+            "category": "MNK"
+          },
+          "label": "Look",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_Look",
+          "key": "Gamepad_Right2D",
+          "modifiers": [
+            "BallestInputModifierStickDeadzone",
+            "InputModifierScalar",
+            "BallestInputModifierLookSensitivity"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "BallestInputModifierStickDeadzone",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierStickDeadzone\" named \"UserLookDeadzone\" correctly | ParserException: Missing prop mappings for type BallestInputModifierStickDeadzone"
+            },
+            {
+              "type": "InputModifierScalar",
+              "settings": {
+                "Scalar": {
+                  "X": 0.6,
+                  "Y": 0.6,
+                  "Z": 0.6
+                }
+              }
+            },
+            {
+              "type": "BallestInputModifierLookSensitivity",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierLookSensitivity\" named \"UserLook_Gamepad_Right2D\" correctly | ParserException: Missing prop mappings for type BallestInputModifierLookSensitivity"
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Look Controller",
+            "displayName": "Look",
+            "category": "Controller"
+          },
+          "label": "Look",
+          "section": "gamepad"
+        },
+        {
+          "action": "IA_Look",
+          "key": "Right",
+          "modifiers": [
+            "InputModifierScalar",
+            "BallestInputModifierLookSensitivity"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierScalar",
+              "settings": {
+                "Scalar": {
+                  "X": 0.25,
+                  "Y": 0.25,
+                  "Z": 0.25
+                }
+              }
+            },
+            {
+              "type": "BallestInputModifierLookSensitivity",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierLookSensitivity\" named \"UserLook_Right\" correctly | ParserException: Missing prop mappings for type BallestInputModifierLookSensitivity"
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Look Right",
+            "displayName": "Look Right",
+            "category": "MNK"
+          },
+          "label": "Look Right",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_Look",
+          "key": "Left",
+          "modifiers": [
+            "InputModifierNegate",
+            "InputModifierScalar",
+            "BallestInputModifierLookSensitivity"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierNegate",
+              "settings": {
+                "bX": true,
+                "bY": true,
+                "bZ": true
+              }
+            },
+            {
+              "type": "InputModifierScalar",
+              "settings": {
+                "Scalar": {
+                  "X": 0.25,
+                  "Y": 0.25,
+                  "Z": 0.25
+                }
+              }
+            },
+            {
+              "type": "BallestInputModifierLookSensitivity",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierLookSensitivity\" named \"UserLook_Left\" correctly | ParserException: Missing prop mappings for type BallestInputModifierLookSensitivity"
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Look Left",
+            "displayName": "Look Left",
+            "category": "MNK"
+          },
+          "label": "Look Left",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_Look",
+          "key": "Up",
+          "modifiers": [
+            "InputModifierSwizzleAxis",
+            "InputModifierNegate",
+            "InputModifierScalar",
+            "BallestInputModifierLookSensitivity"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierSwizzleAxis",
+              "settings": {
+                "Order": "EInputAxisSwizzle::YXZ"
+              }
+            },
+            {
+              "type": "InputModifierNegate",
+              "settings": {
+                "bX": true,
+                "bY": true,
+                "bZ": true
+              }
+            },
+            {
+              "type": "InputModifierScalar",
+              "settings": {
+                "Scalar": {
+                  "X": 0.25,
+                  "Y": 0.25,
+                  "Z": 0.25
+                }
+              }
+            },
+            {
+              "type": "BallestInputModifierLookSensitivity",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierLookSensitivity\" named \"UserLook_Up\" correctly | ParserException: Missing prop mappings for type BallestInputModifierLookSensitivity"
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Look Up",
+            "displayName": "Look Up",
+            "category": "MNK"
+          },
+          "label": "Look Up",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_Look",
+          "key": "Down",
+          "modifiers": [
+            "InputModifierSwizzleAxis",
+            "InputModifierScalar",
+            "BallestInputModifierLookSensitivity"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierSwizzleAxis",
+              "settings": {
+                "Order": "EInputAxisSwizzle::YXZ"
+              }
+            },
+            {
+              "type": "InputModifierScalar",
+              "settings": {
+                "Scalar": {
+                  "X": 0.25,
+                  "Y": 0.25,
+                  "Z": 0.25
+                }
+              }
+            },
+            {
+              "type": "BallestInputModifierLookSensitivity",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierLookSensitivity\" named \"UserLook_Down\" correctly | ParserException: Missing prop mappings for type BallestInputModifierLookSensitivity"
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Look Down",
+            "displayName": "Look Down",
+            "category": "MNK"
+          },
+          "label": "Look Down",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_Move",
+          "key": "Gamepad_RightTriggerAxis",
+          "modifiers": [
+            "InputModifierSwizzleAxis",
+            "BallestInputModifierCaptureMove"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierSwizzleAxis",
+              "settings": {
+                "Order": "EInputAxisSwizzle::YXZ"
+              }
+            },
+            {
+              "type": "BallestInputModifierCaptureMove",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_1\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Move FWD Controller",
+            "displayName": "Forward",
+            "category": "Controller"
+          },
+          "label": "Forward",
+          "section": "gamepad"
+        },
+        {
+          "action": "IA_Move",
+          "key": "Gamepad_LeftTriggerAxis",
+          "modifiers": [
+            "InputModifierSwizzleAxis",
+            "InputModifierNegate",
+            "BallestInputModifierCaptureMove"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierSwizzleAxis",
+              "settings": {
+                "Order": "EInputAxisSwizzle::YXZ"
+              }
+            },
+            {
+              "type": "InputModifierNegate",
+              "settings": {
+                "bX": true,
+                "bY": true,
+                "bZ": true
+              }
+            },
+            {
+              "type": "BallestInputModifierCaptureMove",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_2\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Move BACK Controller",
+            "displayName": "Reverse",
+            "category": "Controller"
+          },
+          "label": "Reverse",
+          "section": "gamepad"
+        },
+        {
+          "action": "IA_Move",
+          "key": "Gamepad_RightShoulder",
+          "modifiers": [
+            "BallestInputModifierCaptureMove"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "BallestInputModifierCaptureMove",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_3\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Move RIGHT Controller",
+            "displayName": "Right",
+            "category": "Controller"
+          },
+          "label": "Right",
+          "section": "gamepad"
+        },
+        {
+          "action": "IA_Move",
+          "key": "Gamepad_LeftShoulder",
+          "modifiers": [
+            "InputModifierNegate",
+            "BallestInputModifierCaptureMove"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierNegate",
+              "settings": {
+                "bX": true,
+                "bY": true,
+                "bZ": true
+              }
+            },
+            {
+              "type": "BallestInputModifierCaptureMove",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_4\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Move LEFT Controller",
+            "displayName": "Left",
+            "category": "Controller"
+          },
+          "label": "Left",
+          "section": "gamepad"
+        },
+        {
+          "action": "IA_CenterCamera",
+          "key": "C",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Center Camera",
+            "displayName": "Center Camera",
+            "category": "MNK"
+          },
+          "label": "Center Camera",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_CenterCamera",
+          "key": "Gamepad_RightThumbstick",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "Center Cam Controller",
+            "displayName": "Center Camera",
+            "category": "Controller"
+          },
+          "label": "Center Camera",
+          "section": "gamepad"
+        },
+        {
+          "action": "IA_Move",
+          "key": "W",
+          "modifiers": [
+            "InputModifierSwizzleAxis",
+            "BallestInputModifierCaptureMove"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierSwizzleAxis",
+              "settings": {
+                "Order": "EInputAxisSwizzle::YXZ"
+              }
+            },
+            {
+              "type": "BallestInputModifierCaptureMove",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_5\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "MoveFwdMNK",
+            "displayName": "Forward",
+            "category": "MNK"
+          },
+          "label": "Forward",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_Move",
+          "key": "A",
+          "modifiers": [
+            "InputModifierNegate",
+            "BallestInputModifierCaptureMove"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierNegate",
+              "settings": {
+                "bX": true,
+                "bY": true,
+                "bZ": true
+              }
+            },
+            {
+              "type": "BallestInputModifierCaptureMove",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_6\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "MoveLeftMNK",
+            "displayName": "Left",
+            "category": "MNK"
+          },
+          "label": "Left",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_Move",
+          "key": "S",
+          "modifiers": [
+            "InputModifierSwizzleAxis",
+            "InputModifierNegate",
+            "BallestInputModifierCaptureMove"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierSwizzleAxis",
+              "settings": {
+                "Order": "EInputAxisSwizzle::YXZ"
+              }
+            },
+            {
+              "type": "InputModifierNegate",
+              "settings": {
+                "bX": true,
+                "bY": true,
+                "bZ": true
+              }
+            },
+            {
+              "type": "BallestInputModifierCaptureMove",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_7\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "MoveBackMNK",
+            "displayName": "Reverse",
+            "category": "MNK"
+          },
+          "label": "Reverse",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_Move",
+          "key": "D",
+          "modifiers": [
+            "BallestInputModifierCaptureMove"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "BallestInputModifierCaptureMove",
+              "settings": null,
+              "error": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_8\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "MoveRightMNK",
+            "displayName": "Right",
+            "category": "MNK"
+          },
+          "label": "Right",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_ToggleNamePlate",
+          "key": "LeftAlt",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "ToggleNameplates_KeyboardPrimary",
+            "displayName": "Toggle Nameplates",
+            "category": "MNK"
+          },
+          "label": "Toggle Nameplates",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_ToggleNamePlate",
+          "key": "Gamepad_LeftShoulder",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "ToggleNameplates_Controller",
+            "displayName": "Toggle Nameplates",
+            "category": "Controller"
+          },
+          "label": "Toggle Nameplates",
+          "section": "gamepad"
+        },
+        {
+          "action": "IA_ShowScoreboard",
+          "key": "Tab",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "label": null,
+          "section": null
+        },
+        {
+          "action": "IA_ToggleCursor",
+          "key": "MiddleMouseButton",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "label": null,
+          "section": null
+        }
+      ]
+    },
+    {
+      "name": "IMC_FreeCam",
+      "path": "/Game/Core/Input/IMC_FreeCam",
+      "priority": null,
+      "description": null,
+      "mappings": [
+        {
+          "action": "IA_Pan",
+          "key": "W",
+          "modifiers": [
+            "InputModifierSwizzleAxis"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierSwizzleAxis",
+              "settings": {
+                "Order": "EInputAxisSwizzle::YXZ"
+              }
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "PanFwdMNK",
+            "displayName": "Forward",
+            "category": "SpectatorMNK"
+          },
+          "label": "Forward",
+          "section": "mouse and keyboard free camera"
+        },
+        {
+          "action": "IA_Pan",
+          "key": "S",
+          "modifiers": [
+            "InputModifierNegate",
+            "InputModifierSwizzleAxis"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierNegate",
+              "settings": {
+                "bX": true,
+                "bY": true,
+                "bZ": true
+              }
+            },
+            {
+              "type": "InputModifierSwizzleAxis",
+              "settings": {
+                "Order": "EInputAxisSwizzle::YXZ"
+              }
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "PanReverseMNK",
+            "displayName": "Reverse",
+            "category": "SpectatorMNK"
+          },
+          "label": "Reverse",
+          "section": "mouse and keyboard free camera"
+        },
+        {
+          "action": "IA_Pan",
+          "key": "A",
+          "modifiers": [
+            "InputModifierNegate"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierNegate",
+              "settings": {
+                "bX": true,
+                "bY": true,
+                "bZ": true
+              }
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "PanLeftMNK",
+            "displayName": "Left",
+            "category": "SpectatorMNK"
+          },
+          "label": "Left",
+          "section": "mouse and keyboard free camera"
+        },
+        {
+          "action": "IA_Pan",
+          "key": "D",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "PanRightMNK",
+            "displayName": "Right",
+            "category": "SpectatorMNK"
+          },
+          "label": "Right",
+          "section": "mouse and keyboard free camera"
+        },
+        {
+          "action": "IA_Pan",
+          "key": "Gamepad_Left2D",
+          "modifiers": [
+            "InputModifierDeadZone",
+            "InputModifierScalar"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierDeadZone",
+              "settings": {
+                "LowerThreshold": 0.2,
+                "UpperThreshold": 1,
+                "Type": "EDeadZoneType::Radial"
+              }
+            },
+            {
+              "type": "InputModifierScalar",
+              "settings": {
+                "Scalar": {
+                  "X": 1,
+                  "Y": 1,
+                  "Z": 1
+                }
+              }
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "PanController",
+            "displayName": "Pan",
+            "category": "SpectatorController"
+          },
+          "label": "Pan",
+          "section": "gamepad free camera"
+        },
+        {
+          "action": "IA_Camera",
+          "key": "Mouse2D",
+          "modifiers": [
+            "InputModifierNegate",
+            "InputModifierScalar"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierNegate",
+              "settings": {
+                "bX": false,
+                "bY": true,
+                "bZ": false
+              }
+            },
+            {
+              "type": "InputModifierScalar",
+              "settings": {
+                "Scalar": {
+                  "X": 1,
+                  "Y": 1,
+                  "Z": 1
+                }
+              }
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "LookMNK",
+            "displayName": "Look",
+            "category": "SpectatorMNK"
+          },
+          "label": "Look",
+          "section": "mouse and keyboard free camera"
+        },
+        {
+          "action": "IA_Camera",
+          "key": "Gamepad_Right2D",
+          "modifiers": [
+            "InputModifierDeadZone",
+            "InputModifierScalar"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierDeadZone",
+              "settings": {
+                "LowerThreshold": 0.2,
+                "UpperThreshold": 1,
+                "Type": "EDeadZoneType::Radial"
+              }
+            },
+            {
+              "type": "InputModifierScalar",
+              "settings": {
+                "Scalar": {
+                  "X": 0.6,
+                  "Y": 0.6,
+                  "Z": 0.6
+                }
+              }
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "LookController",
+            "displayName": "Look",
+            "category": "SpectatorController"
+          },
+          "label": "Look",
+          "section": "gamepad free camera"
+        },
+        {
+          "action": "IA_Height",
+          "key": "SpaceBar",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "UpMNK",
+            "displayName": "Up",
+            "category": "SpectatorMNK"
+          },
+          "label": "Up",
+          "section": "mouse and keyboard free camera"
+        },
+        {
+          "action": "IA_Height",
+          "key": "LeftControl",
+          "modifiers": [
+            "InputModifierNegate"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierNegate",
+              "settings": {
+                "bX": true,
+                "bY": true,
+                "bZ": true
+              }
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "DownMNK",
+            "displayName": "Down",
+            "category": "SpectatorMNK"
+          },
+          "label": "Down",
+          "section": "mouse and keyboard free camera"
+        },
+        {
+          "action": "IA_Height",
+          "key": "Gamepad_RightTriggerAxis",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "UpController",
+            "displayName": "Up",
+            "category": "SpectatorController"
+          },
+          "label": "Up",
+          "section": "gamepad free camera"
+        },
+        {
+          "action": "IA_Height",
+          "key": "Gamepad_LeftTriggerAxis",
+          "modifiers": [
+            "InputModifierNegate"
+          ],
+          "triggers": [],
+          "modifierSettings": [
+            {
+              "type": "InputModifierNegate",
+              "settings": {
+                "bX": true,
+                "bY": true,
+                "bZ": true
+              }
+            }
+          ],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "DownController",
+            "displayName": "Down",
+            "category": "SpectatorController"
+          },
+          "label": "Down",
+          "section": "gamepad free camera"
+        },
+        {
+          "action": "IA_CamSpeedModifier",
+          "key": "MouseWheelAxis",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "label": null,
+          "section": null
+        }
+      ]
+    },
+    {
+      "name": "IMC_FreeCamFilming",
+      "path": "/Game/Core/Input/IMC_FreeCamFilming",
+      "priority": null,
+      "description": null,
+      "mappings": [
+        {
+          "action": "IA_CameraSpeedSlower",
+          "key": "Gamepad_LeftShoulder",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "CameraSpeedSlowerController",
+            "displayName": "Camera Speed Slower",
+            "category": "SpectatorController"
+          },
+          "label": "Camera Speed Slower",
+          "section": "gamepad free camera"
+        },
+        {
+          "action": "IA_CameraSpeedFaster",
+          "key": "Gamepad_RightShoulder",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "CameraSpeedFasterController",
+            "displayName": "Camera Speed Faster",
+            "category": "SpectatorController"
+          },
+          "label": "Camera Speed Faster",
+          "section": "gamepad free camera"
+        }
+      ]
+    },
+    {
+      "name": "IMC_GameMenu",
+      "path": "/Game/Core/Input/IMC_GameMenu",
+      "priority": null,
+      "description": null,
+      "mappings": [
+        {
+          "action": "IA_TabLeft",
+          "key": "Q",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "label": null,
+          "section": null
+        },
+        {
+          "action": "IA_TabRight",
+          "key": "E",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "label": null,
+          "section": null
+        },
+        {
+          "action": "IA_TabLeft",
+          "key": "Gamepad_LeftShoulder",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "label": null,
+          "section": null
+        },
+        {
+          "action": "IA_TabRight",
+          "key": "Gamepad_RightShoulder",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "label": null,
+          "section": null
+        },
+        {
+          "action": "IA_UI_Home",
+          "key": "Home",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "label": null,
+          "section": null
+        },
+        {
+          "action": "IA_UI_Home",
+          "key": "Gamepad_FaceButton_Right",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "label": null,
+          "section": null
+        }
+      ]
+    },
+    {
+      "name": "IMC_GhostPOV",
+      "path": "/Game/Core/Input/IMC_GhostPOV",
+      "priority": null,
+      "description": null,
+      "mappings": [
+        {
+          "action": "IA_POV_Pause",
+          "key": "LeftShift",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "POV_Pause_Keyboard",
+            "displayName": "Replay pause",
+            "category": "SpectatorMNK"
+          },
+          "label": "Replay pause",
+          "section": "mouse and keyboard free camera"
+        },
+        {
+          "action": "IA_POV_Pause",
+          "key": "Gamepad_FaceButton_Bottom",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "POV_Pause_Controller",
+            "displayName": "Replay pause",
+            "category": "SpectatorController"
+          },
+          "label": "Replay pause",
+          "section": "gamepad free camera"
+        },
+        {
+          "action": "IA_POV_SeekBack",
+          "key": "Q",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "POV_SeekBack_Keyboard",
+            "displayName": "Replay back 5 seconds",
+            "category": "SpectatorMNK"
+          },
+          "label": "Replay back 5 seconds",
+          "section": "mouse and keyboard free camera"
+        },
+        {
+          "action": "IA_POV_SeekBack",
+          "key": "Gamepad_LeftShoulder",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "POV_SeekBack_Controller",
+            "displayName": "Replay back 5 seconds",
+            "category": "SpectatorController"
+          },
+          "label": "Replay back 5 seconds",
+          "section": "gamepad free camera"
+        },
+        {
+          "action": "IA_POV_SeekForward",
+          "key": "E",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "POV_SeekForward_Keyboard",
+            "displayName": "Replay forward 5 seconds",
+            "category": "SpectatorMNK"
+          },
+          "label": "Replay forward 5 seconds",
+          "section": "mouse and keyboard free camera"
+        },
+        {
+          "action": "IA_POV_SeekForward",
+          "key": "Gamepad_RightShoulder",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "POV_SeekForward_Controller",
+            "displayName": "Replay forward 5 seconds",
+            "category": "SpectatorController"
+          },
+          "label": "Replay forward 5 seconds",
+          "section": "gamepad free camera"
+        },
+        {
+          "action": "IA_POV_Rate",
+          "key": "X",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "POV_Rate_Keyboard",
+            "displayName": "Replay speed",
+            "category": "SpectatorMNK"
+          },
+          "label": "Replay speed",
+          "section": "mouse and keyboard free camera"
+        },
+        {
+          "action": "IA_POV_Exit",
+          "key": "Escape",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "POV_Exit_Keyboard",
+            "displayName": "Exit Replay",
+            "category": "SpectatorMNK"
+          },
+          "label": "Exit Replay",
+          "section": "mouse and keyboard free camera"
+        },
+        {
+          "action": "IA_POV_Exit",
+          "key": "Gamepad_FaceButton_Right",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "POV_Exit_Controller",
+            "displayName": "Exit Replay",
+            "category": "SpectatorController"
+          },
+          "label": "Exit Replay",
+          "section": "gamepad free camera"
+        },
+        {
+          "action": "IA_POV_Rate",
+          "key": "Gamepad_FaceButton_Left",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "POV_Rate_Controller",
+            "displayName": "Replay Speed",
+            "category": "SpectatorController"
+          },
+          "label": "Replay Speed",
+          "section": "gamepad free camera"
+        },
+        {
+          "action": "IA_POV_CameraMode",
+          "key": "T",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "POV_CameraMode_Keyboard",
+            "displayName": "Replay Camera Mode",
+            "category": "SpectatorMNK"
+          },
+          "label": "Replay Camera Mode",
+          "section": "mouse and keyboard free camera"
+        },
+        {
+          "action": "IA_POV_CameraMode",
+          "key": "Gamepad_FaceButton_Top",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "POV_CameraMode_Controller",
+            "displayName": "Replay Camera Mode",
+            "category": "SpectatorController"
+          },
+          "label": "Replay Camera Mode",
+          "section": "gamepad free camera"
+        }
+      ]
+    },
+    {
+      "name": "IMC_InGame",
+      "path": "/Game/Core/Input/IMC_InGame",
+      "priority": null,
+      "description": null,
+      "mappings": [
+        {
+          "action": "IA_RestartCheckpoint",
+          "key": "R",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "RestartCP_Keyboard",
+            "displayName": "Restart Checkpoint",
+            "category": "MNK"
+          },
+          "label": "Restart Checkpoint",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_RestartCheckpoint",
+          "key": "Gamepad_FaceButton_Right",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "RestartCP_Controller",
+            "displayName": "Restart Checkpoint",
+            "category": "Controller"
+          },
+          "label": "Restart Checkpoint",
+          "section": "gamepad"
+        },
+        {
+          "action": "IA_RestartLevel",
+          "key": "BackSpace",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "RestartTrack_Keyboard",
+            "displayName": "Restart Track",
+            "category": "MNK"
+          },
+          "label": "Restart Track",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_RestartLevel",
+          "key": "Gamepad_Special_Left",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "RestartTrack_Gamepad",
+            "displayName": "Restart Track",
+            "category": "Controller"
+          },
+          "label": "Restart Track",
+          "section": "gamepad"
+        },
+        {
+          "action": "IA_ToggleGhosts",
+          "key": "G",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "ToggleGhosts_Keyboard",
+            "displayName": "Toggle Ghosts",
+            "category": "MNK"
+          },
+          "label": "Toggle Ghosts",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_ToggleGhosts",
+          "key": "Gamepad_RightShoulder",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "ToggleGhosts_Gamepad",
+            "displayName": "Toggle Ghosts",
+            "category": "Controller"
+          },
+          "label": "Toggle Ghosts",
+          "section": "gamepad"
+        }
+      ]
+    },
+    {
+      "name": "IMC_LegacyEditorCameraSpeed",
+      "path": "/Game/Core/Input/IMC_LegacyEditorCameraSpeed",
+      "priority": null,
+      "description": null,
+      "mappings": [
+        {
+          "action": "IA_CamSpeedModifier",
+          "key": "Gamepad_LeftShoulder",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "label": null,
+          "section": null
+        }
+      ]
+    },
+    {
+      "name": "IMC_LevelEditor",
+      "path": "/Game/Core/Input/IMC_LevelEditor",
+      "priority": null,
+      "description": null,
+      "mappings": [],
+      "note": "asset has no serialized mappings (empty in the cooked game)"
+    },
+    {
+      "name": "IMC_MainMenu",
+      "path": "/Game/Core/Input/IMC_MainMenu",
+      "priority": null,
+      "description": null,
+      "mappings": [],
+      "note": "asset has no serialized mappings (empty in the cooked game)"
+    },
+    {
+      "name": "IMC_ModeEditor",
+      "path": "/Game/Core/Input/IMC_ModeEditor",
+      "priority": null,
+      "description": null,
+      "mappings": [],
+      "note": "asset has no serialized mappings (empty in the cooked game)"
+    },
+    {
+      "name": "IMC_ModeRace",
+      "path": "/Game/Core/Input/IMC_ModeRace",
+      "priority": null,
+      "description": null,
+      "mappings": [],
+      "note": "asset has no serialized mappings (empty in the cooked game)"
+    },
+    {
+      "name": "IMC_Paused",
+      "path": "/Game/Core/Input/IMC_Paused",
+      "priority": null,
+      "description": null,
+      "mappings": [],
+      "note": "asset has no serialized mappings (empty in the cooked game)"
+    },
+    {
+      "name": "IMC_Play",
+      "path": "/Game/Core/Input/IMC_Play",
+      "priority": null,
+      "description": null,
+      "mappings": [
+        {
+          "action": "IA_ToggleFreeCam",
+          "key": "T",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "ToggleFreeCam_Keyboard",
+            "displayName": "Toggle Free Camera",
+            "category": "MNK"
+          },
+          "label": "Toggle Free Camera",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_ToggleFreeCam",
+          "key": "Gamepad_FaceButton_Top",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "ToggleFreeCam_Controller",
+            "displayName": "Toggle Free Camera",
+            "category": "Controller"
+          },
+          "label": "Toggle Free Camera",
+          "section": "gamepad"
+        },
+        {
+          "action": "IA_ToggleAutoCamera",
+          "key": "F",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "AutoCamera_Keyboard",
+            "displayName": "Auto Camera",
+            "category": "MNK"
+          },
+          "label": "Auto Camera",
+          "section": "mouse and keyboard bindings"
+        },
+        {
+          "action": "IA_ToggleAutoCamera",
+          "key": "Gamepad_FaceButton_Left",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "AutoCamera_Controller",
+            "displayName": "Auto Camera",
+            "category": "Controller"
+          },
+          "label": "Auto Camera",
+          "section": "gamepad"
+        }
+      ]
+    },
+    {
+      "name": "IMC_Universal",
+      "path": "/Game/Core/Input/IMC_Universal",
+      "priority": null,
+      "description": null,
+      "mappings": [
+        {
+          "action": "IA_Pause",
+          "key": "Escape",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "label": null,
+          "section": null
+        },
+        {
+          "action": "IA_Pause",
+          "key": "Gamepad_Special_Right",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "label": null,
+          "section": null
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "name": "IA_Camera",
+      "path": "/Game/Core/Input/FreeCanActions/IA_Camera",
+      "valueType": "Axis2D",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Look"
+      ],
+      "label": "Look",
+      "sections": [
+        "mouse and keyboard free camera",
+        "gamepad free camera"
+      ],
+      "section": "mouse and keyboard free camera"
+    },
+    {
+      "name": "IA_CameraSpeedFaster",
+      "path": "/Game/Core/Input/FreeCanActions/IA_CameraSpeedFaster",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Camera Speed Faster"
+      ],
+      "label": "Camera Speed Faster",
+      "sections": [
+        "gamepad free camera"
+      ],
+      "section": "gamepad free camera"
+    },
+    {
+      "name": "IA_CameraSpeedSlower",
+      "path": "/Game/Core/Input/FreeCanActions/IA_CameraSpeedSlower",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Camera Speed Slower"
+      ],
+      "label": "Camera Speed Slower",
+      "sections": [
+        "gamepad free camera"
+      ],
+      "section": "gamepad free camera"
+    },
+    {
+      "name": "IA_CamSpeedModifier",
+      "path": "/Game/Core/Input/FreeCanActions/IA_CamSpeedModifier",
+      "valueType": "Axis2D",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [],
+      "label": null,
+      "sections": [],
+      "section": null
+    },
+    {
+      "name": "IA_CenterCamera",
+      "path": "/Game/Core/Input/Actions/IA_CenterCamera",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Center Camera"
+      ],
+      "label": "Center Camera",
+      "sections": [
+        "mouse and keyboard bindings",
+        "gamepad"
+      ],
+      "section": "mouse and keyboard bindings"
+    },
+    {
+      "name": "IA_Coordinates",
+      "path": "/Game/Core/Input/LevelEditor/IA_Coordinates",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [],
+      "label": null,
+      "sections": [],
+      "section": null
+    },
+    {
+      "name": "IA_Height",
+      "path": "/Game/Core/Input/FreeCanActions/IA_Height",
+      "valueType": "Axis1D",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Up",
+        "Down"
+      ],
+      "label": "Up",
+      "sections": [
+        "mouse and keyboard free camera",
+        "gamepad free camera"
+      ],
+      "section": "mouse and keyboard free camera"
+    },
+    {
+      "name": "IA_Jump",
+      "path": "/Game/Core/Input/Actions/IA_Jump",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [
+        "InputTriggerPressed"
+      ],
+      "modifierSettings": [],
+      "triggerSettings": [
+        {
+          "type": "InputTriggerPressed",
+          "settings": {
+            "ActuationThreshold": 0.5
+          }
+        }
+      ],
+      "labels": [
+        "Jump"
+      ],
+      "label": "Jump",
+      "sections": [
+        "mouse and keyboard bindings",
+        "gamepad"
+      ],
+      "section": "mouse and keyboard bindings"
+    },
+    {
+      "name": "IA_Look",
+      "path": "/Game/Core/Input/Actions/IA_Look",
+      "valueType": "Axis2D",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Look",
+        "Look Right",
+        "Look Left",
+        "Look Up",
+        "Look Down"
+      ],
+      "label": "Look",
+      "sections": [
+        "mouse and keyboard bindings",
+        "gamepad"
+      ],
+      "section": "mouse and keyboard bindings"
+    },
+    {
+      "name": "IA_Modifier",
+      "path": "/Game/Core/Input/FreeCanActions/IA_Modifier",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [],
+      "label": null,
+      "sections": [],
+      "section": null
+    },
+    {
+      "name": "IA_Move",
+      "path": "/Game/Core/Input/Actions/IA_Move",
+      "valueType": "Axis2D",
+      "description": null,
+      "consumeInput": false,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "Cumulative",
+      "modifiers": [
+        "BallestInputModifierLatestMove"
+      ],
+      "triggers": [],
+      "modifierSettings": [
+        {
+          "type": "BallestInputModifierLatestMove",
+          "settings": null,
+          "error": "Could not read \"BallestInputModifierLatestMove\" named \"BallestInputModifierLatestMove_0\" correctly | ParserException: Missing prop mappings for type BallestInputModifierLatestMove"
+        }
+      ],
+      "triggerSettings": [],
+      "labels": [
+        "Move",
+        "Forward",
+        "Reverse",
+        "Right",
+        "Left"
+      ],
+      "label": "Move",
+      "sections": [
+        "gamepad",
+        "mouse and keyboard bindings"
+      ],
+      "section": "gamepad"
+    },
+    {
+      "name": "IA_Pan",
+      "path": "/Game/Core/Input/FreeCanActions/IA_Pan",
+      "valueType": "Axis2D",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Forward",
+        "Reverse",
+        "Left",
+        "Right",
+        "Pan"
+      ],
+      "label": "Forward",
+      "sections": [
+        "mouse and keyboard free camera",
+        "gamepad free camera"
+      ],
+      "section": "mouse and keyboard free camera"
+    },
+    {
+      "name": "IA_Pause",
+      "path": "/Game/Core/Input/Actions/IA_Pause",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [
+        "InputTriggerPressed"
+      ],
+      "modifierSettings": [],
+      "triggerSettings": [
+        {
+          "type": "InputTriggerPressed",
+          "settings": {
+            "ActuationThreshold": 0.5
+          }
+        }
+      ],
+      "labels": [],
+      "label": null,
+      "sections": [],
+      "section": null
+    },
+    {
+      "name": "IA_POV_CameraMode",
+      "path": "/Game/Core/Input/Actions/IA_POV_CameraMode",
+      "valueType": "Boolean",
+      "description": "Replay Camera Mode",
+      "consumeInput": true,
+      "triggerWhenPaused": true,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Replay Camera Mode"
+      ],
+      "label": "Replay Camera Mode",
+      "sections": [
+        "mouse and keyboard free camera",
+        "gamepad free camera"
+      ],
+      "section": "mouse and keyboard free camera"
+    },
+    {
+      "name": "IA_POV_Exit",
+      "path": "/Game/Core/Input/Actions/IA_POV_Exit",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": true,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Exit Replay"
+      ],
+      "label": "Exit Replay",
+      "sections": [
+        "mouse and keyboard free camera",
+        "gamepad free camera"
+      ],
+      "section": "mouse and keyboard free camera"
+    },
+    {
+      "name": "IA_POV_Pause",
+      "path": "/Game/Core/Input/Actions/IA_POV_Pause",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": true,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [
+        "InputTriggerPressed"
+      ],
+      "modifierSettings": [],
+      "triggerSettings": [
+        {
+          "type": "InputTriggerPressed",
+          "settings": {
+            "ActuationThreshold": 0.5
+          }
+        }
+      ],
+      "labels": [
+        "Replay pause"
+      ],
+      "label": "Replay pause",
+      "sections": [
+        "mouse and keyboard free camera",
+        "gamepad free camera"
+      ],
+      "section": "mouse and keyboard free camera"
+    },
+    {
+      "name": "IA_POV_Rate",
+      "path": "/Game/Core/Input/Actions/IA_POV_Rate",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": true,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [
+        "InputTriggerPressed"
+      ],
+      "modifierSettings": [],
+      "triggerSettings": [
+        {
+          "type": "InputTriggerPressed",
+          "settings": {
+            "ActuationThreshold": 0.5
+          }
+        }
+      ],
+      "labels": [
+        "Replay speed",
+        "Replay Speed"
+      ],
+      "label": "Replay speed",
+      "sections": [
+        "mouse and keyboard free camera",
+        "gamepad free camera"
+      ],
+      "section": "mouse and keyboard free camera"
+    },
+    {
+      "name": "IA_POV_SeekBack",
+      "path": "/Game/Core/Input/Actions/IA_POV_SeekBack",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": true,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [
+        "InputTriggerPressed"
+      ],
+      "modifierSettings": [],
+      "triggerSettings": [
+        {
+          "type": "InputTriggerPressed",
+          "settings": {
+            "ActuationThreshold": 0.5
+          }
+        }
+      ],
+      "labels": [
+        "Replay back 5 seconds"
+      ],
+      "label": "Replay back 5 seconds",
+      "sections": [
+        "mouse and keyboard free camera",
+        "gamepad free camera"
+      ],
+      "section": "mouse and keyboard free camera"
+    },
+    {
+      "name": "IA_POV_SeekForward",
+      "path": "/Game/Core/Input/Actions/IA_POV_SeekForward",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": true,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [
+        "InputTriggerPressed"
+      ],
+      "modifierSettings": [],
+      "triggerSettings": [
+        {
+          "type": "InputTriggerPressed",
+          "settings": {
+            "ActuationThreshold": 0.5
+          }
+        }
+      ],
+      "labels": [
+        "Replay forward 5 seconds"
+      ],
+      "label": "Replay forward 5 seconds",
+      "sections": [
+        "mouse and keyboard free camera",
+        "gamepad free camera"
+      ],
+      "section": "mouse and keyboard free camera"
+    },
+    {
+      "name": "IA_RestartCheckpoint",
+      "path": "/Game/Core/Input/Actions/IA_RestartCheckpoint",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Restart Checkpoint"
+      ],
+      "label": "Restart Checkpoint",
+      "sections": [
+        "mouse and keyboard bindings",
+        "gamepad"
+      ],
+      "section": "mouse and keyboard bindings"
+    },
+    {
+      "name": "IA_RestartLevel",
+      "path": "/Game/Core/Input/Actions/IA_RestartLevel",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Restart Track"
+      ],
+      "label": "Restart Track",
+      "sections": [
+        "mouse and keyboard bindings",
+        "gamepad"
+      ],
+      "section": "mouse and keyboard bindings"
+    },
+    {
+      "name": "IA_Rotate",
+      "path": "/Game/Core/Input/LevelEditor/IA_Rotate",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [],
+      "label": null,
+      "sections": [],
+      "section": null
+    },
+    {
+      "name": "IA_Scale",
+      "path": "/Game/Core/Input/LevelEditor/IA_Scale",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [],
+      "label": null,
+      "sections": [],
+      "section": null
+    },
+    {
+      "name": "IA_ShowScoreboard",
+      "path": "/Game/Core/Input/Actions/IA_ShowScoreboard",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [],
+      "label": null,
+      "sections": [],
+      "section": null
+    },
+    {
+      "name": "IA_TabLeft",
+      "path": "/Game/Core/Input/MenuActions/IA_TabLeft",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [],
+      "label": null,
+      "sections": [],
+      "section": null
+    },
+    {
+      "name": "IA_TabRight",
+      "path": "/Game/Core/Input/MenuActions/IA_TabRight",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [],
+      "label": null,
+      "sections": [],
+      "section": null
+    },
+    {
+      "name": "IA_ToggleAutoCamera",
+      "path": "/Game/Core/Input/Actions/IA_ToggleAutoCamera",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": false,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [
+        "InputTriggerPressed"
+      ],
+      "modifierSettings": [],
+      "triggerSettings": [
+        {
+          "type": "InputTriggerPressed",
+          "settings": {
+            "ActuationThreshold": 0.5
+          }
+        }
+      ],
+      "labels": [
+        "Auto Camera"
+      ],
+      "label": "Auto Camera",
+      "sections": [
+        "mouse and keyboard bindings",
+        "gamepad"
+      ],
+      "section": "mouse and keyboard bindings"
+    },
+    {
+      "name": "IA_ToggleCursor",
+      "path": "/Game/Core/Input/Actions/IA_ToggleCursor",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [],
+      "label": null,
+      "sections": [],
+      "section": null
+    },
+    {
+      "name": "IA_ToggleFreeCam",
+      "path": "/Game/Core/Input/Actions/IA_ToggleFreeCam",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [
+        "InputTriggerPressed"
+      ],
+      "modifierSettings": [],
+      "triggerSettings": [
+        {
+          "type": "InputTriggerPressed",
+          "settings": {
+            "ActuationThreshold": 0.5
+          }
+        }
+      ],
+      "labels": [
+        "Toggle Free Camera"
+      ],
+      "label": "Toggle Free Camera",
+      "sections": [
+        "mouse and keyboard bindings",
+        "gamepad"
+      ],
+      "section": "mouse and keyboard bindings"
+    },
+    {
+      "name": "IA_ToggleGhosts",
+      "path": "/Game/Core/Input/Actions/IA_ToggleGhosts",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Toggle Ghosts"
+      ],
+      "label": "Toggle Ghosts",
+      "sections": [
+        "mouse and keyboard bindings",
+        "gamepad"
+      ],
+      "section": "mouse and keyboard bindings"
+    },
+    {
+      "name": "IA_ToggleNamePlate",
+      "path": "/Game/Core/Input/Actions/IA_ToggleNamePlate",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Toggle Nameplates"
+      ],
+      "label": "Toggle Nameplates",
+      "sections": [
+        "mouse and keyboard bindings",
+        "gamepad"
+      ],
+      "section": "mouse and keyboard bindings"
+    },
+    {
+      "name": "IA_Translate",
+      "path": "/Game/Core/Input/LevelEditor/IA_Translate",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [],
+      "label": null,
+      "sections": [],
+      "section": null
+    },
+    {
+      "name": "IA_UI_Home",
+      "path": "/Game/Core/Input/MenuActions/IA_UI_Home",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [],
+      "label": null,
+      "sections": [],
+      "section": null
+    }
+  ],
+  "legacy": {
+    "actionMappings": [],
+    "axisMappings": [],
+    "consoleKeys": [
+      "Tilde",
+      "Caret"
+    ],
+    "defaultInputComponentClass": "/Script/EnhancedInput.EnhancedInputComponent"
+  },
+  "blueprintKeyEvents": [
+    {
+      "asset": "/Game/UI/LevelEditor/WBP_LevelSubmission",
+      "bindingType": "InputDebugKeyDelegateBinding",
+      "key": "End",
+      "shift": false,
+      "ctrl": false,
+      "alt": false,
+      "cmd": false,
+      "event": "IE_Pressed",
+      "function": "InpActEvt_End_K2Node_InputDebugKeyEvent_0"
+    },
+    {
+      "asset": "/Game/UI/LevelEditor/WBP_PublishWindow",
+      "bindingType": "InputDebugKeyDelegateBinding",
+      "key": "U",
+      "shift": false,
+      "ctrl": false,
+      "alt": false,
+      "cmd": false,
+      "event": "IE_Released",
+      "function": "InpActEvt_U_K2Node_InputDebugKeyEvent_0"
+    },
+    {
+      "asset": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/UI/W_MapEditor",
+      "bindingType": "InputDebugKeyDelegateBinding",
+      "key": "PageDown",
+      "shift": false,
+      "ctrl": false,
+      "alt": false,
+      "cmd": false,
+      "event": "IE_Pressed",
+      "function": "InpActEvt_PageDown_K2Node_InputDebugKeyEvent_0"
+    },
+    {
+      "asset": "/Game/UI/MainMenu/Pages/WBP_2_Settings",
+      "bindingType": "EnhancedInputActionDelegateBinding",
+      "key": null,
+      "shift": false,
+      "ctrl": false,
+      "alt": false,
+      "cmd": false,
+      "event": null,
+      "function": "InpActEvt_IA_TabRight_K2Node_EnhancedInputActionEvent_0"
+    },
+    {
+      "asset": "/Game/UI/MainMenu/Pages/WBP_2_Settings",
+      "bindingType": "EnhancedInputActionDelegateBinding",
+      "key": null,
+      "shift": false,
+      "ctrl": false,
+      "alt": false,
+      "cmd": false,
+      "event": null,
+      "function": "InpActEvt_IA_TabLeft_K2Node_EnhancedInputActionEvent_1"
+    }
+  ],
+  "errors": [
+    {
+      "asset": "Ballest/Content/Core/Input/Actions/IA_Move",
+      "message": "Could not read \"BallestInputModifierLatestMove\" named \"BallestInputModifierLatestMove_0\" correctly | ParserException: Missing prop mappings for type BallestInputModifierLatestMove"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_0\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_1\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_2\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_3\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_4\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_5\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_6\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_7\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierCaptureMove\" named \"BallestInputModifierCaptureMove_8\" correctly | ParserException: Missing prop mappings for type BallestInputModifierCaptureMove"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierLookSensitivity\" named \"UserLook_Down\" correctly | ParserException: Missing prop mappings for type BallestInputModifierLookSensitivity"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierLookSensitivity\" named \"UserLook_Gamepad_Right2D\" correctly | ParserException: Missing prop mappings for type BallestInputModifierLookSensitivity"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierLookSensitivity\" named \"UserLook_Left\" correctly | ParserException: Missing prop mappings for type BallestInputModifierLookSensitivity"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierLookSensitivity\" named \"UserLook_Right\" correctly | ParserException: Missing prop mappings for type BallestInputModifierLookSensitivity"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierLookSensitivity\" named \"UserLook_Up\" correctly | ParserException: Missing prop mappings for type BallestInputModifierLookSensitivity"
+    },
+    {
+      "asset": "Ballest/Content/Core/Input/IMC_Default",
+      "message": "Could not read \"BallestInputModifierStickDeadzone\" named \"UserLookDeadzone\" correctly | ParserException: Missing prop mappings for type BallestInputModifierStickDeadzone"
+    }
+  ]
+}
