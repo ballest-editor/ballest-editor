@@ -1,0 +1,5026 @@
+{
+	"worldSettings":
+	{
+		"directionalLight":
+		{
+			"timeOfDay": 7.2997093200683594,
+			"brightness": 12
+		},
+		"metaData": [
+			{
+				"title": "Bevel Up_stoxy999",
+				"descriptor": ""
+			}
+		],
+		"levelData":
+		{
+			"systemLevelName": "Map_TrackUGCPlayback",
+			"userLevelName": "Bevel Up_stoxy999",
+			"levelDifficulty": "Beginner",
+			"levelDescription": "",
+			"uploaderOnlyLevelPreviewImagePath": "C:/Users/david/AppData/Local/Ballest/Saved/UserSavedMaps/Bevel Up/Bevel Up_stoxy999.jpg",
+			"bValidated": true,
+			"mapTags":
+			{
+				"gameplayTags": [
+					{
+						"tagName": "UGCTypes.Map"
+					},
+					{
+						"tagName": "MapTags.UGCTags.Mood.sunrise"
+					},
+					{
+						"tagName": "MapTags.UGCTags.Difficulty.medium"
+					},
+					{
+						"tagName": "MapTags.UGCTags.Gameplay.climb"
+					},
+					{
+						"tagName": "MapTags.UGCTags.Routes.single"
+					},
+					{
+						"tagName": "MapTags.UGCTags.Gameplay.pathfinding"
+					},
+					{
+						"tagName": "MapTags.UGCTags.Mood.day"
+					}
+				]
+			},
+			"medalTimesByIndex": [
+				120,
+				90,
+				80,
+				74.868476867675781
+			],
+			"createdAt": "2026.10.18-20.25.07",
+			"creatorName": "stoxy999",
+			"levelDisplayName": "Bevel Up",
+			"levelPublishedFileId": -1
+		},
+		"skylightIntensity": 1,
+		"directionalLightAngle": 159.3525390625
+	},
+	"items": [
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/MapItems/PlayerStart/MP_PlayerStart.MP_PlayerStart_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -3955,
+					"y": -1965,
+					"z": 315
+				},
+				"scale3D":
+				{
+					"x": 0.27653800000000001,
+					"y": 0.27653800000000001,
+					"z": 0.27653800000000001
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_GoalYellow.MI_GoalYellow'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_Start_Fixed.SM_Start_Fixed",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_GoalYellow.MI_GoalYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/BP_Checkpoint.BP_Checkpoint_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0.70710678118654757,
+					"z": 0,
+					"w": 0.70710678118654768
+				},
+				"translation":
+				{
+					"x": -2790,
+					"y": -1863,
+					"z": 8896
+				},
+				"scale3D":
+				{
+					"x": 1.5,
+					"y": 1.5,
+					"z": 1.5
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_GoalYellow.MI_GoalYellow'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_GoalRing.SM_GoalRing",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_GoalYellow.MI_GoalYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -3700,
+					"y": -1990,
+					"z": 250
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Kicker.Bevel_Full_Kicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0,
+					"y": 0,
+					"z": -0.70710678118654757,
+					"w": 0.70710678118654768
+				},
+				"translation":
+				{
+					"x": -3020,
+					"y": -1740,
+					"z": 250
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Kicker.Bevel_Full_Kicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2700,
+					"y": -1280,
+					"z": 520
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShortUScoop_R.Bevel_Full_ShortUScoop_R_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0,
+					"y": 0,
+					"z": -0.70710678118654757,
+					"w": 0.70710678118654768
+				},
+				"translation":
+				{
+					"x": -1820,
+					"y": -1940,
+					"z": 630
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShortUScoop_R.Bevel_Full_ShortUScoop_R",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_RingScoop.Bevel_Full_RingScoop_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2340,
+					"y": -2510,
+					"z": 1200
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_RingScoop.Bevel_Full_RingScoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_MediumScoop.Bevel_Full_MediumScoop_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0.70710678118654757,
+					"z": 0,
+					"w": 0.70710678118654768
+				},
+				"translation":
+				{
+					"x": -2570,
+					"y": -2550,
+					"z": 1530
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_MediumScoop.Bevel_Full_MediumScoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/MP_ActualCheckpoint_Strip.MP_ActualCheckpoint_Strip_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.70710678118654746,
+					"y": 4.329780281177467e-17,
+					"z": 0.70710678118654757,
+					"w": 4.3297802811774677e-17
+				},
+				"translation":
+				{
+					"x": -1690,
+					"y": -2550,
+					"z": 1210
+				},
+				"scale3D":
+				{
+					"x": 0.18178697507559605,
+					"y": 0.70645247161867175,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [],
+					"meshAssetPath": "",
+					"materialAssetPaths": []
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0,
+					"z": 0.99999999999999989,
+					"w": 6.123233995736766e-17
+				},
+				"translation":
+				{
+					"x": -3240,
+					"y": -2550,
+					"z": 1200
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -4240,
+					"y": -2550,
+					"z": 1200
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_StubKicker.Bevel_Full_StubKicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.42261826174069894,
+					"y": 2.5877905075098266e-17,
+					"z": 0.90630778703664994,
+					"w": 5.5495346521837729e-17
+				},
+				"translation":
+				{
+					"x": -4585.3718759775738,
+					"y": -2550,
+					"z": 1480.1904404405989
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_StubKicker.Bevel_Full_StubKicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0.087155742747658221,
+					"z": 0,
+					"w": 0.99619469809174532
+				},
+				"translation":
+				{
+					"x": -2999.0600073223386,
+					"y": -2550,
+					"z": 1604.9553115024999
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/MP_ActualCheckpoint_Strip.MP_ActualCheckpoint_Strip_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.6427876096865407,
+					"y": 3.9359389436710018e-17,
+					"z": 0.76604444311897679,
+					"w": 4.6906693763513586e-17
+				},
+				"translation":
+				{
+					"x": -2910.1246788981675,
+					"y": -2550,
+					"z": 1475.7770057833609
+				},
+				"scale3D":
+				{
+					"x": 0.16340562783020118,
+					"y": 0.73072961923117441,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [],
+					"meshAssetPath": "",
+					"materialAssetPaths": []
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_FlatGlassPlane.MP_FlatGlassPlane_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0,
+					"y": 0,
+					"z": -0.70710678118654757,
+					"w": 0.70710678118654768
+				},
+				"translation":
+				{
+					"x": -3170,
+					"y": -2310,
+					"z": 1250
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 2.170483159226944,
+					"z": 1.9958478296367863
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_GlassStylized.M_GlassStylized'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/Meshes/SM_SmallGlassPane_Flat.SM_SmallGlassPane_Flat",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_GlassStylized.M_GlassStylized"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_FlatGlassPlane.MP_FlatGlassPlane_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0,
+					"y": 0,
+					"z": -0.70710678118654757,
+					"w": 0.70710678118654768
+				},
+				"translation":
+				{
+					"x": -3200,
+					"y": -2790,
+					"z": 1250
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 2.017922389888263,
+					"z": 1.9486432074331945
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_GlassStylized.M_GlassStylized'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/Meshes/SM_SmallGlassPane_Flat.SM_SmallGlassPane_Flat",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_GlassStylized.M_GlassStylized"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShortUScoop_L.Bevel_Full_ShortUScoop_L_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.29883623873011977,
+					"y": -0.29883623873011994,
+					"z": -0.64085638205578854,
+					"w": 0.64085638205578865
+				},
+				"translation":
+				{
+					"x": -1214.9279884605389,
+					"y": -3190,
+					"z": 2077.9813332935692
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShortUScoop_L.Bevel_Full_ShortUScoop_L",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -270,
+					"y": -3180,
+					"z": 2410
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Branch.Bevel_Full_Branch_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 660,
+					"y": -3180,
+					"z": 2410
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Branch.Bevel_Full_Branch",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0,
+					"z": 0.70710678118654768,
+					"w": 0.70710678118654746
+				},
+				"translation":
+				{
+					"x": 850.00000000000023,
+					"y": -4310,
+					"z": 2410
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/MP_ActualCheckpoint_Strip.MP_ActualCheckpoint_Strip_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.49999999999999983,
+					"y": 0.50000000000000033,
+					"z": 0.49999999999999989,
+					"w": 0.50000000000000033
+				},
+				"translation":
+				{
+					"x": 849.99999999999977,
+					"y": -4790,
+					"z": 2580
+				},
+				"scale3D":
+				{
+					"x": 0.14280794152301723,
+					"y": 0.68255160550873661,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [],
+					"meshAssetPath": "",
+					"materialAssetPaths": []
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0,
+					"y": 0,
+					"z": -0.70710678118654791,
+					"w": 0.70710678118654724
+				},
+				"translation":
+				{
+					"x": -1900,
+					"y": -3670,
+					"z": 3030
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShortUScoop_R.Bevel_Full_ShortUScoop_R_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0,
+					"z": 0.99999999999999989,
+					"w": 6.123233995736766e-17
+				},
+				"translation":
+				{
+					"x": -2560,
+					"y": -4550,
+					"z": 3140
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShortUScoop_R.Bevel_Full_ShortUScoop_R",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_MediumScoop.Bevel_Full_MediumScoop_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0,
+					"y": 0.087155742747658166,
+					"z": 0,
+					"w": 0.99619469809174543
+				},
+				"translation":
+				{
+					"x": -2604.1019066867038,
+					"y": -3400,
+					"z": 4563.1149920299285
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_MediumScoop.Bevel_Full_MediumScoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_MediumScoop.Bevel_Full_MediumScoop_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 2.9143354396410349e-16,
+					"y": -1.7845157838990442e-32,
+					"z": 0.99999999999999989,
+					"w": 6.123233995736766e-17
+				},
+				"translation":
+				{
+					"x": -3395.105082234264,
+					"y": -3410.6016480698336,
+					"z": 4630.8513371775143
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_MediumScoop.Bevel_Full_MediumScoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShortUScoop_R.Bevel_Full_ShortUScoop_R_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0,
+					"z": 0.99619469809174543,
+					"w": 0.087155742747658124
+				},
+				"translation":
+				{
+					"x": -1744.1805392007545,
+					"y": -4569.4937192430234,
+					"z": 4310
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShortUScoop_R.Bevel_Full_ShortUScoop_R",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/MP_ActualCheckpoint_Strip.MP_ActualCheckpoint_Strip_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.54167522041970229,
+					"y": 0.45451947767204343,
+					"z": -0.5416752204197024,
+					"w": 0.45451947767204348
+				},
+				"translation":
+				{
+					"x": -1030.5864366256587,
+					"y": -4326.7030013035273,
+					"z": 4370
+				},
+				"scale3D":
+				{
+					"x": 0.14095979703307648,
+					"y": 0.72928198465819705,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [],
+					"meshAssetPath": "",
+					"materialAssetPaths": []
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Ring.Bevel_Full_Ring_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2350,
+					"y": -3540,
+					"z": 5050
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Ring.Bevel_Full_Ring",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowShortScoop.Bevel_Full_ShallowShortScoop_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0,
+					"z": 0.64278760968653903,
+					"w": 0.76604444311897846
+				},
+				"translation":
+				{
+					"x": -2215.3168743941383,
+					"y": -3727.766922136082,
+					"z": 5170
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowShortScoop.Bevel_Full_ShallowShortScoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Kicker.Bevel_Full_Kicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.76604444311897779,
+					"y": -0.64278760968653947,
+					"z": 3.9359389436709944e-17,
+					"w": 4.6906693763513648e-17
+				},
+				"translation":
+				{
+					"x": -2362.2307522741926,
+					"y": -4581.3007533342052,
+					"z": 5430
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Kicker.Bevel_Full_Kicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0,
+					"z": 0.99619469809174543,
+					"w": 0.087155742747658124
+				},
+				"translation":
+				{
+					"x": -1628.6767791252576,
+					"y": -4394.875516193586,
+					"z": 5430
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_RingScoop.Bevel_Full_RingScoop_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.022557566113149852,
+					"y": -0.25783416049629965,
+					"z": -0.084185982829369177,
+					"w": 0.96225018689905817
+				},
+				"translation":
+				{
+					"x": -19.371932109970544,
+					"y": -5090.5597489932406,
+					"z": 6406.5063509461097
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_RingScoop.Bevel_Full_RingScoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowSideKicker_L.Bevel_Full_ShallowSideKicker_L_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0,
+					"z": 0.42261826174069989,
+					"w": 0.9063077870366496
+				},
+				"translation":
+				{
+					"x": -957.64147228002707,
+					"y": -3519.2240004771675,
+					"z": 6360
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowSideKicker_R.Bevel_Full_ShallowSideKicker_R",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Turn.Bevel_Full_Turn_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0,
+					"z": 0.42261826174069972,
+					"w": 0.9063077870366496
+				},
+				"translation":
+				{
+					"x": -413.97247407210119,
+					"y": -2668.5908634506432,
+					"z": 6430
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 0.98604245932305323,
+					"z": 0.75546644148416109
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Turn.Bevel_Full_Turn",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0,
+					"z": 0.42261826174069977,
+					"w": 0.9063077870366496
+				},
+				"translation":
+				{
+					"x": -690.79656275625132,
+					"y": -1927.9453123495919,
+					"z": 6360
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_MediumScoop.Bevel_Full_MediumScoop_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.036833608500734888,
+					"y": 0.078989928337165602,
+					"z": 0.42101007166283461,
+					"w": 0.90285901228517307
+				},
+				"translation":
+				{
+					"x": -68.144815283072788,
+					"y": -1181.0812029765839,
+					"z": 7282.8239814528033
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_MediumScoop.Bevel_Full_MediumScoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/MP_ActualCheckpoint_Strip.MP_ActualCheckpoint_Strip_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.45451947767204326,
+					"y": 0.5416752204197024,
+					"z": 0.45451947767204331,
+					"w": 0.5416752204197024
+				},
+				"translation":
+				{
+					"x": -2370.3407216893738,
+					"y": -4619.5939437026136,
+					"z": 5630
+				},
+				"scale3D":
+				{
+					"x": 0.21955949620397064,
+					"y": 0.721288282952535,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [],
+					"meshAssetPath": "",
+					"materialAssetPaths": []
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0,
+					"y": 0,
+					"z": -0.34202014332566877,
+					"w": 0.93969262078590832
+				},
+				"translation":
+				{
+					"x": -311.61563710682208,
+					"y": -1854.3380232472116,
+					"z": 7140
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0,
+					"z": 0.42261826174069972,
+					"w": 0.9063077870366496
+				},
+				"translation":
+				{
+					"x": -557.20010091392396,
+					"y": -2535.9451469897513,
+					"z": 7140
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/MP_ActualCheckpoint_Strip.MP_ActualCheckpoint_Strip_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.29883623873012011,
+					"y": 0.64085638205578832,
+					"z": 0.29883623873012011,
+					"w": 0.64085638205578843
+				},
+				"translation":
+				{
+					"x": -863.21302620547738,
+					"y": -2905.9997814767667,
+					"z": 7300
+				},
+				"scale3D":
+				{
+					"x": 0.10196481804628377,
+					"y": 0.72063646940954484,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [],
+					"meshAssetPath": "",
+					"materialAssetPaths": []
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Kicker.Bevel_Full_Kicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0,
+					"y": 0,
+					"z": -0.90630778703664971,
+					"w": 0.42261826174069961
+				},
+				"translation":
+				{
+					"x": -754.2757160031407,
+					"y": -1248.1122719252098,
+					"z": 7380
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Kicker.Bevel_Full_Kicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Kicker.Bevel_Full_Kicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0,
+					"z": 0.42261826174070016,
+					"w": 0.90630778703664938
+				},
+				"translation":
+				{
+					"x": -1397.063325689679,
+					"y": -2014.1567150441888,
+					"z": 7380
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Kicker.Bevel_Full_Kicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Kicker.Bevel_Full_Kicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2570.1261780339942,
+					"y": -1869.1652775353477,
+					"z": 8180
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Kicker.Bevel_Full_Kicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Tube1.BP_Pipe_Tube1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2830,
+					"y": -2190,
+					"z": 310
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 0.40008868777437756
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_Pipe.SM_2000_Pipe",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Tube1.BP_Pipe_Tube1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2050,
+					"y": -2500,
+					"z": 620
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1.4320911558589704
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_Pipe.SM_2000_Pipe",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.70710678118654791,
+					"y": -0.70710678118654702,
+					"z": 4.329780281177464e-17,
+					"w": 4.3297802811774695e-17
+				},
+				"translation":
+				{
+					"x": -1899.9999999999989,
+					"y": -2770,
+					"z": 3400
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Turn.Bevel_Full_Turn_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0,
+					"z": 0.70710678118654746,
+					"w": 0.70710678118654768
+				},
+				"translation":
+				{
+					"x": -1210,
+					"y": -4180,
+					"z": 3080
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Turn.Bevel_Full_Turn",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Tube1.BP_Pipe_Tube1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -1260,
+					"y": -4530,
+					"z": 3090
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1.2187844799730669
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_Pipe.SM_2000_Pipe",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Tube1.BP_Pipe_Tube1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -1780,
+					"y": -3290,
+					"z": 5140
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 0.65973241465000165
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_Pipe.SM_2000_Pipe",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0,
+					"z": 0.42261826174069989,
+					"w": 0.9063077870366496
+				},
+				"translation":
+				{
+					"x": -1333.5841724427896,
+					"y": -2693.9897554685704,
+					"z": 6360
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0,
+					"z": 0.42261826174070005,
+					"w": 0.90630778703664949
+				},
+				"translation":
+				{
+					"x": -1976.3717821293278,
+					"y": -3460.0341985875493,
+					"z": 6360
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_BumperLongSingle.Bevel_BumperLongSingle_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -3130,
+					"y": -1180,
+					"z": 630
+				},
+				"scale3D":
+				{
+					"x": 0.40721520795192134,
+					"y": 0.42544186922665261,
+					"z": 1.3422862548615129
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_BumperLongSingle.Bevel_BumperLongSingle",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -3130,
+					"y": -1180,
+					"z": 690
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -3130,
+					"y": -1180,
+					"z": 830
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -3130,
+					"y": -1180,
+					"z": 960
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -3130,
+					"y": -1180,
+					"z": 1090
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -3130,
+					"y": -1180,
+					"z": 1230
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_BumperLongSingle.Bevel_BumperLongSingle_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -4780,
+					"y": -2530,
+					"z": 1860
+				},
+				"scale3D":
+				{
+					"x": 0.40721520795192134,
+					"y": 0.42544186922665261,
+					"z": 1.3422862548615129
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_BumperLongSingle.Bevel_BumperLongSingle",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -4780,
+					"y": -2530,
+					"z": 2440
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -4780,
+					"y": -2530,
+					"z": 2310
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -4780,
+					"y": -2530,
+					"z": 2170
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -4780,
+					"y": -2530,
+					"z": 2030
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_BumperLongSingle.Bevel_BumperLongSingle_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 860,
+					"y": -2640,
+					"z": 2530
+				},
+				"scale3D":
+				{
+					"x": 0.40721520795192134,
+					"y": 0.42544186922665261,
+					"z": 1.3422862548615129
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_BumperLongSingle.Bevel_BumperLongSingle",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 860,
+					"y": -2640,
+					"z": 2560
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 860,
+					"y": -2640,
+					"z": 2670
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 860,
+					"y": -2640,
+					"z": 2780
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 860,
+					"y": -2640,
+					"z": 2780
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 860,
+					"y": -2640,
+					"z": 2890
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 860,
+					"y": -2640,
+					"z": 3000
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 860,
+					"y": -2640,
+					"z": 3110
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_BumperLongSingle.Bevel_BumperLongSingle_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2030,
+					"y": -2950,
+					"z": 3470
+				},
+				"scale3D":
+				{
+					"x": 0.40721520795192134,
+					"y": 0.42544186922665261,
+					"z": 1.3422862548615129
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_BumperLongSingle.Bevel_BumperLongSingle",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2030,
+					"y": -2950,
+					"z": 3530
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2030,
+					"y": -2950,
+					"z": 3670
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2030,
+					"y": -2950,
+					"z": 4080
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2030,
+					"y": -2950,
+					"z": 3940
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2030,
+					"y": -2950,
+					"z": 3810
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_BumperLongSingle.Bevel_BumperLongSingle_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -1830,
+					"y": -3740,
+					"z": 5170
+				},
+				"scale3D":
+				{
+					"x": 0.40721520795192134,
+					"y": 0.42544186922665261,
+					"z": 1.3422862548615129
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_BumperLongSingle.Bevel_BumperLongSingle",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -1830,
+					"y": -3740,
+					"z": 5220
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -1830,
+					"y": -3740,
+					"z": 5360
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -1830,
+					"y": -3740,
+					"z": 5510
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -1830,
+					"y": -3740,
+					"z": 5650
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -1830,
+					"y": -3740,
+					"z": 5790
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_BumperLongSingle.Bevel_BumperLongSingle_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -550,
+					"y": -970,
+					"z": 7690
+				},
+				"scale3D":
+				{
+					"x": 0.40721520795192134,
+					"y": 0.42544186922665261,
+					"z": 1.3422862548615129
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_BumperLongSingle.Bevel_BumperLongSingle",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2230,
+					"y": -3780,
+					"z": 6510
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2230,
+					"y": -3780,
+					"z": 6640
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2230,
+					"y": -3780,
+					"z": 6770
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2230,
+					"y": -3780,
+					"z": 6900
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2230,
+					"y": -3780,
+					"z": 7020
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2230,
+					"y": -3780,
+					"z": 7130
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -550,
+					"y": -970,
+					"z": 7770
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -550,
+					"y": -970,
+					"z": 7910
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -550,
+					"y": -970,
+					"z": 8050
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -550,
+					"y": -970,
+					"z": 8190
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -550,
+					"y": -970,
+					"z": 8340
+				},
+				"scale3D":
+				{
+					"x": 0.10238184074204071,
+					"y": 0.094680501192499378,
+					"z": 0.092962075693424295
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		}
+	]
+}

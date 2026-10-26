@@ -1,0 +1,651 @@
+{
+	"worldSettings":
+	{
+		"directionalLight":
+		{
+			"timeOfDay": 7.2997093200683594,
+			"brightness": 12
+		},
+		"metaData": [
+			{
+				"title": "Foo",
+				"descriptor": "Bar"
+			}
+		],
+		"levelData":
+		{
+			"systemLevelName": "Map_LevelEditorMain",
+			"userLevelName": "circuit s1 t1_spigipplespigipplespigipple",
+			"levelDifficulty": "Beginner",
+			"levelDescription": "",
+			"uploaderOnlyLevelPreviewImagePath": "",
+			"bValidated": true,
+			"mapTags":
+			{
+				"gameplayTags": []
+			},
+			"medalTimesByIndex": [
+				10,
+				8,
+				7,
+				6.24932861328125
+			],
+			"createdAt": "2026.10.06-17.49.47",
+			"creatorName": "spigipplespigipplespigipple",
+			"levelDisplayName": "circuit s1 t1",
+			"levelPublishedFileId": -1
+		},
+		"skylightIntensity": 1,
+		"directionalLightAngle": -20.647455215454102
+	},
+	"items": [
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/MapItems/PlayerStart/MP_PlayerStart.MP_PlayerStart_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -3955,
+					"y": -1820,
+					"z": 8615
+				},
+				"scale3D":
+				{
+					"x": 0.27653800000000001,
+					"y": 0.27653800000000001,
+					"z": 0.27653800000000001
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_GoalYellow.MI_GoalYellow'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_Start_Fixed.SM_Start_Fixed",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_GoalYellow.MI_GoalYellow"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/BP_Checkpoint.BP_Checkpoint_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0.70710678118654757,
+					"z": 0,
+					"w": 0.70710678118654768
+				},
+				"translation":
+				{
+					"x": 1280,
+					"y": -1863,
+					"z": 8896
+				},
+				"scale3D":
+				{
+					"x": 1.5,
+					"y": 1.5,
+					"z": 1.5
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_GoalYellow.MI_GoalYellow'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_GoalRing.SM_GoalRing",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_GoalYellow.MI_GoalYellow"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Short1.BP_Track_Short1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -3950,
+					"y": -1820,
+					"z": 8570
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_500.SM_500",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete",
+						"/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Short1.BP_Track_Short1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -3450,
+					"y": -1820,
+					"z": 8570
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 5.2371520049016453,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_500.SM_500",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete",
+						"/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Misc_Pinched1.BP_Misc_Pinched1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2699.4431858062744,
+					"y": -2880,
+					"z": 8570
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000_Bridge.SM_1000_Bridge",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Curve_Large1.BP_Track_Curve_Large1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.65328148243818784,
+					"y": -0.27059805007309884,
+					"z": -0.27059805007309856,
+					"w": 0.6532814824381884
+				},
+				"translation":
+				{
+					"x": -2007.9267026789539,
+					"y": -3130,
+					"z": 8698.7958654785216
+				},
+				"scale3D":
+				{
+					"x": 0.21527009677711276,
+					"y": 0.21527009677711276,
+					"z": 5.0407323373898318
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_90turn.SM_2000_90turn",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Curve_Large1.BP_Track_Curve_Large1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.27059805007309878,
+					"y": 0.65328148243818795,
+					"z": 0.65328148243818829,
+					"w": 0.27059805007309889
+				},
+				"translation":
+				{
+					"x": -1843.8136708792968,
+					"y": -3130,
+					"z": 9081.7262730110542
+				},
+				"scale3D":
+				{
+					"x": 0.21527009677711276,
+					"y": 0.21527009677711276,
+					"z": 5.0407323373898318
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_90turn.SM_2000_90turn",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Kicker1.BP_Ramp_Kicker1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2700,
+					"y": -760,
+					"z": 8570
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000_softkicker.SM_1000_softkicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve_Long1.BP_Ramp_Curve_Long1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0.043619387365336063,
+					"z": 0,
+					"w": 0.99904822158185791
+				},
+				"translation":
+				{
+					"x": -2093.620490201095,
+					"y": -1810,
+					"z": 8500.963553305608
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Red_Smooth.MI_Env_Red_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_45scoop.SM_2000_45scoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Red_Smooth.MI_Env_Red_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Mid1.BP_Track_Mid1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -670,
+					"y": -1810,
+					"z": 8780
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Red_Smooth.MI_Env_Red_Smooth'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Red_Smooth.MI_Env_Red_Smooth'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000.SM_1000",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Red_Smooth.MI_Env_Red_Smooth",
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Red_Smooth.MI_Env_Red_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve_Long1.BP_Ramp_Curve_Long1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -6.8700912975985304e-17,
+					"y": -0.99144486137380994,
+					"z": 6.8700912975985304e-17,
+					"w": -0.13052619222005152
+				},
+				"translation":
+				{
+					"x": -1107.0138861431512,
+					"y": -790,
+					"z": 9391.0718474321457
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_45scoop.SM_2000_45scoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Short1.BP_Track_Short1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -4470,
+					"y": -1820,
+					"z": 8570
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 0.011258643315912309,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_Pipes.MI_Pipes'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_Pipes.MI_Pipes'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_500.SM_500",
+					"materialAssetPaths": [
+						"/Game/Art/MI_Pipes.MI_Pipes",
+						"/Game/Art/MI_Pipes.MI_Pipes"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		}
+	],
+	"editorState":
+	{
+		"version": 1,
+		"groups": [],
+		"pivots": [],
+		"bHasCamera": true,
+		"cameraLocation":
+		{
+			"x": -5830.7441697128652,
+			"y": -1479.4373222315885,
+			"z": 9921.6452521514766
+		},
+		"cameraRotation":
+		{
+			"pitch": 0,
+			"yaw": 0,
+			"roll": 0
+		}
+	}
+}

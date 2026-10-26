@@ -1,0 +1,140 @@
+{
+	"worldSettings":
+	{
+		"directionalLight":
+		{
+			"timeOfDay": 7.2925662994384766,
+			"brightness": 8
+		},
+		"metaData": [
+			{
+				"title": "ct4NameBugTest_CryT4x",
+				"descriptor": ""
+			}
+		],
+		"levelData":
+		{
+			"systemLevelName": "Map_TrackUGCPlayback",
+			"userLevelName": "ct4NameBugTest_CryT4x",
+			"levelDifficulty": "Beginner",
+			"levelDescription": "",
+			"uploaderOnlyLevelPreviewImagePath": "C:/Users/jojoz/AppData/Local/Ballest/Saved/UserSavedMaps/ct4nr1/ct4nr1_CryT4x.jpg",
+			"bValidated": true,
+			"mapTags":
+			{
+				"gameplayTags": [
+					{
+						"tagName": "MapTags.UGCTags.beginner"
+					},
+					{
+						"tagName": "MapTags.UGCTags.downhill"
+					},
+					{
+						"tagName": "UGCTypes.Map"
+					}
+				]
+			},
+			"medalTimesByIndex": [ 12, 9, 8, 7.7623095512390137 ],
+			"createdAt": "2025.10.24-08.46.05",
+			"creatorName": "CryT4x",
+			"levelDisplayName": "ct4NameBugTest",
+			"levelPublishedFileId": -1
+		}
+	},
+	"items": [
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/BP_Checkpoint.BP_Checkpoint_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0.0092846390734135902,
+					"z": 0,
+					"w": 0.99995689680969579
+				},
+				"translation":
+				{
+					"x": -3925.8049097061157,
+					"y": -1863,
+					"z": 8262.0203247070312
+				},
+				"scale3D":
+				{
+					"x": 1.5,
+					"y": 1.5,
+					"z": 1.5
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_GoalRing.SM_GoalRing",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/MapItems/PlayerStart/MP_PlayerStart.MP_PlayerStart_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -3955,
+					"y": -1785,
+					"z": 8615
+				},
+				"scale3D":
+				{
+					"x": 0.27653800000000001,
+					"y": 0.27653800000000001,
+					"z": 0.27653800000000001
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_GoldWorn.MI_GoldWorn'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_Start_Fixed.SM_Start_Fixed",
+					"materialAssetPaths": [
+						"/Game/Art/MI_GoldWorn.MI_GoldWorn"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		}
+	]
+}

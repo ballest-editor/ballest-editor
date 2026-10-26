@@ -1,0 +1,1281 @@
+{
+	"worldSettings":
+	{
+		"directionalLight":
+		{
+			"timeOfDay": 12,
+			"brightness": 2
+		},
+		"metaData": [
+			{
+				"title": "Roundabout_Action Jackson",
+				"descriptor": ""
+			}
+		],
+		"levelData":
+		{
+			"systemLevelName": "Map_TrackUGCPlayback",
+			"userLevelName": "Roundabout_Action Jackson",
+			"levelDifficulty": "Beginner",
+			"levelDescription": "",
+			"uploaderOnlyLevelPreviewImagePath": "C:/P4_Workspaces/jackson_Unit_Ballgame/main/Ballprj/Saved/UserSavedMaps/Roundabout/Roundabout_Action Jackson.png",
+			"bValidated": true,
+			"mapTags":
+			{
+				"gameplayTags": [
+					{
+						"tagName": "MapTags.UGCTags.expert"
+					},
+					{
+						"tagName": "MapTags.UGCTags.tech"
+					},
+					{
+						"tagName": "MapTags.UGCTags.flow"
+					},
+					{
+						"tagName": "UGCTypes.Map"
+					}
+				]
+			},
+			"medalTimesByIndex": [ 31, 23, 20, 19.297155380249023 ],
+			"createdAt": "2025.10.07-12.20.47",
+			"creatorName": "Action Jackson",
+			"levelDisplayName": "Roundabout",
+			"levelPublishedFileId": -1
+		}
+	},
+	"items": [
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/BP_Checkpoint.BP_Checkpoint_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.09466589589358565,
+					"y": -0.60003087673883271,
+					"z": 0.058208514448967241,
+					"w": 0.79222035063506002
+				},
+				"translation":
+				{
+					"x": 1480.0383069336665,
+					"y": -3609.0213601730138,
+					"z": 10291.528137071762
+				},
+				"scale3D":
+				{
+					"x": 1.5,
+					"y": 1.5,
+					"z": 1.5
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Checkpoint_C_2.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/MapItems/PlayerStart/MP_PlayerStart.MP_PlayerStart_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0,
+					"y": 0,
+					"z": -0.043619393443521545,
+					"w": 0.99904822131647841
+				},
+				"translation":
+				{
+					"x": -4682.6321979213371,
+					"y": -2571.8851312015427,
+					"z": 8822.7578389999999
+				},
+				"scale3D":
+				{
+					"x": 0.27653800000000001,
+					"y": 0.27653800000000001,
+					"z": 0.27653800000000001
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.MP_PlayerStart_C_1.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_GoldWorn.MI_GoldWorn'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Curve_Large1.BP_Track_Curve_Large1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.95131598653709648,
+					"y": -0.28892651463522262,
+					"z": -0.098176641311217797,
+					"w": 0.04336715347520223
+				},
+				"translation":
+				{
+					"x": -3519.7651963630842,
+					"y": -2709.4968134584224,
+					"z": 8967.2489361570879
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 4.3699638843536377
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Track_Curve_Large1_C_3.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Curve_Large1.BP_Track_Curve_Large1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.53234824350206733,
+					"y": 0.8216174278120848,
+					"z": 0.19276743717705763,
+					"w": -0.066263603281931927
+				},
+				"translation":
+				{
+					"x": -3113.7239324766138,
+					"y": -1336.509484930614,
+					"z": 9428.6516104182028
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 4.3699638843536377
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Track_Curve_Large1_C_4.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Curve_Large1.BP_Track_Curve_Large1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.16806270899717593,
+					"y": -0.95221967318476564,
+					"z": -0.25241968314313118,
+					"w": 0.03628943932261823
+				},
+				"translation":
+				{
+					"x": -4434.7651963630842,
+					"y": -843.49681345842237,
+					"z": 9715.2489361570879
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 4.3699638843536377
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Track_Curve_Large1_C_5.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Half_Tiny1.BP_Pipe_Half_Tiny1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.39586775274424219,
+					"y": -0.50690796377923752,
+					"z": -0.59608246694651656,
+					"w": 0.48064407953637145
+				},
+				"translation":
+				{
+					"x": -4594.7901790132109,
+					"y": -4547.9890804790202,
+					"z": 9881.9518988923246
+				},
+				"scale3D":
+				{
+					"x": 2.3474710881710052,
+					"y": 2.8382658958435059,
+					"z": 4.7916893884539604
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Pipe_Half_Tiny1_C_5.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Half_Tiny1.BP_Pipe_Half_Tiny1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.05030504322483545,
+					"y": 0.94619272452355174,
+					"z": -0.01535935534376735,
+					"w": 0.31930051814594618
+				},
+				"translation":
+				{
+					"x": -2138.2149892272632,
+					"y": -2690.5840222061474,
+					"z": 11403.529194255247
+				},
+				"scale3D":
+				{
+					"x": 0.11013823747634888,
+					"y": 0.70508337020874023,
+					"z": 0.14169716835021973
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Pipe_Half_Tiny1_C_6.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Half_Tiny1.BP_Pipe_Half_Tiny1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.05131644442320097,
+					"y": 0.45705837471701044,
+					"z": 0.072023995317385611,
+					"w": 0.88502926998564657
+				},
+				"translation":
+				{
+					"x": -5807.1789539960164,
+					"y": -5184.605287890211,
+					"z": 10090.859499560565
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Pipe_Half_Tiny1_C_7.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve1.BP_Ramp_Curve1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.39231980673717298,
+					"y": 0.37831366196964811,
+					"z": -0.64061193290427199,
+					"w": 0.54090691789759426
+				},
+				"translation":
+				{
+					"x": -5638.5082918665912,
+					"y": -1709.1306081472633,
+					"z": 9545.4043705203185
+				},
+				"scale3D":
+				{
+					"x": -0.47033810615539551,
+					"y": 0.41259640455245972,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve1_C_1.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.043235790178744959,
+					"y": -0.18132976979256771,
+					"z": 0.37451159243491272,
+					"w": 0.90829028849066729
+				},
+				"translation":
+				{
+					"x": -3906.8083437094047,
+					"y": -3072.2341572861424,
+					"z": 9870.55079179311
+				},
+				"scale3D":
+				{
+					"x": -1.0091713666915894,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve2_C_10.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.64627101261095088,
+					"y": 0.23346650349854223,
+					"z": -0.66285666467475479,
+					"w": 0.29740244131351878
+				},
+				"translation":
+				{
+					"x": -3625.1072649126477,
+					"y": -2743.4828463741378,
+					"z": 10456.929556851335
+				},
+				"scale3D":
+				{
+					"x": -1.0091713666915894,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve2_C_11.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.065576159387065652,
+					"y": 0.24990143852716903,
+					"z": -0.045364966754038102,
+					"w": 0.96498241338041935
+				},
+				"translation":
+				{
+					"x": -4166.0924434040244,
+					"y": -3339.3046187602531,
+					"z": 10498.657398214144
+				},
+				"scale3D":
+				{
+					"x": -1.0091713666915894,
+					"y": 1,
+					"z": 1.1837323978543282
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve2_C_12.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.15945200857471803,
+					"y": 0.59671766454237907,
+					"z": -0.69671151414047638,
+					"w": 0.36482345298604557
+				},
+				"translation":
+				{
+					"x": -4262.6583269847561,
+					"y": -2842.073334510289,
+					"z": 10914.086631968326
+				},
+				"scale3D":
+				{
+					"x": -1.0091713666915894,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve2_C_13.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.042637668332881462,
+					"y": 0.60708415440143981,
+					"z": -0.067381318833101694,
+					"w": 0.79062672392611211
+				},
+				"translation":
+				{
+					"x": -4466.9400616625089,
+					"y": -3272.0734388194473,
+					"z": 10833.010012982742
+				},
+				"scale3D":
+				{
+					"x": -1.0091713666915894,
+					"y": 1,
+					"z": 1.1837323978543282
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve2_C_14.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.078185854147997738,
+					"y": -0.52055413050873767,
+					"z": 0.015658387519180472,
+					"w": 0.85009716169490823
+				},
+				"translation":
+				{
+					"x": -3237.2778474947136,
+					"y": -3347.9788785836486,
+					"z": 10782.202268701278
+				},
+				"scale3D":
+				{
+					"x": -1.0091713666915894,
+					"y": 1,
+					"z": 1.1837323978543282
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve2_C_15.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.23401355433234514,
+					"y": 0.1290974943374387,
+					"z": -0.18239677931426718,
+					"w": 0.94620447485748027
+				},
+				"translation":
+				{
+					"x": -4109.6933181121904,
+					"y": -3654.9293038611422,
+					"z": 10525.240617759038
+				},
+				"scale3D":
+				{
+					"x": -1.1977072954177856,
+					"y": 1,
+					"z": 1.6278406754136086
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve2_C_16.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.28733503346967559,
+					"y": -0.25890799560229755,
+					"z": -0.073956117099638979,
+					"w": 0.91920385176397412
+				},
+				"translation":
+				{
+					"x": -3567.2528876657457,
+					"y": -3777.6964967698063,
+					"z": 10634.04167618043
+				},
+				"scale3D":
+				{
+					"x": -1.1977072954177856,
+					"y": 1,
+					"z": 1.6278406754136086
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve2_C_17.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.3405685717284388,
+					"y": -0.83149049742904757,
+					"z": -0.28876315800129759,
+					"w": -0.33053356745898566
+				},
+				"translation":
+				{
+					"x": -4217.659893631775,
+					"y": -3551.2379703970987,
+					"z": 11189.959570558183
+				},
+				"scale3D":
+				{
+					"x": -1.0746475458145142,
+					"y": 3.7391326725482941,
+					"z": 1.8596017137169838
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve2_C_18.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.67011641382030107,
+					"y": -0.50971884218277874,
+					"z": -0.47328171774878414,
+					"w": 0.2591044374325282
+				},
+				"translation":
+				{
+					"x": -3406.0146065150211,
+					"y": -3399.3444932738371,
+					"z": 10781.953488607645
+				},
+				"scale3D":
+				{
+					"x": -1.0091713666915894,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve2_C_19.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.67011641382030107,
+					"y": -0.50971884218277874,
+					"z": -0.47328171774878414,
+					"w": 0.2591044374325282
+				},
+				"translation":
+				{
+					"x": -3577.2269137512258,
+					"y": -3534.6708385514544,
+					"z": 11106.382411678105
+				},
+				"scale3D":
+				{
+					"x": -1.0091713666915894,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve2_C_20.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Half_Tiny1.BP_Pipe_Half_Tiny1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.07822357087490453,
+					"y": -0.10780625477098908,
+					"z": -0.66654210395660363,
+					"w": 0.73347154549098614
+				},
+				"translation":
+				{
+					"x": -3620.2717289635821,
+					"y": -2848.8070266583491,
+					"z": 10887.302061718354
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Pipe_Half_Tiny1_C_8.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Half_Tiny1.BP_Pipe_Half_Tiny1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.66654210395660396,
+					"y": 0.73347154549098592,
+					"z": 0.078223570874904905,
+					"w": 0.10780625477098942
+				},
+				"translation":
+				{
+					"x": -3729.23267352311,
+					"y": -2836.8762267259908,
+					"z": 11287.815439827273
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Pipe_Half_Tiny1_C_9.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.15945200857471803,
+					"y": 0.59671766454237907,
+					"z": -0.69671151414047638,
+					"w": 0.36482345298604557
+				},
+				"translation":
+				{
+					"x": -4360.6201110036654,
+					"y": -2835.4008982940418,
+					"z": 11206.016362326118
+				},
+				"scale3D":
+				{
+					"x": -1.0091713666915894,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve2_C_21.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.7952165661640419,
+					"y": -0.38300880811787491,
+					"z": -0.20169830273180722,
+					"w": 0.42456172752322224
+				},
+				"translation":
+				{
+					"x": -3869.3127065522744,
+					"y": -3142.3762485405337,
+					"z": 11466.584916239008
+				},
+				"scale3D":
+				{
+					"x": -1.0091713666915894,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve2_C_22.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.83816655130685402,
+					"y": -0.40337966830292776,
+					"z": -0.15704392895170094,
+					"w": 0.33181151253325708
+				},
+				"translation":
+				{
+					"x": -3808.2604709322263,
+					"y": -3093.7016757429851,
+					"z": 11424.614184856931
+				},
+				"scale3D":
+				{
+					"x": -1.0091713666915894,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Ramp_Curve2_C_23.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Half_Tiny1.BP_Pipe_Half_Tiny1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.07822357087490453,
+					"y": -0.10780625477098908,
+					"z": -0.66654210395660363,
+					"w": 0.73347154549098614
+				},
+				"translation":
+				{
+					"x": -3177.290672849771,
+					"y": -2803.0733403814552,
+					"z": 11006.454123655272
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Pipe_Half_Tiny1_C_10.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Half_Tiny1.BP_Pipe_Half_Tiny1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.07822357087490453,
+					"y": -0.10780625477098908,
+					"z": -0.66654210395660363,
+					"w": 0.73347154549098614
+				},
+				"translation":
+				{
+					"x": -2780.4334577196105,
+					"y": -2762.1015129793791,
+					"z": 11113.199897147566
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Pipe_Half_Tiny1_C_11.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Half_Tiny1.BP_Pipe_Half_Tiny1_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.07822357087490453,
+					"y": -0.10780625477098908,
+					"z": -0.66654210395660363,
+					"w": 0.73347154549098614
+				},
+				"translation":
+				{
+					"x": -2341.2960550211037,
+					"y": -2716.7646482753867,
+					"z": 11231.3181017141
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponent": "/Script/Engine.StaticMeshComponent'/Game/Maps/LevelEditor/Map_LevelEditorMain.Map_LevelEditorMain:PersistentLevel.BP_Pipe_Half_Tiny1_C_12.Main'",
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		}
+	]
+}
