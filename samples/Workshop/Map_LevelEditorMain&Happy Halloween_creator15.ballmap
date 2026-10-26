@@ -1,0 +1,4843 @@
+{
+	"worldSettings":
+	{
+		"directionalLight":
+		{
+			"timeOfDay": 24.000001907348633,
+			"brightness": 0
+		},
+		"metaData": [
+			{
+				"title": "Happy Halloween_creator15",
+				"descriptor": ""
+			}
+		],
+		"levelData":
+		{
+			"systemLevelName": "Map_TrackUGCPlayback",
+			"userLevelName": "Happy Halloween_creator15",
+			"levelDifficulty": "Beginner",
+			"levelDescription": "",
+			"uploaderOnlyLevelPreviewImagePath": "C:/Users/player/AppData/Local/Ballest/Saved/UserSavedMaps/pumpkin/pumpkin_creator15.jpg",
+			"bValidated": true,
+			"mapTags":
+			{
+				"gameplayTags": [
+					{
+						"tagName": "MapTags.UGCTags.speed"
+					},
+					{
+						"tagName": "MapTags.UGCTags.medium"
+					},
+					{
+						"tagName": "MapTags.UGCTags.advanced"
+					},
+					{
+						"tagName": "UGCTypes.Map"
+					}
+				]
+			},
+			"medalTimesByIndex": [ 24, 18, 16, 14.9197998046875 ],
+			"createdAt": "2025.10.31-17.39.17",
+			"creatorName": "creator15",
+			"levelDisplayName": "Happy Halloween",
+			"levelPublishedFileId": -1
+		}
+	},
+	"items": [
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2075,
+					"y": -4370,
+					"z": 8445
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2075,
+					"y": 1370,
+					"z": 8445
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -1180,
+					"y": -1500,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1.25,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_Ring.Bevel_Tall_Ring_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 240,
+					"y": -1500,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Tall/Bevel_Tall_Ring.Bevel_Tall_Ring",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_SSurveR.Bevel_Half_SSurveR_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.066452280653523682,
+					"y": 0.16042999720436035,
+					"z": 0.37686961114246409,
+					"w": 0.90984372646640865
+				},
+				"translation":
+				{
+					"x": -5704.8002585020613,
+					"y": -230,
+					"z": 8552.1916290544923
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Workshop/BevelExtras/Mirror_246A67AB.Mirror_246A67AB",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_SSurveL.Bevel_Half_SSurveL_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.066452280653523987,
+					"y": 0.16042999720436038,
+					"z": -0.37686961114246331,
+					"w": 0.9098437264664091
+				},
+				"translation":
+				{
+					"x": -5716.0765699514923,
+					"y": -2770,
+					"z": 8556.2958707744001
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/HalfDepth/Bevel_Half_SSurve.Bevel_Half_SSurve",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_Cap.BP_Bevel_Full_Cap_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2750,
+					"y": -4370,
+					"z": 8500
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Cap.Bevel_Full_Cap",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_Cap.BP_Bevel_Full_Cap_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -1750,
+					"y": -3097,
+					"z": 8500
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Cap.Bevel_Full_Cap",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_Cap.BP_Bevel_Full_Cap_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2750,
+					"y": 1370,
+					"z": 8500
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Cap.Bevel_Full_Cap",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_Cap.BP_Bevel_Full_Cap_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -1750,
+					"y": 97,
+					"z": 8500
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Cap.Bevel_Full_Cap",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Branch.Bevel_Full_Branch_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0,
+					"y": 0.17364817766693036,
+					"z": 0,
+					"w": 0.98480775301220802
+				},
+				"translation":
+				{
+					"x": -6509.3718132240692,
+					"y": -1500,
+					"z": 8786.6769082877181
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Branch.Bevel_Full_Branch",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cylinder.BP_Prim_Cylinder_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -4000,
+					"y": -1500,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.75,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_Start_Fixed.SM_Start_Fixed",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cylinder.BP_Prim_Cylinder_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -4000,
+					"y": -1500,
+					"z": 8030
+				},
+				"scale3D":
+				{
+					"x": 1.5,
+					"y": 2,
+					"z": 0.5
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_Start_Fixed.SM_Start_Fixed",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveUp.BP_Ramp_Round_CurveUp_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.5,
+					"y": -0.50000000000000022,
+					"z": 0.49999999999999994,
+					"w": 0.50000000000000022
+				},
+				"translation":
+				{
+					"x": -3970,
+					"y": -1500,
+					"z": 10000
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 0.5,
+					"z": 0.5
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_Sausage_45scoop.SM_2000_Sausage_45scoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0.70710678118654757,
+					"z": 0,
+					"w": 0.70710678118654768
+				},
+				"translation":
+				{
+					"x": -5000,
+					"y": -1500,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.50000000000000011,
+					"y": 0.50000000000000011,
+					"z": 0.50000000000000011,
+					"w": -0.49999999999999994
+				},
+				"translation":
+				{
+					"x": -4000,
+					"y": -250,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.70710678118654746,
+					"y": -4.329780281177467e-17,
+					"z": 0.70710678118654757,
+					"w": 4.3297802811774677e-17
+				},
+				"translation":
+				{
+					"x": -3000,
+					"y": -1500,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.49999999999999978,
+					"y": -0.50000000000000022,
+					"z": 0.49999999999999978,
+					"w": 0.50000000000000033
+				},
+				"translation":
+				{
+					"x": -4000,
+					"y": -2750,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.066452280653523932,
+					"y": -0.37686961114246392,
+					"z": -0.16042999720436041,
+					"w": 0.9098437264664091
+				},
+				"translation":
+				{
+					"x": -4590,
+					"y": -1290,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.27059805007309917,
+					"y": -0.27059805007309923,
+					"z": 0.65328148243818784,
+					"w": 0.65328148243818795
+				},
+				"translation":
+				{
+					"x": -4000,
+					"y": -2360,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.38268343236509045,
+					"y": -2.3432602026631561e-17,
+					"z": 0.92387953251128607,
+					"w": 5.6571305614384988e-17
+				},
+				"translation":
+				{
+					"x": -3390,
+					"y": -1500,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.27059805007309939,
+					"y": -0.27059805007309912,
+					"z": -0.65328148243818807,
+					"w": 0.6532814824381874
+				},
+				"translation":
+				{
+					"x": -4000,
+					"y": -650,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.69636424032001876,
+					"y": -0.12278780396897285,
+					"z": -0.69636424032001887,
+					"w": 0.12278780396897285
+				},
+				"translation":
+				{
+					"x": -3013.3227481747963,
+					"y": -1140.8788495080478,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.12278780396897301,
+					"y": -0.69636424032001876,
+					"z": 0.12278780396897301,
+					"w": 0.69636424032001887
+				},
+				"translation":
+				{
+					"x": -4996.0741780330645,
+					"y": -1862.541351925209,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.66446302438867477,
+					"y": -0.24184476264797539,
+					"z": -0.66446302438867466,
+					"w": 0.24184476264797541
+				},
+				"translation":
+				{
+					"x": -3165.011557000314,
+					"y": -799.36150544167231,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.24184476264797541,
+					"y": -0.66446302438867466,
+					"z": 0.2418447626479755,
+					"w": 0.66446302438867455
+				},
+				"translation":
+				{
+					"x": -4850.309331862064,
+					"y": -2213.4942467520577,
+					"z": 9000.0000000000018
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.61237243569579447,
+					"y": -0.35355339059327368,
+					"z": -0.61237243569579436,
+					"w": 0.35355339059327373
+				},
+				"translation":
+				{
+					"x": -3435,
+					"y": -521.39129372358479,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.35355339059327401,
+					"y": -0.61237243569579425,
+					"z": 0.35355339059327406,
+					"w": 0.61237243569579425
+				},
+				"translation":
+				{
+					"x": -4569.9999999999991,
+					"y": -2487.2689603142599,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.45451947767204404,
+					"y": 0.54167522041970184,
+					"z": -0.45451947767204404,
+					"w": -0.54167522041970173
+				},
+				"translation":
+				{
+					"x": -4203.1683678703066,
+					"y": -2652.2250710242829,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.54167522041970206,
+					"y": -0.45451947767204365,
+					"z": -0.54167522041970206,
+					"w": 0.4545194776720437
+				},
+				"translation":
+				{
+					"x": -3796.8316321296911,
+					"y": -347.7749289757113,
+					"z": 8999.9999999999964
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.69636424032001876,
+					"y": -0.12278780396897285,
+					"z": 0.69636424032001887,
+					"w": 0.12278780396897285
+				},
+				"translation":
+				{
+					"x": -3032.1166005905143,
+					"y": -1852.2807476254388,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.12278780396897301,
+					"y": -0.6963642403200192,
+					"z": -0.1227878039689731,
+					"w": 0.69636424032001909
+				},
+				"translation":
+				{
+					"x": -4968.4864732016276,
+					"y": -1151.1394538078177,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.66446302438867511,
+					"y": -0.24184476264797519,
+					"z": 0.66446302438867499,
+					"w": 0.24184476264797528
+				},
+				"translation":
+				{
+					"x": -3172.6720014315038,
+					"y": -2194.2106184614627,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.2418447626479753,
+					"y": -0.66446302438867477,
+					"z": -0.24184476264797536,
+					"w": 0.66446302438867488
+				},
+				"translation":
+				{
+					"x": -4819.667554137307,
+					"y": -812.21725763540314,
+					"z": 9000.0000000000018
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.61237243569579447,
+					"y": -0.35355339059327356,
+					"z": 0.61237243569579458,
+					"w": 0.35355339059327351
+				},
+				"translation":
+				{
+					"x": -3440,
+					"y": -2469.9484522385715,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.3535533905932739,
+					"y": -0.61237243569579436,
+					"z": -0.35355339059327384,
+					"w": 0.61237243569579447
+				},
+				"translation":
+				{
+					"x": -4560.0000000000018,
+					"y": -530.05154776142751,
+					"z": 9000.0000000000018
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.54167522041970195,
+					"y": -0.45451947767204376,
+					"z": 0.54167522041970195,
+					"w": 0.45451947767204387
+				},
+				"translation":
+				{
+					"x": -3798.5681139063608,
+					"y": -2642.3769934941615,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.45451947767204448,
+					"y": -0.54167522041970151,
+					"z": -0.45451947767204437,
+					"w": 0.54167522041970151
+				},
+				"translation":
+				{
+					"x": -4201.4318860936392,
+					"y": -357.62300650583825,
+					"z": 9000.0000000000018
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.37686961114246431,
+					"y": -0.066452280653524043,
+					"z": 0.9098437264664091,
+					"w": 0.16042999720436049
+				},
+				"translation":
+				{
+					"x": -3390,
+					"y": -1720,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.35960479749049906,
+					"y": -0.13088544238586719,
+					"z": 0.86816277919599039,
+					"w": 0.31598541012516185
+				},
+				"translation":
+				{
+					"x": -3470,
+					"y": -1940,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.33141357403559341,
+					"y": -0.19134171618254553,
+					"z": 0.80010314519126502,
+					"w": 0.46193976625564226
+				},
+				"translation":
+				{
+					"x": -3640,
+					"y": -2130,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.37686961114246431,
+					"y": -0.066452280653523946,
+					"z": -0.90984372646640899,
+					"w": 0.16042999720436024
+				},
+				"translation":
+				{
+					"x": -3380,
+					"y": -1270,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.35960479749049906,
+					"y": -0.13088544238586713,
+					"z": -0.86816277919599039,
+					"w": 0.31598541012516185
+				},
+				"translation":
+				{
+					"x": -3460,
+					"y": -1050,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.33141357403559324,
+					"y": -0.1913417161825452,
+					"z": -0.80010314519126535,
+					"w": 0.46193976625564215
+				},
+				"translation":
+				{
+					"x": -3630,
+					"y": -860,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0.38268343236509056,
+					"z": 0,
+					"w": 0.92387953251128629
+				},
+				"translation":
+				{
+					"x": -4610,
+					"y": -1500,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.13088544238586722,
+					"y": -0.35960479749049906,
+					"z": -0.31598541012516201,
+					"w": 0.86816277919599039
+				},
+				"translation":
+				{
+					"x": -4520,
+					"y": -1060,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.19134171618254603,
+					"y": -0.33141357403559285,
+					"z": -0.46193976625564365,
+					"w": 0.80010314519126413
+				},
+				"translation":
+				{
+					"x": -4360,
+					"y": -870,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.13088544238586722,
+					"y": -0.35960479749049878,
+					"z": 0.31598541012516218,
+					"w": 0.86816277919599028
+				},
+				"translation":
+				{
+					"x": -4550,
+					"y": -1960,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.06645228065352414,
+					"y": -0.37686961114246448,
+					"z": 0.16042999720436063,
+					"w": 0.90984372646640876
+				},
+				"translation":
+				{
+					"x": -4630,
+					"y": -1730,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.19134171618254558,
+					"y": -0.33141357403559263,
+					"z": 0.46193976625564337,
+					"w": 0.80010314519126458
+				},
+				"translation":
+				{
+					"x": -4370,
+					"y": -2150,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.31347591593739249,
+					"y": -0.21949819938655521,
+					"z": 0.75679780773337857,
+					"w": 0.52991552987549329
+				},
+				"translation":
+				{
+					"x": -3820,
+					"y": -2230,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.2194981993865559,
+					"y": -0.31347591593739271,
+					"z": -0.52991552987549395,
+					"w": 0.75679780773337757
+				},
+				"translation":
+				{
+					"x": -4180,
+					"y": -780,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.21949819938655549,
+					"y": -0.31347591593739266,
+					"z": 0.52991552987549362,
+					"w": 0.75679780773337813
+				},
+				"translation":
+				{
+					"x": -4170,
+					"y": -2250,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.3134759159373931,
+					"y": -0.21949819938655521,
+					"z": -0.75679780773337879,
+					"w": 0.52991552987549262
+				},
+				"translation":
+				{
+					"x": -3830,
+					"y": -760,
+					"z": 9900
+				},
+				"scale3D":
+				{
+					"x": 0.5,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_2000_SausageInvert.SM_2000_SausageInvert",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowSideKicker_R.Bevel_Full_ShallowSideKicker_R_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.12278780396897292,
+					"y": 0.1227878039689729,
+					"z": -0.69636424032001898,
+					"w": 0.69636424032001909
+				},
+				"translation":
+				{
+					"x": -5060,
+					"y": 947,
+					"z": 8343
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowSideKicker_L.Bevel_Full_ShallowSideKicker_L",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_HalfRingKicker.Bevel_Full_HalfRingKicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -1132,
+					"y": -3734,
+					"z": 8445
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_HalfRingKicker.Bevel_Full_HalfRingKicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_HalfRingKicker.Bevel_Full_HalfRingKicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -1132,
+					"y": 734,
+					"z": 8445
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_HalfRingKicker.Bevel_Full_HalfRingKicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowSideKicker_L.Bevel_Full_ShallowSideKicker_L_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.12278780396897286,
+					"y": 0.12278780396897285,
+					"z": 0.69636424032001898,
+					"w": 0.69636424032001887
+				},
+				"translation":
+				{
+					"x": -5137,
+					"y": -3906,
+					"z": 8287
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowSideKicker_R.Bevel_Full_ShallowSideKicker_R",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowScoop.Bevel_Full_ShallowScoop_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.57922796533956944,
+					"y": -0.40557978767263847,
+					"z": -0.40557978767263853,
+					"w": 0.57922796533956955
+				},
+				"translation":
+				{
+					"x": -4341,
+					"y": -4981,
+					"z": 8800.5074270000005
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowScoop.Bevel_Full_ShallowScoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowScoop.Bevel_Full_ShallowScoop_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.57922796533956922,
+					"y": -0.40557978767263858,
+					"z": 0.40557978767263847,
+					"w": 0.57922796533956977
+				},
+				"translation":
+				{
+					"x": -4341,
+					"y": 1981,
+					"z": 8800.5074270000005
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowScoop.Bevel_Full_ShallowScoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2270,
+					"y": -1500,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/SpecialPieces/RubberBlock2_M_PlasticBase.RubberBlock2_M_PlasticBase_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 3000,
+					"y": -1500,
+					"z": 8800
+				},
+				"scale3D":
+				{
+					"x": 0,
+					"y": 200,
+					"z": 30
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_PlasticBase.M_PlasticBase'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/willc/RubberBlock2.RubberBlock2",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_PlasticBase.M_PlasticBase"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/SpecialPieces/RubberBlock2_M_PlasticBase.RubberBlock2_M_PlasticBase_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -8000,
+					"y": -1500,
+					"z": 8800
+				},
+				"scale3D":
+				{
+					"x": 0,
+					"y": 200,
+					"z": 30
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_PlasticBase.M_PlasticBase'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/willc/RubberBlock2.RubberBlock2",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_PlasticBase.M_PlasticBase"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/SpecialPieces/RubberBlock2_M_PlasticBase.RubberBlock2_M_PlasticBase_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -1.2325951644078309e-32,
+					"y": -0.70710678118654746,
+					"z": 6.1629758220391547e-33,
+					"w": 0.70710678118654735
+				},
+				"translation":
+				{
+					"x": -2500.0000000000005,
+					"y": -1500,
+					"z": 4980.0000000000009
+				},
+				"scale3D":
+				{
+					"x": 0,
+					"y": 200,
+					"z": 30
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_PlasticBase.M_PlasticBase'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/willc/RubberBlock2.RubberBlock2",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_PlasticBase.M_PlasticBase"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/SpecialPieces/RubberBlock2_M_PlasticBase.RubberBlock2_M_PlasticBase_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2500,
+					"y": -13000,
+					"z": 8800
+				},
+				"scale3D":
+				{
+					"x": 20,
+					"y": 0,
+					"z": 30
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_PlasticBase.M_PlasticBase'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/willc/RubberBlock2.RubberBlock2",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_PlasticBase.M_PlasticBase"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/SpecialPieces/RubberBlock2_M_PlasticBase.RubberBlock2_M_PlasticBase_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -2500,
+					"y": 10000,
+					"z": 8800
+				},
+				"scale3D":
+				{
+					"x": 20,
+					"y": 0,
+					"z": 30
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_PlasticBase.M_PlasticBase'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/willc/RubberBlock2.RubberBlock2",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_PlasticBase.M_PlasticBase"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/SpecialPieces/RubberBlock2_M_PlasticBase.RubberBlock2_M_PlasticBase_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -1.4637067577342992e-32,
+					"y": -0.70710678118654735,
+					"z": -1.3096323621833204e-32,
+					"w": 0.70710678118654746
+				},
+				"translation":
+				{
+					"x": -2500,
+					"y": -1500,
+					"z": 15000
+				},
+				"scale3D":
+				{
+					"x": 0,
+					"y": 200,
+					"z": 30
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Masters/M_PlasticBase.M_PlasticBase'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/willc/RubberBlock2.RubberBlock2",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Masters/M_PlasticBase.M_PlasticBase"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.38268343236509034,
+					"y": -0,
+					"z": 0,
+					"w": 0.92387953251128629
+				},
+				"translation":
+				{
+					"x": -5190,
+					"y": -1110,
+					"z": 9540
+				},
+				"scale3D":
+				{
+					"x": 0.20000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.38268343236508978,
+					"y": 0,
+					"z": 0,
+					"w": 0.92387953251128663
+				},
+				"translation":
+				{
+					"x": -5190,
+					"y": -1220,
+					"z": 9540
+				},
+				"scale3D":
+				{
+					"x": 0.20000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5190,
+					"y": -1160,
+					"z": 9486
+				},
+				"scale3D":
+				{
+					"x": 0.20000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5190,
+					"y": -1840,
+					"z": 9486
+				},
+				"scale3D":
+				{
+					"x": 0.20000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.38268343236509056,
+					"y": -0,
+					"z": 0,
+					"w": 0.92387953251128629
+				},
+				"translation":
+				{
+					"x": -5190,
+					"y": -1790,
+					"z": 9540
+				},
+				"scale3D":
+				{
+					"x": 0.20000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.38268343236508978,
+					"y": 0,
+					"z": 0,
+					"w": 0.92387953251128663
+				},
+				"translation":
+				{
+					"x": -5190,
+					"y": -1900,
+					"z": 9540
+				},
+				"scale3D":
+				{
+					"x": 0.20000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": -0.38268343236509034,
+					"y": -0,
+					"z": 0,
+					"w": 0.92387953251128629
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1960,
+					"z": 9026
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1975,
+					"z": 9096
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 1.5,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1870,
+					"z": 9030
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 1,
+					"z": 4
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1420,
+					"z": 9030
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 2,
+					"z": 4
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1550,
+					"z": 9096
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0.38268343236508978,
+					"y": 0,
+					"z": 0,
+					"w": 0.92387953251128663
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1120,
+					"z": 9026
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1780,
+					"z": 9012
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1300,
+					"z": 9002
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1470,
+					"z": 8972
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1630,
+					"z": 8972
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1790,
+					"z": 8932
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1290,
+					"z": 8932
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1630,
+					"z": 8932
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1470,
+					"z": 8932
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 2,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1660,
+					"z": 9030
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 2,
+					"z": 4
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1105,
+					"z": 9096
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 1.5,
+					"z": 2
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -5220,
+					"y": -1210,
+					"z": 9030
+				},
+				"scale3D":
+				{
+					"x": 0.10000000000000001,
+					"y": 1,
+					"z": 4
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_BallGrid.MI_BallGrid'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Props/Bevel_Rail.Bevel_Rail",
+					"materialAssetPaths": [
+						"/Game/Art/MI_BallGrid.MI_BallGrid",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/BP_Checkpoint.BP_Checkpoint_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": -0.70710678118654757,
+					"z": 0,
+					"w": 0.70710678118654768
+				},
+				"translation":
+				{
+					"x": -3940,
+					"y": -1500,
+					"z": 10910
+				},
+				"scale3D":
+				{
+					"x": 1.5,
+					"y": 1.5,
+					"z": 1.5
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_GoalRing.SM_GoalRing",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/MapItems/PlayerStart/MP_PlayerStart.MP_PlayerStart_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -7000,
+					"y": -1500,
+					"z": 9000
+				},
+				"scale3D":
+				{
+					"x": 0.27653800000000001,
+					"y": 0.27653800000000001,
+					"z": 0.27653800000000001
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_GoldWorn.MI_GoldWorn'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_Start_Fixed.SM_Start_Fixed",
+					"materialAssetPaths": [
+						"/Game/Art/MI_GoldWorn.MI_GoldWorn"
+					]
+				}
+			],
+			"bIsBaseItem": true,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		}
+	]
+}
