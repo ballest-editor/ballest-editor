@@ -1,0 +1,14 @@
+node_modules/
+.output/
+.vinxi/
+.tanstack/
+dist/
+result
+.direnv/
+*.log
+
+# Extracted game meshes (tools/extract/run.sh output, ~74 MB; regenerate with `nix run .#extract`)
+assets/pieces/
+
+# Extracted textures (tools/extract/run.sh output, ~140 MB at --tex-max 2048)
+assets/textures/

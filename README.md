@@ -1,3 +1,10 @@
 # ballest-editor
 
-Created in [T3 Code](https://t3.codes).
+A standalone, CAD-style map editor for [Ballest of Them All](https://store.steampowered.com/app/3339810). Reads and writes the game's own `.balledit` / `.ballmap` JSON, so maps made here load in the in-game editor and publish to the Workshop normally.
+
+- [docs/FORMAT.md](docs/FORMAT.md) — the map format, hard limits, where files live
+- [docs/VISION.md](docs/VISION.md) — feature roadmap
+- `app/` — the editor (TanStack Start, Three.js, Effect)
+- `tools/extract/` — pulls piece meshes out of the game pak (Nix flake)
+
+Contributors and coding agents: read [AGENTS.md](AGENTS.md).

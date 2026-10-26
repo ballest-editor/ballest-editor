@@ -1,0 +1,199 @@
+{
+  "version": 1,
+  "units": "cm",
+  "coordinateSystem": "Unreal native: left-handed, +X forward, +Y right, +Z up. glb files are NOT converted to glTF Y-up.",
+  "pieces": [
+    {
+      "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/MapItems/PlayerStart/MP_PlayerStart.MP_PlayerStart_C'",
+      "className": "MP_PlayerStart",
+      "meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_Start_Fixed.SM_Start_Fixed",
+      "glb": "pieces/Maps/_GENERATED/PC/SM_Start_Fixed.glb",
+      "materialSlots": [
+        {
+          "index": 0,
+          "slotName": "WorldGridMaterial",
+          "defaultMaterial": "/Game/Art/Stadium/Arena/MI_GoalYellow.MI_GoalYellow",
+          "meshMaterial": "/Engine/EngineMaterials/WorldGridMaterial.WorldGridMaterial"
+        }
+      ],
+      "bounds": {
+        "min": [
+          -499.9958,
+          -499.9958,
+          0.0144
+        ],
+        "max": [
+          499.9958,
+          499.9958,
+          199.9842
+        ]
+      },
+      "seenInSamples": 22,
+      "mainRelativeTransform": {
+        "location": [
+          0,
+          0,
+          0
+        ],
+        "rotation": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "scale": [
+          0.2765,
+          0.2765,
+          0.2765
+        ]
+      },
+      "extraMeshes": []
+    },
+    {
+      "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
+      "className": "BP_Prim_Cube",
+      "meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+      "glb": "pieces/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.glb",
+      "materialSlots": [
+        {
+          "index": 0,
+          "slotName": "Material_0",
+          "defaultMaterial": "/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal",
+          "meshMaterial": "/Engine/EngineMaterials/WorldGridMaterial.WorldGridMaterial"
+        }
+      ],
+      "bounds": {
+        "min": [
+          -500,
+          -500,
+          0
+        ],
+        "max": [
+          500,
+          500,
+          1000
+        ]
+      },
+      "seenInSamples": 1650,
+      "mainRelativeTransform": {
+        "location": [
+          0,
+          0,
+          0
+        ],
+        "rotation": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "extraMeshes": []
+    },
+    {
+      "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Short1.BP_Track_Short1_C'",
+      "className": "BP_Track_Short1",
+      "meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_500.SM_500",
+      "glb": "pieces/Maps/_GENERATED/PC/SM_500.glb",
+      "materialSlots": [
+        {
+          "index": 0,
+          "slotName": "Material_0",
+          "defaultMaterial": "/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal",
+          "meshMaterial": "/Engine/EngineMaterials/WorldGridMaterial.WorldGridMaterial"
+        },
+        {
+          "index": 1,
+          "slotName": "M_OutlineEdges",
+          "defaultMaterial": "/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal",
+          "meshMaterial": "/Game/Art/Materials/Masters/M_OutlineEdges.M_OutlineEdges"
+        }
+      ],
+      "bounds": {
+        "min": [
+          -250,
+          -250,
+          0
+        ],
+        "max": [
+          250,
+          250,
+          100
+        ]
+      },
+      "seenInSamples": 1260,
+      "mainRelativeTransform": {
+        "location": [
+          0,
+          0,
+          0
+        ],
+        "rotation": {
+          "pitch": 0,
+          "yaw": 0,
+          "roll": 0
+        },
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "extraMeshes": []
+    }
+  ],
+  "meshes": [
+    {
+      "meshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+      "glb": "pieces/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.glb",
+      "bounds": {
+        "min": [
+          -500,
+          -500,
+          0
+        ],
+        "max": [
+          500,
+          500,
+          1000
+        ]
+      }
+    },
+    {
+      "meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_500.SM_500",
+      "glb": "pieces/Maps/_GENERATED/PC/SM_500.glb",
+      "bounds": {
+        "min": [
+          -250,
+          -250,
+          0
+        ],
+        "max": [
+          250,
+          250,
+          100
+        ]
+      }
+    },
+    {
+      "meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_Start_Fixed.SM_Start_Fixed",
+      "glb": "pieces/Maps/_GENERATED/PC/SM_Start_Fixed.glb",
+      "bounds": {
+        "min": [
+          -499.9958,
+          -499.9958,
+          0.0144
+        ],
+        "max": [
+          499.9958,
+          499.9958,
+          199.9842
+        ]
+      }
+    }
+  ],
+  "unresolved": []
+}
