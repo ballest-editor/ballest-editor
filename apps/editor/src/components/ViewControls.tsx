@@ -15,6 +15,12 @@ import { ToolBar } from "./ToolBar"
 const GROUP =
   "pointer-events-auto flex items-center gap-1 rounded-full border border-border/60 bg-background/60 p-1 shadow-lg backdrop-blur-md"
 
+/**
+ * Popups open from a control's edge; these offsets clear the group's padding and border
+ * (plus the usual 4px gap): `button` for the 32px buttons, `size` for the 24px size picker.
+ */
+const POPUP_OFFSET = { button: 9, size: 13 } as const
+
 /** Keeps keyboard focus with the viewport: no focus on mousedown, no Space/Enter activation. */
 const noFocus = {
   tabIndex: -1,
@@ -55,7 +61,7 @@ export function ViewControls({ disabled = false }: { readonly disabled?: boolean
           >
             {local ? <IconCube /> : <IconWorld />}
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="flex items-center gap-1.5">
+          <TooltipContent side="bottom" sideOffset={POPUP_OFFSET.button} className="flex items-center gap-1.5">
             {label}
             {keybinds.toggleGizmoSpace.map((binding) => <Kbd key={binding}>{formatBinding(binding)}</Kbd>)}
           </TooltipContent>
@@ -96,7 +102,9 @@ function SnapControls({ disabled }: { readonly disabled: boolean }) {
         >
           <IconGrid4x4 />
         </TooltipTrigger>
-        <TooltipContent side="bottom">Snap to grid {enabled ? "on" : "off"}</TooltipContent>
+        <TooltipContent side="bottom" sideOffset={POPUP_OFFSET.button}>
+          Snap to grid {enabled ? "on" : "off"}
+        </TooltipContent>
       </Tooltip>
       <Select
         value={gridSize}
@@ -121,11 +129,11 @@ function SnapControls({ disabled }: { readonly disabled: boolean }) {
               />
             }
           >
-            <SelectValue />
+            <SelectValue className="flex-none justify-center text-center" />
           </TooltipTrigger>
-          <TooltipContent side="bottom">Grid size ({units})</TooltipContent>
+          <TooltipContent side="bottom" sideOffset={POPUP_OFFSET.size}>Grid size ({units})</TooltipContent>
         </Tooltip>
-        <SelectContent side="bottom" align="end" alignItemWithTrigger={false}>
+        <SelectContent side="bottom" sideOffset={POPUP_OFFSET.size} align="end" alignItemWithTrigger={false}>
           {GRID_SIZES.map((size) => (
             <SelectItem key={size} value={size} className="tabular-nums">
               {formatGridSize(size, units)}
