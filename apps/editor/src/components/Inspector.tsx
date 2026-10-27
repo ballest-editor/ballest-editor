@@ -133,7 +133,7 @@ function TransformRow(props: {
           >
             <row.icon />
           </TooltipTrigger>
-          <TooltipContent side="left" sideOffset={8} className="px-2.5 py-2">
+          <TooltipContent side="left" sideOffset={8} className="flex flex-col items-start px-2.5 py-2">
             <div className="font-medium">{props.title}</div>
             <div className="mt-1.5 grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-1 opacity-80">
               <span>Copy</span>
