@@ -25,6 +25,7 @@ export const keybindSections = [
       "translateMode",
       "rotateMode",
       "scaleMode",
+      "toggleGizmoSpace",
       "focusSelection",
       "deleteSelection",
       "undo",
@@ -53,6 +54,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   translateMode: "translate",
   rotateMode: "rotate",
   scaleMode: "scale",
+  toggleGizmoSpace: "local / world axes",
   focusSelection: "focus selection",
   deleteSelection: "delete",
   undo: "undo",
@@ -87,6 +89,8 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   rotateMode: "Rotate: drag a ring to rotate the selection. E in the game's level editor.",
   scaleMode:
     "Scale: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the game's level editor.",
+  toggleGizmoSpace:
+    "Switch the translate, rotate and scale gizmos between the selected item's own axes and the world axes. Editor only.",
   focusSelection:
     "Frame the current selection in the viewport. F in the game's level editor; its free camera calls this \"center camera\" (C).",
   deleteSelection: "Delete the selected item. Backspace in the game's level editor; Delete also works.",
@@ -147,6 +151,7 @@ export const defaultKeybinds: Keybinds = {
   translateMode: ["KeyW"],
   rotateMode: ["KeyE"],
   scaleMode: ["KeyR"],
+  toggleGizmoSpace: ["KeyX"],
   focusSelection: ["KeyF", "KeyC"],
   deleteSelection: ["Backspace", "Delete"],
   undo: ["Ctrl+KeyZ"],

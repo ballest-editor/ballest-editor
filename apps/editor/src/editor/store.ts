@@ -16,6 +16,7 @@ import type { MaterialTable } from "../domain/Materials"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import type { LoadedCatalog } from "../services/CatalogLoader"
 
+import type { GizmoSpace } from "./gizmo/handles"
 export interface Doc {
   readonly map: MapFile
   readonly ids: ReadonlyArray<string>
@@ -58,6 +59,8 @@ export interface EditorState {
   readonly sourceName: string | null
   readonly selectedId: string | null
   readonly tool: Tool
+  /** Whether the gizmo follows the selected item's axes or the world's. */
+  readonly gizmoSpace: GizmoSpace
   /** The open modal dialog; editor keybinds are suspended while one is open. */
   readonly dialog: Dialog | null
   readonly settingsCategory: SettingsCategory
@@ -99,6 +102,7 @@ export interface EditorState {
   /** Changes the selection; its own undo step when settings.general.undoSelection is on. */
   readonly select: (id: string | null) => void
   readonly setTool: (tool: Tool) => void
+  readonly toggleGizmoSpace: () => void
   readonly openDialog: (dialog: Dialog, category?: SettingsCategory) => void
   readonly closeDialog: () => void
   readonly setSettingsCategory: (category: SettingsCategory) => void
@@ -159,6 +163,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     sourceName: null,
     selectedId: null,
     tool: "translate",
+    gizmoSpace: "world",
     dialog: null,
     settingsCategory: "general",
     catalog: null,
@@ -266,6 +271,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         return { selectedId, past: [...s.past, step].slice(-HISTORY_LIMIT), future: [] }
       }),
     setTool: (tool) => set({ tool }),
+    toggleGizmoSpace: () => set((s) => ({ gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
     openDialog: (dialog, category) => set((s) => ({ dialog, settingsCategory: category ?? s.settingsCategory })),
     closeDialog: () => set({ dialog: null }),
     setSettingsCategory: (settingsCategory) => set({ settingsCategory }),
