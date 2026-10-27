@@ -412,8 +412,7 @@ export function SettingsDialog(props: {
         id: "undoSelection",
         ...setting("general", "undoSelection"),
         label: "Undo selection changes",
-        description:
-          "Make every selection change its own undo step. Off: undo only steps through edits, each restoring the selection it had.",
+        description: "Make every selection change its own undo step.",
         control: (
           <Switch
             checked={settings.general.undoSelection}
