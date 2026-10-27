@@ -2,7 +2,7 @@ import { useGLTF } from "@react-three/drei"
 import { Component, memo, type ReactNode, Suspense, useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import { type Bounds, type CatalogIndex, DEFAULT_BOUNDS, type MeshInfo } from "../domain/Catalog"
-import { UE_TO_THREE_MATRIX, ueBoundsToScene, ueToScene } from "../domain/coords"
+import { type Tuple3, UE_TO_THREE_MATRIX, ueBoundsToScene, ueToScene } from "../domain/coords"
 import type { Item } from "../domain/MapFile"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
@@ -12,6 +12,10 @@ import { fixSceneWinding } from "./winding"
 
 const ueToThree = new THREE.Matrix4().set(...UE_TO_THREE_MATRIX)
 
+/** Box dimensions for a bounds size: never flat, so the stand-in stays visible. */
+const solid = (n: number) => Math.max(Math.abs(n), 1)
+const boxSize = ([x, y, z]: Tuple3): [number, number, number] => [solid(x), solid(y), solid(z)]
+
 /**
  * While a glb loads: a faint wireframe of its local bounds (nothing if bounds are unknown).
  * Never a solid box; that's reserved for failed loads and pieces with no mesh.
@@ -20,7 +24,7 @@ function LoadingHint({ bounds }: { readonly bounds: Bounds | undefined }) {
   const edges = useMemo(() => {
     if (bounds === undefined) return null
     const { size } = ueBoundsToScene(bounds.min, bounds.max)
-    return new THREE.EdgesGeometry(new THREE.BoxGeometry(...size.map((n) => Math.max(Math.abs(n), 1)) as [number, number, number]))
+    return new THREE.EdgesGeometry(new THREE.BoxGeometry(...boxSize(size)))
   }, [bounds])
   useEffect(() => () => edges?.dispose(), [edges])
   if (bounds === undefined || edges === null) return null
@@ -38,7 +42,7 @@ function BoundsBox({ bounds, warn }: { readonly bounds: Bounds | undefined; read
   const { size, center } = ueBoundsToScene(b.min, b.max)
   return (
     <mesh position={center}>
-      <boxGeometry args={size.map((n) => Math.max(Math.abs(n), 1)) as [number, number, number]} />
+      <boxGeometry args={boxSize(size)} />
       <meshStandardMaterial color={warn ? "#c9803a" : "#8b93a1"} roughness={0.8} />
     </mesh>
   )

@@ -1,21 +1,10 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Effect } from "effect"
+import { objectAt, parseJson } from "../test/json"
 import { listSamples, readSample } from "../test/samples"
 import { MapCodec } from "./MapCodec"
 
 const samples = listSamples()
-
-/** The slice of raw map JSON the unknown-field test pokes at. */
-interface RawMap {
-  futureTopLevel?: unknown
-  worldSettings: { levelData: { futureField?: unknown } }
-  items: Array<{
-    futureItemField?: unknown
-    itemTransform: { rotation: { extra?: unknown } }
-    meshComponents: Array<{ futureMesh?: unknown }>
-  }>
-  editorState: { futureEditor?: unknown }
-}
 
 describe("MapCodec", () => {
   it("finds the samples", () => {
@@ -49,18 +38,17 @@ describe("MapCodec", () => {
   it.effect("preserves unknown fields at every level and appends them after known fields", () =>
     Effect.gen(function*() {
       const codec = yield* MapCodec
-      const base = JSON.parse(readSample(samples.find((s) => s.kind === "balledit")!)) as RawMap
-      const item = base.items[0]!
-      base.futureTopLevel = { a: [1, 2] }
-      base.worldSettings.levelData.futureField = "x"
-      item.futureItemField = true
-      item.itemTransform.rotation.extra = 1
-      item.meshComponents[0]!.futureMesh = null
-      base.editorState.futureEditor = { nested: { ok: 1 } }
+      const base = parseJson(readSample(samples.find((s) => s.kind === "balledit")!))
+      objectAt(base)["futureTopLevel"] = { a: [1, 2] }
+      objectAt(base, "worldSettings", "levelData")["futureField"] = "x"
+      objectAt(base, "items", 0)["futureItemField"] = true
+      objectAt(base, "items", 0, "itemTransform", "rotation")["extra"] = 1
+      objectAt(base, "items", 0, "meshComponents", 0)["futureMesh"] = null
+      objectAt(base, "editorState")["futureEditor"] = { nested: { ok: 1 } }
       const input = JSON.stringify(base)
-      const out = JSON.parse(yield* codec.encode(yield* codec.decode(input))) as RawMap
-      assert.deepStrictEqual(out, JSON.parse(input))
-      const itemKeys = Object.keys(out.items[0]!)
+      const out = parseJson(yield* codec.encode(yield* codec.decode(input)))
+      assert.deepStrictEqual(out, parseJson(input))
+      const itemKeys = Object.keys(objectAt(out, "items", 0))
       assert.strictEqual(itemKeys[0], "actorToSpawn")
       assert.strictEqual(itemKeys.at(-1), "futureItemField")
     }).pipe(Effect.provide(MapCodec.layer)))

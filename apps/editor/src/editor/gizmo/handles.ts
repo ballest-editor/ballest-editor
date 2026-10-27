@@ -15,6 +15,7 @@
 import * as THREE from "three"
 import type { Quat4 } from "../../domain/coords"
 import { type Axis, axisWorldDir } from "./math"
+import { isLine, isMesh } from "../threeGuards"
 
 export type HandleKind = "translateAxis" | "translatePlane" | "rotateAxis" | "rotateView" | "scaleAxis" | "scaleUniform"
 
@@ -161,14 +162,19 @@ export const orientHandle = (handle: Handle, frame: GizmoFrame): void => {
   const { spec, root } = handle
   switch (spec.kind) {
     case "translateAxis":
-    case "scaleAxis":
-      root.quaternion.setFromUnitVectors(X, handleWorldDir(spec, frame.gameRotation)!)
+    case "scaleAxis": {
+      const dir = handleWorldDir(spec, frame.gameRotation)
+      if (dir !== undefined) root.quaternion.setFromUnitVectors(X, dir)
       return
-    case "rotateAxis":
-      root.quaternion.setFromUnitVectors(Z, handleWorldDir(spec, frame.gameRotation)!)
+    }
+    case "rotateAxis": {
+      const dir = handleWorldDir(spec, frame.gameRotation)
+      if (dir !== undefined) root.quaternion.setFromUnitVectors(Z, dir)
       return
+    }
     case "translatePlane": {
-      const [a, b] = pairOf(spec.axis!)
+      if (spec.axis === undefined) return
+      const [a, b] = pairOf(spec.axis)
       const u = axisWorldDir(a)
       const v = axisWorldDir(b)
       // proper rotation (no mirror): third column is u x v
@@ -200,13 +206,14 @@ export class GizmoObject extends THREE.Group {
   readonly handles: ReadonlyArray<Handle>
   readonly body = new THREE.Group()
   readonly guide: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>
+  private readonly guidePositions = new THREE.BufferAttribute(new Float32Array(6), 3)
 
   constructor(specs: ReadonlyArray<HandleSpec>) {
     super()
     this.handles = specs.map(makeHandle)
     for (const h of this.handles) this.body.add(h.root)
     this.add(this.body)
-    const geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()])
+    const geometry = new THREE.BufferGeometry().setAttribute("position", this.guidePositions)
     this.guide = new THREE.Line(
       geometry,
       new THREE.LineBasicMaterial({ color: "#ffffff", depthTest: false, depthWrite: false, transparent: true, opacity: 0.6, toneMapped: false })
@@ -245,7 +252,7 @@ export class GizmoObject extends THREE.Group {
       return
     }
     const far = 1e6
-    const positions = this.guide.geometry.getAttribute("position") as THREE.BufferAttribute
+    const positions = this.guidePositions
     positions.setXYZ(0, origin.x - dir.x * far, origin.y - dir.y * far, origin.z - dir.z * far)
     positions.setXYZ(1, origin.x + dir.x * far, origin.y + dir.y * far, origin.z + dir.z * far)
     positions.needsUpdate = true
@@ -255,9 +262,7 @@ export class GizmoObject extends THREE.Group {
 
   override dispose(): void {
     this.traverse((o) => {
-      if (o instanceof THREE.Mesh || o instanceof THREE.Line) {
-        ;(o.geometry as THREE.BufferGeometry).dispose()
-      }
+      if (isMesh(o) || isLine(o)) o.geometry.dispose()
     })
     for (const h of this.handles) for (const m of h.materials) m.dispose()
     this.guide.material.dispose()

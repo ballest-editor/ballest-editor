@@ -19,7 +19,7 @@ describe("game load rules", () => {
   })
 
   it("rejects non-normalized rotations", () => {
-    assert.isTrue(isNormalizedRotation({ x: 0, y: 0, z: 0.7071, w: 0.7071 }))
+    assert.isTrue(isNormalizedRotation({ x: 0, y: 0, z: Math.SQRT1_2 - 1e-5, w: Math.SQRT1_2 - 1e-5 }))
     assert.isFalse(isNormalizedRotation({ x: 0, y: 0, z: 1, w: 1 }))
     const map = addItem(fresh(), withRotation(plain(), { x: 0, y: 0, z: 1, w: 1 }))
     assert.deepStrictEqual(gameLoadProblems(map), ["Item 1 has a non-normalized rotation."])

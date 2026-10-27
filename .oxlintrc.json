@@ -1,0 +1,109 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "import", "unicorn", "oxc", "eslint", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "options": { "typeAware": true },
+  "env": { "browser": true, "es2024": true },
+  "ignorePatterns": ["repos/**", "samples/**", "assets/**", "tools/**", "**/routeTree.gen.ts"],
+  "rules": {
+    // typescript-eslint strict-type-checked, minus what tsc already covers
+    "typescript/no-confusing-void-expression": ["error", { "ignoreArrowShorthand": true }],
+    "typescript/restrict-template-expressions": ["error", { "allowNumber": true }],
+    // Schema.Opaque classes are plain structs typed as classes; spreading them is how edits work.
+    "typescript/no-misused-spread": ["error", {
+      "allow": [
+        {
+          "from": "file",
+          "path": "src/domain/MapFile.ts",
+          "name": ["Vector3", "Quat", "ItemTransform", "MaterialSlot", "MeshComponent", "Item", "LevelData", "WorldSettings", "ItemPivot", "EditorState", "MapFile"]
+        },
+        {
+          "from": "file",
+          "path": "src/domain/Catalog.ts",
+          "name": ["Bounds", "CatalogMaterialSlot", "Rotator", "MainRelativeTransform", "ExtraMesh", "CatalogPiece", "CatalogMesh", "Catalog"]
+        }
+      ]
+    }],
+    "typescript/no-deprecated": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-mixed-enums": "error",
+    "typescript/no-unnecessary-condition": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/related-getter-setter-pairs": "error",
+    "typescript/require-await": "error",
+    "typescript/restrict-plus-operands": "error",
+    "typescript/return-await": "error",
+    "typescript/switch-exhaustiveness-check": ["error", { "considerDefaultExhaustiveForUnions": true }],
+    "typescript/use-unknown-in-catch-callback-variable": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    // stylistic-type-checked
+    "typescript/prefer-optional-chain": "error",
+    // `a || b` on strings deliberately treats "" as missing.
+    "typescript/prefer-nullish-coalescing": ["error", { "ignorePrimitives": { "string": true } }],
+    "typescript/prefer-includes": "error",
+    "typescript/prefer-find": "error",
+    "typescript/prefer-string-starts-ends-with": "error",
+    "typescript/prefer-reduce-type-parameter": "error",
+    "typescript/non-nullable-type-assertion-style": "error",
+    "typescript/consistent-type-imports": ["error", { "prefer": "type-imports" }],
+    "typescript/no-import-type-side-effects": "error",
+
+    "react/rules-of-hooks": "error",
+    "react/react-in-jsx-scope": "off",
+
+    "import/no-cycle": "error",
+    "import/no-duplicates": "error",
+    "import/no-self-import": "error",
+    "import/first": "error",
+
+    "eslint/eqeqeq": ["error", "always", { "null": "ignore" }],
+    "eslint/no-var": "error",
+    "eslint/prefer-const": "error",
+    "unicorn/prefer-node-protocol": "error",
+    "unicorn/no-abusive-eslint-disable": "error",
+
+    "vitest/expect-expect": ["error", { "assertFunctionNames": ["expect", "expectVec", "assert", "assert.*"] }],
+
+    // Off, as in Effect's own oxlintrc: `_tag` is the Effect discriminant; local
+    // helpers in components/tests read better next to their use; sort() on fresh arrays is fine.
+    "eslint/no-underscore-dangle": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "unicorn/no-array-sort": "off",
+    "oxc/no-map-spread": "off",
+    // tsc's noImplicitReturns covers this and understands exhaustive switches; effects
+    // that return a cleanup on some paths only are normal React.
+    "typescript/consistent-return": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/test/**"],
+      "rules": { "typescript/no-non-null-assertion": "off" }
+    },
+    {
+      // react-three-fiber scene components mutate three objects in effects and useFrame by design.
+      "files": ["apps/editor/src/editor/**/*.tsx"],
+      "rules": { "react/immutability": "off" }
+    },
+    {
+      // shadcn-generated; kept as upstream ships it so `shadcn add` updates apply cleanly.
+      "files": ["packages/ui/src/components/**"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off",
+        "react/jsx-no-constructed-context-values": "off"
+      }
+    }
+  ]
+}

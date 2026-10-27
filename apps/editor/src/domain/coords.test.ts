@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
+import { Schema } from "effect"
 import * as THREE from "three"
 import { listSamples, readSample } from "../test/samples"
 import {
@@ -13,6 +14,9 @@ import {
   ueToThreeVector,
   type Vec3
 } from "./coords"
+import { MapFile } from "./MapFile"
+
+const decodeSample = Schema.decodeSync(Schema.fromJsonString(MapFile))
 
 /** FQuat::RotateVector: v' = v + 2w(q x v) + 2 q x (q x v), evaluated on raw UE components. */
 const ueRotate = (q: Quat4, v: Vec3): Vec3 => {
@@ -61,7 +65,7 @@ describe("coords", () => {
   })
 
   it("maps the sample checkpoint rotation (-90 deg about UE Y: forward pitches up)", () => {
-    const q = { x: 0, y: -0.70710678118654757, z: 0, w: 0.70710678118654768 }
+    const q = { x: 0, y: -Math.SQRT1_2, z: 0, w: 0.70710678118654768 }
     // In UE this rotation turns forward (+X) into up (+Z).
     expectVec(ueRotate(q, UE_FORWARD), UE_UP)
     const q3 = ueToThreeQuat(q)
@@ -83,9 +87,7 @@ describe("coords", () => {
   it.each(samples.map((s) => [s.name, s] as const))(
     "conjugation and exact round-trip for every transform in %s",
     (_name, sample) => {
-      const map = JSON.parse(readSample(sample)) as {
-        items: ReadonlyArray<{ itemTransform: { rotation: Quat4; translation: Vec3; scale3D: Vec3 } }>
-      }
+      const map = decodeSample(readSample(sample))
       // Rotating then mapping == mapping then rotating, for the first 200 items.
       for (const item of map.items.slice(0, 200)) {
         const q = item.itemTransform.rotation

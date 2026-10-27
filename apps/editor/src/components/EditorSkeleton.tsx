@@ -69,7 +69,7 @@ export function EditorSkeleton() {
             <Skeleton className="h-7 w-full" />
           </div>
           <div className="flex flex-col gap-1">
-            {LABEL_WIDTHS.slice(0, 5).map((w, i) => <Skeleton key={i} className="my-0.5 h-3 rounded-sm" style={{ width: w }} />)}
+            {LABEL_WIDTHS.slice(0, 5).map((w) => <Skeleton key={w} className="my-0.5 h-3 rounded-sm" style={{ width: w }} />)}
           </div>
         </div>
       </div>

@@ -10,21 +10,23 @@ import { Schema } from "effect"
 import { listSamples, readSample, repoRoot } from "../test/samples"
 import { Catalog, HIDDEN_SECTION, indexCatalog, paletteSections, unavailableReasonOf, visibleExtras } from "./Catalog"
 import { itemFromPiece, placementTransform, qualifyMaterialPath } from "./factory"
-import { Item, objectPathOf } from "./MapFile"
+import { Item, MapFile, objectPathOf } from "./MapFile"
 
 const catalogPath = path.join(repoRoot, "assets", "catalog.json")
 const hasCatalog = fs.existsSync(catalogPath)
-const load = () => Schema.decodeUnknownSync(Catalog)(JSON.parse(fs.readFileSync(catalogPath, "utf8")))
+const load = () => Schema.decodeSync(Schema.fromJsonString(Catalog))(fs.readFileSync(catalogPath, "utf8"))
 
-const sampleItems = () =>
-  listSamples().flatMap((s) => (JSON.parse(readSample(s)) as { items: Array<typeof Item.Encoded> }).items)
+const decodeSample = Schema.decodeSync(Schema.fromJsonString(MapFile))
+const sampleItems = () => listSamples().flatMap((s) => decodeSample(readSample(s)).items)
 
 describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
   it("decodes and keeps unknown keys", () => {
-    const raw = JSON.parse(fs.readFileSync(catalogPath, "utf8"))
+    const raw = Schema.decodeSync(Schema.fromJsonString(Schema.Struct({ units: Schema.Unknown })))(
+      fs.readFileSync(catalogPath, "utf8")
+    )
     const catalog = load()
     assert.isAbove(catalog.pieces.length, 0)
-    assert.strictEqual((catalog as unknown as Record<string, unknown>)["units"], raw.units)
+    assert.deepStrictEqual(catalog["units"], raw.units)
   })
 
   it("has a piece for every class in the samples", () => {
@@ -36,7 +38,7 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
   it("builds a schema-valid item from every piece", () => {
     for (const piece of load().pieces) {
       const item = itemFromPiece(piece, placementTransform(piece, { x: 0, y: 0, z: 0 }))
-      Schema.decodeSync(Item)(item)
+      assert.doesNotThrow(() => Schema.decodeSync(Item)(item))
     }
   })
 
@@ -70,12 +72,10 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
     const unavailable = hidden.filter((p) => unavailableReasonOf(indexCatalog(catalog), p) !== undefined).map((p) => p.className)
     expect(unavailable.length).toBe((catalog.unresolved ?? []).length)
     // extras-only pieces stay placeable
-    for (const name of ["MP_OrangeSign", "MP_PinballPaddle", "BP_CircularFlexiblePlatform"]) {
-      const piece = catalog.pieces.find((p) => p.className === name)
-      if (piece !== undefined) {
-        expect(unavailableReasonOf(indexCatalog(catalog), piece)).toBeUndefined()
-        expect(visibleExtras(piece).length).toBeGreaterThan(0)
-      }
+    const extrasOnly = new Set(["MP_OrangeSign", "MP_PinballPaddle", "BP_CircularFlexiblePlatform"])
+    for (const piece of catalog.pieces.filter((p) => extrasOnly.has(p.className))) {
+      expect(unavailableReasonOf(indexCatalog(catalog), piece)).toBeUndefined()
+      expect(visibleExtras(piece).length).toBeGreaterThan(0)
     }
   })
 

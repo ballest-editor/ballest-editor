@@ -48,7 +48,12 @@ export const loadSettings = () =>
 /** Applies immediately, then persists. */
 export const saveSettings = (settings: Settings) => {
   useEditor.getState().setSettings(settings)
-  return run(SettingsStore.use((store) => store.save(settings)))
+  return run(
+    Effect.gen(function*() {
+      const store = yield* SettingsStore
+      yield* store.save(settings)
+    })
+  )
 }
 
 export const loadKeybinds = () =>

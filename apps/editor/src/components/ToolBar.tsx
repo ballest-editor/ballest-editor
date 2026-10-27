@@ -32,8 +32,8 @@ export function ToolBar({ disabled = false }: { readonly disabled?: boolean }) {
       <ToggleGroup
         value={[tool]}
         onValueChange={(value) => {
-          const next = value[0] as Tool | undefined
-          if (next !== undefined) setTool(next) // clicking the active tool keeps it
+          const next = TOOLS.find((t) => value.includes(t.tool))
+          if (next !== undefined) setTool(next.tool) // clicking the active tool keeps it
         }}
         spacing={1}
         disabled={disabled}

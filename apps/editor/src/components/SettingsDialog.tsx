@@ -8,7 +8,8 @@ import { Slider } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type ReactNode, useEffect, useMemo, useState } from "react"
+import { Struct } from "effect"
+import { type ReactNode, useEffect, useState } from "react"
 import {
   type Bindings,
   chordOf,
@@ -17,6 +18,7 @@ import {
   isDefaultBinding,
   type KeybindAction,
   keybindActionDescriptions,
+  keybindActions,
   keybindActionLabels,
   keybindSections,
   mouseChordOf,
@@ -28,12 +30,23 @@ import { CUSTOM_FOV_PRESET, defaultSettings, type Settings } from "../domain/Set
 import { resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
 import { type SettingsCategory, useEditor } from "../editor/store"
 
+const CATEGORY_LABELS: Readonly<Record<SettingsCategory, string>> = {
+  general: "General",
+  camera: "Camera",
+  keybinds: "Keybinds",
+  appearance: "Appearance"
+}
+
 const CATEGORIES: ReadonlyArray<{ readonly id: SettingsCategory; readonly label: string; readonly icon: typeof IconSettings }> = [
-  { id: "general", label: "General", icon: IconSettings },
-  { id: "camera", label: "Camera", icon: IconCamera },
-  { id: "keybinds", label: "Keybinds", icon: IconKeyboard },
-  { id: "appearance", label: "Appearance", icon: IconPalette }
+  { id: "general", label: CATEGORY_LABELS.general, icon: IconSettings },
+  { id: "camera", label: CATEGORY_LABELS.camera, icon: IconCamera },
+  { id: "keybinds", label: CATEGORY_LABELS.keybinds, icon: IconKeyboard },
+  { id: "appearance", label: CATEGORY_LABELS.appearance, icon: IconPalette }
 ]
+
+/** base-ui sliders report a number, or an array for range sliders. */
+const sliderValue = (value: number | ReadonlyArray<number>): number | undefined =>
+  typeof value === "number" ? value : value[0]
 
 /** One searchable setting. `group` is a sub-heading inside the category (keybind sections). */
 interface Row {
@@ -128,7 +141,7 @@ function KeybindControl(props: {
     <div className="flex min-h-7 flex-wrap items-center justify-end gap-1">
       {props.bindings.map((binding, index) =>
         props.listening === index
-          ? <CaptureCap key={`capture-${index}`} />
+          ? <CaptureCap key="capture" />
           : (
             <span
               key={binding}
@@ -206,7 +219,7 @@ export function SettingsDialog(props: {
   const update = <K extends keyof Settings>(section: K, patch: Partial<Settings[K]>) =>
     void saveSettings({ ...settings, [section]: { ...settings[section], ...patch } })
   const resetField = <K extends keyof Settings>(section: K, key: keyof Settings[K]) =>
-    update(section, { [key]: defaultSettings[section][key] } as Partial<Settings[K]>)
+    update(section, Struct.pick(defaultSettings[section], [key]))
   const isDefault = <K extends keyof Settings>(section: K, key: keyof Settings[K]) =>
     settings[section][key] === defaultSettings[section][key]
 
@@ -221,7 +234,7 @@ export function SettingsDialog(props: {
       const next = [...keybinds[action]]
       next[index] = binding
       setListening(null)
-      setBindings(action, next)
+      void saveKeybinds({ ...keybinds, [action]: uniqueBindings(next) })
     }
     const stop = (e: Event) => {
       e.preventDefault()
@@ -257,12 +270,13 @@ export function SettingsDialog(props: {
     }
   }, [listening, keybinds])
 
-  const rows = useMemo((): ReadonlyArray<Row> => {
+  const rows = ((): ReadonlyArray<Row> => {
     // A chord is a conflict when two actions of the same kind share it. A fly key doubling
     // as a tool shortcut (W: forward + move mode, as in the game) is fine: it only flies
     // while the look button is held.
     const kinds = new Map<string, Set<string>>()
-    for (const [action, bindings] of Object.entries(keybinds) as Array<[KeybindAction, Bindings]>) {
+    for (const action of keybindActions) {
+      const bindings = keybinds[action]
       const kind = heldActions.has(action) ? "held" : mouseDragActions.has(action) ? "drag" : "oneShot"
       for (const b of bindings) {
         const set = kinds.get(`${kind}:${b}`) ?? new Set<string>()
@@ -307,10 +321,11 @@ export function SettingsDialog(props: {
       .map(({ row }) => row)
 
     const c = settings.camera
-    const presetItems: Record<string, string> = Object.fromEntries([
-      ...defaults.cameraPresets.map((p) => [p.id, `${p.label} (fov ${p.fov})`]),
+    const presetEntries: ReadonlyArray<readonly [string, string]> = [
+      ...defaults.cameraPresets.map((p) => [p.id, `${p.label} (fov ${p.fov})`] as const),
       [CUSTOM_FOV_PRESET, `Custom (fov ${c.customFov})`]
-    ])
+    ]
+    const presetItems = Object.fromEntries(presetEntries)
     const a = settings.appearance
     const customFovOff = c.fovPreset !== CUSTOM_FOV_PRESET
     return [
@@ -325,7 +340,7 @@ export function SettingsDialog(props: {
           <Select
             value={settings.general.units}
             items={{ cm: "Centimetres", m: "Metres" }}
-            onValueChange={(v) => update("general", { units: v as "cm" | "m" })}
+            onValueChange={(v) => v !== null && update("general", { units: v })}
           >
             <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -394,7 +409,10 @@ export function SettingsDialog(props: {
               step={1}
               value={c.customFov}
               disabled={customFovOff}
-              onValueChange={(v) => update("camera", { customFov: v as number })}
+              onValueChange={(v) => {
+                const customFov = sliderValue(v)
+                if (customFov !== undefined) update("camera", { customFov })
+              }}
             />
             <span className={cn("w-20 text-right font-mono text-xs tabular-nums", customFovOff && "text-muted-foreground/60")}>{c.customFov}°</span>
           </>
@@ -409,7 +427,10 @@ export function SettingsDialog(props: {
         reset: () => resetField("camera", "flySpeed"),
         control: (
           <>
-            <Slider className="w-48" min={100} max={20000} step={100} value={c.flySpeed} onValueChange={(v) => update("camera", { flySpeed: v as number })} />
+            <Slider className="w-48" min={100} max={20000} step={100} value={c.flySpeed} onValueChange={(v) => {
+                const flySpeed = sliderValue(v)
+                if (flySpeed !== undefined) update("camera", { flySpeed })
+              }} />
             <span className="w-20 text-right font-mono text-xs tabular-nums">{(c.flySpeed / 100).toFixed(0)} m/s</span>
           </>
         )
@@ -422,7 +443,10 @@ export function SettingsDialog(props: {
         reset: () => resetField("camera", "lookSensitivity"),
         control: (
           <>
-            <Slider className="w-48" min={0.1} max={5} step={0.1} value={c.lookSensitivity} onValueChange={(v) => update("camera", { lookSensitivity: v as number })} />
+            <Slider className="w-48" min={0.1} max={5} step={0.1} value={c.lookSensitivity} onValueChange={(v) => {
+                const lookSensitivity = sliderValue(v)
+                if (lookSensitivity !== undefined) update("camera", { lookSensitivity })
+              }} />
             <span className="w-20 text-right font-mono text-xs tabular-nums">×{c.lookSensitivity.toFixed(1)}</span>
           </>
         )
@@ -454,7 +478,7 @@ export function SettingsDialog(props: {
           <Select
             value={a.theme}
             items={{ dark: "Dark", light: "Light", system: "System" }}
-            onValueChange={(v) => update("appearance", { theme: v as Settings["appearance"]["theme"] })}
+            onValueChange={(v) => v !== null && update("appearance", { theme: v })}
           >
             <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -490,7 +514,7 @@ export function SettingsDialog(props: {
         control: <Input type="color" className="h-7 w-14 p-0.5" value={a.gridSectionColor} onChange={(e) => update("appearance", { gridSectionColor: e.target.value })} />
       }
     ]
-  }, [settings, keybinds, defaults, listening])
+  })()
 
   const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 0)
   const searching = terms.length > 0
@@ -506,14 +530,13 @@ export function SettingsDialog(props: {
   const groups: Array<{ key: string; title: string | undefined; rows: Array<Row> }> = []
   for (const row of visible) {
     const title = searching
-      ? [CATEGORIES.find((c) => c.id === row.category)?.label, row.group].filter(Boolean).join(" › ")
+      ? [CATEGORY_LABELS[row.category], row.group].filter(Boolean).join(" › ")
       : row.group
     const last = groups.at(-1)
     if (last !== undefined && last.title === title) last.rows.push(row)
     else groups.push({ key: `${row.category}-${title ?? ""}`, title, rows: [row] })
   }
 
-  const current = CATEGORIES.find((c) => c.id === props.category)!
   const resetCurrent = () => {
     if (props.category === "keybinds") void resetKeybinds()
     else if (props.category === "general") void saveSettings({ ...settings, general: defaultSettings.general })
@@ -571,7 +594,7 @@ export function SettingsDialog(props: {
         </nav>
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="border-b px-5 py-3">
-            <DialogTitle>{searching ? `Search: ${query}` : current.label}</DialogTitle>
+            <DialogTitle>{searching ? `Search: ${query}` : CATEGORY_LABELS[props.category]}</DialogTitle>
             <DialogDescription className="sr-only">Editor settings</DialogDescription>
           </div>
           <ScrollArea className="min-h-0 flex-1">
@@ -591,7 +614,7 @@ export function SettingsDialog(props: {
           </ScrollArea>
           <div className="flex justify-between border-t px-5 py-3">
             <Button variant="outline" onClick={resetCurrent} disabled={searching || !modifiedIn(props.category)}>
-              Reset {current.label.toLowerCase()} to defaults
+              Reset {CATEGORY_LABELS[props.category].toLowerCase()} to defaults
             </Button>
             <Button onClick={props.onClose} disabled={listening !== null}>Done</Button>
           </div>

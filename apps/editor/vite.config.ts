@@ -21,11 +21,11 @@ const repoAssets = (dir: string): Plugin => {
   }
   const middleware: Connect.NextHandleFunction = (req, res, next) => {
     const url = req.url?.split("?")[0] ?? ""
-    if (!url.startsWith("/assets/")) return next()
+    if (!url.startsWith("/assets/")) {  next(); return; }
     const file = path.join(root, decodeURIComponent(url.slice("/assets/".length)))
-    if (!file.startsWith(root + path.sep)) return next()
+    if (!file.startsWith(root + path.sep)) {  next(); return; }
     fs.stat(file, (error, stat) => {
-      if (error !== null || !stat.isFile()) return next()
+      if (error !== null || !stat.isFile()) {  next(); return; }
       res.setHeader("Content-Type", types[path.extname(file)] ?? "application/octet-stream")
       res.setHeader("Content-Length", stat.size)
       res.setHeader("Cache-Control", "no-cache")

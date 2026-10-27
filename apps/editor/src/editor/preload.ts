@@ -57,7 +57,11 @@ export const warmCatalog = (
   let cancelled = false
   const tick = () => {
     if (cancelled) return
-    for (let i = 0; i < perTick && queue.length > 0; i++) preloadGlb(queue.shift()!, options.preload)
+    for (let i = 0; i < perTick; i++) {
+      const url = queue.shift()
+      if (url === undefined) break
+      preloadGlb(url, options.preload)
+    }
     if (queue.length > 0) idle(tick)
   }
   idle(tick)

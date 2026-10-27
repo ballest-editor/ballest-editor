@@ -3,6 +3,7 @@ import { DateTime, Effect, Layer, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import { newMapFile } from "../domain/factory"
 import { isPlayerStart, MapFile } from "../domain/MapFile"
+import { objectAt, parseJson } from "../test/json"
 import { listSamples, readSample } from "../test/samples"
 import { MapCodec } from "./MapCodec"
 import { MapExporter } from "./MapExporter"
@@ -22,8 +23,8 @@ describe("MapExporter", () => {
       const exporter = yield* MapExporter
       const result = yield* exporter.prepare(fresh())
       assert.strictEqual(result.filename, "Map_LevelEditorMain&My Track_spig.balledit")
-      const json = JSON.parse(result.text)
-      const levelData = json.worldSettings.levelData
+      const decoded = yield* Schema.decodeEffect(Schema.fromJsonString(MapFile))(result.text)
+      const levelData = decoded.worldSettings.levelData
       assert.strictEqual(levelData.systemLevelName, "Map_LevelEditorMain")
       assert.strictEqual(levelData.userLevelName, "My Track_spig")
       assert.strictEqual(levelData.createdAt, "2026.10.26-17.04.05")
@@ -31,7 +32,6 @@ describe("MapExporter", () => {
       assert.isTrue(result.text.startsWith("{\r\n\t\"worldSettings\":\r\n\t{\r\n"))
       assert.strictEqual(result.blob.size, new TextEncoder().encode(result.text).length)
       // the output decodes again and keeps exactly one player start
-      const decoded = yield* Schema.decodeUnknownEffect(MapFile)(json)
       assert.strictEqual(decoded.items.filter(isPlayerStart).length, 1)
       assert.isDefined(decoded.editorState)
     }).pipe(Effect.provide(TestLayer)))
@@ -41,12 +41,15 @@ describe("MapExporter", () => {
       const codec = yield* MapCodec
       const exporter = yield* MapExporter
       const sample = listSamples().find((s) => s.kind === "ballmap")!
-      const original = JSON.parse(readSample(sample))
+      const original = parseJson(readSample(sample))
       const result = yield* exporter.prepare(yield* codec.decode(readSample(sample)))
-      const json = JSON.parse(result.text)
-      assert.deepStrictEqual(json.items, original.items)
-      assert.deepStrictEqual(json.editorState.pivots, [])
-      assert.strictEqual(json.worldSettings.levelData.levelDisplayName, original.worldSettings.levelData.levelDisplayName)
+      const json = parseJson(result.text)
+      assert.deepStrictEqual(objectAt(json)["items"], objectAt(original)["items"])
+      assert.deepStrictEqual(objectAt(json, "editorState")["pivots"], [])
+      assert.strictEqual(
+        objectAt(json, "worldSettings", "levelData")["levelDisplayName"],
+        objectAt(original, "worldSettings", "levelData")["levelDisplayName"]
+      )
     }).pipe(Effect.provide(TestLayer)))
 
   it.effect("refuses maps without exactly one player start, or without a name", () =>
