@@ -423,6 +423,18 @@ export function SettingsDialog(props: {
         )
       },
       {
+        id: "undoSelection",
+        ...setting("general", "undoSelection"),
+        label: "Undo selection changes",
+        description: "Make every selection change its own undo step.",
+        control: (
+          <Switch
+            checked={settings.general.undoSelection}
+            onCheckedChange={(v) => update("general", { undoSelection: v })}
+          />
+        )
+      },
+      {
         id: "autosave",
         category: "general",
         label: "Autosave",
