@@ -11,7 +11,8 @@ A standalone map editor for _Ballest of Them All_ (Steam 3339810, UE 5.8). Read 
 
 ## Layout
 
-- Turborepo + pnpm workspace. Run `pnpm dev|test|typecheck|build` from the root.
+- Turborepo + pnpm workspace. Run `pnpm dev|test|typecheck|build|lint|knip|format` from the root; `pnpm check:everything` runs format check, lint, knip, typecheck, tests and build, and must pass before committing.
+- Typecheck is `effect-tsgo tsc` (TypeScript 7 + Effect diagnostics; config in `tsconfig.base.json`). Lint is type-aware oxlint (`.oxlintrc.json`). Formatting is dprint (`dprint.json`, Effect's style). Don't run `effect-tsgo patch`: pnpm hard-links node_modules to the global store.
 - `apps/editor/` — TanStack Start (React) + Three.js editor. Effect for all non-trivial logic (services, schema, errors).
 - `packages/ui/` — shadcn/ui (`@workspace/ui`, preset `b6nCVm82TK`). All UI chrome comes from here.
 - `tools/extract/` — pak → glTF/catalog/keybinds pipeline, run via the Nix flake (`nix run .#extract`).
@@ -35,7 +36,7 @@ We use **Effect v4** (`effect@^4`). Before writing Effect code, read `repos/effe
 
 ## Conventions
 
-- TypeScript strict; pnpm; vitest (`@effect/vitest`) for tests.
+- TypeScript strict (see `tsconfig.base.json`); pnpm; vitest (`@effect/vitest`) for tests. Fix lint findings rather than disabling rules; a disable comment needs a `-- reason`.
 - Errors are `Schema.TaggedError` classes; no thrown exceptions across service boundaries.
 - Map file I/O goes through a single `MapFile` schema (`Schema.Class`) that decodes the game JSON and encodes it back; the catalog through a `Catalog` schema. Add a round-trip test against every file in `samples/` when touching either.
 - Commit only when asked.
