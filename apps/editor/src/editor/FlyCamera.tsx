@@ -85,7 +85,7 @@ export function FlyCamera() {
     const onBlur = () => pressed.current.clear()
 
     const onPointerDown = (e: PointerEvent) => {
-      if (sceneRegistry.gizmoActive()) return
+      // No gizmo check: the gizmo stops the left presses it takes, other buttons fall through.
       const chord = mouseChordOf(e)
       const mode = dragModes.find(([bindings]) => bindings.includes(chord))?.[1]
       if (mode === undefined) return
