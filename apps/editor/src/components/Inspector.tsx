@@ -1,6 +1,5 @@
 import {
   type Icon,
-  IconArrowBigUp,
   IconArrowsMaximize,
   IconArrowsMove,
   IconClipboard,
@@ -10,7 +9,6 @@ import {
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
-import { Kbd } from "@workspace/ui/components/kbd"
 import { Label } from "@workspace/ui/components/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
@@ -23,7 +21,7 @@ import { quatToRotator, rotatorToQuat } from "../domain/ueMath"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import { selectedIndex, useEditor } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
-import { MouseButtonIcon } from "./MouseButtonIcon"
+import { ShiftClick } from "./MouseButtonIcon"
 import { NumberField } from "./NumberField"
 
 type Axis = "x" | "y" | "z"
@@ -112,6 +110,7 @@ function TransformRow(props: {
       >
         <Tooltip>
           <TooltipTrigger
+            delay={500}
             render={
               <PopoverTrigger
                 render={
@@ -134,20 +133,14 @@ function TransformRow(props: {
           >
             <row.icon />
           </TooltipTrigger>
-          <TooltipContent side="left" className="flex flex-col items-start gap-1">
-            <span>{props.title}</span>
-            <span className="flex items-center gap-1.5">
-              Copy{" "}
-              <Kbd>
-                <IconArrowBigUp />
-                <MouseButtonIcon button="right" />
-              </Kbd>
-              Paste{" "}
-              <Kbd>
-                <IconArrowBigUp />
-                <MouseButtonIcon button="left" />
-              </Kbd>
-            </span>
+          <TooltipContent side="left" sideOffset={8} className="px-2.5 py-2">
+            <div className="font-medium">{props.title}</div>
+            <div className="mt-1.5 grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-1 opacity-80">
+              <span>Copy</span>
+              <ShiftClick button="right" />
+              <span>Paste</span>
+              <ShiftClick button="left" />
+            </div>
           </TooltipContent>
         </Tooltip>
         <PopoverContent side="left" align="start" className="w-auto gap-1 p-1">
@@ -164,10 +157,7 @@ function TransformRow(props: {
             <span className="flex items-center gap-2">
               <IconCopy />Copy X, Y, Z
             </span>
-            <Kbd>
-              <IconArrowBigUp />
-              <MouseButtonIcon button="right" />
-            </Kbd>
+            <ShiftClick button="right" />
           </Button>
           <Button
             variant="ghost"
@@ -182,10 +172,7 @@ function TransformRow(props: {
             <span className="flex items-center gap-2">
               <IconClipboard />Paste
             </span>
-            <Kbd>
-              <IconArrowBigUp />
-              <MouseButtonIcon button="left" />
-            </Kbd>
+            <ShiftClick button="left" />
           </Button>
         </PopoverContent>
       </Popover>
