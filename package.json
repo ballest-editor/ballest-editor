@@ -11,7 +11,7 @@
     "knip": "knip --treat-config-hints-as-errors",
     "format": "dprint fmt",
     "format:check": "dprint check",
-    "check:everything": "pnpm format:check && pnpm lint && pnpm knip && turbo typecheck test build"
+    "check:everything": "turbo run format:check lint knip typecheck test build --continue"
   },
   "devDependencies": {
     "@effect/tsgo": "0.61.0",

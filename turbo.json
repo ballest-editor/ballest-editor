@@ -3,32 +3,71 @@
   "ui": "stream",
   "cacheDir": "node_modules/.cache/turbo",
   "tasks": {
-    "build": {
-      "dependsOn": [
-        "^build"
-      ],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        ".env*"
-      ],
-      "outputs": [
-        "dist/**"
-      ]
-    },
-    "test": {
-      "dependsOn": [
-        "^build"
-      ],
-      "outputs": []
+    // No script: lets a package's hash include its dependencies' sources without
+    // waiting for their tasks (typecheck/test run in parallel across packages).
+    "transit": {
+      "dependsOn": ["^transit"]
     },
     "typecheck": {
-      "dependsOn": [
-        "^typecheck"
+      "dependsOn": ["transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tsconfig.base.json"]
+    },
+    "test": {
+      "dependsOn": ["transit"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/tsconfig.base.json",
+        "$TURBO_ROOT$/samples/**",
+        "$TURBO_ROOT$/assets/**"
       ]
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tsconfig.base.json", ".env*"],
+      "outputs": ["dist/**"]
     },
     "dev": {
       "cache": false,
       "persistent": true
+    },
+
+    // Repo-wide tools, run once from the root.
+    "//#lint": {
+      "inputs": [
+        ".oxlintrc.json",
+        "tsconfig.base.json",
+        "pnpm-lock.yaml",
+        "apps/*/tsconfig.json",
+        "packages/*/tsconfig.json",
+        "apps/**/*.{ts,tsx,js,mjs}",
+        "packages/**/*.{ts,tsx,js,mjs}",
+        "!**/node_modules/**",
+        "!**/dist/**"
+      ]
+    },
+    "//#knip": {
+      "inputs": [
+        "knip.json",
+        "package.json",
+        "pnpm-lock.yaml",
+        "tsconfig.base.json",
+        "apps/**",
+        "packages/**",
+        "tools/extract/**",
+        "!**/node_modules/**",
+        "!**/dist/**"
+      ]
+    },
+    "//#format:check": {
+      "inputs": [
+        "dprint.json",
+        "**/*.{ts,tsx,js,mjs,json,md}",
+        "!repos/**",
+        "!samples/**",
+        "!assets/**",
+        "!**/node_modules/**",
+        "!**/dist/**"
+      ]
     }
   }
 }
