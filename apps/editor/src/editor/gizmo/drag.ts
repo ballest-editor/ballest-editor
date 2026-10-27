@@ -72,10 +72,9 @@ export const dragDelta = (start: DragStart, now: PointerSample, grid?: DragGrid)
   if (dir === undefined) return undefined
   switch (spec.kind) {
     case "translateAxis": {
-      const t0 = axisParamFromRay(o, dir, start.pointer.rayOrigin, start.pointer.rayDir)
-      const t1 = axisParamFromRay(o, dir, now.rayOrigin, now.rayDir)
-      if (t0 === undefined || t1 === undefined || spec.axis === undefined) return undefined
-      return translateDelta(start, [[spec.axis, t1 - t0]], grid)
+      const t = axisParams(start, now, dir)
+      if (t === undefined || spec.axis === undefined) return undefined
+      return translateDelta(start, [[spec.axis, t[1] - t[0]]], grid)
     }
     case "translatePlane": {
       const p0 = planeHit(o, dir, start.pointer.rayOrigin, start.pointer.rayDir)
@@ -96,12 +95,22 @@ export const dragDelta = (start: DragStart, now: PointerSample, grid?: DragGrid)
       return { kind: "rotate", rotation: worldAxisAngleToGameQuat(dir, angle) }
     }
     case "scaleAxis": {
-      const t0 = axisParamFromRay(o, dir, start.pointer.rayOrigin, start.pointer.rayDir)
-      const t1 = axisParamFromRay(o, dir, now.rayOrigin, now.rayDir)
-      if (t0 === undefined || t1 === undefined || Math.abs(t0) < 1e-6) return undefined
-      return { kind: "scale", factor: t1 / t0, axis: worldDirToGame(dir) }
+      const t = axisParams(start, now, dir)
+      if (t === undefined || Math.abs(t[0]) < 1e-6) return undefined
+      return { kind: "scale", factor: t[1] / t[0], axis: worldDirToGame(dir) }
     }
   }
+}
+
+/** Where the pointer's ray passes the axis line through the origin, at drag start and now. */
+const axisParams = (
+  start: DragStart,
+  now: PointerSample,
+  dir: THREE.Vector3
+): readonly [number, number] | undefined => {
+  const t0 = axisParamFromRay(start.originWorld, dir, start.pointer.rayOrigin, start.pointer.rayDir)
+  const t1 = axisParamFromRay(start.originWorld, dir, now.rayOrigin, now.rayDir)
+  return t0 === undefined || t1 === undefined ? undefined : [t0, t1]
 }
 
 /** A move of `distance` cm along each gizmo axis (game axes, or the active item's own in local space). */
