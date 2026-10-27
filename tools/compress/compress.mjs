@@ -1,24 +1,28 @@
 #!/usr/bin/env node
 // usage: node tools/compress/compress.mjs [ASSETS_DIR] [OUT_DIR]   (defaults: ./assets ./web-assets)
 //
-// Turns the extractor's raw output into the tree the editor serves at /assets/*:
+// Compresses the extractor's big binaries into the tree the editor serves under /assets/*:
 //   pieces/**.glb    -> meshopt-compressed glb, lossless (gltfpack -cc without quantization; same names)
-//   textures/**.png  -> AVIF, 4:4:4, quality 80 (avifenc; .png -> .avif)
-//   materials.json   -> texture paths rewritten to the .avif files
-//   everything else  -> copied as is
-// OUT_DIR is owned by this script and rebuilt from scratch on every run. It is committed, so machines without
-// the gitignored raw meshes and textures (CI, Vercel, a fresh clone) keep it as is instead.
+//   textures/**.png  -> AVIF, 4:4:4, quality 80 (avifenc; .png -> .avif, the editor asks for .avif)
+// Everything else under assets/ (catalog, materials, keybinds, thumbs, ...) is small and committed, and is
+// served from assets/ directly. OUT_DIR is owned by this script and rebuilt from scratch on every run. It is
+// gitignored: `pnpm assets:upload` publishes it to Vercel Blob (see README.md), which deployments and clones
+// without it use instead.
 import { pack } from "gltfpack"
 import { execFileSync, spawn } from "node:child_process"
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { availableParallelism } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
 const [assets = "assets", out = "web-assets"] = process.argv.slice(2).map((p) => resolve(p))
 const log = (msg) => console.error(`[compress] ${msg}`)
+/** Paths relative to `dir`, forward slashes, sorted. */
 const files = (dir, ext) =>
   existsSync(dir)
-    ? readdirSync(dir, { recursive: true }).filter((f) => f.endsWith(ext)).sort()
+    ? readdirSync(dir, { recursive: true })
+      .map((f) => f.replaceAll("\\", "/"))
+      .filter((f) => f.endsWith(ext))
+      .sort()
     : []
 
 // Lossless: -noq keeps float attributes as they are; -kn/-km/-ke/-kv keep the node, material, extras and
@@ -70,21 +74,19 @@ if (!existsSync(join(assets, "catalog.json"))) {
 }
 const raw = ["pieces", "textures"].filter((dir) => existsSync(join(assets, dir)))
 if (raw.length === 0) {
-  log(`no ${assets}/pieces or textures (not extracted here): keeping ${out} as committed`)
+  log(
+    `no ${assets}/pieces or textures (not extracted here): ${
+      existsSync(out) ? `keeping ${out}` : "using Vercel Blob (web-assets.json)"
+    }`
+  )
   process.exit(0)
 }
 if (raw.length === 1) {
-  console.error(`only ${raw[0]}/ in ${assets}: rerun tools/extract; a rebuild now would drop the committed other half`)
+  console.error(`only ${raw[0]}/ in ${assets}: rerun tools/extract so both pieces/ and textures/ are present`)
   process.exit(2)
 }
 rmSync(out, { recursive: true, force: true })
 mkdirSync(out, { recursive: true })
-
-// Everything except the three things rewritten below, as is.
-cpSync(assets, out, {
-  recursive: true,
-  filter: (src) => ![join(assets, "pieces"), join(assets, "textures"), join(assets, "materials.json")].includes(src)
-})
 
 const glbs = files(join(assets, "pieces"), ".glb")
 for (const glb of glbs) {
@@ -108,20 +110,4 @@ if (pngs.length > 0) {
   })
 }
 log(`${pngs.length} textures`)
-
-// materials.json names textures by their path under assets/ ("textures/....png"), both in each material's
-// approx.*Texture and in textures[].png. Point every one that was encoded at its .avif.
-if (existsSync(join(assets, "materials.json"))) {
-  const encoded = new Set(pngs.map((png) => `textures/${png}`))
-  const rewrite = (value) =>
-    typeof value === "string"
-      ? encoded.has(value) ? value.replace(/\.png$/, ".avif") : value
-      : Array.isArray(value)
-      ? value.map(rewrite)
-      : value !== null && typeof value === "object"
-      ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, rewrite(v)]))
-      : value
-  const materials = JSON.parse(readFileSync(join(assets, "materials.json"), "utf8"))
-  writeFileSync(join(out, "materials.json"), JSON.stringify(rewrite(materials), null, 2) + "\n")
-}
-log(`wrote ${out}`)
+log(`wrote ${out}; run \`pnpm assets:upload\` to publish it`)

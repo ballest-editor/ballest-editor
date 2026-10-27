@@ -6,6 +6,6 @@ A standalone, CAD-style map editor for [Ballest of Them All](https://store.steam
 - [docs/VISION.md](docs/VISION.md) — feature roadmap
 - `apps/editor/` — the editor (TanStack Start, Three.js, Effect)
 - `tools/extract/` — pulls piece meshes out of the game pak (Nix flake)
-- `tools/compress/` — compresses the extracted assets into `web-assets/`, the tree the editor serves
+- `tools/compress/` — compresses the extracted meshes and textures and publishes them to Vercel Blob
 
 Contributors and coding agents: read [AGENTS.md](AGENTS.md).
