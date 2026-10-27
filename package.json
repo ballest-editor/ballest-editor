@@ -11,11 +11,13 @@
     "knip": "knip --treat-config-hints-as-errors",
     "format": "dprint fmt",
     "format:check": "dprint check",
-    "check:everything": "turbo run format:check lint knip typecheck test build --continue"
+    "check:everything": "turbo run format:check lint knip dupes typecheck test build --continue",
+    "dupes": "jscpd"
   },
   "devDependencies": {
     "@effect/tsgo": "0.61.0",
     "dprint": "0.64.3",
+    "jscpd": "5.4.2",
     "knip": "6.43.0",
     "oxlint": "1.89.0",
     "oxlint-tsgolint": "7.0.2005",
