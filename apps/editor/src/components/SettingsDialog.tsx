@@ -19,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/component
 import { cn } from "@workspace/ui/lib/utils"
 import { Struct } from "effect"
 import { type ReactNode, useEffect, useState } from "react"
+import { movementLookModes } from "../domain/flyKeys"
 import {
   type Bindings,
   chordOf,
@@ -38,6 +39,8 @@ import {
 import { CUSTOM_FOV_PRESET, defaultSettings, type Settings } from "../domain/Settings"
 import { resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
 import { type SettingsCategory, useEditor } from "../editor/store"
+
+const movementLookItems = { none: "None", upDown: "Up and down", all: "All" } as const
 
 const CATEGORY_LABELS: Readonly<Record<SettingsCategory, string>> = {
   general: "General",
@@ -526,6 +529,27 @@ export function SettingsDialog(props: {
         ...setting("camera", "invertLookY"),
         label: "Invert look vertical",
         control: <Switch checked={c.invertLookY} onCheckedChange={(v) => update("camera", { invertLookY: v })} />
+      },
+      {
+        id: "movementNeedsLook",
+        ...setting("camera", "movementNeedsLook"),
+        label: "Movement keys need look held",
+        description:
+          "Which movement keys only fly while the look button is held. Forward (W) is also move mode: unless it needs look, it flies while looking or while another movement key is flying, and switches to move mode otherwise.",
+        control: (
+          <Select
+            value={c.movementNeedsLook}
+            items={movementLookItems}
+            onValueChange={(v) => v !== null && update("camera", { movementNeedsLook: v })}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {movementLookModes.map((m) => <SelectItem key={m} value={m}>{movementLookItems[m]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )
       },
       ...keybindRows,
       {

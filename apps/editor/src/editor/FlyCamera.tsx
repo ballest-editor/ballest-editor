@@ -2,6 +2,7 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useRef } from "react"
 import * as THREE from "three"
 import { threeToUeVector, ueToThreeVector } from "../domain/coords"
+import { flyingActions, type MovementAction } from "../domain/flyKeys"
 import {
   type Bindings,
   chordOf,
@@ -9,6 +10,7 @@ import {
   isBound,
   isBoundChord,
   isOneShotChord,
+  type Keybinds,
   mouseChordOf,
   wheelChordOf
 } from "../domain/Keybinds"
@@ -33,6 +35,15 @@ export const isEditorKeyEvent = (e: KeyboardEvent): boolean =>
   !(e.target instanceof Element && e.target.closest("[role=dialog]") !== null)
 
 type DragMode = "look" | "orbit" | "pan"
+
+/** The movement actions flying the camera now, per the "movement keys need look" setting. */
+const flyingNow = (keybinds: Keybinds, keys: HeldKeys, looking: boolean, now: number) =>
+  flyingActions(
+    keybinds,
+    useEditor.getState().settings.camera.movementNeedsLook,
+    looking,
+    (binding) => keys.holds(binding, now)
+  )
 
 /**
  * Free-fly camera: hold the look button and drag to look, movement keys to fly, orbit and
@@ -77,6 +88,8 @@ export function FlyCamera() {
     ]
     sceneRegistry.isNavigationChord = (chord) => dragModes.some(([bindings]) => bindings.includes(chord))
     sceneRegistry.lookDragActive = () => drag.current !== null
+    sceneRegistry.flyKeysActive = () =>
+      flyingNow(keybinds, pressed.current, drag.current !== null, performance.now()).size > 0
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditorKeyEvent(e)) pressed.current.press(e.code, performance.now(), isBoundChord(keybinds, chordOf(e)))
@@ -218,8 +231,8 @@ export function FlyCamera() {
   useFrame((_, delta) => {
     const keys = pressed.current
     const now = performance.now()
-    // A fly key that is also a tool shortcut (W = forward and move mode, as in the game's
-    // editor) only flies while the look button is held, UE-style; the rest fly any time.
+    // Non-movement held keys (arrow look, fast) that are also tool shortcuts only count while
+    // looking; movement keys follow the "movement keys need look" setting (see flyKeys).
     const looking = drag.current !== null
     const held = (bindings: Bindings) =>
       bindings.some((binding) => keys.holds(binding, now) && (looking || !isOneShotChord(keybinds, binding)))
@@ -237,10 +250,13 @@ export function FlyCamera() {
       camera.quaternion.setFromEuler(eul)
     }
 
+    const flying = flyingNow(keybinds, keys, looking, now)
+    const axis = (plus: MovementAction, minus: MovementAction) =>
+      (flying.has(plus) ? 1 : 0) - (flying.has(minus) ? 1 : 0)
     const move = new THREE.Vector3(
-      (held(keybinds.moveRight) ? 1 : 0) - (held(keybinds.moveLeft) ? 1 : 0),
-      (held(keybinds.moveUp) ? 1 : 0) - (held(keybinds.moveDown) ? 1 : 0),
-      (held(keybinds.moveBack) ? 1 : 0) - (held(keybinds.moveForward) ? 1 : 0)
+      axis("moveRight", "moveLeft"),
+      axis("moveUp", "moveDown"),
+      axis("moveBack", "moveForward")
     )
     if (move.lengthSq() === 0) return
     // Keys held together with Ctrl/Alt are chords (Ctrl+S...), not movement.

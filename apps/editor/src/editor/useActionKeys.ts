@@ -1,4 +1,5 @@
 import { useEffect } from "react"
+import { isMovementChord } from "../domain/flyKeys"
 import { actionsFor, chordOf, type KeybindAction } from "../domain/Keybinds"
 import { commands } from "./commands"
 import { isEditorKeyEvent } from "./FlyCamera"
@@ -52,6 +53,8 @@ export function useActionKeys() {
       if (!isEditorKeyEvent(e) || e.repeat || sceneRegistry.lookDragActive() || sceneRegistry.gizmoDragActive()) return
       const chord = chordOf(e)
       const { keybinds } = useEditor.getState()
+      // W while already flying (A held) joins the flight instead of switching to move mode.
+      if (isMovementChord(keybinds, chord) && sceneRegistry.flyKeysActive()) return
       for (const action of actionsFor(keybinds, chord)) {
         const run = oneShot(action)
         if (run === undefined) continue
