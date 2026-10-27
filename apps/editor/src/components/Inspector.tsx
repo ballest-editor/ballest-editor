@@ -4,7 +4,8 @@ import {
   IconArrowsMove,
   IconClipboard,
   IconCopy,
-  IconRefresh
+  IconRefresh,
+  IconTrash
 } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
@@ -15,182 +16,25 @@ import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Separator } from "@workspace/ui/components/separator"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { type ReactNode, useState } from "react"
+import { useShallow } from "zustand/react/shallow"
 import type { UeTransform, Vec3 } from "../domain/coords"
-import { classNameOf, isPlayerStart, objectPathOf } from "../domain/MapFile"
-import { quatToRotator, rotatorToQuat } from "../domain/ueMath"
+import { type Axis, readField, type TransformField } from "../domain/groupTransform"
+import { formatBindings, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
+import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/MapFile"
+import {
+  deleteSelection,
+  duplicateSelection,
+  editSelectionAxis,
+  previewSelectionAxis,
+  setSelectionField
+} from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
-import { selectedIndex, useEditor } from "../editor/store"
+import { selectedIndices, shownTransform, useEditor } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { ShiftClick } from "./MouseButtonIcon"
 import { NumberField } from "./NumberField"
 
-type Axis = "x" | "y" | "z"
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
-
-/** One X/Y/Z row of the transform, in display values (units, degrees). */
-interface TransformRowSpec {
-  readonly kind: "position" | "rotation" | "scale"
-  readonly title: string
-  readonly icon: Icon
-  readonly labels: Readonly<Record<Axis, string>>
-  readonly read: (t: UeTransform) => Vec3
-  readonly write: (t: UeTransform, v: Vec3) => UeTransform
-}
-
-const transformRows = (perUnit: number): ReadonlyArray<TransformRowSpec> => [
-  {
-    kind: "position",
-    title: "Location",
-    icon: IconArrowsMove,
-    labels: { x: "X", y: "Y", z: "Z" },
-    read: (t) => ({ x: t.translation.x / perUnit, y: t.translation.y / perUnit, z: t.translation.z / perUnit }),
-    write: (t, v) => ({ ...t, translation: { x: v.x * perUnit, y: v.y * perUnit, z: v.z * perUnit } })
-  },
-  {
-    // UE rotator axes: roll about X, pitch about Y, yaw about Z.
-    kind: "rotation",
-    title: "Rotation",
-    icon: IconRefresh,
-    labels: { x: "X roll", y: "Y pitch", z: "Z yaw" },
-    read: (t) => {
-      const r = quatToRotator(t.rotation)
-      return { x: r.roll, y: r.pitch, z: r.yaw }
-    },
-    write: (t, v) => ({ ...t, rotation: rotatorToQuat({ roll: v.x, pitch: v.y, yaw: v.z }) })
-  },
-  {
-    kind: "scale",
-    title: "Scale",
-    icon: IconArrowsMaximize,
-    labels: { x: "X", y: "Y", z: "Z" },
-    read: (t) => ({ x: t.scale3D.x, y: t.scale3D.y, z: t.scale3D.z }),
-    write: (t, v) => ({ ...t, scale3D: { x: v.x, y: v.y, z: v.z } })
-  }
-]
-
-/** Copied rows, in display values, shared by every item. */
-const copiedRows = new Map<TransformRowSpec["kind"], Vec3>()
-
-function TransformRow(props: {
-  readonly row: TransformRowSpec
-  /** Tooltip heading, with units. */
-  readonly title: string
-  /** The transform on screen (live during a drag or scrub). */
-  readonly shown: UeTransform
-  /** The document's transform, which edits build on. */
-  readonly committed: UeTransform
-  readonly onCommit: (transform: UeTransform) => void
-  readonly onPreview: (transform: UeTransform | null) => void
-  readonly step: number
-  readonly digits: number
-}) {
-  const notify = useEditor((s) => s.notify)
-  const { row, committed } = props
-  const value = row.read(props.shown)
-  const [open, setOpen] = useState(false)
-  const copy = () => {
-    copiedRows.set(row.kind, row.read(committed))
-    notify("info", `Copied ${row.title.toLowerCase()}.`)
-  }
-  const paste = () => {
-    const copied = copiedRows.get(row.kind)
-    if (copied === undefined) notify("info", `Nothing copied for ${row.title.toLowerCase()} yet.`)
-    else props.onCommit(row.write(committed, copied))
-  }
-  const withAxis = (axis: Axis, n: number) => row.write(committed, { ...row.read(committed), [axis]: n })
-  return (
-    <div className="contents">
-      <Popover
-        open={open}
-        onOpenChange={(next, details) => {
-          // Shift+click pastes instead of opening the menu
-          if (next && details.event instanceof MouseEvent && details.event.shiftKey) return
-          setOpen(next)
-        }}
-      >
-        <Tooltip>
-          <TooltipTrigger
-            delay={500}
-            render={
-              <PopoverTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={props.title}
-                    onClick={(e) => {
-                      if (e.shiftKey) paste()
-                    }}
-                    onContextMenu={(e) => {
-                      if (!e.shiftKey) return
-                      e.preventDefault()
-                      copy()
-                    }}
-                  />
-                }
-              />
-            }
-          >
-            <row.icon />
-          </TooltipTrigger>
-          <TooltipContent side="left" sideOffset={8} className="flex flex-col items-start py-2 pr-3 pl-2.5">
-            <div className="font-medium">{props.title}</div>
-            <div className="mt-1.5 grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-1 opacity-80">
-              <span>Copy</span>
-              <ShiftClick button="right" />
-              <span>Paste</span>
-              <ShiftClick button="left" />
-            </div>
-          </TooltipContent>
-        </Tooltip>
-        <PopoverContent side="left" align="start" className="w-auto gap-1 p-1">
-          <div className="px-2 py-1 text-xs text-muted-foreground">{props.title}</div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="justify-between gap-4"
-            onClick={() => {
-              copy()
-              setOpen(false)
-            }}
-          >
-            <span className="flex items-center gap-2">
-              <IconCopy />Copy X, Y, Z
-            </span>
-            <ShiftClick button="right" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="justify-between gap-4"
-            disabled={copiedRows.get(row.kind) === undefined}
-            onClick={() => {
-              paste()
-              setOpen(false)
-            }}
-          >
-            <span className="flex items-center gap-2">
-              <IconClipboard />Paste
-            </span>
-            <ShiftClick button="left" />
-          </Button>
-        </PopoverContent>
-      </Popover>
-      {axes.map((axis) => (
-        <NumberField
-          key={axis}
-          label={row.labels[axis]}
-          value={value[axis]}
-          onCommit={(n) => props.onCommit(withAxis(axis, n))}
-          onScrub={(n) => props.onPreview(n === null ? null : withAxis(axis, n))}
-          step={props.step}
-          digits={props.digits}
-          handleClassName={AXIS_BG_CLASSES[axis]}
-        />
-      ))}
-    </div>
-  )
-}
 
 const SectionTitle = ({ children }: { readonly children: ReactNode }) => (
   <div className="text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">{children}</div>
@@ -235,18 +79,282 @@ function MapSettings() {
   )
 }
 
-export function Inspector() {
-  const index = useEditor(selectedIndex)
-  const item = useEditor((s) => (index < 0 ? undefined : s.doc.map.items[index]))
-  const selectedId = useEditor((s) => s.selectedId)
+/** The value all items share, or null when they differ (shown as mixed). */
+const shared = (values: ReadonlyArray<number>): number | null => {
+  const first = values[0]
+  return first !== undefined && values.every((v) => v === first) ? first : null
+}
+
+/** One X/Y/Z row of the transform: which field, how it's labelled, and its display precision. */
+interface TransformRowSpec {
+  readonly field: TransformField
+  readonly title: string
+  readonly icon: Icon
+  readonly labels: Readonly<Record<Axis, string>>
+  readonly step: number
+  readonly digits: number
+}
+
+const transformRows = (units: "cm" | "m"): ReadonlyArray<TransformRowSpec> => [
+  {
+    field: "translation",
+    title: `Location (game ${units}, Z up)`,
+    icon: IconArrowsMove,
+    labels: { x: "X", y: "Y", z: "Z" },
+    step: units === "m" ? 0.01 : 1,
+    digits: units === "m" ? 3 : 1
+  },
+  {
+    field: "rotation",
+    title: "Rotation (degrees: roll, pitch, yaw)",
+    icon: IconRefresh,
+    labels: { x: "X roll", y: "Y pitch", z: "Z yaw" },
+    step: 1,
+    digits: 1
+  },
+  {
+    field: "scale3D",
+    title: "Scale",
+    icon: IconArrowsMaximize,
+    labels: { x: "X", y: "Y", z: "Z" },
+    step: 0.01,
+    digits: 2
+  }
+]
+
+const rowName = (
+  field: TransformField
+) => (field === "translation" ? "location" : field === "scale3D" ? "scale" : field)
+
+/** Copied rows in stored units (cm, degrees, factor), shared by every selection. */
+const copiedRows = new Map<TransformField, Vec3>()
+
+/**
+ * One editable row over the whole selection: a label icon whose menu (or Shift+click
+ * shortcuts) copies and pastes all three axes, then an X/Y/Z field each. A typed value sets
+ * every selected item; a scrub moves each by the same amount from where it was, so a mixed
+ * selection keeps its spread. `perUnit` converts display units to the stored value.
+ */
+function TransformRow(props: {
+  readonly row: TransformRowSpec
+  /** The selection's transforms as shown (live while a drag or scrub is in progress). */
+  readonly shown: ReadonlyArray<UeTransform>
+  /** The active item's document transform, which a copy reads. */
+  readonly active: UeTransform
+  readonly perUnit: number
+}) {
+  const notify = useEditor((s) => s.notify)
+  const { row, perUnit } = props
+  const { field } = row
+  const [open, setOpen] = useState(false)
+  const copy = () => {
+    copiedRows.set(field, readField(props.active, field))
+    notify("info", `Copied ${rowName(field)}.`)
+  }
+  const paste = () => {
+    const copied = copiedRows.get(field)
+    if (copied === undefined) notify("info", `Nothing copied for ${rowName(field)} yet.`)
+    else setSelectionField(field, copied)
+  }
+  return (
+    <div className="contents">
+      <Popover
+        open={open}
+        onOpenChange={(next, details) => {
+          // Shift+click pastes instead of opening the menu
+          if (next && details.event instanceof MouseEvent && details.event.shiftKey) return
+          setOpen(next)
+        }}
+      >
+        <Tooltip>
+          <TooltipTrigger
+            delay={500}
+            render={
+              <PopoverTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={row.title}
+                    onClick={(e) => {
+                      if (e.shiftKey) paste()
+                    }}
+                    onContextMenu={(e) => {
+                      if (!e.shiftKey) return
+                      e.preventDefault()
+                      copy()
+                    }}
+                  />
+                }
+              />
+            }
+          >
+            <row.icon />
+          </TooltipTrigger>
+          <TooltipContent side="left" sideOffset={8} className="flex flex-col items-start py-2 pr-3 pl-2.5">
+            <div className="font-medium">{row.title}</div>
+            <div className="mt-1.5 grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-1 opacity-80">
+              <span>Copy</span>
+              <ShiftClick button="right" />
+              <span>Paste</span>
+              <ShiftClick button="left" />
+            </div>
+          </TooltipContent>
+        </Tooltip>
+        <PopoverContent side="left" align="start" className="w-auto gap-1 p-1">
+          <div className="px-2 py-1 text-xs text-muted-foreground">{row.title}</div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="justify-between gap-4"
+            onClick={() => {
+              copy()
+              setOpen(false)
+            }}
+          >
+            <span className="flex items-center gap-2">
+              <IconCopy />Copy X, Y, Z
+            </span>
+            <ShiftClick button="right" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="justify-between gap-4"
+            disabled={copiedRows.get(field) === undefined}
+            onClick={() => {
+              paste()
+              setOpen(false)
+            }}
+          >
+            <span className="flex items-center gap-2">
+              <IconClipboard />Paste
+            </span>
+            <ShiftClick button="left" />
+          </Button>
+        </PopoverContent>
+      </Popover>
+      {axes.map((axis) => {
+        const value = shared(props.shown.map((t) => readField(t, field)[axis] / perUnit))
+        const offset = (v: number) => ({ kind: "offset", by: (v - (value ?? 0)) * perUnit }) as const
+        return (
+          <NumberField
+            key={axis}
+            label={row.labels[axis]}
+            value={value}
+            onCommit={(v) => editSelectionAxis(field, axis, { kind: "set", value: v * perUnit })}
+            onScrub={(v) => previewSelectionAxis(field, axis, v === null ? null : offset(v))}
+            onScrubCommit={(v) => editSelectionAxis(field, axis, offset(v))}
+            step={row.step}
+            digits={row.digits}
+            handleClassName={AXIS_BG_CLASSES[axis]}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+function SelectionActions() {
+  const keybinds = useEditor((s) => s.keybinds)
+  const shortcut = (action: KeybindAction) => `${keybindActionLabels[action]} (${formatBindings(keybinds[action])})`
+  return (
+    <div className="flex gap-2">
+      <Button variant="outline" size="sm" title={shortcut("duplicateSelection")} onClick={duplicateSelection}>
+        <IconCopy />
+        Duplicate
+      </Button>
+      <Button variant="destructive" size="sm" title={shortcut("deleteSelection")} onClick={deleteSelection}>
+        <IconTrash />
+        Delete
+      </Button>
+    </div>
+  )
+}
+
+/** What's selected: one item's class (and index), or a count with the classes involved. */
+function SelectionHeader(
+  { items }: { readonly items: ReadonlyArray<{ readonly index: number; readonly item: Item }> }
+) {
+  const only = items.length === 1 ? items[0] : undefined
+  const counts = new Map<string, number>()
+  for (const { item } of items) {
+    const name = classNameOf(item.actorToSpawn)
+    counts.set(name, (counts.get(name) ?? 0) + 1)
+  }
+  return (
+    <>
+      <SectionTitle>{only === undefined ? `${items.length} items selected` : `Item #${only.index}`}</SectionTitle>
+      {only === undefined
+        ? (
+          <ul className="flex flex-col gap-0.5 text-xs break-all">
+            {[...counts].map(([name, n]) => (
+              <li key={name}>
+                <span className="font-semibold">{name}</span>
+                <span className="ml-1 text-muted-foreground">× {n}</span>
+              </li>
+            ))}
+          </ul>
+        )
+        : (
+          <div className="text-sm font-semibold break-all" title={only.item.actorToSpawn}>
+            {classNameOf(only.item.actorToSpawn)}
+          </div>
+        )}
+      {items.some(({ item }) => isPlayerStart(item)) && <Badge variant="secondary">Player start (required)</Badge>}
+    </>
+  )
+}
+
+function Meshes({ item }: { readonly item: Item }) {
   const catalogIndex = useEditor((s) => s.catalogIndex)
   const missing = useEditor((s) => s.missingGlbs)
-  const transformItem = useEditor((s) => s.transformItem)
-  const setPreview = useEditor((s) => s.setPreview)
-  const preview = useEditor((s) => s.preview)
+  const failed = visualsOf(item, catalogIndex).flatMap((v) => {
+    const url = glbUrl(v.mesh?.glb)
+    return url !== undefined && missing.has(url)
+      ? [`${v.mesh?.meshAssetPath.split(".").at(-1)}: mesh failed to load`]
+      : []
+  })
+  return (
+    <>
+      {failed.map((w) => <Badge key={w} variant="destructive">{w}</Badge>)}
+      <SectionTitle>Meshes</SectionTitle>
+      {item.meshComponents.map((mesh, i) => (
+        // oxlint-disable-next-line react/no-array-index-key -- mesh components have no id; the slot index is their identity
+        <div key={i} className="flex flex-col gap-1 text-xs break-all">
+          <div className="font-mono" title={mesh.meshAssetPath}>
+            {mesh.meshAssetPath === undefined || mesh.meshAssetPath === ""
+              ? "(no main mesh)"
+              : mesh.meshAssetPath.split("/").at(-1)}
+          </div>
+          <ul className="flex flex-col gap-0.5 pl-2 font-mono text-muted-foreground">
+            {mesh.materials.map((m) => (
+              <li key={m.materialIndex} title={m.material}>
+                {m.materialIndex}: {objectPathOf(m.material).split(".").at(-1)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </>
+  )
+}
+
+export function Inspector() {
+  // Selected items in selection order, with their shown transforms (live while the gizmo
+  // drags or a field scrubs; committed on release).
+  const items = useEditor(useShallow((s) =>
+    selectedIndices(s).flatMap((index) => {
+      const item = s.doc.map.items[index]
+      return item === undefined ? [] : [item]
+    })
+  ))
+  const indices = useEditor(useShallow(selectedIndices))
+  const transforms = useEditor(useShallow((s) => s.selectedIds.flatMap((id) => shownTransform(s, id) ?? [])))
   const units = useEditor((s) => s.settings.general.units)
 
-  if (item === undefined || selectedId === null) {
+  const first = items[0]
+  if (first === undefined) {
     return (
       <ScrollArea className="h-full bg-card">
         <div className="p-3">
@@ -256,73 +364,36 @@ export function Inspector() {
     )
   }
 
-  // While the gizmo drags, show the live transform (committed on release).
-  const t = preview?.id === selectedId ? preview.transform : item.itemTransform
-  // Display units only; the map always stores centimetres.
+  // Display units only; the map always stores centimetres (rotation and scale don't convert).
   const perUnit = units === "m" ? 100 : 1
-  const rows = transformRows(perUnit)
-  const fieldProps = {
-    position: { step: perUnit === 100 ? 0.01 : 1, digits: perUnit === 100 ? 3 : 1 },
-    rotation: { step: 1, digits: 1 },
-    scale: { step: 0.01, digits: 2 }
-  } as const
-  const failed = visualsOf(item, catalogIndex).flatMap((v) => {
-    const url = glbUrl(v.mesh?.glb)
-    return url !== undefined && missing.has(url)
-      ? [`${v.mesh?.meshAssetPath.split(".").at(-1)}: mesh failed to load`]
-      : []
-  })
+  const active = items.at(-1) ?? first
 
   return (
     <ScrollArea className="h-full bg-card">
       <div className="flex flex-col gap-3 p-3">
-        <SectionTitle>Item #{index}</SectionTitle>
-        <div className="text-sm font-semibold break-all" title={item.actorToSpawn}>
-          {classNameOf(item.actorToSpawn)}
-        </div>
-        {isPlayerStart(item) && <Badge variant="secondary">Player start (required)</Badge>}
-        {failed.map((w) => <Badge key={w} variant="destructive">{w}</Badge>)}
+        <SelectionHeader items={items.map((item, i) => ({ item, index: indices[i] ?? -1 }))} />
+        <SelectionActions />
 
         <Separator />
         <SectionTitle>Transform</SectionTitle>
         <div className="grid grid-cols-[auto_1fr_1fr_1fr] items-center gap-x-1.5 gap-y-1.5">
-          {rows.map((row) => (
+          {transformRows(units).map((row) => (
             <TransformRow
-              key={row.kind}
+              key={row.field}
               row={row}
-              title={row.kind === "position"
-                ? `Location (game ${units}, Z up)`
-                : row.kind === "rotation"
-                ? "Rotation (degrees: roll, pitch, yaw)"
-                : row.title}
-              shown={t}
-              committed={item.itemTransform}
-              onCommit={(transform) => transformItem(selectedId, transform)}
-              onPreview={(transform) => setPreview(transform === null ? null : { id: selectedId, transform })}
-              {...fieldProps[row.kind]}
+              shown={transforms}
+              active={active.itemTransform}
+              perUnit={row.field === "translation" ? perUnit : 1}
             />
           ))}
         </div>
 
-        <Separator />
-        <SectionTitle>Meshes</SectionTitle>
-        {item.meshComponents.map((mesh, i) => (
-          // oxlint-disable-next-line react/no-array-index-key -- mesh components have no id; the slot index is their identity
-          <div key={i} className="flex flex-col gap-1 text-xs break-all">
-            <div className="font-mono" title={mesh.meshAssetPath}>
-              {mesh.meshAssetPath === undefined || mesh.meshAssetPath === ""
-                ? "(no main mesh)"
-                : mesh.meshAssetPath.split("/").at(-1)}
-            </div>
-            <ul className="flex flex-col gap-0.5 pl-2 font-mono text-muted-foreground">
-              {mesh.materials.map((m) => (
-                <li key={m.materialIndex} title={m.material}>
-                  {m.materialIndex}: {objectPathOf(m.material).split(".").at(-1)}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+        {items.length === 1 && (
+          <>
+            <Separator />
+            <Meshes item={first} />
+          </>
+        )}
       </div>
     </ScrollArea>
   )

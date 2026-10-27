@@ -1,15 +1,26 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as THREE from "three"
 import { ueToScene, ueToThreeVector } from "../../domain/coords"
-import { type DragStart, dragTransform } from "./drag"
-import { GizmoObject, SIZE, toolHandles } from "./handles"
-import { axisParamFromRay, axisWorldDir, gameDirToWorld, planeHit, rotateVec, screenAngle } from "./math"
+import type { UeTransform } from "../../domain/coords"
+import { applyGroupDelta } from "../../domain/groupTransform"
+import { rotateVec } from "../../domain/ueMath"
+import { dragDelta, type DragStart, type PointerSample } from "./drag"
+import { GizmoObject, type GizmoSpace, SIZE, toolHandles } from "./handles"
+import { axisParamFromRay, axisWorldDir, gameDirToWorld, planeHit, screenAngle } from "./math"
 
 const v3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
 const identity = {
   translation: { x: 0, y: 0, z: 0 },
   rotation: { x: 0, y: 0, z: 0, w: 1 },
   scale3D: { x: 1, y: 1, z: 1 }
+}
+
+const frame = {
+  origin: v3(100, 200, 300),
+  worldPerPixel: 2,
+  gameRotation: identity.rotation,
+  space: "world" as const,
+  cameraQuaternion: new THREE.Quaternion()
 }
 
 describe("gizmo math", () => {
@@ -51,13 +62,6 @@ describe("gizmo math", () => {
 })
 
 describe("gizmo handles", () => {
-  const frame = {
-    origin: v3(100, 200, 300),
-    worldPerPixel: 2,
-    gameRotation: identity.rotation,
-    cameraQuaternion: new THREE.Quaternion()
-  }
-
   it("points the red arrow along the mapped game +X in world space (never flipped)", () => {
     const gizmo = new GizmoObject(toolHandles.translate)
     gizmo.update(frame, null, null)
@@ -87,6 +91,9 @@ describe("gizmo handles", () => {
   })
 })
 
+/** A drag start plus the one item it moves (at the origin, so it is its own pivot). */
+type TestDrag = DragStart & { readonly transform: UeTransform }
+
 describe("gizmo drags (game space)", () => {
   const camera = v3(0, 1000, 1000)
   const pointer = (target: THREE.Vector3, px = { x: 0, y: 0 }) => ({
@@ -94,14 +101,27 @@ describe("gizmo drags (game space)", () => {
     rayDir: target.clone().sub(camera).normalize(),
     px
   })
-  const start = (id: string, transform = identity, px = { x: 10, y: 0 }): DragStart => ({
+  const start = (
+    id: string,
+    transform = identity,
+    px = { x: 10, y: 0 },
+    space: GizmoSpace = "world"
+  ): TestDrag => ({
     spec: [...toolHandles.translate, ...toolHandles.rotate, ...toolHandles.scale].find((s) => s.id === id)!,
+    space,
+    frameRotation: transform.rotation,
     transform,
     originWorld: v3(0, 0, 0),
     originPx: { x: 0, y: 0 },
     toCamera: camera.clone().normalize(),
     pointer: { ...pointer(v3(0, 0, 0)), px }
   })
+
+  /** The drag applied to the start's item. */
+  const dragTransform = (s: TestDrag, now: PointerSample) => {
+    const delta = dragDelta(s, now)
+    return delta === undefined ? undefined : applyGroupDelta(s.transform, s.transform.translation, delta)
+  }
 
   it("translates along game X by the pointer's projection on the axis", () => {
     const out = dragTransform(start("t-x"), pointer(v3(250, 0, 0)))!
@@ -148,6 +168,58 @@ describe("gizmo drags (game space)", () => {
       x: 1.5,
       y: 1.5,
       z: 1.5
+    })
+  })
+
+  describe("local vs world space", () => {
+    // game X turns to game Y
+    const yaw90 = { ...identity, rotation: { x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 } }
+    const gameY = gameDirToWorld({ x: 0, y: 1, z: 0 })
+
+    it("translates along the item's own X in local space, world X in world space", () => {
+      const target = gameY.clone().multiplyScalar(250)
+      const local = dragTransform(start("t-x", yaw90, undefined, "local"), pointer(target))!
+      expect(local.translation.y).toBeCloseTo(250, 6)
+      expect(local.translation.x).toBeCloseTo(0, 6)
+      const world = dragTransform(start("t-x", yaw90, undefined, "world"), pointer(v3(250, 0, 0)))!
+      expect(world.translation.x).toBeCloseTo(250, 6)
+      expect(world.translation.y).toBeCloseTo(0, 6)
+    })
+
+    it("rotates about the item's own axes in local space", () => {
+      // a quarter turn about local X (= game Y here) leaves game Y fixed
+      const s = { ...start("r-x", yaw90, undefined, "local"), toCamera: gameY.clone() }
+      const out = dragTransform(s, { ...pointer(v3(0, 0, 0)), px: { x: 0, y: -10 } })!
+      const y = rotateVec(out.rotation, { x: 1, y: 0, z: 0 })
+      expect(y.y).toBeCloseTo(1, 9)
+      // the same drag in world space turns about game X instead, moving the item's X off game Y
+      const w = { ...start("r-x", yaw90, undefined, "world"), toCamera: axisWorldDir("x") }
+      const outWorld = dragTransform(w, { ...pointer(v3(0, 0, 0)), px: { x: 0, y: -10 } })!
+      expect(Math.abs(rotateVec(outWorld.rotation, { x: 1, y: 0, z: 0 }).y)).toBeLessThan(1e-9)
+    })
+
+    it("scales the local axis nearest a world-space handle", () => {
+      const s0 = { ...start("s-x", yaw90, undefined, "world"), pointer: pointer(v3(100, 0, 0)) }
+      // world X is the item's local Y after the yaw
+      const world = dragTransform(s0, pointer(v3(250, 0, 0)))!.scale3D
+      expect(world.y).toBeCloseTo(2.5, 9)
+      expect([world.x, world.z]).toEqual([1, 1])
+      const l0 = { ...start("s-x", yaw90, undefined, "local"), pointer: pointer(gameY.clone().multiplyScalar(100)) }
+      const local = dragTransform(l0, pointer(gameY.clone().multiplyScalar(250)))!.scale3D
+      expect(local.x).toBeCloseTo(2.5, 9)
+      expect([local.y, local.z]).toEqual([1, 1])
+    })
+
+    it("orients the handles by the item's rotation only in local space", () => {
+      const gizmo = new GizmoObject(toolHandles.translate)
+      const arrowDir = (space: GizmoSpace) => {
+        gizmo.update({ ...frame, gameRotation: yaw90.rotation, space }, null, null)
+        gizmo.updateMatrixWorld(true)
+        const arrow = gizmo.handle("t-x")!.root
+        return arrow.localToWorld(v3(SIZE.axisLength, 0, 0)).sub(arrow.localToWorld(v3(0, 0, 0))).normalize()
+      }
+      expect(arrowDir("local").distanceTo(gameY)).toBeLessThan(1e-9)
+      expect(arrowDir("world").distanceTo(axisWorldDir("x"))).toBeLessThan(1e-9)
     })
   })
 })

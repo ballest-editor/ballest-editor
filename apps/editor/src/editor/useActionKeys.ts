@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { isMovementChord, sharedKeysFlyFreely } from "../domain/flyKeys"
 import { actionsFor, chordOf, type KeybindAction } from "../domain/Keybinds"
+import { deleteSelection, duplicateSelection } from "./actions"
 import { commands } from "./commands"
 import { isEditorKeyEvent } from "./FlyCamera"
 import { sceneRegistry } from "./sceneRegistry"
@@ -14,11 +15,13 @@ const oneShot = (action: KeybindAction): (() => void) | undefined => {
     case "redo":
       return s.redo
     case "deleteSelection":
-      return s.deleteSelection
+      return deleteSelection
+    case "duplicateSelection":
+      return duplicateSelection
     case "focusSelection":
       return s.requestFocus
     case "deselect":
-      return () => s.select(null)
+      return () => s.select([])
     case "selectMode":
       return () => s.setTool("select")
     case "translateMode":
@@ -27,6 +30,8 @@ const oneShot = (action: KeybindAction): (() => void) | undefined => {
       return () => s.setTool("rotate")
     case "scaleMode":
       return () => s.setTool("scale")
+    case "toggleGizmoSpace":
+      return s.toggleGizmoSpace
     case "speedFaster":
       return () => s.changeSpeed(1)
     case "speedSlower":
@@ -38,7 +43,7 @@ const oneShot = (action: KeybindAction): (() => void) | undefined => {
     case "exportMap":
       return () => s.openDialog("export")
     default:
-      return undefined // held movement keys and mouse drags are handled by FlyCamera
+      return undefined // held keys and mouse drags: FlyCamera; selection clicks: the viewport
   }
 }
 

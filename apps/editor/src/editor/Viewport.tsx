@@ -14,14 +14,14 @@ import {
   useState
 } from "react"
 import * as THREE from "three"
-import { mouseChordOf } from "../domain/Keybinds"
+import { isBound, mouseChordOf } from "../domain/Keybinds"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { ItemObject } from "./ItemObject"
 import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { sceneRegistry } from "./sceneRegistry"
-import { makeSelectionHelper, updateSelectionHelper } from "./selectionBounds"
-import { useEditor } from "./store"
+import { SelectionOutline } from "./selectionOutline"
+import { nextSelection, type SelectMode, useEditor } from "./store"
 import { glbUrl, visualsOf } from "./visuals"
 
 const CLICK_SLOP_PX = 4
@@ -102,21 +102,38 @@ function StartingMapMeshes({ onSettled }: { readonly onSettled: () => void }) {
   )
 }
 
-/** Plain left-click selection with a manual raycast on click only (cheap for maps with thousands of items). */
+/**
+ * How a left click selects, from its chord: the add/toggle selection bindings, else a
+ * plain click. Null when the chord drives the camera instead (Alt+LMB orbit).
+ */
+const selectModeOf = (e: PointerEvent): SelectMode | null => {
+  if (e.button !== 0) return null
+  const chord = mouseChordOf(e)
+  const { keybinds } = useEditor.getState()
+  if (isBound(keybinds, "toggleSelection", chord)) return "toggle"
+  if (isBound(keybinds, "addToSelection", chord)) return "add"
+  return sceneRegistry.isNavigationChord(chord) ? null : "replace"
+}
+
+/**
+ * Left-click selection, with the add/toggle modifiers, via a manual raycast on click only
+ * (cheap for maps with thousands of items).
+ */
 function ClickSelect() {
   const camera = useThree((s) => s.camera)
   const gl = useThree((s) => s.gl)
   useEffect(() => {
     const el = gl.domElement
     const raycaster = new THREE.Raycaster()
-    let down: { x: number; y: number } | null = null
+    let down: { x: number; y: number; mode: SelectMode } | null = null
     const onDown = (e: PointerEvent) => {
-      const plainLeft = e.button === 0 && !sceneRegistry.isNavigationChord(mouseChordOf(e))
-      down = plainLeft && !sceneRegistry.gizmoActive() ? { x: e.clientX, y: e.clientY } : null
+      const mode = selectModeOf(e)
+      down = mode !== null && !sceneRegistry.gizmoActive() ? { x: e.clientX, y: e.clientY, mode } : null
     }
     const onUp = (e: PointerEvent) => {
       if (down === null || e.button !== 0) return
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y)
+      const { mode } = down
       down = null
       if (moved > CLICK_SLOP_PX || sceneRegistry.gizmoActive()) return
       const rect = el.getBoundingClientRect()
@@ -127,16 +144,8 @@ function ClickSelect() {
       raycaster.setFromCamera(ndc, camera)
       const root = sceneRegistry.itemsRoot
       const hits = root === null ? [] : raycaster.intersectObject(root, true)
-      for (const hit of hits) {
-        let o: THREE.Object3D | null = hit.object
-        while (o !== null && o.userData["itemId"] === undefined) o = o.parent
-        if (o !== null) {
-          const itemId: unknown = o.userData["itemId"]
-          if (typeof itemId === "string") useEditor.getState().select(itemId)
-          return
-        }
-      }
-      useEditor.getState().select(null)
+      const { selectedIds, select } = useEditor.getState()
+      select(nextSelection(selectedIds, hitItemId(hits), mode))
     }
     el.addEventListener("pointerdown", onDown)
     el.addEventListener("pointerup", onUp)
@@ -145,6 +154,19 @@ function ClickSelect() {
       el.removeEventListener("pointerup", onUp)
     }
   }, [camera, gl])
+  return null
+}
+
+/** The item under the nearest hit, if any. */
+const hitItemId = (hits: ReadonlyArray<THREE.Intersection>): string | null => {
+  for (const hit of hits) {
+    let o: THREE.Object3D | null = hit.object
+    while (o !== null && o.userData["itemId"] === undefined) o = o.parent
+    if (o !== null) {
+      const itemId: unknown = o.userData["itemId"]
+      return typeof itemId === "string" ? itemId : null
+    }
+  }
   return null
 }
 
@@ -220,21 +242,25 @@ function ViewportGrid() {
   )
 }
 
-/** Oriented selection box: local bounds parented to the selected item (see selectionBounds.ts). */
-function SelectionBox() {
-  const selectedId = useEditor((s) => s.selectedId)
-  const helper = useMemo(() => makeSelectionHelper(), [])
+/** Outline along a selected item's mesh edges (see selectionOutline.ts). */
+function SelectedOutline({ id }: { readonly id: string }) {
+  const outline = useMemo(() => new SelectionOutline(), [])
   useFrame(() => {
-    const object = selectedId === null ? undefined : sceneRegistry.objects.get(selectedId)
+    const object = sceneRegistry.objects.get(id)
     if (object === undefined) {
-      helper.removeFromParent()
+      outline.removeFromParent()
       return
     }
-    if (helper.parent !== object) object.add(helper)
-    updateSelectionHelper(helper, object) // glbs load async, so keep it fresh
+    if (outline.parent !== object) object.add(outline)
+    outline.update(object) // glbs load async, so keep it fresh
   })
-  useEffect(() => () => void helper.removeFromParent(), [helper])
+  useEffect(() => () => void outline.removeFromParent(), [outline])
   return null
+}
+
+function SelectedOutlines() {
+  const selectedIds = useEditor((s) => s.selectedIds)
+  return selectedIds.map((id) => <SelectedOutline key={id} id={id} />)
 }
 
 function Overlay() {
@@ -252,8 +278,10 @@ function Overlay() {
   )
 }
 
-/** `toolbar` floats over the scene; it is disabled until the first scene shows. */
-export function Viewport({ toolbar: Toolbar }: { readonly toolbar?: ComponentType<{ readonly disabled?: boolean }> }) {
+/** `controls` (tool bar, view controls) floats over the scene; it is disabled until the first scene shows. */
+export function Viewport(
+  { controls: Controls }: { readonly controls?: ComponentType<{ readonly disabled?: boolean }> }
+) {
   const [revealed, setRevealed] = useState(false)
   const reveal = useCallback(() => setRevealed(true), [])
   return (
@@ -278,14 +306,14 @@ export function Viewport({ toolbar: Toolbar }: { readonly toolbar?: ComponentTyp
         <directionalLight position={[3000, 8000, 2000]} intensity={1.6} />
         <ViewportGrid />
         <MapItems />
-        <SelectionBox />
+        <SelectedOutlines />
         <GizmoController />
         <ClickSelect />
         <FlyCamera />
         {!revealed && <InitialMeshes onSettled={reveal} />}
       </Canvas>
       <Overlay />
-      {Toolbar && <Toolbar disabled={!revealed} />}
+      {Controls && <Controls disabled={!revealed} />}
     </div>
   )
 }

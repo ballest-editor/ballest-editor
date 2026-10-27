@@ -97,14 +97,18 @@ function useScrub(options: {
 /**
  * Numeric input that commits on Enter or blur and reverts on Escape or invalid input.
  * With `onScrub`, dragging the label left/right scrubs the value (`step` per pixel, Shift
- * ten times finer) and commits once on release, so a whole scrub is one undo step.
+ * ten times finer) and commits once on release (`onScrubCommit`, else `onCommit`), so a
+ * whole scrub is one undo step. A null `value` is mixed (several items that disagree): the
+ * input is blank, typing sets them all, and a scrub starts from 0.
  */
 export function NumberField(props: {
   readonly label: string
-  readonly value: number
+  readonly value: number | null
   readonly onCommit: (value: number) => void
   /** Live value while the label is scrubbed; null when the scrub ends or is cancelled. */
   readonly onScrub?: (value: number | null) => void
+  /** The value a finished scrub ends on; defaults to `onCommit`. */
+  readonly onScrubCommit?: (value: number) => void
   readonly step?: number
   readonly digits?: number
   /** Background class for the handle, e.g. an axis colour. */
@@ -116,7 +120,7 @@ export function NumberField(props: {
   // Text being typed; otherwise the field shows the current value.
   const [draft, setDraft] = useState<string | null>(null)
   const cancelling = useRef(false)
-  const text = draft ?? round(props.value).toFixed(digits)
+  const text = draft ?? (props.value === null ? "" : round(props.value).toFixed(digits))
   const commit = () => {
     const n = Number(draft)
     const valid = draft !== null && draft.trim() !== "" && Number.isFinite(n)
@@ -125,11 +129,11 @@ export function NumberField(props: {
     setDraft(null)
   }
   const scrubHandlers = useScrub({
-    value: props.value,
+    value: props.value ?? 0,
     step: props.step ?? 1,
     round,
     onScrub: props.onScrub,
-    onCommit: props.onCommit
+    onCommit: props.onScrubCommit ?? props.onCommit
   })
   const scrubbable = props.onScrub !== undefined
   return (
@@ -147,6 +151,7 @@ export function NumberField(props: {
         inputMode="decimal"
         className="h-full min-w-0 rounded-none border-0 bg-transparent px-1 py-0 text-right font-mono tabular-nums leading-none focus-visible:border-0 focus-visible:ring-0 md:leading-none dark:bg-transparent"
         value={text}
+        placeholder={props.value === null ? "Mixed" : undefined}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {

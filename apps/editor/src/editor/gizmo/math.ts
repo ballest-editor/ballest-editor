@@ -4,6 +4,7 @@
  */
 import * as THREE from "three"
 import { type Quat4, threeToUeQuat, threeToUeVector, ueToThreeVector, type Vec3 } from "../../domain/coords"
+import { rotateVec } from "../../domain/ueMath"
 
 export type Axis = "x" | "y" | "z"
 
@@ -18,32 +19,6 @@ const toThree = (v: Vec3) => new THREE.Vector3(v.x, v.y, v.z)
 /** A game-space direction expressed in three.js world space (through the coords mapping). */
 export const gameDirToWorld = (v: Vec3): THREE.Vector3 => toThree(ueToThreeVector(v))
 export const worldDirToGame = (v: THREE.Vector3): Vec3 => threeToUeVector({ x: v.x, y: v.y, z: v.z })
-
-// --- game-space quaternions (Hamilton product on raw components) ---------------------
-
-export const quatMul = (a: Quat4, b: Quat4): Quat4 => ({
-  x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
-  y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
-  z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
-  w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
-})
-
-export const quatNormalize = (q: Quat4): Quat4 => {
-  const n = Math.hypot(q.x, q.y, q.z, q.w) || 1
-  return { x: q.x / n, y: q.y / n, z: q.z / n, w: q.w / n }
-}
-
-/** v' = q v q* (same formula as FQuat::RotateVector). */
-export const rotateVec = (q: Quat4, v: Vec3): Vec3 => {
-  const tx = 2 * (q.y * v.z - q.z * v.y)
-  const ty = 2 * (q.z * v.x - q.x * v.z)
-  const tz = 2 * (q.x * v.y - q.y * v.x)
-  return {
-    x: v.x + q.w * tx + (q.y * tz - q.z * ty),
-    y: v.y + q.w * ty + (q.z * tx - q.x * tz),
-    z: v.z + q.w * tz + (q.x * ty - q.y * tx)
-  }
-}
 
 /** World-space direction of a game axis, optionally in the item's local frame (game rotation). */
 export const axisWorldDir = (axis: Axis, localRotation?: Quat4): THREE.Vector3 =>
