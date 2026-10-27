@@ -13,7 +13,9 @@ export const GeneralSettings = Schema.Struct({
   /** How lengths are shown in the inspector (the map file always stores cm). */
   units: Schema.Literals(["cm", "m"]),
   /** Your in-game name; written into every exported map's `creatorName` and file name. */
-  creatorName: Schema.String
+  creatorName: Schema.String,
+  /** Whether a selection change is its own undo step (edits always restore their selection). */
+  undoSelection: Schema.Boolean
 })
 
 export const CameraSettings = Schema.Struct({
@@ -46,7 +48,7 @@ export const Settings = Schema.Struct({
 export type Settings = typeof Settings.Type
 
 export const defaultSettings: Settings = {
-  general: { units: "cm", creatorName: "" },
+  general: { units: "cm", creatorName: "", undoSelection: false },
   camera: {
     flySpeed: 2000,
     lookSensitivity: 1,

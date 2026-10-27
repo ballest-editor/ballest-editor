@@ -9,6 +9,9 @@ import { selectedIndex, useEditor } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { NumberField } from "./NumberField"
 
+type Axis = "x" | "y" | "z"
+const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
+
 const SectionTitle = ({ children }: { readonly children: ReactNode }) => (
   <div className="text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">{children}</div>
 )
@@ -59,6 +62,7 @@ export function Inspector() {
   const catalogIndex = useEditor((s) => s.catalogIndex)
   const missing = useEditor((s) => s.missingGlbs)
   const moveItem = useEditor((s) => s.moveItem)
+  const setPreview = useEditor((s) => s.setPreview)
   const preview = useEditor((s) => s.preview)
   const units = useEditor((s) => s.settings.general.units)
 
@@ -76,8 +80,19 @@ export function Inspector() {
   const t = preview?.id === selectedId ? preview.transform : item.itemTransform
   // Display units only; the map always stores centimetres.
   const perUnit = units === "m" ? 100 : 1
-  const setAxis = (axis: "x" | "y" | "z") => (value: number) =>
-    moveItem(selectedId, { ...t.translation, [axis]: value * perUnit })
+  const setAxis = (axis: Axis) => (value: number) =>
+    moveItem(selectedId, { ...item.itemTransform.translation, [axis]: value * perUnit })
+  // A scrub previews live and commits once on release (one undo step).
+  const scrubAxis = (axis: Axis) => (value: number | null) =>
+    setPreview(
+      value === null ? null : {
+        id: selectedId,
+        transform: {
+          ...item.itemTransform,
+          translation: { ...item.itemTransform.translation, [axis]: value * perUnit }
+        }
+      }
+    )
   const failed = visualsOf(item, catalogIndex).flatMap((v) => {
     const url = glbUrl(v.mesh?.glb)
     return url !== undefined && missing.has(url)
@@ -98,24 +113,17 @@ export function Inspector() {
         <Separator />
         <SectionTitle>Position (game {units}, Z up)</SectionTitle>
         <div className="grid grid-cols-3 gap-2">
-          <NumberField
-            label="X"
-            value={t.translation.x / perUnit}
-            onCommit={setAxis("x")}
-            digits={units === "m" ? 5 : 3}
-          />
-          <NumberField
-            label="Y"
-            value={t.translation.y / perUnit}
-            onCommit={setAxis("y")}
-            digits={units === "m" ? 5 : 3}
-          />
-          <NumberField
-            label="Z"
-            value={t.translation.z / perUnit}
-            onCommit={setAxis("z")}
-            digits={units === "m" ? 5 : 3}
-          />
+          {axes.map((axis) => (
+            <NumberField
+              key={axis}
+              label={axis.toUpperCase()}
+              value={t.translation[axis] / perUnit}
+              onCommit={setAxis(axis)}
+              onScrub={scrubAxis(axis)}
+              step={units === "m" ? 0.01 : 1}
+              digits={units === "m" ? 5 : 3}
+            />
+          ))}
         </div>
 
         <SectionTitle>Rotation (quaternion)</SectionTitle>
