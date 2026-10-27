@@ -31,24 +31,25 @@ const oneShot = (action: KeybindAction): (() => void) | undefined => {
     case "speedSlower":
       return () => s.changeSpeed(-1)
     case "newMap":
-      return () => commands.openDialog("new")
+      return () => s.openDialog("new")
     case "importMap":
       return () => commands.openImport()
     case "exportMap":
-      return () => commands.openDialog("export")
+      return () => s.openDialog("export")
     default:
       return undefined // held movement keys and mouse drags are handled by FlyCamera
   }
 }
 
 /**
- * One-shot actions, matched on the full chord. Ignored in text fields and dialogs, and
- * while a look drag is active (the fly keys own the keyboard then).
+ * One-shot actions, matched on the full chord. Ignored in text fields and dialogs, while a
+ * look drag is active (the fly keys own the keyboard then), and while a gizmo drag is in
+ * progress (undo mid-drag would be overwritten by the drag's commit on release).
  */
 export function useActionKeys() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!isEditorKeyEvent(e) || e.repeat || sceneRegistry.lookDragActive()) return
+      if (!isEditorKeyEvent(e) || e.repeat || sceneRegistry.lookDragActive() || sceneRegistry.gizmoDragActive()) return
       const chord = chordOf(e)
       const { keybinds } = useEditor.getState()
       for (const action of actionsFor(keybinds, chord)) {

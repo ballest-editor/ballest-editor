@@ -1,6 +1,7 @@
 import { Context, DateTime, Effect, Layer } from "effect"
 import { currentCreatedAt, defaultEditorState, isValidName, mapFileNameOf, NAME_RULE, userLevelNameOf } from "../domain/factory"
-import { isPlayerStart, type MapFile, SYSTEM_LEVEL_NAME } from "../domain/MapFile"
+import { gameLoadProblems } from "../domain/limits"
+import { type MapFile, SYSTEM_LEVEL_NAME } from "../domain/MapFile"
 import { ExportValidationError, type MapEncodeError } from "./errors"
 import { MapCodec } from "./MapCodec"
 
@@ -13,7 +14,7 @@ export interface ExportedMap {
 }
 
 export class MapExporter extends Context.Service<MapExporter, {
-  /** Applies the level-name fields the game expects, validates, and encodes to a `.balledit`. */
+  /** Applies the level-name fields the game expects, checks the game's load rules (domain/limits), and encodes to a `.balledit`. */
   prepare(map: MapFile): Effect.Effect<ExportedMap, ExportValidationError | MapEncodeError>
 }>()("ballest/services/MapExporter") {
   static readonly layerNoDeps = Layer.effect(
@@ -32,11 +33,9 @@ export class MapExporter extends Context.Service<MapExporter, {
         if (!isValidName(displayName) || !isValidName(creatorName)) {
           return yield* new ExportValidationError({ message: `Map name and creator: ${NAME_RULE} (they become the file name).` })
         }
-        const playerStarts = map.items.filter(isPlayerStart).length
-        if (playerStarts !== 1) {
-          return yield* new ExportValidationError({
-            message: `The game needs exactly one MP_PlayerStart; this map has ${playerStarts}.`
-          })
+        const problems = gameLoadProblems(map)
+        if (problems.length > 0) {
+          return yield* new ExportValidationError({ message: problems.slice(0, 3).join(" ") })
         }
         const createdAt = yield* currentCreatedAt.pipe(Effect.provideService(DateTime.CurrentTimeZone, timeZone))
         const out: MapFile = {

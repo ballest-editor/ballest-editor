@@ -66,14 +66,14 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
     expect(visible.length + hidden.length).toBe(catalog.pieces.length)
     expect(hidden.every((p) => p.inPalette === false)).toBe(true)
     // every palette piece is placeable; unavailable ones (e.g. unresolved base classes) are only in Hidden
-    expect(visible.filter((p) => unavailableReasonOf(catalog, p) !== undefined)).toEqual([])
-    const unavailable = hidden.filter((p) => unavailableReasonOf(catalog, p) !== undefined).map((p) => p.className)
+    expect(visible.filter((p) => unavailableReasonOf(indexCatalog(catalog), p) !== undefined)).toEqual([])
+    const unavailable = hidden.filter((p) => unavailableReasonOf(indexCatalog(catalog), p) !== undefined).map((p) => p.className)
     expect(unavailable.length).toBe((catalog.unresolved ?? []).length)
     // extras-only pieces stay placeable
     for (const name of ["MP_OrangeSign", "MP_PinballPaddle", "BP_CircularFlexiblePlatform"]) {
       const piece = catalog.pieces.find((p) => p.className === name)
       if (piece !== undefined) {
-        expect(unavailableReasonOf(catalog, piece)).toBeUndefined()
+        expect(unavailableReasonOf(indexCatalog(catalog), piece)).toBeUndefined()
         expect(visibleExtras(piece).length).toBeGreaterThan(0)
       }
     }

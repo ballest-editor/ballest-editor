@@ -1,32 +1,87 @@
-import { Grid } from "@react-three/drei"
+import { Grid, useGLTF } from "@react-three/drei"
 import { Canvas, useFrame, useStore, useThree } from "@react-three/fiber"
 import { Badge } from "@workspace/ui/components/badge"
-import { useEffect, useMemo, useRef } from "react"
+import { cn } from "@workspace/ui/lib/utils"
+import { Component, type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as THREE from "three"
-import { indexCatalog } from "../domain/Catalog"
 import { mouseChordOf } from "../domain/Keybinds"
 import { ToolBar } from "../components/ToolBar"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { ItemObject } from "./ItemObject"
+import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { makeSelectionHelper, updateSelectionHelper } from "./selectionBounds"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
+import { glbUrl, visualsOf } from "./visuals"
 
 const CLICK_SLOP_PX = 4
 
 function MapItems() {
   const doc = useEditor((s) => s.doc)
-  const catalog = useEditor((s) => s.catalog)
-  const index = useMemo(() => (catalog === null ? null : indexCatalog(catalog.catalog)), [catalog])
+  const index = useEditor((s) => s.catalogIndex)
+  // Without the catalog every item would draw as an unknown-mesh warning box, so wait for it
+  // (unless it failed to load, when those boxes are the truth).
+  const booting = useEditor((s) => s.booting)
   const root = useRef<THREE.Group>(null)
   useEffect(() => {
     sceneRegistry.itemsRoot = root.current
   }, [])
   return (
     <group ref={root}>
-      {doc.map.items.map((item, i) => <ItemObject key={doc.ids[i]} id={doc.ids[i]!} item={item} index={index} />)}
+      {(index !== null || !booting) &&
+        doc.map.items.map((item, i) => <ItemObject key={doc.ids[i]} id={doc.ids[i]!} item={item} index={index} />)}
     </group>
+  )
+}
+
+/** Suspends until `url` is in drei's glb cache, the same entry ItemObject reads. */
+function CachedGlb({ url }: { readonly url: string }) {
+  useGLTF(url)
+  return null
+}
+
+function OnCommit({ run }: { readonly run: () => void }) {
+  useEffect(run, [run])
+  return null
+}
+
+/** A failed glb still settles the wait: its item draws a warning box. */
+class SettleOnError extends Component<{ readonly onSettled: () => void; readonly children: ReactNode }, { readonly failed: boolean }> {
+  override state = { failed: false }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  override componentDidCatch() {
+    this.props.onSettled()
+  }
+  override render() {
+    return this.state.failed ? null : this.props.children
+  }
+}
+
+/**
+ * Calls `onSettled` once the startup loads are done and every mesh of the map on screen at
+ * that point is in the cache. Until then the viewport keeps the scene hidden, so it appears
+ * once, complete, instead of stepping through stand-in boxes and loading wireframes. Later
+ * loads (imports, placed pieces) show their loading hints as usual.
+ */
+function InitialMeshes({ onSettled }: { readonly onSettled: () => void }) {
+  const booting = useEditor((s) => s.booting)
+  const urls = useMemo(() => {
+    if (booting) return null
+    const { catalogIndex: index, doc } = useEditor.getState()
+    const all = doc.map.items.flatMap((item) => visualsOf(item, index).flatMap((v) => glbUrl(v.mesh?.glb) ?? []))
+    return [...new Set(all)]
+  }, [booting])
+  if (urls === null) return null
+  return (
+    <SettleOnError onSettled={onSettled}>
+      <Suspense fallback={null}>
+        {urls.map((url) => <CachedGlb key={url} url={url} />)}
+        <OnCommit run={onSettled} />
+      </Suspense>
+    </SettleOnError>
   )
 }
 
@@ -111,9 +166,8 @@ function SmoothResize() {
 }
 
 /**
- * Clear colour follows the theme: dark slate, or a light grey in light mode. The same colour
- * goes on the container behind the canvas, so any strip the canvas hasn't covered yet during
- * a window resize is the scene colour, not black.
+ * Clear colour follows the theme: dark slate, or a light grey in light mode. The container
+ * behind the canvas has the same colour (sceneBackgroundClass).
  */
 function ViewportBackground() {
   const gl = useThree((s) => s.gl)
@@ -122,10 +176,7 @@ function ViewportBackground() {
     const media = window.matchMedia("(prefers-color-scheme: dark)")
     const apply = () => {
       const dark = theme === "dark" || (theme === "system" && media.matches)
-      const color = dark ? "#1d2128" : "#e9ecf1"
-      gl.setClearColor(color)
-      const viewport = gl.domElement.closest<HTMLElement>("[data-viewport]")
-      if (viewport !== null) viewport.style.backgroundColor = color
+      gl.setClearColor(dark ? SCENE_COLORS.dark : SCENE_COLORS.light)
     }
     apply()
     media.addEventListener("change", apply)
@@ -184,16 +235,20 @@ function Overlay() {
 }
 
 export function Viewport() {
+  const [revealed, setRevealed] = useState(false)
+  const reveal = useCallback(() => setRevealed(true), [])
   return (
     <div
       // [&_canvas]: the canvas element always fills the container, even on frames where its
       // drawing buffer is still the previous size (it stretches briefly instead of leaving a gap).
-      className="relative h-full w-full outline-none [&_canvas]:h-full! [&_canvas]:w-full!"
+      className={cn("relative h-full w-full outline-none [&_canvas]:h-full! [&_canvas]:w-full!", sceneBackgroundClass)}
       tabIndex={-1}
       data-viewport
       onPointerDown={(e) => e.currentTarget.focus({ preventScroll: true })}
     >
       <Canvas
+        // Hidden until the first scene is ready, then a quick fade up from translucent.
+        className={revealed ? "animate-in fade-in-30 duration-300 ease-out" : "opacity-0"}
         camera={{ fov: 60, near: 5, far: 2_000_000, position: [1500, 1200, 1500] }}
         gl={{ antialias: true, logarithmicDepthBuffer: true }}
       >
@@ -208,9 +263,10 @@ export function Viewport() {
         <GizmoController />
         <ClickSelect />
         <FlyCamera />
+        {!revealed && <InitialMeshes onSettled={reveal} />}
       </Canvas>
       <Overlay />
-      <ToolBar />
+      <ToolBar disabled={!revealed} />
     </div>
   )
 }

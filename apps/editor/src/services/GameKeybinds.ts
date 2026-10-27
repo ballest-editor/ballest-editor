@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from "effect"
 import { type DerivedKeybinds, deriveKeybinds, GameKeybindsFile } from "../domain/GameKeybinds"
-import type { FetchText } from "./CatalogLoader"
 import { GameKeybindsLoadError } from "./errors"
+import { browserFetch, type FetchText, fetchFromText, fetchJson } from "./fetchJson"
 
 export const GAME_KEYBINDS_URL = "/assets/keybinds.json"
 
@@ -16,13 +16,10 @@ export class GameKeybinds extends Context.Service<GameKeybinds, {
   static readonly make = Effect.fnUntraced(function*(fetchText: FetchText, url: string = GAME_KEYBINDS_URL) {
     const fail = (message: string) => new GameKeybindsLoadError({ url, message })
 
-    const fetchFile = Effect.gen(function*() {
-      const response = yield* Effect.tryPromise({ try: () => fetchText(url), catch: (c) => fail(String(c)) })
-      if (!response.ok) return yield* fail(`HTTP ${response.status}`)
-      const text = yield* Effect.tryPromise({ try: () => response.text(), catch: (c) => fail(String(c)) })
-      const json = yield* Effect.try({ try: () => JSON.parse(text) as unknown, catch: () => fail("not JSON (keybinds.json missing?)") })
-      return yield* decodeFile(json).pipe(Effect.mapError((e) => fail(e.message)))
-    }).pipe(Effect.withSpan("GameKeybinds.fetch"))
+    const fetchFile = fetchJson(fetchText, url, fail).pipe(
+      Effect.flatMap((json) => decodeFile(json).pipe(Effect.mapError((e) => fail(e.message)))),
+      Effect.withSpan("GameKeybinds.fetch")
+    )
 
     const defaults = yield* fetchFile.pipe(
       Effect.map(deriveKeybinds),
@@ -41,14 +38,8 @@ export class GameKeybinds extends Context.Service<GameKeybinds, {
     return GameKeybinds.of({ fetch: fetchFile, defaults })
   })
 
-  static readonly layer = Layer.effect(GameKeybinds, GameKeybinds.make((url) => globalThis.fetch(url)))
+  static readonly layer = Layer.effect(GameKeybinds, GameKeybinds.make(browserFetch))
 
   /** For tests: serve `body` (or a 404 when undefined) instead of fetching. */
-  static readonly layerFromText = (body: string | undefined) =>
-    Layer.effect(
-      GameKeybinds,
-      GameKeybinds.make(() =>
-        Promise.resolve({ ok: body !== undefined, status: body === undefined ? 404 : 200, text: () => Promise.resolve(body ?? "") })
-      )
-    )
+  static readonly layerFromText = (body: string | undefined) => Layer.effect(GameKeybinds, GameKeybinds.make(fetchFromText(body)))
 }

@@ -7,7 +7,6 @@ import { riskyClassesIn } from "../domain/Catalog"
 import { classNameOf } from "../domain/MapFile"
 import { isValidName, mapFileNameOf, NAME_RULE } from "../domain/factory"
 import { exportMap, saveSettings } from "../editor/actions"
-import { commands } from "../editor/commands"
 import { useEditor } from "../editor/store"
 
 /**
@@ -18,6 +17,7 @@ export function ExportDialog({ open, onClose }: { readonly open: boolean; readon
   const displayName = useEditor((s) => s.doc.map.worldSettings.levelData.levelDisplayName)
   const settings = useEditor((s) => s.settings)
   const renameLevel = useEditor((s) => s.renameLevel)
+  const openDialog = useEditor((s) => s.openDialog)
   const items = useEditor((s) => s.doc.map.items)
   const catalog = useEditor((s) => s.catalog)
   const risky = useMemo(
@@ -75,7 +75,7 @@ export function ExportDialog({ open, onClose }: { readonly open: boolean; readon
             : (
               <div className="text-xs text-muted-foreground">
                 Creator: <span className="text-foreground">{creator}</span>{" "}
-                <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => commands.openDialog("settings", "general")}>
+                <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => openDialog("settings", "general")}>
                   change
                 </button>
               </div>

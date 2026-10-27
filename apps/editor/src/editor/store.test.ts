@@ -33,4 +33,29 @@ describe("editor store", () => {
     assert.strictEqual(s().doc.map.items.length, 1)
     assert.strictEqual(s().future.length, 0)
   })
+
+  it("reports whether a transform was accepted", () => {
+    const s = () => useEditor.getState()
+    s().loadMap(initialMap(), null)
+    s().placePiece(cube, placementTransform(cube, { x: 0, y: 0, z: 0 }))
+    const id = s().selectedId!
+    const t = s().doc.map.items[1]!.itemTransform
+    assert.isTrue(s().transformItem(id, { ...t, rotation: { x: 0, y: 0, z: 2, w: 0 } }))
+    assert.deepStrictEqual(s().doc.map.items[1]!.itemTransform.rotation, { x: 0, y: 0, z: 1, w: 0 })
+    const before = s().past.length
+    assert.isFalse(s().transformItem(id, { ...t, rotation: { x: 0, y: 0, z: 0, w: 0 } }))
+    assert.strictEqual(s().past.length, before)
+  })
+
+  it("tracks the open dialog and settings category", () => {
+    const s = () => useEditor.getState()
+    assert.isNull(s().dialog)
+    s().openDialog("settings", "keybinds")
+    assert.strictEqual(s().dialog, "settings")
+    assert.strictEqual(s().settingsCategory, "keybinds")
+    s().openDialog("export")
+    assert.strictEqual(s().settingsCategory, "keybinds") // unchanged when no category is given
+    s().closeDialog()
+    assert.isNull(s().dialog)
+  })
 })

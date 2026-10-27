@@ -7,14 +7,12 @@
  * transforms and glb vertices are all in Unreal local space, centimetres, left-handed Z-up.
  * coords.ts converts them for rendering.
  */
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
+import { open } from "./schema"
 
 const Vec3Tuple = Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite])
 const QuatTuple = Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite, Schema.Finite])
 const NullableString = Schema.optionalKey(Schema.NullOr(Schema.String))
-const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const
-const open = <const Fields extends Schema.Struct.Fields>(fields: Fields) =>
-  Schema.StructWithRest(Schema.Struct(fields), Rest)
 
 export class Bounds extends Schema.Opaque<Bounds>()(open({
   min: Vec3Tuple,
@@ -110,9 +108,14 @@ const slotDefaultsOf = (slots: ReadonlyArray<CatalogMaterialSlot> | undefined): 
 export interface CatalogIndex {
   readonly meshes: ReadonlyMap<string, MeshInfo>
   readonly pieceByClass: ReadonlyMap<string, CatalogPiece>
+  /** Class path -> why the extractor couldn't resolve it (`catalog.unresolved`). */
+  readonly unresolvedReasons: ReadonlyMap<string, string>
 }
 
 const orUndefined = <A>(a: A | null | undefined): A | undefined => a ?? undefined
+
+const UnresolvedEntry = Schema.Struct({ classPath: Schema.String, reason: Schema.optionalKey(Schema.String) })
+const decodeUnresolved = Schema.decodeUnknownOption(UnresolvedEntry)
 
 export const indexCatalog = (catalog: Catalog): CatalogIndex => {
   const meshes = new Map<string, MeshInfo>()
@@ -140,7 +143,14 @@ export const indexCatalog = (catalog: Catalog): CatalogIndex => {
   for (const mesh of catalog.meshes ?? []) add(mesh.meshAssetPath, mesh.glb, mesh.bounds, mesh.materialSlots)
   const pieceByClass = new Map<string, CatalogPiece>()
   for (const piece of catalog.pieces) if (!pieceByClass.has(piece.classPath)) pieceByClass.set(piece.classPath, piece)
-  return { meshes, pieceByClass }
+  const unresolvedReasons = new Map<string, string>()
+  for (const entry of catalog.unresolved ?? []) {
+    const decoded = decodeUnresolved(entry)
+    if (Option.isSome(decoded) && !unresolvedReasons.has(decoded.value.classPath)) {
+      unresolvedReasons.set(decoded.value.classPath, decoded.value.reason ?? "The extractor couldn't resolve this piece.")
+    }
+  }
+  return { meshes, pieceByClass, unresolvedReasons }
 }
 
 /**
@@ -189,23 +199,16 @@ export const paletteSections = (pieces: ReadonlyArray<CatalogPiece>): ReadonlyAr
 
 export const pieceLabelOf = (piece: CatalogPiece): string => piece.displayName || piece.className
 
-const UnresolvedEntry = Schema.Struct({ classPath: Schema.String, reason: Schema.optionalKey(Schema.String) })
-const decodeUnresolved = Schema.decodeUnknownOption(UnresolvedEntry)
-
 /**
  * Why a piece can't be placed, or undefined if it can: the extractor lists it as
  * unresolved (base classes, runtime-generated geometry), or it has no mesh of any kind.
  */
-export const unavailableReasonOf = (catalog: Catalog, piece: CatalogPiece, verified: VerificationTable = NO_VERIFICATION): string | undefined => {
+export const unavailableReasonOf = (index: CatalogIndex, piece: CatalogPiece, verified: VerificationTable = NO_VERIFICATION): string | undefined => {
   if (verificationOf(piece, verified) === "rejected") {
     return `The in-game editor rejects this piece${verified[piece.className]?.note ? ` (${verified[piece.className]?.note})` : ""}.`
   }
-  for (const entry of catalog.unresolved ?? []) {
-    const decoded = decodeUnresolved(entry)
-    if (decoded._tag === "Some" && decoded.value.classPath === piece.classPath) {
-      return decoded.value.reason ?? "The extractor couldn't resolve this piece."
-    }
-  }
+  const unresolved = index.unresolvedReasons.get(piece.classPath)
+  if (unresolved !== undefined) return unresolved
   if (piece.meshAssetPath === null && (piece.extraMeshes ?? []).length === 0) {
     return "No mesh: this class has no geometry the editor can place."
   }

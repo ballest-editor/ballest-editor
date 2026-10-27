@@ -10,10 +10,7 @@
  */
 import { Option, Predicate, Schema } from "effect"
 import { objectPathOf } from "./MapFile"
-
-const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const
-const open = <const Fields extends Schema.Struct.Fields>(fields: Fields) =>
-  Schema.StructWithRest(Schema.Struct(fields), Rest)
+import { open } from "./schema"
 
 const Num = Schema.optionalKey(Schema.NullOr(Schema.Finite))
 const Str = Schema.optionalKey(Schema.NullOr(Schema.String))
