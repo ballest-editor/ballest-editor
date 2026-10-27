@@ -40,11 +40,18 @@ import { CUSTOM_FOV_PRESET, defaultSettings, type Settings } from "../domain/Set
 import { resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
 import { type SettingsCategory, useEditor } from "../editor/store"
 
-const movementLookItems = { none: "Forward only", upDown: "Forward, up, down", all: "All movement keys" } as const
+const movementLookItems = {
+  all: "All movement keys",
+  upDown: "Up and down",
+  conflicting: "Only conflicting keys",
+  nothing: "Nothing"
+} as const
 const movementLookDescriptions = {
-  none: "Forward (W) is also Move mode. It flies while looking or alongside another movement key.",
-  upDown: "Up and down also fly only while looking.",
-  all: "No movement key flies unless you're looking."
+  all: "No movement key flies unless you're looking. The game's default.",
+  upDown: "Up and down need look, and so do conflicting keys.",
+  conflicting:
+    "Keys that are also shortcuts (W is Translate) fly while looking or alongside another movement key, and pick their tool otherwise.",
+  nothing: "Every movement key flies any time. W no longer picks Translate."
 } as const
 
 const CATEGORY_LABELS: Readonly<Record<SettingsCategory, string>> = {
@@ -321,8 +328,8 @@ export function SettingsDialog(props: {
 
   const rows = ((): ReadonlyArray<Row> => {
     // A chord is a conflict when two actions of the same kind share it. A fly key doubling
-    // as a tool shortcut (W: forward + move mode, as in the game) is fine: it only flies
-    // while the look button is held.
+    // as a tool shortcut (W: forward + translate, as in the game) is fine: the "fly only while
+    // looking" setting decides which one it does.
     const kinds = new Map<string, Set<string>>()
     for (const action of keybindActions) {
       const bindings = keybinds[action]

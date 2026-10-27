@@ -8,13 +8,14 @@
 import { Schema } from "effect"
 
 /**
- * Sections and names follow the game: the level editor's own hotkey overlay ("select
- * mode", "move mode", "focus selection"...) and its settings screen ("mouse and keyboard
- * free camera": "forward", "reverse"...). Game actions that mean nothing in the editor
- * (replay controls, nameplates) are omitted; editor-only actions get plain lower-case
- * names in the same style. keybinds.json `label`/`section` fields, when the extractor
- * provides them, override the camera names (see GameKeybinds); level-editor names come
- * from the in-game overlay and are fixed here.
+ * Sections and names follow the game: the level editor's own hotkey overlay ("focus
+ * selection", "delete"...) and its settings screen ("mouse and keyboard free camera":
+ * "forward", "reverse"...). The tools are the exception: plain "select", "translate",
+ * "rotate", "scale" instead of the overlay's "select mode", "move mode"... Game actions
+ * that mean nothing in the editor (replay controls, nameplates) are omitted; editor-only
+ * actions get plain lower-case names in the same style. keybinds.json `label`/`section`
+ * fields, when the extractor provides them, override the camera names (see GameKeybinds);
+ * level-editor names come from the in-game overlay and are fixed here.
  */
 export const keybindSections = [
   {
@@ -48,10 +49,10 @@ export const editorOverlayActions: ReadonlySet<KeybindAction> = new Set(keybindS
 
 /** The name shown in the settings (the game's wording where the action exists in-game). */
 export const keybindActionLabels: Record<KeybindAction, string> = {
-  selectMode: "select mode",
-  translateMode: "move mode",
-  rotateMode: "rotate mode",
-  scaleMode: "scale mode",
+  selectMode: "select",
+  translateMode: "translate",
+  rotateMode: "rotate",
+  scaleMode: "scale",
   focusSelection: "focus selection",
   deleteSelection: "delete",
   undo: "undo",
@@ -80,12 +81,12 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
 
 /** What each action does in the editor (binding tooltips). */
 export const keybindActionDescriptions: Record<KeybindAction, string> = {
-  selectMode: "Select mode: click to select, no gizmo. Q in the game's level editor.",
+  selectMode: "Select: click to select, no gizmo. Q in the game's level editor.",
   translateMode:
-    "Move mode: drag the arrows or plane handles to move the selection. W in the game's level editor; the camera's W flies only while looking or alongside another movement key.",
-  rotateMode: "Rotate mode: drag a ring to rotate the selection. E in the game's level editor.",
+    "Translate: drag the arrows or plane handles to move the selection. W in the game's level editor, where it's also forward; the \"fly only while looking\" camera setting decides which one W does.",
+  rotateMode: "Rotate: drag a ring to rotate the selection. E in the game's level editor.",
   scaleMode:
-    "Scale mode: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the game's level editor.",
+    "Scale: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the game's level editor.",
   focusSelection:
     "Frame the current selection in the viewport. F in the game's level editor; its free camera calls this \"center camera\" (C).",
   deleteSelection: "Delete the selected item. Backspace in the game's level editor; Delete also works.",

@@ -54,7 +54,7 @@ export const defaultSettings: Settings = {
     customFov: 90,
     invertLookX: false,
     invertLookY: false,
-    movementNeedsLook: "none"
+    movementNeedsLook: "all"
   },
   appearance: { theme: "dark", gridVisible: true, gridCellColor: "#3a404a", gridSectionColor: "#58606e" }
 }

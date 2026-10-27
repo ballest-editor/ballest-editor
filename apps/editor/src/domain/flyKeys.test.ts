@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { flyingActions, isMovementChord, type MovementLookMode, needsLook } from "./flyKeys"
+import { flyingActions, isMovementChord, keepsShortcuts, type MovementLookMode, needsLook } from "./flyKeys"
 import { defaultKeybinds } from "./Keybinds"
 
 const flying = (mode: MovementLookMode, looking: boolean, ...held: ReadonlyArray<string>) =>
@@ -7,20 +7,32 @@ const flying = (mode: MovementLookMode, looking: boolean, ...held: ReadonlyArray
 
 describe("needsLook", () => {
   it("follows the mode", () => {
-    expect(needsLook("none", "moveUp")).toBe(false)
+    expect(needsLook("nothing", "moveForward")).toBe(false)
+    expect(needsLook("conflicting", "moveUp")).toBe(false)
     expect(needsLook("upDown", "moveUp")).toBe(true)
     expect(needsLook("upDown", "moveDown")).toBe(true)
     expect(needsLook("upDown", "moveLeft")).toBe(false)
     expect(needsLook("all", "moveLeft")).toBe(true)
   })
+
+  it("only nothing gives up the shortcuts", () => {
+    expect(keepsShortcuts("all")).toBe(true)
+    expect(keepsShortcuts("conflicting")).toBe(true)
+    expect(keepsShortcuts("nothing")).toBe(false)
+  })
 })
 
 describe("flyingActions", () => {
-  it("none: plain keys fly any time, W only while looking or another key flies", () => {
-    expect(flying("none", false, "KeyA", "Space")).toEqual(["moveLeft", "moveUp"])
-    expect(flying("none", false, "KeyW")).toEqual([])
-    expect(flying("none", true, "KeyW")).toEqual(["moveForward"])
-    expect(flying("none", false, "KeyW", "KeyD")).toEqual(["moveForward", "moveRight"])
+  it("nothing: every key flies any time, W included", () => {
+    expect(flying("nothing", false, "KeyW")).toEqual(["moveForward"])
+    expect(flying("nothing", false, "KeyA", "Space")).toEqual(["moveLeft", "moveUp"])
+  })
+
+  it("conflicting: plain keys fly any time, W only while looking or another key flies", () => {
+    expect(flying("conflicting", false, "KeyA", "Space")).toEqual(["moveLeft", "moveUp"])
+    expect(flying("conflicting", false, "KeyW")).toEqual([])
+    expect(flying("conflicting", true, "KeyW")).toEqual(["moveForward"])
+    expect(flying("conflicting", false, "KeyW", "KeyD")).toEqual(["moveForward", "moveRight"])
   })
 
   it("upDown: up/down need look, and don't let W fly on their own", () => {
