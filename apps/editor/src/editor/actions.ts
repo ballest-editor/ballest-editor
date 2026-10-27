@@ -58,13 +58,17 @@ export const saveSettings = (settings: Settings) => {
   )
 }
 
-export const loadKeybinds = () =>
+/** Stored (or default) keybinds, with the game's defaults they were derived from, into the editor. */
+const applyKeybinds = (source: "load" | "reset") =>
   run(
     Effect.gen(function*() {
-      const { keybinds, defaults } = yield* KeybindStore.use((store) => store.load)
+      const store = yield* KeybindStore
+      const { keybinds, defaults } = yield* store[source]
       useEditor.getState().setKeybinds(keybinds, defaults)
     })
   )
+
+export const loadKeybinds = () => applyKeybinds("load")
 
 export const saveKeybinds = (keybinds: Keybinds) =>
   run(
@@ -74,13 +78,7 @@ export const saveKeybinds = (keybinds: Keybinds) =>
     })
   )
 
-export const resetKeybinds = () =>
-  run(
-    Effect.gen(function*() {
-      const { keybinds, defaults } = yield* KeybindStore.use((store) => store.reset)
-      useEditor.getState().setKeybinds(keybinds, defaults)
-    })
-  )
+export const resetKeybinds = () => applyKeybinds("reset")
 
 export const newMap = (displayName: string, creatorName: string) =>
   run(
