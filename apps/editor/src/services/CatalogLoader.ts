@@ -1,4 +1,5 @@
 import { Context, Effect, Layer } from "effect"
+import fixtureJson from "../domain/bundledCatalog.json"
 import {
   type Catalog,
   decodeCatalog,
@@ -6,7 +7,6 @@ import {
   NO_VERIFICATION,
   type VerificationTable
 } from "../domain/Catalog"
-import fixtureJson from "../test/fixtures/catalog.json"
 import { CatalogLoadError } from "./errors"
 import { browserFetch, fetchJson, type FetchText } from "./fetchJson"
 

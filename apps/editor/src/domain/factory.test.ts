@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
-import fixture from "../test/fixtures/catalog.json"
+import fixture from "./bundledCatalog.json"
 import { Catalog } from "./Catalog"
 import {
   formatCreatedAt,

@@ -29,7 +29,7 @@ The preset is `b6nCVm82TK` (style `base-mira`, tabler icons).
 keybinds.json and pieces/**.glb from tools/extract). A small Vite plugin in
 `vite.config.ts` does this in `dev` and `preview`, with `Cache-Control: no-cache`, so the
 glbs are never copied and a re-exported glb is picked up on reload. If
-`assets/catalog.json` is missing, the app falls back to `src/test/fixtures/catalog.json`
+`assets/catalog.json` is missing, the app falls back to `src/domain/bundledCatalog.json`
 and shows a badge. If `assets/keybinds.json` is missing, every keybind uses the editor
 default.
 

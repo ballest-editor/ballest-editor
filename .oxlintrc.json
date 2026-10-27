@@ -96,6 +96,17 @@
     "unicorn/prefer-node-protocol": "error",
     "unicorn/no-abusive-eslint-disable": "error",
 
+    "eslint/no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "regex": "(^|/)repos/",
+            "message": "repos/ is vendored reference material; import the npm package instead."
+          }
+        ]
+      }
+    ],
     "vitest/expect-expect": ["error", { "assertFunctionNames": ["expect", "expectVec", "assert", "assert.*"] }],
 
     // Off, as in Effect's own oxlintrc: `_tag` is the Effect discriminant; local
@@ -124,6 +135,308 @@
       "rules": {
         "typescript/no-unsafe-type-assertion": "off",
         "react/jsx-no-constructed-context-values": "off"
+      }
+    },
+    // Module boundaries: domain <- services <- editor <- components <- routes; ui knows none of them.
+    {
+      "files": ["apps/editor/src/domain/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)editor(/|$)",
+                "message": "domain/ is the game's data model: pure TypeScript + Effect, no renderer, UI or app layers."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)services(/|$)",
+                "message": "domain/ is the game's data model: pure TypeScript + Effect, no renderer, UI or app layers."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)components(/|$)",
+                "message": "domain/ is the game's data model: pure TypeScript + Effect, no renderer, UI or app layers."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)routes(/|$)",
+                "message": "domain/ is the game's data model: pure TypeScript + Effect, no renderer, UI or app layers."
+              },
+              {
+                "group": ["react", "react-dom", "react/*"],
+                "message": "domain/ is the game's data model: pure TypeScript + Effect, no renderer, UI or app layers."
+              },
+              {
+                "group": ["three", "three/*", "@react-three/*"],
+                "message": "domain/ is the game's data model: pure TypeScript + Effect, no renderer, UI or app layers."
+              },
+              {
+                "group": ["zustand", "sonner", "@workspace/ui/*", "@tanstack/*"],
+                "message": "domain/ is the game's data model: pure TypeScript + Effect, no renderer, UI or app layers."
+              },
+              {
+                "regex": "(^|/)repos/",
+                "message": "repos/ is vendored reference material; import the npm package instead."
+              },
+              { "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)test(/|$)", "message": "src/test/ helpers are for tests only." },
+              {
+                "regex": "^node:",
+                "message": "Editor source runs in the browser; node: builtins are for tests and tooling."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/editor/src/domain/**/*.test.ts"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)editor(/|$)",
+                "message": "domain/ is the game's data model: pure TypeScript + Effect, no renderer, UI or app layers."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)services(/|$)",
+                "message": "domain/ is the game's data model: pure TypeScript + Effect, no renderer, UI or app layers."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)components(/|$)",
+                "message": "domain/ is the game's data model: pure TypeScript + Effect, no renderer, UI or app layers."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)routes(/|$)",
+                "message": "domain/ is the game's data model: pure TypeScript + Effect, no renderer, UI or app layers."
+              },
+              {
+                "group": ["react", "react-dom", "@react-three/*", "zustand", "sonner", "@workspace/ui/*"],
+                "message": "domain/ is the game's data model: pure TypeScript + Effect, no renderer, UI or app layers. (Tests may use three.js to check the frame mapping.)"
+              },
+              {
+                "regex": "(^|/)repos/",
+                "message": "repos/ is vendored reference material; import the npm package instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/editor/src/services/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)editor(/|$)",
+                "message": "services/ are Effect services over domain/; they don't know about the scene or the UI."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)components(/|$)",
+                "message": "services/ are Effect services over domain/; they don't know about the scene or the UI."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)routes(/|$)",
+                "message": "services/ are Effect services over domain/; they don't know about the scene or the UI."
+              },
+              {
+                "group": ["react", "react-dom", "react/*"],
+                "message": "services/ are Effect services over domain/; they don't know about the scene or the UI."
+              },
+              {
+                "group": ["three", "three/*", "@react-three/*"],
+                "message": "services/ are Effect services over domain/; they don't know about the scene or the UI."
+              },
+              {
+                "group": ["zustand", "sonner", "@workspace/ui/*", "@tanstack/*"],
+                "message": "services/ are Effect services over domain/; they don't know about the scene or the UI."
+              },
+              {
+                "regex": "(^|/)repos/",
+                "message": "repos/ is vendored reference material; import the npm package instead."
+              },
+              { "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)test(/|$)", "message": "src/test/ helpers are for tests only." },
+              {
+                "regex": "^node:",
+                "message": "Editor source runs in the browser; node: builtins are for tests and tooling."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/editor/src/services/**/*.test.ts"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)editor(/|$)",
+                "message": "services/ are Effect services over domain/; they don't know about the scene or the UI."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)components(/|$)",
+                "message": "services/ are Effect services over domain/; they don't know about the scene or the UI."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)routes(/|$)",
+                "message": "services/ are Effect services over domain/; they don't know about the scene or the UI."
+              },
+              {
+                "group": ["react", "react-dom", "react/*"],
+                "message": "services/ are Effect services over domain/; they don't know about the scene or the UI."
+              },
+              {
+                "group": ["three", "three/*", "@react-three/*"],
+                "message": "services/ are Effect services over domain/; they don't know about the scene or the UI."
+              },
+              {
+                "group": ["zustand", "sonner", "@workspace/ui/*", "@tanstack/*"],
+                "message": "services/ are Effect services over domain/; they don't know about the scene or the UI."
+              },
+              {
+                "regex": "(^|/)repos/",
+                "message": "repos/ is vendored reference material; import the npm package instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/editor/src/editor/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)components(/|$)",
+                "message": "editor/ (scene, store, actions) sits below the UI: components/ and routes/ import it, not the reverse."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)routes(/|$)",
+                "message": "editor/ (scene, store, actions) sits below the UI: components/ and routes/ import it, not the reverse."
+              },
+              {
+                "regex": "(^|/)repos/",
+                "message": "repos/ is vendored reference material; import the npm package instead."
+              },
+              { "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)test(/|$)", "message": "src/test/ helpers are for tests only." },
+              {
+                "regex": "^node:",
+                "message": "Editor source runs in the browser; node: builtins are for tests and tooling."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/editor/src/editor/**/*.test.ts"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)components(/|$)",
+                "message": "editor/ (scene, store, actions) sits below the UI: components/ and routes/ import it, not the reverse."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)routes(/|$)",
+                "message": "editor/ (scene, store, actions) sits below the UI: components/ and routes/ import it, not the reverse."
+              },
+              {
+                "regex": "(^|/)repos/",
+                "message": "repos/ is vendored reference material; import the npm package instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/editor/src/components/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)services(/|$)",
+                "message": "components/ is React UI: reach services through editor/actions and keep three.js in editor/."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)routes(/|$)",
+                "message": "components/ is React UI: reach services through editor/actions and keep three.js in editor/."
+              },
+              {
+                "group": ["three", "three/*", "@react-three/*"],
+                "message": "components/ is React UI: reach services through editor/actions and keep three.js in editor/."
+              },
+              {
+                "regex": "(^|/)repos/",
+                "message": "repos/ is vendored reference material; import the npm package instead."
+              },
+              { "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)test(/|$)", "message": "src/test/ helpers are for tests only." },
+              {
+                "regex": "^node:",
+                "message": "Editor source runs in the browser; node: builtins are for tests and tooling."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/editor/src/routes/**", "apps/editor/src/router.tsx"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              { "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)domain(/|$)", "message": "routes/ only compose components/." },
+              { "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)editor(/|$)", "message": "routes/ only compose components/." },
+              { "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)services(/|$)", "message": "routes/ only compose components/." },
+              {
+                "regex": "(^|/)repos/",
+                "message": "repos/ is vendored reference material; import the npm package instead."
+              },
+              { "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)test(/|$)", "message": "src/test/ helpers are for tests only." },
+              {
+                "regex": "^node:",
+                "message": "Editor source runs in the browser; node: builtins are for tests and tooling."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/ui/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@ballest/*", "@/*"],
+                "message": "@workspace/ui is app-agnostic: it can't import the editor."
+              },
+              { "regex": "^(\\.\\./)+apps/", "message": "@workspace/ui is app-agnostic: it can't import the editor." },
+              {
+                "regex": "(^|/)repos/",
+                "message": "repos/ is vendored reference material; import the npm package instead."
+              }
+            ]
+          }
+        ]
       }
     }
   ]
