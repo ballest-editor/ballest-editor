@@ -75,6 +75,17 @@ interface Row {
   readonly control: ReactNode
 }
 
+function ColorInput(props: { readonly value: string; readonly onChange: (value: string) => void }) {
+  return (
+    <Input
+      type="color"
+      className="h-7 w-14 p-0.5"
+      value={props.value}
+      onChange={(e) => props.onChange(e.target.value)}
+    />
+  )
+}
+
 /** A binding being captured: a fresh slot (`index` = bindings.length) or a replacement. */
 interface Listening {
   readonly action: KeybindAction
@@ -246,6 +257,12 @@ export function SettingsDialog(props: {
     update(section, Struct.pick(defaultSettings[section], [key]))
   const isDefault = <K extends keyof Settings>(section: K, key: keyof Settings[K]) =>
     settings[section][key] === defaultSettings[section][key]
+  /** The parts of a settings row that come from its field: category, modified flag, reset. */
+  const setting = <K extends keyof Settings>(section: K, key: keyof Settings[K]) => ({
+    category: section,
+    modified: !isDefault(section, key),
+    reset: () => resetField(section, key)
+  })
 
   const setBindings = (action: KeybindAction, bindings: Bindings) =>
     void saveKeybinds({ ...keybinds, [action]: uniqueBindings(bindings) })
@@ -357,11 +374,9 @@ export function SettingsDialog(props: {
     return [
       {
         id: "units",
-        category: "general",
+        ...setting("general", "units"),
         label: "Units",
         description: "How positions are shown in the inspector. Map files always store centimetres.",
-        modified: !isDefault("general", "units"),
-        reset: () => resetField("general", "units"),
         control: (
           <Select
             value={settings.general.units}
@@ -380,12 +395,10 @@ export function SettingsDialog(props: {
       },
       {
         id: "creatorName",
-        category: "general",
+        ...setting("general", "creatorName"),
         label: "Creator name",
         description:
           "Your in-game name. Written into every exported map and its file name (letters, digits and spaces).",
-        modified: !isDefault("general", "creatorName"),
-        reset: () => resetField("general", "creatorName"),
         control: (
           <Input
             className="w-56"
@@ -407,12 +420,10 @@ export function SettingsDialog(props: {
       },
       {
         id: "fov",
-        category: "camera",
+        ...setting("camera", "fovPreset"),
         label: "Field of view",
         description:
           "The game's camera presets (from its camera settings). Only the field of view applies to the editor.",
-        modified: !isDefault("camera", "fovPreset"),
-        reset: () => resetField("camera", "fovPreset"),
         control: (
           <Select
             value={c.fovPreset}
@@ -430,14 +441,12 @@ export function SettingsDialog(props: {
       },
       {
         id: "customFov",
-        category: "camera",
+        ...setting("camera", "customFov"),
         label: "Custom field of view",
         description: customFovOff
           ? "Horizontal degrees. Choose the Custom preset to use it."
           : "Horizontal degrees, used by the Custom preset (like the game).",
         disabled: customFovOff,
-        modified: !isDefault("camera", "customFov"),
-        reset: () => resetField("camera", "customFov"),
         control: (
           <>
             <Slider
@@ -465,11 +474,9 @@ export function SettingsDialog(props: {
       },
       {
         id: "flySpeed",
-        category: "camera",
+        ...setting("camera", "flySpeed"),
         label: "Fly speed",
         description: "Base camera speed. Camera speed up/down multiply it.",
-        modified: !isDefault("camera", "flySpeed"),
-        reset: () => resetField("camera", "flySpeed"),
         control: (
           <>
             <Slider
@@ -489,10 +496,8 @@ export function SettingsDialog(props: {
       },
       {
         id: "lookSensitivity",
-        category: "camera",
+        ...setting("camera", "lookSensitivity"),
         label: "Look sensitivity",
-        modified: !isDefault("camera", "lookSensitivity"),
-        reset: () => resetField("camera", "lookSensitivity"),
         control: (
           <>
             <Slider
@@ -512,27 +517,21 @@ export function SettingsDialog(props: {
       },
       {
         id: "invertX",
-        category: "camera",
+        ...setting("camera", "invertLookX"),
         label: "Invert look horizontal",
-        modified: !isDefault("camera", "invertLookX"),
-        reset: () => resetField("camera", "invertLookX"),
         control: <Switch checked={c.invertLookX} onCheckedChange={(v) => update("camera", { invertLookX: v })} />
       },
       {
         id: "invertY",
-        category: "camera",
+        ...setting("camera", "invertLookY"),
         label: "Invert look vertical",
-        modified: !isDefault("camera", "invertLookY"),
-        reset: () => resetField("camera", "invertLookY"),
         control: <Switch checked={c.invertLookY} onCheckedChange={(v) => update("camera", { invertLookY: v })} />
       },
       ...keybindRows,
       {
         id: "theme",
-        category: "appearance",
+        ...setting("appearance", "theme"),
         label: "Theme",
-        modified: !isDefault("appearance", "theme"),
-        reset: () => resetField("appearance", "theme"),
         control: (
           <Select
             value={a.theme}
@@ -552,39 +551,24 @@ export function SettingsDialog(props: {
       },
       {
         id: "gridVisible",
-        category: "appearance",
+        ...setting("appearance", "gridVisible"),
         label: "Show grid",
-        modified: !isDefault("appearance", "gridVisible"),
-        reset: () => resetField("appearance", "gridVisible"),
         control: <Switch checked={a.gridVisible} onCheckedChange={(v) => update("appearance", { gridVisible: v })} />
       },
       {
         id: "gridCell",
-        category: "appearance",
+        ...setting("appearance", "gridCellColor"),
         label: "Grid colour (1 m cells)",
-        modified: !isDefault("appearance", "gridCellColor"),
-        reset: () => resetField("appearance", "gridCellColor"),
-        control: (
-          <Input
-            type="color"
-            className="h-7 w-14 p-0.5"
-            value={a.gridCellColor}
-            onChange={(e) => update("appearance", { gridCellColor: e.target.value })}
-          />
-        )
+        control: <ColorInput value={a.gridCellColor} onChange={(v) => update("appearance", { gridCellColor: v })} />
       },
       {
         id: "gridSection",
-        category: "appearance",
+        ...setting("appearance", "gridSectionColor"),
         label: "Grid colour (10 m sections)",
-        modified: !isDefault("appearance", "gridSectionColor"),
-        reset: () => resetField("appearance", "gridSectionColor"),
         control: (
-          <Input
-            type="color"
-            className="h-7 w-14 p-0.5"
+          <ColorInput
             value={a.gridSectionColor}
-            onChange={(e) => update("appearance", { gridSectionColor: e.target.value })}
+            onChange={(v) => update("appearance", { gridSectionColor: v })}
           />
         )
       }
