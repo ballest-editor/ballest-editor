@@ -50,7 +50,7 @@ const movementLookDescriptions = {
   all: "Every key needs look. The game's default.",
   upDown: "Up, down and keys shared with a tool need look.",
   conflicting: "Only keys shared with a tool need look.",
-  nothing: "No key needs look. Keys shared with a tool fly and pick it."
+  nothing: "No key needs look. Shared keys fly and pick their tool."
 } as const
 
 const CATEGORY_LABELS: Readonly<Record<SettingsCategory, string>> = {
@@ -555,10 +555,10 @@ export function SettingsDialog(props: {
             <SelectTrigger className="w-44">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="w-72" align="end" alignItemWithTrigger={false}>
+            <SelectContent className="w-auto" align="end" alignItemWithTrigger={false}>
               {movementLookModes.map((m) => (
                 <SelectItem key={m} value={m} className="py-1.5 pr-7">
-                  <span className="flex flex-col gap-0.5 whitespace-normal">
+                  <span className="flex flex-col gap-0.5">
                     <span>{movementLookItems[m]}</span>
                     <span className="opacity-70">{movementLookDescriptions[m]}</span>
                   </span>
