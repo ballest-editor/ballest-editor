@@ -1,6 +1,8 @@
 /** UI-facing operations that run Effects through the single app runtime. */
 import { Cause, Effect, Exit } from "effect"
+import type { UeTransform } from "../domain/coords"
 import { currentCreatedAt, newMapFile } from "../domain/factory"
+import { type Axis, type AxisEdit, editAxis, type TransformField } from "../domain/groupTransform"
 import type { Keybinds } from "../domain/Keybinds"
 import { PLAYER_START_CLASS } from "../domain/MapFile"
 import type { Settings } from "../domain/Settings"
@@ -23,6 +25,32 @@ const run = async <A, E>(effect: Effect.Effect<A, E, AppServices>): Promise<A | 
   useEditor.getState().notify("error", message)
   return undefined
 }
+
+// --- selection edits: each is one undo step, however many items it touches ---------------
+
+export const transformSelection = (transforms: ReadonlyMap<string, UeTransform>): boolean =>
+  useEditor.getState().transformItems(transforms)
+
+export const deleteSelection = () => useEditor.getState().deleteSelection()
+
+export const duplicateSelection = () => useEditor.getState().duplicateSelection()
+
+/** The selected items' document transforms with one axis of `field` edited. */
+const withAxisEdit = (field: TransformField, axis: Axis, edit: AxisEdit): ReadonlyMap<string, UeTransform> => {
+  const { doc, selectedIds } = useEditor.getState()
+  return new Map(selectedIds.flatMap((id) => {
+    const t = doc.map.items[doc.ids.indexOf(id)]?.itemTransform
+    return t === undefined ? [] : [[id, editAxis(t, field, axis, edit)] as const]
+  }))
+}
+
+/** Applies an axis edit (an inspector field) to every selected item. */
+export const editSelectionAxis = (field: TransformField, axis: Axis, edit: AxisEdit): boolean =>
+  transformSelection(withAxisEdit(field, axis, edit))
+
+/** Shows an axis edit live (a scrub) without committing it; null ends the preview. */
+export const previewSelectionAxis = (field: TransformField, axis: Axis, edit: AxisEdit | null): void =>
+  useEditor.getState().setPreview(edit === null ? null : withAxisEdit(field, axis, edit))
 
 export const loadCatalog = () =>
   run(

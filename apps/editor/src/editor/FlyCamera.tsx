@@ -197,10 +197,13 @@ export function FlyCamera() {
   // Focus selection
   useEffect(() => {
     if (focusRequest === 0) return
-    const { selectedId } = useEditor.getState()
-    const object = selectedId === null ? undefined : sceneRegistry.objects.get(selectedId)
-    if (object === undefined) return
-    const sphere = new THREE.Box3().setFromObject(object).getBoundingSphere(new THREE.Sphere())
+    const box = new THREE.Box3()
+    for (const id of useEditor.getState().selectedIds) {
+      const object = sceneRegistry.objects.get(id)
+      if (object !== undefined) box.expandByObject(object)
+    }
+    if (box.isEmpty()) return
+    const sphere = box.getBoundingSphere(new THREE.Sphere())
     const forward = camera.getWorldDirection(new THREE.Vector3())
     target.current.copy(sphere.center)
     camera.position.copy(sphere.center).addScaledVector(forward, -Math.max(sphere.radius * 2.5, 300))

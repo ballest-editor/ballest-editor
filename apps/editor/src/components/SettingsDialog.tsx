@@ -32,6 +32,7 @@ import {
   keybindActions,
   keybindSections,
   mouseChordOf,
+  mouseClickActions,
   mouseDragActions,
   uniqueBindings,
   wheelChordOf
@@ -328,11 +329,16 @@ export function SettingsDialog(props: {
   const rows = ((): ReadonlyArray<Row> => {
     // A chord is a conflict when two actions of the same kind share it. A fly key doubling
     // as a tool shortcut (W: forward + translate, as in the game) is fine: the "fly only while
-    // looking" setting decides which one it does.
+    // looking" setting decides which one it does. Mouse drags and selection clicks share a
+    // kind: a camera drag chord never reaches click selection.
     const kinds = new Map<string, Set<string>>()
     for (const action of keybindActions) {
       const bindings = keybinds[action]
-      const kind = heldActions.has(action) ? "held" : mouseDragActions.has(action) ? "drag" : "oneShot"
+      const kind = heldActions.has(action)
+        ? "held"
+        : mouseDragActions.has(action) || mouseClickActions.has(action)
+        ? "mouse"
+        : "oneShot"
       for (const b of bindings) {
         const set = kinds.get(`${kind}:${b}`) ?? new Set<string>()
         set.add(action)

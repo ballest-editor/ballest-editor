@@ -176,18 +176,6 @@ const spaceRotation = (gameRotation: Quat4, space: GizmoSpace): Quat4 | undefine
 export const handleWorldDir = (spec: HandleSpec, gameRotation: Quat4, space: GizmoSpace): THREE.Vector3 | undefined =>
   spec.axis === undefined ? undefined : axisWorldDir(spec.axis, spaceRotation(gameRotation, space))
 
-/**
- * The item's own scale axis a scale handle drives. An item can only scale along its own
- * axes, so a world-space handle drives the local axis closest to it (exact when the item's
- * axes line up with the world's).
- */
-export const scaleTargetAxis = (axis: Axis, gameRotation: Quat4, space: GizmoSpace): Axis => {
-  if (space === "local") return axis
-  const world = axisWorldDir(axis)
-  const alignment = (a: Axis) => Math.abs(axisWorldDir(a, gameRotation).dot(world))
-  return (["x", "y", "z"] as const).reduce((best, a) => (alignment(a) > alignment(best) ? a : best))
-}
-
 export const orientHandle = (handle: Handle, frame: GizmoFrame): void => {
   const { spec, root } = handle
   switch (spec.kind) {
