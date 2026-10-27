@@ -1,7 +1,5 @@
 import { Input } from "@workspace/ui/components/input"
-import { Kbd } from "@workspace/ui/components/kbd"
 import { Label } from "@workspace/ui/components/label"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { type MouseEvent, type PointerEvent, useEffect, useId, useRef, useState } from "react"
 
 /** Pixels the pointer must travel before a press on the label becomes a scrub (else it's a click). */
@@ -136,33 +134,18 @@ export function NumberField(props: {
   const scrubbable = props.onScrub !== undefined
   return (
     <div className="flex min-w-0">
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Label
-              htmlFor={id}
-              className={`w-2 shrink-0 rounded-l-md ${props.handleClassName ?? "bg-muted"} ${
-                scrubbable ? "cursor-ew-resize hover:brightness-125" : ""
-              }`}
-              {...scrubHandlers}
-            />
-          }
-        >
-          <span className="sr-only">{props.label}</span>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="flex items-center gap-1.5">
-          {props.label}
-          {scrubbable && (
-            <>
-              · drag to scrub <Kbd>Shift</Kbd> finer <Kbd>Esc</Kbd> cancel
-            </>
-          )}
-        </TooltipContent>
-      </Tooltip>
+      <Label
+        htmlFor={id}
+        aria-label={props.label}
+        className={`w-2 shrink-0 rounded-l-md ${props.handleClassName ?? "bg-muted"} ${
+          scrubbable ? "cursor-ew-resize hover:brightness-125" : ""
+        }`}
+        {...scrubHandlers}
+      />
       <Input
         id={id}
         inputMode="decimal"
-        className="min-w-0 rounded-l-none border-l-0 px-1.5 font-mono"
+        className="min-w-0 rounded-l-none border-l-0 px-1.5 py-0 font-mono leading-none md:leading-none"
         value={text}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}

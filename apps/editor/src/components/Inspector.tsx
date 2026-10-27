@@ -1,5 +1,6 @@
 import {
   type Icon,
+  IconArrowBigUp,
   IconArrowsMaximize,
   IconArrowsMove,
   IconClipboard,
@@ -22,6 +23,7 @@ import { quatToRotator, rotatorToQuat } from "../domain/ueMath"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import { selectedIndex, useEditor } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
+import { MouseButtonIcon } from "./MouseButtonIcon"
 import { NumberField } from "./NumberField"
 
 type Axis = "x" | "y" | "z"
@@ -135,7 +137,16 @@ function TransformRow(props: {
           <TooltipContent side="left" className="flex flex-col items-start gap-1">
             <span>{props.title}</span>
             <span className="flex items-center gap-1.5">
-              Copy <Kbd>⇧ Right-click</Kbd> · Paste <Kbd>⇧ Click</Kbd>
+              Copy{" "}
+              <Kbd>
+                <IconArrowBigUp />
+                <MouseButtonIcon button="right" />
+              </Kbd>
+              Paste{" "}
+              <Kbd>
+                <IconArrowBigUp />
+                <MouseButtonIcon button="left" />
+              </Kbd>
             </span>
           </TooltipContent>
         </Tooltip>
@@ -153,7 +164,10 @@ function TransformRow(props: {
             <span className="flex items-center gap-2">
               <IconCopy />Copy X, Y, Z
             </span>
-            <Kbd>⇧ Right-click</Kbd>
+            <Kbd>
+              <IconArrowBigUp />
+              <MouseButtonIcon button="right" />
+            </Kbd>
           </Button>
           <Button
             variant="ghost"
@@ -168,7 +182,10 @@ function TransformRow(props: {
             <span className="flex items-center gap-2">
               <IconClipboard />Paste
             </span>
-            <Kbd>⇧ Click</Kbd>
+            <Kbd>
+              <IconArrowBigUp />
+              <MouseButtonIcon button="left" />
+            </Kbd>
           </Button>
         </PopoverContent>
       </Popover>
