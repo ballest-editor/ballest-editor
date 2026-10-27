@@ -21,7 +21,7 @@ export function TopBar() {
       <Button variant="ghost" size="sm" onClick={() => openDialog("export")}>
         <IconDownload /> Export
       </Button>
-      <Separator orientation="vertical" className="mx-1 h-5" />
+      <Separator orientation="vertical" className="mx-1 h-5 data-vertical:self-center" />
       {/* TODO(menu-bar): move into a universal menu bar (Edit > Settings…) */}
       <Button variant="ghost" size="sm" onClick={() => openDialog("settings")}>
         <IconSettings /> Settings
