@@ -1,18 +1,23 @@
 import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
-import { ueToScene, type UeTransform } from "../../domain/coords"
+import { type Quat4, ueToScene, ueToThreeVector, type UeTransform, type Vec3 } from "../../domain/coords"
+import { applyGroupDelta, selectionPivot } from "../../domain/groupTransform"
 import { chordOf } from "../../domain/Keybinds"
+import { transformSelection } from "../actions"
 import { sceneRegistry } from "../sceneRegistry"
-import { selectedIndex, useEditor } from "../store"
-import { dragAxisWorld, type DragStart, dragTransform, type PointerSample } from "./drag"
+import { activeId, shownTransform, useEditor } from "../store"
+import { dragAxisWorld, dragDelta, type DragStart, type PointerSample } from "./drag"
 import { AXIS_COLORS, GizmoObject, toolHandles } from "./handles"
 import { worldPerPixel } from "./math"
 
 interface ActiveDrag {
   readonly id: string
   readonly start: DragStart
-  last: UeTransform | undefined
+  /** Every selected item's transform at drag start, and the pivot they move about. */
+  readonly startTransforms: ReadonlyMap<string, UeTransform>
+  readonly pivot: Vec3
+  last: ReadonlyMap<string, UeTransform> | undefined
 }
 
 const applyToObject = (object: THREE.Object3D, transform: UeTransform) => {
@@ -23,16 +28,45 @@ const applyToObject = (object: THREE.Object3D, transform: UeTransform) => {
   object.updateMatrixWorld(true)
 }
 
-/** The item transform the gizmo should show: the live drag preview, else the document. */
-const currentTransform = (): UeTransform | undefined => {
+/** Moves each item's scene object (ahead of React, which follows through the preview). */
+const applyToObjects = (transforms: ReadonlyMap<string, UeTransform>) => {
+  for (const [id, transform] of transforms) {
+    const object = sceneRegistry.objects.get(id)
+    if (object !== undefined) applyToObject(object, transform)
+  }
+}
+
+interface GizmoTarget {
+  /** The selected items' shown transforms (live preview, else the document). */
+  readonly transforms: ReadonlyMap<string, UeTransform>
+  /** Where the gizmo sits: the selection pivot, in game space. */
+  readonly pivot: Vec3
+  /** The active item's rotation (the local scale axes follow it). */
+  readonly rotation: Quat4
+}
+
+/** What the gizmo acts on: the selected items that are in the scene. */
+const currentTarget = (): GizmoTarget | undefined => {
   const s = useEditor.getState()
-  if (s.selectedId !== null && s.preview?.id === s.selectedId) return s.preview.transform
-  return s.doc.map.items[selectedIndex(s)]?.itemTransform
+  const transforms = new Map(s.selectedIds.flatMap((id) => {
+    const t = shownTransform(s, id)
+    return t === undefined || !sceneRegistry.objects.has(id) ? [] : [[id, t] as const]
+  }))
+  const pivot = selectionPivot([...transforms.values()])
+  const id = activeId(s)
+  const rotation = (id === undefined ? undefined : transforms.get(id)) ?? transforms.values().next().value
+  return pivot === undefined || rotation === undefined ? undefined : { transforms, pivot, rotation: rotation.rotation }
+}
+
+const toWorld = (v: Vec3) => {
+  const w = ueToThreeVector(v)
+  return new THREE.Vector3(w.x, w.y, w.z)
 }
 
 /**
  * Hosts the Blender-style gizmo for the current tool: hover picking, dragging with a live
- * preview (inspector stays in sync), one undo entry per drag, Escape to cancel.
+ * preview (inspector stays in sync), one undo entry per drag, Escape to cancel. The gizmo
+ * sits on the selection pivot and a drag moves every selected item together.
  */
 export function GizmoController() {
   const camera = useThree((s) => s.camera)
@@ -62,21 +96,19 @@ export function GizmoController() {
   useFrame(() => {
     // The Canvas camera is perspective; gizmo sizing needs its fov.
     if (gizmo === null || !(camera instanceof THREE.PerspectiveCamera)) return
-    const { selectedId } = useEditor.getState()
-    const object = selectedId === null ? undefined : sceneRegistry.objects.get(selectedId)
-    const transform = currentTransform()
-    gizmo.visible = object !== undefined && transform !== undefined
-    if (object === undefined || transform === undefined) {
+    const target = currentTarget()
+    gizmo.visible = target !== undefined
+    if (target === undefined) {
       hovered.current = null
       return
     }
-    const origin = object.getWorldPosition(new THREE.Vector3())
+    const origin = toWorld(target.pivot)
     const height = gl.domElement.clientHeight
     gizmo.update(
       {
         origin,
         worldPerPixel: worldPerPixel(camera, origin, height),
-        gameRotation: transform.rotation,
+        gameRotation: target.rotation,
         space: useEditor.getState().gizmoSpace,
         cameraQuaternion: camera.quaternion
       },
@@ -103,10 +135,6 @@ export function GizmoController() {
       const handleId: unknown = hit?.object.userData["handleId"]
       return typeof handleId === "string" ? handleId : null
     }
-    const selectedObject = () => {
-      const { selectedId } = useEditor.getState()
-      return selectedId === null ? undefined : sceneRegistry.objects.get(selectedId)
-    }
     const endDrag = () => {
       drag.current = null
       gizmo.setGuide(undefined, undefined)
@@ -116,10 +144,9 @@ export function GizmoController() {
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return
       const id = pick(e)
-      const object = selectedObject()
-      const transform = currentTransform()
+      const target = currentTarget()
       const spec = gizmo.handle(id)?.spec
-      if (id === null || object === undefined || transform === undefined || spec === undefined) return
+      if (id === null || target === undefined || spec === undefined) return
       e.stopImmediatePropagation() // the gizmo wins over camera drags and click-select
       e.preventDefault()
       try {
@@ -127,19 +154,19 @@ export function GizmoController() {
       } catch {
         // synthetic events (automation) have no capturable pointer
       }
-      const originWorld = object.getWorldPosition(new THREE.Vector3())
+      const originWorld = toWorld(target.pivot)
       const projected = originWorld.clone().project(camera)
       const rect = el.getBoundingClientRect()
       const start: DragStart = {
         spec,
         space: useEditor.getState().gizmoSpace,
-        transform,
+        frameRotation: target.rotation,
         originWorld,
         originPx: { x: ((projected.x + 1) / 2) * rect.width, y: ((1 - projected.y) / 2) * rect.height },
         toCamera: camera.position.clone().sub(originWorld).normalize(),
         pointer: sample(e)
       }
-      drag.current = { id, start, last: undefined }
+      drag.current = { id, start, startTransforms: target.transforms, pivot: target.pivot, last: undefined }
       const axis = spec.kind === "translateAxis" || spec.kind === "scaleAxis" || spec.kind === "rotateAxis"
         ? dragAxisWorld(start)
         : undefined
@@ -152,13 +179,12 @@ export function GizmoController() {
         if (e.buttons === 0) hovered.current = pick(e)
         return
       }
-      const next = dragTransform(active.start, sample(e))
-      const object = selectedObject()
-      if (next === undefined || object === undefined) return
+      const delta = dragDelta(active.start, sample(e))
+      if (delta === undefined) return
+      const next = new Map([...active.startTransforms].map(([id, t]) => [id, applyGroupDelta(t, active.pivot, delta)]))
       active.last = next
-      applyToObject(object, next)
-      const { selectedId, setPreview } = useEditor.getState()
-      if (selectedId !== null) setPreview({ id: selectedId, transform: next })
+      applyToObjects(next)
+      useEditor.getState().setPreview(next)
     }
 
     const onPointerUp = (e: PointerEvent) => {
@@ -166,12 +192,11 @@ export function GizmoController() {
       if (active === null) return
       e.stopImmediatePropagation()
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
-      const { selectedId, transformItem } = useEditor.getState()
-      const object = selectedObject()
       endDrag()
-      if (active.last === undefined || selectedId === null) return
-      // One undo entry. If the document refuses it, the scene object goes back where it started.
-      if (!transformItem(selectedId, active.last) && object !== undefined) applyToObject(object, active.start.transform)
+      if (active.last === undefined) return
+      // One undo entry for the whole selection. If the document refuses it, the scene objects
+      // go back where they started.
+      if (!transformSelection(active.last)) applyToObjects(active.startTransforms)
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -180,8 +205,7 @@ export function GizmoController() {
       if (e.code !== "Escape" && !useEditor.getState().keybinds.deselect.includes(chordOf(e))) return
       e.preventDefault()
       e.stopImmediatePropagation() // don't also deselect
-      const object = selectedObject()
-      if (object !== undefined) applyToObject(object, active.start.transform)
+      applyToObjects(active.startTransforms)
       endDrag()
     }
 

@@ -1,5 +1,5 @@
 /** Unreal-frame math (no frame conversion here; see coords.ts for that). */
-import type { Quat4 } from "./coords"
+import type { Quat4, Vec3 } from "./coords"
 
 /** FRotator::Quaternion (degrees -> unit quaternion), same formula as the engine. */
 export const rotatorToQuat = (r: { readonly pitch: number; readonly yaw: number; readonly roll: number }): Quat4 => {
@@ -12,5 +12,34 @@ export const rotatorToQuat = (r: { readonly pitch: number; readonly yaw: number;
     y: -cr * sp * cy - sr * cp * sy,
     z: cr * cp * sy - sr * sp * cy,
     w: cr * cp * cy + sr * sp * sy
+  }
+}
+
+// --- quaternions (Hamilton product on raw components) ---------------------------------
+
+export const quatMul = (a: Quat4, b: Quat4): Quat4 => ({
+  x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+  y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+  z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+  w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
+})
+
+export const quatNormalize = (q: Quat4): Quat4 => {
+  const n = Math.hypot(q.x, q.y, q.z, q.w) || 1
+  return { x: q.x / n, y: q.y / n, z: q.z / n, w: q.w / n }
+}
+
+/** The inverse rotation of a unit quaternion. */
+export const quatConjugate = (q: Quat4): Quat4 => ({ x: -q.x, y: -q.y, z: -q.z, w: q.w })
+
+/** v' = q v q* (same formula as FQuat::RotateVector). */
+export const rotateVec = (q: Quat4, v: Vec3): Vec3 => {
+  const tx = 2 * (q.y * v.z - q.z * v.y)
+  const ty = 2 * (q.z * v.x - q.x * v.z)
+  const tz = 2 * (q.x * v.y - q.y * v.x)
+  return {
+    x: v.x + q.w * tx + (q.y * tz - q.z * ty),
+    y: v.y + q.w * ty + (q.z * tx - q.x * tz),
+    z: v.z + q.w * tz + (q.x * ty - q.y * tx)
   }
 }

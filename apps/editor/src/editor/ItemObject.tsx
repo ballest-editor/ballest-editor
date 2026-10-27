@@ -117,7 +117,7 @@ export const ItemObject = memo(function ItemObjectView(props: {
   }, [id])
 
   // A continuous interaction (gizmo drag, inspector scrub) shows here before it commits.
-  const live = useEditor((s) => (s.preview?.id === id ? s.preview.transform : undefined))
+  const live = useEditor((s) => s.preview?.get(id))
   const itemTransform = live ?? item.itemTransform
   const transform = useMemo(() => ueToScene(itemTransform), [itemTransform])
   const visuals = useMemo(() => visualsOf(item, index), [item, index])

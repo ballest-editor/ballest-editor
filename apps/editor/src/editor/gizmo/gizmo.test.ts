@@ -1,9 +1,12 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as THREE from "three"
 import { ueToScene, ueToThreeVector } from "../../domain/coords"
-import { type DragStart, dragTransform } from "./drag"
+import type { UeTransform } from "../../domain/coords"
+import { applyGroupDelta } from "../../domain/groupTransform"
+import { rotateVec } from "../../domain/ueMath"
+import { dragDelta, type DragStart, type PointerSample } from "./drag"
 import { GizmoObject, type GizmoSpace, SIZE, toolHandles } from "./handles"
-import { axisParamFromRay, axisWorldDir, gameDirToWorld, planeHit, rotateVec, screenAngle } from "./math"
+import { axisParamFromRay, axisWorldDir, gameDirToWorld, planeHit, screenAngle } from "./math"
 
 const v3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
 const identity = {
@@ -88,6 +91,9 @@ describe("gizmo handles", () => {
   })
 })
 
+/** A drag start plus the one item it moves (at the origin, so it is its own pivot). */
+type TestDrag = DragStart & { readonly transform: UeTransform }
+
 describe("gizmo drags (game space)", () => {
   const camera = v3(0, 1000, 1000)
   const pointer = (target: THREE.Vector3, px = { x: 0, y: 0 }) => ({
@@ -100,15 +106,22 @@ describe("gizmo drags (game space)", () => {
     transform = identity,
     px = { x: 10, y: 0 },
     space: GizmoSpace = "world"
-  ): DragStart => ({
+  ): TestDrag => ({
     spec: [...toolHandles.translate, ...toolHandles.rotate, ...toolHandles.scale].find((s) => s.id === id)!,
     space,
+    frameRotation: transform.rotation,
     transform,
     originWorld: v3(0, 0, 0),
     originPx: { x: 0, y: 0 },
     toCamera: camera.clone().normalize(),
     pointer: { ...pointer(v3(0, 0, 0)), px }
   })
+
+  /** The drag applied to the start's item. */
+  const dragTransform = (s: TestDrag, now: PointerSample) => {
+    const delta = dragDelta(s, now)
+    return delta === undefined ? undefined : applyGroupDelta(s.transform, s.transform.translation, delta)
+  }
 
   it("translates along game X by the pointer's projection on the axis", () => {
     const out = dragTransform(start("t-x"), pointer(v3(250, 0, 0)))!
