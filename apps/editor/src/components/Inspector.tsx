@@ -4,13 +4,118 @@ import { Label } from "@workspace/ui/components/label"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Separator } from "@workspace/ui/components/separator"
 import { type ReactNode, useState } from "react"
+import type { UeTransform, Vec3 } from "../domain/coords"
 import { classNameOf, isPlayerStart, objectPathOf } from "../domain/MapFile"
+import { quatToRotator, rotatorToQuat } from "../domain/ueMath"
 import { selectedIndex, useEditor } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { NumberField } from "./NumberField"
 
 type Axis = "x" | "y" | "z"
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
+/** Game-axis colours, matching the gizmo (X red, Y green, Z blue). */
+const axisClass: Record<Axis, string> = {
+  x: "border-red-500/70 text-red-600 dark:text-red-400",
+  y: "border-green-500/70 text-green-600 dark:text-green-400",
+  z: "border-blue-500/70 text-blue-600 dark:text-blue-400"
+}
+
+/** One X/Y/Z row of the transform, in display values (units, degrees). */
+interface TransformRowSpec {
+  readonly kind: "position" | "rotation" | "scale"
+  readonly title: string
+  readonly labels: Readonly<Record<Axis, string>>
+  readonly read: (t: UeTransform) => Vec3
+  readonly write: (t: UeTransform, v: Vec3) => UeTransform
+}
+
+const transformRows = (perUnit: number): ReadonlyArray<TransformRowSpec> => [
+  {
+    kind: "position",
+    title: "Position",
+    labels: { x: "X", y: "Y", z: "Z" },
+    read: (t) => ({ x: t.translation.x / perUnit, y: t.translation.y / perUnit, z: t.translation.z / perUnit }),
+    write: (t, v) => ({ ...t, translation: { x: v.x * perUnit, y: v.y * perUnit, z: v.z * perUnit } })
+  },
+  {
+    // UE rotator axes: roll about X, pitch about Y, yaw about Z.
+    kind: "rotation",
+    title: "Rotation (degrees)",
+    labels: { x: "X roll", y: "Y pitch", z: "Z yaw" },
+    read: (t) => {
+      const r = quatToRotator(t.rotation)
+      return { x: r.roll, y: r.pitch, z: r.yaw }
+    },
+    write: (t, v) => ({ ...t, rotation: rotatorToQuat({ roll: v.x, pitch: v.y, yaw: v.z }) })
+  },
+  {
+    kind: "scale",
+    title: "Scale",
+    labels: { x: "X", y: "Y", z: "Z" },
+    read: (t) => ({ x: t.scale3D.x, y: t.scale3D.y, z: t.scale3D.z }),
+    write: (t, v) => ({ ...t, scale3D: { x: v.x, y: v.y, z: v.z } })
+  }
+]
+
+/** Copied rows, in display values, shared by every item. */
+const copiedRows = new Map<TransformRowSpec["kind"], Vec3>()
+
+function TransformRow(props: {
+  readonly row: TransformRowSpec
+  readonly title: string
+  /** The transform on screen (live during a drag or scrub). */
+  readonly shown: UeTransform
+  /** The document's transform, which edits build on. */
+  readonly committed: UeTransform
+  readonly onCommit: (transform: UeTransform) => void
+  readonly onPreview: (transform: UeTransform | null) => void
+  readonly step: number
+  readonly digits: number
+}) {
+  const notify = useEditor((s) => s.notify)
+  const { row, committed } = props
+  const value = row.read(props.shown)
+  const withAxis = (axis: Axis, n: number) => row.write(committed, { ...row.read(committed), [axis]: n })
+  return (
+    <div className="flex flex-col gap-2">
+      <div
+        className="cursor-default select-none"
+        title="Shift+right-click: copy X, Y, Z · Shift+click: paste"
+        onClick={(e) => {
+          if (!e.shiftKey) return
+          const copied = copiedRows.get(row.kind)
+          if (copied === undefined) {
+            notify("info", `Nothing copied for ${row.title.toLowerCase()} yet.`)
+            return
+          }
+          props.onCommit(row.write(committed, copied))
+        }}
+        onContextMenu={(e) => {
+          if (!e.shiftKey) return
+          e.preventDefault()
+          copiedRows.set(row.kind, row.read(committed))
+          notify("info", `Copied ${row.title.toLowerCase()}.`)
+        }}
+      >
+        <SectionTitle>{props.title}</SectionTitle>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {axes.map((axis) => (
+          <NumberField
+            key={axis}
+            label={row.labels[axis]}
+            value={value[axis]}
+            onCommit={(n) => props.onCommit(withAxis(axis, n))}
+            onScrub={(n) => props.onPreview(n === null ? null : withAxis(axis, n))}
+            step={props.step}
+            digits={props.digits}
+            inputClassName={axisClass[axis]}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
 
 const SectionTitle = ({ children }: { readonly children: ReactNode }) => (
   <div className="text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">{children}</div>
@@ -61,7 +166,7 @@ export function Inspector() {
   const selectedId = useEditor((s) => s.selectedId)
   const catalogIndex = useEditor((s) => s.catalogIndex)
   const missing = useEditor((s) => s.missingGlbs)
-  const moveItem = useEditor((s) => s.moveItem)
+  const transformItem = useEditor((s) => s.transformItem)
   const setPreview = useEditor((s) => s.setPreview)
   const preview = useEditor((s) => s.preview)
   const units = useEditor((s) => s.settings.general.units)
@@ -80,19 +185,12 @@ export function Inspector() {
   const t = preview?.id === selectedId ? preview.transform : item.itemTransform
   // Display units only; the map always stores centimetres.
   const perUnit = units === "m" ? 100 : 1
-  const setAxis = (axis: Axis) => (value: number) =>
-    moveItem(selectedId, { ...item.itemTransform.translation, [axis]: value * perUnit })
-  // A scrub previews live and commits once on release (one undo step).
-  const scrubAxis = (axis: Axis) => (value: number | null) =>
-    setPreview(
-      value === null ? null : {
-        id: selectedId,
-        transform: {
-          ...item.itemTransform,
-          translation: { ...item.itemTransform.translation, [axis]: value * perUnit }
-        }
-      }
-    )
+  const rows = transformRows(perUnit)
+  const fieldProps = {
+    position: { step: perUnit === 100 ? 0.01 : 1, digits: perUnit === 100 ? 5 : 3 },
+    rotation: { step: 1, digits: 3 },
+    scale: { step: 0.01, digits: 3 }
+  } as const
   const failed = visualsOf(item, catalogIndex).flatMap((v) => {
     const url = glbUrl(v.mesh?.glb)
     return url !== undefined && missing.has(url)
@@ -111,30 +209,18 @@ export function Inspector() {
         {failed.map((w) => <Badge key={w} variant="destructive">{w}</Badge>)}
 
         <Separator />
-        <SectionTitle>Position (game {units}, Z up)</SectionTitle>
-        <div className="grid grid-cols-3 gap-2">
-          {axes.map((axis) => (
-            <NumberField
-              key={axis}
-              label={axis.toUpperCase()}
-              value={t.translation[axis] / perUnit}
-              onCommit={setAxis(axis)}
-              onScrub={scrubAxis(axis)}
-              step={units === "m" ? 0.01 : 1}
-              digits={units === "m" ? 5 : 3}
-            />
-          ))}
-        </div>
-
-        <SectionTitle>Rotation (quaternion)</SectionTitle>
-        <div className="font-mono text-xs text-muted-foreground">
-          x {t.rotation.x.toFixed(4)} y {t.rotation.y.toFixed(4)} z {t.rotation.z.toFixed(4)} w{" "}
-          {t.rotation.w.toFixed(4)}
-        </div>
-        <SectionTitle>Scale</SectionTitle>
-        <div className="font-mono text-xs text-muted-foreground">
-          {t.scale3D.x.toFixed(3)} × {t.scale3D.y.toFixed(3)} × {t.scale3D.z.toFixed(3)}
-        </div>
+        {rows.map((row) => (
+          <TransformRow
+            key={row.kind}
+            row={row}
+            title={row.kind === "position" ? `Position (game ${units}, Z up)` : row.title}
+            shown={t}
+            committed={item.itemTransform}
+            onCommit={(transform) => transformItem(selectedId, transform)}
+            onPreview={(transform) => setPreview(transform === null ? null : { id: selectedId, transform })}
+            {...fieldProps[row.kind]}
+          />
+        ))}
 
         <Separator />
         <SectionTitle>Meshes</SectionTitle>

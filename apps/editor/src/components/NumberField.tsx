@@ -107,6 +107,8 @@ export function NumberField(props: {
   readonly onScrub?: (value: number | null) => void
   readonly step?: number
   readonly digits?: number
+  /** Extra classes for the input, e.g. an axis colour. */
+  readonly inputClassName?: string
 }) {
   const id = useId()
   const digits = props.digits ?? 3
@@ -143,7 +145,7 @@ export function NumberField(props: {
       <Input
         id={id}
         inputMode="decimal"
-        className="font-mono"
+        className={props.inputClassName === undefined ? "font-mono" : `font-mono ${props.inputClassName}`}
         value={text}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
