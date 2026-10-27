@@ -5,10 +5,11 @@ import { type Quat4, ueToScene, ueToThreeVector, type UeTransform, type Vec3 } f
 import { applyGroupDelta, selectionPivot } from "../../domain/groupTransform"
 import { chordOf } from "../../domain/Keybinds"
 import { transformSelection } from "../actions"
+import { AXIS_COLORS } from "../axisColors"
 import { sceneRegistry } from "../sceneRegistry"
 import { activeId, shownTransform, useEditor } from "../store"
 import { dragAxisWorld, dragDelta, type DragStart, type PointerSample } from "./drag"
-import { AXIS_COLORS, GizmoObject, toolHandles } from "./handles"
+import { GizmoObject, toolHandles } from "./handles"
 import { worldPerPixel } from "./math"
 
 interface ActiveDrag {

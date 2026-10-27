@@ -1,19 +1,37 @@
-import { IconCopy, IconTrash } from "@tabler/icons-react"
+import {
+  type Icon,
+  IconArrowsMaximize,
+  IconArrowsMove,
+  IconClipboard,
+  IconCopy,
+  IconRefresh,
+  IconTrash
+} from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Separator } from "@workspace/ui/components/separator"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { type ReactNode, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
-import type { UeTransform } from "../domain/coords"
-import type { Axis, TransformField } from "../domain/groupTransform"
+import type { UeTransform, Vec3 } from "../domain/coords"
+import { type Axis, readField, type TransformField } from "../domain/groupTransform"
 import { formatBindings, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
 import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/MapFile"
-import { deleteSelection, duplicateSelection, editSelectionAxis, previewSelectionAxis } from "../editor/actions"
+import {
+  deleteSelection,
+  duplicateSelection,
+  editSelectionAxis,
+  previewSelectionAxis,
+  setSelectionField
+} from "../editor/actions"
+import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import { selectedIndices, shownTransform, useEditor } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
+import { ShiftClick } from "./MouseButtonIcon"
 import { NumberField } from "./NumberField"
 
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
@@ -67,36 +85,169 @@ const shared = (values: ReadonlyArray<number>): number | null => {
   return first !== undefined && values.every((v) => v === first) ? first : null
 }
 
-const fixed = (value: number | null, digits: number) => (value === null ? "mixed" : value.toFixed(digits))
-
-/**
- * One editable row (position or scale) over the whole selection. A typed value sets every
- * selected item; a scrub moves each by the same amount from where it was, so a mixed
- * selection keeps its spread. `perUnit` converts display units to the stored value.
- */
-function AxisFields(props: {
+/** One X/Y/Z row of the transform: which field, how it's labelled, and its display precision. */
+interface TransformRowSpec {
   readonly field: TransformField
-  readonly transforms: ReadonlyArray<UeTransform>
-  readonly perUnit: number
+  readonly title: string
+  readonly icon: Icon
+  readonly labels: Readonly<Record<Axis, string>>
   readonly step: number
   readonly digits: number
+}
+
+const transformRows = (units: "cm" | "m"): ReadonlyArray<TransformRowSpec> => [
+  {
+    field: "translation",
+    title: `Location (game ${units}, Z up)`,
+    icon: IconArrowsMove,
+    labels: { x: "X", y: "Y", z: "Z" },
+    step: units === "m" ? 0.01 : 1,
+    digits: units === "m" ? 3 : 1
+  },
+  {
+    field: "rotation",
+    title: "Rotation (degrees: roll, pitch, yaw)",
+    icon: IconRefresh,
+    labels: { x: "X roll", y: "Y pitch", z: "Z yaw" },
+    step: 1,
+    digits: 1
+  },
+  {
+    field: "scale3D",
+    title: "Scale",
+    icon: IconArrowsMaximize,
+    labels: { x: "X", y: "Y", z: "Z" },
+    step: 0.01,
+    digits: 2
+  }
+]
+
+const rowName = (
+  field: TransformField
+) => (field === "translation" ? "location" : field === "scale3D" ? "scale" : field)
+
+/** Copied rows in stored units (cm, degrees, factor), shared by every selection. */
+const copiedRows = new Map<TransformField, Vec3>()
+
+/**
+ * One editable row over the whole selection: a label icon whose menu (or Shift+click
+ * shortcuts) copies and pastes all three axes, then an X/Y/Z field each. A typed value sets
+ * every selected item; a scrub moves each by the same amount from where it was, so a mixed
+ * selection keeps its spread. `perUnit` converts display units to the stored value.
+ */
+function TransformRow(props: {
+  readonly row: TransformRowSpec
+  /** The selection's transforms as shown (live while a drag or scrub is in progress). */
+  readonly shown: ReadonlyArray<UeTransform>
+  /** The active item's document transform, which a copy reads. */
+  readonly active: UeTransform
+  readonly perUnit: number
 }) {
-  const { field, transforms, perUnit, step, digits } = props
+  const notify = useEditor((s) => s.notify)
+  const { row, perUnit } = props
+  const { field } = row
+  const [open, setOpen] = useState(false)
+  const copy = () => {
+    copiedRows.set(field, readField(props.active, field))
+    notify("info", `Copied ${rowName(field)}.`)
+  }
+  const paste = () => {
+    const copied = copiedRows.get(field)
+    if (copied === undefined) notify("info", `Nothing copied for ${rowName(field)} yet.`)
+    else setSelectionField(field, copied)
+  }
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="contents">
+      <Popover
+        open={open}
+        onOpenChange={(next, details) => {
+          // Shift+click pastes instead of opening the menu
+          if (next && details.event instanceof MouseEvent && details.event.shiftKey) return
+          setOpen(next)
+        }}
+      >
+        <Tooltip>
+          <TooltipTrigger
+            delay={500}
+            render={
+              <PopoverTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={row.title}
+                    onClick={(e) => {
+                      if (e.shiftKey) paste()
+                    }}
+                    onContextMenu={(e) => {
+                      if (!e.shiftKey) return
+                      e.preventDefault()
+                      copy()
+                    }}
+                  />
+                }
+              />
+            }
+          >
+            <row.icon />
+          </TooltipTrigger>
+          <TooltipContent side="left" sideOffset={8} className="flex flex-col items-start py-2 pr-3 pl-2.5">
+            <div className="font-medium">{row.title}</div>
+            <div className="mt-1.5 grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-1 opacity-80">
+              <span>Copy</span>
+              <ShiftClick button="right" />
+              <span>Paste</span>
+              <ShiftClick button="left" />
+            </div>
+          </TooltipContent>
+        </Tooltip>
+        <PopoverContent side="left" align="start" className="w-auto gap-1 p-1">
+          <div className="px-2 py-1 text-xs text-muted-foreground">{row.title}</div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="justify-between gap-4"
+            onClick={() => {
+              copy()
+              setOpen(false)
+            }}
+          >
+            <span className="flex items-center gap-2">
+              <IconCopy />Copy X, Y, Z
+            </span>
+            <ShiftClick button="right" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="justify-between gap-4"
+            disabled={copiedRows.get(field) === undefined}
+            onClick={() => {
+              paste()
+              setOpen(false)
+            }}
+          >
+            <span className="flex items-center gap-2">
+              <IconClipboard />Paste
+            </span>
+            <ShiftClick button="left" />
+          </Button>
+        </PopoverContent>
+      </Popover>
       {axes.map((axis) => {
-        const value = shared(transforms.map((t) => t[field][axis] / perUnit))
+        const value = shared(props.shown.map((t) => readField(t, field)[axis] / perUnit))
         const offset = (v: number) => ({ kind: "offset", by: (v - (value ?? 0)) * perUnit }) as const
         return (
           <NumberField
             key={axis}
-            label={axis.toUpperCase()}
+            label={row.labels[axis]}
             value={value}
             onCommit={(v) => editSelectionAxis(field, axis, { kind: "set", value: v * perUnit })}
             onScrub={(v) => previewSelectionAxis(field, axis, v === null ? null : offset(v))}
             onScrubCommit={(v) => editSelectionAxis(field, axis, offset(v))}
-            step={step}
-            digits={digits}
+            step={row.step}
+            digits={row.digits}
+            handleClassName={AXIS_BG_CLASSES[axis]}
           />
         )
       })}
@@ -213,9 +364,9 @@ export function Inspector() {
     )
   }
 
-  // Display units only; the map always stores centimetres.
+  // Display units only; the map always stores centimetres (rotation and scale don't convert).
   const perUnit = units === "m" ? 100 : 1
-  const rotation = (axis: keyof UeTransform["rotation"]) => fixed(shared(transforms.map((t) => t.rotation[axis])), 4)
+  const active = items.at(-1) ?? first
 
   return (
     <ScrollArea className="h-full bg-card">
@@ -224,21 +375,18 @@ export function Inspector() {
         <SelectionActions />
 
         <Separator />
-        <SectionTitle>Position (game {units}, Z up)</SectionTitle>
-        <AxisFields
-          field="translation"
-          transforms={transforms}
-          perUnit={perUnit}
-          step={units === "m" ? 0.01 : 1}
-          digits={units === "m" ? 5 : 3}
-        />
-
-        <SectionTitle>Rotation (quaternion)</SectionTitle>
-        <div className="font-mono text-xs text-muted-foreground">
-          x {rotation("x")} y {rotation("y")} z {rotation("z")} w {rotation("w")}
+        <SectionTitle>Transform</SectionTitle>
+        <div className="grid grid-cols-[auto_1fr_1fr_1fr] items-center gap-x-1.5 gap-y-1.5">
+          {transformRows(units).map((row) => (
+            <TransformRow
+              key={row.field}
+              row={row}
+              shown={transforms}
+              active={active.itemTransform}
+              perUnit={row.field === "translation" ? perUnit : 1}
+            />
+          ))}
         </div>
-        <SectionTitle>Scale</SectionTitle>
-        <AxisFields field="scale3D" transforms={transforms} perUnit={1} step={0.01} digits={3} />
 
         {items.length === 1 && (
           <>

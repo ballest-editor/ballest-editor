@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import type { UeTransform, Vec3 } from "./coords"
-import { applyGroupDelta, editAxis, selectionPivot } from "./groupTransform"
+import { applyGroupDelta, editAxis, readField, selectionPivot } from "./groupTransform"
 import { rotateVec } from "./ueMath"
 
 const at = (x: number, y: number, z: number, rotation = { x: 0, y: 0, z: 0, w: 1 }): UeTransform => ({
@@ -66,5 +66,11 @@ describe("group transforms", () => {
     expect(editAxis(t, "translation", "y", { kind: "set", value: 5 }).translation).toEqual({ x: 10, y: 5, z: 30 })
     expect(editAxis(t, "translation", "z", { kind: "offset", by: -5 }).translation).toEqual({ x: 10, y: 20, z: 25 })
     expect(editAxis(t, "scale3D", "x", { kind: "set", value: 0 }).scale3D.x).toBeGreaterThan(0)
+    // rotation is edited in rotator degrees; a yaw of 90 is the quaternion (0, 0, sin 45, cos 45)
+    const turned = editAxis(t, "rotation", "z", { kind: "set", value: 90 })
+    expect(turned.rotation.z).toBeCloseTo(Math.SQRT1_2, 6)
+    expect(turned.rotation.w).toBeCloseTo(Math.SQRT1_2, 6)
+    expect(readField(turned, "rotation").z).toBeCloseTo(90, 6)
+    expect(readField(editAxis(turned, "rotation", "z", { kind: "offset", by: -30 }), "rotation").z).toBeCloseTo(60, 6)
   })
 })
