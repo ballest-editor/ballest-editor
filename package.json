@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
+    "assets": "node tools/compress/compress.mjs",
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "lint": "oxlint --type-aware --deny-warnings --disable-nested-config",
@@ -20,6 +21,7 @@
     "@commitlint/config-conventional": "21.2.4",
     "@effect/tsgo": "0.61.0",
     "dprint": "0.64.3",
+    "gltfpack": "1.2.0",
     "husky": "9.1.7",
     "jscpd": "5.4.2",
     "knip": "6.43.0",

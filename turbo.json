@@ -22,18 +22,24 @@
       ]
     },
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "//#assets"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tsconfig.base.json", ".env*"],
       // Nitro picks its deploy preset from these (VERCEL=1 → .vercel/output, else .output).
       "env": ["VERCEL", "NITRO_PRESET"],
       "outputs": ["dist/**", ".output/**", ".vercel/output/**"]
     },
     "dev": {
+      "dependsOn": ["//#assets"],
       "cache": false,
       "persistent": true
     },
 
     // Repo-wide tools, run once from the root.
+    // tools/compress: the extractor's raw assets/ -> web-assets/, the tree the editor serves.
+    "//#assets": {
+      "inputs": ["tools/compress/**", "assets/**"],
+      "outputs": ["web-assets/**"]
+    },
     "//#lint": {
       "inputs": [
         ".oxlintrc.json",
@@ -59,12 +65,13 @@
         "apps/**",
         "packages/**",
         "tools/extract/**",
+        "tools/compress/**",
         "!**/node_modules/**",
         "!**/dist/**"
       ]
     },
     "//#dupes": {
-      "inputs": [".jscpd.json", "apps/editor/src/**", "packages/ui/src/**", "tools/extract/**"]
+      "inputs": [".jscpd.json", "apps/editor/src/**", "packages/ui/src/**", "tools/extract/**", "tools/compress/**"]
     },
     "//#format:check": {
       "inputs": [
@@ -73,6 +80,7 @@
         "!repos/**",
         "!samples/**",
         "!assets/**",
+        "!web-assets/**",
         "!**/node_modules/**",
         "!**/dist/**"
       ]
