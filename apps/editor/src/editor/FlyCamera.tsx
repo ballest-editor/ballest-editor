@@ -36,7 +36,6 @@ export function FlyCamera() {
   const keybinds = useEditor((s) => s.keybinds)
   const cameraSettings = useEditor((s) => s.settings.camera)
   const cameraPresets = useEditor((s) => s.keybindDefaults.cameraPresets)
-  const size = useThree((s) => s.size)
   const focusRequest = useEditor((s) => s.focusRequest)
   const frameAllRequest = useEditor((s) => s.frameAllRequest)
 

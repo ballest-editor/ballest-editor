@@ -87,7 +87,7 @@ describe("palette sections", () => {
     const { paletteSections, HIDDEN_SECTION, OTHER_SECTION, pieceLabelOf } = await import("./Catalog")
     const base = Schema.encodeSync(Catalog)(catalog).pieces[0]!
     const piece = (className: string, extra: Record<string, unknown>) =>
-      Schema.decodeUnknownSync(Catalog)({ pieces: [{ ...base, className, ...extra }] }).pieces[0]!
+      Schema.decodeSync(Catalog)({ pieces: [{ ...base, className, ...extra }] }).pieces[0]!
     const sections = paletteSections([
       piece("A", { category: "Tracks" }),
       piece("B", { category: "Shapes", displayName: "Big B" }),

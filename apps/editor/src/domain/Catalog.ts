@@ -61,7 +61,7 @@ export class CatalogPiece extends Schema.Opaque<CatalogPiece>()(open({
   glb: NullableString,
   materialSlots: Schema.Array(CatalogMaterialSlot),
   bounds: NullableBounds,
-  seenInSamples: Schema.optionalKey(Schema.Number),
+  seenInSamples: Schema.optionalKey(Schema.Int),
   mainRelativeTransform: Schema.optionalKey(Schema.NullOr(MainRelativeTransform)),
   extraMeshes: Schema.optionalKey(Schema.Array(ExtraMesh)),
   /** In-game browser category, display name, visibility and thumbnail (newer catalogs). */

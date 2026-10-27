@@ -5,6 +5,18 @@ import { MapCodec } from "./MapCodec"
 
 const samples = listSamples()
 
+/** The slice of raw map JSON the unknown-field test pokes at. */
+interface RawMap {
+  futureTopLevel?: unknown
+  worldSettings: { levelData: { futureField?: unknown } }
+  items: Array<{
+    futureItemField?: unknown
+    itemTransform: { rotation: { extra?: unknown } }
+    meshComponents: Array<{ futureMesh?: unknown }>
+  }>
+  editorState: { futureEditor?: unknown }
+}
+
 describe("MapCodec", () => {
   it("finds the samples", () => {
     assert.isAtLeast(samples.filter((s) => s.kind === "balledit").length, 1)
@@ -37,17 +49,18 @@ describe("MapCodec", () => {
   it.effect("preserves unknown fields at every level and appends them after known fields", () =>
     Effect.gen(function*() {
       const codec = yield* MapCodec
-      const base = JSON.parse(readSample(samples.find((s) => s.kind === "balledit")!)) as Record<string, any>
+      const base = JSON.parse(readSample(samples.find((s) => s.kind === "balledit")!)) as RawMap
+      const item = base.items[0]!
       base.futureTopLevel = { a: [1, 2] }
       base.worldSettings.levelData.futureField = "x"
-      base.items[0].futureItemField = true
-      base.items[0].itemTransform.rotation.extra = 1
-      base.items[0].meshComponents[0].futureMesh = null
+      item.futureItemField = true
+      item.itemTransform.rotation.extra = 1
+      item.meshComponents[0]!.futureMesh = null
       base.editorState.futureEditor = { nested: { ok: 1 } }
       const input = JSON.stringify(base)
-      const out = JSON.parse(yield* codec.encode(yield* codec.decode(input)))
+      const out = JSON.parse(yield* codec.encode(yield* codec.decode(input))) as RawMap
       assert.deepStrictEqual(out, JSON.parse(input))
-      const itemKeys = Object.keys(out.items[0])
+      const itemKeys = Object.keys(out.items[0]!)
       assert.strictEqual(itemKeys[0], "actorToSpawn")
       assert.strictEqual(itemKeys.at(-1), "futureItemField")
     }).pipe(Effect.provide(MapCodec.layer)))
