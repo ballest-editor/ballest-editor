@@ -4,10 +4,13 @@
     "repos/**"
   ],
   "ignoreExportsUsedInFile": true,
+  // System binaries tools/compress runs: avifenc from the Nix dev shell, else nix to build it from the flake.
+  "ignoreBinaries": ["avifenc", "nix"],
   "workspaces": {
     ".": {
       "entry": [
-        "tools/extract/*.mjs"
+        "tools/extract/*.mjs",
+        "tools/compress/*.mjs"
       ],
       "ignoreDependencies": [
         "@effect/language-service"

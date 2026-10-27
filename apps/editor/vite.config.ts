@@ -7,21 +7,19 @@ import * as path from "node:path"
 import { type Connect, defineConfig, type Plugin } from "vite"
 
 /**
- * Serves the repo-level `assets/` directory (two levels up from apps/editor) (catalog.json + pieces/**.glb from
- * tools/extract) at /assets/* in `vite dev` and `vite preview`, straight from disk; unknown paths fall through to
- * Vite (whose own build chunks also live under /assets/).
- * `vite build` copies the committed part (JSON + thumbs) into the client output so deployments serve it too.
- * The extracted meshes and textures are left out: they are gitignored, so a deploy built from git never has them.
+ * Serves the repo-level `web-assets/` directory (tools/compress's output from tools/extract's `assets/`: catalog.json,
+ * meshopt pieces/**.glb, AVIF textures) at /assets/* in `vite dev` and `vite preview`, straight from disk; unknown
+ * paths fall through to Vite (whose own build chunks also live under /assets/).
+ * `vite build` copies it into the client output so deployments serve it too.
  */
-const unbundledAssets = new Set(["pieces", "textures"])
-
 const repoAssets = (dir: string): Plugin => {
   const root = path.resolve(dir)
   const types: Record<string, string> = {
     ".json": "application/json",
     ".glb": "model/gltf-binary",
     ".svg": "image/svg+xml",
-    ".png": "image/png"
+    ".png": "image/png",
+    ".avif": "image/avif"
   }
   const middleware: Connect.NextHandleFunction = (req, res, next) => {
     const url = req.url?.split("?")[0] ?? ""
@@ -52,12 +50,11 @@ const repoAssets = (dir: string): Plugin => {
     generateBundle(this) {
       if (this.environment.name !== "client") return
       for (const entry of fs.readdirSync(root, { recursive: true, withFileTypes: true })) {
+        if (!entry.isFile()) continue
         const file = path.join(entry.parentPath, entry.name)
-        const relative = path.relative(root, file)
-        if (!entry.isFile() || unbundledAssets.has(relative.split(path.sep)[0] ?? "")) continue
         this.emitFile({
           type: "asset",
-          fileName: path.posix.join("assets", ...relative.split(path.sep)),
+          fileName: path.posix.join("assets", ...path.relative(root, file).split(path.sep)),
           source: fs.readFileSync(file)
         })
       }
@@ -75,7 +72,7 @@ export default defineConfig(({ command }) => ({
   // evaluate inlined CJS like react/index.js.
   ...(command === "build" ? { ssr: { noExternal: true } } : {}),
   plugins: [
-    repoAssets(path.resolve(import.meta.dirname, "../../assets")),
+    repoAssets(path.resolve(import.meta.dirname, "../../web-assets")),
     tailwindcss(),
     tanstackStart(),
     nitro(),

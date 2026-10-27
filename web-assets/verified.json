@@ -1,0 +1,480 @@
+{
+  "note": "Hand-maintained results of loading single-piece probe maps in the in-game level editor (build 0.4.0-playtest). Palette pieces are assumed ok. A rejected item makes the game discard the whole map and start a default one.",
+  "results": {
+    "MP_RawPointLight": {
+      "status": "ok",
+      "date": "2026-10-26"
+    },
+    "MP_BoostRing": {
+      "status": "ok",
+      "date": "2026-10-26"
+    },
+    "Bevel_Full_Cap": {
+      "status": "ok",
+      "date": "2026-10-26"
+    },
+    "MP_PinballPaddle": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "note": "mesh-less piece; written with meshAssetPath \"\" like the air vent"
+    },
+    "BP_Track_Curve_Tiny1": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "note": "palette piece used as the control"
+    },
+    "MP_OrangeSign": {
+      "status": "rejected",
+      "note": "game saved ['MP_PlayerStart', 'BP_Checkpoint'] instead",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "MP_LightCard_01": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "MP_RawSpotLight": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "AJ_500_kicker1_M_ClearCoat_M_OutlineEdges": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "AJ_Bowl00_M_TechSubtle": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "AJ_Bowl00_MI_ArenaWhite": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "AJ_Prop_Box2_MI_ArenaYellow": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "AJ_Ramp_00_M_BaseSurface_Metal": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "AJ_Ramp_00_M_TechSubtle": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "AJ_Ramp_00_Merge_FDB4E64F_M_BaseSurface_Metal": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "AJ_Ramp_00_WorldGridMaterial": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "AJ_Ringscoop_00_MI_ArenaWhite": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "AJ_Sausage_01_MI_ArenaOrange": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Bevel_Full_HalfRing": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Bevel_Half_DeepScoop": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Bevel_Half_MediumRamp": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Bevel_Half_ShallowRamp": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_04A2A514_MI_ArenaOrange": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_04A2A514_MI_ArenaWhite": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_1459EA0F_MI_ArenaWhite": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_1C6BD50B_MI_Pipes": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_3024C8A1_MI_ArenaWhite": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_3024C8A1_MI_ArenaYellow": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_52A10C51_MI_ArenaWhite": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_53D127A7_WorldGridMaterial_MI_ArenaOrange": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_631C696A_WorldGridMaterial_MI_ArenaWhite": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_7DFF2134_MI_ArenaOrange": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_84A9059E_MI_ArenaGreen_MI_ArenaGreen": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_84A9059E_MI_ArenaRed_MI_ArenaRed": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_84A9059E_MI_ArenaWhite_MI_ArenaWhite": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_84A9059E_MI_ArenaYellow_MI_ArenaYellow": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_B6FBEE07_MI_ArenaOrange": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_D12E18D1_MI_ArenaWhite": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_Merge_2B91702A_MI_ArenaOrange": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_Merge_2B91702A_MI_ArenaYellow": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Boolean_Merge_2B91702A_MI_InteriorLight2": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Box_005FE104_WorldGridMaterial": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Box_9379DB4B_M_TechSubtle": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Box_9379DB4B_MI_ArenaAluminum": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Box_9379DB4B_WorldGridMaterial": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Box_A3F21BC8": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Box_AA156F14_M_BaseSurface_Metal": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Box_AA156F14_MI_ArenaAluminum": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Box_AA156F14_MI_ArenaOrange": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Box_AA156F14_WorldGridMaterial": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_AirVent": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Bevel_Full_Branch": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Bevel_Full_HalfRing": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Bevel_Full_HalfRingKicker": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Bevel_Full_Kicker": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Bevel_Full_MediumScoop": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Bevel_Full_Ring": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Bevel_Full_RingScoop": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Bevel_Full_ShallowKicker": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Bevel_Full_ShallowScoop": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Bowl_Shallow": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Bump": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_CinematicLaserTerminal": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_CircularFlexiblePlatform": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Cube": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_CubePrePlac": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Floor": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_LeftArm": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_OneCubeTwoColor": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_PieceTest": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Ramp": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_RightArm": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Stairs": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_TwoCubeOneColor": {
+      "status": "rejected",
+      "note": "game saved ['MP_PlayerStart', 'BP_Checkpoint'] instead",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_TwoCubeTwoColor": {
+      "status": "rejected",
+      "note": "game saved ['MP_PlayerStart', 'BP_Checkpoint'] instead",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_UGCShapeDecal": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "BP_Wall": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Cylinder_3071E2C2_MI_ArenaYellow": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Cylinder_3071E2C2_MI_Pipes": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Cylinder_4B40C9CF_MI_ArenaBlue": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Cylinder_4B40C9CF_MI_ArenaYellow": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Merge_C6C6700A_MI_ArenaYellow": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "Mirror_E8D8C4F0_MI_ArenaAluminum": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "MP_ActualCheckpoint_Disc": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "MP_Airvents": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "MP_BoostPlatform": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "MP_BoostVolume": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "MP_LaserTerminal": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "MP_LightCard_02": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "MP_LightCard_03": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "MP_LightCard_04": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "MP_PinballLauncher": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "MP_PointLightFixture": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "MP_RawRectLight": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    },
+    "MP_SpotLightFixture": {
+      "status": "ok",
+      "date": "2026-10-26",
+      "via": "tools/probe/run.py"
+    }
+  }
+}
