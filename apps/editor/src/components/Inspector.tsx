@@ -1,6 +1,17 @@
+import {
+  type Icon,
+  IconArrowsMaximize,
+  IconArrowsMove,
+  IconClipboard,
+  IconCopy,
+  IconRefresh
+} from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
+import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
+import { Kbd } from "@workspace/ui/components/kbd"
 import { Label } from "@workspace/ui/components/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Separator } from "@workspace/ui/components/separator"
 import { type ReactNode, useState } from "react"
@@ -24,6 +35,7 @@ const axisClass: Record<Axis, string> = {
 interface TransformRowSpec {
   readonly kind: "position" | "rotation" | "scale"
   readonly title: string
+  readonly icon: Icon
   readonly labels: Readonly<Record<Axis, string>>
   readonly read: (t: UeTransform) => Vec3
   readonly write: (t: UeTransform, v: Vec3) => UeTransform
@@ -33,6 +45,7 @@ const transformRows = (perUnit: number): ReadonlyArray<TransformRowSpec> => [
   {
     kind: "position",
     title: "Location",
+    icon: IconArrowsMove,
     labels: { x: "X", y: "Y", z: "Z" },
     read: (t) => ({ x: t.translation.x / perUnit, y: t.translation.y / perUnit, z: t.translation.z / perUnit }),
     write: (t, v) => ({ ...t, translation: { x: v.x * perUnit, y: v.y * perUnit, z: v.z * perUnit } })
@@ -41,6 +54,7 @@ const transformRows = (perUnit: number): ReadonlyArray<TransformRowSpec> => [
     // UE rotator axes: roll about X, pitch about Y, yaw about Z.
     kind: "rotation",
     title: "Rotation",
+    icon: IconRefresh,
     labels: { x: "X roll", y: "Y pitch", z: "Z yaw" },
     read: (t) => {
       const r = quatToRotator(t.rotation)
@@ -51,6 +65,7 @@ const transformRows = (perUnit: number): ReadonlyArray<TransformRowSpec> => [
   {
     kind: "scale",
     title: "Scale",
+    icon: IconArrowsMaximize,
     labels: { x: "X", y: "Y", z: "Z" },
     read: (t) => ({ x: t.scale3D.x, y: t.scale3D.y, z: t.scale3D.z }),
     write: (t, v) => ({ ...t, scale3D: { x: v.x, y: v.y, z: v.z } })
@@ -76,30 +91,80 @@ function TransformRow(props: {
   const notify = useEditor((s) => s.notify)
   const { row, committed } = props
   const value = row.read(props.shown)
+  const [open, setOpen] = useState(false)
+  const copy = () => {
+    copiedRows.set(row.kind, row.read(committed))
+    notify("info", `Copied ${row.title.toLowerCase()}.`)
+  }
+  const paste = () => {
+    const copied = copiedRows.get(row.kind)
+    if (copied === undefined) notify("info", `Nothing copied for ${row.title.toLowerCase()} yet.`)
+    else props.onCommit(row.write(committed, copied))
+  }
   const withAxis = (axis: Axis, n: number) => row.write(committed, { ...row.read(committed), [axis]: n })
   return (
     <div className="contents">
-      <div
-        className="cursor-default self-center text-right text-sm font-medium select-none"
-        title={`${props.title}\nShift+right-click: copy X, Y, Z · Shift+click: paste`}
-        onClick={(e) => {
-          if (!e.shiftKey) return
-          const copied = copiedRows.get(row.kind)
-          if (copied === undefined) {
-            notify("info", `Nothing copied for ${row.title.toLowerCase()} yet.`)
-            return
-          }
-          props.onCommit(row.write(committed, copied))
-        }}
-        onContextMenu={(e) => {
-          if (!e.shiftKey) return
-          e.preventDefault()
-          copiedRows.set(row.kind, row.read(committed))
-          notify("info", `Copied ${row.title.toLowerCase()}.`)
+      <Popover
+        open={open}
+        onOpenChange={(next, details) => {
+          // Shift+click pastes instead of opening the menu
+          if (next && details.event instanceof MouseEvent && details.event.shiftKey) return
+          setOpen(next)
         }}
       >
-        {row.title}
-      </div>
+        <PopoverTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={props.title}
+              title={`${props.title}\nShift+right-click: copy · Shift+click: paste`}
+              onClick={(e) => {
+                if (e.shiftKey) paste()
+              }}
+              onContextMenu={(e) => {
+                if (!e.shiftKey) return
+                e.preventDefault()
+                copy()
+              }}
+            />
+          }
+        >
+          <row.icon />
+        </PopoverTrigger>
+        <PopoverContent side="left" align="start" className="w-auto gap-1 p-1">
+          <div className="px-2 py-1 text-xs text-muted-foreground">{props.title}</div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="justify-between gap-4"
+            onClick={() => {
+              copy()
+              setOpen(false)
+            }}
+          >
+            <span className="flex items-center gap-2">
+              <IconCopy />Copy X, Y, Z
+            </span>
+            <Kbd>⇧ Right-click</Kbd>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="justify-between gap-4"
+            disabled={copiedRows.get(row.kind) === undefined}
+            onClick={() => {
+              paste()
+              setOpen(false)
+            }}
+          >
+            <span className="flex items-center gap-2">
+              <IconClipboard />Paste
+            </span>
+            <Kbd>⇧ Click</Kbd>
+          </Button>
+        </PopoverContent>
+      </Popover>
       {axes.map((axis) => (
         <NumberField
           key={axis}
@@ -212,7 +277,7 @@ export function Inspector() {
           <SectionTitle>Transform</SectionTitle>
           <span className="text-[0.65rem] text-muted-foreground">game {units} · degrees · Z up</span>
         </div>
-        <div className="grid grid-cols-[auto_1fr_1fr_1fr] gap-x-1.5 gap-y-1.5">
+        <div className="grid grid-cols-[auto_1fr_1fr_1fr] items-center gap-x-1.5 gap-y-1.5">
           {rows.map((row) => (
             <TransformRow
               key={row.kind}
