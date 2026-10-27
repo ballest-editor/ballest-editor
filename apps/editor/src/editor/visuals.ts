@@ -5,10 +5,11 @@
 import { type CatalogIndex, type MeshInfo, visibleExtras } from "../domain/Catalog"
 import { type Tuple3, type Tuple4, ueToScene } from "../domain/coords"
 import type { Item } from "../domain/MapFile"
+import { assetUrl } from "./assetUrl"
 
-/** URL of a catalog glb (`pieces/...`) under the served assets dir; undefined when there is none. */
+/** URL of a catalog glb (`pieces/...`); undefined when there is none. */
 export const glbUrl = (glb: string | null | undefined): string | undefined =>
-  glb === undefined || glb === null || glb.length === 0 ? undefined : `/assets/${glb}`
+  glb === undefined || glb === null || glb.length === 0 ? undefined : assetUrl(glb)
 
 export interface Visual {
   readonly key: string

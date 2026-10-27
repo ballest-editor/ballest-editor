@@ -6,7 +6,7 @@ A standalone map editor for _Ballest of Them All_ (Steam 3339810, UE 5.8). Read 
 
 - **Never write to the game install** at `~/.local/share/Steam/steamapps/common/Ballest of Them All`. Copy what you need to `/tmp`.
 - Map samples live in `samples/` (`UserSavedMaps/*.balledit` drafts, `Workshop/*.ballmap` published). They are test fixtures; don't edit them.
-- Game-derived assets live in `assets/` (`catalog.json`, `pieces/*.glb`), produced by `tools/extract/`. `tools/compress/` turns them into `web-assets/` (meshopt meshes, AVIF textures), which is what the app serves at `/assets/*`. Neither directory is edited by hand.
+- Game-derived assets live in `assets/` (`catalog.json`, `pieces/*.glb`), produced by `tools/extract/`. `tools/compress/` turns the gitignored meshes and textures into `web-assets/` (meshopt, AVIF; also gitignored) and publishes it to Vercel Blob, recorded in `web-assets.json`. The app serves everything at `/assets/*` (`apps/editor/src/editor/assetUrl.ts` picks local or Blob). None of these are edited by hand.
 - Keep the game's conventions: positions in centimetres, rotations as unit quaternions, UE left-handed Z-up. Convert to the renderer's frame in exactly one place.
 
 ## Layout
@@ -17,7 +17,7 @@ A standalone map editor for _Ballest of Them All_ (Steam 3339810, UE 5.8). Read 
   Layers, enforced by `no-restricted-imports` in `.oxlintrc.json`: `domain/` (data model; no renderer, UI or node builtins) ← `services/` (Effect services) ← `editor/` (scene, store, actions) ← `components/` (React UI; reaches services through `editor/actions`) ← `routes/`. `src/test/` helpers are for tests only; nothing imports `repos/`.
 - `packages/ui/` — shadcn/ui (`@workspace/ui`, preset `b6nCVm82TK`). All UI chrome comes from here.
 - `tools/extract/` — pak → glTF/catalog/keybinds pipeline, run via the Nix flake (`nix run .#extract`).
-- `tools/compress/` — `assets/` → `web-assets/` (`pnpm assets`, the turbo task `//#assets` that `dev` and `build` depend on).
+- `tools/compress/` — `assets/{pieces,textures}` → `web-assets/` (`pnpm assets`, the turbo task `//#assets` that `dev` and `build` depend on) and `pnpm assets:upload` → Vercel Blob + `web-assets.json`.
 - `repos/` — vendored read-only references (see below).
 - `docs/` — format, vision, decisions.
 

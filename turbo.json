@@ -23,7 +23,14 @@
     },
     "build": {
       "dependsOn": ["^build", "//#assets"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tsconfig.base.json", ".env*"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/tsconfig.base.json",
+        ".env*",
+        "$TURBO_ROOT$/assets/**",
+        "$TURBO_ROOT$/web-assets/**",
+        "$TURBO_ROOT$/web-assets.json"
+      ],
       // Nitro picks its deploy preset from these (VERCEL=1 → .vercel/output, else .output).
       "env": ["VERCEL", "NITRO_PRESET"],
       "outputs": ["dist/**", ".output/**", ".vercel/output/**"]
@@ -35,9 +42,9 @@
     },
 
     // Repo-wide tools, run once from the root.
-    // tools/compress: the extractor's raw assets/ -> web-assets/, the tree the editor serves.
+    // tools/compress: the extractor's raw meshes and textures -> web-assets/ (gitignored; absent on CI and Vercel).
     "//#assets": {
-      "inputs": ["tools/compress/**", "assets/**"],
+      "inputs": ["tools/compress/compress.mjs", "assets/pieces/**", "assets/textures/**"],
       "outputs": ["web-assets/**"]
     },
     "//#lint": {

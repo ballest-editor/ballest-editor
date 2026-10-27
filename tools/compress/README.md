@@ -1,23 +1,33 @@
-# tools/compress: the extractor's assets, ready to serve
+# tools/compress: the extractor's meshes and textures, ready to serve
 
-`tools/extract/` writes the raw game data to `assets/`. This step compresses it into `web-assets/`, the tree the editor serves at `/assets/*` (in `vite dev`/`preview`, and copied into the build output by `vite build`). `web-assets/` is committed (about 57 MB): it is how the meshes and textures reach deployments built from git, since `assets/pieces/` and `assets/textures/` are gitignored.
+`tools/extract/` writes the raw game data to `assets/`. Its small files (catalog, materials, keybinds, strings, registry, thumbs) are committed and the editor serves them itself at `/assets/*`. Its meshes (`assets/pieces/`, 89 MB) and textures (`assets/textures/`, 148 MB) are gitignored. This step compresses those two into `web-assets/` (about 53 MB, also gitignored), and `upload.mjs` publishes that to a public Vercel Blob store, which is where deployments and clones without the raw data get them from.
 
 ```sh
-pnpm assets                                    # node tools/compress/compress.mjs assets web-assets
+pnpm assets           # node tools/compress/compress.mjs assets web-assets
+pnpm assets:upload    # node tools/compress/upload.mjs web-assets web-assets.json  (needs BLOB_READ_WRITE_TOKEN)
 ```
-
-It is the turbo task `//#assets`, which `dev` and `build` depend on. Turbo caches it by the contents of `assets/` (gitignored meshes and textures included) and `tools/compress/`, so it only reruns after a re-extract or a change here.
-
-- With the raw `assets/pieces/` and `assets/textures/` present, it rebuilds `web-assets/` from scratch. The output is deterministic, so a rerun without changes leaves git clean. Commit `web-assets/` after a re-extract.
-- With neither present (CI, Vercel, a fresh clone), it keeps the committed `web-assets/` as is.
-- With only one present, it fails rather than drop the committed other half.
 
 | `assets/`         | `web-assets/`                            | size (Oct 2026) |
 | ----------------- | ---------------------------------------- | --------------- |
 | `pieces/**.glb`   | same names, meshopt-compressed, lossless | 89 → 24 MB      |
 | `textures/**.png` | `.avif`, 4:4:4, quality 80               | 148 → 29 MB     |
-| `materials.json`  | texture paths point at the `.avif` files |                 |
-| everything else   | copied as is                             |                 |
+
+## Where the editor reads from
+
+`apps/editor/src/editor/assetUrl.ts` is the one place that decides. Paths are always the extractor's (`pieces/...glb`, `textures/...png`); textures are requested as `.avif`.
+
+- `web-assets/` on disk (you ran `pnpm assets`): `vite dev`, `vite preview` and `vite build` serve it at `/assets/*` next to the committed files.
+- Otherwise (Vercel, CI, a fresh clone): `vite.config.ts` reads `web-assets.json` and builds the client with `VITE_ASSETS_BASE` set to that URL, so meshes and textures are fetched from the blob store.
+
+`pnpm assets` is the turbo task `//#assets` that `dev` and `build` depend on. It is a no-op when `assets/pieces/` and `assets/textures/` are absent, and fails if only one of them is. Turbo caches it by their contents and by `compress.mjs`.
+
+## Publishing: Vercel Blob
+
+The store is `ballest-assets` (public, `iad1`), connected to the `ballest-editor` project. `vercel link` writes its `BLOB_READ_WRITE_TOKEN` to `.env.local`, which `pnpm assets:upload` loads.
+
+`upload.mjs` hashes the whole tree and uploads under `<hash>/`, so blobs are immutable and served with a one-year cache; a re-extract gets a new prefix and never fights the CDN or browser cache. It skips blobs that already exist, then writes the base URL to `web-assets.json`. **Commit `web-assets.json` after a re-extract**, together with `assets/`. Old prefixes are not deleted automatically: `vercel blob list --prefix <old>/` and `vercel blob delete` once the deployment that used it is gone (deletes are free).
+
+Free (Hobby) plan limits, shared with everything else on the account: 1 GB stored, 10 GB downloaded a month, 10,000 cache-miss reads, 2,000 writes. One tree is 53 MB and about 250 writes; a user's first load of a full map is up to 53 MB, after which the one-year cache keeps repeats off the meter. Vercel emails as limits approach and switches Blob off for 30 days once they are exceeded, so watch the Observability page if usage grows.
 
 ## Meshes: lossless
 
