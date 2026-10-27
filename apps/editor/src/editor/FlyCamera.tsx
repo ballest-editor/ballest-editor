@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react"
 import * as THREE from "three"
 import { threeToUeVector, ueToThreeVector } from "../domain/coords"
 import { type Bindings, chordOf, HeldKeys, isBound, isBoundChord, isOneShotChord, mouseChordOf, wheelChordOf } from "../domain/Keybinds"
-import { fovOf, verticalFov } from "../domain/Settings"
+import { editorVerticalFov } from "../domain/Settings"
 import { commands } from "./commands"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
@@ -158,12 +158,12 @@ export function FlyCamera() {
     }
   }, [camera, gl, keybinds])
 
-  // Field of view: the game's presets are horizontal; three.js wants vertical for this aspect.
+  // Field of view: constant vertical FOV (see editorVerticalFov), independent of viewport size.
   useEffect(() => {
     if (!(camera instanceof THREE.PerspectiveCamera)) return
-    camera.fov = verticalFov(fovOf(useEditor.getState().settings, cameraPresets), size.width / Math.max(size.height, 1))
+    camera.fov = editorVerticalFov(useEditor.getState().settings, cameraPresets)
     camera.updateProjectionMatrix()
-  }, [camera, size, cameraSettings.fovPreset, cameraSettings.customFov, cameraPresets])
+  }, [camera, cameraSettings.fovPreset, cameraSettings.customFov, cameraPresets])
 
   // Focus selection
   useEffect(() => {

@@ -1,8 +1,6 @@
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@workspace/ui/components/resizable"
 import { Toaster } from "@workspace/ui/components/sonner"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
 import { useEffect, useRef, useState } from "react"
-import { useDefaultLayout } from "react-resizable-panels"
 import { importFile, loadCatalog, loadKeybinds, loadMaterials, loadSettings } from "../editor/actions"
 import { warmCatalog } from "../editor/preload"
 import { commands, type Dialog, type SettingsCategory } from "../editor/commands"
@@ -15,14 +13,13 @@ import { SettingsDialog } from "./SettingsDialog"
 import { ExportDialog } from "./ExportDialog"
 import { NewMapDialog } from "./NewMapDialog"
 import { Palette } from "./Palette"
+import { SidePanel } from "./SidePanel"
 import { TopBar } from "./TopBar"
 
 if (import.meta.env.DEV) {
   // Dev-only handle for poking at the scene from the console / browser automation.
   Object.assign(globalThis, { __ballest: { sceneRegistry, useEditor } })
 }
-
-export const LAYOUT_STORAGE_ID = "ballest-editor.layout.v1"
 
 /**
  * Chrome buttons are for the mouse: after a pointer click they give focus back, so a
@@ -54,7 +51,6 @@ export function Editor() {
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>("general")
   const fileInput = useRef<HTMLInputElement>(null)
-  const layout = useDefaultLayout({ id: LAYOUT_STORAGE_ID, storage: localStorage })
 
   commands.openDialog = (next, category) => {
     if (category !== undefined) setSettingsCategory(category)
@@ -84,24 +80,17 @@ export function Editor() {
     <TooltipProvider>
       <div className="flex h-svh flex-col bg-background text-foreground">
         <TopBar />
-        <ResizablePanelGroup
-          orientation="horizontal"
-          className="min-h-0 flex-1"
-          defaultLayout={layout.defaultLayout}
-          onLayoutChanged={layout.onLayoutChanged}
-        >
-          <ResizablePanel id="palette" defaultSize="18" minSize={180} maxSize="40">
+        <div className="flex min-h-0 flex-1">
+          <SidePanel id="palette" side="left" defaultWidth={260} minWidth={180} maxWidth={560}>
             <Palette />
-          </ResizablePanel>
-          <ResizableHandle />
-          <ResizablePanel id="viewport" minSize={320}>
+          </SidePanel>
+          <div className="min-w-0 flex-1">
             <Viewport />
-          </ResizablePanel>
-          <ResizableHandle />
-          <ResizablePanel id="inspector" defaultSize="22" minSize={220} maxSize="45">
+          </div>
+          <SidePanel id="inspector" side="right" defaultWidth={300} minWidth={220} maxWidth={640}>
             <Inspector />
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          </SidePanel>
+        </div>
       </div>
       <input
         ref={fileInput}
