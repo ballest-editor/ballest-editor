@@ -5,13 +5,12 @@
  */
 import * as THREE from "three"
 import { lookupMaterial, type MaterialSpec, type MaterialTable, NEUTRAL } from "../domain/Materials"
+import { textureUrl } from "./assetUrl"
 import { isMesh } from "./threeGuards"
 
 const textureLoader = new THREE.TextureLoader()
 const textures = new Map<string, THREE.Texture>()
 const materials = new Map<string, THREE.MeshStandardMaterial>()
-
-const textureUrl = (path: string) => (path.startsWith("/") ? path : `/assets/${path}`)
 
 const loadTexture = (path: string, colorSpace: THREE.ColorSpace, onError: () => void): THREE.Texture => {
   const key = `${colorSpace}|${path}`

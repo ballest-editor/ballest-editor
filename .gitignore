@@ -1,5 +1,7 @@
 node_modules/
 .output/
+.vercel/
+.env*.local
 .vinxi/
 .tanstack/
 dist/
@@ -15,3 +17,6 @@ assets/textures/
 
 # In-game probe automation (machine-specific uinput/screen driving)
 tools/probe/
+
+# tools/compress output (meshopt glb + AVIF, ~53 MB); published to Vercel Blob by `pnpm assets:upload`, see web-assets.json
+web-assets/
