@@ -37,7 +37,7 @@ describe("keybind table", () => {
       ["focus selection", ["KeyF", "KeyC"]],
       ["delete", ["Backspace", "Delete"]],
       ["undo", ["Ctrl+KeyZ"]],
-      ["redo", ["Ctrl+KeyY"]],
+      ["redo", ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"]],
       ["deselect", ["Escape"]]
     ])
   })

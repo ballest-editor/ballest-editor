@@ -89,8 +89,9 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   focusSelection:
     "Frame the current selection in the viewport. F in the game's level editor; its free camera calls this \"center camera\" (C).",
   deleteSelection: "Delete the selected item. Backspace in the game's level editor; Delete also works.",
-  undo: "Undo the last change.",
-  redo: "Redo the last undone change.",
+  undo:
+    "Undo the last change. Ctrl+Z in the game's level editor; a whole gizmo drag or number-field scrub is one step.",
+  redo: "Redo the last undone change. Ctrl+Y in the game's level editor; Ctrl+Shift+Z also works.",
   deselect: "Clear the selection. During a gizmo drag it cancels the drag instead. (The game uses Ctrl+click.)",
   moveForward: "Fly the camera forward while held.",
   moveBack: "Fly the camera backward while held.",
@@ -148,7 +149,7 @@ export const defaultKeybinds: Keybinds = {
   focusSelection: ["KeyF", "KeyC"],
   deleteSelection: ["Backspace", "Delete"],
   undo: ["Ctrl+KeyZ"],
-  redo: ["Ctrl+KeyY"],
+  redo: ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"],
   deselect: ["Escape"],
   moveForward: ["KeyW"],
   moveBack: ["KeyS"],

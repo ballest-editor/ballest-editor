@@ -41,15 +41,18 @@ const oneShot = (action: KeybindAction): (() => void) | undefined => {
   }
 }
 
+const interactionActive = () => sceneRegistry.gizmoDragActive() || useEditor.getState().preview !== null
+
 /**
  * One-shot actions, matched on the full chord. Ignored in text fields and dialogs, while a
- * look drag is active (the fly keys own the keyboard then), and while a gizmo drag is in
- * progress (undo mid-drag would be overwritten by the drag's commit on release).
+ * look drag is active (the fly keys own the keyboard then), and while a gizmo drag or
+ * number-field scrub is in progress (it commits as one undo step on release; undo or
+ * delete mid-interaction would be overwritten or orphan it).
  */
 export function useActionKeys() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!isEditorKeyEvent(e) || e.repeat || sceneRegistry.lookDragActive() || sceneRegistry.gizmoDragActive()) return
+      if (!isEditorKeyEvent(e) || e.repeat || sceneRegistry.lookDragActive() || interactionActive()) return
       const chord = chordOf(e)
       const { keybinds } = useEditor.getState()
       for (const action of actionsFor(keybinds, chord)) {

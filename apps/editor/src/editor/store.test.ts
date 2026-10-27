@@ -47,6 +47,101 @@ describe("editor store", () => {
     assert.strictEqual(s().past.length, before)
   })
 
+  describe("history", () => {
+    const s = () => useEditor.getState()
+    const place = (x: number) => {
+      s().placePiece(cube, placementTransform(cube, { x, y: 0, z: 0 }))
+      return s().selectedId!
+    }
+    const translationOf = (id: string) => s().doc.map.items[s().doc.ids.indexOf(id)]!.itemTransform.translation
+
+    it("puts every kind of edit on the stack, and loading a map clears it", () => {
+      s().loadMap(initialMap(), null)
+      const id = place(0)
+      s().moveItem(id, { x: 5, y: 0, z: 0 })
+      const t = s().doc.map.items[1]!.itemTransform
+      s().transformItem(id, { ...t, scale3D: { x: 2, y: 2, z: 2 } })
+      s().renameLevel("Renamed", "me")
+      s().deleteSelection()
+      assert.strictEqual(s().past.length, 5)
+      s().loadMap(initialMap(), null)
+      assert.strictEqual(s().past.length, 0)
+      assert.strictEqual(s().future.length, 0)
+      assert.isFalse(s().dirty)
+    })
+
+    it("leaves no step for edits that change nothing", () => {
+      s().loadMap(initialMap(), null)
+      const id = place(10)
+      const before = s().past.length
+      s().moveItem(id, { x: 10, y: 0, z: 0 })
+      assert.isTrue(s().transformItem(id, s().doc.map.items[1]!.itemTransform)) // a drag that ended where it began
+      const { levelDisplayName, creatorName } = s().doc.map.worldSettings.levelData
+      s().renameLevel(levelDisplayName, creatorName)
+      assert.strictEqual(s().past.length, before)
+    })
+
+    it("clears the redo stack on a new edit", () => {
+      s().loadMap(initialMap(), null)
+      const id = place(0)
+      s().moveItem(id, { x: 1, y: 0, z: 0 })
+      s().undo()
+      assert.strictEqual(s().future.length, 1)
+      s().moveItem(id, { x: 2, y: 0, z: 0 })
+      assert.strictEqual(s().future.length, 0)
+      s().redo() // nothing to redo
+      assert.deepStrictEqual(translationOf(id), { x: 2, y: 0, z: 0 })
+    })
+
+    it("restores the selection that went with each step", () => {
+      s().loadMap(initialMap(), null)
+      const a = place(0)
+      const b = place(100)
+      s().select(a)
+      s().deleteSelection()
+      assert.isNull(s().selectedId)
+      s().select(b)
+      s().undo() // the deleted item comes back selected
+      assert.strictEqual(s().selectedId, a)
+      s().redo() // and is gone again with nothing selected
+      assert.isNull(s().selectedId)
+      assert.isFalse(s().doc.ids.includes(a))
+      s().undo()
+      s().undo() // undoing b's placement goes back to a, selected before it
+      assert.isFalse(s().doc.ids.includes(b))
+      assert.strictEqual(s().selectedId, a)
+      s().select(null)
+      s().redo() // redoing it selects b, as placing did
+      assert.strictEqual(s().selectedId, b)
+    })
+
+    it("waits while a gizmo drag or scrub is previewing", () => {
+      s().loadMap(initialMap(), null)
+      const id = place(0)
+      const t = s().doc.map.items[1]!.itemTransform
+      s().setPreview({ id, transform: { ...t, translation: { x: 50, y: 0, z: 0 } } })
+      s().undo()
+      assert.strictEqual(s().doc.map.items.length, 2)
+      // the interaction commits once on release
+      s().setPreview(null)
+      s().moveItem(id, { x: 50, y: 0, z: 0 })
+      s().undo()
+      assert.deepStrictEqual(translationOf(id), { x: 0, y: 0, z: 0 })
+    })
+
+    it("keeps at most 200 steps", () => {
+      s().loadMap(initialMap(), null)
+      const id = place(0)
+      for (let i = 1; i <= 250; i++) s().moveItem(id, { x: i, y: 0, z: 0 })
+      assert.strictEqual(s().past.length, 200)
+      for (let i = 0; i < 300; i++) s().undo()
+      assert.deepStrictEqual(translationOf(id), { x: 50, y: 0, z: 0 })
+      for (let i = 0; i < 300; i++) s().redo()
+      assert.deepStrictEqual(translationOf(id), { x: 250, y: 0, z: 0 })
+      assert.strictEqual(s().past.length, 200)
+    })
+  })
+
   it("tracks the open dialog and settings category", () => {
     const s = () => useEditor.getState()
     assert.isNull(s().dialog)
