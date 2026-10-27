@@ -4,7 +4,7 @@
  * the selection moves, turns and scales as a rigid group.
  */
 import type { Quat4, UeTransform, Vec3 } from "./coords"
-import { quatConjugate, quatMul, quatNormalize, rotateVec } from "./ueMath"
+import { quatConjugate, quatMul, quatNormalize, quatToRotator, rotateVec, rotatorToQuat } from "./ueMath"
 
 /** What a gizmo drag does, independent of how many items it applies to. */
 export type GroupDelta =
@@ -76,9 +76,30 @@ export const applyGroupDelta = (t: UeTransform, pivot: Vec3, delta: GroupDelta):
   }
 }
 
-/** The transform fields the inspector edits one axis at a time. */
-export type TransformField = "translation" | "scale3D"
+/**
+ * The transform fields the inspector edits one axis at a time. `rotation` is edited as a
+ * rotator in degrees (X roll, Y pitch, Z yaw), the way the game's own editor shows it.
+ */
+export type TransformField = "translation" | "rotation" | "scale3D"
 export type Axis = "x" | "y" | "z"
+
+/** A field's three axis values in the units the inspector edits (cm, degrees, factor). */
+export const readField = (t: UeTransform, field: TransformField): Vec3 => {
+  if (field !== "rotation") return t[field]
+  const r = quatToRotator(t.rotation)
+  return { x: r.roll, y: r.pitch, z: r.yaw }
+}
+
+export const writeField = (t: UeTransform, field: TransformField, v: Vec3): UeTransform => {
+  switch (field) {
+    case "translation":
+      return { ...t, translation: v }
+    case "rotation":
+      return { ...t, rotation: rotatorToQuat({ roll: v.x, pitch: v.y, yaw: v.z }) }
+    case "scale3D":
+      return { ...t, scale3D: { x: clampScale(v.x), y: clampScale(v.y), z: clampScale(v.z) } }
+  }
+}
 
 /** Set an axis to a value (typed into a field), or offset it (a scrub across a mixed selection). */
 export type AxisEdit = { readonly kind: "set"; readonly value: number } | {
@@ -87,6 +108,7 @@ export type AxisEdit = { readonly kind: "set"; readonly value: number } | {
 }
 
 export const editAxis = (t: UeTransform, field: TransformField, axis: Axis, edit: AxisEdit): UeTransform => {
-  const raw = edit.kind === "set" ? edit.value : t[field][axis] + edit.by
-  return { ...t, [field]: { ...t[field], [axis]: field === "scale3D" ? clampScale(raw) : raw } }
+  const current = readField(t, field)
+  const value = edit.kind === "set" ? edit.value : current[axis] + edit.by
+  return writeField(t, field, { ...current, [axis]: value })
 }

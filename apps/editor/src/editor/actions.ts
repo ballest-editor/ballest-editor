@@ -1,8 +1,8 @@
 /** UI-facing operations that run Effects through the single app runtime. */
 import { Cause, Effect, Exit } from "effect"
-import type { UeTransform } from "../domain/coords"
+import type { UeTransform, Vec3 } from "../domain/coords"
 import { currentCreatedAt, newMapFile } from "../domain/factory"
-import { type Axis, type AxisEdit, editAxis, type TransformField } from "../domain/groupTransform"
+import { type Axis, type AxisEdit, editAxis, type TransformField, writeField } from "../domain/groupTransform"
 import type { Keybinds } from "../domain/Keybinds"
 import { PLAYER_START_CLASS } from "../domain/MapFile"
 import type { Settings } from "../domain/Settings"
@@ -35,14 +35,21 @@ export const deleteSelection = () => useEditor.getState().deleteSelection()
 
 export const duplicateSelection = () => useEditor.getState().duplicateSelection()
 
-/** The selected items' document transforms with one axis of `field` edited. */
-const withAxisEdit = (field: TransformField, axis: Axis, edit: AxisEdit): ReadonlyMap<string, UeTransform> => {
+/** The selected items' document transforms, each put through `edit`. */
+const withSelectionEdit = (edit: (t: UeTransform) => UeTransform): ReadonlyMap<string, UeTransform> => {
   const { doc, selectedIds } = useEditor.getState()
   return new Map(selectedIds.flatMap((id) => {
     const t = doc.map.items[doc.ids.indexOf(id)]?.itemTransform
-    return t === undefined ? [] : [[id, editAxis(t, field, axis, edit)] as const]
+    return t === undefined ? [] : [[id, edit(t)] as const]
   }))
 }
+
+const withAxisEdit = (field: TransformField, axis: Axis, edit: AxisEdit) =>
+  withSelectionEdit((t) => editAxis(t, field, axis, edit))
+
+/** Sets all three axes of `field` on every selected item (pasting a copied row). */
+export const setSelectionField = (field: TransformField, value: Vec3): boolean =>
+  transformSelection(withSelectionEdit((t) => writeField(t, field, value)))
 
 /** Applies an axis edit (an inspector field) to every selected item. */
 export const editSelectionAxis = (field: TransformField, axis: Axis, edit: AxisEdit): boolean =>
