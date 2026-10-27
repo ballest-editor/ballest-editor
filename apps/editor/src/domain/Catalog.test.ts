@@ -83,7 +83,9 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
     }
   })
 
-  it("every glb referenced by the catalog index exists on disk", () => {
+  // assets/pieces/ is git-ignored extractor output (`nix run .#extract`); absent in CI.
+  const hasPieces = fs.existsSync(path.join(repoRoot, "assets", "pieces"))
+  it.skipIf(!hasPieces)("every glb referenced by the catalog index exists on disk", () => {
     const { meshes } = indexCatalog(load())
     const missing = [...meshes.values()]
       .filter((m) => m.glb !== undefined && !fs.existsSync(path.join(repoRoot, "assets", m.glb)))
