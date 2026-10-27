@@ -1,0 +1,10 @@
+name: Task
+description: Tooling, refactors, docs, extraction pipeline
+title: "chore: "
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What needs doing
+    validations:
+      required: true
