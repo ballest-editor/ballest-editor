@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": [
+    "repos/**"
+  ],
+  "ignoreExportsUsedInFile": true,
+  "workspaces": {
+    ".": {
+      "entry": [
+        "tools/extract/*.mjs"
+      ],
+      "ignoreDependencies": [
+        "@effect/language-service"
+      ]
+    },
+    "apps/editor": {
+      "ignoreDependencies": [
+        "tailwindcss"
+      ]
+    },
+    "packages/ui": {}
+  }
+}

@@ -6,7 +6,6 @@ import * as THREE from "three"
 import { type Quat4, threeToUeQuat, threeToUeVector, ueToThreeVector, type Vec3 } from "../../domain/coords"
 
 export type Axis = "x" | "y" | "z"
-export const AXES: ReadonlyArray<Axis> = ["x", "y", "z"]
 
 export const GAME_BASIS: Readonly<Record<Axis, Vec3>> = {
   x: { x: 1, y: 0, z: 0 },
