@@ -5,13 +5,14 @@ export type Theme = Settings["appearance"]["theme"]
 
 const DARK_QUERY = "(prefers-color-scheme: dark)"
 
-export const isDarkTheme = (theme: Theme, systemDark: boolean): boolean => theme === "dark" || (theme === "system" && systemDark)
+export const isDarkTheme = (theme: Theme, systemDark: boolean): boolean =>
+  theme === "dark" || (theme === "system" && systemDark)
 
 /**
  * Calls `apply` with the resolved theme now and whenever the OS preference changes.
  * Returns the unsubscribe function (for a React effect cleanup).
  */
-export const watchResolvedTheme = (theme: Theme, apply: (dark: boolean) => void): (() => void) => {
+export const watchResolvedTheme = (theme: Theme, apply: (dark: boolean) => void): () => void => {
   const media = window.matchMedia(DARK_QUERY)
   const run = () => apply(isDarkTheme(theme, media.matches))
   run()

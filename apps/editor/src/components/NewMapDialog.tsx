@@ -1,5 +1,12 @@
 import { Button } from "@workspace/ui/components/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@workspace/ui/components/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { useState } from "react"
@@ -16,7 +23,9 @@ export function NewMapDialog({ open, onClose }: { readonly open: boolean; readon
   const valid = isValidName(name) && isValidName(effectiveCreator)
   const submit = async () => {
     if (!valid) return
-    if (creator === "") await saveSettings({ ...settings, general: { ...settings.general, creatorName: effectiveCreator } })
+    if (creator === "") {
+      await saveSettings({ ...settings, general: { ...settings.general, creatorName: effectiveCreator } })
+    }
     await newMap(name, effectiveCreator)
     setName("")
     onClose()
@@ -34,13 +43,20 @@ export function NewMapDialog({ open, onClose }: { readonly open: boolean; readon
           <DialogHeader>
             <DialogTitle>New map</DialogTitle>
             <DialogDescription>
-              Exports as <code className="break-all">{mapFileNameOf(name || "name", effectiveCreator || "creator")}</code>. Starts with
-              the one player start the game requires. Unsaved changes in the current map are discarded.
+              Exports as{" "}
+              <code className="break-all">{mapFileNameOf(name || "name", effectiveCreator || "creator")}</code>. Starts
+              with the one player start the game requires. Unsaved changes in the current map are discarded.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-1">
             <Label htmlFor="new-name">Map name</Label>
-            <Input id="new-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} aria-invalid={name !== "" && !isValidName(name)} />
+            <Input
+              id="new-name"
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              aria-invalid={name !== "" && !isValidName(name)}
+            />
             <span className="text-[0.7rem] text-muted-foreground">{NAME_RULE}</span>
           </div>
           {creator === "" && (

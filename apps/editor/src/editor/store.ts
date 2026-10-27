@@ -9,7 +9,7 @@ import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Ca
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { addItem, removeItems, setLevelNames, setTransform, setTranslation, validateItem } from "../domain/edits"
 import { itemFromPiece, newMapFile } from "../domain/factory"
-import { deriveKeybinds, type DerivedKeybinds } from "../domain/GameKeybinds"
+import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
 import type { Keybinds } from "../domain/Keybinds"
 import type { ItemTransform, MapFile } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
@@ -217,8 +217,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     finishBoot: () => set({ booting: false }),
     setMaterialTable: (materialTable) => set({ materialTable }),
     setSettings: (settings) => set({ settings }),
-    setKeybinds: (keybinds, defaults) =>
-      set((s) => ({ keybinds, keybindDefaults: defaults ?? s.keybindDefaults })),
+    setKeybinds: (keybinds, defaults) => set((s) => ({ keybinds, keybindDefaults: defaults ?? s.keybindDefaults })),
     reportMissingGlb: (url) =>
       set((s) => (s.missingGlbs.has(url) ? s : { missingGlbs: new Set([...s.missingGlbs, url]) })),
     notify: (kind, text) => {

@@ -38,7 +38,12 @@ export const visualsOf = (item: Item, index: CatalogIndex | null): ReadonlyArray
       scale3D: { x: t.scale[0], y: t.scale[1], z: t.scale[2] }
     })
     const mesh = index?.meshes.get(extra.meshAssetPath ?? "") ??
-      { meshAssetPath: extra.meshAssetPath ?? "", glb: extra.glb ?? undefined, bounds: extra.bounds ?? undefined, slotDefaults: [] }
+      {
+        meshAssetPath: extra.meshAssetPath ?? "",
+        glb: extra.glb ?? undefined,
+        bounds: extra.bounds ?? undefined,
+        slotDefaults: []
+      }
     visuals.push({ key: `x${i}`, mesh, slotMaterials: mesh.slotDefaults, relative: rel })
   })
   return visuals

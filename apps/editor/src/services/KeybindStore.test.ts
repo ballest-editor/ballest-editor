@@ -7,7 +7,12 @@ import { KEYBINDS_STORAGE_KEY, KeybindStore } from "./KeybindStore"
 const gameFile = JSON.stringify({
   contexts: [{
     name: "IMC_FreeCam",
-    mappings: [{ action: "IA_Move", key: "I", modifiers: ["InputModifierSwizzleAxis"], modifierSettings: [{ type: "InputModifierSwizzleAxis", settings: { Order: "EInputAxisSwizzle::YXZ" } }] }]
+    mappings: [{
+      action: "IA_Move",
+      key: "I",
+      modifiers: ["InputModifierSwizzleAxis"],
+      modifierSettings: [{ type: "InputModifierSwizzleAxis", settings: { Order: "EInputAxisSwizzle::YXZ" } }]
+    }]
   }]
 })
 
@@ -29,7 +34,10 @@ describe("KeybindStore", () => {
       const kv = yield* KeyValueStore.KeyValueStore
       const store = yield* KeybindStore
       assert.deepStrictEqual((yield* store.load).keybinds.moveForward, ["KeyI"])
-      yield* kv.set(KEYBINDS_STORAGE_KEY, JSON.stringify({ undo: "Ctrl+KeyU", redo: ["Ctrl+KeyR", "Ctrl+Shift+KeyZ"], bogus: "KeyX" }))
+      yield* kv.set(
+        KEYBINDS_STORAGE_KEY,
+        JSON.stringify({ undo: "Ctrl+KeyU", redo: ["Ctrl+KeyR", "Ctrl+Shift+KeyZ"], bogus: "KeyX" })
+      )
       const { keybinds } = yield* store.load
       assert.deepStrictEqual(keybinds.undo, ["Ctrl+KeyU"]) // old single-string saves still load
       assert.deepStrictEqual(keybinds.redo, ["Ctrl+KeyR", "Ctrl+Shift+KeyZ"])

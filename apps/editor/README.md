@@ -1,6 +1,6 @@
 # Ballest editor (apps/editor)
 
-Web map editor for *Ballest of Them All*. TanStack Start (React, Vite), three.js via
+Web map editor for _Ballest of Them All_. TanStack Start (React, Vite), three.js via
 @react-three/fiber + drei, Effect v4 for services, schemas and errors. The UI chrome is
 built from shadcn/ui components in `packages/ui` (`@workspace/ui`, Base UI primitives,
 Tailwind v4).

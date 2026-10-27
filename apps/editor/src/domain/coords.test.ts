@@ -7,10 +7,10 @@ import {
   sceneToUe,
   threeToUeQuat,
   threeToUeVector,
+  UE_TO_THREE_MATRIX,
   ueBoundsToScene,
   ueToScene,
   ueToThreeQuat,
-  UE_TO_THREE_MATRIX,
   ueToThreeVector,
   type Vec3
 } from "./coords"
@@ -99,7 +99,11 @@ describe("coords", () => {
       // Round trips are bit-exact (only permutations and negations).
       for (const item of map.items) {
         const t = item.itemTransform
-        expect(sceneToUe(ueToScene(t))).toEqual({ translation: t.translation, rotation: t.rotation, scale3D: t.scale3D })
+        expect(sceneToUe(ueToScene(t))).toEqual({
+          translation: t.translation,
+          rotation: t.rotation,
+          scale3D: t.scale3D
+        })
         expect(threeToUeQuat(ueToThreeQuat(t.rotation))).toEqual(t.rotation)
         expect(threeToUeVector(ueToThreeVector(t.translation))).toEqual(t.translation)
       }

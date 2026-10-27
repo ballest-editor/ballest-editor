@@ -3,10 +3,10 @@
  * the catalog decodes, covers every class used in the samples, and items built from it
  * look like the ones the game saved.
  */
-import * as fs from "node:fs"
-import * as path from "node:path"
 import { assert, describe, expect, it } from "@effect/vitest"
 import { Schema } from "effect"
+import * as fs from "node:fs"
+import * as path from "node:path"
 import { listSamples, readSample, repoRoot } from "../test/samples"
 import { Catalog, HIDDEN_SECTION, indexCatalog, paletteSections, unavailableReasonOf, visibleExtras } from "./Catalog"
 import { itemFromPiece, placementTransform, qualifyMaterialPath } from "./factory"
@@ -61,7 +61,9 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
     const names = sections.map((s) => s.name)
     expect(names.at(-1)).toBe(HIDDEN_SECTION)
     // categories appear in the order the catalog lists them (the in-game browser order)
-    const firstSeen = [...new Set(catalog.pieces.filter((p) => p.inPalette !== false && p.category).map((p) => p.category!))]
+    const firstSeen = [
+      ...new Set(catalog.pieces.filter((p) => p.inPalette !== false && p.category).map((p) => p.category!))
+    ]
     expect(names.slice(0, firstSeen.length)).toEqual(firstSeen)
     const visible = sections.filter((s) => !s.hidden).flatMap((s) => s.pieces)
     const hidden = sections.find((s) => s.hidden)!.pieces
@@ -69,7 +71,9 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
     expect(hidden.every((p) => p.inPalette === false)).toBe(true)
     // every palette piece is placeable; unavailable ones (e.g. unresolved base classes) are only in Hidden
     expect(visible.filter((p) => unavailableReasonOf(indexCatalog(catalog), p) !== undefined)).toEqual([])
-    const unavailable = hidden.filter((p) => unavailableReasonOf(indexCatalog(catalog), p) !== undefined).map((p) => p.className)
+    const unavailable = hidden.filter((p) => unavailableReasonOf(indexCatalog(catalog), p) !== undefined).map((p) =>
+      p.className
+    )
     expect(unavailable.length).toBe((catalog.unresolved ?? []).length)
     // extras-only pieces stay placeable
     const extrasOnly = new Set(["MP_OrangeSign", "MP_PinballPaddle", "BP_CircularFlexiblePlatform"])
@@ -90,7 +94,9 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
 
 describe("material paths", () => {
   it("qualifyMaterialPath inverts objectPathOf for every material in the samples", () => {
-    const materials = new Set(sampleItems().flatMap((i) => i.meshComponents.flatMap((m) => m.materials.map((x) => x.material))))
+    const materials = new Set(
+      sampleItems().flatMap((i) => i.meshComponents.flatMap((m) => m.materials.map((x) => x.material)))
+    )
     for (const material of materials) assert.strictEqual(qualifyMaterialPath(objectPathOf(material)), material)
   })
 })

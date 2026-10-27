@@ -1,4 +1,13 @@
-import { IconCamera, IconKeyboard, IconPalette, IconPlus, IconRestore, IconSearch, IconSettings, IconX } from "@tabler/icons-react"
+import {
+  IconCamera,
+  IconKeyboard,
+  IconPalette,
+  IconPlus,
+  IconRestore,
+  IconSearch,
+  IconSettings,
+  IconX
+} from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
@@ -18,8 +27,8 @@ import {
   isDefaultBinding,
   type KeybindAction,
   keybindActionDescriptions,
-  keybindActions,
   keybindActionLabels,
+  keybindActions,
   keybindSections,
   mouseChordOf,
   mouseDragActions,
@@ -37,7 +46,9 @@ const CATEGORY_LABELS: Readonly<Record<SettingsCategory, string>> = {
   appearance: "Appearance"
 }
 
-const CATEGORIES: ReadonlyArray<{ readonly id: SettingsCategory; readonly label: string; readonly icon: typeof IconSettings }> = [
+const CATEGORIES: ReadonlyArray<
+  { readonly id: SettingsCategory; readonly label: string; readonly icon: typeof IconSettings }
+> = [
   { id: "general", label: CATEGORY_LABELS.general, icon: IconSettings },
   { id: "camera", label: CATEGORY_LABELS.camera, icon: IconCamera },
   { id: "keybinds", label: CATEGORY_LABELS.keybinds, icon: IconKeyboard },
@@ -80,7 +91,14 @@ function RowView({ row }: { readonly row: Row }) {
     <div className="group/row relative flex min-h-9 items-center gap-4 py-1 pl-3">
       {row.modified && (
         <Tooltip>
-          <TooltipTrigger render={<span className="absolute top-1/2 left-0 size-1.5 -translate-y-1/2 rounded-full bg-primary" aria-label="Changed from default" />} />
+          <TooltipTrigger
+            render={
+              <span
+                className="absolute top-1/2 left-0 size-1.5 -translate-y-1/2 rounded-full bg-primary"
+                aria-label="Changed from default"
+              />
+            }
+          />
           <TooltipContent side="left">Changed from default</TooltipContent>
         </Tooltip>
       )}
@@ -88,7 +106,11 @@ function RowView({ row }: { readonly row: Row }) {
         {row.tooltip && row.description !== undefined
           ? (
             <Tooltip>
-              <TooltipTrigger render={<span className="w-fit cursor-help underline decoration-dotted decoration-muted-foreground/50 underline-offset-4" />}>
+              <TooltipTrigger
+                render={
+                  <span className="w-fit cursor-help underline decoration-dotted decoration-muted-foreground/50 underline-offset-4" />
+                }
+              >
                 {label}
               </TooltipTrigger>
               <TooltipContent side="right" className="max-w-xs">{row.description}</TooltipContent>
@@ -96,7 +118,9 @@ function RowView({ row }: { readonly row: Row }) {
           )
           : label}
         {!row.tooltip && row.description !== undefined && (
-          <span className={cn("text-[0.7rem] text-muted-foreground", row.disabled && "opacity-60")}>{row.description}</span>
+          <span className={cn("text-[0.7rem] text-muted-foreground", row.disabled && "opacity-60")}>
+            {row.description}
+          </span>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
@@ -284,7 +308,9 @@ export function SettingsDialog(props: {
         kinds.set(`${kind}:${b}`, set)
       }
     }
-    const conflicts = new Set([...kinds].filter(([, actions]) => actions.size > 1).map(([key]) => key.slice(key.indexOf(":") + 1)))
+    const conflicts = new Set(
+      [...kinds].filter(([, actions]) => actions.size > 1).map(([key]) => key.slice(key.indexOf(":") + 1))
+    )
 
     // Sections and labels: keybinds.json naming when the extractor provides it, else our table.
     const sectionOf = (action: KeybindAction, fallback: string) => defaults.naming.get(action)?.section ?? fallback
@@ -342,7 +368,9 @@ export function SettingsDialog(props: {
             items={{ cm: "Centimetres", m: "Metres" }}
             onValueChange={(v) => v !== null && update("general", { units: v })}
           >
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="cm">Centimetres</SelectItem>
               <SelectItem value="m">Metres</SelectItem>
@@ -354,7 +382,8 @@ export function SettingsDialog(props: {
         id: "creatorName",
         category: "general",
         label: "Creator name",
-        description: "Your in-game name. Written into every exported map and its file name (letters, digits and spaces).",
+        description:
+          "Your in-game name. Written into every exported map and its file name (letters, digits and spaces).",
         modified: !isDefault("general", "creatorName"),
         reset: () => resetField("general", "creatorName"),
         control: (
@@ -380,12 +409,19 @@ export function SettingsDialog(props: {
         id: "fov",
         category: "camera",
         label: "Field of view",
-        description: "The game's camera presets (from its camera settings). Only the field of view applies to the editor.",
+        description:
+          "The game's camera presets (from its camera settings). Only the field of view applies to the editor.",
         modified: !isDefault("camera", "fovPreset"),
         reset: () => resetField("camera", "fovPreset"),
         control: (
-          <Select value={c.fovPreset} items={presetItems} onValueChange={(v) => update("camera", { fovPreset: String(v) })}>
-            <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+          <Select
+            value={c.fovPreset}
+            items={presetItems}
+            onValueChange={(v) => update("camera", { fovPreset: String(v) })}
+          >
+            <SelectTrigger className="w-56">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {Object.entries(presetItems).map(([id, label]) => <SelectItem key={id} value={id}>{label}</SelectItem>)}
             </SelectContent>
@@ -396,7 +432,9 @@ export function SettingsDialog(props: {
         id: "customFov",
         category: "camera",
         label: "Custom field of view",
-        description: customFovOff ? "Horizontal degrees. Choose the Custom preset to use it." : "Horizontal degrees, used by the Custom preset (like the game).",
+        description: customFovOff
+          ? "Horizontal degrees. Choose the Custom preset to use it."
+          : "Horizontal degrees, used by the Custom preset (like the game).",
         disabled: customFovOff,
         modified: !isDefault("camera", "customFov"),
         reset: () => resetField("camera", "customFov"),
@@ -414,7 +452,14 @@ export function SettingsDialog(props: {
                 if (customFov !== undefined) update("camera", { customFov })
               }}
             />
-            <span className={cn("w-20 text-right font-mono text-xs tabular-nums", customFovOff && "text-muted-foreground/60")}>{c.customFov}°</span>
+            <span
+              className={cn(
+                "w-20 text-right font-mono text-xs tabular-nums",
+                customFovOff && "text-muted-foreground/60"
+              )}
+            >
+              {c.customFov}°
+            </span>
           </>
         )
       },
@@ -427,10 +472,17 @@ export function SettingsDialog(props: {
         reset: () => resetField("camera", "flySpeed"),
         control: (
           <>
-            <Slider className="w-48" min={100} max={20000} step={100} value={c.flySpeed} onValueChange={(v) => {
+            <Slider
+              className="w-48"
+              min={100}
+              max={20000}
+              step={100}
+              value={c.flySpeed}
+              onValueChange={(v) => {
                 const flySpeed = sliderValue(v)
                 if (flySpeed !== undefined) update("camera", { flySpeed })
-              }} />
+              }}
+            />
             <span className="w-20 text-right font-mono text-xs tabular-nums">{(c.flySpeed / 100).toFixed(0)} m/s</span>
           </>
         )
@@ -443,10 +495,17 @@ export function SettingsDialog(props: {
         reset: () => resetField("camera", "lookSensitivity"),
         control: (
           <>
-            <Slider className="w-48" min={0.1} max={5} step={0.1} value={c.lookSensitivity} onValueChange={(v) => {
+            <Slider
+              className="w-48"
+              min={0.1}
+              max={5}
+              step={0.1}
+              value={c.lookSensitivity}
+              onValueChange={(v) => {
                 const lookSensitivity = sliderValue(v)
                 if (lookSensitivity !== undefined) update("camera", { lookSensitivity })
-              }} />
+              }}
+            />
             <span className="w-20 text-right font-mono text-xs tabular-nums">×{c.lookSensitivity.toFixed(1)}</span>
           </>
         )
@@ -480,7 +539,9 @@ export function SettingsDialog(props: {
             items={{ dark: "Dark", light: "Light", system: "System" }}
             onValueChange={(v) => v !== null && update("appearance", { theme: v })}
           >
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="dark">Dark</SelectItem>
               <SelectItem value="light">Light</SelectItem>
@@ -503,7 +564,14 @@ export function SettingsDialog(props: {
         label: "Grid colour (1 m cells)",
         modified: !isDefault("appearance", "gridCellColor"),
         reset: () => resetField("appearance", "gridCellColor"),
-        control: <Input type="color" className="h-7 w-14 p-0.5" value={a.gridCellColor} onChange={(e) => update("appearance", { gridCellColor: e.target.value })} />
+        control: (
+          <Input
+            type="color"
+            className="h-7 w-14 p-0.5"
+            value={a.gridCellColor}
+            onChange={(e) => update("appearance", { gridCellColor: e.target.value })}
+          />
+        )
       },
       {
         id: "gridSection",
@@ -511,14 +579,22 @@ export function SettingsDialog(props: {
         label: "Grid colour (10 m sections)",
         modified: !isDefault("appearance", "gridSectionColor"),
         reset: () => resetField("appearance", "gridSectionColor"),
-        control: <Input type="color" className="h-7 w-14 p-0.5" value={a.gridSectionColor} onChange={(e) => update("appearance", { gridSectionColor: e.target.value })} />
+        control: (
+          <Input
+            type="color"
+            className="h-7 w-14 p-0.5"
+            value={a.gridSectionColor}
+            onChange={(e) => update("appearance", { gridSectionColor: e.target.value })}
+          />
+        )
       }
     ]
   })()
 
   const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 0)
   const searching = terms.length > 0
-  const matches = (r: Row) => terms.every((t) => `${r.label} ${r.description ?? ""} ${r.group ?? ""} ${r.category}`.toLowerCase().includes(t))
+  const matches = (r: Row) =>
+    terms.every((t) => `${r.label} ${r.description ?? ""} ${r.group ?? ""} ${r.category}`.toLowerCase().includes(t))
   const matched = searching ? rows.filter(matches) : []
   const hitsPerCategory = new Map<SettingsCategory, number>()
   for (const r of matched) hitsPerCategory.set(r.category, (hitsPerCategory.get(r.category) ?? 0) + 1)
@@ -563,7 +639,11 @@ export function SettingsDialog(props: {
             />
           </div>
           {searching && (
-            <Button variant={scope === null ? "secondary" : "ghost"} className="justify-between" onClick={() => setScope(null)}>
+            <Button
+              variant={scope === null ? "secondary" : "ghost"}
+              className="justify-between"
+              onClick={() => setScope(null)}
+            >
               <span>All results</span>
               <span className="text-[0.65rem] text-muted-foreground tabular-nums">{matched.length}</span>
             </Button>
@@ -586,8 +666,14 @@ export function SettingsDialog(props: {
                 <Icon />
                 <span className="flex-1 text-left">{label}</span>
                 {searching
-                  ? hits > 0 && <span className="rounded-full bg-primary/15 px-1.5 text-[0.65rem] text-primary tabular-nums">{hits}</span>
-                  : modifiedIn(id) && <span className="size-1.5 rounded-full bg-primary" aria-label="Has changed settings" />}
+                  ? hits > 0 && (
+                    <span className="rounded-full bg-primary/15 px-1.5 text-[0.65rem] text-primary tabular-nums">
+                      {hits}
+                    </span>
+                  )
+                  : modifiedIn(id) && (
+                    <span className="size-1.5 rounded-full bg-primary" aria-label="Has changed settings" />
+                  )}
               </Button>
             )
           })}
@@ -602,7 +688,9 @@ export function SettingsDialog(props: {
               {groups.map((group) => (
                 <section key={group.key} className="flex flex-col">
                   {group.title !== undefined && group.title !== "" && (
-                    <h3 className="mb-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">{group.title}</h3>
+                    <h3 className="mb-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
+                      {group.title}
+                    </h3>
                   )}
                   <div className="flex flex-col divide-y divide-border/50">
                     {group.rows.map((row) => <RowView key={row.id} row={row} />)}

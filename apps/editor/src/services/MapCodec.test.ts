@@ -12,15 +12,18 @@ describe("MapCodec", () => {
     assert.isAtLeast(samples.filter((s) => s.kind === "ballmap").length, 1)
   })
 
-  it.effect.each(samples.map((s) => [s.name, s] as const))("round-trips %s (JSON-equal)", ([, sample]) =>
-    Effect.gen(function*() {
-      const codec = yield* MapCodec
-      const text = readSample(sample)
-      const map = yield* codec.decode(text)
-      const out = yield* codec.encode(map)
-      assert.deepStrictEqual(JSON.parse(out), JSON.parse(text))
-      assert.strictEqual(map.editorState !== undefined, sample.kind === "balledit")
-    }).pipe(Effect.provide(MapCodec.layer)))
+  it.effect.each(samples.map((s) => [s.name, s] as const))(
+    "round-trips %s (JSON-equal)",
+    ([, sample]) =>
+      Effect.gen(function*() {
+        const codec = yield* MapCodec
+        const text = readSample(sample)
+        const map = yield* codec.decode(text)
+        const out = yield* codec.encode(map)
+        assert.deepStrictEqual(JSON.parse(out), JSON.parse(text))
+        assert.strictEqual(map.editorState !== undefined, sample.kind === "balledit")
+      }).pipe(Effect.provide(MapCodec.layer))
+  )
 
   // Current in-game saves are reproduced byte for byte (older Workshop files write short
   // number arrays inline, which the current game no longer does).

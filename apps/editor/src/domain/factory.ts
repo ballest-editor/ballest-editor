@@ -92,7 +92,9 @@ export const itemFromPiece = (piece: CatalogPiece, transform: ItemTransform): It
       ? meshComponentFor("", [])
       : meshComponentFor(
         piece.meshAssetPath,
-        [...piece.materialSlots].sort((a, b) => a.index - b.index).map((slot) => qualifyMaterialPath(slot.defaultMaterial))
+        [...piece.materialSlots].sort((a, b) => a.index - b.index).map((slot) =>
+          qualifyMaterialPath(slot.defaultMaterial)
+        )
       )
   ],
   bIsBaseItem: false,

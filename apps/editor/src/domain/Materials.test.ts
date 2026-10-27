@@ -1,7 +1,7 @@
-import * as fs from "node:fs"
-import * as path from "node:path"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect } from "effect"
+import * as fs from "node:fs"
+import * as path from "node:path"
 import * as THREE from "three"
 import { applySlotMaterials, materialFor, neutralMaterial, slotIndexOf } from "../editor/materials"
 import { MaterialLibrary } from "../services/MaterialLibrary"
@@ -17,7 +17,13 @@ const file = {
     {
       path: BLUE,
       blendMode: "BLEND_Opaque",
-      approx: { baseColor: [0.02, 0.1, 0.8], metallic: 0, roughness: 0.3, normalTexture: "textures/n.png", ormTexture: "textures/n.png" },
+      approx: {
+        baseColor: [0.02, 0.1, 0.8],
+        metallic: 0,
+        roughness: 0.3,
+        normalTexture: "textures/n.png",
+        ormTexture: "textures/n.png"
+      },
       recovered: true
     },
     {
@@ -81,7 +87,9 @@ describe("materials", () => {
 
   it.effect("falls back to an empty table when the file is missing", () =>
     Effect.gen(function*() {
-      const library = MaterialLibrary.make(() => Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve("") }))
+      const library = MaterialLibrary.make(() =>
+        Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve("") })
+      )
       assert.strictEqual((yield* library.load).materials.size, 0)
     }))
 
@@ -90,12 +98,20 @@ describe("materials", () => {
     const table = parseMaterialsFile(JSON.parse(fs.readFileSync(real, "utf8")))
     assert.isAbove(table.materials.size, 0)
     assert.strictEqual(table.skipped, 0)
-    const blue = lookupMaterial(table, "/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Glossy_Blue.MI_Env_Glossy_Blue")!
+    const blue = lookupMaterial(
+      table,
+      "/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Glossy_Blue.MI_Env_Glossy_Blue"
+    )!
     assert.isTrue(blue.baseColor[2] > blue.baseColor[0] && blue.baseColor[2] > blue.baseColor[1])
     const glass = lookupMaterial(table, "/Game/Art/Materials/Masters/M_GlassV2.M_GlassV2")!
     assert.isTrue(glass.translucent)
     // old maps reference this path; it must resolve (redirect or by name)
-    assert.isDefined(lookupMaterial(table, "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'"))
+    assert.isDefined(
+      lookupMaterial(
+        table,
+        "/Script/Engine.Material'/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal'"
+      )
+    )
     assert.isBelow(glass.opacity, 1)
   })
 })

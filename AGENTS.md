@@ -1,6 +1,6 @@
 # ballest-editor — agent instructions
 
-A standalone map editor for *Ballest of Them All* (Steam 3339810, UE 5.8). Read `docs/FORMAT.md` (the map JSON format, hard limits, validation rules) and `docs/VISION.md` (where this is going) before changing anything.
+A standalone map editor for _Ballest of Them All_ (Steam 3339810, UE 5.8). Read `docs/FORMAT.md` (the map JSON format, hard limits, validation rules) and `docs/VISION.md` (where this is going) before changing anything.
 
 ## Ground rules
 

@@ -22,7 +22,10 @@ describe("Settings", () => {
 
   it("uses the game's FOV presets (horizontal) converted to three's vertical FOV", () => {
     const presets = FALLBACK_CAMERA_PRESETS
-    const withPreset = (fovPreset: string, customFov = 90) => ({ ...defaultSettings, camera: { ...defaultSettings.camera, fovPreset, customFov } })
+    const withPreset = (fovPreset: string, customFov = 90) => ({
+      ...defaultSettings,
+      camera: { ...defaultSettings.camera, fovPreset, customFov }
+    })
     assert.strictEqual(fovOf(withPreset("WideAngle").camera, presets), 110)
     assert.strictEqual(fovOf(defaultSettings.camera, presets), 90)
     assert.strictEqual(fovOf(withPreset("Custom", 75).camera, presets), 75)

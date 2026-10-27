@@ -3,21 +3,23 @@ import { Cause, Effect, Exit } from "effect"
 import { currentCreatedAt, newMapFile } from "../domain/factory"
 import type { Keybinds } from "../domain/Keybinds"
 import { PLAYER_START_CLASS } from "../domain/MapFile"
+import type { Settings } from "../domain/Settings"
 import { CatalogLoader } from "../services/CatalogLoader"
 import { KeybindStore } from "../services/KeybindStore"
 import { MapCodec } from "../services/MapCodec"
 import { MapExporter } from "../services/MapExporter"
 import { MaterialLibrary } from "../services/MaterialLibrary"
-import { SettingsStore } from "../services/SettingsStore"
-import type { Settings } from "../domain/Settings"
 import { type AppServices, runtime } from "../services/runtime"
+import { SettingsStore } from "../services/SettingsStore"
 import { useEditor } from "./store"
 
 const run = async <A, E>(effect: Effect.Effect<A, E, AppServices>): Promise<A | undefined> => {
   const exit = await runtime.runPromiseExit(effect)
   if (Exit.isSuccess(exit)) return exit.value
   const error = Cause.squash(exit.cause)
-  const message = typeof error === "object" && error !== null && "message" in error ? String(error.message) : String(error)
+  const message = typeof error === "object" && error !== null && "message" in error
+    ? String(error.message)
+    : String(error)
   useEditor.getState().notify("error", message)
   return undefined
 }

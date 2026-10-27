@@ -87,13 +87,37 @@ export const ueBoundsToScene = (min: Tuple3, max: Tuple3): { readonly size: Tupl
  * Its negative determinant makes three.js flip the triangle winding for us.
  */
 export const UE_TO_THREE_MATRIX: readonly [
-  number, number, number, number,
-  number, number, number, number,
-  number, number, number, number,
-  number, number, number, number
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number
 ] = [
-  1, 0, 0, 0,
-  0, 0, 1, 0,
-  0, 1, 0, 0,
-  0, 0, 0, 1
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1
 ]

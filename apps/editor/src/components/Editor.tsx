@@ -2,18 +2,18 @@ import { Toaster } from "@workspace/ui/components/sonner"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
 import { useEffect, useRef } from "react"
 import { importFile, loadCatalog, loadKeybinds, loadMaterials, loadSettings } from "../editor/actions"
-import { warmCatalog } from "../editor/preload"
 import { commands } from "../editor/commands"
+import { warmCatalog } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
 import { useEditor } from "../editor/store"
 import { watchResolvedTheme } from "../editor/theme"
 import { useActionKeys } from "../editor/useActionKeys"
 import { Viewport } from "../editor/Viewport"
-import { Inspector } from "./Inspector"
-import { SettingsDialog } from "./SettingsDialog"
 import { ExportDialog } from "./ExportDialog"
+import { Inspector } from "./Inspector"
 import { NewMapDialog } from "./NewMapDialog"
 import { Palette } from "./Palette"
+import { SettingsDialog } from "./SettingsDialog"
 import { SidePanel } from "./SidePanel"
 import { TopBar } from "./TopBar"
 
@@ -63,7 +63,10 @@ export function Editor() {
   // Background-warm the glb cache for every palette piece once the catalog is in.
   const catalog = useEditor((s) => s.catalog)
   const catalogIndex = useEditor((s) => s.catalogIndex)
-  useEffect(() => (catalog === null || catalogIndex === null ? undefined : warmCatalog(catalog.catalog, catalogIndex)), [catalog, catalogIndex])
+  useEffect(
+    () => (catalog === null || catalogIndex === null ? undefined : warmCatalog(catalog.catalog, catalogIndex)),
+    [catalog, catalogIndex]
+  )
 
   useEffect(() => {
     // The viewport holds its first reveal until these have settled (see Viewport.tsx).

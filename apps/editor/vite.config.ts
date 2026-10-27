@@ -1,8 +1,8 @@
+import tailwindcss from "@tailwindcss/vite"
+import { tanstackStart } from "@tanstack/react-start/plugin/vite"
+import viteReact from "@vitejs/plugin-react"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { tanstackStart } from "@tanstack/react-start/plugin/vite"
-import tailwindcss from "@tailwindcss/vite"
-import viteReact from "@vitejs/plugin-react"
 import { type Connect, defineConfig, type Plugin } from "vite"
 
 /**
@@ -21,11 +21,20 @@ const repoAssets = (dir: string): Plugin => {
   }
   const middleware: Connect.NextHandleFunction = (req, res, next) => {
     const url = req.url?.split("?")[0] ?? ""
-    if (!url.startsWith("/assets/")) {  next(); return; }
+    if (!url.startsWith("/assets/")) {
+      next()
+      return
+    }
     const file = path.join(root, decodeURIComponent(url.slice("/assets/".length)))
-    if (!file.startsWith(root + path.sep)) {  next(); return; }
+    if (!file.startsWith(root + path.sep)) {
+      next()
+      return
+    }
     fs.stat(file, (error, stat) => {
-      if (error !== null || !stat.isFile()) {  next(); return; }
+      if (error !== null || !stat.isFile()) {
+        next()
+        return
+      }
       res.setHeader("Content-Type", types[path.extname(file)] ?? "application/octet-stream")
       res.setHeader("Content-Length", stat.size)
       res.setHeader("Cache-Control", "no-cache")

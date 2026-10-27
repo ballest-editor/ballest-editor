@@ -21,7 +21,11 @@ describe("glb preloading", () => {
 
     const ticks: Array<() => void> = []
     const warmed: Array<string> = []
-    warmCatalog(catalog, indexCatalog(catalog), { perTick: 1, idle: (run) => ticks.push(run), preload: (u) => warmed.push(u) })
+    warmCatalog(catalog, indexCatalog(catalog), {
+      perTick: 1,
+      idle: (run) => ticks.push(run),
+      preload: (u) => warmed.push(u)
+    })
     expect(warmed).toEqual([]) // nothing happens until the browser is idle
     while (ticks.length > 0) {
       ticks.shift()!()

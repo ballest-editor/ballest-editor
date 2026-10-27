@@ -1,12 +1,12 @@
+import { describe, expect, it } from "@effect/vitest"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { describe, expect, it } from "@effect/vitest"
 import * as THREE from "three"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { UE_TO_THREE_MATRIX } from "../domain/coords"
 import { repoRoot } from "../test/samples"
-import { fixWinding, normalAgreement } from "./winding"
 import { isMesh } from "./threeGuards"
+import { fixWinding, normalAgreement } from "./winding"
 
 const loadGlb = async (rel: string) => {
   const buf = fs.readFileSync(path.join(repoRoot, "assets/pieces", rel))
