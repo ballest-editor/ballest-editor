@@ -1,4 +1,4 @@
-import { IconCube, IconMagnet, IconWorld } from "@tabler/icons-react"
+import { IconCube, IconGrid4x4, IconWorld } from "@tabler/icons-react"
 import { Kbd } from "@workspace/ui/components/kbd"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Toggle } from "@workspace/ui/components/toggle"
@@ -11,6 +11,10 @@ import { saveSettings } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { ToolBar } from "./ToolBar"
 
+/** One frosted button group; each control gets its own, like the game's. */
+const GROUP =
+  "pointer-events-auto flex items-center gap-1 rounded-full border border-border/60 bg-background/60 p-1 shadow-lg backdrop-blur-md"
+
 /** Keeps keyboard focus with the viewport: no focus on mousedown, no Space/Enter activation. */
 const noFocus = {
   tabIndex: -1,
@@ -22,7 +26,8 @@ const noFocus = {
 
 /**
  * Floating view controls, top-right of the viewport, like the game's: the gizmo's local
- * (cube) or world (globe) axes, then grid snapping. Icons are named in their tooltips.
+ * (cube) or world (globe) axes, then grid snapping, each in its own group. Icons are named
+ * in their tooltips.
  * Pointer-only like the tool bar, so keybinds stay with the viewport.
  */
 export function ViewControls({ disabled = false }: { readonly disabled?: boolean }) {
@@ -33,8 +38,8 @@ export function ViewControls({ disabled = false }: { readonly disabled?: boolean
   const label = local ? "Using piece-local axes" : "Using world axes"
 
   return (
-    <div className="pointer-events-none absolute top-3 right-3 flex justify-end">
-      <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-border/60 bg-background/60 p-1 shadow-lg backdrop-blur-md">
+    <div className="pointer-events-none absolute top-3 right-3 flex justify-end gap-2">
+      <div className={GROUP}>
         <Tooltip>
           <TooltipTrigger
             render={
@@ -55,14 +60,14 @@ export function ViewControls({ disabled = false }: { readonly disabled?: boolean
             {keybinds.toggleGizmoSpace.map((binding) => <Kbd key={binding}>{formatBinding(binding)}</Kbd>)}
           </TooltipContent>
         </Tooltip>
-        <SnapControls disabled={disabled} />
       </div>
+      <SnapControls disabled={disabled} />
     </div>
   )
 }
 
 /**
- * Grid snapping for gizmo translation: the magnet turns it on and off, the menu picks the
+ * Grid snapping for gizmo translation, its own group like the game's: the grid icon turns it on and off, the menu picks the
  * grid size (and turns snapping on). Saved with the settings.
  */
 function SnapControls({ disabled }: { readonly disabled: boolean }) {
@@ -74,7 +79,7 @@ function SnapControls({ disabled }: { readonly disabled: boolean }) {
   const items = Object.fromEntries(GRID_SIZES.map((size) => [size, formatGridSize(size, units)]))
 
   return (
-    <>
+    <div className={GROUP}>
       <Tooltip>
         <TooltipTrigger
           render={
@@ -88,7 +93,7 @@ function SnapControls({ disabled }: { readonly disabled: boolean }) {
             />
           }
         >
-          <IconMagnet />
+          <IconGrid4x4 />
         </TooltipTrigger>
         <TooltipContent side="bottom">Snap to grid {enabled ? "on" : "off"}</TooltipContent>
       </Tooltip>
@@ -126,7 +131,7 @@ function SnapControls({ disabled }: { readonly disabled: boolean }) {
           ))}
         </SelectContent>
       </Select>
-    </>
+    </div>
   )
 }
 
