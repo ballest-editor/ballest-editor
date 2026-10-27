@@ -51,13 +51,6 @@ export const saveSettings = (settings: Settings) => {
   return run(SettingsStore.use((store) => store.save(settings)))
 }
 
-export const resetSettings = () =>
-  run(
-    Effect.gen(function*() {
-      useEditor.getState().setSettings(yield* SettingsStore.use((store) => store.reset))
-    })
-  )
-
 export const loadKeybinds = () =>
   run(
     Effect.gen(function*() {

@@ -7,10 +7,12 @@
     "build": "turbo build",
     "test": "turbo test",
     "typecheck": "turbo typecheck",
-    "lint": "turbo lint"
+    "lint": "turbo lint",
+    "knip": "knip"
   },
   "devDependencies": {
     "@effect/tsgo": "0.61.0",
+    "knip": "6.43.0",
     "turbo": "^2.11.10",
     "typescript": "^6.0.2"
   },

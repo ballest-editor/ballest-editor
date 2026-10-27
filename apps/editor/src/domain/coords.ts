@@ -39,8 +39,8 @@ export const ueToThreeVector = (v: Vec3): Vec3 => ({ x: v.x, y: v.z, z: v.y })
 export const threeToUeVector = (v: Vec3): Vec3 => ({ x: v.x, y: v.z, z: v.y })
 
 /** Axis-aligned scale: diag(s) conjugated by a permutation is the permuted diagonal. */
-export const ueToThreeScale = ueToThreeVector
-export const threeToUeScale = threeToUeVector
+const ueToThreeScale = ueToThreeVector
+const threeToUeScale = threeToUeVector
 
 export const ueToThreeQuat = (q: Quat4): Quat4 => ({ x: -q.x, y: -q.z, z: -q.y, w: q.w })
 export const threeToUeQuat = (q: Quat4): Quat4 => ({ x: -q.x, y: -q.z, z: -q.y, w: q.w })

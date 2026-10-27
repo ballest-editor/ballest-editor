@@ -33,8 +33,6 @@ export const keybindSections = [
 export type KeybindAction = (typeof keybindSections)[number]["actions"][number]
 export const keybindActions: ReadonlyArray<KeybindAction> = keybindSections.flatMap((g) => g.actions)
 
-export const KeybindActionSchema = Schema.Literals(keybindActions as unknown as readonly [KeybindAction, ...Array<KeybindAction>])
-
 /** Actions named by the in-game level editor's hotkey overlay (keybinds.json naming doesn't apply). */
 export const editorOverlayActions: ReadonlySet<KeybindAction> = new Set(keybindSections[0].actions)
 
@@ -236,8 +234,6 @@ export const isOneShotChord = (keybinds: Keybinds, chord: string): boolean =>
 
 /** True when `chord` (from chordOf) is bound to a one-shot action with a modifier, e.g. Ctrl+KeyZ. */
 export const isBoundChord = (keybinds: Keybinds, chord: string): boolean => chord.includes("+") && isOneShotChord(keybinds, chord)
-
-export const isModifierCode = (code: string): boolean => MODIFIER_CODES.has(code)
 
 /** How long a bare modifier must be held alone before it drives a held action (fly down on Ctrl). */
 export const MODIFIER_HOLD_MS = 120
