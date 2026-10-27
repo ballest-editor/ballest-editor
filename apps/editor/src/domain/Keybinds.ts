@@ -82,7 +82,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
 export const keybindActionDescriptions: Record<KeybindAction, string> = {
   selectMode: "Select mode: click to select, no gizmo. Q in the game's level editor.",
   translateMode:
-    "Move mode: drag the arrows or plane handles to move the selection. W in the game's level editor; the camera's W only flies while the look button is held.",
+    "Move mode: drag the arrows or plane handles to move the selection. W in the game's level editor; the camera's W flies only while looking or alongside another movement key.",
   rotateMode: "Rotate mode: drag a ring to rotate the selection. E in the game's level editor.",
   scaleMode:
     "Scale mode: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the game's level editor.",

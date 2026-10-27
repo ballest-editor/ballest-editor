@@ -40,7 +40,12 @@ import { CUSTOM_FOV_PRESET, defaultSettings, type Settings } from "../domain/Set
 import { resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
 import { type SettingsCategory, useEditor } from "../editor/store"
 
-const movementLookItems = { none: "None", upDown: "Up and down", all: "All" } as const
+const movementLookItems = { none: "Forward only", upDown: "Forward, up, down", all: "All movement keys" } as const
+const movementLookDescriptions = {
+  none: "Forward (W) is also Move mode. It flies while looking or alongside another movement key.",
+  upDown: "Up and down also fly only while looking.",
+  all: "No movement key flies unless you're looking."
+} as const
 
 const CATEGORY_LABELS: Readonly<Record<SettingsCategory, string>> = {
   general: "General",
@@ -533,20 +538,26 @@ export function SettingsDialog(props: {
       {
         id: "movementNeedsLook",
         ...setting("camera", "movementNeedsLook"),
-        label: "Movement keys need look held",
-        description:
-          "Which movement keys only fly while the look button is held. Forward (W) is also move mode: unless it needs look, it flies while looking or while another movement key is flying, and switches to move mode otherwise.",
+        label: "Fly only while looking",
+        description: "Movement keys that need the look button held. The rest fly any time.",
         control: (
           <Select
             value={c.movementNeedsLook}
             items={movementLookItems}
             onValueChange={(v) => v !== null && update("camera", { movementNeedsLook: v })}
           >
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-44">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              {movementLookModes.map((m) => <SelectItem key={m} value={m}>{movementLookItems[m]}</SelectItem>)}
+            <SelectContent className="w-72" align="end" alignItemWithTrigger={false}>
+              {movementLookModes.map((m) => (
+                <SelectItem key={m} value={m} className="py-1.5 pr-7">
+                  <span className="flex flex-col gap-0.5 whitespace-normal">
+                    <span>{movementLookItems[m]}</span>
+                    <span className="opacity-70">{movementLookDescriptions[m]}</span>
+                  </span>
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         )
