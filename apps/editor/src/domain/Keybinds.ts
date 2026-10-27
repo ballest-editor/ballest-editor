@@ -169,13 +169,13 @@ export type StoredKeybinds = typeof StoredKeybinds.Type
 export const uniqueBindings = (bindings: ReadonlyArray<string>): Bindings => [...new Set(bindings.filter((b) => b.length > 0))]
 
 export const mergeKeybinds = (stored: StoredKeybinds, defaults: Keybinds = defaultKeybinds): Keybinds => {
-  const out: Record<string, Bindings> = { ...defaults }
+  const out: Record<KeybindAction, Bindings> = { ...defaults }
   for (const action of keybindActions) {
     const value = stored[action]
     if (value === undefined) continue
     out[action] = uniqueBindings(typeof value === "string" ? [value] : value)
   }
-  return out as Keybinds
+  return out
 }
 
 export const sameBindings = (a: Bindings, b: Bindings): boolean => a.length === b.length && a.every((x, i) => x === b[i])

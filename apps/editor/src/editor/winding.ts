@@ -12,6 +12,7 @@
  * inside-out exports still render correctly. No BackSide/DoubleSide anywhere.
  */
 import * as THREE from "three"
+import { isMesh } from "./threeGuards"
 
 const FIXED = "ballestWindingChecked"
 
@@ -79,5 +80,5 @@ export const fixWinding = (geometry: THREE.BufferGeometry): boolean => {
 
 export const fixSceneWinding = (root: THREE.Object3D): void =>
   root.traverse((object) => {
-    if (object instanceof THREE.Mesh) fixWinding(object.geometry as THREE.BufferGeometry)
+    if (isMesh(object)) fixWinding(object.geometry)
   })

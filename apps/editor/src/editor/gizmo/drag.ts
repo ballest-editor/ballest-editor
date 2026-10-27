@@ -44,18 +44,27 @@ export const dragAxisWorld = (start: DragStart): THREE.Vector3 | undefined =>
 
 export const dragTransform = (start: DragStart, now: PointerSample): UeTransform | undefined => {
   const { spec, transform: t, originWorld: o } = start
+  if (spec.kind === "scaleUniform") {
+    const r0 = Math.hypot(start.pointer.px.x - start.originPx.x, start.pointer.px.y - start.originPx.y)
+    const r1 = Math.hypot(now.px.x - start.originPx.x, now.px.y - start.originPx.y)
+    if (r0 < 1) return undefined
+    const k = r1 / r0
+    const s = t.scale3D
+    return { ...t, scale3D: { x: clampScale(s.x * k), y: clampScale(s.y * k), z: clampScale(s.z * k) } }
+  }
   const dir = dragAxisWorld(start)
+  if (dir === undefined) return undefined
   switch (spec.kind) {
     case "translateAxis": {
-      const t0 = axisParamFromRay(o, dir!, start.pointer.rayOrigin, start.pointer.rayDir)
-      const t1 = axisParamFromRay(o, dir!, now.rayOrigin, now.rayDir)
+      const t0 = axisParamFromRay(o, dir, start.pointer.rayOrigin, start.pointer.rayDir)
+      const t1 = axisParamFromRay(o, dir, now.rayOrigin, now.rayDir)
       if (t0 === undefined || t1 === undefined) return undefined
-      const d = worldDirToGame(dir!.clone().multiplyScalar(t1 - t0))
+      const d = worldDirToGame(dir.clone().multiplyScalar(t1 - t0))
       return { ...t, translation: { x: t.translation.x + d.x, y: t.translation.y + d.y, z: t.translation.z + d.z } }
     }
     case "translatePlane": {
-      const p0 = planeHit(o, dir!, start.pointer.rayOrigin, start.pointer.rayDir)
-      const p1 = planeHit(o, dir!, now.rayOrigin, now.rayDir)
+      const p0 = planeHit(o, dir, start.pointer.rayOrigin, start.pointer.rayDir)
+      const p1 = planeHit(o, dir, now.rayOrigin, now.rayDir)
       if (p0 === undefined || p1 === undefined) return undefined
       const d = worldDirToGame(p1.sub(p0))
       return { ...t, translation: { x: t.translation.x + d.x, y: t.translation.y + d.y, z: t.translation.z + d.z } }
@@ -64,28 +73,19 @@ export const dragTransform = (start: DragStart, now: PointerSample): UeTransform
     case "rotateView": {
       // Counter-clockwise on screen is a positive (right-handed) turn about an axis
       // pointing at the viewer; flip when the axis points away.
-      const facing = dir!.dot(start.toCamera)
+      const facing = dir.dot(start.toCamera)
       const sign = spec.kind === "rotateView" || facing >= 0 ? 1 : -1
       const angle = sign * screenAngle(start.originPx, start.pointer.px, now.px)
-      const delta = worldAxisAngleToGameQuat(dir!, angle)
+      const delta = worldAxisAngleToGameQuat(dir, angle)
       return { ...t, rotation: quatNormalize(quatMul(delta, t.rotation)) }
     }
     case "scaleAxis": {
-      const t0 = axisParamFromRay(o, dir!, start.pointer.rayOrigin, start.pointer.rayDir)
-      const t1 = axisParamFromRay(o, dir!, now.rayOrigin, now.rayDir)
-      if (t0 === undefined || t1 === undefined || Math.abs(t0) < 1e-6) return undefined
-      const ratio = t1 / t0
-      const axis = spec.axis!
-      const next = { ...t.scale3D, [axis]: clampScale(t.scale3D[axis] * ratio) }
+      const axis = spec.axis
+      const t0 = axisParamFromRay(o, dir, start.pointer.rayOrigin, start.pointer.rayDir)
+      const t1 = axisParamFromRay(o, dir, now.rayOrigin, now.rayDir)
+      if (axis === undefined || t0 === undefined || t1 === undefined || Math.abs(t0) < 1e-6) return undefined
+      const next = { ...t.scale3D, [axis]: clampScale(t.scale3D[axis] * (t1 / t0)) }
       return { ...t, scale3D: next }
-    }
-    case "scaleUniform": {
-      const r0 = Math.hypot(start.pointer.px.x - start.originPx.x, start.pointer.px.y - start.originPx.y)
-      const r1 = Math.hypot(now.px.x - start.originPx.x, now.px.y - start.originPx.y)
-      if (r0 < 1) return undefined
-      const k = r1 / r0
-      const s = t.scale3D
-      return { ...t, scale3D: { x: clampScale(s.x * k), y: clampScale(s.y * k), z: clampScale(s.z * k) } }
     }
   }
 }

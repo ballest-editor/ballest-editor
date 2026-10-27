@@ -6,6 +6,7 @@
  * instead of growing like a world-space AABB would.
  */
 import * as THREE from "three"
+import { isMesh } from "./threeGuards"
 
 const inverse = new THREE.Matrix4()
 const relative = new THREE.Matrix4()
@@ -16,8 +17,8 @@ export const localBounds = (item: THREE.Object3D, into = new THREE.Box3()): THRE
   item.updateMatrixWorld(true)
   inverse.copy(item.matrixWorld).invert()
   item.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return
-    const geometry = object.geometry as THREE.BufferGeometry
+    if (!isMesh(object)) return
+    const geometry = object.geometry
     if (geometry.boundingBox === null) geometry.computeBoundingBox()
     const box = geometry.boundingBox
     if (box === null || box.isEmpty()) return
@@ -43,8 +44,7 @@ export const makeSelectionHelper = (): THREE.Box3Helper => {
   const helper = new THREE.Box3Helper(new THREE.Box3(), new THREE.Color("#ffb020"))
   helper.raycast = () => {}
   helper.userData["selectionHelper"] = true
-  const material = helper.material as THREE.LineBasicMaterial
-  material.toneMapped = false
+  for (const material of [helper.material].flat()) material.toneMapped = false
   return helper
 }
 

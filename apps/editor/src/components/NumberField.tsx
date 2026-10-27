@@ -1,6 +1,6 @@
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import { useEffect, useId, useState } from "react"
+import { useId, useRef, useState } from "react"
 
 /** Numeric input that commits on Enter or blur and reverts on Escape or invalid input. */
 export function NumberField(props: {
@@ -12,12 +12,16 @@ export function NumberField(props: {
   const id = useId()
   const digits = props.digits ?? 3
   const format = (n: number) => String(Math.round(n * 10 ** digits) / 10 ** digits)
-  const [text, setText] = useState(format(props.value))
-  useEffect(() => setText(format(props.value)), [props.value])
+  // Text being typed; otherwise the field shows the current value.
+  const [draft, setDraft] = useState<string | null>(null)
+  const cancelling = useRef(false)
+  const text = draft ?? format(props.value)
   const commit = () => {
-    const n = Number(text)
-    if (text.trim() === "" || !Number.isFinite(n)) setText(format(props.value))
-    else if (n !== props.value) props.onCommit(n)
+    const n = Number(draft)
+    const valid = draft !== null && draft.trim() !== "" && Number.isFinite(n)
+    if (valid && !cancelling.current && n !== props.value) props.onCommit(n)
+    cancelling.current = false
+    setDraft(null)
   }
   return (
     <div className="flex min-w-0 flex-col gap-1">
@@ -27,12 +31,12 @@ export function NumberField(props: {
         inputMode="decimal"
         className="font-mono"
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur()
           if (e.key === "Escape") {
-            setText(format(props.value))
+            cancelling.current = true
             e.currentTarget.blur()
           }
         }}

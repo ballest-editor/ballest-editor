@@ -131,7 +131,7 @@ const playerStartTransform = (translation: Vec3 = { x: 0, y: 0, z: 0 }): ItemTra
 })
 
 export const playerStartItem = (piece?: CatalogPiece): Item =>
-  piece !== undefined && piece.classPath === PLAYER_START_CLASS
+  piece?.classPath === PLAYER_START_CLASS
     ? itemFromPiece(piece, playerStartTransform())
     : {
       actorToSpawn: PLAYER_START_CLASS,

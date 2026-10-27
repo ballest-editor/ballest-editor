@@ -30,7 +30,7 @@ const useBlurButtonsAfterClick = () =>
   useEffect(() => {
     const onPointerUp = (e: PointerEvent) => {
       const button = e.target instanceof Element ? e.target.closest("button") : null
-      if (button !== null && button.closest("[role=dialog]") === null) requestAnimationFrame(() => button.blur())
+      if (button?.closest("[role=dialog]") === null) requestAnimationFrame(() => button.blur())
     }
     document.addEventListener("pointerup", onPointerUp)
     return () => document.removeEventListener("pointerup", onPointerUp)

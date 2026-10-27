@@ -7,14 +7,16 @@
     "build": "turbo build",
     "test": "turbo test",
     "typecheck": "turbo typecheck",
-    "lint": "turbo lint",
+    "lint": "oxlint --type-aware --deny-warnings --disable-nested-config",
     "knip": "knip"
   },
   "devDependencies": {
     "@effect/tsgo": "0.61.0",
     "knip": "6.43.0",
+    "oxlint": "1.89.0",
+    "oxlint-tsgolint": "7.0.2005",
     "turbo": "^2.11.10",
-    "typescript": "^6.0.2"
+    "typescript": "7.0.2"
   },
   "packageManager": "pnpm@12.9.0",
   "engines": {

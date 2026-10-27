@@ -35,7 +35,10 @@ export const removeItems = (map: MapFile, indices: ReadonlyArray<number>): MapFi
       ...map.editorState,
       pivots: map.editorState.pivots
         .filter((p) => !removed.has(p.itemIndex))
-        .map((p) => (sorted[0]! < p.itemIndex ? { ...p, itemIndex: shift(p.itemIndex) } : p))
+        .map((p) => {
+          const itemIndex = shift(p.itemIndex)
+          return itemIndex === p.itemIndex ? p : { ...p, itemIndex }
+        })
     }
   }
 }

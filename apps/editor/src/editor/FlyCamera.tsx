@@ -37,7 +37,6 @@ export function FlyCamera() {
   const cameraSettings = useEditor((s) => s.settings.camera)
   const cameraPresets = useEditor((s) => s.keybindDefaults.cameraPresets)
   const focusRequest = useEditor((s) => s.focusRequest)
-  const frameAllRequest = useEditor((s) => s.frameAllRequest)
 
   const pressed = useRef(new HeldKeys())
   const drag = useRef<DragMode | null>(null)
@@ -129,8 +128,8 @@ export function FlyCamera() {
       e.preventDefault()
       const chord = wheelChordOf(e)
       const state = useEditor.getState()
-      if (isBound(keybinds, "speedFaster", chord)) return state.changeSpeed(1)
-      if (isBound(keybinds, "speedSlower", chord)) return state.changeSpeed(-1)
+      if (isBound(keybinds, "speedFaster", chord)) {  state.changeSpeed(1); return; }
+      if (isBound(keybinds, "speedSlower", chord)) {  state.changeSpeed(-1); return; }
       const forward = camera.getWorldDirection(new THREE.Vector3())
       const step = -Math.sign(e.deltaY) * Math.max(50, camera.position.distanceTo(target.current) * 0.1)
       camera.position.addScaledVector(forward, step)
@@ -159,9 +158,9 @@ export function FlyCamera() {
   // Field of view: constant vertical FOV (see editorVerticalFov), independent of viewport size.
   useEffect(() => {
     if (!(camera instanceof THREE.PerspectiveCamera)) return
-    camera.fov = editorVerticalFov(useEditor.getState().settings, cameraPresets)
+    camera.fov = editorVerticalFov(cameraSettings, cameraPresets)
     camera.updateProjectionMatrix()
-  }, [camera, cameraSettings.fovPreset, cameraSettings.customFov, cameraPresets])
+  }, [camera, cameraSettings, cameraPresets])
 
   // Focus selection
   useEffect(() => {
@@ -175,8 +174,9 @@ export function FlyCamera() {
     camera.position.copy(sphere.center).addScaledVector(forward, -Math.max(sphere.radius * 2.5, 300))
   }, [focusRequest, camera])
 
-  // Frame the whole map (on load). Uses item translations so it works before meshes load.
+  // Frame the whole map on load and on request. Uses item translations so it works before meshes load.
   useEffect(() => {
+    const frameAll = () => {
     const { items } = useEditor.getState().doc.map
     const box = new THREE.Box3()
     for (const item of items) {
@@ -189,7 +189,12 @@ export function FlyCamera() {
     target.current.copy(sphere.center)
     camera.position.copy(sphere.center).add(new THREE.Vector3(-1, 0.8, 1).normalize().multiplyScalar(radius * 1.6))
     camera.lookAt(sphere.center)
-  }, [frameAllRequest, camera])
+    }
+    frameAll()
+    return useEditor.subscribe((s, prev) => {
+      if (s.frameAllRequest !== prev.frameAllRequest) frameAll()
+    })
+  }, [camera])
 
   useFrame((_, delta) => {
     const keys = pressed.current

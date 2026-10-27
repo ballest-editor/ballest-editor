@@ -6,6 +6,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { UE_TO_THREE_MATRIX } from "../domain/coords"
 import { repoRoot } from "../test/samples"
 import { fixWinding, normalAgreement } from "./winding"
+import { isMesh } from "./threeGuards"
 
 const loadGlb = async (rel: string) => {
   const buf = fs.readFileSync(path.join(repoRoot, "assets/pieces", rel))
@@ -14,7 +15,7 @@ const loadGlb = async (rel: string) => {
 const meshesOf = (root: THREE.Object3D) => {
   const out: Array<THREE.Mesh> = []
   root.traverse((o) => {
-    if (o instanceof THREE.Mesh) out.push(o)
+    if (isMesh(o)) out.push(o)
   })
   return out
 }
@@ -54,7 +55,7 @@ describe("glb winding", () => {
       fixWinding(mesh.geometry)
       expect(mesh.matrixWorld.determinant()).toBeLessThan(0) // three will use CW front faces...
       expect(frontFacesPointOutward(mesh)).toBe(true) // ...which now are the outward ones
-      expect((mesh.material as THREE.Material).side).toBe(THREE.FrontSide)
+      expect([mesh.material].flat().map((m) => m.side)).toEqual([THREE.FrontSide])
     }
   })
 })

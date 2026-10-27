@@ -3,7 +3,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Separator } from "@workspace/ui/components/separator"
-import { type ReactNode, useEffect, useState } from "react"
+import { type ReactNode, useState } from "react"
 import { classNameOf, isPlayerStart, objectPathOf } from "../domain/MapFile"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { selectedIndex, useEditor } from "../editor/store"
@@ -19,10 +19,12 @@ function MapSettings() {
   const hasEditorState = useEditor((s) => s.doc.map.editorState !== undefined)
   const sourceName = useEditor((s) => s.sourceName)
   const renameLevel = useEditor((s) => s.renameLevel)
-  const [name, setName] = useState(levelData.levelDisplayName)
-  useEffect(() => setName(levelData.levelDisplayName), [levelData.levelDisplayName])
+  // An edit in progress; otherwise the input shows the map's name.
+  const [draft, setDraft] = useState<string | null>(null)
+  const name = draft ?? levelData.levelDisplayName
   const commit = () => {
     if (name !== levelData.levelDisplayName) renameLevel(name, levelData.creatorName)
+    setDraft(null)
   }
   const facts: ReadonlyArray<readonly [string, string]> = [
     ["Creator", levelData.creatorName || "set in Settings › General"],
@@ -36,7 +38,7 @@ function MapSettings() {
       <SectionTitle>Map</SectionTitle>
       <div className="flex flex-col gap-1">
         <Label htmlFor="map-name" className="text-muted-foreground">Name</Label>
-        <Input id="map-name" value={name} onChange={(e) => setName(e.target.value)} onBlur={commit} />
+        <Input id="map-name" value={name} onChange={(e) => setDraft(e.target.value)} onBlur={commit} />
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
         {facts.map(([k, v]) => (
@@ -69,7 +71,7 @@ export function Inspector() {
   }
 
   // While the gizmo drags, show the live transform (committed on release).
-  const t = preview !== null && preview.id === selectedId ? preview.transform : item.itemTransform
+  const t = preview?.id === selectedId ? preview.transform : item.itemTransform
   // Display units only; the map always stores centimetres.
   const perUnit = units === "m" ? 100 : 1
   const setAxis = (axis: "x" | "y" | "z") => (value: number) => moveItem(selectedId, { ...t.translation, [axis]: value * perUnit })
@@ -106,6 +108,7 @@ export function Inspector() {
         <Separator />
         <SectionTitle>Meshes</SectionTitle>
         {item.meshComponents.map((mesh, i) => (
+          // oxlint-disable-next-line react/no-array-index-key -- mesh components have no id; the slot index is their identity
           <div key={i} className="flex flex-col gap-1 text-xs break-all">
             <div className="font-mono" title={mesh.meshAssetPath}>
               {mesh.meshAssetPath === undefined || mesh.meshAssetPath === "" ? "(no main mesh)" : mesh.meshAssetPath.split("/").at(-1)}

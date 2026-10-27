@@ -2,7 +2,7 @@ import { Button } from "@workspace/ui/components/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { riskyClassesIn } from "../domain/Catalog"
 import { classNameOf } from "../domain/MapFile"
 import { isValidName, mapFileNameOf, NAME_RULE } from "../domain/factory"
@@ -27,9 +27,12 @@ export function ExportDialog({ open, onClose }: { readonly open: boolean; readon
   const creator = settings.general.creatorName.trim()
   const [name, setName] = useState(displayName)
   const [creatorDraft, setCreatorDraft] = useState("")
-  useEffect(() => {
+  // Each time the dialog opens, start from the map's current name.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
     if (open) setName(displayName)
-  }, [open, displayName])
+  }
 
   const effectiveCreator = creator || creatorDraft.trim()
   const nameOk = isValidName(name)
