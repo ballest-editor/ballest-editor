@@ -20,7 +20,7 @@ import { GizmoController } from "./gizmo/GizmoController"
 import { ItemObject } from "./ItemObject"
 import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { sceneRegistry } from "./sceneRegistry"
-import { makeSelectionHelper, updateSelectionHelper } from "./selectionBounds"
+import { SelectionOutline } from "./selectionOutline"
 import { nextSelection, type SelectMode, useEditor } from "./store"
 import { glbUrl, visualsOf } from "./visuals"
 
@@ -242,25 +242,25 @@ function ViewportGrid() {
   )
 }
 
-/** Oriented selection box: local bounds parented to a selected item (see selectionBounds.ts). */
-function SelectionBox({ id }: { readonly id: string }) {
-  const helper = useMemo(() => makeSelectionHelper(), [])
+/** Outline along a selected item's mesh edges (see selectionOutline.ts). */
+function SelectedOutline({ id }: { readonly id: string }) {
+  const outline = useMemo(() => new SelectionOutline(), [])
   useFrame(() => {
     const object = sceneRegistry.objects.get(id)
     if (object === undefined) {
-      helper.removeFromParent()
+      outline.removeFromParent()
       return
     }
-    if (helper.parent !== object) object.add(helper)
-    updateSelectionHelper(helper, object) // glbs load async, so keep it fresh
+    if (outline.parent !== object) object.add(outline)
+    outline.update(object) // glbs load async, so keep it fresh
   })
-  useEffect(() => () => void helper.removeFromParent(), [helper])
+  useEffect(() => () => void outline.removeFromParent(), [outline])
   return null
 }
 
-function SelectionBoxes() {
+function SelectedOutlines() {
   const selectedIds = useEditor((s) => s.selectedIds)
-  return selectedIds.map((id) => <SelectionBox key={id} id={id} />)
+  return selectedIds.map((id) => <SelectedOutline key={id} id={id} />)
 }
 
 function Overlay() {
@@ -306,7 +306,7 @@ export function Viewport(
         <directionalLight position={[3000, 8000, 2000]} intensity={1.6} />
         <ViewportGrid />
         <MapItems />
-        <SelectionBoxes />
+        <SelectedOutlines />
         <GizmoController />
         <ClickSelect />
         <FlyCamera />
