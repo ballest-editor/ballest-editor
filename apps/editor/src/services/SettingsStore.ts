@@ -37,9 +37,9 @@ export class SettingsStore extends Context.Service<SettingsStore, {
       )
 
       const save = Effect.fn("SettingsStore.save")(function*(settings: Settings) {
-        const text = yield* encode(settings).pipe(Effect.mapError(toError))
-        yield* kv.set(SETTINGS_STORAGE_KEY, text).pipe(Effect.mapError(toError))
-      })
+        const text = yield* encode(settings)
+        yield* kv.set(SETTINGS_STORAGE_KEY, text)
+      }, Effect.mapError(toError))
 
       const reset = kv.remove(SETTINGS_STORAGE_KEY).pipe(Effect.mapError(toError), Effect.as(defaultSettings))
 

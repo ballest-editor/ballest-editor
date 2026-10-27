@@ -31,7 +31,7 @@ describe("MapExporter", () => {
       assert.isTrue(result.text.startsWith("{\r\n\t\"worldSettings\":\r\n\t{\r\n"))
       assert.strictEqual(result.blob.size, new TextEncoder().encode(result.text).length)
       // the output decodes again and keeps exactly one player start
-      const decoded = Schema.decodeUnknownSync(MapFile)(json)
+      const decoded = yield* Schema.decodeUnknownEffect(MapFile)(json)
       assert.strictEqual(decoded.items.filter(isPlayerStart).length, 1)
       assert.isDefined(decoded.editorState)
     }).pipe(Effect.provide(TestLayer)))

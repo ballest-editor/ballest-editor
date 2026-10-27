@@ -2,7 +2,6 @@ import { IconCamera, IconKeyboard, IconPalette, IconPlus, IconRestore, IconSearc
 import { Button } from "@workspace/ui/components/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
-import { Kbd } from "@workspace/ui/components/kbd"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Slider } from "@workspace/ui/components/slider"

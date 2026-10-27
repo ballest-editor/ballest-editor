@@ -36,7 +36,7 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
   it("builds a schema-valid item from every piece", () => {
     for (const piece of load().pieces) {
       const item = itemFromPiece(piece, placementTransform(piece, { x: 0, y: 0, z: 0 }))
-      Schema.decodeUnknownSync(Item)(item)
+      Schema.decodeSync(Item)(item)
     }
   })
 

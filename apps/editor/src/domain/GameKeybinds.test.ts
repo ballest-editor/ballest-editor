@@ -25,7 +25,7 @@ describe("GameKeybinds", () => {
   })
 
   it("maps a free-cam context onto editor actions and reports the rest as fallbacks", () => {
-    const file = Schema.decodeUnknownSync(GameKeybindsFile)({
+    const file = Schema.decodeSync(GameKeybindsFile)({
       contexts: [
         { name: "IMC_LevelEditor", mappings: [] },
         {
@@ -71,12 +71,12 @@ describe("GameKeybinds", () => {
   })
 
   it("takes labels and sections from the file when present", () => {
-    const file = Schema.decodeUnknownSync(GameKeybindsFile)({
+    const file = Schema.decodeSync(GameKeybindsFile)({
       contexts: [{ name: "IMC_FreeCam", mappings: [{ ...m("IA_Height", "SpaceBar"), label: "up", section: "mouse and keyboard free camera" }] }]
     })
     assert.deepStrictEqual(deriveKeybinds(file).naming.get("moveUp"), { label: "up", section: "mouse and keyboard free camera" })
     // arrow-key look in the racing context names our look actions (direction from modifiers)
-    const look = Schema.decodeUnknownSync(GameKeybindsFile)({
+    const look = Schema.decodeSync(GameKeybindsFile)({
       contexts: [{
         name: "IMC_Default",
         mappings: [
