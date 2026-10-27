@@ -117,9 +117,13 @@ describe("gizmo drags (game space)", () => {
     pointer: { ...pointer(v3(0, 0, 0)), px }
   })
 
-  /** The drag applied to the start's item. */
-  const dragTransform = (s: TestDrag, now: PointerSample) => {
-    const delta = dragDelta(s, now)
+  /** The drag applied to the start's item (snapped to `gridSize` cm when given). */
+  const dragTransform = (s: TestDrag, now: PointerSample, gridSize?: number) => {
+    const delta = dragDelta(
+      s,
+      now,
+      gridSize === undefined ? undefined : { size: gridSize, pivot: s.transform.translation }
+    )
     return delta === undefined ? undefined : applyGroupDelta(s.transform, s.transform.translation, delta)
   }
 
@@ -143,6 +147,20 @@ describe("gizmo drags (game space)", () => {
     expect(out.translation.x).toBeCloseTo(120, 9)
     expect(out.translation.y).toBeCloseTo(-40, 9)
     expect(out.translation.z).toBeCloseTo(0, 9)
+  })
+
+  it("snaps the moved axes to the world grid and leaves the others alone", () => {
+    const off = { ...identity, translation: { x: 3, y: 7, z: 11 } }
+    const axis = dragTransform(start("t-x", off), pointer(v3(243, 0, 0)), 25)!
+    expect(axis.translation).toEqual({ x: 250, y: 7, z: 11 })
+    const target = ueToScene({ ...identity, translation: { x: 123, y: -38, z: 0 } }).position
+    const plane = dragTransform(start("tp-z", off), pointer(v3(...target)), 10)!
+    expect(plane.translation).toEqual({ x: 130, y: -30, z: 11 })
+    // rotation drags ignore the grid
+    const s = { ...start("r-z", off), toCamera: v3(0, 1, 0) }
+    expect(dragTransform(s, { ...pointer(v3(0, 0, 0)), px: { x: 0, y: -10 } }, 100)!.translation).toEqual(
+      off.translation
+    )
   })
 
   it("rotates about game Z: a quarter turn counter-clockwise seen from above is -90 deg game yaw", () => {
@@ -184,6 +202,20 @@ describe("gizmo drags (game space)", () => {
       const world = dragTransform(start("t-x", yaw90, undefined, "world"), pointer(v3(250, 0, 0)))!
       expect(world.translation.x).toBeCloseTo(250, 6)
       expect(world.translation.y).toBeCloseTo(0, 6)
+    })
+
+    it("snaps local-space moves to whole grid steps along the item's own axes", () => {
+      // 30 deg yaw: local X is off every world axis, so only the distance can be snapped
+      const yaw30 = {
+        ...identity,
+        translation: { x: 3, y: 7, z: 11 },
+        rotation: { x: 0, y: 0, z: Math.sin(Math.PI / 12), w: Math.cos(Math.PI / 12) }
+      }
+      const localX = gameDirToWorld({ x: Math.cos(Math.PI / 6), y: Math.sin(Math.PI / 6), z: 0 })
+      const out = dragTransform(start("t-x", yaw30, undefined, "local"), pointer(localX.multiplyScalar(137)), 50)!
+      expect(out.translation.x).toBeCloseTo(3 + 150 * Math.cos(Math.PI / 6), 6)
+      expect(out.translation.y).toBeCloseTo(7 + 150 * Math.sin(Math.PI / 6), 6)
+      expect(out.translation.z).toBeCloseTo(11, 9)
     })
 
     it("rotates about the item's own axes in local space", () => {
