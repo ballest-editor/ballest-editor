@@ -7,6 +7,7 @@ allowBuilds:
   lightningcss: true
   unrs-resolver: true
   msw: false
+  dprint: false
 
 minimumReleaseAgeExclude:
   - "@effect/tsgo-darwin-arm64@0.61.0"
