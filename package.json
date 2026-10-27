@@ -8,9 +8,10 @@
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "lint": "oxlint --type-aware --deny-warnings --disable-nested-config",
-    "knip": "knip",
+    "knip": "knip --treat-config-hints-as-errors",
     "format": "dprint fmt",
-    "format:check": "dprint check"
+    "format:check": "dprint check",
+    "check:everything": "pnpm format:check && pnpm lint && pnpm knip && turbo typecheck test build"
   },
   "devDependencies": {
     "@effect/tsgo": "0.61.0",
