@@ -58,6 +58,9 @@
         "!**/dist/**"
       ]
     },
+    "//#dupes": {
+      "inputs": [".jscpd.json", "apps/editor/src/**", "packages/ui/src/**", "tools/extract/**"]
+    },
     "//#format:check": {
       "inputs": [
         "dprint.json",

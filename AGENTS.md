@@ -11,8 +11,8 @@ A standalone map editor for _Ballest of Them All_ (Steam 3339810, UE 5.8). Read 
 
 ## Layout
 
-- Turborepo + pnpm workspace. Run `pnpm dev|test|typecheck|build|lint|knip|format` from the root; `pnpm check:everything` runs format check, lint, knip, typecheck, tests and build, and must pass before committing.
-- Typecheck is `effect-tsgo tsc` (TypeScript 7 + Effect diagnostics; config in `tsconfig.base.json`). Lint is type-aware oxlint (`.oxlintrc.json`). Formatting is dprint (`dprint.json`, Effect's style). Don't run `effect-tsgo patch`: pnpm hard-links node_modules to the global store.
+- Turborepo + pnpm workspace. Run `pnpm dev|test|typecheck|build|lint|knip|dupes|format` from the root; `pnpm check:everything` runs format check, lint, knip, duplicate detection, typecheck, tests and build (in parallel, cached by turbo), and must pass before committing.
+- Typecheck is `effect-tsgo tsc` (TypeScript 7 + Effect diagnostics; config in `tsconfig.base.json`). Lint is type-aware oxlint (`.oxlintrc.json`). Formatting is dprint (`dprint.json`, Effect's style). Duplicate code is jscpd (`.jscpd.json`: exact token clones plus structurally similar functions; shadcn components excluded). Don't run `effect-tsgo patch`: pnpm hard-links node_modules to the global store.
 - `apps/editor/` — TanStack Start (React) + Three.js editor. Effect for all non-trivial logic (services, schema, errors).
 - `packages/ui/` — shadcn/ui (`@workspace/ui`, preset `b6nCVm82TK`). All UI chrome comes from here.
 - `tools/extract/` — pak → glTF/catalog/keybinds pipeline, run via the Nix flake (`nix run .#extract`).
