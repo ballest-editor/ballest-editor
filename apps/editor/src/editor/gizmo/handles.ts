@@ -1,3 +1,4 @@
+import { AXIS_COLORS } from "../axisColors"
 /**
  * Blender-style gizmo handles as plain three.js objects (testable without WebGL).
  *
@@ -37,8 +38,6 @@ export const toolHandles: Readonly<Record<GizmoTool, ReadonlyArray<HandleSpec>>>
   scale: [...axisSpecs("scaleAxis", "s"), { id: "s-uniform", kind: "scaleUniform" }]
 }
 
-/** Blender's theme colours: X red, Y green, Z blue (Z is up in the game). */
-export const AXIS_COLORS: Readonly<Record<Axis, string>> = { x: "#ff3653", y: "#8adb00", z: "#2c8fff" }
 const VIEW_COLOR = "#ffffff"
 const HOVER_TINT = new THREE.Color("#fff3c4")
 const RENDER_ORDER = 1000

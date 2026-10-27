@@ -14,22 +14,18 @@ import { Label } from "@workspace/ui/components/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Separator } from "@workspace/ui/components/separator"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { type ReactNode, useState } from "react"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { classNameOf, isPlayerStart, objectPathOf } from "../domain/MapFile"
 import { quatToRotator, rotatorToQuat } from "../domain/ueMath"
+import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import { selectedIndex, useEditor } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { NumberField } from "./NumberField"
 
 type Axis = "x" | "y" | "z"
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
-/** Game-axis colours, matching the gizmo (X red, Y green, Z blue). */
-const axisClass: Record<Axis, string> = {
-  x: "bg-red-500",
-  y: "bg-green-500",
-  z: "bg-blue-500"
-}
 
 /** One X/Y/Z row of the transform, in display values (units, degrees). */
 interface TransformRowSpec {
@@ -112,26 +108,37 @@ function TransformRow(props: {
           setOpen(next)
         }}
       >
-        <PopoverTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={props.title}
-              title={`${props.title}\nShift+right-click: copy · Shift+click: paste`}
-              onClick={(e) => {
-                if (e.shiftKey) paste()
-              }}
-              onContextMenu={(e) => {
-                if (!e.shiftKey) return
-                e.preventDefault()
-                copy()
-              }}
-            />
-          }
-        >
-          <row.icon />
-        </PopoverTrigger>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <PopoverTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={props.title}
+                    onClick={(e) => {
+                      if (e.shiftKey) paste()
+                    }}
+                    onContextMenu={(e) => {
+                      if (!e.shiftKey) return
+                      e.preventDefault()
+                      copy()
+                    }}
+                  />
+                }
+              />
+            }
+          >
+            <row.icon />
+          </TooltipTrigger>
+          <TooltipContent side="left" className="flex flex-col items-start gap-1">
+            <span>{props.title}</span>
+            <span className="flex items-center gap-1.5">
+              Copy <Kbd>⇧ Right-click</Kbd> · Paste <Kbd>⇧ Click</Kbd>
+            </span>
+          </TooltipContent>
+        </Tooltip>
         <PopoverContent side="left" align="start" className="w-auto gap-1 p-1">
           <div className="px-2 py-1 text-xs text-muted-foreground">{props.title}</div>
           <Button
@@ -174,7 +181,7 @@ function TransformRow(props: {
           onScrub={(n) => props.onPreview(n === null ? null : withAxis(axis, n))}
           step={props.step}
           digits={props.digits}
-          handleClassName={axisClass[axis]}
+          handleClassName={AXIS_BG_CLASSES[axis]}
         />
       ))}
     </div>

@@ -1,5 +1,7 @@
 import { Input } from "@workspace/ui/components/input"
+import { Kbd } from "@workspace/ui/components/kbd"
 import { Label } from "@workspace/ui/components/label"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { type MouseEvent, type PointerEvent, useEffect, useId, useRef, useState } from "react"
 
 /** Pixels the pointer must travel before a press on the label becomes a scrub (else it's a click). */
@@ -134,16 +136,29 @@ export function NumberField(props: {
   const scrubbable = props.onScrub !== undefined
   return (
     <div className="flex min-w-0">
-      <Label
-        htmlFor={id}
-        className={`w-2 shrink-0 rounded-l-md ${props.handleClassName ?? "bg-muted"} ${
-          scrubbable ? "cursor-ew-resize opacity-80 hover:opacity-100" : ""
-        }`}
-        title={scrubbable ? `${props.label}: drag to scrub (Shift: finer, Esc: cancel)` : props.label}
-        {...scrubHandlers}
-      >
-        <span className="sr-only">{props.label}</span>
-      </Label>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Label
+              htmlFor={id}
+              className={`w-2 shrink-0 rounded-l-md ${props.handleClassName ?? "bg-muted"} ${
+                scrubbable ? "cursor-ew-resize opacity-80 hover:opacity-100" : ""
+              }`}
+              {...scrubHandlers}
+            />
+          }
+        >
+          <span className="sr-only">{props.label}</span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="flex items-center gap-1.5">
+          {props.label}
+          {scrubbable && (
+            <>
+              · drag to scrub <Kbd>Shift</Kbd> finer <Kbd>Esc</Kbd> cancel
+            </>
+          )}
+        </TooltipContent>
+      </Tooltip>
       <Input
         id={id}
         inputMode="decimal"

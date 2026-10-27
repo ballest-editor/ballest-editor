@@ -3,10 +3,11 @@ import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import { ueToScene, type UeTransform } from "../../domain/coords"
 import { chordOf } from "../../domain/Keybinds"
+import { AXIS_COLORS } from "../axisColors"
 import { sceneRegistry } from "../sceneRegistry"
 import { selectedIndex, useEditor } from "../store"
 import { dragAxisWorld, type DragStart, dragTransform, type PointerSample } from "./drag"
-import { AXIS_COLORS, GizmoObject, toolHandles } from "./handles"
+import { GizmoObject, toolHandles } from "./handles"
 import { worldPerPixel } from "./math"
 
 interface ActiveDrag {
