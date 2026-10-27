@@ -142,7 +142,7 @@ export function NumberField(props: {
             <Label
               htmlFor={id}
               className={`w-2 shrink-0 rounded-l-md ${props.handleClassName ?? "bg-muted"} ${
-                scrubbable ? "cursor-ew-resize opacity-80 hover:opacity-100" : ""
+                scrubbable ? "cursor-ew-resize hover:brightness-125" : ""
               }`}
               {...scrubHandlers}
             />
