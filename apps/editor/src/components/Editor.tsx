@@ -15,8 +15,8 @@ import { NewMapDialog } from "./NewMapDialog"
 import { Palette } from "./Palette"
 import { SettingsDialog } from "./SettingsDialog"
 import { SidePanel } from "./SidePanel"
-import { ToolBar } from "./ToolBar"
 import { TopBar } from "./TopBar"
+import { ViewportControls } from "./ViewControls"
 
 if (import.meta.env.DEV) {
   // Dev-only handle for poking at the scene from the console / browser automation.
@@ -84,7 +84,7 @@ export function Editor() {
             <Palette />
           </SidePanel>
           <div className="min-w-0 flex-1">
-            <Viewport toolbar={ToolBar} />
+            <Viewport controls={ViewportControls} />
           </div>
           <SidePanel id="inspector" side="right" defaultWidth={300} minWidth={220} maxWidth={640}>
             <Inspector />

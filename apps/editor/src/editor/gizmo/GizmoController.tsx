@@ -77,6 +77,7 @@ export function GizmoController() {
         origin,
         worldPerPixel: worldPerPixel(camera, origin, height),
         gameRotation: transform.rotation,
+        space: useEditor.getState().gizmoSpace,
         cameraQuaternion: camera.quaternion
       },
       hovered.current,
@@ -131,6 +132,7 @@ export function GizmoController() {
       const rect = el.getBoundingClientRect()
       const start: DragStart = {
         spec,
+        space: useEditor.getState().gizmoSpace,
         transform,
         originWorld,
         originPx: { x: ((projected.x + 1) / 2) * rect.width, y: ((1 - projected.y) / 2) * rect.height },

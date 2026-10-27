@@ -8,8 +8,8 @@ import { Input } from "@workspace/ui/components/input"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { sceneBackgroundClass } from "../editor/sceneColors"
 import { panelWidthVar } from "./SidePanel"
-import { ToolBar } from "./ToolBar"
 import { TopBar } from "./TopBar"
+import { ViewportControls } from "./ViewControls"
 
 /** Varied label widths so the placeholder list doesn't look like a barcode. */
 const LABEL_WIDTHS = ["45%", "38%", "52%", "41%", "60%", "35%", "48%", "56%", "43%", "50%"]
@@ -64,7 +64,7 @@ export function EditorSkeleton() {
         </div>
         <div className="w-px shrink-0 bg-border" />
         <div className={`relative min-w-0 flex-1 ${sceneBackgroundClass}`}>
-          <ToolBar disabled />
+          <ViewportControls disabled />
         </div>
         <div className="w-px shrink-0 bg-border" />
         <div

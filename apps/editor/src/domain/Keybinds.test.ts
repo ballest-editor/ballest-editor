@@ -34,6 +34,7 @@ describe("keybind table", () => {
       ["translate", ["KeyW"]],
       ["rotate", ["KeyE"]],
       ["scale", ["KeyR"]],
+      ["local / world axes", ["KeyX"]], // editor only
       ["focus selection", ["KeyF", "KeyC"]],
       ["delete", ["Backspace", "Delete"]],
       ["undo", ["Ctrl+KeyZ"]],

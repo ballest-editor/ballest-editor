@@ -5,7 +5,7 @@
  */
 import type * as THREE from "three"
 import type { UeTransform } from "../../domain/coords"
-import { type HandleSpec, handleWorldDir } from "./handles"
+import { type GizmoSpace, type HandleSpec, handleWorldDir, scaleTargetAxis } from "./handles"
 import {
   axisParamFromRay,
   planeHit,
@@ -27,6 +27,7 @@ export interface PointerSample {
 
 export interface DragStart {
   readonly spec: HandleSpec
+  readonly space: GizmoSpace
   readonly transform: UeTransform
   /** Selection origin in world space, and on screen. */
   readonly originWorld: THREE.Vector3
@@ -40,7 +41,9 @@ const MIN_SCALE = 1e-3
 
 /** The world-space line/plane/rotation axis the drag acts on (for the guide line). */
 export const dragAxisWorld = (start: DragStart): THREE.Vector3 | undefined =>
-  start.spec.kind === "rotateView" ? start.toCamera.clone() : handleWorldDir(start.spec, start.transform.rotation)
+  start.spec.kind === "rotateView"
+    ? start.toCamera.clone()
+    : handleWorldDir(start.spec, start.transform.rotation, start.space)
 
 export const dragTransform = (start: DragStart, now: PointerSample): UeTransform | undefined => {
   const { spec, transform: t, originWorld: o } = start
@@ -80,7 +83,7 @@ export const dragTransform = (start: DragStart, now: PointerSample): UeTransform
       return { ...t, rotation: quatNormalize(quatMul(delta, t.rotation)) }
     }
     case "scaleAxis": {
-      const axis = spec.axis
+      const axis = spec.axis === undefined ? undefined : scaleTargetAxis(spec.axis, t.rotation, start.space)
       const t0 = axisParamFromRay(o, dir, start.pointer.rayOrigin, start.pointer.rayDir)
       const t1 = axisParamFromRay(o, dir, now.rayOrigin, now.rayDir)
       if (axis === undefined || t0 === undefined || t1 === undefined || Math.abs(t0) < 1e-6) return undefined

@@ -27,6 +27,8 @@ const oneShot = (action: KeybindAction): (() => void) | undefined => {
       return () => s.setTool("rotate")
     case "scaleMode":
       return () => s.setTool("scale")
+    case "toggleGizmoSpace":
+      return s.toggleGizmoSpace
     case "speedFaster":
       return () => s.changeSpeed(1)
     case "speedSlower":
