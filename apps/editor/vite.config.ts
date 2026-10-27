@@ -69,6 +69,10 @@ export default defineConfig({
   server: { port: 3000 },
   preview: { port: 3000 },
   resolve: { tsconfigPaths: true },
+  // Bundle every server dependency. Otherwise the SSR build inlines CJS deps it treats as framework packages
+  // (e.g. base-ui's use-sync-external-store shim) but leaves their `require("react")` to runtime, and the
+  // Vercel function ships no node_modules to satisfy it.
+  ssr: { noExternal: true },
   plugins: [
     repoAssets(path.resolve(import.meta.dirname, "../../assets")),
     tailwindcss(),
