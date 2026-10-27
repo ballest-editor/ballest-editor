@@ -7,11 +7,11 @@ import { toast } from "sonner"
 import { create } from "zustand"
 import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
-import { addItem, removeItems, setLevelNames, setTransform, setTranslation, validateItem } from "../domain/edits"
+import { addItem, duplicateItems, removeItems, setLevelNames, setTransforms, validateItem } from "../domain/edits"
 import { itemFromPiece, newMapFile } from "../domain/factory"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
 import type { Keybinds } from "../domain/Keybinds"
-import type { ItemTransform, MapFile } from "../domain/MapFile"
+import { isPlayerStart, type ItemTransform, type MapFile } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import type { LoadedCatalog } from "../services/CatalogLoader"
@@ -23,15 +23,24 @@ export interface Doc {
 }
 
 /**
+ * The selected item ids: a set kept in selection order, without duplicates. The last one
+ * is the active item (the gizmo's local axes follow it).
+ */
+export type Selection = ReadonlyArray<string>
+
+/** How a click changes the selection: plain click, add-to-selection, or toggle. */
+export type SelectMode = "replace" | "add" | "toggle"
+
+/**
  * One undo/redo step, seen from the side it restores: the document and the selection that
  * went with it, plus the selection on the other side of the step. Undoing a delete selects
- * the restored item; redoing it leaves what the delete left. A `selectionOnly` step (the
+ * the restored items; redoing it leaves what the delete left. A `selectionOnly` step (the
  * "Undo selection changes" setting) restores just the selection and leaves the doc alone.
  */
 export interface Snapshot {
   readonly doc: Doc
-  readonly selectedId: string | null
-  readonly otherSelectedId: string | null
+  readonly selectedIds: Selection
+  readonly otherSelectedIds: Selection
   readonly selectionOnly: boolean
 }
 
@@ -57,7 +66,7 @@ export interface EditorState {
   readonly future: ReadonlyArray<Snapshot>
   readonly dirty: boolean
   readonly sourceName: string | null
-  readonly selectedId: string | null
+  readonly selectedIds: Selection
   readonly tool: Tool
   /** Whether the gizmo follows the selected item's axes or the world's. */
   readonly gizmoSpace: GizmoSpace
@@ -77,11 +86,11 @@ export interface EditorState {
   readonly keybindDefaults: DerivedKeybinds
   readonly missingGlbs: ReadonlySet<string>
   /**
-   * Live transform of the item under a continuous interaction (gizmo drag, number-field
-   * scrub). Not in the document until the interaction commits, as one undo step; undo and
-   * redo wait while it is set.
+   * Live transforms of the items under a continuous interaction (gizmo drag, number-field
+   * scrub), by id. Not in the document until the interaction commits, as one undo step;
+   * undo and redo wait while it is set.
    */
-  readonly preview: { readonly id: string; readonly transform: UeTransform } | null
+  readonly preview: ReadonlyMap<string, UeTransform> | null
   /** Multiplier on the fly speed, changed by speedFaster/speedSlower. */
   readonly cameraSpeed: number
   /** Bumped to ask the camera to frame the selection / the whole map. */
@@ -91,16 +100,20 @@ export interface EditorState {
   readonly loadMap: (map: MapFile, sourceName: string | null) => void
   readonly replaceMapSilently: (map: MapFile) => void
   readonly placePiece: (piece: CatalogPiece, transform: ItemTransform) => void
-  readonly moveItem: (id: string, translation: Vec3) => void
-  /** Replaces the item's transform; false (with a notice) when the game would reject it. */
-  readonly transformItem: (id: string, transform: UeTransform) => boolean
+  /**
+   * Replaces the transforms of several items as one undo step; false (with a notice, and
+   * nothing changed) when the game would reject any of them.
+   */
+  readonly transformItems: (transforms: ReadonlyMap<string, UeTransform>) => boolean
   readonly deleteSelection: () => void
+  /** Copies the selected items in place (one undo step) and selects the copies. */
+  readonly duplicateSelection: () => void
   readonly renameLevel: (displayName: string, creatorName: string) => void
   /** Restores the previous snapshot, including its selection. */
   readonly undo: () => void
   readonly redo: () => void
   /** Changes the selection; its own undo step when settings.general.undoSelection is on. */
-  readonly select: (id: string | null) => void
+  readonly select: (ids: Selection) => void
   readonly setTool: (tool: Tool) => void
   readonly toggleGizmoSpace: () => void
   readonly openDialog: (dialog: Dialog, category?: SettingsCategory) => void
@@ -127,32 +140,32 @@ export const useEditor = create<EditorState>()((set, get) => {
       doc,
       past: [...s.past, {
         doc: s.doc,
-        selectedId: s.selectedId,
-        otherSelectedId: extra.selectedId === undefined ? s.selectedId : extra.selectedId,
+        selectedIds: s.selectedIds,
+        otherSelectedIds: extra.selectedIds ?? s.selectedIds,
         selectionOnly: false
       }].slice(-HISTORY_LIMIT),
       future: [],
       dirty: true
     }))
 
-  /** Swaps in a history snapshot; its selection is restored when that item still exists. */
+  /** Swaps in a history snapshot; its selection is restored for the items that still exist. */
   const restore = (s: EditorState, snapshot: Snapshot) => {
     const doc = snapshot.selectionOnly ? s.doc : snapshot.doc
+    const existing = new Set(doc.ids)
     return {
       doc,
       dirty: snapshot.selectionOnly ? s.dirty : true,
-      selectedId: snapshot.selectedId !== null && doc.ids.includes(snapshot.selectedId) ? snapshot.selectedId : null,
+      selectedIds: snapshot.selectedIds.filter((id) => existing.has(id)),
       // the side being left, for the opposite stack
       current: {
         doc: s.doc,
-        selectedId: snapshot.otherSelectedId,
-        otherSelectedId: snapshot.selectedId,
+        selectedIds: snapshot.otherSelectedIds,
+        otherSelectedIds: snapshot.selectedIds,
         selectionOnly: snapshot.selectionOnly
       }
     }
   }
 
-  const indexOf = (id: string | null) => (id === null ? -1 : get().doc.ids.indexOf(id))
   const fallbackDefaults = deriveKeybinds(undefined)
 
   return {
@@ -161,7 +174,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     future: [],
     dirty: false,
     sourceName: null,
-    selectedId: null,
+    selectedIds: [],
     tool: "translate",
     gizmoSpace: "world",
     dialog: null,
@@ -186,7 +199,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         future: [],
         dirty: false,
         sourceName,
-        selectedId: null,
+        selectedIds: [],
         frameAllRequest: s.frameAllRequest + 1
       })),
 
@@ -200,25 +213,18 @@ export const useEditor = create<EditorState>()((set, get) => {
       }
       const { doc } = get()
       const id = freshId()
-      commit({ map: addItem(doc.map, item.value), ids: [...doc.ids, id] }, { selectedId: id })
+      commit({ map: addItem(doc.map, item.value), ids: [...doc.ids, id] }, { selectedIds: [id] })
     },
 
-    moveItem: (id, translation) => {
+    transformItems: (transforms) => {
       const { doc } = get()
-      const index = indexOf(id)
-      const next = setTranslation(doc.map, index, translation)
-      if (Option.isSome(next) && !sameItemTransform(doc.map, next.value, index)) {
-        commit({ map: next.value, ids: doc.ids })
-      }
-    },
-
-    transformItem: (id, transform) => {
-      const { doc } = get()
-      const index = indexOf(id)
-      const next = setTransform(doc.map, index, transform)
+      const entries = [...transforms].map(([id, t]) => [doc.ids.indexOf(id), t] as const)
+      const next = setTransforms(doc.map, entries)
       if (Option.isSome(next)) {
         // a drag that ends where it started leaves no step
-        if (!sameItemTransform(doc.map, next.value, index)) commit({ map: next.value, ids: doc.ids })
+        if (!entries.every(([index]) => sameItemTransform(doc.map, next.value, index))) {
+          commit({ map: next.value, ids: doc.ids })
+        }
         return true
       }
       get().notify("error", "That transform isn't valid for the game (non-finite or zero rotation).")
@@ -226,13 +232,28 @@ export const useEditor = create<EditorState>()((set, get) => {
     },
 
     deleteSelection: () => {
-      const { doc, selectedId } = get()
-      const index = indexOf(selectedId)
-      if (index < 0) return
+      const s = get()
+      const indices = selectedIndices(s)
+      if (indices.length === 0) return
+      const removed = new Set(indices)
       commit(
-        { map: removeItems(doc.map, [index]), ids: doc.ids.filter((_, i) => i !== index) },
-        { selectedId: null }
+        { map: removeItems(s.doc.map, indices), ids: s.doc.ids.filter((_, i) => !removed.has(i)) },
+        { selectedIds: [] }
       )
+    },
+
+    duplicateSelection: () => {
+      const s = get()
+      const all = selectedIndices(s)
+      // A map has exactly one player start (every sample does); copying it would make a second.
+      const indices = all.filter((i) => {
+        const item = s.doc.map.items[i]
+        return item !== undefined && !isPlayerStart(item)
+      })
+      if (indices.length < all.length) s.notify("info", "The player start isn't duplicated: a map has only one.")
+      if (indices.length === 0) return
+      const ids = freshIds(indices.length)
+      commit({ map: duplicateItems(s.doc.map, indices), ids: [...s.doc.ids, ...ids] }, { selectedIds: ids })
     },
 
     renameLevel: (displayName, creatorName) => {
@@ -258,17 +279,18 @@ export const useEditor = create<EditorState>()((set, get) => {
         return { ...next, past: [...s.past, current].slice(-HISTORY_LIMIT), future: s.future.slice(1) }
       }),
 
-    select: (selectedId) =>
+    select: (ids) =>
       set((s) => {
-        if (selectedId === s.selectedId) return s
-        if (!s.settings.general.undoSelection) return { selectedId }
+        const selectedIds = [...new Set(ids)]
+        if (sameSelection(selectedIds, s.selectedIds)) return s
+        if (!s.settings.general.undoSelection) return { selectedIds }
         const step: Snapshot = {
           doc: s.doc,
-          selectedId: s.selectedId,
-          otherSelectedId: selectedId,
+          selectedIds: s.selectedIds,
+          otherSelectedIds: selectedIds,
           selectionOnly: true
         }
-        return { selectedId, past: [...s.past, step].slice(-HISTORY_LIMIT), future: [] }
+        return { selectedIds, past: [...s.past, step].slice(-HISTORY_LIMIT), future: [] }
       }),
     setTool: (tool) => set({ tool }),
     toggleGizmoSpace: () => set((s) => ({ gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
@@ -311,4 +333,27 @@ const sameItemTransform = (before: MapFile, after: MapFile, index: number): bool
     qa.x === qb.x && qa.y === qb.y && qa.z === qb.z && qa.w === qb.w
 }
 
-export const selectedIndex = (s: EditorState): number => (s.selectedId === null ? -1 : s.doc.ids.indexOf(s.selectedId))
+const sameSelection = (a: Selection, b: Selection) => a.length === b.length && a.every((id, i) => id === b[i])
+
+/**
+ * The selection after clicking `id` (null: empty space). A plain click selects just that
+ * item, or clears; adding keeps the rest and makes the item active; toggling adds or
+ * removes it. Clicking empty space with a modifier leaves the selection alone.
+ */
+export const nextSelection = (current: Selection, id: string | null, mode: SelectMode): Selection => {
+  if (mode === "replace") return id === null ? [] : [id]
+  if (id === null) return current
+  const rest = current.filter((x) => x !== id)
+  return mode === "toggle" && rest.length < current.length ? rest : [...rest, id]
+}
+
+/** Document indices of the selected items, in selection order. */
+export const selectedIndices = (s: EditorState): Array<number> =>
+  s.selectedIds.map((id) => s.doc.ids.indexOf(id)).filter((i) => i >= 0)
+
+/** The active (last selected) item's id, if any. */
+export const activeId = (s: EditorState): string | undefined => s.selectedIds.at(-1)
+
+/** An item's transform as shown: the live preview, else the document. */
+export const shownTransform = (s: EditorState, id: string): UeTransform | undefined =>
+  s.preview?.get(id) ?? s.doc.map.items[s.doc.ids.indexOf(id)]?.itemTransform

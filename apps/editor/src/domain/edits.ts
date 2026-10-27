@@ -4,9 +4,8 @@
  * schemas before they reach the document.
  */
 import { Option, Schema } from "effect"
-import { Item, ItemTransform, type MapFile, Vector3 } from "./MapFile"
+import { Item, ItemTransform, type MapFile } from "./MapFile"
 
-const decodeVector3 = Schema.decodeUnknownOption(Vector3)
 const decodeItem = Schema.decodeUnknownOption(Item)
 const decodeTransform = Schema.decodeUnknownOption(ItemTransform)
 
@@ -43,38 +42,52 @@ export const removeItems = (map: MapFile, indices: ReadonlyArray<number>): MapFi
   }
 }
 
-export const replaceItem = (map: MapFile, index: number, item: Item): MapFile => {
-  if (index < 0 || index >= map.items.length) return map
-  const items = map.items.slice()
-  items[index] = item
-  return { ...map, items }
-}
-
-/** Sets an item's translation (UE cm). Returns None for invalid input (non-finite, wrong shape, bad index). */
-export const setTranslation = (map: MapFile, index: number, translation: unknown): Option.Option<MapFile> => {
-  const item = map.items[index]
-  if (item === undefined) return Option.none()
-  return Option.map(
-    decodeVector3(translation),
-    (t: Vector3) => replaceItem(map, index, { ...item, itemTransform: { ...item.itemTransform, translation: t } })
-  )
-}
-
 /**
- * Replaces an item's transform (rotation, translation, scale). The game rejects
- * non-normalized rotations, so the quaternion is renormalized; a zero-length quaternion
- * or any non-finite value is rejected.
+ * A transform from the UI, as the game will accept it: the schema decodes it, and the
+ * quaternion is renormalized (the game rejects non-normalized rotations). A zero-length
+ * quaternion or any non-finite value is rejected.
  */
-export const setTransform = (map: MapFile, index: number, transform: unknown): Option.Option<MapFile> => {
-  const item = map.items[index]
-  if (item === undefined) return Option.none()
-  return Option.flatMap(decodeTransform(transform), (t: ItemTransform) => {
+const validTransform = (transform: unknown): Option.Option<ItemTransform> =>
+  Option.flatMap(decodeTransform(transform), (t: ItemTransform) => {
     const q = t.rotation
     const length = Math.hypot(q.x, q.y, q.z, q.w)
     if (!(length > 1e-9)) return Option.none()
-    const rotation = { ...q, x: q.x / length, y: q.y / length, z: q.z / length, w: q.w / length }
-    return Option.some(replaceItem(map, index, { ...item, itemTransform: { ...item.itemTransform, ...t, rotation } }))
+    return Option.some({ ...t, rotation: { ...q, x: q.x / length, y: q.y / length, z: q.z / length, w: q.w / length } })
   })
+
+/**
+ * Replaces the transforms (rotation, translation, scale) of several items at once, all or
+ * nothing: None when any index is out of range or any transform is invalid.
+ */
+export const setTransforms = (
+  map: MapFile,
+  entries: ReadonlyArray<readonly [index: number, transform: unknown]>
+): Option.Option<MapFile> => {
+  const items = map.items.slice()
+  for (const [index, transform] of entries) {
+    const item = items[index]
+    const t = validTransform(transform)
+    if (item === undefined || Option.isNone(t)) return Option.none()
+    items[index] = { ...item, itemTransform: { ...item.itemTransform, ...t.value } }
+  }
+  return Option.some({ ...map, items })
+}
+
+/**
+ * Appends copies of items (in the given order) and copies their `editorState.pivots`
+ * entries to the new indices, so a copy keeps its original's pivot choice.
+ */
+export const duplicateItems = (map: MapFile, indices: ReadonlyArray<number>): MapFile => {
+  const sources = indices.filter((i) => map.items[i] !== undefined)
+  if (sources.length === 0) return map
+  const items = [...map.items, ...sources.flatMap((i) => map.items[i] ?? [])]
+  if (map.editorState === undefined) return { ...map, items }
+  const copyOf = new Map(sources.map((source, n) => [source, map.items.length + n]))
+  const copied = map.editorState.pivots.flatMap((p) => {
+    const itemIndex = copyOf.get(p.itemIndex)
+    return itemIndex === undefined ? [] : [{ ...p, itemIndex }]
+  })
+  return { ...map, items, editorState: { ...map.editorState, pivots: [...map.editorState.pivots, ...copied] } }
 }
 
 /** Validates a freshly built item against the schema before it enters the document. */

@@ -27,7 +27,10 @@ export const keybindSections = [
       "scaleMode",
       "toggleGizmoSpace",
       "focusSelection",
+      "addToSelection",
+      "toggleSelection",
       "deleteSelection",
+      "duplicateSelection",
       "undo",
       "redo",
       "deselect"
@@ -56,7 +59,10 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   scaleMode: "scale",
   toggleGizmoSpace: "local / world axes",
   focusSelection: "focus selection",
+  addToSelection: "add to selection",
+  toggleSelection: "toggle selection",
   deleteSelection: "delete",
+  duplicateSelection: "duplicate",
   undo: "undo",
   redo: "redo",
   deselect: "deselect",
@@ -90,10 +96,16 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   scaleMode:
     "Scale: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the game's level editor.",
   toggleGizmoSpace:
-    "Switch the translate, rotate and scale gizmos between the selected item's own axes and the world axes. Editor only.",
+    "Switch the translate, rotate and scale gizmos between the selected item's own axes (the last one picked, when several are selected) and the world axes. Editor only.",
   focusSelection:
     "Frame the current selection in the viewport. F in the game's level editor; its free camera calls this \"center camera\" (C).",
-  deleteSelection: "Delete the selected item. Backspace in the game's level editor; Delete also works.",
+  addToSelection:
+    "Click an item to add it to the selection (it becomes the active item). Shift+click, as in Unreal's editor; the game's key for this isn't recorded.",
+  toggleSelection:
+    "Click an item to add it to the selection, or to remove it if it's already selected. Ctrl+click, which the game's level editor uses to deselect.",
+  deleteSelection: "Delete the selected items. Backspace in the game's level editor; Delete also works.",
+  duplicateSelection:
+    "Copy the selected items in place and select the copies, ready to move. Ctrl+D, as in Unreal's editor; the game's key for this isn't recorded.",
   undo:
     "Undo the last change. Ctrl+Z in the game's level editor; a whole gizmo drag or number-field scrub is one step.",
   redo: "Redo the last undone change. Ctrl+Y in the game's level editor; Ctrl+Shift+Z also works.",
@@ -120,6 +132,9 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   importMap: "Open a .balledit or .ballmap file.",
   exportMap: "Download the map as a .balledit file for the game."
 }
+
+/** Actions bound to a mouse click (with modifiers) on an item in the viewport. */
+export const mouseClickActions: ReadonlySet<KeybindAction> = new Set(["addToSelection", "toggleSelection"])
 
 /** Actions bound to a mouse button held while dragging. */
 export const mouseDragActions: ReadonlySet<KeybindAction> = new Set(["look", "orbit", "pan"])
@@ -153,7 +168,10 @@ export const defaultKeybinds: Keybinds = {
   scaleMode: ["KeyR"],
   toggleGizmoSpace: ["KeyX"],
   focusSelection: ["KeyF", "KeyC"],
+  addToSelection: ["Shift+Mouse0"],
+  toggleSelection: ["Ctrl+Mouse0"],
   deleteSelection: ["Backspace", "Delete"],
+  duplicateSelection: ["Ctrl+KeyD"],
   undo: ["Ctrl+KeyZ"],
   redo: ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"],
   deselect: ["Escape"],
