@@ -107,8 +107,8 @@ export function NumberField(props: {
   readonly onScrub?: (value: number | null) => void
   readonly step?: number
   readonly digits?: number
-  /** Extra classes for the input, e.g. an axis colour. */
-  readonly inputClassName?: string
+  /** Background class for the handle, e.g. an axis colour. */
+  readonly handleClassName?: string
 }) {
   const id = useId()
   const digits = props.digits ?? 3
@@ -133,19 +133,21 @@ export function NumberField(props: {
   })
   const scrubbable = props.onScrub !== undefined
   return (
-    <div className="flex min-w-0 flex-col gap-1">
+    <div className="flex min-w-0">
       <Label
         htmlFor={id}
-        className={scrubbable ? "cursor-ew-resize text-muted-foreground select-none" : "text-muted-foreground"}
-        title={scrubbable ? "Drag to scrub (Shift: finer, Esc: cancel)" : undefined}
+        className={`w-2 shrink-0 rounded-l-md ${props.handleClassName ?? "bg-muted"} ${
+          scrubbable ? "cursor-ew-resize opacity-80 hover:opacity-100" : ""
+        }`}
+        title={scrubbable ? `${props.label}: drag to scrub (Shift: finer, Esc: cancel)` : props.label}
         {...scrubHandlers}
       >
-        {props.label}
+        <span className="sr-only">{props.label}</span>
       </Label>
       <Input
         id={id}
         inputMode="decimal"
-        className={props.inputClassName === undefined ? "font-mono" : `font-mono ${props.inputClassName}`}
+        className="min-w-0 rounded-l-none border-l-0 px-1.5 font-mono"
         value={text}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}

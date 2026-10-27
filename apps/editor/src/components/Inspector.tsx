@@ -15,9 +15,9 @@ type Axis = "x" | "y" | "z"
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
 /** Game-axis colours, matching the gizmo (X red, Y green, Z blue). */
 const axisClass: Record<Axis, string> = {
-  x: "border-red-500/70 text-red-600 dark:text-red-400",
-  y: "border-green-500/70 text-green-600 dark:text-green-400",
-  z: "border-blue-500/70 text-blue-600 dark:text-blue-400"
+  x: "bg-red-500",
+  y: "bg-green-500",
+  z: "bg-blue-500"
 }
 
 /** One X/Y/Z row of the transform, in display values (units, degrees). */
@@ -32,7 +32,7 @@ interface TransformRowSpec {
 const transformRows = (perUnit: number): ReadonlyArray<TransformRowSpec> => [
   {
     kind: "position",
-    title: "Position",
+    title: "Location",
     labels: { x: "X", y: "Y", z: "Z" },
     read: (t) => ({ x: t.translation.x / perUnit, y: t.translation.y / perUnit, z: t.translation.z / perUnit }),
     write: (t, v) => ({ ...t, translation: { x: v.x * perUnit, y: v.y * perUnit, z: v.z * perUnit } })
@@ -40,7 +40,7 @@ const transformRows = (perUnit: number): ReadonlyArray<TransformRowSpec> => [
   {
     // UE rotator axes: roll about X, pitch about Y, yaw about Z.
     kind: "rotation",
-    title: "Rotation (degrees)",
+    title: "Rotation",
     labels: { x: "X roll", y: "Y pitch", z: "Z yaw" },
     read: (t) => {
       const r = quatToRotator(t.rotation)
@@ -62,6 +62,7 @@ const copiedRows = new Map<TransformRowSpec["kind"], Vec3>()
 
 function TransformRow(props: {
   readonly row: TransformRowSpec
+  /** Tooltip heading, with units. */
   readonly title: string
   /** The transform on screen (live during a drag or scrub). */
   readonly shown: UeTransform
@@ -77,10 +78,10 @@ function TransformRow(props: {
   const value = row.read(props.shown)
   const withAxis = (axis: Axis, n: number) => row.write(committed, { ...row.read(committed), [axis]: n })
   return (
-    <div className="flex flex-col gap-2">
+    <div className="contents">
       <div
-        className="cursor-default select-none"
-        title="Shift+right-click: copy X, Y, Z · Shift+click: paste"
+        className="cursor-default self-center text-right text-sm font-medium select-none"
+        title={`${props.title}\nShift+right-click: copy X, Y, Z · Shift+click: paste`}
         onClick={(e) => {
           if (!e.shiftKey) return
           const copied = copiedRows.get(row.kind)
@@ -97,22 +98,20 @@ function TransformRow(props: {
           notify("info", `Copied ${row.title.toLowerCase()}.`)
         }}
       >
-        <SectionTitle>{props.title}</SectionTitle>
+        {row.title}
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        {axes.map((axis) => (
-          <NumberField
-            key={axis}
-            label={row.labels[axis]}
-            value={value[axis]}
-            onCommit={(n) => props.onCommit(withAxis(axis, n))}
-            onScrub={(n) => props.onPreview(n === null ? null : withAxis(axis, n))}
-            step={props.step}
-            digits={props.digits}
-            inputClassName={axisClass[axis]}
-          />
-        ))}
-      </div>
+      {axes.map((axis) => (
+        <NumberField
+          key={axis}
+          label={row.labels[axis]}
+          value={value[axis]}
+          onCommit={(n) => props.onCommit(withAxis(axis, n))}
+          onScrub={(n) => props.onPreview(n === null ? null : withAxis(axis, n))}
+          step={props.step}
+          digits={props.digits}
+          handleClassName={axisClass[axis]}
+        />
+      ))}
     </div>
   )
 }
@@ -209,18 +208,28 @@ export function Inspector() {
         {failed.map((w) => <Badge key={w} variant="destructive">{w}</Badge>)}
 
         <Separator />
-        {rows.map((row) => (
-          <TransformRow
-            key={row.kind}
-            row={row}
-            title={row.kind === "position" ? `Position (game ${units}, Z up)` : row.title}
-            shown={t}
-            committed={item.itemTransform}
-            onCommit={(transform) => transformItem(selectedId, transform)}
-            onPreview={(transform) => setPreview(transform === null ? null : { id: selectedId, transform })}
-            {...fieldProps[row.kind]}
-          />
-        ))}
+        <div className="flex items-baseline justify-between">
+          <SectionTitle>Transform</SectionTitle>
+          <span className="text-[0.65rem] text-muted-foreground">game {units} · degrees · Z up</span>
+        </div>
+        <div className="grid grid-cols-[auto_1fr_1fr_1fr] gap-x-1.5 gap-y-1.5">
+          {rows.map((row) => (
+            <TransformRow
+              key={row.kind}
+              row={row}
+              title={row.kind === "position"
+                ? `Location (game ${units}, Z up)`
+                : row.kind === "rotation"
+                ? "Rotation (degrees: roll, pitch, yaw)"
+                : row.title}
+              shown={t}
+              committed={item.itemTransform}
+              onCommit={(transform) => transformItem(selectedId, transform)}
+              onPreview={(transform) => setPreview(transform === null ? null : { id: selectedId, transform })}
+              {...fieldProps[row.kind]}
+            />
+          ))}
+        </div>
 
         <Separator />
         <SectionTitle>Meshes</SectionTitle>
