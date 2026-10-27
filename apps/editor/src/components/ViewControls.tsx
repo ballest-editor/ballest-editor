@@ -76,7 +76,8 @@ function SnapControls({ disabled }: { readonly disabled: boolean }) {
   const units = settings.general.units
   const update = (snapping: Partial<Settings["snapping"]>) =>
     void saveSettings({ ...settings, snapping: { ...settings.snapping, ...snapping } })
-  const items = Object.fromEntries(GRID_SIZES.map((size) => [size, formatGridSize(size, units)]))
+  // The button shows just the number, like the game's; the menu and tooltip carry the unit.
+  const items = Object.fromEntries(GRID_SIZES.map((size) => [size, String(units === "m" ? size / 100 : size)]))
 
   return (
     <div className={GROUP}>
@@ -112,8 +113,9 @@ function SnapControls({ disabled }: { readonly disabled: boolean }) {
             render={
               <SelectTrigger
                 aria-label="Grid size"
+                size="sm"
                 tabIndex={-1}
-                className={`h-8 w-22 rounded-full border-none bg-transparent pr-2 pl-3 tabular-nums dark:bg-transparent ${
+                className={`min-w-8 justify-center rounded-full border-none bg-transparent px-1.5 tabular-nums dark:bg-transparent [&>svg]:hidden ${
                   enabled ? "" : "text-muted-foreground"
                 }`}
               />
@@ -121,12 +123,12 @@ function SnapControls({ disabled }: { readonly disabled: boolean }) {
           >
             <SelectValue />
           </TooltipTrigger>
-          <TooltipContent side="bottom">Grid size</TooltipContent>
+          <TooltipContent side="bottom">Grid size ({units})</TooltipContent>
         </Tooltip>
         <SelectContent side="bottom" align="end" alignItemWithTrigger={false}>
           {GRID_SIZES.map((size) => (
             <SelectItem key={size} value={size} className="tabular-nums">
-              {items[size]}
+              {formatGridSize(size, units)}
             </SelectItem>
           ))}
         </SelectContent>
