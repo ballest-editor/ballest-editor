@@ -1,5 +1,5 @@
 import { Grid } from "@react-three/drei"
-import { Canvas, useFrame, useThree } from "@react-three/fiber"
+import { Canvas, useFrame, useStore, useThree } from "@react-three/fiber"
 import { Badge } from "@workspace/ui/components/badge"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
@@ -75,7 +75,46 @@ function ClickSelect() {
   return null
 }
 
-/** Clear colour follows the theme: dark slate, or a light grey in light mode. */
+/**
+ * Smooth resizing. R3F learns the container size through React state, so the canvas keeps
+ * its old pixel size (and is cleared when it finally changes) for a frame or more while the
+ * window is dragged. Instead, watch the container ourselves: ResizeObserver callbacks run
+ * after layout and before paint, so resizing the renderer, fixing the camera and redrawing
+ * here means every painted frame is already the right size. R3F's own later update then
+ * sees an unchanged size and does nothing.
+ */
+function SmoothResize() {
+  const store = useStore()
+  useEffect(() => {
+    const container = store.getState().gl.domElement.parentElement
+    if (container === null) return
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry === undefined) return
+      const { width, height } = entry.contentRect
+      const state = store.getState()
+      if (width <= 0 || height <= 0 || (width === state.size.width && height === state.size.height)) return
+      const rect = container.getBoundingClientRect()
+      state.setSize(width, height, rect.top, rect.left) // R3F's subscription resizes gl + camera aspect; ours below redraws
+    })
+    observer.observe(container)
+    // Whoever changes the size (us or R3F's own measuring), redraw at once: a resized
+    // canvas is blank until the next render.
+    const unsubscribe = store.subscribe((state, prev) => {
+      if (state.size !== prev.size) state.gl.render(state.scene, state.camera)
+    })
+    return () => {
+      observer.disconnect()
+      unsubscribe()
+    }
+  }, [store])
+  return null
+}
+
+/**
+ * Clear colour follows the theme: dark slate, or a light grey in light mode. The same colour
+ * goes on the container behind the canvas, so any strip the canvas hasn't covered yet during
+ * a window resize is the scene colour, not black.
+ */
 function ViewportBackground() {
   const gl = useThree((s) => s.gl)
   const theme = useEditor((s) => s.settings.appearance.theme)
@@ -83,7 +122,10 @@ function ViewportBackground() {
     const media = window.matchMedia("(prefers-color-scheme: dark)")
     const apply = () => {
       const dark = theme === "dark" || (theme === "system" && media.matches)
-      gl.setClearColor(dark ? "#1d2128" : "#e9ecf1")
+      const color = dark ? "#1d2128" : "#e9ecf1"
+      gl.setClearColor(color)
+      const viewport = gl.domElement.closest<HTMLElement>("[data-viewport]")
+      if (viewport !== null) viewport.style.backgroundColor = color
     }
     apply()
     media.addEventListener("change", apply)
@@ -144,7 +186,9 @@ function Overlay() {
 export function Viewport() {
   return (
     <div
-      className="relative h-full w-full outline-none"
+      // [&_canvas]: the canvas element always fills the container, even on frames where its
+      // drawing buffer is still the previous size (it stretches briefly instead of leaving a gap).
+      className="relative h-full w-full outline-none [&_canvas]:h-full! [&_canvas]:w-full!"
       tabIndex={-1}
       data-viewport
       onPointerDown={(e) => e.currentTarget.focus({ preventScroll: true })}
@@ -154,6 +198,7 @@ export function Viewport() {
         gl={{ antialias: true, logarithmicDepthBuffer: true }}
       >
         <ViewportBackground />
+        <SmoothResize />
         <ambientLight intensity={0.6} />
         <hemisphereLight args={["#dfe8ff", "#30302a", 0.8]} />
         <directionalLight position={[3000, 8000, 2000]} intensity={1.6} />

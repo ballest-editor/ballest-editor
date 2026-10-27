@@ -74,11 +74,22 @@ export const mergeSettings = (stored: unknown, defaults: Settings = defaultSetti
   return Schema.decodeUnknownSync(Settings)(out)
 }
 
+/**
+ * The game's FOV presets are horizontal at the player's screen shape. The editor holds the
+ * equivalent *vertical* FOV for a 16:9 screen constant, so resizing the viewport shows more
+ * or less at the sides instead of zooming.
+ */
+export const REFERENCE_ASPECT = 16 / 9
+
 /** UE's FOV is horizontal; three.js wants vertical. */
 export const verticalFov = (horizontalDeg: number, aspect: number): number => {
   const h = (horizontalDeg * Math.PI) / 180
   return (2 * Math.atan(Math.tan(h / 2) / Math.max(aspect, 1e-6)) * 180) / Math.PI
 }
+
+/** Vertical FOV (degrees) for the editor camera: the preset's horizontal FOV at 16:9. */
+export const editorVerticalFov = (settings: Settings, presets: ReadonlyArray<{ readonly id: string; readonly fov: number }>): number =>
+  verticalFov(fovOf(settings, presets), REFERENCE_ASPECT)
 
 /** The horizontal FOV for the chosen preset; unknown presets use the first (Default). */
 export const fovOf = (settings: Settings, presets: ReadonlyArray<{ readonly id: string; readonly fov: number }>): number => {
