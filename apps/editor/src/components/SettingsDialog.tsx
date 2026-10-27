@@ -47,11 +47,10 @@ const movementLookItems = {
   nothing: "Nothing"
 } as const
 const movementLookDescriptions = {
-  all: "No movement key flies unless you're looking. The game's default.",
-  upDown: "Up and down need look, and so do conflicting keys.",
-  conflicting:
-    "Keys that are also shortcuts (W is Translate) fly while looking or alongside another movement key, and pick their tool otherwise.",
-  nothing: "Every movement key flies any time. W no longer picks Translate."
+  all: "Every key needs look. The game's default.",
+  upDown: "Up, down and conflicting keys need look.",
+  conflicting: "Only keys shared with a tool (W) need look.",
+  nothing: "No key needs look. W won't pick Translate."
 } as const
 
 const CATEGORY_LABELS: Readonly<Record<SettingsCategory, string>> = {
@@ -546,7 +545,7 @@ export function SettingsDialog(props: {
         id: "movementNeedsLook",
         ...setting("camera", "movementNeedsLook"),
         label: "Fly only while looking",
-        description: "Movement keys that need the look button held. The rest fly any time.",
+        description: "Which movement keys need the look button held.",
         control: (
           <Select
             value={c.movementNeedsLook}
