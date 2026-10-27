@@ -3,6 +3,7 @@ import { Schema } from "effect"
 import fixture from "../domain/bundledCatalog.json"
 import { Catalog } from "../domain/Catalog"
 import { placementTransform } from "../domain/factory"
+import { defaultSettings } from "../domain/Settings"
 import { initialMap, useEditor } from "./store"
 
 const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!
@@ -127,6 +128,100 @@ describe("editor store", () => {
       s().moveItem(id, { x: 50, y: 0, z: 0 })
       s().undo()
       assert.deepStrictEqual(translationOf(id), { x: 0, y: 0, z: 0 })
+    })
+
+    const withUndoSelection = (on: boolean) =>
+      s().setSettings({ ...defaultSettings, general: { ...defaultSettings.general, undoSelection: on } })
+
+    it("doesn't record selection changes by default", () => {
+      withUndoSelection(false)
+      s().loadMap(initialMap(), null)
+      const a = place(0)
+      const b = place(100)
+      const before = s().past.length
+      s().select(a)
+      s().select(null)
+      s().select(b)
+      assert.strictEqual(s().past.length, before)
+    })
+
+    it("records each selection change as its own step when enabled", () => {
+      withUndoSelection(true)
+      try {
+        s().loadMap(initialMap(), null)
+        const a = place(0)
+        const b = place(100)
+        s().select(null)
+        const before = s().past.length
+        const doc = s().doc
+        s().select(a)
+        s().select(a) // unchanged: no step
+        s().select(b)
+        s().select(null)
+        assert.strictEqual(s().past.length, before + 3)
+        s().undo()
+        assert.strictEqual(s().selectedId, b)
+        s().undo()
+        assert.strictEqual(s().selectedId, a)
+        s().undo()
+        assert.isNull(s().selectedId)
+        assert.strictEqual(s().doc, doc) // selection steps never touch the doc
+        s().redo()
+        s().redo()
+        assert.strictEqual(s().selectedId, b)
+        s().select(a) // a new selection clears the redo stack
+        assert.strictEqual(s().future.length, 0)
+      } finally {
+        withUndoSelection(false)
+      }
+    })
+
+    it("doesn't mark the map dirty or leave a deleted selection behind", () => {
+      withUndoSelection(true)
+      try {
+        s().loadMap(initialMap(), null)
+        s().select(s().doc.ids[0]!)
+        s().select(null)
+        s().undo()
+        s().undo()
+        s().redo()
+        assert.isFalse(s().dirty)
+
+        // edits around selection steps keep their own before/after selection
+        const a = place(0) // selected as part of the placement step
+        s().select(null)
+        s().select(a)
+        s().deleteSelection()
+        s().undo() // a is back, selected
+        assert.strictEqual(s().selectedId, a)
+        s().undo() // re-selecting a
+        s().undo() // deselecting
+        assert.strictEqual(s().selectedId, a)
+        s().undo() // the placement: back to what was selected before it
+        assert.isFalse(s().doc.ids.includes(a))
+        assert.strictEqual(s().selectedId, s().doc.ids[0])
+
+        // a selection step naming an item that is gone resolves to no selection
+        const b = place(0)
+        const step = { doc: s().doc, selectedId: "item-gone", otherSelectedId: b, selectionOnly: true }
+        useEditor.setState({ past: [...s().past, step] })
+        s().undo()
+        assert.isNull(s().selectedId)
+      } finally {
+        withUndoSelection(false)
+      }
+    })
+
+    it("counts selection steps against the 200-step limit", () => {
+      withUndoSelection(true)
+      try {
+        s().loadMap(initialMap(), null)
+        const a = place(0)
+        for (let i = 0; i < 250; i++) s().select(i % 2 === 0 ? null : a)
+        assert.strictEqual(s().past.length, 200)
+      } finally {
+        withUndoSelection(false)
+      }
     })
 
     it("keeps at most 200 steps", () => {

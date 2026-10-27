@@ -24,12 +24,14 @@ export interface Doc {
 /**
  * One undo/redo step, seen from the side it restores: the document and the selection that
  * went with it, plus the selection on the other side of the step. Undoing a delete selects
- * the restored item; redoing it leaves what the delete left.
+ * the restored item; redoing it leaves what the delete left. A `selectionOnly` step (the
+ * "Undo selection changes" setting) restores just the selection and leaves the doc alone.
  */
 export interface Snapshot {
   readonly doc: Doc
   readonly selectedId: string | null
   readonly otherSelectedId: string | null
+  readonly selectionOnly: boolean
 }
 
 export type Tool = "select" | "translate" | "rotate" | "scale"
@@ -94,6 +96,7 @@ export interface EditorState {
   /** Restores the previous snapshot, including its selection. */
   readonly undo: () => void
   readonly redo: () => void
+  /** Changes the selection; its own undo step when settings.general.undoSelection is on. */
   readonly select: (id: string | null) => void
   readonly setTool: (tool: Tool) => void
   readonly openDialog: (dialog: Dialog, category?: SettingsCategory) => void
@@ -121,22 +124,29 @@ export const useEditor = create<EditorState>()((set, get) => {
       past: [...s.past, {
         doc: s.doc,
         selectedId: s.selectedId,
-        otherSelectedId: extra.selectedId === undefined ? s.selectedId : extra.selectedId
+        otherSelectedId: extra.selectedId === undefined ? s.selectedId : extra.selectedId,
+        selectionOnly: false
       }].slice(-HISTORY_LIMIT),
       future: [],
       dirty: true
     }))
 
   /** Swaps in a history snapshot; its selection is restored when that item still exists. */
-  const restore = (s: EditorState, snapshot: Snapshot) => ({
-    doc: snapshot.doc,
-    dirty: true,
-    selectedId: snapshot.selectedId !== null && snapshot.doc.ids.includes(snapshot.selectedId)
-      ? snapshot.selectedId
-      : null,
-    // the side being left, for the opposite stack
-    current: { doc: s.doc, selectedId: snapshot.otherSelectedId, otherSelectedId: snapshot.selectedId }
-  })
+  const restore = (s: EditorState, snapshot: Snapshot) => {
+    const doc = snapshot.selectionOnly ? s.doc : snapshot.doc
+    return {
+      doc,
+      dirty: snapshot.selectionOnly ? s.dirty : true,
+      selectedId: snapshot.selectedId !== null && doc.ids.includes(snapshot.selectedId) ? snapshot.selectedId : null,
+      // the side being left, for the opposite stack
+      current: {
+        doc: s.doc,
+        selectedId: snapshot.otherSelectedId,
+        otherSelectedId: snapshot.selectedId,
+        selectionOnly: snapshot.selectionOnly
+      }
+    }
+  }
 
   const indexOf = (id: string | null) => (id === null ? -1 : get().doc.ids.indexOf(id))
   const fallbackDefaults = deriveKeybinds(undefined)
@@ -243,7 +253,18 @@ export const useEditor = create<EditorState>()((set, get) => {
         return { ...next, past: [...s.past, current].slice(-HISTORY_LIMIT), future: s.future.slice(1) }
       }),
 
-    select: (selectedId) => set({ selectedId }),
+    select: (selectedId) =>
+      set((s) => {
+        if (selectedId === s.selectedId) return s
+        if (!s.settings.general.undoSelection) return { selectedId }
+        const step: Snapshot = {
+          doc: s.doc,
+          selectedId: s.selectedId,
+          otherSelectedId: selectedId,
+          selectionOnly: true
+        }
+        return { selectedId, past: [...s.past, step].slice(-HISTORY_LIMIT), future: [] }
+      }),
     setTool: (tool) => set({ tool }),
     openDialog: (dialog, category) => set((s) => ({ dialog, settingsCategory: category ?? s.settingsCategory })),
     closeDialog: () => set({ dialog: null }),
