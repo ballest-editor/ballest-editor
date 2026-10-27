@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { flyingActions, isMovementChord, keepsShortcuts, type MovementLookMode, needsLook } from "./flyKeys"
+import { flyingActions, isMovementChord, type MovementLookMode, needsLook, sharedKeysFlyFreely } from "./flyKeys"
 import { defaultKeybinds } from "./Keybinds"
 
 const flying = (mode: MovementLookMode, looking: boolean, ...held: ReadonlyArray<string>) =>
@@ -15,10 +15,10 @@ describe("needsLook", () => {
     expect(needsLook("all", "moveLeft")).toBe(true)
   })
 
-  it("only nothing gives up the shortcuts", () => {
-    expect(keepsShortcuts("all")).toBe(true)
-    expect(keepsShortcuts("conflicting")).toBe(true)
-    expect(keepsShortcuts("nothing")).toBe(false)
+  it("only nothing lets shared keys fly freely", () => {
+    expect(sharedKeysFlyFreely("all")).toBe(false)
+    expect(sharedKeysFlyFreely("conflicting")).toBe(false)
+    expect(sharedKeysFlyFreely("nothing")).toBe(true)
   })
 })
 

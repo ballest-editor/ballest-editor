@@ -48,9 +48,9 @@ const movementLookItems = {
 } as const
 const movementLookDescriptions = {
   all: "Every key needs look. The game's default.",
-  upDown: "Up, down and conflicting keys need look.",
-  conflicting: "Only keys shared with a tool (W) need look.",
-  nothing: "No key needs look. W won't pick Translate."
+  upDown: "Up, down and keys shared with a tool need look.",
+  conflicting: "Only keys shared with a tool need look.",
+  nothing: "No key needs look. Keys shared with a tool fly and pick it."
 } as const
 
 const CATEGORY_LABELS: Readonly<Record<SettingsCategory, string>> = {
