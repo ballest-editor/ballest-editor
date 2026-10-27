@@ -1,4 +1,5 @@
 import { useEffect } from "react"
+import { isMovementChord, sharedKeysFlyFreely } from "../domain/flyKeys"
 import { actionsFor, chordOf, type KeybindAction } from "../domain/Keybinds"
 import { commands } from "./commands"
 import { isEditorKeyEvent } from "./FlyCamera"
@@ -54,7 +55,14 @@ export function useActionKeys() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!isEditorKeyEvent(e) || e.repeat || sceneRegistry.lookDragActive() || interactionActive()) return
       const chord = chordOf(e)
-      const { keybinds } = useEditor.getState()
+      const { keybinds, settings } = useEditor.getState()
+      // A movement key that is also a tool shortcut (W: forward + translate) joins an ongoing
+      // flight instead of switching tool, unless no movement key needs look: then it does both.
+      if (
+        isMovementChord(keybinds, chord)
+        && sceneRegistry.flyKeysActive()
+        && !sharedKeysFlyFreely(settings.camera.movementNeedsLook)
+      ) return
       for (const action of actionsFor(keybinds, chord)) {
         const run = oneShot(action)
         if (run === undefined) continue

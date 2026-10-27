@@ -19,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/component
 import { cn } from "@workspace/ui/lib/utils"
 import { Struct } from "effect"
 import { type ReactNode, useEffect, useState } from "react"
+import { movementLookModes } from "../domain/flyKeys"
 import {
   type Bindings,
   chordOf,
@@ -38,6 +39,19 @@ import {
 import { CUSTOM_FOV_PRESET, defaultSettings, type Settings } from "../domain/Settings"
 import { resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
 import { type SettingsCategory, useEditor } from "../editor/store"
+
+const movementLookItems = {
+  all: "All movement keys",
+  upDown: "Up and down",
+  conflicting: "Only conflicting keys",
+  nothing: "Nothing"
+} as const
+const movementLookDescriptions = {
+  all: "Every key needs look. The game's default.",
+  upDown: "Up, down and keys shared with a tool need look.",
+  conflicting: "Only keys shared with a tool need look.",
+  nothing: "No key needs look. Shared keys fly and pick their tool."
+} as const
 
 const CATEGORY_LABELS: Readonly<Record<SettingsCategory, string>> = {
   general: "General",
@@ -313,8 +327,8 @@ export function SettingsDialog(props: {
 
   const rows = ((): ReadonlyArray<Row> => {
     // A chord is a conflict when two actions of the same kind share it. A fly key doubling
-    // as a tool shortcut (W: forward + move mode, as in the game) is fine: it only flies
-    // while the look button is held.
+    // as a tool shortcut (W: forward + translate, as in the game) is fine: the "fly only while
+    // looking" setting decides which one it does.
     const kinds = new Map<string, Set<string>>()
     for (const action of keybindActions) {
       const bindings = keybinds[action]
@@ -538,6 +552,33 @@ export function SettingsDialog(props: {
         ...setting("camera", "invertLookY"),
         label: "Invert look vertical",
         control: <Switch checked={c.invertLookY} onCheckedChange={(v) => update("camera", { invertLookY: v })} />
+      },
+      {
+        id: "movementNeedsLook",
+        ...setting("camera", "movementNeedsLook"),
+        label: "Fly only while looking",
+        description: "Which movement keys need the look button held.",
+        control: (
+          <Select
+            value={c.movementNeedsLook}
+            items={movementLookItems}
+            onValueChange={(v) => v !== null && update("camera", { movementNeedsLook: v })}
+          >
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="w-auto" align="end" alignItemWithTrigger={false}>
+              {movementLookModes.map((m) => (
+                <SelectItem key={m} value={m} className="py-1.5 pr-7">
+                  <span className="flex flex-col gap-0.5">
+                    <span>{movementLookItems[m]}</span>
+                    <span className="opacity-70">{movementLookDescriptions[m]}</span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )
       },
       ...keybindRows,
       {
