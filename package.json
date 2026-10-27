@@ -8,10 +8,13 @@
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "lint": "oxlint --type-aware --deny-warnings --disable-nested-config",
-    "knip": "knip"
+    "knip": "knip",
+    "format": "dprint fmt",
+    "format:check": "dprint check"
   },
   "devDependencies": {
     "@effect/tsgo": "0.61.0",
+    "dprint": "0.64.3",
     "knip": "6.43.0",
     "oxlint": "1.89.0",
     "oxlint-tsgolint": "7.0.2005",
