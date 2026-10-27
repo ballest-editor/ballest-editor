@@ -252,8 +252,10 @@ function Overlay() {
   )
 }
 
-/** `toolbar` floats over the scene; it is disabled until the first scene shows. */
-export function Viewport({ toolbar: Toolbar }: { readonly toolbar?: ComponentType<{ readonly disabled?: boolean }> }) {
+/** `controls` (tool bar, view controls) floats over the scene; it is disabled until the first scene shows. */
+export function Viewport(
+  { controls: Controls }: { readonly controls?: ComponentType<{ readonly disabled?: boolean }> }
+) {
   const [revealed, setRevealed] = useState(false)
   const reveal = useCallback(() => setRevealed(true), [])
   return (
@@ -285,7 +287,7 @@ export function Viewport({ toolbar: Toolbar }: { readonly toolbar?: ComponentTyp
         {!revealed && <InitialMeshes onSettled={reveal} />}
       </Canvas>
       <Overlay />
-      {Toolbar && <Toolbar disabled={!revealed} />}
+      {Controls && <Controls disabled={!revealed} />}
     </div>
   )
 }

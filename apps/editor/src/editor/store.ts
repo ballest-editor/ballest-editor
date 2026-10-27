@@ -102,7 +102,6 @@ export interface EditorState {
   /** Changes the selection; its own undo step when settings.general.undoSelection is on. */
   readonly select: (id: string | null) => void
   readonly setTool: (tool: Tool) => void
-  readonly setGizmoSpace: (space: GizmoSpace) => void
   readonly toggleGizmoSpace: () => void
   readonly openDialog: (dialog: Dialog, category?: SettingsCategory) => void
   readonly closeDialog: () => void
@@ -272,7 +271,6 @@ export const useEditor = create<EditorState>()((set, get) => {
         return { selectedId, past: [...s.past, step].slice(-HISTORY_LIMIT), future: [] }
       }),
     setTool: (tool) => set({ tool }),
-    setGizmoSpace: (gizmoSpace) => set({ gizmoSpace }),
     toggleGizmoSpace: () => set((s) => ({ gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
     openDialog: (dialog, category) => set((s) => ({ dialog, settingsCategory: category ?? s.settingsCategory })),
     closeDialog: () => set({ dialog: null }),
