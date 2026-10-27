@@ -5,8 +5,14 @@ import { gameLoadProblems, isNormalizedRotation, LIMITS } from "./limits"
 import type { Item, MapFile } from "./MapFile"
 
 const fresh = (): MapFile => newMapFile({ displayName: "A", creatorName: "B", createdAt: "" })
-const plain = (): Item => ({ ...playerStartItem(), actorToSpawn: "/Script/Engine.BlueprintGeneratedClass'/Game/X/BP_X.BP_X_C'" })
-const withRotation = (item: Item, rotation: Item["itemTransform"]["rotation"]): Item => ({ ...item, itemTransform: { ...identityTransform(), rotation } })
+const plain = (): Item => ({
+  ...playerStartItem(),
+  actorToSpawn: "/Script/Engine.BlueprintGeneratedClass'/Game/X/BP_X.BP_X_C'"
+})
+const withRotation = (item: Item, rotation: Item["itemTransform"]["rotation"]): Item => ({
+  ...item,
+  itemTransform: { ...identityTransform(), rotation }
+})
 
 describe("game load rules", () => {
   it("accepts a fresh map", () => {
@@ -19,7 +25,7 @@ describe("game load rules", () => {
   })
 
   it("rejects non-normalized rotations", () => {
-    assert.isTrue(isNormalizedRotation({ x: 0, y: 0, z: 0.7071, w: 0.7071 }))
+    assert.isTrue(isNormalizedRotation({ x: 0, y: 0, z: Math.SQRT1_2 - 1e-5, w: Math.SQRT1_2 - 1e-5 }))
     assert.isFalse(isNormalizedRotation({ x: 0, y: 0, z: 1, w: 1 }))
     const map = addItem(fresh(), withRotation(plain(), { x: 0, y: 0, z: 1, w: 1 }))
     assert.deepStrictEqual(gameLoadProblems(map), ["Item 1 has a non-normalized rotation."])
@@ -27,10 +33,16 @@ describe("game load rules", () => {
 
   it("enforces the per-item array limits", () => {
     const base = plain()
-    const tooManyMeshes: Item = { ...base, meshComponents: Array.from({ length: LIMITS.meshComponentsPerItem + 1 }, () => base.meshComponents[0]!) }
+    const tooManyMeshes: Item = {
+      ...base,
+      meshComponents: Array.from({ length: LIMITS.meshComponentsPerItem + 1 }, () => base.meshComponents[0]!)
+    }
     const tooManyProps: Item = {
       ...base,
-      boolProperties: Array.from({ length: LIMITS.propertiesPerList + 1 }, () => ({ propertyName: "b", propertyType: "Bool", currentValue: true }))
+      boolProperties: Array.from(
+        { length: LIMITS.propertiesPerList + 1 },
+        () => ({ propertyName: "b", propertyType: "Bool", currentValue: true })
+      )
     }
     const problems = gameLoadProblems(addItem(addItem(fresh(), tooManyMeshes), tooManyProps))
     assert.strictEqual(problems.length, 2)

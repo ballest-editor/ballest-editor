@@ -1,7 +1,7 @@
 import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
-import { type UeTransform, ueToScene } from "../../domain/coords"
+import { ueToScene, type UeTransform } from "../../domain/coords"
 import { chordOf } from "../../domain/Keybinds"
 import { sceneRegistry } from "../sceneRegistry"
 import { selectedIndex, useEditor } from "../store"
@@ -35,7 +35,7 @@ const currentTransform = (): UeTransform | undefined => {
  * preview (inspector stays in sync), one undo entry per drag, Escape to cancel.
  */
 export function GizmoController() {
-  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera
+  const camera = useThree((s) => s.camera)
   const gl = useThree((s) => s.gl)
   const tool = useEditor((s) => s.tool)
   const gizmo = useMemo(() => (tool === "select" ? null : new GizmoObject(toolHandles[tool])), [tool])
@@ -60,7 +60,8 @@ export function GizmoController() {
   }, [])
 
   useFrame(() => {
-    if (gizmo === null) return
+    // The Canvas camera is perspective; gizmo sizing needs its fov.
+    if (gizmo === null || !(camera instanceof THREE.PerspectiveCamera)) return
     const { selectedId } = useEditor.getState()
     const object = selectedId === null ? undefined : sceneRegistry.objects.get(selectedId)
     const transform = currentTransform()
@@ -98,7 +99,8 @@ export function GizmoController() {
       if (!gizmo.visible) return null
       sample(e)
       const hit = raycaster.intersectObjects([...gizmo.hitMeshes], false)[0]
-      return (hit?.object.userData["handleId"] as string | undefined) ?? null
+      const handleId: unknown = hit?.object.userData["handleId"]
+      return typeof handleId === "string" ? handleId : null
     }
     const selectedObject = () => {
       const { selectedId } = useEditor.getState()

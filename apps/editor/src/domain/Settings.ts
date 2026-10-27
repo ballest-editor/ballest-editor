@@ -44,29 +44,33 @@ export type Settings = typeof Settings.Type
 
 export const defaultSettings: Settings = {
   general: { units: "cm", creatorName: "" },
-  camera: { flySpeed: 2000, lookSensitivity: 1, fovPreset: "Default", customFov: 90, invertLookX: false, invertLookY: false },
+  camera: {
+    flySpeed: 2000,
+    lookSensitivity: 1,
+    fovPreset: "Default",
+    customFov: 90,
+    invertLookX: false,
+    invertLookY: false
+  },
   appearance: { theme: "dark", gridVisible: true, gridCellColor: "#3a404a", gridSectionColor: "#58606e" }
 }
 
 type Section = keyof Settings
 
-const sectionSchemas: { readonly [K in Section]: Schema.Struct<Schema.Struct.Fields> } = {
-  general: GeneralSettings,
-  camera: CameraSettings,
-  appearance: AppearanceSettings
-}
+const sections: ReadonlyArray<Section> = ["general", "camera", "appearance"]
 
 /** Stored JSON -> Settings, field by field; invalid or missing fields keep their defaults. */
 export const mergeSettings = (stored: unknown, defaults: Settings = defaultSettings): Settings => {
   const out: Record<string, Record<string, unknown>> = {}
-  for (const section of Object.keys(sectionSchemas) as Array<Section>) {
-    const fields = sectionSchemas[section].fields
-    const from = Predicate.isObject(stored) ? (stored as Record<string, unknown>)[section] : undefined
-    const merged: Record<string, unknown> = { ...defaults[section] }
+  for (const section of sections) {
+    const from = Predicate.isObject(stored) ? stored[section] : undefined
+    let merged: Record<string, unknown> = { ...defaults[section] }
     if (Predicate.isObject(from)) {
-      for (const [key, schema] of Object.entries(fields)) {
-        const value = Schema.decodeUnknownOption(schema as Schema.Codec<unknown>)((from as Record<string, unknown>)[key])
-        if (Option.isSome(value)) merged[key] = value.value
+      // A field is kept when the section still decodes with it in place.
+      const decodeSection = Schema.decodeUnknownOption(Settings.fields[section])
+      for (const key of Object.keys(merged)) {
+        const candidate = { ...merged, [key]: from[key] }
+        if (Option.isSome(decodeSection(candidate))) merged = candidate
       }
     }
     out[section] = merged
@@ -88,11 +92,16 @@ export const verticalFov = (horizontalDeg: number, aspect: number): number => {
 }
 
 /** Vertical FOV (degrees) for the editor camera: the preset's horizontal FOV at 16:9. */
-export const editorVerticalFov = (settings: Settings, presets: ReadonlyArray<{ readonly id: string; readonly fov: number }>): number =>
-  verticalFov(fovOf(settings, presets), REFERENCE_ASPECT)
+export const editorVerticalFov = (
+  camera: Settings["camera"],
+  presets: ReadonlyArray<{ readonly id: string; readonly fov: number }>
+): number => verticalFov(fovOf(camera, presets), REFERENCE_ASPECT)
 
 /** The horizontal FOV for the chosen preset; unknown presets use the first (Default). */
-export const fovOf = (settings: Settings, presets: ReadonlyArray<{ readonly id: string; readonly fov: number }>): number => {
-  if (settings.camera.fovPreset === CUSTOM_FOV_PRESET) return settings.camera.customFov
-  return presets.find((p) => p.id === settings.camera.fovPreset)?.fov ?? presets[0]?.fov ?? 90
+export const fovOf = (
+  camera: Settings["camera"],
+  presets: ReadonlyArray<{ readonly id: string; readonly fov: number }>
+): number => {
+  if (camera.fovPreset === CUSTOM_FOV_PRESET) return camera.customFov
+  return presets.find((p) => p.id === camera.fovPreset)?.fov ?? presets[0]?.fov ?? 90
 }

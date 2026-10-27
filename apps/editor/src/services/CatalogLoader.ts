@@ -1,8 +1,14 @@
 import { Context, Effect, Layer } from "effect"
-import { type Catalog, decodeCatalog, decodeVerification, NO_VERIFICATION, type VerificationTable } from "../domain/Catalog"
-import fixtureJson from "../test/fixtures/catalog.json"
+import fixtureJson from "../domain/bundledCatalog.json"
+import {
+  type Catalog,
+  decodeCatalog,
+  decodeVerification,
+  NO_VERIFICATION,
+  type VerificationTable
+} from "../domain/Catalog"
 import { CatalogLoadError } from "./errors"
-import { browserFetch, type FetchText, fetchJson } from "./fetchJson"
+import { browserFetch, fetchJson, type FetchText } from "./fetchJson"
 
 export type { FetchText } from "./fetchJson"
 
@@ -36,10 +42,16 @@ export class CatalogLoader extends Context.Service<CatalogLoader, {
 
     // Optional: a missing or malformed verified.json just means "nothing verified".
     const verifiedUrl = url.replace(/[^/]+$/, VERIFIED_URL.slice(VERIFIED_URL.lastIndexOf("/") + 1))
-    const fetchVerified = fetchJson(fetchText, verifiedUrl, (message) => new CatalogLoadError({ url: verifiedUrl, message })).pipe(
+    const fetchVerified = fetchJson(
+      fetchText,
+      verifiedUrl,
+      (message) => new CatalogLoadError({ url: verifiedUrl, message })
+    ).pipe(
       Effect.flatMap(decodeVerification),
       Effect.map((file) => file.results),
-      Effect.catch((error) => Effect.logWarning(`No in-game verification table: ${error.message}`).pipe(Effect.as(NO_VERIFICATION)))
+      Effect.catch((error) =>
+        Effect.logWarning(`No in-game verification table: ${error.message}`).pipe(Effect.as(NO_VERIFICATION))
+      )
     )
 
     const load = Effect.gen(function*() {
@@ -56,8 +68,7 @@ export class CatalogLoader extends Context.Service<CatalogLoader, {
               verified,
               warning: `Couldn't load ${url} (${error.message}). Using the 3-piece development fixture.`
             } satisfies LoadedCatalog
-          })
-        )
+          }))
       )
     })
 

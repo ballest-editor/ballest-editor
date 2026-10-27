@@ -61,7 +61,7 @@ export class CatalogPiece extends Schema.Opaque<CatalogPiece>()(open({
   glb: NullableString,
   materialSlots: Schema.Array(CatalogMaterialSlot),
   bounds: NullableBounds,
-  seenInSamples: Schema.optionalKey(Schema.Number),
+  seenInSamples: Schema.optionalKey(Schema.Int),
   mainRelativeTransform: Schema.optionalKey(Schema.NullOr(MainRelativeTransform)),
   extraMeshes: Schema.optionalKey(Schema.Array(ExtraMesh)),
   /** In-game browser category, display name, visibility and thumbnail (newer catalogs). */
@@ -147,7 +147,10 @@ export const indexCatalog = (catalog: Catalog): CatalogIndex => {
   for (const entry of catalog.unresolved ?? []) {
     const decoded = decodeUnresolved(entry)
     if (Option.isSome(decoded) && !unresolvedReasons.has(decoded.value.classPath)) {
-      unresolvedReasons.set(decoded.value.classPath, decoded.value.reason ?? "The extractor couldn't resolve this piece.")
+      unresolvedReasons.set(
+        decoded.value.classPath,
+        decoded.value.reason ?? "The extractor couldn't resolve this piece."
+      )
     }
   }
   return { meshes, pieceByClass, unresolvedReasons }
@@ -203,9 +206,15 @@ export const pieceLabelOf = (piece: CatalogPiece): string => piece.displayName |
  * Why a piece can't be placed, or undefined if it can: the extractor lists it as
  * unresolved (base classes, runtime-generated geometry), or it has no mesh of any kind.
  */
-export const unavailableReasonOf = (index: CatalogIndex, piece: CatalogPiece, verified: VerificationTable = NO_VERIFICATION): string | undefined => {
+export const unavailableReasonOf = (
+  index: CatalogIndex,
+  piece: CatalogPiece,
+  verified: VerificationTable = NO_VERIFICATION
+): string | undefined => {
   if (verificationOf(piece, verified) === "rejected") {
-    return `The in-game editor rejects this piece${verified[piece.className]?.note ? ` (${verified[piece.className]?.note})` : ""}.`
+    return `The in-game editor rejects this piece${
+      verified[piece.className]?.note ? ` (${verified[piece.className]?.note})` : ""
+    }.`
   }
   const unresolved = index.unresolvedReasons.get(piece.classPath)
   if (unresolved !== undefined) return unresolved

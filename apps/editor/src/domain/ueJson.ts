@@ -36,6 +36,7 @@ const toDigits17 = (n: number): { readonly digits: string; readonly exponent: nu
     const sign = s.startsWith("-") ? "-" : ""
     return { digits: s.slice(sign.length, eIndex).replace(".", ""), exponent: Number(s.slice(eIndex + 1)), sign }
   }
+  // oxlint-disable-next-line oxc/number-arg-out-of-range -- toExponential takes 0..100 since ES2018
   const full = split(n.toExponential(99))
   const isTie = full.digits[17] === "5" && /^0*$/.test(full.digits.slice(18))
   if (isTie && Number(full.digits[16]) % 2 === 0) {

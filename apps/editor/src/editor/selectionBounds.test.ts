@@ -45,7 +45,11 @@ describe("selection bounds", () => {
     const expected = obbCorners(turned, b1)
     const unit = [-0.5, 0.5]
     const drawn: Array<THREE.Vector3> = []
-    for (const x of unit) for (const y of unit) for (const z of unit) drawn.push(new THREE.Vector3(x * 2, y * 2, z * 2).applyMatrix4(helper.matrixWorld))
+    for (const x of unit) {
+      for (const y of unit) {
+        for (const z of unit) drawn.push(new THREE.Vector3(x * 2, y * 2, z * 2).applyMatrix4(helper.matrixWorld))
+      }
+    }
     // Box3Helper draws the unit cube [-1, 1]^3 scaled by half the box size
     for (let i = 0; i < 8; i++) expect(drawn[i]!.distanceTo(expected[i]!)).toBeLessThan(1e-6)
     // and the world AABB of the turned item is bigger than the box we draw (the old bug)

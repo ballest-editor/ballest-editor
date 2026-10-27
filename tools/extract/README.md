@@ -63,12 +63,12 @@ Normals are UE TangentZ, normalized. UVs are UV0 as cooked; UE and glTF both put
 
 In the cooked UE index buffers, outward faces are **clockwise** when the stored positions are read with ordinary right-handed math. The signed volume `Σ a·(b×c)/6` comes out negative, and every face normal points opposite the vertex normals:
 
-| mesh | signed volume, UE index order | after the writer fix |
-|---|---|---|
-| `SM_500` | -25,000,000 (= -500·500·100) | +25,000,000 |
-| `SM_Sphere` | -33,369,034 | +33,369,034 |
-| `Torus` | -443,775,589 | +443,775,589 |
-| `/Engine/BasicShapes/Cube` | -1,000,000 | +1,000,000 |
+| mesh                       | signed volume, UE index order | after the writer fix |
+| -------------------------- | ----------------------------- | -------------------- |
+| `SM_500`                   | -25,000,000 (= -500·500·100)  | +25,000,000          |
+| `SM_Sphere`                | -33,369,034                   | +33,369,034          |
+| `Torus`                    | -443,775,589                  | +443,775,589         |
+| `/Engine/BasicShapes/Cube` | -1,000,000                    | +1,000,000           |
 
 glTF, and three.js, define the front face as **CCW in the mesh's local coordinates**. three.js keeps that true under a negative-determinant world matrix: it sees `det < 0` and switches `gl.frontFace` to CW, which compensates for the mirror. So under the mapping M (negative determinant), three.js flips frontFace, and faces are outward only if the stored winding is CCW-outward. With UE's original order they weren't, which is why rings and tori showed their inside faces. Mirroring the root does not change which faces three.js treats as front.
 
@@ -82,11 +82,8 @@ Opened in a plain glTF viewer, a glb now has correct faces, but it looks mirrore
 
    ```js
    // three.x = ue.y (right), three.y = ue.z (up), three.z = -ue.x (UE forward = three -Z)
-   root.matrixAutoUpdate = false;
-   root.matrix.set(0, 1, 0, 0,
-                   0, 0, 1, 0,
-                  -1, 0, 0, 0,
-                   0, 0, 0, 1);
+   root.matrixAutoUpdate = false
+   root.matrix.set(0, 1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0, 0, 0, 1)
    ```
 
    The mirror undoes UE's left-handedness, so the map isn't shown mirrored. three.js handles the CW/CCW switch itself.
@@ -223,12 +220,12 @@ Output shape:
 - **`label`** on each mapping and action is `PlayerMappableKeySettings.DisplayName`, for example "Forward", "Replay back 5 seconds" or "Look Right". This is the text the Controls page shows; the UI lowercases it.
 - **`section`** is the Controls-page header the mapping is listed under. It comes from `UI/MainMenu/Pages/WBP_2_Settings`, whose `Keybinds` scroll box alternates `WBP_OptionsHeader` (the title) with a box named `<Game|Spectator>Bindings_<MNK|Controller>_VB`. The widget graph fills each box at runtime from the key profile, filtered by `DisplayCategory`:
 
-  | `DisplayCategory` | Section |
-  |---|---|
-  | `MNK` | "mouse and keyboard bindings" |
-  | `SpectatorMNK` | "mouse and keyboard free camera" |
-  | `Controller` | "gamepad" |
-  | `SpectatorController` | "gamepad free camera" |
+  | `DisplayCategory`     | Section                          |
+  | --------------------- | -------------------------------- |
+  | `MNK`                 | "mouse and keyboard bindings"    |
+  | `SpectatorMNK`        | "mouse and keyboard free camera" |
+  | `Controller`          | "gamepad"                        |
+  | `SpectatorController` | "gamepad free camera"            |
 
   Those category literals appear in the widget's bytecode.
 - **`sections[]`** gives the sections in UI order with their actions. Membership is exact. Row order within a section is assigned at runtime and isn't stored in the asset, so it's listed in IMC order. Each section has 9 or 11 design-time row slots (`rowSlots`).

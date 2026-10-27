@@ -1,7 +1,7 @@
-import * as fs from "node:fs"
-import * as path from "node:path"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect } from "effect"
+import * as fs from "node:fs"
+import * as path from "node:path"
 import { repoRoot } from "../test/samples"
 import { CatalogLoader, type FetchText } from "./CatalogLoader"
 
@@ -11,7 +11,13 @@ const respond = (status: number, body: string): FetchText => () =>
 describe("CatalogLoader", () => {
   it.effect("falls back to the fixture on 404 or an HTML body", () =>
     Effect.gen(function*() {
-      for (const fetchText of [respond(404, ""), respond(200, "<!doctype html>"), () => Promise.reject(new Error("offline"))]) {
+      for (
+        const fetchText of [
+          respond(404, ""),
+          respond(200, "<!doctype html>"),
+          () => Promise.reject(new Error("offline"))
+        ]
+      ) {
         const loaded = yield* CatalogLoader.make(fetchText).load
         assert.strictEqual(loaded.source, "fixture")
         assert.isDefined(loaded.warning)

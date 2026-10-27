@@ -3,10 +3,10 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Separator } from "@workspace/ui/components/separator"
-import { type ReactNode, useEffect, useState } from "react"
+import { type ReactNode, useState } from "react"
 import { classNameOf, isPlayerStart, objectPathOf } from "../domain/MapFile"
-import { glbUrl, visualsOf } from "../editor/visuals"
 import { selectedIndex, useEditor } from "../editor/store"
+import { glbUrl, visualsOf } from "../editor/visuals"
 import { NumberField } from "./NumberField"
 
 const SectionTitle = ({ children }: { readonly children: ReactNode }) => (
@@ -19,10 +19,12 @@ function MapSettings() {
   const hasEditorState = useEditor((s) => s.doc.map.editorState !== undefined)
   const sourceName = useEditor((s) => s.sourceName)
   const renameLevel = useEditor((s) => s.renameLevel)
-  const [name, setName] = useState(levelData.levelDisplayName)
-  useEffect(() => setName(levelData.levelDisplayName), [levelData.levelDisplayName])
+  // An edit in progress; otherwise the input shows the map's name.
+  const [draft, setDraft] = useState<string | null>(null)
+  const name = draft ?? levelData.levelDisplayName
   const commit = () => {
     if (name !== levelData.levelDisplayName) renameLevel(name, levelData.creatorName)
+    setDraft(null)
   }
   const facts: ReadonlyArray<readonly [string, string]> = [
     ["Creator", levelData.creatorName || "set in Settings › General"],
@@ -36,7 +38,7 @@ function MapSettings() {
       <SectionTitle>Map</SectionTitle>
       <div className="flex flex-col gap-1">
         <Label htmlFor="map-name" className="text-muted-foreground">Name</Label>
-        <Input id="map-name" value={name} onChange={(e) => setName(e.target.value)} onBlur={commit} />
+        <Input id="map-name" value={name} onChange={(e) => setDraft(e.target.value)} onBlur={commit} />
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
         {facts.map(([k, v]) => (
@@ -63,40 +65,63 @@ export function Inspector() {
   if (item === undefined || selectedId === null) {
     return (
       <ScrollArea className="h-full bg-card">
-        <div className="p-3"><MapSettings /></div>
+        <div className="p-3">
+          <MapSettings />
+        </div>
       </ScrollArea>
     )
   }
 
   // While the gizmo drags, show the live transform (committed on release).
-  const t = preview !== null && preview.id === selectedId ? preview.transform : item.itemTransform
+  const t = preview?.id === selectedId ? preview.transform : item.itemTransform
   // Display units only; the map always stores centimetres.
   const perUnit = units === "m" ? 100 : 1
-  const setAxis = (axis: "x" | "y" | "z") => (value: number) => moveItem(selectedId, { ...t.translation, [axis]: value * perUnit })
+  const setAxis = (axis: "x" | "y" | "z") => (value: number) =>
+    moveItem(selectedId, { ...t.translation, [axis]: value * perUnit })
   const failed = visualsOf(item, catalogIndex).flatMap((v) => {
     const url = glbUrl(v.mesh?.glb)
-    return url !== undefined && missing.has(url) ? [`${v.mesh?.meshAssetPath.split(".").at(-1)}: mesh failed to load`] : []
+    return url !== undefined && missing.has(url)
+      ? [`${v.mesh?.meshAssetPath.split(".").at(-1)}: mesh failed to load`]
+      : []
   })
 
   return (
     <ScrollArea className="h-full bg-card">
       <div className="flex flex-col gap-3 p-3">
         <SectionTitle>Item #{index}</SectionTitle>
-        <div className="text-sm font-semibold break-all" title={item.actorToSpawn}>{classNameOf(item.actorToSpawn)}</div>
+        <div className="text-sm font-semibold break-all" title={item.actorToSpawn}>
+          {classNameOf(item.actorToSpawn)}
+        </div>
         {isPlayerStart(item) && <Badge variant="secondary">Player start (required)</Badge>}
         {failed.map((w) => <Badge key={w} variant="destructive">{w}</Badge>)}
 
         <Separator />
         <SectionTitle>Position (game {units}, Z up)</SectionTitle>
         <div className="grid grid-cols-3 gap-2">
-          <NumberField label="X" value={t.translation.x / perUnit} onCommit={setAxis("x")} digits={units === "m" ? 5 : 3} />
-          <NumberField label="Y" value={t.translation.y / perUnit} onCommit={setAxis("y")} digits={units === "m" ? 5 : 3} />
-          <NumberField label="Z" value={t.translation.z / perUnit} onCommit={setAxis("z")} digits={units === "m" ? 5 : 3} />
+          <NumberField
+            label="X"
+            value={t.translation.x / perUnit}
+            onCommit={setAxis("x")}
+            digits={units === "m" ? 5 : 3}
+          />
+          <NumberField
+            label="Y"
+            value={t.translation.y / perUnit}
+            onCommit={setAxis("y")}
+            digits={units === "m" ? 5 : 3}
+          />
+          <NumberField
+            label="Z"
+            value={t.translation.z / perUnit}
+            onCommit={setAxis("z")}
+            digits={units === "m" ? 5 : 3}
+          />
         </div>
 
         <SectionTitle>Rotation (quaternion)</SectionTitle>
         <div className="font-mono text-xs text-muted-foreground">
-          x {t.rotation.x.toFixed(4)} y {t.rotation.y.toFixed(4)} z {t.rotation.z.toFixed(4)} w {t.rotation.w.toFixed(4)}
+          x {t.rotation.x.toFixed(4)} y {t.rotation.y.toFixed(4)} z {t.rotation.z.toFixed(4)} w{" "}
+          {t.rotation.w.toFixed(4)}
         </div>
         <SectionTitle>Scale</SectionTitle>
         <div className="font-mono text-xs text-muted-foreground">
@@ -106,9 +131,12 @@ export function Inspector() {
         <Separator />
         <SectionTitle>Meshes</SectionTitle>
         {item.meshComponents.map((mesh, i) => (
+          // oxlint-disable-next-line react/no-array-index-key -- mesh components have no id; the slot index is their identity
           <div key={i} className="flex flex-col gap-1 text-xs break-all">
             <div className="font-mono" title={mesh.meshAssetPath}>
-              {mesh.meshAssetPath === undefined || mesh.meshAssetPath === "" ? "(no main mesh)" : mesh.meshAssetPath.split("/").at(-1)}
+              {mesh.meshAssetPath === undefined || mesh.meshAssetPath === ""
+                ? "(no main mesh)"
+                : mesh.meshAssetPath.split("/").at(-1)}
             </div>
             <ul className="flex flex-col gap-0.5 pl-2 font-mono text-muted-foreground">
               {mesh.materials.map((m) => (

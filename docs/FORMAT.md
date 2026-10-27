@@ -5,11 +5,11 @@ Install: `~/.local/share/Steam/steamapps/common/Ballest of Them All` (read-only 
 
 ## Where maps live
 
-| What | Path | Ext |
-|---|---|---|
-| Local drafts | `<proton pfx>/drive_c/users/steamuser/AppData/Local/Ballest/Saved/UserSavedMaps/` | `.balledit` |
-| Published (Workshop) | `~/.local/share/Steam/steamapps/workshop/content/3339810/<id>/` | `.ballmap` + `.jpg` thumbnail |
-| Prefabs | `.../Saved/SaveGames/Prefabs/` | JSON (`BallestPrefab` v1) |
+| What                 | Path                                                                              | Ext                           |
+| -------------------- | --------------------------------------------------------------------------------- | ----------------------------- |
+| Local drafts         | `<proton pfx>/drive_c/users/steamuser/AppData/Local/Ballest/Saved/UserSavedMaps/` | `.balledit`                   |
+| Published (Workshop) | `~/.local/share/Steam/steamapps/workshop/content/3339810/<id>/`                   | `.ballmap` + `.jpg` thumbnail |
+| Prefabs              | `.../Saved/SaveGames/Prefabs/`                                                    | JSON (`BallestPrefab` v1)     |
 
 Proton prefix: `~/.local/share/Steam/steamapps/compatdata/3339810/pfx`.
 File name convention: `Map_LevelEditorMain&<displayName>_<creatorName>.balledit`.
@@ -73,14 +73,14 @@ Largest sample: 3750 items ("Ballest Of The Mall").
 
 Found by locating the `lea` that references each error string and reading the adjacent `cmp` immediate (`/tmp/ballest-re`, objdump).
 
-| Limit | Value | Error string | Code addr |
-|---|---|---|---|
-| Items per level | **100,000** (0x186A0) | `Serialized level contains more than %d items.` | 0x1447EEB9D |
-| Any JSON array length | 100,000 | `...array with more than %d entries.` | 0x1447EE993 |
-| Mesh components per item | 64 | `Item %d contains more than %d saved mesh components.` | 0x1447EFAFB |
-| Properties per typed list | 4,096 | `Item %d contains more than %d saved %s properties.` | 0x1447B665B |
-| JSON field-name length | 4,096 | `...oversized field name.` | 0x1447EE8C2 |
-| Prefab items | 2–4,096 | string | — |
+| Limit                     | Value                                     | Error string                                            | Code addr   |
+| ------------------------- | ----------------------------------------- | ------------------------------------------------------- | ----------- |
+| Items per level           | **100,000** (0x186A0)                     | `Serialized level contains more than %d items.`         | 0x1447EEB9D |
+| Any JSON array length     | 100,000                                   | `...array with more than %d entries.`                   | 0x1447EE993 |
+| Mesh components per item  | 64                                        | `Item %d contains more than %d saved mesh components.`  | 0x1447EFAFB |
+| Properties per typed list | 4,096                                     | `Item %d contains more than %d saved %s properties.`    | 0x1447B665B |
+| JSON field-name length    | 4,096                                     | `...oversized field name.`                              | 0x1447EE8C2 |
+| Prefab items              | 2–4,096                                   | string                                                  | —           |
 | Workshop `.ballmap` bytes | not recovered (64-bit constant elsewhere) | `...oversized root .ballmap (%lld bytes; maximum %lld)` | 0x144ECBD1C |
 
 Practical ceiling is performance, not the parser: largest Workshop map seen is 3,750 items; the game spawns one actor per item (`Ballest.UGC.Playback.ForceFullActors`, spatial bucketing cvars suggest instancing for big maps).

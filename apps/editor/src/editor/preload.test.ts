@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Schema } from "effect"
+import fixture from "../domain/bundledCatalog.json"
 import { Catalog, indexCatalog } from "../domain/Catalog"
-import fixture from "../test/fixtures/catalog.json"
 import { glbUrlsForPiece, preloadGlb, warmCatalog } from "./preload"
 
 const catalog = Schema.decodeUnknownSync(Catalog)(fixture)
@@ -21,7 +21,11 @@ describe("glb preloading", () => {
 
     const ticks: Array<() => void> = []
     const warmed: Array<string> = []
-    warmCatalog(catalog, indexCatalog(catalog), { perTick: 1, idle: (run) => ticks.push(run), preload: (u) => warmed.push(u) })
+    warmCatalog(catalog, indexCatalog(catalog), {
+      perTick: 1,
+      idle: (run) => ticks.push(run),
+      preload: (u) => warmed.push(u)
+    })
     expect(warmed).toEqual([]) // nothing happens until the browser is idle
     while (ticks.length > 0) {
       ticks.shift()!()

@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from "effect"
 import { type DerivedKeybinds, deriveKeybinds, GameKeybindsFile } from "../domain/GameKeybinds"
 import { GameKeybindsLoadError } from "./errors"
-import { browserFetch, type FetchText, fetchFromText, fetchJson } from "./fetchJson"
+import { browserFetch, fetchFromText, fetchJson, type FetchText } from "./fetchJson"
 
 export const GAME_KEYBINDS_URL = "/assets/keybinds.json"
 
@@ -23,10 +23,13 @@ export class GameKeybinds extends Context.Service<GameKeybinds, {
 
     const defaults = yield* fetchFile.pipe(
       Effect.map(deriveKeybinds),
-      Effect.catchTag("GameKeybindsLoadError", (error) =>
-        Effect.logWarning(`Game keybinds unavailable (${error.message}); using editor fallbacks`).pipe(
-          Effect.as(deriveKeybinds(undefined))
-        )),
+      Effect.catchTag(
+        "GameKeybindsLoadError",
+        (error) =>
+          Effect.logWarning(`Game keybinds unavailable (${error.message}); using editor fallbacks`).pipe(
+            Effect.as(deriveKeybinds(undefined))
+          )
+      ),
       Effect.tap((derived) =>
         derived.fellBack.length === 0
           ? Effect.void
@@ -41,5 +44,6 @@ export class GameKeybinds extends Context.Service<GameKeybinds, {
   static readonly layer = Layer.effect(GameKeybinds, GameKeybinds.make(browserFetch))
 
   /** For tests: serve `body` (or a 404 when undefined) instead of fetching. */
-  static readonly layerFromText = (body: string | undefined) => Layer.effect(GameKeybinds, GameKeybinds.make(fetchFromText(body)))
+  static readonly layerFromText = (body: string | undefined) =>
+    Layer.effect(GameKeybinds, GameKeybinds.make(fetchFromText(body)))
 }

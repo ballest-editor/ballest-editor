@@ -1,8 +1,8 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
+import fixture from "../domain/bundledCatalog.json"
 import { Catalog } from "../domain/Catalog"
 import { placementTransform } from "../domain/factory"
-import fixture from "../test/fixtures/catalog.json"
 import { initialMap, useEditor } from "./store"
 
 const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!

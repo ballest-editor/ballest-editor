@@ -29,8 +29,9 @@ export class KeybindStore extends Context.Service<KeybindStore, {
       const load = Effect.gen(function*() {
         const defaults = yield* game.defaults
         const stored = yield* store.get(KEYBINDS_STORAGE_KEY).pipe(
-          Effect.catchTag("SchemaError", (error) =>
-            Effect.logWarning(`Ignoring saved keybinds: ${error.message}`).pipe(Effect.as(Option.none()))
+          Effect.catchTag(
+            "SchemaError",
+            (error) => Effect.logWarning(`Ignoring saved keybinds: ${error.message}`).pipe(Effect.as(Option.none()))
           ),
           Effect.mapError(toError)
         )

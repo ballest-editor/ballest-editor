@@ -41,14 +41,16 @@ export const preloadPiece = (piece: CatalogPiece, index: CatalogIndex, preload?:
 type IdleScheduler = (run: () => void) => void
 
 const defaultIdle: IdleScheduler = (run) =>
-  typeof requestIdleCallback === "function" ? void requestIdleCallback(run, { timeout: 2000 }) : void setTimeout(run, 50)
+  typeof requestIdleCallback === "function"
+    ? void requestIdleCallback(run, { timeout: 2000 })
+    : void setTimeout(run, 50)
 
 /** Preloads all palette pieces' meshes, `perTick` urls per idle callback. Returns a cancel function. */
 export const warmCatalog = (
   catalog: Catalog,
   index: CatalogIndex,
   options: { readonly perTick?: number; readonly idle?: IdleScheduler; readonly preload?: Preload } = {}
-): (() => void) => {
+): () => void => {
   const queue = catalog.pieces
     .filter((piece) => piece.inPalette !== false)
     .flatMap((piece) => glbUrlsForPiece(piece, index))
@@ -57,7 +59,11 @@ export const warmCatalog = (
   let cancelled = false
   const tick = () => {
     if (cancelled) return
-    for (let i = 0; i < perTick && queue.length > 0; i++) preloadGlb(queue.shift()!, options.preload)
+    for (let i = 0; i < perTick; i++) {
+      const url = queue.shift()
+      if (url === undefined) break
+      preloadGlb(url, options.preload)
+    }
     if (queue.length > 0) idle(tick)
   }
   idle(tick)

@@ -14,7 +14,11 @@ export const Route = createRootRoute({
     scripts: [{ children: panelWidthsScript }]
   }),
   component: RootComponent,
-  notFoundComponent: () => <p className="p-8">Not found. The editor is at <a className="underline" href="/">/</a>.</p>
+  notFoundComponent: () => (
+    <p className="p-8">
+      Not found. The editor is at <a className="underline" href="/">/</a>.
+    </p>
+  )
 })
 
 function RootComponent() {

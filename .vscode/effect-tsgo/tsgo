@@ -1,0 +1,6 @@
+#!/bin/sh
+# TypeScript (Native Preview) runs this as the language server (js/ts.tsdk.path points
+# here). effect-tsgo launches its TypeScript 7 build with the Effect language service,
+# without patching node_modules.
+root="$(cd "$(dirname "$0")/../.." && pwd)"
+exec "$root/node_modules/.bin/effect-tsgo" tsc "$@"

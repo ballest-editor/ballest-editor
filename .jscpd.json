@@ -1,0 +1,10 @@
+{
+  "path": ["apps/editor/src", "packages/ui/src", "tools/extract"],
+  "format": ["typescript", "tsx", "javascript"],
+  "ignore": ["**/routeTree.gen.ts", "packages/ui/src/components/**"],
+  "minTokens": 50,
+  "minLines": 3,
+  "similarity": 0.8,
+  "reporters": ["console"],
+  "exitCode": 1
+}

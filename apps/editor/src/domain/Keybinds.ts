@@ -19,7 +19,17 @@ import { Schema } from "effect"
 export const keybindSections = [
   {
     name: "level editor",
-    actions: ["selectMode", "translateMode", "rotateMode", "scaleMode", "focusSelection", "deleteSelection", "undo", "redo", "deselect"]
+    actions: [
+      "selectMode",
+      "translateMode",
+      "rotateMode",
+      "scaleMode",
+      "focusSelection",
+      "deleteSelection",
+      "undo",
+      "redo",
+      "deselect"
+    ]
   },
   {
     name: "mouse and keyboard free camera",
@@ -32,8 +42,6 @@ export const keybindSections = [
 
 export type KeybindAction = (typeof keybindSections)[number]["actions"][number]
 export const keybindActions: ReadonlyArray<KeybindAction> = keybindSections.flatMap((g) => g.actions)
-
-export const KeybindActionSchema = Schema.Literals(keybindActions as unknown as readonly [KeybindAction, ...Array<KeybindAction>])
 
 /** Actions named by the in-game level editor's hotkey overlay (keybinds.json naming doesn't apply). */
 export const editorOverlayActions: ReadonlySet<KeybindAction> = new Set(keybindSections[0].actions)
@@ -73,10 +81,13 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
 /** What each action does in the editor (binding tooltips). */
 export const keybindActionDescriptions: Record<KeybindAction, string> = {
   selectMode: "Select mode: click to select, no gizmo. Q in the game's level editor.",
-  translateMode: "Move mode: drag the arrows or plane handles to move the selection. W in the game's level editor; the camera's W only flies while the look button is held.",
+  translateMode:
+    "Move mode: drag the arrows or plane handles to move the selection. W in the game's level editor; the camera's W only flies while the look button is held.",
   rotateMode: "Rotate mode: drag a ring to rotate the selection. E in the game's level editor.",
-  scaleMode: "Scale mode: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the game's level editor.",
-  focusSelection: "Frame the current selection in the viewport. F in the game's level editor; its free camera calls this \"center camera\" (C).",
+  scaleMode:
+    "Scale mode: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the game's level editor.",
+  focusSelection:
+    "Frame the current selection in the viewport. F in the game's level editor; its free camera calls this \"center camera\" (C).",
   deleteSelection: "Delete the selected item. Backspace in the game's level editor; Delete also works.",
   undo: "Undo the last change.",
   redo: "Redo the last undone change.",
@@ -85,9 +96,11 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   moveBack: "Fly the camera backward while held.",
   moveLeft: "Fly the camera left while held.",
   moveRight: "Fly the camera right while held.",
-  look: "Hold and drag to turn the camera. The game uses plain mouse movement; in the browser a button has to be held. While it's held, the fly keys never trigger tool shortcuts.",
+  look:
+    "Hold and drag to turn the camera. The game uses plain mouse movement; in the browser a button has to be held. While it's held, the fly keys never trigger tool shortcuts.",
   moveUp: "Fly the camera straight up while held.",
-  moveDown: "Fly the camera straight down while held. The game uses Left Ctrl; the editor defaults to Left Shift so Ctrl+Z / Ctrl+Y never move the camera.",
+  moveDown:
+    "Fly the camera straight down while held. The game uses Left Ctrl; the editor defaults to Left Shift so Ctrl+Z / Ctrl+Y never move the camera.",
   lookRight: "Turn the camera right while held.",
   lookLeft: "Turn the camera left while held.",
   lookUp: "Tilt the camera up while held.",
@@ -168,26 +181,30 @@ export const editorOverrides: Partial<Keybinds> = { moveDown: ["ShiftLeft"] }
 export const StoredKeybinds = Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Array(Schema.String)]))
 export type StoredKeybinds = typeof StoredKeybinds.Type
 
-export const uniqueBindings = (bindings: ReadonlyArray<string>): Bindings => [...new Set(bindings.filter((b) => b.length > 0))]
+export const uniqueBindings = (
+  bindings: ReadonlyArray<string>
+): Bindings => [...new Set(bindings.filter((b) => b.length > 0))]
 
 export const mergeKeybinds = (stored: StoredKeybinds, defaults: Keybinds = defaultKeybinds): Keybinds => {
-  const out: Record<string, Bindings> = { ...defaults }
+  const out: Record<KeybindAction, Bindings> = { ...defaults }
   for (const action of keybindActions) {
     const value = stored[action]
     if (value === undefined) continue
     out[action] = uniqueBindings(typeof value === "string" ? [value] : value)
   }
-  return out as Keybinds
+  return out
 }
 
-export const sameBindings = (a: Bindings, b: Bindings): boolean => a.length === b.length && a.every((x, i) => x === b[i])
+export const sameBindings = (a: Bindings, b: Bindings): boolean =>
+  a.length === b.length && a.every((x, i) => x === b[i])
 
 /** True when the action's bindings are exactly its defaults. */
 export const isDefaultBinding = (keybinds: Keybinds, defaults: Keybinds, action: KeybindAction): boolean =>
   sameBindings(keybinds[action], defaults[action])
 
 /** Is `chord` one of the action's bindings? */
-export const isBound = (keybinds: Keybinds, action: KeybindAction, chord: string): boolean => keybinds[action].includes(chord)
+export const isBound = (keybinds: Keybinds, action: KeybindAction, chord: string): boolean =>
+  keybinds[action].includes(chord)
 
 /** The action(s) a chord is bound to. */
 export const actionsFor = (keybinds: Keybinds, chord: string): ReadonlyArray<KeybindAction> =>
@@ -223,7 +240,8 @@ const withModifiers = (e: ModifierState, code: string): string => {
 export const chordOf = (e: ModifierState & { readonly code: string }): string =>
   MODIFIER_CODES.has(e.code) ? e.code : withModifiers(e, e.code)
 
-export const mouseChordOf = (e: ModifierState & { readonly button: number }): string => withModifiers(e, `Mouse${e.button}`)
+export const mouseChordOf = (e: ModifierState & { readonly button: number }): string =>
+  withModifiers(e, `Mouse${e.button}`)
 export const wheelChordOf = (e: ModifierState & { readonly deltaY: number }): string =>
   withModifiers(e, e.deltaY < 0 ? "WheelUp" : "WheelDown")
 
@@ -235,9 +253,8 @@ export const isOneShotChord = (keybinds: Keybinds, chord: string): boolean =>
   actionsFor(keybinds, chord).some((action) => !heldActions.has(action) && !mouseDragActions.has(action))
 
 /** True when `chord` (from chordOf) is bound to a one-shot action with a modifier, e.g. Ctrl+KeyZ. */
-export const isBoundChord = (keybinds: Keybinds, chord: string): boolean => chord.includes("+") && isOneShotChord(keybinds, chord)
-
-export const isModifierCode = (code: string): boolean => MODIFIER_CODES.has(code)
+export const isBoundChord = (keybinds: Keybinds, chord: string): boolean =>
+  chord.includes("+") && isOneShotChord(keybinds, chord)
 
 /** How long a bare modifier must be held alone before it drives a held action (fly down on Ctrl). */
 export const MODIFIER_HOLD_MS = 120

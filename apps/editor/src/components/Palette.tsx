@@ -4,16 +4,24 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/
 import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { type MouseEvent, useMemo, useState } from "react"
-import { type CatalogPiece, paletteSections, pieceIdOf, pieceLabelOf, unavailableReasonOf, verificationOf } from "../domain/Catalog"
-import { preloadPiece } from "../editor/preload"
+import {
+  type CatalogPiece,
+  paletteSections,
+  pieceIdOf,
+  pieceLabelOf,
+  unavailableReasonOf,
+  verificationOf
+} from "../domain/Catalog"
 import { placementTransform } from "../domain/factory"
+import { preloadPiece } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
 import { useEditor } from "../editor/store"
 import { focusViewport } from "../editor/Viewport"
 import { PaletteSkeleton } from "./EditorSkeleton"
 
 const matches = (piece: CatalogPiece, terms: ReadonlyArray<string>) => {
-  const haystack = `${pieceLabelOf(piece)} ${piece.className} ${piece.meshAssetPath ?? ""} ${piece.category ?? ""}`.toLowerCase()
+  const haystack = `${pieceLabelOf(piece)} ${piece.className} ${piece.meshAssetPath ?? ""} ${piece.category ?? ""}`
+    .toLowerCase()
   return terms.every((t) => haystack.includes(t))
 }
 
@@ -40,13 +48,21 @@ function PieceButton({ piece, onPlace, onHover, unavailable, unverified }: {
       }}
     >
       {thumbnail !== undefined && (
-        <img src={`/assets/${thumbnail}`} alt="" className="size-8 shrink-0 rounded-sm bg-muted object-fill" loading="lazy" />
+        <img
+          src={`/assets/${thumbnail}`}
+          alt=""
+          className="size-8 shrink-0 rounded-sm bg-muted object-fill"
+          loading="lazy"
+        />
       )}
       <span className="flex min-w-0 flex-col">
         <span className="flex items-center gap-1.5 truncate text-xs font-medium">
           {pieceLabelOf(piece)}
           {unverified && (
-            <span className="rounded-sm border border-amber-500/40 bg-amber-500/15 px-1 text-[0.6rem] font-normal text-amber-700 dark:text-amber-300" title="Not yet confirmed to load in the in-game editor. A rejected item makes the game discard the whole map.">
+            <span
+              className="rounded-sm border border-amber-500/40 bg-amber-500/15 px-1 text-[0.6rem] font-normal text-amber-700 dark:text-amber-300"
+              title="Not yet confirmed to load in the in-game editor. A rejected item makes the game discard the whole map."
+            >
               unverified
             </span>
           )}
@@ -58,7 +74,9 @@ function PieceButton({ piece, onPlace, onHover, unavailable, unverified }: {
     </Button>
   )
   // Disabled buttons get no pointer events, so the tooltip lives on a wrapper.
-  return unavailable === undefined ? button : <span className="block cursor-not-allowed" title={`${piece.className}: ${unavailable}`}>{button}</span>
+  return unavailable === undefined
+    ? button
+    : <span className="block cursor-not-allowed" title={`${piece.className}: ${unavailable}`}>{button}</span>
 }
 
 export function Palette() {
@@ -73,7 +91,10 @@ export function Palette() {
   const sections = useMemo(
     () =>
       paletteSections(catalog?.catalog.pieces ?? [])
-        .map((section) => ({ ...section, pieces: terms.length === 0 ? section.pieces : section.pieces.filter((p) => matches(p, terms)) }))
+        .map((section) => ({
+          ...section,
+          pieces: terms.length === 0 ? section.pieces : section.pieces.filter((p) => matches(p, terms))
+        }))
         .filter((section) => section.pieces.length > 0),
     [catalog, terms]
   )
@@ -94,10 +115,10 @@ export function Palette() {
     <aside className="flex h-full min-w-0 flex-col gap-2 bg-card p-2">
       <div className="px-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">Pieces</div>
       <Input type="search" placeholder="Search pieces…" value={query} onChange={(e) => setQuery(e.target.value)} />
-      {catalog === null && !booting && <div className="px-1 text-xs text-muted-foreground">The piece catalog couldn't be loaded.</div>}
-      {catalog === null && booting ? (
-        <PaletteSkeleton />
-      ) : (
+      {catalog === null && !booting && (
+        <div className="px-1 text-xs text-muted-foreground">The piece catalog couldn't be loaded.</div>
+      )}
+      {catalog === null && booting ? <PaletteSkeleton /> : (
         <ScrollArea className="min-h-0 flex-1">
           <div className="flex flex-col gap-1 pr-2">
             {sections.map((section) => {
@@ -138,7 +159,9 @@ export function Palette() {
                 </Collapsible>
               )
             })}
-            {catalog !== null && sections.length === 0 && <div className="px-1 text-xs text-muted-foreground">No pieces match.</div>}
+            {catalog !== null && sections.length === 0 && (
+              <div className="px-1 text-xs text-muted-foreground">No pieces match.</div>
+            )}
           </div>
         </ScrollArea>
       )}
