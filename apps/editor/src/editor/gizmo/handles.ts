@@ -62,7 +62,8 @@ export const SIZE = {
   hitRadius: 7
 } as const
 
-const pairOf = (
+/** The two axes spanning the plane with normal `axis`. */
+export const pairOf = (
   axis: Axis
 ): readonly [Axis, Axis] => (axis === "x" ? ["y", "z"] : axis === "y" ? ["z", "x"] : ["x", "y"])
 

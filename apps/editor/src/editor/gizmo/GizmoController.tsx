@@ -180,7 +180,9 @@ export function GizmoController() {
         if (e.buttons === 0) hovered.current = pick(e)
         return
       }
-      const delta = dragDelta(active.start, sample(e))
+      const { snapping } = useEditor.getState().settings
+      const grid = snapping.enabled ? { size: snapping.gridSize, pivot: active.pivot } : undefined
+      const delta = dragDelta(active.start, sample(e), grid)
       if (delta === undefined) return
       const next = new Map([...active.startTransforms].map(([id, t]) => [id, applyGroupDelta(t, active.pivot, delta)]))
       active.last = next

@@ -5,6 +5,7 @@
  */
 import { Option, Predicate, Schema } from "effect"
 import { movementLookModes } from "./flyKeys"
+import { DEFAULT_GRID_SIZE, GRID_SIZES } from "./snap"
 
 /** "Custom" uses CameraSettings.customFov instead of a preset's. */
 export const CUSTOM_FOV_PRESET = "Custom"
@@ -40,10 +41,19 @@ export const AppearanceSettings = Schema.Struct({
   gridSectionColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/))
 })
 
+/** Changed from the tool bar rather than the settings dialog, but persisted with the rest. */
+export const SnappingSettings = Schema.Struct({
+  /** Whether gizmo translation lands on the world grid. */
+  enabled: Schema.Boolean,
+  /** Grid step in cm. */
+  gridSize: Schema.Literals(GRID_SIZES)
+})
+
 export const Settings = Schema.Struct({
   general: GeneralSettings,
   camera: CameraSettings,
-  appearance: AppearanceSettings
+  appearance: AppearanceSettings,
+  snapping: SnappingSettings
 })
 export type Settings = typeof Settings.Type
 
@@ -58,12 +68,13 @@ export const defaultSettings: Settings = {
     invertLookY: false,
     movementNeedsLook: "all"
   },
-  appearance: { theme: "dark", gridVisible: true, gridCellColor: "#3a404a", gridSectionColor: "#58606e" }
+  appearance: { theme: "dark", gridVisible: true, gridCellColor: "#3a404a", gridSectionColor: "#58606e" },
+  snapping: { enabled: false, gridSize: DEFAULT_GRID_SIZE }
 }
 
 type Section = keyof Settings
 
-const sections: ReadonlyArray<Section> = ["general", "camera", "appearance"]
+const sections: ReadonlyArray<Section> = ["general", "camera", "appearance", "snapping"]
 
 /** Stored JSON -> Settings, field by field; invalid or missing fields keep their defaults. */
 export const mergeSettings = (stored: unknown, defaults: Settings = defaultSettings): Settings => {

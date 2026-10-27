@@ -5,10 +5,22 @@
  * converted to game space through coords.ts.
  */
 import type * as THREE from "three"
-import type { Quat4 } from "../../domain/coords"
+import type { Quat4, Vec3 } from "../../domain/coords"
 import type { GroupDelta } from "../../domain/groupTransform"
-import { type GizmoSpace, type HandleSpec, handleWorldDir } from "./handles"
-import { axisParamFromRay, planeHit, type Px, screenAngle, worldAxisAngleToGameQuat, worldDirToGame } from "./math"
+import { snapValue } from "../../domain/snap"
+import { rotateVec } from "../../domain/ueMath"
+import { type GizmoSpace, type HandleSpec, handleWorldDir, pairOf } from "./handles"
+import {
+  type Axis,
+  axisParamFromRay,
+  axisWorldDir,
+  GAME_BASIS,
+  planeHit,
+  type Px,
+  screenAngle,
+  worldAxisAngleToGameQuat,
+  worldDirToGame
+} from "./math"
 
 export interface PointerSample {
   /** World-space pointer ray (unit direction). */
@@ -37,7 +49,18 @@ export const dragAxisWorld = (start: DragStart): THREE.Vector3 | undefined =>
     ? start.toCamera.clone()
     : handleWorldDir(start.spec, start.frameRotation, start.space)
 
-export const dragDelta = (start: DragStart, now: PointerSample): GroupDelta | undefined => {
+/** Grid snapping for translate drags: the step in cm, and the selection pivot (game space) it applies to. */
+export interface DragGrid {
+  readonly size: number
+  readonly pivot: Vec3
+}
+
+/**
+ * The delta for the pointer at `now`. With a `grid`, translate drags snap: in world space
+ * the pivot lands on the world grid along the moved axes (the others keep their values); in
+ * local space the selection moves in whole grid steps along the active item's axes.
+ */
+export const dragDelta = (start: DragStart, now: PointerSample, grid?: DragGrid): GroupDelta | undefined => {
   const { spec, originWorld: o } = start
   if (spec.kind === "scaleUniform") {
     const r0 = Math.hypot(start.pointer.px.x - start.originPx.x, start.pointer.px.y - start.originPx.y)
@@ -49,16 +72,18 @@ export const dragDelta = (start: DragStart, now: PointerSample): GroupDelta | un
   if (dir === undefined) return undefined
   switch (spec.kind) {
     case "translateAxis": {
-      const t0 = axisParamFromRay(o, dir, start.pointer.rayOrigin, start.pointer.rayDir)
-      const t1 = axisParamFromRay(o, dir, now.rayOrigin, now.rayDir)
-      if (t0 === undefined || t1 === undefined) return undefined
-      return { kind: "translate", offset: worldDirToGame(dir.clone().multiplyScalar(t1 - t0)) }
+      const t = axisParams(start, now, dir)
+      if (t === undefined || spec.axis === undefined) return undefined
+      return translateDelta(start, [[spec.axis, t[1] - t[0]]], grid)
     }
     case "translatePlane": {
       const p0 = planeHit(o, dir, start.pointer.rayOrigin, start.pointer.rayDir)
       const p1 = planeHit(o, dir, now.rayOrigin, now.rayDir)
-      if (p0 === undefined || p1 === undefined) return undefined
-      return { kind: "translate", offset: worldDirToGame(p1.sub(p0)) }
+      if (p0 === undefined || p1 === undefined || spec.axis === undefined) return undefined
+      // Measured along the plane's two axes, so nothing leaks along its normal.
+      const d = p1.sub(p0)
+      const frame = start.space === "local" ? start.frameRotation : undefined
+      return translateDelta(start, pairOf(spec.axis).map((a) => [a, d.dot(axisWorldDir(a, frame))] as const), grid)
     }
     case "rotateAxis":
     case "rotateView": {
@@ -70,10 +95,41 @@ export const dragDelta = (start: DragStart, now: PointerSample): GroupDelta | un
       return { kind: "rotate", rotation: worldAxisAngleToGameQuat(dir, angle) }
     }
     case "scaleAxis": {
-      const t0 = axisParamFromRay(o, dir, start.pointer.rayOrigin, start.pointer.rayDir)
-      const t1 = axisParamFromRay(o, dir, now.rayOrigin, now.rayDir)
-      if (t0 === undefined || t1 === undefined || Math.abs(t0) < 1e-6) return undefined
-      return { kind: "scale", factor: t1 / t0, axis: worldDirToGame(dir) }
+      const t = axisParams(start, now, dir)
+      if (t === undefined || Math.abs(t[0]) < 1e-6) return undefined
+      return { kind: "scale", factor: t[1] / t[0], axis: worldDirToGame(dir) }
     }
   }
+}
+
+/** Where the pointer's ray passes the axis line through the origin, at drag start and now. */
+const axisParams = (
+  start: DragStart,
+  now: PointerSample,
+  dir: THREE.Vector3
+): readonly [number, number] | undefined => {
+  const t0 = axisParamFromRay(start.originWorld, dir, start.pointer.rayOrigin, start.pointer.rayDir)
+  const t1 = axisParamFromRay(start.originWorld, dir, now.rayOrigin, now.rayDir)
+  return t0 === undefined || t1 === undefined ? undefined : [t0, t1]
+}
+
+/** A move of `distance` cm along each gizmo axis (game axes, or the active item's own in local space). */
+const translateDelta = (
+  start: DragStart,
+  moves: ReadonlyArray<readonly [Axis, number]>,
+  grid: DragGrid | undefined
+): GroupDelta => {
+  const local = start.space === "local"
+  const offset = { x: 0, y: 0, z: 0 }
+  for (const [axis, distance] of moves) {
+    const step = local && grid !== undefined ? snapValue(distance, grid.size) : distance
+    const dir = local ? rotateVec(start.frameRotation, GAME_BASIS[axis]) : GAME_BASIS[axis]
+    offset.x += dir.x * step
+    offset.y += dir.y * step
+    offset.z += dir.z * step
+  }
+  if (!local && grid !== undefined) {
+    for (const [axis] of moves) offset[axis] = snapValue(grid.pivot[axis] + offset[axis], grid.size) - grid.pivot[axis]
+  }
+  return { kind: "translate", offset }
 }
