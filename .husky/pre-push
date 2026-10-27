@@ -1,0 +1,2 @@
+# Same gate as CI; turbo replays whatever is unchanged.
+pnpm check:everything

@@ -40,4 +40,5 @@ We use **Effect v4** (`effect@^4`). Before writing Effect code, read `repos/effe
 - TypeScript strict (see `tsconfig.base.json`); pnpm; vitest (`@effect/vitest`) for tests. Fix lint findings rather than disabling rules; a disable comment needs a `-- reason`.
 - Errors are `Schema.TaggedError` classes; no thrown exceptions across service boundaries.
 - Map file I/O goes through a single `MapFile` schema (`Schema.Class`) that decodes the game JSON and encodes it back; the catalog through a `Catalog` schema. Add a round-trip test against every file in `samples/` when touching either.
-- Commit only when asked.
+- Commit only when asked. Commit messages, PR titles and issue titles follow Conventional Commits (`commitlint.config.mjs`); PRs are squash-merged with the PR title as the commit on `main`. `main` only changes through PRs that pass CI.
+- Git hooks (husky): pre-commit formats and lints staged files (lint-staged), commit-msg runs commitlint, pre-push runs `pnpm check:everything`.

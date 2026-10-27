@@ -12,13 +12,18 @@
     "format": "dprint fmt",
     "format:check": "dprint check",
     "check:everything": "turbo run format:check lint knip dupes typecheck test build --continue",
-    "dupes": "jscpd"
+    "dupes": "jscpd",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-conventional": "21.2.4",
     "@effect/tsgo": "0.61.0",
     "dprint": "0.64.3",
+    "husky": "9.1.7",
     "jscpd": "5.4.2",
     "knip": "6.43.0",
+    "lint-staged": "17.6.0",
     "oxlint": "1.89.0",
     "oxlint-tsgolint": "7.0.2005",
     "turbo": "^2.11.10",
@@ -27,5 +32,9 @@
   "packageManager": "pnpm@12.9.0",
   "engines": {
     "node": ">=22.12.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,json,md}": "dprint fmt --allow-no-files",
+    "{apps,packages}/**/*.{ts,tsx}": "oxlint --type-aware --deny-warnings --disable-nested-config"
   }
 }
