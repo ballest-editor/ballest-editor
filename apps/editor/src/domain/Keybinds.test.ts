@@ -30,10 +30,10 @@ describe("keybind table", () => {
   it("uses the game's level-editor hotkeys and names", () => {
     const editor = keybindSections.find((s) => s.name === "level editor")!
     expect(editor.actions.map((a) => [keybindActionLabels[a], defaultKeybinds[a]])).toEqual([
-      ["select mode", ["KeyQ"]],
-      ["move mode", ["KeyW"]],
-      ["rotate mode", ["KeyE"]],
-      ["scale mode", ["KeyR"]],
+      ["select", ["KeyQ"]],
+      ["translate", ["KeyW"]],
+      ["rotate", ["KeyE"]],
+      ["scale", ["KeyR"]],
       ["focus selection", ["KeyF", "KeyC"]],
       ["delete", ["Backspace", "Delete"]],
       ["undo", ["Ctrl+KeyZ"]],
@@ -57,7 +57,7 @@ describe("keybind table", () => {
     expect(defaultKeybinds.fastMove).toEqual([])
   })
 
-  it("only shares keys between a fly key and a tool shortcut (W: forward + move mode, as in the game)", () => {
+  it("only shares keys between a fly key and a tool shortcut (W: forward + translate, as in the game)", () => {
     const seen = new Map<string, Array<string>>()
     for (const [action, bindings] of Object.entries(defaultKeybinds)) {
       for (const b of bindings) seen.set(b, [...(seen.get(b) ?? []), action])

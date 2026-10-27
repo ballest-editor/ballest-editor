@@ -4,6 +4,7 @@
  * or hand-edited saves never break the editor.
  */
 import { Option, Predicate, Schema } from "effect"
+import { movementLookModes } from "./flyKeys"
 
 /** "Custom" uses CameraSettings.customFov instead of a preset's. */
 export const CUSTOM_FOV_PRESET = "Custom"
@@ -25,7 +26,9 @@ export const CameraSettings = Schema.Struct({
   /** Horizontal FOV (degrees) when the preset is "Custom". */
   customFov: Schema.Finite.check(Schema.isBetween({ minimum: 30, maximum: 140 })),
   invertLookX: Schema.Boolean,
-  invertLookY: Schema.Boolean
+  invertLookY: Schema.Boolean,
+  /** Which movement keys only fly while the look button is held (see flyKeys). */
+  movementNeedsLook: Schema.Literals(movementLookModes)
 })
 
 export const AppearanceSettings = Schema.Struct({
@@ -50,7 +53,8 @@ export const defaultSettings: Settings = {
     fovPreset: "Default",
     customFov: 90,
     invertLookX: false,
-    invertLookY: false
+    invertLookY: false,
+    movementNeedsLook: "all"
   },
   appearance: { theme: "dark", gridVisible: true, gridCellColor: "#3a404a", gridSectionColor: "#58606e" }
 }
