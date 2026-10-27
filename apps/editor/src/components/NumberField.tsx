@@ -116,7 +116,7 @@ export function NumberField(props: {
   // Text being typed; otherwise the field shows the current value.
   const [draft, setDraft] = useState<string | null>(null)
   const cancelling = useRef(false)
-  const text = draft ?? String(round(props.value))
+  const text = draft ?? round(props.value).toFixed(digits)
   const commit = () => {
     const n = Number(draft)
     const valid = draft !== null && draft.trim() !== "" && Number.isFinite(n)
@@ -133,11 +133,11 @@ export function NumberField(props: {
   })
   const scrubbable = props.onScrub !== undefined
   return (
-    <div className="flex min-w-0">
+    <div className="flex h-7 min-w-0 overflow-hidden rounded-md border border-input bg-input/20 transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30 dark:bg-input/30">
       <Label
         htmlFor={id}
         aria-label={props.label}
-        className={`w-2 shrink-0 rounded-l-md ${props.handleClassName ?? "bg-muted"} ${
+        className={`w-2 shrink-0 ${props.handleClassName ?? "bg-muted"} ${
           scrubbable ? "cursor-ew-resize hover:brightness-125" : ""
         }`}
         {...scrubHandlers}
@@ -145,7 +145,7 @@ export function NumberField(props: {
       <Input
         id={id}
         inputMode="decimal"
-        className="min-w-0 rounded-l-none border-l-0 px-1.5 py-0 font-mono leading-none md:leading-none"
+        className="h-full min-w-0 rounded-none border-0 bg-transparent px-1 py-0 text-right font-mono tabular-nums leading-none focus-visible:border-0 focus-visible:ring-0 md:leading-none dark:bg-transparent"
         value={text}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}

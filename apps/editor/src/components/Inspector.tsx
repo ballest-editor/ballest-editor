@@ -275,9 +275,9 @@ export function Inspector() {
   const perUnit = units === "m" ? 100 : 1
   const rows = transformRows(perUnit)
   const fieldProps = {
-    position: { step: perUnit === 100 ? 0.01 : 1, digits: perUnit === 100 ? 5 : 3 },
-    rotation: { step: 1, digits: 3 },
-    scale: { step: 0.01, digits: 3 }
+    position: { step: perUnit === 100 ? 0.01 : 1, digits: perUnit === 100 ? 3 : 1 },
+    rotation: { step: 1, digits: 1 },
+    scale: { step: 0.01, digits: 2 }
   } as const
   const failed = visualsOf(item, catalogIndex).flatMap((v) => {
     const url = glbUrl(v.mesh?.glb)
@@ -297,10 +297,7 @@ export function Inspector() {
         {failed.map((w) => <Badge key={w} variant="destructive">{w}</Badge>)}
 
         <Separator />
-        <div className="flex items-baseline justify-between">
-          <SectionTitle>Transform</SectionTitle>
-          <span className="text-[0.65rem] text-muted-foreground">game {units} · degrees · Z up</span>
-        </div>
+        <SectionTitle>Transform</SectionTitle>
         <div className="grid grid-cols-[auto_1fr_1fr_1fr] items-center gap-x-1.5 gap-y-1.5">
           {rows.map((row) => (
             <TransformRow
