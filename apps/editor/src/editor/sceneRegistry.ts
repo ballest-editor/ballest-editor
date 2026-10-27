@@ -15,6 +15,8 @@ export const sceneRegistry = {
   itemsRoot: null as Object3D | null,
   /** true while the pointer is over (or dragging) a gizmo handle */
   gizmoActive: () => false,
+  /** true only while a gizmo handle is being dragged (one-shot keybinds such as undo wait) */
+  gizmoDragActive: () => false,
   /** true when a mouse chord ("Mouse2", "Alt+Mouse0") is bound to look/orbit/pan */
   isNavigationChord: (_chord: string) => false,
   /** true while a look/orbit/pan drag is in progress (fly keys then win over tool shortcuts) */

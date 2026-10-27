@@ -4,7 +4,7 @@ A standalone, CAD-style map editor for [Ballest of Them All](https://store.steam
 
 - [docs/FORMAT.md](docs/FORMAT.md) — the map format, hard limits, where files live
 - [docs/VISION.md](docs/VISION.md) — feature roadmap
-- `app/` — the editor (TanStack Start, Three.js, Effect)
+- `apps/editor/` — the editor (TanStack Start, Three.js, Effect)
 - `tools/extract/` — pulls piece meshes out of the game pak (Nix flake)
 
 Contributors and coding agents: read [AGENTS.md](AGENTS.md).

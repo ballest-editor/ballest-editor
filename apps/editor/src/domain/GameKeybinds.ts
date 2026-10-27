@@ -19,10 +19,7 @@ import {
   type Keybinds,
   uniqueBindings
 } from "./Keybinds"
-
-const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const
-const open = <const Fields extends Schema.Struct.Fields>(fields: Fields) =>
-  Schema.StructWithRest(Schema.Struct(fields), Rest)
+import { open } from "./schema"
 
 const Settings = Schema.optionalKey(Schema.NullOr(Schema.Record(Schema.String, Schema.Unknown)))
 export const SubobjectSettings = open({ type: Schema.NullOr(Schema.String), settings: Settings })

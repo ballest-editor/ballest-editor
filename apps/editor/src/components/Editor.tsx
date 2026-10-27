@@ -1,11 +1,12 @@
 import { Toaster } from "@workspace/ui/components/sonner"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import { importFile, loadCatalog, loadKeybinds, loadMaterials, loadSettings } from "../editor/actions"
 import { warmCatalog } from "../editor/preload"
-import { commands, type Dialog, type SettingsCategory } from "../editor/commands"
+import { commands } from "../editor/commands"
 import { sceneRegistry } from "../editor/sceneRegistry"
 import { useEditor } from "../editor/store"
+import { watchResolvedTheme } from "../editor/theme"
 import { useActionKeys } from "../editor/useActionKeys"
 import { Viewport } from "../editor/Viewport"
 import { Inspector } from "./Inspector"
@@ -38,26 +39,22 @@ const useBlurButtonsAfterClick = () =>
 /** Applies the theme setting to <html> (the ui preset styles `.dark`). */
 const useTheme = () => {
   const theme = useEditor((s) => s.settings.appearance.theme)
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)")
-    const apply = () => document.documentElement.classList.toggle("dark", theme === "dark" || (theme === "system" && media.matches))
-    apply()
-    media.addEventListener("change", apply)
-    return () => media.removeEventListener("change", apply)
-  }, [theme])
+  useEffect(() => watchResolvedTheme(theme, (dark) => document.documentElement.classList.toggle("dark", dark)), [theme])
 }
 
 export function Editor() {
-  const [dialog, setDialog] = useState<Dialog | null>(null)
-  const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>("general")
+  const dialog = useEditor((s) => s.dialog)
+  const settingsCategory = useEditor((s) => s.settingsCategory)
+  const setSettingsCategory = useEditor((s) => s.setSettingsCategory)
+  const close = useEditor((s) => s.closeDialog)
   const fileInput = useRef<HTMLInputElement>(null)
 
-  commands.openDialog = (next, category) => {
-    if (category !== undefined) setSettingsCategory(category)
-    setDialog(next)
-  }
-  commands.openImport = () => fileInput.current?.click()
-  commands.dialogOpen = () => dialog !== null
+  useEffect(() => {
+    commands.openImport = () => fileInput.current?.click()
+    return () => {
+      commands.openImport = () => {}
+    }
+  }, [])
 
   useActionKeys()
   useTheme()
@@ -65,16 +62,14 @@ export function Editor() {
 
   // Background-warm the glb cache for every palette piece once the catalog is in.
   const catalog = useEditor((s) => s.catalog)
-  useEffect(() => (catalog === null ? undefined : warmCatalog(catalog.catalog)), [catalog])
+  const catalogIndex = useEditor((s) => s.catalogIndex)
+  useEffect(() => (catalog === null || catalogIndex === null ? undefined : warmCatalog(catalog.catalog, catalogIndex)), [catalog, catalogIndex])
 
   useEffect(() => {
-    void loadCatalog()
-    void loadMaterials()
+    // The viewport holds its first reveal until these have settled (see Viewport.tsx).
+    void Promise.all([loadCatalog(), loadMaterials(), loadSettings()]).then(() => useEditor.getState().finishBoot())
     void loadKeybinds()
-    void loadSettings()
   }, [])
-
-  const close = () => setDialog(null)
 
   return (
     <TooltipProvider>

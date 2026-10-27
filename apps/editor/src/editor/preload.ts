@@ -7,10 +7,8 @@
  *   per idle callback, so it never competes with interaction.
  */
 import { useGLTF } from "@react-three/drei"
-import { type Catalog, type CatalogIndex, type CatalogPiece, indexCatalog, visibleExtras } from "../domain/Catalog"
-
-const glbUrl = (glb: string | null | undefined): string | undefined =>
-  glb === undefined || glb === null || glb.length === 0 ? undefined : `/assets/${glb}`
+import { type Catalog, type CatalogIndex, type CatalogPiece, visibleExtras } from "../domain/Catalog"
+import { glbUrl } from "./visuals"
 
 /** Every glb a placed piece will render: its main mesh and its visible extra meshes. */
 export const glbUrlsForPiece = (piece: CatalogPiece, index: CatalogIndex): ReadonlyArray<string> => {
@@ -48,9 +46,9 @@ const defaultIdle: IdleScheduler = (run) =>
 /** Preloads all palette pieces' meshes, `perTick` urls per idle callback. Returns a cancel function. */
 export const warmCatalog = (
   catalog: Catalog,
+  index: CatalogIndex,
   options: { readonly perTick?: number; readonly idle?: IdleScheduler; readonly preload?: Preload } = {}
 ): (() => void) => {
-  const index = indexCatalog(catalog)
   const queue = catalog.pieces
     .filter((piece) => piece.inPalette !== false)
     .flatMap((piece) => glbUrlsForPiece(piece, index))

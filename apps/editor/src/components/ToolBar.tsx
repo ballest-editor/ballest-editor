@@ -20,9 +20,9 @@ const TOOLS: ReadonlyArray<{
 /**
  * Floating tool switcher, bottom-centre of the viewport. Pointer-only: items never take
  * focus (mousedown is prevented, tabIndex -1) and ignore Space/Enter, so keyboard focus
- * and keybinds stay with the viewport.
+ * and keybinds stay with the viewport. `disabled` greys it out while the scene is loading.
  */
-export function ToolBar() {
+export function ToolBar({ disabled = false }: { readonly disabled?: boolean }) {
   const tool = useEditor((s) => s.tool)
   const setTool = useEditor((s) => s.setTool)
   const keybinds = useEditor((s) => s.keybinds)
@@ -36,6 +36,7 @@ export function ToolBar() {
           if (next !== undefined) setTool(next) // clicking the active tool keeps it
         }}
         spacing={1}
+        disabled={disabled}
         className="pointer-events-auto rounded-full border border-border/60 bg-background/60 p-1 shadow-lg backdrop-blur-md"
       >
         {TOOLS.map(({ tool: t, action, icon: Icon }) => (

@@ -1,20 +1,11 @@
 /**
  * Schemas for the game's map JSON (`.balledit` / `.ballmap`). See docs/FORMAT.md.
  *
- * Every object is an "open" struct: known fields are typed and validated, and any field
- * we don't model is kept in an index signature so a Workshop map survives
- * import -> export without data loss. Known fields are declared in the order the game
- * writes them; unknown fields are appended after them on encode.
- *
- * `Schema.Class` cannot carry an index signature in Effect v4, so the named types use
- * `Schema.Opaque` over `Schema.StructWithRest` instead.
+ * Every object is an "open" struct (see schema.ts): known fields are declared in the order
+ * the game writes them, and anything we don't model survives import -> export.
  */
 import { Schema } from "effect"
-
-const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const
-
-const open = <const Fields extends Schema.Struct.Fields>(fields: Fields) =>
-  Schema.StructWithRest(Schema.Struct(fields), Rest)
+import { open } from "./schema"
 
 // ---------------------------------------------------------------------------
 // Math

@@ -5,7 +5,7 @@
 import { Option } from "effect"
 import { toast } from "sonner"
 import { create } from "zustand"
-import type { CatalogPiece } from "../domain/Catalog"
+import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { addItem, removeItems, setLevelNames, setTransform, setTranslation, validateItem } from "../domain/edits"
 import { itemFromPiece, newMapFile } from "../domain/factory"
@@ -22,6 +22,8 @@ export interface Doc {
 }
 
 export type Tool = "select" | "translate" | "rotate" | "scale"
+export type Dialog = "new" | "export" | "settings"
+export type SettingsCategory = "general" | "camera" | "keybinds" | "appearance"
 
 const HISTORY_LIMIT = 200
 const SPEED_STEPS = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
@@ -40,7 +42,14 @@ export interface EditorState {
   readonly sourceName: string | null
   readonly selectedId: string | null
   readonly tool: Tool
+  /** The open modal dialog; editor keybinds are suspended while one is open. */
+  readonly dialog: Dialog | null
+  readonly settingsCategory: SettingsCategory
   readonly catalog: LoadedCatalog | null
+  /** Lookups over `catalog`, built once per catalog load. */
+  readonly catalogIndex: CatalogIndex | null
+  /** True until the startup loads (catalog, materials, settings) have finished, successfully or not. */
+  readonly booting: boolean
   /** Approximate game materials; null until loaded (everything renders neutral meanwhile). */
   readonly materialTable: MaterialTable | null
   readonly keybinds: Keybinds
@@ -60,15 +69,20 @@ export interface EditorState {
   replaceMapSilently(map: MapFile): void
   placePiece(piece: CatalogPiece, transform: ItemTransform): void
   moveItem(id: string, translation: Vec3): void
-  transformItem(id: string, transform: UeTransform): void
+  /** Replaces the item's transform; false (with a notice) when the game would reject it. */
+  transformItem(id: string, transform: UeTransform): boolean
   deleteSelection(): void
   renameLevel(displayName: string, creatorName: string): void
   undo(): void
   redo(): void
   select(id: string | null): void
   setTool(tool: Tool): void
+  openDialog(dialog: Dialog, category?: SettingsCategory): void
+  closeDialog(): void
+  setSettingsCategory(category: SettingsCategory): void
   setPreview(preview: EditorState["preview"]): void
   setCatalog(catalog: LoadedCatalog): void
+  finishBoot(): void
   setMaterialTable(table: MaterialTable): void
   setKeybinds(keybinds: Keybinds, defaults?: DerivedKeybinds): void
   setSettings(settings: Settings): void
@@ -95,7 +109,11 @@ export const useEditor = create<EditorState>()((set, get) => {
     sourceName: null,
     selectedId: null,
     tool: "translate",
+    dialog: null,
+    settingsCategory: "general",
     catalog: null,
+    catalogIndex: null,
+    booting: true,
     materialTable: null,
     keybinds: fallbackDefaults.keybinds,
     settings: defaultSettings,
@@ -139,8 +157,12 @@ export const useEditor = create<EditorState>()((set, get) => {
     transformItem: (id, transform) => {
       const { doc } = get()
       const next = setTransform(doc.map, indexOf(id), transform)
-      if (Option.isSome(next)) commit({ map: next.value, ids: doc.ids })
-      else get().notify("error", "That transform isn't valid for the game (non-finite or zero rotation).")
+      if (Option.isSome(next)) {
+        commit({ map: next.value, ids: doc.ids })
+        return true
+      }
+      get().notify("error", "That transform isn't valid for the game (non-finite or zero rotation).")
+      return false
     },
 
     deleteSelection: () => {
@@ -186,8 +208,12 @@ export const useEditor = create<EditorState>()((set, get) => {
 
     select: (selectedId) => set({ selectedId }),
     setTool: (tool) => set({ tool }),
+    openDialog: (dialog, category) => set((s) => ({ dialog, settingsCategory: category ?? s.settingsCategory })),
+    closeDialog: () => set({ dialog: null }),
+    setSettingsCategory: (settingsCategory) => set({ settingsCategory }),
     setPreview: (preview) => set({ preview }),
-    setCatalog: (catalog) => set({ catalog }),
+    setCatalog: (catalog) => set({ catalog, catalogIndex: indexCatalog(catalog.catalog) }),
+    finishBoot: () => set({ booting: false }),
     setMaterialTable: (materialTable) => set({ materialTable }),
     setSettings: (settings) => set({ settings }),
     setKeybinds: (keybinds, defaults) =>

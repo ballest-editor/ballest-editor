@@ -52,8 +52,10 @@ export function GizmoController() {
 
   useEffect(() => {
     sceneRegistry.gizmoActive = () => hovered.current !== null || drag.current !== null
+    sceneRegistry.gizmoDragActive = () => drag.current !== null
     return () => {
       sceneRegistry.gizmoActive = () => false
+      sceneRegistry.gizmoDragActive = () => false
     }
   }, [])
 
@@ -161,8 +163,11 @@ export function GizmoController() {
       e.stopImmediatePropagation()
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
       const { selectedId, transformItem } = useEditor.getState()
+      const object = selectedObject()
       endDrag()
-      if (active.last !== undefined && selectedId !== null) transformItem(selectedId, active.last) // one undo entry
+      if (active.last === undefined || selectedId === null) return
+      // One undo entry. If the document refuses it, the scene object goes back where it started.
+      if (!transformItem(selectedId, active.last) && object !== undefined) applyToObject(object, active.start.transform)
     }
 
     const onKeyDown = (e: KeyboardEvent) => {

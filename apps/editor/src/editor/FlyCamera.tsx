@@ -4,7 +4,6 @@ import * as THREE from "three"
 import { threeToUeVector, ueToThreeVector } from "../domain/coords"
 import { type Bindings, chordOf, HeldKeys, isBound, isBoundChord, isOneShotChord, mouseChordOf, wheelChordOf } from "../domain/Keybinds"
 import { editorVerticalFov } from "../domain/Settings"
-import { commands } from "./commands"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
 
@@ -21,7 +20,7 @@ export const isTypingTarget = (target: EventTarget | null): boolean =>
 /** Keyboard events that belong to a text field or an open dialog never drive the editor. */
 export const isEditorKeyEvent = (e: KeyboardEvent): boolean =>
   !isTypingTarget(e.target) &&
-  !commands.dialogOpen() &&
+  useEditor.getState().dialog === null &&
   !(e.target instanceof Element && e.target.closest("[role=dialog]") !== null)
 
 type DragMode = "look" | "orbit" | "pan"

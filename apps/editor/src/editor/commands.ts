@@ -1,16 +1,12 @@
 /**
- * UI commands that keybinds can trigger but that live in React components (dialogs, file
- * picker).
+ * Commands that must run inside a user gesture on a DOM element the Editor component owns
+ * (the hidden file input). Dialog state lives in the store (`openDialog`); this is only
+ * what can't.
  *
  * TODO(menu-bar): a universal menu bar (File / Edit / View / ...) should call these same
- * commands, e.g. Edit > Settings… -> openDialog("settings"), File > Import… -> openImport().
+ * entry points, e.g. File > Import… -> openImport(), Edit > Settings… -> openDialog("settings").
  */
-export type SettingsCategory = "general" | "camera" | "keybinds" | "appearance"
-export type Dialog = "new" | "export" | "settings"
-
 export const commands = {
-  openDialog: (_dialog: Dialog, _category?: SettingsCategory): void => {},
-  openImport: (): void => {},
-  /** True while a modal dialog is open; editor keybinds are suspended. */
-  dialogOpen: (): boolean => false
+  /** Opens the file picker. Registered by the Editor component in an effect. */
+  openImport: (): void => {}
 }

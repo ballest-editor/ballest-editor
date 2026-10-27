@@ -27,8 +27,7 @@ import {
 } from "../domain/Keybinds"
 import { CUSTOM_FOV_PRESET, defaultSettings, type Settings } from "../domain/Settings"
 import { resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
-import type { SettingsCategory } from "../editor/commands"
-import { useEditor } from "../editor/store"
+import { type SettingsCategory, useEditor } from "../editor/store"
 
 const CATEGORIES: ReadonlyArray<{ readonly id: SettingsCategory; readonly label: string; readonly icon: typeof IconSettings }> = [
   { id: "general", label: "General", icon: IconSettings },

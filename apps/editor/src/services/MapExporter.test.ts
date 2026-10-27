@@ -56,6 +56,11 @@ describe("MapExporter", () => {
       const noStart = yield* Effect.flip(exporter.prepare({ ...map, items: [] }))
       assert.strictEqual(noStart._tag, "ExportValidationError")
       const twoStarts = yield* Effect.flip(exporter.prepare({ ...map, items: [map.items[0]!, map.items[0]!] }))
+      const start = map.items[0]!
+      const skewed = { ...start, itemTransform: { ...start.itemTransform, rotation: { x: 0, y: 0, z: 1, w: 1 } } }
+      const badRotation = yield* Effect.flip(exporter.prepare({ ...map, items: [skewed] }))
+      assert.strictEqual(badRotation._tag, "ExportValidationError")
+      assert.match(badRotation.message, /non-normalized rotation/)
       assert.include(twoStarts.message, "exactly one")
       const unnamed = newMapFile({ displayName: " ", creatorName: "x", createdAt: "" })
       assert.strictEqual((yield* Effect.flip(exporter.prepare(unnamed)))._tag, "ExportValidationError")

@@ -4,9 +4,8 @@ import { Label } from "@workspace/ui/components/label"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Separator } from "@workspace/ui/components/separator"
 import { type ReactNode, useEffect, useState } from "react"
-import { indexCatalog } from "../domain/Catalog"
 import { classNameOf, isPlayerStart, objectPathOf } from "../domain/MapFile"
-import { glbUrl, visualsOf } from "../editor/ItemObject"
+import { glbUrl, visualsOf } from "../editor/visuals"
 import { selectedIndex, useEditor } from "../editor/store"
 import { NumberField } from "./NumberField"
 
@@ -55,7 +54,7 @@ export function Inspector() {
   const index = useEditor(selectedIndex)
   const item = useEditor((s) => (index < 0 ? undefined : s.doc.map.items[index]))
   const selectedId = useEditor((s) => s.selectedId)
-  const catalog = useEditor((s) => s.catalog)
+  const catalogIndex = useEditor((s) => s.catalogIndex)
   const missing = useEditor((s) => s.missingGlbs)
   const moveItem = useEditor((s) => s.moveItem)
   const preview = useEditor((s) => s.preview)
@@ -74,7 +73,6 @@ export function Inspector() {
   // Display units only; the map always stores centimetres.
   const perUnit = units === "m" ? 100 : 1
   const setAxis = (axis: "x" | "y" | "z") => (value: number) => moveItem(selectedId, { ...t.translation, [axis]: value * perUnit })
-  const catalogIndex = catalog === null ? null : indexCatalog(catalog.catalog)
   const failed = visualsOf(item, catalogIndex).flatMap((v) => {
     const url = glbUrl(v.mesh?.glb)
     return url !== undefined && missing.has(url) ? [`${v.mesh?.meshAssetPath.split(".").at(-1)}: mesh failed to load`] : []

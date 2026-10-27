@@ -1,7 +1,7 @@
 import { Context, Effect, Layer } from "effect"
 import { emptyMaterialTable, type MaterialTable, parseMaterialsFile } from "../domain/Materials"
-import type { FetchText } from "./CatalogLoader"
 import { MaterialLibraryLoadError } from "./errors"
+import { browserFetch, type FetchText, fetchJson } from "./fetchJson"
 
 export const MATERIALS_URL = "/assets/materials.json"
 
@@ -14,11 +14,7 @@ export class MaterialLibrary extends Context.Service<MaterialLibrary, {
   static readonly make = (fetchText: FetchText, url: string = MATERIALS_URL) => {
     const fail = (message: string) => new MaterialLibraryLoadError({ url, message })
     const fetchTable = Effect.gen(function*() {
-      const response = yield* Effect.tryPromise({ try: () => fetchText(url), catch: (c) => fail(String(c)) })
-      if (!response.ok) return yield* fail(`HTTP ${response.status}`)
-      const text = yield* Effect.tryPromise({ try: () => response.text(), catch: (c) => fail(String(c)) })
-      const json = yield* Effect.try({ try: () => JSON.parse(text) as unknown, catch: () => fail("not JSON (materials.json missing?)") })
-      const table = parseMaterialsFile(json)
+      const table = parseMaterialsFile(yield* fetchJson(fetchText, url, fail))
       if (table.skipped > 0) yield* Effect.logWarning(`materials.json: skipped ${table.skipped} entries that didn't decode`)
       return table
     }).pipe(Effect.withSpan("MaterialLibrary.fetch"))
@@ -32,5 +28,5 @@ export class MaterialLibrary extends Context.Service<MaterialLibrary, {
     return MaterialLibrary.of({ fetch: fetchTable, load })
   }
 
-  static readonly layer = Layer.sync(MaterialLibrary, () => MaterialLibrary.make((url) => globalThis.fetch(url)))
+  static readonly layer = Layer.sync(MaterialLibrary, () => MaterialLibrary.make(browserFetch))
 }
