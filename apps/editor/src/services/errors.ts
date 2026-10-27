@@ -26,10 +26,12 @@ export class GameKeybindsLoadError extends Schema.TaggedError<GameKeybindsLoadEr
   message: Schema.String
 }) {}
 
-export class MaterialLibraryLoadError extends Schema.TaggedError<MaterialLibraryLoadError>()("MaterialLibraryLoadError", {
-  url: Schema.String,
-  message: Schema.String
-}) {}
+export class MaterialLibraryLoadError
+  extends Schema.TaggedError<MaterialLibraryLoadError>()("MaterialLibraryLoadError", {
+    url: Schema.String,
+    message: Schema.String
+  })
+{}
 
 export class SettingsStoreError extends Schema.TaggedError<SettingsStoreError>()("SettingsStoreError", {
   message: Schema.String

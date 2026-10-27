@@ -1,0 +1,10 @@
+name: Feature
+description: Something the editor should do
+title: "feat: "
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What and why
+    validations:
+      required: true

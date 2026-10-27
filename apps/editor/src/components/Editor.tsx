@@ -2,19 +2,20 @@ import { Toaster } from "@workspace/ui/components/sonner"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
 import { useEffect, useRef } from "react"
 import { importFile, loadCatalog, loadKeybinds, loadMaterials, loadSettings } from "../editor/actions"
-import { warmCatalog } from "../editor/preload"
 import { commands } from "../editor/commands"
+import { warmCatalog } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
 import { useEditor } from "../editor/store"
 import { watchResolvedTheme } from "../editor/theme"
 import { useActionKeys } from "../editor/useActionKeys"
 import { Viewport } from "../editor/Viewport"
-import { Inspector } from "./Inspector"
-import { SettingsDialog } from "./SettingsDialog"
 import { ExportDialog } from "./ExportDialog"
+import { Inspector } from "./Inspector"
 import { NewMapDialog } from "./NewMapDialog"
 import { Palette } from "./Palette"
+import { SettingsDialog } from "./SettingsDialog"
 import { SidePanel } from "./SidePanel"
+import { ToolBar } from "./ToolBar"
 import { TopBar } from "./TopBar"
 
 if (import.meta.env.DEV) {
@@ -30,7 +31,7 @@ const useBlurButtonsAfterClick = () =>
   useEffect(() => {
     const onPointerUp = (e: PointerEvent) => {
       const button = e.target instanceof Element ? e.target.closest("button") : null
-      if (button !== null && button.closest("[role=dialog]") === null) requestAnimationFrame(() => button.blur())
+      if (button?.closest("[role=dialog]") === null) requestAnimationFrame(() => button.blur())
     }
     document.addEventListener("pointerup", onPointerUp)
     return () => document.removeEventListener("pointerup", onPointerUp)
@@ -63,7 +64,10 @@ export function Editor() {
   // Background-warm the glb cache for every palette piece once the catalog is in.
   const catalog = useEditor((s) => s.catalog)
   const catalogIndex = useEditor((s) => s.catalogIndex)
-  useEffect(() => (catalog === null || catalogIndex === null ? undefined : warmCatalog(catalog.catalog, catalogIndex)), [catalog, catalogIndex])
+  useEffect(
+    () => (catalog === null || catalogIndex === null ? undefined : warmCatalog(catalog.catalog, catalogIndex)),
+    [catalog, catalogIndex]
+  )
 
   useEffect(() => {
     // The viewport holds its first reveal until these have settled (see Viewport.tsx).
@@ -80,7 +84,7 @@ export function Editor() {
             <Palette />
           </SidePanel>
           <div className="min-w-0 flex-1">
-            <Viewport />
+            <Viewport toolbar={ToolBar} />
           </div>
           <SidePanel id="inspector" side="right" defaultWidth={300} minWidth={220} maxWidth={640}>
             <Inspector />

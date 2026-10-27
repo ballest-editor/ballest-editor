@@ -16,6 +16,7 @@ import {
   editorOverrides,
   heldActions,
   type KeybindAction,
+  keybindActions,
   type Keybinds,
   uniqueBindings
 } from "./Keybinds"
@@ -137,8 +138,8 @@ type Vec = readonly [number, number, number]
 
 const swizzle = (v: Vec, order: string): Vec => {
   const axes = order.replace(/^.*::/, "").toUpperCase()
-  const pick = (c: string) => v["XYZ".indexOf(c)] ?? 0
-  return axes.length === 3 ? [pick(axes[0]!), pick(axes[1]!), pick(axes[2]!)] : v
+  const pick = (c: string | undefined) => (c === undefined ? 0 : v["XYZ".indexOf(c)] ?? 0)
+  return axes.length === 3 ? [pick(axes[0]), pick(axes[1]), pick(axes[2])] : v
 }
 
 export const mappingDirection = (mapping: GameMapping): Vec => {
@@ -181,12 +182,15 @@ const axis1D = (positive: KeybindAction, negative: KeybindAction): Resolver => (
 ]
 /** Wheel axis: scrolling up drives the positive action. */
 const wheelAxis = (up: KeybindAction, down: KeybindAction): Resolver => (m) =>
-  m.key === "MouseWheelAxis" ? [{ action: up, code: "WheelUp" }, { action: down, code: "WheelDown" }] : axis1D(up, down)(m)
-const mouseButtonOnly = (action: KeybindAction): Resolver => (m) => (/MouseButton$/.test(m.key ?? "") ? [{ action }] : [])
+  m.key === "MouseWheelAxis"
+    ? [{ action: up, code: "WheelUp" }, { action: down, code: "WheelDown" }]
+    : axis1D(up, down)(m)
+const mouseButtonOnly =
+  (action: KeybindAction): Resolver => (m) => ((m.key ?? "").endsWith("MouseButton") ? [{ action }] : [])
 /** IA_Look: a mouse button is our drag-look; keyboard keys are the arrow-key look actions. */
 const lookResolver: Resolver = (m) => {
   const key = m.key ?? ""
-  if (/MouseButton$/.test(key)) return [{ action: "look" }]
+  if (key.endsWith("MouseButton")) return [{ action: "look" }]
   if (key.startsWith("Mouse") || key.startsWith("Gamepad") || UE_KEY_TO_CODE[key] === undefined) return []
   const [x, y] = mappingDirection(m)
   if (Math.abs(x) >= Math.abs(y) && x !== 0) return [{ action: x > 0 ? "lookRight" : "lookLeft" }]
@@ -228,9 +232,9 @@ const chordFromMapping = (mapping: GameMapping, codeOverride: string | undefined
     .filter((t) => /Chord/i.test(t.type ?? ""))
     .map((t) => JSON.stringify(t.settings ?? {}))
     .join(" ")
-  const mods = [/ctrl|control/i, /alt/i, /shift/i]
-    .map((re, i) => (re.test(chordText) ? ["Ctrl", "Alt", "Shift"][i]! : undefined))
-    .filter((m): m is string => m !== undefined)
+  const mods = ([[/ctrl|control/i, "Ctrl"], [/alt/i, "Alt"], [/shift/i, "Shift"]] as const)
+    .filter(([re]) => re.test(chordText))
+    .map(([, name]) => name)
   return [...mods, code].join("+")
 }
 
@@ -266,7 +270,7 @@ export const FALLBACK_CAMERA_PRESETS: ReadonlyArray<CameraPreset> = [
 ]
 
 export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybinds => {
-  const out: Record<string, Bindings> = { ...defaultKeybinds }
+  const out: Record<KeybindAction, Bindings> = { ...defaultKeybinds }
   const fromGame = new Map<KeybindAction, { context: string; action: string }>()
   const naming = new Map<KeybindAction, ActionNaming>()
   for (const name of EDITOR_CONTEXTS) {
@@ -285,7 +289,7 @@ export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybi
         // The first game mapping replaces the editor default; later ones become secondary
         // bindings. Level-editor overlay hotkeys stay primary (F focus, then the camera's C).
         const first = !fromGame.has(action)
-        const keep = first && !editorOverlayActions.has(action) ? [] : out[action]!
+        const keep = first && !editorOverlayActions.has(action) ? [] : out[action]
         out[action] = uniqueBindings([...keep, chord])
         if (first) fromGame.set(action, { context: name, action: mapping.action })
       }
@@ -313,14 +317,16 @@ export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybi
       }
     }
   }
-  for (const [action, bindings] of Object.entries(editorOverrides) as Array<[KeybindAction, Bindings]>) {
+  for (const action of keybindActions) {
+    const bindings = editorOverrides[action]
+    if (bindings === undefined) continue
     out[action] = bindings
     fromGame.delete(action)
   }
-  const fellBack = (Object.keys(defaultKeybinds) as Array<KeybindAction>).filter((a) => !fromGame.has(a))
+  const fellBack = keybindActions.filter((a) => !fromGame.has(a))
   const sectionOrder = (file?.sections ?? []).map((s) => s.name).filter((name) => !/gamepad/i.test(name))
   const cameraPresets = file?.cameraPresets !== undefined && file.cameraPresets.length > 0
     ? file.cameraPresets.map((p) => ({ id: p.row, label: p.label, fov: p.fov }))
     : FALLBACK_CAMERA_PRESETS
-  return { keybinds: out as Keybinds, naming, fromGame, fellBack, sectionOrder, cameraPresets }
+  return { keybinds: out, naming, fromGame, fellBack, sectionOrder, cameraPresets }
 }

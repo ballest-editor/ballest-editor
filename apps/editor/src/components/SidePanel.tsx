@@ -20,7 +20,10 @@ export const panelWidthVar = (id: string, defaultWidth: number): string => `var(
  * Inline <head> script that exposes the saved panel widths as `--panel-<id>` on <html>
  * before first paint, so the server-rendered loading shell lays out like the editor will.
  */
-export const panelWidthsScript = `try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf(${JSON.stringify(STORAGE_PREFIX)})===0){var w=Number(localStorage.getItem(k));if(w>0)document.documentElement.style.setProperty("--panel-"+k.slice(${STORAGE_PREFIX.length}),w+"px")}}}catch(e){}`
+export const panelWidthsScript =
+  `try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf(${
+    JSON.stringify(STORAGE_PREFIX)
+  })===0){var w=Number(localStorage.getItem(k));if(w>0)document.documentElement.style.setProperty("--panel-"+k.slice(${STORAGE_PREFIX.length}),w+"px")}}}catch(e){}`
 
 /**
  * A fixed-pixel sidebar with a drag handle on its inner edge. Plain CSS width, so window
@@ -43,7 +46,8 @@ export function SidePanel(props: {
   }, [props.id, width])
 
   const clamp = (w: number) => {
-    const otherPanels = document.body.clientWidth - (document.querySelector("[data-viewport]")?.clientWidth ?? 0) - width
+    const otherPanels = document.body.clientWidth - (document.querySelector("[data-viewport]")?.clientWidth ?? 0) -
+      width
     const room = document.body.clientWidth - otherPanels - MIN_VIEWPORT
     return Math.max(props.minWidth, Math.min(props.maxWidth, room, w))
   }

@@ -7,3 +7,14 @@ allowBuilds:
   lightningcss: true
   unrs-resolver: true
   msw: false
+  dprint: false
+
+minimumReleaseAgeExclude:
+  - "@effect/tsgo-darwin-arm64@0.61.0"
+  - "@effect/tsgo-darwin-x64@0.61.0"
+  - "@effect/tsgo-linux-arm64@0.61.0"
+  - "@effect/tsgo-linux-arm@0.61.0"
+  - "@effect/tsgo-linux-x64@0.61.0"
+  - "@effect/tsgo-win32-arm64@0.61.0"
+  - "@effect/tsgo-win32-x64@0.61.0"
+  - "@effect/tsgo@0.61.0"

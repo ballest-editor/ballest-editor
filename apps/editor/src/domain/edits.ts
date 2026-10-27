@@ -35,7 +35,10 @@ export const removeItems = (map: MapFile, indices: ReadonlyArray<number>): MapFi
       ...map.editorState,
       pivots: map.editorState.pivots
         .filter((p) => !removed.has(p.itemIndex))
-        .map((p) => (sorted[0]! < p.itemIndex ? { ...p, itemIndex: shift(p.itemIndex) } : p))
+        .map((p) => {
+          const itemIndex = shift(p.itemIndex)
+          return itemIndex === p.itemIndex ? p : { ...p, itemIndex }
+        })
     }
   }
 }
@@ -51,8 +54,10 @@ export const replaceItem = (map: MapFile, index: number, item: Item): MapFile =>
 export const setTranslation = (map: MapFile, index: number, translation: unknown): Option.Option<MapFile> => {
   const item = map.items[index]
   if (item === undefined) return Option.none()
-  return Option.map(decodeVector3(translation), (t: Vector3) =>
-    replaceItem(map, index, { ...item, itemTransform: { ...item.itemTransform, translation: t } }))
+  return Option.map(
+    decodeVector3(translation),
+    (t: Vector3) => replaceItem(map, index, { ...item, itemTransform: { ...item.itemTransform, translation: t } })
+  )
 }
 
 /**

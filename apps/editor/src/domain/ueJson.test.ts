@@ -8,7 +8,7 @@ describe("ueJson", () => {
     [10, "10"],
     [-3955, "-3955"],
     [0.276538, "0.27653800000000001"],
-    [-0.70710678118654757, "-0.70710678118654757"],
+    [-Math.SQRT1_2, "-0.70710678118654757"],
     [184.154937744140625, "184.15493774414062"], // exact tie -> even
     [708.87933349609375, "708.87933349609375"],
     [1e-5, "1.0000000000000001e-05"],
@@ -26,6 +26,6 @@ describe("ueJson", () => {
   })
 
   it("rejects non-finite numbers", () => {
-    expect(() => stringifyUe({ a: Number.NaN })).toThrow()
+    expect(() => stringifyUe({ a: Number.NaN })).toThrow("Cannot write non-finite number NaN to JSON")
   })
 })

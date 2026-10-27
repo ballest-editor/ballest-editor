@@ -9,7 +9,7 @@ import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Ca
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { addItem, removeItems, setLevelNames, setTransform, setTranslation, validateItem } from "../domain/edits"
 import { itemFromPiece, newMapFile } from "../domain/factory"
-import { deriveKeybinds, type DerivedKeybinds } from "../domain/GameKeybinds"
+import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
 import type { Keybinds } from "../domain/Keybinds"
 import type { ItemTransform, MapFile } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
@@ -29,7 +29,8 @@ const HISTORY_LIMIT = 200
 const SPEED_STEPS = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
 
 let nextId = 0
-const freshIds = (n: number) => Array.from({ length: n }, () => `item-${++nextId}`)
+const freshId = () => `item-${++nextId}`
+const freshIds = (n: number) => Array.from({ length: n }, freshId)
 const docOf = (map: MapFile): Doc => ({ map, ids: freshIds(map.items.length) })
 
 export const initialMap = () => newMapFile({ displayName: "Untitled", creatorName: "", createdAt: "" })
@@ -65,32 +66,32 @@ export interface EditorState {
   readonly focusRequest: number
   readonly frameAllRequest: number
 
-  loadMap(map: MapFile, sourceName: string | null): void
-  replaceMapSilently(map: MapFile): void
-  placePiece(piece: CatalogPiece, transform: ItemTransform): void
-  moveItem(id: string, translation: Vec3): void
+  readonly loadMap: (map: MapFile, sourceName: string | null) => void
+  readonly replaceMapSilently: (map: MapFile) => void
+  readonly placePiece: (piece: CatalogPiece, transform: ItemTransform) => void
+  readonly moveItem: (id: string, translation: Vec3) => void
   /** Replaces the item's transform; false (with a notice) when the game would reject it. */
-  transformItem(id: string, transform: UeTransform): boolean
-  deleteSelection(): void
-  renameLevel(displayName: string, creatorName: string): void
-  undo(): void
-  redo(): void
-  select(id: string | null): void
-  setTool(tool: Tool): void
-  openDialog(dialog: Dialog, category?: SettingsCategory): void
-  closeDialog(): void
-  setSettingsCategory(category: SettingsCategory): void
-  setPreview(preview: EditorState["preview"]): void
-  setCatalog(catalog: LoadedCatalog): void
-  finishBoot(): void
-  setMaterialTable(table: MaterialTable): void
-  setKeybinds(keybinds: Keybinds, defaults?: DerivedKeybinds): void
-  setSettings(settings: Settings): void
-  reportMissingGlb(url: string): void
-  notify(kind: "info" | "error", text: string): void
-  changeSpeed(direction: 1 | -1): void
-  requestFocus(): void
-  requestFrameAll(): void
+  readonly transformItem: (id: string, transform: UeTransform) => boolean
+  readonly deleteSelection: () => void
+  readonly renameLevel: (displayName: string, creatorName: string) => void
+  readonly undo: () => void
+  readonly redo: () => void
+  readonly select: (id: string | null) => void
+  readonly setTool: (tool: Tool) => void
+  readonly openDialog: (dialog: Dialog, category?: SettingsCategory) => void
+  readonly closeDialog: () => void
+  readonly setSettingsCategory: (category: SettingsCategory) => void
+  readonly setPreview: (preview: EditorState["preview"]) => void
+  readonly setCatalog: (catalog: LoadedCatalog) => void
+  readonly finishBoot: () => void
+  readonly setMaterialTable: (table: MaterialTable) => void
+  readonly setKeybinds: (keybinds: Keybinds, defaults?: DerivedKeybinds) => void
+  readonly setSettings: (settings: Settings) => void
+  readonly reportMissingGlb: (url: string) => void
+  readonly notify: (kind: "info" | "error", text: string) => void
+  readonly changeSpeed: (direction: 1 | -1) => void
+  readonly requestFocus: () => void
+  readonly requestFrameAll: () => void
 }
 
 export const useEditor = create<EditorState>()((set, get) => {
@@ -144,8 +145,8 @@ export const useEditor = create<EditorState>()((set, get) => {
         return
       }
       const { doc } = get()
-      const [id] = freshIds(1)
-      commit({ map: addItem(doc.map, item.value), ids: [...doc.ids, id!] }, { selectedId: id! })
+      const id = freshId()
+      commit({ map: addItem(doc.map, item.value), ids: [...doc.ids, id] }, { selectedId: id })
     },
 
     moveItem: (id, translation) => {
@@ -216,8 +217,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     finishBoot: () => set({ booting: false }),
     setMaterialTable: (materialTable) => set({ materialTable }),
     setSettings: (settings) => set({ settings }),
-    setKeybinds: (keybinds, defaults) =>
-      set((s) => ({ keybinds, keybindDefaults: defaults ?? s.keybindDefaults })),
+    setKeybinds: (keybinds, defaults) => set((s) => ({ keybinds, keybindDefaults: defaults ?? s.keybindDefaults })),
     reportMissingGlb: (url) =>
       set((s) => (s.missingGlbs.has(url) ? s : { missingGlbs: new Set([...s.missingGlbs, url]) })),
     notify: (kind, text) => {
@@ -227,8 +227,8 @@ export const useEditor = create<EditorState>()((set, get) => {
     changeSpeed: (direction) =>
       set((s) => {
         const i = SPEED_STEPS.indexOf(s.cameraSpeed)
-        const next = SPEED_STEPS[Math.min(SPEED_STEPS.length - 1, Math.max(0, (i < 0 ? 3 : i) + direction))]!
-        return { cameraSpeed: next }
+        const next = SPEED_STEPS[Math.min(SPEED_STEPS.length - 1, Math.max(0, (i < 0 ? 3 : i) + direction))]
+        return { cameraSpeed: next ?? s.cameraSpeed }
       }),
     requestFocus: () => set((s) => ({ focusRequest: s.focusRequest + 1 })),
     requestFrameAll: () => set((s) => ({ frameAllRequest: s.frameAllRequest + 1 }))

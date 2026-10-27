@@ -100,8 +100,6 @@ export class WorldSettings extends Schema.Opaque<WorldSettings>()(
 // ---------------------------------------------------------------------------
 // Editor state (drafts only)
 
-export const PivotChoice = Schema.Literals(["Default", "Center", "Bottom", "Top", "Left", "Right", "Back", "Front"])
-
 export class ItemPivot extends Schema.Opaque<ItemPivot>()(
   open({
     itemIndex: Schema.Int,
@@ -130,9 +128,6 @@ export class MapFile extends Schema.Opaque<MapFile>()(
     editorState: Schema.optionalKey(EditorState)
   })
 ) {}
-
-export const decodeMapFile = Schema.decodeUnknownEffect(MapFile)
-export const encodeMapFile = Schema.encodeEffect(MapFile)
 
 // ---------------------------------------------------------------------------
 // Constants

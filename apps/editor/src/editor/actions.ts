@@ -3,21 +3,23 @@ import { Cause, Effect, Exit } from "effect"
 import { currentCreatedAt, newMapFile } from "../domain/factory"
 import type { Keybinds } from "../domain/Keybinds"
 import { PLAYER_START_CLASS } from "../domain/MapFile"
+import type { Settings } from "../domain/Settings"
 import { CatalogLoader } from "../services/CatalogLoader"
 import { KeybindStore } from "../services/KeybindStore"
 import { MapCodec } from "../services/MapCodec"
 import { MapExporter } from "../services/MapExporter"
 import { MaterialLibrary } from "../services/MaterialLibrary"
-import { SettingsStore } from "../services/SettingsStore"
-import type { Settings } from "../domain/Settings"
 import { type AppServices, runtime } from "../services/runtime"
+import { SettingsStore } from "../services/SettingsStore"
 import { useEditor } from "./store"
 
 const run = async <A, E>(effect: Effect.Effect<A, E, AppServices>): Promise<A | undefined> => {
   const exit = await runtime.runPromiseExit(effect)
   if (Exit.isSuccess(exit)) return exit.value
   const error = Cause.squash(exit.cause)
-  const message = typeof error === "object" && error !== null && "message" in error ? String(error.message) : String(error)
+  const message = typeof error === "object" && error !== null && "message" in error
+    ? String(error.message)
+    : String(error)
   useEditor.getState().notify("error", message)
   return undefined
 }
@@ -48,23 +50,25 @@ export const loadSettings = () =>
 /** Applies immediately, then persists. */
 export const saveSettings = (settings: Settings) => {
   useEditor.getState().setSettings(settings)
-  return run(SettingsStore.use((store) => store.save(settings)))
-}
-
-export const resetSettings = () =>
-  run(
+  return run(
     Effect.gen(function*() {
-      useEditor.getState().setSettings(yield* SettingsStore.use((store) => store.reset))
+      const store = yield* SettingsStore
+      yield* store.save(settings)
     })
   )
+}
 
-export const loadKeybinds = () =>
+/** Stored (or default) keybinds, with the game's defaults they were derived from, into the editor. */
+const applyKeybinds = (source: "load" | "reset") =>
   run(
     Effect.gen(function*() {
-      const { keybinds, defaults } = yield* KeybindStore.use((store) => store.load)
+      const store = yield* KeybindStore
+      const { keybinds, defaults } = yield* store[source]
       useEditor.getState().setKeybinds(keybinds, defaults)
     })
   )
+
+export const loadKeybinds = () => applyKeybinds("load")
 
 export const saveKeybinds = (keybinds: Keybinds) =>
   run(
@@ -74,13 +78,7 @@ export const saveKeybinds = (keybinds: Keybinds) =>
     })
   )
 
-export const resetKeybinds = () =>
-  run(
-    Effect.gen(function*() {
-      const { keybinds, defaults } = yield* KeybindStore.use((store) => store.reset)
-      useEditor.getState().setKeybinds(keybinds, defaults)
-    })
-  )
+export const resetKeybinds = () => applyKeybinds("reset")
 
 export const newMap = (displayName: string, creatorName: string) =>
   run(

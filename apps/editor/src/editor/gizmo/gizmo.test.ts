@@ -1,12 +1,16 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as THREE from "three"
 import { ueToScene, ueToThreeVector } from "../../domain/coords"
-import { dragTransform, type DragStart } from "./drag"
+import { type DragStart, dragTransform } from "./drag"
 import { GizmoObject, SIZE, toolHandles } from "./handles"
 import { axisParamFromRay, axisWorldDir, gameDirToWorld, planeHit, rotateVec, screenAngle } from "./math"
 
 const v3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
-const identity = { translation: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale3D: { x: 1, y: 1, z: 1 } }
+const identity = {
+  translation: { x: 0, y: 0, z: 0 },
+  rotation: { x: 0, y: 0, z: 0, w: 1 },
+  scale3D: { x: 1, y: 1, z: 1 }
+}
 
 describe("gizmo math", () => {
   it("maps the game basis through coords: Z (blue) is world up", () => {
@@ -140,6 +144,10 @@ describe("gizmo drags (game space)", () => {
     expect(scaled.x).toBeCloseTo(2.5, 9)
     expect([scaled.y, scaled.z]).toEqual([1, 1])
     const u = start("s-uniform", identity, { x: 20, y: 0 })
-    expect(dragTransform(u, { ...pointer(v3(0, 0, 0)), px: { x: 0, y: 30 } })!.scale3D).toEqual({ x: 1.5, y: 1.5, z: 1.5 })
+    expect(dragTransform(u, { ...pointer(v3(0, 0, 0)), px: { x: 0, y: 30 } })!.scale3D).toEqual({
+      x: 1.5,
+      y: 1.5,
+      z: 1.5
+    })
   })
 })

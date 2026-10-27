@@ -2,16 +2,25 @@ import { Grid, useGLTF } from "@react-three/drei"
 import { Canvas, useFrame, useStore, useThree } from "@react-three/fiber"
 import { Badge } from "@workspace/ui/components/badge"
 import { cn } from "@workspace/ui/lib/utils"
-import { Component, type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  Component,
+  type ComponentType,
+  type ReactNode,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react"
 import * as THREE from "three"
 import { mouseChordOf } from "../domain/Keybinds"
-import { ToolBar } from "../components/ToolBar"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { ItemObject } from "./ItemObject"
 import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
-import { makeSelectionHelper, updateSelectionHelper } from "./selectionBounds"
 import { sceneRegistry } from "./sceneRegistry"
+import { makeSelectionHelper, updateSelectionHelper } from "./selectionBounds"
 import { useEditor } from "./store"
 import { glbUrl, visualsOf } from "./visuals"
 
@@ -30,7 +39,10 @@ function MapItems() {
   return (
     <group ref={root}>
       {(index !== null || !booting) &&
-        doc.map.items.map((item, i) => <ItemObject key={doc.ids[i]} id={doc.ids[i]!} item={item} index={index} />)}
+        doc.map.items.map((item, i) => {
+          const id = doc.ids[i]
+          return id === undefined ? null : <ItemObject key={id} id={id} item={item} index={index} />
+        })}
     </group>
   )
 }
@@ -47,7 +59,9 @@ function OnCommit({ run }: { readonly run: () => void }) {
 }
 
 /** A failed glb still settles the wait: its item draws a warning box. */
-class SettleOnError extends Component<{ readonly onSettled: () => void; readonly children: ReactNode }, { readonly failed: boolean }> {
+class SettleOnError
+  extends Component<{ readonly onSettled: () => void; readonly children: ReactNode }, { readonly failed: boolean }>
+{
   override state = { failed: false }
   static getDerivedStateFromError() {
     return { failed: true }
@@ -68,13 +82,16 @@ class SettleOnError extends Component<{ readonly onSettled: () => void; readonly
  */
 function InitialMeshes({ onSettled }: { readonly onSettled: () => void }) {
   const booting = useEditor((s) => s.booting)
-  const urls = useMemo(() => {
-    if (booting) return null
-    const { catalogIndex: index, doc } = useEditor.getState()
-    const all = doc.map.items.flatMap((item) => visualsOf(item, index).flatMap((v) => glbUrl(v.mesh?.glb) ?? []))
-    return [...new Set(all)]
-  }, [booting])
-  if (urls === null) return null
+  return booting ? null : <StartingMapMeshes onSettled={onSettled} />
+}
+
+/** Mounted when booting ends; the map on screen at that moment is what the reveal waits for. */
+function StartingMapMeshes({ onSettled }: { readonly onSettled: () => void }) {
+  const index = useEditor((s) => s.catalogIndex)
+  const items = useEditor((s) => s.doc.map.items)
+  const [urls] = useState(() => [
+    ...new Set(items.flatMap((item) => visualsOf(item, index).flatMap((v) => glbUrl(v.mesh?.glb) ?? [])))
+  ])
   return (
     <SettleOnError onSettled={onSettled}>
       <Suspense fallback={null}>
@@ -114,7 +131,8 @@ function ClickSelect() {
         let o: THREE.Object3D | null = hit.object
         while (o !== null && o.userData["itemId"] === undefined) o = o.parent
         if (o !== null) {
-          useEditor.getState().select(o.userData["itemId"] as string)
+          const itemId: unknown = o.userData["itemId"]
+          if (typeof itemId === "string") useEditor.getState().select(itemId)
           return
         }
       }
@@ -205,7 +223,7 @@ function ViewportGrid() {
 /** Oriented selection box: local bounds parented to the selected item (see selectionBounds.ts). */
 function SelectionBox() {
   const selectedId = useEditor((s) => s.selectedId)
-  const helper = useMemo(makeSelectionHelper, [])
+  const helper = useMemo(() => makeSelectionHelper(), [])
   useFrame(() => {
     const object = selectedId === null ? undefined : sceneRegistry.objects.get(selectedId)
     if (object === undefined) {
@@ -234,7 +252,8 @@ function Overlay() {
   )
 }
 
-export function Viewport() {
+/** `toolbar` floats over the scene; it is disabled until the first scene shows. */
+export function Viewport({ toolbar: Toolbar }: { readonly toolbar?: ComponentType<{ readonly disabled?: boolean }> }) {
   const [revealed, setRevealed] = useState(false)
   const reveal = useCallback(() => setRevealed(true), [])
   return (
@@ -266,7 +285,7 @@ export function Viewport() {
         {!revealed && <InitialMeshes onSettled={reveal} />}
       </Canvas>
       <Overlay />
-      <ToolBar disabled={!revealed} />
+      {Toolbar && <Toolbar disabled={!revealed} />}
     </div>
   )
 }

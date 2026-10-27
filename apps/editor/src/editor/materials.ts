@@ -5,6 +5,7 @@
  */
 import * as THREE from "three"
 import { lookupMaterial, type MaterialSpec, type MaterialTable, NEUTRAL } from "../domain/Materials"
+import { isMesh } from "./threeGuards"
 
 const textureLoader = new THREE.TextureLoader()
 const textures = new Map<string, THREE.Texture>()
@@ -58,7 +59,11 @@ const build = (
     material.needsUpdate = true
   }
   if (spec.baseColorTexture !== undefined) {
-    material.map = loadTexture(spec.baseColorTexture, colorSpaceOf(spec.baseColorTexture, THREE.SRGBColorSpace), drop("map"))
+    material.map = loadTexture(
+      spec.baseColorTexture,
+      colorSpaceOf(spec.baseColorTexture, THREE.SRGBColorSpace),
+      drop("map")
+    )
   }
   if (spec.normalTexture !== undefined) {
     material.normalMap = loadTexture(spec.normalTexture, THREE.NoColorSpace, drop("normalMap"))
@@ -73,7 +78,11 @@ const build = (
     material.metalnessMap = orm // B channel
   }
   if (spec.emissiveTexture !== undefined) {
-    material.emissiveMap = loadTexture(spec.emissiveTexture, colorSpaceOf(spec.emissiveTexture, THREE.SRGBColorSpace), drop("emissiveMap"))
+    material.emissiveMap = loadTexture(
+      spec.emissiveTexture,
+      colorSpaceOf(spec.emissiveTexture, THREE.SRGBColorSpace),
+      drop("emissiveMap")
+    )
     if (spec.emissive.every((c) => c === 0)) material.emissive.setRGB(1, 1, 1)
   }
   return material
@@ -95,10 +104,10 @@ export const materialFor = (table: MaterialTable | null, path: string | undefine
 
 /** UE slot index of a glb primitive: `extras.ueMaterialIndex`, else the "<i>:<slot>" material name. */
 export const slotIndexOf = (mesh: THREE.Mesh): number => {
-  const fromExtras = mesh.geometry.userData["ueMaterialIndex"]
+  const fromExtras: unknown = mesh.geometry.userData["ueMaterialIndex"]
   if (typeof fromExtras === "number") return fromExtras
   const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material
-  const fromMaterialExtras = material?.userData["ueMaterialIndex"]
+  const fromMaterialExtras: unknown = material?.userData["ueMaterialIndex"]
   if (typeof fromMaterialExtras === "number") return fromMaterialExtras
   const match = /^(\d+):/.exec(material?.name ?? "")
   return match ? Number(match[1]) : 0
@@ -111,5 +120,5 @@ export const applySlotMaterials = (
   slotMaterials: ReadonlyArray<string | undefined>
 ): void =>
   root.traverse((object) => {
-    if (object instanceof THREE.Mesh) object.material = materialFor(table, slotMaterials[slotIndexOf(object)])
+    if (isMesh(object)) object.material = materialFor(table, slotMaterials[slotIndexOf(object)])
   })

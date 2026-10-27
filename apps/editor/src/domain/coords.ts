@@ -39,8 +39,8 @@ export const ueToThreeVector = (v: Vec3): Vec3 => ({ x: v.x, y: v.z, z: v.y })
 export const threeToUeVector = (v: Vec3): Vec3 => ({ x: v.x, y: v.z, z: v.y })
 
 /** Axis-aligned scale: diag(s) conjugated by a permutation is the permuted diagonal. */
-export const ueToThreeScale = ueToThreeVector
-export const threeToUeScale = threeToUeVector
+const ueToThreeScale = ueToThreeVector
+const threeToUeScale = threeToUeVector
 
 export const ueToThreeQuat = (q: Quat4): Quat4 => ({ x: -q.x, y: -q.z, z: -q.y, w: q.w })
 export const threeToUeQuat = (q: Quat4): Quat4 => ({ x: -q.x, y: -q.z, z: -q.y, w: q.w })
@@ -87,13 +87,37 @@ export const ueBoundsToScene = (min: Tuple3, max: Tuple3): { readonly size: Tupl
  * Its negative determinant makes three.js flip the triangle winding for us.
  */
 export const UE_TO_THREE_MATRIX: readonly [
-  number, number, number, number,
-  number, number, number, number,
-  number, number, number, number,
-  number, number, number, number
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number
 ] = [
-  1, 0, 0, 0,
-  0, 0, 1, 0,
-  0, 1, 0, 0,
-  0, 0, 0, 1
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1
 ]

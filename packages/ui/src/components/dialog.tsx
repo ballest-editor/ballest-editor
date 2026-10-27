@@ -1,9 +1,9 @@
-import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { cn } from "cn"
+import * as React from "react"
 
-import { Button } from "@workspace/ui/components/button"
 import { IconX } from "@tabler/icons-react"
+import { Button } from "@workspace/ui/components/button"
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -68,8 +68,7 @@ function DialogContent({
               />
             }
           >
-            <IconX
-            />
+            <IconX />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         )}
@@ -151,5 +150,5 @@ export {
   DialogOverlay,
   DialogPortal,
   DialogTitle,
-  DialogTrigger,
+  DialogTrigger
 }

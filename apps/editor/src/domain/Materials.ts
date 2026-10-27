@@ -109,7 +109,7 @@ const orUndefined = (s: string | null | undefined) => (s === null || s === undef
 export const toSpec = (path: string, entry: typeof MaterialEntry.Type): MaterialSpec => {
   const a = entry.approx ?? {}
   const rgb = (v: ReadonlyArray<number> | null | undefined, fallback: readonly [number, number, number]) =>
-    v === null || v === undefined ? fallback : ([v[0]!, v[1]!, v[2]!] as const)
+    v === null || v === undefined ? fallback : ([v[0] ?? 0, v[1] ?? 0, v[2] ?? 0] as const)
   const emissive = Predicate.isNumber(a.emissive)
     ? ([a.emissive, a.emissive, a.emissive] as const)
     : rgb(a.emissive, NEUTRAL.emissive)
@@ -136,13 +136,12 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
 
 /** Accepts the extractor's `{ materials: [...], textures: [...] }`, or a `{ path: entry }` map. */
 export const parseMaterialsFile = (json: unknown): MaterialTable => {
-  const table = emptyMaterialTable()
-  const materials = table.materials as Map<string, MaterialSpec>
-  const byName = table.byName as Map<string, MaterialSpec>
-  const textureSrgb = table.textureSrgb as Map<string, boolean>
+  if (!Predicate.isObject(json)) return emptyMaterialTable()
+  const root = json
+  const materials = new Map<string, MaterialSpec>()
+  const byName = new Map<string, MaterialSpec>()
+  const textureSrgb = new Map<string, boolean>()
   let skipped = 0
-  if (!Predicate.isObject(json)) return table
-  const root = json as Record<string, unknown>
   const add = (key: string | undefined, value: unknown) => {
     const entry = decodeEntry(value)
     const path = entry._tag === "Some" ? (entry.value.path ?? key) : undefined
@@ -161,7 +160,7 @@ export const parseMaterialsFile = (json: unknown): MaterialTable => {
   if (Array.isArray(list)) {
     for (const value of list) add(undefined, value)
   } else {
-    const map = Predicate.isObject(list) ? (list as Record<string, unknown>) : root
+    const map = Predicate.isObject(list) ? list : root
     for (const [key, value] of Object.entries(map)) if (key.startsWith("/")) add(key, value)
   }
   if (Array.isArray(root["textures"])) {

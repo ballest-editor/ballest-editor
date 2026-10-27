@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
-import fixture from "../test/fixtures/catalog.json"
+import fixture from "./bundledCatalog.json"
 import { Catalog } from "./Catalog"
 import {
   formatCreatedAt,
@@ -61,7 +61,11 @@ describe("factory", () => {
 
   it("places the player start at the in-game default scale", () => {
     const start = catalog.pieces.find((p) => p.className === "MP_PlayerStart")!
-    assert.deepStrictEqual(placementTransform(start, { x: 1, y: 2, z: 3 }).scale3D, { x: 0.276538, y: 0.276538, z: 0.276538 })
+    assert.deepStrictEqual(placementTransform(start, { x: 1, y: 2, z: 3 }).scale3D, {
+      x: 0.276538,
+      y: 0.276538,
+      z: 0.276538
+    })
   })
 
   it("creates a new map with exactly one player start that decodes", () => {
@@ -87,7 +91,7 @@ describe("palette sections", () => {
     const { paletteSections, HIDDEN_SECTION, OTHER_SECTION, pieceLabelOf } = await import("./Catalog")
     const base = Schema.encodeSync(Catalog)(catalog).pieces[0]!
     const piece = (className: string, extra: Record<string, unknown>) =>
-      Schema.decodeUnknownSync(Catalog)({ pieces: [{ ...base, className, ...extra }] }).pieces[0]!
+      Schema.decodeSync(Catalog)({ pieces: [{ ...base, className, ...extra }] }).pieces[0]!
     const sections = paletteSections([
       piece("A", { category: "Tracks" }),
       piece("B", { category: "Shapes", displayName: "Big B" }),

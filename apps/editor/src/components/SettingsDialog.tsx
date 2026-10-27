@@ -1,15 +1,24 @@
-import { IconCamera, IconKeyboard, IconPalette, IconPlus, IconRestore, IconSearch, IconSettings, IconX } from "@tabler/icons-react"
+import {
+  IconCamera,
+  IconKeyboard,
+  IconPalette,
+  IconPlus,
+  IconRestore,
+  IconSearch,
+  IconSettings,
+  IconX
+} from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
-import { Kbd } from "@workspace/ui/components/kbd"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Slider } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type ReactNode, useEffect, useMemo, useState } from "react"
+import { Struct } from "effect"
+import { type ReactNode, useEffect, useState } from "react"
 import {
   type Bindings,
   chordOf,
@@ -19,6 +28,7 @@ import {
   type KeybindAction,
   keybindActionDescriptions,
   keybindActionLabels,
+  keybindActions,
   keybindSections,
   mouseChordOf,
   mouseDragActions,
@@ -29,12 +39,25 @@ import { CUSTOM_FOV_PRESET, defaultSettings, type Settings } from "../domain/Set
 import { resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
 import { type SettingsCategory, useEditor } from "../editor/store"
 
-const CATEGORIES: ReadonlyArray<{ readonly id: SettingsCategory; readonly label: string; readonly icon: typeof IconSettings }> = [
-  { id: "general", label: "General", icon: IconSettings },
-  { id: "camera", label: "Camera", icon: IconCamera },
-  { id: "keybinds", label: "Keybinds", icon: IconKeyboard },
-  { id: "appearance", label: "Appearance", icon: IconPalette }
+const CATEGORY_LABELS: Readonly<Record<SettingsCategory, string>> = {
+  general: "General",
+  camera: "Camera",
+  keybinds: "Keybinds",
+  appearance: "Appearance"
+}
+
+const CATEGORIES: ReadonlyArray<
+  { readonly id: SettingsCategory; readonly label: string; readonly icon: typeof IconSettings }
+> = [
+  { id: "general", label: CATEGORY_LABELS.general, icon: IconSettings },
+  { id: "camera", label: CATEGORY_LABELS.camera, icon: IconCamera },
+  { id: "keybinds", label: CATEGORY_LABELS.keybinds, icon: IconKeyboard },
+  { id: "appearance", label: CATEGORY_LABELS.appearance, icon: IconPalette }
 ]
+
+/** base-ui sliders report a number, or an array for range sliders. */
+const sliderValue = (value: number | ReadonlyArray<number>): number | undefined =>
+  typeof value === "number" ? value : value[0]
 
 /** One searchable setting. `group` is a sub-heading inside the category (keybind sections). */
 interface Row {
@@ -50,6 +73,17 @@ interface Row {
   readonly modified: boolean
   readonly reset: () => void
   readonly control: ReactNode
+}
+
+function ColorInput(props: { readonly value: string; readonly onChange: (value: string) => void }) {
+  return (
+    <Input
+      type="color"
+      className="h-7 w-14 p-0.5"
+      value={props.value}
+      onChange={(e) => props.onChange(e.target.value)}
+    />
+  )
 }
 
 /** A binding being captured: a fresh slot (`index` = bindings.length) or a replacement. */
@@ -68,7 +102,14 @@ function RowView({ row }: { readonly row: Row }) {
     <div className="group/row relative flex min-h-9 items-center gap-4 py-1 pl-3">
       {row.modified && (
         <Tooltip>
-          <TooltipTrigger render={<span className="absolute top-1/2 left-0 size-1.5 -translate-y-1/2 rounded-full bg-primary" aria-label="Changed from default" />} />
+          <TooltipTrigger
+            render={
+              <span
+                className="absolute top-1/2 left-0 size-1.5 -translate-y-1/2 rounded-full bg-primary"
+                aria-label="Changed from default"
+              />
+            }
+          />
           <TooltipContent side="left">Changed from default</TooltipContent>
         </Tooltip>
       )}
@@ -76,7 +117,11 @@ function RowView({ row }: { readonly row: Row }) {
         {row.tooltip && row.description !== undefined
           ? (
             <Tooltip>
-              <TooltipTrigger render={<span className="w-fit cursor-help underline decoration-dotted decoration-muted-foreground/50 underline-offset-4" />}>
+              <TooltipTrigger
+                render={
+                  <span className="w-fit cursor-help underline decoration-dotted decoration-muted-foreground/50 underline-offset-4" />
+                }
+              >
                 {label}
               </TooltipTrigger>
               <TooltipContent side="right" className="max-w-xs">{row.description}</TooltipContent>
@@ -84,7 +129,9 @@ function RowView({ row }: { readonly row: Row }) {
           )
           : label}
         {!row.tooltip && row.description !== undefined && (
-          <span className={cn("text-[0.7rem] text-muted-foreground", row.disabled && "opacity-60")}>{row.description}</span>
+          <span className={cn("text-[0.7rem] text-muted-foreground", row.disabled && "opacity-60")}>
+            {row.description}
+          </span>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
@@ -129,7 +176,7 @@ function KeybindControl(props: {
     <div className="flex min-h-7 flex-wrap items-center justify-end gap-1">
       {props.bindings.map((binding, index) =>
         props.listening === index
-          ? <CaptureCap key={`capture-${index}`} />
+          ? <CaptureCap key="capture" />
           : (
             <span
               key={binding}
@@ -207,9 +254,15 @@ export function SettingsDialog(props: {
   const update = <K extends keyof Settings>(section: K, patch: Partial<Settings[K]>) =>
     void saveSettings({ ...settings, [section]: { ...settings[section], ...patch } })
   const resetField = <K extends keyof Settings>(section: K, key: keyof Settings[K]) =>
-    update(section, { [key]: defaultSettings[section][key] } as Partial<Settings[K]>)
+    update(section, Struct.pick(defaultSettings[section], [key]))
   const isDefault = <K extends keyof Settings>(section: K, key: keyof Settings[K]) =>
     settings[section][key] === defaultSettings[section][key]
+  /** The parts of a settings row that come from its field: category, modified flag, reset. */
+  const setting = <K extends keyof Settings>(section: K, key: keyof Settings[K]) => ({
+    category: section,
+    modified: !isDefault(section, key),
+    reset: () => resetField(section, key)
+  })
 
   const setBindings = (action: KeybindAction, bindings: Bindings) =>
     void saveKeybinds({ ...keybinds, [action]: uniqueBindings(bindings) })
@@ -222,7 +275,7 @@ export function SettingsDialog(props: {
       const next = [...keybinds[action]]
       next[index] = binding
       setListening(null)
-      setBindings(action, next)
+      void saveKeybinds({ ...keybinds, [action]: uniqueBindings(next) })
     }
     const stop = (e: Event) => {
       e.preventDefault()
@@ -258,12 +311,13 @@ export function SettingsDialog(props: {
     }
   }, [listening, keybinds])
 
-  const rows = useMemo((): ReadonlyArray<Row> => {
+  const rows = ((): ReadonlyArray<Row> => {
     // A chord is a conflict when two actions of the same kind share it. A fly key doubling
     // as a tool shortcut (W: forward + move mode, as in the game) is fine: it only flies
     // while the look button is held.
     const kinds = new Map<string, Set<string>>()
-    for (const [action, bindings] of Object.entries(keybinds) as Array<[KeybindAction, Bindings]>) {
+    for (const action of keybindActions) {
+      const bindings = keybinds[action]
       const kind = heldActions.has(action) ? "held" : mouseDragActions.has(action) ? "drag" : "oneShot"
       for (const b of bindings) {
         const set = kinds.get(`${kind}:${b}`) ?? new Set<string>()
@@ -271,7 +325,9 @@ export function SettingsDialog(props: {
         kinds.set(`${kind}:${b}`, set)
       }
     }
-    const conflicts = new Set([...kinds].filter(([, actions]) => actions.size > 1).map(([key]) => key.slice(key.indexOf(":") + 1)))
+    const conflicts = new Set(
+      [...kinds].filter(([, actions]) => actions.size > 1).map(([key]) => key.slice(key.indexOf(":") + 1))
+    )
 
     // Sections and labels: keybinds.json naming when the extractor provides it, else our table.
     const sectionOf = (action: KeybindAction, fallback: string) => defaults.naming.get(action)?.section ?? fallback
@@ -308,27 +364,28 @@ export function SettingsDialog(props: {
       .map(({ row }) => row)
 
     const c = settings.camera
-    const presetItems: Record<string, string> = Object.fromEntries([
-      ...defaults.cameraPresets.map((p) => [p.id, `${p.label} (fov ${p.fov})`]),
+    const presetEntries: ReadonlyArray<readonly [string, string]> = [
+      ...defaults.cameraPresets.map((p) => [p.id, `${p.label} (fov ${p.fov})`] as const),
       [CUSTOM_FOV_PRESET, `Custom (fov ${c.customFov})`]
-    ])
+    ]
+    const presetItems = Object.fromEntries(presetEntries)
     const a = settings.appearance
     const customFovOff = c.fovPreset !== CUSTOM_FOV_PRESET
     return [
       {
         id: "units",
-        category: "general",
+        ...setting("general", "units"),
         label: "Units",
         description: "How positions are shown in the inspector. Map files always store centimetres.",
-        modified: !isDefault("general", "units"),
-        reset: () => resetField("general", "units"),
         control: (
           <Select
             value={settings.general.units}
             items={{ cm: "Centimetres", m: "Metres" }}
-            onValueChange={(v) => update("general", { units: v as "cm" | "m" })}
+            onValueChange={(v) => v !== null && update("general", { units: v })}
           >
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="cm">Centimetres</SelectItem>
               <SelectItem value="m">Metres</SelectItem>
@@ -338,11 +395,10 @@ export function SettingsDialog(props: {
       },
       {
         id: "creatorName",
-        category: "general",
+        ...setting("general", "creatorName"),
         label: "Creator name",
-        description: "Your in-game name. Written into every exported map and its file name (letters, digits and spaces).",
-        modified: !isDefault("general", "creatorName"),
-        reset: () => resetField("general", "creatorName"),
+        description:
+          "Your in-game name. Written into every exported map and its file name (letters, digits and spaces).",
         control: (
           <Input
             className="w-56"
@@ -364,14 +420,19 @@ export function SettingsDialog(props: {
       },
       {
         id: "fov",
-        category: "camera",
+        ...setting("camera", "fovPreset"),
         label: "Field of view",
-        description: "The game's camera presets (from its camera settings). Only the field of view applies to the editor.",
-        modified: !isDefault("camera", "fovPreset"),
-        reset: () => resetField("camera", "fovPreset"),
+        description:
+          "The game's camera presets (from its camera settings). Only the field of view applies to the editor.",
         control: (
-          <Select value={c.fovPreset} items={presetItems} onValueChange={(v) => update("camera", { fovPreset: String(v) })}>
-            <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+          <Select
+            value={c.fovPreset}
+            items={presetItems}
+            onValueChange={(v) => update("camera", { fovPreset: String(v) })}
+          >
+            <SelectTrigger className="w-56">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {Object.entries(presetItems).map(([id, label]) => <SelectItem key={id} value={id}>{label}</SelectItem>)}
             </SelectContent>
@@ -380,12 +441,12 @@ export function SettingsDialog(props: {
       },
       {
         id: "customFov",
-        category: "camera",
+        ...setting("camera", "customFov"),
         label: "Custom field of view",
-        description: customFovOff ? "Horizontal degrees. Choose the Custom preset to use it." : "Horizontal degrees, used by the Custom preset (like the game).",
+        description: customFovOff
+          ? "Horizontal degrees. Choose the Custom preset to use it."
+          : "Horizontal degrees, used by the Custom preset (like the game).",
         disabled: customFovOff,
-        modified: !isDefault("camera", "customFov"),
-        reset: () => resetField("camera", "customFov"),
         control: (
           <>
             <Slider
@@ -395,69 +456,91 @@ export function SettingsDialog(props: {
               step={1}
               value={c.customFov}
               disabled={customFovOff}
-              onValueChange={(v) => update("camera", { customFov: v as number })}
+              onValueChange={(v) => {
+                const customFov = sliderValue(v)
+                if (customFov !== undefined) update("camera", { customFov })
+              }}
             />
-            <span className={cn("w-20 text-right font-mono text-xs tabular-nums", customFovOff && "text-muted-foreground/60")}>{c.customFov}°</span>
+            <span
+              className={cn(
+                "w-20 text-right font-mono text-xs tabular-nums",
+                customFovOff && "text-muted-foreground/60"
+              )}
+            >
+              {c.customFov}°
+            </span>
           </>
         )
       },
       {
         id: "flySpeed",
-        category: "camera",
+        ...setting("camera", "flySpeed"),
         label: "Fly speed",
         description: "Base camera speed. Camera speed up/down multiply it.",
-        modified: !isDefault("camera", "flySpeed"),
-        reset: () => resetField("camera", "flySpeed"),
         control: (
           <>
-            <Slider className="w-48" min={100} max={20000} step={100} value={c.flySpeed} onValueChange={(v) => update("camera", { flySpeed: v as number })} />
+            <Slider
+              className="w-48"
+              min={100}
+              max={20000}
+              step={100}
+              value={c.flySpeed}
+              onValueChange={(v) => {
+                const flySpeed = sliderValue(v)
+                if (flySpeed !== undefined) update("camera", { flySpeed })
+              }}
+            />
             <span className="w-20 text-right font-mono text-xs tabular-nums">{(c.flySpeed / 100).toFixed(0)} m/s</span>
           </>
         )
       },
       {
         id: "lookSensitivity",
-        category: "camera",
+        ...setting("camera", "lookSensitivity"),
         label: "Look sensitivity",
-        modified: !isDefault("camera", "lookSensitivity"),
-        reset: () => resetField("camera", "lookSensitivity"),
         control: (
           <>
-            <Slider className="w-48" min={0.1} max={5} step={0.1} value={c.lookSensitivity} onValueChange={(v) => update("camera", { lookSensitivity: v as number })} />
+            <Slider
+              className="w-48"
+              min={0.1}
+              max={5}
+              step={0.1}
+              value={c.lookSensitivity}
+              onValueChange={(v) => {
+                const lookSensitivity = sliderValue(v)
+                if (lookSensitivity !== undefined) update("camera", { lookSensitivity })
+              }}
+            />
             <span className="w-20 text-right font-mono text-xs tabular-nums">×{c.lookSensitivity.toFixed(1)}</span>
           </>
         )
       },
       {
         id: "invertX",
-        category: "camera",
+        ...setting("camera", "invertLookX"),
         label: "Invert look horizontal",
-        modified: !isDefault("camera", "invertLookX"),
-        reset: () => resetField("camera", "invertLookX"),
         control: <Switch checked={c.invertLookX} onCheckedChange={(v) => update("camera", { invertLookX: v })} />
       },
       {
         id: "invertY",
-        category: "camera",
+        ...setting("camera", "invertLookY"),
         label: "Invert look vertical",
-        modified: !isDefault("camera", "invertLookY"),
-        reset: () => resetField("camera", "invertLookY"),
         control: <Switch checked={c.invertLookY} onCheckedChange={(v) => update("camera", { invertLookY: v })} />
       },
       ...keybindRows,
       {
         id: "theme",
-        category: "appearance",
+        ...setting("appearance", "theme"),
         label: "Theme",
-        modified: !isDefault("appearance", "theme"),
-        reset: () => resetField("appearance", "theme"),
         control: (
           <Select
             value={a.theme}
             items={{ dark: "Dark", light: "Light", system: "System" }}
-            onValueChange={(v) => update("appearance", { theme: v as Settings["appearance"]["theme"] })}
+            onValueChange={(v) => v !== null && update("appearance", { theme: v })}
           >
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="dark">Dark</SelectItem>
               <SelectItem value="light">Light</SelectItem>
@@ -468,34 +551,34 @@ export function SettingsDialog(props: {
       },
       {
         id: "gridVisible",
-        category: "appearance",
+        ...setting("appearance", "gridVisible"),
         label: "Show grid",
-        modified: !isDefault("appearance", "gridVisible"),
-        reset: () => resetField("appearance", "gridVisible"),
         control: <Switch checked={a.gridVisible} onCheckedChange={(v) => update("appearance", { gridVisible: v })} />
       },
       {
         id: "gridCell",
-        category: "appearance",
+        ...setting("appearance", "gridCellColor"),
         label: "Grid colour (1 m cells)",
-        modified: !isDefault("appearance", "gridCellColor"),
-        reset: () => resetField("appearance", "gridCellColor"),
-        control: <Input type="color" className="h-7 w-14 p-0.5" value={a.gridCellColor} onChange={(e) => update("appearance", { gridCellColor: e.target.value })} />
+        control: <ColorInput value={a.gridCellColor} onChange={(v) => update("appearance", { gridCellColor: v })} />
       },
       {
         id: "gridSection",
-        category: "appearance",
+        ...setting("appearance", "gridSectionColor"),
         label: "Grid colour (10 m sections)",
-        modified: !isDefault("appearance", "gridSectionColor"),
-        reset: () => resetField("appearance", "gridSectionColor"),
-        control: <Input type="color" className="h-7 w-14 p-0.5" value={a.gridSectionColor} onChange={(e) => update("appearance", { gridSectionColor: e.target.value })} />
+        control: (
+          <ColorInput
+            value={a.gridSectionColor}
+            onChange={(v) => update("appearance", { gridSectionColor: v })}
+          />
+        )
       }
     ]
-  }, [settings, keybinds, defaults, listening])
+  })()
 
   const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 0)
   const searching = terms.length > 0
-  const matches = (r: Row) => terms.every((t) => `${r.label} ${r.description ?? ""} ${r.group ?? ""} ${r.category}`.toLowerCase().includes(t))
+  const matches = (r: Row) =>
+    terms.every((t) => `${r.label} ${r.description ?? ""} ${r.group ?? ""} ${r.category}`.toLowerCase().includes(t))
   const matched = searching ? rows.filter(matches) : []
   const hitsPerCategory = new Map<SettingsCategory, number>()
   for (const r of matched) hitsPerCategory.set(r.category, (hitsPerCategory.get(r.category) ?? 0) + 1)
@@ -507,14 +590,13 @@ export function SettingsDialog(props: {
   const groups: Array<{ key: string; title: string | undefined; rows: Array<Row> }> = []
   for (const row of visible) {
     const title = searching
-      ? [CATEGORIES.find((c) => c.id === row.category)?.label, row.group].filter(Boolean).join(" › ")
+      ? [CATEGORY_LABELS[row.category], row.group].filter(Boolean).join(" › ")
       : row.group
     const last = groups.at(-1)
     if (last !== undefined && last.title === title) last.rows.push(row)
     else groups.push({ key: `${row.category}-${title ?? ""}`, title, rows: [row] })
   }
 
-  const current = CATEGORIES.find((c) => c.id === props.category)!
   const resetCurrent = () => {
     if (props.category === "keybinds") void resetKeybinds()
     else if (props.category === "general") void saveSettings({ ...settings, general: defaultSettings.general })
@@ -541,7 +623,11 @@ export function SettingsDialog(props: {
             />
           </div>
           {searching && (
-            <Button variant={scope === null ? "secondary" : "ghost"} className="justify-between" onClick={() => setScope(null)}>
+            <Button
+              variant={scope === null ? "secondary" : "ghost"}
+              className="justify-between"
+              onClick={() => setScope(null)}
+            >
               <span>All results</span>
               <span className="text-[0.65rem] text-muted-foreground tabular-nums">{matched.length}</span>
             </Button>
@@ -564,15 +650,21 @@ export function SettingsDialog(props: {
                 <Icon />
                 <span className="flex-1 text-left">{label}</span>
                 {searching
-                  ? hits > 0 && <span className="rounded-full bg-primary/15 px-1.5 text-[0.65rem] text-primary tabular-nums">{hits}</span>
-                  : modifiedIn(id) && <span className="size-1.5 rounded-full bg-primary" aria-label="Has changed settings" />}
+                  ? hits > 0 && (
+                    <span className="rounded-full bg-primary/15 px-1.5 text-[0.65rem] text-primary tabular-nums">
+                      {hits}
+                    </span>
+                  )
+                  : modifiedIn(id) && (
+                    <span className="size-1.5 rounded-full bg-primary" aria-label="Has changed settings" />
+                  )}
               </Button>
             )
           })}
         </nav>
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="border-b px-5 py-3">
-            <DialogTitle>{searching ? `Search: ${query}` : current.label}</DialogTitle>
+            <DialogTitle>{searching ? `Search: ${query}` : CATEGORY_LABELS[props.category]}</DialogTitle>
             <DialogDescription className="sr-only">Editor settings</DialogDescription>
           </div>
           <ScrollArea className="min-h-0 flex-1">
@@ -580,7 +672,9 @@ export function SettingsDialog(props: {
               {groups.map((group) => (
                 <section key={group.key} className="flex flex-col">
                   {group.title !== undefined && group.title !== "" && (
-                    <h3 className="mb-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">{group.title}</h3>
+                    <h3 className="mb-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
+                      {group.title}
+                    </h3>
                   )}
                   <div className="flex flex-col divide-y divide-border/50">
                     {group.rows.map((row) => <RowView key={row.id} row={row} />)}
@@ -592,7 +686,7 @@ export function SettingsDialog(props: {
           </ScrollArea>
           <div className="flex justify-between border-t px-5 py-3">
             <Button variant="outline" onClick={resetCurrent} disabled={searching || !modifiedIn(props.category)}>
-              Reset {current.label.toLowerCase()} to defaults
+              Reset {CATEGORY_LABELS[props.category].toLowerCase()} to defaults
             </Button>
             <Button onClick={props.onClose} disabled={listening !== null}>Done</Button>
           </div>

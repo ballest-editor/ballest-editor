@@ -1,0 +1,16 @@
+name: Bug
+description: Something in the editor or an exported map is wrong
+title: "fix: "
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Steps, what you expected, what you saw. For export problems, say whether the game loads the map.
+    validations:
+      required: true
+  - type: textarea
+    id: map
+    attributes:
+      label: Map file
+      description: Attach the .balledit/.ballmap if it helps reproduce.
