@@ -12,12 +12,15 @@ function Slider({
   const _values = Array.isArray(value)
     ? value
     : Array.isArray(defaultValue)
-      ? defaultValue
-      : [min, max]
+    ? defaultValue
+    : [min, max]
 
   return (
     <SliderPrimitive.Root
-      className={cn("data-horizontal:w-full data-vertical:h-full data-disabled:pointer-events-none data-disabled:opacity-40", className)}
+      className={cn(
+        "data-horizontal:w-full data-vertical:h-full data-disabled:pointer-events-none data-disabled:opacity-40",
+        className
+      )}
       data-slot="slider"
       defaultValue={defaultValue}
       value={value}

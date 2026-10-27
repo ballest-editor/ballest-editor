@@ -5,8 +5,8 @@ import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Separator } from "@workspace/ui/components/separator"
 import { type ReactNode, useState } from "react"
 import { classNameOf, isPlayerStart, objectPathOf } from "../domain/MapFile"
-import { glbUrl, visualsOf } from "../editor/visuals"
 import { selectedIndex, useEditor } from "../editor/store"
+import { glbUrl, visualsOf } from "../editor/visuals"
 import { NumberField } from "./NumberField"
 
 const SectionTitle = ({ children }: { readonly children: ReactNode }) => (
@@ -65,7 +65,9 @@ export function Inspector() {
   if (item === undefined || selectedId === null) {
     return (
       <ScrollArea className="h-full bg-card">
-        <div className="p-3"><MapSettings /></div>
+        <div className="p-3">
+          <MapSettings />
+        </div>
       </ScrollArea>
     )
   }
@@ -74,31 +76,52 @@ export function Inspector() {
   const t = preview?.id === selectedId ? preview.transform : item.itemTransform
   // Display units only; the map always stores centimetres.
   const perUnit = units === "m" ? 100 : 1
-  const setAxis = (axis: "x" | "y" | "z") => (value: number) => moveItem(selectedId, { ...t.translation, [axis]: value * perUnit })
+  const setAxis = (axis: "x" | "y" | "z") => (value: number) =>
+    moveItem(selectedId, { ...t.translation, [axis]: value * perUnit })
   const failed = visualsOf(item, catalogIndex).flatMap((v) => {
     const url = glbUrl(v.mesh?.glb)
-    return url !== undefined && missing.has(url) ? [`${v.mesh?.meshAssetPath.split(".").at(-1)}: mesh failed to load`] : []
+    return url !== undefined && missing.has(url)
+      ? [`${v.mesh?.meshAssetPath.split(".").at(-1)}: mesh failed to load`]
+      : []
   })
 
   return (
     <ScrollArea className="h-full bg-card">
       <div className="flex flex-col gap-3 p-3">
         <SectionTitle>Item #{index}</SectionTitle>
-        <div className="text-sm font-semibold break-all" title={item.actorToSpawn}>{classNameOf(item.actorToSpawn)}</div>
+        <div className="text-sm font-semibold break-all" title={item.actorToSpawn}>
+          {classNameOf(item.actorToSpawn)}
+        </div>
         {isPlayerStart(item) && <Badge variant="secondary">Player start (required)</Badge>}
         {failed.map((w) => <Badge key={w} variant="destructive">{w}</Badge>)}
 
         <Separator />
         <SectionTitle>Position (game {units}, Z up)</SectionTitle>
         <div className="grid grid-cols-3 gap-2">
-          <NumberField label="X" value={t.translation.x / perUnit} onCommit={setAxis("x")} digits={units === "m" ? 5 : 3} />
-          <NumberField label="Y" value={t.translation.y / perUnit} onCommit={setAxis("y")} digits={units === "m" ? 5 : 3} />
-          <NumberField label="Z" value={t.translation.z / perUnit} onCommit={setAxis("z")} digits={units === "m" ? 5 : 3} />
+          <NumberField
+            label="X"
+            value={t.translation.x / perUnit}
+            onCommit={setAxis("x")}
+            digits={units === "m" ? 5 : 3}
+          />
+          <NumberField
+            label="Y"
+            value={t.translation.y / perUnit}
+            onCommit={setAxis("y")}
+            digits={units === "m" ? 5 : 3}
+          />
+          <NumberField
+            label="Z"
+            value={t.translation.z / perUnit}
+            onCommit={setAxis("z")}
+            digits={units === "m" ? 5 : 3}
+          />
         </div>
 
         <SectionTitle>Rotation (quaternion)</SectionTitle>
         <div className="font-mono text-xs text-muted-foreground">
-          x {t.rotation.x.toFixed(4)} y {t.rotation.y.toFixed(4)} z {t.rotation.z.toFixed(4)} w {t.rotation.w.toFixed(4)}
+          x {t.rotation.x.toFixed(4)} y {t.rotation.y.toFixed(4)} z {t.rotation.z.toFixed(4)} w{" "}
+          {t.rotation.w.toFixed(4)}
         </div>
         <SectionTitle>Scale</SectionTitle>
         <div className="font-mono text-xs text-muted-foreground">
@@ -111,7 +134,9 @@ export function Inspector() {
           // oxlint-disable-next-line react/no-array-index-key -- mesh components have no id; the slot index is their identity
           <div key={i} className="flex flex-col gap-1 text-xs break-all">
             <div className="font-mono" title={mesh.meshAssetPath}>
-              {mesh.meshAssetPath === undefined || mesh.meshAssetPath === "" ? "(no main mesh)" : mesh.meshAssetPath.split("/").at(-1)}
+              {mesh.meshAssetPath === undefined || mesh.meshAssetPath === ""
+                ? "(no main mesh)"
+                : mesh.meshAssetPath.split("/").at(-1)}
             </div>
             <ul className="flex flex-col gap-0.5 pl-2 font-mono text-muted-foreground">
               {mesh.materials.map((m) => (

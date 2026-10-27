@@ -47,7 +47,8 @@ export const rotateVec = (q: Quat4, v: Vec3): Vec3 => {
 
 /** World-space direction of a game axis, optionally in the item's local frame (game rotation). */
 export const axisWorldDir = (axis: Axis, localRotation?: Quat4): THREE.Vector3 =>
-  gameDirToWorld(localRotation === undefined ? GAME_BASIS[axis] : rotateVec(localRotation, GAME_BASIS[axis])).normalize()
+  gameDirToWorld(localRotation === undefined ? GAME_BASIS[axis] : rotateVec(localRotation, GAME_BASIS[axis]))
+    .normalize()
 
 /** A rotation by `angle` (right-handed) about a world axis, expressed as a game quaternion. */
 export const worldAxisAngleToGameQuat = (worldAxis: THREE.Vector3, angle: number): Quat4 => {
@@ -105,7 +106,11 @@ export const screenAngle = (center: Px, start: Px, current: Px): number => {
 }
 
 /** World units per screen pixel at `point` for a perspective camera, for constant screen-size gizmos. */
-export const worldPerPixel = (camera: THREE.PerspectiveCamera, point: THREE.Vector3, viewportHeightPx: number): number => {
+export const worldPerPixel = (
+  camera: THREE.PerspectiveCamera,
+  point: THREE.Vector3,
+  viewportHeightPx: number
+): number => {
   const forward = camera.getWorldDirection(new THREE.Vector3())
   const depth = Math.max(point.clone().sub(camera.position).dot(forward), camera.near)
   return (2 * depth * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) / Math.max(viewportHeightPx, 1)

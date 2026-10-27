@@ -31,7 +31,9 @@ export function PaletteSkeleton() {
         {Array.from({ length: 48 }, (_, i) => (
           // Same box as a palette entry: an inline-flex PieceButton inside a block <li>.
           <div key={i}>
-            <div className={buttonVariants({ variant: "ghost", className: "h-auto w-full justify-start gap-2 px-2 py-1" })}>
+            <div
+              className={buttonVariants({ variant: "ghost", className: "h-auto w-full justify-start gap-2 px-2 py-1" })}
+            >
               <Skeleton className="size-8 shrink-0 rounded-sm" />
               <Skeleton className="h-2.5 rounded-sm" style={{ width: LABEL_WIDTHS[i % LABEL_WIDTHS.length] }} />
             </div>
@@ -52,7 +54,10 @@ export function EditorSkeleton() {
     <div className="flex h-svh flex-col bg-background text-foreground" aria-busy>
       <TopBar />
       <div className="flex min-h-0 flex-1">
-        <div className="flex shrink-0 flex-col gap-2 overflow-hidden bg-card p-2" style={{ width: panelWidthVar("palette", 260) }}>
+        <div
+          className="flex shrink-0 flex-col gap-2 overflow-hidden bg-card p-2"
+          style={{ width: panelWidthVar("palette", 260) }}
+        >
           <div className="px-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">Pieces</div>
           <Input type="search" placeholder="Search pieces…" disabled />
           <PaletteSkeleton />
@@ -62,14 +67,19 @@ export function EditorSkeleton() {
           <ToolBar disabled />
         </div>
         <div className="w-px shrink-0 bg-border" />
-        <div className="flex shrink-0 flex-col gap-3 overflow-hidden bg-card p-3" style={{ width: panelWidthVar("inspector", 300) }}>
+        <div
+          className="flex shrink-0 flex-col gap-3 overflow-hidden bg-card p-3"
+          style={{ width: panelWidthVar("inspector", 300) }}
+        >
           <div className="text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">Map</div>
           <div className="flex flex-col gap-1">
             <Skeleton className="h-3 w-10 rounded-sm" />
             <Skeleton className="h-7 w-full" />
           </div>
           <div className="flex flex-col gap-1">
-            {LABEL_WIDTHS.slice(0, 5).map((w) => <Skeleton key={w} className="my-0.5 h-3 rounded-sm" style={{ width: w }} />)}
+            {LABEL_WIDTHS.slice(0, 5).map((w) => (
+              <Skeleton key={w} className="my-0.5 h-3 rounded-sm" style={{ width: w }} />
+            ))}
           </div>
         </div>
       </div>

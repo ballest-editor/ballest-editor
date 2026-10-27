@@ -4,9 +4,9 @@ import * as THREE from "three"
 import { type Bounds, type CatalogIndex, DEFAULT_BOUNDS, type MeshInfo } from "../domain/Catalog"
 import { type Tuple3, UE_TO_THREE_MATRIX, ueBoundsToScene, ueToScene } from "../domain/coords"
 import type { Item } from "../domain/MapFile"
+import { applySlotMaterials } from "./materials"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
-import { applySlotMaterials } from "./materials"
 import { glbUrl, visualsOf } from "./visuals"
 import { fixSceneWinding } from "./winding"
 
@@ -49,7 +49,9 @@ function BoundsBox({ bounds, warn }: { readonly bounds: Bounds | undefined; read
 }
 
 /** A glb in UE local space, re-expressed in the scene frame by the UE -> three matrix. */
-function GlbMesh({ url, slotMaterials }: { readonly url: string; readonly slotMaterials: ReadonlyArray<string | undefined> }) {
+function GlbMesh(
+  { url, slotMaterials }: { readonly url: string; readonly slotMaterials: ReadonlyArray<string | undefined> }
+) {
   const gltf = useGLTF(url)
   const table = useEditor((s) => s.materialTable)
   const object = useMemo(() => {
@@ -81,7 +83,12 @@ class GlbBoundary extends Component<
   }
 }
 
-function MeshVisual({ mesh, slotMaterials }: { readonly mesh: MeshInfo | undefined; readonly slotMaterials: ReadonlyArray<string | undefined> }) {
+function MeshVisual(
+  { mesh, slotMaterials }: {
+    readonly mesh: MeshInfo | undefined
+    readonly slotMaterials: ReadonlyArray<string | undefined>
+  }
+) {
   const url = glbUrl(mesh?.glb)
   if (url === undefined) return <BoundsBox bounds={mesh?.bounds} warn />
   return (

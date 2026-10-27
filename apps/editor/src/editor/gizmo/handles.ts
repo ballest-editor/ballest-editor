@@ -14,8 +14,8 @@
  */
 import * as THREE from "three"
 import type { Quat4 } from "../../domain/coords"
-import { type Axis, axisWorldDir } from "./math"
 import { isLine, isMesh } from "../threeGuards"
+import { type Axis, axisWorldDir } from "./math"
 
 export type HandleKind = "translateAxis" | "translatePlane" | "rotateAxis" | "rotateView" | "scaleAxis" | "scaleUniform"
 
@@ -60,7 +60,9 @@ export const SIZE = {
   hitRadius: 7
 } as const
 
-const pairOf = (axis: Axis): readonly [Axis, Axis] => (axis === "x" ? ["y", "z"] : axis === "y" ? ["z", "x"] : ["x", "y"])
+const pairOf = (
+  axis: Axis
+): readonly [Axis, Axis] => (axis === "x" ? ["y", "z"] : axis === "y" ? ["z", "x"] : ["x", "y"])
 
 export interface Handle {
   readonly spec: HandleSpec
@@ -93,7 +95,10 @@ const mesh = (geometry: THREE.BufferGeometry, material: THREE.Material) => {
 const alongX = (geometry: THREE.BufferGeometry, x0: number, x1: number) =>
   geometry.rotateZ(-Math.PI / 2).translate((x0 + x1) / 2, 0, 0)
 
-const buildVisual = (spec: HandleSpec, material: THREE.MeshBasicMaterial): { parts: Array<THREE.Mesh>; hits: Array<THREE.Mesh> } => {
+const buildVisual = (
+  spec: HandleSpec,
+  material: THREE.MeshBasicMaterial
+): { parts: Array<THREE.Mesh>; hits: Array<THREE.Mesh> } => {
   const S = SIZE
   switch (spec.kind) {
     case "translateAxis":
@@ -101,8 +106,16 @@ const buildVisual = (spec: HandleSpec, material: THREE.MeshBasicMaterial): { par
       const tip = spec.kind === "translateAxis"
         ? alongX(new THREE.ConeGeometry(S.coneRadius, S.coneLength, 20), S.axisLength, S.axisLength + S.coneLength)
         : new THREE.BoxGeometry(S.cube, S.cube, S.cube).translate(S.axisLength + S.cube / 2, 0, 0)
-      const shaft = alongX(new THREE.CylinderGeometry(S.shaft, S.shaft, S.axisLength - S.axisStart, 8), S.axisStart, S.axisLength)
-      const hit = alongX(new THREE.CylinderGeometry(S.hitRadius, S.hitRadius, S.axisLength + S.coneLength - S.axisStart, 8), S.axisStart, S.axisLength + S.coneLength)
+      const shaft = alongX(
+        new THREE.CylinderGeometry(S.shaft, S.shaft, S.axisLength - S.axisStart, 8),
+        S.axisStart,
+        S.axisLength
+      )
+      const hit = alongX(
+        new THREE.CylinderGeometry(S.hitRadius, S.hitRadius, S.axisLength + S.coneLength - S.axisStart, 8),
+        S.axisStart,
+        S.axisLength + S.coneLength
+      )
       return { parts: [mesh(shaft, material), mesh(tip, material)], hits: [mesh(hit, hitMaterial)] }
     }
     case "translatePlane": {
@@ -216,7 +229,14 @@ export class GizmoObject extends THREE.Group {
     const geometry = new THREE.BufferGeometry().setAttribute("position", this.guidePositions)
     this.guide = new THREE.Line(
       geometry,
-      new THREE.LineBasicMaterial({ color: "#ffffff", depthTest: false, depthWrite: false, transparent: true, opacity: 0.6, toneMapped: false })
+      new THREE.LineBasicMaterial({
+        color: "#ffffff",
+        depthTest: false,
+        depthWrite: false,
+        transparent: true,
+        opacity: 0.6,
+        toneMapped: false
+      })
     )
     this.guide.renderOrder = RENDER_ORDER - 1
     this.guide.frustumCulled = false
@@ -239,7 +259,9 @@ export class GizmoObject extends THREE.Group {
       orientHandle(h, frame)
       const state: HandleState = active !== null
         ? (h.spec.id === active ? "active" : "dimmed")
-        : h.spec.id === hovered ? "hover" : "idle"
+        : h.spec.id === hovered
+        ? "hover"
+        : "idle"
       styleHandle(h, state)
     }
     this.body.updateMatrixWorld(true)

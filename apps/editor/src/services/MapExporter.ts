@@ -1,5 +1,12 @@
 import { Context, DateTime, Effect, Layer } from "effect"
-import { currentCreatedAt, defaultEditorState, isValidName, mapFileNameOf, NAME_RULE, userLevelNameOf } from "../domain/factory"
+import {
+  currentCreatedAt,
+  defaultEditorState,
+  isValidName,
+  mapFileNameOf,
+  NAME_RULE,
+  userLevelNameOf
+} from "../domain/factory"
 import { gameLoadProblems } from "../domain/limits"
 import { type MapFile, SYSTEM_LEVEL_NAME } from "../domain/MapFile"
 import { ExportValidationError, type MapEncodeError } from "./errors"
@@ -31,7 +38,9 @@ export class MapExporter extends Context.Service<MapExporter, {
           return yield* new ExportValidationError({ message: "Map name and creator are required." })
         }
         if (!isValidName(displayName) || !isValidName(creatorName)) {
-          return yield* new ExportValidationError({ message: `Map name and creator: ${NAME_RULE} (they become the file name).` })
+          return yield* new ExportValidationError({
+            message: `Map name and creator: ${NAME_RULE} (they become the file name).`
+          })
         }
         const problems = gameLoadProblems(map)
         if (problems.length > 0) {

@@ -182,12 +182,15 @@ const axis1D = (positive: KeybindAction, negative: KeybindAction): Resolver => (
 ]
 /** Wheel axis: scrolling up drives the positive action. */
 const wheelAxis = (up: KeybindAction, down: KeybindAction): Resolver => (m) =>
-  m.key === "MouseWheelAxis" ? [{ action: up, code: "WheelUp" }, { action: down, code: "WheelDown" }] : axis1D(up, down)(m)
-const mouseButtonOnly = (action: KeybindAction): Resolver => (m) => ((m.key ?? "").endsWith("MouseButton") ? [{ action }] : [])
+  m.key === "MouseWheelAxis"
+    ? [{ action: up, code: "WheelUp" }, { action: down, code: "WheelDown" }]
+    : axis1D(up, down)(m)
+const mouseButtonOnly =
+  (action: KeybindAction): Resolver => (m) => ((m.key ?? "").endsWith("MouseButton") ? [{ action }] : [])
 /** IA_Look: a mouse button is our drag-look; keyboard keys are the arrow-key look actions. */
 const lookResolver: Resolver = (m) => {
   const key = m.key ?? ""
-  if (key.endsWith('MouseButton')) return [{ action: "look" }]
+  if (key.endsWith("MouseButton")) return [{ action: "look" }]
   if (key.startsWith("Mouse") || key.startsWith("Gamepad") || UE_KEY_TO_CODE[key] === undefined) return []
   const [x, y] = mappingDirection(m)
   if (Math.abs(x) >= Math.abs(y) && x !== 0) return [{ action: x > 0 ? "lookRight" : "lookLeft" }]

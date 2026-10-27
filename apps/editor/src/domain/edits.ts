@@ -54,8 +54,10 @@ export const replaceItem = (map: MapFile, index: number, item: Item): MapFile =>
 export const setTranslation = (map: MapFile, index: number, translation: unknown): Option.Option<MapFile> => {
   const item = map.items[index]
   if (item === undefined) return Option.none()
-  return Option.map(decodeVector3(translation), (t: Vector3) =>
-    replaceItem(map, index, { ...item, itemTransform: { ...item.itemTransform, translation: t } }))
+  return Option.map(
+    decodeVector3(translation),
+    (t: Vector3) => replaceItem(map, index, { ...item, itemTransform: { ...item.itemTransform, translation: t } })
+  )
 }
 
 /**

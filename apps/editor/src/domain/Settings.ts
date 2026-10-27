@@ -44,7 +44,14 @@ export type Settings = typeof Settings.Type
 
 export const defaultSettings: Settings = {
   general: { units: "cm", creatorName: "" },
-  camera: { flySpeed: 2000, lookSensitivity: 1, fovPreset: "Default", customFov: 90, invertLookX: false, invertLookY: false },
+  camera: {
+    flySpeed: 2000,
+    lookSensitivity: 1,
+    fovPreset: "Default",
+    customFov: 90,
+    invertLookX: false,
+    invertLookY: false
+  },
   appearance: { theme: "dark", gridVisible: true, gridCellColor: "#3a404a", gridSectionColor: "#58606e" }
 }
 
@@ -85,11 +92,16 @@ export const verticalFov = (horizontalDeg: number, aspect: number): number => {
 }
 
 /** Vertical FOV (degrees) for the editor camera: the preset's horizontal FOV at 16:9. */
-export const editorVerticalFov = (camera: Settings["camera"], presets: ReadonlyArray<{ readonly id: string; readonly fov: number }>): number =>
-  verticalFov(fovOf(camera, presets), REFERENCE_ASPECT)
+export const editorVerticalFov = (
+  camera: Settings["camera"],
+  presets: ReadonlyArray<{ readonly id: string; readonly fov: number }>
+): number => verticalFov(fovOf(camera, presets), REFERENCE_ASPECT)
 
 /** The horizontal FOV for the chosen preset; unknown presets use the first (Default). */
-export const fovOf = (camera: Settings["camera"], presets: ReadonlyArray<{ readonly id: string; readonly fov: number }>): number => {
+export const fovOf = (
+  camera: Settings["camera"],
+  presets: ReadonlyArray<{ readonly id: string; readonly fov: number }>
+): number => {
   if (camera.fovPreset === CUSTOM_FOV_PRESET) return camera.customFov
   return presets.find((p) => p.id === camera.fovPreset)?.fov ?? presets[0]?.fov ?? 90
 }

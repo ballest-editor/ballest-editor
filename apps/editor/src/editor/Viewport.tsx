@@ -4,14 +4,14 @@ import { Badge } from "@workspace/ui/components/badge"
 import { cn } from "@workspace/ui/lib/utils"
 import { Component, type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as THREE from "three"
-import { mouseChordOf } from "../domain/Keybinds"
 import { ToolBar } from "../components/ToolBar"
+import { mouseChordOf } from "../domain/Keybinds"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { ItemObject } from "./ItemObject"
 import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
-import { makeSelectionHelper, updateSelectionHelper } from "./selectionBounds"
 import { sceneRegistry } from "./sceneRegistry"
+import { makeSelectionHelper, updateSelectionHelper } from "./selectionBounds"
 import { useEditor } from "./store"
 import { glbUrl, visualsOf } from "./visuals"
 
@@ -50,7 +50,9 @@ function OnCommit({ run }: { readonly run: () => void }) {
 }
 
 /** A failed glb still settles the wait: its item draws a warning box. */
-class SettleOnError extends Component<{ readonly onSettled: () => void; readonly children: ReactNode }, { readonly failed: boolean }> {
+class SettleOnError
+  extends Component<{ readonly onSettled: () => void; readonly children: ReactNode }, { readonly failed: boolean }>
+{
   override state = { failed: false }
   static getDerivedStateFromError() {
     return { failed: true }

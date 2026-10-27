@@ -19,12 +19,33 @@
         {
           "from": "file",
           "path": "src/domain/MapFile.ts",
-          "name": ["Vector3", "Quat", "ItemTransform", "MaterialSlot", "MeshComponent", "Item", "LevelData", "WorldSettings", "ItemPivot", "EditorState", "MapFile"]
+          "name": [
+            "Vector3",
+            "Quat",
+            "ItemTransform",
+            "MaterialSlot",
+            "MeshComponent",
+            "Item",
+            "LevelData",
+            "WorldSettings",
+            "ItemPivot",
+            "EditorState",
+            "MapFile"
+          ]
         },
         {
           "from": "file",
           "path": "src/domain/Catalog.ts",
-          "name": ["Bounds", "CatalogMaterialSlot", "Rotator", "MainRelativeTransform", "ExtraMesh", "CatalogPiece", "CatalogMesh", "Catalog"]
+          "name": [
+            "Bounds",
+            "CatalogMaterialSlot",
+            "Rotator",
+            "MainRelativeTransform",
+            "ExtraMesh",
+            "CatalogPiece",
+            "CatalogMesh",
+            "Catalog"
+          ]
         }
       ]
     }],

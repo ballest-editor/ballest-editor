@@ -59,7 +59,11 @@ const build = (
     material.needsUpdate = true
   }
   if (spec.baseColorTexture !== undefined) {
-    material.map = loadTexture(spec.baseColorTexture, colorSpaceOf(spec.baseColorTexture, THREE.SRGBColorSpace), drop("map"))
+    material.map = loadTexture(
+      spec.baseColorTexture,
+      colorSpaceOf(spec.baseColorTexture, THREE.SRGBColorSpace),
+      drop("map")
+    )
   }
   if (spec.normalTexture !== undefined) {
     material.normalMap = loadTexture(spec.normalTexture, THREE.NoColorSpace, drop("normalMap"))
@@ -74,7 +78,11 @@ const build = (
     material.metalnessMap = orm // B channel
   }
   if (spec.emissiveTexture !== undefined) {
-    material.emissiveMap = loadTexture(spec.emissiveTexture, colorSpaceOf(spec.emissiveTexture, THREE.SRGBColorSpace), drop("emissiveMap"))
+    material.emissiveMap = loadTexture(
+      spec.emissiveTexture,
+      colorSpaceOf(spec.emissiveTexture, THREE.SRGBColorSpace),
+      drop("emissiveMap")
+    )
     if (spec.emissive.every((c) => c === 0)) material.emissive.setRGB(1, 1, 1)
   }
   return material

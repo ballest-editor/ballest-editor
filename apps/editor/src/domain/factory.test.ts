@@ -61,7 +61,11 @@ describe("factory", () => {
 
   it("places the player start at the in-game default scale", () => {
     const start = catalog.pieces.find((p) => p.className === "MP_PlayerStart")!
-    assert.deepStrictEqual(placementTransform(start, { x: 1, y: 2, z: 3 }).scale3D, { x: 0.276538, y: 0.276538, z: 0.276538 })
+    assert.deepStrictEqual(placementTransform(start, { x: 1, y: 2, z: 3 }).scale3D, {
+      x: 0.276538,
+      y: 0.276538,
+      z: 0.276538
+    })
   })
 
   it("creates a new map with exactly one player start that decodes", () => {

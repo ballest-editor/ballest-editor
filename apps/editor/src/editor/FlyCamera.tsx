@@ -2,7 +2,16 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useRef } from "react"
 import * as THREE from "three"
 import { threeToUeVector, ueToThreeVector } from "../domain/coords"
-import { type Bindings, chordOf, HeldKeys, isBound, isBoundChord, isOneShotChord, mouseChordOf, wheelChordOf } from "../domain/Keybinds"
+import {
+  type Bindings,
+  chordOf,
+  HeldKeys,
+  isBound,
+  isBoundChord,
+  isOneShotChord,
+  mouseChordOf,
+  wheelChordOf
+} from "../domain/Keybinds"
 import { editorVerticalFov } from "../domain/Settings"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
@@ -107,7 +116,11 @@ export function FlyCamera() {
       const { lookSensitivity, invertLookX, invertLookY } = useEditor.getState().settings.camera
       const k = LOOK_SENSITIVITY * lookSensitivity
       eul.y -= e.movementX * k * (invertLookX ? -1 : 1)
-      eul.x = THREE.MathUtils.clamp(eul.x - e.movementY * k * (invertLookY ? -1 : 1), -Math.PI / 2 + 0.001, Math.PI / 2 - 0.001)
+      eul.x = THREE.MathUtils.clamp(
+        eul.x - e.movementY * k * (invertLookY ? -1 : 1),
+        -Math.PI / 2 + 0.001,
+        Math.PI / 2 - 0.001
+      )
       eul.z = 0
       if (drag.current === "orbit") {
         const distance = camera.position.distanceTo(target.current)
@@ -128,8 +141,14 @@ export function FlyCamera() {
       e.preventDefault()
       const chord = wheelChordOf(e)
       const state = useEditor.getState()
-      if (isBound(keybinds, "speedFaster", chord)) {  state.changeSpeed(1); return; }
-      if (isBound(keybinds, "speedSlower", chord)) {  state.changeSpeed(-1); return; }
+      if (isBound(keybinds, "speedFaster", chord)) {
+        state.changeSpeed(1)
+        return
+      }
+      if (isBound(keybinds, "speedSlower", chord)) {
+        state.changeSpeed(-1)
+        return
+      }
       const forward = camera.getWorldDirection(new THREE.Vector3())
       const step = -Math.sign(e.deltaY) * Math.max(50, camera.position.distanceTo(target.current) * 0.1)
       camera.position.addScaledVector(forward, step)
@@ -177,18 +196,18 @@ export function FlyCamera() {
   // Frame the whole map on load and on request. Uses item translations so it works before meshes load.
   useEffect(() => {
     const frameAll = () => {
-    const { items } = useEditor.getState().doc.map
-    const box = new THREE.Box3()
-    for (const item of items) {
-      const p = ueToThreeVector(item.itemTransform.translation)
-      box.expandByPoint(new THREE.Vector3(p.x, p.y, p.z))
-    }
-    if (box.isEmpty()) box.set(new THREE.Vector3(-500, 0, -500), new THREE.Vector3(500, 0, 500))
-    const sphere = box.getBoundingSphere(new THREE.Sphere())
-    const radius = Math.max(sphere.radius, 1000)
-    target.current.copy(sphere.center)
-    camera.position.copy(sphere.center).add(new THREE.Vector3(-1, 0.8, 1).normalize().multiplyScalar(radius * 1.6))
-    camera.lookAt(sphere.center)
+      const { items } = useEditor.getState().doc.map
+      const box = new THREE.Box3()
+      for (const item of items) {
+        const p = ueToThreeVector(item.itemTransform.translation)
+        box.expandByPoint(new THREE.Vector3(p.x, p.y, p.z))
+      }
+      if (box.isEmpty()) box.set(new THREE.Vector3(-500, 0, -500), new THREE.Vector3(500, 0, 500))
+      const sphere = box.getBoundingSphere(new THREE.Sphere())
+      const radius = Math.max(sphere.radius, 1000)
+      target.current.copy(sphere.center)
+      camera.position.copy(sphere.center).add(new THREE.Vector3(-1, 0.8, 1).normalize().multiplyScalar(radius * 1.6))
+      camera.lookAt(sphere.center)
     }
     frameAll()
     return useEditor.subscribe((s, prev) => {
@@ -225,7 +244,8 @@ export function FlyCamera() {
     )
     if (move.lengthSq() === 0) return
     // Keys held together with Ctrl/Alt are chords (Ctrl+S...), not movement.
-    const chordModifier = keys.has("ControlLeft") || keys.has("ControlRight") || keys.has("MetaLeft") || keys.has("MetaRight") ||
+    const chordModifier = keys.has("ControlLeft") || keys.has("ControlRight") || keys.has("MetaLeft") ||
+      keys.has("MetaRight") ||
       keys.has("AltLeft") || keys.has("AltRight")
     if (chordModifier && move.y === 0) return
     const { cameraSpeed } = useEditor.getState()

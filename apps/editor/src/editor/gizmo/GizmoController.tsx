@@ -1,7 +1,7 @@
 import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
-import { type UeTransform, ueToScene } from "../../domain/coords"
+import { ueToScene, type UeTransform } from "../../domain/coords"
 import { chordOf } from "../../domain/Keybinds"
 import { sceneRegistry } from "../sceneRegistry"
 import { selectedIndex, useEditor } from "../store"
