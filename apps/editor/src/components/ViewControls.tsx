@@ -7,15 +7,15 @@ import { useEditor } from "../editor/store"
 import { ToolBar } from "./ToolBar"
 
 /**
- * Floating view controls, top-right of the viewport. For now one toggle: the gizmo's
- * local/world axes. Pointer-only like the tool bar, so keybinds stay with the viewport.
+ * Floating view controls, top-right of the viewport, like the game's. For now one
+ * icon toggle: the gizmo's local (cube) or world (globe) axes, named in its tooltip. Pointer-only like the tool bar, so keybinds stay with the viewport.
  */
 export function ViewControls({ disabled = false }: { readonly disabled?: boolean }) {
   const gizmoSpace = useEditor((s) => s.gizmoSpace)
   const toggleGizmoSpace = useEditor((s) => s.toggleGizmoSpace)
   const keybinds = useEditor((s) => s.keybinds)
   const local = gizmoSpace === "local"
-  const label = local ? "Local axes" : "World axes"
+  const label = local ? "Using piece-local axes" : "Using world axes"
 
   return (
     <div className="pointer-events-none absolute top-3 right-3 flex justify-end">
@@ -27,9 +27,9 @@ export function ViewControls({ disabled = false }: { readonly disabled?: boolean
                 pressed={local}
                 onPressedChange={toggleGizmoSpace}
                 disabled={disabled}
-                aria-label="Gizmo axes: local"
+                aria-label={label}
                 tabIndex={-1}
-                className="h-8 gap-1.5 rounded-full px-3 data-[pressed]:bg-primary data-[pressed]:text-primary-foreground"
+                className="size-8 rounded-full aria-pressed:bg-transparent aria-pressed:hover:bg-muted"
                 onMouseDown={(e) => e.preventDefault()}
                 onKeyDown={(e) => {
                   if (e.key === " " || e.key === "Enter") e.preventDefault()
@@ -38,10 +38,9 @@ export function ViewControls({ disabled = false }: { readonly disabled?: boolean
             }
           >
             {local ? <IconCube /> : <IconWorld />}
-            {local ? "Local" : "World"}
           </TooltipTrigger>
           <TooltipContent side="bottom" className="flex items-center gap-1.5">
-            {label}: click to use {local ? "world" : "local"} axes
+            {label}
             {keybinds.toggleGizmoSpace.map((binding) => <Kbd key={binding}>{formatBinding(binding)}</Kbd>)}
           </TooltipContent>
         </Tooltip>
