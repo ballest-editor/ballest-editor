@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as THREE from "three"
 import { UE_TO_THREE_MATRIX, ueToScene } from "../domain/coords"
-import { edgesOf, SelectionOutline } from "./selectionOutline"
+import { outlineOf, SelectionOutline } from "./selectionOutline"
 import { isLine } from "./threeGuards"
 
 /** A wedge (ramp) in UE local space: 400 long in X, 100 wide in Y, rising 0..30 cm in Z. */
@@ -55,10 +55,53 @@ const firstLine = (outline: THREE.Group): THREE.Line => {
   return line
 }
 
+/** The segments the shader keeps for an eye at `eye` (mesh-local): its facing test, on the CPU. */
+const visibleFrom = (outline: THREE.BufferGeometry, eye: THREE.Vector3): Array<[THREE.Vector3, THREE.Vector3]> => {
+  const position = outline.getAttribute("position")
+  const normalA = outline.getAttribute("faceNormalA")
+  const normalB = outline.getAttribute("faceNormalB")
+  const kept: Array<[THREE.Vector3, THREE.Vector3]> = []
+  for (let i = 0; i < position.count; i += 2) {
+    const from = new THREE.Vector3().fromBufferAttribute(position, i)
+    const toEye = eye.clone().sub(from)
+    const a = new THREE.Vector3().fromBufferAttribute(normalA, i).dot(toEye)
+    const b = new THREE.Vector3().fromBufferAttribute(normalB, i).dot(toEye)
+    if (a * b <= 0) kept.push([from, new THREE.Vector3().fromBufferAttribute(position, i + 1)])
+  }
+  return kept
+}
+
 describe("selection outline", () => {
-  it("draws a ramp's own edges, not its bounding box", () => {
-    // a triangular prism has 9 edges; its bounding box would have 12
-    expect(edgesOf(wedge()).getAttribute("position").count / 2).toBe(9)
+  it("draws a ramp's own edges, not its bounding box, from any side", () => {
+    // a triangular prism has 9 edges, all creases; its bounding box would have 12
+    const outline = outlineOf(wedge())
+    expect(outline.getAttribute("position").count / 2).toBe(9)
+    expect(visibleFrom(outline, new THREE.Vector3(1000, 500, -300))).toHaveLength(9)
+    expect(visibleFrom(outline, new THREE.Vector3(-1000, -500, 300))).toHaveLength(9)
+  })
+
+  it("draws a smooth surface's silhouette as seen from the eye", () => {
+    // a sphere has no creases: from far out on +X its outline is the ring around the X axis
+    const radius = 100
+    const outline = outlineOf(new THREE.SphereGeometry(radius, 48, 24))
+    const kept = visibleFrom(outline, new THREE.Vector3(100_000, 0, 0))
+    expect(kept.length).toBeGreaterThan(40)
+    for (const [from, to] of kept) {
+      for (const end of [from, to]) {
+        expect(Math.abs(end.x)).toBeLessThan(radius * 0.1)
+        expect(Math.hypot(end.y, end.z)).toBeGreaterThan(radius * 0.99)
+      }
+    }
+    // and from +Y the ring turns with the eye
+    for (const [from] of visibleFrom(outline, new THREE.Vector3(0, 100_000, 0))) {
+      expect(Math.abs(from.y)).toBeLessThan(radius * 0.1)
+    }
+  })
+
+  it("welds glb seams: a box split per face still has only its 12 edges", () => {
+    // BoxGeometry duplicates every corner per face, like a glb with hard normals
+    const box = new THREE.BoxGeometry(10, 20, 30)
+    expect(outlineOf(box).getAttribute("position").count / 2).toBe(12)
   })
 
   it("lands every edge on the mesh in world space, through the item's transform", () => {
@@ -70,7 +113,7 @@ describe("selection outline", () => {
     expect(outline.visible).toBe(true)
     expect(outline.children).toHaveLength(1)
     const line = firstLine(outline)
-    const expected = new THREE.LineSegments(edgesOf(mesh.geometry))
+    const expected = new THREE.LineSegments(outlineOf(mesh.geometry))
     expected.matrixWorld.copy(mesh.matrixWorld)
     expect(segments(line)).toEqual(segments(expected))
   })
@@ -105,9 +148,9 @@ describe("selection outline", () => {
 
   it("caches edges per geometry and frees them with it", () => {
     const geometry = wedge()
-    const edges = edgesOf(geometry)
-    expect(edgesOf(geometry)).toBe(edges)
+    const edges = outlineOf(geometry)
+    expect(outlineOf(geometry)).toBe(edges)
     geometry.dispose()
-    expect(edgesOf(geometry)).not.toBe(edges)
+    expect(outlineOf(geometry)).not.toBe(edges)
   })
 })
