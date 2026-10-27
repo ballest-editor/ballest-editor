@@ -12,6 +12,7 @@ import { useActionKeys } from "../editor/useActionKeys"
 import { Viewport } from "../editor/Viewport"
 import { Inspector } from "./Inspector"
 import { SettingsDialog } from "./SettingsDialog"
+import { ExportDialog } from "./ExportDialog"
 import { NewMapDialog } from "./NewMapDialog"
 import { Palette } from "./Palette"
 import { TopBar } from "./TopBar"
@@ -114,6 +115,7 @@ export function Editor() {
         }}
       />
       <NewMapDialog open={dialog === "new"} onClose={close} />
+      <ExportDialog open={dialog === "export"} onClose={close} />
       <SettingsDialog
         open={dialog === "settings"}
         category={settingsCategory}

@@ -4,7 +4,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/
 import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { type MouseEvent, useMemo, useState } from "react"
-import { type CatalogPiece, indexCatalog, paletteSections, pieceIdOf, pieceLabelOf, unavailableReasonOf } from "../domain/Catalog"
+import { type CatalogPiece, indexCatalog, paletteSections, pieceIdOf, pieceLabelOf, unavailableReasonOf, verificationOf } from "../domain/Catalog"
 import { preloadPiece } from "../editor/preload"
 import { placementTransform } from "../domain/factory"
 import { sceneRegistry } from "../editor/sceneRegistry"
@@ -16,12 +16,14 @@ const matches = (piece: CatalogPiece, terms: ReadonlyArray<string>) => {
   return terms.every((t) => haystack.includes(t))
 }
 
-function PieceButton({ piece, onPlace, onHover, unavailable }: {
+function PieceButton({ piece, onPlace, onHover, unavailable, unverified }: {
   readonly piece: CatalogPiece
   readonly onPlace: (e: MouseEvent<HTMLButtonElement>) => void
   readonly onHover: () => void
   /** Set for pieces that can't be placed; shown disabled with this as the tooltip. */
   readonly unavailable?: string | undefined
+  /** Hidden piece nobody has loaded in-game yet: placeable, but flagged. */
+  readonly unverified?: boolean
 }) {
   const thumbnail = piece.thumbnail ?? undefined
   const button = (
@@ -37,10 +39,17 @@ function PieceButton({ piece, onPlace, onHover, unavailable }: {
       }}
     >
       {thumbnail !== undefined && (
-        <img src={`/assets/${thumbnail}`} alt="" className="size-8 shrink-0 rounded-sm bg-muted object-contain" loading="lazy" />
+        <img src={`/assets/${thumbnail}`} alt="" className="size-8 shrink-0 rounded-sm bg-muted object-fill" loading="lazy" />
       )}
       <span className="flex min-w-0 flex-col">
-        <span className="truncate text-xs font-medium">{pieceLabelOf(piece)}</span>
+        <span className="flex items-center gap-1.5 truncate text-xs font-medium">
+          {pieceLabelOf(piece)}
+          {unverified && (
+            <span className="rounded-sm border border-amber-500/40 bg-amber-500/15 px-1 text-[0.6rem] font-normal text-amber-700 dark:text-amber-300" title="Not yet confirmed to load in the in-game editor. A rejected item makes the game discard the whole map.">
+              unverified
+            </span>
+          )}
+        </span>
         {thumbnail === undefined && piece.displayName && piece.displayName !== piece.className && (
           <span className="truncate text-[0.65rem] text-muted-foreground">{piece.className}</span>
         )}
@@ -71,7 +80,7 @@ export function Palette() {
   // button) produces a click with detail === 0 and is ignored. Focus then moves to the
   // viewport so editor keybinds apply straight away.
   const place = (piece: CatalogPiece) => (e: MouseEvent<HTMLButtonElement>) => {
-    if (e.detail === 0 || (catalog !== null && unavailableReasonOf(catalog.catalog, piece) !== undefined)) return
+    if (e.detail === 0 || (catalog !== null && unavailableReasonOf(catalog.catalog, piece, catalog.verified) !== undefined)) return
     placePiece(piece, placementTransform(piece, sceneRegistry.placementPoint()))
     e.currentTarget.blur()
     focusViewport()
@@ -109,7 +118,8 @@ export function Palette() {
                           piece={piece}
                           onPlace={place(piece)}
                           onHover={() => index !== null && preloadPiece(piece, index)}
-                          unavailable={catalog === null ? undefined : unavailableReasonOf(catalog.catalog, piece)}
+                          unavailable={catalog === null ? undefined : unavailableReasonOf(catalog.catalog, piece, catalog.verified)}
+                          unverified={catalog !== null && verificationOf(piece, catalog.verified) === "unverified"}
                         />
                       </li>
                     ))}

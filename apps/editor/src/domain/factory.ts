@@ -31,6 +31,15 @@ export const currentCreatedAt: Effect.Effect<string, never, DateTime.CurrentTime
   (now) => formatCreatedAt(DateTime.toParts(now))
 )
 
+/**
+ * Map and creator names: letters, digits and spaces only. The game joins them with `_`
+ * into `userLevelName` and the file name, so `_` (and anything Windows rejects in a file
+ * name) is out.
+ */
+export const NAME_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N} ]*$/u
+export const isValidName = (name: string): boolean => NAME_PATTERN.test(name) && name.trim() === name
+export const NAME_RULE = "letters, digits and spaces only"
+
 export const userLevelNameOf = (displayName: string, creatorName: string): string => `${displayName}_${creatorName}`
 
 export const mapFileNameOf = (displayName: string, creatorName: string): string =>

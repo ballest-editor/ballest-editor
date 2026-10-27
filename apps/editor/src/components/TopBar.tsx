@@ -2,7 +2,6 @@ import { IconDownload, IconFilePlus, IconSettings, IconUpload } from "@tabler/ic
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Separator } from "@workspace/ui/components/separator"
-import { exportMap } from "../editor/actions"
 import { commands } from "../editor/commands"
 import { useEditor } from "../editor/store"
 
@@ -18,7 +17,7 @@ export function TopBar() {
       <Button variant="ghost" size="sm" onClick={() => commands.openImport()}>
         <IconUpload /> Import
       </Button>
-      <Button variant="ghost" size="sm" onClick={() => void exportMap()}>
+      <Button variant="ghost" size="sm" onClick={() => commands.openDialog("export")}>
         <IconDownload /> Export
       </Button>
       <Separator orientation="vertical" className="mx-1 h-5" />

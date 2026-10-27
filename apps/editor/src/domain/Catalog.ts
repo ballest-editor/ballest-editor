@@ -196,7 +196,10 @@ const decodeUnresolved = Schema.decodeUnknownOption(UnresolvedEntry)
  * Why a piece can't be placed, or undefined if it can: the extractor lists it as
  * unresolved (base classes, runtime-generated geometry), or it has no mesh of any kind.
  */
-export const unavailableReasonOf = (catalog: Catalog, piece: CatalogPiece): string | undefined => {
+export const unavailableReasonOf = (catalog: Catalog, piece: CatalogPiece, verified: VerificationTable = NO_VERIFICATION): string | undefined => {
+  if (verificationOf(piece, verified) === "rejected") {
+    return `The in-game editor rejects this piece${verified[piece.className]?.note ? ` (${verified[piece.className]?.note})` : ""}.`
+  }
   for (const entry of catalog.unresolved ?? []) {
     const decoded = decodeUnresolved(entry)
     if (decoded._tag === "Some" && decoded.value.classPath === piece.classPath) {
@@ -207,4 +210,46 @@ export const unavailableReasonOf = (catalog: Catalog, piece: CatalogPiece): stri
     return "No mesh: this class has no geometry the editor can place."
   }
   return undefined
+}
+
+// ---------------------------------------------------------------------------
+// In-game verification (assets/verified.json): which hidden classes the in-game editor
+// actually loads. One rejected item makes the game discard the whole map.
+
+export const VerificationStatus = Schema.Literals(["ok", "rejected"])
+export const VerificationEntry = open({
+  status: VerificationStatus,
+  date: Schema.optionalKey(Schema.String),
+  note: Schema.optionalKey(Schema.String)
+})
+export const VerificationFile = open({ results: Schema.Record(Schema.String, VerificationEntry) })
+export type VerificationTable = typeof VerificationFile.Type["results"]
+export const decodeVerification = Schema.decodeUnknownEffect(VerificationFile)
+export const NO_VERIFICATION: VerificationTable = {}
+
+export type Verification = "ok" | "rejected" | "unverified"
+
+/** Palette pieces are what the game itself offers; hidden ones are only as good as our probes. */
+export const verificationOf = (piece: CatalogPiece, table: VerificationTable): Verification => {
+  const entry = table[piece.className]
+  if (entry !== undefined) return entry.status
+  return piece.inPalette === false ? "unverified" : "ok"
+}
+
+/** Classes in a map that the in-game editor rejects / hasn't been shown to accept. */
+export const riskyClassesIn = (
+  classNames: ReadonlyArray<string>,
+  pieces: ReadonlyArray<CatalogPiece>,
+  table: VerificationTable
+): { readonly rejected: ReadonlyArray<string>; readonly unverified: ReadonlyArray<string> } => {
+  const byName = new Map(pieces.map((p) => [p.className, p]))
+  const rejected = new Set<string>()
+  const unverified = new Set<string>()
+  for (const name of classNames) {
+    const piece = byName.get(name)
+    const status = piece === undefined ? "unverified" : verificationOf(piece, table)
+    if (status === "rejected") rejected.add(name)
+    else if (status === "unverified") unverified.add(name)
+  }
+  return { rejected: [...rejected], unverified: [...unverified] }
 }

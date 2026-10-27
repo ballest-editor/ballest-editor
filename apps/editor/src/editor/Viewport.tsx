@@ -75,6 +75,23 @@ function ClickSelect() {
   return null
 }
 
+/** Clear colour follows the theme: dark slate, or a light grey in light mode. */
+function ViewportBackground() {
+  const gl = useThree((s) => s.gl)
+  const theme = useEditor((s) => s.settings.appearance.theme)
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)")
+    const apply = () => {
+      const dark = theme === "dark" || (theme === "system" && media.matches)
+      gl.setClearColor(dark ? "#1d2128" : "#e9ecf1")
+    }
+    apply()
+    media.addEventListener("change", apply)
+    return () => media.removeEventListener("change", apply)
+  }, [gl, theme])
+  return null
+}
+
 /** The ground grid (1 m cells, 10 m sections), styled by the appearance settings. */
 function ViewportGrid() {
   const appearance = useEditor((s) => s.settings.appearance)
@@ -135,8 +152,8 @@ export function Viewport() {
       <Canvas
         camera={{ fov: 60, near: 5, far: 2_000_000, position: [1500, 1200, 1500] }}
         gl={{ antialias: true, logarithmicDepthBuffer: true }}
-        onCreated={({ gl }) => gl.setClearColor("#1d2128")}
       >
+        <ViewportBackground />
         <ambientLight intensity={0.6} />
         <hemisphereLight args={["#dfe8ff", "#30302a", 0.8]} />
         <directionalLight position={[3000, 8000, 2000]} intensity={1.6} />

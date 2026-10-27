@@ -3,18 +3,21 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { useState } from "react"
-import { newMap } from "../editor/actions"
-
-const CREATOR_KEY = "ballest-editor.creator"
+import { isValidName, mapFileNameOf, NAME_RULE } from "../domain/factory"
+import { newMap, saveSettings } from "../editor/actions"
+import { useEditor } from "../editor/store"
 
 export function NewMapDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
+  const settings = useEditor((s) => s.settings)
+  const creator = settings.general.creatorName.trim()
   const [name, setName] = useState("")
-  const [creator, setCreator] = useState(() => localStorage.getItem(CREATOR_KEY) ?? "")
-  const valid = name.trim().length > 0 && creator.trim().length > 0
+  const [creatorDraft, setCreatorDraft] = useState("")
+  const effectiveCreator = creator || creatorDraft.trim()
+  const valid = isValidName(name) && isValidName(effectiveCreator)
   const submit = async () => {
     if (!valid) return
-    localStorage.setItem(CREATOR_KEY, creator.trim())
-    await newMap(name.trim(), creator.trim())
+    if (creator === "") await saveSettings({ ...settings, general: { ...settings.general, creatorName: effectiveCreator } })
+    await newMap(name, effectiveCreator)
     setName("")
     onClose()
   }
@@ -31,18 +34,22 @@ export function NewMapDialog({ open, onClose }: { readonly open: boolean; readon
           <DialogHeader>
             <DialogTitle>New map</DialogTitle>
             <DialogDescription>
-              Saved as <code>Map_LevelEditorMain&amp;{name || "name"}_{creator || "creator"}.balledit</code>. Starts with
+              Exports as <code className="break-all">{mapFileNameOf(name || "name", effectiveCreator || "creator")}</code>. Starts with
               the one player start the game requires. Unsaved changes in the current map are discarded.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-1">
             <Label htmlFor="new-name">Map name</Label>
-            <Input id="new-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+            <Input id="new-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} aria-invalid={name !== "" && !isValidName(name)} />
+            <span className="text-[0.7rem] text-muted-foreground">{NAME_RULE}</span>
           </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="new-creator">Creator</Label>
-            <Input id="new-creator" value={creator} onChange={(e) => setCreator(e.target.value)} placeholder="your in-game name" />
-          </div>
+          {creator === "" && (
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="new-creator">Creator (your in-game name)</Label>
+              <Input id="new-creator" value={creatorDraft} onChange={(e) => setCreatorDraft(e.target.value)} />
+              <span className="text-[0.7rem] text-muted-foreground">Saved to Settings › General.</span>
+            </div>
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={!valid}>Create</Button>

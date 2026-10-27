@@ -2,7 +2,7 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useRef } from "react"
 import * as THREE from "three"
 import { threeToUeVector, ueToThreeVector } from "../domain/coords"
-import { chordOf, HeldKeys, isBoundChord, mouseChordOf, wheelChordOf } from "../domain/Keybinds"
+import { type Bindings, chordOf, HeldKeys, isBound, isBoundChord, isOneShotChord, mouseChordOf, wheelChordOf } from "../domain/Keybinds"
 import { fovOf, verticalFov } from "../domain/Settings"
 import { commands } from "./commands"
 import { sceneRegistry } from "./sceneRegistry"
@@ -64,12 +64,13 @@ export function FlyCamera() {
 
   useEffect(() => {
     const el = gl.domElement
-    const dragModes: ReadonlyArray<readonly [string, DragMode]> = [
+    const dragModes: ReadonlyArray<readonly [Bindings, DragMode]> = [
       [keybinds.look, "look"],
       [keybinds.orbit, "orbit"],
       [keybinds.pan, "pan"]
     ]
-    sceneRegistry.isNavigationChord = (chord) => dragModes.some(([binding]) => binding === chord)
+    sceneRegistry.isNavigationChord = (chord) => dragModes.some(([bindings]) => bindings.includes(chord))
+    sceneRegistry.lookDragActive = () => drag.current !== null
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditorKeyEvent(e)) pressed.current.press(e.code, performance.now(), isBoundChord(keybinds, chordOf(e)))
@@ -79,7 +80,8 @@ export function FlyCamera() {
 
     const onPointerDown = (e: PointerEvent) => {
       if (sceneRegistry.gizmoActive()) return
-      const mode = dragModes.find(([binding]) => binding === mouseChordOf(e))?.[1]
+      const chord = mouseChordOf(e)
+      const mode = dragModes.find(([bindings]) => bindings.includes(chord))?.[1]
       if (mode === undefined) return
       drag.current = mode
       if (mode === "orbit") {
@@ -129,8 +131,8 @@ export function FlyCamera() {
       e.preventDefault()
       const chord = wheelChordOf(e)
       const state = useEditor.getState()
-      if (chord === keybinds.speedFaster) return state.changeSpeed(1)
-      if (chord === keybinds.speedSlower) return state.changeSpeed(-1)
+      if (isBound(keybinds, "speedFaster", chord)) return state.changeSpeed(1)
+      if (isBound(keybinds, "speedSlower", chord)) return state.changeSpeed(-1)
       const forward = camera.getWorldDirection(new THREE.Vector3())
       const step = -Math.sign(e.deltaY) * Math.max(50, camera.position.distanceTo(target.current) * 0.1)
       camera.position.addScaledVector(forward, step)
@@ -194,7 +196,11 @@ export function FlyCamera() {
   useFrame((_, delta) => {
     const keys = pressed.current
     const now = performance.now()
-    const held = (binding: string) => keys.holds(binding, now)
+    // A fly key that is also a tool shortcut (W = forward and move mode, as in the game's
+    // editor) only flies while the look button is held, UE-style; the rest fly any time.
+    const looking = drag.current !== null
+    const held = (bindings: Bindings) =>
+      bindings.some((binding) => keys.holds(binding, now) && (looking || !isOneShotChord(keybinds, binding)))
     const dt = Math.min(delta, 0.1)
 
     // Arrow-key look (the game's "look right/left/up/down").

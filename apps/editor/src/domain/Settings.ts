@@ -10,7 +10,9 @@ export const CUSTOM_FOV_PRESET = "Custom"
 
 export const GeneralSettings = Schema.Struct({
   /** How lengths are shown in the inspector (the map file always stores cm). */
-  units: Schema.Literals(["cm", "m"])
+  units: Schema.Literals(["cm", "m"]),
+  /** Your in-game name; written into every exported map's `creatorName` and file name. */
+  creatorName: Schema.String
 })
 
 export const CameraSettings = Schema.Struct({
@@ -41,7 +43,7 @@ export const Settings = Schema.Struct({
 export type Settings = typeof Settings.Type
 
 export const defaultSettings: Settings = {
-  general: { units: "cm" },
+  general: { units: "cm", creatorName: "" },
   camera: { flySpeed: 2000, lookSensitivity: 1, fovPreset: "Default", customFov: 90, invertLookX: false, invertLookY: false },
   appearance: { theme: "dark", gridVisible: true, gridCellColor: "#3a404a", gridSectionColor: "#58606e" }
 }

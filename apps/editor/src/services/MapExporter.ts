@@ -1,5 +1,5 @@
 import { Context, DateTime, Effect, Layer } from "effect"
-import { currentCreatedAt, defaultEditorState, mapFileNameOf, userLevelNameOf } from "../domain/factory"
+import { currentCreatedAt, defaultEditorState, isValidName, mapFileNameOf, NAME_RULE, userLevelNameOf } from "../domain/factory"
 import { isPlayerStart, type MapFile, SYSTEM_LEVEL_NAME } from "../domain/MapFile"
 import { ExportValidationError, type MapEncodeError } from "./errors"
 import { MapCodec } from "./MapCodec"
@@ -11,10 +11,6 @@ export interface ExportedMap {
   /** The map as written (with the export-time level fields applied). */
   readonly map: MapFile
 }
-
-/** Characters Windows won't accept in a file name; the game saves under the user's profile on Windows. */
-// eslint-disable-next-line no-control-regex -- control characters are exactly what Windows rejects
-const INVALID_FILENAME_CHARS = /[<>:"/\\|?*\u0000-\u001f]/
 
 export class MapExporter extends Context.Service<MapExporter, {
   /** Applies the level-name fields the game expects, validates, and encodes to a `.balledit`. */
@@ -33,10 +29,8 @@ export class MapExporter extends Context.Service<MapExporter, {
         if (displayName.length === 0 || creatorName.length === 0) {
           return yield* new ExportValidationError({ message: "Map name and creator are required." })
         }
-        if (INVALID_FILENAME_CHARS.test(displayName) || INVALID_FILENAME_CHARS.test(creatorName)) {
-          return yield* new ExportValidationError({
-            message: "Map name and creator can't contain < > : \" / \\ | ? * (they become the file name)."
-          })
+        if (!isValidName(displayName) || !isValidName(creatorName)) {
+          return yield* new ExportValidationError({ message: `Map name and creator: ${NAME_RULE} (they become the file name).` })
         }
         const playerStarts = map.items.filter(isPlayerStart).length
         if (playerStarts !== 1) {

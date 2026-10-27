@@ -9,7 +9,16 @@
  * are game-native modifiers the extractor couldn't parse; they're ignored.
  */
 import { Schema } from "effect"
-import { defaultKeybinds, editorOverrides, heldActions, type KeybindAction, type Keybinds } from "./Keybinds"
+import {
+  type Bindings,
+  defaultKeybinds,
+  editorOverlayActions,
+  editorOverrides,
+  heldActions,
+  type KeybindAction,
+  type Keybinds,
+  uniqueBindings
+} from "./Keybinds"
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const
 const open = <const Fields extends Schema.Struct.Fields>(fields: Fields) =>
@@ -260,7 +269,7 @@ export const FALLBACK_CAMERA_PRESETS: ReadonlyArray<CameraPreset> = [
 ]
 
 export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybinds => {
-  const out: Record<string, string> = { ...defaultKeybinds }
+  const out: Record<string, Bindings> = { ...defaultKeybinds }
   const fromGame = new Map<KeybindAction, { context: string; action: string }>()
   const naming = new Map<KeybindAction, ActionNaming>()
   for (const name of EDITOR_CONTEXTS) {
@@ -269,7 +278,6 @@ export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybi
       if (mapping.ignored === true || mapping.action === null) continue
       const resolver = GAME_ACTIONS[mapping.action.replace(/^IA_/, "").toLowerCase()]
       for (const { action, code } of resolver?.(mapping) ?? []) {
-        if (fromGame.has(action)) continue
         const chord = chordFromMapping(mapping, code)
         if (chord === undefined) continue
         const base = chord.slice(chord.lastIndexOf("+") + 1)
@@ -277,8 +285,12 @@ export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybi
         if ((action === "look" || action === "orbit" || action === "pan") && !base.startsWith("Mouse")) continue
         // A bare modifier key only works for held actions (e.g. LeftControl = fly down).
         if (MODIFIER_PREFIX[base] !== undefined && !heldActions.has(action)) continue
-        out[action] = chord
-        fromGame.set(action, { context: name, action: mapping.action })
+        // The first game mapping replaces the editor default; later ones become secondary
+        // bindings. Level-editor overlay hotkeys stay primary (F focus, then the camera's C).
+        const first = !fromGame.has(action)
+        const keep = first && !editorOverlayActions.has(action) ? [] : out[action]!
+        out[action] = uniqueBindings([...keep, chord])
+        if (first) fromGame.set(action, { context: name, action: mapping.action })
       }
     }
   }
@@ -296,7 +308,7 @@ export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybi
       if ((mapping.key ?? "").startsWith("Gamepad") || /gamepad/i.test(mapping.section ?? "")) continue
       const resolver = GAME_ACTIONS[mapping.action.replace(/^IA_/, "").toLowerCase()]
       for (const { action } of resolver?.(mapping) ?? []) {
-        if (naming.has(action)) continue
+        if (naming.has(action) || editorOverlayActions.has(action)) continue
         naming.set(action, {
           ...(mapping.label ? { label: mapping.label.toLowerCase() } : {}),
           ...(mapping.section ? { section: mapping.section } : {})
@@ -304,8 +316,8 @@ export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybi
       }
     }
   }
-  for (const [action, binding] of Object.entries(editorOverrides) as Array<[KeybindAction, string]>) {
-    out[action] = binding
+  for (const [action, bindings] of Object.entries(editorOverrides) as Array<[KeybindAction, Bindings]>) {
+    out[action] = bindings
     fromGame.delete(action)
   }
   const fellBack = (Object.keys(defaultKeybinds) as Array<KeybindAction>).filter((a) => !fromGame.has(a))

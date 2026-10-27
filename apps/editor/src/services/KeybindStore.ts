@@ -5,7 +5,7 @@ import { type Keybinds, mergeKeybinds, StoredKeybinds } from "../domain/Keybinds
 import { KeybindStoreError } from "./errors"
 import { GameKeybinds } from "./GameKeybinds"
 
-export const KEYBINDS_STORAGE_KEY = "ballest-editor.keybinds.v3"
+export const KEYBINDS_STORAGE_KEY = "ballest-editor.keybinds.v4"
 
 export interface LoadedKeybinds {
   readonly keybinds: Keybinds
