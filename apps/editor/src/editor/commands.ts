@@ -6,7 +6,7 @@
  * commands, e.g. Edit > Settings… -> openDialog("settings"), File > Import… -> openImport().
  */
 export type SettingsCategory = "general" | "camera" | "keybinds" | "appearance"
-export type Dialog = "new" | "settings"
+export type Dialog = "new" | "export" | "settings"
 
 export const commands = {
   openDialog: (_dialog: Dialog, _category?: SettingsCategory): void => {},

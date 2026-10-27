@@ -17,7 +17,7 @@ function Slider({
 
   return (
     <SliderPrimitive.Root
-      className={cn("data-horizontal:w-full data-vertical:h-full", className)}
+      className={cn("data-horizontal:w-full data-vertical:h-full data-disabled:pointer-events-none data-disabled:opacity-40", className)}
       data-slot="slider"
       defaultValue={defaultValue}
       value={value}

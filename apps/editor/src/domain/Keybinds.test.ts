@@ -1,5 +1,20 @@
 import { describe, expect, it } from "@effect/vitest"
-import { defaultKeybinds, HeldKeys, isBoundChord, keybindActionDescriptions, keybindActionLabels, keybindActions, keybindSections, MODIFIER_HOLD_MS } from "./Keybinds"
+import {
+  actionsFor,
+  defaultKeybinds,
+  formatBinding,
+  formatBindings,
+  HeldKeys,
+  isBoundChord,
+  isDefaultBinding,
+  isOneShotChord,
+  keybindActionDescriptions,
+  keybindActionLabels,
+  keybindActions,
+  keybindSections,
+  mergeKeybinds,
+  MODIFIER_HOLD_MS
+} from "./Keybinds"
 
 describe("keybind table", () => {
   it("lists every action exactly once, with a lower-case label, a description and a default", () => {
@@ -12,26 +27,64 @@ describe("keybind table", () => {
     }
   })
 
+  it("uses the game's level-editor hotkeys and names", () => {
+    const editor = keybindSections.find((s) => s.name === "level editor")!
+    expect(editor.actions.map((a) => [keybindActionLabels[a], defaultKeybinds[a]])).toEqual([
+      ["select mode", ["KeyQ"]],
+      ["move mode", ["KeyW"]],
+      ["rotate mode", ["KeyE"]],
+      ["scale mode", ["KeyR"]],
+      ["focus selection", ["KeyF", "KeyC"]],
+      ["delete", ["Backspace", "Delete"]],
+      ["undo", ["Ctrl+KeyZ"]],
+      ["redo", ["Ctrl+KeyY"]],
+      ["deselect", ["Escape"]]
+    ])
+  })
+
   it("uses the game's names and defaults for its free camera", () => {
     const freeCam = keybindSections.find((s) => s.name === "mouse and keyboard free camera")!
     expect(freeCam.actions.map((a) => [keybindActionLabels[a], defaultKeybinds[a]])).toEqual([
-      ["forward", "KeyW"],
-      ["reverse", "KeyS"],
-      ["left", "KeyA"],
-      ["right", "KeyD"],
-      ["look", "Mouse2"],
-      ["up", "Space"],
-      ["down", "ShiftLeft"]
+      ["forward", ["KeyW"]],
+      ["reverse", ["KeyS"]],
+      ["left", ["KeyA"]],
+      ["right", ["KeyD"]],
+      ["look", ["Mouse2"]],
+      ["up", ["Space"]],
+      ["down", ["ShiftLeft"]]
     ])
-    expect([keybindActionLabels.focusSelection, defaultKeybinds.focusSelection]).toEqual(["center camera", "KeyC"])
-    expect(keybindActionDescriptions.scaleMode).toContain("replay camera mode")
     expect(keybindActionDescriptions.moveDown).toContain("Left Ctrl")
-    expect(defaultKeybinds.fastMove).toBe("")
+    expect(defaultKeybinds.fastMove).toEqual([])
   })
 
-  it("has no duplicate defaults (unbound actions aside)", () => {
-    const values = Object.values(defaultKeybinds).filter((v) => v !== "")
-    expect(new Set(values).size).toBe(values.length)
+  it("only shares keys between a fly key and a tool shortcut (W: forward + move mode, as in the game)", () => {
+    const seen = new Map<string, Array<string>>()
+    for (const [action, bindings] of Object.entries(defaultKeybinds)) {
+      for (const b of bindings) seen.set(b, [...(seen.get(b) ?? []), action])
+    }
+    const shared = [...seen].filter(([, actions]) => actions.length > 1)
+    expect(shared).toEqual([["KeyW", ["translateMode", "moveForward"]]])
+    expect(isOneShotChord(defaultKeybinds, "KeyW")).toBe(true)
+    expect(isOneShotChord(defaultKeybinds, "KeyS")).toBe(false)
+    expect(actionsFor(defaultKeybinds, "KeyC")).toEqual(["focusSelection"])
+  })
+
+  it("merges stored bindings, accepting the old single-string form", () => {
+    const merged = mergeKeybinds({ undo: "Ctrl+KeyU", redo: ["Ctrl+KeyR", "Ctrl+KeyR", ""], bogus: "KeyX" })
+    expect(merged.undo).toEqual(["Ctrl+KeyU"])
+    expect(merged.redo).toEqual(["Ctrl+KeyR"])
+    expect(merged).not.toHaveProperty("bogus")
+    expect(isDefaultBinding(merged, defaultKeybinds, "undo")).toBe(false)
+    expect(isDefaultBinding(merged, defaultKeybinds, "moveForward")).toBe(true)
+  })
+
+  it("formats bindings for display", () => {
+    expect(formatBinding("Ctrl+KeyZ")).toBe("Ctrl + Z")
+    expect(formatBinding("Alt+Mouse0")).toBe("Alt + LMB")
+    expect(formatBinding("Mouse3")).toBe("Mouse 4")
+    expect(formatBinding("ArrowLeft")).toBe("←")
+    expect(formatBindings(["KeyF", "KeyC"])).toBe("F / C")
+    expect(formatBindings([])).toBe("Unbound")
   })
 })
 
@@ -61,8 +114,8 @@ describe("HeldKeys: Left Ctrl = fly down vs Ctrl chords", () => {
     keys.press("ShiftLeft", 0)
     expect(isBoundChord(defaultKeybinds, "Shift+KeyW")).toBe(false)
     keys.press("KeyW", 10, isBoundChord(defaultKeybinds, "Shift+KeyW"))
-    expect(keys.holds(defaultKeybinds.moveDown, 500)).toBe(true)
-    expect(keys.holds(defaultKeybinds.moveForward, 500)).toBe(true)
+    expect(keys.holdsAny(defaultKeybinds.moveDown, 500)).toBe(true)
+    expect(keys.holdsAny(defaultKeybinds.moveForward, 500)).toBe(true)
   })
 
   it("plain keys hold immediately", () => {
@@ -70,5 +123,6 @@ describe("HeldKeys: Left Ctrl = fly down vs Ctrl chords", () => {
     keys.press("KeyW", 0)
     expect(keys.holds("KeyW", 0)).toBe(true)
     expect(keys.holds("", 0)).toBe(false)
+    expect(keys.holdsAny([], 0)).toBe(false)
   })
 })

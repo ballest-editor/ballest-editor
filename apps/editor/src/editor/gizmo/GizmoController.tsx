@@ -168,7 +168,7 @@ export function GizmoController() {
     const onKeyDown = (e: KeyboardEvent) => {
       const active = drag.current
       if (active === null) return
-      if (e.code !== "Escape" && chordOf(e) !== useEditor.getState().keybinds.deselect) return
+      if (e.code !== "Escape" && !useEditor.getState().keybinds.deselect.includes(chordOf(e))) return
       e.preventDefault()
       e.stopImmediatePropagation() // don't also deselect
       const object = selectedObject()

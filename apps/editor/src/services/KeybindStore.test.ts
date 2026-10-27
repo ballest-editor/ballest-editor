@@ -18,8 +18,8 @@ describe("KeybindStore", () => {
       const loaded = yield* store.load
       assert.deepStrictEqual(loaded.keybinds, defaultKeybinds)
       assert.include(loaded.defaults.fellBack, "moveForward")
-      yield* store.save({ ...loaded.keybinds, moveForward: "KeyZ" })
-      assert.strictEqual((yield* store.load).keybinds.moveForward, "KeyZ")
+      yield* store.save({ ...loaded.keybinds, moveForward: ["KeyZ"] })
+      assert.deepStrictEqual((yield* store.load).keybinds.moveForward, ["KeyZ"])
       assert.deepStrictEqual((yield* store.reset).keybinds, defaultKeybinds)
       assert.deepStrictEqual((yield* store.load).keybinds, defaultKeybinds)
     }).pipe(Effect.provide(KeybindStore.layerTest())))
@@ -28,14 +28,15 @@ describe("KeybindStore", () => {
     Effect.gen(function*() {
       const kv = yield* KeyValueStore.KeyValueStore
       const store = yield* KeybindStore
-      assert.strictEqual((yield* store.load).keybinds.moveForward, "KeyI")
-      yield* kv.set(KEYBINDS_STORAGE_KEY, JSON.stringify({ undo: "Ctrl+KeyU", bogus: "KeyX" }))
+      assert.deepStrictEqual((yield* store.load).keybinds.moveForward, ["KeyI"])
+      yield* kv.set(KEYBINDS_STORAGE_KEY, JSON.stringify({ undo: "Ctrl+KeyU", redo: ["Ctrl+KeyR", "Ctrl+Shift+KeyZ"], bogus: "KeyX" }))
       const { keybinds } = yield* store.load
-      assert.strictEqual(keybinds.undo, "Ctrl+KeyU")
-      assert.strictEqual(keybinds.moveForward, "KeyI")
+      assert.deepStrictEqual(keybinds.undo, ["Ctrl+KeyU"]) // old single-string saves still load
+      assert.deepStrictEqual(keybinds.redo, ["Ctrl+KeyR", "Ctrl+Shift+KeyZ"])
+      assert.deepStrictEqual(keybinds.moveForward, ["KeyI"])
       assert.notProperty(keybinds, "bogus")
       yield* kv.set(KEYBINDS_STORAGE_KEY, "not json")
-      assert.strictEqual((yield* store.load).keybinds.undo, defaultKeybinds.undo)
+      assert.deepStrictEqual((yield* store.load).keybinds.undo, defaultKeybinds.undo)
     }).pipe(Effect.provide(KeybindStore.layerTest(gameFile))))
 
   it("builds chord strings", () => {

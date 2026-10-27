@@ -1,16 +1,19 @@
 import { Context, Effect, Layer } from "effect"
-import { type Catalog, decodeCatalog } from "../domain/Catalog"
+import { type Catalog, decodeCatalog, decodeVerification, NO_VERIFICATION, type VerificationTable } from "../domain/Catalog"
 import fixtureJson from "../test/fixtures/catalog.json"
 import { CatalogLoadError } from "./errors"
 
 export interface LoadedCatalog {
   readonly catalog: Catalog
   readonly source: "assets" | "fixture"
+  /** In-game load results for hidden pieces (assets/verified.json); empty when missing. */
+  readonly verified: VerificationTable
   /** Set when we fell back to the bundled fixture. */
   readonly warning?: string
 }
 
 export const CATALOG_URL = "/assets/catalog.json"
+export const VERIFIED_URL = "/assets/verified.json"
 
 export type FetchText = (url: string) => Promise<{ readonly ok: boolean; readonly status: number; text(): Promise<string> }>
 
@@ -40,20 +43,35 @@ export class CatalogLoader extends Context.Service<CatalogLoader, {
 
     const fixture = decodeCatalog(fixtureJson).pipe(Effect.orDie)
 
-    const load = fetchCatalog.pipe(
-      Effect.map((catalog): LoadedCatalog => ({ catalog, source: "assets" })),
-      Effect.catchTag("CatalogLoadError", (error) =>
-        Effect.gen(function*() {
-          yield* Effect.logWarning(`Falling back to fixture catalog: ${error.message}`)
-          const catalog = yield* fixture
-          return {
-            catalog,
-            source: "fixture",
-            warning: `Couldn't load ${url} (${error.message}). Using the 3-piece development fixture.`
-          } satisfies LoadedCatalog
-        })
-      )
+    // Optional: a missing or malformed verified.json just means "nothing verified".
+    const fetchVerified = Effect.gen(function*() {
+      const verifiedUrl = url.replace(/[^/]+$/, VERIFIED_URL.slice(VERIFIED_URL.lastIndexOf("/") + 1))
+      const response = yield* Effect.promise(() => fetchText(verifiedUrl))
+      if (!response.ok) return NO_VERIFICATION
+      const json = JSON.parse(yield* Effect.promise(() => response.text())) as unknown
+      return (yield* decodeVerification(json)).results
+    }).pipe(
+      Effect.catchCause((cause) => Effect.logWarning(`No in-game verification table: ${String(cause)}`).pipe(Effect.as(NO_VERIFICATION)))
     )
+
+    const load = Effect.gen(function*() {
+      const verified = yield* fetchVerified
+      return yield* fetchCatalog.pipe(
+        Effect.map((catalog): LoadedCatalog => ({ catalog, source: "assets", verified })),
+        Effect.catchTag("CatalogLoadError", (error) =>
+          Effect.gen(function*() {
+            yield* Effect.logWarning(`Falling back to fixture catalog: ${error.message}`)
+            const catalog = yield* fixture
+            return {
+              catalog,
+              source: "fixture",
+              verified,
+              warning: `Couldn't load ${url} (${error.message}). Using the 3-piece development fixture.`
+            } satisfies LoadedCatalog
+          })
+        )
+      )
+    })
 
     return CatalogLoader.of({ fetch: fetchCatalog, load })
   }

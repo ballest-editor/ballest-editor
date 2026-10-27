@@ -52,18 +52,18 @@ describe("GameKeybinds", () => {
       ]
     })
     const { keybinds, fromGame, fellBack } = deriveKeybinds(file)
-    assert.strictEqual(keybinds.moveForward, "ArrowUp")
-    assert.strictEqual(keybinds.moveBack, "ArrowDown")
-    assert.strictEqual(keybinds.moveLeft, "ArrowLeft")
-    assert.strictEqual(keybinds.moveRight, "ArrowRight")
-    assert.strictEqual(keybinds.moveUp, "Space")
-    assert.strictEqual(keybinds.moveDown, "ShiftLeft") // editor override beats the game's Left Ctrl
-    assert.strictEqual(keybinds.look, defaultKeybinds.look) // Mouse2D has no button; IMC_Default ignored
-    assert.strictEqual(defaultKeybinds.focusSelection, "KeyC") // the game's "center camera"
-    assert.strictEqual(keybinds.speedFaster, "WheelUp")
-    assert.strictEqual(keybinds.speedSlower, "WheelDown")
-    assert.strictEqual(keybinds.focusSelection, "KeyC")
-    assert.strictEqual(keybinds.deselect, "Escape")
+    assert.deepStrictEqual(keybinds.moveForward, ["ArrowUp"])
+    assert.deepStrictEqual(keybinds.moveBack, ["ArrowDown"])
+    assert.deepStrictEqual(keybinds.moveLeft, ["ArrowLeft"])
+    assert.deepStrictEqual(keybinds.moveRight, ["ArrowRight"])
+    assert.deepStrictEqual(keybinds.moveUp, ["Space"])
+    assert.deepStrictEqual(keybinds.moveDown, ["ShiftLeft"]) // editor override beats the game's Left Ctrl
+    assert.deepStrictEqual(keybinds.look, defaultKeybinds.look) // Mouse2D has no button; IMC_Default ignored
+    assert.deepStrictEqual(keybinds.speedFaster, ["WheelUp"])
+    assert.deepStrictEqual(keybinds.speedSlower, ["WheelDown"])
+    // level-editor overlay hotkey stays primary; the free camera's "center camera" is secondary
+    assert.deepStrictEqual(keybinds.focusSelection, ["KeyF", "KeyC"])
+    assert.deepStrictEqual(keybinds.deselect, ["Escape"])
     assert.strictEqual(fromGame.get("moveForward")?.context, "IMC_FreeCam")
     assert.strictEqual(fromGame.get("deselect")?.context, "IMC_Universal")
     assert.include(fellBack, "undo")
@@ -88,7 +88,7 @@ describe("GameKeybinds", () => {
     const named = deriveKeybinds(look)
     assert.strictEqual(named.naming.get("lookUp")?.label, "look up")
     assert.strictEqual(named.naming.get("lookLeft")?.label, "look left")
-    assert.strictEqual(named.keybinds.lookUp, "ArrowUp") // racing context doesn't rebind the editor
+    assert.deepStrictEqual(named.keybinds.lookUp, ["ArrowUp"]) // racing context doesn't rebind the editor
     assert.strictEqual(deriveKeybinds(undefined).naming.size, 0)
   })
 
@@ -107,9 +107,11 @@ describe("GameKeybinds", () => {
     // IMC_FreeCam: WASD fly, Space up, LeftControl down, wheel = camera speed; IMC_Universal: Escape
     assert.deepStrictEqual(
       [keybinds.moveForward, keybinds.moveLeft, keybinds.moveBack, keybinds.moveRight, keybinds.moveUp, keybinds.moveDown],
-      ["KeyW", "KeyA", "KeyS", "KeyD", "Space", "ShiftLeft"]
+      [["KeyW"], ["KeyA"], ["KeyS"], ["KeyD"], ["Space"], ["ShiftLeft"]]
     )
-    assert.deepStrictEqual([keybinds.speedFaster, keybinds.speedSlower, keybinds.deselect], ["WheelUp", "WheelDown", "Escape"])
+    assert.deepStrictEqual([keybinds.speedFaster, keybinds.speedSlower, keybinds.deselect], [["WheelUp"], ["WheelDown"], ["Escape"]])
+    assert.deepStrictEqual(keybinds.translateMode, ["KeyW"]) // the game's editor overlay, untouched by the camera contexts
+    assert.deepStrictEqual(keybinds.focusSelection, ["KeyF", "KeyC"])
     for (const action of ["moveForward", "moveUp", "speedFaster", "deselect"] as const) {
       assert.isTrue(fromGame.has(action), action)
     }
@@ -119,7 +121,7 @@ describe("GameKeybinds", () => {
     assert.strictEqual(naming.get("moveBack")?.label, "reverse")
     assert.strictEqual(naming.get("lookRight")?.label, "look right")
     assert.strictEqual(naming.get("lookUp")?.label, "look up")
-    assert.strictEqual(naming.get("focusSelection")?.label, "center camera")
+    assert.isUndefined(naming.get("focusSelection")) // named by the level-editor overlay, not the camera
     assert.include(sectionOrder, "mouse and keyboard free camera")
     assert.notInclude(sectionOrder.join(), "gamepad")
     for (const [, n] of naming) assert.notMatch(n.section ?? "", /gamepad/i)

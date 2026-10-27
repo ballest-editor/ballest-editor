@@ -21,15 +21,12 @@ function MapSettings() {
   const sourceName = useEditor((s) => s.sourceName)
   const renameLevel = useEditor((s) => s.renameLevel)
   const [name, setName] = useState(levelData.levelDisplayName)
-  const [creator, setCreator] = useState(levelData.creatorName)
-  useEffect(() => {
-    setName(levelData.levelDisplayName)
-    setCreator(levelData.creatorName)
-  }, [levelData.levelDisplayName, levelData.creatorName])
+  useEffect(() => setName(levelData.levelDisplayName), [levelData.levelDisplayName])
   const commit = () => {
-    if (name !== levelData.levelDisplayName || creator !== levelData.creatorName) renameLevel(name, creator)
+    if (name !== levelData.levelDisplayName) renameLevel(name, levelData.creatorName)
   }
   const facts: ReadonlyArray<readonly [string, string]> = [
+    ["Creator", levelData.creatorName || "set in Settings › General"],
     ["Items", String(itemCount)],
     ["Created", levelData.createdAt || "on export"],
     ["Validated", levelData.bValidated ? "yes" : "no"],
@@ -41,10 +38,6 @@ function MapSettings() {
       <div className="flex flex-col gap-1">
         <Label htmlFor="map-name" className="text-muted-foreground">Name</Label>
         <Input id="map-name" value={name} onChange={(e) => setName(e.target.value)} onBlur={commit} />
-      </div>
-      <div className="flex flex-col gap-1">
-        <Label htmlFor="map-creator" className="text-muted-foreground">Creator</Label>
-        <Input id="map-creator" value={creator} onChange={(e) => setCreator(e.target.value)} onBlur={commit} />
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
         {facts.map(([k, v]) => (

@@ -1,27 +1,32 @@
 /**
- * Editor keybinds. A binding is a chord string: optional modifiers then a code, e.g.
- * "KeyW", "Ctrl+KeyZ", a mouse button "Mouse0" | "Mouse1" | "Mouse2", or a wheel
- * direction "WheelUp" | "WheelDown". Key codes are `KeyboardEvent.code`, so bindings
- * follow physical key positions. An empty string means unbound.
+ * Editor keybinds. Each action has a list of bindings (primary first); a binding is a
+ * chord string: optional modifiers then a code, e.g. "KeyW", "Ctrl+KeyZ", a mouse button
+ * "Mouse0" | "Mouse1" | "Mouse2", or a wheel direction "WheelUp" | "WheelDown". Key codes
+ * are `KeyboardEvent.code`, so bindings follow physical key positions. An empty list means
+ * unbound.
  */
 import { Schema } from "effect"
 
 /**
- * Sections and names follow the game's own settings screen ("mouse and keyboard free
- * camera", "forward", "reverse", "center camera"...). Game actions that mean nothing in the
- * editor (replay controls, nameplates) are omitted; editor-only actions get plain
- * lower-case names in the same style. keybinds.json `label`/`section` fields, when the
- * extractor provides them, override these (see GameKeybinds).
+ * Sections and names follow the game: the level editor's own hotkey overlay ("select
+ * mode", "move mode", "focus selection"...) and its settings screen ("mouse and keyboard
+ * free camera": "forward", "reverse"...). Game actions that mean nothing in the editor
+ * (replay controls, nameplates) are omitted; editor-only actions get plain lower-case
+ * names in the same style. keybinds.json `label`/`section` fields, when the extractor
+ * provides them, override the camera names (see GameKeybinds); level-editor names come
+ * from the in-game overlay and are fixed here.
  */
 export const keybindSections = [
+  {
+    name: "level editor",
+    actions: ["selectMode", "translateMode", "rotateMode", "scaleMode", "focusSelection", "deleteSelection", "undo", "redo", "deselect"]
+  },
   {
     name: "mouse and keyboard free camera",
     actions: ["moveForward", "moveBack", "moveLeft", "moveRight", "look", "moveUp", "moveDown"]
   },
-  { name: "mouse and keyboard bindings", actions: ["lookRight", "lookLeft", "lookUp", "lookDown", "focusSelection"] },
+  { name: "mouse and keyboard bindings", actions: ["lookRight", "lookLeft", "lookUp", "lookDown"] },
   { name: "editor camera", actions: ["fastMove", "speedFaster", "speedSlower", "orbit", "pan"] },
-  { name: "editor tools", actions: ["selectMode", "translateMode", "rotateMode", "scaleMode"] },
-  { name: "editing", actions: ["deselect", "deleteSelection", "undo", "redo"] },
   { name: "file", actions: ["newMap", "importMap", "exportMap"] }
 ] as const
 
@@ -30,8 +35,20 @@ export const keybindActions: ReadonlyArray<KeybindAction> = keybindSections.flat
 
 export const KeybindActionSchema = Schema.Literals(keybindActions as unknown as readonly [KeybindAction, ...Array<KeybindAction>])
 
+/** Actions named by the in-game level editor's hotkey overlay (keybinds.json naming doesn't apply). */
+export const editorOverlayActions: ReadonlySet<KeybindAction> = new Set(keybindSections[0].actions)
+
 /** The name shown in the settings (the game's wording where the action exists in-game). */
 export const keybindActionLabels: Record<KeybindAction, string> = {
+  selectMode: "select mode",
+  translateMode: "move mode",
+  rotateMode: "rotate mode",
+  scaleMode: "scale mode",
+  focusSelection: "focus selection",
+  deleteSelection: "delete",
+  undo: "undo",
+  redo: "redo",
+  deselect: "deselect",
   moveForward: "forward",
   moveBack: "reverse",
   moveLeft: "left",
@@ -43,20 +60,11 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   lookLeft: "look left",
   lookUp: "look up",
   lookDown: "look down",
-  focusSelection: "center camera",
   fastMove: "fly faster",
   speedFaster: "camera speed up",
   speedSlower: "camera speed down",
   orbit: "orbit",
   pan: "pan",
-  selectMode: "select tool",
-  translateMode: "move tool",
-  rotateMode: "rotate tool",
-  scaleMode: "scale tool",
-  deselect: "deselect",
-  deleteSelection: "delete",
-  undo: "undo",
-  redo: "redo",
   newMap: "new map",
   importMap: "import map",
   exportMap: "export map"
@@ -64,31 +72,31 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
 
 /** What each action does in the editor (binding tooltips). */
 export const keybindActionDescriptions: Record<KeybindAction, string> = {
+  selectMode: "Select mode: click to select, no gizmo. Q in the game's level editor.",
+  translateMode: "Move mode: drag the arrows or plane handles to move the selection. W in the game's level editor; the camera's W only flies while the look button is held.",
+  rotateMode: "Rotate mode: drag a ring to rotate the selection. E in the game's level editor.",
+  scaleMode: "Scale mode: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the game's level editor.",
+  focusSelection: "Frame the current selection in the viewport. F in the game's level editor; its free camera calls this \"center camera\" (C).",
+  deleteSelection: "Delete the selected item. Backspace in the game's level editor; Delete also works.",
+  undo: "Undo the last change.",
+  redo: "Redo the last undone change.",
+  deselect: "Clear the selection. During a gizmo drag it cancels the drag instead. (The game uses Ctrl+click.)",
   moveForward: "Fly the camera forward while held.",
   moveBack: "Fly the camera backward while held.",
   moveLeft: "Fly the camera left while held.",
   moveRight: "Fly the camera right while held.",
-  look: "Hold and drag to turn the camera. The game uses plain mouse movement; in the browser a button has to be held.",
+  look: "Hold and drag to turn the camera. The game uses plain mouse movement; in the browser a button has to be held. While it's held, the fly keys never trigger tool shortcuts.",
   moveUp: "Fly the camera straight up while held.",
   moveDown: "Fly the camera straight down while held. The game uses Left Ctrl; the editor defaults to Left Shift so Ctrl+Z / Ctrl+Y never move the camera.",
   lookRight: "Turn the camera right while held.",
   lookLeft: "Turn the camera left while held.",
   lookUp: "Tilt the camera up while held.",
   lookDown: "Tilt the camera down while held.",
-  focusSelection: "Frame the current selection in the viewport (F in Blender terms).",
   fastMove: "Hold to fly several times faster. Unbound by default: the mouse wheel changes camera speed.",
   speedFaster: "Raise the camera's fly speed one step.",
   speedSlower: "Lower the camera's fly speed one step.",
   orbit: "Hold and drag to orbit around the focus point.",
   pan: "Hold and drag to slide the camera sideways and up/down.",
-  selectMode: "Select tool: click to select, no gizmo.",
-  translateMode: "Move tool: drag the arrows or plane handles to move the selection.",
-  rotateMode: "Rotate tool: drag a ring to rotate the selection.",
-  scaleMode: "Scale tool: drag a cube to scale along one axis, or the centre ring to scale uniformly. (T is \"replay camera mode\" in-game; it's free in the editor.)",
-  deselect: "Clear the selection. During a gizmo drag it cancels the drag instead.",
-  deleteSelection: "Delete the selected item.",
-  undo: "Undo the last change.",
-  redo: "Redo the last undone change.",
   newMap: "Start a new map.",
   importMap: "Open a .balledit or .ballmap file.",
   exportMap: "Download the map as a .balledit file for the game."
@@ -111,60 +119,79 @@ export const heldActions: ReadonlySet<KeybindAction> = new Set([
   "fastMove"
 ])
 
-export type Keybinds = Readonly<Record<KeybindAction, string>>
+export type Bindings = ReadonlyArray<string>
+export type Keybinds = Readonly<Record<KeybindAction, Bindings>>
 
 /**
- * The defaults: the game's own bindings (its settings screen), plus editor-only actions.
- * GameKeybinds overlays whatever assets/keybinds.json defines on top.
+ * The defaults: the game's own bindings (its level-editor hotkey overlay and its settings
+ * screen), plus editor-only actions. GameKeybinds overlays whatever assets/keybinds.json
+ * defines on top.
  */
 export const defaultKeybinds: Keybinds = {
-  moveForward: "KeyW",
-  moveBack: "KeyS",
-  moveLeft: "KeyA",
-  moveRight: "KeyD",
-  look: "Mouse2",
-  moveUp: "Space",
-  moveDown: "ShiftLeft",
-  lookRight: "ArrowRight",
-  lookLeft: "ArrowLeft",
-  lookUp: "ArrowUp",
-  lookDown: "ArrowDown",
-  focusSelection: "KeyC",
-  fastMove: "",
-  speedFaster: "WheelUp",
-  speedSlower: "WheelDown",
-  orbit: "Alt+Mouse0",
-  pan: "Mouse1",
-  selectMode: "KeyV",
-  translateMode: "KeyG",
-  rotateMode: "KeyR",
-  scaleMode: "KeyT",
-  deselect: "Escape",
-  deleteSelection: "Delete",
-  undo: "Ctrl+KeyZ",
-  redo: "Ctrl+KeyY",
-  newMap: "Alt+KeyN",
-  importMap: "Ctrl+KeyO",
-  exportMap: "Ctrl+KeyS"
+  selectMode: ["KeyQ"],
+  translateMode: ["KeyW"],
+  rotateMode: ["KeyE"],
+  scaleMode: ["KeyR"],
+  focusSelection: ["KeyF", "KeyC"],
+  deleteSelection: ["Backspace", "Delete"],
+  undo: ["Ctrl+KeyZ"],
+  redo: ["Ctrl+KeyY"],
+  deselect: ["Escape"],
+  moveForward: ["KeyW"],
+  moveBack: ["KeyS"],
+  moveLeft: ["KeyA"],
+  moveRight: ["KeyD"],
+  look: ["Mouse2"],
+  moveUp: ["Space"],
+  moveDown: ["ShiftLeft"],
+  lookRight: ["ArrowRight"],
+  lookLeft: ["ArrowLeft"],
+  lookUp: ["ArrowUp"],
+  lookDown: ["ArrowDown"],
+  fastMove: [],
+  speedFaster: ["WheelUp"],
+  speedSlower: ["WheelDown"],
+  orbit: ["Alt+Mouse0"],
+  pan: ["Mouse1"],
+  newMap: ["Alt+KeyN"],
+  importMap: ["Ctrl+KeyO"],
+  exportMap: ["Ctrl+KeyS"]
 }
 
 /**
  * Editor decisions that win over the game's mappings in keybinds.json:
  * "down" is Left Shift (the game's Left Ctrl collides with Ctrl+Z / Ctrl+Y).
  */
-export const editorOverrides: Partial<Keybinds> = { moveDown: "ShiftLeft" }
+export const editorOverrides: Partial<Keybinds> = { moveDown: ["ShiftLeft"] }
 
-/** What's persisted: any subset, unknown actions ignored, so old saves keep working. */
-export const StoredKeybinds = Schema.Record(Schema.String, Schema.String)
+/** What's persisted: any subset, unknown actions ignored. Older saves stored one string. */
+export const StoredKeybinds = Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Array(Schema.String)]))
+export type StoredKeybinds = typeof StoredKeybinds.Type
 
-export const mergeKeybinds = (stored: Readonly<Record<string, string>>, defaults: Keybinds = defaultKeybinds): Keybinds => {
-  const out: Record<string, string> = { ...defaults }
+export const uniqueBindings = (bindings: ReadonlyArray<string>): Bindings => [...new Set(bindings.filter((b) => b.length > 0))]
+
+export const mergeKeybinds = (stored: StoredKeybinds, defaults: Keybinds = defaultKeybinds): Keybinds => {
+  const out: Record<string, Bindings> = { ...defaults }
   for (const action of keybindActions) {
     const value = stored[action]
-    if (value !== undefined) out[action] = value
+    if (value === undefined) continue
+    out[action] = uniqueBindings(typeof value === "string" ? [value] : value)
   }
   return out as Keybinds
 }
+
+export const sameBindings = (a: Bindings, b: Bindings): boolean => a.length === b.length && a.every((x, i) => x === b[i])
+
+/** True when the action's bindings are exactly its defaults. */
+export const isDefaultBinding = (keybinds: Keybinds, defaults: Keybinds, action: KeybindAction): boolean =>
+  sameBindings(keybinds[action], defaults[action])
+
+/** Is `chord` one of the action's bindings? */
+export const isBound = (keybinds: Keybinds, action: KeybindAction, chord: string): boolean => keybinds[action].includes(chord)
+
+/** The action(s) a chord is bound to. */
+export const actionsFor = (keybinds: Keybinds, chord: string): ReadonlyArray<KeybindAction> =>
+  keybindActions.filter((action) => keybinds[action].includes(chord))
 
 const MODIFIER_CODES = new Set([
   "ShiftLeft",
@@ -203,10 +230,12 @@ export const wheelChordOf = (e: ModifierState & { readonly deltaY: number }): st
 /** The key code a binding waits for, ignoring modifiers (used for held movement keys). */
 export const baseCodeOf = (binding: string): string => binding.slice(binding.lastIndexOf("+") + 1)
 
+/** True when `chord` is bound to a one-shot action (anything that isn't held or a drag). */
+export const isOneShotChord = (keybinds: Keybinds, chord: string): boolean =>
+  actionsFor(keybinds, chord).some((action) => !heldActions.has(action) && !mouseDragActions.has(action))
+
 /** True when `chord` (from chordOf) is bound to a one-shot action with a modifier, e.g. Ctrl+KeyZ. */
-export const isBoundChord = (keybinds: Keybinds, chord: string): boolean =>
-  chord.includes("+") &&
-  (Object.entries(keybinds) as Array<[KeybindAction, string]>).some(([action, binding]) => binding === chord && !heldActions.has(action))
+export const isBoundChord = (keybinds: Keybinds, chord: string): boolean => chord.includes("+") && isOneShotChord(keybinds, chord)
 
 export const isModifierCode = (code: string): boolean => MODIFIER_CODES.has(code)
 
@@ -251,6 +280,11 @@ export class HeldKeys {
     return false
   }
 
+  /** Is one of the action's bindings held? (bare modifiers obey the chord rule) */
+  holdsAny(bindings: Bindings, now: number): boolean {
+    return bindings.some((binding) => this.holds(binding, now))
+  }
+
   /** Is the binding's key held, for a held action? (bare modifiers obey the chord rule) */
   holds(binding: string, now: number): boolean {
     if (binding.length === 0) return false
@@ -262,6 +296,7 @@ export class HeldKeys {
   }
 }
 
+/** Display form of one chord, e.g. "Ctrl + Z", "RMB", "←". */
 export const formatBinding = (binding: string): string =>
   binding.length === 0 ? "Unbound" : binding
     .split("+")
@@ -271,11 +306,17 @@ export const formatBinding = (binding: string): string =>
       if (part === "Mouse0") return "LMB"
       if (part === "Mouse1") return "MMB"
       if (part === "Mouse2") return "RMB"
+      if (part.startsWith("Mouse")) return `Mouse ${Number(part.slice(5)) + 1}`
       const arrows: Record<string, string> = { ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→" }
       if (arrows[part] !== undefined) return arrows[part]
       if (part === "WheelUp") return "Wheel up"
       if (part === "WheelDown") return "Wheel down"
       if (part.endsWith("Left") && MODIFIER_CODES.has(part)) return part.replace("Left", "")
+      if (part.endsWith("Right") && MODIFIER_CODES.has(part)) return `Right ${part.replace("Right", "")}`
       return part
     })
     .join(" + ")
+
+/** Display form of an action's bindings ("Q / F", or "Unbound"). */
+export const formatBindings = (bindings: Bindings): string =>
+  bindings.length === 0 ? "Unbound" : bindings.map(formatBinding).join(" / ")

@@ -12,3 +12,6 @@ assets/pieces/
 
 # Extracted textures (tools/extract/run.sh output, ~140 MB at --tex-max 2048)
 assets/textures/
+
+# In-game probe automation (machine-specific uinput/screen driving)
+tools/probe/

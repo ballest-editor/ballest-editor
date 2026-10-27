@@ -1,8 +1,8 @@
 import { useEffect } from "react"
-import { chordOf, type KeybindAction } from "../domain/Keybinds"
-import { exportMap } from "./actions"
+import { actionsFor, chordOf, type KeybindAction } from "../domain/Keybinds"
 import { commands } from "./commands"
 import { isEditorKeyEvent } from "./FlyCamera"
+import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
 
 const oneShot = (action: KeybindAction): (() => void) | undefined => {
@@ -35,21 +35,23 @@ const oneShot = (action: KeybindAction): (() => void) | undefined => {
     case "importMap":
       return () => commands.openImport()
     case "exportMap":
-      return () => void exportMap()
+      return () => commands.openDialog("export")
     default:
       return undefined // held movement keys and mouse drags are handled by FlyCamera
   }
 }
 
-/** One-shot actions, matched on the full chord. Ignored in text fields and dialogs. */
+/**
+ * One-shot actions, matched on the full chord. Ignored in text fields and dialogs, and
+ * while a look drag is active (the fly keys own the keyboard then).
+ */
 export function useActionKeys() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!isEditorKeyEvent(e) || e.repeat) return
+      if (!isEditorKeyEvent(e) || e.repeat || sceneRegistry.lookDragActive()) return
       const chord = chordOf(e)
       const { keybinds } = useEditor.getState()
-      for (const [action, binding] of Object.entries(keybinds) as Array<[KeybindAction, string]>) {
-        if (binding !== chord) continue
+      for (const action of actionsFor(keybinds, chord)) {
         const run = oneShot(action)
         if (run === undefined) continue
         e.preventDefault()
