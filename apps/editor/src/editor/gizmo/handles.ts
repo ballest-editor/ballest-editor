@@ -28,6 +28,9 @@ export interface HandleSpec {
 
 export type GizmoTool = "translate" | "rotate" | "scale"
 
+/** Which axes the handles follow: the item's own (rotated) axes, or the world's. */
+export type GizmoSpace = "local" | "world"
+
 const axisSpecs = (kind: HandleKind, prefix: string): Array<HandleSpec> =>
   (["x", "y", "z"] as const).map((axis) => ({ id: `${prefix}-${axis}`, kind, axis }))
 
@@ -159,16 +162,30 @@ export interface GizmoFrame {
   readonly worldPerPixel: number
   /** The item's rotation in game space (for local-axis handles). */
   readonly gameRotation: Quat4
+  readonly space: GizmoSpace
   readonly cameraQuaternion: THREE.Quaternion
 }
 
 const X = new THREE.Vector3(1, 0, 0)
 const Z = new THREE.Vector3(0, 0, 1)
 
-/** World direction a handle acts along (its axis, ring normal, or plane normal). */
-export const handleWorldDir = (spec: HandleSpec, gameRotation: Quat4): THREE.Vector3 | undefined => {
-  if (spec.axis === undefined) return undefined
-  return spec.kind === "scaleAxis" ? axisWorldDir(spec.axis, gameRotation) : axisWorldDir(spec.axis)
+const spaceRotation = (gameRotation: Quat4, space: GizmoSpace): Quat4 | undefined =>
+  space === "local" ? gameRotation : undefined
+
+/** World direction a handle acts along (its axis, ring normal, or plane normal) in `space`. */
+export const handleWorldDir = (spec: HandleSpec, gameRotation: Quat4, space: GizmoSpace): THREE.Vector3 | undefined =>
+  spec.axis === undefined ? undefined : axisWorldDir(spec.axis, spaceRotation(gameRotation, space))
+
+/**
+ * The item's own scale axis a scale handle drives. An item can only scale along its own
+ * axes, so a world-space handle drives the local axis closest to it (exact when the item's
+ * axes line up with the world's).
+ */
+export const scaleTargetAxis = (axis: Axis, gameRotation: Quat4, space: GizmoSpace): Axis => {
+  if (space === "local") return axis
+  const world = axisWorldDir(axis)
+  const alignment = (a: Axis) => Math.abs(axisWorldDir(a, gameRotation).dot(world))
+  return (["x", "y", "z"] as const).reduce((best, a) => (alignment(a) > alignment(best) ? a : best))
 }
 
 export const orientHandle = (handle: Handle, frame: GizmoFrame): void => {
@@ -176,20 +193,21 @@ export const orientHandle = (handle: Handle, frame: GizmoFrame): void => {
   switch (spec.kind) {
     case "translateAxis":
     case "scaleAxis": {
-      const dir = handleWorldDir(spec, frame.gameRotation)
+      const dir = handleWorldDir(spec, frame.gameRotation, frame.space)
       if (dir !== undefined) root.quaternion.setFromUnitVectors(X, dir)
       return
     }
     case "rotateAxis": {
-      const dir = handleWorldDir(spec, frame.gameRotation)
+      const dir = handleWorldDir(spec, frame.gameRotation, frame.space)
       if (dir !== undefined) root.quaternion.setFromUnitVectors(Z, dir)
       return
     }
     case "translatePlane": {
       if (spec.axis === undefined) return
       const [a, b] = pairOf(spec.axis)
-      const u = axisWorldDir(a)
-      const v = axisWorldDir(b)
+      const rotation = spaceRotation(frame.gameRotation, frame.space)
+      const u = axisWorldDir(a, rotation)
+      const v = axisWorldDir(b, rotation)
       // proper rotation (no mirror): third column is u x v
       root.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(u, v, u.clone().cross(v)))
       return
