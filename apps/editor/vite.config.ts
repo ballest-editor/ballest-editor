@@ -1,16 +1,20 @@
 import tailwindcss from "@tailwindcss/vite"
 import { tanstackStart } from "@tanstack/react-start/plugin/vite"
 import viteReact from "@vitejs/plugin-react"
+import { nitro } from "nitro/vite"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { type Connect, defineConfig, type Plugin } from "vite"
 
 /**
  * Serves the repo-level `assets/` directory (two levels up from apps/editor) (catalog.json + pieces/**.glb from
- * tools/extract) at /assets/* in `vite dev` and `vite preview`, straight from disk.
- * Nothing is copied into the app or the build output; unknown paths fall through to
+ * tools/extract) at /assets/* in `vite dev` and `vite preview`, straight from disk; unknown paths fall through to
  * Vite (whose own build chunks also live under /assets/).
+ * `vite build` copies the committed part (JSON + thumbs) into the client output so deployments serve it too.
+ * The extracted meshes and textures are left out: they are gitignored, so a deploy built from git never has them.
  */
+const unbundledAssets = new Set(["pieces", "textures"])
+
 const repoAssets = (dir: string): Plugin => {
   const root = path.resolve(dir)
   const types: Record<string, string> = {
@@ -44,7 +48,20 @@ const repoAssets = (dir: string): Plugin => {
   return {
     name: "ballest:repo-assets",
     configureServer: (server) => void server.middlewares.use(middleware),
-    configurePreviewServer: (server) => void server.middlewares.use(middleware)
+    configurePreviewServer: (server) => void server.middlewares.use(middleware),
+    generateBundle(this) {
+      if (this.environment.name !== "client") return
+      for (const entry of fs.readdirSync(root, { recursive: true, withFileTypes: true })) {
+        const file = path.join(entry.parentPath, entry.name)
+        const relative = path.relative(root, file)
+        if (!entry.isFile() || unbundledAssets.has(relative.split(path.sep)[0] ?? "")) continue
+        this.emitFile({
+          type: "asset",
+          fileName: path.posix.join("assets", ...relative.split(path.sep)),
+          source: fs.readFileSync(file)
+        })
+      }
+    }
   }
 }
 
@@ -52,5 +69,11 @@ export default defineConfig({
   server: { port: 3000 },
   preview: { port: 3000 },
   resolve: { tsconfigPaths: true },
-  plugins: [repoAssets(path.resolve(import.meta.dirname, "../../assets")), tailwindcss(), tanstackStart(), viteReact()]
+  plugins: [
+    repoAssets(path.resolve(import.meta.dirname, "../../assets")),
+    tailwindcss(),
+    tanstackStart(),
+    nitro(),
+    viteReact()
+  ]
 })

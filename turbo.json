@@ -24,7 +24,9 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tsconfig.base.json", ".env*"],
-      "outputs": ["dist/**"]
+      // Nitro picks its deploy preset from these (VERCEL=1 → .vercel/output, else .output).
+      "env": ["VERCEL", "NITRO_PRESET"],
+      "outputs": ["dist/**", ".output/**", ".vercel/output/**"]
     },
     "dev": {
       "cache": false,
