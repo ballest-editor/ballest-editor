@@ -21,7 +21,8 @@
     {
       devShells = forAll (pkgs: {
         default = pkgs.mkShell {
-          packages = toolsFor pkgs;
+          # libavif: avifenc for tools/compress.
+          packages = toolsFor pkgs ++ [ pkgs.libavif ];
           CUE4PARSE_SRC = "${cue4parse}";
           LD_LIBRARY_PATH = libPathFor pkgs;
           DOTNET_CLI_TELEMETRY_OPTOUT = "1";
@@ -30,6 +31,8 @@
       });
 
       packages = forAll (pkgs: {
+        # tools/compress builds this when avifenc isn't on PATH, so encodes follow flake.lock.
+        libavif = pkgs.libavif;
         extract = pkgs.writeShellApplication {
           name = "ballest-extract";
           runtimeInputs = toolsFor pkgs;

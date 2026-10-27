@@ -16,6 +16,7 @@
     "repos",
     "samples",
     "assets",
+    "web-assets",
     "**/node_modules",
     "**/dist",
     "**/.output",
