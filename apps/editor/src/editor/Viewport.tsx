@@ -2,9 +2,18 @@ import { Grid, useGLTF } from "@react-three/drei"
 import { Canvas, useFrame, useStore, useThree } from "@react-three/fiber"
 import { Badge } from "@workspace/ui/components/badge"
 import { cn } from "@workspace/ui/lib/utils"
-import { Component, type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  Component,
+  type ComponentType,
+  type ReactNode,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react"
 import * as THREE from "three"
-import { ToolBar } from "../components/ToolBar"
 import { mouseChordOf } from "../domain/Keybinds"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
@@ -243,7 +252,8 @@ function Overlay() {
   )
 }
 
-export function Viewport() {
+/** `toolbar` floats over the scene; it is disabled until the first scene shows. */
+export function Viewport({ toolbar: Toolbar }: { readonly toolbar?: ComponentType<{ readonly disabled?: boolean }> }) {
   const [revealed, setRevealed] = useState(false)
   const reveal = useCallback(() => setRevealed(true), [])
   return (
@@ -275,7 +285,7 @@ export function Viewport() {
         {!revealed && <InitialMeshes onSettled={reveal} />}
       </Canvas>
       <Overlay />
-      <ToolBar disabled={!revealed} />
+      {Toolbar && <Toolbar disabled={!revealed} />}
     </div>
   )
 }
