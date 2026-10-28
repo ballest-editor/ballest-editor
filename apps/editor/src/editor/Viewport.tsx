@@ -242,8 +242,8 @@ function ViewportGrid() {
   )
 }
 
-/** Outline along a selected item's mesh edges (see selectionOutline.ts). */
-function SelectedOutline({ id }: { readonly id: string }) {
+/** Outline along a selected item's mesh edges (see selectionOutline.ts); the active item draws lighter. */
+function SelectedOutline({ id, active }: { readonly id: string; readonly active: boolean }) {
   const outline = useMemo(() => new SelectionOutline(), [])
   useFrame(() => {
     const object = sceneRegistry.objects.get(id)
@@ -252,7 +252,7 @@ function SelectedOutline({ id }: { readonly id: string }) {
       return
     }
     if (outline.parent !== object) object.add(outline)
-    outline.update(object) // glbs load async, so keep it fresh
+    outline.update(object, active) // glbs load async, so keep it fresh
   })
   useEffect(() => () => void outline.removeFromParent(), [outline])
   return null
@@ -260,7 +260,8 @@ function SelectedOutline({ id }: { readonly id: string }) {
 
 function SelectedOutlines() {
   const selectedIds = useEditor((s) => s.selectedIds)
-  return selectedIds.map((id) => <SelectedOutline key={id} id={id} />)
+  const active = selectedIds.at(-1)
+  return selectedIds.map((id) => <SelectedOutline key={id} id={id} active={id === active} />)
 }
 
 function Overlay() {
