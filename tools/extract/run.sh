@@ -119,8 +119,12 @@ node "$here/build-keybinds.mjs" "$WORK/input-dump.json" "$OUT/keybinds.json"
 # All English game strings (Localization/Game/en/Game.locres): { namespace: { key: text } }.
 extract locres --file Ballest/Content/Localization/Game/en/Game.locres --out "$OUT/strings.json" 2>>"$WORK/input.log"
 
-# 6. Materials: every material referenced by samples + catalog, parent chains, textures -> PNG.
+# 6. Materials: every material referenced by samples + catalog + the in-game paint picker, parent chains,
+#    textures -> PNG. The picker's data assets (categories x colours -> material) go into materials.json too.
 log "exporting materials and textures"
+extract dump --prefix Ballest/Content/LevelEditor/PackageAssets/MultiplayerLevelEditor/UI/Data/MaterialSelection \
+  --prefix Ballest/Content/Art/DataAssets/BallestMaterials \
+  --out "$WORK/paint-dump.json" 2>"$WORK/paint.log" || { tail -20 "$WORK/paint.log" >&2; exit 1; }
 node "$here/build-materials.mjs" list "$WORK" "$OUT"
 mkdir -p "$WORK/textures"
 extract materials --list "$WORK/materials.txt" --out "$WORK/materials-dump.json" --tex-dir "$WORK/textures" --tex-max "$TEX_MAX" \

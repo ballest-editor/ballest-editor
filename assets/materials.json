@@ -5,7 +5,8 @@
     "vectors are linear RGBA as stored by UE. baseColor/emissive in approx are linear; set three.js colors with Color.setRGB(r,g,b, THREE.LinearSRGBColorSpace) (or the default working space).",
     "approx is a heuristic: cooked UMaterials have no expression graph, so how parameters are combined (UV tiling, detail textures, fresnel, world-aligned textures, vertex colour) is unknown. approx.keys names the parameter each value came from (null = neutral default).",
     "Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).",
-    "UV tiling parameters (UV Scale / UV Tile U,V / Texture Scale X,Y / World Space Scale) are listed in scalars but not applied in approx; several masters use world-aligned or triplanar mapping, so mesh UVs alone will not match the game."
+    "UV tiling parameters (UV Scale / UV Tile U,V / Texture Scale X,Y / World Space Scale) are listed in scalars but not applied in approx; several masters use world-aligned or triplanar mapping, so mesh UVs alone will not match the game.",
+    "paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap)."
   ],
   "materials": [
     {
@@ -363,6 +364,99 @@
         ],
         "metallic": 0,
         "roughness": 0.4,
+        "opacity": 1,
+        "emissive": null,
+        "baseColorTexture": null,
+        "normalTexture": null,
+        "ormTexture": null,
+        "keys": {
+          "baseColor": "BaseColor",
+          "metallic": "Metallic",
+          "roughness": "RoughnessMin",
+          "opacity": null,
+          "emissive": null,
+          "emissiveIntensity": null,
+          "baseColorTexture": null,
+          "normalTexture": null,
+          "ormTexture": null
+        }
+      }
+    },
+    {
+      "path": "/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Tiles.MI_Env_Blue_Tiles",
+      "kind": "instance",
+      "parent": "/Game/Art/Materials/Environment/Materials/M_Env_Material_Default.M_Env_Material_Default",
+      "chain": [
+        "/Game/Art/Materials/Environment/Materials/M_Env_Material_Default.M_Env_Material_Default"
+      ],
+      "root": "/Game/Art/Materials/Environment/Materials/M_Env_Material_Default.M_Env_Material_Default",
+      "recovered": true,
+      "scalars": {
+        "Metallic": 0.1,
+        "Specular": 0.2,
+        "RoughnessMultiple": 0.9,
+        "SlopeValueHigh": 1.4,
+        "SlopeValueLow": 0.8,
+        "FakeShadowStrength": 0.3,
+        "UV Offset U": 0,
+        "UV Offset V": 0,
+        "UV Tile U": 1,
+        "UV Tile V": 1,
+        "UV Scale": 1,
+        "ColorContrast": 0.9,
+        "RoughnessMin": 0.3,
+        "SlopeGradientPower": 1,
+        "SlopeGradientStrength": 0.7,
+        "TileNormalStrength": 1,
+        "RefractionDepthBias": 0
+      },
+      "vectors": {
+        "BaseColor": [
+          0,
+          0.162029,
+          1,
+          1
+        ],
+        "TriPlanar Rotation": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "TriPlanar Pivot": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "textures": {},
+      "switches": {
+        "UseTiles": true,
+        "Use Object UVs": false
+      },
+      "blendMode": "BLEND_Opaque",
+      "shadingModel": "MSM_DefaultLit",
+      "twoSided": false,
+      "connectedOutputs": [
+        "BaseColor",
+        "Metallic",
+        "Specular",
+        "Roughness",
+        "Normal"
+      ],
+      "referencedTextures": [
+        "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
+        "textures/Art/Materials/Textures/T_MacroVariation.png"
+      ],
+      "approx": {
+        "baseColor": [
+          0,
+          0.162029,
+          1
+        ],
+        "metallic": 0.1,
+        "roughness": 0.3,
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
@@ -1033,6 +1127,99 @@
       }
     },
     {
+      "path": "/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Tiles.MI_Env_Purple_Tiles",
+      "kind": "instance",
+      "parent": "/Game/Art/Materials/Environment/Materials/M_Env_Material_Default.M_Env_Material_Default",
+      "chain": [
+        "/Game/Art/Materials/Environment/Materials/M_Env_Material_Default.M_Env_Material_Default"
+      ],
+      "root": "/Game/Art/Materials/Environment/Materials/M_Env_Material_Default.M_Env_Material_Default",
+      "recovered": true,
+      "scalars": {
+        "Metallic": 0.1,
+        "Specular": 0.2,
+        "RoughnessMultiple": 0.9,
+        "SlopeValueHigh": 1.4,
+        "SlopeValueLow": 0.8,
+        "FakeShadowStrength": 0.3,
+        "UV Offset U": 0,
+        "UV Offset V": 0,
+        "UV Tile U": 1,
+        "UV Tile V": 1,
+        "UV Scale": 1,
+        "ColorContrast": 0.9,
+        "RoughnessMin": 0.3,
+        "SlopeGradientPower": 1,
+        "SlopeGradientStrength": 0.7,
+        "TileNormalStrength": 1,
+        "RefractionDepthBias": 0
+      },
+      "vectors": {
+        "BaseColor": [
+          0.119538,
+          0,
+          1,
+          1
+        ],
+        "TriPlanar Rotation": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "TriPlanar Pivot": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "textures": {},
+      "switches": {
+        "UseTiles": true,
+        "Use Object UVs": false
+      },
+      "blendMode": "BLEND_Opaque",
+      "shadingModel": "MSM_DefaultLit",
+      "twoSided": false,
+      "connectedOutputs": [
+        "BaseColor",
+        "Metallic",
+        "Specular",
+        "Roughness",
+        "Normal"
+      ],
+      "referencedTextures": [
+        "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
+        "textures/Art/Materials/Textures/T_MacroVariation.png"
+      ],
+      "approx": {
+        "baseColor": [
+          0.119538,
+          0,
+          1
+        ],
+        "metallic": 0.1,
+        "roughness": 0.3,
+        "opacity": 1,
+        "emissive": null,
+        "baseColorTexture": null,
+        "normalTexture": null,
+        "ormTexture": null,
+        "keys": {
+          "baseColor": "BaseColor",
+          "metallic": "Metallic",
+          "roughness": "RoughnessMin",
+          "opacity": null,
+          "emissive": null,
+          "emissiveIntensity": null,
+          "baseColorTexture": null,
+          "normalTexture": null,
+          "ormTexture": null
+        }
+      }
+    },
+    {
       "path": "/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Red_Smooth.MI_Env_Red_Smooth",
       "kind": "instance",
       "parent": "/Game/Art/Materials/Environment/Materials/M_Env_Material_Default.M_Env_Material_Default",
@@ -1107,6 +1294,99 @@
         ],
         "metallic": 0,
         "roughness": 0.4,
+        "opacity": 1,
+        "emissive": null,
+        "baseColorTexture": null,
+        "normalTexture": null,
+        "ormTexture": null,
+        "keys": {
+          "baseColor": "BaseColor",
+          "metallic": "Metallic",
+          "roughness": "RoughnessMin",
+          "opacity": null,
+          "emissive": null,
+          "emissiveIntensity": null,
+          "baseColorTexture": null,
+          "normalTexture": null,
+          "ormTexture": null
+        }
+      }
+    },
+    {
+      "path": "/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Red_Tiles.MI_Env_Red_Tiles",
+      "kind": "instance",
+      "parent": "/Game/Art/Materials/Environment/Materials/M_Env_Material_Default.M_Env_Material_Default",
+      "chain": [
+        "/Game/Art/Materials/Environment/Materials/M_Env_Material_Default.M_Env_Material_Default"
+      ],
+      "root": "/Game/Art/Materials/Environment/Materials/M_Env_Material_Default.M_Env_Material_Default",
+      "recovered": true,
+      "scalars": {
+        "Metallic": 0.1,
+        "Specular": 0.2,
+        "RoughnessMultiple": 0.9,
+        "SlopeValueHigh": 1.4,
+        "SlopeValueLow": 0.8,
+        "FakeShadowStrength": 0.3,
+        "UV Offset U": 0,
+        "UV Offset V": 0,
+        "UV Tile U": 1,
+        "UV Tile V": 1,
+        "UV Scale": 1,
+        "ColorContrast": 0.9,
+        "RoughnessMin": 0.3,
+        "SlopeGradientPower": 1,
+        "SlopeGradientStrength": 0.7,
+        "TileNormalStrength": 1,
+        "RefractionDepthBias": 0
+      },
+      "vectors": {
+        "BaseColor": [
+          1,
+          0,
+          0.034339,
+          1
+        ],
+        "TriPlanar Rotation": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "TriPlanar Pivot": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "textures": {},
+      "switches": {
+        "UseTiles": true,
+        "Use Object UVs": false
+      },
+      "blendMode": "BLEND_Opaque",
+      "shadingModel": "MSM_DefaultLit",
+      "twoSided": false,
+      "connectedOutputs": [
+        "BaseColor",
+        "Metallic",
+        "Specular",
+        "Roughness",
+        "Normal"
+      ],
+      "referencedTextures": [
+        "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
+        "textures/Art/Materials/Textures/T_MacroVariation.png"
+      ],
+      "approx": {
+        "baseColor": [
+          1,
+          0,
+          0.034339
+        ],
+        "metallic": 0.1,
+        "roughness": 0.3,
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
@@ -2470,6 +2750,156 @@
       }
     },
     {
+      "path": "/Game/Art/Materials/Environment/Materials/Instances_AJ/MI_Env_Purple_Concrete.MI_Env_Purple_Concrete",
+      "kind": "instance",
+      "parent": "/Game/Art/Materials/Masters/M_SmartMat.M_SmartMat",
+      "chain": [
+        "/Game/Art/Materials/Masters/M_SmartMat.M_SmartMat"
+      ],
+      "root": "/Game/Art/Materials/Masters/M_SmartMat.M_SmartMat",
+      "recovered": true,
+      "scalars": {
+        "Flatten Grunge N": -1.616617,
+        "Grunge Rough Offset": 0.268398,
+        "Flatten N Edgewear": 0,
+        "Edge Wear Rough": 0.491568,
+        "Detail Normal UV Scale": 1,
+        "Angle Rough": 1.543304,
+        "Angle Metal": 0,
+        "Rainwear Strength": 0.5432,
+        "World Space Scale": 2048,
+        "Metal": 0,
+        "Roughness": 0.4,
+        "Roughness Low": 0.244,
+        "Roughness High": 0.712,
+        "Normal Strength": 1.953752,
+        "Normal Strength 2": 0,
+        "Texture Scale X": 1,
+        "Texture Scale Y": 1,
+        "Ambient Occlusion": 1,
+        "Specular": 0.5,
+        "Contrast": 0,
+        "RefractionDepthBias": 0
+      },
+      "vectors": {
+        "Grunge Tint": [
+          0.515625,
+          0.371184,
+          0.344477,
+          1
+        ],
+        "Gunge Blend": [
+          1.193393,
+          0.686998,
+          468.74133,
+          1
+        ],
+        "Highlight Tint": [
+          0.216667,
+          0.311183,
+          0.8,
+          1
+        ],
+        "Edgewear Blend": [
+          0.494554,
+          3.261948,
+          1613.517,
+          0
+        ],
+        "Noise Channel": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "Angle Col": [
+          0.744792,
+          0.478783,
+          0.318088,
+          0
+        ],
+        "Tint Direction": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "Tint": [
+          0.119538,
+          0,
+          1,
+          1
+        ]
+      },
+      "textures": {
+        "GrungeTexture": null,
+        "Detail Normal": null,
+        "Albedo": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+        "Masks": "textures/Art/Materials/Textures/T_ConcreteTileable_M.png",
+        "Normal": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png"
+      },
+      "switches": {
+        "Local Space UV": true,
+        "Enable Grunge": false,
+        "Enable Edgewear": true,
+        "Detail Normal": false,
+        "Enable Rainwear": false,
+        "Use Metal Mask": false,
+        "Use Roughness Mask": true,
+        "Use Mesh UVs": false,
+        "Use AO Mask": false,
+        "Use Spec Mask": false,
+        "Use Normal Mask": true,
+        "Use Normal Texture": true,
+        "Use Albedo Texture": true
+      },
+      "blendMode": "BLEND_Opaque",
+      "shadingModel": "MSM_DefaultLit",
+      "twoSided": false,
+      "connectedOutputs": [
+        "BaseColor",
+        "Metallic",
+        "Specular",
+        "Roughness",
+        "Normal",
+        "AmbientOcclusion"
+      ],
+      "referencedTextures": [
+        "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+        "textures/Art/Materials/Textures/T_ConcreteTileable_M.png",
+        "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
+        "textures/Art/Materials/Textures/T_DesolveNoise.png",
+        "textures/Art/Materials/Textures/T_RainWear_R.png",
+        "textures/Art/Materials/Textures/T_Grey_SRGB.png",
+        "textures/Art/Materials/Textures/BaseFlattenNormalMap_VT.png"
+      ],
+      "approx": {
+        "baseColor": [
+          0.119538,
+          0,
+          1
+        ],
+        "metallic": 0,
+        "roughness": 0.4,
+        "opacity": 1,
+        "emissive": null,
+        "baseColorTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+        "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
+        "ormTexture": null,
+        "keys": {
+          "baseColor": "Tint",
+          "metallic": "Metal",
+          "roughness": "Roughness",
+          "opacity": null,
+          "emissive": null,
+          "emissiveIntensity": null,
+          "baseColorTexture": "Albedo",
+          "normalTexture": "Normal",
+          "ormTexture": null
+        }
+      }
+    },
+    {
       "path": "/Game/Art/Materials/Environment/Materials/Instances_AJ/MI_Env_Red_Concrete.MI_Env_Red_Concrete",
       "kind": "instance",
       "parent": "/Game/Art/Materials/Masters/M_SmartMat.M_SmartMat",
@@ -2898,6 +3328,156 @@
           0.885417,
           0.885417,
           0.885417
+        ],
+        "metallic": 0,
+        "roughness": 0.4,
+        "opacity": 1,
+        "emissive": null,
+        "baseColorTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+        "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
+        "ormTexture": null,
+        "keys": {
+          "baseColor": "Tint",
+          "metallic": "Metal",
+          "roughness": "Roughness",
+          "opacity": null,
+          "emissive": null,
+          "emissiveIntensity": null,
+          "baseColorTexture": "Albedo",
+          "normalTexture": "Normal",
+          "ormTexture": null
+        }
+      }
+    },
+    {
+      "path": "/Game/Art/Materials/Environment/Materials/Instances_AJ/MI_Env_Wine_Concrete.MI_Env_Wine_Concrete",
+      "kind": "instance",
+      "parent": "/Game/Art/Materials/Masters/M_SmartMat.M_SmartMat",
+      "chain": [
+        "/Game/Art/Materials/Masters/M_SmartMat.M_SmartMat"
+      ],
+      "root": "/Game/Art/Materials/Masters/M_SmartMat.M_SmartMat",
+      "recovered": true,
+      "scalars": {
+        "Flatten Grunge N": -1.616617,
+        "Grunge Rough Offset": 0.268398,
+        "Flatten N Edgewear": 0,
+        "Edge Wear Rough": 0.491568,
+        "Detail Normal UV Scale": 1,
+        "Angle Rough": 1.543304,
+        "Angle Metal": 0,
+        "Rainwear Strength": 0.5432,
+        "World Space Scale": 2048,
+        "Metal": 0,
+        "Roughness": 0.4,
+        "Roughness Low": 0.244,
+        "Roughness High": 0.6,
+        "Normal Strength": 1.953752,
+        "Normal Strength 2": 0,
+        "Texture Scale X": 1,
+        "Texture Scale Y": 1,
+        "Ambient Occlusion": 1,
+        "Specular": 0.5,
+        "Contrast": 0,
+        "RefractionDepthBias": 0
+      },
+      "vectors": {
+        "Grunge Tint": [
+          0.515625,
+          0.371184,
+          0.344477,
+          1
+        ],
+        "Gunge Blend": [
+          1.193393,
+          0.686998,
+          468.74133,
+          1
+        ],
+        "Highlight Tint": [
+          0.361307,
+          0.159954,
+          0.19344,
+          1
+        ],
+        "Edgewear Blend": [
+          0.494554,
+          3.261948,
+          1613.517,
+          0
+        ],
+        "Noise Channel": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "Angle Col": [
+          0.744792,
+          0.478783,
+          0.318088,
+          0
+        ],
+        "Tint Direction": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "Tint": [
+          0.361307,
+          0.036889,
+          0.090842,
+          1
+        ]
+      },
+      "textures": {
+        "GrungeTexture": null,
+        "Detail Normal": null,
+        "Albedo": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+        "Masks": "textures/Art/Materials/Textures/T_ConcreteTileable_M.png",
+        "Normal": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png"
+      },
+      "switches": {
+        "Local Space UV": true,
+        "Enable Grunge": false,
+        "Enable Edgewear": true,
+        "Detail Normal": false,
+        "Enable Rainwear": false,
+        "Use Metal Mask": false,
+        "Use Roughness Mask": true,
+        "Use Mesh UVs": false,
+        "Use AO Mask": false,
+        "Use Spec Mask": false,
+        "Use Normal Mask": true,
+        "Use Normal Texture": true,
+        "Use Albedo Texture": true
+      },
+      "blendMode": "BLEND_Opaque",
+      "shadingModel": "MSM_DefaultLit",
+      "twoSided": false,
+      "connectedOutputs": [
+        "BaseColor",
+        "Metallic",
+        "Specular",
+        "Roughness",
+        "Normal",
+        "AmbientOcclusion"
+      ],
+      "referencedTextures": [
+        "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+        "textures/Art/Materials/Textures/T_ConcreteTileable_M.png",
+        "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
+        "textures/Art/Materials/Textures/T_DesolveNoise.png",
+        "textures/Art/Materials/Textures/T_RainWear_R.png",
+        "textures/Art/Materials/Textures/T_Grey_SRGB.png",
+        "textures/Art/Materials/Textures/BaseFlattenNormalMap_VT.png"
+      ],
+      "approx": {
+        "baseColor": [
+          0.361307,
+          0.036889,
+          0.090842
         ],
         "metallic": 0,
         "roughness": 0.4,
@@ -7614,6 +8194,190 @@
       }
     },
     {
+      "path": "/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Rough_Wine.MI_Env_Rough_Wine",
+      "kind": "instance",
+      "parent": "/Game/Art/Materials/Environment/Materials/M_Env_Material_Flexible.M_Env_Material_Flexible",
+      "chain": [
+        "/Game/Art/Materials/Environment/Materials/M_Env_Material_Flexible.M_Env_Material_Flexible"
+      ],
+      "root": "/Game/Art/Materials/Environment/Materials/M_Env_Material_Flexible.M_Env_Material_Flexible",
+      "recovered": true,
+      "scalars": {
+        "Metallic": 0.1,
+        "Specular": 0.2,
+        "Roughness": 0.8,
+        "UV_Scale": 40,
+        "UV_Offset_X": 0,
+        "UV_Offset_Y": 0,
+        "Flatten Normal": 0,
+        "Emmisive Intensity": 0,
+        "Metallic Mult": 1,
+        "Specular Mult": 1,
+        "Roughness Mult": 1,
+        "Roughness_Contrast": 0,
+        "Normal Intensity": 1,
+        "UV_Tile_X": 1,
+        "UV_Tile_Y": 1,
+        "Roughness Min": 0,
+        "Roughness Max": 1,
+        "UV Offset U": 0,
+        "UV Offset V": 0,
+        "UV Tile U": 0.1,
+        "UV Tile V": 0.1,
+        "UV Scale": 1,
+        "DT1 Scale": 0.5,
+        "DT1 Offset X": 0,
+        "DT1 Offset Y": 0,
+        "DT1 Opacity": 0.05,
+        "DT1 Desaturation": 0,
+        "DT1 Contrast": 0,
+        "DT1 Mult": 1,
+        "DT1 Flatten Normal": 0,
+        "DT1 Normal Intensity": 1,
+        "DT2 Scale": 0.1,
+        "DT2 Offset X": 0,
+        "DT2 Offset Y": 0,
+        "DT2 Opacity": 1,
+        "DT2 Desaturation": 0,
+        "DT2 Contrast": 0,
+        "DT2 Mult": 1,
+        "DT1 Roughness Contrast": 0,
+        "DT1 Roughness Mult": 1,
+        "DT1 Roughness Opacity": 1,
+        "Rotation Speed": 0.2,
+        "FresnelValue": 5,
+        "Grid Size": 150,
+        "Sub Grid Number": 8,
+        "FakeLightStrength": 0.55,
+        "SlopeValueHigh": 1.1,
+        "SlopeValueLow": 0.8,
+        "RefractionDepthBias": 0
+      },
+      "vectors": {
+        "Base Color": [
+          0.361307,
+          0.036889,
+          0.090842,
+          1
+        ],
+        "Emissive Color": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "TriPlanar Rotation": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "TriPlanar Pivot": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "DT1 Tint": [
+          1,
+          1,
+          1,
+          0
+        ],
+        "DT2 Tint": [
+          1,
+          1,
+          1,
+          0
+        ],
+        "Axis of Rotation": [
+          -1,
+          0,
+          0,
+          0
+        ]
+      },
+      "textures": {
+        "Normal Map": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
+        "Emmisive Map": null,
+        "Metallic Map": null,
+        "Specular Map": null,
+        "Roughness Map": null,
+        "Detail Texture 1": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
+        "DT1 Normal Map": null,
+        "Detail Texture 2": null,
+        "DT1 Roughness Map": null
+      },
+      "switches": {
+        "Use Metallic Map?": false,
+        "Use Specular Map?": false,
+        "Use Detail Texture 1 Roughness Map?": false,
+        "Use Rotation?": false,
+        "ShowWorldGrid": false,
+        "Use Detail Texture 1?": true,
+        "Use Detail Texture 2?": false,
+        "Use Roughness Map?": false,
+        "Use Normal Map?": true,
+        "Use Emmisive Map?": false,
+        "Use TeamA ?": false,
+        "Use TeamB?": false,
+        "Pallete1_Accent": false,
+        "Pallete1_Fill": false,
+        "Pallete2_Fill": false,
+        "Pallete2_Accent": false,
+        "TeamA_Light": false,
+        "TeamB_Light": false,
+        "Pallete1_BG": false,
+        "Use Object UVs": false,
+        "Use Detail Texture 1 Normal Map?": false,
+        "Use Team Colors for Emmisive?": false,
+        "TopSurfaceColor": false,
+        "ObjectAligned": false
+      },
+      "blendMode": "BLEND_Opaque",
+      "shadingModel": "MSM_DefaultLit",
+      "twoSided": true,
+      "connectedOutputs": [
+        "EmissiveColor",
+        "BaseColor",
+        "Metallic",
+        "Specular",
+        "Roughness",
+        "Anisotropy",
+        "Normal",
+        "WorldPositionOffset"
+      ],
+      "referencedTextures": [
+        "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
+        "textures/Packs/StarterContent/Textures/T_MacroVariation.png"
+      ],
+      "approx": {
+        "baseColor": [
+          0.361307,
+          0.036889,
+          0.090842
+        ],
+        "metallic": 0.1,
+        "roughness": 0.8,
+        "opacity": 1,
+        "emissive": null,
+        "baseColorTexture": null,
+        "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
+        "ormTexture": null,
+        "keys": {
+          "baseColor": "Base Color",
+          "metallic": "Metallic",
+          "roughness": "Roughness",
+          "opacity": null,
+          "emissive": "Emissive Color",
+          "emissiveIntensity": "Emmisive Intensity",
+          "baseColorTexture": null,
+          "normalTexture": "Normal Map",
+          "ormTexture": null
+        }
+      }
+    },
+    {
       "path": "/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Rough_Yellow.MI_Env_Rough_Yellow",
       "kind": "instance",
       "parent": "/Game/Art/Materials/Environment/Materials/M_Env_Material_Flexible.M_Env_Material_Flexible",
@@ -12181,6 +12945,328 @@
           "ormTexture": null
         }
       }
+    }
+  ],
+  "paint": [
+    {
+      "name": "smooth",
+      "colors": [
+        {
+          "color": "White",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Smooth.MI_Env_White_Smooth'"
+        },
+        {
+          "color": "Black",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Smooth.MI_Env_Dark_Smooth'"
+        },
+        {
+          "color": "Red",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Red_Smooth.MI_Env_Red_Smooth'"
+        },
+        {
+          "color": "Orange",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Orange_Smooth.MI_Env_Orange_Smooth'"
+        },
+        {
+          "color": "Yellow",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Yellow_Smooth.MI_Env_Yellow_Smooth'"
+        },
+        {
+          "color": "Lime",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Lime_Smooth.MI_Env_Lime_Smooth'"
+        },
+        {
+          "color": "Blue",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth'"
+        },
+        {
+          "color": "SkyBlue",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Smooth.MI_Env_SkyBlue_Smooth'"
+        },
+        {
+          "color": "Purple",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Smooth.MI_Env_Purple_Smooth'"
+        },
+        {
+          "color": "Wine",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Wine_Smooth.MI_Env_Wine_Smooth'"
+        }
+      ]
+    },
+    {
+      "name": "rough",
+      "colors": [
+        {
+          "color": "White",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Rough_White.MI_Env_Rough_White'"
+        },
+        {
+          "color": "Black",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Rough_Dark.MI_Env_Rough_Dark'"
+        },
+        {
+          "color": "Red",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Rough_Red.MI_Env_Rough_Red'"
+        },
+        {
+          "color": "Orange",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Rough_Orange.MI_Env_Rough_Orange'"
+        },
+        {
+          "color": "Yellow",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Rough_Yellow.MI_Env_Rough_Yellow'"
+        },
+        {
+          "color": "Lime",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Rough_Lime.MI_Env_Rough_Lime'"
+        },
+        {
+          "color": "Blue",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Rough_Blue.MI_Env_Rough_Blue'"
+        },
+        {
+          "color": "SkyBlue",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Rough_SkyBlue.MI_Env_Rough_SkyBlue'"
+        },
+        {
+          "color": "Purple",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Rough_Purple.MI_Env_Rough_Purple'"
+        },
+        {
+          "color": "Wine",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Rough_Wine.MI_Env_Rough_Wine'"
+        }
+      ]
+    },
+    {
+      "name": "glossy",
+      "colors": [
+        {
+          "color": "White",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Glossy_White.MI_Env_Glossy_White'"
+        },
+        {
+          "color": "Black",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Glossy_Dark.MI_Env_Glossy_Dark'"
+        },
+        {
+          "color": "Red",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Glossy_Red.MI_Env_Glossy_Red'"
+        },
+        {
+          "color": "Orange",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Glossy_Orange.MI_Env_Glossy_Orange'"
+        },
+        {
+          "color": "Yellow",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Glossy_Yellow.MI_Env_Glossy_Yellow'"
+        },
+        {
+          "color": "Lime",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Glossy_Lime.MI_Env_Glossy_Lime'"
+        },
+        {
+          "color": "Blue",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Glossy_Blue.MI_Env_Glossy_Blue'"
+        },
+        {
+          "color": "SkyBlue",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Glossy_SkyBlue.MI_Env_Glossy_SkyBlue'"
+        },
+        {
+          "color": "Purple",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Glossy_Purple.MI_Env_Glossy_Purple'"
+        },
+        {
+          "color": "Wine",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Glossy_Wine.MI_Env_Glossy_Wine'"
+        }
+      ]
+    },
+    {
+      "name": "concrete",
+      "colors": [
+        {
+          "color": "White",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Masters/MI_Concrete.MI_Concrete'"
+        },
+        {
+          "color": "Black",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_AJ/MI_Env_Dark_Concrete.MI_Env_Dark_Concrete'"
+        },
+        {
+          "color": "Red",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_AJ/MI_Env_Red_Concrete.MI_Env_Red_Concrete'"
+        },
+        {
+          "color": "Orange",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_AJ/MI_Env_Orange_Concrete.MI_Env_Orange_Concrete'"
+        },
+        {
+          "color": "Yellow",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_AJ/MI_Env_Yellow_Concrete.MI_Env_Yellow_Concrete'"
+        },
+        {
+          "color": "Lime",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_AJ/MI_Env_Lime_Concrete.MI_Env_Lime_Concrete'"
+        },
+        {
+          "color": "Blue",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_AJ/MI_Env_Blue_Concrete.MI_Env_Blue_Concrete'"
+        },
+        {
+          "color": "SkyBlue",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_AJ/MI_Env_SkyBlue_Concrete.MI_Env_SkyBlue_Concrete'"
+        },
+        {
+          "color": "Purple",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_AJ/MI_Env_Purple_Concrete.MI_Env_Purple_Concrete'"
+        },
+        {
+          "color": "Wine",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_AJ/MI_Env_Wine_Concrete.MI_Env_Wine_Concrete'"
+        }
+      ]
+    },
+    {
+      "name": "tiled",
+      "colors": [
+        {
+          "color": "White",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_White_Tiles.MI_Env_White_Tiles'"
+        },
+        {
+          "color": "Black",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Dark_Tiles.MI_Env_Dark_Tiles'"
+        },
+        {
+          "color": "Red",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Red_Tiles.MI_Env_Red_Tiles'"
+        },
+        {
+          "color": "Orange",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Orange_Tiles.MI_Env_Orange_Tiles'"
+        },
+        {
+          "color": "Yellow",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Yellow_Tiles.MI_Env_Yellow_Tiles'"
+        },
+        {
+          "color": "Lime",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Lime_Tiles.MI_Env_Lime_Tiles'"
+        },
+        {
+          "color": "Blue",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Tiles.MI_Env_Blue_Tiles'"
+        },
+        {
+          "color": "SkyBlue",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_SkyBlue_Tiles.MI_Env_SkyBlue_Tiles'"
+        },
+        {
+          "color": "Purple",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Purple_Tiles.MI_Env_Purple_Tiles'"
+        },
+        {
+          "color": "Wine",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Wine_Tiles.MI_Env_Wine_Tiles'"
+        }
+      ]
+    },
+    {
+      "name": "emissive",
+      "colors": [
+        {
+          "color": "White",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Emissive_White.MI_Env_Emissive_White'"
+        },
+        {
+          "color": "Black",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Emissive_Dark.MI_Env_Emissive_Dark'"
+        },
+        {
+          "color": "Red",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Emissive_Red.MI_Env_Emissive_Red'"
+        },
+        {
+          "color": "Orange",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Emissive_Orange.MI_Env_Emissive_Orange'"
+        },
+        {
+          "color": "Yellow",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Emissive_Yellow.MI_Env_Emissive_Yellow'"
+        },
+        {
+          "color": "Lime",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Emissive_Lime.MI_Env_Emissive_Lime'"
+        },
+        {
+          "color": "Blue",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Emissive_Blue.MI_Env_Emissive_Blue'"
+        },
+        {
+          "color": "SkyBlue",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Emissive_SkyBlue.MI_Env_Emissive_SkyBlue'"
+        },
+        {
+          "color": "Purple",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Emissive_Purple.MI_Env_Emissive_Purple'"
+        },
+        {
+          "color": "Wine",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Emissive_Wine.MI_Env_Emissive_Wine'"
+        }
+      ]
+    },
+    {
+      "name": "special",
+      "colors": [
+        {
+          "color": "Aluminum",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Aluminum.MI_Env_Aluminum'",
+          "displayColor": [
+            0.508881,
+            0.552011,
+            0.571125
+          ]
+        },
+        {
+          "color": "Copper",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Copper.MI_Env_Copper'",
+          "displayColor": [
+            0.434154,
+            0.208637,
+            0.135633
+          ]
+        },
+        {
+          "color": "Iron",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Iron.MI_Env_Iron'",
+          "displayColor": [
+            0.042311,
+            0.057805,
+            0.084376
+          ]
+        },
+        {
+          "color": "Concrete",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_Env_Concrete.MI_Env_Concrete'",
+          "displayColor": [
+            0.337164,
+            0.371238,
+            0.386429
+          ]
+        },
+        {
+          "color": "Grey",
+          "material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_Pipes.MI_Pipes'",
+          "displayColor": [
+            0.107023,
+            0.445201,
+            0.545724
+          ]
+        }
+      ]
     }
   ],
   "textures": [

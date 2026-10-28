@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // usage:
-//   node build-materials.mjs list  WORK ASSETS_DIR  -> WORK/materials.txt (union of sample + catalog materials)
+//   node build-materials.mjs list  WORK ASSETS_DIR  -> WORK/materials.txt (union of sample, catalog and paint materials)
 //   node build-materials.mjs build WORK ASSETS_DIR  -> ASSETS_DIR/materials.json (from WORK/materials-dump.json)
-import { readFileSync, writeFileSync } from "node:fs"
+// Both read WORK/paint-dump.json (the in-game material picker's data assets) when it exists.
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 const [mode, work, assets] = process.argv.slice(2)
@@ -11,6 +12,53 @@ if (!["list", "build"].includes(mode) || !assets) {
   process.exit(2)
 }
 const readJson = (p) => JSON.parse(readFileSync(p, "utf8"))
+// `{ObjectName: "Class'Name'", ObjectPath: "/Game/X/Name.0"}` -> `/Game/X/Name.Name`
+const refPath = (r) => {
+  if (!r?.ObjectName || !r?.ObjectPath) return null
+  const name = r.ObjectName.split("'")[1]?.split(":").pop()
+  return `${r.ObjectPath.slice(0, r.ObjectPath.lastIndexOf("."))}.${name}`
+}
+
+// ------------------------------------------------------------------ paint (in-game picker)
+// The level editor's "Paint" panel: MaterialCategories_Library lists PDA_MaterialCategory
+// assets (smooth, rough, ...); each maps EBallestMaterialColors to one material. Category and
+// colour names come from the enums' display names; the map order is the order the game lists them.
+const PAINT_LIBRARY = "MaterialCategories_Library"
+function paintOf(dump) {
+  const exports = Object.values(dump.packages).flat()
+  const byName = new Map(exports.map((e) => [e.Name, e]))
+  const enumNames = (name) =>
+    new Map((byName.get(name)?.Properties?.DisplayNameMap ?? []).map((kv) => [kv.Key, kv.Value.CultureInvariantString]))
+  const categoryNames = enumNames("EBallestMaterialCategories")
+  const colorNames = enumNames("EBallestMaterialColors")
+  const enumKey = (v) => v?.split("::").pop()
+  const library = byName.get(PAINT_LIBRARY)
+  if (!library) throw new Error(`paint: ${PAINT_LIBRARY} not in the dump`)
+  return library.Properties.BallestMaterialCategories.map((ref) => {
+    const asset = byName.get(ref.ObjectName.split("'")[1])
+    if (!asset) throw new Error(`paint: ${ref.ObjectName} not in the dump`)
+    const p = asset.Properties
+    // An unset byte enum is its first enumerator (MaterialCategory_Smooth stores none).
+    const name = categoryNames.get(enumKey(p.MaterialCategory) ?? "NewEnumerator0")
+    const display = new Map((p.ColorColorMap ?? []).map((kv) => [kv.Key, kv.Value]))
+    return {
+      name,
+      colors: p.ColorMaterialMap.map((kv) => {
+        const cls = kv.Value.ObjectName.split("'")[0]
+        const path = refPath(kv.Value)
+        const shown = display.get(kv.Key)
+        return {
+          color: colorNames.get(enumKey(kv.Key)),
+          // class-qualified, as map files store it
+          material: `/Script/Engine.${cls}'${path}'`,
+          ...(shown ? { displayColor: [shown.R, shown.G, shown.B] } : {})
+        }
+      })
+    }
+  })
+}
+const paintDump = join(work, "paint-dump.json")
+const paint = existsSync(paintDump) ? paintOf(readJson(paintDump)) : null
 
 if (mode === "list") {
   const set = new Set()
@@ -25,6 +73,7 @@ if (mode === "list") {
     for (const x of p.extraMeshes ?? []) slots(x.materialSlots)
   }
   for (const m of cat.meshes) slots(m.materialSlots)
+  for (const c of paint ?? []) for (const { material } of c.colors) add(material.split("'")[1])
   writeFileSync(join(work, "materials.txt"), [...set].sort().join("\n") + "\n")
   console.error(`[materials] ${set.size} referenced materials`)
   process.exit(0)
@@ -33,11 +82,6 @@ if (mode === "list") {
 // ------------------------------------------------------------------ build
 const dump = readJson(join(work, "materials-dump.json"))
 const texPath = (p) => (p && dump.textures[p]?.png ? `textures/${dump.textures[p].png}` : null)
-const refPath = (r) => {
-  if (!r?.ObjectName || !r?.ObjectPath) return null
-  const name = r.ObjectName.split("'")[1]?.split(":").pop()
-  return `${r.ObjectPath.slice(0, r.ObjectPath.lastIndexOf("."))}.${name}`
-}
 const color = (c) => (c ? [c.R, c.G, c.B, c.A ?? 1] : null)
 const strip = (v) => (typeof v === "string" ? v.replace(/^[A-Za-z_]+::/, "") : v)
 
@@ -278,9 +322,11 @@ const out = {
     "vectors are linear RGBA as stored by UE. baseColor/emissive in approx are linear; set three.js colors with Color.setRGB(r,g,b, THREE.LinearSRGBColorSpace) (or the default working space).",
     "approx is a heuristic: cooked UMaterials have no expression graph, so how parameters are combined (UV tiling, detail textures, fresnel, world-aligned textures, vertex colour) is unknown. approx.keys names the parameter each value came from (null = neutral default).",
     "Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).",
-    "UV tiling parameters (UV Scale / UV Tile U,V / Texture Scale X,Y / World Space Scale) are listed in scalars but not applied in approx; several masters use world-aligned or triplanar mapping, so mesh UVs alone will not match the game."
+    "UV tiling parameters (UV Scale / UV Tile U,V / Texture Scale X,Y / World Space Scale) are listed in scalars but not applied in approx; several masters use world-aligned or triplanar mapping, so mesh UVs alone will not match the game.",
+    "paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap)."
   ],
   materials: records,
+  ...(paint ? { paint } : {}),
   textures: texList.sort((a, b) => a.path.localeCompare(b.path))
 }
 writeFileSync(join(assets, "materials.json"), JSON.stringify(out, null, 2) + "\n")
