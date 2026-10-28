@@ -14,6 +14,7 @@ import {
   pasteItems,
   removeItems,
   setLevelNames,
+  setLighting,
   setProperties,
   setSlotMaterials,
   setTransforms,
@@ -30,6 +31,7 @@ import { isPlayerStart, type ItemTransform, type MapFile } from "../domain/MapFi
 import type { MaterialTable } from "../domain/Materials"
 import type { PaintPicker } from "../domain/Paint"
 import { defaultSettings, type Settings } from "../domain/Settings"
+import { type Lighting, lightingOf } from "../domain/sunlight"
 import type { LoadedCatalog } from "../services/CatalogLoader"
 
 import type { GizmoSpace } from "./gizmo/handles"
@@ -121,9 +123,11 @@ export interface EditorState {
   /**
    * Live transforms of the items under a continuous interaction (gizmo drag, number-field
    * scrub), by id. Not in the document until the interaction commits, as one undo step;
-   * undo and redo wait while it is set.
+   * undo and redo wait while it (or lightingPreview) is set.
    */
   readonly preview: ReadonlyMap<string, UeTransform> | null
+  /** Live sun settings while a lighting slider or field is dragged; committed on release. */
+  readonly lightingPreview: Lighting | null
   /** Multiplier on the fly speed, changed by speedFaster/speedSlower. */
   readonly cameraSpeed: number
   /** Bumped to ask the camera to frame the selection / the whole map. */
@@ -172,6 +176,8 @@ export interface EditorState {
    */
   readonly endDuplicateDrag: (transforms: ReadonlyMap<string, UeTransform> | null) => boolean
   readonly renameLevel: (displayName: string, creatorName: string) => void
+  /** Sets the sun (time of day, brightness, yaw) as one undo step; non-finite values are ignored. */
+  readonly setLighting: (lighting: Lighting) => void
   /** Restores the previous snapshot, including its selection. */
   readonly undo: () => void
   readonly redo: () => void
@@ -184,6 +190,7 @@ export interface EditorState {
   readonly setCheatSheet: (cheatSheet: boolean) => void
   readonly setSettingsCategory: (category: SettingsCategory) => void
   readonly setPreview: (preview: EditorState["preview"]) => void
+  readonly setLightingPreview: (lighting: Lighting | null) => void
   readonly setCatalog: (catalog: LoadedCatalog) => void
   readonly finishBoot: () => void
   readonly setMaterials: (table: MaterialTable, paint: PaintPicker) => void
@@ -290,6 +297,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     missingGlbs: new Set(),
     clipboard: null,
     preview: null,
+    lightingPreview: null,
     cameraSpeed: 1,
     focusRequest: 0,
     frameAllRequest: 0,
@@ -436,10 +444,17 @@ export const useEditor = create<EditorState>()((set, get) => {
       commit({ map: setLevelNames(doc.map, displayName, creatorName), ids: doc.ids })
     },
 
+    setLighting: (lighting) => {
+      const { doc } = get()
+      const next = setLighting(doc.map, lighting)
+      if (Option.isNone(next) || sameLighting(lightingOf(doc.map.worldSettings), lighting)) return
+      commit({ map: next.value, ids: doc.ids })
+    },
+
     undo: () =>
       set((s) => {
         const prev = s.past.at(-1)
-        if (prev === undefined || s.preview !== null) return s
+        if (prev === undefined || interacting(s)) return s
         const { current, ...next } = restore(s, prev)
         return { ...next, past: s.past.slice(0, -1), future: [current, ...s.future] }
       }),
@@ -447,7 +462,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     redo: () =>
       set((s) => {
         const following = s.future[0]
-        if (following === undefined || s.preview !== null) return s
+        if (following === undefined || interacting(s)) return s
         const { current, ...next } = restore(s, following)
         return { ...next, past: [...s.past, current].slice(-HISTORY_LIMIT), future: s.future.slice(1) }
       }),
@@ -472,6 +487,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setCheatSheet: (cheatSheet) => set({ cheatSheet }),
     setSettingsCategory: (settingsCategory) => set({ settingsCategory }),
     setPreview: (preview) => set({ preview }),
+    setLightingPreview: (lightingPreview) => set({ lightingPreview }),
     setCatalog: (catalog) => set({ catalog, catalogIndex: indexCatalog(catalog.catalog) }),
     finishBoot: () => set({ booting: false }),
     setMaterials: (materialTable, paint) => set({ materialTable, paint }),
@@ -521,6 +537,12 @@ const sameItemTransform = (before: MapFile, after: MapFile, index: number): bool
     qa.x === qb.x && qa.y === qb.y && qa.z === qb.z && qa.w === qb.w
 }
 
+/** A drag or scrub is showing values that aren't committed yet; undo and redo wait for it. */
+const interacting = (s: EditorState) => s.preview !== null || s.lightingPreview !== null
+
+const sameLighting = (a: Lighting, b: Lighting) =>
+  a.timeOfDay === b.timeOfDay && a.brightness === b.brightness && a.angle === b.angle
+
 const sameSelection = (a: Selection, b: Selection) => a.length === b.length && a.every((id, i) => id === b[i])
 
 /**
@@ -541,6 +563,9 @@ export const selectedIndices = (s: EditorState): Array<number> =>
 
 /** The active (last selected) item's id, if any. */
 export const activeId = (s: EditorState): string | undefined => s.selectedIds.at(-1)
+
+/** The sun as shown: the live preview, else the document. */
+export const shownLighting = (s: EditorState): Lighting => s.lightingPreview ?? lightingOf(s.doc.map.worldSettings)
 
 /** An item's transform as shown: the live preview, else the document. */
 export const shownTransform = (s: EditorState, id: string): UeTransform | undefined =>

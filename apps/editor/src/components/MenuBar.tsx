@@ -153,6 +153,13 @@ export function MenuBar() {
           </MenubarSubContent>
         </MenubarSub>
         <MenubarSeparator />
+        <MenubarCheckboxItem
+          closeOnClick
+          checked={appearance.mapLighting}
+          onCheckedChange={(mapLighting) => void updateSettings("appearance", { mapLighting })}
+        >
+          Map lighting
+        </MenubarCheckboxItem>
         <MenubarSub>
           <MenubarSubTrigger inset>Theme</MenubarSubTrigger>
           <MenubarSubContent>

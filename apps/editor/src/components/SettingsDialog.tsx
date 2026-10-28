@@ -609,6 +609,13 @@ export function SettingsDialog(props: {
         )
       },
       {
+        id: "mapLighting",
+        ...setting("appearance", "mapLighting"),
+        label: "Map lighting",
+        description: "Light the viewport with the map's sun, as set under Lighting. Off: fixed studio lights.",
+        control: <Switch checked={a.mapLighting} onCheckedChange={(v) => update("appearance", { mapLighting: v })} />
+      },
+      {
         id: "gridVisible",
         ...setting("appearance", "gridVisible"),
         label: "Show grid",

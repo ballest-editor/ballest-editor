@@ -38,6 +38,8 @@ export const CameraSettings = Schema.Struct({
 
 export const AppearanceSettings = Schema.Struct({
   theme: Schema.Literals(["dark", "light", "system"]),
+  /** Light the viewport with the map's own sun (time of day, brightness, rotation) instead of fixed studio lights. */
+  mapLighting: Schema.Boolean,
   gridVisible: Schema.Boolean,
   gridCellColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)),
   gridSectionColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)),
@@ -78,6 +80,7 @@ export const defaultSettings: Settings = {
   },
   appearance: {
     theme: "dark",
+    mapLighting: true,
     gridVisible: true,
     gridCellColor: "#3a404a",
     gridSectionColor: "#58606e",

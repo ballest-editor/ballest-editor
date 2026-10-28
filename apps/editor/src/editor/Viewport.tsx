@@ -21,6 +21,7 @@ import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { ItemObject } from "./ItemObject"
 import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
+import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline } from "./selectionOutline"
 import { nextSelection, type SelectMode, useEditor } from "./store"
@@ -324,9 +325,7 @@ export function Viewport(
       >
         <ViewportBackground />
         <SmoothResize />
-        <ambientLight intensity={0.6} />
-        <hemisphereLight args={["#dfe8ff", "#30302a", 0.8]} />
-        <directionalLight position={[3000, 8000, 2000]} intensity={1.6} />
+        <SceneLights />
         <ViewportGrid />
         <Water />
         <MapItems />

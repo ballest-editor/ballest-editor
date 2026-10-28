@@ -33,6 +33,7 @@ import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import { selectedIndices, shownTransform, useEditor } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { ItemProperties } from "./ItemProperties"
+import { LightingSettings } from "./LightingSettings"
 import { ShiftClick } from "./MouseButtonIcon"
 import { NumberField } from "./NumberField"
 import { PaintSection } from "./PaintSection"
@@ -368,8 +369,11 @@ export function Inspector() {
   if (first === undefined) {
     return (
       <ScrollArea className="h-full bg-card">
-        <div className="p-3">
+        <div className="flex flex-col gap-3 p-3">
           <MapSettings />
+          <Separator />
+          <SectionTitle>Lighting</SectionTitle>
+          <LightingSettings />
         </div>
       </ScrollArea>
     )
