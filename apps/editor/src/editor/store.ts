@@ -73,6 +73,8 @@ export interface EditorState {
   /** The open modal dialog; editor keybinds are suspended while one is open. */
   readonly dialog: Dialog | null
   readonly settingsCategory: SettingsCategory
+  /** The keybind cheat sheet: shown while its binding is held. */
+  readonly cheatSheet: boolean
   readonly catalog: LoadedCatalog | null
   /** Lookups over `catalog`, built once per catalog load. */
   readonly catalogIndex: CatalogIndex | null
@@ -118,6 +120,7 @@ export interface EditorState {
   readonly toggleGizmoSpace: () => void
   readonly openDialog: (dialog: Dialog, category?: SettingsCategory) => void
   readonly closeDialog: () => void
+  readonly setCheatSheet: (cheatSheet: boolean) => void
   readonly setSettingsCategory: (category: SettingsCategory) => void
   readonly setPreview: (preview: EditorState["preview"]) => void
   readonly setCatalog: (catalog: LoadedCatalog) => void
@@ -179,6 +182,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     gizmoSpace: "world",
     dialog: null,
     settingsCategory: "general",
+    cheatSheet: false,
     catalog: null,
     catalogIndex: null,
     booting: true,
@@ -296,6 +300,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     toggleGizmoSpace: () => set((s) => ({ gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
     openDialog: (dialog, category) => set((s) => ({ dialog, settingsCategory: category ?? s.settingsCategory })),
     closeDialog: () => set({ dialog: null }),
+    setCheatSheet: (cheatSheet) => set({ cheatSheet }),
     setSettingsCategory: (settingsCategory) => set({ settingsCategory }),
     setPreview: (preview) => set({ preview }),
     setCatalog: (catalog) => set({ catalog, catalogIndex: indexCatalog(catalog.catalog) }),

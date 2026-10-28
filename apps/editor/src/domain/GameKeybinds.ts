@@ -16,8 +16,10 @@ import {
   editorOverrides,
   heldActions,
   type KeybindAction,
+  keybindActionLabels,
   keybindActions,
   type Keybinds,
+  keybindSections,
   uniqueBindings
 } from "./Keybinds"
 import { open } from "./schema"
@@ -329,4 +331,36 @@ export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybi
     ? file.cameraPresets.map((p) => ({ id: p.row, label: p.label, fov: p.fov }))
     : FALLBACK_CAMERA_PRESETS
   return { keybinds: out, naming, fromGame, fellBack, sectionOrder, cameraPresets }
+}
+
+export interface NamedAction {
+  readonly action: KeybindAction
+  readonly section: string
+  readonly label: string
+}
+
+/**
+ * Every action with the section and label to show it under (keybinds.json naming when the
+ * extractor provides it, else the built-in table), ordered by section: ours first in table
+ * order, then the game's in its settings-screen order.
+ */
+export const namedActions = (derived: DerivedKeybinds): ReadonlyArray<NamedAction> => {
+  const tableOrder: ReadonlyArray<string> = keybindSections.map((s) => s.name)
+  const sectionRank = (name: string) => {
+    const ours = tableOrder.indexOf(name)
+    if (ours >= 0) return ours
+    const game = derived.sectionOrder.indexOf(name)
+    return tableOrder.length + (game >= 0 ? game : derived.sectionOrder.length)
+  }
+  return keybindSections
+    .flatMap((section) =>
+      section.actions.map((action): NamedAction => ({
+        action,
+        section: derived.naming.get(action)?.section ?? section.name,
+        label: derived.naming.get(action)?.label ?? keybindActionLabels[action]
+      }))
+    )
+    .map((named, i) => ({ named, i }))
+    .sort((x, y) => sectionRank(x.named.section) - sectionRank(y.named.section) || x.i - y.i)
+    .map(({ named }) => named)
 }

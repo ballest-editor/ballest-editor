@@ -3,7 +3,7 @@ import { Schema } from "effect"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { repoRoot } from "../test/samples"
-import { deriveKeybinds, GameKeybindsFile, mappingDirection, UE_KEY_TO_CODE } from "./GameKeybinds"
+import { deriveKeybinds, GameKeybindsFile, mappingDirection, namedActions, UE_KEY_TO_CODE } from "./GameKeybinds"
 import { defaultKeybinds } from "./Keybinds"
 
 const negate = { type: "InputModifierNegate", settings: { bX: true, bY: true, bZ: true } }
@@ -68,6 +68,22 @@ describe("GameKeybinds", () => {
     assert.strictEqual(fromGame.get("deselect")?.context, "IMC_Universal")
     assert.include(fellBack, "undo")
     assert.include(fellBack, "look")
+  })
+
+  it("names every action once, grouped by section with ours first", () => {
+    const file = Schema.decodeSync(GameKeybindsFile)({
+      sections: [{ name: "racing" }],
+      contexts: [{
+        name: "IMC_FreeCam",
+        mappings: [{ ...m("IA_Height", "SpaceBar"), label: "rise", section: "racing" }]
+      }]
+    })
+    const named = namedActions(deriveKeybinds(file))
+    assert.strictEqual(new Set(named.map((n) => n.action)).size, named.length)
+    assert.deepStrictEqual(named.at(-1), { action: "moveUp", section: "racing", label: "rise" })
+    assert.deepStrictEqual(named[0], { action: "selectMode", section: "level editor", label: "select" })
+    const sections = named.map((n) => n.section)
+    assert.deepStrictEqual(sections, [...sections].sort((a, b) => sections.indexOf(a) - sections.indexOf(b)))
   })
 
   it("takes labels and sections from the file when present", () => {
