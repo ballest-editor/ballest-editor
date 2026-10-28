@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import type { UeTransform, Vec3 } from "./coords"
-import { applyGroupDelta, editAxis, readField, selectionPivot } from "./groupTransform"
+import { applyGroupDelta, editAxis, readField } from "./groupTransform"
 import { rotateVec } from "./ueMath"
 
 const at = (x: number, y: number, z: number, rotation = { x: 0, y: 0, z: 0, w: 1 }): UeTransform => ({
@@ -16,12 +16,6 @@ const expectVec = (actual: Vec3, expected: Vec3) => {
 }
 
 describe("group transforms", () => {
-  it("pivots on the mean of the item origins", () => {
-    expect(selectionPivot([at(0, 0, 0), at(100, 50, 30)])).toEqual({ x: 50, y: 25, z: 15 })
-    expect(selectionPivot([at(7, 8, 9)])).toEqual({ x: 7, y: 8, z: 9 })
-    expect(selectionPivot([])).toBeUndefined()
-  })
-
   it("translates every item by the same offset", () => {
     const out = applyGroupDelta(at(10, 0, 0), { x: 0, y: 0, z: 0 }, {
       kind: "translate",
@@ -39,21 +33,24 @@ describe("group transforms", () => {
     expect(applyGroupDelta(at(0, 0, 0), pivot, { kind: "rotate", rotation: yaw90 }).translation).toEqual(pivot)
   })
 
-  it("scales uniformly about the pivot", () => {
+  it("scales uniformly in place, as the game does: the pivot doesn't move items", () => {
     const out = applyGroupDelta(at(100, 0, 0), { x: 50, y: 0, z: 0 }, { kind: "scale", factor: 2 })
-    expect(out.translation).toEqual({ x: 150, y: 0, z: 0 })
+    expect(out.translation).toEqual({ x: 100, y: 0, z: 0 })
     expect(out.scale3D).toEqual({ x: 2, y: 2, z: 2 })
   })
 
-  it("scales along an axis: spreads positions and stretches the matching local axis", () => {
+  it("scales along each item's own axis, wherever it is and however it's turned", () => {
     const pivot = { x: 0, y: 0, z: 0 }
-    const axisX = { kind: "scale", factor: 3, axis: { x: 1, y: 0, z: 0 } } as const
+    const axisX = { kind: "scale", factor: 3, axis: "x" } as const
     const aligned = applyGroupDelta(at(10, 20, 0), pivot, axisX)
-    expect(aligned.translation).toEqual({ x: 30, y: 20, z: 0 })
+    expect(aligned.translation).toEqual({ x: 10, y: 20, z: 0 })
     expect(aligned.scale3D).toEqual({ x: 3, y: 1, z: 1 })
-    // turned 90 degrees: game X is that item's local Y
-    const turned = applyGroupDelta(at(0, 0, 0, yaw90), pivot, axisX)
-    expectVec(turned.scale3D, { x: 1, y: 3, z: 1 })
+    const turned = applyGroupDelta(at(5, 5, 5, yaw90), pivot, axisX)
+    expect(turned.translation).toEqual({ x: 5, y: 5, z: 5 })
+    expect(turned.scale3D).toEqual({ x: 3, y: 1, z: 1 })
+    // a mirrored item keeps its sign
+    const mirrored = applyGroupDelta({ ...at(0, 0, 0), scale3D: { x: -1, y: 1, z: 1 } }, pivot, axisX)
+    expect(mirrored.scale3D).toEqual({ x: -3, y: 1, z: 1 })
   })
 
   it("never scales to zero", () => {

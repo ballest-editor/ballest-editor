@@ -2,7 +2,7 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import { type Quat4, ueToScene, ueToThreeVector, type UeTransform, type Vec3 } from "../../domain/coords"
-import { applyGroupDelta, selectionPivot } from "../../domain/groupTransform"
+import { applyGroupDelta } from "../../domain/groupTransform"
 import { chordOf } from "../../domain/Keybinds"
 import { transformSelection } from "../actions"
 import { AXIS_COLORS } from "../axisColors"
@@ -15,7 +15,7 @@ import { worldPerPixel } from "./math"
 interface ActiveDrag {
   readonly id: string
   readonly start: DragStart
-  /** Every selected item's transform at drag start, and the pivot they move about. */
+  /** Every selected item's transform at drag start, and the pivot they turn about. */
   readonly startTransforms: ReadonlyMap<string, UeTransform>
   readonly pivot: Vec3
   last: ReadonlyMap<string, UeTransform> | undefined
@@ -40,23 +40,25 @@ const applyToObjects = (transforms: ReadonlyMap<string, UeTransform>) => {
 interface GizmoTarget {
   /** The selected items' shown transforms (live preview, else the document). */
   readonly transforms: ReadonlyMap<string, UeTransform>
-  /** Where the gizmo sits: the selection pivot, in game space. */
+  /** Where the gizmo sits and the selection turns: the active item's origin, in game space. */
   readonly pivot: Vec3
-  /** The active item's rotation (the local scale axes follow it). */
+  /** The active item's rotation: the frame of the local axes. */
   readonly rotation: Quat4
 }
 
-/** What the gizmo acts on: the selected items that are in the scene. */
+/**
+ * What the gizmo acts on: the selected items that are in the scene, framed on the active
+ * (last selected) item like the game's editor.
+ */
 const currentTarget = (): GizmoTarget | undefined => {
   const s = useEditor.getState()
   const transforms = new Map(s.selectedIds.flatMap((id) => {
     const t = shownTransform(s, id)
     return t === undefined || !sceneRegistry.objects.has(id) ? [] : [[id, t] as const]
   }))
-  const pivot = selectionPivot([...transforms.values()])
   const id = activeId(s)
-  const rotation = (id === undefined ? undefined : transforms.get(id)) ?? transforms.values().next().value
-  return pivot === undefined || rotation === undefined ? undefined : { transforms, pivot, rotation: rotation.rotation }
+  const active = (id === undefined ? undefined : transforms.get(id)) ?? transforms.values().next().value
+  return active === undefined ? undefined : { transforms, pivot: active.translation, rotation: active.rotation }
 }
 
 const toWorld = (v: Vec3) => {
@@ -67,7 +69,7 @@ const toWorld = (v: Vec3) => {
 /**
  * Hosts the Blender-style gizmo for the current tool: hover picking, dragging with a live
  * preview (inspector stays in sync), one undo entry per drag, Escape to cancel. The gizmo
- * sits on the selection pivot and a drag moves every selected item together.
+ * sits on the active item and a drag moves every selected item together.
  */
 export function GizmoController() {
   const camera = useThree((s) => s.camera)

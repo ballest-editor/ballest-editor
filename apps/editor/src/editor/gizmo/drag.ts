@@ -1,6 +1,6 @@
 /**
  * Drag math: start state + current pointer -> the GAME-space delta the drag applies to the
- * selection (domain/groupTransform applies it to each item about the pivot). World-space
+ * selection (domain/groupTransform applies it to each item). World-space
  * quantities (rays, axis directions) are only used to measure the pointer; the deltas are
  * converted to game space through coords.ts.
  */
@@ -18,8 +18,7 @@ import {
   planeHit,
   type Px,
   screenAngle,
-  worldAxisAngleToGameQuat,
-  worldDirToGame
+  worldAxisAngleToGameQuat
 } from "./math"
 
 export interface PointerSample {
@@ -35,7 +34,7 @@ export interface DragStart {
   readonly space: GizmoSpace
   /** The active item's rotation at drag start: the frame of the local axes. */
   readonly frameRotation: Quat4
-  /** Selection pivot in world space, and on screen. */
+  /** The pivot (the active item's origin) in world space, and on screen. */
   readonly originWorld: THREE.Vector3
   readonly originPx: Px
   /** Unit vector from the origin toward the camera at drag start. */
@@ -49,7 +48,7 @@ export const dragAxisWorld = (start: DragStart): THREE.Vector3 | undefined =>
     ? start.toCamera.clone()
     : handleWorldDir(start.spec, start.frameRotation, start.space)
 
-/** Grid snapping for translate drags: the step in cm, and the selection pivot (game space) it applies to. */
+/** Grid snapping for translate drags: the step in cm, and the pivot (game space) it applies to. */
 export interface DragGrid {
   readonly size: number
   readonly pivot: Vec3
@@ -95,9 +94,10 @@ export const dragDelta = (start: DragStart, now: PointerSample, grid?: DragGrid)
       return { kind: "rotate", rotation: worldAxisAngleToGameQuat(dir, angle) }
     }
     case "scaleAxis": {
+      // The handle is measured along its world direction, but each item scales its own axis.
       const t = axisParams(start, now, dir)
-      if (t === undefined || Math.abs(t[0]) < 1e-6) return undefined
-      return { kind: "scale", factor: t[1] / t[0], axis: worldDirToGame(dir) }
+      if (t === undefined || Math.abs(t[0]) < 1e-6 || spec.axis === undefined) return undefined
+      return { kind: "scale", factor: t[1] / t[0], axis: spec.axis }
     }
   }
 }

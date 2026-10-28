@@ -106,9 +106,8 @@ export const outlineOf = (geometry: THREE.BufferGeometry): THREE.BufferGeometry 
   return outline
 }
 
-/** Shared by every outline line; one small material for the editor's lifetime. */
-const outlineMaterial = new THREE.LineBasicMaterial({ color: "#ffb020", toneMapped: false })
-outlineMaterial.onBeforeCompile = (shader) => {
+/** Drops smooth edges that aren't on the silhouette and pulls every line toward the eye. */
+const silhouetteShader = (shader: THREE.WebGLProgramParametersWithUniforms) => {
   shader.vertexShader = `attribute vec3 faceNormalA;
 attribute vec3 faceNormalB;
 ${
@@ -125,6 +124,19 @@ ${
   }`
 }
 
+/**
+ * Shared by every outline line; two small materials for the editor's lifetime. The active
+ * item (the one the gizmo and inspector follow) draws lighter, as in Blender.
+ */
+export const OUTLINE_COLORS = { selected: "#ffb020", active: "#ffe08a" } as const
+const silhouetteMaterial = (color: string): THREE.LineBasicMaterial => {
+  const material = new THREE.LineBasicMaterial({ color, toneMapped: false })
+  material.onBeforeCompile = silhouetteShader
+  return material
+}
+const outlineMaterial = silhouetteMaterial(OUTLINE_COLORS.selected)
+const activeOutlineMaterial = silhouetteMaterial(OUTLINE_COLORS.active)
+
 const inverse = new THREE.Matrix4()
 
 /** The outline of one item: add it to the item, then `update` it from that item. Never raycast. */
@@ -134,11 +146,12 @@ export class SelectionOutline extends THREE.Group {
   /**
    * Matches the lines to the meshes under `item` (the outline itself holds no meshes) and
    * places each in `item`'s local space. Cheap enough per frame: glbs load async, so the
-   * caller keeps it fresh.
+   * caller keeps it fresh. `active` picks the lighter colour.
    */
-  update(item: THREE.Object3D): void {
+  update(item: THREE.Object3D, active = false): void {
     item.updateMatrixWorld(true)
     inverse.copy(item.matrixWorld).invert()
+    const material = active ? activeOutlineMaterial : outlineMaterial
     let count = 0
     item.traverse((object) => {
       if (!isMesh(object)) return
@@ -151,6 +164,7 @@ export class SelectionOutline extends THREE.Group {
         this.lines.push(line)
       }
       line.geometry = lines
+      line.material = material
       line.matrix.multiplyMatrices(inverse, object.matrixWorld)
       if (line.parent !== this) this.add(line)
       count++
