@@ -3,7 +3,7 @@
  * written back to the map is in game (UE) space. The two meet only through coords.ts.
  */
 import * as THREE from "three"
-import { type Quat4, threeToUeQuat, threeToUeVector, ueToThreeVector, type Vec3 } from "../../domain/coords"
+import { type Quat4, threeToUeQuat, ueToThreeVector, type Vec3 } from "../../domain/coords"
 import { rotateVec } from "../../domain/ueMath"
 
 export type Axis = "x" | "y" | "z"
@@ -18,7 +18,6 @@ const toThree = (v: Vec3) => new THREE.Vector3(v.x, v.y, v.z)
 
 /** A game-space direction expressed in three.js world space (through the coords mapping). */
 export const gameDirToWorld = (v: Vec3): THREE.Vector3 => toThree(ueToThreeVector(v))
-export const worldDirToGame = (v: THREE.Vector3): Vec3 => threeToUeVector({ x: v.x, y: v.y, z: v.z })
 
 /** World-space direction of a game axis, optionally in the item's local frame (game rotation). */
 export const axisWorldDir = (axis: Axis, localRotation?: Quat4): THREE.Vector3 =>

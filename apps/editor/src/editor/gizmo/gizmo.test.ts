@@ -230,12 +230,12 @@ describe("gizmo drags (game space)", () => {
       expect(Math.abs(rotateVec(outWorld.rotation, { x: 1, y: 0, z: 0 }).y)).toBeLessThan(1e-9)
     })
 
-    it("scales the local axis nearest a world-space handle", () => {
+    it("scales the item's own X from the X handle in either space", () => {
       const s0 = { ...start("s-x", yaw90, undefined, "world"), pointer: pointer(v3(100, 0, 0)) }
-      // world X is the item's local Y after the yaw
+      // the world handle is measured along world X, but the item still scales its own X
       const world = dragTransform(s0, pointer(v3(250, 0, 0)))!.scale3D
-      expect(world.y).toBeCloseTo(2.5, 9)
-      expect([world.x, world.z]).toEqual([1, 1])
+      expect(world.x).toBeCloseTo(2.5, 9)
+      expect([world.y, world.z]).toEqual([1, 1])
       const l0 = { ...start("s-x", yaw90, undefined, "local"), pointer: pointer(gameY.clone().multiplyScalar(100)) }
       const local = dragTransform(l0, pointer(gameY.clone().multiplyScalar(250)))!.scale3D
       expect(local.x).toBeCloseTo(2.5, 9)
