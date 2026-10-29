@@ -29,16 +29,19 @@ function Shortcut({ action }: { readonly action: KeybindAction }) {
 
 /** A menu item that runs the same command as the action's keybind, and shows that keybind. */
 function CommandItem(
-  { action, disabled = false, inset = false, children }: {
+  { action, disabled = false, inset, children }: {
     readonly action: CommandAction
     readonly disabled?: boolean
-    /** Lines the label up with checkbox and radio items in the same menu. */
+    /**
+     * Lines the label up with checkbox and radio items in the same menu. Absent otherwise:
+     * any `data-inset` attribute, even "false", draws the checkmark gutter.
+     */
     readonly inset?: boolean
     readonly children: ReactNode
   }
 ) {
   return (
-    <MenubarItem disabled={disabled} inset={inset} onClick={() => actionCommands[action]()}>
+    <MenubarItem disabled={disabled} {...(inset && { inset })} onClick={() => actionCommands[action]()}>
       {children}
       <Shortcut action={action} />
     </MenubarItem>
