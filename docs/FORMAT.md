@@ -67,6 +67,7 @@ Round-trip: `json.dumps(d, indent='\t', ensure_ascii=False)` with `\n` → `\r\n
 91 distinct `actorToSpawn` classes so far — families: `BP_Prim_*` (cube/cylinder/sphere), `BP_Track_*`, `BP_Ramp_*`, `BP_Pipe_*`, `Bevel_*` (~40 pieces), `MP_*` (glass planes, bowls, air vent, cone, torus…), `BP_Checkpoint`, `MP_ActualCheckpoint_Strip`, `MP_PlayerStart` (required, forbidden in prefabs), `BP_UGCCircuitDecal`.
 Mesh assets referenced from `/Game/Maps/_GENERATED/PC/*` (79 in the pak), materials from `/Game/Art/Materials/*` (`MI_Env_*`, `M_GlassV2`, …).
 Exposed item properties seen: `Field Magnitude`, `EntryAssistMinSpeed`, `QualifiedAirflowTargetSpeed`, `UpperAirflowMultiplier` (air vent), `DecalWidth/Height/Depth`, `DecalStyle`, `bFacingOnly` (decal).
+A class's exposed properties are its CDO's `LevelEditorExposedProperties` (Blueprint variables, so readable from the pak; `catalog.json` `properties`). The game saves every one of them on every item of that class, in that order, split by type into the typed lists (Blueprint `Double`/`Float` → `floatProperties` `"Float"`, `Int` → `intProperties` `"Integer"`, `Bool` → `boolProperties` `"Bool"`). Defaults: air vent 750000 / 800 / 0.25 / 2000; decal 200 × 200 × 100, style 0, `bFacingOnly` true. `LevelEditorHiddenProperties` (the decal's width/height/depth, a rect light's source size) are still saved, just left out of the in-game panel.
 Largest sample: 3750 items ("Ballest Of The Mall").
 
 ## Hard limits (constants recovered from the shipping exe, build 0.4.0-playtest)

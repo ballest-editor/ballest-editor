@@ -80,6 +80,33 @@ const slotsFor = (meshPath, overrides = []) =>
     meshMaterial: s.defaultMaterial
   }))
 
+// Blueprint property type -> the typed list and propertyType the game writes into map files.
+const PROPERTY_KINDS = {
+  BoolProperty: { list: "boolProperties", type: "Bool", zero: false },
+  FloatProperty: { list: "floatProperties", type: "Float", zero: 0 },
+  DoubleProperty: { list: "floatProperties", type: "Float", zero: 0 },
+  IntProperty: { list: "intProperties", type: "Integer", zero: 0 }
+}
+
+// The item properties the level editor exposes, in the game's order, with their defaults.
+// A type with no known list (native, enum, ...) keeps list/type null; the app only shows those.
+const propertiesOf = (cls) => {
+  const props = cls?.levelEditorProperties
+  if (!props) return []
+  const hidden = new Set(props.hidden)
+  return props.exposed.map((p) => {
+    const kind = PROPERTY_KINDS[p.ueType]
+    return {
+      name: p.name,
+      list: kind?.list ?? null,
+      type: kind?.type ?? null,
+      ueType: p.ueType,
+      default: p.default ?? kind?.zero ?? null,
+      hidden: hidden.has(p.name)
+    }
+  })
+}
+
 const pieces = []
 const unresolved = []
 const registry = JSON.parse(readFileSync(join(assets, "registry.json"), "utf8"))
@@ -136,7 +163,8 @@ for (const o of pieceOrder(registry)) {
         materialSlots: slotsFor(m.staticMesh, m.overrideMaterials),
         bounds: meshes.get(m.staticMesh)?.bounds ?? null
       })),
-    sampleProperties: Object.keys(s.propertyNames).sort()
+    sampleProperties: Object.keys(s.propertyNames).sort(),
+    properties: propertiesOf(cls)
   }
   if (cls?.error) piece.classError = cls.error
   if (!meshAssetPath) {
