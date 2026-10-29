@@ -10,6 +10,7 @@ import * as path from "node:path"
 import { listSamples, readSample, repoRoot } from "../test/samples"
 import { Catalog, HIDDEN_SECTION, indexCatalog, paletteSections, unavailableReasonOf, visibleExtras } from "./Catalog"
 import { itemFromPiece, placementTransform, qualifyMaterialPath } from "./factory"
+import { PROPERTY_LISTS } from "./itemProperties"
 import { Item, MapFile, objectPathOf } from "./MapFile"
 
 const catalogPath = path.join(repoRoot, "assets", "catalog.json")
@@ -50,9 +51,25 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
     const sampleVent = sampleItems().find((i) => i.actorToSpawn === vent.classPath)!
     assert.deepStrictEqual(ventItem.meshComponents, sampleVent.meshComponents)
     assert.deepStrictEqual(ventItem.itemTransform.scale3D, sampleVent.itemTransform.scale3D)
+    // the sample vent is unedited: the extracted defaults are exactly what the game saves
+    for (const list of PROPERTY_LISTS) assert.deepStrictEqual(ventItem[list], sampleVent[list])
     assert.isAbove(visibleExtras(vent).length, 0)
     const checkpoint = byName("BP_Checkpoint")
     assert.deepStrictEqual(placementTransform(checkpoint, { x: 0, y: 0, z: 0 }).scale3D, { x: 1.5, y: 1.5, z: 1.5 })
+  })
+
+  it("lists the properties sample items carry, in the order the game writes them", () => {
+    const { pieceByClass } = indexCatalog(load())
+    const names = (entries: ReadonlyArray<{ readonly propertyName: string }>) => entries.map((p) => p.propertyName)
+    for (const item of sampleItems()) {
+      const known = pieceByClass.get(item.actorToSpawn)?.properties ?? []
+      for (const list of PROPERTY_LISTS) {
+        assert.deepStrictEqual(names(item[list]), known.filter((p) => p.list === list).map((p) => p.name))
+        for (const entry of item[list]) {
+          assert.strictEqual(entry.propertyType, known.find((p) => p.name === entry.propertyName)?.type)
+        }
+      }
+    }
   })
 
   it("groups the palette in the in-game category order, then Hidden; unresolved pieces are unavailable", () => {
