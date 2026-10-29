@@ -128,7 +128,7 @@ Piece = {
   extraMeshes: [{ name, meshAssetPath, glb, visible, hiddenInGame,
                   transformRelativeToMain: {location, quat, scale}, materialSlots, bounds }]
   sampleProperties     // "propertyName:type" pairs seen in samples
-  properties: [{ name, list, type, ueType, default, hidden }]
+  properties: [{ name, list, type, ueType, default, hidden, source }]
                        // the CDO's LevelEditorExposedProperties, in order: list/type are where and how
                        // map files store it ("floatProperties"/"Float", "intProperties"/"Integer",
                        // "boolProperties"/"Bool"; null for other Blueprint types), default is the CDO
@@ -137,7 +137,7 @@ Piece = {
 }
 ```
 
-**`properties` (7 pieces):** the air vent, the circuit decal and five light classes. Every sample item's properties match these names, lists and order, and an unedited sample air vent carries exactly these defaults.
+**`properties`:** where the CDO lists `LevelEditorExposedProperties` (the air vent, the circuit decal, five light classes) they come from there (`source: "cdo"`). Some classes expose properties from native code instead (the shape decal, the light cards): for those the names, lists and order are the ones the game wrote into the samples, and the defaults are the Blueprint variables' CDO values (`source: "samples"`; the class's `variables` in `classes.json`). Every sample item's properties match these names, lists and order, and unedited sample items carry exactly these defaults.
 
 **Piece order:** palette order first, category by category, following `DT_MapItems` rows and the items within each. Then the 100 registry-only ("hidden") items, alphabetically.
 

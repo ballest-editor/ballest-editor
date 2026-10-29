@@ -68,7 +68,14 @@ Round-trip: `json.dumps(d, indent='\t', ensure_ascii=False)` with `\n` → `\r\n
 Mesh assets referenced from `/Game/Maps/_GENERATED/PC/*` (79 in the pak), materials from `/Game/Art/Materials/*` (`MI_Env_*`, `M_GlassV2`, …).
 Exposed item properties seen: `Field Magnitude`, `EntryAssistMinSpeed`, `QualifiedAirflowTargetSpeed`, `UpperAirflowMultiplier` (air vent), `DecalWidth/Height/Depth`, `DecalStyle`, `bFacingOnly` (decal).
 A class's exposed properties are its CDO's `LevelEditorExposedProperties` (Blueprint variables, so readable from the pak; `catalog.json` `properties`). The game saves every one of them on every item of that class, in that order, split by type into the typed lists (Blueprint `Double`/`Float` → `floatProperties` `"Float"`, `Int` → `intProperties` `"Integer"`, `Bool` → `boolProperties` `"Bool"`). Defaults: air vent 750000 / 800 / 0.25 / 2000; decal 200 × 200 × 100, style 0, `bFacingOnly` true. `LevelEditorHiddenProperties` (the decal's width/height/depth, a rect light's source size) are still saved, just left out of the in-game panel.
-Largest sample: 3750 items ("Ballest Of The Mall").
+
+Not every class lists them in its CDO. The probe map `samples/UserSavedMaps/...props probe...` (one of each hidden piece with Blueprint variables, loaded and saved in game on 2026-10-28) showed:
+
+- `BP_UGCShapeDecal` (17) and `MP_LightCard_01`–`04` (9, or 10 for card 04) are saved with properties although their CDOs have no exposed list: native code exposes the class's own bool/int/double variables, in declaration order. Their defaults match the CDO values exactly. The shape decal's `LevelEditorHiddenProperties` still applies.
+- `MP_LaserTerminal`, `MP_BoostPlatform/Ring/Volume`, `MP_PinballLauncher` and `MP_PinballPaddle` have editable Blueprint variables (laser radii and brightness, `BoostMagnitude`, ...) but are saved with no properties and show none in the in-game panel.
+- `DecalStyle` (circuit decal) is a dropdown in game: 0 = Arrow, 1 = scratch marks, 2 = Stripes. The labels come from native code (`GetStyleDisplayNames`) and aren't in the pak, the locres or the exe's strings; each style is a pair of decal materials (`BallestUGCCircuitDecalMaterialOption`: `NormalMaterial`, `FacingOnlyMaterial`).
+- In the saved file every item except the two floors sat 170–400 cm higher than written (z only; the player start went from 0 to 170). Not yet explained: it may be the editor settling items onto the ground on load.
+  Largest sample: 3750 items ("Ballest Of The Mall").
 
 ## Hard limits (constants recovered from the shipping exe, build 0.4.0-playtest)
 

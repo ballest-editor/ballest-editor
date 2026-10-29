@@ -345,6 +345,8 @@ public static partial class Program
     // CDO's default. Unversioned serialization omits values equal to the zero default,
     // so a missing default means 0 / false; `declaredIn` null means a native property
     // whose type and default the foreign .usmap can't give.
+    // `variables`: every bool/int/float/double Blueprint variable with its CDO default,
+    // for classes whose exposed list lives in native code (shape decal, light cards).
     static JObject LevelEditorProperties(List<UBlueprintGeneratedClass> chain)
     {
         var defaults = new JObject();
@@ -374,6 +376,15 @@ public static partial class Program
                 };
             })),
             ["hidden"] = Names("LevelEditorHiddenProperties").DeepClone(),
+            ["variables"] = new JArray(types
+                .Where(t => t.Value.Type is "BoolProperty" or "IntProperty" or "FloatProperty" or "DoubleProperty")
+                .Select(t => new JObject
+                {
+                    ["name"] = t.Key,
+                    ["ueType"] = t.Value.Type,
+                    ["declaredIn"] = t.Value.Owner,
+                    ["default"] = defaults[t.Key]?.DeepClone(),
+                })),
         };
     }
 

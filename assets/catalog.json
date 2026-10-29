@@ -5198,7 +5198,7 @@
           1000
         ]
       },
-      "seenInSamples": 1650,
+      "seenInSamples": 1652,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
       "mainRelativeTransform": {
@@ -5753,7 +5753,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 750000,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "EntryAssistMinSpeed",
@@ -5761,7 +5762,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 800,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "UpperAirflowMultiplier",
@@ -5769,7 +5771,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 0.25,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "QualifiedAirflowTargetSpeed",
@@ -5777,7 +5780,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 2000,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         }
       ],
       "note": "Main component has no mesh; visuals come from extraMeshes"
@@ -6739,7 +6743,7 @@
       "glb": null,
       "materialSlots": [],
       "bounds": null,
-      "seenInSamples": 1,
+      "seenInSamples": 4,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Engine/BasicShapes/Sphere.Sphere",
       "mainRelativeTransform": {
@@ -6820,7 +6824,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 200,
-          "hidden": true
+          "hidden": true,
+          "source": "cdo"
         },
         {
           "name": "DecalHeight",
@@ -6828,7 +6833,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 200,
-          "hidden": true
+          "hidden": true,
+          "source": "cdo"
         },
         {
           "name": "DecalDepth",
@@ -6836,7 +6842,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 100,
-          "hidden": true
+          "hidden": true,
+          "source": "cdo"
         },
         {
           "name": "DecalStyle",
@@ -6844,7 +6851,8 @@
           "type": "Integer",
           "ueType": "IntProperty",
           "default": 0,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "bFacingOnly",
@@ -6852,7 +6860,8 @@
           "type": "Bool",
           "ueType": "BoolProperty",
           "default": true,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         }
       ],
       "note": "Main component has no mesh; visuals come from extraMeshes"
@@ -11347,9 +11356,9 @@
       "glb": null,
       "materialSlots": [],
       "bounds": null,
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Engine/BasicShapes/Sphere.Sphere",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -11414,8 +11423,180 @@
           }
         }
       ],
-      "sampleProperties": [],
-      "properties": [],
+      "sampleProperties": [
+        "DecalBlue:Float",
+        "DecalDepth:Float",
+        "DecalEmissiveIntensity:Float",
+        "DecalFillEdgeSoftness:Float",
+        "DecalFillType:Integer",
+        "DecalGreen:Float",
+        "DecalHeight:Float",
+        "DecalRed:Float",
+        "DecalRoughness:Float",
+        "DecalSDFSize:Float",
+        "DecalShapeType:Integer",
+        "DecalSpecular:Float",
+        "DecalTileCount:Integer",
+        "DecalTileSpacing:Float",
+        "DecalWidth:Float",
+        "bDecalEnabled:Bool",
+        "bDecalUseEmissive:Bool"
+      ],
+      "properties": [
+        {
+          "name": "bDecalEnabled",
+          "list": "boolProperties",
+          "type": "Bool",
+          "ueType": "BoolProperty",
+          "default": true,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "bDecalUseEmissive",
+          "list": "boolProperties",
+          "type": "Bool",
+          "ueType": "BoolProperty",
+          "default": false,
+          "hidden": true,
+          "source": "samples"
+        },
+        {
+          "name": "DecalWidth",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 200,
+          "hidden": true,
+          "source": "samples"
+        },
+        {
+          "name": "DecalHeight",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 200,
+          "hidden": true,
+          "source": "samples"
+        },
+        {
+          "name": "DecalDepth",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 100,
+          "hidden": true,
+          "source": "samples"
+        },
+        {
+          "name": "DecalRed",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalGreen",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalBlue",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalTileSpacing",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalSDFSize",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalFillEdgeSoftness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalEmissiveIntensity",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalRoughness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": true,
+          "source": "samples"
+        },
+        {
+          "name": "DecalSpecular",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0,
+          "hidden": true,
+          "source": "samples"
+        },
+        {
+          "name": "DecalShapeType",
+          "list": "intProperties",
+          "type": "Integer",
+          "ueType": "IntProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalFillType",
+          "list": "intProperties",
+          "type": "Integer",
+          "ueType": "IntProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalTileCount",
+          "list": "intProperties",
+          "type": "Integer",
+          "ueType": "IntProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        }
+      ],
       "note": "Main component has no mesh; visuals come from extraMeshes"
     },
     {
@@ -12024,9 +12205,9 @@
           10
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Game/Core/Physics/Actors/Boosters/Meshes/SM_BostPlatform.SM_BostPlatform",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12091,9 +12272,9 @@
           25
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/Meshes/SM_Hole.SM_Hole",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12146,9 +12327,9 @@
           128
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Engine/EngineMeshes/Cube.Cube",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12239,9 +12420,9 @@
           28.125
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Game/Art/VFX/Lasers/SM_LaserTerminal.SM_LaserTerminal",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12294,9 +12475,9 @@
           0
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Engine/EngineVolumetrics/LightBeam/Mesh/S_EV_SimpleLightBeam_01.S_EV_SimpleLightBeam_01",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12315,8 +12496,100 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": [],
-      "properties": []
+      "sampleProperties": [
+        "LightBrightness:Float",
+        "LightColorB:Float",
+        "LightColorG:Float",
+        "LightColorR:Float",
+        "LightFalloffPower:Float",
+        "LightIntersectionFadeDistance:Float",
+        "LightIntersectionFadeStrength:Float",
+        "LightNearFadeDistance:Float",
+        "LightOpacity:Float"
+      ],
+      "properties": [
+        {
+          "name": "LightColorR",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorG",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorB",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightBrightness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightOpacity",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.25,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightNearFadeDistance",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 400,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightFalloffPower",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightIntersectionFadeDistance",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 100,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightIntersectionFadeStrength",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        }
+      ]
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/LightCards/MP_LightCard_02.MP_LightCard_02_C'",
@@ -12349,9 +12622,9 @@
           0
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Game/Art/Props/Lights/S_EV_SimpleLightBeam_03.S_EV_SimpleLightBeam_03",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12370,8 +12643,100 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": [],
-      "properties": []
+      "sampleProperties": [
+        "LightBrightness:Float",
+        "LightColorB:Float",
+        "LightColorG:Float",
+        "LightColorR:Float",
+        "LightFalloffPower:Float",
+        "LightIntersectionFadeDistance:Float",
+        "LightIntersectionFadeStrength:Float",
+        "LightNearFadeDistance:Float",
+        "LightOpacity:Float"
+      ],
+      "properties": [
+        {
+          "name": "LightColorR",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorG",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorB",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightBrightness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightOpacity",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.25,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightNearFadeDistance",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 400,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightFalloffPower",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightIntersectionFadeDistance",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 100,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightIntersectionFadeStrength",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        }
+      ]
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/LightCards/MP_LightCard_03.MP_LightCard_03_C'",
@@ -12404,9 +12769,9 @@
           100
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Game/Packs/StarterContent/Shapes/Shape_Sphere.Shape_Sphere",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12425,8 +12790,100 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": [],
-      "properties": []
+      "sampleProperties": [
+        "LightBrightness:Float",
+        "LightColorB:Float",
+        "LightColorG:Float",
+        "LightColorR:Float",
+        "LightFalloffPower:Float",
+        "LightIntersectionFadeDistance:Float",
+        "LightIntersectionFadeStrength:Float",
+        "LightNearFadeDistance:Float",
+        "LightOpacity:Float"
+      ],
+      "properties": [
+        {
+          "name": "LightColorR",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorG",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorB",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightBrightness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 4,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightOpacity",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.25,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightNearFadeDistance",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 800,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightFalloffPower",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightIntersectionFadeDistance",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 500,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightIntersectionFadeStrength",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        }
+      ]
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/LightCards/MP_LightCard_04.MP_LightCard_04_C'",
@@ -12459,9 +12916,9 @@
           100
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Game/Packs/StarterContent/Shapes/Shape_Cube.Shape_Cube",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12480,8 +12937,110 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": [],
-      "properties": []
+      "sampleProperties": [
+        "LightBrightness:Float",
+        "LightColorB:Float",
+        "LightColorG:Float",
+        "LightColorR:Float",
+        "LightDensity:Float",
+        "LightEdgeSoftness:Float",
+        "LightEndFadeStart:Float",
+        "LightSoftnessGrowth:Float",
+        "LightSourceHeight:Float",
+        "LightSourceWidth:Float"
+      ],
+      "properties": [
+        {
+          "name": "LightColorR",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorG",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.95,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorB",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.85,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightBrightness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 2,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightDensity",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.001,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightEdgeSoftness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.12,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightSoftnessGrowth",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.12,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightEndFadeStart",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.7,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightSourceWidth",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.35,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightSourceHeight",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.2,
+          "hidden": false,
+          "source": "samples"
+        }
+      ]
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Signage/MP_OrangeSign.MP_OrangeSign_C'",
@@ -12598,9 +13157,9 @@
           150
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Game/Core/Physics/Actors/Projectors/PinballLauncher/Meshes/SM_PinballProjector.SM_PinballProjector",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12635,7 +13194,7 @@
       "glb": null,
       "materialSlots": [],
       "bounds": null,
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": null,
       "mainRelativeTransform": {
@@ -12788,7 +13347,7 @@
           199.9842
         ]
       },
-      "seenInSamples": 22,
+      "seenInSamples": 23,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_Start_Fixed.SM_Start_Fixed",
       "mainRelativeTransform": {
@@ -13008,7 +13567,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1000,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightRed",
@@ -13016,7 +13576,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightGreen",
@@ -13024,7 +13585,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightBlue",
@@ -13032,7 +13594,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "bLightCastsShadows",
@@ -13040,7 +13603,8 @@
           "type": "Bool",
           "ueType": "BoolProperty",
           "default": true,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         }
       ]
     },
@@ -13150,7 +13714,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1000,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightRed",
@@ -13158,7 +13723,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightGreen",
@@ -13166,7 +13732,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightBlue",
@@ -13174,7 +13741,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "bLightCastsShadows",
@@ -13182,7 +13750,8 @@
           "type": "Bool",
           "ueType": "BoolProperty",
           "default": true,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         }
       ]
     },
@@ -13292,7 +13861,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1000,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightRed",
@@ -13300,7 +13870,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightGreen",
@@ -13308,7 +13879,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightBlue",
@@ -13316,7 +13888,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "bLightCastsShadows",
@@ -13324,7 +13897,8 @@
           "type": "Bool",
           "ueType": "BoolProperty",
           "default": true,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightSourceWidth",
@@ -13332,7 +13906,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 100,
-          "hidden": true
+          "hidden": true,
+          "source": "cdo"
         },
         {
           "name": "LightSourceHeight",
@@ -13340,7 +13915,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 100,
-          "hidden": true
+          "hidden": true,
+          "source": "cdo"
         }
       ]
     },
@@ -13450,7 +14026,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1000,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightRed",
@@ -13458,7 +14035,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightGreen",
@@ -13466,7 +14044,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightBlue",
@@ -13474,7 +14053,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "bLightCastsShadows",
@@ -13482,7 +14062,8 @@
           "type": "Bool",
           "ueType": "BoolProperty",
           "default": true,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightInnerConeAngle",
@@ -13490,7 +14071,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 20,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightOuterConeAngle",
@@ -13498,7 +14080,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 45,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         }
       ]
     },
@@ -13743,7 +14326,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1000,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightRed",
@@ -13751,7 +14335,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightGreen",
@@ -13759,7 +14344,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightBlue",
@@ -13767,7 +14353,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 1,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "bLightCastsShadows",
@@ -13775,7 +14362,8 @@
           "type": "Bool",
           "ueType": "BoolProperty",
           "default": true,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightInnerConeAngle",
@@ -13783,7 +14371,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 20,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         },
         {
           "name": "LightOuterConeAngle",
@@ -13791,7 +14380,8 @@
           "type": "Float",
           "ueType": "DoubleProperty",
           "default": 45,
-          "hidden": false
+          "hidden": false,
+          "source": "cdo"
         }
       ]
     }

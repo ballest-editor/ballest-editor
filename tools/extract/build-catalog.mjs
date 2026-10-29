@@ -89,21 +89,34 @@ const PROPERTY_KINDS = {
 }
 
 // The item properties the level editor exposes, in the game's order, with their defaults.
+// Most classes list them in their CDO (LevelEditorExposedProperties). Some (the shape decal,
+// the light cards) expose them from native code instead; for those, the properties the game
+// wrote into the samples give the names and order, and the Blueprint variables the defaults.
 // A type with no known list (native, enum, ...) keeps list/type null; the app only shows those.
-const propertiesOf = (cls) => {
+const propertiesOf = (cls, sample) => {
   const props = cls?.levelEditorProperties
   if (!props) return []
   const hidden = new Set(props.hidden)
-  return props.exposed.map((p) => {
+  const variables = new Map((props.variables ?? []).map((v) => [v.name, v]))
+  const entry = (p, source) => {
     const kind = PROPERTY_KINDS[p.ueType]
     return {
       name: p.name,
       list: kind?.list ?? null,
       type: kind?.type ?? null,
-      ueType: p.ueType,
+      ueType: p.ueType ?? null,
       default: p.default ?? kind?.zero ?? null,
-      hidden: hidden.has(p.name)
+      hidden: hidden.has(p.name),
+      source
     }
+  }
+  if (props.exposed.length > 0) return props.exposed.map((p) => entry(p, "cdo"))
+  return (sample?.properties ?? []).map((p) => {
+    const variable = variables.get(p.name)
+    const built = entry({ name: p.name, ueType: variable?.ueType, default: variable?.default }, "samples")
+    // the game's own list and type win; a mismatch with the Blueprint drops the default
+    const agrees = built.list === p.list && built.type === p.type
+    return { ...built, list: p.list, type: p.type, default: agrees ? built.default : null }
   })
 }
 
@@ -164,7 +177,7 @@ for (const o of pieceOrder(registry)) {
         bounds: meshes.get(m.staticMesh)?.bounds ?? null
       })),
     sampleProperties: Object.keys(s.propertyNames).sort(),
-    properties: propertiesOf(cls)
+    properties: propertiesOf(cls, s)
   }
   if (cls?.error) piece.classError = cls.error
   if (!meshAssetPath) {
