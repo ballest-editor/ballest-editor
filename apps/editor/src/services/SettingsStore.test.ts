@@ -20,6 +20,18 @@ describe("Settings", () => {
     assert.deepStrictEqual(mergeSettings("nope"), defaultSettings)
   })
 
+  it("carries undoSelection over from general to editor in older saves", () => {
+    assert.isTrue(mergeSettings({ general: { undoSelection: true } }).editor.undoSelection)
+    assert.isFalse(
+      mergeSettings({ general: { undoSelection: true }, editor: { undoSelection: false } }).editor.undoSelection
+    )
+    assert.strictEqual(mergeSettings({ editor: { placeDistance: 4000 } }).editor.placeDistance, 4000)
+    assert.strictEqual(
+      mergeSettings({ editor: { placeDistance: 50 } }).editor.placeDistance,
+      defaultSettings.editor.placeDistance
+    )
+  })
+
   it("uses the game's FOV presets (horizontal) converted to three's vertical FOV", () => {
     const presets = FALLBACK_CAMERA_PRESETS
     const withPreset = (fovPreset: string, customFov = 90) => ({

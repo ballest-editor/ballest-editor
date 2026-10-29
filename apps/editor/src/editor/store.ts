@@ -66,7 +66,7 @@ export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
 export type Tool = "select" | "translate" | "rotate" | "scale"
 export type Dialog = "new" | "export" | "settings" | "project"
-export type SettingsCategory = "general" | "camera" | "keybinds" | "appearance"
+export type SettingsCategory = "general" | "editor" | "camera" | "keybinds" | "appearance"
 
 const HISTORY_LIMIT = 200
 const SPEED_STEPS = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
@@ -181,7 +181,7 @@ export interface EditorState {
   /** Restores the previous snapshot, including its selection. */
   readonly undo: () => void
   readonly redo: () => void
-  /** Changes the selection; its own undo step when settings.general.undoSelection is on. */
+  /** Changes the selection; its own undo step when settings.editor.undoSelection is on. */
   readonly select: (ids: Selection) => void
   readonly setTool: (tool: Tool) => void
   readonly toggleGizmoSpace: () => void
@@ -470,7 +470,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       set((s) => {
         const selectedIds = [...new Set(ids)]
         if (sameSelection(selectedIds, s.selectedIds)) return s
-        if (!s.settings.general.undoSelection) return { selectedIds }
+        if (!s.settings.editor.undoSelection) return { selectedIds }
         const step: Snapshot = {
           doc: s.doc,
           selectedIds: s.selectedIds,

@@ -1,4 +1,4 @@
-import { IconCamera, IconKeyboard, IconPalette, IconPlus, IconSettings, IconX } from "@tabler/icons-react"
+import { IconCamera, IconKeyboard, IconPalette, IconPencil, IconPlus, IconSettings, IconX } from "@tabler/icons-react"
 import { Input } from "@workspace/ui/components/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Slider } from "@workspace/ui/components/slider"
@@ -44,6 +44,7 @@ const movementLookDescriptions = {
 
 const CATEGORIES: ReadonlyArray<SettingsCategoryInfo<SettingsCategory>> = [
   { id: "general", label: "General", icon: IconSettings },
+  { id: "editor", label: "Editor", icon: IconPencil },
   { id: "camera", label: "Camera", icon: IconCamera },
   { id: "keybinds", label: "Keybinds", icon: IconKeyboard },
   { id: "appearance", label: "Appearance", icon: IconPalette }
@@ -313,18 +314,6 @@ export function SettingsDialog(props: {
         )
       },
       {
-        id: "undoSelection",
-        ...setting("general", "undoSelection"),
-        label: "Undo selection changes",
-        description: "Make every selection change its own undo step.",
-        control: (
-          <Switch
-            checked={settings.general.undoSelection}
-            onCheckedChange={(v) => update("general", { undoSelection: v })}
-          />
-        )
-      },
-      {
         id: "altDragDuplicates",
         ...setting("general", "altDragDuplicates"),
         label: "Alt+drag duplicates",
@@ -345,6 +334,44 @@ export function SettingsDialog(props: {
         disabled: true,
         changes: { modified: false, reset: () => {} },
         control: <Switch disabled checked={false} />
+      },
+      {
+        id: "placeDistance",
+        ...setting("editor", "placeDistance"),
+        label: "Placement distance",
+        description:
+          "How far from the camera a new piece lands when the floor is further away or out of sight. Pieces too wide to fit at this distance go further out.",
+        control: (
+          <>
+            <Slider
+              className="w-48"
+              min={500}
+              max={10000}
+              step={100}
+              largeStep={1000}
+              value={settings.editor.placeDistance}
+              onValueChange={(v) => {
+                const placeDistance = sliderValue(v)
+                if (placeDistance !== undefined) update("editor", { placeDistance })
+              }}
+            />
+            <span className="w-20 text-right font-mono text-xs tabular-nums">
+              {(settings.editor.placeDistance / 100).toFixed(0)} m
+            </span>
+          </>
+        )
+      },
+      {
+        id: "undoSelection",
+        ...setting("editor", "undoSelection"),
+        label: "Undo selection changes",
+        description: "Make every selection change its own undo step.",
+        control: (
+          <Switch
+            checked={settings.editor.undoSelection}
+            onCheckedChange={(v) => update("editor", { undoSelection: v })}
+          />
+        )
       },
       {
         id: "fov",
