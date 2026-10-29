@@ -1,7 +1,7 @@
 /**
  * The game's sky as a three.js material (see domain/sky for where each term comes from).
- * One material draws the visible dome, with the sun disc and stars, cut off below the grid
- * (`uClipY`) so the theme's background shows under it; a second, `capture`,
+ * One material draws the visible dome, with the sun disc and stars, fading out just above the
+ * grid (`uClipY`) so the theme's background shows under it; a second, `capture`,
  * draws the same sky without the sun and with a dim ground, for the environment map the
  * scene is lit by (the game's sky light is a real-time capture of this sky).
  */
@@ -14,6 +14,9 @@ import { type Sky, SKY_GAIN, SUN_RADIUS } from "../domain/sky"
  * cut at the grid's height, the sky then starts where the grid ends.
  */
 export const SKY_DOME_RADIUS = 60_000
+
+/** How far above the grid's height (on the dome, cm) the sky fades in: about 12° of elevation, a soft edge without aliasing. */
+const SKY_FADE_HEIGHT = SKY_DOME_RADIUS * 0.2
 
 /** Exposure on the visible sky; the game's auto exposure has no counterpart here. */
 const SKY_EXPOSURE = 1.6
@@ -57,14 +60,18 @@ void main() {
   float up = clamp( d.y, 0.0, 1.0 );
   float f = 1.0 - up <= 1e-7 ? 0.0 : clamp( pow( 1.0 - up, uFalloff ), 0.0, 1.0 );
   vec3 color = mix( uZenith + uStars * 0.5 * ballestStars( d ), uHorizon, f );
+  float alpha = 1.0;
   #ifdef BALLEST_CAPTURE
     color = d.y < 0.0 ? uGround : color;
   #else
-    // Where this direction meets the dome, from the exact direction (not the faceted mesh).
-    if ( cameraPosition.y + d.y * ${SKY_DOME_RADIUS.toFixed(1)} < uClipY ) discard;
+    // How far above the grid's height this direction meets the dome (from the exact
+    // direction, not the faceted mesh); the sky fades in over SKY_FADE_HEIGHT from there.
+    float above = cameraPosition.y + d.y * ${SKY_DOME_RADIUS.toFixed(1)} - uClipY;
+    alpha = smoothstep( 0.0, ${SKY_FADE_HEIGHT.toFixed(1)}, above );
+    if ( alpha <= 0.0 ) discard;
     color += uSun * clamp( 1.0 - abs( dot( d, uToSun ) - 1.0 ) / ${SUN_RADIUS.toFixed(6)}, 0.0, 1.0 );
   #endif
-  gl_FragColor = vec4( color * uGain, 1.0 );
+  gl_FragColor = vec4( color * uGain, alpha );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
@@ -79,11 +86,16 @@ const skyUniforms = (capture: boolean) => ({
   uStars: { value: 0 },
   uGain: { value: capture ? SKY_GAIN : SKY_GAIN * SKY_EXPOSURE },
   uGround: { value: new THREE.Color() },
-  /** World height (scene units) below which the visible dome isn't drawn. */
+  /** World height (scene units) where the visible dome has faded out. */
   uClipY: { value: -Infinity }
 })
 
-/** The sky from inside a sphere: drawn first and behind everything (no depth). */
+/**
+ * The sky from inside a sphere: drawn first and behind everything (no depth). The visible
+ * dome blends its fade onto the clear colour with custom blending, which three applies in the
+ * opaque pass (a transparent material would be drawn after the pieces), and leaves the
+ * canvas's alpha as it is.
+ */
 export class SkyMaterial extends THREE.ShaderMaterial {
   readonly sky: ReturnType<typeof skyUniforms>
 
@@ -99,6 +111,13 @@ export class SkyMaterial extends THREE.ShaderMaterial {
       depthWrite: false
     })
     this.sky = sky
+    if (!capture) {
+      this.blending = THREE.CustomBlending
+      this.blendSrc = THREE.SrcAlphaFactor
+      this.blendDst = THREE.OneMinusSrcAlphaFactor
+      this.blendSrcAlpha = THREE.ZeroFactor
+      this.blendDstAlpha = THREE.OneFactor
+    }
     // three tone-maps the visible dome; the capture stays linear for lighting.
     this.toneMapped = !capture
   }
