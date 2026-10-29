@@ -5,15 +5,14 @@
 // and the output.
 import type { Leaf } from "./dxil.ts"
 import { nameOf } from "./json.ts"
-import { type Merged, paramValueOf, type Rgba } from "./params.ts"
-import { slotValue } from "./preshader.ts"
-import type { MaterialShaders } from "./shaders.ts"
+import { materialParams, type Merged, type Rgba } from "./params.ts"
+import type { MaterialShaders, MaterialSurface } from "./shaders.ts"
 
 export type Projection = "uv" | "object" | "world"
 export type Role = "color" | "normal" | "orm" | "variation" | "opacity" | "mask"
 
 /** The surface shaders.json evaluated for the material's own parameters. */
-export type Surface = NonNullable<MaterialShaders["surface"]>
+export type Surface = MaterialSurface
 
 export interface Read {
   readonly texture: string
@@ -75,19 +74,9 @@ export const sourceOf = (sh: MaterialShaders, leaf: Leaf): Source | undefined =>
   return best
 }
 
-/** A constant-buffer ref (`cb3[2].w`) -> its value through the preshader slot table and the merged parameters. */
-const paramOf = (sh: MaterialShaders, merged: Merged, ref: string): number | undefined => {
-  const buffer = sh.materialBuffer
-  if (buffer === null || !ref.startsWith(buffer + "[")) return undefined
-  const slot = sh.slots.find((s) => s.ref === ref.slice(buffer.length))
-  if (slot === undefined) return undefined
-  return slotValue(
-    slot,
-    sh.paramNames,
-    (name) => paramValueOf(merged, name),
-    (name) => merged.vectors[name] ?? undefined
-  )
-}
+/** A constant-buffer ref on a traced path (`cb3[2].w`) -> its value for this material. */
+const paramsOf = (sh: MaterialShaders, merged: Merged): (ref: string) => number | undefined =>
+  sh.materialBuffer === null ? () => undefined : materialParams(sh.materialBuffer, sh, merged)
 
 /** What the dump knows about a texture that decides a read's role. */
 export interface TextureInfo {
@@ -110,6 +99,7 @@ export const readsOf = (
   const out: Array<Read> = []
   /** shader read index of each entry of `out` */
   const index: Array<number> = []
+  const paramOf = paramsOf(sh, merged)
   for (const [ri, r] of sh.reads.entries()) {
     const tex = r.texture >= 0 ? textureOf(r.texture) : null
     if (tex === null) continue
@@ -123,7 +113,7 @@ export const readsOf = (
         if (src === undefined) continue
         let f = src.factor
         for (const p of leaf.params) {
-          const v = paramOf(sh, merged, p)
+          const v = paramOf(p)
           if (v === undefined) {
             if (sh.materialBuffer !== null && p.startsWith(sh.materialBuffer)) unresolved.add(p)
           } else f *= Math.abs(v)
@@ -191,7 +181,7 @@ export const variationOf = (
   if (mo === null) return null
   const layers = mo.reads.map((i) => readIndex.indexOf(i)).map((i) => reads[i])
   if (layers.some((l) => l === undefined)) return null
-  const paramValue = mo.gain.param === undefined ? 1 : paramOf(sh, merged, mo.gain.param)
+  const paramValue = mo.gain.param === undefined ? 1 : paramsOf(sh, merged)(mo.gain.param)
   if (paramValue === undefined) return null
   const gain = mo.gain.sign * mo.gain.constant * (paramValue + (mo.gain.paramAdd ?? 0))
   const first = layers[0]

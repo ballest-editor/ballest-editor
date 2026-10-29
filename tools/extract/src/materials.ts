@@ -9,8 +9,8 @@ import { FileSystem } from "effect/FileSystem"
 import { Path } from "effect/Path"
 import { approxOf, layersOf, type Override, picksOf, type TextureInfo, translucencyOf } from "./approx.ts"
 import { arr, bool, get, type JsonObject, nameOf, num, obj, refPath, str } from "./json.ts"
-import { chainOf } from "./params.ts"
-import type { MaterialShaders, ShadersFile } from "./shaders.ts"
+import { chainOf, slotTexture } from "./params.ts"
+import type { MaterialShaders, MaterialSurface, ShaderTrace } from "./shaders.ts"
 
 export class MaterialsError extends Schema.TaggedError<MaterialsError>()("MaterialsError", {
   message: Schema.String
@@ -159,17 +159,23 @@ export const compactJson = (value: unknown, indent = ""): string => {
   return value === undefined ? "null" : JSON.stringify(value)
 }
 
-/** shaders.json's materials, if the file is one this version wrote. */
-const shaderMaterialsOf = (file: unknown): ShadersFile["materials"] => {
-  if (get(file, "version") !== 1) return {}
-  const materials = obj(get(file, "materials")) ?? {}
-  return Object.fromEntries(
-    Object.entries(materials).map(([k, v]) => [k, isMaterialShaders(v) ? v : { error: str(get(v, "error")) ?? "?" }])
-  )
+/** shaders.json, if the file is one this version wrote: per listed material, its trace with its evaluated surface. */
+const shaderMaterialsOf = (file: unknown): Record<string, MaterialShaders> => {
+  if (get(file, "version") !== 2) return {}
+  const traces = obj(get(file, "shaders")) ?? {}
+  const out: Record<string, MaterialShaders> = {}
+  for (const [materialPath, entry] of Object.entries(obj(get(file, "materials")) ?? {})) {
+    const trace = traces[str(get(entry, "shader")) ?? ""]
+    const surface = get(entry, "surface")
+    if (isShaderTrace(trace)) out[materialPath] = { ...trace, surface: isSurface(surface) ? surface : null }
+  }
+  return out
 }
-const isMaterialShaders = (v: unknown): v is MaterialShaders =>
+const isShaderTrace = (v: unknown): v is ShaderTrace =>
   typeof get(v, "pixel") === "string" && Array.isArray(get(v, "reads")) && Array.isArray(get(v, "textures")) &&
   Array.isArray(get(v, "paramNames"))
+const isSurface = (v: unknown): v is MaterialSurface =>
+  Array.isArray(get(v, "baseColor")) && obj(get(v, "gains")) !== undefined
 
 /**
  * Materials the cooked data cannot describe, by asset name, each a function of the instance's vectors.
@@ -207,20 +213,10 @@ export const materialsBuild = Effect.fn("materialsBuild")(
           0
       const name = nameOf(materialPath)
       // The compiled shader's trace, evaluated for this instance's parameters (shaders.json).
-      const sh = [
-        shaderMaterials[materialPath],
-        ...chainOwn.flatMap((o) => [o.path, ...(o.redirectedTo === undefined ? [] : [o.redirectedTo])]).map((p) =>
-          shaderMaterials[p]
-        )
-      ].find((s): s is MaterialShaders => s !== undefined && !Object.hasOwn(s, "error"))
+      const sh = shaderMaterials[materialPath]
       if (sh !== undefined) withShaders++
       const evaluated = sh?.surface ?? null
-      const textureOf = (slot: number): string | null => {
-        const t = sh?.textures[slot]
-        if (t === undefined) return null
-        const override = t.param === null ? undefined : merged.textures[t.param]
-        return override ?? root.referencedTextures[t.index] ?? null
-      }
+      const textureOf = (slot: number): string | null => slotTexture({ merged, root }, sh?.textures[slot])
       const picks = picksOf(merged, root.connectedOutputs ?? null)
       const translucency = translucencyOf(blendMode, evaluated, picks.pickedEmissive)
       const layers = layersOf(sh, merged, textureOf, textureInfo, translucency.translucent)
