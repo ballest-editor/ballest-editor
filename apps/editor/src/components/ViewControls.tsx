@@ -7,7 +7,7 @@ import type { KeyboardEvent, MouseEvent } from "react"
 import { formatBinding } from "../domain/Keybinds"
 import type { Settings } from "../domain/Settings"
 import { formatGridSize, GRID_SIZES, type GridSize } from "../domain/snap"
-import { saveSettings } from "../editor/actions"
+import { updateSettings } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { ToolBar } from "./ToolBar"
 
@@ -80,8 +80,7 @@ function SnapControls({ disabled }: { readonly disabled: boolean }) {
   const settings = useEditor((s) => s.settings)
   const { enabled, gridSize } = settings.snapping
   const units = settings.general.units
-  const update = (snapping: Partial<Settings["snapping"]>) =>
-    void saveSettings({ ...settings, snapping: { ...settings.snapping, ...snapping } })
+  const update = (snapping: Partial<Settings["snapping"]>) => void updateSettings("snapping", snapping)
   // The button shows just the number, like the game's; the menu and tooltip carry the unit.
   const items = Object.fromEntries(GRID_SIZES.map((size) => [size, String(units === "m" ? size / 100 : size)]))
 

@@ -93,6 +93,12 @@ export const saveSettings = (settings: Settings) => {
   )
 }
 
+/** Changes some fields of one settings section (snapping, appearance...), then persists. */
+export const updateSettings = <K extends keyof Settings>(section: K, patch: Partial<Settings[K]>) => {
+  const { settings } = useEditor.getState()
+  return saveSettings({ ...settings, [section]: { ...settings[section], ...patch } })
+}
+
 /** Stored (or default) keybinds, with the game's defaults they were derived from, into the editor. */
 const applyKeybinds = (source: "load" | "reset") =>
   run(

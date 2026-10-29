@@ -1,60 +1,17 @@
 import { useEffect } from "react"
 import { isMovementChord, sharedKeysFlyFreely } from "../domain/flyKeys"
-import { actionsFor, chordOf, type KeybindAction, releasesBinding } from "../domain/Keybinds"
-import { deleteSelection, duplicateSelection } from "./actions"
-import { commands } from "./commands"
+import { actionsFor, chordOf, releasesBinding } from "../domain/Keybinds"
+import { commandFor } from "./commands"
 import { isEditorKeyEvent } from "./FlyCamera"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
 
-const oneShot = (action: KeybindAction): (() => void) | undefined => {
-  const s = useEditor.getState()
-  switch (action) {
-    case "undo":
-      return s.undo
-    case "redo":
-      return s.redo
-    case "deleteSelection":
-      return deleteSelection
-    case "duplicateSelection":
-      return duplicateSelection
-    case "focusSelection":
-      return s.requestFocus
-    case "deselect":
-      return () => s.select([])
-    case "selectMode":
-      return () => s.setTool("select")
-    case "translateMode":
-      return () => s.setTool("translate")
-    case "rotateMode":
-      return () => s.setTool("rotate")
-    case "scaleMode":
-      return () => s.setTool("scale")
-    case "toggleGizmoSpace":
-      return s.toggleGizmoSpace
-    case "speedFaster":
-      return () => s.changeSpeed(1)
-    case "speedSlower":
-      return () => s.changeSpeed(-1)
-    case "newMap":
-      return () => s.openDialog("new")
-    case "importMap":
-      return () => commands.openImport()
-    case "exportMap":
-      return () => s.openDialog("export")
-    case "showKeybinds":
-      return () => s.setCheatSheet(true)
-    default:
-      return undefined // held keys and mouse drags: FlyCamera; selection clicks: the viewport
-  }
-}
-
 const interactionActive = () => sceneRegistry.gizmoDragActive() || useEditor.getState().preview !== null
 
 /**
- * One-shot actions, matched on the full chord. Ignored in text fields and dialogs, while a
- * look drag is active (the fly keys own the keyboard then), and while a gizmo drag or
- * number-field scrub is in progress (it commits as one undo step on release; undo or
+ * One-shot actions, matched on the full chord. Ignored in text fields, dialogs and menus,
+ * while a look drag is active (the fly keys own the keyboard then), and while a gizmo drag
+ * or number-field scrub is in progress (it commits as one undo step on release; undo or
  * delete mid-interaction would be overwritten or orphan it). The cheat sheet is the one
  * held action here: it hides when a key of its binding is released or the window blurs.
  */
@@ -72,7 +29,7 @@ export function useActionKeys() {
         && !sharedKeysFlyFreely(settings.camera.movementNeedsLook)
       ) return
       for (const action of actionsFor(keybinds, chord)) {
-        const run = oneShot(action)
+        const run = commandFor(action)
         if (run === undefined) continue
         e.preventDefault()
         run()
