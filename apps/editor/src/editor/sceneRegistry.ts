@@ -23,6 +23,6 @@ export const sceneRegistry = {
   lookDragActive: () => false,
   /** true while a movement key is flying the camera (a movement key's shortcut then waits) */
   flyKeysActive: () => false,
-  /** where a palette click should place a new piece, in UE cm */
-  placementPoint: (): Vec3 => ({ x: 0, y: 0, z: 0 })
+  /** where a palette click should place a new piece with this footprint (cm), in UE cm */
+  placementPoint: (_footprint: number): Vec3 => ({ x: 0, y: 0, z: 0 })
 }
