@@ -64,7 +64,25 @@ function MapSettings() {
   ]
   return (
     <div className="flex flex-col gap-3">
-      <SectionTitle>Map</SectionTitle>
+      <div className="-my-1.5 flex items-center justify-between">
+        <SectionTitle>Map</SectionTitle>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground"
+                aria-label="Project settings"
+                onClick={() => openDialog("project")}
+              />
+            }
+          >
+            <IconAdjustments />
+          </TooltipTrigger>
+          <TooltipContent side="left">Project settings</TooltipContent>
+        </Tooltip>
+      </div>
       <div className="flex flex-col gap-1">
         <Label htmlFor="map-name" className="text-muted-foreground">Name</Label>
         <Input id="map-name" value={name} onChange={(e) => setDraft(e.target.value)} onBlur={commit} />
@@ -77,9 +95,6 @@ function MapSettings() {
           </div>
         ))}
       </dl>
-      <Button variant="outline" size="sm" className="self-start" onClick={() => openDialog("project")}>
-        <IconAdjustments /> Project settings…
-      </Button>
     </div>
   )
 }
