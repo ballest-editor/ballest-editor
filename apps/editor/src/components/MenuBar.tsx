@@ -61,7 +61,7 @@ function Menu({ title, children }: { readonly title: string; readonly children: 
         })
       }}
     >
-      <MenubarTrigger className="px-1.5 py-0.5">{title}</MenubarTrigger>
+      <MenubarTrigger className="px-2.5">{title}</MenubarTrigger>
       <MenubarContent className="min-w-52" finalFocus={(closeType) => closeType === "keyboard"}>
         {children}
       </MenubarContent>
