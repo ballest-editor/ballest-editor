@@ -34,7 +34,7 @@ export interface DragStart {
   readonly space: GizmoSpace
   /** The active item's rotation at drag start: the frame of the local axes. */
   readonly frameRotation: Quat4
-  /** The pivot (the active item's origin) in world space, and on screen. */
+  /** The pivot (the active item's pivot point) in world space, and on screen. */
   readonly originWorld: THREE.Vector3
   readonly originPx: Px
   /** Unit vector from the origin toward the camera at drag start. */

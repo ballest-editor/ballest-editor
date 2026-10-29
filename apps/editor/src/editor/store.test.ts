@@ -8,7 +8,7 @@ import { placementTransform } from "../domain/factory"
 import { isPlayerStart } from "../domain/MapFile"
 import { withDifficulty } from "../domain/mapTags"
 import { defaultSettings } from "../domain/Settings"
-import { initialMap, nextSelection, useEditor } from "./store"
+import { initialMap, nextSelection, pivotOf, useEditor } from "./store"
 
 const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!
 
@@ -116,6 +116,21 @@ describe("editor store", () => {
     assert.isFalse(s().paintSlots([{ id: "nope", component: 0, slot: 0, material }]))
     s().undo()
     assert.deepStrictEqual([slotOf(1), slotOf(2)], [before, before])
+  })
+
+  it("sets pivots on several items as one undo step, and skips no-op changes", () => {
+    const s = state
+    mapWithCubes(0, 100)
+    const ids = s().doc.ids.slice(1)
+    const top = { choice: "Top", localPosition: { x: 0, y: 0, z: 1000 } }
+    const before = s().past.length
+    s().setItemPivots(new Map(ids.map((id) => [id, top])))
+    assert.strictEqual(s().past.length, before + 1)
+    assert.deepStrictEqual(ids.map((id) => pivotOf(s(), id).choice), ["Top", "Top"])
+    s().setItemPivots(new Map(ids.map((id) => [id, top])))
+    assert.strictEqual(s().past.length, before + 1)
+    s().undo()
+    assert.deepStrictEqual(ids.map((id) => pivotOf(s(), id).choice), ["Default", "Default"])
   })
 
   describe("history", () => {

@@ -15,6 +15,7 @@ import {
   removeItems,
   setLevelData,
   setLevelNames,
+  setPivots,
   setProperties,
   setSlotMaterials,
   setTransforms,
@@ -30,6 +31,7 @@ import { LIMITS } from "../domain/limits"
 import { isPlayerStart, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
 import type { PaintPicker } from "../domain/Paint"
+import { type Pivot, pivotAt } from "../domain/pivot"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import type { LoadedCatalog } from "../services/CatalogLoader"
 
@@ -151,6 +153,8 @@ export interface EditorState {
    * one edit); false (with a notice, and nothing changed) when a value doesn't fit its property.
    */
   readonly setSelectionProperties: (changes: ReadonlyArray<PropertyChange>) => boolean
+  /** Sets the pivots of several items as one undo step (nothing when none changes). */
+  readonly setItemPivots: (pivots: ReadonlyMap<string, Pivot>) => void
   readonly deleteSelection: () => void
   /** Copies the selected items in place (one undo step) and selects the copies. */
   readonly duplicateSelection: () => void
@@ -369,6 +373,15 @@ export const useEditor = create<EditorState>()((set, get) => {
       return true
     },
 
+    setItemPivots: (pivots) => {
+      const { doc } = get()
+      const entries = [...pivots].flatMap(([id, pivot]) => {
+        const index = doc.ids.indexOf(id)
+        return index < 0 || samePivot(pivotAt(doc.map, index), pivot) ? [] : [[index, pivot] as const]
+      })
+      if (entries.length > 0) commit({ map: setPivots(doc.map, entries), ids: doc.ids })
+    },
+
     deleteSelection: () => {
       const s = get()
       const indices = selectedIndices(s)
@@ -524,6 +537,8 @@ const INVALID_TRANSFORM = "That transform isn't valid for the game (non-finite o
 
 const sameVec = (a: Vec3, b: Vec3) => a.x === b.x && a.y === b.y && a.z === b.z
 
+const samePivot = (a: Pivot, b: Pivot) => a.choice === b.choice && sameVec(a.localPosition, b.localPosition)
+
 /** True when item `index` has the same transform in both maps (an edit that changed nothing). */
 const sameItemTransform = (before: MapFile, after: MapFile, index: number): boolean => {
   const a = before.items[index]?.itemTransform
@@ -555,6 +570,9 @@ export const selectedIndices = (s: EditorState): Array<number> =>
 
 /** The active (last selected) item's id, if any. */
 export const activeId = (s: EditorState): string | undefined => s.selectedIds.at(-1)
+
+/** An item's pivot (Default when it has none, or isn't in the document). */
+export const pivotOf = (s: EditorState, id: string): Pivot => pivotAt(s.doc.map, s.doc.ids.indexOf(id))
 
 /** An item's transform as shown: the live preview, else the document. */
 export const shownTransform = (s: EditorState, id: string): UeTransform | undefined =>
