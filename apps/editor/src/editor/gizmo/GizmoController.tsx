@@ -15,10 +15,15 @@ import { worldPerPixel } from "./math"
 interface ActiveDrag {
   readonly id: string
   readonly start: DragStart
-  /** Every selected item's transform at drag start, and the pivot they turn about. */
-  readonly startTransforms: ReadonlyMap<string, UeTransform>
+  /**
+   * Every dragged item's transform at drag start, and the pivot they turn about. An Alt+drag
+   * duplicate swaps the selection for its copies on the first move.
+   */
+  startTransforms: ReadonlyMap<string, UeTransform>
   readonly pivot: Vec3
   last: ReadonlyMap<string, UeTransform> | undefined
+  /** "pending": an Alt+drag that copies the selection once it moves; "copied": it has. */
+  duplicate: "pending" | "copied" | undefined
 }
 
 const applyToObject = (object: THREE.Object3D, transform: UeTransform) => {
@@ -69,7 +74,8 @@ const toWorld = (v: Vec3) => {
 /**
  * Hosts the Blender-style gizmo for the current tool: hover picking, dragging with a live
  * preview (inspector stays in sync), one undo entry per drag, Escape to cancel. The gizmo
- * sits on the active item and a drag moves every selected item together.
+ * sits on the active item and a drag moves every selected item together. Alt+dragging a
+ * translate handle moves a copy instead and leaves the selection in place, like the game.
  */
 export function GizmoController() {
   const camera = useThree((s) => s.camera)
@@ -143,6 +149,10 @@ export function GizmoController() {
       gizmo.setGuide(undefined, undefined)
       useEditor.getState().setPreview(null)
     }
+    /** Drops the copies of an Alt+drag that is cancelled (Escape, unmount). */
+    const cancelDuplicate = (active: ActiveDrag) => {
+      if (active.duplicate === "copied") useEditor.getState().endDuplicateDrag(null)
+    }
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return
@@ -169,7 +179,12 @@ export function GizmoController() {
         toCamera: camera.position.clone().sub(originWorld).normalize(),
         pointer: sample(e)
       }
-      drag.current = { id, start, startTransforms: target.transforms, pivot: target.pivot, last: undefined }
+      const { settings } = useEditor.getState()
+      const duplicate = e.altKey && settings.general.altDragDuplicates
+          && (spec.kind === "translateAxis" || spec.kind === "translatePlane")
+        ? "pending"
+        : undefined
+      drag.current = { id, start, startTransforms: target.transforms, pivot: target.pivot, last: undefined, duplicate }
       const axis = spec.kind === "translateAxis" || spec.kind === "scaleAxis" || spec.kind === "rotateAxis"
         ? dragAxisWorld(start)
         : undefined
@@ -186,6 +201,17 @@ export function GizmoController() {
       const grid = snapping.enabled ? { size: snapping.gridSize, pivot: active.pivot } : undefined
       const delta = dragDelta(active.start, sample(e), grid)
       if (delta === undefined) return
+      if (active.duplicate === "pending") {
+        // The copies start where the selection is; the selection itself stays put.
+        const copies = useEditor.getState().beginDuplicateDrag()
+        active.duplicate = copies === undefined ? undefined : "copied"
+        if (copies !== undefined) {
+          active.startTransforms = new Map([...copies].flatMap(([source, copy]) => {
+            const t = active.startTransforms.get(source)
+            return t === undefined ? [] : [[copy, t] as const]
+          }))
+        }
+      }
       const next = new Map([...active.startTransforms].map(([id, t]) => [id, applyGroupDelta(t, active.pivot, delta)]))
       active.last = next
       applyToObjects(next)
@@ -198,6 +224,11 @@ export function GizmoController() {
       e.stopImmediatePropagation()
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
       endDrag()
+      if (active.duplicate === "copied") {
+        // the copy and the move are one undo entry; refused, the copies go
+        useEditor.getState().endDuplicateDrag(active.last ?? null)
+        return
+      }
       if (active.last === undefined) return
       // One undo entry for the whole selection. If the document refuses it, the scene objects
       // go back where they started.
@@ -212,6 +243,7 @@ export function GizmoController() {
       e.stopImmediatePropagation() // don't also deselect
       applyToObjects(active.startTransforms)
       endDrag()
+      cancelDuplicate(active)
     }
 
     el.addEventListener("pointerdown", onPointerDown, { capture: true })
@@ -223,7 +255,11 @@ export function GizmoController() {
       el.removeEventListener("pointermove", onPointerMove)
       el.removeEventListener("pointerup", onPointerUp, { capture: true })
       window.removeEventListener("keydown", onKeyDown, { capture: true })
-      if (drag.current !== null) endDrag()
+      const active = drag.current
+      if (active !== null) {
+        endDrag()
+        cancelDuplicate(active)
+      }
       hovered.current = null
     }
   }, [gizmo, camera, gl])

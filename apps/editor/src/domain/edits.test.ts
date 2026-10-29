@@ -1,6 +1,15 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Option } from "effect"
-import { addItem, duplicateItems, removeItems, setLevelNames, setTransforms, validateItem } from "./edits"
+import {
+  addItem,
+  copyItems,
+  duplicateItems,
+  pasteItems,
+  removeItems,
+  setLevelNames,
+  setTransforms,
+  validateItem
+} from "./edits"
 import { identityTransform, newMapFile, playerStartItem } from "./factory"
 import type { MapFile } from "./MapFile"
 
@@ -63,6 +72,25 @@ describe("edits", () => {
       [5, 3]
     ])
     assert.strictEqual(duplicateItems(map, []), map)
+  })
+
+  it("copies items with their pivots and pastes them into another map", () => {
+    const clip = copyItems(withItems(5), [4, 2, 9])
+    assert.deepStrictEqual(clip.items.map((i) => i.itemTransform.translation.x), [4, 2])
+    assert.deepStrictEqual(clip.pivots.map((p) => [p.itemIndex, p.pivot.localPosition.x]), [[0, 4]])
+
+    const two = withItems(2)
+    const target = { ...two, editorState: { ...two.editorState!, pivots: two.editorState!.pivots.slice(0, 1) } }
+    const next = pasteItems(target, clip)
+    assert.deepStrictEqual(next.items.map((i) => i.itemTransform.translation.x), [0, 1, 4, 2])
+    assert.deepStrictEqual(next.editorState!.pivots.map((p) => [p.itemIndex, p.pivot.localPosition.x]), [
+      [1, 1],
+      [2, 4]
+    ])
+    assert.strictEqual(pasteItems(target, copyItems(target, [])), target)
+    // a published map has no editorState to keep pivots in
+    const { editorState: _, ...published } = target
+    assert.isUndefined(pasteItems(published, clip).editorState)
   })
 
   it("validates items and renames levels", () => {

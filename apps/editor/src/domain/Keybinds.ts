@@ -31,6 +31,8 @@ export const keybindSections = [
       "toggleSelection",
       "deleteSelection",
       "duplicateSelection",
+      "copySelection",
+      "paste",
       "undo",
       "redo",
       "deselect"
@@ -63,6 +65,8 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   toggleSelection: "toggle selection",
   deleteSelection: "delete",
   duplicateSelection: "duplicate",
+  copySelection: "copy",
+  paste: "paste",
   undo: "undo",
   redo: "redo",
   deselect: "deselect",
@@ -105,7 +109,11 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Click an item to add it to the selection, or to remove it if it's already selected. Ctrl+click, which the game's level editor uses to deselect.",
   deleteSelection: "Delete the selected items. Backspace in the game's level editor; Delete also works.",
   duplicateSelection:
-    "Copy the selected items in place and select the copies, ready to move. Ctrl+D, as in Unreal's editor; the game's key for this isn't recorded.",
+    "Copy the selected items in place and select the copies, ready to move. Ctrl+D, as in Unreal's editor; the game has no key for this and duplicates with Alt+drag on the translate gizmo (see General settings).",
+  copySelection:
+    "Copy the selected items, with their properties, so paste can add them again. Ctrl+C in the game's level editor.",
+  paste:
+    "Add the copied items where they were when copied, and select them. Ctrl+V in the game's level editor, which also pastes in place.",
   undo:
     "Undo the last change. Ctrl+Z in the game's level editor; a whole gizmo drag or number-field scrub is one step.",
   redo: "Redo the last undone change. Ctrl+Y in the game's level editor; Ctrl+Shift+Z also works.",
@@ -172,6 +180,8 @@ export const defaultKeybinds: Keybinds = {
   toggleSelection: ["Ctrl+Mouse0"],
   deleteSelection: ["Backspace", "Delete"],
   duplicateSelection: ["Ctrl+KeyD"],
+  copySelection: ["Ctrl+KeyC"],
+  paste: ["Ctrl+KeyV"],
   undo: ["Ctrl+KeyZ"],
   redo: ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"],
   deselect: ["Escape"],

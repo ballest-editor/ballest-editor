@@ -18,6 +18,10 @@ const oneShot = (action: KeybindAction): (() => void) | undefined => {
       return deleteSelection
     case "duplicateSelection":
       return duplicateSelection
+    case "copySelection":
+      return s.copySelection
+    case "paste":
+      return s.paste
     case "focusSelection":
       return s.requestFocus
     case "deselect":

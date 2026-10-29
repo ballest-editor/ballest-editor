@@ -40,6 +40,8 @@ describe("keybind table", () => {
       ["toggle selection", ["Ctrl+Mouse0"]],
       ["delete", ["Backspace", "Delete"]],
       ["duplicate", ["Ctrl+KeyD"]],
+      ["copy", ["Ctrl+KeyC"]],
+      ["paste", ["Ctrl+KeyV"]],
       ["undo", ["Ctrl+KeyZ"]],
       ["redo", ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"]],
       ["deselect", ["Escape"]]
