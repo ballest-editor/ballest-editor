@@ -23,8 +23,15 @@ import { isMesh } from "./threeGuards"
  * concrete tiles (tiling 4) a 64 cm pitch, which matches the in-game palette renders.
  */
 export const TRIPLANAR_PERIOD_CM = 1024
-/** How much of the grey mottle shows (0 = none, 1 = multiplied in whole); tuned against the palette renders. */
-const VARIATION_STRENGTH = 0.45
+/**
+ * How much of the grey mottle shows (0 = none, 1 = multiplied in whole) and how large its blotches
+ * are (a factor on its tiling). Tuned against in-game cubes: the smooth finishes show a soft,
+ * large-scale mottle; the default metal barely any.
+ */
+const VARIATION_STRENGTH = 0.18
+const VARIATION_SCALE = 0.5
+/** Normal-map strength: the game's concrete grooves read crisper than a unit normal map gives. */
+const NORMAL_STRENGTH = 1.6
 
 const textureLoader = new THREE.TextureLoader()
 const textures = new Map<string, THREE.Texture>()
@@ -77,7 +84,7 @@ const patchOf = (spec: Omit<MaterialSpec, "path">, variation: THREE.Texture | nu
       uBaseColorTiling: { value: tiling.baseColor },
       uNormalTiling: { value: tiling.normal },
       uOpacityTiling: { value: tiling.opacity },
-      uVariationTiling: { value: tiling.variation },
+      uVariationTiling: { value: tiling.variation * VARIATION_SCALE },
       uVariationMap: { value: variation },
       uOutlineInset: { value: new THREE.Vector2(outline?.inset[0] ?? 0, outline?.inset[1] ?? 0) },
       uOutlineColor: {
@@ -253,7 +260,7 @@ const build = (
   }
   if (spec.normalTexture !== undefined) {
     material.normalMap = loadTexture(spec.normalTexture, THREE.NoColorSpace, drop("normalMap"))
-    material.normalScale.set(1, -1) // UE normal maps use DirectX green (-Y)
+    material.normalScale.set(NORMAL_STRENGTH, -NORMAL_STRENGTH) // UE normal maps use DirectX green (-Y)
   }
   if (spec.ormTexture !== undefined) {
     const orm = loadTexture(spec.ormTexture, THREE.NoColorSpace, () => {

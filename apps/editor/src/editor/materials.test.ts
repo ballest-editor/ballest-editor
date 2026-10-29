@@ -22,7 +22,7 @@ describe("three materials", () => {
     assert.isTrue(glass.transparent)
     assert.isBelow(glass.opacity, 1)
     assert.strictEqual(glass.normalMap?.colorSpace, THREE.NoColorSpace)
-    assert.strictEqual(glass.normalScale.y, -1)
+    assert.isBelow(glass.normalScale.y, 0) // DirectX green flipped
     assert.strictEqual(glass.side, THREE.DoubleSide) // the game material is two-sided
     assert.strictEqual(blue.side, THREE.FrontSide)
     assert.strictEqual(materialFor(table, "/Game/Unknown.Unknown"), neutralMaterial())
