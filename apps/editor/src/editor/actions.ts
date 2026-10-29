@@ -197,8 +197,8 @@ const saveMapPrefs = Effect.gen(function*() {
   yield* MapPrefsStore.use((store) => store.save(mapPrefsKeyOf(doc.map), prefs))
 })
 
-/** Map settings: the level fields (one undo step) and the grid height (saved with the map's prefs). */
-export const saveMapSettings = (levelData: LevelData, gridHeight: number) =>
+/** Project settings: the map's level fields (one undo step) and the grid height (saved with the map's prefs). */
+export const saveProjectSettings = (levelData: LevelData, gridHeight: number) =>
   run(
     Effect.gen(function*() {
       useEditor.getState().setLevelData(levelData)

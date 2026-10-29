@@ -32,7 +32,7 @@ import {
   withDifficulty,
   withTag
 } from "../domain/mapTags"
-import { saveMapSettings } from "../editor/actions"
+import { saveProjectSettings } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { NumberField } from "./NumberField"
 
@@ -89,11 +89,11 @@ interface Draft {
 }
 
 /**
- * Settings for the open map: its name, the editor's grid height for it, and the difficulty
- * and tags the game's publish screen sets. Changes apply on Save, the level fields as one
+ * Project settings. A project is one map for now: its name, the editor's grid height for
+ * it, and the difficulty and tags the game's publish screen sets. Changes apply on Save, the level fields as one
  * undo step.
  */
-export function MapSettingsDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
+export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   const levelData = useEditor((s) => s.doc.map.worldSettings.levelData)
   const floorHeight = useEditor((s) => s.floorHeight)
   const startHeight = useEditor((s) => floorHeightOf(s.doc.map))
@@ -118,7 +118,7 @@ export function MapSettingsDialog({ open, onClose }: { readonly open: boolean; r
 
   const save = async () => {
     onClose()
-    await saveMapSettings(withLevelNames(draft.levelData, draft.name, creator), draft.gridHeight)
+    await saveProjectSettings(withLevelNames(draft.levelData, draft.name, creator), draft.gridHeight)
   }
 
   return (
@@ -132,7 +132,7 @@ export function MapSettingsDialog({ open, onClose }: { readonly open: boolean; r
           }}
         >
           <DialogHeader className="p-4 pb-3">
-            <DialogTitle>Map settings</DialogTitle>
+            <DialogTitle>Project settings</DialogTitle>
             <DialogDescription>
               Exports as{" "}
               <code className="break-all">{mapFileNameOf(draft.name || "name", creator || "creator")}</code>. Difficulty
@@ -142,9 +142,9 @@ export function MapSettingsDialog({ open, onClose }: { readonly open: boolean; r
           <ScrollArea className="min-h-0 flex-1">
             <div className="flex flex-col gap-4 px-4 pb-4">
               <div className="flex flex-col gap-1">
-                <Label htmlFor="map-settings-name">Map name</Label>
+                <Label htmlFor="project-map-name">Map name</Label>
                 <Input
-                  id="map-settings-name"
+                  id="project-map-name"
                   value={draft.name}
                   onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
                   aria-invalid={!isValidName(draft.name)}

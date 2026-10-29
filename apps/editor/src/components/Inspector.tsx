@@ -77,8 +77,8 @@ function MapSettings() {
           </div>
         ))}
       </dl>
-      <Button variant="outline" size="sm" className="self-start" onClick={() => openDialog("map")}>
-        <IconAdjustments /> Map settings…
+      <Button variant="outline" size="sm" className="self-start" onClick={() => openDialog("project")}>
+        <IconAdjustments /> Project settings…
       </Button>
     </div>
   )

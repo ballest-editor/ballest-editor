@@ -107,7 +107,7 @@ export function MenuBar() {
         <CommandItem action="importMap">Import…</CommandItem>
         <CommandItem action="exportMap">Export…</CommandItem>
         <MenubarSeparator />
-        <MenubarItem onClick={() => openDialog("map")}>Map settings…</MenubarItem>
+        <MenubarItem onClick={() => openDialog("project")}>Project settings…</MenubarItem>
       </Menu>
       <Menu title="Edit">
         <CommandItem action="undo" disabled={!canUndo}>Undo</CommandItem>

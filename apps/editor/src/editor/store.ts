@@ -65,7 +65,7 @@ export interface Snapshot {
 export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
 export type Tool = "select" | "translate" | "rotate" | "scale"
-export type Dialog = "new" | "export" | "settings" | "map"
+export type Dialog = "new" | "export" | "settings" | "project"
 export type SettingsCategory = "general" | "camera" | "keybinds" | "appearance"
 
 const HISTORY_LIMIT = 200
@@ -82,7 +82,7 @@ export interface EditorState {
   readonly doc: Doc
   /**
    * The height (UE cm) the grid is drawn at and palette pieces land on: by default the player
-   * start's, taken when the map loads so it stays put while the start is moved. Map settings
+   * start's, taken when the map loads so it stays put while the start is moved. Project settings
    * can change it (kept per map in MapPrefsStore, not in the file or its history).
    */
   readonly floorHeight: number
