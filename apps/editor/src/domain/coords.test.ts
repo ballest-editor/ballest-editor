@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Schema } from "effect"
 import * as THREE from "three"
 import { listSamples, readSample } from "../test/samples"
+import { expectVec } from "../test/vec"
 import {
   type Quat4,
   sceneToUe,
@@ -34,12 +35,6 @@ const ueRotate = (q: Quat4, v: Vec3): Vec3 => {
 const threeRotate = (q: Quat4, v: Vec3): Vec3 => {
   const r = new THREE.Vector3(v.x, v.y, v.z).applyQuaternion(new THREE.Quaternion(q.x, q.y, q.z, q.w))
   return { x: r.x, y: r.y, z: r.z }
-}
-
-const expectVec = (actual: Vec3, expected: Vec3, digits = 9) => {
-  expect(actual.x).toBeCloseTo(expected.x, digits)
-  expect(actual.y).toBeCloseTo(expected.y, digits)
-  expect(actual.z).toBeCloseTo(expected.z, digits)
 }
 
 const UE_FORWARD = { x: 1, y: 0, z: 0 }
