@@ -94,29 +94,31 @@ default.
   - **Appearance:** theme (dark/light/system) and grid visibility/colours.
   - **Keybinds:** the game's own names and sections ("mouse and keyboard free camera":
     forward, reverse, left, right, look, up, down; "mouse and keyboard bindings": look
-    right/left/up/down, center camera), then editor-only sections. Labels and sections
+    right/left/up/down), then editor-only sections. Labels and sections
     come from `keybinds.json` when present. Every row has a tooltip describing what it
     does in the editor. Click a binding and press a key, mouse button or wheel; Esc
     cancels. Overrides persist in `ballest-editor.keybinds.v3`.
 
 ### Default bindings
 
-The defaults are the game's own. Arrow keys look, C centers the camera, and the wheel
-changes camera speed. Gizmos are V/G/R/T: T is "replay camera mode" in the game, but
+The defaults are the game's own. Arrow keys look, F focuses the selection, C switches
+the gizmos between local and world axes, and the wheel changes camera speed. The free
+camera's "center camera" (C) is left out of `GAME_ACTIONS` because C means local / world
+axes in the level editor. Gizmos are V/G/R/T: T is "replay camera mode" in the game, but
 that's free in the editor. Editing uses Delete, Ctrl+Z/Ctrl+Y and Escape. File uses
 Alt+N/Ctrl+O/Ctrl+S.
 
 - **WASD** flies.
 - **Space** goes up.
-- **Down is Left Shift.** The game uses Left Ctrl, but that collides with Ctrl+Z/Y.
-  `editorOverrides` keeps this even though `keybinds.json` says Left Ctrl.
+- **Down is Left Ctrl**, as in the game. It doesn't move the camera when it's the
+  modifier of a chord (Ctrl+Z, Ctrl+C, Ctrl+V, Ctrl+D, Ctrl+click, the browser's own Ctrl shortcuts).
 - **"fly faster" is unbound** (the wheel already changes speed).
 - **RMB-drag looks.** The game's look is Mouse2D, which needs a held button in a browser.
 - **Alt+LMB orbits, MMB pans.**
 
-If you rebind a movement action to a bare modifier key, it only acts after a short solo
-hold, and pressing a key that completes a bound chord (Ctrl+Z) suppresses it until
-released (`HeldKeys`).
+A movement action bound to a bare modifier key only acts after a short solo hold, and
+pressing a key that isn't a movement key (Ctrl+Z, Ctrl+C) or clicking a bound chord
+(Ctrl+click) suppresses it until released (`HeldKeys`, `formsChord`).
 
 The mapping lives in `src/domain/GameKeybinds.ts`:
 

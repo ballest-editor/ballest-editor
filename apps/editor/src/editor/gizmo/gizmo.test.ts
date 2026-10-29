@@ -1,11 +1,11 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as THREE from "three"
 import { ueToScene, ueToThreeVector } from "../../domain/coords"
-import type { UeTransform } from "../../domain/coords"
+import type { Quat4, UeTransform } from "../../domain/coords"
 import { applyGroupDelta } from "../../domain/groupTransform"
-import { rotateVec } from "../../domain/ueMath"
+import { rotateVec, rotatorToQuat } from "../../domain/ueMath"
 import { dragDelta, type DragStart, type PointerSample } from "./drag"
-import { GizmoObject, type GizmoSpace, SIZE, toolHandles } from "./handles"
+import { GizmoObject, type GizmoSpace, pairOf, SIZE, toolHandles } from "./handles"
 import { axisParamFromRay, axisWorldDir, gameDirToWorld, planeHit, screenAngle } from "./math"
 
 const v3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
@@ -20,7 +20,8 @@ const frame = {
   worldPerPixel: 2,
   gameRotation: identity.rotation,
   space: "world" as const,
-  cameraQuaternion: new THREE.Quaternion()
+  cameraQuaternion: new THREE.Quaternion(),
+  toCamera: v3(0, 0, 1)
 }
 
 describe("gizmo math", () => {
@@ -79,6 +80,41 @@ describe("gizmo handles", () => {
     gizmo.traverse((o) => expect(o.matrixWorld.determinant()).toBeGreaterThan(0))
   })
 
+  it("shows the quarter of each rotate ring that faces the camera, like the game", () => {
+    const local = { space: "local" as const, gameRotation: rotatorToQuat({ roll: 20, pitch: -35, yaw: 70 }) }
+    const views = [v3(1, 1, 1), v3(-2, 1, 0.5), v3(0.3, -1, -2)].map((d) => d.normalize())
+    for (const toCamera of views) {
+      for (const f of [{ ...frame, toCamera }, { ...frame, ...local, toCamera }]) {
+        const gizmo = new GizmoObject(toolHandles.rotate)
+        gizmo.update(f, null, null)
+        gizmo.updateMatrixWorld(true)
+        const rotation = f.space === "local" ? f.gameRotation : undefined
+        for (const axis of ["x", "y", "z"] as const) {
+          const root = gizmo.handle(`r-${axis}`)!.root
+          // the ring still turns about the axis
+          const normal = root.localToWorld(v3(0, 0, 1)).sub(f.origin).normalize()
+          expect(Math.abs(normal.dot(axisWorldDir(axis, rotation)))).toBeCloseTo(1, 9)
+          // the arc's midpoint sits on the camera's side of both other axes
+          const mid = root.localToWorld(v3(Math.SQRT1_2, Math.SQRT1_2, 0).multiplyScalar(SIZE.ring)).sub(f.origin)
+          for (const other of pairOf(axis)) {
+            const dir = axisWorldDir(other, rotation)
+            expect(Math.sign(mid.dot(dir))).toBe(Math.sign(toCamera.dot(dir)))
+          }
+        }
+        gizmo.traverse((o) => expect(o.matrixWorld.determinant()).toBeGreaterThan(0))
+      }
+    }
+  })
+
+  it("shows a rotate handle's whole ring only while it is dragged", () => {
+    const gizmo = new GizmoObject(toolHandles.rotate)
+    const ring = (axis: string) => gizmo.handle(`r-${axis}`)!.activeParts[0]!
+    gizmo.update(frame, "r-x", null)
+    expect(["x", "y", "z"].map((a) => ring(a).visible)).toEqual([false, false, false])
+    gizmo.update(frame, null, "r-y")
+    expect(["x", "y", "z"].map((a) => ring(a).visible)).toEqual([false, true, false])
+  })
+
   it("has one hit mesh per handle and highlights only the hovered one", () => {
     const gizmo = new GizmoObject(toolHandles.scale)
     expect(gizmo.hitMeshes.length).toBe(toolHandles.scale.length)
@@ -117,13 +153,12 @@ describe("gizmo drags (game space)", () => {
     pointer: { ...pointer(v3(0, 0, 0)), px }
   })
 
-  /** The drag applied to the start's item (snapped to `gridSize` cm when given). */
-  const dragTransform = (s: TestDrag, now: PointerSample, gridSize?: number) => {
-    const delta = dragDelta(
-      s,
-      now,
-      gridSize === undefined ? undefined : { size: gridSize, pivot: s.transform.translation }
-    )
+  /** The drag applied to the start's item (snapped to `gridSize` cm and `rotationStep` degrees when given). */
+  const dragTransform = (s: TestDrag, now: PointerSample, gridSize?: number, rotationStep?: number) => {
+    const delta = dragDelta(s, now, {
+      grid: gridSize === undefined ? undefined : { size: gridSize, pivot: s.transform.translation },
+      rotationStep
+    })
     return delta === undefined ? undefined : applyGroupDelta(s.transform, s.transform.translation, delta)
   }
 
@@ -172,6 +207,29 @@ describe("gizmo drags (game space)", () => {
     expect(out.rotation.w).toBeCloseTo(Math.SQRT1_2, 9)
     // and that turns game +X toward game -Y
     expect(rotateVec(out.rotation, { x: 1, y: 0, z: 0 }).y).toBeCloseTo(-1, 9)
+  })
+
+  it("turns in whole rotation steps from where the drag started", () => {
+    const s = { ...start("r-z"), toCamera: v3(0, 1, 0) }
+    // 40 deg counter-clockwise on screen snaps to 45, i.e. -45 deg game yaw
+    const now = {
+      ...pointer(v3(0, 0, 0)),
+      px: { x: 10 * Math.cos(Math.PI * 2 / 9), y: -10 * Math.sin(Math.PI * 2 / 9) }
+    }
+    // the turn counter-clockwise seen from above, in degrees (minus the game yaw)
+    const ccw = (q: Quat4) => -2 * Math.atan2(q.z, q.w) * 180 / Math.PI
+    expect(ccw(dragTransform(s, now, undefined, 15)!.rotation)).toBeCloseTo(45, 9)
+    expect(ccw(dragTransform(s, now, undefined, 90)!.rotation)).toBeCloseTo(0, 9)
+    expect(ccw(dragTransform(s, now)!.rotation)).toBeCloseTo(40, 9)
+    // relative to the start: an item already turned 7 deg turns to 52, not 45
+    const yaw7 = {
+      ...identity,
+      rotation: { x: 0, y: 0, z: -Math.sin(Math.PI * 7 / 360), w: Math.cos(Math.PI * 7 / 360) }
+    }
+    const s7 = { ...start("r-z", yaw7), toCamera: v3(0, 1, 0) }
+    expect(ccw(dragTransform(s7, now, undefined, 15)!.rotation)).toBeCloseTo(52, 9)
+    // translate drags ignore the rotation step
+    expect(dragTransform(start("t-x"), pointer(v3(243, 0, 0)), undefined, 90)!.translation.x).toBeCloseTo(243, 9)
   })
 
   it("scales one local axis by the distance ratio, and uniformly from the centre handle", () => {

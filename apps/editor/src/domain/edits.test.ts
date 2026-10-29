@@ -2,7 +2,9 @@ import { assert, describe, it } from "@effect/vitest"
 import { Option } from "effect"
 import {
   addItem,
+  copyItems,
   duplicateItems,
+  pasteItems,
   removeItems,
   setLevelNames,
   setSlotMaterials,
@@ -13,8 +15,9 @@ import { identityTransform, newMapFile, playerStartItem } from "./factory"
 import type { MapFile } from "./MapFile"
 
 const withItems = (n: number): MapFile => {
-  let map = newMapFile({ displayName: "A", creatorName: "B", createdAt: "" })
-  for (let i = 1; i < n; i++) {
+  // item i sits at x = i
+  let map: MapFile = { ...newMapFile({ displayName: "A", creatorName: "B", createdAt: "" }), items: [] }
+  for (let i = 0; i < n; i++) {
     map = addItem(map, { ...playerStartItem(), itemTransform: identityTransform({ x: i, y: 0, z: 0 }) })
   }
   return {
@@ -99,6 +102,25 @@ describe("edits", () => {
       { index: 0, component: 0, slot: 0, material: glossy },
       { index: 1, component: 3, slot: 0, material: glossy }
     ])))
+  })
+
+  it("copies items with their pivots and pastes them into another map", () => {
+    const clip = copyItems(withItems(5), [4, 2, 9])
+    assert.deepStrictEqual(clip.items.map((i) => i.itemTransform.translation.x), [4, 2])
+    assert.deepStrictEqual(clip.pivots.map((p) => [p.itemIndex, p.pivot.localPosition.x]), [[0, 4]])
+
+    const two = withItems(2)
+    const target = { ...two, editorState: { ...two.editorState!, pivots: two.editorState!.pivots.slice(0, 1) } }
+    const next = pasteItems(target, clip)
+    assert.deepStrictEqual(next.items.map((i) => i.itemTransform.translation.x), [0, 1, 4, 2])
+    assert.deepStrictEqual(next.editorState!.pivots.map((p) => [p.itemIndex, p.pivot.localPosition.x]), [
+      [1, 1],
+      [2, 4]
+    ])
+    assert.strictEqual(pasteItems(target, copyItems(target, [])), target)
+    // a published map has no editorState to keep pivots in
+    const { editorState: _, ...published } = target
+    assert.isUndefined(pasteItems(published, clip).editorState)
   })
 
   it("validates items and renames levels", () => {

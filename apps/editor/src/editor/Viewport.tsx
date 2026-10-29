@@ -14,7 +14,9 @@ import {
   useState
 } from "react"
 import * as THREE from "three"
+import { toTuple3, ueToThreeVector } from "../domain/coords"
 import { isBound, mouseChordOf } from "../domain/Keybinds"
+import { WATER } from "../domain/level"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { ItemObject } from "./ItemObject"
@@ -23,6 +25,7 @@ import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline } from "./selectionOutline"
 import { nextSelection, type SelectMode, useEditor } from "./store"
 import { glbUrl, visualsOf } from "./visuals"
+import { waterTopMaterial, waterUnderMaterial } from "./water"
 
 const CLICK_SLOP_PX = 4
 
@@ -225,12 +228,15 @@ function ViewportBackground() {
   return null
 }
 
-/** The ground grid (1 m cells, 10 m sections), styled by the appearance settings. */
+/** The floor grid (1 m cells, 10 m sections) at the map's floor height, styled by the appearance settings. */
 function ViewportGrid() {
   const appearance = useEditor((s) => s.settings.appearance)
+  const floorHeight = useEditor((s) => s.floorHeight)
   if (!appearance.gridVisible) return null
   return (
     <Grid
+      position={[0, floorHeight, 0]}
+      side={THREE.DoubleSide} // drei's default (BackSide) hides it from below
       infiniteGrid
       cellSize={100}
       sectionSize={1000}
@@ -239,6 +245,22 @@ function ViewportGrid() {
       cellColor={appearance.gridCellColor}
       sectionColor={appearance.gridSectionColor}
     />
+  )
+}
+
+const WATER_POSITION = toTuple3(ueToThreeVector({ ...WATER.center, z: WATER.height }))
+
+/** The level's water sheet (see water.ts). Not in the click raycast (that only walks the items). */
+function Water() {
+  const visible = useEditor((s) => s.settings.appearance.waterVisible)
+  const geometry = useMemo(() => new THREE.PlaneGeometry(WATER.size, WATER.size), [])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  if (!visible) return null
+  return (
+    <group position={WATER_POSITION} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh geometry={geometry} material={waterTopMaterial} renderOrder={1} />
+      <mesh geometry={geometry} material={waterUnderMaterial} renderOrder={1} />
+    </group>
   )
 }
 
@@ -306,6 +328,7 @@ export function Viewport(
         <hemisphereLight args={["#dfe8ff", "#30302a", 0.8]} />
         <directionalLight position={[3000, 8000, 2000]} intensity={1.6} />
         <ViewportGrid />
+        <Water />
         <MapItems />
         <SelectedOutlines />
         <GizmoController />

@@ -6,6 +6,8 @@
 import { DateTime, Effect } from "effect"
 import type { CatalogPiece } from "./Catalog"
 import type { Vec3 } from "./coords"
+import { defaultProperties } from "./itemProperties"
+import { DEFAULT_PLAYER_START } from "./level"
 import {
   type EditorState,
   type Item,
@@ -82,7 +84,7 @@ export const qualifyMaterialPath = (path: string): string => {
 /**
  * An item exactly as the in-game editor writes a freshly placed piece. Pieces whose Main
  * component has no mesh (air vent, checkpoint strip) get the empty mesh component the
- * game writes for them.
+ * game writes for them, and every exposed property is written at its class default.
  */
 export const itemFromPiece = (piece: CatalogPiece, transform: ItemTransform): Item => ({
   actorToSpawn: piece.classPath,
@@ -98,7 +100,7 @@ export const itemFromPiece = (piece: CatalogPiece, transform: ItemTransform): It
       )
   ],
   bIsBaseItem: false,
-  ...emptyProperties
+  ...defaultProperties(piece)
 })
 
 /**
@@ -127,7 +129,7 @@ const PLAYER_START_MATERIAL =
 /** The in-game editor saves new player starts at this scale (20/20 samples; the catalog rounds it to 0.2765). */
 const PLAYER_START_SCALE = 0.276538
 
-const playerStartTransform = (translation: Vec3 = { x: 0, y: 0, z: 0 }): ItemTransform => ({
+const playerStartTransform = (translation: Vec3 = DEFAULT_PLAYER_START): ItemTransform => ({
   ...identityTransform({ ...translation }),
   scale3D: { x: PLAYER_START_SCALE, y: PLAYER_START_SCALE, z: PLAYER_START_SCALE }
 })
@@ -159,7 +161,10 @@ export interface NewMapOptions {
   readonly playerStartPiece?: CatalogPiece | undefined
 }
 
-/** A new, unvalidated map with the one player start the game requires. Defaults match fresh in-game saves. */
+/**
+ * A new, unvalidated map with the one player start the game requires, where the game puts
+ * it. Defaults match fresh in-game saves.
+ */
 export const newMapFile = (options: NewMapOptions): MapFile => ({
   worldSettings: {
     directionalLight: { timeOfDay: 7.299709320068359, brightness: 12 },

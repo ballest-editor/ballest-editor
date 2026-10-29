@@ -52,6 +52,17 @@ export const IntProperty = property(Schema.Int)
 // No samples contain text/name/string properties yet; keep their values untyped.
 export const UnknownProperty = property(Schema.Unknown)
 
+/** The typed lists an item's properties live in, in the order the game writes them. */
+export const PropertyList = Schema.Literals([
+  "boolProperties",
+  "floatProperties",
+  "intProperties",
+  "textProperties",
+  "nameProperties",
+  "stringProperties"
+])
+export type PropertyList = typeof PropertyList.Type
+
 export class Item extends Schema.Opaque<Item>()(
   open({
     actorToSpawn: Schema.String,

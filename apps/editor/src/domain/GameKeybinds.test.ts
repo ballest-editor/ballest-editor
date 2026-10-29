@@ -3,7 +3,7 @@ import { Schema } from "effect"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { repoRoot } from "../test/samples"
-import { deriveKeybinds, GameKeybindsFile, mappingDirection, UE_KEY_TO_CODE } from "./GameKeybinds"
+import { deriveKeybinds, GameKeybindsFile, mappingDirection, namedActions, UE_KEY_TO_CODE } from "./GameKeybinds"
 import { defaultKeybinds } from "./Keybinds"
 
 const negate = { type: "InputModifierNegate", settings: { bX: true, bY: true, bZ: true } }
@@ -57,17 +57,34 @@ describe("GameKeybinds", () => {
     assert.deepStrictEqual(keybinds.moveLeft, ["ArrowLeft"])
     assert.deepStrictEqual(keybinds.moveRight, ["ArrowRight"])
     assert.deepStrictEqual(keybinds.moveUp, ["Space"])
-    assert.deepStrictEqual(keybinds.moveDown, ["ShiftLeft"]) // editor override beats the game's Left Ctrl
+    assert.deepStrictEqual(keybinds.moveDown, ["ControlLeft"])
     assert.deepStrictEqual(keybinds.look, defaultKeybinds.look) // Mouse2D has no button; IMC_Default ignored
     assert.deepStrictEqual(keybinds.speedFaster, ["WheelUp"])
     assert.deepStrictEqual(keybinds.speedSlower, ["WheelDown"])
-    // level-editor overlay hotkey stays primary; the free camera's "center camera" is secondary
-    assert.deepStrictEqual(keybinds.focusSelection, ["KeyF", "KeyC"])
+    // the free camera's "center camera" (C) is left out: C switches local / world axes
+    assert.deepStrictEqual(keybinds.focusSelection, ["KeyF"])
+    assert.deepStrictEqual(keybinds.toggleGizmoSpace, ["KeyC"])
     assert.deepStrictEqual(keybinds.deselect, ["Escape"])
     assert.strictEqual(fromGame.get("moveForward")?.context, "IMC_FreeCam")
     assert.strictEqual(fromGame.get("deselect")?.context, "IMC_Universal")
     assert.include(fellBack, "undo")
     assert.include(fellBack, "look")
+  })
+
+  it("names every action once, grouped by section with ours first", () => {
+    const file = Schema.decodeSync(GameKeybindsFile)({
+      sections: [{ name: "racing" }],
+      contexts: [{
+        name: "IMC_FreeCam",
+        mappings: [{ ...m("IA_Height", "SpaceBar"), label: "rise", section: "racing" }]
+      }]
+    })
+    const named = namedActions(deriveKeybinds(file))
+    assert.strictEqual(new Set(named.map((n) => n.action)).size, named.length)
+    assert.deepStrictEqual(named.at(-1), { action: "moveUp", section: "racing", label: "rise" })
+    assert.deepStrictEqual(named[0], { action: "selectMode", section: "level editor", label: "select" })
+    const sections = named.map((n) => n.section)
+    assert.deepStrictEqual(sections, [...sections].sort((a, b) => sections.indexOf(a) - sections.indexOf(b)))
   })
 
   it("takes labels and sections from the file when present", () => {
@@ -120,7 +137,7 @@ describe("GameKeybinds", () => {
         keybinds.moveUp,
         keybinds.moveDown
       ],
-      [["KeyW"], ["KeyA"], ["KeyS"], ["KeyD"], ["Space"], ["ShiftLeft"]]
+      [["KeyW"], ["KeyA"], ["KeyS"], ["KeyD"], ["Space"], ["ControlLeft"]]
     )
     assert.deepStrictEqual([keybinds.speedFaster, keybinds.speedSlower, keybinds.deselect], [
       ["WheelUp"],
@@ -128,8 +145,8 @@ describe("GameKeybinds", () => {
       ["Escape"]
     ])
     assert.deepStrictEqual(keybinds.translateMode, ["KeyW"]) // the game's editor overlay, untouched by the camera contexts
-    assert.deepStrictEqual(keybinds.focusSelection, ["KeyF", "KeyC"])
-    for (const action of ["moveForward", "moveUp", "speedFaster", "deselect"] as const) {
+    assert.deepStrictEqual(keybinds.focusSelection, ["KeyF"])
+    for (const action of ["moveForward", "moveUp", "moveDown", "speedFaster", "deselect"] as const) {
       assert.isTrue(fromGame.has(action), action)
     }
     // the game's own names and sections, lower-cased

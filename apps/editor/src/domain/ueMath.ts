@@ -29,6 +29,9 @@ export const quatNormalize = (q: Quat4): Quat4 => {
   return { x: q.x / n, y: q.y / n, z: q.z / n, w: q.w / n }
 }
 
+/** The inverse rotation of a unit quaternion. */
+export const quatConjugate = (q: Quat4): Quat4 => ({ x: -q.x, y: -q.y, z: -q.z, w: q.w })
+
 /** v' = q v q* (same formula as FQuat::RotateVector). */
 export const rotateVec = (q: Quat4, v: Vec3): Vec3 => {
   const tx = 2 * (q.y * v.z - q.z * v.y)

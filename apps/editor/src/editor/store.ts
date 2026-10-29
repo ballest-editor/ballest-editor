@@ -9,9 +9,12 @@ import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Ca
 import type { UeTransform, Vec3 } from "../domain/coords"
 import {
   addItem,
-  duplicateItems,
+  type Clip,
+  copyItems,
+  pasteItems,
   removeItems,
   setLevelNames,
+  setProperties,
   setSlotMaterials,
   setTransforms,
   type SlotMaterial,
@@ -19,7 +22,10 @@ import {
 } from "../domain/edits"
 import { itemFromPiece, newMapFile } from "../domain/factory"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
+import type { PropertyChange } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
+import { floorHeightOf } from "../domain/level"
+import { LIMITS } from "../domain/limits"
 import { isPlayerStart, type ItemTransform, type MapFile } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
 import type { PaintPicker } from "../domain/Paint"
@@ -73,6 +79,11 @@ export const initialMap = () => newMapFile({ displayName: "Untitled", creatorNam
 
 export interface EditorState {
   readonly doc: Doc
+  /**
+   * The height (UE cm) the grid is drawn at and palette pieces land on: the player start's,
+   * taken when the map loads so it stays put while the start is moved.
+   */
+  readonly floorHeight: number
   /** Undo stack, oldest first (at most HISTORY_LIMIT entries). */
   readonly past: ReadonlyArray<Snapshot>
   /** Redo stack, next first; cleared by any new edit. */
@@ -86,6 +97,8 @@ export interface EditorState {
   /** The open modal dialog; editor keybinds are suspended while one is open. */
   readonly dialog: Dialog | null
   readonly settingsCategory: SettingsCategory
+  /** The keybind cheat sheet: shown while its binding is held. */
+  readonly cheatSheet: boolean
   readonly catalog: LoadedCatalog | null
   /** Lookups over `catalog`, built once per catalog load. */
   readonly catalogIndex: CatalogIndex | null
@@ -100,6 +113,11 @@ export interface EditorState {
   /** The game's defaults (and which actions fell back to editor defaults). */
   readonly keybindDefaults: DerivedKeybinds
   readonly missingGlbs: ReadonlySet<string>
+  /**
+   * The last copied items (Ctrl+C), as they were when copied. Not part of the document or
+   * its history, so it survives undo and loading another map.
+   */
+  readonly clipboard: Clip | null
   /**
    * Live transforms of the items under a continuous interaction (gizmo drag, number-field
    * scrub), by id. Not in the document until the interaction commits, as one undo step;
@@ -125,9 +143,34 @@ export interface EditorState {
    * (with a notice, and nothing changed) when an item or mesh component doesn't exist.
    */
   readonly paintSlots: (edits: ReadonlyArray<SlotPaint>) => boolean
+  /**
+   * Sets properties on every selected item as one undo step (a colour's three channels are
+   * one edit); false (with a notice, and nothing changed) when a value doesn't fit its property.
+   */
+  readonly setSelectionProperties: (changes: ReadonlyArray<PropertyChange>) => boolean
   readonly deleteSelection: () => void
   /** Copies the selected items in place (one undo step) and selects the copies. */
   readonly duplicateSelection: () => void
+  /** Puts the selected items on the clipboard; the document is unchanged. */
+  readonly copySelection: () => void
+  /** Puts the selected items on the clipboard and removes them (one undo step). */
+  readonly cutSelection: () => void
+  /**
+   * Adds the clipboard's items where they were copied, like the game (one undo step), and
+   * selects them.
+   */
+  readonly paste: () => void
+  /**
+   * Starts an Alt+drag duplicate: copies the selection in place and selects the copies, with
+   * no undo step yet. Returns each source id's copy id, or undefined when nothing was copied.
+   */
+  readonly beginDuplicateDrag: () => ReadonlyMap<string, string> | undefined
+  /**
+   * Ends an Alt+drag duplicate. With transforms (by copy id), the copy and the move commit
+   * as one undo step; with null (a cancelled drag), or when the game would reject a
+   * transform (false), the copies are removed and the selection restored.
+   */
+  readonly endDuplicateDrag: (transforms: ReadonlyMap<string, UeTransform> | null) => boolean
   readonly renameLevel: (displayName: string, creatorName: string) => void
   /** Restores the previous snapshot, including its selection. */
   readonly undo: () => void
@@ -138,6 +181,7 @@ export interface EditorState {
   readonly toggleGizmoSpace: () => void
   readonly openDialog: (dialog: Dialog, category?: SettingsCategory) => void
   readonly closeDialog: () => void
+  readonly setCheatSheet: (cheatSheet: boolean) => void
   readonly setSettingsCategory: (category: SettingsCategory) => void
   readonly setPreview: (preview: EditorState["preview"]) => void
   readonly setCatalog: (catalog: LoadedCatalog) => void
@@ -153,20 +197,52 @@ export interface EditorState {
 }
 
 export const useEditor = create<EditorState>()((set, get) => {
-  /** Push the current doc onto the undo stack and replace it; clears the redo stack. */
-  const commit = (doc: Doc, extra: Partial<EditorState> = {}) =>
+  /**
+   * Push `before` (by default the current doc and selection) onto the undo stack and replace
+   * the doc; clears the redo stack.
+   */
+  const commit = (doc: Doc, extra: Partial<EditorState> = {}, before?: DocState) =>
     set((s) => ({
       ...extra,
       doc,
       past: [...s.past, {
-        doc: s.doc,
-        selectedIds: s.selectedIds,
+        doc: before?.doc ?? s.doc,
+        selectedIds: before?.selectedIds ?? s.selectedIds,
         otherSelectedIds: extra.selectedIds ?? s.selectedIds,
         selectionOnly: false
       }].slice(-HISTORY_LIMIT),
       future: [],
       dirty: true
     }))
+
+  /**
+   * Document indices of the selected items that can be copied, in selection order. A map has
+   * exactly one player start (every sample does); copying it would make a second, so it is
+   * left out, with a notice.
+   */
+  const copyableIndices = (s: EditorState): Array<number> => {
+    const all = selectedIndices(s)
+    const indices = all.filter((i) => {
+      const item = s.doc.map.items[i]
+      return item !== undefined && !isPlayerStart(item)
+    })
+    if (indices.length < all.length) s.notify("info", "The player start isn't copied: a map has only one.")
+    return indices
+  }
+
+  /** The doc with the clip's items added and their fresh ids; undefined (with a notice) when there's no room. */
+  const withClip = (s: EditorState, clip: Clip): (Doc & { readonly added: ReadonlyArray<string> }) | undefined => {
+    if (clip.items.length === 0) return undefined
+    if (s.doc.map.items.length + clip.items.length > LIMITS.itemsPerLevel) {
+      s.notify("error", `The game allows at most ${LIMITS.itemsPerLevel.toLocaleString()} items in a map.`)
+      return undefined
+    }
+    const added = freshIds(clip.items.length)
+    return { map: pasteItems(s.doc.map, clip), ids: [...s.doc.ids, ...added], added }
+  }
+
+  /** Where an Alt+drag duplicate started, while one is in progress. */
+  let duplicateDragBase: DocState | null = null
 
   /** Swaps in a history snapshot; its selection is restored for the items that still exist. */
   const restore = (s: EditorState, snapshot: Snapshot) => {
@@ -188,8 +264,11 @@ export const useEditor = create<EditorState>()((set, get) => {
 
   const fallbackDefaults = deriveKeybinds(undefined)
 
+  const startingMap = initialMap()
+
   return {
-    doc: docOf(initialMap()),
+    doc: docOf(startingMap),
+    floorHeight: floorHeightOf(startingMap),
     past: [],
     future: [],
     dirty: false,
@@ -199,6 +278,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     gizmoSpace: "world",
     dialog: null,
     settingsCategory: "general",
+    cheatSheet: false,
     catalog: null,
     catalogIndex: null,
     booting: true,
@@ -208,6 +288,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     settings: defaultSettings,
     keybindDefaults: fallbackDefaults,
     missingGlbs: new Set(),
+    clipboard: null,
     preview: null,
     cameraSpeed: 1,
     focusRequest: 0,
@@ -216,6 +297,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     loadMap: (map, sourceName) =>
       set((s) => ({
         doc: docOf(map),
+        floorHeight: floorHeightOf(map),
         past: [],
         future: [],
         dirty: false,
@@ -248,7 +330,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         }
         return true
       }
-      get().notify("error", "That transform isn't valid for the game (non-finite or zero rotation).")
+      get().notify("error", INVALID_TRANSFORM)
       return false
     },
 
@@ -263,29 +345,88 @@ export const useEditor = create<EditorState>()((set, get) => {
       return true
     },
 
+    setSelectionProperties: (changes) => {
+      const s = get()
+      const indices = selectedIndices(s)
+      const next = setProperties(s.doc.map, indices, changes)
+      if (Option.isNone(next)) {
+        const names = changes.map((c) => `${JSON.stringify(c.value)} for ${c.property.name}`).join(", ")
+        s.notify("error", `Not a valid value: ${names}.`)
+        return false
+      }
+      const unchanged = indices.every((i) =>
+        changes.every(({ property, value }) =>
+          s.doc.map.items[i]?.[property.list].some((p) => p.propertyName === property.name && p.currentValue === value)
+        )
+      )
+      if (!unchanged) commit({ map: next.value, ids: s.doc.ids })
+      return true
+    },
+
     deleteSelection: () => {
       const s = get()
       const indices = selectedIndices(s)
       if (indices.length === 0) return
-      const removed = new Set(indices)
-      commit(
-        { map: removeItems(s.doc.map, indices), ids: s.doc.ids.filter((_, i) => !removed.has(i)) },
-        { selectedIds: [] }
-      )
+      commit(withoutItems(s.doc, indices), { selectedIds: [] })
     },
 
     duplicateSelection: () => {
       const s = get()
-      const all = selectedIndices(s)
-      // A map has exactly one player start (every sample does); copying it would make a second.
-      const indices = all.filter((i) => {
-        const item = s.doc.map.items[i]
-        return item !== undefined && !isPlayerStart(item)
-      })
-      if (indices.length < all.length) s.notify("info", "The player start isn't duplicated: a map has only one.")
+      const next = withClip(s, copyItems(s.doc.map, copyableIndices(s)))
+      if (next !== undefined) commit(next, { selectedIds: next.added })
+    },
+
+    copySelection: () => {
+      const s = get()
+      const clip = copyItems(s.doc.map, copyableIndices(s))
+      if (clip.items.length > 0) set({ clipboard: clip })
+    },
+
+    cutSelection: () => {
+      const s = get()
+      // only what was copied goes: cutting never removes the player start
+      const indices = copyableIndices(s)
       if (indices.length === 0) return
-      const ids = freshIds(indices.length)
-      commit({ map: duplicateItems(s.doc.map, indices), ids: [...s.doc.ids, ...ids] }, { selectedIds: ids })
+      commit(withoutItems(s.doc, indices), { selectedIds: [], clipboard: copyItems(s.doc.map, indices) })
+    },
+
+    paste: () => {
+      const s = get()
+      const next = s.clipboard === null ? undefined : withClip(s, s.clipboard)
+      if (next !== undefined) commit(next, { selectedIds: next.added })
+    },
+
+    beginDuplicateDrag: () => {
+      const s = get()
+      if (duplicateDragBase !== null) return undefined
+      const indices = copyableIndices(s)
+      const next = withClip(s, copyItems(s.doc.map, indices))
+      if (next === undefined) return undefined
+      duplicateDragBase = { doc: s.doc, selectedIds: s.selectedIds }
+      set({ doc: next, selectedIds: next.added })
+      // every index is in range, so copyItems keeps them all and the copies line up with them
+      return new Map(indices.flatMap((index, n) => {
+        const id = s.doc.ids[index]
+        const copy = next.added[n]
+        return id === undefined || copy === undefined ? [] : [[id, copy] as const]
+      }))
+    },
+
+    endDuplicateDrag: (transforms) => {
+      const before = duplicateDragBase
+      duplicateDragBase = null
+      if (before === null) return false
+      const { doc } = get()
+      const next = transforms === null
+        ? Option.none()
+        : setTransforms(doc.map, [...transforms].map(([id, t]) => [doc.ids.indexOf(id), t] as const))
+      if (Option.isNone(next)) {
+        set({ doc: before.doc, selectedIds: before.selectedIds })
+        if (transforms !== null) get().notify("error", INVALID_TRANSFORM)
+        return false
+      }
+      commit({ map: next.value, ids: doc.ids }, {}, before)
+      return true
     },
 
     renameLevel: (displayName, creatorName) => {
@@ -328,6 +469,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     toggleGizmoSpace: () => set((s) => ({ gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
     openDialog: (dialog, category) => set((s) => ({ dialog, settingsCategory: category ?? s.settingsCategory })),
     closeDialog: () => set({ dialog: null }),
+    setCheatSheet: (cheatSheet) => set({ cheatSheet }),
     setSettingsCategory: (settingsCategory) => set({ settingsCategory }),
     setPreview: (preview) => set({ preview }),
     setCatalog: (catalog) => set({ catalog, catalogIndex: indexCatalog(catalog.catalog) }),
@@ -351,6 +493,20 @@ export const useEditor = create<EditorState>()((set, get) => {
     requestFrameAll: () => set((s) => ({ frameAllRequest: s.frameAllRequest + 1 }))
   }
 })
+
+/** A document and the selection that goes with it. */
+interface DocState {
+  readonly doc: Doc
+  readonly selectedIds: Selection
+}
+
+/** The doc without the items at `indices`. */
+const withoutItems = (doc: Doc, indices: ReadonlyArray<number>): Doc => {
+  const removed = new Set(indices)
+  return { map: removeItems(doc.map, indices), ids: doc.ids.filter((_, i) => !removed.has(i)) }
+}
+
+const INVALID_TRANSFORM = "That transform isn't valid for the game (non-finite or zero rotation)."
 
 const sameVec = (a: Vec3, b: Vec3) => a.x === b.x && a.y === b.y && a.z === b.z
 

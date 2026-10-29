@@ -1,13 +1,13 @@
-import { IconCube, IconGrid4x4, IconWorld } from "@tabler/icons-react"
+import { IconAngle, IconCube, IconGrid4x4, IconWorld } from "@tabler/icons-react"
 import { Kbd } from "@workspace/ui/components/kbd"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Toggle } from "@workspace/ui/components/toggle"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import type { KeyboardEvent, MouseEvent } from "react"
+import type { KeyboardEvent, MouseEvent, ReactNode } from "react"
 import { formatBinding } from "../domain/Keybinds"
 import type { Settings } from "../domain/Settings"
-import { formatGridSize, GRID_SIZES, type GridSize } from "../domain/snap"
-import { saveSettings } from "../editor/actions"
+import { formatGridSize, formatRotationStep, GRID_SIZES, ROTATION_STEPS } from "../domain/snap"
+import { updateSettings } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { ToolBar } from "./ToolBar"
 
@@ -32,7 +32,7 @@ const noFocus = {
 
 /**
  * Floating view controls, top-right of the viewport, like the game's: the gizmo's local
- * (cube) or world (globe) axes, then grid snapping, each in its own group. Icons are named
+ * (cube) or world (globe) axes, then grid and rotation snapping, each in its own group. Icons are named
  * in their tooltips.
  * Pointer-only like the tool bar, so keybinds stay with the viewport.
  */
@@ -72,18 +72,68 @@ export function ViewControls({ disabled = false }: { readonly disabled?: boolean
   )
 }
 
-/**
- * Grid snapping for gizmo translation, its own group like the game's: the grid icon turns it on and off, the menu picks the
- * grid size (and turns snapping on). Saved with the settings.
- */
+/** Grid and rotation snapping, each its own group like the game's. Saved with the settings. */
 function SnapControls({ disabled }: { readonly disabled: boolean }) {
   const settings = useEditor((s) => s.settings)
-  const { enabled, gridSize } = settings.snapping
+  const { enabled, gridSize, rotationEnabled, rotationStep } = settings.snapping
   const units = settings.general.units
-  const update = (snapping: Partial<Settings["snapping"]>) =>
-    void saveSettings({ ...settings, snapping: { ...settings.snapping, ...snapping } })
-  // The button shows just the number, like the game's; the menu and tooltip carry the unit.
-  const items = Object.fromEntries(GRID_SIZES.map((size) => [size, String(units === "m" ? size / 100 : size)]))
+  const update = (snapping: Partial<Settings["snapping"]>) => void updateSettings("snapping", snapping)
+  const degrees = (step: number) => `${formatRotationStep(step)}°`
+
+  return (
+    <>
+      <SnapGroup
+        icon={<IconGrid4x4 />}
+        label="Snap to grid"
+        enabled={enabled}
+        onToggle={(pressed) => update({ enabled: pressed })}
+        value={gridSize}
+        options={GRID_SIZES}
+        onPick={(size) => update({ enabled: true, gridSize: size })}
+        valueLabel={`Grid size (${units})`}
+        // The button shows just the number, like the game's; the menu and tooltip carry the unit.
+        short={(size) => String(units === "m" ? size / 100 : size)}
+        long={(size) => formatGridSize(size, units)}
+        disabled={disabled}
+      />
+      <SnapGroup
+        icon={<IconAngle />}
+        label="Snap rotation"
+        enabled={rotationEnabled}
+        onToggle={(pressed) => update({ rotationEnabled: pressed })}
+        value={rotationStep}
+        options={ROTATION_STEPS}
+        onPick={(step) => update({ rotationEnabled: true, rotationStep: step })}
+        valueLabel="Rotation step"
+        short={degrees}
+        long={degrees}
+        disabled={disabled}
+      />
+    </>
+  )
+}
+
+/**
+ * One kind of gizmo snapping: the icon turns it on and off, the number next to it picks the
+ * step from a menu (and turns snapping on).
+ */
+function SnapGroup<V extends number>(props: {
+  readonly icon: ReactNode
+  readonly label: string
+  readonly enabled: boolean
+  readonly onToggle: (pressed: boolean) => void
+  readonly value: V
+  readonly options: ReadonlyArray<V>
+  readonly onPick: (value: V) => void
+  /** Names the step picker in its tooltip. */
+  readonly valueLabel: string
+  /** The step on the button, and in the menu. */
+  readonly short: (value: V) => string
+  readonly long: (value: V) => string
+  readonly disabled: boolean
+}) {
+  const { enabled, disabled } = props
+  const items = Object.fromEntries(props.options.map((v) => [v, props.short(v)]))
 
   return (
     <div className={GROUP}>
@@ -92,25 +142,25 @@ function SnapControls({ disabled }: { readonly disabled: boolean }) {
           render={
             <Toggle
               pressed={enabled}
-              onPressedChange={(pressed) => update({ enabled: pressed })}
+              onPressedChange={props.onToggle}
               disabled={disabled}
-              aria-label="Snap to grid"
+              aria-label={props.label}
               className="size-8 rounded-full data-[pressed]:bg-primary data-[pressed]:text-primary-foreground"
               {...noFocus}
             />
           }
         >
-          <IconGrid4x4 />
+          {props.icon}
         </TooltipTrigger>
         <TooltipContent side="bottom" sideOffset={POPUP_OFFSET.button}>
-          Snap to grid {enabled ? "on" : "off"}
+          {props.label} {enabled ? "on" : "off"}
         </TooltipContent>
       </Tooltip>
       <Select
-        value={gridSize}
+        value={props.value}
         items={items}
         disabled={disabled}
-        onValueChange={(size: GridSize | null) => size !== null && update({ enabled: true, gridSize: size })}
+        onValueChange={(v: V | null) => v !== null && props.onPick(v)}
         onOpenChangeComplete={(open) => {
           // Hand focus back to the viewport so Space doesn't reopen the menu.
           if (!open && document.activeElement instanceof HTMLElement) document.activeElement.blur()
@@ -120,7 +170,7 @@ function SnapControls({ disabled }: { readonly disabled: boolean }) {
           <TooltipTrigger
             render={
               <SelectTrigger
-                aria-label="Grid size"
+                aria-label={props.valueLabel}
                 size="sm"
                 tabIndex={-1}
                 className={`min-w-8 justify-center rounded-full border-none bg-transparent px-1.5 tabular-nums dark:bg-transparent [&>svg]:hidden ${
@@ -131,12 +181,12 @@ function SnapControls({ disabled }: { readonly disabled: boolean }) {
           >
             <SelectValue className="flex-none justify-center text-center" />
           </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={POPUP_OFFSET.size}>Grid size ({units})</TooltipContent>
+          <TooltipContent side="bottom" sideOffset={POPUP_OFFSET.size}>{props.valueLabel}</TooltipContent>
         </Tooltip>
         <SelectContent side="bottom" sideOffset={POPUP_OFFSET.size} align="end" alignItemWithTrigger={false}>
-          {GRID_SIZES.map((size) => (
-            <SelectItem key={size} value={size} className="tabular-nums">
-              {formatGridSize(size, units)}
+          {props.options.map((v) => (
+            <SelectItem key={v} value={v} className="tabular-nums">
+              {props.long(v)}
             </SelectItem>
           ))}
         </SelectContent>

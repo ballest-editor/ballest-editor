@@ -54,12 +54,23 @@ export interface DragGrid {
   readonly pivot: Vec3
 }
 
+/** Which snapping is on for a drag: the translation grid, and the rotation step in degrees. */
+export interface DragSnap {
+  readonly grid?: DragGrid | undefined
+  readonly rotationStep?: number | undefined
+}
+
 /**
  * The delta for the pointer at `now`. With a `grid`, translate drags snap: in world space
  * the pivot lands on the world grid along the moved axes (the others keep their values); in
- * local space the selection moves in whole grid steps along the active item's axes.
+ * local space the selection moves in whole grid steps along the active item's axes. With a
+ * `rotationStep`, rotate drags turn in whole steps from where they started.
  */
-export const dragDelta = (start: DragStart, now: PointerSample, grid?: DragGrid): GroupDelta | undefined => {
+export const dragDelta = (
+  start: DragStart,
+  now: PointerSample,
+  { grid, rotationStep }: DragSnap = {}
+): GroupDelta | undefined => {
   const { spec, originWorld: o } = start
   if (spec.kind === "scaleUniform") {
     const r0 = Math.hypot(start.pointer.px.x - start.originPx.x, start.pointer.px.y - start.originPx.y)
@@ -90,7 +101,10 @@ export const dragDelta = (start: DragStart, now: PointerSample, grid?: DragGrid)
       // pointing at the viewer; flip when the axis points away.
       const facing = dir.dot(start.toCamera)
       const sign = spec.kind === "rotateView" || facing >= 0 ? 1 : -1
-      const angle = sign * screenAngle(start.originPx, start.pointer.px, now.px)
+      const free = sign * screenAngle(start.originPx, start.pointer.px, now.px)
+      const angle = rotationStep === undefined
+        ? free
+        : snapValue((free * 180) / Math.PI, rotationStep) * Math.PI / 180
       return { kind: "rotate", rotation: worldAxisAngleToGameQuat(dir, angle) }
     }
     case "scaleAxis": {

@@ -5,7 +5,7 @@
  */
 import { Option, Predicate, Schema } from "effect"
 import { movementLookModes } from "./flyKeys"
-import { DEFAULT_GRID_SIZE, GRID_SIZES } from "./snap"
+import { DEFAULT_GRID_SIZE, DEFAULT_ROTATION_STEP, GRID_SIZES, ROTATION_STEPS } from "./snap"
 
 /** "Custom" uses CameraSettings.customFov instead of a preset's. */
 export const CUSTOM_FOV_PRESET = "Custom"
@@ -16,7 +16,9 @@ export const GeneralSettings = Schema.Struct({
   /** Your in-game name; written into every exported map's `creatorName` and file name. */
   creatorName: Schema.String,
   /** Whether a selection change is its own undo step (edits always restore their selection). */
-  undoSelection: Schema.Boolean
+  undoSelection: Schema.Boolean,
+  /** Whether Alt+dragging a translate handle moves a copy and leaves the selection in place, like the game. */
+  altDragDuplicates: Schema.Boolean
 })
 
 export const CameraSettings = Schema.Struct({
@@ -38,7 +40,9 @@ export const AppearanceSettings = Schema.Struct({
   theme: Schema.Literals(["dark", "light", "system"]),
   gridVisible: Schema.Boolean,
   gridCellColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)),
-  gridSectionColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/))
+  gridSectionColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)),
+  /** Whether the level's water (see domain/level) is drawn. */
+  waterVisible: Schema.Boolean
 })
 
 /** Changed from the tool bar rather than the settings dialog, but persisted with the rest. */
@@ -46,7 +50,11 @@ export const SnappingSettings = Schema.Struct({
   /** Whether gizmo translation lands on the world grid. */
   enabled: Schema.Boolean,
   /** Grid step in cm. */
-  gridSize: Schema.Literals(GRID_SIZES)
+  gridSize: Schema.Literals(GRID_SIZES),
+  /** Whether gizmo rotation turns in whole steps. */
+  rotationEnabled: Schema.Boolean,
+  /** Rotation step in degrees. */
+  rotationStep: Schema.Literals(ROTATION_STEPS)
 })
 
 export const Settings = Schema.Struct({
@@ -58,7 +66,7 @@ export const Settings = Schema.Struct({
 export type Settings = typeof Settings.Type
 
 export const defaultSettings: Settings = {
-  general: { units: "cm", creatorName: "", undoSelection: false },
+  general: { units: "cm", creatorName: "", undoSelection: false, altDragDuplicates: true },
   camera: {
     flySpeed: 2000,
     lookSensitivity: 1,
@@ -68,8 +76,19 @@ export const defaultSettings: Settings = {
     invertLookY: false,
     movementNeedsLook: "all"
   },
-  appearance: { theme: "dark", gridVisible: true, gridCellColor: "#3a404a", gridSectionColor: "#58606e" },
-  snapping: { enabled: false, gridSize: DEFAULT_GRID_SIZE }
+  appearance: {
+    theme: "dark",
+    gridVisible: true,
+    gridCellColor: "#3a404a",
+    gridSectionColor: "#58606e",
+    waterVisible: true
+  },
+  snapping: {
+    enabled: false,
+    gridSize: DEFAULT_GRID_SIZE,
+    rotationEnabled: false,
+    rotationStep: DEFAULT_ROTATION_STEP
+  }
 }
 
 type Section = keyof Settings

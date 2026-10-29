@@ -2,7 +2,7 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useRef } from "react"
 import * as THREE from "three"
 import { threeToUeVector, ueToThreeVector } from "../domain/coords"
-import { flyingActions, type MovementAction } from "../domain/flyKeys"
+import { flyingActions, formsChord, type MovementAction } from "../domain/flyKeys"
 import {
   type Bindings,
   chordOf,
@@ -28,11 +28,14 @@ export const isTypingTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement &&
   (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
 
-/** Keyboard events that belong to a text field or an open dialog never drive the editor. */
+/**
+ * Keyboard events that belong to a text field, an open dialog or a menu (the menu bar's
+ * arrow keys, Escape and type-ahead) never drive the editor.
+ */
 export const isEditorKeyEvent = (e: KeyboardEvent): boolean =>
   !isTypingTarget(e.target) &&
   useEditor.getState().dialog === null &&
-  !(e.target instanceof Element && e.target.closest("[role=dialog]") !== null)
+  !(e.target instanceof Element && e.target.closest("[role=dialog], [role=menu], [role=menubar]") !== null)
 
 type DragMode = "look" | "orbit" | "pan"
 
@@ -63,12 +66,13 @@ export function FlyCamera() {
   const target = useRef(new THREE.Vector3())
   const euler = useRef(new THREE.Euler(0, 0, 0, "YXZ"))
 
-  // Placement point: ground-plane hit at screen centre, else a fixed distance ahead.
+  // Placement point: floor hit at screen centre, else a fixed distance ahead.
   useEffect(() => {
     sceneRegistry.camera = camera
     const raycaster = new THREE.Raycaster()
     const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
     sceneRegistry.placementPoint = () => {
+      ground.constant = -useEditor.getState().floorHeight // the plane y = floorHeight
       raycaster.setFromCamera(new THREE.Vector2(0, 0), camera)
       const hit = raycaster.ray.intersectPlane(ground, new THREE.Vector3())
       const point = hit !== null && hit.distanceTo(camera.position) < MAX_GROUND_HIT
@@ -92,7 +96,7 @@ export function FlyCamera() {
       flyingNow(keybinds, pressed.current, drag.current !== null, performance.now()).size > 0
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (isEditorKeyEvent(e)) pressed.current.press(e.code, performance.now(), isBoundChord(keybinds, chordOf(e)))
+      if (isEditorKeyEvent(e)) pressed.current.press(e.code, performance.now(), formsChord(keybinds, chordOf(e)))
     }
     const onKeyUp = (e: KeyboardEvent) => pressed.current.release(e.code)
     const onBlur = () => pressed.current.clear()
@@ -100,6 +104,8 @@ export function FlyCamera() {
     const onPointerDown = (e: PointerEvent) => {
       // No gizmo check: the gizmo stops the left presses it takes, other buttons fall through.
       const chord = mouseChordOf(e)
+      // Ctrl+click and the like: the held modifier is the click's, not "down".
+      if (isBoundChord(keybinds, chord)) pressed.current.suppressModifiers()
       const mode = dragModes.find(([bindings]) => bindings.includes(chord))?.[1]
       if (mode === undefined) return
       drag.current = mode
@@ -218,7 +224,10 @@ export function FlyCamera() {
         const p = ueToThreeVector(item.itemTransform.translation)
         box.expandByPoint(new THREE.Vector3(p.x, p.y, p.z))
       }
-      if (box.isEmpty()) box.set(new THREE.Vector3(-500, 0, -500), new THREE.Vector3(500, 0, 500))
+      if (box.isEmpty()) {
+        const floor = useEditor.getState().floorHeight
+        box.set(new THREE.Vector3(-500, floor, -500), new THREE.Vector3(500, floor, 500))
+      }
       const sphere = box.getBoundingSphere(new THREE.Sphere())
       const radius = Math.max(sphere.radius, 1000)
       target.current.copy(sphere.center)

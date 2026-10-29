@@ -6,7 +6,7 @@
  * and nothing changes position.
  */
 import type { Quat4, UeTransform, Vec3 } from "./coords"
-import { quatMul, quatNormalize, quatToRotator, rotateVec, rotatorToQuat } from "./ueMath"
+import { quatConjugate, quatMul, quatNormalize, quatToRotator, rotateVec, rotatorToQuat } from "./ueMath"
 
 /** What a gizmo drag does, independent of how many items it applies to. */
 export type GroupDelta =
@@ -72,14 +72,54 @@ export const writeField = (t: UeTransform, field: TransformField, v: Vec3): UeTr
   }
 }
 
-/** Set an axis to a value (typed into a field), or offset it (a scrub across a mixed selection). */
+/** Set an axis to a value (typed into a field), or offset it (a scrub). */
 export type AxisEdit = { readonly kind: "set"; readonly value: number } | {
   readonly kind: "offset"
   readonly by: number
 }
 
-export const editAxis = (t: UeTransform, field: TransformField, axis: Axis, edit: AxisEdit): UeTransform => {
-  const current = readField(t, field)
-  const value = edit.kind === "set" ? edit.value : current[axis] + edit.by
-  return writeField(t, field, { ...current, [axis]: value })
+const setAxis = (t: UeTransform, field: TransformField, axis: Axis, value: number): UeTransform =>
+  writeField(t, field, { ...readField(t, field), [axis]: value })
+
+/**
+ * The gizmo delta that turns `active` by `by` degrees about one rotator axis. Measured on
+ * the active item's rotator round-tripped through the quaternion, so only the edited angle
+ * changes even near gimbal lock, where the item's other rotator angles are ambiguous.
+ */
+const rotatorOffset = (active: UeTransform, axis: Axis, by: number): GroupDelta => {
+  const rotator = readField(active, "rotation")
+  const from = writeField(active, "rotation", rotator).rotation
+  const to = writeField(active, "rotation", { ...rotator, [axis]: rotator[axis] + by }).rotation
+  return { kind: "rotate", rotation: quatNormalize(quatMul(to, quatConjugate(from))) }
+}
+
+/**
+ * An inspector axis edit over a whole selection, as the change to make to each item's
+ * transform from before the edit. A typed value sets that axis on every item. An offset (a
+ * scrub) acts like a gizmo drag on the same selection: a location moves every item by the
+ * same amount; a rotation turns the active item about the edited rotator axis and the rest
+ * rigidly with it, about the active item's origin; a scale changes each item's own axis in
+ * place. Always applied to the transforms from before the scrub, never to a live preview, so
+ * a scrub's steps don't compound.
+ */
+export const selectionAxisEdit = (
+  active: UeTransform,
+  field: TransformField,
+  axis: Axis,
+  edit: AxisEdit
+): (t: UeTransform) => UeTransform => {
+  if (edit.kind === "set") return (t) => setAxis(t, field, axis, edit.value)
+  const { by } = edit
+  switch (field) {
+    case "translation": {
+      const delta: GroupDelta = { kind: "translate", offset: { x: 0, y: 0, z: 0, [axis]: by } }
+      return (t) => applyGroupDelta(t, active.translation, delta)
+    }
+    case "rotation": {
+      const delta = rotatorOffset(active, axis, by)
+      return (t) => applyGroupDelta(t, active.translation, delta)
+    }
+    case "scale3D":
+      return (t) => setAxis(t, field, axis, t.scale3D[axis] + by)
+  }
 }

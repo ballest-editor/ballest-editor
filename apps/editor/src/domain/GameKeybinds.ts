@@ -13,11 +13,12 @@ import {
   type Bindings,
   defaultKeybinds,
   editorOverlayActions,
-  editorOverrides,
   heldActions,
   type KeybindAction,
+  keybindActionLabels,
   keybindActions,
   type Keybinds,
+  keybindSections,
   uniqueBindings
 } from "./Keybinds"
 import { open } from "./schema"
@@ -209,7 +210,7 @@ const GAME_ACTIONS: Readonly<Record<string, Resolver>> = {
   cameraspeedslower: fixed("speedSlower"),
   camera: mouseButtonOnly("look"), // Mouse2D in game; the browser needs a held button
   look: lookResolver,
-  centercamera: fixed("focusSelection"),
+  // IA_CenterCamera (C) is left out: the level editor's C switches local / world axes.
   // IMC_Universal
   pause: fixed("deselect"),
   // Editor actions the pak declares but no context maps yet (native SKG plugin hotkeys).
@@ -287,7 +288,7 @@ export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybi
         // A bare modifier key only works for held actions (e.g. LeftControl = fly down).
         if (MODIFIER_PREFIX[base] !== undefined && !heldActions.has(action)) continue
         // The first game mapping replaces the editor default; later ones become secondary
-        // bindings. Level-editor overlay hotkeys stay primary (F focus, then the camera's C).
+        // bindings. Level-editor overlay hotkeys stay primary.
         const first = !fromGame.has(action)
         const keep = first && !editorOverlayActions.has(action) ? [] : out[action]
         out[action] = uniqueBindings([...keep, chord])
@@ -317,16 +318,42 @@ export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybi
       }
     }
   }
-  for (const action of keybindActions) {
-    const bindings = editorOverrides[action]
-    if (bindings === undefined) continue
-    out[action] = bindings
-    fromGame.delete(action)
-  }
   const fellBack = keybindActions.filter((a) => !fromGame.has(a))
   const sectionOrder = (file?.sections ?? []).map((s) => s.name).filter((name) => !/gamepad/i.test(name))
   const cameraPresets = file?.cameraPresets !== undefined && file.cameraPresets.length > 0
     ? file.cameraPresets.map((p) => ({ id: p.row, label: p.label, fov: p.fov }))
     : FALLBACK_CAMERA_PRESETS
   return { keybinds: out, naming, fromGame, fellBack, sectionOrder, cameraPresets }
+}
+
+export interface NamedAction {
+  readonly action: KeybindAction
+  readonly section: string
+  readonly label: string
+}
+
+/**
+ * Every action with the section and label to show it under (keybinds.json naming when the
+ * extractor provides it, else the built-in table), ordered by section: ours first in table
+ * order, then the game's in its settings-screen order.
+ */
+export const namedActions = (derived: DerivedKeybinds): ReadonlyArray<NamedAction> => {
+  const tableOrder: ReadonlyArray<string> = keybindSections.map((s) => s.name)
+  const sectionRank = (name: string) => {
+    const ours = tableOrder.indexOf(name)
+    if (ours >= 0) return ours
+    const game = derived.sectionOrder.indexOf(name)
+    return tableOrder.length + (game >= 0 ? game : derived.sectionOrder.length)
+  }
+  return keybindSections
+    .flatMap((section) =>
+      section.actions.map((action): NamedAction => ({
+        action,
+        section: derived.naming.get(action)?.section ?? section.name,
+        label: derived.naming.get(action)?.label ?? keybindActionLabels[action]
+      }))
+    )
+    .map((named, i) => ({ named, i }))
+    .sort((x, y) => sectionRank(x.named.section) - sectionRank(y.named.section) || x.i - y.i)
+    .map(({ named }) => named)
 }
