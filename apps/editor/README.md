@@ -111,7 +111,7 @@ Alt+N/Ctrl+O/Ctrl+S.
 - **WASD** flies.
 - **Space** goes up.
 - **Down is Left Ctrl**, as in the game. It doesn't move the camera when it's the
-  modifier of a chord (Ctrl+Z, Ctrl+D, the browser's Ctrl+C / Ctrl+V, Ctrl+click).
+  modifier of a chord (Ctrl+Z, Ctrl+C, Ctrl+V, Ctrl+D, Ctrl+click, the browser's own Ctrl shortcuts).
 - **"fly faster" is unbound** (the wheel already changes speed).
 - **RMB-drag looks.** The game's look is Mouse2D, which needs a held button in a browser.
 - **Alt+LMB orbits, MMB pans.**
