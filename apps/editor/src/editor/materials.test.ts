@@ -137,6 +137,7 @@ describe("three materials", () => {
     assert.deepStrictEqual(shaderPatchOf(wind)?.defines, {
       BALLEST_TILING: 1,
       BALLEST_ALPHA: 1,
+      BALLEST_ALPHA_CHANNEL: "r",
       BALLEST_PROGRAM_ALPHA: 1
     })
     assert.deepStrictEqual(shaderPatchOf(wind)?.uniforms.uAlphaShape.value, new THREE.Vector2(0.6, 0.3))
@@ -147,6 +148,7 @@ describe("three materials", () => {
     applyShaderPatch(shader, shaderPatchOf(wind)!)
     assert.include(shader.vertexShader, "vBallestUp = abs( vBallestWorldNormal.z )")
     assert.include(shader.fragmentShader, "uniform sampler2D uTex0;\nfloat ballestAlpha(")
+    assert.include(shader.fragmentShader, "ballestUv( uAlphaTiling ) ).BALLEST_ALPHA_CHANNEL")
     assert.include(
       shader.fragmentShader,
       "diffuseColor.a = ballestAlpha( vBallestUv, vBallestWorldNormal, vBallestLocal, uBallestTime )"

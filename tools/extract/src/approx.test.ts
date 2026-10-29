@@ -364,9 +364,21 @@ describe("approxOf", () => {
       tiling: [0.01, 0.01],
       projection: "world",
       instanceScale: 0,
+      channel: "r",
       gain: 0.9, // the whole swing, larger than the read's own gain
       mean: 0.2
     }])
+    // a read of the green channel says so, and its mean is the green one
+    const green = build(
+      {
+        ...sh,
+        reads: [{ ...sh.reads[0]!, channels: "y" }],
+        surface: { ...sh.surface!, gains: { "0": { gain: [0, 0, 0], alpha: 0.3, mean: [0.2, 0.7, 0.2] } } }
+      },
+      { ...MERGED, scalars: {} },
+      "BLEND_Translucent"
+    )
+    assert.deepStrictEqual([green.opacityLayers[0]?.channel, green.opacityLayers[0]?.mean], ["g", 0.7])
     assert.deepStrictEqual(a.programs, {
       alpha: {
         code: "float ballestAlpha() {}",

@@ -74,7 +74,7 @@ const loadTexture = (
 
 /** The shader patch's inputs; `defines` (and `glsl`, per material) make the program cache key. */
 export interface Patch {
-  readonly defines: Readonly<Record<string, number>>
+  readonly defines: Readonly<Record<string, number | string>>
   /** The material's own GLSL (an `approx.programs` function and its samplers), or "". */
   readonly glsl: string
   readonly uniforms: Record<string, THREE.IUniform> & {
@@ -125,7 +125,7 @@ const patchOf = (
     | { readonly kind: ProgramKind; readonly code: string; readonly maps: ReadonlyArray<[string, THREE.Texture]> }
     | null
 ): Patch | undefined => {
-  const defines: Record<string, number> = {}
+  const defines: Record<string, number | string> = {}
   const { tiling } = spec
   const projected = spec.projection !== "uv"
   if (projected || !isOne(tiling.baseColor) || !isOne(tiling.normal) || !isOne(tiling.opacity)) {
@@ -139,7 +139,11 @@ const patchOf = (
   }
   if (normal2 !== null) defines["BALLEST_NORMAL2"] = 1
   if (colorMaps.length > 0) defines["BALLEST_COLOR"] = colorMaps.length
-  if (alphaMap !== null) defines["BALLEST_ALPHA"] = 1
+  if (alphaMap !== null) {
+    defines["BALLEST_ALPHA"] = 1
+    // The channel the game's shader reads the alpha shape from (a swizzle, so a define).
+    defines["BALLEST_ALPHA_CHANNEL"] = spec.opacityLayer?.channel ?? "r"
+  }
   // A program carries the game's own cap mask; the up fade stands in only without one.
   if (spec.translucent && spec.upFade < 1 && program === null) defines["BALLEST_UP_FADE"] = 1
   if (spec.outline !== undefined) defines["BALLEST_OUTLINE"] = 1
@@ -298,7 +302,7 @@ const COLOR_EXTRAS = /* glsl */ `
   diffuseColor.rgb = clamp( diffuseColor.rgb, 0.0, 1.0 );
 #endif
 #ifdef BALLEST_ALPHA
-  diffuseColor.a = clamp( diffuseColor.a + uAlphaShape.x * ( texture2D( uAlphaMap, ballestUv( uAlphaTiling ) ).r - uAlphaShape.y ), 0.0, 1.0 );
+  diffuseColor.a = clamp( diffuseColor.a + uAlphaShape.x * ( texture2D( uAlphaMap, ballestUv( uAlphaTiling ) ).BALLEST_ALPHA_CHANNEL - uAlphaShape.y ), 0.0, 1.0 );
 #endif
 #ifdef BALLEST_UP_FADE
   // The game's beams multiply their alpha by 1 - |world normal z|: only the vertical faces show.
@@ -430,7 +434,8 @@ export const shaderPatchOf = (material: THREE.Material): Patch | undefined => pa
 const patchShader = (material: THREE.MeshStandardMaterial, patch: Patch): void => {
   material.defines = { ...material.defines, ...patch.defines }
   // Materials with their own GLSL cannot share a compiled program.
-  const key = Object.keys(patch.defines).sort().join(",") + (patch.glsl === "" ? "" : `|${material.name}`)
+  const key = Object.keys(patch.defines).sort().map((k) => `${k}=${patch.defines[k]}`).join(",") +
+    (patch.glsl === "" ? "" : `|${material.name}`)
   material.customProgramCacheKey = () => key
   material.onBeforeCompile = (shader) => applyShaderPatch(shader, patch)
   patches.set(material, patch)

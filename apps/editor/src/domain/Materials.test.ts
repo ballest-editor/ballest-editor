@@ -55,6 +55,7 @@ describe("materials", () => {
     assert.deepStrictEqual(wind.opacityLayer, {
       texture: "textures/ray.png",
       tiling: [0.25, 0.25],
+      channel: "r", // older files say no channel: the red one
       gain: 0.6,
       mean: 0.3
     })

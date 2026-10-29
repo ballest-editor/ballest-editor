@@ -456,16 +456,21 @@ export const approxOf = (
     opacityLayers: reads
       .filter((r) => r.role !== "normal" && r.unresolved.length === 0 && Math.abs(r.alphaGain) >= 1e-4)
       .sort((a, b) => Math.abs(b.alphaGain) - Math.abs(a.alphaGain))
-      .map((r, i) => ({
-        texture: texPath(r.texture) ?? `missing:${r.texture}`,
-        tiling: r.scale,
-        projection: r.projection,
-        instanceScale: r.instanceScale,
-        gain: i === 0 && evaluated?.alphaRange && r.alphaGain > 0
-          ? Math.max(r.alphaGain, evaluated.alphaRange[1] - evaluated.alphaRange[0])
-          : r.alphaGain,
-        mean: r.mean === null ? 0.5 : r.mean[0]
-      })),
+      .map((r, i) => {
+        // The channel the shader reads (a single-channel read; the first of a wider one), and its mean.
+        const channel = "xyzw".indexOf(r.channels[0] ?? "x")
+        return {
+          texture: texPath(r.texture) ?? `missing:${r.texture}`,
+          tiling: r.scale,
+          projection: r.projection,
+          instanceScale: r.instanceScale,
+          channel: "rgba"[channel] ?? "r",
+          gain: i === 0 && evaluated?.alphaRange && r.alphaGain > 0
+            ? Math.max(r.alphaGain, evaluated.alphaRange[1] - evaluated.alphaRange[0])
+            : r.alphaGain,
+          mean: r.mean === null ? 0.5 : r.mean[channel] ?? 0.5
+        }
+      }),
     // Textures added to the base colour, each scaled by what the shader adds for it (colour = base + sum gain_i * read_i).
     // A base program computes the whole colour itself, layers and mottle included.
     colorLayers: (programs["base"] ? [] : colorLayers).map((r) => ({
