@@ -239,8 +239,9 @@ Output shape:
 
 - all sample `materials[].material` entries
 - every `defaultMaterial`/`meshMaterial` in `catalog.json`, including `extraMeshes`
+- every material the in-game Paint picker offers (see below)
 
-That gives 116 paths now that the catalog covers all 200 pieces. `BallestExtract materials` follows each one's `Parent` chain up to the root `UMaterial` and dumps every asset in the chain. It also decodes every texture those assets reference: 55 textures, written as PNG to `assets/textures/` mirroring the UE path. Each PNG is the largest mip at or below `--tex-max`, which defaults to 2048 px. Textures with no mip that small (single-mip UI textures, for example) are resized with ImageSharp.
+That gives 122 paths now that the catalog covers all 200 pieces. `BallestExtract materials` follows each one's `Parent` chain up to the root `UMaterial` and dumps every asset in the chain. It also decodes every texture those assets reference: 55 textures, written as PNG to `assets/textures/` mirroring the UE path. Each PNG is the largest mip at or below `--tex-max`, which defaults to 2048 px. Textures with no mip that small (single-mip UI textures, for example) are resized with ImageSharp.
 
 The textures total about 142 MB, so `assets/textures/` is gitignored.
 
@@ -293,6 +294,14 @@ If the root's BaseColor pin isn't connected but EmissiveColor is (`M_Emissive_Li
 
   These are root materials with zero parameters; their look is built from constants inside the graph, which isn't cooked. Each still has `referencedTextures`, and `recovered: false`.
 - `approx` ignores UV tiling and world-aligned or triplanar mapping. Masters such as `M_Env_Material_Default` and `M_SmartMat` use world-space UVs, so textures on mesh UVs won't line up with the game. Flat colour is the reliable part.
+
+**The Paint picker (`paint`).** The level editor's Paint panel (`UI/Details/Material/WBP_CustomizeMaterial`, one row per mesh slot) offers a finish dropdown and a row of colour swatches. Its data:
+
+- `UI/Data/MaterialSelection/MaterialCategories_Library` (a `PDA_MaterialCategories`) lists the finishes in order. Each one is a `PDA_MaterialCategory` under `/Game/Art/DataAssets/BallestMaterials/`.
+- Each category's `ColorMaterialMap` maps an `EBallestMaterialColors` value to a material. `MaterialCategory` is an `EBallestMaterialCategories` value; `MaterialCategory_Smooth` leaves it unset, so it takes the first enumerator, `smooth`. `ColorColorMap` sets an explicit swatch colour, and only `special` uses it.
+- Category and colour names are the enums' display names. The `*_Dark` materials are listed as "Black". `MaterialName` says "emmissive", so the extractor uses the enum's name instead.
+
+`run.sh` dumps both directories to `paint-dump.json`. `build-materials.mjs` adds the picker's materials to the list and writes `paint: [{ name, colors: [{ color, material, displayColor? }] }]`, with `material` class-qualified the way map files store it. That's 7 finishes and 66 materials: smooth, rough, glossy, concrete, tiled and emissive in 10 colours each (White, Black, Red, Orange, Yellow, Lime, Blue, SkyBlue, Purple, Wine), and special in 5 (Aluminum, Copper, Iron, Concrete, Grey = `MI_Pipes`). The swatches' preview textures (`ColorPreviewTextureMap`) are empty in the cooked assets.
 
 **Usmap patches (`Program.cs`):** found by diffing against the 5.8.0-release headers.
 

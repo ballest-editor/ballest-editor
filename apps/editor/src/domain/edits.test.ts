@@ -1,6 +1,14 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Option } from "effect"
-import { addItem, duplicateItems, removeItems, setLevelNames, setTransforms, validateItem } from "./edits"
+import {
+  addItem,
+  duplicateItems,
+  removeItems,
+  setLevelNames,
+  setSlotMaterials,
+  setTransforms,
+  validateItem
+} from "./edits"
 import { identityTransform, newMapFile, playerStartItem } from "./factory"
 import type { MapFile } from "./MapFile"
 
@@ -63,6 +71,34 @@ describe("edits", () => {
       [5, 3]
     ])
     assert.strictEqual(duplicateItems(map, []), map)
+  })
+
+  it("sets material slots and keeps materialAssetPaths in step", () => {
+    const map = withItems(2)
+    const glossy = "/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Glossy_Blue.MI_Env_Glossy_Blue"
+    const next = Option.getOrThrow(setSlotMaterials(map, [{ index: 1, component: 0, slot: 0, material: glossy }]))
+    const mesh = next.items[1]!.meshComponents[0]!
+    // a bare object path is stored class-qualified, as the game writes it
+    assert.deepStrictEqual(mesh.materials, [
+      { material: `/Script/Engine.MaterialInstanceConstant'${glossy}'`, materialIndex: 0 }
+    ])
+    assert.deepStrictEqual(mesh.materialAssetPaths, [glossy])
+    assert.strictEqual(next.items[0], map.items[0]) // structural sharing
+    // painting it again changes nothing, and gives back the same map
+    assert.strictEqual(
+      Option.getOrThrow(setSlotMaterials(next, [{ index: 1, component: 0, slot: 0, material: glossy }])),
+      next
+    )
+    // a slot the item didn't list yet is added in index order
+    const added = Option.getOrThrow(setSlotMaterials(map, [{ index: 0, component: 0, slot: 1, material: glossy }]))
+    assert.deepStrictEqual(added.items[0]!.meshComponents[0]!.materials.map((m) => m.materialIndex), [0, 1])
+    assert.strictEqual(added.items[0]!.meshComponents[0]!.materialAssetPaths?.length, 2)
+    // all or nothing
+    assert.isTrue(Option.isNone(setSlotMaterials(map, [{ index: 9, component: 0, slot: 0, material: glossy }])))
+    assert.isTrue(Option.isNone(setSlotMaterials(map, [
+      { index: 0, component: 0, slot: 0, material: glossy },
+      { index: 1, component: 3, slot: 0, material: glossy }
+    ])))
   })
 
   it("validates items and renames levels", () => {

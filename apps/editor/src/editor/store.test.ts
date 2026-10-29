@@ -13,6 +13,11 @@ const state = () => useEditor.getState()
 const transformOf = (id: string) => state().doc.map.items[state().doc.ids.indexOf(id)]!.itemTransform
 const transformItem = (id: string, t: UeTransform) => state().transformItems(new Map([[id, t]]))
 const moveItem = (id: string, translation: Vec3) => transformItem(id, { ...transformOf(id), translation })
+/** A new map (player start only) with a cube placed at each x; the last one is selected. */
+const mapWithCubes = (...xs: ReadonlyArray<number>) => {
+  state().loadMap(initialMap(), null)
+  for (const x of xs) state().placePiece(cube, placementTransform(cube, { x, y: 0, z: 0 }))
+}
 
 describe("editor store", () => {
   it("places, moves, deletes, and undoes/redoes", () => {
@@ -43,8 +48,7 @@ describe("editor store", () => {
 
   it("reports whether a transform was accepted", () => {
     const s = () => useEditor.getState()
-    s().loadMap(initialMap(), null)
-    s().placePiece(cube, placementTransform(cube, { x: 0, y: 0, z: 0 }))
+    mapWithCubes(0)
     const id = s().selectedIds[0]!
     const t = s().doc.map.items[1]!.itemTransform
     assert.isTrue(transformItem(id, { ...t, rotation: { x: 0, y: 0, z: 2, w: 0 } }))
@@ -52,6 +56,24 @@ describe("editor store", () => {
     const before = s().past.length
     assert.isFalse(transformItem(id, { ...t, rotation: { x: 0, y: 0, z: 0, w: 0 } }))
     assert.strictEqual(s().past.length, before)
+  })
+
+  it("paints material slots as one undo step, and none when nothing changes", () => {
+    const s = () => useEditor.getState()
+    mapWithCubes(0, 100)
+    const ids = s().doc.ids.slice(1)
+    const material = "/Script/Engine.MaterialInstanceConstant'/Game/A/MI_Env_Rough_Red.MI_Env_Rough_Red'"
+    const slotOf = (i: number) => s().doc.map.items[i]!.meshComponents[0]!.materials[0]!.material
+    const before = slotOf(1)
+    const steps = s().past.length
+    assert.isTrue(s().paintSlots(ids.map((id) => ({ id, component: 0, slot: 0, material }))))
+    assert.deepStrictEqual([slotOf(1), slotOf(2)], [material, material])
+    assert.strictEqual(s().past.length, steps + 1)
+    assert.isTrue(s().paintSlots(ids.map((id) => ({ id, component: 0, slot: 0, material }))))
+    assert.strictEqual(s().past.length, steps + 1)
+    assert.isFalse(s().paintSlots([{ id: "nope", component: 0, slot: 0, material }]))
+    s().undo()
+    assert.deepStrictEqual([slotOf(1), slotOf(2)], [before, before])
   })
 
   describe("history", () => {
