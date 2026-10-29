@@ -1,11 +1,11 @@
 import {
   type Icon,
-  IconAdjustments,
   IconArrowsMaximize,
   IconArrowsMove,
   IconClipboard,
   IconCopy,
   IconRefresh,
+  IconSettings,
   IconTrash
 } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
@@ -78,7 +78,7 @@ function MapSettings() {
               />
             }
           >
-            <IconAdjustments />
+            <IconSettings />
           </TooltipTrigger>
           <TooltipContent side="left">Project settings</TooltipContent>
         </Tooltip>
