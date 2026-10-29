@@ -74,6 +74,14 @@ void main() {
   gl_FragColor = vec4( color * uGain, alpha );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
+  #ifndef BALLEST_CAPTURE
+    // Triangular dither of about one 8-bit step on the colour and the fade, so the long, slow
+    // gradients (the fade onto the background, the horizon) don't band.
+    vec2 p = gl_FragCoord.xy;
+    float dither = ballestHash( p ) + ballestHash( p + 17.31 ) - 1.0;
+    gl_FragColor.rgb += dither / 255.0;
+    gl_FragColor.a = clamp( gl_FragColor.a + dither / 255.0, 0.0, 1.0 );
+  #endif
 }
 `
 
