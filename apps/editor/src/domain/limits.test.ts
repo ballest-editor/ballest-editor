@@ -28,7 +28,7 @@ describe("game load rules", () => {
     assert.isTrue(isNormalizedRotation({ x: 0, y: 0, z: Math.SQRT1_2 - 1e-5, w: Math.SQRT1_2 - 1e-5 }))
     assert.isFalse(isNormalizedRotation({ x: 0, y: 0, z: 1, w: 1 }))
     const map = addItem(fresh(), withRotation(plain(), { x: 0, y: 0, z: 1, w: 1 }))
-    assert.deepStrictEqual(gameLoadProblems(map), ["Item 1 has a non-normalized rotation."])
+    assert.deepStrictEqual(gameLoadProblems(map), ["Item 2 has a non-normalized rotation."])
   })
 
   it("enforces the per-item array limits", () => {
@@ -46,8 +46,8 @@ describe("game load rules", () => {
     }
     const problems = gameLoadProblems(addItem(addItem(fresh(), tooManyMeshes), tooManyProps))
     assert.strictEqual(problems.length, 2)
-    assert.match(problems[0]!, /Item 1 has 65 mesh components/)
-    assert.match(problems[1]!, /Item 2 has 4097 boolProperties/)
+    assert.match(problems[0]!, /Item 2 has 65 mesh components/)
+    assert.match(problems[1]!, /Item 3 has 4097 boolProperties/)
   })
 
   it("enforces the item-count limit without touching every item", () => {

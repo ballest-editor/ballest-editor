@@ -2,8 +2,8 @@ import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import { listSamples, readSample } from "../test/samples"
 import { newMapFile } from "./factory"
-import { DEFAULT_PLAYER_START, floorHeightOf, KILL_ZONE_HEIGHT, WATER } from "./level"
-import { isPlayerStart, MapFile } from "./MapFile"
+import { DEFAULT_GOAL, DEFAULT_PLAYER_START, floorHeightOf, KILL_ZONE_HEIGHT, WATER } from "./level"
+import { GOAL_CLASS, isPlayerStart, MapFile } from "./MapFile"
 
 const decodeSample = Schema.decodeSync(Schema.fromJsonString(MapFile))
 const sample = (name: string) => {
@@ -17,6 +17,13 @@ describe("level", () => {
     for (const name of ["achievement_creator02", "ct4NameBugTest", "flow trial", "Sway n So"]) {
       const start = sample(name).items.find(isPlayerStart)
       assert.deepStrictEqual(start?.itemTransform.translation, DEFAULT_PLAYER_START, name)
+    }
+  })
+
+  it("matches the goal of maps left where the game put it", () => {
+    for (const name of ["achievement_creator02", "prefabs 1", "Bevel Up", "focus", "leos"]) {
+      const goal = sample(name).items.find((item) => item.actorToSpawn === GOAL_CLASS)
+      assert.deepStrictEqual(goal?.itemTransform.translation, DEFAULT_GOAL, name)
     }
   })
 
