@@ -38,14 +38,17 @@ describe("keybind table", () => {
       ["local / world axes", ["KeyX"]], // editor only
       ["focus selection", ["KeyF", "KeyC"]],
       ["add to selection", ["Shift+Mouse0"]],
-      ["toggle selection", ["Ctrl+Mouse0"]],
-      ["delete", ["Backspace", "Delete"]],
-      ["duplicate", ["Ctrl+KeyD"]],
-      ["copy", ["Ctrl+KeyC"]],
-      ["cut", ["Ctrl+KeyX"]], // editor only
-      ["paste", ["Ctrl+KeyV"]],
+      ["toggle selection", ["Ctrl+Mouse0"]]
+    ])
+    const edit = keybindSections.find((s) => s.name === "edit")!
+    expect(edit.actions.map((a) => [keybindActionLabels[a], defaultKeybinds[a]])).toEqual([
       ["undo", ["Ctrl+KeyZ"]],
       ["redo", ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"]],
+      ["cut", ["Ctrl+KeyX"]], // editor only
+      ["copy", ["Ctrl+KeyC"]],
+      ["paste", ["Ctrl+KeyV"]],
+      ["duplicate", ["Ctrl+KeyD"]],
+      ["delete", ["Backspace", "Delete"]],
       ["deselect", ["Escape"]]
     ])
   })

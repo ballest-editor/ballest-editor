@@ -10,12 +10,14 @@ import { Schema } from "effect"
 /**
  * Sections and names follow the game: the level editor's own hotkey overlay ("focus
  * selection", "delete"...) and its settings screen ("mouse and keyboard free camera":
- * "forward", "reverse"...). The tools are the exception: plain "select", "translate",
- * "rotate", "scale" instead of the overlay's "select mode", "move mode"... Game actions
- * that mean nothing in the editor (replay controls, nameplates) are omitted; editor-only
- * actions get plain lower-case names in the same style. keybinds.json `label`/`section`
- * fields, when the extractor provides them, override the camera names (see GameKeybinds);
- * level-editor names come from the in-game overlay and are fixed here.
+ * "forward", "reverse"...). The exceptions: the tools get plain "select", "translate",
+ * "rotate", "scale" instead of the overlay's "select mode", "move mode"..., and the
+ * overlay's edit commands (undo, copy, delete...) get their own "edit" section, in the
+ * Edit menu's order. Game actions that mean nothing in the editor (replay controls,
+ * nameplates) are omitted; editor-only actions get plain lower-case names in the same
+ * style. keybinds.json `label`/`section` fields, when the extractor provides them,
+ * override the camera names (see GameKeybinds); level-editor and edit names come from
+ * the in-game overlay and are fixed here.
  */
 export const keybindSections = [
   {
@@ -28,14 +30,19 @@ export const keybindSections = [
       "toggleGizmoSpace",
       "focusSelection",
       "addToSelection",
-      "toggleSelection",
-      "deleteSelection",
-      "duplicateSelection",
-      "copySelection",
-      "cutSelection",
-      "paste",
+      "toggleSelection"
+    ]
+  },
+  {
+    name: "edit",
+    actions: [
       "undo",
       "redo",
+      "cutSelection",
+      "copySelection",
+      "paste",
+      "duplicateSelection",
+      "deleteSelection",
       "deselect"
     ]
   },
@@ -53,7 +60,10 @@ export type KeybindAction = (typeof keybindSections)[number]["actions"][number]
 export const keybindActions: ReadonlyArray<KeybindAction> = keybindSections.flatMap((g) => g.actions)
 
 /** Actions named by the in-game level editor's hotkey overlay (keybinds.json naming doesn't apply). */
-export const editorOverlayActions: ReadonlySet<KeybindAction> = new Set(keybindSections[0].actions)
+export const editorOverlayActions: ReadonlySet<KeybindAction> = new Set([
+  ...keybindSections[0].actions,
+  ...keybindSections[1].actions
+])
 
 /** The name shown in the settings (the game's wording where the action exists in-game). */
 export const keybindActionLabels: Record<KeybindAction, string> = {
