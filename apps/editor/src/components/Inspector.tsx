@@ -15,10 +15,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/component
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Separator } from "@workspace/ui/components/separator"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import { type ReactNode, useState } from "react"
+import { useState } from "react"
 import { useShallow } from "zustand/react/shallow"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { type Axis, readField, type TransformField } from "../domain/groupTransform"
+import { selectionProperties } from "../domain/itemProperties"
 import { formatBindings, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
 import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/MapFile"
 import {
@@ -31,14 +32,12 @@ import {
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import { selectedIndices, shownTransform, useEditor } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
+import { ItemProperties } from "./ItemProperties"
 import { ShiftClick } from "./MouseButtonIcon"
 import { NumberField } from "./NumberField"
+import { SectionTitle } from "./SectionTitle"
 
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
-
-const SectionTitle = ({ children }: { readonly children: ReactNode }) => (
-  <div className="text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">{children}</div>
-)
 
 function MapSettings() {
   const levelData = useEditor((s) => s.doc.map.worldSettings.levelData)
@@ -352,6 +351,7 @@ export function Inspector() {
   const indices = useEditor(useShallow(selectedIndices))
   const transforms = useEditor(useShallow((s) => s.selectedIds.flatMap((id) => shownTransform(s, id) ?? [])))
   const units = useEditor((s) => s.settings.general.units)
+  const catalogIndex = useEditor((s) => s.catalogIndex)
 
   const first = items[0]
   if (first === undefined) {
@@ -387,6 +387,12 @@ export function Inspector() {
             />
           ))}
         </div>
+
+        <ItemProperties
+          properties={selectionProperties(
+            items.map((item) => ({ item, piece: catalogIndex?.pieceByClass.get(item.actorToSpawn) }))
+          )}
+        />
 
         {items.length === 1 && (
           <>

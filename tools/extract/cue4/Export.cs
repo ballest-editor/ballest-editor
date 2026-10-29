@@ -333,6 +333,59 @@ public static partial class Program
         }
         entry["rootComponent"] = root;
         entry["meshComponents"] = comps;
+        entry["levelEditorProperties"] = LevelEditorProperties(chain);
+    }
+
+    static readonly JsonSerializer ExportSerializer =
+        JsonSerializer.Create(new JsonSerializerSettings { ReferenceLoopHandling = ReferenceLoopHandling.Ignore });
+
+    // The properties the level editor exposes on an item: the CDO's
+    // LevelEditorExposedProperties (and LevelEditorHiddenProperties, the ones its
+    // property panel leaves out), each with the type the Blueprint declares and the
+    // CDO's default. Unversioned serialization omits values equal to the zero default,
+    // so a missing default means 0 / false; `declaredIn` null means a native property
+    // whose type and default the foreign .usmap can't give.
+    // `variables`: every bool/int/float/double Blueprint variable with its CDO default,
+    // for classes whose exposed list lives in native code (shape decal, light cards).
+    static JObject LevelEditorProperties(List<UBlueprintGeneratedClass> chain)
+    {
+        var defaults = new JObject();
+        var types = new Dictionary<string, (string Type, string Owner)>();
+        foreach (var c in chain) // most-derived first: its values win
+        {
+            if (c.ClassDefaultObject.Load() is { } cdo &&
+                JToken.FromObject(cdo, ExportSerializer)["Properties"] is JObject props)
+                foreach (var p in props.Properties())
+                    if (!defaults.ContainsKey(p.Name)) defaults[p.Name] = p.Value;
+            foreach (var f in c.ChildProperties ?? [])
+                types.TryAdd(f.Name.Text, (f.GetType().Name[1..], c.GetPathName()));
+        }
+        JArray Names(string key) => defaults[key] as JArray ?? [];
+        return new JObject
+        {
+            ["exposed"] = new JArray(Names("LevelEditorExposedProperties").Select(n =>
+            {
+                var name = (string)n!;
+                var known = types.TryGetValue(name, out var t);
+                return new JObject
+                {
+                    ["name"] = name,
+                    ["ueType"] = known ? t.Type : null,
+                    ["declaredIn"] = known ? t.Owner : null,
+                    ["default"] = defaults[name]?.DeepClone(),
+                };
+            })),
+            ["hidden"] = Names("LevelEditorHiddenProperties").DeepClone(),
+            ["variables"] = new JArray(types
+                .Where(t => t.Value.Type is "BoolProperty" or "IntProperty" or "FloatProperty" or "DoubleProperty")
+                .Select(t => new JObject
+                {
+                    ["name"] = t.Key,
+                    ["ueType"] = t.Value.Type,
+                    ["declaredIn"] = t.Value.Owner,
+                    ["default"] = defaults[t.Key]?.DeepClone(),
+                })),
+        };
     }
 
     // Property lookup that follows the archetype (Template) chain.

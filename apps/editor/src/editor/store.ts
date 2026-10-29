@@ -14,11 +14,13 @@ import {
   pasteItems,
   removeItems,
   setLevelNames,
+  setProperties,
   setTransforms,
   validateItem
 } from "../domain/edits"
 import { itemFromPiece, newMapFile } from "../domain/factory"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
+import type { PropertyChange } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { LIMITS } from "../domain/limits"
 import { isPlayerStart, type ItemTransform, type MapFile } from "../domain/MapFile"
@@ -122,6 +124,11 @@ export interface EditorState {
    * nothing changed) when the game would reject any of them.
    */
   readonly transformItems: (transforms: ReadonlyMap<string, UeTransform>) => boolean
+  /**
+   * Sets properties on every selected item as one undo step (a colour's three channels are
+   * one edit); false (with a notice, and nothing changed) when a value doesn't fit its property.
+   */
+  readonly setSelectionProperties: (changes: ReadonlyArray<PropertyChange>) => boolean
   readonly deleteSelection: () => void
   /** Copies the selected items in place (one undo step) and selects the copies. */
   readonly duplicateSelection: () => void
@@ -301,6 +308,24 @@ export const useEditor = create<EditorState>()((set, get) => {
       }
       get().notify("error", INVALID_TRANSFORM)
       return false
+    },
+
+    setSelectionProperties: (changes) => {
+      const s = get()
+      const indices = selectedIndices(s)
+      const next = setProperties(s.doc.map, indices, changes)
+      if (Option.isNone(next)) {
+        const names = changes.map((c) => `${JSON.stringify(c.value)} for ${c.property.name}`).join(", ")
+        s.notify("error", `Not a valid value: ${names}.`)
+        return false
+      }
+      const unchanged = indices.every((i) =>
+        changes.every(({ property, value }) =>
+          s.doc.map.items[i]?.[property.list].some((p) => p.propertyName === property.name && p.currentValue === value)
+        )
+      )
+      if (!unchanged) commit({ map: next.value, ids: s.doc.ids })
+      return true
     },
 
     deleteSelection: () => {
