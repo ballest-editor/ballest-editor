@@ -36,10 +36,9 @@ import {
   uniqueBindings,
   wheelChordOf
 } from "../domain/Keybinds"
-import { AUTO_GRID_COLORS, CUSTOM_FOV_PRESET, defaultSettings, gridBackdropOf, type Settings } from "../domain/Settings"
-import { sunOf } from "../domain/sunlight"
+import { CUSTOM_FOV_PRESET, defaultSettings, gridColorsOf, type Settings } from "../domain/Settings"
 import { resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
-import { type SettingsCategory, shownLighting, useEditor } from "../editor/store"
+import { type SettingsCategory, useEditor } from "../editor/store"
 import { useDarkTheme } from "../editor/theme"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
@@ -104,7 +103,7 @@ function ColorSetting(props: {
   )
 }
 
-const GRID_COLOR_DESCRIPTION = "Automatic suits the theme's background, or the sky by day and by night."
+const GRID_COLOR_DESCRIPTION = "Automatic suits the dark or light theme."
 
 /** A binding being captured: a fresh slot (`index` = bindings.length) or a replacement. */
 interface Listening {
@@ -199,8 +198,7 @@ export function SettingsDialog(props: {
 }) {
   const settings = useEditor((s) => s.settings)
   const dark = useDarkTheme(settings.appearance.theme)
-  const sunElevation = useEditor((s) => sunOf(shownLighting(s)).elevation)
-  const autoGrid = AUTO_GRID_COLORS[gridBackdropOf(dark, settings.lighting.skyVisible, sunElevation)]
+  const autoGrid = gridColorsOf({ ...settings.appearance, gridCellColor: null, gridSectionColor: null }, dark)
   const keybinds = useEditor((s) => s.keybinds)
   const defaults = useEditor((s) => s.keybindDefaults)
   const [listening, setListening] = useState<Listening | null>(null)

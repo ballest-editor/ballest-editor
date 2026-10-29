@@ -1,12 +1,19 @@
 /**
  * The game's sky as a three.js material (see domain/sky for where each term comes from).
- * One material draws the visible dome, with the sun disc and stars; a second, `capture`,
+ * One material draws the visible dome, with the sun disc and stars, cut off below the grid
+ * (`uClipY`) so the theme's background shows under it; a second, `capture`,
  * draws the same sky without the sun and with a dim ground, for the environment map the
  * scene is lit by (the game's sky light is a real-time capture of this sky).
  */
 import * as THREE from "three"
 import { ueToThreeVector } from "../domain/coords"
 import { type Sky, SKY_GAIN, SUN_RADIUS } from "../domain/sky"
+
+/**
+ * The visible dome's radius (cm), which is also where the floor grid finishes fading out:
+ * cut at the grid's height, the sky then starts where the grid ends.
+ */
+export const SKY_DOME_RADIUS = 60_000
 
 /** Exposure on the visible sky; the game's auto exposure has no counterpart here. */
 const SKY_EXPOSURE = 1.6
@@ -29,6 +36,7 @@ uniform vec3 uSun;
 uniform float uStars;
 uniform float uGain;
 uniform vec3 uGround;
+uniform float uClipY;
 varying vec3 vDir;
 
 float ballestHash( vec2 p ) {
@@ -52,6 +60,8 @@ void main() {
   #ifdef BALLEST_CAPTURE
     color = d.y < 0.0 ? uGround : color;
   #else
+    // Where this direction meets the dome, from the exact direction (not the faceted mesh).
+    if ( cameraPosition.y + d.y * ${SKY_DOME_RADIUS.toFixed(1)} < uClipY ) discard;
     color += uSun * clamp( 1.0 - abs( dot( d, uToSun ) - 1.0 ) / ${SUN_RADIUS.toFixed(6)}, 0.0, 1.0 );
   #endif
   gl_FragColor = vec4( color * uGain, 1.0 );
@@ -68,7 +78,9 @@ const skyUniforms = (capture: boolean) => ({
   uSun: { value: new THREE.Color() },
   uStars: { value: 0 },
   uGain: { value: capture ? SKY_GAIN : SKY_GAIN * SKY_EXPOSURE },
-  uGround: { value: new THREE.Color() }
+  uGround: { value: new THREE.Color() },
+  /** World height (scene units) below which the visible dome isn't drawn. */
+  uClipY: { value: -Infinity }
 })
 
 /** The sky from inside a sphere: drawn first and behind everything (no depth). */

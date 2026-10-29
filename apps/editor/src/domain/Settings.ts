@@ -140,35 +140,23 @@ const migrate = (stored: unknown): unknown => {
   return out
 }
 
-/** What the grid is seen against, which decides its automatic colours. */
-export type GridBackdrop = "dark" | "light" | "day sky" | "night sky"
-
 /**
- * Automatic grid colours per backdrop: the theme's background when the sky is hidden, else
- * the sky and water (the same for either theme), light by day and dark at night. Most of the
- * grid is seen over the water, which tints the backdrop blue. Sections stand out more than
- * cells: lighter on dark backdrops, darker on light ones.
+ * Automatic grid colours per theme. The sky is cut off at the grid's height, so the grid is
+ * always seen against the theme's background, or the water over it. Sections stand out more
+ * than cells: lighter on the dark background, darker on the light one.
  */
-export const AUTO_GRID_COLORS: Readonly<Record<GridBackdrop, { readonly cell: string; readonly section: string }>> = {
-  dark: { cell: "#3a404a", section: "#58606e" },
-  light: { cell: "#93a4b5", section: "#5c6f82" },
-  "day sky": { cell: "#7d98a8", section: "#4a6272" },
-  "night sky": { cell: "#2c3a4d", section: "#4b5d75" }
-}
+export const AUTO_GRID_COLORS: Readonly<Record<"dark" | "light", { readonly cell: string; readonly section: string }>> =
+  {
+    dark: { cell: "#474e5a", section: "#5f6877" },
+    light: { cell: "#a3b0bd", section: "#7a8a9b" }
+  }
 
-/** Below this sun elevation (degrees, civil twilight) the sky counts as night for the grid. */
-const NIGHT_BELOW = -6
-
-/** The grid's backdrop: the theme's background, or the sky by day or night. */
-export const gridBackdropOf = (dark: boolean, skyVisible: boolean, sunElevation: number): GridBackdrop =>
-  skyVisible ? (sunElevation > NIGHT_BELOW ? "day sky" : "night sky") : dark ? "dark" : "light"
-
-/** The grid colours to draw: the user's, else the backdrop's automatic ones. */
+/** The grid colours to draw: the user's, else the theme's automatic ones. */
 export const gridColorsOf = (
   appearance: Settings["appearance"],
-  backdrop: GridBackdrop
+  dark: boolean
 ): { readonly cell: string; readonly section: string } => {
-  const auto = AUTO_GRID_COLORS[backdrop]
+  const auto = AUTO_GRID_COLORS[dark ? "dark" : "light"]
   return { cell: appearance.gridCellColor ?? auto.cell, section: appearance.gridSectionColor ?? auto.section }
 }
 

@@ -2,15 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { KeyValueStore } from "effect/persistence"
 import { FALLBACK_CAMERA_PRESETS } from "../domain/GameKeybinds"
-import {
-  AUTO_GRID_COLORS,
-  defaultSettings,
-  fovOf,
-  gridBackdropOf,
-  gridColorsOf,
-  mergeSettings,
-  verticalFov
-} from "../domain/Settings"
+import { AUTO_GRID_COLORS, defaultSettings, fovOf, gridColorsOf, mergeSettings, verticalFov } from "../domain/Settings"
 import { SETTINGS_STORAGE_KEY, SettingsStore } from "./SettingsStore"
 
 describe("Settings", () => {
@@ -49,15 +41,10 @@ describe("Settings", () => {
     assert.strictEqual(mergeSettings({ appearance: { gridCellColor: null } }).appearance.gridCellColor, null)
   })
 
-  it("picks automatic grid colours for what the grid is seen against", () => {
-    assert.strictEqual(gridBackdropOf(true, false, 30), "dark")
-    assert.strictEqual(gridBackdropOf(false, false, -60), "light")
-    assert.strictEqual(gridBackdropOf(false, true, 30), "day sky") // the theme doesn't matter under the sky
-    assert.strictEqual(gridBackdropOf(true, true, -3), "day sky") // twilight still counts as day
-    assert.strictEqual(gridBackdropOf(true, true, -30), "night sky")
-    const auto = gridColorsOf(defaultSettings.appearance, "light")
-    assert.deepStrictEqual(auto, AUTO_GRID_COLORS.light)
-    const chosen = gridColorsOf({ ...defaultSettings.appearance, gridCellColor: "#ff0000" }, "light")
+  it("picks automatic grid colours for the theme, or the user's", () => {
+    assert.deepStrictEqual(gridColorsOf(defaultSettings.appearance, true), AUTO_GRID_COLORS.dark)
+    assert.deepStrictEqual(gridColorsOf(defaultSettings.appearance, false), AUTO_GRID_COLORS.light)
+    const chosen = gridColorsOf({ ...defaultSettings.appearance, gridCellColor: "#ff0000" }, false)
     assert.deepStrictEqual(chosen, { cell: "#ff0000", section: AUTO_GRID_COLORS.light.section })
   })
 

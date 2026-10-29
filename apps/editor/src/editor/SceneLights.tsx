@@ -5,7 +5,7 @@ import { useShallow } from "zustand/react/shallow"
 import { toTuple3, ueToThreeVector } from "../domain/coords"
 import { type Sky, skyIrradiance, skyOf } from "../domain/sky"
 import { sunOf } from "../domain/sunlight"
-import { setSky, SkyMaterial } from "./sky"
+import { setSky, SKY_DOME_RADIUS, SkyMaterial } from "./sky"
 import { shownLighting, useEditor } from "./store"
 import { setWaterLight } from "./water"
 
@@ -22,8 +22,6 @@ const STUDIO_FILL = AMBIENT + HEMISPHERE * 0.8
 const SUN_PER_BRIGHTNESS = STUDIO_SUN_INTENSITY / 12
 /** How far out the sun sits (cm); a directional light only uses the direction. */
 const SUN_DISTANCE = 10_000
-/** The visible dome's radius (cm): well inside the camera's far plane. */
-const DOME_RADIUS = 100_000
 /**
  * The capture's ground, as a fraction of the sky's light: the game's sky light treats the lower
  * hemisphere as black and lets its global illumination light undersides from the water and
@@ -41,7 +39,8 @@ const STUDIO_UPWARD_LIGHT = upwardLight(STUDIO_FILL, STUDIO_SUN_INTENSITY, STUDI
 
 /**
  * The viewport's sky and lights, each its own setting. The sky is the game's, drawn around
- * the camera with the sun disc in it (hidden, the theme's background shows). Map lighting
+ * the camera with the sun disc in it, down to the grid's height (below it, and when the sky
+ * is hidden, the theme's background shows). Map lighting
  * lights the scene the game's way: the sun as a directional light and the sky light as an
  * environment map captured from that sky (as the game's sky light is, whether or not the sky
  * is shown), so every material, the shader-patched game materials included, is lit and
@@ -69,7 +68,8 @@ const useMapSun = () => {
 
 function MapSky() {
   const { sky } = useMapSun()
-  return <SkyDome sky={sky} />
+  const floorHeight = useEditor((s) => s.floorHeight)
+  return <SkyDome sky={sky} clipBelow={floorHeight} />
 }
 
 function StudioLights() {
@@ -103,16 +103,23 @@ function MapLights() {
   )
 }
 
-/** The visible sky: a sphere that travels with the camera, drawn before everything else. */
-function SkyDome({ sky }: { readonly sky: Sky }) {
+/**
+ * The visible sky: a sphere that travels with the camera, drawn before everything else, and
+ * cut off below the grid's height so the theme's background shows under the grid. (The sky
+ * light is captured separately, so the cut doesn't change how pieces are lit.)
+ */
+function SkyDome({ sky, clipBelow }: { readonly sky: Sky; readonly clipBelow: number }) {
   const mesh = useRef<THREE.Mesh>(null)
   const material = useMemo(() => new SkyMaterial(false), [])
-  const geometry = useMemo(() => new THREE.SphereGeometry(DOME_RADIUS, 64, 32), [])
+  const geometry = useMemo(() => new THREE.SphereGeometry(SKY_DOME_RADIUS, 64, 32), [])
   useEffect(() => () => {
     material.dispose()
     geometry.dispose()
   }, [material, geometry])
   useEffect(() => setSky(material, sky, 0), [material, sky])
+  useEffect(() => {
+    material.sky.uClipY.value = clipBelow
+  }, [material, clipBelow])
   useFrame(({ camera }) => void mesh.current?.position.copy(camera.position))
   return <mesh ref={mesh} geometry={geometry} material={material} renderOrder={-1000} frustumCulled={false} />
 }

@@ -17,8 +17,7 @@ import * as THREE from "three"
 import { toTuple3, ueToThreeVector } from "../domain/coords"
 import { isBound, mouseChordOf } from "../domain/Keybinds"
 import { WATER } from "../domain/level"
-import { gridBackdropOf, gridColorsOf } from "../domain/Settings"
-import { sunOf } from "../domain/sunlight"
+import { gridColorsOf } from "../domain/Settings"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { ItemObject } from "./ItemObject"
@@ -26,7 +25,8 @@ import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline } from "./selectionOutline"
-import { nextSelection, type SelectMode, shownLighting, useEditor } from "./store"
+import { SKY_DOME_RADIUS } from "./sky"
+import { nextSelection, type SelectMode, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
 import { glbUrl, visualsOf } from "./visuals"
 import { waterTopMaterial, waterUnderMaterial } from "./water"
@@ -238,11 +238,9 @@ function ViewportBackground() {
  */
 function ViewportGrid() {
   const appearance = useEditor((s) => s.settings.appearance)
-  const skyVisible = useEditor((s) => s.settings.lighting.skyVisible)
-  const sunElevation = useEditor((s) => sunOf(shownLighting(s)).elevation)
   const floorHeight = useEditor((s) => s.floorHeight)
   const dark = useDarkTheme(appearance.theme)
-  const colors = gridColorsOf(appearance, gridBackdropOf(dark, skyVisible, sunElevation))
+  const colors = gridColorsOf(appearance, dark)
   if (!appearance.gridVisible) return null
   return (
     <Grid
@@ -251,7 +249,7 @@ function ViewportGrid() {
       infiniteGrid
       cellSize={100}
       sectionSize={1000}
-      fadeDistance={60000}
+      fadeDistance={SKY_DOME_RADIUS}
       fadeStrength={2}
       cellColor={colors.cell}
       sectionColor={colors.section}
