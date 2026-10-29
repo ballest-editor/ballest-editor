@@ -8,7 +8,7 @@ This pipeline reads the game's IoStore containers, resolves the level-editor pie
 - `assets/keybinds.json`: the default Enhanced Input bindings, with in-game labels, settings sections and camera presets.
 - `assets/strings.json`: the English locres strings.
 - `assets/registry.json`: the item class hierarchy, the in-game palette, and recipe-registry references (which pieces exist).
-- `assets/materials.json` + `assets/textures/**.png`: material parameters with a PBR approximation (the textures are gitignored, about 142 MB).
+- `assets/materials.json` + `assets/textures/**.png`: material parameters, plus how each texture is read (UV or object/world projection, scale, layers), traced through the game's compiled shaders (the textures are gitignored, about 142 MB).
 
 The current output has 200 pieces and 5 unresolved. 195 meshes were exported with 0 failures. That covers the 157 meshes referenced by the pieces, including their extra components, plus everything else in `/Game/Maps/_GENERATED/PC`. All files pass the Khronos glTF validator with no errors or warnings.
 
@@ -40,6 +40,7 @@ What `run.sh` does:
    4. `BallestExtract export` writes the glbs.
    5. `build-catalog.mjs catalog` writes `catalog.json`.
 5. Writes `assets/keybinds.json`, `assets/materials.json` + `assets/textures/`, and `assets/registry.json` (see below).
+   Materials go through `src/` (TypeScript + Effect, run by node directly): `materials list` collects the referenced materials, `BallestExtract materials` dumps them, `materials shader-list` + `BallestExtract shaders` dump every loaded material's cooked vertex/pixel shaders from the IoStore shader library, `shaders` disassembles them with `dxc` and traces each texture read back to its coordinate source, and `materials build` writes `materials.json` from both.
 6. Runs `verify.mjs`, which has no dependencies. It parses the GLB and recomputes bounds and the signed volume (winding) for `SM_500` and `SM_Start_Fixed`.
 
 The extractor also has debugging modes. Run them with `dotnet ~/.cache/ballest-editor/extract/bin/BallestExtract.dll MODE --paks DIR --oodle FILE --usmap FILE ...`:
@@ -49,6 +50,11 @@ The extractor also has debugging modes. Run them with `dotnet ~/.cache/ballest-e
 - `dump --prefix DIR --file PATH --out F` does the same for a whole directory, plus loose files, with errors captured.
 - `imports --prefix DIR [--props PKG] --out F` writes header-only dependency data (imports, name-map paths, export classes and supers).
 - `usmap-dump --types A B` prints the property layout the `.usmap` gives for those types.
+- `shaders --list FILE --out DIR` writes each listed material's base-pass shaders (`DIR/<asset>/*.dxil`) and `DIR/index.json` (shader map hashes, the uniform expression set with texture slots and preshader bytecode).
+
+## Shader analysis (`src/shaders.ts`)
+
+A cooked `UMaterial` has no expression graph, so UV tiling, projection and texture wiring can't be read from the asset. The compiled shader is the graph: `src/dxil.ts` parses `dxc -dumpbin` output and, for every `sample` in the base-pass pixel shader, walks the coordinate's SSA chain back to its sources (interpolants, vertex buffers, GPU-scene transforms, constant-buffer parameters, literals), keeping the product of literal factors along each path; the vertex shader's outputs are traced the same way so an interpolant resolves to the mesh UVs or to the object/world position. `src/preshader.ts` decodes the material preshader so constant-buffer slots map back to parameter names, and `src/materials.ts` folds the instance's parameter values in. The result per material is `approx.reads`: texture, role, projection (`uv` / `object` / `world`), scale in repeats per UV unit or per cm, whether the piece's instance scale multiplies in, and a normal layer's strength. Checked against the game: the Env masters' 200 cm object-aligned tiles (20 across the 10 m cube, 80/40/20 at scale 2,1,1), the metal master's 12 UV repeats (48 tiles).
 
 ## Coordinate convention (glb files)
 

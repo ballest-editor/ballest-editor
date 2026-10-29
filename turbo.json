@@ -54,8 +54,10 @@
         "pnpm-lock.yaml",
         "apps/*/tsconfig.json",
         "packages/*/tsconfig.json",
+        "tools/*/tsconfig.json",
         "apps/**/*.{ts,tsx,js,mjs}",
         "packages/**/*.{ts,tsx,js,mjs}",
+        "tools/**/*.ts",
         "!**/node_modules/**",
         "!**/dist/**"
       ]

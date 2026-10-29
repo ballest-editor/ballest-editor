@@ -74,6 +74,9 @@ fi
 log "building extractor"
 BIN="$(bash "$here/build.sh")"
 extract() { dotnet "$BIN.dll" "$@" --paks "$PAKS_COPY" --oodle "$OODLE" --usmap "$USMAP"; }
+# The TypeScript half (tools/extract/src, Effect): run by node directly, dependencies from the workspace.
+[[ -d "$here/node_modules" ]] || { echo "tools/extract/node_modules missing: run pnpm install first" >&2; exit 1; }
+tsx() { node --experimental-strip-types "$here/src/main.ts" "$@"; }
 
 # 4. Samples + item registry -> classes -> component templates -> mesh list -> glb -> catalog.
 node "$here/scan-samples.mjs" --out "$WORK" "${SAMPLES[@]}"
@@ -121,17 +124,22 @@ extract locres --file Ballest/Content/Localization/Game/en/Game.locres --out "$O
 
 # 6. Materials: every material referenced by samples + catalog + the in-game paint picker, parent chains,
 #    textures -> PNG. The picker's data assets (categories x colours -> material) go into materials.json too.
+#    Then the compiled shaders of every loaded material (shader library + dxc) tell how each texture is read.
 log "exporting materials and textures"
 extract dump --prefix Ballest/Content/LevelEditor/PackageAssets/MultiplayerLevelEditor/UI/Data/MaterialSelection \
   --prefix Ballest/Content/Art/DataAssets/BallestMaterials \
   --out "$WORK/paint-dump.json" 2>"$WORK/paint.log" || { tail -20 "$WORK/paint.log" >&2; exit 1; }
-node "$here/build-materials.mjs" list "$WORK" "$OUT"
+tsx materials list "$WORK" "$OUT"
 mkdir -p "$WORK/textures"
 extract materials --list "$WORK/materials.txt" --out "$WORK/materials-dump.json" --tex-dir "$WORK/textures" --tex-max "$TEX_MAX" \
   2>"$WORK/materials.log" || { tail -20 "$WORK/materials.log" >&2; exit 1; }
 rm -rf "$OUT/textures"
 cp -r "$WORK/textures" "$OUT/textures"
-node "$here/build-materials.mjs" build "$WORK" "$OUT"
+log "analysing material shaders"
+tsx materials shader-list "$WORK"
+extract shaders --list "$WORK/shader-materials.txt" --out "$WORK/shaders" 2>"$WORK/shaders.log" || { tail -20 "$WORK/shaders.log" >&2; exit 1; }
+tsx shaders --dump "$WORK/shaders" --out "$WORK/shaders.json" --dxc "${BALLEST_DXC:-dxc}"
+tsx materials build "$WORK" "$OUT"
 
 # 7. Sanity checks.
 node "$here/verify.mjs" "$OUT/pieces/Maps/_GENERATED/PC/SM_500.glb" "$OUT/pieces/Maps/_GENERATED/PC/SM_Start_Fixed.glb" >&2
