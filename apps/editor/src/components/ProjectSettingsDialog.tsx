@@ -1,5 +1,6 @@
-import { IconAlertTriangleFilled, IconCheck, IconMap, IconTags } from "@tabler/icons-react"
+import { IconAlertTriangleFilled, IconCheck, IconMap } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
+import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Toggle } from "@workspace/ui/components/toggle"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
@@ -27,13 +28,11 @@ import { useEditor } from "../editor/store"
 import { NumberField } from "./NumberField"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
-type ProjectCategory = "map" | "workshop"
-
-// A project is one map for now; its settings are the map's.
-const CATEGORIES: ReadonlyArray<SettingsCategoryInfo<ProjectCategory>> = [
-  { id: "map", label: "Map", icon: IconMap },
-  { id: "workshop", label: "Difficulty and tags", icon: IconTags }
-]
+/**
+ * One category per map, under "Maps". A project is one map for now; project-wide categories
+ * go above the maps once there are any.
+ */
+type ProjectCategory = "map"
 
 const TAG_DESCRIPTIONS: Readonly<Record<TagGroup, string>> = {
   Gameplay: "What playing the map is like.",
@@ -161,21 +160,23 @@ export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolea
   const units = useEditor((s) => s.settings.general.units)
   const savedCreator = useEditor((s) => s.settings.general.creatorName.trim())
   const [category, setCategory] = useState<ProjectCategory>("map")
+  const categories: ReadonlyArray<SettingsCategoryInfo<ProjectCategory>> = [
+    { id: "map", label: levelData.levelDisplayName, icon: IconMap, section: "Maps" }
+  ]
 
   // A map made before a creator was saved has none yet; it gets the saved one, as Export would.
   const creator = levelData.creatorName || savedCreator
   const perUnit = units === "m" ? 100 : 1
   const difficulty = difficultyOf(levelData)
   const others = unknownTags(levelData)
-  const fixed = { modified: false, reset: () => {} }
 
   const rows: ReadonlyArray<SettingsRow<ProjectCategory>> = [
     {
       id: "name",
       category: "map",
+      group: "General",
       label: "Name",
       description: `Exports as ${mapFileNameOf(levelData.levelDisplayName, creator || "creator")} (${NAME_RULE}).`,
-      ...fixed,
       control: (
         <NameInput
           value={levelData.levelDisplayName}
@@ -186,11 +187,20 @@ export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolea
     {
       id: "gridHeight",
       category: "map",
+      group: "General",
       label: `Grid height (${units})`,
       description:
-        "Where the grid is drawn and new pieces land. Defaults to the player start's height. Kept in this editor, not in the map file.",
-      modified: floorHeight !== startHeight,
-      reset: () => void setGridHeight(startHeight),
+        "Where the grid is drawn and new pieces land. Starts at the player start's height. Kept in this editor, not in the map file.",
+      action: (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={floorHeight === startHeight}
+          onClick={() => void setGridHeight(startHeight)}
+        >
+          Use player start
+        </Button>
+      ),
       control: (
         <div className="w-32">
           <NumberField
@@ -204,40 +214,47 @@ export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolea
     },
     {
       id: "difficulty",
-      category: "workshop",
+      category: "map",
+      group: "Workshop",
       label: "Difficulty",
       description: difficulty === undefined
         ? "Not set."
         : `${DIFFICULTIES.find((d) => d.tag === difficulty)?.level ?? difficulty}.`,
       keywords: DIFFICULTIES.map((d) => d.level).join(" "),
-      ...fixed,
       control: <DifficultyPicker value={difficulty} onChange={(d) => void setLevelData(withDifficulty(levelData, d))} />
     },
     ...TAG_GROUPS.map((group): SettingsRow<ProjectCategory> => {
       const names = group.tags.map((tag) => tagNameOf(group.group, tag))
       return {
         id: `tags-${group.group}`,
-        category: "workshop",
-        group: "Tags",
-        label: group.group,
+        category: "map",
+        group: "Workshop",
+        label: `${group.group} tags`,
         description: TAG_DESCRIPTIONS[group.group],
         keywords: group.tags.join(" "),
         wide: true,
-        modified: names.some((name) => hasTag(levelData, name)),
-        reset: () => void setLevelData(names.reduce((l, name) => withTag(l, name, false), levelData)),
+        action: names.some((name) => hasTag(levelData, name)) && (
+          <Button
+            variant="ghost"
+            size="xs"
+            className="text-muted-foreground"
+            onClick={() => void setLevelData(names.reduce((l, name) => withTag(l, name, false), levelData))}
+          >
+            Clear
+          </Button>
+        ),
         control: <TagChips group={group} levelData={levelData} />
       }
     }),
     ...(others.length === 0 ? [] : [
       {
         id: "tags-other",
-        category: "workshop",
-        group: "Tags",
-        label: "Other",
+        category: "map",
+        group: "Workshop",
+        label: "Other tags",
         description: "Tags this editor doesn't know, such as the old ungrouped ones. They are kept as they are.",
         keywords: others.join(" "),
         wide: true,
-        ...fixed,
         control: (
           <div className="flex flex-wrap gap-1">
             {others.map((name) => <Badge key={name} variant="outline" className="font-mono">{name}</Badge>)}
@@ -252,8 +269,8 @@ export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolea
       open={open}
       onClose={onClose}
       title="Project settings"
-      description="Settings for this project: its map's name, grid height, difficulty and tags."
-      categories={CATEGORIES}
+      description="Settings for this project and its map: name, grid height, difficulty and tags."
+      categories={categories}
       category={category}
       onCategoryChange={setCategory}
       rows={rows}

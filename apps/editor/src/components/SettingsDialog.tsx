@@ -171,8 +171,7 @@ export function SettingsDialog(props: {
   /** The parts of a settings row that come from its field: category, modified flag, reset. */
   const setting = <K extends keyof Settings>(section: K, key: keyof Settings[K]) => ({
     category: section,
-    modified: !isDefault(section, key),
-    reset: () => resetField(section, key)
+    changes: { modified: !isDefault(section, key), reset: () => resetField(section, key) }
   })
 
   const setBindings = (action: KeybindAction, bindings: Bindings) =>
@@ -252,8 +251,10 @@ export function SettingsDialog(props: {
       label,
       description: keybindActionDescriptions[action],
       tooltip: true,
-      modified: !isDefaultBinding(keybinds, defaults.keybinds, action),
-      reset: () => setBindings(action, defaults.keybinds[action]),
+      changes: {
+        modified: !isDefaultBinding(keybinds, defaults.keybinds, action),
+        reset: () => setBindings(action, defaults.keybinds[action])
+      },
       control: (
         <KeybindControl
           action={action}
@@ -342,8 +343,7 @@ export function SettingsDialog(props: {
         label: "Autosave",
         description: "Coming later.",
         disabled: true,
-        modified: false,
-        reset: () => {},
+        changes: { modified: false, reset: () => {} },
         control: <Switch disabled checked={false} />
       },
       {

@@ -12,7 +12,7 @@ import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type ReactNode, useState } from "react"
+import { Fragment, type ReactNode, useState } from "react"
 
 /** One searchable setting. `group` is a sub-heading inside the category (keybind sections). */
 export interface SettingsRow<C extends string> {
@@ -26,9 +26,14 @@ export interface SettingsRow<C extends string> {
   /** More text the search matches (e.g. the choices inside the control). */
   readonly keywords?: string
   readonly disabled?: boolean
-  /** Differs from its default; `reset` puts it back. */
-  readonly modified: boolean
-  readonly reset: () => void
+  /**
+   * For settings with a default: whether it differs (a dot marks the row and its category)
+   * and how to put it back. Rows without one (things the user writes, like a map's name)
+   * get neither.
+   */
+  readonly changes?: { readonly modified: boolean; readonly reset: () => void }
+  /** A row-specific action shown where the reset button goes (e.g. "Clear"). */
+  readonly action?: ReactNode
   /** The control goes under the label at full width instead of beside it. */
   readonly wide?: boolean
   readonly control: ReactNode
@@ -38,9 +43,13 @@ export interface SettingsCategoryInfo<C extends string> {
   readonly id: C
   readonly label: string
   readonly icon: Icon
+  /** A heading the nav shows above the first category of each section ("Maps"). */
+  readonly section?: string
 }
 
-function ResetButton({ row }: { readonly row: SettingsRow<string> }) {
+const isModified = (row: SettingsRow<string>): boolean => row.changes?.modified === true
+
+function ResetButton({ modified, reset }: NonNullable<SettingsRow<string>["changes"]>) {
   return (
     <Tooltip>
       <TooltipTrigger
@@ -48,10 +57,10 @@ function ResetButton({ row }: { readonly row: SettingsRow<string> }) {
           <Button
             variant="ghost"
             size="icon-sm"
-            className={cn("size-6 text-muted-foreground", !row.modified && "invisible")}
-            onClick={row.reset}
+            className={cn("size-6 text-muted-foreground", !modified && "invisible")}
+            onClick={reset}
             aria-label="Reset to default"
-            tabIndex={row.modified ? 0 : -1}
+            tabIndex={modified ? 0 : -1}
           />
         }
       >
@@ -91,9 +100,10 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
       )}
     </div>
   )
+  const trailing = row.action ?? (row.changes && <ResetButton {...row.changes} />)
   return (
     <div className="group/row relative flex min-h-9 flex-col gap-2 py-1 pl-3">
-      {row.modified && (
+      {isModified(row) && (
         <Tooltip>
           <TooltipTrigger
             render={
@@ -114,9 +124,9 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
           <>
             <div className="flex items-start gap-4">
               {text}
-              <ResetButton row={row} />
+              {trailing}
             </div>
-            <div className="pr-8 pb-1">{row.control}</div>
+            <div className={cn("pb-1", row.changes && "pr-8")}>{row.control}</div>
           </>
         )
         : (
@@ -124,7 +134,7 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
             {text}
             <div className="flex shrink-0 items-center gap-2">
               {row.control}
-              <ResetButton row={row} />
+              {trailing}
             </div>
           </div>
         )}
@@ -183,7 +193,7 @@ export function SettingsShell<C extends string>(props: {
     else groups.push({ key: `${row.category}-${title ?? ""}`, title, rows: [row] })
   }
 
-  const modifiedIn = (category: C) => props.rows.some((r) => r.category === category && r.modified)
+  const modifiedIn = (category: C) => props.rows.some((r) => r.category === category && isModified(r))
   const { onResetCategory } = props
 
   return (
@@ -213,33 +223,40 @@ export function SettingsShell<C extends string>(props: {
               <span className="text-[0.65rem] text-muted-foreground tabular-nums">{matched.length}</span>
             </Button>
           )}
-          {props.categories.map(({ id, label, icon: CategoryIcon }) => {
+          {props.categories.map(({ id, label, icon: CategoryIcon, section }, i) => {
             const hits = hitsPerCategory.get(id) ?? 0
             const active = searching ? scope === id : props.category === id
+            const heading = section !== undefined && section !== props.categories[i - 1]?.section
             return (
-              <Button
-                key={id}
-                variant={active ? "secondary" : "ghost"}
-                className={cn("justify-start", searching && hits === 0 && "text-muted-foreground/50")}
-                disabled={searching && hits === 0}
-                onClick={() => {
-                  if (searching) setScope(id)
-                  else props.onCategoryChange(id)
-                }}
-                data-category={id}
-              >
-                <CategoryIcon />
-                <span className="flex-1 text-left">{label}</span>
-                {searching
-                  ? hits > 0 && (
-                    <span className="rounded-full bg-primary/15 px-1.5 text-[0.65rem] text-primary tabular-nums">
-                      {hits}
-                    </span>
-                  )
-                  : modifiedIn(id) && (
-                    <span className="size-1.5 rounded-full bg-primary" aria-label="Has changed settings" />
-                  )}
-              </Button>
+              <Fragment key={id}>
+                {heading && (
+                  <div className="mt-2 px-2 pb-0.5 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
+                    {section}
+                  </div>
+                )}
+                <Button
+                  variant={active ? "secondary" : "ghost"}
+                  className={cn("justify-start", searching && hits === 0 && "text-muted-foreground/50")}
+                  disabled={searching && hits === 0}
+                  onClick={() => {
+                    if (searching) setScope(id)
+                    else props.onCategoryChange(id)
+                  }}
+                  data-category={id}
+                >
+                  <CategoryIcon />
+                  <span className="flex-1 text-left">{label}</span>
+                  {searching
+                    ? hits > 0 && (
+                      <span className="rounded-full bg-primary/15 px-1.5 text-[0.65rem] text-primary tabular-nums">
+                        {hits}
+                      </span>
+                    )
+                    : modifiedIn(id) && (
+                      <span className="size-1.5 rounded-full bg-primary" aria-label="Has changed settings" />
+                    )}
+                </Button>
+              </Fragment>
             )
           })}
         </nav>
