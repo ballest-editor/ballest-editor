@@ -251,7 +251,8 @@ const WATER_COLOR = "#2f7fb8"
 
 /**
  * The level's water sheet. Translucent here so pieces under it stay visible (tinted), where
- * the game's opaque water hides them. Not in the click raycast (that only walks the items).
+ * the game's opaque water hides them. Only its top face draws: from below, a sheet that fills
+ * the whole view would wash everything out. Not in the click raycast (that only walks the items).
  */
 function Water() {
   const visible = useEditor((s) => s.settings.appearance.waterVisible)
@@ -259,7 +260,7 @@ function Water() {
   return (
     <mesh position={WATER_POSITION} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
       <planeGeometry args={[WATER.size, WATER.size]} />
-      <meshBasicMaterial color={WATER_COLOR} transparent opacity={0.35} depthWrite={false} side={THREE.DoubleSide} />
+      <meshBasicMaterial color={WATER_COLOR} transparent opacity={0.35} depthWrite={false} />
     </mesh>
   )
 }
