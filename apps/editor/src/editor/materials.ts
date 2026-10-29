@@ -36,16 +36,14 @@ const loads = new WeakMap<THREE.Texture, Promise<void>>()
 /** Resolves when `texture` has its image or has failed to load; at once for one that was never requested. */
 export const textureLoaded = (texture: THREE.Texture): Promise<void> => loads.get(texture) ?? Promise.resolve()
 
-const loadTexture = (
-  path: string,
-  colorSpace: THREE.ColorSpace,
-  onError: () => void,
-  // The glb UVs are UE's (origin top-left, copied as-is by the extractor). The programs run the game's own
-  // math on them, so their textures keep the PNG's row order; three's default flip is what the tiled reads
-  // were tuned with.
-  flipY = true
-): THREE.Texture => {
-  const key = `${colorSpace}|${flipY}|${path}`
+/**
+ * One convention for every texture read, the game's: the glb UVs are UE's (origin top-left, copied as-is
+ * by the extractor) and the projected coordinates are the game's object / world positions, so textures
+ * keep the PNG's row order (`flipY` off) instead of three's default flip. The programs (`approx.programs`)
+ * run the game's own math on the same reads.
+ */
+const loadTexture = (path: string, colorSpace: THREE.ColorSpace, onError: () => void): THREE.Texture => {
+  const key = `${colorSpace}|${path}`
   const cached = textures.get(key)
   if (cached !== undefined) return cached
   // Without a DOM (unit tests) there's no image loader; keep an empty texture.
@@ -65,7 +63,7 @@ const loadTexture = (
     loads.set(texture, load)
   }
   texture.colorSpace = colorSpace
-  texture.flipY = flipY
+  texture.flipY = false
   texture.wrapS = THREE.RepeatWrapping
   texture.wrapT = THREE.RepeatWrapping
   textures.set(key, texture)
@@ -479,7 +477,9 @@ const build = (
   }
   if (spec.normalTexture !== undefined) {
     material.normalMap = loadTexture(spec.normalTexture, THREE.NoColorSpace, drop("normalMap"))
-    material.normalScale.set(NORMAL_STRENGTH, -NORMAL_STRENGTH) // UE normal maps use DirectX green (-Y)
+    // UE normal maps use DirectX green (+Y = down the image); with the rows unflipped that is +v, three's
+    // bitangent, so no sign flip (three's default flip would need (1, -1)).
+    material.normalScale.set(NORMAL_STRENGTH, NORMAL_STRENGTH)
   }
   if (spec.ormTexture !== undefined) {
     const orm = loadTexture(spec.ormTexture, THREE.NoColorSpace, () => {
@@ -539,8 +539,7 @@ const build = (
         loadTexture(
           t.texture,
           colorSpaceOf(t.texture, THREE.SRGBColorSpace),
-          dropDefine(`BALLEST_PROGRAM_${programKind.toUpperCase()}`),
-          false
+          dropDefine(`BALLEST_PROGRAM_${programKind.toUpperCase()}`)
         )
       ])
     }

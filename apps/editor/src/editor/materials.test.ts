@@ -30,7 +30,9 @@ describe("three materials", () => {
     assert.isTrue(glass.transparent)
     assert.isBelow(glass.opacity, 1)
     assert.strictEqual(glass.normalMap?.colorSpace, THREE.NoColorSpace)
-    assert.isBelow(glass.normalScale.y, 0) // DirectX green flipped
+    // The game's orientation for every read: PNG rows as they are (UE's UV origin), DirectX green along +v.
+    assert.isFalse(glass.normalMap?.flipY)
+    assert.isAbove(glass.normalScale.y, 0)
     assert.strictEqual(glass.side, THREE.DoubleSide) // the game material is two-sided
     assert.strictEqual(blue.side, THREE.FrontSide)
     assert.strictEqual(materialFor(table, "/Game/Unknown.Unknown"), neutralMaterial())
@@ -142,6 +144,7 @@ describe("three materials", () => {
     })
     assert.deepStrictEqual(shaderPatchOf(wind)?.uniforms.uAlphaShape.value, new THREE.Vector2(0.6, 0.3))
     assert.isDefined(shaderPatchOf(wind)?.uniforms["uTex0"])
+    assert.isFalse(shaderPatchOf(wind)?.uniforms.uAlphaMap.value?.flipY) // same rows as the program's read
     assert.strictEqual(shaderPatchOf(wind)?.uniforms.uBallestTime.value, 0)
     assert.strictEqual(wind.defines?.["STANDARD"], "") // three's own define survives the patch
     const shader = program()

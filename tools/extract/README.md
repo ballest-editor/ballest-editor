@@ -261,7 +261,7 @@ The textures total about 142 MB, so `assets/textures/` is gitignored.
 
 Decoding uses CUE4Parse-Conversion's managed AssetRipper BCn decoder (`TextureDecoder.UseAssetRipperTextureDecoder = true`), and the PNGs are written with ImageSharp. Neither SkiaSharp nor any native library is needed, so the flake doesn't add one.
 
-Normal maps (BC5) get their Z channel rebuilt, and they keep UE's DirectX green channel. In three.js, use `normalScale (1, -1)`.
+Normal maps (BC5) get their Z channel rebuilt, and they keep UE's DirectX green channel. The editor loads every texture with `flipY` off (the glb UVs are UE's, origin top-left, and the projected reads and the GLSL programs use the game's orientation), where DirectX green already points along +v: `normalScale (1, 1)`. With three's default flip it would be `(1, -1)`.
 
 `build-materials.mjs` merges each chain from the root down: instances store only their overrides. That produces:
 
