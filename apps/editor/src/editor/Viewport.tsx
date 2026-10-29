@@ -25,6 +25,7 @@ import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline } from "./selectionOutline"
 import { nextSelection, type SelectMode, useEditor } from "./store"
 import { glbUrl, visualsOf } from "./visuals"
+import { waterTopMaterial, waterUnderMaterial } from "./water"
 
 const CLICK_SLOP_PX = 4
 
@@ -235,6 +236,7 @@ function ViewportGrid() {
   return (
     <Grid
       position={[0, floorHeight, 0]}
+      side={THREE.DoubleSide} // drei's default (BackSide) hides it from below
       infiniteGrid
       cellSize={100}
       sectionSize={1000}
@@ -247,21 +249,18 @@ function ViewportGrid() {
 }
 
 const WATER_POSITION = toTuple3(ueToThreeVector({ ...WATER.center, z: WATER.height }))
-const WATER_COLOR = "#2f7fb8"
 
-/**
- * The level's water sheet. Translucent here so pieces under it stay visible (tinted), where
- * the game's opaque water hides them. Only its top face draws: from below, a sheet that fills
- * the whole view would wash everything out. Not in the click raycast (that only walks the items).
- */
+/** The level's water sheet (see water.ts). Not in the click raycast (that only walks the items). */
 function Water() {
   const visible = useEditor((s) => s.settings.appearance.waterVisible)
+  const geometry = useMemo(() => new THREE.PlaneGeometry(WATER.size, WATER.size), [])
+  useEffect(() => () => geometry.dispose(), [geometry])
   if (!visible) return null
   return (
-    <mesh position={WATER_POSITION} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
-      <planeGeometry args={[WATER.size, WATER.size]} />
-      <meshBasicMaterial color={WATER_COLOR} transparent opacity={0.35} depthWrite={false} />
-    </mesh>
+    <group position={WATER_POSITION} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh geometry={geometry} material={waterTopMaterial} renderOrder={1} />
+      <mesh geometry={geometry} material={waterUnderMaterial} renderOrder={1} />
+    </group>
   )
 }
 
