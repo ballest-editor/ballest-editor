@@ -7,9 +7,10 @@ import { DateTime, Effect } from "effect"
 import type { CatalogPiece } from "./Catalog"
 import type { Vec3 } from "./coords"
 import { defaultProperties } from "./itemProperties"
-import { DEFAULT_PLAYER_START } from "./level"
+import { DEFAULT_GOAL, DEFAULT_PLAYER_START } from "./level"
 import {
   type EditorState,
+  GOAL_CLASS,
   type Item,
   type ItemTransform,
   type MapFile,
@@ -124,8 +125,7 @@ export const placementTransform = (piece: CatalogPiece, translation: Vec3): Item
 }
 
 const PLAYER_START_MESH = "/Game/Maps/_GENERATED/PC/SM_Start_Fixed.SM_Start_Fixed"
-const PLAYER_START_MATERIAL =
-  "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_GoalYellow.MI_GoalYellow'"
+const GOAL_YELLOW = "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_GoalYellow.MI_GoalYellow'"
 /** The in-game editor saves new player starts at this scale (20/20 samples; the catalog rounds it to 0.2765). */
 const PLAYER_START_SCALE = 0.276538
 
@@ -140,10 +140,28 @@ export const playerStartItem = (piece?: CatalogPiece): Item =>
     : {
       actorToSpawn: PLAYER_START_CLASS,
       itemTransform: playerStartTransform(),
-      meshComponents: [meshComponentFor(PLAYER_START_MESH, [PLAYER_START_MATERIAL])],
+      meshComponents: [meshComponentFor(PLAYER_START_MESH, [GOAL_YELLOW])],
       bIsBaseItem: false,
       ...emptyProperties
     }
+
+const GOAL_MESH = "/Game/Maps/_GENERATED/PC/SM_GoalRing.SM_GoalRing"
+/**
+ * The level's goal ring, as every untouched in-game save writes it: pitched 90° so the ring
+ * stands upright facing the player start, at its Main component's scale 1.5.
+ */
+export const goalItem = (): Item => ({
+  actorToSpawn: GOAL_CLASS,
+  itemTransform: {
+    // The game's own bits: y is exactly -SQRT1_2, w one ulp above it.
+    rotation: { x: 0, y: -Math.SQRT1_2, z: 0, w: 0.7071067811865477 },
+    translation: { ...DEFAULT_GOAL },
+    scale3D: { x: 1.5, y: 1.5, z: 1.5 }
+  },
+  meshComponents: [meshComponentFor(GOAL_MESH, [GOAL_YELLOW])],
+  bIsBaseItem: false,
+  ...emptyProperties
+})
 
 export const defaultEditorState = (): EditorState => ({
   version: 1,
@@ -162,8 +180,9 @@ export interface NewMapOptions {
 }
 
 /**
- * A new, unvalidated map with the one player start the game requires, where the game puts
- * it. Defaults match fresh in-game saves.
+ * A new, unvalidated map with what a fresh in-game map starts with: the one player start the
+ * game requires, then the goal ring, both where the level puts them. Defaults match fresh
+ * in-game saves.
  */
 export const newMapFile = (options: NewMapOptions): MapFile => ({
   worldSettings: {
@@ -186,6 +205,6 @@ export const newMapFile = (options: NewMapOptions): MapFile => ({
     skylightIntensity: 1,
     directionalLightAngle: -20.6474552154541
   },
-  items: [playerStartItem(options.playerStartPiece)],
+  items: [playerStartItem(options.playerStartPiece), goalItem()],
   editorState: defaultEditorState()
 })

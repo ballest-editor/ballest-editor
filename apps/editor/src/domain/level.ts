@@ -15,6 +15,13 @@ import { isPlayerStart, type MapFile } from "./MapFile"
 export const DEFAULT_PLAYER_START: Vec3 = { x: -3955, y: -1785, z: 8615 }
 
 /**
+ * Where the game puts a new map's goal ring: the level's own `BP_Checkpoint` (its Main
+ * component), 11.65 m along +X from the player start and 2.8 m above it. Untouched in-game
+ * maps keep it here (achievement_TwoRibbons, Bevel Up, focus, leos).
+ */
+export const DEFAULT_GOAL: Vec3 = { x: -2790, y: -1863, z: 8896 }
+
+/**
  * The water: `BP_ArenaPieces.Water_Plane`, a flat `SM_WaterTile` (1000 cm square) at scale
  * 200, so a 2 km square sheet at this height. It is opaque in game; anything below it
  * can't be seen from above.

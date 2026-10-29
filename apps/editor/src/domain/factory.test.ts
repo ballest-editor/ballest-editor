@@ -1,5 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
+import { listSamples, readSample } from "../test/samples"
 import fixture from "./bundledCatalog.json"
 import { Catalog } from "./Catalog"
 import {
@@ -10,7 +11,8 @@ import {
   placementTransform,
   qualifyMaterialPath
 } from "./factory"
-import { classNameOf, isPlayerStart, Item, MapFile, objectPathOf } from "./MapFile"
+import { DEFAULT_GOAL, DEFAULT_PLAYER_START } from "./level"
+import { classNameOf, Item, MapFile, objectPathOf } from "./MapFile"
 
 const catalog = Schema.decodeUnknownSync(Catalog)(fixture)
 const cube = catalog.pieces.find((p) => p.className === "BP_Prim_Cube")!
@@ -68,12 +70,40 @@ describe("factory", () => {
     })
   })
 
-  it("creates a new map with exactly one player start that decodes", () => {
+  it("creates a new map with the player start and goal where the game puts them, through MapFile", () => {
     const map = newMapFile({ displayName: "A", creatorName: "B", createdAt: "2026.01.02-03.04.05" })
-    const decoded = Schema.decodeUnknownSync(MapFile)(JSON.parse(JSON.stringify(map)))
-    assert.strictEqual(decoded.items.filter(isPlayerStart).length, 1)
+    const json = JSON.stringify(map)
+    const codec = Schema.fromJsonString(MapFile)
+    const decoded = Schema.decodeSync(codec)(json)
+    assert.deepStrictEqual(JSON.parse(Schema.encodeSync(codec)(decoded)), JSON.parse(json))
+    assert.deepStrictEqual(decoded.items.map((item) => classNameOf(item.actorToSpawn)), [
+      "MP_PlayerStart",
+      "BP_Checkpoint"
+    ])
+    assert.deepStrictEqual(decoded.items[0]!.itemTransform.translation, DEFAULT_PLAYER_START)
+    assert.deepStrictEqual(decoded.items[1]!.itemTransform.translation, DEFAULT_GOAL)
     assert.strictEqual(decoded.worldSettings.levelData.userLevelName, "A_B")
     assert.isFalse(decoded.worldSettings.levelData.bValidated)
+  })
+
+  it("writes the new map's two items exactly as a fresh in-game draft does", () => {
+    // prefabs 1 is a draft whose goal was never moved; drafts write bIsBaseItem false.
+    const file = listSamples().find((f) => f.name.includes("prefabs 1"))!
+    const codec = Schema.fromJsonString(MapFile)
+    const draft = Schema.encodeSync(MapFile)(Schema.decodeSync(codec)(readSample(file)))
+    const fresh = Schema.encodeSync(MapFile)(
+      Schema.decodeSync(codec)(JSON.stringify(newMapFile({ displayName: "A", creatorName: "B", createdAt: "" })))
+    )
+    const [start, goal] = fresh.items
+    assert.deepStrictEqual(goal, draft.items[1])
+    assert.deepStrictEqual(start, {
+      ...draft.items[0]!,
+      itemTransform: {
+        rotation: { x: 0, y: 0, z: 0, w: 1 },
+        translation: DEFAULT_PLAYER_START,
+        scale3D: { x: 0.276538, y: 0.276538, z: 0.276538 }
+      }
+    })
   })
 
   it("formats createdAt and parses class/material paths", () => {

@@ -110,7 +110,7 @@ Every map is spawned into `/Game/Maps/LevelEditor/Map_LevelEditorMain`. Read fro
 | What                          | Where it comes from                                           | Value                                               |
 | ----------------------------- | ------------------------------------------------------------- | --------------------------------------------------- |
 | Player start of a new map     | the level's `MP_PlayerStart` (Main)                           | (−3955, −1785, 8615), scale 0.276538                |
-| Goal of a new map             | the level's `BP_Checkpoint` (Main)                            | (−2790, −1863, 8896)                                |
+| Goal of a new map             | the level's `BP_Checkpoint` (Main)                            | (−2790, −1863, 8896), pitch 90°, scale 1.5          |
 | Water surface                 | `BP_ArenaPieces.Water_Plane`: flat `SM_WaterTile` × 200       | z = 126.71326, 2 km square centred on (173, −2569)  |
 | Kill zone                     | `BP_KillZone`: box extent 32 × (1000, 1000, 0.25)             | z = 92–108, 640 m square centred on (−260, −4100)   |
 | Item placement bounds         | `BP_ItemPlacementBounds` (× 615) with ±50/±150 boundaries     | x −31062…30438, y −34598…26902, z −6569…177931      |
