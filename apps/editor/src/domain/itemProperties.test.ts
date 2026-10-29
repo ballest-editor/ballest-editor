@@ -122,6 +122,12 @@ describe("item properties", () => {
     assert.strictEqual(map.items[0]!.floatProperties[0]!.currentValue, 200)
   })
 
+  it("labels the decal style dropdown the way the game does", () => {
+    const shown = selectionProperties([{ item: placed(), piece: decal }])
+    assert.deepStrictEqual(shown.find((p) => p.name === "DecalStyle")?.options, ["Arrow", "Scratch Marks", "Stripes"])
+    assert.isUndefined(shown.find((p) => p.name === "DecalWidth")?.options)
+  })
+
   it("labels property names readably", () => {
     assert.strictEqual(propertyLabel("bFacingOnly"), "Facing Only")
     assert.strictEqual(propertyLabel("QualifiedAirflowTargetSpeed"), "Qualified Airflow Target Speed")

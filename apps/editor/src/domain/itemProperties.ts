@@ -20,7 +20,22 @@ export interface ItemProperty {
   readonly default: unknown
   /** Left out of the game's own property panel (the decal's size follows its scale there). */
   readonly hidden: boolean
+  /** Labels by value for an integer the game edits as a dropdown; undefined for a plain number. */
+  readonly options: ReadonlyArray<string> | undefined
 }
+
+/**
+ * Dropdown labels for integer properties, by class and property name. The game fills these
+ * dropdowns from native code, so they aren't in the pak or the exe's strings: they were read
+ * off the in-game editor (build 0.4.0-playtest) with a map holding one decal per style
+ * (`samples/UserSavedMaps/...props probe...`).
+ */
+const PROPERTY_OPTIONS: Readonly<Record<string, Readonly<Record<string, ReadonlyArray<string>>>>> = {
+  BP_UGCCircuitDecal: { DecalStyle: ["Arrow", "Scratch Marks", "Stripes"] }
+}
+
+const optionsOf = (piece: CatalogPiece | undefined, list: PropertyList, name: string) =>
+  list === "intProperties" && piece !== undefined ? PROPERTY_OPTIONS[piece.className]?.[name] : undefined
 
 export const PROPERTY_LISTS: ReadonlyArray<PropertyList> = [
   "boolProperties",
@@ -52,7 +67,14 @@ export const validPropertyValue = (list: PropertyList, value: unknown): boolean 
 const knownProperties = (piece: CatalogPiece | undefined) =>
   (piece?.properties ?? []).flatMap((p) =>
     p.list !== null && p.type !== null && validPropertyValue(p.list, p.default)
-      ? [{ list: p.list, name: p.name, type: p.type, default: p.default, hidden: p.hidden === true }]
+      ? [{
+        list: p.list,
+        name: p.name,
+        type: p.type,
+        default: p.default,
+        hidden: p.hidden === true,
+        options: optionsOf(piece, p.list, p.name)
+      }]
       : []
   )
 
@@ -100,7 +122,8 @@ const propertiesOfItem = (item: Item, piece: CatalogPiece | undefined): Readonly
         type: p.propertyType,
         values: [p.currentValue],
         default: undefined,
-        hidden: false
+        hidden: false,
+        options: optionsOf(piece, list, p.propertyName)
       }))
     )
   ]

@@ -1,6 +1,7 @@
 import { IconArrowBackUp } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Label } from "@workspace/ui/components/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Separator } from "@workspace/ui/components/separator"
 import { Switch } from "@workspace/ui/components/switch"
 import { useId, useState } from "react"
@@ -17,10 +18,42 @@ const sharedValue = (values: ReadonlyArray<unknown>): unknown => {
 
 const formatValue = (value: unknown): string => typeof value === "string" ? `"${value}"` : JSON.stringify(value)
 
+/** A value as the inspector names it: an option's label, else the value itself. */
+const describe = (property: ItemProperty, value: unknown): string => {
+  if (typeof value !== "number") return formatValue(value)
+  const label = property.options?.[value]
+  return label === undefined ? String(value) : `${label} (${value})`
+}
+
 /** Scrub speed per pixel, scaled to the property's magnitude (a vent's 750000 vs its 0.25). */
 const scrubStep = (reference: number): number => {
   const magnitude = Math.abs(reference)
   return magnitude === 0 ? 0.01 : Math.max(0.001, 10 ** (Math.floor(Math.log10(magnitude)) - 2))
+}
+
+/** An integer the game edits as a dropdown; a value outside the known labels shows as its number. */
+function OptionValue(props: {
+  readonly options: ReadonlyArray<string>
+  readonly value: unknown
+  readonly onChange: (value: number) => void
+}) {
+  const current = typeof props.value === "number" ? props.value : null
+  const labels = new Map(props.options.map((label, i) => [String(i), label]))
+  if (current !== null && !labels.has(String(current))) labels.set(String(current), `${current} (unknown)`)
+  return (
+    <Select
+      value={current === null ? null : String(current)}
+      items={Object.fromEntries(labels)}
+      onValueChange={(v) => v !== null && props.onChange(Number(v))}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder="Mixed" />
+      </SelectTrigger>
+      <SelectContent>
+        {[...labels].map(([v, label]) => <SelectItem key={v} value={v}>{label}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  )
 }
 
 function PropertyValue({ property, id }: { readonly property: ItemProperty; readonly id: string }) {
@@ -36,8 +69,9 @@ function PropertyValue({ property, id }: { readonly property: ItemProperty; read
           {value === undefined && <span className="text-xs text-muted-foreground">Mixed</span>}
         </div>
       )
-    case "floatProperties":
-    case "intProperties": {
+    case "intProperties":
+    case "floatProperties": {
+      if (property.options !== undefined) return <OptionValue options={property.options} value={value} onChange={set} />
       const integer = property.list === "intProperties"
       const shown = typeof value === "number" ? value : null
       const reference = typeof property.default === "number" ? property.default : shown ?? 0
@@ -66,7 +100,7 @@ function PropertyRow({ property }: { readonly property: ItemProperty }) {
   const atDefault = property.values.every((v) => v === property.default)
   const details = [
     `${property.name} (${property.type})`,
-    hasDefault ? `Default: ${formatValue(property.default)}` : "Not a property the catalog lists for this piece",
+    hasDefault ? `Default: ${describe(property, property.default)}` : "Not a property the catalog lists for this piece",
     ...(property.hidden ? ["Hidden in the game's own property panel"] : [])
   ].join("\n")
   return (
@@ -82,7 +116,7 @@ function PropertyRow({ property }: { readonly property: ItemProperty }) {
             variant="ghost"
             size="icon-sm"
             aria-label={`Reset ${property.name}`}
-            title={`Reset to ${formatValue(property.default)}`}
+            title={`Reset to ${describe(property, property.default)}`}
             onClick={() => setSelectionProperty(property, property.default)}
           >
             <IconArrowBackUp />
