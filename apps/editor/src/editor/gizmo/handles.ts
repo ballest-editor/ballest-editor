@@ -4,9 +4,10 @@ import { AXIS_COLORS } from "../axisColors"
  *
  * A tool is a list of HandleSpecs; handles are independent, so a combined tool is just the
  * concatenation of lists. Visuals are built in "pixel" units along local +X (axis
- * handles), in the local XY plane (plane handles), or around local +Z (rings, whose axis
- * letters face the camera), and are oriented every frame from world-space directions
- * computed from the GAME basis via coords.ts. The gizmo lives in plain world space (never under a mirror), is scaled to a
+ * handles), in the local XY plane (plane handles), or around local +Z (rings; like the
+ * game's, a rotate ring shows only its quarter facing the camera until it is dragged), and are
+ * oriented every frame from world-space directions computed from the GAME basis via
+ * coords.ts. The gizmo lives in plain world space (never under a mirror), is scaled to a
  * constant screen size, renders on top, and is grabbed through invisible fatter hit meshes.
  *
  * TODO(pivot-dot): render the selection-origin dot in perspective when the pivot sits on
@@ -14,8 +15,7 @@ import { AXIS_COLORS } from "../axisColors"
  * box.
  */
 import * as THREE from "three"
-import { type Quat4, ueToThreeQuat } from "../../domain/coords"
-import { rotatorToQuat } from "../../domain/ueMath"
+import type { Quat4 } from "../../domain/coords"
 import { isLine, isMesh } from "../threeGuards"
 import { type Axis, axisWorldDir } from "./math"
 
@@ -59,12 +59,7 @@ export const SIZE = {
   ring: 78,
   viewRing: 94,
   ringTube: 1.2,
-  /** Rotate rings: arrowheads on the ring, and a stub along the ring's axis ending in its letter. */
-  ringArrowLength: 15,
-  ringArrowRadius: 5.5,
-  stubLength: 38,
-  label: 11,
-  labelStroke: 1.8,
+  arcTube: 2.2,
   uniform: 14,
   hitRadius: 7
 } as const
@@ -74,12 +69,14 @@ export const pairOf = (
   axis: Axis
 ): readonly [Axis, Axis] => (axis === "x" ? ["y", "z"] : axis === "y" ? ["z", "x"] : ["x", "y"])
 
+type ActivePart = THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
+
 export interface Handle {
   readonly spec: HandleSpec
   readonly root: THREE.Group
   readonly hits: ReadonlyArray<THREE.Mesh>
-  /** Parts that always face the camera (axis letters). */
-  readonly billboards: ReadonlyArray<THREE.Object3D>
+  /** Parts shown only while the handle is being dragged, in the plain axis colour (own materials). */
+  readonly activeParts: ReadonlyArray<ActivePart>
   readonly baseColor: THREE.Color
   readonly materials: ReadonlyArray<THREE.MeshBasicMaterial>
 }
@@ -97,7 +94,7 @@ const visualMaterial = (color: THREE.Color) =>
 /** Never rendered, but raycastable (Mesh.raycast ignores material.visible). */
 const hitMaterial = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
 
-const mesh = (geometry: THREE.BufferGeometry, material: THREE.Material) => {
+const mesh = <M extends THREE.Material>(geometry: THREE.BufferGeometry, material: M) => {
   const m = new THREE.Mesh(geometry, material)
   m.renderOrder = RENDER_ORDER
   return m
@@ -107,48 +104,10 @@ const mesh = (geometry: THREE.BufferGeometry, material: THREE.Material) => {
 const alongX = (geometry: THREE.BufferGeometry, x0: number, x1: number) =>
   geometry.rotateZ(-Math.PI / 2).translate((x0 + x1) / 2, 0, 0)
 
-/**
- * Which way each axis's inspector angle (X roll, Y pitch, Z yaw) grows, as a right-handed
- * turn about the axis's world direction: +1, or -1 for the opposite sense.
- */
-export const positiveTurn = (axis: Axis): 1 | -1 => {
-  const q = ueToThreeQuat(rotatorToQuat({ roll: +(axis === "x"), pitch: +(axis === "y"), yaw: +(axis === "z") }))
-  return new THREE.Vector3(q.x, q.y, q.z).dot(axisWorldDir(axis)) >= 0 ? 1 : -1
-}
-
-/**
- * Where the arrowheads sit on a ring (radians from local +X): between the other two rings,
- * all four quadrants so some are seen side-on from any view.
- */
-export const RING_ARROW_ANGLES = [1, 3, 5, 7].map((k) => (k * Math.PI) / 4)
-
-/** Letter strokes in a unit box centred on the origin (x right, y up). */
-const GLYPHS: Readonly<Record<Axis, ReadonlyArray<readonly [number, number, number, number]>>> = {
-  x: [[-0.5, -0.5, 0.5, 0.5], [-0.5, 0.5, 0.5, -0.5]],
-  y: [[-0.5, 0.5, 0, 0], [0.5, 0.5, 0, 0], [0, 0, 0, -0.5]],
-  z: [[-0.5, 0.5, 0.5, 0.5], [0.5, 0.5, -0.5, -0.5], [-0.5, -0.5, 0.5, -0.5]]
-}
-
-/** An axis letter drawn from flat strokes in the local XY plane, `SIZE.label` pixels tall. */
-const letter = (axis: Axis, material: THREE.Material): THREE.Group => {
-  const group = new THREE.Group()
-  const h = SIZE.label
-  const w = h * 0.75
-  for (const [x0, y0, x1, y1] of GLYPHS[axis]) {
-    const dx = (x1 - x0) * w
-    const dy = (y1 - y0) * h
-    const stroke = new THREE.PlaneGeometry(Math.hypot(dx, dy) + SIZE.labelStroke, SIZE.labelStroke)
-      .rotateZ(Math.atan2(dy, dx))
-      .translate(((x0 + x1) / 2) * w, ((y0 + y1) / 2) * h, 0)
-    group.add(mesh(stroke, material))
-  }
-  return group
-}
-
 const buildVisual = (
   spec: HandleSpec,
   material: THREE.MeshBasicMaterial
-): { parts: Array<THREE.Object3D>; hits: Array<THREE.Mesh>; billboards?: Array<THREE.Object3D> } => {
+): { parts: Array<THREE.Mesh>; hits: Array<THREE.Mesh>; activeParts?: Array<ActivePart> } => {
   const S = SIZE
   switch (spec.kind) {
     case "translateAxis":
@@ -175,30 +134,12 @@ const buildVisual = (
       return { parts: [mesh(square, material)], hits: [mesh(hit, hitMaterial)] }
     }
     case "rotateAxis": {
-      const ring = new THREE.TorusGeometry(S.ring, S.ringTube, 6, 96)
-      const hit = new THREE.TorusGeometry(S.ring, S.hitRadius, 6, 48)
-      if (spec.axis === undefined) return { parts: [mesh(ring, material)], hits: [mesh(hit, hitMaterial)] }
-      // Arrowheads point the way the axis's inspector angle grows (counter-clockwise about local +Z is positive).
-      const turn = positiveTurn(spec.axis) === 1 ? 0 : Math.PI
-      const arrows = RING_ARROW_ANGLES.map((a) =>
-        mesh(
-          new THREE.ConeGeometry(S.ringArrowRadius, S.ringArrowLength, 16)
-            .rotateZ(a + turn) // +Y onto the ring's tangent
-            .translate(S.ring * Math.cos(a), S.ring * Math.sin(a), 0),
-          material
-        )
-      )
-      // The axis the ring turns about, labelled at its tip.
-      const stub = new THREE.CylinderGeometry(S.shaft, S.shaft, S.stubLength - S.axisStart, 8)
-        .translate(0, (S.axisStart + S.stubLength) / 2, 0)
-        .rotateX(Math.PI / 2)
-      const label = letter(spec.axis, material)
-      label.position.set(0, 0, S.stubLength + S.label * 0.9)
-      return {
-        parts: [mesh(ring, material), ...arrows, mesh(stub, material), label],
-        hits: [mesh(hit, hitMaterial)],
-        billboards: [label]
-      }
+      // The quarter of the ring between local +X and +Y (turned to face the camera), and the
+      // whole ring while dragging.
+      const arc = new THREE.TorusGeometry(S.ring, S.arcTube, 8, 32, Math.PI / 2)
+      const ring = mesh(new THREE.TorusGeometry(S.ring, S.ringTube, 6, 96), material.clone())
+      const hit = new THREE.TorusGeometry(S.ring, S.hitRadius, 6, 16, Math.PI / 2)
+      return { parts: [mesh(arc, material), ring], hits: [mesh(hit, hitMaterial)], activeParts: [ring] }
     }
     case "rotateView": {
       const ring = new THREE.TorusGeometry(S.viewRing, S.ringTube, 6, 96)
@@ -216,14 +157,14 @@ const buildVisual = (
 export const makeHandle = (spec: HandleSpec): Handle => {
   const baseColor = new THREE.Color(spec.axis === undefined ? VIEW_COLOR : AXIS_COLORS[spec.axis])
   const material = visualMaterial(baseColor)
-  const { billboards = [], hits, parts } = buildVisual(spec, material)
+  const { activeParts = [], hits, parts } = buildVisual(spec, material)
   const root = new THREE.Group()
   root.name = spec.id
   for (const part of [...parts, ...hits]) {
     part.userData["handleId"] = spec.id
     root.add(part)
   }
-  return { spec, root, hits, billboards, baseColor, materials: [material] }
+  return { spec, root, hits, activeParts, baseColor, materials: [material] }
 }
 
 /** Everything a handle needs to place itself this frame. */
@@ -235,6 +176,8 @@ export interface GizmoFrame {
   readonly gameRotation: Quat4
   readonly space: GizmoSpace
   readonly cameraQuaternion: THREE.Quaternion
+  /** Unit vector from the origin toward the camera. */
+  readonly toCamera: THREE.Vector3
 }
 
 const X = new THREE.Vector3(1, 0, 0)
@@ -264,13 +207,14 @@ export const orientHandle = (handle: Handle, frame: GizmoFrame): void => {
     }
     case "rotateAxis": {
       if (spec.axis === undefined) return
-      // Local +Z along the axis, local +X/+Y along the other two, so the arrowheads sit between rings.
-      const [u, v] = pairWorldDirs(spec.axis, frame)
-      // proper rotation (no mirror): v x u is the axis itself
-      root.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(v, u, v.clone().cross(u)))
-      // letters face the camera
-      const facing = root.quaternion.clone().invert().multiply(frame.cameraQuaternion)
-      for (const billboard of handle.billboards) billboard.quaternion.copy(facing)
+      // Local +X and +Y along the other two axes, each flipped toward the camera, so the
+      // arc spans the octant the camera looks at. Local +Z (the ring's normal) stays on the
+      // axis, up to sign.
+      const towardCamera = (d: THREE.Vector3) => (d.dot(frame.toCamera) < 0 ? d.negate() : d)
+      const [a, b] = pairWorldDirs(spec.axis, frame)
+      const u = towardCamera(a)
+      const v = towardCamera(b)
+      root.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(u, v, u.clone().cross(v)))
       return
     }
     case "translatePlane": {
@@ -295,6 +239,7 @@ export const styleHandle = (handle: Handle, state: HandleState): void => {
     if (state === "hover" || state === "active") material.color.lerp(HOVER_TINT, 0.7)
     material.opacity = state === "dimmed" ? 0.25 : 1
   }
+  for (const part of handle.activeParts) part.visible = state === "active"
 }
 
 /**
@@ -372,7 +317,7 @@ export class GizmoObject extends THREE.Group {
     this.traverse((o) => {
       if (isMesh(o) || isLine(o)) o.geometry.dispose()
     })
-    for (const h of this.handles) for (const m of h.materials) m.dispose()
+    for (const h of this.handles) for (const m of [...h.materials, ...h.activeParts.map((p) => p.material)]) m.dispose()
     this.guide.material.dispose()
     super.dispose()
   }
