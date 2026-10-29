@@ -5,7 +5,7 @@ import * as path from "node:path"
 import { listSamples, readSample, repoRoot } from "../test/samples"
 import { expectVec } from "../test/vec"
 import { Catalog, indexCatalog } from "./Catalog"
-import { addItem, setPivots } from "./edits"
+import { addItem, copyItems, pasteItems, setPivots } from "./edits"
 import { identityTransform, newMapFile, playerStartItem } from "./factory"
 import { MapFile } from "./MapFile"
 import {
@@ -72,6 +72,18 @@ describe("setPivots", () => {
     assert.deepStrictEqual(map.editorState!.pivots.map((p) => p.itemIndex), [2])
     assert.deepStrictEqual(pivotAt(map, 1), DEFAULT_PIVOT)
     assert.deepStrictEqual(pivotAt(map, 0), DEFAULT_PIVOT)
+  })
+
+  it("pastes pivots sorted by item index, whatever order they were copied in", () => {
+    const map = setPivots(base(), [[1, top], [3, { ...top, choice: "Bottom" }]])
+    const pasted = pasteItems(map, copyItems(map, [3, 1]))
+    const n = map.items.length
+    assert.deepStrictEqual(pasted.editorState!.pivots.map((p) => [p.itemIndex, p.pivot.choice]), [
+      [1, "Top"],
+      [3, "Bottom"],
+      [n, "Bottom"],
+      [n + 1, "Top"]
+    ])
   })
 
   it("adds editorState to a map that has none (an imported .ballmap)", () => {

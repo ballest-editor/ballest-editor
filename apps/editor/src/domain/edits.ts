@@ -184,7 +184,9 @@ export const pasteItems = (map: MapFile, clip: Clip): MapFile => {
   const editorState = map.editorState ?? defaultEditorState()
   const offset = map.items.length
   const pivots = clip.pivots.map((p) => ({ ...p, itemIndex: p.itemIndex + offset }))
-  return { ...map, items, editorState: { ...editorState, pivots: [...editorState.pivots, ...pivots] } }
+  // sorted by item index, as the game writes them (a clip lists them in selection order)
+  const all = [...editorState.pivots, ...pivots].sort((x, y) => x.itemIndex - y.itemIndex)
+  return { ...map, items, editorState: { ...editorState, pivots: all } }
 }
 
 /** Appends copies of items (in the given order), pivots included: copy, then paste. */
