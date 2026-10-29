@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
 import { parseMaterialsFile } from "../domain/Materials"
-import { BLUE, GLASS, GLOW, materialsFile, OUTLINE, PIPE, TILES, WIND } from "../test/materials"
+import { BLUE, GLASS, GLOW, materialsFile, OUTLINE, PIPE, primitive, TILES, WIND } from "../test/materials"
 import {
   applyShaderPatch,
   applySlotMaterials,
@@ -30,7 +30,9 @@ describe("three materials", () => {
     assert.isTrue(glass.transparent)
     assert.isBelow(glass.opacity, 1)
     assert.strictEqual(glass.normalMap?.colorSpace, THREE.NoColorSpace)
-    assert.isBelow(glass.normalScale.y, 0) // DirectX green flipped
+    // The game's orientation for every read: PNG rows as they are (UE's UV origin), DirectX green along +v.
+    assert.isFalse(glass.normalMap?.flipY)
+    assert.isAbove(glass.normalScale.y, 0)
     assert.strictEqual(glass.side, THREE.DoubleSide) // the game material is two-sided
     assert.strictEqual(blue.side, THREE.FrontSide)
     assert.strictEqual(materialFor(table, "/Game/Unknown.Unknown"), neutralMaterial())
@@ -137,16 +139,19 @@ describe("three materials", () => {
     assert.deepStrictEqual(shaderPatchOf(wind)?.defines, {
       BALLEST_TILING: 1,
       BALLEST_ALPHA: 1,
+      BALLEST_ALPHA_CHANNEL: "r",
       BALLEST_PROGRAM_ALPHA: 1
     })
     assert.deepStrictEqual(shaderPatchOf(wind)?.uniforms.uAlphaShape.value, new THREE.Vector2(0.6, 0.3))
     assert.isDefined(shaderPatchOf(wind)?.uniforms["uTex0"])
+    assert.isFalse(shaderPatchOf(wind)?.uniforms.uAlphaMap.value?.flipY) // same rows as the program's read
     assert.strictEqual(shaderPatchOf(wind)?.uniforms.uBallestTime.value, 0)
     assert.strictEqual(wind.defines?.["STANDARD"], "") // three's own define survives the patch
     const shader = program()
     applyShaderPatch(shader, shaderPatchOf(wind)!)
     assert.include(shader.vertexShader, "vBallestUp = abs( vBallestWorldNormal.z )")
     assert.include(shader.fragmentShader, "uniform sampler2D uTex0;\nfloat ballestAlpha(")
+    assert.include(shader.fragmentShader, "ballestUv( uAlphaTiling ) ).BALLEST_ALPHA_CHANNEL")
     assert.include(
       shader.fragmentShader,
       "diffuseColor.a = ballestAlpha( vBallestUv, vBallestWorldNormal, vBallestLocal, uBallestTime )"
@@ -176,9 +181,8 @@ describe("three materials", () => {
   it("assigns materials per primitive by UE slot index", () => {
     const table = parseMaterialsFile(materialsFile)
     const root = new THREE.Group()
-    const prim = (name: string) => new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ name }))
-    const a = prim("0:Base")
-    const b = prim("1:Glass")
+    const a = primitive("0:Base")
+    const b = primitive("1:Glass")
     root.add(a, b)
     assert.deepStrictEqual([slotIndexOf(a), slotIndexOf(b)], [0, 1])
     applySlotMaterials(root, table, [BLUE, GLASS])

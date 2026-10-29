@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { outputsOf, parseFloat, parseModule, samples } from "./dxil.ts"
+import { instructionOf, mottleOf, outputsOf, parseFloat, parseModule, samples } from "./dxil.ts"
 
 // A pixel shader in the shape dxc -dumpbin prints: one material texture read whose u is
 // TEXCOORD0.x * 12 * cb3[0].x, scaled by the length of a GPU-scene row (the instance scale), and whose
@@ -77,6 +77,31 @@ define void @MainVS() {
 !56 = !{i32 0, i32 1}
 `
 
+// The Env masters' grey mottle: two reads of one texture, each offset by 0.5, multiplied, scaled by
+// ColorContrast - 1 (a Material constant-buffer float) and taken off 1.
+const MOTTLE = `
+define void @MainPS() {
+  %1 = call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 16, i32 16, i32 0, i8 0 }, i32 16, i1 false)
+  %2 = call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 3, i32 3, i32 0, i8 2 }, i32 3, i1 false)
+  %10 = call float @dx.op.loadInput.f32(i32 4, i32 2, i32 0, i8 0, i32 undef)
+  %11 = call float @dx.op.loadInput.f32(i32 4, i32 2, i32 0, i8 1, i32 undef)
+  %12 = fmul fast float %10, 2.000000e+00
+  %20 = call %dx.types.ResRet.f32 @dx.op.sample.f32(i32 60, %dx.types.Handle %1, %dx.types.Handle %1, float %10, float %11, float undef, float undef, i32 0, i32 0, i32 undef, float undef)
+  %21 = extractvalue %dx.types.ResRet.f32 %20, 0
+  %22 = call %dx.types.ResRet.f32 @dx.op.sample.f32(i32 60, %dx.types.Handle %1, %dx.types.Handle %1, float %12, float %11, float undef, float undef, i32 0, i32 0, i32 undef, float undef)
+  %23 = extractvalue %dx.types.ResRet.f32 %22, 0
+  %30 = fadd fast float %21, 5.000000e-01
+  %31 = fadd fast float %23, 0x3FD0000000000000
+  %32 = fmul fast float %30, %31
+  %40 = call %dx.types.CBufRet.f32 @dx.op.cbufferLoadLegacy.f32(i32 59, %dx.types.Handle %2, i32 0)
+  %41 = extractvalue %dx.types.CBufRet.f32 %40, 2
+  %42 = fadd fast float %41, -1.000000e+00
+  %43 = fmul fast float %32, %42
+  %44 = fsub fast float 1.000000e+00, %43
+  ret void
+}
+`
+
 describe("dxil", () => {
   it("reads LLVM's hex doubles", () => {
     assert.strictEqual(parseFloat("0x3FF0000000000000"), 1)
@@ -111,6 +136,34 @@ describe("dxil", () => {
     assert.strictEqual(v.sceneScale, 0)
     // the additive 0.5 offset is not a source
     assert.isFalse(read.coords[0]!.some((l) => l.kind === "constant" && l.source === "0.5"))
+  })
+
+  it("reads an instruction once per module, in every shape the walkers need", () => {
+    const m = parseModule(PS)
+    assert.deepStrictEqual(instructionOf(m, "%10"), { kind: "input", id: 2, row: 0, component: 0 })
+    assert.deepStrictEqual(instructionOf(m, "%13"), { kind: "extract", aggregate: "%12", channel: 0 })
+    assert.deepStrictEqual(instructionOf(m, "%12"), { kind: "cbuffer", type: "f32", handle: "%5", index: 0 })
+    assert.deepStrictEqual(instructionOf(m, "%14"), { kind: "rawLoad", handle: "%6", index: "4" })
+    assert.deepStrictEqual(instructionOf(m, "%20"), { kind: "float", op: "fmul", a: "%10", b: "1.200000e+01" })
+    assert.deepStrictEqual(instructionOf(m, "%17"), { kind: "unary", op: "24", x: "%16" })
+    assert.deepStrictEqual(instructionOf(m, "%30"), {
+      kind: "sample",
+      op: "sampleBias",
+      handle: "%4",
+      coords: ["%23", "%24", "undef"]
+    })
+    assert.strictEqual(instructionOf(m, "%30"), instructionOf(m, "%30")) // cached
+    assert.deepStrictEqual(instructionOf(m, "%1")?.kind, "other")
+    assert.isUndefined(instructionOf(m, "%99"))
+  })
+
+  it("finds the grey-mottle chain: offset reads, their product, the gain and its parameter", () => {
+    const mottle = mottleOf(parseModule(MOTTLE))
+    assert.deepStrictEqual(mottle?.samples, ["%20", "%22"])
+    assert.deepStrictEqual(mottle?.offsets, [0.5, 0.25])
+    assert.deepStrictEqual(mottle?.gain, { sign: -1, constant: 1, param: "cb3[0].z", paramAdd: -1 })
+    // a shader without a product of offset reads has none
+    assert.isNull(mottleOf(parseModule(PS)))
   })
 
   it("traces vertex outputs to the position attribute and vertex-fetched buffers", () => {

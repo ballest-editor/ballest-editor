@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "notes": ["scalars/vectors/textures/switches are effective values: root UMaterial defaults (from CachedExpressionData) overridden by each instance down the chain.","vectors are linear RGBA as stored by UE. baseColor/emissive in approx are linear; set three.js colors with Color.setRGB(r,g,b, THREE.LinearSRGBColorSpace) (or the default working space).","approx.baseColor/metallic/roughness are the compiled shader evaluated for the material's parameters and a facing view with every texture at its mean colour (approx.evaluated true); otherwise (translucent passes) parameters picked by name (approx.keys says which; null = neutral default). opacity/emissive are always picked by name.","approx.colorLayers are the texture reads the base colour depends on: colour = baseColor + sum of gain * (read - mean); approx.opacityLayers the reads a translucent pass's alpha depends on, the same way (gain and mean from the evaluated shader; tiling is repeats per UV unit, or per cm when projected; instanceScale as for the normal map).","approx.reads are the base-pass pixel shader's texture reads, traced through the compiled shader (tools/extract shaders): projection uv = mesh UV0 (scale in repeats per UV unit); object = object-aligned position, pivot at the object origin, rotating with the piece (scale in repeats per cm; instanceScale 1 = u, v also multiply by the piece's x, y scale); world. strength is a normal layer's blend strength. approx.*Texture/tiling/projection/instanceScale are the primary read per role; tiling is [u, v].","Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).","approx.variation is the grey mottle as the base pass applies it: colour *= 1 + gain * product over layers of (texture read at tilings[i] + offsets[i]); gain already includes the instance's parameter (ColorContrast - 1 for the Env masters).","approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).","approx.opacity is the evaluated alpha on the face that shows most (a beam masks its caps with 1 - |world normal z|: its sides); approx.upFade (0..1, null = 1) is the fraction left on a face that looks up. An additive pass renders as its evaluated glow (emissive, black base, opacity 1) faded the same way.","approx.programs is the compiled shader's own output math as GLSL functions f(uv, worldNormal, objectPosition, time) with the instance's parameters folded in: alpha (a translucent pass's alpha, e.g. the vent's streaks for any frame via time), glow (an additive pass's unlit colour) and base (an opaque base colour whose texture reads the layers cannot place, e.g. the rubber block's cells); textures are the samplers the code reads (uTexN).","A few materials cannot be read from the cooked data and are overridden by name (OVERRIDES in tools/extract/src/materials.ts): M_PlasticBase's cell noise samples the engine's placeholder texture, so its base colour is taken as BaseColor_Light, the colour the game shows.","paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap)."],
+  "notes": ["scalars/vectors/textures/switches are effective values: root UMaterial defaults (from CachedExpressionData) overridden by each instance down the chain.","vectors are linear RGBA as stored by UE. baseColor/emissive in approx are linear; set three.js colors with Color.setRGB(r,g,b, THREE.LinearSRGBColorSpace) (or the default working space).","approx.baseColor/metallic/roughness are the compiled shader evaluated for the material's parameters and a facing view with every texture at its mean colour (approx.evaluated true); otherwise (translucent passes) parameters picked by name (approx.keys says which; null = neutral default). opacity/emissive are always picked by name.","approx.colorLayers are the texture reads the base colour depends on: colour = baseColor + sum of gain * (read - mean); approx.opacityLayers the reads a translucent pass's alpha depends on, the same way on the read's channel (r/g/b/a; gain and mean from the evaluated shader; tiling is repeats per UV unit, or per cm when projected; instanceScale as for the normal map).","approx.reads are the base-pass pixel shader's texture reads, traced through the compiled shader (tools/extract shaders): projection uv = mesh UV0 (scale in repeats per UV unit); object = object-aligned position, pivot at the object origin, rotating with the piece (scale in repeats per cm; instanceScale 1 = u, v also multiply by the piece's x, y scale); world. strength is a normal layer's blend strength. approx.*Texture/tiling/projection/instanceScale are the primary read per role; tiling is [u, v].","Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).","approx.variation is the grey mottle as the base pass applies it: colour *= 1 + gain * product over layers of (texture read at tilings[i] + offsets[i]); gain already includes the instance's parameter (ColorContrast - 1 for the Env masters).","approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).","approx.opacity is the evaluated alpha on the face that shows most (a beam masks its caps with 1 - |world normal z|: its sides); approx.upFade (0..1, null = 1) is the fraction left on a face that looks up. An additive pass renders as its evaluated glow (emissive, black base, opacity 1) faded the same way.","approx.programs is the compiled shader's own output math as GLSL functions f(uv, worldNormal, objectPosition, time) with the instance's parameters folded in: alpha (a translucent pass's alpha, e.g. the vent's streaks for any frame via time), glow (an additive pass's unlit colour) and base (an opaque base colour whose texture reads the layers cannot place, e.g. the rubber block's cells); textures are the samplers the code reads (uTexN).","A few materials cannot be read from the cooked data and are overridden by name (OVERRIDES in tools/extract/src/materials.ts): M_PlasticBase's cell noise samples the engine's placeholder texture, so its base colour is taken as BaseColor_Light, the colour the game shows.","paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap)."],
   "materials": [
     {
       "path": "/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial",
@@ -10686,6 +10686,7 @@
             "tiling": [1,0.5],
             "projection": "uv",
             "instanceScale": 0,
+            "channel": "r",
             "gain": 0.03620000121593477,
             "mean": 0.24816340549174098
           },
@@ -10694,6 +10695,7 @@
             "tiling": [0.5,0.25],
             "projection": "uv",
             "instanceScale": 0,
+            "channel": "r",
             "gain": 0.008612855309600664,
             "mean": 0.19263826872542333
           },
@@ -10702,6 +10704,7 @@
             "tiling": [0.800000011920929,0.4000000059604645],
             "projection": "uv",
             "instanceScale": 0,
+            "channel": "r",
             "gain": 0.006716069030218089,
             "mean": 0.19263826872542333
           },
@@ -10710,14 +10713,16 @@
             "tiling": [1,0.5],
             "projection": "uv",
             "instanceScale": 0,
+            "channel": "g",
             "gain": 0.004963268165303665,
-            "mean": 0.24816340549174098
+            "mean": 0.851063871667733
           },
           {
             "texture": "textures/Art/UsedMarketPlace/StylizedFX_Collection_q/T_Ray_02.png",
             "tiling": [0.5,0.25],
             "projection": "uv",
             "instanceScale": 0,
+            "channel": "r",
             "gain": 0.0017378349453157204,
             "mean": 0.19263826872542333
           },
@@ -10726,6 +10731,7 @@
             "tiling": [0.8999999761581421,0.44999998807907104],
             "projection": "uv",
             "instanceScale": 0,
+            "channel": "r",
             "gain": 0.001041837336697828,
             "mean": 0.19263826872542333
           }
