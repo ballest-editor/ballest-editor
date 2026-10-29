@@ -308,9 +308,6 @@ class Tracer {
 
 const ROOT: Ctx = { factor: 1, params: [], sceneDepth: 0, sceneScale: 0 }
 
-/** Whether `v` depends on a shader input (an interpolant / vertex attribute), transitively. */
-export const dependsOnInput = (m: Module, v: string, tracer = new Tracer(m)): boolean => tracer.facts(v).hasInput
-
 /** A function that answers `dependsOnInput` with one shared cache for the module. */
 export const inputDependency = (m: Module): (v: string) => boolean => {
   const tracer = new Tracer(m)

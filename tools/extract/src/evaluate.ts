@@ -118,9 +118,11 @@ export class Evaluator {
       return cond === undefined ? this.value(g(sel, 3)) : cond ? this.value(g(sel, 2)) : this.value(g(sel, 3))
     }
     if (d.startsWith("phi ")) {
-      // The incoming from the entry block is the path with nothing extra applied (no decal, no special case).
-      const incoming = [...d.matchAll(/\[ (\S+), (%[\w.]+) \]/g)]
-      const entry = incoming.find((i) => i[2] === "%0") ?? incoming[0]
+      // The incoming from the earliest block is the plain path: the special cases (a decal to blend, a
+      // selection highlight) branch off into later blocks and merge back here.
+      const incoming = [...d.matchAll(/\[ (\S+), %(\d+) \]/g)]
+        .sort((a, b) => num(a[2]) - num(b[2]))
+      const entry = incoming[0]
       return entry === undefined ? 0 : this.value(g(entry, 1))
     }
     const conv = d.match(/^(?:sitofp|uitofp) \S+ (\S+) to float$/)

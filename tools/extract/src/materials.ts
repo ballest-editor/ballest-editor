@@ -422,7 +422,9 @@ export const materialsBuild = Effect.fn("materialsBuild")(
       const primary = (role: Role) => byRole(role)[0]
       // Colour layers: reads the evaluated surface says add to the base colour (gain != 0). Without an
       // evaluation (translucent passes) no colour texture is applied: the parameters alone are safer.
-      const colorLayers = reads.filter((r) => r.role !== "normal" && r.gain !== null && r.unresolved.length === 0)
+      const colorLayers = reads
+        .filter((r) => r.role !== "normal" && r.gain !== null && r.unresolved.length === 0)
+        .sort((a, b) => Math.max(...(b.gain ?? [0]).map(Math.abs)) - Math.max(...(a.gain ?? [0]).map(Math.abs)))
       const normalRead = normals[0]
       const variationRead = primary("variation")
       const opacityRead = primary("opacity")
