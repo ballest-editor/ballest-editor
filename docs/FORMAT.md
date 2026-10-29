@@ -152,3 +152,7 @@ Pak: `Ballest/Content/Paks/Ballest-Windows.{pak,utoc,ucas}` — IoStore TOC v8, 
 Note: `itemTransform` in a map file is the piece's **Main component** world transform, not the actor transform (e.g. every AirVent item carries Main's scale 0.75,0.75,1).
 
 In-game console (`ballest.editor.*`): `saveprefab`, `spawnprefab`, `listprefabs`, `deleteprefab`, `pivot`.
+
+## Pivots (`editorState.pivots`)
+
+The in-game inspector sets a per-item pivot: Default, Center, Bottom, Top, Left, Right, Back or Front. The gizmo sits on it and rotates and scales the item about it. `localPosition` is that point in the item's local frame (the Main component, unscaled cm): the centre of the Main mesh's local bounds, or the centre of one face of them. Back is +X, Front −X, Right +Y, Left −Y, Top +Z, Bottom −Z. Every pivot in `samples/` matches the catalog's bounds this way (`apps/editor/src/domain/pivot.test.ts`). Items without an entry use Default (the origin), and no sample has a Default entry, so the editor drops the entry when a pivot goes back to Default. Entries are sorted by `itemIndex`. A map without `editorState` (an imported `.ballmap`) gets one when a pivot is set or pasted.

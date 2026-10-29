@@ -4,10 +4,11 @@ import * as THREE from "three"
 import { type Quat4, ueToScene, ueToThreeVector, type UeTransform, type Vec3 } from "../../domain/coords"
 import { applyGroupDelta } from "../../domain/groupTransform"
 import { chordOf } from "../../domain/Keybinds"
+import { localToWorld } from "../../domain/pivot"
 import { transformSelection } from "../actions"
 import { AXIS_COLORS } from "../axisColors"
 import { sceneRegistry } from "../sceneRegistry"
-import { activeId, shownTransform, useEditor } from "../store"
+import { activeId, pivotOf, shownTransform, useEditor } from "../store"
 import { dragAxisWorld, dragDelta, type DragStart, type PointerSample } from "./drag"
 import { GizmoObject, toolHandles } from "./handles"
 import { worldPerPixel } from "./math"
@@ -20,6 +21,8 @@ interface ActiveDrag {
    * duplicate swaps the selection for its copies on the first move.
    */
   startTransforms: ReadonlyMap<string, UeTransform>
+  /** Each dragged item's own pivot (local, unscaled cm), which a scale keeps in place. */
+  localPivots: ReadonlyMap<string, Vec3>
   readonly pivot: Vec3
   last: ReadonlyMap<string, UeTransform> | undefined
   /** "pending": an Alt+drag that copies the selection once it moves; "copied": it has. */
@@ -45,7 +48,9 @@ const applyToObjects = (transforms: ReadonlyMap<string, UeTransform>) => {
 interface GizmoTarget {
   /** The selected items' shown transforms (live preview, else the document). */
   readonly transforms: ReadonlyMap<string, UeTransform>
-  /** Where the gizmo sits and the selection turns: the active item's origin, in game space. */
+  /** Each one's pivot in its local frame (unscaled cm), which a scale keeps in place. */
+  readonly localPivots: ReadonlyMap<string, Vec3>
+  /** Where the gizmo sits and the selection turns: the active item's pivot, in game space. */
   readonly pivot: Vec3
   /** The active item's rotation: the frame of the local axes. */
   readonly rotation: Quat4
@@ -53,7 +58,7 @@ interface GizmoTarget {
 
 /**
  * What the gizmo acts on: the selected items that are in the scene, framed on the active
- * (last selected) item like the game's editor.
+ * (last selected) item like the game's editor, at that item's pivot.
  */
 const currentTarget = (): GizmoTarget | undefined => {
   const s = useEditor.getState()
@@ -61,9 +66,21 @@ const currentTarget = (): GizmoTarget | undefined => {
     const t = shownTransform(s, id)
     return t === undefined || !sceneRegistry.objects.has(id) ? [] : [[id, t] as const]
   }))
-  const id = activeId(s)
-  const active = (id === undefined ? undefined : transforms.get(id)) ?? transforms.values().next().value
-  return active === undefined ? undefined : { transforms, pivot: active.translation, rotation: active.rotation }
+  const localPivots = new Map([...transforms.keys()].map((id) => [id, pivotOf(s, id).localPosition]))
+  const active = activeId(s)
+  const frameId = active !== undefined && transforms.has(active) ? active : transforms.keys().next().value
+  const frame = frameId === undefined ? undefined : transforms.get(frameId)
+  const localPivot = frameId === undefined ? undefined : localPivots.get(frameId)
+  if (frame === undefined || localPivot === undefined) return undefined
+  return { transforms, localPivots, pivot: localToWorld(frame, localPivot), rotation: frame.rotation }
+}
+
+/** A drag's per-item values re-keyed from each source id to its copy's. */
+function byCopy<A>(copies: ReadonlyMap<string, string>, bySource: ReadonlyMap<string, A>): ReadonlyMap<string, A> {
+  return new Map([...copies].flatMap(([source, copy]) => {
+    const value = bySource.get(source)
+    return value === undefined ? [] : [[copy, value] as const]
+  }))
 }
 
 const toWorld = (v: Vec3) => {
@@ -185,7 +202,15 @@ export function GizmoController() {
           && (spec.kind === "translateAxis" || spec.kind === "translatePlane")
         ? "pending"
         : undefined
-      drag.current = { id, start, startTransforms: target.transforms, pivot: target.pivot, last: undefined, duplicate }
+      drag.current = {
+        id,
+        start,
+        startTransforms: target.transforms,
+        localPivots: target.localPivots,
+        pivot: target.pivot,
+        last: undefined,
+        duplicate
+      }
       const axis = spec.kind === "translateAxis" || spec.kind === "scaleAxis" || spec.kind === "rotateAxis"
         ? dragAxisWorld(start)
         : undefined
@@ -209,13 +234,15 @@ export function GizmoController() {
         const copies = useEditor.getState().beginDuplicateDrag()
         active.duplicate = copies === undefined ? undefined : "copied"
         if (copies !== undefined) {
-          active.startTransforms = new Map([...copies].flatMap(([source, copy]) => {
-            const t = active.startTransforms.get(source)
-            return t === undefined ? [] : [[copy, t] as const]
-          }))
+          active.startTransforms = byCopy(copies, active.startTransforms)
+          active.localPivots = byCopy(copies, active.localPivots)
         }
       }
-      const next = new Map([...active.startTransforms].map(([id, t]) => [id, applyGroupDelta(t, active.pivot, delta)]))
+      const next = new Map(
+        [...active.startTransforms].map((
+          [id, t]
+        ) => [id, applyGroupDelta(t, active.pivot, delta, active.localPivots.get(id))])
+      )
       active.last = next
       applyToObjects(next)
       useEditor.getState().setPreview(next)

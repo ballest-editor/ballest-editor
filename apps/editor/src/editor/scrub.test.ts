@@ -4,10 +4,11 @@ import fixture from "../domain/bundledCatalog.json"
 import { Catalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { placementTransform } from "../domain/factory"
-import { type Axis, readField, selectionAxisEdit, type TransformField } from "../domain/groupTransform"
-import { rotateVec, rotatorToQuat } from "../domain/ueMath"
-import { editSelectionAxis, previewSelectionAxis } from "./actions"
-import { initialMap, shownTransform, useEditor } from "./store"
+import { applyGroupDelta, type Axis, readField, selectionAxisEdit, type TransformField } from "../domain/groupTransform"
+import { localToWorld } from "../domain/pivot"
+import { quatConjugate, quatMul, rotateVec, rotatorToQuat } from "../domain/ueMath"
+import { editSelectionAxis, previewSelectionAxis, setSelectionField } from "./actions"
+import { initialMap, pivotOf, shownTransform, useEditor } from "./store"
 
 const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!
 const s = () => useEditor.getState()
@@ -120,5 +121,60 @@ describe("scrubbing a transform field over a turned multi-selection (#43)", () =
     // the active item turns in place and only its yaw changes
     const active = docTransform(ids.at(-1)!)
     expectVec(readField(active, "rotation"), { x: 5, y: -15, z: -150 }, "active rotator")
+  })
+})
+
+describe("scrubbing with pivots (#51)", () => {
+  /** setup(), with a different pivot on each cube (the cube's bounds run 0..1000 in Z). */
+  const withPivots = () => {
+    const setUp = setup()
+    const pivots = [
+      { choice: "Top", localPosition: { x: 0, y: 0, z: 1000 } },
+      { choice: "Back", localPosition: { x: 500, y: 0, z: 500 } },
+      { choice: "Left", localPosition: { x: 0, y: -500, z: 500 } }
+    ]
+    s().setItemPivots(new Map(setUp.ids.map((id, i) => [id, pivots[i]!])))
+    return { ...setUp, pivots: new Map(setUp.ids.map((id) => [id, pivotOf(s(), id).localPosition])) }
+  }
+  const pivotPoint = (id: string, t = docTransform(id)) => localToWorld(t, pivotOf(s(), id).localPosition)
+
+  it("turns the selection about the active item's pivot, as the gizmo does", () => {
+    const { ids, before } = withPivots()
+    const activeId = ids.at(-1)!
+    const pivot = pivotPoint(activeId, before.get(activeId))
+    previewSelectionAxis("rotation", "y", { kind: "offset", by: 25 })
+    previewSelectionAxis("rotation", "y", null)
+    editSelectionAxis("rotation", "y", { kind: "offset", by: 25 })
+    expectVec(pivotPoint(activeId), pivot, "active pivot")
+    const turn = selectionAxisEdit(before.get(activeId)!, "rotation", "y", { kind: "offset", by: 25 })
+    const delta = { kind: "rotate", rotation: turn(before.get(activeId)!).rotation } as const
+    for (const id of ids) {
+      // the same rigid turn the gizmo applies, about the same point
+      const gizmo = applyGroupDelta(before.get(id)!, pivot, {
+        ...delta,
+        rotation: quatMul(delta.rotation, quatConjugate(before.get(activeId)!.rotation))
+      })
+      sameTransform(docTransform(id), gizmo, id)
+    }
+  })
+
+  it("scales and sets rotation or scale about each item's own pivot", () => {
+    const { ids } = withPivots()
+    const where = () => new Map(ids.map((id) => [id, pivotPoint(id)]))
+    for (
+      const edit of [
+        () => editSelectionAxis("scale3D", "z", { kind: "offset", by: 0.5 }),
+        () => editSelectionAxis("scale3D", "x", { kind: "set", value: 2 }),
+        () => editSelectionAxis("rotation", "x", { kind: "set", value: 30 }),
+        () => setSelectionField("rotation", { x: 10, y: 20, z: 30 })
+      ]
+    ) {
+      const before = where()
+      edit()
+      for (const id of ids) expectVec(pivotPoint(id), before.get(id)!, id)
+    }
+    // a typed location still sets the origin
+    editSelectionAxis("translation", "z", { kind: "set", value: 70 })
+    for (const id of ids) assert.strictEqual(docTransform(id).translation.z, 70)
   })
 })
