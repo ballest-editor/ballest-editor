@@ -5,6 +5,7 @@ import { setProperty } from "./edits"
 import { identityTransform, itemFromPiece, newMapFile } from "./factory"
 import {
   defaultProperties,
+  optionLabel,
   propertyLabel,
   selectionProperties,
   validPropertyValue,
@@ -126,6 +127,13 @@ describe("item properties", () => {
     const shown = selectionProperties([{ item: placed(), piece: decal }])
     assert.deepStrictEqual(shown.find((p) => p.name === "DecalStyle")?.options, ["Arrow", "Scratch Marks", "Stripes"])
     assert.isUndefined(shown.find((p) => p.name === "DecalWidth")?.options)
+  })
+
+  it("names option values past the end by what the game draws", () => {
+    const styles = ["Arrow", "Scratch Marks", "Stripes"]
+    assert.strictEqual(optionLabel(styles, 1), "Scratch Marks")
+    assert.strictEqual(optionLabel(styles, 10), "10 (draws as Stripes)")
+    assert.strictEqual(optionLabel(styles, -1), "-1 (unknown)")
   })
 
   it("labels property names readably", () => {

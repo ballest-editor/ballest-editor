@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@workspace/ui/components/separator"
 import { Switch } from "@workspace/ui/components/switch"
 import { useId, useState } from "react"
-import { type ItemProperty, propertyLabel } from "../domain/itemProperties"
+import { type ItemProperty, optionLabel, propertyLabel } from "../domain/itemProperties"
 import { setSelectionProperty } from "../editor/actions"
 import { NumberField } from "./NumberField"
 import { SectionTitle } from "./SectionTitle"
@@ -21,8 +21,7 @@ const formatValue = (value: unknown): string => typeof value === "string" ? `"${
 /** A value as the inspector names it: an option's label, else the value itself. */
 const describe = (property: ItemProperty, value: unknown): string => {
   if (typeof value !== "number") return formatValue(value)
-  const label = property.options?.[value]
-  return label === undefined ? String(value) : `${label} (${value})`
+  return property.options === undefined ? String(value) : `${optionLabel(property.options, value)} (${value})`
 }
 
 /** Scrub speed per pixel, scaled to the property's magnitude (a vent's 750000 vs its 0.25). */
@@ -31,7 +30,7 @@ const scrubStep = (reference: number): number => {
   return magnitude === 0 ? 0.01 : Math.max(0.001, 10 ** (Math.floor(Math.log10(magnitude)) - 2))
 }
 
-/** An integer the game edits as a dropdown; a value outside the known labels shows as its number. */
+/** An integer with labelled values; a value outside them is listed too, with what it draws. */
 function OptionValue(props: {
   readonly options: ReadonlyArray<string>
   readonly value: unknown
@@ -39,7 +38,7 @@ function OptionValue(props: {
 }) {
   const current = typeof props.value === "number" ? props.value : null
   const labels = new Map(props.options.map((label, i) => [String(i), label]))
-  if (current !== null && !labels.has(String(current))) labels.set(String(current), `${current} (unknown)`)
+  if (current !== null && !labels.has(String(current))) labels.set(String(current), optionLabel(props.options, current))
   return (
     <Select
       value={current === null ? null : String(current)}

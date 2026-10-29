@@ -25,13 +25,25 @@ export interface ItemProperty {
 }
 
 /**
- * Dropdown labels for integer properties, by class and property name. The game fills these
- * dropdowns from native code, so they aren't in the pak or the exe's strings: they were read
- * off the in-game editor (build 0.4.0-playtest) with a map holding one decal per style
- * (`samples/UserSavedMaps/...props probe...`).
+ * Dropdown labels for integer properties, by class and property name. None of them are in the
+ * game data, so they come from in-game probe maps (build 0.4.0-playtest): the decal style
+ * names are the game's own dropdown labels; the shape decal's shape and fill are sliders in
+ * game, named here after what each value draws. Larger values draw the last option.
  */
 const PROPERTY_OPTIONS: Readonly<Record<string, Readonly<Record<string, ReadonlyArray<string>>>>> = {
-  BP_UGCCircuitDecal: { DecalStyle: ["Arrow", "Scratch Marks", "Stripes"] }
+  BP_UGCCircuitDecal: { DecalStyle: ["Arrow", "Scratch Marks", "Stripes"] },
+  BP_UGCShapeDecal: {
+    DecalShapeType: ["Square", "Circle", "Hexagon", "Parallelogram", "Triangle"],
+    DecalFillType: ["Filled", "Outline"]
+  }
+}
+
+/** The label for an option value: the game draws values past the end as the last option. */
+export const optionLabel = (options: ReadonlyArray<string>, value: number): string => {
+  const label = options[value]
+  if (label !== undefined) return label
+  const last = options.at(-1)
+  return value > 0 && last !== undefined ? `${value} (draws as ${last})` : `${value} (unknown)`
 }
 
 const optionsOf = (piece: CatalogPiece | undefined, list: PropertyList, name: string) =>
