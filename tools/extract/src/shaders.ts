@@ -8,7 +8,7 @@ import { Effect, Schema } from "effect"
 import { FileSystem } from "effect/FileSystem"
 import { Path } from "effect/Path"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { type Leaf, type Module, outputsOf, parseModule, samples } from "./dxil.ts"
+import { type Leaf, type Module, type Mottle, mottleOf, outputsOf, parseModule, samples } from "./dxil.ts"
 import { decodePreshaders, type Slot } from "./preshader.ts"
 
 const ShaderRecord = Schema.Struct({
@@ -76,6 +76,12 @@ export interface MaterialShaders {
   readonly materialBuffer: string | null
   readonly slots: ReadonlyArray<Slot>
   readonly reads: ReadonlyArray<TextureRead>
+  /** The mottle chain (`1 + gain * product(read + offset)`) over `reads` indices, if the shader has one. */
+  readonly mottle: {
+    readonly reads: ReadonlyArray<number>
+    readonly offsets: ReadonlyArray<number>
+    readonly gain: Mottle["gain"]
+  } | null
   /** Vertex-shader interpolants by `SEMANTIC.component`, each traced to its sources. */
   readonly interpolants: Record<string, ReadonlyArray<Leaf>>
 }
@@ -135,7 +141,9 @@ export const shaders = Effect.fn("shaders")(function*(options: {
       const textureParams = ues.UniformTextureParameters[0] ?? []
       const registers = materialTextureRegisters(pixel.module, textureParams.length)
       const materialCb = pixel.module.cbuffers.find((c) => c.type === "Material")
-      const reads: Array<TextureRead> = samples(pixel.module).map((s) => ({
+      const pixelSamples = samples(pixel.module)
+      const mottle = mottleOf(pixel.module)
+      const reads: Array<TextureRead> = pixelSamples.map((s) => ({
         texture: registers.indexOf(s.register),
         op: s.op,
         channels: s.channels,
@@ -155,6 +163,11 @@ export const shaders = Effect.fn("shaders")(function*(options: {
         materialBuffer: materialCb === undefined ? null : `cb${materialCb.register}`,
         slots: decodePreshaders(bytes, ues.UniformPreshaders, ues.UniformNumericParameters),
         reads,
+        mottle: mottle === null ? null : {
+          reads: mottle.samples.map((v) => pixelSamples.findIndex((s) => s.value === v)),
+          offsets: mottle.offsets,
+          gain: mottle.gain
+        },
         interpolants
       }
       done++
@@ -165,6 +178,7 @@ export const shaders = Effect.fn("shaders")(function*(options: {
     notes: [
       "Per material: the base-pass pixel shader's texture reads (`reads`, texture = index into `textures`, -1 = an engine texture) with each coordinate traced to its sources (`leaves`), and the vertex shader's outputs (`interpolants`) traced the same way.",
       "A leaf is one source the coordinate depends on linearly: kind input (vertex attribute ATTRIBUTEn in the vertex shader, interpolant TEXCOORDn / SV_Position in the pixel shader), buffer (vertex fetch: UVs), sceneData (the primitive/instance transform), param (constant buffer), texture, constant. factor = product of the literal constants on the path; params = constant-buffer values on the path; sceneDepth = transform rows multiplied in (1: local->world, 2: ...->object); sceneScale = multiplied (1) / divided (-1) by the instance scale.",
+      "`mottle` is the grey-mottle chain where the base pass has one: reads (indices) offset by `offsets`, multiplied together, times `gain` (sign * constant * (param + paramAdd)) and added to 1, multiplying the base colour.",
       "`textures[i].index` indexes the root material's ReferencedTextures; `param` names the texture parameter an instance may override. `slots` name the Material constant-buffer floats (`[reg].c`) by parameter (from the preshader bytecode) where the expression is a plain parameter read."
     ],
     materials

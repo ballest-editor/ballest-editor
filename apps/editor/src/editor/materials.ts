@@ -13,7 +13,8 @@
  *   dominant axis, and (as the game's instances do) multiplied again by the piece's x/y scale;
  *   world-aligned projection for the few masters that use the world position;
  * - a second normal layer (the Env masters' fine x12 tiles, the metal's coarse ones);
- * - the grey mottle (T_MacroVariation) at the game's three octaves, multiplied into the base colour;
+ * - the grey mottle (T_MacroVariation) exactly as the game's shader forms it: a product of offset reads at
+ *   three scales, times a gain, added to 1 and multiplied into the base colour;
  * - M_OutlineEdges' grey band along the UV border of a face.
  */
 import * as THREE from "three"
@@ -21,11 +22,6 @@ import { lookupMaterial, type MaterialSpec, type MaterialTable, NEUTRAL, type Pa
 import { textureUrl } from "./assetUrl"
 import { isMesh } from "./threeGuards"
 
-/**
- * How much of the grey mottle shows (0 = none, 1 = the game's product of three octaves in whole).
- * The game lerps its colour contrast with it; tuned against in-game cubes.
- */
-const VARIATION_STRENGTH = 0.35
 /** Normal-map strength: the game's concrete grooves read crisper than a unit normal map gives. */
 const NORMAL_STRENGTH = 1.6
 
@@ -53,7 +49,7 @@ const loadTexture = (path: string, colorSpace: THREE.ColorSpace, onError: () => 
 
 /** The shader patch's inputs; `defines` doubles as the program cache key. */
 export interface Patch {
-  readonly defines: Readonly<Record<string, 1>>
+  readonly defines: Readonly<Record<string, number>>
   readonly uniforms: {
     readonly uBaseColorTiling: THREE.IUniform<THREE.Vector2>
     readonly uNormalTiling: THREE.IUniform<THREE.Vector2>
@@ -61,6 +57,8 @@ export interface Patch {
     readonly uVariationTiling: THREE.IUniform<THREE.Vector2>
     readonly uVariationTiling2: THREE.IUniform<THREE.Vector2>
     readonly uVariationTiling3: THREE.IUniform<THREE.Vector2>
+    /** The mottle's three offsets and, in w, its gain (`1 + gain * product`). */
+    readonly uVariationShape: THREE.IUniform<THREE.Vector4>
     readonly uVariationMap: THREE.IUniform<THREE.Texture | null>
     readonly uNormalMap2: THREE.IUniform<THREE.Texture | null>
     readonly uNormal2Tiling: THREE.IUniform<THREE.Vector2>
@@ -78,7 +76,7 @@ const patchOf = (
   variation: THREE.Texture | null,
   normal2: THREE.Texture | null
 ): Patch | undefined => {
-  const defines: Record<string, 1> = {}
+  const defines: Record<string, number> = {}
   const { tiling } = spec
   const projected = spec.projection !== "uv"
   if (projected || !isOne(tiling.baseColor) || !isOne(tiling.normal) || !isOne(tiling.opacity)) {
@@ -87,22 +85,33 @@ const patchOf = (
   if (spec.projection === "object") defines["BALLEST_OBJECT"] = 1
   if (spec.projection === "world") defines["BALLEST_WORLD"] = 1
   if (projected && spec.instanceScale) defines["BALLEST_INSTANCE_SCALE"] = 1
-  if (variation !== null) defines["BALLEST_VARIATION"] = 1
+  if (variation !== null && spec.variation !== undefined) {
+    defines["BALLEST_VARIATION"] = Math.min(3, spec.variation.tilings.length)
+  }
   if (normal2 !== null) defines["BALLEST_NORMAL2"] = 1
   if (spec.outline !== undefined) defines["BALLEST_OUTLINE"] = 1
   if (Object.keys(defines).length === 0) return undefined
   const outline = spec.outline
-  const [v2, v3] = spec.variationTilings
+  const vt = spec.variation?.tilings ?? []
+  const vo = spec.variation?.offsets ?? []
   return {
     defines,
     uniforms: {
       uBaseColorTiling: { value: vec2(tiling.baseColor) },
       uNormalTiling: { value: vec2(tiling.normal) },
       uOpacityTiling: { value: vec2(tiling.opacity) },
-      uVariationTiling: { value: vec2(tiling.variation) },
-      // The game's second and third octaves are 1/4 and 1/100 of the first; used when the shader didn't say.
-      uVariationTiling2: { value: vec2(v2 ?? [tiling.variation[0] / 4, tiling.variation[1] / 4]) },
-      uVariationTiling3: { value: vec2(v3 ?? [tiling.variation[0] / 100, tiling.variation[1] / 100]) },
+      uVariationTiling: { value: vec2(vt[0] ?? [1, 1]) },
+      uVariationTiling2: { value: vec2(vt[1] ?? vt[0] ?? [1, 1]) },
+      uVariationTiling3: { value: vec2(vt[2] ?? vt[0] ?? [1, 1]) },
+      // A missing layer reads as a constant 1 (offset 1, and the texture term is dropped by the shader).
+      uVariationShape: {
+        value: new THREE.Vector4(
+          vo[0] ?? 0,
+          vt.length > 1 ? vo[1] ?? 0 : 1,
+          vt.length > 2 ? vo[2] ?? 0 : 1,
+          spec.variation?.gain ?? 0
+        )
+      },
       uVariationMap: { value: variation },
       uNormalMap2: { value: normal2 },
       uNormal2Tiling: { value: vec2(spec.normalLayer?.tiling ?? [1, 1]) },
@@ -149,6 +158,7 @@ uniform vec2 uOpacityTiling;
 uniform vec2 uVariationTiling;
 uniform vec2 uVariationTiling2;
 uniform vec2 uVariationTiling3;
+uniform vec4 uVariationShape;
 uniform sampler2D uVariationMap;
 uniform sampler2D uNormalMap2;
 uniform vec2 uNormal2Tiling;
@@ -178,14 +188,23 @@ vec2 ballestUv( vec2 tiling ) {
 }
 `
 // After three's own map sampling: the mottle multiplies in, then the outline band paints over.
-// The mottle is the game's product of three octaves, normalised to its mean so it only modulates,
-// then blended towards white: the game mixes it into its colour contrast, not straight into the colour.
+// The mottle is the game's own expression: (r1 + o1)(r2 + o2)(r3 + o3) * gain + 1 (the Env masters' gain is
+// ColorContrast - 1, the metal's -0.1: a few percent either way).
 const COLOR_EXTRAS = /* glsl */ `
 #ifdef BALLEST_VARIATION
-  float ballestMottle = ( texture2D( uVariationMap, ballestUv( uVariationTiling ) ).r + 0.5 )
-    * ( texture2D( uVariationMap, ballestUv( uVariationTiling2 ) ).r + 0.4 )
-    * ( texture2D( uVariationMap, ballestUv( uVariationTiling3 ) ).r + 0.3 ) / 0.72;
-  diffuseColor.rgb *= mix( 1.0, ballestMottle, ${VARIATION_STRENGTH.toFixed(2)} );
+  #if BALLEST_VARIATION >= 3
+    float ballestMottle3 = texture2D( uVariationMap, ballestUv( uVariationTiling3 ) ).r + uVariationShape.z;
+  #else
+    float ballestMottle3 = uVariationShape.z;
+  #endif
+  #if BALLEST_VARIATION >= 2
+    float ballestMottle2 = texture2D( uVariationMap, ballestUv( uVariationTiling2 ) ).r + uVariationShape.y;
+  #else
+    float ballestMottle2 = uVariationShape.y;
+  #endif
+  float ballestMottle = ( texture2D( uVariationMap, ballestUv( uVariationTiling ) ).r + uVariationShape.x )
+    * ballestMottle2 * ballestMottle3;
+  diffuseColor.rgb *= 1.0 + uVariationShape.w * ballestMottle;
 #endif
 #ifdef BALLEST_OUTLINE
   vec2 ballestEdge = min( vBallestUv, 1.0 - vBallestUv );

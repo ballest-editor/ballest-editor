@@ -6,6 +6,7 @@
     "approx.baseColor/metallic/roughness/opacity/emissive come from parameters picked by name (approx.keys says which; null = neutral default): the cooked material has no expression graph.",
     "approx.reads are the base-pass pixel shader's texture reads, traced through the compiled shader (tools/extract shaders): projection uv = mesh UV0 (scale in repeats per UV unit); object = object-aligned position, pivot at the object origin, rotating with the piece (scale in repeats per cm; instanceScale 1 = u, v also multiply by the piece's x, y scale); world. strength is a normal layer's blend strength. approx.*Texture/tiling/projection/instanceScale are the primary read per role; tiling is [u, v].",
     "Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).",
+    "approx.variation is the grey mottle as the base pass applies it: colour *= 1 + gain * product over layers of (texture read at tilings[i] + offsets[i]); gain already includes the instance's parameter (ColorContrast - 1 for the Env masters).",
     "approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).",
     "paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap)."
   ],
@@ -74,6 +75,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -145,6 +147,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -216,6 +219,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/_Engine/EngineMaterials/T_Default_Material_Grid_N.png",
@@ -363,6 +367,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/_Engine/EngineVolumetrics/LightBeam/Materials/T_EV_LightBeam_Falloff_01.png",
@@ -470,6 +475,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -585,6 +591,29 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.09999999999999998
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
@@ -740,6 +769,29 @@
         },
         "projection": "object",
         "instanceScale": 1,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.09999999999999998
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -921,6 +973,29 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.19999999999999996
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
@@ -1076,6 +1151,29 @@
         },
         "projection": "object",
         "instanceScale": 1,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.09999999999999998
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -1257,6 +1355,29 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.15000000000000002
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
@@ -1412,6 +1533,29 @@
         },
         "projection": "object",
         "instanceScale": 1,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.09999999999999998
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -1593,6 +1737,29 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.15000000000000002
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
@@ -1748,6 +1915,29 @@
         },
         "projection": "object",
         "instanceScale": 1,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.09999999999999998
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -1929,6 +2119,29 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.12
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
@@ -2084,6 +2297,29 @@
         },
         "projection": "object",
         "instanceScale": 1,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.09999999999999998
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -2265,6 +2501,29 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.15000000000000002
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
@@ -2420,6 +2679,29 @@
         },
         "projection": "object",
         "instanceScale": 1,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.09999999999999998
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -2601,6 +2883,29 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.09999999999999998
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
@@ -2756,6 +3061,29 @@
         },
         "projection": "object",
         "instanceScale": 1,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.09999999999999998
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -2937,6 +3265,29 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.09999999999999998
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
@@ -3092,6 +3443,29 @@
         },
         "projection": "object",
         "instanceScale": 1,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.09999999999999998
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -3273,6 +3647,29 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.15000000000000002
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
@@ -3428,6 +3825,29 @@
         },
         "projection": "object",
         "instanceScale": 1,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.09999999999999998
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -3609,6 +4029,29 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.09999999999999998
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
@@ -3764,6 +4207,29 @@
         },
         "projection": "object",
         "instanceScale": 1,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.00026499999094754464,
+              0.00026499999094754464
+            ],
+            [
+              0.0010499999437481172,
+              0.0010499999437481172
+            ],
+            [
+              0.000010000000251457085,
+              0.000010000000251457085
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.5,
+            0.30000001192092896
+          ],
+          "gain": -0.09999999999999998
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -3999,6 +4465,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
@@ -4361,6 +4828,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
@@ -4675,6 +5143,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
@@ -5037,6 +5506,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
@@ -5399,6 +5869,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
@@ -5761,6 +6232,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
@@ -6123,6 +6595,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
@@ -6485,6 +6958,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
@@ -6934,6 +7408,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
@@ -7296,6 +7771,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
@@ -7646,6 +8122,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -7870,6 +8347,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -7972,6 +8450,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -8059,6 +8538,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -8147,6 +8627,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -8235,6 +8716,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -8323,6 +8805,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -8410,6 +8893,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -8496,6 +8980,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -8583,6 +9068,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -8670,6 +9156,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -8758,6 +9245,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -8966,6 +9454,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -9185,6 +9674,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -9430,6 +9920,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -9652,6 +10143,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -9874,6 +10366,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -10096,6 +10589,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -10318,6 +10812,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -10542,6 +11037,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -10761,6 +11257,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -10980,6 +11477,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -11204,6 +11702,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -11423,6 +11922,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -11655,6 +12155,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -11887,6 +12388,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -12119,6 +12621,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -12351,6 +12854,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -12583,6 +13087,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -12815,6 +13320,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -13034,6 +13540,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -13266,6 +13773,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -13498,6 +14006,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -13717,6 +14226,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Packs/StarterContent/Textures/T_Concrete_Tiles_N.png",
@@ -13941,6 +14451,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -14166,6 +14677,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -14390,6 +14902,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
@@ -14486,6 +14999,29 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.2134000062942505,
+              0.2134000062942505
+            ],
+            [
+              0.05341000109910965,
+              0.05341000109910965
+            ],
+            [
+              0.0020000000949949026,
+              0.0020000000949949026
+            ]
+          ],
+          "offsets": [
+            0.10000000149011612,
+            0.20000000298023224,
+            0.5
+          ],
+          "gain": -0.10000002384185791
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -14636,6 +15172,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -14719,6 +15256,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -14825,6 +15363,29 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.2134000062942505,
+              0.2134000062942505
+            ],
+            [
+              0.05341000109910965,
+              0.05341000109910965
+            ],
+            [
+              0.0020000000949949026,
+              0.0020000000949949026
+            ]
+          ],
+          "offsets": [
+            0.5,
+            0.800000011920929,
+            0.5
+          ],
+          "gain": -0.10000002384185791
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -14958,6 +15519,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Packs/Vefects/Easy_Shockwaves_VFX/Shared/Textures/T_VFX_Linear_Gradient_Mirror_Horizontal_01.png",
@@ -15072,6 +15634,29 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.2134000062942505,
+              0.2134000062942505
+            ],
+            [
+              0.05341000109910965,
+              0.05341000109910965
+            ],
+            [
+              0.0020000000949949026,
+              0.0020000000949949026
+            ]
+          ],
+          "offsets": [
+            0.4000000059604645,
+            0.20000000298023224,
+            0.5
+          ],
+          "gain": -0.10000002384185791
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -15225,6 +15810,29 @@
         },
         "projection": "object",
         "instanceScale": 1,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.2134000062942505,
+              0.2134000062942505
+            ],
+            [
+              0.05341000109910965,
+              0.05341000109910965
+            ],
+            [
+              0.0020000000949949026,
+              0.0020000000949949026
+            ]
+          ],
+          "offsets": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "gain": -0.10000002384185791
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -15387,6 +15995,29 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.2134000062942505,
+              0.2134000062942505
+            ],
+            [
+              0.05341000109910965,
+              0.05341000109910965
+            ],
+            [
+              0.0020000000949949026,
+              0.0020000000949949026
+            ]
+          ],
+          "offsets": [
+            0.10000000149011612,
+            0.20000000298023224,
+            0.5
+          ],
+          "gain": -0.10000002384185791
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -15538,6 +16169,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/VFX/Noise/Perlin/Perlin_01-512x512.png",
@@ -15645,6 +16277,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Packs/Skatepark/Textures/Metal/T_metal_trim_01_Normal.png",
@@ -15744,6 +16377,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -15843,6 +16477,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
@@ -15969,6 +16604,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/_Engine/Engine_MI_Shaders/T_Base_Tile_Normal.png",
@@ -16122,6 +16758,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/T_Patterns/KennyPack2/Thin/pattern_0001.png",
@@ -16265,6 +16902,29 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": {
+          "texture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+          "tilings": [
+            [
+              0.2134000062942505,
+              0.2134000062942505
+            ],
+            [
+              0.05341000109910965,
+              0.05341000109910965
+            ],
+            [
+              0.0020000000949949026,
+              0.0020000000949949026
+            ]
+          ],
+          "offsets": [
+            0.5,
+            0.800000011920929,
+            0.5
+          ],
+          "gain": -0.10000002384185791
+        },
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
@@ -16489,6 +17149,7 @@
         },
         "projection": "object",
         "instanceScale": 1,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Packs/Vefects/Stylized_Galaxy_Shader/Demo/Scene/Textures/Grid/T_VFX_Grid_01_Normal.png",
@@ -16859,6 +17520,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_Tech_Hex_Tile_N.png",
@@ -17055,6 +17717,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
@@ -17450,6 +18113,7 @@
         },
         "projection": "object",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/_Engine/Engine_MI_Shaders/T_Base_Tile_Normal.png",
@@ -17601,6 +18265,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/_Engine/EngineMaterials/FlatNormal.png",
@@ -17716,6 +18381,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/_Engine/EditorMaterials/T_1x1_Grid.png",
@@ -17811,6 +18477,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -17899,6 +18566,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/_Engine/EditorMaterials/T_1x1_Grid.png",
@@ -17999,6 +18667,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -18085,6 +18754,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -18171,6 +18841,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -18278,6 +18949,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/Macro_N_normal.png",
@@ -18451,6 +19123,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/Macro_N_normal.png",
@@ -18624,6 +19297,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/Macro_N_normal.png",
@@ -18797,6 +19471,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/Macro_N_normal.png",
@@ -18971,6 +19646,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/Macro_N_normal.png",
@@ -19145,6 +19821,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/Macro_N_normal.png",
@@ -19318,6 +19995,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/Macro_N_normal.png",
@@ -19491,6 +20169,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/Macro_N_normal.png",
@@ -19664,6 +20343,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/Macro_N_normal.png",
@@ -19837,6 +20517,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/Macro_N_normal.png",
@@ -20010,6 +20691,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/Materials/Textures/Macro_N_normal.png",
@@ -20149,6 +20831,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -20221,6 +20904,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Art/UsedMarketPlace/StylizedFX_Collection_q/T_Ray_02.png",
@@ -20410,6 +21094,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/_Engine/EngineVolumetrics/LightBeam/Materials/T_EV_LightBeam_Falloff_01.png",
@@ -20536,6 +21221,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/_Engine/EngineVolumetrics/LightBeam/Materials/T_EV_LightBeam_Falloff_01.png",
@@ -20661,6 +21347,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -20760,6 +21447,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/_Engine/EngineVolumetrics/LightBeam/Materials/T_EV_LightBeam_Falloff_01.png",
@@ -20862,6 +21550,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -20939,6 +21628,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -21016,6 +21706,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -21093,6 +21784,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -21169,6 +21861,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -21252,6 +21945,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [],
         "outline": null,
         "keys": {
@@ -21325,6 +22019,7 @@
         },
         "projection": "uv",
         "instanceScale": 0,
+        "variation": null,
         "reads": [
           {
             "texture": "textures/Packs/StarterContent/Textures/T_Metal_Steel_N.png",

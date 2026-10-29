@@ -357,6 +357,115 @@ export const samples = (m: Module): Array<Sample> => {
   return out
 }
 
+/**
+ * The grey-mottle chain the Ballest masters share: several reads of one texture, each offset by a constant,
+ * multiplied together, scaled by a gain and added to 1 (`1 + k * P`, or `1 - k * P`), which then multiplies
+ * the base colour. The gain is a literal or a parameter (optionally plus a literal, e.g. ColorContrast - 1).
+ */
+export interface Mottle {
+  /** The sample values (`%n`) in product order. */
+  readonly samples: ReadonlyArray<string>
+  readonly offsets: ReadonlyArray<number>
+  readonly gain: {
+    readonly sign: number
+    readonly constant: number
+    readonly param?: string
+    readonly paramAdd?: number
+  }
+}
+
+export const mottleOf = (m: Module): Mottle | null => {
+  const tracer = new Tracer(m)
+  // sample channel 0 -> (+ offset) value
+  const offsetOf = new Map<string, { sample: string; offset: number }>()
+  for (const [e, d] of m.defs) {
+    const ev = d.match(/^extractvalue %dx\.types\.ResRet\.f32 (%[\w.]+), 0$/)
+    if (!ev || !(m.defs.get(g(ev, 1)) ?? "").includes("@dx.op.sample")) continue
+    for (const [o, dd] of m.defs) {
+      const add = dd.match(/^fadd (?:fast )?float (\S+), (\S+)$/)
+      if (!add) continue
+      const other = add[1] === e ? add[2] : add[2] === e ? add[1] : undefined
+      const c = other === undefined ? undefined : parseFloat(other)
+      if (c !== undefined) offsetOf.set(o, { sample: g(ev, 1), offset: c })
+    }
+  }
+  // products of those values (through literal scalings)
+  const members = new Map<string, Array<string>>()
+  for (const [o] of offsetOf) members.set(o, [o])
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const [v, d] of m.defs) {
+      if (members.has(v)) continue
+      const mul = d.match(/^fmul (?:fast )?float (\S+), (\S+)$/)
+      if (!mul) continue
+      const a = members.get(g(mul, 1)), b = members.get(g(mul, 2))
+      if (a && b) members.set(v, [...a, ...b])
+      else if (a && parseFloat(g(mul, 2)) !== undefined) members.set(v, a)
+      else if (b && parseFloat(g(mul, 1)) !== undefined) members.set(v, b)
+      else continue
+      grew = true
+    }
+  }
+  const [product] = [...members.entries()].filter(([, ms]) => ms.length >= 2).sort((x, y) => y[1].length - x[1].length)
+  if (product === undefined) return null
+  const [pv, pm] = product
+  // literal factors folded into the product so far
+  let constant = 1
+  const foldConstants = (v: string): void => {
+    const d = m.defs.get(v) ?? ""
+    const mul = d.match(/^fmul (?:fast )?float (\S+), (\S+)$/)
+    if (!mul) return
+    const [a, b] = [g(mul, 1), g(mul, 2)]
+    const ca = parseFloat(a), cb = parseFloat(b)
+    if (ca !== undefined) constant *= ca
+    else foldConstants(a)
+    if (cb !== undefined) constant *= cb
+    else foldConstants(b)
+  }
+  foldConstants(pv)
+  // forward: multipliers until `1 + x` / `1 - x`
+  let cur = pv
+  let param: string | undefined
+  let paramAdd: number | undefined
+  for (let step = 0; step < 6; step++) {
+    let next: string | undefined
+    for (const [v, d] of m.defs) {
+      const mul = d.match(/^fmul (?:fast )?float (\S+), (\S+)$/)
+      if (mul && (mul[1] === cur || mul[2] === cur)) {
+        const other = mul[1] === cur ? g(mul, 2) : g(mul, 1)
+        const c = parseFloat(other)
+        if (c !== undefined) constant *= c
+        else {
+          const od = m.defs.get(other) ?? ""
+          const add = od.match(/^fadd (?:fast )?float (\S+), (\S+)$/)
+          const base = add ? (parseFloat(g(add, 2)) === undefined ? g(add, 2) : g(add, 1)) : other
+          const cbufs = [...tracer.facts(base).cbufRefs]
+          if (cbufs.length !== 1 || tracer.facts(other).hasInput) return null
+          param = cbufs[0]
+          if (add) paramAdd = parseFloat(g(add, 1)) ?? parseFloat(g(add, 2)) ?? 0
+        }
+        next = v
+        break
+      }
+      const done = (sign: number): Mottle => ({
+        samples: pm.map((o) => offsetOf.get(o)?.sample ?? o),
+        offsets: pm.map((o) => offsetOf.get(o)?.offset ?? 0),
+        gain: param === undefined ? { sign, constant } : { sign, constant, param, paramAdd: paramAdd ?? 0 }
+      })
+      const add = d.match(/^fadd (?:fast )?float (\S+), (\S+)$/)
+      if (add && (add[1] === cur || add[2] === cur) && parseFloat(add[1] === cur ? g(add, 2) : g(add, 1)) === 1) {
+        return done(1)
+      }
+      const sub = d.match(/^fsub (?:fast )?float (\S+), (\S+)$/)
+      if (sub?.[2] === cur && parseFloat(g(sub, 1)) === 1) return done(-1)
+    }
+    if (next === undefined) return null
+    cur = next
+  }
+  return null
+}
+
 /** Every `storeOutput` of a vertex shader, by output semantic and component. */
 export const outputsOf = (ir: string, m: Module): Array<Output> => {
   const tracer = new Tracer(m)

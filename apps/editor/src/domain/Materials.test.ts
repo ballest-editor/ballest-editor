@@ -29,13 +29,19 @@ describe("materials", () => {
     assert.strictEqual(outline.variationTexture, "textures/macro.png")
     // the second normal read is the coarse layer at 0.2; the other variation octaves follow
     assert.deepStrictEqual(outline.normalLayer, { texture: "textures/tiles_n.png", tiling: [4, 4], strength: 0.2 })
-    assert.deepStrictEqual(outline.variationTilings, [[0.05341, 0.05341], [0.002, 0.002]])
+    assert.deepStrictEqual(outline.variation, {
+      texture: "textures/macro.png",
+      tilings: [[0.2134, 0.2134], [0.05341, 0.05341], [0.002, 0.002]],
+      offsets: [0.1, 0.2, 0.5],
+      gain: -0.1
+    })
     const tiles = lookupMaterial(table, TILES)!
     assert.strictEqual(tiles.projection, "object")
     assert.isTrue(tiles.instanceScale)
     assert.deepStrictEqual(tiles.tiling.normal, [0.005, 0.005])
     assert.deepStrictEqual(tiles.normalLayer, { texture: "textures/tiles_n.png", tiling: [0.06, 0.06], strength: 1 })
-    assert.deepStrictEqual(tiles.variationTilings, [])
+    assert.strictEqual(tiles.variation?.tilings.length, 1)
+    assert.isUndefined(blue.variation)
     assert.deepStrictEqual(outline.outline, { inset: [0, 0.1], color: [0.59, 0.59, 0.59] })
     const wind = lookupMaterial(table, WIND)!
     assert.isTrue(wind.translucent)

@@ -39,6 +39,12 @@ export const materialsFile = {
         variationTexture: "textures/macro.png",
         tiling: { baseColor: 1, normal: 12, variation: [0.2134, 0.2134], opacity: 1 },
         projection: "uv",
+        variation: {
+          texture: "textures/macro.png",
+          tilings: [[0.2134, 0.2134], [0.05341, 0.05341], [0.002, 0.002]],
+          offsets: [0.1, 0.2, 0.5],
+          gain: -0.1
+        },
         reads: [
           { texture: "textures/tiles_n.png", role: "normal", scale: [12, 12], projection: "uv", strength: 1 },
           { texture: "textures/tiles_n.png", role: "normal", scale: [4, 4], projection: "uv", strength: 0.2 },
@@ -67,6 +73,7 @@ export const materialsFile = {
         tiling: { normal: [0.005, 0.005], variation: [0.00105, 0.00105] },
         projection: "object",
         instanceScale: 1,
+        variation: { texture: "textures/macro.png", tilings: [[0.00105, 0.00105]], offsets: [0.5], gain: -0.1 },
         reads: [
           {
             texture: "textures/tiles_n.png",

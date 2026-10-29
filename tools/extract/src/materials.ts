@@ -320,7 +320,7 @@ const sourceOf = (sh: MaterialShaders, leaf: Leaf): Source | undefined => {
 }
 
 /** A constant-buffer ref (`cb3[2].w`) -> its value through the preshader slot table and the merged parameters. */
-const paramValue = (sh: MaterialShaders, merged: Merged, ref: string): number | undefined => {
+const paramOf = (sh: MaterialShaders, merged: Merged, ref: string): number | undefined => {
   const buffer = sh.materialBuffer
   if (buffer === null || !ref.startsWith(buffer + "[")) return undefined
   const slot = sh.slots.find((s) => s.ref === ref.slice(buffer.length))
@@ -341,9 +341,11 @@ const readsOf = (
   textureOf: (i: number) => string | null,
   dump: unknown,
   translucent: boolean
-): Array<Read> => {
+): { reads: Array<Read>; index: Array<number> } => {
   const out: Array<Read> = []
-  for (const r of sh.reads) {
+  /** shader read index of each entry of `out` */
+  const index: Array<number> = []
+  for (const [ri, r] of sh.reads.entries()) {
     const tex = r.texture >= 0 ? textureOf(r.texture) : null
     if (tex === null) continue
     let projection: Projection | undefined
@@ -356,7 +358,7 @@ const readsOf = (
         if (src === undefined) continue
         let f = src.factor
         for (const p of leaf.params) {
-          const v = paramValue(sh, merged, p)
+          const v = paramOf(sh, merged, p)
           if (v === undefined) {
             if (sh.materialBuffer !== null && p.startsWith(sh.materialBuffer)) unresolved.add(p)
           } else f *= Math.abs(v)
@@ -385,6 +387,7 @@ const readsOf = (
       ? "mask"
       : "color"
     const u = scale[0] ?? 0, v = scale[1] ?? u
+    index.push(ri)
     // A projected read at more than one repeat per 5 cm is not a surface texture: the coordinate went
     // through a cell function (floor/frac) the trace does not follow (M_PlasticBase's hex-cell lookups).
     if (projection !== "uv" && Math.max(u, v) > 0.2) unresolved.add("scale")
@@ -399,7 +402,7 @@ const readsOf = (
       unresolved: [...unresolved].sort()
     })
   }
-  return out
+  return { reads: out, index }
 }
 
 // ------------------------------------------------------------------ build
@@ -411,6 +414,30 @@ const shaderMaterialsOf = (file: unknown): ShadersFile["materials"] => {
     Object.entries(materials).map(([k, v]) => [k, isMaterialShaders(v) ? v : { error: str(get(v, "error")) ?? "?" }])
   )
 }
+/** The mottle, with its gain evaluated for this instance's parameters: `colour *= 1 + gain * product(read + offset)`. */
+const variationOf = (
+  sh: MaterialShaders,
+  merged: Merged,
+  reads: ReadonlyArray<Read>,
+  readIndex: ReadonlyArray<number>
+) => {
+  const mo = sh.mottle
+  if (mo === null) return null
+  const layers = mo.reads.map((i) => readIndex.indexOf(i)).map((i) => reads[i])
+  if (layers.some((l) => l === undefined)) return null
+  const paramValue = mo.gain.param === undefined ? 1 : paramOf(sh, merged, mo.gain.param)
+  if (paramValue === undefined) return null
+  const gain = mo.gain.sign * mo.gain.constant * (paramValue + (mo.gain.paramAdd ?? 0))
+  const first = layers[0]
+  if (first === undefined) return null
+  return {
+    texture: first.texture,
+    tilings: layers.map((l) => l?.scale ?? [1, 1]),
+    offsets: mo.offsets,
+    gain
+  }
+}
+
 const isMaterialShaders = (v: unknown): v is MaterialShaders =>
   typeof get(v, "pixel") === "string" && Array.isArray(get(v, "reads")) && Array.isArray(get(v, "textures"))
 
@@ -512,7 +539,11 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         const override = t.param === null ? undefined : merged.textures[t.param]
         return override ?? root.referencedTextures[t.index] ?? null
       }
-      const reads = sh === undefined ? [] : readsOf(sh, merged, textureOf, dump, isTranslucent)
+      const traced: { reads: Array<Read>; index: Array<number> } = sh === undefined
+        ? { reads: [], index: [] }
+        : readsOf(sh, merged, textureOf, dump, isTranslucent)
+      const reads = traced.reads
+      const variation = sh === undefined ? null : variationOf(sh, merged, reads, traced.index)
       if (sh !== undefined) withShaders++
       // Only reads whose coordinates are fully known can stand for a role.
       const byRole = (role: Role) => reads.filter((r) => r.role === role && r.unresolved.length === 0)
@@ -552,6 +583,10 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         },
         projection,
         instanceScale: (baseColorRead ?? normalRead)?.instanceScale ?? 0,
+        // The mottle exactly as the shader applies it: colour *= 1 + gain * product_i(texture(tilings_i) + offsets_i).
+        variation: variation === null
+          ? null
+          : { ...variation, texture: texPath(variation.texture) ?? `missing:${variation.texture}` },
         // Every texture read the base pass makes, in shader order (all layers; the fields above are the primary ones).
         reads: reads.map((r) => ({ ...r, texture: texPath(r.texture) ?? `missing:${r.texture}` })),
         outline,
@@ -611,6 +646,7 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         "approx.baseColor/metallic/roughness/opacity/emissive come from parameters picked by name (approx.keys says which; null = neutral default): the cooked material has no expression graph.",
         "approx.reads are the base-pass pixel shader's texture reads, traced through the compiled shader (tools/extract shaders): projection uv = mesh UV0 (scale in repeats per UV unit); object = object-aligned position, pivot at the object origin, rotating with the piece (scale in repeats per cm; instanceScale 1 = u, v also multiply by the piece's x, y scale); world. strength is a normal layer's blend strength. approx.*Texture/tiling/projection/instanceScale are the primary read per role; tiling is [u, v].",
         "Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).",
+        "approx.variation is the grey mottle as the base pass applies it: colour *= 1 + gain * product over layers of (texture read at tilings[i] + offsets[i]); gain already includes the instance's parameter (ColorContrast - 1 for the Env masters).",
         "approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).",
         "paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap)."
       ],

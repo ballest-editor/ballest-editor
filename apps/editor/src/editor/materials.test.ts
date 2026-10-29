@@ -58,6 +58,9 @@ describe("three materials", () => {
     assert.deepStrictEqual(shader.uniforms["uNormal2Tiling"]?.value, new THREE.Vector2(4, 4))
     assert.strictEqual(shader.uniforms["uNormal2Strength"]?.value, 0.2)
     assert.deepStrictEqual(shader.uniforms["uVariationTiling3"]?.value, new THREE.Vector2(0.002, 0.002))
+    assert.deepStrictEqual(shader.uniforms["uVariationShape"]?.value, new THREE.Vector4(0.1, 0.2, 0.5, -0.1))
+    assert.strictEqual(patch.defines["BALLEST_VARIATION"], 3)
+    assert.include(shader.fragmentShader, "diffuseColor.rgb *= 1.0 + uVariationShape.w * ballestMottle;")
     assert.deepStrictEqual(shader.uniforms["uOutlineInset"]?.value, new THREE.Vector2(0, 0.1))
     assert.include(shader.fragmentShader, "uOutlineColor")
     assert.include(shader.fragmentShader, "uVariationMap")
@@ -83,8 +86,9 @@ describe("three materials", () => {
       "BALLEST_VARIATION"
     ])
     assert.deepStrictEqual(patch.uniforms.uNormalTiling.value, new THREE.Vector2(0.005, 0.005))
-    // no second/third octave reported: the game's ratios fill in
-    assert.closeTo(patch.uniforms.uVariationTiling2.value.x, 0.00105 / 4, 1e-9)
+    // one mottle layer: the other two read as constant 1
+    assert.strictEqual(patch.defines["BALLEST_VARIATION"], 1)
+    assert.deepStrictEqual(patch.uniforms.uVariationShape.value, new THREE.Vector4(0.5, 1, 1, -0.1))
     const shader: ShaderProgram = {
       uniforms: {},
       vertexShader: "#include <common>\n#include <project_vertex>",
