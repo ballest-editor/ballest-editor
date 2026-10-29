@@ -19,7 +19,7 @@ import type { Settings } from "../domain/Settings"
 import { formatGridSize, GRID_SIZES, type GridSize } from "../domain/snap"
 import { updateSettings } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
-import { type Tool, useEditor } from "../editor/store"
+import { useEditor } from "../editor/store"
 
 /** The action's primary binding, as the menu shows it (nothing when unbound). */
 function Shortcut({ action }: { readonly action: KeybindAction }) {
@@ -61,20 +61,13 @@ function Menu({ title, children }: { readonly title: string; readonly children: 
         })
       }}
     >
-      <MenubarTrigger className="px-2.5">{title}</MenubarTrigger>
+      <MenubarTrigger className="px-1.5 py-0.5">{title}</MenubarTrigger>
       <MenubarContent className="min-w-52" finalFocus={(closeType) => closeType === "keyboard"}>
         {children}
       </MenubarContent>
     </MenubarMenu>
   )
 }
-
-const TOOLS: ReadonlyArray<{ readonly tool: Tool; readonly action: KeybindAction; readonly label: string }> = [
-  { tool: "select", action: "selectMode", label: "Select" },
-  { tool: "translate", action: "translateMode", label: "Translate" },
-  { tool: "rotate", action: "rotateMode", label: "Rotate" },
-  { tool: "scale", action: "scaleMode", label: "Scale" }
-]
 
 const THEMES: ReadonlyArray<{ readonly theme: Settings["appearance"]["theme"]; readonly label: string }> = [
   { theme: "dark", label: "Dark" },
@@ -83,7 +76,7 @@ const THEMES: ReadonlyArray<{ readonly theme: Settings["appearance"]["theme"]; r
 ]
 
 /**
- * File / Edit / View / Tools. Every item calls the entry point its keybind or button
+ * File / Edit / View. Every item calls the entry point its keybind or button
  * uses (`actionCommands`, the store, the settings), so the three never disagree.
  */
 export function MenuBar() {
@@ -91,10 +84,6 @@ export function MenuBar() {
   const canRedo = useEditor((s) => s.future.length > 0 && s.preview === null)
   const hasSelection = useEditor((s) => s.selectedIds.length > 0)
   const openDialog = useEditor((s) => s.openDialog)
-  const requestFrameAll = useEditor((s) => s.requestFrameAll)
-  const tool = useEditor((s) => s.tool)
-  const setTool = useEditor((s) => s.setTool)
-  const gizmoSpace = useEditor((s) => s.gizmoSpace)
   const { snapping, appearance, general } = useEditor((s) => s.settings)
 
   return (
@@ -126,7 +115,6 @@ export function MenuBar() {
       </Menu>
       <Menu title="View">
         <CommandItem action="focusSelection" disabled={!hasSelection} inset>Focus selection</CommandItem>
-        <MenubarItem inset onClick={requestFrameAll}>Frame whole map</MenubarItem>
         <MenubarSeparator />
         <MenubarCheckboxItem
           closeOnClick
@@ -157,14 +145,6 @@ export function MenuBar() {
             </MenubarRadioGroup>
           </MenubarSubContent>
         </MenubarSub>
-        <MenubarCheckboxItem
-          closeOnClick
-          checked={gizmoSpace === "local"}
-          onCheckedChange={actionCommands.toggleGizmoSpace}
-        >
-          Piece-local axes
-          <Shortcut action="toggleGizmoSpace" />
-        </MenubarCheckboxItem>
         <MenubarSeparator />
         <MenubarSub>
           <MenubarSubTrigger inset>Theme</MenubarSubTrigger>
@@ -179,16 +159,6 @@ export function MenuBar() {
             </MenubarRadioGroup>
           </MenubarSubContent>
         </MenubarSub>
-      </Menu>
-      <Menu title="Tools">
-        <MenubarRadioGroup value={tool} onValueChange={(next: Tool) => setTool(next)}>
-          {TOOLS.map(({ tool: t, action, label }) => (
-            <MenubarRadioItem closeOnClick key={t} value={t}>
-              {label}
-              <Shortcut action={action} />
-            </MenubarRadioItem>
-          ))}
-        </MenubarRadioGroup>
       </Menu>
     </Menubar>
   )
