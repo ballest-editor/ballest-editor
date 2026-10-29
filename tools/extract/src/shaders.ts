@@ -97,12 +97,19 @@ export interface MaterialShaders {
    */
   readonly surface: {
     readonly baseColor: readonly [number, number, number]
-    readonly metallic: number
-    readonly roughness: number
-    /** By read index: the colour the read adds going 0 -> 1, and the mean it was evaluated at. */
+    /** Opaque passes only (GBuffer); null for a translucent pass. */
+    readonly metallic: number | null
+    readonly roughness: number | null
+    /** Translucent passes: the alpha written; null for opaque. */
+    readonly opacity: number | null
+    /** By read index: the colour (and, translucent, alpha) the read adds going 0 -> 1, and the mean it was evaluated at. */
     readonly gains: Record<
       string,
-      { readonly gain: readonly [number, number, number]; readonly mean: readonly [number, number, number] }
+      {
+        readonly gain: readonly [number, number, number]
+        readonly alpha: number
+        readonly mean: readonly [number, number, number]
+      }
     >
   } | null
 }
@@ -269,19 +276,35 @@ export const shaders = Effect.fn("shaders")(function*(options: {
       const mean = texture === null ? null : yield* meanOf(texture)
       if (mean !== null) means.set(v, mean)
     }
-    const surface = surfaceOf(px.module, px.ir, cbuf, (v, ch) => means.get(v)?.[ch] ?? 0.5, colour)
-    const gains: Record<string, { gain: readonly [number, number, number]; mean: readonly [number, number, number] }> =
-      {}
+    // Engine textures (custom stencil / depth lookups that gate the level editor's ghost modes) read 1: the
+    // plain, placed state. Material textures without a decodable mean read mid-grey.
+    const engine = new Set(px.sampleValues.filter((_, i) => (base.reads[i]?.texture ?? -1) < 0))
+    const surface = surfaceOf(
+      px.module,
+      px.ir,
+      cbuf,
+      (v, ch) => means.get(v)?.[ch] ?? (engine.has(v) ? 1 : 0.5),
+      colour
+    )
+    const gains: Record<
+      string,
+      { gain: readonly [number, number, number]; alpha: number; mean: readonly [number, number, number] }
+    > = {}
     for (const [v, gain] of Object.entries(surface?.gains ?? {})) {
-      if (gain.every((x) => Math.abs(x) < 1e-4)) continue
+      const alpha = surface?.alphaGains[v] ?? 0
+      if (gain.every((x) => Math.abs(x) < 1e-4) && Math.abs(alpha) < 1e-4) continue
       const m = means.get(v) ?? [0.5, 0.5, 0.5, 1]
-      gains[String(px.sampleValues.indexOf(v))] = { gain, mean: [m[0], m[1], m[2]] }
+      gains[String(px.sampleValues.indexOf(v))] = { gain, alpha, mean: [m[0], m[1], m[2]] }
     }
     materials[material] = {
       ...base,
-      surface: surface?.baseColor == null
-        ? null
-        : { baseColor: surface.baseColor, metallic: surface.metallic ?? 0, roughness: surface.roughness ?? 0.5, gains }
+      surface: surface?.baseColor == null ? null : {
+        baseColor: surface.baseColor,
+        metallic: surface.metallic,
+        roughness: surface.roughness,
+        opacity: surface.opacity,
+        gains
+      }
     }
     evaluated++
   }
@@ -291,7 +314,7 @@ export const shaders = Effect.fn("shaders")(function*(options: {
     notes: [
       "Per material: the base-pass pixel shader's texture reads (`reads`, texture = index into `textures`, -1 = an engine texture) with each coordinate traced to its sources (`leaves`), and the vertex shader's outputs (`interpolants`) traced the same way.",
       "A leaf is one source the coordinate depends on linearly: kind input (vertex attribute ATTRIBUTEn in the vertex shader, interpolant TEXCOORDn / SV_Position in the pixel shader), buffer (vertex fetch: UVs), sceneData (the primitive/instance transform), param (constant buffer), texture, constant. factor = product of the literal constants on the path; params = constant-buffer values on the path; sceneDepth = transform rows multiplied in (1: local->world, 2: ...->object); sceneScale = multiplied (1) / divided (-1) by the instance scale.",
-      "`surface` is the shader evaluated for this material's parameters and a facing view, every texture read at its mean colour: GBuffer base colour, metallic, roughness, and per read index the colour the read adds going 0 -> 1 (gain) around the mean it was evaluated at. Only opaque passes have a GBuffer; translucent entries have null.",
+      "`surface` is the shader evaluated for this material's parameters and a facing view, every texture read at its mean colour: base colour (the GBuffer's for opaque passes, the lit diffuse term for translucent ones), metallic and roughness (opaque), opacity (translucent), and per read index the colour / alpha the read adds going 0 -> 1 (gain) around the mean it was evaluated at.",
       "`mottle` is the grey-mottle chain where the base pass has one: reads (indices) offset by `offsets`, multiplied together, times `gain` (sign * constant * (param + paramAdd)) and added to 1, multiplying the base colour.",
       "`textures[i].index` indexes the root material's ReferencedTextures; `param` names the texture parameter an instance may override. `slots` name the Material constant-buffer floats (`[reg].c`) by parameter (from the preshader bytecode) where the expression is a plain parameter read."
     ],

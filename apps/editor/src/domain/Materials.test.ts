@@ -52,6 +52,12 @@ describe("materials", () => {
     assert.isTrue(wind.translucent)
     assert.strictEqual(wind.opacityTexture, "textures/ray.png")
     assert.deepStrictEqual(wind.tiling.opacity, [0.25, 0.25])
+    assert.deepStrictEqual(wind.opacityLayer, {
+      texture: "textures/ray.png",
+      tiling: [0.25, 0.25],
+      gain: 0.6,
+      mean: 0.3
+    })
     assert.strictEqual(parseMaterialsFile({ [BLUE]: materialsFile.materials[0] }).materials.size, 1) // bare map
     assert.strictEqual(parseMaterialsFile("nope").materials.size, 0)
   })

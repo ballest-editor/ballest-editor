@@ -63,6 +63,15 @@ const ColorLayer = open({
   mean: Schema.optionalKey(Schema.NullOr(Rgb))
 })
 
+/** A texture a translucent pass's alpha depends on: `alpha += gain * (read.r - mean)`. */
+const OpacityLayer = open({
+  texture: Schema.String,
+  tiling: Pair,
+  projection: Schema.optionalKey(Schema.NullOr(Projection)),
+  gain: Schema.Finite,
+  mean: Num
+})
+
 export const MaterialApprox = open({
   baseColor: Schema.optionalKey(Schema.NullOr(Rgb)),
   metallic: Num,
@@ -89,6 +98,7 @@ export const MaterialApprox = open({
   instanceScale: Num,
   variation: Schema.optionalKey(Schema.NullOr(Variation)),
   colorLayers: Schema.optionalKey(Schema.NullOr(Schema.Array(ColorLayer))),
+  opacityLayers: Schema.optionalKey(Schema.NullOr(Schema.Array(OpacityLayer))),
   /** Every texture read of the base pass, including the secondary layers the fields above don't name. */
   reads: Schema.optionalKey(Schema.NullOr(Schema.Array(Read))),
   /** M_OutlineEdges' grey band along the UV border: `inset` is its width as a fraction of U and V. */
@@ -118,6 +128,14 @@ export interface ColorLayer {
   readonly tiling: Pair
   readonly gain: readonly [number, number, number]
   readonly mean: readonly [number, number, number]
+}
+
+/** A texture the alpha of a translucent material depends on: `alpha += gain * (read - mean)`. */
+export interface OpacityLayer {
+  readonly texture: string
+  readonly tiling: Pair
+  readonly gain: number
+  readonly mean: number
 }
 
 /** The grey mottle: `colour *= 1 + gain * product over i of (texture read at tilings[i] + offsets[i])`. */
@@ -165,6 +183,8 @@ export interface MaterialSpec {
   readonly normalLayer: NormalLayer | undefined
   /** Textures the base colour depends on (the pipes' grid, the vent's slats), in the material's projection. */
   readonly colorLayers: ReadonlyArray<ColorLayer>
+  /** Translucent materials: the texture the alpha follows (the vent's air streaks, the checkpoint's glow). */
+  readonly opacityLayer: OpacityLayer | undefined
   /** The mottle, as the game computes it; undefined when the shader has none (then no mottle is drawn). */
   readonly variation: Variation | undefined
   /** Grey band along the UV border (M_OutlineEdges): width per axis as a fraction, and its linear colour. */
@@ -217,6 +237,7 @@ export const NEUTRAL: Omit<MaterialSpec, "path"> = {
   instanceScale: false,
   normalLayer: undefined,
   colorLayers: [],
+  opacityLayer: undefined,
   variation: undefined,
   outline: undefined,
   translucent: false,
@@ -263,6 +284,12 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
       gain: rgb(l.gain, [0, 0, 0]),
       mean: rgb(l.mean, [0.5, 0.5, 0.5])
     }))
+  const ol = (a.opacityLayers ?? []).find((l) =>
+    projectionOf(l.projection) === projection && orUndefined(l.texture) !== undefined
+  )
+  const opacityLayer: OpacityLayer | undefined = ol === undefined
+    ? undefined
+    : { texture: ol.texture, tiling: pair(ol.tiling, [1, 1]), gain: ol.gain, mean: ol.mean ?? 0.5 }
   const v = a.variation
   const variation: Variation | undefined = v == null || v.tilings.length === 0 || v.gain === 0
     ? undefined
@@ -294,6 +321,7 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
     projection,
     instanceScale: (a.instanceScale ?? 0) > 0,
     colorLayers,
+    opacityLayer,
     normalLayer: second === undefined || normalTexture === undefined
       ? undefined
       : {

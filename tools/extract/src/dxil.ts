@@ -180,6 +180,7 @@ interface Facts {
   hasBuffer: boolean
   hasRaw: boolean
   hasSqrt: boolean
+  hasSample: boolean
   cbufRefs: Set<string>
 }
 
@@ -210,7 +211,14 @@ class Tracer {
   facts(v: string, seen = new Set<string>()): Facts {
     const cached = this.#facts.get(v)
     if (cached) return cached
-    const f: Facts = { hasInput: false, hasBuffer: false, hasRaw: false, hasSqrt: false, cbufRefs: new Set() }
+    const f: Facts = {
+      hasInput: false,
+      hasBuffer: false,
+      hasRaw: false,
+      hasSqrt: false,
+      hasSample: false,
+      cbufRefs: new Set()
+    }
     if (seen.has(v)) return f
     seen.add(v)
     const d = this.#m.defs.get(v)
@@ -218,6 +226,7 @@ class Tracer {
     if (d.includes("@dx.op.loadInput")) f.hasInput = true
     if (d.includes("@dx.op.bufferLoad")) f.hasBuffer = true
     if (d.includes("@dx.op.rawBufferLoad")) f.hasRaw = true
+    if (d.includes("@dx.op.sample")) f.hasSample = true
     if (d.includes("@dx.op.unary.f32(i32 24,")) f.hasSqrt = true
     const ev = d.match(/^extractvalue \S+ (%[\w.]+), (\d+)$/)
     if (ev) {
@@ -231,6 +240,7 @@ class Tracer {
       f.hasBuffer ||= sub.hasBuffer
       f.hasRaw ||= sub.hasRaw
       f.hasSqrt ||= sub.hasSqrt
+      f.hasSample ||= sub.hasSample
       for (const r of sub.cbufRefs) f.cbufRefs.add(r)
     }
     this.#facts.set(v, f)
@@ -308,10 +318,21 @@ class Tracer {
 
 const ROOT: Ctx = { factor: 1, params: [], sceneDepth: 0, sceneScale: 0 }
 
-/** A function that answers `dependsOnInput` with one shared cache for the module. */
-export const inputDependency = (m: Module): (v: string) => boolean => {
+/**
+ * Per module, with one shared cache: whether a value depends on a shader input at all, and whether it is
+ * made of inputs only (a normalised normal, say: no parameters, buffers or texture reads on the way).
+ */
+export const inputDependency = (
+  m: Module
+): { readonly any: (v: string) => boolean; readonly pure: (v: string) => boolean } => {
   const tracer = new Tracer(m)
-  return (v) => tracer.facts(v).hasInput
+  return {
+    any: (v) => tracer.facts(v).hasInput,
+    pure: (v) => {
+      const f = tracer.facts(v)
+      return f.hasInput && f.cbufRefs.size === 0 && !f.hasRaw && !f.hasBuffer && !f.hasSample
+    }
+  }
 }
 
 const dedupe = (leaves: ReadonlyArray<Leaf>): Array<Leaf> => {

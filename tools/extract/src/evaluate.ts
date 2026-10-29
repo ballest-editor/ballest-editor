@@ -40,13 +40,16 @@ export class Evaluator {
   readonly #env: Env
   readonly #memo = new Map<string, number>()
   readonly #inputDependent: (v: string) => boolean
+  readonly #pureInput: (v: string) => boolean
   readonly #handles = new Map<string, string>()
   #depth = 0
 
   constructor(m: Module, env: Env) {
     this.#m = m
     this.#env = env
-    this.#inputDependent = inputDependency(m)
+    const dependency = inputDependency(m)
+    this.#inputDependent = dependency.any
+    this.#pureInput = dependency.pure
     for (const [v, h] of m.handles) {
       const cb = m.cbuffers.find((c) => c.register === h.register)
       this.#handles.set(v, cb === undefined ? `cb${h.register}` : cb.type.replace(/^hostlayout\./, ""))
@@ -72,7 +75,7 @@ export class Evaluator {
   #compute(v: string): number {
     const d = this.#m.defs.get(v)
     if (d === undefined) return 0
-    if (d.includes("@dx.op.loadInput")) return 0
+    if (d.includes("@dx.op.loadInput")) return this.#input(d)
     const ev = d.match(/^extractvalue \S+ (%[\w.]+), (\d+)$/)
     if (ev) {
       const agg = this.#m.defs.get(g(ev, 1)) ?? ""
@@ -82,6 +85,9 @@ export class Evaluator {
       if (agg.includes("@dx.op.sample")) return this.#env.sample(g(ev, 1), ch)
       return 0
     }
+    // A dot product the compiler expanded into multiplies and adds of input-derived vectors (N·V and
+    // friends) reads 1, like an explicit dot: the surface is seen head-on.
+    if (this.#dotLike(v)) return 1
     const bin = d.match(/^(fmul|fadd|fsub|fdiv) (?:fast )?float (\S+), (\S+)$/)
     if (bin) {
       const a = this.value(g(bin, 2)), b = this.value(g(bin, 3))
@@ -130,12 +136,51 @@ export class Evaluator {
     return 0
   }
 
+  /**
+   * The surface seen head-on from above: the world normal (UE's TEXCOORD11, z up) is +z, the tangent
+   * (TEXCOORD10) +x, texture coordinates sit mid-face, everything else (positions) is 0.
+   */
+  #input(d: string): number {
+    const li = d.match(/loadInput\.f32\(i32 \d+, i32 (\d+), i32 \d+, i8 (\d+)/)
+    if (!li) return 0
+    const sig = this.#m.inputs.find((x) => x.id === num(li[1]))
+    const component = num(li[2])
+    if (sig === undefined) return 0
+    if (sig.name.startsWith("TEXCOORD11")) return component === 2 ? 1 : 0
+    if (sig.name.startsWith("TEXCOORD10")) return component === 0 ? 1 : 0
+    if (sig.name === "TEXCOORD") return 0.5
+    return 0
+  }
+
+  /** Sum of 2..4 products of two input-dependent values, through fmul / fadd / fmad. */
+  #dotLike(v: string): boolean {
+    const terms: Array<[string, string]> = []
+    const walk = (x: string, depth: number): boolean => {
+      const d = this.#m.defs.get(x)
+      if (d === undefined || depth > 4) return false
+      const mul = d.match(/^fmul (?:fast )?float (\S+), (\S+)$/)
+      if (mul) {
+        terms.push([g(mul, 1), g(mul, 2)])
+        return true
+      }
+      const add = d.match(/^fadd (?:fast )?float (\S+), (\S+)$/)
+      if (add) return walk(g(add, 1), depth + 1) && walk(g(add, 2), depth + 1)
+      const mad = d.match(/@dx\.op\.tertiary\.f32\(i32 46, float (\S+), float (\S+), float (\S+)\)/)
+      if (mad) {
+        terms.push([g(mad, 1), g(mad, 2)])
+        return walk(g(mad, 3), depth + 1)
+      }
+      return false
+    }
+    if (!walk(v, 0) || terms.length < 2 || terms.length > 4) return false
+    return terms.every(([a, b]) => this.#pureInput(a) && this.#pureInput(b))
+  }
+
   #bool(v: string): boolean | undefined {
     const d = this.#m.defs.get(v)
     if (d === undefined) return v === "true" ? true : v === "false" ? false : undefined
     const cmp = d.match(/^fcmp (?:fast )?(\w+) float (\S+), (\S+)$/)
     if (cmp) {
-      if (this.#inputDependent(g(cmp, 2)) || this.#inputDependent(g(cmp, 3))) return undefined
       const a = this.value(g(cmp, 2)), b = this.value(g(cmp, 3))
       switch (g(cmp, 1)) {
         case "olt":
@@ -214,10 +259,17 @@ export class Evaluator {
 }
 
 export interface Surface {
-  /** GBuffer base colour with every colour read at 0; null for a translucent pass (no GBuffer). */
+  /**
+   * Base colour: the GBuffer's for an opaque pass; for a translucent pass, the diffuse colour the lighting
+   * code multiplies by View.DiffuseOverrideParameter (the material's base colour after its own math).
+   */
   readonly baseColor: readonly [number, number, number] | null
   readonly metallic: number | null
   readonly roughness: number | null
+  /** Translucent passes: the alpha the pass writes (scene colour .a); null for opaque. */
+  readonly opacity: number | null
+  /** Translucent passes: how much the alpha changes when a sample goes 0 -> 1. */
+  readonly alphaGains: Record<string, number>
   /** Scene colour with no lights: the emissive term (for a translucent pass, its unlit colour). */
   readonly emissive: readonly [number, number, number]
   /** Per texture sample value: how much r, g, b of the base colour change when the sample goes 0 -> 1. */
@@ -233,8 +285,48 @@ export const ENGINE_DEFAULTS: Record<string, number> = {
   "View[160].z": 1,
   "View[160].w": 1,
   // View.DiffuseOverrideParameter / SpecularOverrideParameter: (0, 0, 0, 1) = no override
-  "View[162].w": 1,
-  "View[163].w": 1
+  "View[161].w": 1,
+  "View[162].w": 1
+}
+
+/**
+ * The diffuse colour of a lit pass, per channel: the value the engine multiplies by
+ * View.DiffuseOverrideParameter.w and offsets by its .xyz (`DiffuseColor * w + xyz`). That is the material's
+ * base colour after its own math, the only place a translucent pass (no GBuffer) exposes it.
+ */
+const diffuseOf = (m: Module): ReadonlyArray<string> | null => {
+  const cbufComponent = (v: string): [string, number] | null => {
+    const d = m.defs.get(v)
+    const ev = d?.match(/^extractvalue \S+ (%[\w.]+), (\d+)$/)
+    if (!ev) return null
+    const agg = m.defs.get(g(ev, 1)) ?? ""
+    const cb = agg.match(/cbufferLoadLegacy\.\w+\(i32 \d+, %dx\.types\.Handle (%[\w.]+), i32 (\d+)\)/)
+    if (!cb) return null
+    const h = m.handles.get(g(cb, 1))
+    const type = m.cbuffers.find((c) => c.register === h?.register)?.type.replace(/^hostlayout\./, "")
+    return [`${type ?? "?"}[${g(cb, 2)}]`, num(ev[2])]
+  }
+  const out: Array<string> = []
+  for (const [v, d] of m.defs) {
+    const mul = d.match(/^fmul (?:fast )?float (\S+), (\S+)$/)
+    if (!mul) continue
+    const [a, b] = [g(mul, 1), g(mul, 2)]
+    const w = cbufComponent(a)?.[1] === 3 && cbufComponent(a)?.[0] === "View[161]"
+      ? b
+      : cbufComponent(b)?.[1] === 3 && cbufComponent(b)?.[0] === "View[161]"
+      ? a
+      : undefined
+    if (w === undefined) continue
+    // which channel: the add of View[161].{x,y,z} that follows
+    for (const dd of m.defs.values()) {
+      const add = dd.match(/^fadd (?:fast )?float (\S+), (\S+)$/)
+      if (!add || (add[1] !== v && add[2] !== v)) continue
+      const other = add[1] === v ? g(add, 2) : g(add, 1)
+      const c = cbufComponent(other)
+      if (c?.[0] === "View[161]" && c[1] < 3 && out[c[1]] === undefined) out[c[1]] = w
+    }
+  }
+  return Object.keys(out).length === 3 ? out : null
 }
 
 /** The value a render-target output stores, before the decal blend (the entry-block side of its phi). */
@@ -263,12 +355,15 @@ export const surfaceOf = (
   colorSamples: ReadonlyArray<string>
 ): Surface | null => {
   const outs = outputs(m, ir)
-  const base = ["3.x", "3.y", "3.z"].map((k) => outs.get(k))
   const scene = ["0.x", "0.y", "0.z"].map((k) => outs.get(k))
   const metallic = outs.get("2.x")
   const roughness = outs.get("2.z")
   if (scene.some((b) => b === undefined)) return null
-  const opaque = base.every((b) => b !== undefined) && metallic !== undefined && roughness !== undefined
+  const gbuffer = ["3.x", "3.y", "3.z"].map((k) => outs.get(k))
+  const opaque = gbuffer.every((b) => b !== undefined) && metallic !== undefined && roughness !== undefined
+  const diffuse = opaque ? null : diffuseOf(m)
+  const base = opaque ? gbuffer : diffuse ?? [undefined, undefined, undefined]
+  const alpha = opaque ? undefined : outs.get("0.w")
   const at = (overrides: ReadonlyMap<string, number>) => {
     const e = new Evaluator(m, {
       cbuf: (ref) => cbuf(ref) ?? ENGINE_DEFAULTS[ref],
@@ -278,24 +373,30 @@ export const surfaceOf = (
       rgb: base.map((b) => (b === undefined ? 0 : e.value(b))),
       scene: scene.map((b) => (b === undefined ? 0 : e.value(b))),
       metallic: metallic === undefined ? 0 : e.value(metallic),
-      roughness: roughness === undefined ? 0 : e.value(roughness)
+      roughness: roughness === undefined ? 0 : e.value(roughness),
+      alpha: alpha === undefined ? 1 : e.value(alpha)
     }
   }
+  const hasBase = base.every((b) => b !== undefined)
   const rgb = (v: ReadonlyArray<number>): readonly [number, number, number] => [v[0] ?? 0, v[1] ?? 0, v[2] ?? 0]
   const zero = at(new Map())
   const gains: Record<string, readonly [number, number, number]> = {}
-  if (opaque) {
+  const alphaGains: Record<string, number> = {}
+  if (hasBase) {
     for (const s of colorSamples) {
-      const hi = rgb(at(new Map([[s, 1]])).rgb)
-      const lo = rgb(at(new Map([[s, 0]])).rgb)
-      gains[s] = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]]
+      const hi = at(new Map([[s, 1]])), lo = at(new Map([[s, 0]]))
+      const h = rgb(hi.rgb), l = rgb(lo.rgb)
+      gains[s] = [h[0] - l[0], h[1] - l[1], h[2] - l[2]]
+      if (!opaque) alphaGains[s] = hi.alpha - lo.alpha
     }
   }
   return {
-    baseColor: opaque ? rgb(zero.rgb) : null,
+    baseColor: hasBase ? rgb(zero.rgb) : null,
     metallic: opaque ? zero.metallic : null,
     roughness: opaque ? zero.roughness : null,
+    opacity: opaque ? null : zero.alpha,
     emissive: rgb(zero.scene),
-    gains
+    gains,
+    alphaGains
   }
 }

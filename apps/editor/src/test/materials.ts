@@ -62,7 +62,12 @@ export const materialsFile = {
       path: WIND,
       blendMode: "BLEND_TranslucentGreyTransmittance",
       twoSided: true,
-      approx: { opacity: 0.5, opacityTexture: "textures/ray.png", tiling: { opacity: 0.25 } },
+      approx: {
+        opacity: 0.5,
+        opacityTexture: "textures/ray.png",
+        tiling: { opacity: 0.25 },
+        opacityLayers: [{ texture: "textures/ray.png", tiling: [0.25, 0.25], projection: "uv", gain: 0.6, mean: 0.3 }]
+      },
       recovered: false
     },
     {

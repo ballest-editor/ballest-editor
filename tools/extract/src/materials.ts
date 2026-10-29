@@ -161,6 +161,8 @@ export interface Read {
   readonly gain: readonly [number, number, number] | null
   /** The read's mean colour the surface was evaluated at (so colour = base + gain * (read - mean)). */
   readonly mean: readonly [number, number, number] | null
+  /** Translucent passes: what the read adds to the alpha going 0 -> 1. */
+  readonly alphaGain: number
 }
 
 interface Source {
@@ -279,13 +281,30 @@ const readsOf = (
       strength: role === "normal" && r.resultFactor !== null ? Math.abs(r.resultFactor) / 2 : 1,
       unresolved: [...unresolved].sort(),
       gain: null,
-      mean: null
+      mean: null,
+      alphaGain: 0
     })
   }
   return { reads: out, index }
 }
 
 // ------------------------------------------------------------------ build
+/** JSON with objects indented but arrays of numbers / strings on one line: a third of the lines, same diffs. */
+export const compactJson = (value: unknown, indent = ""): string => {
+  if (Array.isArray(value)) {
+    if (value.every((v) => typeof v !== "object" || v === null)) return JSON.stringify(value)
+    return `[\n${value.map((v) => `${indent}  ${compactJson(v, indent + "  ")}`).join(",\n")}\n${indent}]`
+  }
+  if (typeof value === "object" && value !== null) {
+    const entries = Object.entries(value).filter(([, v]) => v !== undefined)
+    if (entries.length === 0) return "{}"
+    return `{\n${
+      entries.map(([k, v]) => `${indent}  ${JSON.stringify(k)}: ${compactJson(v, indent + "  ")}`).join(",\n")
+    }\n${indent}}`
+  }
+  return value === undefined ? "null" : JSON.stringify(value)
+}
+
 /** shaders.json's materials, if the file is one this version wrote. */
 const shaderMaterialsOf = (file: unknown): ShadersFile["materials"] => {
   if (get(file, "version") !== 1) return {}
@@ -411,7 +430,7 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         : readsOf(sh, merged, textureOf, dump, isTranslucent)
       const reads = traced.reads.map((r, i) => {
         const g = evaluated?.gains[String(traced.index[i])]
-        return g === undefined ? r : { ...r, gain: g.gain, mean: g.mean }
+        return g === undefined ? r : { ...r, gain: g.gain, mean: g.mean, alphaGain: g.alpha }
       })
       const variation = sh === undefined ? null : variationOf(sh, merged, reads, traced.index)
       if (sh !== undefined) withShaders++
@@ -423,7 +442,9 @@ export const materialsBuild = Effect.fn("materialsBuild")(
       // Colour layers: reads the evaluated surface says add to the base colour (gain != 0). Without an
       // evaluation (translucent passes) no colour texture is applied: the parameters alone are safer.
       const colorLayers = reads
-        .filter((r) => r.role !== "normal" && r.gain !== null && r.unresolved.length === 0)
+        .filter((r) =>
+          r.role !== "normal" && r.gain !== null && r.unresolved.length === 0 && r.gain.some((x) => Math.abs(x) >= 1e-4)
+        )
         .sort((a, b) => Math.max(...(b.gain ?? [0]).map(Math.abs)) - Math.max(...(a.gain ?? [0]).map(Math.abs)))
       const normalRead = normals[0]
       const variationRead = primary("variation")
@@ -446,10 +467,14 @@ export const materialsBuild = Effect.fn("materialsBuild")(
           : emissiveOnly && emissiveColor
           ? [0, 0, 0]
           : (bc ?? [0.8, 0.8, 0.8, 1]).slice(0, 3),
-        metallic: evaluated !== null ? clamp01(evaluated.metallic) : met ?? 0,
-        roughness: evaluated !== null ? clamp01(evaluated.roughness) : rou ?? 0.6,
+        metallic: evaluated?.metallic != null ? clamp01(evaluated.metallic) : met ?? 0,
+        roughness: evaluated?.roughness != null ? clamp01(evaluated.roughness) : rou ?? 0.6,
         evaluated: evaluated !== null,
-        opacity: op ?? (isTranslucent ? 0.5 : 1),
+        // A translucent pass whose alpha vanishes head-on (a view-angle beam like the vent's air) keeps the
+        // parameter's opacity: the evaluation is for one view, the piece is seen from all of them.
+        opacity: evaluated?.opacity != null && evaluated.opacity >= 0.02
+          ? clamp01(evaluated.opacity)
+          : op ?? (isTranslucent ? 0.5 : 1),
         emissive: emissiveColor,
         baseColorTexture: null,
         normalTexture: tex(normalRead),
@@ -464,6 +489,18 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         },
         projection,
         instanceScale: (normalRead ?? colorLayers[0])?.instanceScale ?? 0,
+        // Translucent: texture reads the alpha depends on (alpha = opacity + sum alphaGain * (read - mean)).
+        opacityLayers: reads
+          .filter((r) => r.role !== "normal" && r.unresolved.length === 0 && Math.abs(r.alphaGain) >= 1e-4)
+          .sort((a, b) => Math.abs(b.alphaGain) - Math.abs(a.alphaGain))
+          .map((r) => ({
+            texture: texPath(r.texture) ?? `missing:${r.texture}`,
+            tiling: r.scale,
+            projection: r.projection,
+            instanceScale: r.instanceScale,
+            gain: r.alphaGain,
+            mean: r.mean === null ? 0.5 : r.mean[0]
+          })),
         // Textures added to the base colour, each scaled by what the shader adds for it (colour = base + sum gain_i * read_i).
         colorLayers: colorLayers.map((r) => ({
           texture: texPath(r.texture) ?? `missing:${r.texture}`,
@@ -477,14 +514,13 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         variation: variation === null
           ? null
           : { ...variation, texture: texPath(variation.texture) ?? `missing:${variation.texture}` },
-        // Every texture read the base pass makes, in shader order (all layers; the fields above are the primary ones).
-        reads: reads.map((r) => ({ ...r, texture: texPath(r.texture) ?? `missing:${r.texture}` })),
         outline,
+        // Which parameters the name-based picks used (translucent passes, emissive); null = neutral default.
         keys: {
-          baseColor: bcKey,
-          metallic: metKey,
-          roughness: rouKey,
-          opacity: opKey,
+          baseColor: evaluated === null ? bcKey : null,
+          metallic: evaluated?.metallic == null ? metKey : null,
+          roughness: evaluated?.roughness == null ? rouKey : null,
+          opacity: evaluated?.opacity == null ? opKey : null,
           emissive: emKey,
           emissiveIntensity: emiKey
         }
@@ -509,7 +545,6 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         shadingModel,
         twoSided,
         connectedOutputs: root.connectedOutputs ?? null,
-        referencedTextures: root.referencedTextures.map(texPath).filter((x) => x !== null),
         approx,
         ...(errors.length === 0 ? {} : {
           errors: errors.map((o) => ({ path: o.path, error: o.error, parseErrors: o.errors }))
@@ -534,7 +569,7 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         "scalars/vectors/textures/switches are effective values: root UMaterial defaults (from CachedExpressionData) overridden by each instance down the chain.",
         "vectors are linear RGBA as stored by UE. baseColor/emissive in approx are linear; set three.js colors with Color.setRGB(r,g,b, THREE.LinearSRGBColorSpace) (or the default working space).",
         "approx.baseColor/metallic/roughness are the compiled shader evaluated for the material's parameters and a facing view with every texture at its mean colour (approx.evaluated true); otherwise (translucent passes) parameters picked by name (approx.keys says which; null = neutral default). opacity/emissive are always picked by name.",
-        "approx.colorLayers are the texture reads the base colour depends on: colour = baseColor + sum of gain * (read - mean) (gain and mean from the evaluated shader; projection/tiling as for reads).",
+        "approx.colorLayers are the texture reads the base colour depends on: colour = baseColor + sum of gain * (read - mean); approx.opacityLayers the reads a translucent pass's alpha depends on, the same way (gain and mean from the evaluated shader; tiling is repeats per UV unit, or per cm when projected; instanceScale as for the normal map).",
         "approx.reads are the base-pass pixel shader's texture reads, traced through the compiled shader (tools/extract shaders): projection uv = mesh UV0 (scale in repeats per UV unit); object = object-aligned position, pivot at the object origin, rotating with the piece (scale in repeats per cm; instanceScale 1 = u, v also multiply by the piece's x, y scale); world. strength is a normal layer's blend strength. approx.*Texture/tiling/projection/instanceScale are the primary read per role; tiling is [u, v].",
         "Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).",
         "approx.variation is the grey mottle as the base pass applies it: colour *= 1 + gain * product over layers of (texture read at tilings[i] + offsets[i]); gain already includes the instance's parameter (ColorContrast - 1 for the Env masters).",
@@ -545,8 +580,10 @@ export const materialsBuild = Effect.fn("materialsBuild")(
       ...(paint === null ? {} : { paint }),
       textures: texList.sort((a, b) => a.path.localeCompare(b.path))
     }
-    yield* fs.writeFileString(path.join(assets, "materials.json"), JSON.stringify(out, null, 2) + "\n")
-    const withTex = records.filter((r) => arr(get(r, "approx", "reads")).length > 0)
+    yield* fs.writeFileString(path.join(assets, "materials.json"), compactJson(out) + "\n")
+    const withTex = records.filter((r) =>
+      arr(get(r, "approx", "colorLayers")).length > 0 || get(r, "approx", "normalTexture") !== null
+    )
     yield* Effect.logInfo(
       `[materials] ${records.length} materials, ${
         records.filter((r) => r["recovered"] === true).length

@@ -129,10 +129,11 @@ describe("three materials", () => {
     const table = parseMaterialsFile(materialsFile)
     const wind = materialFor(table, WIND)
     assert.isTrue(wind.transparent)
-    assert.isDefined(wind.alphaMap)
-    assert.strictEqual(wind.blending, THREE.AdditiveBlending)
+    assert.isNull(wind.alphaMap) // the alpha layer is the patch's, around the evaluated opacity
+    assert.strictEqual(wind.blending, THREE.NormalBlending)
     assert.isFalse(wind.depthWrite)
-    assert.deepStrictEqual(shaderPatchOf(wind)?.defines, { BALLEST_TILING: 1 })
+    assert.deepStrictEqual(shaderPatchOf(wind)?.defines, { BALLEST_TILING: 1, BALLEST_ALPHA: 1 })
+    assert.deepStrictEqual(shaderPatchOf(wind)?.uniforms.uAlphaShape.value, new THREE.Vector2(0.6, 0.3))
     assert.strictEqual(wind.defines?.["STANDARD"], "") // three's own define survives the patch
   })
 

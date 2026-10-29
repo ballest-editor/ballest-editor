@@ -71,6 +71,10 @@ export interface Patch {
     readonly uColor2Gain: THREE.IUniform<THREE.Vector3>
     readonly uColor1Mean: THREE.IUniform<THREE.Vector3>
     readonly uColor2Mean: THREE.IUniform<THREE.Vector3>
+    readonly uAlphaMap: THREE.IUniform<THREE.Texture | null>
+    readonly uAlphaTiling: THREE.IUniform<THREE.Vector2>
+    /** gain, mean */
+    readonly uAlphaShape: THREE.IUniform<THREE.Vector2>
     readonly uNormal2Tiling: THREE.IUniform<THREE.Vector2>
     readonly uNormal2Strength: THREE.IUniform<number>
     readonly uOutlineInset: THREE.IUniform<THREE.Vector2>
@@ -85,7 +89,8 @@ const patchOf = (
   spec: Omit<MaterialSpec, "path">,
   variation: THREE.Texture | null,
   normal2: THREE.Texture | null,
-  colorMaps: ReadonlyArray<THREE.Texture>
+  colorMaps: ReadonlyArray<THREE.Texture>,
+  alphaMap: THREE.Texture | null
 ): Patch | undefined => {
   const defines: Record<string, number> = {}
   const { tiling } = spec
@@ -101,6 +106,7 @@ const patchOf = (
   }
   if (normal2 !== null) defines["BALLEST_NORMAL2"] = 1
   if (colorMaps.length > 0) defines["BALLEST_COLOR"] = colorMaps.length
+  if (alphaMap !== null) defines["BALLEST_ALPHA"] = 1
   if (spec.outline !== undefined) defines["BALLEST_OUTLINE"] = 1
   if (Object.keys(defines).length === 0) return undefined
   const outline = spec.outline
@@ -134,6 +140,9 @@ const patchOf = (
       uColor2Gain: { value: new THREE.Vector3(...(spec.colorLayers[1]?.gain ?? [0, 0, 0])) },
       uColor1Mean: { value: new THREE.Vector3(...(spec.colorLayers[0]?.mean ?? [0.5, 0.5, 0.5])) },
       uColor2Mean: { value: new THREE.Vector3(...(spec.colorLayers[1]?.mean ?? [0.5, 0.5, 0.5])) },
+      uAlphaMap: { value: alphaMap },
+      uAlphaTiling: { value: vec2(spec.opacityLayer?.tiling ?? [1, 1]) },
+      uAlphaShape: { value: new THREE.Vector2(spec.opacityLayer?.gain ?? 0, spec.opacityLayer?.mean ?? 0.5) },
       uNormal2Tiling: { value: vec2(spec.normalLayer?.tiling ?? [1, 1]) },
       uNormal2Strength: { value: spec.normalLayer?.strength ?? 0 },
       uOutlineInset: { value: new THREE.Vector2(outline?.inset[0] ?? 0, outline?.inset[1] ?? 0) },
@@ -189,6 +198,9 @@ uniform vec3 uColor1Gain;
 uniform vec3 uColor2Gain;
 uniform vec3 uColor1Mean;
 uniform vec3 uColor2Mean;
+uniform sampler2D uAlphaMap;
+uniform vec2 uAlphaTiling;
+uniform vec2 uAlphaShape;
 uniform vec2 uNormal2Tiling;
 uniform float uNormal2Strength;
 uniform vec2 uOutlineInset;
@@ -225,6 +237,9 @@ const COLOR_EXTRAS = /* glsl */ `
     diffuseColor.rgb += uColor2Gain * ( texture2D( uColorMap2, ballestUv( uColor2Tiling ) ).rgb - uColor2Mean );
   #endif
   diffuseColor.rgb = clamp( diffuseColor.rgb, 0.0, 1.0 );
+#endif
+#ifdef BALLEST_ALPHA
+  diffuseColor.a = clamp( diffuseColor.a + uAlphaShape.x * ( texture2D( uAlphaMap, ballestUv( uAlphaTiling ) ).r - uAlphaShape.y ), 0.0, 1.0 );
 #endif
 #ifdef BALLEST_VARIATION
   #if BALLEST_VARIATION >= 3
@@ -403,17 +418,16 @@ const build = (
     )
     if (spec.emissive.every((c) => c === 0)) material.emissive.setRGB(1, 1, 1)
   }
-  // A shaped translucent effect (the air vent's wind, light beams): its streak texture is the alpha,
-  // and it adds light rather than shading what's behind it.
-  if (spec.translucent && spec.opacityTexture !== undefined) {
-    material.alphaMap = loadTexture(spec.opacityTexture, THREE.NoColorSpace, drop("alphaMap"))
-    material.blending = THREE.AdditiveBlending
-  }
+  // A shaped translucent effect (the air vent's streaks, the checkpoint's glow): the shader's alpha follows a
+  // texture around the opacity evaluated at its mean.
   const dropDefine = (define: string) => () => {
     material.defines = { ...material.defines }
     delete material.defines[define]
     material.needsUpdate = true
   }
+  const alphaMap = spec.translucent && spec.opacityLayer !== undefined
+    ? loadTexture(spec.opacityLayer.texture, THREE.NoColorSpace, dropDefine("BALLEST_ALPHA"))
+    : null
   const variation = spec.variationTexture === undefined
     ? null
     : loadTexture(
@@ -427,7 +441,7 @@ const build = (
   const colorMaps = spec.colorLayers.map((layer) =>
     loadTexture(layer.texture, colorSpaceOf(layer.texture, THREE.SRGBColorSpace), dropDefine("BALLEST_COLOR"))
   )
-  const patch = patchOf(spec, variation, normal2, colorMaps)
+  const patch = patchOf(spec, variation, normal2, colorMaps, alphaMap)
   if (patch !== undefined) patchShader(material, patch)
   return material
 }
