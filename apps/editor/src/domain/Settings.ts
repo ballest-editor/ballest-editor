@@ -5,7 +5,7 @@
  */
 import { Option, Predicate, Schema } from "effect"
 import { movementLookModes } from "./flyKeys"
-import { DEFAULT_GRID_SIZE, GRID_SIZES } from "./snap"
+import { DEFAULT_GRID_SIZE, DEFAULT_ROTATION_STEP, GRID_SIZES, ROTATION_STEPS } from "./snap"
 
 /** "Custom" uses CameraSettings.customFov instead of a preset's. */
 export const CUSTOM_FOV_PRESET = "Custom"
@@ -48,7 +48,11 @@ export const SnappingSettings = Schema.Struct({
   /** Whether gizmo translation lands on the world grid. */
   enabled: Schema.Boolean,
   /** Grid step in cm. */
-  gridSize: Schema.Literals(GRID_SIZES)
+  gridSize: Schema.Literals(GRID_SIZES),
+  /** Whether gizmo rotation turns in whole steps. */
+  rotationEnabled: Schema.Boolean,
+  /** Rotation step in degrees. */
+  rotationStep: Schema.Literals(ROTATION_STEPS)
 })
 
 export const Settings = Schema.Struct({
@@ -71,7 +75,12 @@ export const defaultSettings: Settings = {
     movementNeedsLook: "all"
   },
   appearance: { theme: "dark", gridVisible: true, gridCellColor: "#3a404a", gridSectionColor: "#58606e" },
-  snapping: { enabled: false, gridSize: DEFAULT_GRID_SIZE }
+  snapping: {
+    enabled: false,
+    gridSize: DEFAULT_GRID_SIZE,
+    rotationEnabled: false,
+    rotationStep: DEFAULT_ROTATION_STEP
+  }
 }
 
 type Section = keyof Settings

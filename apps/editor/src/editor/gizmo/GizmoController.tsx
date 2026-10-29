@@ -199,8 +199,10 @@ export function GizmoController() {
         return
       }
       const { snapping } = useEditor.getState().settings
-      const grid = snapping.enabled ? { size: snapping.gridSize, pivot: active.pivot } : undefined
-      const delta = dragDelta(active.start, sample(e), grid)
+      const delta = dragDelta(active.start, sample(e), {
+        grid: snapping.enabled ? { size: snapping.gridSize, pivot: active.pivot } : undefined,
+        rotationStep: snapping.rotationEnabled ? snapping.rotationStep : undefined
+      })
       if (delta === undefined) return
       if (active.duplicate === "pending") {
         // The copies start where the selection is; the selection itself stays put.

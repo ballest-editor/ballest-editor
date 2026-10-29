@@ -1,9 +1,13 @@
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { type MouseEvent, type PointerEvent, useEffect, useId, useRef, useState } from "react"
+import { snapValue } from "../domain/snap"
 
 /** Pixels the pointer must travel before a press on the label becomes a scrub (else it's a click). */
 const SCRUB_THRESHOLD = 3
+
+/** A snapped scrub moves at least one snap step per this many pixels, however big the step. */
+const PIXELS_PER_SNAP = 10
 
 interface Scrub {
   readonly pointerId: number
@@ -16,14 +20,16 @@ interface Scrub {
 
 /**
  * Drag-to-scrub on a label: `onScrub` gets each live value and `null` when the scrub ends,
- * then `onCommit` runs once with the final value if it changed. Escape cancels.
+ * then `onCommit` runs once with the final value if it changed. Both also get the value the
+ * scrub started from, since the shown value follows the live one. Escape cancels.
  */
 function useScrub(options: {
   readonly value: number
   readonly step: number
+  readonly snap: number | undefined
   readonly round: (n: number) => number
-  readonly onScrub: ((value: number | null) => void) | undefined
-  readonly onCommit: (value: number) => void
+  readonly onScrub: ((value: number | null, from: number) => void) | undefined
+  readonly onCommit: (value: number, from: number) => void
 }) {
   const scrub = useRef<Scrub | null>(null)
   const scrubbed = useRef(false)
@@ -39,15 +45,15 @@ function useScrub(options: {
     active.stop()
     if (active.value === null) return // a plain click: the label focuses the input
     scrubbed.current = true
-    latest.current.onScrub?.(null)
-    if (apply && active.value !== active.startValue) latest.current.onCommit(active.value)
+    latest.current.onScrub?.(null, active.startValue)
+    if (apply && active.value !== active.startValue) latest.current.onCommit(active.value, active.startValue)
   }
   // Unmounting mid-scrub drops the live value.
   useEffect(() => () => {
     const active = scrub.current
     scrub.current = null
     active?.stop()
-    if (active?.value != null) latest.current.onScrub?.(null)
+    if (active?.value != null) latest.current.onScrub?.(null, active.startValue)
   }, [])
 
   if (options.onScrub === undefined) return {}
@@ -80,9 +86,14 @@ function useScrub(options: {
       if (active === null || active.pointerId !== e.pointerId) return
       const dx = Math.round(e.clientX - active.startX)
       if (active.value === null && Math.abs(dx) < SCRUB_THRESHOLD) return
-      const { step, round, onScrub } = latest.current
-      active.value = round(active.startValue + dx * step * (e.shiftKey ? 0.1 : 1))
-      onScrub?.(active.value)
+      const { step, snap, round, onScrub } = latest.current
+      if (snap === undefined) {
+        active.value = round(active.startValue + dx * step * (e.shiftKey ? 0.1 : 1))
+      } else {
+        const perPixel = Math.max(step, snap / PIXELS_PER_SNAP) * (e.shiftKey ? 0.1 : 1)
+        active.value = round(snapValue(active.startValue + dx * perPixel, snap))
+      }
+      onScrub?.(active.value, active.startValue)
     },
     onPointerUp: () => end(true),
     onPointerCancel: () => end(false),
@@ -98,18 +109,24 @@ function useScrub(options: {
  * Numeric input that commits on Enter or blur and reverts on Escape or invalid input.
  * With `onScrub`, dragging the label left/right scrubs the value (`step` per pixel, Shift
  * ten times finer) and commits once on release (`onScrubCommit`, else `onCommit`), so a
- * whole scrub is one undo step. A null `value` is mixed (several items that disagree): the
+ * whole scrub is one undo step. With `snap`, a scrub lands on multiples of it (and moves
+ * faster when the snap is coarse); typed values aren't snapped. A null `value` is mixed (several items that disagree): the
  * input is blank, typing sets them all, and a scrub starts from 0.
  */
 export function NumberField(props: {
   readonly label: string
   readonly value: number | null
   readonly onCommit: (value: number) => void
-  /** Live value while the label is scrubbed; null when the scrub ends or is cancelled. */
-  readonly onScrub?: (value: number | null) => void
-  /** The value a finished scrub ends on; defaults to `onCommit`. */
-  readonly onScrubCommit?: (value: number) => void
+  /**
+   * Live value while the label is scrubbed; null when the scrub ends or is cancelled.
+   * `from` is the value the scrub started from.
+   */
+  readonly onScrub?: (value: number | null, from: number) => void
+  /** The value a finished scrub ends on, and the one it started from; defaults to `onCommit`. */
+  readonly onScrubCommit?: (value: number, from: number) => void
   readonly step?: number
+  /** Scrubs land on multiples of this. */
+  readonly snap?: number | undefined
   readonly digits?: number
   /** Background class for the handle, e.g. an axis colour. */
   readonly handleClassName?: string
@@ -131,6 +148,7 @@ export function NumberField(props: {
   const scrubHandlers = useScrub({
     value: props.value ?? 0,
     step: props.step ?? 1,
+    snap: props.snap,
     round,
     onScrub: props.onScrub,
     onCommit: props.onScrubCommit ?? props.onCommit
