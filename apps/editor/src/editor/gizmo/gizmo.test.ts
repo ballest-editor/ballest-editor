@@ -3,9 +3,9 @@ import * as THREE from "three"
 import { ueToScene, ueToThreeVector } from "../../domain/coords"
 import type { UeTransform } from "../../domain/coords"
 import { applyGroupDelta } from "../../domain/groupTransform"
-import { rotateVec } from "../../domain/ueMath"
+import { rotateVec, rotatorToQuat } from "../../domain/ueMath"
 import { dragDelta, type DragStart, type PointerSample } from "./drag"
-import { GizmoObject, type GizmoSpace, SIZE, toolHandles } from "./handles"
+import { GizmoObject, type GizmoSpace, pairOf, SIZE, toolHandles } from "./handles"
 import { axisParamFromRay, axisWorldDir, gameDirToWorld, planeHit, screenAngle } from "./math"
 
 const v3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
@@ -20,7 +20,8 @@ const frame = {
   worldPerPixel: 2,
   gameRotation: identity.rotation,
   space: "world" as const,
-  cameraQuaternion: new THREE.Quaternion()
+  cameraQuaternion: new THREE.Quaternion(),
+  toCamera: v3(0, 0, 1)
 }
 
 describe("gizmo math", () => {
@@ -77,6 +78,41 @@ describe("gizmo handles", () => {
     }
     // the gizmo has no mirrored transform anywhere
     gizmo.traverse((o) => expect(o.matrixWorld.determinant()).toBeGreaterThan(0))
+  })
+
+  it("shows the quarter of each rotate ring that faces the camera, like the game", () => {
+    const local = { space: "local" as const, gameRotation: rotatorToQuat({ roll: 20, pitch: -35, yaw: 70 }) }
+    const views = [v3(1, 1, 1), v3(-2, 1, 0.5), v3(0.3, -1, -2)].map((d) => d.normalize())
+    for (const toCamera of views) {
+      for (const f of [{ ...frame, toCamera }, { ...frame, ...local, toCamera }]) {
+        const gizmo = new GizmoObject(toolHandles.rotate)
+        gizmo.update(f, null, null)
+        gizmo.updateMatrixWorld(true)
+        const rotation = f.space === "local" ? f.gameRotation : undefined
+        for (const axis of ["x", "y", "z"] as const) {
+          const root = gizmo.handle(`r-${axis}`)!.root
+          // the ring still turns about the axis
+          const normal = root.localToWorld(v3(0, 0, 1)).sub(f.origin).normalize()
+          expect(Math.abs(normal.dot(axisWorldDir(axis, rotation)))).toBeCloseTo(1, 9)
+          // the arc's midpoint sits on the camera's side of both other axes
+          const mid = root.localToWorld(v3(Math.SQRT1_2, Math.SQRT1_2, 0).multiplyScalar(SIZE.ring)).sub(f.origin)
+          for (const other of pairOf(axis)) {
+            const dir = axisWorldDir(other, rotation)
+            expect(Math.sign(mid.dot(dir))).toBe(Math.sign(toCamera.dot(dir)))
+          }
+        }
+        gizmo.traverse((o) => expect(o.matrixWorld.determinant()).toBeGreaterThan(0))
+      }
+    }
+  })
+
+  it("shows a rotate handle's whole ring only while it is dragged", () => {
+    const gizmo = new GizmoObject(toolHandles.rotate)
+    const ring = (axis: string) => gizmo.handle(`r-${axis}`)!.activeParts[0]!
+    gizmo.update(frame, "r-x", null)
+    expect(["x", "y", "z"].map((a) => ring(a).visible)).toEqual([false, false, false])
+    gizmo.update(frame, null, "r-y")
+    expect(["x", "y", "z"].map((a) => ring(a).visible)).toEqual([false, true, false])
   })
 
   it("has one hit mesh per handle and highlights only the hovered one", () => {
