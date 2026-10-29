@@ -132,7 +132,8 @@ const copiedRows = new Map<TransformField, Vec3>()
  * One editable row over the whole selection: a label icon whose menu (or Shift+click
  * shortcuts) copies and pastes all three axes, then an X/Y/Z field each. A typed value sets
  * every selected item; a scrub moves each by the same amount from where it was, so a mixed
- * selection keeps its spread. `perUnit` converts display units to the stored value.
+ * selection keeps its spread; with snapping on, a scrub lands on the grid or rotation step
+ * (a mixed selection moves in whole steps). `perUnit` converts display units to the stored value.
  */
 function TransformRow(props: {
   readonly row: TransformRowSpec
@@ -143,8 +144,15 @@ function TransformRow(props: {
   readonly perUnit: number
 }) {
   const notify = useEditor((s) => s.notify)
+  const snapping = useEditor((s) => s.settings.snapping)
   const { row, perUnit } = props
   const { field } = row
+  // Scrubs follow the tool bar's snapping, in display units: the grid for location, the step for rotation.
+  const snap = field === "translation"
+    ? snapping.enabled ? snapping.gridSize / perUnit : undefined
+    : field === "rotation" && snapping.rotationEnabled
+    ? snapping.rotationStep
+    : undefined
   const [open, setOpen] = useState(false)
   const copy = () => {
     copiedRows.set(field, readField(props.active, field))
@@ -235,16 +243,17 @@ function TransformRow(props: {
       </Popover>
       {axes.map((axis) => {
         const value = shared(props.shown.map((t) => readField(t, field)[axis] / perUnit))
-        const offset = (v: number) => ({ kind: "offset", by: (v - (value ?? 0)) * perUnit }) as const
+        const offset = (v: number, from: number) => ({ kind: "offset", by: (v - from) * perUnit }) as const
         return (
           <NumberField
             key={axis}
             label={row.labels[axis]}
             value={value}
             onCommit={(v) => editSelectionAxis(field, axis, { kind: "set", value: v * perUnit })}
-            onScrub={(v) => previewSelectionAxis(field, axis, v === null ? null : offset(v))}
-            onScrubCommit={(v) => editSelectionAxis(field, axis, offset(v))}
+            onScrub={(v, from) => previewSelectionAxis(field, axis, v === null ? null : offset(v, from))}
+            onScrubCommit={(v, from) => editSelectionAxis(field, axis, offset(v, from))}
             step={row.step}
+            snap={snap}
             digits={row.digits}
             handleClassName={AXIS_BG_CLASSES[axis]}
           />
