@@ -61,6 +61,9 @@ describe("preshader", () => {
     assert.strictEqual(r?.length, 3)
     // append and an unknown opcode
     assert.deepStrictEqual(runPreshader(hex("030100", "030100", "26"), param), [0.3, 0.3])
-    assert.isNull(runPreshader(hex("030100", "1b"), param))
+    assert.isNull(runPreshader(hex("030100", "08"), param))
+    // Power(SizeBase2, -1): log, * -1, exp (M_PlasticBase's cell size)
+    const inv = runPreshader(hex("030000250100ffffff", "1b", "0201000080bf", "06", "17"), param)
+    assert.closeTo(inv?.[0] ?? 0, 1, 1e-6)
   })
 })

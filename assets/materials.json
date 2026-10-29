@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "notes": ["scalars/vectors/textures/switches are effective values: root UMaterial defaults (from CachedExpressionData) overridden by each instance down the chain.","vectors are linear RGBA as stored by UE. baseColor/emissive in approx are linear; set three.js colors with Color.setRGB(r,g,b, THREE.LinearSRGBColorSpace) (or the default working space).","approx.baseColor/metallic/roughness are the compiled shader evaluated for the material's parameters and a facing view with every texture at its mean colour (approx.evaluated true); otherwise (translucent passes) parameters picked by name (approx.keys says which; null = neutral default). opacity/emissive are always picked by name.","approx.colorLayers are the texture reads the base colour depends on: colour = baseColor + sum of gain * (read - mean); approx.opacityLayers the reads a translucent pass's alpha depends on, the same way (gain and mean from the evaluated shader; tiling is repeats per UV unit, or per cm when projected; instanceScale as for the normal map).","approx.reads are the base-pass pixel shader's texture reads, traced through the compiled shader (tools/extract shaders): projection uv = mesh UV0 (scale in repeats per UV unit); object = object-aligned position, pivot at the object origin, rotating with the piece (scale in repeats per cm; instanceScale 1 = u, v also multiply by the piece's x, y scale); world. strength is a normal layer's blend strength. approx.*Texture/tiling/projection/instanceScale are the primary read per role; tiling is [u, v].","Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).","approx.variation is the grey mottle as the base pass applies it: colour *= 1 + gain * product over layers of (texture read at tilings[i] + offsets[i]); gain already includes the instance's parameter (ColorContrast - 1 for the Env masters).","approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).","approx.opacity is the evaluated alpha on the face that shows most (a beam masks its caps with 1 - |world normal z|: its sides); approx.upFade (0..1, null = 1) is the fraction left on a face that looks up. An additive pass renders as its evaluated glow (emissive, black base, opacity 1) faded the same way.","A few materials cannot be read from the cooked data and are overridden by name (OVERRIDES in tools/extract/src/materials.ts): M_PlasticBase's cell noise samples the engine's placeholder texture, so its base colour is taken as BaseColor_Light, the colour the game shows.","paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap)."],
+  "notes": ["scalars/vectors/textures/switches are effective values: root UMaterial defaults (from CachedExpressionData) overridden by each instance down the chain.","vectors are linear RGBA as stored by UE. baseColor/emissive in approx are linear; set three.js colors with Color.setRGB(r,g,b, THREE.LinearSRGBColorSpace) (or the default working space).","approx.baseColor/metallic/roughness are the compiled shader evaluated for the material's parameters and a facing view with every texture at its mean colour (approx.evaluated true); otherwise (translucent passes) parameters picked by name (approx.keys says which; null = neutral default). opacity/emissive are always picked by name.","approx.colorLayers are the texture reads the base colour depends on: colour = baseColor + sum of gain * (read - mean); approx.opacityLayers the reads a translucent pass's alpha depends on, the same way (gain and mean from the evaluated shader; tiling is repeats per UV unit, or per cm when projected; instanceScale as for the normal map).","approx.reads are the base-pass pixel shader's texture reads, traced through the compiled shader (tools/extract shaders): projection uv = mesh UV0 (scale in repeats per UV unit); object = object-aligned position, pivot at the object origin, rotating with the piece (scale in repeats per cm; instanceScale 1 = u, v also multiply by the piece's x, y scale); world. strength is a normal layer's blend strength. approx.*Texture/tiling/projection/instanceScale are the primary read per role; tiling is [u, v].","Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).","approx.variation is the grey mottle as the base pass applies it: colour *= 1 + gain * product over layers of (texture read at tilings[i] + offsets[i]); gain already includes the instance's parameter (ColorContrast - 1 for the Env masters).","approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).","approx.opacity is the evaluated alpha on the face that shows most (a beam masks its caps with 1 - |world normal z|: its sides); approx.upFade (0..1, null = 1) is the fraction left on a face that looks up. An additive pass renders as its evaluated glow (emissive, black base, opacity 1) faded the same way.","approx.programs is the compiled shader's own output math as GLSL functions f(uv, worldNormal, objectPosition, time) with the instance's parameters folded in: alpha (a translucent pass's alpha, e.g. the vent's streaks for any frame via time), glow (an additive pass's unlit colour) and base (an opaque base colour whose texture reads the layers cannot place, e.g. the rubber block's cells); textures are the samplers the code reads (uTexN).","A few materials cannot be read from the cooked data and are overridden by name (OVERRIDES in tools/extract/src/materials.ts): M_PlasticBase's cell noise samples the engine's placeholder texture, so its base colour is taken as BaseColor_Light, the colour the game shows.","paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap)."],
   "materials": [
     {
       "path": "/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial",
@@ -47,6 +47,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -98,6 +99,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -166,6 +168,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -236,6 +239,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": "Color",
           "metallic": null,
@@ -292,6 +296,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -377,6 +382,7 @@
           "gain": -0.09999999999999998
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -462,6 +468,7 @@
           "gain": -0.09999999999999998
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -547,6 +554,7 @@
           "gain": -0.19999999999999996
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -632,6 +640,7 @@
           "gain": -0.09999999999999998
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -717,6 +726,7 @@
           "gain": -0.15000000000000002
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -802,6 +812,7 @@
           "gain": -0.09999999999999998
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -887,6 +898,7 @@
           "gain": -0.15000000000000002
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -972,6 +984,7 @@
           "gain": -0.09999999999999998
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -1057,6 +1070,7 @@
           "gain": -0.12
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -1142,6 +1156,7 @@
           "gain": -0.09999999999999998
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -1227,6 +1242,7 @@
           "gain": -0.15000000000000002
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -1312,6 +1328,7 @@
           "gain": -0.09999999999999998
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -1397,6 +1414,7 @@
           "gain": -0.09999999999999998
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -1482,6 +1500,7 @@
           "gain": -0.09999999999999998
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -1567,6 +1586,7 @@
           "gain": -0.09999999999999998
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -1652,6 +1672,7 @@
           "gain": -0.09999999999999998
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -1737,6 +1758,7 @@
           "gain": -0.15000000000000002
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -1822,6 +1844,7 @@
           "gain": -0.09999999999999998
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -1907,6 +1930,7 @@
           "gain": -0.09999999999999998
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -1992,6 +2016,7 @@
           "gain": -0.09999999999999998
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -2078,22 +2103,32 @@
         "upFade": null,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
         "variationTexture": null,
         "opacityTexture": null,
         "tiling": {
           "baseColor": [1,1],
-          "normal": [1,1],
+          "normal": [0.00048828124999999995,0.00048828124999999995],
           "variation": [1,1],
           "opacity": [1,1]
         },
-        "projection": "uv",
+        "projection": "world",
         "instanceScale": 0,
         "opacityLayers": [],
-        "colorLayers": [],
+        "colorLayers": [
+          {
+            "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+            "tiling": [0.00048828124999999995,0.00048828124999999995],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [0.9999999606152475,0.9999999646200091,0.9999999853316694],
+            "mean": [0.3847784651675408,0.3763888345489206,0.3698783396361568]
+          }
+        ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -2180,22 +2215,32 @@
         "upFade": null,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
         "variationTexture": null,
         "opacityTexture": null,
         "tiling": {
           "baseColor": [1,1],
-          "normal": [1,1],
+          "normal": [0.0001627604166666666,0.0001627604166666666],
           "variation": [1,1],
           "opacity": [1,1]
         },
-        "projection": "uv",
+        "projection": "world",
         "instanceScale": 0,
         "opacityLayers": [],
-        "colorLayers": [],
+        "colorLayers": [
+          {
+            "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+            "tiling": [0.0001627604166666666,0.0001627604166666666],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [0.9999999571761191,0.999999957425654,0.999999957624808],
+            "mean": [0.3847784651675408,0.3763888345489206,0.3698783396361568]
+          }
+        ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -2282,22 +2327,32 @@
         "upFade": null,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
         "variationTexture": null,
         "opacityTexture": null,
         "tiling": {
           "baseColor": [1,1],
-          "normal": [1,1],
+          "normal": [0.00048828124999999995,0.00048828124999999995],
           "variation": [1,1],
           "opacity": [1,1]
         },
-        "projection": "uv",
+        "projection": "world",
         "instanceScale": 0,
         "opacityLayers": [],
-        "colorLayers": [],
+        "colorLayers": [
+          {
+            "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+            "tiling": [0.00048828124999999995,0.00048828124999999995],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [0.9999999913700819,1,0.9999999632487298],
+            "mean": [0.3847784651675408,0.3763888345489206,0.3698783396361568]
+          }
+        ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -2384,22 +2439,32 @@
         "upFade": null,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
         "variationTexture": null,
         "opacityTexture": null,
         "tiling": {
           "baseColor": [1,1],
-          "normal": [1,1],
+          "normal": [0.00048828124999999995,0.00048828124999999995],
           "variation": [1,1],
           "opacity": [1,1]
         },
-        "projection": "uv",
+        "projection": "world",
         "instanceScale": 0,
         "opacityLayers": [],
-        "colorLayers": [],
+        "colorLayers": [
+          {
+            "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+            "tiling": [0.00048828124999999995,0.00048828124999999995],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [1,0.9999999608118981,0.9999999559950083],
+            "mean": [0.3847784651675408,0.3763888345489206,0.3698783396361568]
+          }
+        ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -2486,22 +2551,32 @@
         "upFade": null,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
         "variationTexture": null,
         "opacityTexture": null,
         "tiling": {
           "baseColor": [1,1],
-          "normal": [1,1],
+          "normal": [0.00048828124999999995,0.00048828124999999995],
           "variation": [1,1],
           "opacity": [1,1]
         },
-        "projection": "uv",
+        "projection": "world",
         "instanceScale": 0,
         "opacityLayers": [],
-        "colorLayers": [],
+        "colorLayers": [
+          {
+            "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+            "tiling": [0.00048828124999999995,0.00048828124999999995],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [0.9999999606402814,0.9999999552965164,1],
+            "mean": [0.3847784651675408,0.3763888345489206,0.3698783396361568]
+          }
+        ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -2588,22 +2663,32 @@
         "upFade": null,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
         "variationTexture": null,
         "opacityTexture": null,
         "tiling": {
           "baseColor": [1,1],
-          "normal": [1,1],
+          "normal": [0.0004887585532746825,0.0004887585532746825],
           "variation": [1,1],
           "opacity": [1,1]
         },
-        "projection": "uv",
+        "projection": "world",
         "instanceScale": 0,
         "opacityLayers": [],
-        "colorLayers": [],
+        "colorLayers": [
+          {
+            "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+            "tiling": [0.0004887585532746825,0.0004887585532746825],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [0.9999999883584529,0.9999999569496065,0.9999999580281228],
+            "mean": [0.3847784651675408,0.3763888345489206,0.3698783396361568]
+          }
+        ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -2690,22 +2775,32 @@
         "upFade": null,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
         "variationTexture": null,
         "opacityTexture": null,
         "tiling": {
           "baseColor": [1,1],
-          "normal": [1,1],
+          "normal": [0.00048828124999999995,0.00048828124999999995],
           "variation": [1,1],
           "opacity": [1,1]
         },
-        "projection": "uv",
+        "projection": "world",
         "instanceScale": 0,
         "opacityLayers": [],
-        "colorLayers": [],
+        "colorLayers": [
+          {
+            "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+            "tiling": [0.00048828124999999995,0.00048828124999999995],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [0.9999999596589952,0.9999999742180705,0.9999999847281724],
+            "mean": [0.3847784651675408,0.3763888345489206,0.3698783396361568]
+          }
+        ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -2792,18 +2887,18 @@
         "upFade": null,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
         "variationTexture": null,
         "opacityTexture": null,
         "tiling": {
           "baseColor": [1,1],
-          "normal": [1,1],
+          "normal": [0.00048828124999999995,0.00048828124999999995],
           "variation": [1,1],
           "opacity": [1,1]
         },
-        "projection": "object",
-        "instanceScale": 1,
+        "projection": "world",
+        "instanceScale": 0,
         "opacityLayers": [],
         "colorLayers": [
           {
@@ -2813,10 +2908,19 @@
             "instanceScale": 1,
             "gain": [0.0423781710602828,0.042378171060282854,0.042378171060282854],
             "mean": [0.8581845601456236,0.546031263762847,0]
+          },
+          {
+            "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_M.png",
+            "tiling": [0.00048828124999999995,0.00048828124999999995],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [0.021592802636011266,0.02159280263601132,0.02159280263601132],
+            "mean": [0,0.6316057354739966,0.6038029913768682]
           }
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -2903,22 +3007,32 @@
         "upFade": null,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
         "variationTexture": null,
         "opacityTexture": null,
         "tiling": {
           "baseColor": [1,1],
-          "normal": [1,1],
+          "normal": [0.00048828124999999995,0.00048828124999999995],
           "variation": [1,1],
           "opacity": [1,1]
         },
-        "projection": "uv",
+        "projection": "world",
         "instanceScale": 0,
         "opacityLayers": [],
-        "colorLayers": [],
+        "colorLayers": [
+          {
+            "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+            "tiling": [0.00048828124999999995,0.00048828124999999995],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [0.999999971448198,0.9999999569455832,0.9999999593574703],
+            "mean": [0.3847784651675408,0.3763888345489206,0.3698783396361568]
+          }
+        ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -3005,22 +3119,32 @@
         "upFade": null,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
         "variationTexture": null,
         "opacityTexture": null,
         "tiling": {
           "baseColor": [1,1],
-          "normal": [1,1],
+          "normal": [0.0004887585532746825,0.0004887585532746825],
           "variation": [1,1],
           "opacity": [1,1]
         },
-        "projection": "uv",
+        "projection": "world",
         "instanceScale": 0,
         "opacityLayers": [],
-        "colorLayers": [],
+        "colorLayers": [
+          {
+            "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
+            "tiling": [0.0004887585532746825,0.0004887585532746825],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [1,0.99999999238524,0.9999999774420858],
+            "mean": [0.3847784651675408,0.3763888345489206,0.3698783396361568]
+          }
+        ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -3165,6 +3289,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -3314,6 +3439,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -3373,6 +3499,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -3432,6 +3559,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -3491,6 +3619,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -3550,6 +3679,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -3609,6 +3739,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -3668,6 +3799,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -3727,6 +3859,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -3786,6 +3919,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -3845,6 +3979,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -3904,6 +4039,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4051,6 +4187,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4212,6 +4349,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4356,6 +4494,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4503,6 +4642,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4650,6 +4790,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4797,6 +4938,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4944,6 +5086,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -5093,6 +5236,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -5237,6 +5381,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -5381,6 +5526,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -5530,6 +5676,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -5683,6 +5830,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -5836,6 +5984,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -5989,6 +6138,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -6142,6 +6292,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -6295,6 +6446,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -6448,6 +6600,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -6592,6 +6745,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -6745,6 +6899,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -6898,6 +7053,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -7042,6 +7198,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -7186,6 +7343,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -7335,6 +7493,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -7485,6 +7644,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -7634,6 +7794,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -7699,6 +7860,7 @@
           "gain": -0.10000002384185791
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -7755,6 +7917,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -7813,6 +7976,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -7888,6 +8052,7 @@
           "inset": [0,0.09999999999999998],
           "color": [0.5885417,0.5885417,0.5885417]
         },
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -7948,6 +8113,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -8013,6 +8179,7 @@
           "gain": -0.10000002384185791
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -8078,6 +8245,7 @@
           "gain": -0.10000002384185791
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -8144,6 +8312,7 @@
           "gain": -0.10000002384185791
         },
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -8202,6 +8371,29 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {
+          "glow": {
+            "code": "vec3 ballestGlow(vec2 uv, vec3 nrm, vec3 pos, float time) {\n  float t353 = (nrm.x * nrm.x + nrm.y * nrm.y + nrm.z * nrm.z);\n  float t354 = inversesqrt(t353);\n  float t355 = (t354 * nrm.x);\n  float t356 = (t354 * nrm.y);\n  float t357 = (t354 * nrm.z);\n  float t634 = t357 * -1.0;\n  float t635 = abs(t634);\n  float t278 = (uv.x + -0.5);\n  float t602 = (t278 * 2.0);\n  float t604 = abs(t602);\n  float t606 = (t604 + -2.0);\n  float t279 = (uv.y + -0.5);\n  float t603 = (t279 * 2.0);\n  float t605 = abs(t603);\n  float t607 = (t605 + -2.0);\n  float t614 = max(t606, t607);\n  float t615 = min(t614, 0.0);\n  float t609 = max(t607, 0.0);\n  float t611 = (t609 * t609);\n  float t608 = max(t606, 0.0);\n  float t610 = (t608 * t608);\n  float t612 = (t611 + t610);\n  float t613 = sqrt(t612);\n  float t616 = (t615 + t613);\n  float t617 = abs(t616);\n  float t618 = (1.2000000476837158 - t617);\n  float t636 = (t635 * t618);\n  float t637 = (t616 * 100.0);\n  float t638 = clamp(t637, 0.0, 1.0);\n  float t641 = (t638 * t638);\n  float t639 = (t638 * 2.0);\n  float t640 = (3.0 - t639);\n  float t642 = (t641 * t640);\n  float t643 = (1.0 - t642);\n  float t644 = (1.0 - t634);\n  float t645 = (t643 * t644);\n  float t646 = (t636 - t645);\n  float t647 = clamp(t646, 0.0, 1.0);\n  float t648 = (t647 * 0.5);\n  float t280 = (t278 * -4.371138828673793e-8 + t279 * -1.0);\n  float t282 = (t280 + 0.5);\n  float t276 = (time * -0.20000000298023224);\n  float t284 = (t282 + t276);\n  float t505 = (0.0022097088075493684 + t284);\n  float t281 = (t278 + t279 * -4.371138828673793e-8);\n  float t283 = (t281 + 0.5);\n  float t277 = (time * -0.007000000216066837);\n  float t285 = (t283 + t277);\n  float t507 = (0.002209708640721001 + t285);\n  vec4 s512 = texture2D(uTex0, vec2(t505, t507));\n  float t514 = (s512.x * 0.0031250000465661296);\n  float t583 = (t514 / 0.0031250000465661296);\n  float t584 = (t583 + -0.8999999761581421);\n  float t225 = (uv.y * 0.10000000149011612);\n  float t227 = (t225 * t225);\n  float t228 = ((t225 <= 2.980232949312267e-8) ? 0.0 : t227);\n  float t224 = (uv.y * 0.800000011920929);\n  float t231 = (t228 - t224);\n  float t597 = (t584 + t224);\n  float t585 = (t284 * 0.10000000149011612);\n  float t586 = (t285 * 0.10000000149011612);\n  vec4 s591 = texture2D(uTex1, vec2(t585, t586));\n  float t593 = (s591.x + -0.949999988079071);\n  float t594 = (t593 * 0.5);\n  float t595 = (t594 - t584);\n  float t596 = (t595 * 0.5);\n  float t598 = (t597 + t596);\n  float t599 = (t598 * 0.6666666865348816);\n  float t374 = abs(t357);\n  float t600 = (t599 * t374);\n  float t601 = (t599 - t600);\n  float t649 = (t648 + t601);\n  float t650 = (t649 * t357);\n  float t651 = (t649 - t650);\n  float t656 = (4.0 * t651);\n  float t394 = (nrm.y);\n  float t398 = (nrm.z);\n  float t399 = (nrm.x * nrm.x + t394 * t394 + t398 * t398);\n  float t400 = inversesqrt(t399);\n  float t401 = (t400 * t398);\n  float t402 = (-0.8500000238418579 - t401);\n  float t403 = (t402 * 6.666666507720947);\n  float t404 = clamp(t403, 0.0, 1.0);\n  float t405 = (0.5 * t404);\n  float t657 = (t656 + t405);\n  float t661 = clamp(t657, 0.0, 1.0);\n  float t1725 = (t661 * 0.5);\n  float t237 = (t224 * 0.6144430041313171);\n  float t262 = -1.0;\n  float t263 = (t262 + 1.0);\n  float t464 = (5.0 * t405);\n  float t147 = (pos.y);\n  float t157 = (1.0);\n  float t159 = (t147 / t157);\n  float t158 = (pos.x / t157);\n  float t152 = (pos.z);\n  float t160 = (t152 / t157);\n  float t440 = (t159 / 0.0);\n  float t442 = (t440 + -0.5);\n  float t444 = (t442 * 2.0);\n  float t446 = (t444 * t444);\n  float t439 = (t158 / 0.0);\n  float t441 = (t439 + -0.5);\n  float t443 = (t441 * 2.0);\n  float t445 = (t443 * t443);\n  float t447 = (t446 + t445);\n  float t448 = sqrt(t447);\n  float t449 = (t448 + -0.75);\n  float t450 = (t449 * 4.0);\n  float t451 = clamp(t450, 0.0, 1.0);\n  float t454 = (t451 * t451);\n  float t452 = (t451 * 2.0);\n  float t453 = (3.0 - t452);\n  float t455 = (t454 * t453);\n  float t456 = (1.0 - t455);\n  float t457 = (1.5 - t448);\n  float t458 = (t457 * 0.10000000149011612);\n  float t459 = (t456 + t458);\n  float t573 = (t464 * t459);\n  float t658 = clamp(1.0, 0.0, 1.0);\n  float t763 = (0.0179999991208315 + t658);\n  float t766 = (false ? t763 : t658);\n  float t1403 = (1.0 - 1.0);\n  float t1375 = -0.5;\n  float t1378 = abs(t1375);\n  float t1381 = (0.5 - t1378);\n  float t1384 = (t1381 * 6.0);\n  float t1387 = clamp(t1384, 0.0, 1.0);\n  float t1374 = -0.5;\n  float t1377 = abs(t1374);\n  float t1380 = (0.5 - t1377);\n  float t1383 = (t1380 * 6.0);\n  float t1386 = clamp(t1383, 0.0, 1.0);\n  float t1389 = (t1387 * t1386);\n  float t1376 = -0.5;\n  float t1379 = abs(t1376);\n  float t1382 = (0.5 - t1379);\n  float t1385 = (t1382 * 6.0);\n  float t1388 = clamp(t1385, 0.0, 1.0);\n  float t1390 = (t1389 * t1388);\n  float t1407 = (t1403 * t1390);\n  float t1411 = (t1407 + 1.0);\n  float t1425 = (1.0 - 1.0);\n  float t1428 = (t1425 * t1390);\n  float t1431 = (t1428 + 1.0);\n  float t1404 = (1.0 - 1.0);\n  float t1408 = (t1404 * t1390);\n  float t1412 = (t1408 + 1.0);\n  float t1405 = (1.0 - 1.0);\n  float t1409 = (t1405 * t1390);\n  float t1413 = (t1409 + 1.0);\n  float t1434 = (t1411 * 0.2126390039920807 + t1412 * 0.7151686549186707 + t1413 * 0.07219231873750687);\n  float t1435 = (t1434 + 0.000009999999747378752);\n  float t1436 = (t1411 / t1435);\n  float t1439 = (t1431 * t1436);\n  float t1426 = (1.0 - 1.0);\n  float t1429 = (t1426 * t1390);\n  float t1432 = (t1429 + 1.0);\n  float t1440 = (t1432 * t1436);\n  float t1427 = (1.0 - 1.0);\n  float t1430 = (t1427 * t1390);\n  float t1433 = (t1430 + 1.0);\n  float t1441 = (t1433 * t1436);\n  float t124 = (0.0 - nrm.y);\n  float t554 = inversesqrt(0.0);\n  float t1448 = t1411 * 0.886227548122406;\n  float t1451 = max(0.0, t1448);\n  float t1586 = (t766 * t1451);\n  float t829 = -0.2477082908153534;\n  float t783 = (2.0 + -1.0);\n  float t809 = (1.7320513725280762 * t783);\n  float t784 = (2.0 + -1.0);\n  float t810 = (1.7320513725280762 * t784);\n  float t785 = (2.0 + -1.0);\n  float t811 = (1.7320513725280762 * t785);\n  float t839 = max(0.0, 0.886227548122406);\n  float t842 = (t839 * 0.31830987334251404);\n  float t1193 = (t658 * 2.755199909210205);\n  float t1196 = (t1193 + 0.6902999877929688);\n  float t1187 = (t658 * 4.795100212097168);\n  float t1190 = (0.641700029373169 - t1187);\n  float t1181 = (t658 * 2.0404000282287598);\n  float t1184 = (t1181 + -0.33239999413490295);\n  float t1214 = max(0.0, 0.0);\n  float t1590 = (t766 + 0.0179999991208315);\n  float t1595 = (t1590 - t1586);\n  float t379 = (t224 * 3200.0);\n  float t286 = (t276 + uv.x);\n  float t287 = (t277 + uv.y);\n  vec4 s292 = texture2D(uTex2, vec2(t286, t287));\n  float t294 = (s292.x * 0.05000000074505806);\n  float t295 = (t294 + t284);\n  float t296 = (t294 + t285);\n  vec4 s326 = texture2D(uTex3, vec2(t295, t296));\n  float t330 = (s326.x * 0.5714285969734192);\n  float t333 = clamp(t330, 0.0, 1.0);\n  float t340 = (t333 * t333);\n  float t563 = (t333 * 2.0);\n  float t564 = (3.0 - t563);\n  float t565 = (t340 * t564);\n  float t566 = (t565 + -0.10000000149011612);\n  float t567 = (t566 * 2.0);\n  vec4 s301 = texture2D(uTex0, vec2(t295, t296));\n  float t305 = (s301.x * 0.7042253613471985);\n  float t308 = clamp(t305, 0.0, 1.0);\n  float t315 = (t308 * t308);\n  float t558 = (t308 * 2.0);\n  float t559 = (3.0 - t558);\n  float t560 = (t315 * t559);\n  float t561 = (t560 + -0.6700000166893005);\n  float t562 = (t561 * 1.2000000476837158);\n  float t568 = (t567 + t562);\n  float t569 = (t568 * 0.10000000149011612);\n  float t570 = (t374 * t569);\n  float t571 = (t569 - t570);\n  float t572 = (t379 * t571);\n  float t574 = (t573 + t572);\n  float t576 = (0.0 - t574);\n  float t1601 = max(t574, 0.0);\n  float t1716 = (t1586 + t1601);\n  float t1726 = (t1725 * t1716);\n  float t1734 = min(t1726, 1000000.0);\n  float t465 = (t405 * 0.6989099979400635);\n  float t466 = (t465 * 5.0);\n  float t467 = (t466 * t459);\n  float t238 = (t224 * 0.5187809467315674);\n  float t239 = (t238 + 0.23434600234031677);\n  float t234 = (t224 * 0.10416699945926666);\n  float t264 = (0.0 - t234);\n  float t265 = (t264 + 0.637502);\n  float t483 = (1.0 - t234);\n  float t485 = (t467 * t483);\n  float t487 = (t485 + t234);\n  float t659 = clamp(t487, 0.0, 1.0);\n  float t764 = (0.0179999991208315 + t659);\n  float t767 = (false ? t764 : t659);\n  float t1437 = (t1412 / t1435);\n  float t1442 = (t1431 * t1437);\n  float t1443 = (t1432 * t1437);\n  float t1444 = (t1433 * t1437);\n  float t1449 = t1412 * 0.886227548122406;\n  float t1452 = max(0.0, t1449);\n  float t1585 = (t767 * t1452);\n  float t794 = (2.0 + -1.0);\n  float t813 = (1.7320513725280762 * t794);\n  float t795 = (2.0 + -1.0);\n  float t814 = (1.7320513725280762 * t795);\n  float t796 = (2.0 + -1.0);\n  float t815 = (1.7320513725280762 * t796);\n  float t840 = max(0.0, 0.886227548122406);\n  float t843 = (t840 * 0.31830987334251404);\n  float t1194 = (t659 * 2.755199909210205);\n  float t1197 = (t1194 + 0.6902999877929688);\n  float t1188 = (t659 * 4.795100212097168);\n  float t1191 = (0.641700029373169 - t1188);\n  float t1182 = (t659 * 2.0404000282287598);\n  float t1185 = (t1182 + -0.33239999413490295);\n  float t1215 = max(0.0, 0.0);\n  float t1591 = (t767 + 0.0179999991208315);\n  float t1596 = (t1591 - t1585);\n  float t382 = (t234 * t234);\n  float t383 = (t382 * t379);\n  float t331 = (s326.y * 0.5714285969734192);\n  float t334 = clamp(t331, 0.0, 1.0);\n  float t341 = (t334 * t334);\n  float t336 = (t334 * 2.0);\n  float t338 = (3.0 - t336);\n  float t342 = (t341 * t338);\n  float t345 = (t342 + -0.10000000149011612);\n  float t347 = (t345 * 2.0);\n  float t306 = (s301.y * 0.7042253613471985);\n  float t309 = clamp(t306, 0.0, 1.0);\n  float t316 = (t309 * t309);\n  float t311 = (t309 * 2.0);\n  float t313 = (3.0 - t311);\n  float t317 = (t316 * t313);\n  float t320 = (t317 + -0.6700000166893005);\n  float t322 = (t320 * 1.2000000476837158);\n  float t349 = (t347 + t322);\n  float t351 = (t349 * 0.10000000149011612);\n  float t375 = (t374 * t351);\n  float t377 = (t351 - t375);\n  float t384 = (t383 * t377);\n  float t471 = (t467 + t384);\n  float t478 = (0.0 - t471);\n  float t1602 = max(t471, 0.0);\n  float t1719 = (t1585 + t1602);\n  float t1728 = (t1725 * t1719);\n  float t1735 = min(t1728, 1000000.0);\n  float t468 = (t405 * 0.6197919845581055);\n  float t469 = (t468 * 5.0);\n  float t470 = (t469 * t459);\n  float t235 = (t224 * 0.13199499249458313);\n  float t236 = (t235 + 0.012241000309586525);\n  float t266 = (0.0 - t236);\n  float t267 = (t266 + 0.255208);\n  float t484 = (1.0 - t236);\n  float t486 = (t470 * t484);\n  float t582 = (t486 + t236);\n  float t660 = clamp(t582, 0.0, 1.0);\n  float t765 = (0.0179999991208315 + t660);\n  float t768 = (false ? t765 : t660);\n  float t1438 = (t1413 / t1435);\n  float t1445 = (t1431 * t1438);\n  float t1446 = (t1432 * t1438);\n  float t1447 = (t1433 * t1438);\n  float t1450 = t1413 * 0.886227548122406;\n  float t1453 = max(0.0, t1450);\n  float t1584 = (t768 * t1453);\n  float t805 = (2.0 + -1.0);\n  float t817 = (1.7320513725280762 * t805);\n  float t806 = (2.0 + -1.0);\n  float t818 = (1.7320513725280762 * t806);\n  float t807 = (2.0 + -1.0);\n  float t819 = (1.7320513725280762 * t807);\n  float t841 = max(0.0, 0.886227548122406);\n  float t844 = (t841 * 0.31830987334251404);\n  float t1195 = (t660 * 2.755199909210205);\n  float t1198 = (t1195 + 0.6902999877929688);\n  float t1189 = (t660 * 4.795100212097168);\n  float t1192 = (0.641700029373169 - t1189);\n  float t1183 = (t660 * 2.0404000282287598);\n  float t1186 = (t1183 + -0.33239999413490295);\n  float t1216 = max(0.0, 0.0);\n  float t1592 = (t768 + 0.0179999991208315);\n  float t1597 = (t1592 - t1584);\n  float t385 = (t236 * t236);\n  float t386 = (t385 * t379);\n  float t332 = (s326.z * 0.5714285969734192);\n  float t335 = clamp(t332, 0.0, 1.0);\n  float t343 = (t335 * t335);\n  float t337 = (t335 * 2.0);\n  float t339 = (3.0 - t337);\n  float t344 = (t343 * t339);\n  float t346 = (t344 + -0.10000000149011612);\n  float t348 = (t346 * 2.0);\n  float t307 = (s301.z * 0.7042253613471985);\n  float t310 = clamp(t307, 0.0, 1.0);\n  float t318 = (t310 * t310);\n  float t312 = (t310 * 2.0);\n  float t314 = (3.0 - t312);\n  float t319 = (t318 * t314);\n  float t321 = (t319 + -0.6700000166893005);\n  float t323 = (t321 * 1.2000000476837158);\n  float t350 = (t348 + t323);\n  float t352 = (t350 * 0.10000000149011612);\n  float t376 = (t374 * t352);\n  float t378 = (t352 - t376);\n  float t387 = (t386 * t378);\n  float t472 = (t470 + t387);\n  float t479 = (0.0 - t472);\n  float t1603 = max(t472, 0.0);\n  float t1722 = (t1584 + t1603);\n  float t1730 = (t1725 * t1722);\n  float t1736 = min(t1730, 1000000.0);\n  return vec3(t1734, t1735, t1736);\n}",
+            "textures": [
+              {
+                "uniform": "uTex0",
+                "texture": "textures/Packs/AdvancedPortalsSystemVFX/Textures/LC/T_LC_10.png"
+              },
+              {
+                "uniform": "uTex1",
+                "texture": "textures/Packs/Vefects/Stylized_Galaxy_Shader/Galaxy/Textures/T_VFX_Lush_Galaxy_Clouds_04_Contrast.png"
+              },
+              {
+                "uniform": "uTex2",
+                "texture": "textures/Art/VFX/Noise/Perlin/Perlin_01-512x512.png"
+              },
+              {
+                "uniform": "uTex3",
+                "texture": "textures/_Engine/MapTemplates/T_ScreenDirt02_w.png"
+              }
+            ]
+          }
+        },
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -8258,6 +8450,21 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {
+          "alpha": {
+            "code": "float ballestAlpha(vec2 uv, vec3 nrm, vec3 pos, float time) {\n  float t215 = (uv.x + 0.15000000596046448);\n  float t217 = (uv.x + -0.06999999284744263);\n  float t218 = abs(t217);\n  float t221 = (((t215 >= 0.2199999988079071) && (t218 > 0.000009999999747378752)) ? 0.0 : t215);\n  float t224 = abs(uv.x);\n  float t227 = (((t215 >= 0.15000000596046448) && (t224 > 0.000009999999747378752)) ? 0.0 : t215);\n  float t229 = max(t221, t227);\n  float t231 = min(t221, t227);\n  float t233 = (t229 - t231);\n  float t245 = (nrm.z * t233);\n  float t222 = (((t215 >= 0.2199999988079071) && (t218 > 0.000009999999747378752)) ? 0.0 : uv.y);\n  float t228 = (((t215 >= 0.15000000596046448) && (t224 > 0.000009999999747378752)) ? 0.0 : uv.y);\n  float t230 = max(t222, t228);\n  float t232 = min(t222, t228);\n  float t234 = (t230 - t232);\n  float t246 = (nrm.z * t234);\n  vec4 s371 = texture2D(uTex0, vec2(t245, t246));\n  vec4 s299 = texture2D(uTex1, vec2(t245, t246));\n  float t373 = (s371.x * s299.x);\n  float t374 = max(t373, 0.0);\n  float t375 = min(t374, 0.75);\n  float t379 = clamp(t375, 0.0, 1.0);\n  return t379;\n}",
+            "textures": [
+              {
+                "uniform": "uTex0",
+                "texture": "textures/Packs/Vefects/Anime_VFX/Shared/Textures/T_VFX_Gradient_03.png"
+              },
+              {
+                "uniform": "uTex1",
+                "texture": "textures/Packs/Skatepark/Textures/Metal/T_metal_trim_01_BaseColor.png"
+              }
+            ]
+          }
+        },
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -8317,6 +8524,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -8382,6 +8590,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
@@ -8476,6 +8685,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -8532,6 +8742,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": "DiffuseColor",
           "metallic": null,
@@ -8606,6 +8817,7 @@
           "inset": [0,0.09999999999999998],
           "color": [0.5885417,0.5885417,0.5885417]
         },
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -8681,9 +8893,43 @@
         "projection": "object",
         "instanceScale": 1,
         "opacityLayers": [],
-        "colorLayers": [],
+        "colorLayers": [
+          {
+            "texture": "textures/_Engine/EngineMaterials/DefaultWhiteGrid.png",
+            "tiling": [0.03333333333333333,0.03333333333333333],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [-0.0066874277875443346,-0.02223643140337353,-0.010750386233750145],
+            "mean": [0.8929921618278565,0.8910167320329643,0.8929921618278565]
+          },
+          {
+            "texture": "textures/Art/UsedMarketPlace/FXVarietyPack/T_ky_noise4.png",
+            "tiling": [0.009999999999999995,0.005000000000000002],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [-0.0010247126127729649,-0.017928509382422603,-0.00552966333797987],
+            "mean": [0.13197091853019918,0.13232782950828598,0.131970364957799]
+          },
+          {
+            "texture": "textures/Art/UsedMarketPlace/FXVarietyPack/T_ky_noise4.png",
+            "tiling": [0.009999999999999995,0.005000000000000002],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [-0.0010247126127729649,-0.017928509382422603,-0.00552966333797987],
+            "mean": [0.13197091853019918,0.13232782950828598,0.131970364957799]
+          },
+          {
+            "texture": "textures/_Engine/EngineMaterials/DefaultWhiteGrid.png",
+            "tiling": [0.03333333333333333,0.03333333333333333],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [-0.004057780242164091,-0.013495507537559182,-0.006523091723875288],
+            "mean": [0.8929921618278565,0.8910167320329643,0.8929921618278565]
+          }
+        ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -8748,6 +8994,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -8834,18 +9081,18 @@
         "upFade": null,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
         "variationTexture": null,
         "opacityTexture": null,
         "tiling": {
           "baseColor": [1,1],
-          "normal": [1,1],
+          "normal": [0.00048828124999999995,0.00048828124999999995],
           "variation": [1,1],
           "opacity": [1,1]
         },
-        "projection": "object",
-        "instanceScale": 1,
+        "projection": "world",
+        "instanceScale": 0,
         "opacityLayers": [],
         "colorLayers": [
           {
@@ -8855,10 +9102,19 @@
             "instanceScale": 1,
             "gain": [0.0423781710602828,0.042378171060282854,0.042378171060282854],
             "mean": [0.8581845601456236,0.546031263762847,0]
+          },
+          {
+            "texture": "textures/Art/Materials/Textures/T_ConcreteTileable_M.png",
+            "tiling": [0.00048828124999999995,0.00048828124999999995],
+            "projection": "object",
+            "instanceScale": 1,
+            "gain": [0.021592802636011266,0.02159280263601132,0.02159280263601132],
+            "mean": [0,0.6316057354739966,0.6038029913768682]
           }
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -8954,6 +9210,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9010,6 +9267,33 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {
+          "glow": {
+            "code": "vec3 ballestGlow(vec2 uv, vec3 nrm, vec3 pos, float time) {\n  float t400 = (nrm.x * nrm.x + nrm.y * nrm.y + nrm.z * nrm.z);\n  float t401 = inversesqrt(t400);\n  float t402 = (t401 * nrm.x);\n  float t403 = (t401 * nrm.y);\n  float t404 = (t401 * nrm.z);\n  float t701 = t404 * -1.0;\n  float t702 = abs(t701);\n  float t325 = (uv.x + -0.5);\n  float t669 = (t325 * 2.0);\n  float t671 = abs(t669);\n  float t673 = (t671 + -2.0);\n  float t326 = (uv.y + -0.5);\n  float t670 = (t326 * 2.0);\n  float t672 = abs(t670);\n  float t674 = (t672 + -2.0);\n  float t681 = max(t673, t674);\n  float t682 = min(t681, 0.0);\n  float t676 = max(t674, 0.0);\n  float t678 = (t676 * t676);\n  float t675 = max(t673, 0.0);\n  float t677 = (t675 * t675);\n  float t679 = (t678 + t677);\n  float t680 = sqrt(t679);\n  float t683 = (t682 + t680);\n  float t684 = abs(t683);\n  float t685 = (1.2000000476837158 - t684);\n  float t703 = (t702 * t685);\n  float t704 = (t683 * 100.0);\n  float t705 = clamp(t704, 0.0, 1.0);\n  float t708 = (t705 * t705);\n  float t706 = (t705 * 2.0);\n  float t707 = (3.0 - t706);\n  float t709 = (t708 * t707);\n  float t710 = (1.0 - t709);\n  float t711 = (1.0 - t701);\n  float t712 = (t710 * t711);\n  float t713 = (t703 - t712);\n  float t714 = clamp(t713, 0.0, 1.0);\n  float t715 = (t714 * 0.5);\n  float t327 = (t325 * -4.371138828673793e-8 + t326 * -1.0);\n  float t329 = (t327 + 0.5);\n  float t323 = (time * -0.20000000298023224);\n  float t331 = (t329 + t323);\n  float t550 = (0.0022097088075493684 + t331);\n  float t328 = (t325 + t326 * -4.371138828673793e-8);\n  float t330 = (t328 + 0.5);\n  float t324 = (time * -0.007000000216066837);\n  float t332 = (t330 + t324);\n  float t552 = (0.002209708640721001 + t332);\n  vec4 s557 = texture2D(uTex0, vec2(t550, t552));\n  float t559 = (s557.x * 0.0031250000465661296);\n  float t650 = (t559 / 0.0031250000465661296);\n  float t651 = (t650 + -0.8999999761581421);\n  float t272 = (uv.y * 0.10000000149011612);\n  float t274 = (t272 * t272);\n  float t275 = ((t272 <= 2.980232949312267e-8) ? 0.0 : t274);\n  float t271 = (uv.y * 0.800000011920929);\n  float t278 = (t275 - t271);\n  float t664 = (t651 + t271);\n  float t652 = (t331 * 0.10000000149011612);\n  float t653 = (t332 * 0.10000000149011612);\n  vec4 s658 = texture2D(uTex1, vec2(t652, t653));\n  float t660 = (s658.x + -0.949999988079071);\n  float t661 = (t660 * 0.5);\n  float t662 = (t661 - t651);\n  float t663 = (t662 * 0.5);\n  float t665 = (t664 + t663);\n  float t666 = (t665 * 0.6666666865348816);\n  float t421 = abs(t404);\n  float t667 = (t666 * t421);\n  float t668 = (t666 - t667);\n  float t716 = (t715 + t668);\n  float t717 = (t716 * t404);\n  float t718 = (t716 - t717);\n  float t723 = (4.0 * t718);\n  float t441 = (nrm.y);\n  float t445 = (nrm.z);\n  float t446 = (nrm.x * nrm.x + t441 * t441 + t445 * t445);\n  float t447 = inversesqrt(t446);\n  float t448 = (t447 * t445);\n  float t449 = (-0.8500000238418579 - t448);\n  float t450 = (t449 * 6.666666507720947);\n  float t451 = clamp(t450, 0.0, 1.0);\n  float t452 = (0.5 * t451);\n  float t724 = (t723 + t452);\n  float t728 = clamp(t724, 0.0, 1.0);\n  float t284 = (t271 * 0.6144425868988037);\n  float t309 = -1.0;\n  float t310 = (t309 + 1.0);\n  float t174 = (pos.y);\n  float t184 = (1.0);\n  float t186 = (t174 / t184);\n  float t185 = (pos.x / t184);\n  float t179 = (pos.z);\n  float t187 = (t179 / t184);\n  float t486 = (t185 / 0.0);\n  float t488 = (t486 + -0.5);\n  float t487 = (t186 / 0.0);\n  float t489 = (t487 + -0.5);\n  float t491 = (t488 + 0.5);\n  float t492 = (t491 * 2.0);\n  float t493 = floor(t492);\n  float t494 = (t492 - t493);\n  float t495 = (1.0 - t494);\n  float t496 = min(t494, t495);\n  float t497 = (t496 * 100.0000991821289);\n  float t498 = (t497 + -25.000024795532227);\n  float t499 = clamp(t498, 0.0, 1.0);\n  float t502 = (t499 * t499);\n  float t500 = (t499 * 2.0);\n  float t501 = (3.0 - t500);\n  float t503 = (t502 * t501);\n  float t504 = clamp(t503, 0.0, 1.0);\n  float t509 = (t504 * t452);\n  float t640 = (t509 * 5.0);\n  float t725 = clamp(1.0, 0.0, 1.0);\n  float t830 = (0.0179999991208315 + t725);\n  float t833 = (false ? t830 : t725);\n  float t2030 = (1.0 - 1.0);\n  float t2002 = -0.5;\n  float t2005 = abs(t2002);\n  float t2008 = (0.5 - t2005);\n  float t2011 = (t2008 * 6.0);\n  float t2014 = clamp(t2011, 0.0, 1.0);\n  float t2001 = -0.5;\n  float t2004 = abs(t2001);\n  float t2007 = (0.5 - t2004);\n  float t2010 = (t2007 * 6.0);\n  float t2013 = clamp(t2010, 0.0, 1.0);\n  float t2016 = (t2014 * t2013);\n  float t2003 = -0.5;\n  float t2006 = abs(t2003);\n  float t2009 = (0.5 - t2006);\n  float t2012 = (t2009 * 6.0);\n  float t2015 = clamp(t2012, 0.0, 1.0);\n  float t2017 = (t2016 * t2015);\n  float t2034 = (t2030 * t2017);\n  float t2038 = (t2034 + 1.0);\n  float t2052 = (1.0 - 1.0);\n  float t2055 = (t2052 * t2017);\n  float t2058 = (t2055 + 1.0);\n  float t2031 = (1.0 - 1.0);\n  float t2035 = (t2031 * t2017);\n  float t2039 = (t2035 + 1.0);\n  float t2032 = (1.0 - 1.0);\n  float t2036 = (t2032 * t2017);\n  float t2040 = (t2036 + 1.0);\n  float t2061 = (t2038 * 0.2126390039920807 + t2039 * 0.7151686549186707 + t2040 * 0.07219231873750687);\n  float t2062 = (t2061 + 0.000009999999747378752);\n  float t2063 = (t2038 / t2062);\n  float t2066 = (t2058 * t2063);\n  float t2053 = (1.0 - 1.0);\n  float t2056 = (t2053 * t2017);\n  float t2059 = (t2056 + 1.0);\n  float t2067 = (t2059 * t2063);\n  float t2054 = (1.0 - 1.0);\n  float t2057 = (t2054 * t2017);\n  float t2060 = (t2057 + 1.0);\n  float t2068 = (t2060 * t2063);\n  vec4 s236 = texture2D(uTex2, vec2(uv.x, uv.y));\n  float t239 = (s236.x * 2.0);\n  float t241 = (t239 + -1.0);\n  float t240 = (s236.y * 2.0);\n  float t242 = (t240 + -1.0);\n  float t243 = (t241 * t241 + t242 * t242);\n  float t244 = (1.0 - t243);\n  float t245 = clamp(t244, 0.0, 1.0);\n  float t246 = sqrt(t245);\n  float t254 = inversesqrt(0.0);\n  float t151 = (0.0 - nrm.y);\n  float t621 = inversesqrt(0.0);\n  float t2075 = t2038 * 0.886227548122406;\n  float t2078 = max(0.0, t2075);\n  float t2213 = (t833 * t2078);\n  float t896 = -0.2477082908153534;\n  float t850 = (2.0 + -1.0);\n  float t876 = (1.7320513725280762 * t850);\n  float t851 = (2.0 + -1.0);\n  float t877 = (1.7320513725280762 * t851);\n  float t852 = (2.0 + -1.0);\n  float t878 = (1.7320513725280762 * t852);\n  float t906 = max(0.0, 0.886227548122406);\n  float t909 = (t906 * 0.31830987334251404);\n  float t1260 = (t725 * 2.755199909210205);\n  float t1263 = (t1260 + 0.6902999877929688);\n  float t1254 = (t725 * 4.795100212097168);\n  float t1257 = (0.641700029373169 - t1254);\n  float t1248 = (t725 * 2.0404000282287598);\n  float t1251 = (t1248 + -0.33239999413490295);\n  float t1281 = max(0.0, 0.0);\n  float t2217 = (t833 + 0.0179999991208315);\n  float t2222 = (t2217 - t2213);\n  float t426 = (t271 * 3200.0);\n  float t333 = (t323 + uv.x);\n  float t334 = (t324 + uv.y);\n  vec4 s339 = texture2D(uTex3, vec2(t333, t334));\n  float t341 = (s339.x * 0.05000000074505806);\n  float t342 = (t341 + t331);\n  float t343 = (t341 + t332);\n  vec4 s373 = texture2D(uTex4, vec2(t342, t343));\n  float t377 = (s373.x * 0.5714285969734192);\n  float t380 = clamp(t377, 0.0, 1.0);\n  float t387 = (t380 * t380);\n  float t630 = (t380 * 2.0);\n  float t631 = (3.0 - t630);\n  float t632 = (t387 * t631);\n  float t633 = (t632 + -0.10000000149011612);\n  float t634 = (t633 * 2.0);\n  vec4 s348 = texture2D(uTex0, vec2(t342, t343));\n  float t352 = (s348.x * 0.7042253613471985);\n  float t355 = clamp(t352, 0.0, 1.0);\n  float t362 = (t355 * t355);\n  float t625 = (t355 * 2.0);\n  float t626 = (3.0 - t625);\n  float t627 = (t362 * t626);\n  float t628 = (t627 + -0.6700000166893005);\n  float t629 = (t628 * 1.2000000476837158);\n  float t635 = (t634 + t629);\n  float t636 = (t635 * 0.10000000149011612);\n  float t637 = (t421 * t636);\n  float t638 = (t636 - t637);\n  float t639 = (t426 * t638);\n  float t641 = (t640 + t639);\n  float t643 = (0.0 - t641);\n  float t2228 = max(t641, 0.0);\n  float t2343 = (t2213 + t2228);\n  float t2353 = (t728 * t2343);\n  float t2361 = min(t2353, 1000000.0);\n  float t510 = (t452 * 0.6989099979400635);\n  float t511 = (t510 * t504);\n  float t512 = (t511 * 5.0);\n  float t285 = (t271 * 0.5187808871269226);\n  float t286 = (t285 + 0.2343463897705078);\n  float t281 = (t271 * 0.10416699945926666);\n  float t311 = (0.0 - t281);\n  float t312 = (t311 + 0.637502);\n  float t528 = (1.0 - t281);\n  float t530 = (t512 * t528);\n  float t532 = (t530 + t281);\n  float t726 = clamp(t532, 0.0, 1.0);\n  float t831 = (0.0179999991208315 + t726);\n  float t834 = (false ? t831 : t726);\n  float t2064 = (t2039 / t2062);\n  float t2069 = (t2058 * t2064);\n  float t2070 = (t2059 * t2064);\n  float t2071 = (t2060 * t2064);\n  float t2076 = t2039 * 0.886227548122406;\n  float t2079 = max(0.0, t2076);\n  float t2212 = (t834 * t2079);\n  float t861 = (2.0 + -1.0);\n  float t880 = (1.7320513725280762 * t861);\n  float t862 = (2.0 + -1.0);\n  float t881 = (1.7320513725280762 * t862);\n  float t863 = (2.0 + -1.0);\n  float t882 = (1.7320513725280762 * t863);\n  float t907 = max(0.0, 0.886227548122406);\n  float t910 = (t907 * 0.31830987334251404);\n  float t1261 = (t726 * 2.755199909210205);\n  float t1264 = (t1261 + 0.6902999877929688);\n  float t1255 = (t726 * 4.795100212097168);\n  float t1258 = (0.641700029373169 - t1255);\n  float t1249 = (t726 * 2.0404000282287598);\n  float t1252 = (t1249 + -0.33239999413490295);\n  float t1282 = max(0.0, 0.0);\n  float t2218 = (t834 + 0.0179999991208315);\n  float t2223 = (t2218 - t2212);\n  float t429 = (t281 * t281);\n  float t430 = (t429 * t426);\n  float t378 = (s373.y * 0.5714285969734192);\n  float t381 = clamp(t378, 0.0, 1.0);\n  float t388 = (t381 * t381);\n  float t383 = (t381 * 2.0);\n  float t385 = (3.0 - t383);\n  float t389 = (t388 * t385);\n  float t392 = (t389 + -0.10000000149011612);\n  float t394 = (t392 * 2.0);\n  float t353 = (s348.y * 0.7042253613471985);\n  float t356 = clamp(t353, 0.0, 1.0);\n  float t363 = (t356 * t356);\n  float t358 = (t356 * 2.0);\n  float t360 = (3.0 - t358);\n  float t364 = (t363 * t360);\n  float t367 = (t364 + -0.6700000166893005);\n  float t369 = (t367 * 1.2000000476837158);\n  float t396 = (t394 + t369);\n  float t398 = (t396 * 0.10000000149011612);\n  float t422 = (t421 * t398);\n  float t424 = (t398 - t422);\n  float t431 = (t430 * t424);\n  float t516 = (t512 + t431);\n  float t523 = (0.0 - t516);\n  float t2229 = max(t516, 0.0);\n  float t2346 = (t2212 + t2229);\n  float t2355 = (t728 * t2346);\n  float t2362 = min(t2355, 1000000.0);\n  float t513 = (t452 * 0.6197919845581055);\n  float t514 = (t513 * t504);\n  float t515 = (t514 * 5.0);\n  float t282 = (t271 * 0.13199499249458313);\n  float t283 = (t282 + 0.012241000309586525);\n  float t313 = (0.0 - t283);\n  float t314 = (t313 + 0.255208);\n  float t529 = (1.0 - t283);\n  float t531 = (t515 * t529);\n  float t649 = (t531 + t283);\n  float t727 = clamp(t649, 0.0, 1.0);\n  float t832 = (0.0179999991208315 + t727);\n  float t835 = (false ? t832 : t727);\n  float t2065 = (t2040 / t2062);\n  float t2072 = (t2058 * t2065);\n  float t2073 = (t2059 * t2065);\n  float t2074 = (t2060 * t2065);\n  float t2077 = t2040 * 0.886227548122406;\n  float t2080 = max(0.0, t2077);\n  float t2211 = (t835 * t2080);\n  float t872 = (2.0 + -1.0);\n  float t884 = (1.7320513725280762 * t872);\n  float t873 = (2.0 + -1.0);\n  float t885 = (1.7320513725280762 * t873);\n  float t874 = (2.0 + -1.0);\n  float t886 = (1.7320513725280762 * t874);\n  float t908 = max(0.0, 0.886227548122406);\n  float t911 = (t908 * 0.31830987334251404);\n  float t1262 = (t727 * 2.755199909210205);\n  float t1265 = (t1262 + 0.6902999877929688);\n  float t1256 = (t727 * 4.795100212097168);\n  float t1259 = (0.641700029373169 - t1256);\n  float t1250 = (t727 * 2.0404000282287598);\n  float t1253 = (t1250 + -0.33239999413490295);\n  float t1283 = max(0.0, 0.0);\n  float t2219 = (t835 + 0.0179999991208315);\n  float t2224 = (t2219 - t2211);\n  float t432 = (t283 * t283);\n  float t433 = (t432 * t426);\n  float t379 = (s373.z * 0.5714285969734192);\n  float t382 = clamp(t379, 0.0, 1.0);\n  float t390 = (t382 * t382);\n  float t384 = (t382 * 2.0);\n  float t386 = (3.0 - t384);\n  float t391 = (t390 * t386);\n  float t393 = (t391 + -0.10000000149011612);\n  float t395 = (t393 * 2.0);\n  float t354 = (s348.z * 0.7042253613471985);\n  float t357 = clamp(t354, 0.0, 1.0);\n  float t365 = (t357 * t357);\n  float t359 = (t357 * 2.0);\n  float t361 = (3.0 - t359);\n  float t366 = (t365 * t361);\n  float t368 = (t366 + -0.6700000166893005);\n  float t370 = (t368 * 1.2000000476837158);\n  float t397 = (t395 + t370);\n  float t399 = (t397 * 0.10000000149011612);\n  float t423 = (t421 * t399);\n  float t425 = (t399 - t423);\n  float t434 = (t433 * t425);\n  float t517 = (t515 + t434);\n  float t524 = (0.0 - t517);\n  float t2230 = max(t517, 0.0);\n  float t2349 = (t2211 + t2230);\n  float t2357 = (t728 * t2349);\n  float t2363 = min(t2357, 1000000.0);\n  return vec3(t2361, t2362, t2363);\n}",
+            "textures": [
+              {
+                "uniform": "uTex0",
+                "texture": "textures/Packs/AdvancedPortalsSystemVFX/Textures/LC/T_LC_10.png"
+              },
+              {
+                "uniform": "uTex1",
+                "texture": "textures/Packs/Vefects/Stylized_Galaxy_Shader/Galaxy/Textures/T_VFX_Lush_Galaxy_Clouds_04_Contrast.png"
+              },
+              {
+                "uniform": "uTex2",
+                "texture": "textures/_Engine/EngineMaterials/FlatNormal.png"
+              },
+              {
+                "uniform": "uTex3",
+                "texture": "textures/Art/VFX/Noise/Perlin/Perlin_01-512x512.png"
+              },
+              {
+                "uniform": "uTex4",
+                "texture": "textures/_Engine/MapTemplates/T_ScreenDirt02_w.png"
+              }
+            ]
+          }
+        },
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9076,6 +9360,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9133,6 +9418,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9199,6 +9485,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9258,6 +9545,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9317,6 +9605,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9376,6 +9665,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9476,6 +9766,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9576,6 +9867,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9643,6 +9935,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9743,6 +10036,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9810,6 +10104,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9910,6 +10205,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9977,6 +10273,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -10044,6 +10341,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -10111,6 +10409,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -10211,6 +10510,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -10278,6 +10578,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -10331,6 +10632,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -10464,6 +10766,25 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {
+          "alpha": {
+            "code": "float ballestAlpha(vec2 uv, vec3 nrm, vec3 pos, float time) {\n  float t545 = (uv.y * uv.y);\n  float t546 = (t545 * 0.09000000357627869);\n  float t468 = (uv.x * 0.800000011920929);\n  float t466 = (time + 0.4000000059604645);\n  float t467 = (t466 * 3.0);\n  float t469 = (uv.y * 0.4000000059604645);\n  float t470 = (t467 + t469);\n  vec4 s473 = texture2D(uTex0, vec2(t468, t470));\n  float t477 = (s473.x * 0.800000011920929);\n  float t421 = (uv.x * 0.5);\n  float t419 = (time * 2.0);\n  float t422 = (uv.y * 0.25);\n  float t423 = (t419 + t422);\n  vec4 s453 = texture2D(uTex1, vec2(t421, t423));\n  vec4 s426 = texture2D(uTex0, vec2(t421, t423));\n  float t434 = (uv.x * 0.8999999761581421);\n  float t432 = (time + 0.20000000298023224);\n  float t433 = (t432 * 1.5);\n  float t435 = (uv.y * 0.44999998807907104);\n  float t436 = (t433 + t435);\n  vec4 s439 = texture2D(uTex0, vec2(t434, t436));\n  float t443 = (s439.x * 0.4000000059604645);\n  float t446 = max(s426.x, t443);\n  float t455 = (t446 - s426.x);\n  float t458 = (s453.x * t455);\n  float t461 = (t458 + s426.x);\n  float t503 = (t477 - t461);\n  float t482 = (time + 0.6000000238418579);\n  float t483 = (t482 * 2.5);\n  float t484 = (t483 + t422);\n  vec4 s487 = texture2D(uTex0, vec2(t421, t484));\n  float t491 = (s487.x * 0.5);\n  float t494 = max(t477, t491);\n  float t497 = (t494 - t477);\n  float t500 = (t497 * s453.x);\n  float t504 = (t503 + t500);\n  float t509 = (t504 * 0.5);\n  float t512 = (t509 + t461);\n  float t547 = (t546 * t512);\n  float t517 = (time + 0.25);\n  float t518 = (t517 * 2.0);\n  float t420 = (uv.y * 0.5);\n  float t519 = (t518 + t420);\n  vec4 s524 = texture2D(uTex2, vec2(uv.x, t519));\n  float t542 = (s524.x * 0.05000000074505806);\n  float t528 = (time + 0.6629999876022339);\n  float t529 = (t528 * 0.10000000149011612);\n  float t530 = (t529 + t420);\n  vec4 s535 = texture2D(uTex2, vec2(uv.x, t530));\n  float t543 = (t542 * s535.y);\n  float t538 = log(t420);\n  float t539 = (t538 * 1.5);\n  float t540 = exp(t539);\n  float t541 = ((t420 <= 2.980232949312267e-8) ? 0.0 : t540);\n  float t544 = (t543 * t541);\n  float t548 = (t547 - t544);\n  float t549 = (t548 * 0.20000000298023224);\n  float t550 = (t549 + t544);\n  float t562 = abs(nrm.z);\n  float t563 = (t562 * t550);\n  float t564 = (t550 - t563);\n  float t565 = (t564 * 4.0);\n  float t571 = clamp(t565, 0.0, 1.0);\n  return t571;\n}",
+            "textures": [
+              {
+                "uniform": "uTex0",
+                "texture": "textures/Art/UsedMarketPlace/StylizedFX_Collection_q/T_Ray_02.png"
+              },
+              {
+                "uniform": "uTex1",
+                "texture": "textures/_Engine/Functions/Engine_MaterialFunctions02/ExampleContent/Textures/LowResBlurredNoise.png"
+              },
+              {
+                "uniform": "uTex2",
+                "texture": "textures/Art/UsedMarketPlace/StylizedFX_Collection_q/T_Wind_RG_00.png"
+              }
+            ]
+          }
+        },
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -10535,6 +10856,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": "Color",
           "metallic": null,
@@ -10608,6 +10930,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": "Color",
           "metallic": null,
@@ -10681,6 +11004,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": "Tint",
           "metallic": null,
@@ -10754,6 +11078,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": "Color",
           "metallic": null,
@@ -10807,6 +11132,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -10862,6 +11188,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -10917,6 +11244,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -10972,6 +11300,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -11027,6 +11356,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -11086,6 +11416,7 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -11170,6 +11501,7 @@
         ],
         "variation": null,
         "outline": null,
+        "programs": {},
         "keys": {
           "baseColor": null,
           "metallic": null,

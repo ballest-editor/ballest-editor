@@ -72,6 +72,12 @@ const OpacityLayer = open({
   mean: Num
 })
 
+/** The compiled shader's own output math as GLSL: `f(vec2 uv, vec3 worldNormal, vec3 objectPos, float time)`. */
+const Program = open({
+  code: Schema.String,
+  textures: Schema.Array(open({ uniform: Schema.String, texture: Schema.String }))
+})
+
 export const MaterialApprox = open({
   baseColor: Schema.optionalKey(Schema.NullOr(Rgb)),
   metallic: Num,
@@ -104,7 +110,16 @@ export const MaterialApprox = open({
   /** Every texture read of the base pass, including the secondary layers the fields above don't name. */
   reads: Schema.optionalKey(Schema.NullOr(Schema.Array(Read))),
   /** M_OutlineEdges' grey band along the UV border: `inset` is its width as a fraction of U and V. */
-  outline: Schema.optionalKey(Schema.NullOr(Outline))
+  outline: Schema.optionalKey(Schema.NullOr(Outline)),
+  /**
+   * The shader's own math where the fields above cannot say it: a translucent pass's `alpha` (the vent's
+   * streaks, for any frame via time), an additive pass's `glow`, an opaque `base` colour (the rubber block's cells).
+   */
+  programs: Schema.optionalKey(Schema.NullOr(open({
+    alpha: Schema.optionalKey(Schema.NullOr(Program)),
+    glow: Schema.optionalKey(Schema.NullOr(Program)),
+    base: Schema.optionalKey(Schema.NullOr(Program))
+  })))
 })
 
 export const MaterialEntry = open({
@@ -156,6 +171,12 @@ export interface NormalLayer {
   readonly strength: number
 }
 
+/** A GLSL function `<float|vec3> name(vec2 uv, vec3 nrm, vec3 pos, float time)` and the samplers it reads. */
+export interface MaterialProgram {
+  readonly code: string
+  readonly textures: ReadonlyArray<{ readonly uniform: string; readonly texture: string }>
+}
+
 /** What the renderer needs for one material, with defaults filled in. Colours are linear RGB. */
 export interface MaterialSpec {
   readonly path: string
@@ -195,6 +216,12 @@ export interface MaterialSpec {
   readonly outline:
     | { readonly inset: readonly [number, number]; readonly color: readonly [number, number, number] }
     | undefined
+  /** The shader's own math, run by the renderer: `alpha` (translucent), `glow` (additive) or `base` (opaque). */
+  readonly programs: {
+    readonly alpha?: MaterialProgram
+    readonly glow?: MaterialProgram
+    readonly base?: MaterialProgram
+  }
   /** Translucent blend modes render transparent. */
   readonly translucent: boolean
   /** BLEND_Additive: the colour adds to what is behind it (glows). */
@@ -247,6 +274,7 @@ export const NEUTRAL: Omit<MaterialSpec, "path"> = {
   opacityLayer: undefined,
   variation: undefined,
   outline: undefined,
+  programs: {},
   translucent: false,
   additive: false,
   twoSided: false,
@@ -342,6 +370,11 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
     outline: outline === undefined || (outline.inset[0] <= 0 && outline.inset[1] <= 0)
       ? undefined
       : { inset: [clamp01(outline.inset[0]), clamp01(outline.inset[1])], color: rgb(outline.color, [0.5, 0.5, 0.5]) },
+    programs: {
+      ...(a.programs?.alpha ? { alpha: a.programs.alpha } : {}),
+      ...(a.programs?.glow ? { glow: a.programs.glow } : {}),
+      ...(a.programs?.base ? { base: a.programs.base } : {})
+    },
     translucent: opacity < 1 || /translucen|additive|modulate/i.test(entry.blendMode ?? ""),
     additive: /additive/i.test(entry.blendMode ?? ""),
     twoSided: entry.twoSided ?? false,

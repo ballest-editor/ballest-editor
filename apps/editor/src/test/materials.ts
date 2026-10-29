@@ -69,14 +69,34 @@ export const materialsFile = {
         upFade: 0,
         opacityTexture: "textures/ray.png",
         tiling: { opacity: 0.25 },
-        opacityLayers: [{ texture: "textures/ray.png", tiling: [0.25, 0.25], projection: "uv", gain: 0.6, mean: 0.3 }]
+        opacityLayers: [{ texture: "textures/ray.png", tiling: [0.25, 0.25], projection: "uv", gain: 0.6, mean: 0.3 }],
+        programs: {
+          alpha: {
+            code:
+              "float ballestAlpha(vec2 uv, vec3 nrm, vec3 pos, float time) {\n  return texture2D(uTex0, vec2(uv.x, uv.y + time)).x * (1.0 - abs(nrm.z));\n}",
+            textures: [{ uniform: "uTex0", texture: "textures/ray.png" }]
+          }
+        }
       },
       recovered: false
     },
     {
       path: GLOW,
       blendMode: "BLEND_Additive",
-      approx: { baseColor: [0, 0, 0], emissive: [0.63, 0.03, 0.04], opacity: 1, upFade: 0, evaluated: true },
+      approx: {
+        baseColor: [0, 0, 0],
+        emissive: [0.63, 0.03, 0.04],
+        opacity: 1,
+        upFade: 0,
+        evaluated: true,
+        programs: {
+          glow: {
+            code:
+              "vec3 ballestGlow(vec2 uv, vec3 nrm, vec3 pos, float time) {\n  return vec3(0.6, 0.0, 0.0) * texture2D(uTex0, uv).x;\n}",
+            textures: [{ uniform: "uTex0", texture: "textures/glow.png" }]
+          }
+        }
+      },
       recovered: true
     },
     {

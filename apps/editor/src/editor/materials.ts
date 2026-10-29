@@ -31,8 +31,16 @@ const textureLoader = new THREE.TextureLoader()
 const textures = new Map<string, THREE.Texture>()
 const materials = new Map<string, THREE.MeshStandardMaterial>()
 
-const loadTexture = (path: string, colorSpace: THREE.ColorSpace, onError: () => void): THREE.Texture => {
-  const key = `${colorSpace}|${path}`
+const loadTexture = (
+  path: string,
+  colorSpace: THREE.ColorSpace,
+  onError: () => void,
+  // The glb UVs are UE's (origin top-left, copied as-is by the extractor). The programs run the game's own
+  // math on them, so their textures keep the PNG's row order; three's default flip is what the tiled reads
+  // were tuned with.
+  flipY = true
+): THREE.Texture => {
+  const key = `${colorSpace}|${flipY}|${path}`
   const cached = textures.get(key)
   if (cached !== undefined) return cached
   // Without a DOM (unit tests) there's no image loader; keep an empty texture.
@@ -43,16 +51,19 @@ const loadTexture = (path: string, colorSpace: THREE.ColorSpace, onError: () => 
       onError()
     })
   texture.colorSpace = colorSpace
+  texture.flipY = flipY
   texture.wrapS = THREE.RepeatWrapping
   texture.wrapT = THREE.RepeatWrapping
   textures.set(key, texture)
   return texture
 }
 
-/** The shader patch's inputs; `defines` doubles as the program cache key. */
+/** The shader patch's inputs; `defines` (and `glsl`, per material) make the program cache key. */
 export interface Patch {
   readonly defines: Readonly<Record<string, number>>
-  readonly uniforms: {
+  /** The material's own GLSL (an `approx.programs` function and its samplers), or "". */
+  readonly glsl: string
+  readonly uniforms: Record<string, THREE.IUniform> & {
     readonly uBaseColorTiling: THREE.IUniform<THREE.Vector2>
     readonly uNormalTiling: THREE.IUniform<THREE.Vector2>
     readonly uOpacityTiling: THREE.IUniform<THREE.Vector2>
@@ -76,12 +87,16 @@ export interface Patch {
     /** gain, mean */
     readonly uAlphaShape: THREE.IUniform<THREE.Vector2>
     readonly uUpFade: THREE.IUniform<number>
+    /** Game time in seconds for the programs that scroll (the vent's streaks); a fixed frame. */
+    readonly uBallestTime: THREE.IUniform<number>
     readonly uNormal2Tiling: THREE.IUniform<THREE.Vector2>
     readonly uNormal2Strength: THREE.IUniform<number>
     readonly uOutlineInset: THREE.IUniform<THREE.Vector2>
     readonly uOutlineColor: THREE.IUniform<THREE.Color>
   }
 }
+
+type ProgramKind = "alpha" | "glow" | "base"
 
 const vec2 = (p: Pair) => new THREE.Vector2(p[0], p[1])
 const isOne = (p: Pair) => p[0] === 1 && p[1] === 1
@@ -91,7 +106,10 @@ const patchOf = (
   variation: THREE.Texture | null,
   normal2: THREE.Texture | null,
   colorMaps: ReadonlyArray<THREE.Texture>,
-  alphaMap: THREE.Texture | null
+  alphaMap: THREE.Texture | null,
+  program:
+    | { readonly kind: ProgramKind; readonly code: string; readonly maps: ReadonlyArray<[string, THREE.Texture]> }
+    | null
 ): Patch | undefined => {
   const defines: Record<string, number> = {}
   const { tiling } = spec
@@ -108,15 +126,23 @@ const patchOf = (
   if (normal2 !== null) defines["BALLEST_NORMAL2"] = 1
   if (colorMaps.length > 0) defines["BALLEST_COLOR"] = colorMaps.length
   if (alphaMap !== null) defines["BALLEST_ALPHA"] = 1
-  if (spec.translucent && spec.upFade < 1) defines["BALLEST_UP_FADE"] = 1
+  // A program carries the game's own cap mask; the up fade stands in only without one.
+  if (spec.translucent && spec.upFade < 1 && program === null) defines["BALLEST_UP_FADE"] = 1
   if (spec.outline !== undefined) defines["BALLEST_OUTLINE"] = 1
+  if (program !== null) defines[`BALLEST_PROGRAM_${program.kind.toUpperCase()}`] = 1
   if (Object.keys(defines).length === 0) return undefined
   const outline = spec.outline
   const vt = spec.variation?.tilings ?? []
   const vo = spec.variation?.offsets ?? []
+  const glsl = program === null
+    ? ""
+    : `${program.maps.map(([uniform]) => `uniform sampler2D ${uniform};`).join("\n")}\n${program.code}\n`
   return {
     defines,
+    glsl,
     uniforms: {
+      ...Object.fromEntries((program?.maps ?? []).map(([uniform, map]) => [uniform, { value: map }])),
+      uBallestTime: { value: 0 },
       uBaseColorTiling: { value: vec2(tiling.baseColor) },
       uNormalTiling: { value: vec2(tiling.normal) },
       uOpacityTiling: { value: vec2(tiling.opacity) },
@@ -166,6 +192,8 @@ varying vec3 vBallestScale;
 varying vec2 vBallestUv;
 varying mat3 vBallestNormalMatrix;
 varying float vBallestUp;
+varying vec3 vBallestWorldNormal;
+varying vec3 vBallestLocal;
 `
 const VERTEX_BODY = /* glsl */ `
 vBallestScale = vec3( length( modelMatrix[ 0 ].xyz ), length( modelMatrix[ 1 ].xyz ), length( modelMatrix[ 2 ].xyz ) );
@@ -178,8 +206,11 @@ vBallestScale = vec3( length( modelMatrix[ 0 ].xyz ), length( modelMatrix[ 1 ].x
 #endif
 vBallestUv = uv;
 vBallestNormalMatrix = normalMatrix;
-// |world normal . up| (three's y is UE's z): the beams fade their end caps by it.
-vBallestUp = abs( normalize( mat3( modelMatrix ) * objectNormal ).y );
+// The world normal in UE's frame (three's y is UE's z); the beams fade their end caps by its z.
+vBallestWorldNormal = normalize( mat3( modelMatrix ) * objectNormal ).xzy;
+vBallestUp = abs( vBallestWorldNormal.z );
+// The object-space position in cm with the piece's own scale: what the game's shaders see for a piece at the origin.
+vBallestLocal = transformed * vBallestScale;
 `
 const FRAGMENT_DECLS = /* glsl */ `
 varying vec3 vBallestPos;
@@ -188,6 +219,9 @@ varying vec3 vBallestScale;
 varying vec2 vBallestUv;
 varying mat3 vBallestNormalMatrix;
 varying float vBallestUp;
+varying vec3 vBallestWorldNormal;
+varying vec3 vBallestLocal;
+uniform float uBallestTime;
 uniform vec2 uBaseColorTiling;
 uniform vec2 uNormalTiling;
 uniform vec2 uOpacityTiling;
@@ -239,6 +273,9 @@ vec2 ballestUv( vec2 tiling ) {
 // The mottle is the game's own expression: (r1 + o1)(r2 + o2)(r3 + o3) * gain + 1 (the Env masters' gain is
 // ColorContrast - 1, the metal's -0.1: a few percent either way).
 const COLOR_EXTRAS = /* glsl */ `
+#ifdef BALLEST_PROGRAM_BASE
+  diffuseColor.rgb = ballestBase( vBallestUv, vBallestWorldNormal, vBallestLocal, uBallestTime );
+#endif
 #ifdef BALLEST_COLOR
   diffuseColor.rgb += uColor1Gain * ( texture2D( uColorMap1, ballestUv( uColor1Tiling ) ).rgb - uColor1Mean );
   #if BALLEST_COLOR >= 2
@@ -252,6 +289,9 @@ const COLOR_EXTRAS = /* glsl */ `
 #ifdef BALLEST_UP_FADE
   // The game's beams multiply their alpha by 1 - |world normal z|: only the vertical faces show.
   diffuseColor.a *= mix( 1.0, uUpFade, vBallestUp );
+#endif
+#ifdef BALLEST_PROGRAM_ALPHA
+  diffuseColor.a = ballestAlpha( vBallestUv, vBallestWorldNormal, vBallestLocal, uBallestTime );
 #endif
 #ifdef BALLEST_VARIATION
   #if BALLEST_VARIATION >= 3
@@ -337,7 +377,13 @@ export const applyShaderPatch = (shader: ShaderProgram, patch: Patch): void => {
     .replace("#include <project_vertex>", `#include <project_vertex>\n${VERTEX_BODY}`)
   const projected = "BALLEST_OBJECT" in patch.defines || "BALLEST_WORLD" in patch.defines
   shader.fragmentShader = shader.fragmentShader
-    .replace("#include <common>", `#include <common>\n${FRAGMENT_DECLS}`)
+    .replace("#include <common>", `#include <common>\n${FRAGMENT_DECLS}\n${patch.glsl}`)
+    .replace(
+      "#include <emissivemap_fragment>",
+      "BALLEST_PROGRAM_GLOW" in patch.defines
+        ? "totalEmissiveRadiance = ballestGlow( vBallestUv, vBallestWorldNormal, vBallestLocal, uBallestTime );"
+        : "#include <emissivemap_fragment>"
+    )
     .replace("#include <normalmap_pars_fragment>", `#include <normalmap_pars_fragment>\n${NORMAL_LAYERS}`)
     .replace(
       "#include <map_fragment>",
@@ -369,7 +415,8 @@ export const shaderPatchOf = (material: THREE.Material): Patch | undefined => pa
 /** Installs the patch on `material`; see the module comment for what it adds. */
 const patchShader = (material: THREE.MeshStandardMaterial, patch: Patch): void => {
   material.defines = { ...material.defines, ...patch.defines }
-  const key = Object.keys(patch.defines).sort().join(",")
+  // Materials with their own GLSL cannot share a compiled program.
+  const key = Object.keys(patch.defines).sort().join(",") + (patch.glsl === "" ? "" : `|${material.name}`)
   material.customProgramCacheKey = () => key
   material.onBeforeCompile = (shader) => applyShaderPatch(shader, patch)
   patches.set(material, patch)
@@ -454,7 +501,31 @@ const build = (
   const colorMaps = spec.colorLayers.map((layer) =>
     loadTexture(layer.texture, colorSpaceOf(layer.texture, THREE.SRGBColorSpace), dropDefine("BALLEST_COLOR"))
   )
-  const patch = patchOf(spec, variation, normal2, colorMaps, alphaMap)
+  // The shader's own math where there is some (one kind per material: alpha, glow or base).
+  const programKind: ProgramKind | undefined = spec.programs.alpha
+    ? "alpha"
+    : spec.programs.glow
+    ? "glow"
+    : spec.programs.base
+    ? "base"
+    : undefined
+  const programSpec = programKind === undefined ? undefined : spec.programs[programKind]
+  const program = programKind === undefined || programSpec === undefined
+    ? null
+    : {
+      kind: programKind,
+      code: programSpec.code,
+      maps: programSpec.textures.map((t): [string, THREE.Texture] => [
+        t.uniform,
+        loadTexture(
+          t.texture,
+          colorSpaceOf(t.texture, THREE.SRGBColorSpace),
+          dropDefine(`BALLEST_PROGRAM_${programKind.toUpperCase()}`),
+          false
+        )
+      ])
+    }
+  const patch = patchOf(spec, variation, normal2, colorMaps, alphaMap, program)
   if (patch !== undefined) patchShader(material, patch)
   return material
 }

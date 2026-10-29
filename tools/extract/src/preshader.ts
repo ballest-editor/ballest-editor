@@ -17,6 +17,9 @@ export interface NumericParameter {
 
 const OP_CONSTANT = 0x02
 const OP_PARAMETER = 0x03
+// Unary ops: Power(x, -1) compiles to Log, Constant -1, Mul, Exp (so 1/SizeBase2 is exp(-1 * log(SizeBase2))).
+const OP_EXP = 0x17
+const OP_LOG = 0x1b
 const OP_SWIZZLE = 0x25
 
 export interface Slot {
@@ -72,6 +75,11 @@ export const runPreshader = (
       for (let i = 0; i < count; i++) out.push(src[program[at + 2 + i] ?? 0] ?? 0)
       stack.push(out)
       at += 6
+    } else if (op === OP_EXP || op === OP_LOG) {
+      const src = stack.pop()
+      if (src === undefined) return null
+      stack.push(src.map(op === OP_EXP ? Math.exp : Math.log))
+      at += 1
     } else if (op === OP_APPEND) {
       const b = stack.pop(), a = stack.pop()
       if (a === undefined || b === undefined) return null

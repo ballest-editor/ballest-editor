@@ -358,9 +358,10 @@ const pick = <T>(
 
 /**
  * Materials the cooked data cannot describe, by asset name, each a function of the instance's vectors.
- * M_PlasticBase mixes BaseColor_Dark and BaseColor_Light per cell by noise it samples from the engine's
- * placeholder DefaultWhiteGrid (the real texture is bound at runtime); the game shows the light colour
- * with faint darker cells.
+ * M_PlasticBase mixes BaseColor_Dark and BaseColor_Light per 45/30/22.5 cm cell by a noise lookup whose
+ * texture slot holds the engine's placeholder DefaultWhiteGrid in the cooked asset (the blueprint binds the
+ * real one at runtime, so its GLSL program reads near-white and lands on the dark colour); the game shows
+ * the light colour with faint darker cells.
  */
 const OVERRIDES: Record<
   string,
@@ -496,6 +497,24 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         : null
       const tex = (r: Read | undefined) => (r === undefined ? null : texPath(r.texture))
       const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
+      // The shader's own math as GLSL (alpha of a translucent pass, an additive glow, or an opaque base colour
+      // whose reads the layers above could not place): what the renderer runs instead of the linearised look.
+      const programs = Object.fromEntries(
+        Object.entries(evaluated?.programs ?? {})
+          // A base program only where the layers cannot place a read, and never for an overridden material: its
+          // program runs the same math on the placeholder texture the override exists to work around.
+          .filter(([kind]) =>
+            kind !== "base" ||
+            (OVERRIDES[name] === undefined && reads.some((r) => r.role !== "normal" && r.unresolved.length > 0))
+          )
+          .map(([kind, p]) => [kind, {
+            code: p.code,
+            textures: p.textures.map((t) => ({
+              uniform: t.uniform,
+              texture: texPath(textureOf(t.texture)) ?? `missing:${t.texture}`
+            }))
+          }])
+      )
       const approx = {
         // The evaluated shader where there is one (opaque); else parameters picked by name. Emissive-only
         // masters (BaseColor pin unconnected) render black + emissive in UE.
@@ -547,7 +566,8 @@ export const materialsBuild = Effect.fn("materialsBuild")(
             mean: r.mean === null ? 0.5 : r.mean[0]
           })),
         // Textures added to the base colour, each scaled by what the shader adds for it (colour = base + sum gain_i * read_i).
-        colorLayers: colorLayers.map((r) => ({
+        // A base program computes the whole colour itself, layers and mottle included.
+        colorLayers: (programs["base"] ? [] : colorLayers).map((r) => ({
           texture: texPath(r.texture) ?? `missing:${r.texture}`,
           tiling: r.scale,
           projection: r.projection,
@@ -556,10 +576,11 @@ export const materialsBuild = Effect.fn("materialsBuild")(
           mean: r.mean
         })),
         // The mottle exactly as the shader applies it: colour *= 1 + gain * product_i(texture(tilings_i) + offsets_i).
-        variation: variation === null
+        variation: variation === null || programs["base"]
           ? null
           : { ...variation, texture: texPath(variation.texture) ?? `missing:${variation.texture}` },
         outline,
+        programs,
         // Which parameters the name-based picks used (translucent passes, emissive); null = neutral default.
         keys: {
           baseColor: evaluated === null ? bcKey : null,
@@ -620,6 +641,7 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         "approx.variation is the grey mottle as the base pass applies it: colour *= 1 + gain * product over layers of (texture read at tilings[i] + offsets[i]); gain already includes the instance's parameter (ColorContrast - 1 for the Env masters).",
         "approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).",
         "approx.opacity is the evaluated alpha on the face that shows most (a beam masks its caps with 1 - |world normal z|: its sides); approx.upFade (0..1, null = 1) is the fraction left on a face that looks up. An additive pass renders as its evaluated glow (emissive, black base, opacity 1) faded the same way.",
+        "approx.programs is the compiled shader's own output math as GLSL functions f(uv, worldNormal, objectPosition, time) with the instance's parameters folded in: alpha (a translucent pass's alpha, e.g. the vent's streaks for any frame via time), glow (an additive pass's unlit colour) and base (an opaque base colour whose texture reads the layers cannot place, e.g. the rubber block's cells); textures are the samplers the code reads (uTexN).",
         "A few materials cannot be read from the cooked data and are overridden by name (OVERRIDES in tools/extract/src/materials.ts): M_PlasticBase's cell noise samples the engine's placeholder texture, so its base colour is taken as BaseColor_Light, the colour the game shows.",
         "paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap)."
       ],

@@ -18,7 +18,7 @@ describe("three materials", () => {
     uniforms: {},
     vertexShader: "#include <common>\n#include <project_vertex>",
     fragmentShader:
-      "#include <common>\n#include <normalmap_pars_fragment>\n#include <map_fragment>\n#include <alphamap_fragment>\n#include <normal_fragment_maps>"
+      "#include <common>\n#include <normalmap_pars_fragment>\n#include <map_fragment>\n#include <alphamap_fragment>\n#include <emissivemap_fragment>\n#include <normal_fragment_maps>"
   })
 
   it("builds cached three materials: blue is blue, glass is translucent, unknown is neutral", () => {
@@ -133,14 +133,27 @@ describe("three materials", () => {
     assert.isNull(wind.alphaMap) // the alpha layer is the patch's, around the evaluated opacity
     assert.strictEqual(wind.blending, THREE.NormalBlending)
     assert.isFalse(wind.depthWrite)
-    assert.deepStrictEqual(shaderPatchOf(wind)?.defines, { BALLEST_TILING: 1, BALLEST_ALPHA: 1, BALLEST_UP_FADE: 1 })
+    // The game's own alpha math replaces the layered stand-in and its up fade.
+    assert.deepStrictEqual(shaderPatchOf(wind)?.defines, {
+      BALLEST_TILING: 1,
+      BALLEST_ALPHA: 1,
+      BALLEST_PROGRAM_ALPHA: 1
+    })
     assert.deepStrictEqual(shaderPatchOf(wind)?.uniforms.uAlphaShape.value, new THREE.Vector2(0.6, 0.3))
-    assert.strictEqual(shaderPatchOf(wind)?.uniforms.uUpFade.value, 0)
+    assert.isDefined(shaderPatchOf(wind)?.uniforms["uTex0"])
+    assert.strictEqual(shaderPatchOf(wind)?.uniforms.uBallestTime.value, 0)
     assert.strictEqual(wind.defines?.["STANDARD"], "") // three's own define survives the patch
     const shader = program()
     applyShaderPatch(shader, shaderPatchOf(wind)!)
-    assert.include(shader.vertexShader, "vBallestUp = abs( normalize( mat3( modelMatrix ) * objectNormal ).y )")
-    assert.include(shader.fragmentShader, "diffuseColor.a *= mix( 1.0, uUpFade, vBallestUp )")
+    assert.include(shader.vertexShader, "vBallestUp = abs( vBallestWorldNormal.z )")
+    assert.include(shader.fragmentShader, "uniform sampler2D uTex0;\nfloat ballestAlpha(")
+    assert.include(
+      shader.fragmentShader,
+      "diffuseColor.a = ballestAlpha( vBallestUv, vBallestWorldNormal, vBallestLocal, uBallestTime )"
+    )
+    assert.include(shader.fragmentShader, "#include <emissivemap_fragment>")
+    // the program is part of the material, so it cannot share a compiled program with another
+    assert.notStrictEqual(wind.customProgramCacheKey(), materialFor(table, GLASS).customProgramCacheKey())
   })
 
   it("adds an additive glow to the scene and fades its end caps", () => {
@@ -150,7 +163,14 @@ describe("three materials", () => {
     assert.strictEqual(glow.blending, THREE.AdditiveBlending)
     assert.strictEqual(glow.opacity, 1)
     assert.deepStrictEqual(glow.emissive.toArray().map((c) => +c.toFixed(2)), [0.63, 0.03, 0.04])
-    assert.deepStrictEqual(shaderPatchOf(glow)?.defines, { BALLEST_UP_FADE: 1 })
+    assert.deepStrictEqual(shaderPatchOf(glow)?.defines, { BALLEST_PROGRAM_GLOW: 1 })
+    const shader = program()
+    applyShaderPatch(shader, shaderPatchOf(glow)!)
+    assert.include(
+      shader.fragmentShader,
+      "totalEmissiveRadiance = ballestGlow( vBallestUv, vBallestWorldNormal, vBallestLocal, uBallestTime );"
+    )
+    assert.notInclude(shader.fragmentShader, "#include <emissivemap_fragment>")
   })
 
   it("assigns materials per primitive by UE slot index", () => {

@@ -60,6 +60,10 @@ describe("materials", () => {
     })
     assert.strictEqual(wind.upFade, 0)
     assert.isFalse(wind.additive)
+    assert.deepStrictEqual(wind.programs.alpha?.textures, [{ uniform: "uTex0", texture: "textures/ray.png" }])
+    assert.include(wind.programs.alpha?.code, "float ballestAlpha(")
+    assert.isUndefined(wind.programs.base)
+    assert.deepStrictEqual(blue.programs, {})
     const glow = lookupMaterial(table, GLOW)!
     assert.isTrue(glow.translucent && glow.additive)
     assert.deepStrictEqual([glow.opacity, glow.upFade, glow.emissive], [1, 0, [0.63, 0.03, 0.04]])

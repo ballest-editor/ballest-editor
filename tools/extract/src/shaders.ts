@@ -9,7 +9,8 @@ import { FileSystem } from "effect/FileSystem"
 import { Path } from "effect/Path"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { type Leaf, type Module, type Mottle, mottleOf, outputsOf, parseModule, samples } from "./dxil.ts"
-import { surfaceOf } from "./evaluate.ts"
+import { cfgOf, ENGINE_DEFAULTS, Evaluator, outputs, surfaceOf } from "./evaluate.ts"
+import { emitProgram, type GlslEnv } from "./glsl.ts"
 import { get, str } from "./json.ts"
 import { chainOf, paramValueOf } from "./params.ts"
 import { pngMean } from "./png.ts"
@@ -109,6 +110,11 @@ export interface MaterialShaders {
     /** Scene colour with no lights (facing up, and for a vertical surface): what an additive glow adds. */
     readonly emissive: readonly [number, number, number]
     readonly emissiveSide: readonly [number, number, number]
+    /**
+     * The shader's own math as GLSL, with this instance's parameters folded in: `alpha` (translucent), `glow`
+     * (additive: the unlit colour) or `base` (opaque: the GBuffer base colour); textures by material texture index.
+     */
+    readonly programs: Partial<Record<"alpha" | "glow" | "base", GlslProgramRef>>
     /** By read index: the colour (and, translucent, alpha) the read adds going 0 -> 1, and the mean it was evaluated at. */
     readonly gains: Record<
       string,
@@ -119,6 +125,11 @@ export interface MaterialShaders {
       }
     >
   } | null
+}
+
+export interface GlslProgramRef {
+  readonly code: string
+  readonly textures: ReadonlyArray<{ readonly uniform: string; readonly texture: number }>
 }
 
 export interface ShadersFile {
@@ -293,13 +304,47 @@ export const shaders = Effect.fn("shaders")(function*(options: {
     // Engine textures (custom stencil / depth lookups that gate the level editor's ghost modes) read 1: the
     // plain, placed state. Material textures without a decodable mean read mid-grey.
     const engine = new Set(px.sampleValues.filter((_, i) => (base.reads[i]?.texture ?? -1) < 0))
-    const surface = surfaceOf(
-      px.module,
-      px.ir,
-      cbuf,
-      (v, ch) => means.get(v)?.[ch] ?? (engine.has(v) ? 1 : 0.5),
-      colour
-    )
+    const sampleMean = (v: string, ch: number) => means.get(v)?.[ch] ?? (engine.has(v) ? 1 : 0.5)
+    const surface = surfaceOf(px.module, px.ir, cbuf, sampleMean, colour)
+    // The output chains as GLSL: what the renderer runs where the linearised layers fall short.
+    const registers = materialTextureRegisters(px.module, base.textures.length)
+    const bc5 = new Set<number>()
+    for (const [i, register] of registers.entries()) {
+      const slot = base.textures[i]
+      const override = slot?.param == null ? undefined : chain.merged.textures[slot.param]
+      const texture = slot === undefined ? null : override ?? chain.root.referencedTextures[slot.index] ?? null
+      const format = texture === null ? undefined : str(get(dump, "textures", texture, "format"))
+      if ((format ?? "").startsWith("PF_BC5")) bc5.add(register)
+    }
+    const outs = outputs(px.module, px.ir)
+    const glslEnv: GlslEnv = {
+      evaluator: new Evaluator(px.module, {
+        cbuf: (ref) => cbuf(ref) ?? ENGINE_DEFAULTS[ref],
+        sample: sampleMean,
+        cfg: cfgOf(px.ir)
+      }),
+      materialTextures: new Set(registers),
+      bc5,
+      isTime: (ref) => ref === "View[167].z"
+    }
+    const program = (name: string, roots: ReadonlyArray<string | undefined>): GlslProgramRef | undefined => {
+      if (roots.some((r) => r === undefined)) return undefined
+      const p = emitProgram(px.module, glslEnv, name, roots.map((r) => r ?? "0.0"))
+      if (p.textures.length === 0) return undefined
+      return {
+        code: p.code,
+        textures: p.textures.map((t) => ({ uniform: t.uniform, texture: registers.indexOf(t.register) }))
+      }
+    }
+    const opaque = surface?.metallic !== null
+    const additive = chain.blendMode.includes("Additive")
+    const programs: Partial<Record<"alpha" | "glow" | "base", GlslProgramRef>> = {}
+    const alphaProgram = !opaque && !additive ? program("ballestAlpha", [outs.get("0.w")]) : undefined
+    const glowProgram = additive ? program("ballestGlow", ["0.x", "0.y", "0.z"].map((k) => outs.get(k))) : undefined
+    const baseProgram = opaque ? program("ballestBase", ["3.x", "3.y", "3.z"].map((k) => outs.get(k))) : undefined
+    if (alphaProgram) programs.alpha = alphaProgram
+    if (glowProgram) programs.glow = glowProgram
+    if (baseProgram) programs.base = baseProgram
     const gains: Record<
       string,
       { gain: readonly [number, number, number]; alpha: number; mean: readonly [number, number, number] }
@@ -321,6 +366,7 @@ export const shaders = Effect.fn("shaders")(function*(options: {
         alphaRange: surface.alphaRange,
         emissive: surface.emissive,
         emissiveSide: surface.emissiveSide,
+        programs,
         gains
       }
     }

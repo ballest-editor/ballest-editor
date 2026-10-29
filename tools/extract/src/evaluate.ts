@@ -15,6 +15,69 @@ export interface Env {
   readonly sample: (value: string, channel: number) => number
   /** The surface's world normal (UE frame, z up); default `UP`. */
   readonly normal?: readonly [number, number, number]
+  /** The shader's control flow (`cfgOf(ir)`), so a phi takes the branch its condition selects. */
+  readonly cfg?: Cfg
+  /** GPU-scene float4s by index, over `SCENE_ROWS` (tests, experiments). */
+  readonly scene?: Readonly<Record<number, readonly [number, number, number, number]>>
+}
+
+/** The basic blocks of a pixel shader: which block each value is defined in, and each block's terminator. */
+export interface Cfg {
+  readonly blockOf: ReadonlyMap<string, string>
+  /** Block label -> `br i1 %c, label %T, label %F` / `br label %X` / `ret ...` / `switch ...`. */
+  readonly terminators: ReadonlyMap<string, string>
+}
+
+/** The control flow of the (single) function in `ir`: entry block "0", then `N:` / `; <label>:N` blocks. */
+export const cfgOf = (ir: string): Cfg => {
+  const blockOf = new Map<string, string>()
+  const terminators = new Map<string, string>()
+  let block = "0"
+  for (const raw of ir.split("\n")) {
+    const line = raw.trim()
+    const label = line.match(/^(?:; <label>:(\d+)|(\d+):)/)
+    if (label) {
+      block = label[1] ?? label[2] ?? block
+      continue
+    }
+
+    const def = line.match(/^(%[\w.]+) = /)
+    if (def) blockOf.set(g(def, 1), block)
+    if (/^(br |ret |switch )/.test(line)) terminators.set(block, line)
+  }
+  return { blockOf, terminators }
+}
+
+const bitsView = new DataView(new ArrayBuffer(4))
+/** The float whose IEEE bits are `u`. */
+export const bits = (u: number): number => {
+  bitsView.setUint32(0, u >>> 0)
+  return bitsView.getFloat32(0)
+}
+/** The IEEE bits of `f`, as an int32. */
+const bitsOf = (f: number): number => {
+  bitsView.setFloat32(0, f)
+  return bitsView.getInt32(0)
+}
+
+/**
+ * GPU-scene instance data (a raw buffer, 44 float4 per instance; the instance id reads 0 so an index is
+ * the field), as for a piece sitting unrotated and unscaled at the origin: float4 2..4 are the rows of
+ * LocalToWorld and 5..7 of WorldToLocal, both identity; every other field (origin, bounds, flags) is 0.
+ * Positions the shader derives from them are then the piece's own object-space positions.
+ */
+const SCENE_ROWS: Record<number, readonly [number, number, number, number]> = {
+  2: [1, 0, 0, 0],
+  3: [0, 1, 0, 0],
+  4: [0, 0, 1, 0],
+  5: [1, 0, 0, 0],
+  6: [0, 1, 0, 0],
+  7: [0, 0, 1, 0],
+  // The instance's compressed transform (instance data float4 1, placed at 1024 by `Scene[0].x`, see
+  // ENGINE_DEFAULTS), chosen so the shader's decode yields the identity: rotation parts (32768, 32768 in
+  // x's halves; 16384 in y's low 15 bits, sign bit clear) give diag(1, 2, 2), and the per-axis scales
+  // (2, 1, 1) x 2^(141 - 142) in z's halves and w's low half even that out to 1, 1, 1.
+  1024: [bits(0x80008000), bits(0x00004000), bits(0x80018002), bits(0x008d8001)]
 }
 
 /** A surface facing up (a cube's top, the normal the evaluator uses by default). */
@@ -61,7 +124,7 @@ export class Evaluator {
   readonly #memo = new Map<string, number>()
   readonly #inputDependent: (v: string) => boolean
   readonly #pureInput: (v: string) => boolean
-  readonly #handles = new Map<string, string>()
+  readonly #handles: ReadonlyMap<string, string>
   #depth = 0
 
   constructor(m: Module, env: Env) {
@@ -70,10 +133,7 @@ export class Evaluator {
     const dependency = dependencyOf(m)
     this.#inputDependent = dependency.any
     this.#pureInput = dependency.pure
-    for (const [v, h] of m.handles) {
-      const cb = m.cbuffers.find((c) => c.register === h.register)
-      this.#handles.set(v, cb === undefined ? `cb${h.register}` : cb.type.replace(/^hostlayout\./, ""))
-    }
+    this.#handles = bufferNames(m)
   }
 
   /** The value, or undefined when the chain is not a float expression this evaluator understands. */
@@ -103,6 +163,11 @@ export class Evaluator {
       const cb = agg.match(/cbufferLoadLegacy\.\w+\(i32 \d+, %dx\.types\.Handle (%[\w.]+), i32 (\d+)\)/)
       if (cb) return this.#env.cbuf(`${this.#handles.get(g(cb, 1)) ?? "?"}[${g(cb, 2)}].${"xyzw"[ch]}`) ?? 0
       if (agg.includes("@dx.op.sample")) return this.#env.sample(g(ev, 1), ch)
+      const raw = agg.match(/@dx\.op\.rawBufferLoad\.f32\(i32 \d+, %dx\.types\.Handle %[\w.]+, i32 (\S+),/)
+      if (raw) {
+        const index = this.int(g(raw, 1))
+        return (this.#env.scene?.[index] ?? SCENE_ROWS[index])?.[ch] ?? 0
+      }
       return 0
     }
     // A dot product the compiler expanded into multiplies and adds of input-derived vectors (N·V and
@@ -148,19 +213,17 @@ export class Evaluator {
     }
     const sel = d.match(/^select i1 (\S+), float (\S+), float (\S+)$/)
     if (sel) {
-      const cond = this.#bool(g(sel, 1))
+      const cond = this.bool(g(sel, 1))
       return cond === undefined ? this.value(g(sel, 3)) : cond ? this.value(g(sel, 2)) : this.value(g(sel, 3))
     }
     if (d.startsWith("phi ")) {
-      // The incoming from the earliest block is the plain path: the special cases (a decal to blend, a
-      // selection highlight) branch off into later blocks and merge back here.
-      const incoming = [...d.matchAll(/\[ (\S+), %(\d+) \]/g)]
-        .sort((a, b) => num(a[2]) - num(b[2]))
-      const entry = incoming[0]
-      return entry === undefined ? 0 : this.value(g(entry, 1))
+      const entry = this.phiEntry(v)
+      return entry === undefined ? 0 : this.value(entry)
     }
     const conv = d.match(/^(?:sitofp|uitofp) \S+ (\S+) to float$/)
-    if (conv) return this.#int(g(conv, 1))
+    if (conv) return this.int(g(conv, 1))
+    const fromBits = d.match(/^bitcast i32 (\S+) to float$/)
+    if (fromBits) return bits(this.int(g(fromBits, 1)))
     return 0
   }
 
@@ -178,6 +241,45 @@ export class Evaluator {
     if (sig.name.startsWith("TEXCOORD10")) return component === 0 ? 1 : 0
     if (sig.name === "TEXCOORD") return 0.5
     return 0
+  }
+
+  /**
+   * The incoming value a phi takes: the one from the predecessor the control flow actually runs through
+   * (branch conditions evaluated like everything else: the instance-transform decode is taken, a decal
+   * blend is not); without a control flow graph, or when the walk never reaches the phi's block, the
+   * incoming from the earliest block (the plain path, before the special cases branch off).
+   */
+  phiEntry(v: string): string | undefined {
+    const d = this.#m.defs.get(v) ?? ""
+    const incoming = [...d.matchAll(/\[ (\S+), %(\d+) \]/g)].map((i) => ({ value: g(i, 1), block: g(i, 2) }))
+    const block = this.#env.cfg?.blockOf.get(v)
+    const pred = block === undefined ? undefined : this.#predecessors().get(block)
+    const taken = pred === undefined ? undefined : incoming.find((i) => i.block === pred)
+    if (taken !== undefined) return taken.value
+    return incoming.sort((a, b) => num(a.block) - num(b.block))[0]?.value
+  }
+
+  #preds: Map<string, string> | undefined
+  /** Block -> the block the walk came from, walking the control flow from the entry with evaluated conditions. */
+  #predecessors(): Map<string, string> {
+    if (this.#preds !== undefined) return this.#preds
+    const preds = new Map<string, string>()
+    this.#preds = preds
+    const cfg = this.#env.cfg
+    if (cfg === undefined) return preds
+    let block = "0"
+    for (let step = 0; step < 10000; step++) {
+      const t = cfg.terminators.get(block) ?? ""
+      const cond = t.match(/^br i1 (\S+), label %(\d+), label %(\d+)/)
+      const jump = t.match(/^br label %(\d+)/)
+      let next: string | undefined
+      if (cond) next = this.bool(g(cond, 1)) === true ? g(cond, 2) : g(cond, 3)
+      else if (jump) next = g(jump, 1)
+      if (next === undefined || preds.has(next)) break // ret, or a loop: keep the first way in
+      preds.set(next, block)
+      block = next
+    }
+    return preds
   }
 
   /** A load of the vertex normal (UE's TEXCOORD11). */
@@ -243,7 +345,8 @@ export class Evaluator {
     return terms.every(([a, b]) => this.#pureInput(a) && this.#pureInput(b))
   }
 
-  #bool(v: string): boolean | undefined {
+  /** An i1 value (a comparison, and/or of them); undefined when it is not one this evaluator understands. */
+  bool(v: string): boolean | undefined {
     const d = this.#m.defs.get(v)
     if (d === undefined) return v === "true" ? true : v === "false" ? false : undefined
     const cmp = d.match(/^fcmp (?:fast )?(\w+) float (\S+), (\S+)$/)
@@ -274,7 +377,7 @@ export class Evaluator {
     }
     const icmp = d.match(/^icmp (\w+) i32 (\S+), (\S+)$/)
     if (icmp) {
-      const a = this.#int(g(icmp, 2)), b = this.#int(g(icmp, 3))
+      const a = this.int(g(icmp, 2)), b = this.int(g(icmp, 3))
       switch (g(icmp, 1)) {
         case "eq":
           return a === b
@@ -286,14 +389,15 @@ export class Evaluator {
     }
     const andOr = d.match(/^(and|or) i1 (\S+), (\S+)$/)
     if (andOr) {
-      const a = this.#bool(g(andOr, 2)), b = this.#bool(g(andOr, 3))
+      const a = this.bool(g(andOr, 2)), b = this.bool(g(andOr, 3))
       if (a === undefined || b === undefined) return undefined
       return andOr[1] === "and" ? a && b : a || b
     }
     return undefined
   }
 
-  #int(v: string): number {
+  /** An i32 value: literals, integer constant-buffer loads, and integer arithmetic over them; 0 otherwise. */
+  int(v: string): number {
     const n = Number(v)
     if (Number.isFinite(n)) return n
     const d = this.#m.defs.get(v) ?? ""
@@ -303,9 +407,17 @@ export class Evaluator {
       const cb = agg.match(/cbufferLoadLegacy\.i32\(i32 \d+, %dx\.types\.Handle (%[\w.]+), i32 (\d+)\)/)
       if (cb) return this.#env.cbuf(`${this.#handles.get(g(cb, 1)) ?? "?"}[${g(cb, 2)}].${"xyzw"[num(ev[2])]}`) ?? 0
     }
-    const bin = d.match(/^(and|or|shl|lshr|add|mul) i32 (\S+), (\S+)$/)
+    const toBits = d.match(/^bitcast float (\S+) to i32$/)
+    if (toBits) return bitsOf(this.value(g(toBits, 1)))
+    const sel = d.match(/^select i1 (\S+), i32 (\S+), i32 (\S+)$/)
+    if (sel) return this.bool(g(sel, 1)) === true ? this.int(g(sel, 2)) : this.int(g(sel, 3))
+    if (d.startsWith("phi ")) {
+      const entry = this.phiEntry(v)
+      return entry === undefined ? 0 : this.int(entry)
+    }
+    const bin = d.match(/^(and|or|xor|shl|lshr|add|sub|mul)(?: nuw)?(?: nsw)? i32 (\S+), (\S+)$/)
     if (bin) {
-      const a = this.#int(g(bin, 2)), b = this.#int(g(bin, 3))
+      const a = this.int(g(bin, 2)), b = this.int(g(bin, 3))
       switch (bin[1]) {
         case "and":
           return a & b
@@ -315,10 +427,14 @@ export class Evaluator {
           return a << b
         case "lshr":
           return a >>> b
+        case "xor":
+          return a ^ b
         case "add":
-          return a + b
+          return (a + b) | 0
+        case "sub":
+          return (a - b) | 0
         default:
-          return a * b
+          return Math.imul(a, b)
       }
     }
     return 0
@@ -353,6 +469,16 @@ export interface Surface {
   readonly gains: Record<string, readonly [number, number, number]>
 }
 
+/** SSA handle -> the constant buffer's type name (`Material`, `View`), or `cbN` for an unnamed one. */
+export const bufferNames = (m: Module): ReadonlyMap<string, string> => {
+  const names = new Map<string, string>()
+  for (const [v, h] of m.handles) {
+    const cb = m.cbuffers.find((c) => c.register === h.register)
+    names.set(v, cb === undefined ? `cb${h.register}` : cb.type.replace(/^hostlayout\./, ""))
+  }
+  return names
+}
+
 /** Engine constant-buffer values the material math reads that are fixed in practice. */
 export const ENGINE_DEFAULTS: Record<string, number> = {
   // View.RoughnessOverrideParameter: roughness * y + x
@@ -365,7 +491,17 @@ export const ENGINE_DEFAULTS: Record<string, number> = {
   "View[161].w": 1,
   "View[162].w": 1,
   // The translucent passes clamp their scene colour to this maximum: effectively none.
-  "View[358].z": 1e6
+  "View[358].z": 1e6,
+  // View.SVPositionToTranslatedWorld (rows 44..47) = identity and View.PreViewTranslation (128) = 0: the
+  // world position a pixel shader rebuilds from SV_Position is SV_Position itself, so the renderer can
+  // feed the object-space position there (the piece sits at the origin, see SCENE_ROWS).
+  "View[44].x": 1,
+  "View[45].y": 1,
+  "View[46].z": 1,
+  "View[47].w": 1,
+  // Scene.InstanceDataShift (the instance id reads 0): the instance's data starts at float4 1 << 10, clear
+  // of the primitive data at 0..43 (SCENE_ROWS).
+  "Scene[0].x": 10
 }
 
 /**
@@ -408,8 +544,8 @@ const diffuseOf = (m: Module): ReadonlyArray<string> | null => {
   return Object.keys(out).length === 3 ? out : null
 }
 
-/** The value a render-target output stores, before the decal blend (the entry-block side of its phi). */
-const outputs = (m: Module, ir: string): Map<string, string> => {
+/** The value each render-target output (`"<target>.<channel>"`, e.g. `0.w`) stores. */
+export const outputs = (m: Module, ir: string): Map<string, string> => {
   const out = new Map<string, string>()
   for (const s of ir.matchAll(/@dx\.op\.storeOutput\.f32\(i32 \d+, i32 (\d+), i32 (\d+), i8 (\d+), float (\S+)\)/g)) {
     const sig = m.outputs.find((x) => x.id === num(s[1]))
@@ -443,11 +579,13 @@ export const surfaceOf = (
   const diffuse = opaque ? null : diffuseOf(m)
   const base = opaque ? gbuffer : diffuse ?? [undefined, undefined, undefined]
   const alpha = opaque ? undefined : outs.get("0.w")
+  const cfg = cfgOf(ir)
   const at = (overrides: ReadonlyMap<string, number>, normal: readonly [number, number, number]) => {
     const e = new Evaluator(m, {
       cbuf: (ref) => cbuf(ref) ?? ENGINE_DEFAULTS[ref],
       sample: (v, ch) => overrides.get(v) ?? means(v, ch),
-      normal
+      normal,
+      cfg
     })
     return {
       rgb: base.map((b) => (b === undefined ? 0 : e.value(b))),
