@@ -118,9 +118,10 @@ describe("edits", () => {
       [2, 4]
     ])
     assert.strictEqual(pasteItems(target, copyItems(target, [])), target)
-    // a published map has no editorState to keep pivots in
+    // a published map gets an editorState to keep the pivots in, but only when there are some
     const { editorState: _, ...published } = target
-    assert.isUndefined(pasteItems(published, clip).editorState)
+    assert.deepStrictEqual(pasteItems(published, clip).editorState?.pivots.map((p) => p.itemIndex), [2])
+    assert.isUndefined(pasteItems(published, { ...clip, pivots: [] }).editorState)
   })
 
   it("validates items and renames levels", () => {

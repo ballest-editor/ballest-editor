@@ -37,6 +37,7 @@ import { ItemProperties } from "./ItemProperties"
 import { ShiftClick } from "./MouseButtonIcon"
 import { NumberField } from "./NumberField"
 import { PaintSection } from "./PaintSection"
+import { PivotSection } from "./PivotSection"
 import { SectionTitle } from "./SectionTitle"
 
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
@@ -418,6 +419,9 @@ export function Inspector() {
             />
           ))}
         </div>
+
+        <Separator />
+        <PivotSection />
 
         <Separator />
         <SectionTitle>Paint</SectionTitle>

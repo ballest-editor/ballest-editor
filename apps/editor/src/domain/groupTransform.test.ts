@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
-import type { UeTransform, Vec3 } from "./coords"
+import { expectVec } from "../test/vec"
+import type { UeTransform } from "./coords"
 import { applyGroupDelta, type Axis, readField, selectionAxisEdit, type TransformField } from "./groupTransform"
+import { localToWorld } from "./pivot"
 import { rotateVec, rotatorToQuat } from "./ueMath"
 
 const at = (x: number, y: number, z: number, rotation = { x: 0, y: 0, z: 0, w: 1 }): UeTransform => ({
@@ -9,11 +11,6 @@ const at = (x: number, y: number, z: number, rotation = { x: 0, y: 0, z: 0, w: 1
   scale3D: { x: 1, y: 1, z: 1 }
 })
 const yaw90 = { x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 } // game X turns to game Y
-const expectVec = (actual: Vec3, expected: Vec3) => {
-  expect(actual.x).toBeCloseTo(expected.x, 9)
-  expect(actual.y).toBeCloseTo(expected.y, 9)
-  expect(actual.z).toBeCloseTo(expected.z, 9)
-}
 
 describe("group transforms", () => {
   it("translates every item by the same offset", () => {
@@ -51,6 +48,27 @@ describe("group transforms", () => {
     // a mirrored item keeps its sign
     const mirrored = applyGroupDelta({ ...at(0, 0, 0), scale3D: { x: -1, y: 1, z: 1 } }, pivot, axisX)
     expect(mirrored.scale3D).toEqual({ x: -3, y: 1, z: 1 })
+  })
+
+  it("scales about each item's own pivot, which stays put", () => {
+    const top = { x: 0, y: 0, z: 100 }
+    const turned = { ...at(10, 20, 30, yaw90), scale3D: { x: 2, y: 1, z: 0.5 } }
+    for (const delta of [{ kind: "scale", factor: 3 }, { kind: "scale", factor: 0.5, axis: "z" }] as const) {
+      const out = applyGroupDelta(turned, { x: 999, y: 0, z: 0 }, delta, top)
+      expectVec(localToWorld(out, top), localToWorld(turned, top))
+    }
+    // a pivot along X doesn't move under a Z scale
+    const back = { x: 250, y: 0, z: 0 }
+    const out = applyGroupDelta(turned, { x: 0, y: 0, z: 0 }, { kind: "scale", factor: 4, axis: "z" }, back)
+    expectVec(out.translation, turned.translation)
+  })
+
+  it("turns the group about the active item's pivot point", () => {
+    const pivot = localToWorld(at(100, 0, 0), { x: 0, y: 0, z: 50 })
+    const out = applyGroupDelta(at(100, 0, 0), pivot, { kind: "rotate", rotation: yaw90 })
+    expectVec(out.translation, { x: 100, y: 0, z: 0 }) // the pivot sits above the origin, so it only turns
+    const other = applyGroupDelta(at(200, 0, 0), pivot, { kind: "rotate", rotation: yaw90 })
+    expectVec(other.translation, { x: 100, y: 100, z: 0 })
   })
 
   it("never scales to zero", () => {
