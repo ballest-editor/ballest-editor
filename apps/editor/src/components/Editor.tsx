@@ -11,6 +11,7 @@ import { useActionKeys } from "../editor/useActionKeys"
 import { Viewport } from "../editor/Viewport"
 import { ExportDialog } from "./ExportDialog"
 import { Inspector } from "./Inspector"
+import { KeybindCheatSheet } from "./KeybindCheatSheet"
 import { NewMapDialog } from "./NewMapDialog"
 import { Palette } from "./Palette"
 import { SettingsDialog } from "./SettingsDialog"
@@ -110,6 +111,7 @@ export function Editor() {
         onCategoryChange={setSettingsCategory}
         onClose={close}
       />
+      <KeybindCheatSheet />
       <Toaster position="bottom-right" />
     </TooltipProvider>
   )

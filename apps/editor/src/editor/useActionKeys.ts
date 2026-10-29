@@ -1,6 +1,6 @@
 import { useEffect } from "react"
 import { isMovementChord, sharedKeysFlyFreely } from "../domain/flyKeys"
-import { actionsFor, chordOf, type KeybindAction } from "../domain/Keybinds"
+import { actionsFor, chordOf, type KeybindAction, releasesBinding } from "../domain/Keybinds"
 import { deleteSelection, duplicateSelection } from "./actions"
 import { commands } from "./commands"
 import { isEditorKeyEvent } from "./FlyCamera"
@@ -42,6 +42,8 @@ const oneShot = (action: KeybindAction): (() => void) | undefined => {
       return () => commands.openImport()
     case "exportMap":
       return () => s.openDialog("export")
+    case "showKeybinds":
+      return () => s.setCheatSheet(true)
     default:
       return undefined // held keys and mouse drags: FlyCamera; selection clicks: the viewport
   }
@@ -53,7 +55,8 @@ const interactionActive = () => sceneRegistry.gizmoDragActive() || useEditor.get
  * One-shot actions, matched on the full chord. Ignored in text fields and dialogs, while a
  * look drag is active (the fly keys own the keyboard then), and while a gizmo drag or
  * number-field scrub is in progress (it commits as one undo step on release; undo or
- * delete mid-interaction would be overwritten or orphan it).
+ * delete mid-interaction would be overwritten or orphan it). The cheat sheet is the one
+ * held action here: it hides when a key of its binding is released or the window blurs.
  */
 export function useActionKeys() {
   useEffect(() => {
@@ -76,7 +79,18 @@ export function useActionKeys() {
         return
       }
     }
+    const hideCheatSheet = () => useEditor.getState().setCheatSheet(false)
+    const onKeyUp = (e: KeyboardEvent) => {
+      const { cheatSheet, keybinds } = useEditor.getState()
+      if (cheatSheet && keybinds.showKeybinds.some((binding) => releasesBinding(binding, e.code))) hideCheatSheet()
+    }
     window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
+    window.addEventListener("keyup", onKeyUp)
+    window.addEventListener("blur", hideCheatSheet)
+    return () => {
+      window.removeEventListener("keydown", onKeyDown)
+      window.removeEventListener("keyup", onKeyUp)
+      window.removeEventListener("blur", hideCheatSheet)
+    }
   }, [])
 }
