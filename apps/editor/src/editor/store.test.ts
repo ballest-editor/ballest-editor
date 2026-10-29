@@ -3,8 +3,10 @@ import { Schema } from "effect"
 import fixture from "../domain/bundledCatalog.json"
 import { Catalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
+import { withLevelNames } from "../domain/edits"
 import { placementTransform } from "../domain/factory"
 import { isPlayerStart } from "../domain/MapFile"
+import { withDifficulty } from "../domain/mapTags"
 import { defaultSettings } from "../domain/Settings"
 import { initialMap, nextSelection, useEditor } from "./store"
 
@@ -61,6 +63,29 @@ describe("editor store", () => {
     assert.strictEqual(s().floorHeight, 8615)
     s().loadMap(s().doc.map, null)
     assert.strictEqual(s().floorHeight, 500)
+  })
+
+  it("loads a map at a saved grid height, and sets it without an undo step", () => {
+    const s = () => useEditor.getState()
+    s().loadMap(initialMap(), null, 1200)
+    assert.strictEqual(s().floorHeight, 1200)
+    s().setFloorHeight(-50)
+    assert.strictEqual(s().floorHeight, -50)
+    assert.strictEqual(s().past.length, 0)
+  })
+
+  it("changes the level data as one undo step, and not at all when nothing changed", () => {
+    const s = () => useEditor.getState()
+    s().loadMap(initialMap(), null)
+    const before = s().doc.map.worldSettings.levelData
+    s().setLevelData({ ...before })
+    assert.strictEqual(s().past.length, 0)
+    s().setLevelData(withLevelNames(withDifficulty(before, "expert"), "Night Run", "me"))
+    assert.strictEqual(s().past.length, 1)
+    assert.strictEqual(s().doc.map.worldSettings.levelData.userLevelName, "Night Run_me")
+    assert.strictEqual(s().doc.map.worldSettings.levelData.levelDifficulty, "Expert")
+    s().undo()
+    assert.deepStrictEqual(s().doc.map.worldSettings.levelData, before)
   })
 
   it("reports whether a transform was accepted", () => {

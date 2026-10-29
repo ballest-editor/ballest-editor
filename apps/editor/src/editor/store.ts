@@ -13,6 +13,7 @@ import {
   copyItems,
   pasteItems,
   removeItems,
+  setLevelData,
   setLevelNames,
   setProperties,
   setSlotMaterials,
@@ -26,7 +27,7 @@ import type { PropertyChange } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
 import { LIMITS } from "../domain/limits"
-import { isPlayerStart, type ItemTransform, type MapFile } from "../domain/MapFile"
+import { isPlayerStart, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
 import type { PaintPicker } from "../domain/Paint"
 import { defaultSettings, type Settings } from "../domain/Settings"
@@ -64,7 +65,7 @@ export interface Snapshot {
 export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
 export type Tool = "select" | "translate" | "rotate" | "scale"
-export type Dialog = "new" | "export" | "settings"
+export type Dialog = "new" | "export" | "settings" | "project"
 export type SettingsCategory = "general" | "camera" | "keybinds" | "appearance"
 
 const HISTORY_LIMIT = 200
@@ -80,8 +81,9 @@ export const initialMap = () => newMapFile({ displayName: "Untitled", creatorNam
 export interface EditorState {
   readonly doc: Doc
   /**
-   * The height (UE cm) the grid is drawn at and palette pieces land on: the player start's,
-   * taken when the map loads so it stays put while the start is moved.
+   * The height (UE cm) the grid is drawn at and palette pieces land on: by default the player
+   * start's, taken when the map loads so it stays put while the start is moved. Project settings
+   * can change it (kept per map in MapPrefsStore, not in the file or its history).
    */
   readonly floorHeight: number
   /** Undo stack, oldest first (at most HISTORY_LIMIT entries). */
@@ -130,7 +132,8 @@ export interface EditorState {
   readonly focusRequest: number
   readonly frameAllRequest: number
 
-  readonly loadMap: (map: MapFile, sourceName: string | null) => void
+  /** Replaces the document; `floorHeight` defaults to the map's player start height. */
+  readonly loadMap: (map: MapFile, sourceName: string | null, floorHeight?: number) => void
   readonly replaceMapSilently: (map: MapFile) => void
   readonly placePiece: (piece: CatalogPiece, transform: ItemTransform) => void
   /**
@@ -172,6 +175,9 @@ export interface EditorState {
    */
   readonly endDuplicateDrag: (transforms: ReadonlyMap<string, UeTransform> | null) => boolean
   readonly renameLevel: (displayName: string, creatorName: string) => void
+  /** Replaces `worldSettings.levelData` as one undo step (none when nothing changes). */
+  readonly setLevelData: (levelData: LevelData) => void
+  readonly setFloorHeight: (floorHeight: number) => void
   /** Restores the previous snapshot, including its selection. */
   readonly undo: () => void
   readonly redo: () => void
@@ -294,10 +300,10 @@ export const useEditor = create<EditorState>()((set, get) => {
     focusRequest: 0,
     frameAllRequest: 0,
 
-    loadMap: (map, sourceName) =>
+    loadMap: (map, sourceName, floorHeight) =>
       set((s) => ({
         doc: docOf(map),
-        floorHeight: floorHeightOf(map),
+        floorHeight: floorHeight ?? floorHeightOf(map),
         past: [],
         future: [],
         dirty: false,
@@ -435,6 +441,14 @@ export const useEditor = create<EditorState>()((set, get) => {
       if (displayName === levelDisplayName && creatorName === currentCreator) return
       commit({ map: setLevelNames(doc.map, displayName, creatorName), ids: doc.ids })
     },
+
+    setLevelData: (levelData) => {
+      const { doc } = get()
+      if (JSON.stringify(levelData) === JSON.stringify(doc.map.worldSettings.levelData)) return
+      commit({ map: setLevelData(doc.map, levelData), ids: doc.ids })
+    },
+
+    setFloorHeight: (floorHeight) => set({ floorHeight }),
 
     undo: () =>
       set((s) => {

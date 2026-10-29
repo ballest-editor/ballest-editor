@@ -27,7 +27,7 @@ Plain UTF-8 JSON, tab-indented, CRLF line endings, no BOM. `.balledit` and `.bal
     levelData: {
       systemLevelName: "Map_LevelEditorMain",
       userLevelName: "<displayName>_<creator>",
-      levelDifficulty: "Beginner",
+      levelDifficulty: "Beginner",                   // EBallgameDifficulty; see "Difficulty and tags"
       levelDescription: "",
       uploaderOnlyLevelPreviewImagePath: "",
       bValidated: bool,                              // true once a validation run has been completed in-game
@@ -61,6 +61,21 @@ Item = {
 ```
 
 Round-trip: `json.dumps(d, indent='\t', ensure_ascii=False)` with `\n` → `\r\n` is semantically identical but not byte-identical — UE's writer puts the opening `{`/`[` of nested values on its own line (Allman style). The game parses with a generic JSON reader, so whitespace is irrelevant; a custom writer can match it exactly if we ever want clean diffs against in-game saves.
+
+## Difficulty and tags
+
+The game's publish screen sets a difficulty and Workshop tags. Both end up in `levelData`.
+
+- **Difficulty:** five levels, from `EBallgameDifficulty` in the exe and the English locres. The names are Beginner, Medium, Advanced, Expert and Baller. Baller shows as a yellow warning sign; the other four show 1–4 bars in white, green, blue and red. The tag is `MapTags.UGCTags.Difficulty.<beginner|medium|advanced|expert|baller>`. Every sample has `levelDifficulty: "Beginner"`, even the published ones tagged medium, advanced or expert, so the tag is what the game uses. The editor writes both.
+- **Tags:** `MapTags.UGCTags.<Group>.<tag>`, in the screen's groups:
+  - Gameplay: balance, climb, downhill, endurance, flow, mini, ninja, out and back, pathfinding, practice, precision, puzzle, RPG, speed, tech, troll.
+  - Mood: day, night, sunrise, sunset.
+  - Routes: multiple, single, symmetrical.
+  - Props: rubber, vents.
+- **Map type tag:** every file with tags lists `UGCTypes.Map` first.
+- **Old tags:** older Workshop maps use an ungrouped form, `MapTags.UGCTags.<tag>`, e.g. `MapTags.UGCTags.expert`. The editor keeps those as they are.
+- **No limit found:** neither the exe nor the locres has a cap on the number of tags. One sample (A08 Lover 3) has 25 tags, including all 16 gameplay tags.
+- **Grid height:** the editor keeps it outside the file, in localStorage keyed by `userLevelName`. The file has no field for it, and the game validates `editorState` and rewrites it on every save.
 
 ## Catalog (from 22 sample maps, 9.9k items)
 
