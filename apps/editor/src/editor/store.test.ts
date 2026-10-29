@@ -442,12 +442,15 @@ describe("editor store", () => {
     s().select(s().doc.ids.slice(1))
     const before = s().past.length
     const strength = { list: "floatProperties", name: "Strength", type: "Float" } as const
-    assert.isTrue(s().setSelectionProperty(strength, 2))
+    assert.isTrue(s().setSelectionProperties([{ property: strength, value: 2 }]))
     assert.deepStrictEqual(s().doc.map.items.map((i) => i.floatProperties.map((p) => p.currentValue)), [[], [2], [2]])
     assert.strictEqual(s().past.length, before + 1)
-    assert.isTrue(s().setSelectionProperty(strength, 2)) // unchanged: no step
+    assert.isTrue(s().setSelectionProperties([{ property: strength, value: 2 }])) // unchanged: no step
     assert.strictEqual(s().past.length, before + 1)
-    assert.isFalse(s().setSelectionProperty(strength, "fast"))
+    const weight = { list: "floatProperties", name: "Weight", type: "Float" } as const
+    // all or nothing: a bad value leaves the good one unset too
+    assert.isFalse(s().setSelectionProperties([{ property: weight, value: 1 }, { property: strength, value: "fast" }]))
+    assert.deepStrictEqual(s().doc.map.items[1]?.floatProperties.map((p) => p.propertyName), ["Strength"])
     assert.strictEqual(s().past.length, before + 1)
     s().undo()
     assert.deepStrictEqual(s().doc.map.items.map((i) => i.floatProperties.length), [0, 0, 0])

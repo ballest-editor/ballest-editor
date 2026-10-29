@@ -14,13 +14,13 @@ import {
   pasteItems,
   removeItems,
   setLevelNames,
-  setProperty,
+  setProperties,
   setTransforms,
   validateItem
 } from "../domain/edits"
 import { itemFromPiece, newMapFile } from "../domain/factory"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
-import type { ItemProperty } from "../domain/itemProperties"
+import type { PropertyChange } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { LIMITS } from "../domain/limits"
 import { isPlayerStart, type ItemTransform, type MapFile } from "../domain/MapFile"
@@ -125,10 +125,10 @@ export interface EditorState {
    */
   readonly transformItems: (transforms: ReadonlyMap<string, UeTransform>) => boolean
   /**
-   * Sets a property on every selected item as one undo step; false (with a notice, and
-   * nothing changed) when the value doesn't fit the property.
+   * Sets properties on every selected item as one undo step (a colour's three channels are
+   * one edit); false (with a notice, and nothing changed) when a value doesn't fit its property.
    */
-  readonly setSelectionProperty: (property: Pick<ItemProperty, "list" | "name" | "type">, value: unknown) => boolean
+  readonly setSelectionProperties: (changes: ReadonlyArray<PropertyChange>) => boolean
   readonly deleteSelection: () => void
   /** Copies the selected items in place (one undo step) and selects the copies. */
   readonly duplicateSelection: () => void
@@ -310,16 +310,19 @@ export const useEditor = create<EditorState>()((set, get) => {
       return false
     },
 
-    setSelectionProperty: (property, value) => {
+    setSelectionProperties: (changes) => {
       const s = get()
       const indices = selectedIndices(s)
-      const next = setProperty(s.doc.map, indices, property, value)
+      const next = setProperties(s.doc.map, indices, changes)
       if (Option.isNone(next)) {
-        s.notify("error", `${JSON.stringify(value)} isn't a valid value for ${property.name}.`)
+        const names = changes.map((c) => `${JSON.stringify(c.value)} for ${c.property.name}`).join(", ")
+        s.notify("error", `Not a valid value: ${names}.`)
         return false
       }
       const unchanged = indices.every((i) =>
-        s.doc.map.items[i]?.[property.list].some((p) => p.propertyName === property.name && p.currentValue === value)
+        changes.every(({ property, value }) =>
+          s.doc.map.items[i]?.[property.list].some((p) => p.propertyName === property.name && p.currentValue === value)
+        )
       )
       if (!unchanged) commit({ map: next.value, ids: s.doc.ids })
       return true

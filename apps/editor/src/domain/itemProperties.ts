@@ -176,6 +176,61 @@ export const withProperty = (
   return Option.some({ ...item, [property.list]: next })
 }
 
+/** A value to set on one property; several are set together as one edit. */
+export interface PropertyChange {
+  readonly property: Pick<ItemProperty, "list" | "name" | "type">
+  readonly value: unknown
+}
+
+/**
+ * A colour the game edits with one swatch: three float properties, one per linear channel
+ * (`DecalRed/Green/Blue`, `LightRed/Green/Blue`, `LightColorR/G/B`).
+ */
+export interface ColorProperty {
+  readonly label: string
+  readonly channels: readonly [red: ItemProperty, green: ItemProperty, blue: ItemProperty]
+}
+
+/** An inspector row: one property, or a colour made of three. */
+export type PropertyRow =
+  | { readonly _tag: "Property"; readonly property: ItemProperty }
+  | { readonly _tag: "Color"; readonly color: ColorProperty }
+
+/** Channel name suffixes, and what the name before them must end with (so `LightR` alone isn't one). */
+const CHANNEL_SUFFIXES: ReadonlyArray<
+  { readonly names: readonly [string, string, string]; readonly prefixEnd: string }
+> = [
+  { names: ["Red", "Green", "Blue"], prefixEnd: "" },
+  { names: ["R", "G", "B"], prefixEnd: "Color" }
+]
+
+/** The colour a red channel starts, when its green and blue are in the same list. */
+const colorAt = (properties: ReadonlyArray<ItemProperty>, red: ItemProperty): ColorProperty | undefined => {
+  if (red.list !== "floatProperties") return undefined
+  for (const { names: [r, g, b], prefixEnd } of CHANNEL_SUFFIXES) {
+    const prefix = red.name.slice(0, -r.length)
+    if (!red.name.endsWith(r) || prefix === "" || !prefix.endsWith(prefixEnd)) continue
+    const channel = (suffix: string) => properties.find((p) => p.list === red.list && p.name === prefix + suffix)
+    const green = channel(g)
+    const blue = channel(b)
+    if (green === undefined || blue === undefined) continue
+    const label = propertyLabel(prefixEnd === "" ? `${prefix}Color` : prefix)
+    return { label, channels: [red, green, blue] }
+  }
+  return undefined
+}
+
+/** The properties as inspector rows: each colour's channels become one row where its red channel was. */
+export const propertyRows = (properties: ReadonlyArray<ItemProperty>): ReadonlyArray<PropertyRow> => {
+  const colors = properties.flatMap((p) => colorAt(properties, p) ?? [])
+  const inColor = new Set(colors.flatMap((c) => c.channels))
+  return properties.flatMap((property): ReadonlyArray<PropertyRow> => {
+    const color = colors.find((c) => c.channels[0] === property)
+    if (color !== undefined) return [{ _tag: "Color", color }]
+    return inColor.has(property) ? [] : [{ _tag: "Property", property }]
+  })
+}
+
 /** A readable label for a property name: `bFacingOnly` -> `Facing Only`, `DecalWidth` -> `Decal Width`. */
 export const propertyLabel = (name: string): string =>
   name.replace(/^b(?=[A-Z])/, "").replace(/([a-z0-9])([A-Z])/g, "$1 $2")

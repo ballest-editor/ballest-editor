@@ -1,12 +1,14 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
 import { CatalogPiece } from "./Catalog"
-import { setProperty } from "./edits"
+import { setProperties } from "./edits"
 import { identityTransform, itemFromPiece, newMapFile } from "./factory"
 import {
   defaultProperties,
+  type ItemProperty,
   optionLabel,
   propertyLabel,
+  propertyRows,
   selectionProperties,
   validPropertyValue,
   withProperty
@@ -116,9 +118,11 @@ describe("item properties", () => {
     assert.isFalse(validPropertyValue("boolProperties", 1))
     assert.isTrue(validPropertyValue("stringProperties", ""))
     const map = mapOf([placed(), placed()])
-    assert.isTrue(Option.isNone(setProperty(map, [0, 1], width, Number.NaN)))
-    assert.isTrue(Option.isNone(setProperty(map, [0, 5], width, 1)))
-    const next = Option.getOrThrow(setProperty(map, [0, 1], width, 1))
+    const set = (indices: ReadonlyArray<number>, value: unknown) =>
+      setProperties(map, indices, [{ property: width, value }])
+    assert.isTrue(Option.isNone(set([0, 1], Number.NaN)))
+    assert.isTrue(Option.isNone(set([0, 5], 1)))
+    const next = Option.getOrThrow(set([0, 1], 1))
     assert.deepStrictEqual(next.items.map((i) => i.floatProperties[0]?.currentValue), [1, 1])
     assert.strictEqual(map.items[0]!.floatProperties[0]!.currentValue, 200)
   })
@@ -141,5 +145,54 @@ describe("item properties", () => {
     assert.strictEqual(propertyLabel("QualifiedAirflowTargetSpeed"), "Qualified Airflow Target Speed")
     assert.strictEqual(propertyLabel("Field Magnitude"), "Field Magnitude")
     assert.strictEqual(propertyLabel("bool"), "bool")
+  })
+
+  it("groups a colour's three channels into one row where its red channel was", () => {
+    const property = (name: string, list: ItemProperty["list"] = "floatProperties"): ItemProperty => ({
+      list,
+      name,
+      type: "Float",
+      values: [1],
+      default: 1,
+      hidden: false,
+      options: undefined
+    })
+    const rowNames = (names: ReadonlyArray<ItemProperty>) =>
+      propertyRows(names).map((row) =>
+        row._tag === "Color"
+          ? `${row.color.label}: ${row.color.channels.map((c) => c.name).join("/")}`
+          : row.property.name
+      )
+    assert.deepStrictEqual(
+      rowNames([
+        property("bDecalEnabled", "boolProperties"),
+        property("DecalWidth"),
+        property("DecalRed"),
+        property("DecalGreen"),
+        property("DecalBlue"),
+        property("DecalTileSpacing")
+      ]),
+      ["bDecalEnabled", "DecalWidth", "Decal Color: DecalRed/DecalGreen/DecalBlue", "DecalTileSpacing"]
+    )
+    assert.deepStrictEqual(
+      rowNames([
+        property("LightBrightness"),
+        property("LightColorB"),
+        property("LightColorR"),
+        property("LightColorG")
+      ]),
+      ["LightBrightness", "Light Color: LightColorR/LightColorG/LightColorB"]
+    )
+    // not a colour: a channel missing, a single-letter suffix without "Color", or not floats
+    assert.deepStrictEqual(rowNames([property("LightRed"), property("LightGreen")]), ["LightRed", "LightGreen"])
+    assert.deepStrictEqual(rowNames([property("LightR"), property("LightG"), property("LightB")]), [
+      "LightR",
+      "LightG",
+      "LightB"
+    ])
+    assert.deepStrictEqual(
+      rowNames(["Red", "Green", "Blue"].map((c) => property(`Tint${c}`, "intProperties"))),
+      ["TintRed", "TintGreen", "TintBlue"]
+    )
   })
 })
