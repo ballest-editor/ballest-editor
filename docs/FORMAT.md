@@ -99,6 +99,23 @@ Practical ceiling is performance, not the parser: largest Workshop map seen is 3
 
 The in-game item browser is one table of 11 categories → data assets listing **100** item classes. `DA_UGCPlaybackRecipeRegistry` (the load-time allowlist) references **200** item classes. So ~100 classes are spawnable from a map file but hidden from the in-game browser: raw/fixture point, spot and rect lights, light cards 01–04, laser terminal, orange sign, boost platform/ring/volume, pinball launcher/paddle, circular flexible platform, shape decal, checkpoint strip/disc, shallow bowl, extra bevels. `BP_KillZone` is not an item class and not in the registry. `MP_PlayerStart` is placed by the editor, not the browser. The registry's per-class recipe data needs the game's own usmap and is unread.
 
+## The level (`Map_LevelEditorMain`)
+
+Every map is spawned into `/Game/Maps/LevelEditor/Map_LevelEditorMain`. Read from its cooked assets with `BallestExtract probe` (UE cm, world space). The editor's copies are in `apps/editor/src/domain/level.ts`.
+
+| What                          | Where it comes from                                           | Value                                               |
+| ----------------------------- | ------------------------------------------------------------- | --------------------------------------------------- |
+| Player start of a new map     | the level's `MP_PlayerStart` (Main)                           | (−3955, −1785, 8615), scale 0.276538                |
+| Goal of a new map             | the level's `BP_Checkpoint` (Main)                            | (−2790, −1863, 8896)                                |
+| Water surface                 | `BP_ArenaPieces.Water_Plane`: flat `SM_WaterTile` × 200       | z = 126.71326, 2 km square centred on (173, −2569)  |
+| Kill zone                     | `BP_KillZone`: box extent 32 × (1000, 1000, 0.25)             | z = 92–108, 640 m square centred on (−260, −4100)   |
+| Item placement bounds         | `BP_ItemPlacementBounds` (× 615) with ±50/±150 boundaries     | x −31062…30438, y −34598…26902, z −6569…177931      |
+| Arena (stands, seats, floors) | `BP_ArenaPieces` `ArenaBase`/`ArenaFloor*` at z −4232 × 6.875 | a stadium bowl around the water, far from the start |
+
+There is no floor near the start: the player start floats about 85 m above the water, and the ball spawns on it. Maps built near z = 0 sit under the water (opaque in game, so they look missing) and under the kill zone. Workshop maps do both: most build around the default start, some (Giga Tree, Ballest Of The Mall, Elevation Fight) build at water level. The editor draws the water and puts its grid at the map's player-start height.
+
+On load the game does not move items below the water: the `asdf new not loaded` → `asdf loaded and saved` drafts (an in-game load and save, in the game's `UserSavedMaps`, not in `samples/`) kept all 25 transforms unchanged, down to z = −1213. The `props probe` draft (written with everything near z = 0) came back from the game with its non-floor items 170–400 cm higher. Every offset is a multiple of 10 cm, which looks more like moves with the in-game editor's 10 cm snap than physics settling, but that is unconfirmed.
+
 ## Load-time validation (from exe strings)
 
 - transform must be finite, rotation normalized

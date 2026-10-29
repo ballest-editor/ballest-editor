@@ -14,7 +14,9 @@ import {
   useState
 } from "react"
 import * as THREE from "three"
+import { toTuple3, ueToThreeVector } from "../domain/coords"
 import { isBound, mouseChordOf } from "../domain/Keybinds"
+import { WATER } from "../domain/level"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { ItemObject } from "./ItemObject"
@@ -225,12 +227,14 @@ function ViewportBackground() {
   return null
 }
 
-/** The ground grid (1 m cells, 10 m sections), styled by the appearance settings. */
+/** The floor grid (1 m cells, 10 m sections) at the map's floor height, styled by the appearance settings. */
 function ViewportGrid() {
   const appearance = useEditor((s) => s.settings.appearance)
+  const floorHeight = useEditor((s) => s.floorHeight)
   if (!appearance.gridVisible) return null
   return (
     <Grid
+      position={[0, floorHeight, 0]}
       infiniteGrid
       cellSize={100}
       sectionSize={1000}
@@ -239,6 +243,24 @@ function ViewportGrid() {
       cellColor={appearance.gridCellColor}
       sectionColor={appearance.gridSectionColor}
     />
+  )
+}
+
+const WATER_POSITION = toTuple3(ueToThreeVector({ ...WATER.center, z: WATER.height }))
+const WATER_COLOR = "#2f7fb8"
+
+/**
+ * The level's water sheet. Translucent here so pieces under it stay visible (tinted), where
+ * the game's opaque water hides them. Not in the click raycast (that only walks the items).
+ */
+function Water() {
+  const visible = useEditor((s) => s.settings.appearance.waterVisible)
+  if (!visible) return null
+  return (
+    <mesh position={WATER_POSITION} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
+      <planeGeometry args={[WATER.size, WATER.size]} />
+      <meshBasicMaterial color={WATER_COLOR} transparent opacity={0.35} depthWrite={false} side={THREE.DoubleSide} />
+    </mesh>
   )
 }
 
@@ -306,6 +328,7 @@ export function Viewport(
         <hemisphereLight args={["#dfe8ff", "#30302a", 0.8]} />
         <directionalLight position={[3000, 8000, 2000]} intensity={1.6} />
         <ViewportGrid />
+        <Water />
         <MapItems />
         <SelectedOutlines />
         <GizmoController />

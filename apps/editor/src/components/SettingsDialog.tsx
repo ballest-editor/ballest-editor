@@ -630,6 +630,14 @@ export function SettingsDialog(props: {
             onChange={(v) => update("appearance", { gridSectionColor: v })}
           />
         )
+      },
+      {
+        id: "waterVisible",
+        ...setting("appearance", "waterVisible"),
+        label: "Show water",
+        description:
+          "The level's water surface. In game, pieces below it are hidden, and a ball that falls in respawns.",
+        control: <Switch checked={a.waterVisible} onCheckedChange={(v) => update("appearance", { waterVisible: v })} />
       }
     ]
   })()

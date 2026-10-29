@@ -66,12 +66,13 @@ export function FlyCamera() {
   const target = useRef(new THREE.Vector3())
   const euler = useRef(new THREE.Euler(0, 0, 0, "YXZ"))
 
-  // Placement point: ground-plane hit at screen centre, else a fixed distance ahead.
+  // Placement point: floor hit at screen centre, else a fixed distance ahead.
   useEffect(() => {
     sceneRegistry.camera = camera
     const raycaster = new THREE.Raycaster()
     const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
     sceneRegistry.placementPoint = () => {
+      ground.constant = -useEditor.getState().floorHeight // the plane y = floorHeight
       raycaster.setFromCamera(new THREE.Vector2(0, 0), camera)
       const hit = raycaster.ray.intersectPlane(ground, new THREE.Vector3())
       const point = hit !== null && hit.distanceTo(camera.position) < MAX_GROUND_HIT
@@ -223,7 +224,10 @@ export function FlyCamera() {
         const p = ueToThreeVector(item.itemTransform.translation)
         box.expandByPoint(new THREE.Vector3(p.x, p.y, p.z))
       }
-      if (box.isEmpty()) box.set(new THREE.Vector3(-500, 0, -500), new THREE.Vector3(500, 0, 500))
+      if (box.isEmpty()) {
+        const floor = useEditor.getState().floorHeight
+        box.set(new THREE.Vector3(-500, floor, -500), new THREE.Vector3(500, floor, 500))
+      }
       const sphere = box.getBoundingSphere(new THREE.Sphere())
       const radius = Math.max(sphere.radius, 1000)
       target.current.copy(sphere.center)
