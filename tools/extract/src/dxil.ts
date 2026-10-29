@@ -161,6 +161,208 @@ export const parseModule = (ir: string): Module => {
   return { defs, inputs, outputs, cbuffers, srvs, handles }
 }
 
+// ------------------------------------------------------------------ instructions
+// The instruction shapes `dxc -dumpbin` prints, read once here for the tracer, the evaluator and the GLSL
+// emitter: each walks the same SSA graph, one folding to numbers, one to source text.
+export type Instruction =
+  /** `@dx.op.loadInput`: signature `id`, row (semantic index) and component. */
+  | { readonly kind: "input"; readonly id: number; readonly row: number; readonly component: number }
+  /** `extractvalue %agg, ch`: channel `channel` of an aggregate (a load or a sample). */
+  | { readonly kind: "extract"; readonly aggregate: string; readonly channel: number }
+  /** `@dx.op.cbufferLoadLegacy.<type>(handle, index)`: a constant-buffer float4 / int4. */
+  | { readonly kind: "cbuffer"; readonly type: string; readonly handle: string; readonly index: number }
+  /** `@dx.op.sample*`: a texture read at `coords` (u, v, w). */
+  | {
+    readonly kind: "sample"
+    readonly op: string
+    readonly handle: string
+    readonly coords: readonly [string, string, string]
+  }
+  /** `@dx.op.rawBufferLoad` (GPU scene) / `@dx.op.bufferLoad` (vertex fetch) at `index`. */
+  | { readonly kind: "rawLoad" | "bufferLoad"; readonly handle: string; readonly index: string }
+  | { readonly kind: "float"; readonly op: "fmul" | "fadd" | "fsub" | "fdiv"; readonly a: string; readonly b: string }
+  /** `@dx.op.unary.f32(op, x)`, see UNARY_OPS. */
+  | { readonly kind: "unary"; readonly op: string; readonly x: string }
+  /** `@dx.op.binary.f32(op, a, b)`, see BINARY_OPS. */
+  | { readonly kind: "binary"; readonly op: string; readonly a: string; readonly b: string }
+  /** `@dx.op.tertiary.f32(46, a, b, c)`: a * b + c. */
+  | { readonly kind: "mad"; readonly a: string; readonly b: string; readonly c: string }
+  /** `@dx.op.dotN`: the first n operands against the last n. */
+  | { readonly kind: "dot"; readonly n: number; readonly operands: ReadonlyArray<string> }
+  | {
+    readonly kind: "select"
+    readonly type: "float" | "i32"
+    readonly cond: string
+    readonly a: string
+    readonly b: string
+  }
+  | { readonly kind: "phi"; readonly incoming: ReadonlyArray<{ readonly value: string; readonly block: string }> }
+  /** `sitofp` / `uitofp` (to float) and `fptosi` / `fptoui` (to i32). */
+  | { readonly kind: "toFloat" | "toInt"; readonly signed: boolean; readonly x: string }
+  | { readonly kind: "bitcast"; readonly to: "float" | "i32"; readonly x: string }
+  | { readonly kind: "fcmp" | "icmp"; readonly pred: string; readonly a: string; readonly b: string }
+  /** `and` / `or` of two i1 values. */
+  | { readonly kind: "logic"; readonly op: "and" | "or"; readonly a: string; readonly b: string }
+  /** Integer arithmetic, see INT_OPS. */
+  | { readonly kind: "int"; readonly op: string; readonly a: string; readonly b: string }
+  /** `@dx.op.binary.i32(op, a, b)`, see INT_BINARY_OPS. */
+  | { readonly kind: "ibinary"; readonly op: string; readonly a: string; readonly b: string }
+  /** Anything else (handles, stores, loads this never reads). */
+  | { readonly kind: "other" }
+
+const parseInstruction = (d: string): Instruction => {
+  let m = d.match(/@dx\.op\.loadInput\.\w+\(i32 \d+, i32 (\d+), i32 (\d+), i8 (\d+)/)
+  if (m) return { kind: "input", id: num(m[1]), row: num(m[2]), component: num(m[3]) }
+  m = d.match(/^extractvalue \S+ (%[\w.]+), (\d+)$/)
+  if (m) return { kind: "extract", aggregate: g(m, 1), channel: num(m[2]) }
+  m = d.match(/@dx\.op\.cbufferLoadLegacy\.(\w+)\(i32 \d+, %dx\.types\.Handle (%[\w.]+), i32 (\d+)\)/)
+  if (m) return { kind: "cbuffer", type: g(m, 1), handle: g(m, 2), index: num(m[3]) }
+  m = d.match(
+    /@dx\.op\.(sample\w*)\.f32\(i32 \d+, %dx\.types\.Handle (%[\w.]+), %dx\.types\.Handle %[\w.]+, float (\S+), float (\S+), float (\S+)/
+  )
+  if (m) return { kind: "sample", op: g(m, 1), handle: g(m, 2), coords: [g(m, 3), g(m, 4), g(m, 5)] }
+  m = d.match(/@dx\.op\.(rawBufferLoad|bufferLoad)\.\w+\(i32 \d+, %dx\.types\.Handle (%[\w.]+), i32 ([^,)\s]+)/)
+  if (m) return { kind: m[1] === "rawBufferLoad" ? "rawLoad" : "bufferLoad", handle: g(m, 2), index: g(m, 3) }
+  m = d.match(/^(fmul|fadd|fsub|fdiv) (?:fast )?float (\S+), (\S+)$/)
+  if (m) {
+    const op = m[1] === "fmul" ? "fmul" : m[1] === "fadd" ? "fadd" : m[1] === "fsub" ? "fsub" : "fdiv"
+    return { kind: "float", op, a: g(m, 2), b: g(m, 3) }
+  }
+  m = d.match(/@dx\.op\.unary\.f32\(i32 (\d+), float (\S+)\)/)
+  if (m) return { kind: "unary", op: g(m, 1), x: g(m, 2) }
+  m = d.match(/@dx\.op\.binary\.f32\(i32 (\d+), float (\S+), float (\S+)\)/)
+  if (m) return { kind: "binary", op: g(m, 1), a: g(m, 2), b: g(m, 3) }
+  m = d.match(/@dx\.op\.binary\.i32\(i32 (\d+), i32 (\S+), i32 (\S+)\)/)
+  if (m) return { kind: "ibinary", op: g(m, 1), a: g(m, 2), b: g(m, 3) }
+  m = d.match(/@dx\.op\.tertiary\.f32\(i32 46, float (\S+), float (\S+), float (\S+)\)/)
+  if (m) return { kind: "mad", a: g(m, 1), b: g(m, 2), c: g(m, 3) }
+  m = d.match(/@dx\.op\.dot(\d)\.f32\(i32 \d+, (.*)\)/)
+  if (m) return { kind: "dot", n: num(m[1]), operands: [...g(m, 2).matchAll(/float ([^,)\s]+)/g)].map((x) => g(x, 1)) }
+  m = d.match(/^select i1 (\S+), (float|i32) (\S+), (?:float|i32) (\S+)$/)
+  if (m) return { kind: "select", type: m[2] === "i32" ? "i32" : "float", cond: g(m, 1), a: g(m, 3), b: g(m, 4) }
+  if (d.startsWith("phi ")) {
+    return {
+      kind: "phi",
+      incoming: [...d.matchAll(/\[ (\S+), %([\w.]+) \]/g)].map((i) => ({ value: g(i, 1), block: g(i, 2) }))
+    }
+  }
+  m = d.match(/^(sitofp|uitofp) i32 (\S+) to float$/)
+  if (m) return { kind: "toFloat", signed: m[1] === "sitofp", x: g(m, 2) }
+  m = d.match(/^(fptosi|fptoui) float (\S+) to i32$/)
+  if (m) return { kind: "toInt", signed: m[1] === "fptosi", x: g(m, 2) }
+  m = d.match(/^bitcast (i32|float) (\S+) to (float|i32)$/)
+  if (m) return { kind: "bitcast", to: m[3] === "float" ? "float" : "i32", x: g(m, 2) }
+  m = d.match(/^fcmp (?:fast )?(\w+) float (\S+), (\S+)$/)
+  if (m) return { kind: "fcmp", pred: g(m, 1), a: g(m, 2), b: g(m, 3) }
+  m = d.match(/^icmp (\w+) i32 (\S+), (\S+)$/)
+  if (m) return { kind: "icmp", pred: g(m, 1), a: g(m, 2), b: g(m, 3) }
+  m = d.match(/^(and|or) i1 (\S+), (\S+)$/)
+  if (m) return { kind: "logic", op: m[1] === "and" ? "and" : "or", a: g(m, 2), b: g(m, 3) }
+  m = d.match(/^(and|or|xor|shl|lshr|add|sub|mul)(?: nuw)?(?: nsw)? i32 (\S+), (\S+)$/)
+  if (m) return { kind: "int", op: g(m, 1), a: g(m, 2), b: g(m, 3) }
+  return { kind: "other" }
+}
+
+const instructions = new WeakMap<Module, Map<string, Instruction>>()
+/** The instruction defining `v`, parsed once per module; undefined for a literal or an unknown name. */
+export const instructionOf = (m: Module, v: string): Instruction | undefined => {
+  const d = m.defs.get(v)
+  if (d === undefined) return undefined
+  let cache = instructions.get(m)
+  if (cache === undefined) {
+    cache = new Map()
+    instructions.set(m, cache)
+  }
+  const hit = cache.get(v)
+  if (hit !== undefined) return hit
+  const parsed = parseInstruction(d)
+  cache.set(v, parsed)
+  return parsed
+}
+
+/** A DXIL op the evaluator computes (`fn`) and the emitter writes (`glsl`), by opcode. */
+export interface Op<F> {
+  readonly fn: F
+  readonly glsl: (...args: ReadonlyArray<string>) => string
+}
+
+/** `@dx.op.unary.f32` opcodes. */
+export const UNARY_OPS: Record<string, Op<(x: number) => number>> = {
+  "6": { fn: Math.abs, glsl: (x) => `abs(${x})` },
+  "7": { fn: (x) => Math.min(1, Math.max(0, x)), glsl: (x) => `clamp(${x}, 0.0, 1.0)` },
+  "12": { fn: Math.cos, glsl: (x) => `cos(${x})` },
+  "13": { fn: Math.sin, glsl: (x) => `sin(${x})` },
+  "15": { fn: Math.tan, glsl: (x) => `tan(${x})` },
+  "21": { fn: Math.exp, glsl: (x) => `exp(${x})` },
+  "22": { fn: (x) => x - Math.floor(x), glsl: (x) => `fract(${x})` },
+  "23": { fn: Math.log, glsl: (x) => `log(${x})` },
+  "24": { fn: Math.sqrt, glsl: (x) => `sqrt(${x})` },
+  "25": { fn: (x) => 1 / Math.sqrt(x), glsl: (x) => `inversesqrt(${x})` },
+  "26": { fn: Math.round, glsl: (x) => `floor(${x} + 0.5)` },
+  "27": { fn: Math.floor, glsl: (x) => `floor(${x})` },
+  "28": { fn: Math.ceil, glsl: (x) => `ceil(${x})` },
+  "29": { fn: Math.trunc, glsl: (x) => `(${x} < 0.0 ? ceil(${x}) : floor(${x}))` },
+  // DerivCoarseX / DerivCoarseY (texture bombing and mip selection): nothing varies at the one evaluated point.
+  "83": { fn: () => 0, glsl: (x) => `dFdx(${x})` },
+  "84": { fn: () => 0, glsl: (x) => `dFdy(${x})` }
+}
+
+/** `@dx.op.binary.f32` opcodes. */
+export const BINARY_OPS: Record<string, Op<(a: number, b: number) => number>> = {
+  "35": { fn: Math.max, glsl: (a, b) => `max(${a}, ${b})` },
+  "36": { fn: Math.min, glsl: (a, b) => `min(${a}, ${b})` }
+}
+
+/** `@dx.op.binary.i32` opcodes: IMax, IMin, UMax, UMin. */
+export const INT_BINARY_OPS: Record<string, Op<(a: number, b: number) => number>> = {
+  "37": { fn: Math.max, glsl: (a, b) => `max(${a}, ${b})` },
+  "38": { fn: Math.min, glsl: (a, b) => `min(${a}, ${b})` },
+  "39": { fn: (a, b) => Math.max(a >>> 0, b >>> 0) | 0, glsl: (a, b) => `max(${a}, ${b})` },
+  "40": { fn: (a, b) => Math.min(a >>> 0, b >>> 0) | 0, glsl: (a, b) => `min(${a}, ${b})` }
+}
+
+/** LLVM integer arithmetic, on int32 values (`lshr` over the unsigned view). */
+export const INT_OPS: Record<string, Op<(a: number, b: number) => number>> = {
+  and: { fn: (a, b) => a & b, glsl: (a, b) => `(${a} & ${b})` },
+  or: { fn: (a, b) => a | b, glsl: (a, b) => `(${a} | ${b})` },
+  xor: { fn: (a, b) => a ^ b, glsl: (a, b) => `(${a} ^ ${b})` },
+  shl: { fn: (a, b) => a << b, glsl: (a, b) => `(${a} << ${b})` },
+  lshr: { fn: (a, b) => a >>> b, glsl: (a, b) => `(${a} >> ${b})` },
+  add: { fn: (a, b) => (a + b) | 0, glsl: (a, b) => `(${a} + ${b})` },
+  sub: { fn: (a, b) => (a - b) | 0, glsl: (a, b) => `(${a} - ${b})` },
+  mul: { fn: Math.imul, glsl: (a, b) => `(${a} * ${b})` }
+}
+
+/** `fcmp` predicates (ordered and unordered alike: the evaluator never sees a NaN it keeps). */
+export const FCMP_OPS: Record<string, Op<(a: number, b: number) => boolean>> = {
+  olt: { fn: (a, b) => a < b, glsl: (a, b) => `(${a} < ${b})` },
+  ult: { fn: (a, b) => a < b, glsl: (a, b) => `(${a} < ${b})` },
+  ole: { fn: (a, b) => a <= b, glsl: (a, b) => `(${a} <= ${b})` },
+  ule: { fn: (a, b) => a <= b, glsl: (a, b) => `(${a} <= ${b})` },
+  ogt: { fn: (a, b) => a > b, glsl: (a, b) => `(${a} > ${b})` },
+  ugt: { fn: (a, b) => a > b, glsl: (a, b) => `(${a} > ${b})` },
+  oge: { fn: (a, b) => a >= b, glsl: (a, b) => `(${a} >= ${b})` },
+  uge: { fn: (a, b) => a >= b, glsl: (a, b) => `(${a} >= ${b})` },
+  oeq: { fn: (a, b) => a === b, glsl: (a, b) => `(${a} == ${b})` },
+  ueq: { fn: (a, b) => a === b, glsl: (a, b) => `(${a} == ${b})` },
+  one: { fn: (a, b) => a !== b, glsl: (a, b) => `(${a} != ${b})` },
+  une: { fn: (a, b) => a !== b, glsl: (a, b) => `(${a} != ${b})` }
+}
+
+/** `icmp` predicates over int32 values; the GLSL side gets `uint` temporaries, cast for the signed ones. */
+export const ICMP_OPS: Record<string, Op<(a: number, b: number) => boolean>> = {
+  eq: { fn: (a, b) => a === b, glsl: (a, b) => `(${a} == ${b})` },
+  ne: { fn: (a, b) => a !== b, glsl: (a, b) => `(${a} != ${b})` },
+  ult: { fn: (a, b) => a >>> 0 < b >>> 0, glsl: (a, b) => `(${a} < ${b})` },
+  ule: { fn: (a, b) => a >>> 0 <= b >>> 0, glsl: (a, b) => `(${a} <= ${b})` },
+  ugt: { fn: (a, b) => a >>> 0 > b >>> 0, glsl: (a, b) => `(${a} > ${b})` },
+  uge: { fn: (a, b) => a >>> 0 >= b >>> 0, glsl: (a, b) => `(${a} >= ${b})` },
+  slt: { fn: (a, b) => (a | 0) < (b | 0), glsl: (a, b) => `(int(${a}) < int(${b}))` },
+  sle: { fn: (a, b) => (a | 0) <= (b | 0), glsl: (a, b) => `(int(${a}) <= int(${b}))` },
+  sgt: { fn: (a, b) => (a | 0) > (b | 0), glsl: (a, b) => `(int(${a}) > int(${b}))` },
+  sge: { fn: (a, b) => (a | 0) >= (b | 0), glsl: (a, b) => `(int(${a}) >= int(${b}))` }
+}
+
 const semanticOf = (sigs: ReadonlyArray<Signature>, id: number, row: number): string => {
   const s = sigs.find((x) => x.id === id)
   if (!s) return `sig${id}[${row}]`
