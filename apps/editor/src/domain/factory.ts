@@ -6,6 +6,7 @@
 import { DateTime, Effect } from "effect"
 import type { CatalogPiece } from "./Catalog"
 import type { Vec3 } from "./coords"
+import { defaultProperties } from "./itemProperties"
 import {
   type EditorState,
   type Item,
@@ -82,7 +83,7 @@ export const qualifyMaterialPath = (path: string): string => {
 /**
  * An item exactly as the in-game editor writes a freshly placed piece. Pieces whose Main
  * component has no mesh (air vent, checkpoint strip) get the empty mesh component the
- * game writes for them.
+ * game writes for them, and every exposed property is written at its class default.
  */
 export const itemFromPiece = (piece: CatalogPiece, transform: ItemTransform): Item => ({
   actorToSpawn: piece.classPath,
@@ -98,7 +99,7 @@ export const itemFromPiece = (piece: CatalogPiece, transform: ItemTransform): It
       )
   ],
   bIsBaseItem: false,
-  ...emptyProperties
+  ...defaultProperties(piece)
 })
 
 /**

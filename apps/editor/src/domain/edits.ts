@@ -4,7 +4,8 @@
  * schemas before they reach the document.
  */
 import { Option, Schema } from "effect"
-import { Item, ItemTransform, type MapFile } from "./MapFile"
+import { type PropertyChange, withProperty } from "./itemProperties"
+import { Item, type ItemPivot, ItemTransform, type MapFile } from "./MapFile"
 
 const decodeItem = Schema.decodeUnknownOption(Item)
 const decodeTransform = Schema.decodeUnknownOption(ItemTransform)
@@ -74,21 +75,67 @@ export const setTransforms = (
 }
 
 /**
- * Appends copies of items (in the given order) and copies their `editorState.pivots`
- * entries to the new indices, so a copy keeps its original's pivot choice.
+ * Sets properties to the same values on several items, all or nothing: None when any index
+ * is out of range or any value doesn't fit its property's list.
  */
-export const duplicateItems = (map: MapFile, indices: ReadonlyArray<number>): MapFile => {
-  const sources = indices.filter((i) => map.items[i] !== undefined)
-  if (sources.length === 0) return map
-  const items = [...map.items, ...sources.flatMap((i) => map.items[i] ?? [])]
-  if (map.editorState === undefined) return { ...map, items }
-  const copyOf = new Map(sources.map((source, n) => [source, map.items.length + n]))
-  const copied = map.editorState.pivots.flatMap((p) => {
-    const itemIndex = copyOf.get(p.itemIndex)
-    return itemIndex === undefined ? [] : [{ ...p, itemIndex }]
-  })
-  return { ...map, items, editorState: { ...map.editorState, pivots: [...map.editorState.pivots, ...copied] } }
+export const setProperties = (
+  map: MapFile,
+  indices: ReadonlyArray<number>,
+  changes: ReadonlyArray<PropertyChange>
+): Option.Option<MapFile> => {
+  const items = map.items.slice()
+  for (const index of indices) {
+    let item = items[index]
+    for (const { property, value } of changes) {
+      const next = item === undefined ? Option.none() : withProperty(item, property, value)
+      if (Option.isNone(next)) return Option.none()
+      item = next.value
+    }
+    if (item === undefined) return Option.none()
+    items[index] = item
+  }
+  return Option.some({ ...map, items })
 }
+
+/**
+ * Copied items, detached from any map: each item as it was when copied (transform and
+ * properties), and its `editorState.pivots` entry with `itemIndex` pointing into `items`.
+ */
+export interface Clip {
+  readonly items: ReadonlyArray<Item>
+  readonly pivots: ReadonlyArray<ItemPivot>
+}
+
+/** The items at `indices` (in that order, out-of-range ones skipped) with their pivots. */
+export const copyItems = (map: MapFile, indices: ReadonlyArray<number>): Clip => {
+  const sources = indices.filter((i) => map.items[i] !== undefined)
+  const position = new Map(sources.map((source, n) => [source, n]))
+  return {
+    items: sources.flatMap((i) => map.items[i] ?? []),
+    pivots: (map.editorState?.pivots ?? []).flatMap((p) => {
+      const itemIndex = position.get(p.itemIndex)
+      return itemIndex === undefined ? [] : [{ ...p, itemIndex }]
+    })
+  }
+}
+
+/**
+ * Appends a clip's items where they were copied, with their pivots moved to the new
+ * indices, so a copy keeps its original's pivot choice. A map without `editorState` (a
+ * published .ballmap) has nowhere to keep pivots, so they are dropped.
+ */
+export const pasteItems = (map: MapFile, clip: Clip): MapFile => {
+  if (clip.items.length === 0) return map
+  const items = [...map.items, ...clip.items]
+  if (map.editorState === undefined) return { ...map, items }
+  const offset = map.items.length
+  const pivots = clip.pivots.map((p) => ({ ...p, itemIndex: p.itemIndex + offset }))
+  return { ...map, items, editorState: { ...map.editorState, pivots: [...map.editorState.pivots, ...pivots] } }
+}
+
+/** Appends copies of items (in the given order), pivots included: copy, then paste. */
+export const duplicateItems = (map: MapFile, indices: ReadonlyArray<number>): MapFile =>
+  pasteItems(map, copyItems(map, indices))
 
 /** Validates a freshly built item against the schema before it enters the document. */
 export const validateItem = (candidate: unknown): Option.Option<Item> => decodeItem(candidate)

@@ -20,6 +20,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { Struct } from "effect"
 import { type ReactNode, useEffect, useState } from "react"
 import { movementLookModes } from "../domain/flyKeys"
+import { namedActions } from "../domain/GameKeybinds"
 import {
   type Bindings,
   chordOf,
@@ -30,7 +31,6 @@ import {
   keybindActionDescriptions,
   keybindActionLabels,
   keybindActions,
-  keybindSections,
   mouseChordOf,
   mouseClickActions,
   mouseDragActions,
@@ -349,39 +349,26 @@ export function SettingsDialog(props: {
       [...kinds].filter(([, actions]) => actions.size > 1).map(([key]) => key.slice(key.indexOf(":") + 1))
     )
 
-    // Sections and labels: keybinds.json naming when the extractor provides it, else our table.
-    const sectionOf = (action: KeybindAction, fallback: string) => defaults.naming.get(action)?.section ?? fallback
-    const tableOrder: ReadonlyArray<string> = keybindSections.map((s) => s.name)
-    const sectionRank = (name: string) => {
-      const ours = tableOrder.indexOf(name)
-      if (ours >= 0) return ours
-      const game = defaults.sectionOrder.indexOf(name)
-      return tableOrder.length + (game >= 0 ? game : defaults.sectionOrder.length)
-    }
-    const keybindRows = keybindSections.flatMap((section) =>
-      section.actions.map((action): Row => ({
-        id: `key-${action}`,
-        category: "keybinds",
-        group: sectionOf(action, section.name),
-        label: defaults.naming.get(action)?.label ?? keybindActionLabels[action],
-        description: keybindActionDescriptions[action],
-        tooltip: true,
-        modified: !isDefaultBinding(keybinds, defaults.keybinds, action),
-        reset: () => setBindings(action, defaults.keybinds[action]),
-        control: (
-          <KeybindControl
-            action={action}
-            bindings={keybinds[action]}
-            conflicts={conflicts}
-            listening={listening?.action === action ? listening.index : null}
-            onListen={(index) => setListening({ action, index })}
-            onRemove={(index) => setBindings(action, keybinds[action].filter((_, i) => i !== index))}
-          />
-        )
-      }))
-    ).map((row, i) => ({ row, i }))
-      .sort((x, y) => sectionRank(x.row.group ?? "") - sectionRank(y.row.group ?? "") || x.i - y.i)
-      .map(({ row }) => row)
+    const keybindRows = namedActions(defaults).map(({ action, section, label }): Row => ({
+      id: `key-${action}`,
+      category: "keybinds",
+      group: section,
+      label,
+      description: keybindActionDescriptions[action],
+      tooltip: true,
+      modified: !isDefaultBinding(keybinds, defaults.keybinds, action),
+      reset: () => setBindings(action, defaults.keybinds[action]),
+      control: (
+        <KeybindControl
+          action={action}
+          bindings={keybinds[action]}
+          conflicts={conflicts}
+          listening={listening?.action === action ? listening.index : null}
+          onListen={(index) => setListening({ action, index })}
+          onRemove={(index) => setBindings(action, keybinds[action].filter((_, i) => i !== index))}
+        />
+      )
+    }))
 
     const c = settings.camera
     const presetEntries: ReadonlyArray<readonly [string, string]> = [
@@ -437,6 +424,19 @@ export function SettingsDialog(props: {
           <Switch
             checked={settings.general.undoSelection}
             onCheckedChange={(v) => update("general", { undoSelection: v })}
+          />
+        )
+      },
+      {
+        id: "altDragDuplicates",
+        ...setting("general", "altDragDuplicates"),
+        label: "Alt+drag duplicates",
+        description:
+          "Holding Alt while dragging a translate handle moves a copy of the selection and leaves the original in place, like the game. Turn off to make Alt+drag a plain move.",
+        control: (
+          <Switch
+            checked={settings.general.altDragDuplicates}
+            onCheckedChange={(v) => update("general", { altDragDuplicates: v })}
           />
         )
       },

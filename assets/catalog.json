@@ -63,7 +63,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve1.BP_Ramp_Curve1_C'",
@@ -117,7 +118,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve_Long1.BP_Ramp_Curve_Long1_C'",
@@ -171,7 +173,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C'",
@@ -225,7 +228,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve_Short2.BP_Ramp_Curve_Short2_C'",
@@ -285,7 +289,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve_Long2.BP_Ramp_Curve_Long2_C'",
@@ -339,7 +344,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Kicker1_Short.BP_Ramp_Kicker1_Short_C'",
@@ -393,7 +399,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Kicker1.BP_Ramp_Kicker1_C'",
@@ -453,7 +460,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Kicker2_Short.BP_Ramp_Kicker2_Short_C'",
@@ -513,7 +521,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Kicker2.BP_Ramp_Kicker2_C'",
@@ -567,7 +576,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_ShallowCornerHump.Bevel_Half_ShallowCornerHump_C'",
@@ -633,7 +643,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_SteepCornerHump.Bevel_Half_SteepCornerHump_C'",
@@ -699,7 +710,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_DeepCornerScoop.Bevel_Half_DeepCornerScoop_C'",
@@ -765,7 +777,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_ShallowCornerScoop.Bevel_Half_ShallowCornerScoop_C'",
@@ -831,7 +844,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_StubKicker.Bevel_Full_StubKicker_C'",
@@ -903,7 +917,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker_C'",
@@ -975,7 +990,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Kicker.Bevel_Full_Kicker_C'",
@@ -1047,7 +1063,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShortScoop.Bevel_Full_ShortScoop_C'",
@@ -1119,7 +1136,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_MediumScoop.Bevel_Full_MediumScoop_C'",
@@ -1191,7 +1209,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowScoop.Bevel_Full_ShallowScoop_C'",
@@ -1263,7 +1282,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowShortScoop.Bevel_Full_ShallowShortScoop_C'",
@@ -1335,7 +1355,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowSideKicker_R.Bevel_Full_ShallowSideKicker_R_C'",
@@ -1407,7 +1428,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowSideKicker_L.Bevel_Full_ShallowSideKicker_L_C'",
@@ -1479,7 +1501,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_RingScoop.Bevel_Full_RingScoop_C'",
@@ -1551,7 +1574,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShortUScoop_L.Bevel_Full_ShortUScoop_L_C'",
@@ -1623,7 +1647,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShortUScoop_R.Bevel_Full_ShortUScoop_R_C'",
@@ -1695,7 +1720,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_HalfRingKicker.Bevel_Full_HalfRingKicker_C'",
@@ -1767,7 +1793,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveUp.BP_Ramp_Round_CurveUp_C'",
@@ -1821,7 +1848,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C'",
@@ -1875,7 +1903,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_SM_CornerScoop.MP_SM_CornerScoop_C'",
@@ -1935,7 +1964,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Short1.BP_Track_Short1_C'",
@@ -1995,7 +2025,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Long1.BP_Track_Long1_C'",
@@ -2055,7 +2086,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Curve_Tiny1.BP_Track_Curve_Tiny1_C'",
@@ -2109,7 +2141,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Curve1.BP_Track_Curve1_C'",
@@ -2163,7 +2196,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Curve_Large1.BP_Track_Curve_Large1_C'",
@@ -2217,7 +2251,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Mid1.BP_Track_Mid1_C'",
@@ -2277,7 +2312,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight_C'",
@@ -2349,7 +2385,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_Cap.BP_Bevel_Full_Cap_C'",
@@ -2415,7 +2452,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Turn.Bevel_Full_Turn_C'",
@@ -2487,7 +2525,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_Cap.Bevel_Half_Cap_C'",
@@ -2553,7 +2592,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Branch.Bevel_Full_Branch_C'",
@@ -2625,7 +2665,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_ConcaveCornerCurveFlat.Bevel_Half_ConcaveCornerCurveFlat_C'",
@@ -2691,7 +2732,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_TightConcaveCornerCurveFlat.Bevel_Half_TightConcaveCornerCurveFlat_C'",
@@ -2757,7 +2799,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_ConvexCornerCurveFlat.Bevel_Half_ConvexCornerCurveFlat_C'",
@@ -2823,7 +2866,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_CornerStraight.Bevel_Half_CornerStraight_C'",
@@ -2889,7 +2933,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_Platform.Bevel_Half_Platform_C'",
@@ -2955,7 +3000,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_Straight.Bevel_Half_Straight_C'",
@@ -3021,7 +3067,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_Turn.Bevel_Half_Turn_C'",
@@ -3087,7 +3134,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_Branch.Bevel_Tall_Branch_C'",
@@ -3159,7 +3207,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_Cap.Bevel_Tall_Cap_C'",
@@ -3225,7 +3274,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_CornerConcave.Bevel_Tall_CornerConcave_C'",
@@ -3291,7 +3341,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_CornerStraight.Bevel_Tall_CornerStraight_C'",
@@ -3357,7 +3408,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_Podium.Bevel_Tall_Podium_C'",
@@ -3423,7 +3475,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_StraightPlatform.Bevel_Tall_StraightPlatform_C'",
@@ -3495,7 +3548,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_SheerStraight.Bevel_Tall_SheerStraight_C'",
@@ -3561,7 +3615,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_StraightWall.Bevel_Tall_StraightWall_C'",
@@ -3633,7 +3688,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_Ring.Bevel_Tall_Ring_C'",
@@ -3705,7 +3761,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_SSurveL.Bevel_Half_SSurveL_C'",
@@ -3771,7 +3828,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_SSurveR.Bevel_Half_SSurveR_C'",
@@ -3837,7 +3895,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Round_Straight.BP_Track_Round_Straight_C'",
@@ -3891,7 +3950,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Round_Curve.BP_Track_Round_Curve_C'",
@@ -3945,7 +4005,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Ring.Bevel_Full_Ring_C'",
@@ -4017,7 +4078,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Half_Tiny1.BP_Pipe_Half_Tiny1_C'",
@@ -4071,7 +4133,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Half1.BP_Pipe_Half1_C'",
@@ -4125,7 +4188,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Half_Large1.BP_Pipe_Half_Large1_C'",
@@ -4179,7 +4243,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Quarter_Straight.BP_Pipe_Quarter_Straight_C'",
@@ -4233,7 +4298,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Quarter_Small.BP_Pipe_Quarter_Small_C'",
@@ -4293,7 +4359,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Quarter_Large.BP_Pipe_Quarter_Large_C'",
@@ -4347,7 +4414,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Tube1.BP_Pipe_Tube1_C'",
@@ -4401,7 +4469,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_TunnelHalf.MP_TunnelHalf_C'",
@@ -4467,7 +4536,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Bumper.Bevel_Bumper_C'",
@@ -4533,7 +4603,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_BumperLongSingle.Bevel_BumperLongSingle_C'",
@@ -4593,7 +4664,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_BumperLongDouble.Bevel_BumperLongDouble_C'",
@@ -4659,7 +4731,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C'",
@@ -4725,7 +4798,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_RoundedBumper.MP_RoundedBumper_C'",
@@ -4779,7 +4853,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Scenery/Bevel_Arch.Bevel_Arch_C'",
@@ -4851,7 +4926,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Misc_Pinched1.BP_Misc_Pinched1_C'",
@@ -4905,7 +4981,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_FlatRing.MP_FlatRing_C'",
@@ -4965,7 +5042,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_RoundedTorus.MP_RoundedTorus_C'",
@@ -5019,7 +5097,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_SM_Hole.MP_SM_Hole_C'",
@@ -5085,7 +5164,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C'",
@@ -5118,7 +5198,7 @@
           1000
         ]
       },
-      "seenInSamples": 1650,
+      "seenInSamples": 1652,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
       "mainRelativeTransform": {
@@ -5139,7 +5219,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Sphere.BP_Prim_Sphere_C'",
@@ -5193,7 +5274,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cylinder.BP_Prim_Cylinder_C'",
@@ -5247,7 +5329,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/MP_Cone.MP_Cone_C'",
@@ -5307,7 +5390,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/MP_Pyramid.MP_Pyramid_C'",
@@ -5367,7 +5451,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/SpecialPieces/RubberBlock2_M_PlasticBase.RubberBlock2_M_PlasticBase_C'",
@@ -5421,7 +5506,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/SpecialPieces/RubberCylinder.RubberCylinder_C'",
@@ -5475,7 +5561,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/Props/MP_AirVent.MP_AirVent_C'",
@@ -5659,6 +5746,44 @@
         "QualifiedAirflowTargetSpeed:Float",
         "UpperAirflowMultiplier:Float"
       ],
+      "properties": [
+        {
+          "name": "Field Magnitude",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 750000,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "EntryAssistMinSpeed",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 800,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "UpperAirflowMultiplier",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.25,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "QualifiedAirflowTargetSpeed",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 2000,
+          "hidden": false,
+          "source": "cdo"
+        }
+      ],
       "note": "Main component has no mesh; visuals come from extraMeshes"
     },
     {
@@ -5713,7 +5838,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_RoundedGlassPlane1.MP_RoundedGlassPlane1_C'",
@@ -5767,7 +5893,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/MP_ShallowBowlV2.MP_ShallowBowlV2_C'",
@@ -5833,7 +5960,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Bowl_RingScoop.BP_Bowl_RingScoop_C'",
@@ -5887,7 +6015,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_SM_ConeBowl.MP_SM_ConeBowl_C'",
@@ -5953,7 +6082,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_SM_FullMediumBowl.MP_SM_FullMediumBowl_C'",
@@ -6019,7 +6149,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_SM_QuarterShallowHoleBowl.MP_SM_QuarterShallowHoleBowl_C'",
@@ -6085,7 +6216,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_SM_HalfShallowHoleBowl.MP_SM_HalfShallowHoleBowl_C'",
@@ -6151,7 +6283,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_SM_QuarterMediumBowl.MP_SM_QuarterMediumBowl_C'",
@@ -6217,7 +6350,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/MP_ActualCheckpoint_Strip.MP_ActualCheckpoint_Strip_C'",
@@ -6447,6 +6581,7 @@
         }
       ],
       "sampleProperties": [],
+      "properties": [],
       "note": "Main component has no mesh; visuals come from extraMeshes"
     },
     {
@@ -6592,7 +6727,8 @@
           }
         }
       ],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/MapItems/Decals/BP_UGCCircuitDecal.BP_UGCCircuitDecal_C'",
@@ -6607,7 +6743,7 @@
       "glb": null,
       "materialSlots": [],
       "bounds": null,
-      "seenInSamples": 1,
+      "seenInSamples": 4,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Engine/BasicShapes/Sphere.Sphere",
       "mainRelativeTransform": {
@@ -6681,6 +6817,53 @@
         "DecalWidth:Float",
         "bFacingOnly:Bool"
       ],
+      "properties": [
+        {
+          "name": "DecalWidth",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 200,
+          "hidden": true,
+          "source": "cdo"
+        },
+        {
+          "name": "DecalHeight",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 200,
+          "hidden": true,
+          "source": "cdo"
+        },
+        {
+          "name": "DecalDepth",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 100,
+          "hidden": true,
+          "source": "cdo"
+        },
+        {
+          "name": "DecalStyle",
+          "list": "intProperties",
+          "type": "Integer",
+          "ueType": "IntProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "bFacingOnly",
+          "list": "boolProperties",
+          "type": "Bool",
+          "ueType": "BoolProperty",
+          "default": true,
+          "hidden": false,
+          "source": "cdo"
+        }
+      ],
       "note": "Main component has no mesh; visuals come from extraMeshes"
     },
     {
@@ -6741,7 +6924,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_Bowl00_M_TechSubtle.AJ_Bowl00_M_TechSubtle_C'",
@@ -6795,7 +6979,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_Bowl00_MI_ArenaWhite.AJ_Bowl00_MI_ArenaWhite_C'",
@@ -6849,7 +7034,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_Prop_Box2_MI_ArenaYellow.AJ_Prop_Box2_MI_ArenaYellow_C'",
@@ -6903,7 +7089,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ_Ramp_00_M_BaseSurface_Metal.AJ_Ramp_00_M_BaseSurface_Metal_C'",
@@ -6957,7 +7144,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_Ramp_00_M_TechSubtle.AJ_Ramp_00_M_TechSubtle_C'",
@@ -7011,7 +7199,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ_Ramp_00_Merge_FDB4E64F_M_BaseSurface_Metal.AJ_Ramp_00_Merge_FDB4E64F_M_BaseSurface_Metal_C'",
@@ -7065,7 +7254,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_Ramp_00_WorldGridMaterial.AJ_Ramp_00_WorldGridMaterial_C'",
@@ -7119,7 +7309,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_Ringscoop_00_MI_ArenaWhite.AJ_Ringscoop_00_MI_ArenaWhite_C'",
@@ -7173,7 +7364,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_Sausage_01_MI_ArenaOrange.AJ_Sausage_01_MI_ArenaOrange_C'",
@@ -7227,7 +7419,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/Maps/JacksonMaps/_GENERATED/jack/Special/BaseSplineActor.BaseSplineActor_C'",
@@ -7264,6 +7457,7 @@
       },
       "extraMeshes": [],
       "sampleProperties": [],
+      "properties": [],
       "note": "no mesh found"
     },
     {
@@ -7301,6 +7495,7 @@
       },
       "extraMeshes": [],
       "sampleProperties": [],
+      "properties": [],
       "note": "no mesh found"
     },
     {
@@ -7367,7 +7562,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_HalfRing.Bevel_Full_HalfRing_C'",
@@ -7439,7 +7635,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_DeepScoop.Bevel_Half_DeepScoop_C'",
@@ -7505,7 +7702,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_MediumRamp.Bevel_Half_MediumRamp_C'",
@@ -7571,7 +7769,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_ShallowRamp.Bevel_Half_ShallowRamp_C'",
@@ -7637,7 +7836,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_04A2A514_MI_ArenaOrange.Boolean_04A2A514_MI_ArenaOrange_C'",
@@ -7691,7 +7891,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_04A2A514_MI_ArenaWhite.Boolean_04A2A514_MI_ArenaWhite_C'",
@@ -7745,7 +7946,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_1459EA0F_MI_ArenaWhite.Boolean_1459EA0F_MI_ArenaWhite_C'",
@@ -7799,7 +8001,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Boolean_1C6BD50B_MI_Pipes.Boolean_1C6BD50B_MI_Pipes_C'",
@@ -7853,7 +8056,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Boolean_3024C8A1_MI_ArenaWhite.Boolean_3024C8A1_MI_ArenaWhite_C'",
@@ -7907,7 +8111,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Boolean_3024C8A1_MI_ArenaYellow.Boolean_3024C8A1_MI_ArenaYellow_C'",
@@ -7961,7 +8166,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_52A10C51_MI_ArenaWhite.Boolean_52A10C51_MI_ArenaWhite_C'",
@@ -8015,7 +8221,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_53D127A7_WorldGridMaterial_MI_ArenaOrange.Boolean_53D127A7_WorldGridMaterial_MI_ArenaOrange_C'",
@@ -8075,7 +8282,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_631C696A_WorldGridMaterial_MI_ArenaWhite.Boolean_631C696A_WorldGridMaterial_MI_ArenaWhite_C'",
@@ -8135,7 +8343,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_7DFF2134_MI_ArenaOrange.Boolean_7DFF2134_MI_ArenaOrange_C'",
@@ -8189,7 +8398,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Boolean_84A9059E_MI_ArenaGreen_MI_ArenaGreen.Boolean_84A9059E_MI_ArenaGreen_MI_ArenaGreen_C'",
@@ -8249,7 +8459,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Boolean_84A9059E_MI_ArenaRed_MI_ArenaRed.Boolean_84A9059E_MI_ArenaRed_MI_ArenaRed_C'",
@@ -8309,7 +8520,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Boolean_84A9059E_MI_ArenaWhite_MI_ArenaWhite.Boolean_84A9059E_MI_ArenaWhite_MI_ArenaWhite_C'",
@@ -8369,7 +8581,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Boolean_84A9059E_MI_ArenaYellow_MI_ArenaYellow.Boolean_84A9059E_MI_ArenaYellow_MI_ArenaYellow_C'",
@@ -8429,7 +8642,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_B6FBEE07_MI_ArenaOrange.Boolean_B6FBEE07_MI_ArenaOrange_C'",
@@ -8483,7 +8697,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_D12E18D1_MI_ArenaWhite.Boolean_D12E18D1_MI_ArenaWhite_C'",
@@ -8537,7 +8752,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_Merge_2B91702A_MI_ArenaOrange.Boolean_Merge_2B91702A_MI_ArenaOrange_C'",
@@ -8591,7 +8807,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_Merge_2B91702A_MI_ArenaYellow.Boolean_Merge_2B91702A_MI_ArenaYellow_C'",
@@ -8645,7 +8862,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_Merge_2B91702A_MI_InteriorLight2.Boolean_Merge_2B91702A_MI_InteriorLight2_C'",
@@ -8699,7 +8917,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Box_005FE104_WorldGridMaterial.Box_005FE104_WorldGridMaterial_C'",
@@ -8753,7 +8972,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Box_9379DB4B_M_TechSubtle.Box_9379DB4B_M_TechSubtle_C'",
@@ -8807,7 +9027,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Box_9379DB4B_MI_ArenaAluminum.Box_9379DB4B_MI_ArenaAluminum_C'",
@@ -8861,7 +9082,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Box_9379DB4B_WorldGridMaterial.Box_9379DB4B_WorldGridMaterial_C'",
@@ -8915,7 +9137,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Box_A3F21BC8.Box_A3F21BC8_C'",
@@ -8969,7 +9192,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Box_AA156F14_M_BaseSurface_Metal.Box_AA156F14_M_BaseSurface_Metal_C'",
@@ -9023,7 +9247,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Box_AA156F14_MI_ArenaAluminum.Box_AA156F14_MI_ArenaAluminum_C'",
@@ -9077,7 +9302,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Box_AA156F14_MI_ArenaOrange.Box_AA156F14_MI_ArenaOrange_C'",
@@ -9131,7 +9357,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Box_AA156F14_WorldGridMaterial.Box_AA156F14_WorldGridMaterial_C'",
@@ -9185,7 +9412,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/BP_ActualCheckpointBase.BP_ActualCheckpointBase_C'",
@@ -9222,6 +9450,7 @@
       },
       "extraMeshes": [],
       "sampleProperties": [],
+      "properties": [],
       "note": "no mesh found"
     },
     {
@@ -9401,6 +9630,7 @@
         }
       ],
       "sampleProperties": [],
+      "properties": [],
       "note": "Main component has no mesh; visuals come from extraMeshes"
     },
     {
@@ -9473,7 +9703,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_HalfRing.BP_Bevel_Full_HalfRing_C'",
@@ -9545,7 +9776,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_HalfRingKicker.BP_Bevel_Full_HalfRingKicker_C'",
@@ -9617,7 +9849,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_Kicker.BP_Bevel_Full_Kicker_C'",
@@ -9689,7 +9922,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_MediumScoop.BP_Bevel_Full_MediumScoop_C'",
@@ -9761,7 +9995,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_Ring.BP_Bevel_Full_Ring_C'",
@@ -9833,7 +10068,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_RingScoop.BP_Bevel_Full_RingScoop_C'",
@@ -9905,7 +10141,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_ShallowKicker.BP_Bevel_Full_ShallowKicker_C'",
@@ -9977,7 +10214,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_ShallowScoop.BP_Bevel_Full_ShallowScoop_C'",
@@ -10049,7 +10287,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Bowl_Shallow.BP_Bowl_Shallow_C'",
@@ -10109,7 +10348,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_Bump.BP_Bump_C'",
@@ -10163,7 +10403,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/Cinematics/PatchTeaser/BP_CinematicLaserTerminal.BP_CinematicLaserTerminal_C'",
@@ -10217,7 +10458,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Physics/Actors/BP_CircularFlexiblePlatform.BP_CircularFlexiblePlatform_C'",
@@ -10345,6 +10587,7 @@
         }
       ],
       "sampleProperties": [],
+      "properties": [],
       "note": "Main component has no mesh; visuals come from extraMeshes"
     },
     {
@@ -10399,7 +10642,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_CubePrePlac.BP_CubePrePlac_C'",
@@ -10453,7 +10697,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Structures/BP_Floor.BP_Floor_C'",
@@ -10507,7 +10752,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_LeftArm.BP_LeftArm_C'",
@@ -10561,7 +10807,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_OneCubeTwoColor.BP_OneCubeTwoColor_C'",
@@ -10621,7 +10868,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Physics/Actors/BP_PhysicsPropBase.BP_PhysicsPropBase_C'",
@@ -10658,6 +10906,7 @@
       },
       "extraMeshes": [],
       "sampleProperties": [],
+      "properties": [],
       "note": "no mesh found"
     },
     {
@@ -10712,7 +10961,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_Ramp.BP_Ramp_C'",
@@ -10766,7 +11016,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_RightArm.BP_RightArm_C'",
@@ -10820,7 +11071,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_Stairs.BP_Stairs_C'",
@@ -10874,7 +11126,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_TwoCubeOneColor.BP_TwoCubeOneColor_C'",
@@ -10974,7 +11227,8 @@
           }
         }
       ],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_TwoCubeTwoColor.BP_TwoCubeTwoColor_C'",
@@ -11086,7 +11340,8 @@
           }
         }
       ],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/MapItems/Decals/BP_UGCShapeDecal.BP_UGCShapeDecal_C'",
@@ -11101,9 +11356,9 @@
       "glb": null,
       "materialSlots": [],
       "bounds": null,
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Engine/BasicShapes/Sphere.Sphere",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -11168,7 +11423,180 @@
           }
         }
       ],
-      "sampleProperties": [],
+      "sampleProperties": [
+        "DecalBlue:Float",
+        "DecalDepth:Float",
+        "DecalEmissiveIntensity:Float",
+        "DecalFillEdgeSoftness:Float",
+        "DecalFillType:Integer",
+        "DecalGreen:Float",
+        "DecalHeight:Float",
+        "DecalRed:Float",
+        "DecalRoughness:Float",
+        "DecalSDFSize:Float",
+        "DecalShapeType:Integer",
+        "DecalSpecular:Float",
+        "DecalTileCount:Integer",
+        "DecalTileSpacing:Float",
+        "DecalWidth:Float",
+        "bDecalEnabled:Bool",
+        "bDecalUseEmissive:Bool"
+      ],
+      "properties": [
+        {
+          "name": "bDecalEnabled",
+          "list": "boolProperties",
+          "type": "Bool",
+          "ueType": "BoolProperty",
+          "default": true,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "bDecalUseEmissive",
+          "list": "boolProperties",
+          "type": "Bool",
+          "ueType": "BoolProperty",
+          "default": false,
+          "hidden": true,
+          "source": "samples"
+        },
+        {
+          "name": "DecalWidth",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 200,
+          "hidden": true,
+          "source": "samples"
+        },
+        {
+          "name": "DecalHeight",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 200,
+          "hidden": true,
+          "source": "samples"
+        },
+        {
+          "name": "DecalDepth",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 100,
+          "hidden": true,
+          "source": "samples"
+        },
+        {
+          "name": "DecalRed",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalGreen",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalBlue",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalTileSpacing",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalSDFSize",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalFillEdgeSoftness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalEmissiveIntensity",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalRoughness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": true,
+          "source": "samples"
+        },
+        {
+          "name": "DecalSpecular",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0,
+          "hidden": true,
+          "source": "samples"
+        },
+        {
+          "name": "DecalShapeType",
+          "list": "intProperties",
+          "type": "Integer",
+          "ueType": "IntProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalFillType",
+          "list": "intProperties",
+          "type": "Integer",
+          "ueType": "IntProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "DecalTileCount",
+          "list": "intProperties",
+          "type": "Integer",
+          "ueType": "IntProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        }
+      ],
       "note": "Main component has no mesh; visuals come from extraMeshes"
     },
     {
@@ -11223,7 +11651,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Cylinder_3071E2C2_MI_ArenaYellow.Cylinder_3071E2C2_MI_ArenaYellow_C'",
@@ -11277,7 +11706,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Cylinder_3071E2C2_MI_Pipes.Cylinder_3071E2C2_MI_Pipes_C'",
@@ -11331,7 +11761,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Cylinder_4B40C9CF_MI_ArenaBlue.Cylinder_4B40C9CF_MI_ArenaBlue_C'",
@@ -11385,7 +11816,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Cylinder_4B40C9CF_MI_ArenaYellow.Cylinder_4B40C9CF_MI_ArenaYellow_C'",
@@ -11439,7 +11871,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Merge_C6C6700A_MI_ArenaYellow.Merge_C6C6700A_MI_ArenaYellow_C'",
@@ -11493,7 +11926,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Mirror_E8D8C4F0_MI_ArenaAluminum.Mirror_E8D8C4F0_MI_ArenaAluminum_C'",
@@ -11547,7 +11981,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/MP_ActualCheckpoint_Disc.MP_ActualCheckpoint_Disc_C'",
@@ -11681,6 +12116,7 @@
         }
       ],
       "sampleProperties": [],
+      "properties": [],
       "note": "Main component has no mesh; visuals come from extraMeshes"
     },
     {
@@ -11735,7 +12171,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Physics/Actors/Boosters/MP_BoostPlatform.MP_BoostPlatform_C'",
@@ -11768,9 +12205,9 @@
           10
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Game/Core/Physics/Actors/Boosters/Meshes/SM_BostPlatform.SM_BostPlatform",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -11789,7 +12226,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Physics/Actors/Boosters/MP_BoostRing.MP_BoostRing_C'",
@@ -11834,9 +12272,9 @@
           25
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/Meshes/SM_Hole.SM_Hole",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -11855,7 +12293,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Physics/Actors/Boosters/MP_BoostVolume.MP_BoostVolume_C'",
@@ -11888,9 +12327,9 @@
           128
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Engine/EngineMeshes/Cube.Cube",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -11909,7 +12348,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/MP_CheckpointStrip.MP_CheckpointStrip_C'",
@@ -11946,6 +12386,7 @@
       },
       "extraMeshes": [],
       "sampleProperties": [],
+      "properties": [],
       "note": "no mesh found"
     },
     {
@@ -11979,9 +12420,9 @@
           28.125
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Game/Art/VFX/Lasers/SM_LaserTerminal.SM_LaserTerminal",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12000,7 +12441,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/LightCards/MP_LightCard_01.MP_LightCard_01_C'",
@@ -12033,9 +12475,9 @@
           0
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Engine/EngineVolumetrics/LightBeam/Mesh/S_EV_SimpleLightBeam_01.S_EV_SimpleLightBeam_01",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12054,7 +12496,100 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [
+        "LightBrightness:Float",
+        "LightColorB:Float",
+        "LightColorG:Float",
+        "LightColorR:Float",
+        "LightFalloffPower:Float",
+        "LightIntersectionFadeDistance:Float",
+        "LightIntersectionFadeStrength:Float",
+        "LightNearFadeDistance:Float",
+        "LightOpacity:Float"
+      ],
+      "properties": [
+        {
+          "name": "LightColorR",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorG",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorB",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightBrightness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightOpacity",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.25,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightNearFadeDistance",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 400,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightFalloffPower",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightIntersectionFadeDistance",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 100,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightIntersectionFadeStrength",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        }
+      ]
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/LightCards/MP_LightCard_02.MP_LightCard_02_C'",
@@ -12087,9 +12622,9 @@
           0
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Game/Art/Props/Lights/S_EV_SimpleLightBeam_03.S_EV_SimpleLightBeam_03",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12108,7 +12643,100 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [
+        "LightBrightness:Float",
+        "LightColorB:Float",
+        "LightColorG:Float",
+        "LightColorR:Float",
+        "LightFalloffPower:Float",
+        "LightIntersectionFadeDistance:Float",
+        "LightIntersectionFadeStrength:Float",
+        "LightNearFadeDistance:Float",
+        "LightOpacity:Float"
+      ],
+      "properties": [
+        {
+          "name": "LightColorR",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorG",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorB",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightBrightness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightOpacity",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.25,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightNearFadeDistance",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 400,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightFalloffPower",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightIntersectionFadeDistance",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 100,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightIntersectionFadeStrength",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        }
+      ]
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/LightCards/MP_LightCard_03.MP_LightCard_03_C'",
@@ -12141,9 +12769,9 @@
           100
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Game/Packs/StarterContent/Shapes/Shape_Sphere.Shape_Sphere",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12162,7 +12790,100 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [
+        "LightBrightness:Float",
+        "LightColorB:Float",
+        "LightColorG:Float",
+        "LightColorR:Float",
+        "LightFalloffPower:Float",
+        "LightIntersectionFadeDistance:Float",
+        "LightIntersectionFadeStrength:Float",
+        "LightNearFadeDistance:Float",
+        "LightOpacity:Float"
+      ],
+      "properties": [
+        {
+          "name": "LightColorR",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorG",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorB",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightBrightness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 4,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightOpacity",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.25,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightNearFadeDistance",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 800,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightFalloffPower",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightIntersectionFadeDistance",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 500,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightIntersectionFadeStrength",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0,
+          "hidden": false,
+          "source": "samples"
+        }
+      ]
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/LightCards/MP_LightCard_04.MP_LightCard_04_C'",
@@ -12195,9 +12916,9 @@
           100
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Game/Packs/StarterContent/Shapes/Shape_Cube.Shape_Cube",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12216,7 +12937,110 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [
+        "LightBrightness:Float",
+        "LightColorB:Float",
+        "LightColorG:Float",
+        "LightColorR:Float",
+        "LightDensity:Float",
+        "LightEdgeSoftness:Float",
+        "LightEndFadeStart:Float",
+        "LightSoftnessGrowth:Float",
+        "LightSourceHeight:Float",
+        "LightSourceWidth:Float"
+      ],
+      "properties": [
+        {
+          "name": "LightColorR",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorG",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.95,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightColorB",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.85,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightBrightness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 2,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightDensity",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.001,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightEdgeSoftness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.12,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightSoftnessGrowth",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.12,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightEndFadeStart",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.7,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightSourceWidth",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.35,
+          "hidden": false,
+          "source": "samples"
+        },
+        {
+          "name": "LightSourceHeight",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 0.2,
+          "hidden": false,
+          "source": "samples"
+        }
+      ]
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Signage/MP_OrangeSign.MP_OrangeSign_C'",
@@ -12299,6 +13123,7 @@
         }
       ],
       "sampleProperties": [],
+      "properties": [],
       "note": "Main component has no mesh; visuals come from extraMeshes"
     },
     {
@@ -12332,9 +13157,9 @@
           150
         ]
       },
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
-      "sampleMeshAssetPath": null,
+      "sampleMeshAssetPath": "/Game/Core/Physics/Actors/Projectors/PinballLauncher/Meshes/SM_PinballProjector.SM_PinballProjector",
       "mainRelativeTransform": {
         "location": [
           0,
@@ -12353,7 +13178,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Physics/Actors/Projectors/PinballPaddle/MP_PinballPaddle.MP_PinballPaddle_C'",
@@ -12368,7 +13194,7 @@
       "glb": null,
       "materialSlots": [],
       "bounds": null,
-      "seenInSamples": 0,
+      "seenInSamples": 1,
       "meshSource": "pak",
       "sampleMeshAssetPath": null,
       "mainRelativeTransform": {
@@ -12487,6 +13313,7 @@
         }
       ],
       "sampleProperties": [],
+      "properties": [],
       "note": "Main component has no mesh; visuals come from extraMeshes"
     },
     {
@@ -12520,7 +13347,7 @@
           199.9842
         ]
       },
-      "seenInSamples": 22,
+      "seenInSamples": 23,
       "meshSource": "pak",
       "sampleMeshAssetPath": "/Game/Maps/_GENERATED/PC/SM_Start_Fixed.SM_Start_Fixed",
       "mainRelativeTransform": {
@@ -12541,7 +13368,8 @@
         ]
       },
       "extraMeshes": [],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": []
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/MP_PointLightFixture.MP_PointLightFixture_C'",
@@ -12731,7 +13559,54 @@
           }
         }
       ],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": [
+        {
+          "name": "LightBrightness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1000,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightRed",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightGreen",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightBlue",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "bLightCastsShadows",
+          "list": "boolProperties",
+          "type": "Bool",
+          "ueType": "BoolProperty",
+          "default": true,
+          "hidden": false,
+          "source": "cdo"
+        }
+      ]
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/MP_RawPointLight.MP_RawPointLight_C'",
@@ -12831,7 +13706,54 @@
           }
         }
       ],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": [
+        {
+          "name": "LightBrightness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1000,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightRed",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightGreen",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightBlue",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "bLightCastsShadows",
+          "list": "boolProperties",
+          "type": "Bool",
+          "ueType": "BoolProperty",
+          "default": true,
+          "hidden": false,
+          "source": "cdo"
+        }
+      ]
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/MP_RawRectLight.MP_RawRectLight_C'",
@@ -12931,7 +13853,72 @@
           }
         }
       ],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": [
+        {
+          "name": "LightBrightness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1000,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightRed",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightGreen",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightBlue",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "bLightCastsShadows",
+          "list": "boolProperties",
+          "type": "Bool",
+          "ueType": "BoolProperty",
+          "default": true,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightSourceWidth",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 100,
+          "hidden": true,
+          "source": "cdo"
+        },
+        {
+          "name": "LightSourceHeight",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 100,
+          "hidden": true,
+          "source": "cdo"
+        }
+      ]
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/MP_RawSpotLight.MP_RawSpotLight_C'",
@@ -13031,7 +14018,72 @@
           }
         }
       ],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": [
+        {
+          "name": "LightBrightness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1000,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightRed",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightGreen",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightBlue",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "bLightCastsShadows",
+          "list": "boolProperties",
+          "type": "Bool",
+          "ueType": "BoolProperty",
+          "default": true,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightInnerConeAngle",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 20,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightOuterConeAngle",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 45,
+          "hidden": false,
+          "source": "cdo"
+        }
+      ]
     },
     {
       "classPath": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/MP_SpotLightFixture.MP_SpotLightFixture_C'",
@@ -13266,7 +14318,72 @@
           }
         }
       ],
-      "sampleProperties": []
+      "sampleProperties": [],
+      "properties": [
+        {
+          "name": "LightBrightness",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1000,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightRed",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightGreen",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightBlue",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 1,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "bLightCastsShadows",
+          "list": "boolProperties",
+          "type": "Bool",
+          "ueType": "BoolProperty",
+          "default": true,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightInnerConeAngle",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 20,
+          "hidden": false,
+          "source": "cdo"
+        },
+        {
+          "name": "LightOuterConeAngle",
+          "list": "floatProperties",
+          "type": "Float",
+          "ueType": "DoubleProperty",
+          "default": 45,
+          "hidden": false,
+          "source": "cdo"
+        }
+      ]
     }
   ],
   "unresolved": [

@@ -28,11 +28,14 @@ export const isTypingTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement &&
   (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
 
-/** Keyboard events that belong to a text field or an open dialog never drive the editor. */
+/**
+ * Keyboard events that belong to a text field, an open dialog or a menu (the menu bar's
+ * arrow keys, Escape and type-ahead) never drive the editor.
+ */
 export const isEditorKeyEvent = (e: KeyboardEvent): boolean =>
   !isTypingTarget(e.target) &&
   useEditor.getState().dialog === null &&
-  !(e.target instanceof Element && e.target.closest("[role=dialog]") !== null)
+  !(e.target instanceof Element && e.target.closest("[role=dialog], [role=menu], [role=menubar]") !== null)
 
 type DragMode = "look" | "orbit" | "pan"
 

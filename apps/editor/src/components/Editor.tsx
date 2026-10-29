@@ -11,6 +11,7 @@ import { useActionKeys } from "../editor/useActionKeys"
 import { Viewport } from "../editor/Viewport"
 import { ExportDialog } from "./ExportDialog"
 import { Inspector } from "./Inspector"
+import { KeybindCheatSheet } from "./KeybindCheatSheet"
 import { NewMapDialog } from "./NewMapDialog"
 import { Palette } from "./Palette"
 import { SettingsDialog } from "./SettingsDialog"
@@ -25,13 +26,15 @@ if (import.meta.env.DEV) {
 
 /**
  * Chrome buttons are for the mouse: after a pointer click they give focus back, so a
- * later Space/Enter can't re-trigger them and editor keybinds keep working.
+ * later Space/Enter can't re-trigger them and editor keybinds keep working. Not in dialogs,
+ * nor in the menu bar: its menus open in the next frame and would close on the blur (they
+ * hand focus back themselves when they close).
  */
 const useBlurButtonsAfterClick = () =>
   useEffect(() => {
     const onPointerUp = (e: PointerEvent) => {
       const button = e.target instanceof Element ? e.target.closest("button") : null
-      if (button?.closest("[role=dialog]") === null) requestAnimationFrame(() => button.blur())
+      if (button?.closest("[role=dialog], [role=menubar]") === null) requestAnimationFrame(() => button.blur())
     }
     document.addEventListener("pointerup", onPointerUp)
     return () => document.removeEventListener("pointerup", onPointerUp)
@@ -110,6 +113,7 @@ export function Editor() {
         onCategoryChange={setSettingsCategory}
         onClose={close}
       />
+      <KeybindCheatSheet />
       <Toaster position="bottom-right" />
     </TooltipProvider>
   )

@@ -13,7 +13,8 @@ import {
   keybindActions,
   keybindSections,
   mergeKeybinds,
-  MODIFIER_HOLD_MS
+  MODIFIER_HOLD_MS,
+  releasesBinding
 } from "./Keybinds"
 
 describe("keybind table", () => {
@@ -37,11 +38,17 @@ describe("keybind table", () => {
       ["local / world axes", ["KeyC"]],
       ["focus selection", ["KeyF"]],
       ["add to selection", ["Shift+Mouse0"]],
-      ["toggle selection", ["Ctrl+Mouse0"]],
-      ["delete", ["Backspace", "Delete"]],
-      ["duplicate", ["Ctrl+KeyD"]],
+      ["toggle selection", ["Ctrl+Mouse0"]]
+    ])
+    const edit = keybindSections.find((s) => s.name === "edit")!
+    expect(edit.actions.map((a) => [keybindActionLabels[a], defaultKeybinds[a]])).toEqual([
       ["undo", ["Ctrl+KeyZ"]],
       ["redo", ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"]],
+      ["cut", ["Ctrl+KeyX"]], // editor only
+      ["copy", ["Ctrl+KeyC"]],
+      ["paste", ["Ctrl+KeyV"]],
+      ["duplicate", ["Ctrl+KeyD"]],
+      ["delete", ["Backspace", "Delete"]],
       ["deselect", ["Escape"]]
     ])
   })
@@ -91,6 +98,20 @@ describe("keybind table", () => {
     expect(formatBinding("ArrowLeft")).toBe("←")
     expect(formatBindings(["KeyF", "KeyC"])).toBe("F / C")
     expect(formatBindings([])).toBe("Unbound")
+    expect(formatBinding("Shift+Slash")).toBe("Shift + /")
+  })
+
+  it("ends a held binding when its key or one of its modifiers is released", () => {
+    expect(releasesBinding("Shift+Slash", "Slash")).toBe(true)
+    expect(releasesBinding("Shift+Slash", "ShiftRight")).toBe(true)
+    expect(releasesBinding("Ctrl+Slash", "MetaLeft")).toBe(true)
+    expect(releasesBinding("Shift+Slash", "KeyW")).toBe(false)
+    expect(releasesBinding("Shift+Slash", "ControlLeft")).toBe(false)
+  })
+
+  it("shows the cheat sheet on Shift+/ as a one-shot chord, so Shift doesn't fly the camera down", () => {
+    expect(defaultKeybinds.showKeybinds).toEqual(["Shift+Slash"])
+    expect(isBoundChord(defaultKeybinds, "Shift+Slash")).toBe(true)
   })
 })
 

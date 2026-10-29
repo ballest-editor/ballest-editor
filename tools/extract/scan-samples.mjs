@@ -58,6 +58,17 @@ for (const input of inputs) {
           bump(c.propertyNames, `${p.propertyName}:${p.propertyType ?? kind}`)
         }
       }
+      // The properties the game wrote, list by list in its order (the first item that has any).
+      if (!c.properties) {
+        const written = ["bool", "float", "int", "text", "name", "string"].flatMap((kind) =>
+          (it[`${kind}Properties`] ?? []).map((p) => ({
+            list: `${kind}Properties`,
+            name: p.propertyName,
+            type: p.propertyType
+          }))
+        )
+        if (written.length > 0) c.properties = written
+      }
     }
   }
 }
