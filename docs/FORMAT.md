@@ -62,6 +62,24 @@ Item = {
 
 Round-trip: `json.dumps(d, indent='\t', ensure_ascii=False)` with `\n` → `\r\n` is semantically identical but not byte-identical — UE's writer puts the opening `{`/`[` of nested values on its own line (Allman style). The game parses with a generic JSON reader, so whitespace is irrelevant; a custom writer can match it exactly if we ever want clean diffs against in-game saves.
 
+## Lighting (`worldSettings.directionalLight`, `directionalLightAngle`)
+
+Recovered from the pak's Blueprint bytecode (`W_WorldSettings`, `BP_Sky_Sphere_Stylized`, `BP_BallgameGameInstance.InitUGCSkylight`) and the light actors in `Map_LevelEditorMain`. The in-game World Settings panel has a "lighting" section with three sliders, all on one `SKGMapEditorDirectionalLight`:
+
+| Slider (in-game label) | Field                          | Slider range | What it does                                                                            |
+| ---------------------- | ------------------------------ | ------------ | --------------------------------------------------------------------------------------- |
+| time of day            | `directionalLight.timeOfDay`   | 0–24         | Light pitch = −(t − 6) × 15°: sunrise at 6, overhead at 12, sunset at 18, below at 0/24 |
+| sunlight               | `directionalLight.brightness`  | 1.25–7       | The light's intensity. New maps save 12, the editor map's light intensity               |
+| light rotation         | `directionalLightAngle` (opt.) | −360–360     | The light's yaw in degrees (default −20.6474552154541)                                  |
+
+The pitch formula is the native `SetWorldTimeOfDay`, which we can't read; it is confirmed by the editor map's light, which sits at pitch −19.495638 for the default time 7.2997093 (and yaw −20.647455, the default angle). The light is 6000 K. The number fields accept values outside the slider ranges, and samples contain brightness 0, 2, 8 and 12.
+
+The sky light is not a control. On load and on every time change the game sets it from the time of day alone: `clamp(t < 12 ? lerp(MinimumFillLight, 3, t/12) : t ≥ 24 ? MinimumFillLight : lerp(3, MinimumFillLight, (t − 12)/12), 1, 3)`. `MinimumFillLight` is a game-instance default we couldn't read. `skylightIntensity` (always 1 in samples) isn't used for this. The stylized sky sphere switches to a night look before 4:00 and after 20:00.
+
+The sky is `BP_Sky_Sphere_Stylized`, a sphere drawn with the unlit `M_Sky_Panning_Clouds_Stylized`. Its `RefreshMaterial` sets the material from the sun: by day (4:00 to 20:00) the horizon and zenith colours are the engine's `C_Sky_Horizon_Color` / `C_Sky_Zenith_Color` curves (each channel clamped to 0–1) at the sun height elevation / 90, the horizon falloff is lerp(3, 7, |height|) and the sun brightness 20 (it sets the light to 12 first, so 10 × sky light × 12 always passes the clamp); at night the colours are fixed dark blues, the falloff 0.2 and the stars 25. The material's compiled pixel shader (dumped with `BallestExtract shaders`, read with `dxc -dumpbin`) then outputs `1.5 × (lerp(zenith + stars × "Sun height", horizon, pow(1 − saturate(view.z), falloff)) + sunColor × brightness × saturate(1 − |view · toSun − 1| / 0.0003))`, with panning cloud textures blended over by `saturate(cloud²)`. "Sun height" is |height| below the horizon and 0 above, so stars only show at night. The level's sky light is a real-time capture of this sky.
+
+The editor approximates all of this in `apps/editor/src/domain/sunlight.ts` and `sky.ts`: the sky is drawn without its clouds (their textures aren't served), with procedural stars, and lights the scene as an environment map captured from it.
+
 ## Difficulty and tags
 
 The game's publish screen sets a difficulty and Workshop tags. Both end up in `levelData`.

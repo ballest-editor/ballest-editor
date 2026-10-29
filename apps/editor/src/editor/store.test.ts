@@ -8,7 +8,7 @@ import { placementTransform } from "../domain/factory"
 import { isPlayerStart } from "../domain/MapFile"
 import { withDifficulty } from "../domain/mapTags"
 import { defaultSettings } from "../domain/Settings"
-import { initialMap, nextSelection, pivotOf, useEditor } from "./store"
+import { initialMap, nextSelection, pivotOf, shownLighting, useEditor } from "./store"
 
 const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!
 
@@ -499,6 +499,25 @@ describe("editor store", () => {
       s().paste()
       assert.strictEqual(s().doc.map.items.filter(isPlayerStart).length, 1)
     })
+  })
+
+  it("previews lighting live and commits it as one undo step", () => {
+    state().loadMap(initialMap(), null)
+    const before = shownLighting(state())
+    state().setLightingPreview({ ...before, timeOfDay: 20 })
+    assert.strictEqual(shownLighting(state()).timeOfDay, 20)
+    assert.strictEqual(state().doc.map.worldSettings.directionalLight.timeOfDay, before.timeOfDay)
+    state().undo() // waits while the preview is up
+    assert.strictEqual(shownLighting(state()).timeOfDay, 20)
+
+    state().setLightingPreview(null)
+    state().setLighting({ ...before, timeOfDay: 20 })
+    state().setLighting({ ...before, timeOfDay: 20 }) // unchanged: no step
+    state().setLighting({ ...before, brightness: Number.POSITIVE_INFINITY }) // rejected: no step
+    assert.strictEqual(state().past.length, 1)
+    assert.strictEqual(state().doc.map.worldSettings.directionalLight.timeOfDay, 20)
+    state().undo()
+    assert.deepStrictEqual(shownLighting(state()), before)
   })
 
   it("tracks the open dialog and settings category", () => {

@@ -43,3 +43,15 @@ waterUnderMaterial.onBeforeCompile = (shader) => {
   #include <opaque_fragment>`
   )
 }
+
+const waterColor = new THREE.Color(WATER_COLOR)
+
+/**
+ * The water is unlit, so the scene's lights don't reach it. `level` (0-1) dims it the way
+ * the lights dim an up-facing surface: 1 under the studio lights, less at dusk or night.
+ */
+export const setWaterLight = (level: number): void => {
+  for (const material of [waterTopMaterial, waterUnderMaterial]) {
+    material.color.copy(waterColor).multiplyScalar(level)
+  }
+}

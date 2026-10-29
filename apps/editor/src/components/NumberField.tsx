@@ -130,6 +130,8 @@ export function NumberField(props: {
   readonly digits?: number
   /** Background class for the handle, e.g. an axis colour. */
   readonly handleClassName?: string
+  /** Whether the coloured handle (the scrub grip) is drawn; without it the field is a plain input. */
+  readonly handle?: boolean
 }) {
   const id = useId()
   const digits = props.digits ?? 3
@@ -156,16 +158,19 @@ export function NumberField(props: {
   const scrubbable = props.onScrub !== undefined
   return (
     <div className="flex h-7 min-w-0 overflow-hidden rounded-md border border-input bg-input/20 transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30 dark:bg-input/30">
-      <Label
-        htmlFor={id}
-        aria-label={props.label}
-        className={`w-2 shrink-0 ${props.handleClassName ?? "bg-muted"} ${
-          scrubbable ? "cursor-ew-resize hover:brightness-125" : ""
-        }`}
-        {...scrubHandlers}
-      />
+      {props.handle !== false && (
+        <Label
+          htmlFor={id}
+          aria-label={props.label}
+          className={`w-2 shrink-0 ${props.handleClassName ?? "bg-muted"} ${
+            scrubbable ? "cursor-ew-resize hover:brightness-125" : ""
+          }`}
+          {...scrubHandlers}
+        />
+      )}
       <Input
         id={id}
+        aria-label={props.handle === false ? props.label : undefined}
         inputMode="decimal"
         className="h-full min-w-0 rounded-none border-0 bg-transparent px-1 py-0 text-right font-mono tabular-nums leading-none focus-visible:border-0 focus-visible:ring-0 md:leading-none dark:bg-transparent"
         value={text}

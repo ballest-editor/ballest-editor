@@ -42,13 +42,23 @@ export const CameraSettings = Schema.Struct({
   movementNeedsLook: Schema.Literals(movementLookModes)
 })
 
+const HexColor = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/))
+
 export const AppearanceSettings = Schema.Struct({
   theme: Schema.Literals(["dark", "light", "system"]),
   gridVisible: Schema.Boolean,
-  gridCellColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)),
-  gridSectionColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)),
+  /** The grid's colours; null picks one for what is behind the grid (see autoGridColors). */
+  gridCellColor: Schema.NullOr(HexColor),
+  gridSectionColor: Schema.NullOr(HexColor),
   /** Whether the level's water (see domain/level) is drawn. */
   waterVisible: Schema.Boolean
+})
+
+export const LightingSettings = Schema.Struct({
+  /** Light the viewport with the map's sun and sky light instead of fixed studio lights. */
+  mapLighting: Schema.Boolean,
+  /** Whether the game's sky (with the map's sun in it) is drawn behind the scene. */
+  skyVisible: Schema.Boolean
 })
 
 /** Changed from the tool bar rather than the settings dialog, but persisted with the rest. */
@@ -68,6 +78,7 @@ export const Settings = Schema.Struct({
   editor: EditorSettings,
   camera: CameraSettings,
   appearance: AppearanceSettings,
+  lighting: LightingSettings,
   snapping: SnappingSettings
 })
 export type Settings = typeof Settings.Type
@@ -87,10 +98,11 @@ export const defaultSettings: Settings = {
   appearance: {
     theme: "dark",
     gridVisible: true,
-    gridCellColor: "#3a404a",
-    gridSectionColor: "#58606e",
+    gridCellColor: null,
+    gridSectionColor: null,
     waterVisible: true
   },
+  lighting: { mapLighting: true, skyVisible: true },
   snapping: {
     enabled: false,
     gridSize: DEFAULT_GRID_SIZE,
@@ -101,15 +113,51 @@ export const defaultSettings: Settings = {
 
 type Section = keyof Settings
 
-const sections: ReadonlyArray<Section> = ["general", "editor", "camera", "appearance", "snapping"]
+const sections: ReadonlyArray<Section> = ["general", "editor", "camera", "appearance", "lighting", "snapping"]
 
-/** Older saves kept `undoSelection` under general; it now lives under editor. */
+/** The fixed grid colours older saves stored; they now mean "automatic". */
+const LEGACY_GRID_COLORS = { gridCellColor: "#3a404a", gridSectionColor: "#58606e" } as const
+
+/**
+ * Older saves kept `undoSelection` under general (it now lives under editor), and stored the
+ * old fixed grid colours whether or not they were chosen (they become automatic).
+ */
 const migrate = (stored: unknown): unknown => {
   if (!Predicate.isObject(stored)) return stored
-  const general = stored["general"]
-  const editor = Predicate.isObject(stored["editor"]) ? stored["editor"] : {}
-  if (!Predicate.isObject(general) || !("undoSelection" in general) || "undoSelection" in editor) return stored
-  return { ...stored, editor: { ...editor, undoSelection: general["undoSelection"] } }
+  let out: Record<string, unknown> = stored
+  const general = out["general"]
+  const editor = Predicate.isObject(out["editor"]) ? out["editor"] : {}
+  if (Predicate.isObject(general) && "undoSelection" in general && !("undoSelection" in editor)) {
+    out = { ...out, editor: { ...editor, undoSelection: general["undoSelection"] } }
+  }
+  const appearance = out["appearance"]
+  if (Predicate.isObject(appearance)) {
+    const legacy = Object.entries(LEGACY_GRID_COLORS).filter(([key, hex]) => appearance[key] === hex)
+    if (legacy.length > 0) {
+      out = { ...out, appearance: { ...appearance, ...Object.fromEntries(legacy.map(([key]) => [key, null])) } }
+    }
+  }
+  return out
+}
+
+/**
+ * Automatic grid colours per theme. The sky is cut off at the grid's height, so the grid is
+ * always seen against the theme's background, or the water over it. Sections stand out more
+ * than cells: lighter on the dark background, darker on the light one.
+ */
+export const AUTO_GRID_COLORS: Readonly<Record<"dark" | "light", { readonly cell: string; readonly section: string }>> =
+  {
+    dark: { cell: "#474e5a", section: "#5f6877" },
+    light: { cell: "#a3b0bd", section: "#7a8a9b" }
+  }
+
+/** The grid colours to draw: the user's, else the theme's automatic ones. */
+export const gridColorsOf = (
+  appearance: Settings["appearance"],
+  dark: boolean
+): { readonly cell: string; readonly section: string } => {
+  const auto = AUTO_GRID_COLORS[dark ? "dark" : "light"]
+  return { cell: appearance.gridCellColor ?? auto.cell, section: appearance.gridSectionColor ?? auto.section }
 }
 
 /** Stored JSON -> Settings, field by field; invalid or missing fields keep their defaults. */

@@ -17,13 +17,17 @@ import * as THREE from "three"
 import { toTuple3, ueToThreeVector } from "../domain/coords"
 import { isBound, mouseChordOf } from "../domain/Keybinds"
 import { WATER } from "../domain/level"
+import { gridColorsOf } from "../domain/Settings"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { ItemObject } from "./ItemObject"
 import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
+import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline } from "./selectionOutline"
+import { SKY_DOME_RADIUS } from "./sky"
 import { nextSelection, type SelectMode, useEditor } from "./store"
+import { useDarkTheme } from "./theme"
 import { glbUrl, visualsOf } from "./visuals"
 import { waterTopMaterial, waterUnderMaterial } from "./water"
 
@@ -228,10 +232,15 @@ function ViewportBackground() {
   return null
 }
 
-/** The floor grid (1 m cells, 10 m sections) at the map's floor height, styled by the appearance settings. */
+/**
+ * The floor grid (1 m cells, 10 m sections) at the map's floor height, in the user's
+ * colours or ones picked for what it's seen against (the theme, or the sky by day or night).
+ */
 function ViewportGrid() {
   const appearance = useEditor((s) => s.settings.appearance)
   const floorHeight = useEditor((s) => s.floorHeight)
+  const dark = useDarkTheme(appearance.theme)
+  const colors = gridColorsOf(appearance, dark)
   if (!appearance.gridVisible) return null
   return (
     <Grid
@@ -240,10 +249,10 @@ function ViewportGrid() {
       infiniteGrid
       cellSize={100}
       sectionSize={1000}
-      fadeDistance={60000}
+      fadeDistance={SKY_DOME_RADIUS}
       fadeStrength={2}
-      cellColor={appearance.gridCellColor}
-      sectionColor={appearance.gridSectionColor}
+      cellColor={colors.cell}
+      sectionColor={colors.section}
     />
   )
 }
@@ -324,9 +333,7 @@ export function Viewport(
       >
         <ViewportBackground />
         <SmoothResize />
-        <ambientLight intensity={0.6} />
-        <hemisphereLight args={["#dfe8ff", "#30302a", 0.8]} />
-        <directionalLight position={[3000, 8000, 2000]} intensity={1.6} />
+        <SceneLights />
         <ViewportGrid />
         <Water />
         <MapItems />

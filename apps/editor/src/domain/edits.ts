@@ -16,6 +16,7 @@ import {
   objectPathOf
 } from "./MapFile"
 import type { Pivot } from "./pivot"
+import { DEFAULT_LIGHT_ANGLE, type Lighting } from "./sunlight"
 
 const decodeItem = Schema.decodeUnknownOption(Item)
 const decodeTransform = Schema.decodeUnknownOption(ItemTransform)
@@ -235,3 +236,23 @@ export const withLevelNames = (levelData: LevelData, displayName: string, creato
   creatorName,
   userLevelName: userLevelNameOf(displayName, creatorName)
 })
+
+/**
+ * Sets the sun's time of day, brightness and yaw; None when any value isn't finite.
+ * `directionalLightAngle` is only added to files that lack it (older saves) when the yaw
+ * moves off the game's default, so an untouched map exports as it came in.
+ */
+export const setLighting = (map: MapFile, lighting: Lighting): Option.Option<MapFile> => {
+  const { timeOfDay, brightness, angle } = lighting
+  if (![timeOfDay, brightness, angle].every(Number.isFinite)) return Option.none()
+  const world = map.worldSettings
+  const keepsAngle = world.directionalLightAngle !== undefined || angle !== DEFAULT_LIGHT_ANGLE
+  return Option.some({
+    ...map,
+    worldSettings: {
+      ...world,
+      directionalLight: { ...world.directionalLight, timeOfDay, brightness },
+      ...(keepsAngle ? { directionalLightAngle: angle } : {})
+    }
+  })
+}

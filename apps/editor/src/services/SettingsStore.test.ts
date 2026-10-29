@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { KeyValueStore } from "effect/persistence"
 import { FALLBACK_CAMERA_PRESETS } from "../domain/GameKeybinds"
-import { defaultSettings, fovOf, mergeSettings, verticalFov } from "../domain/Settings"
+import { AUTO_GRID_COLORS, defaultSettings, fovOf, gridColorsOf, mergeSettings, verticalFov } from "../domain/Settings"
 import { SETTINGS_STORAGE_KEY, SettingsStore } from "./SettingsStore"
 
 describe("Settings", () => {
@@ -30,6 +30,22 @@ describe("Settings", () => {
       mergeSettings({ editor: { placeDistance: 50 } }).editor.placeDistance,
       defaultSettings.editor.placeDistance
     )
+  })
+
+  it("reads the old fixed grid colours as automatic, keeping colours the user chose", () => {
+    const old = mergeSettings({ appearance: { gridCellColor: "#3a404a", gridSectionColor: "#58606e" } })
+    assert.strictEqual(old.appearance.gridCellColor, null)
+    assert.strictEqual(old.appearance.gridSectionColor, null)
+    const chosen = mergeSettings({ appearance: { gridCellColor: "#3a404a", gridSectionColor: "#123456" } })
+    assert.strictEqual(chosen.appearance.gridSectionColor, "#123456")
+    assert.strictEqual(mergeSettings({ appearance: { gridCellColor: null } }).appearance.gridCellColor, null)
+  })
+
+  it("picks automatic grid colours for the theme, or the user's", () => {
+    assert.deepStrictEqual(gridColorsOf(defaultSettings.appearance, true), AUTO_GRID_COLORS.dark)
+    assert.deepStrictEqual(gridColorsOf(defaultSettings.appearance, false), AUTO_GRID_COLORS.light)
+    const chosen = gridColorsOf({ ...defaultSettings.appearance, gridCellColor: "#ff0000" }, false)
+    assert.deepStrictEqual(chosen, { cell: "#ff0000", section: AUTO_GRID_COLORS.light.section })
   })
 
   it("uses the game's FOV presets (horizontal) converted to three's vertical FOV", () => {

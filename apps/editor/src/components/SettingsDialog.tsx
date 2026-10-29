@@ -1,5 +1,17 @@
-import { IconCamera, IconKeyboard, IconPalette, IconPencil, IconPlus, IconSettings, IconX } from "@tabler/icons-react"
+import {
+  IconCamera,
+  IconKeyboard,
+  IconPalette,
+  IconPencil,
+  IconPlus,
+  IconSettings,
+  IconSun,
+  IconX
+} from "@tabler/icons-react"
+import { Button } from "@workspace/ui/components/button"
+import { ColorPicker, ColorSwatch } from "@workspace/ui/components/color-picker"
 import { Input } from "@workspace/ui/components/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Slider } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
@@ -24,9 +36,10 @@ import {
   uniqueBindings,
   wheelChordOf
 } from "../domain/Keybinds"
-import { CUSTOM_FOV_PRESET, defaultSettings, type Settings } from "../domain/Settings"
+import { CUSTOM_FOV_PRESET, defaultSettings, gridColorsOf, type Settings } from "../domain/Settings"
 import { resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
 import { type SettingsCategory, useEditor } from "../editor/store"
+import { useDarkTheme } from "../editor/theme"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
 const movementLookItems = {
@@ -47,7 +60,8 @@ const CATEGORIES: ReadonlyArray<SettingsCategoryInfo<SettingsCategory>> = [
   { id: "editor", label: "Editor", icon: IconPencil },
   { id: "camera", label: "Camera", icon: IconCamera },
   { id: "keybinds", label: "Keybinds", icon: IconKeyboard },
-  { id: "appearance", label: "Appearance", icon: IconPalette }
+  { id: "appearance", label: "Appearance", icon: IconPalette },
+  { id: "lighting", label: "Lighting", icon: IconSun }
 ]
 
 type Row = SettingsRow<SettingsCategory>
@@ -56,16 +70,40 @@ type Row = SettingsRow<SettingsCategory>
 const sliderValue = (value: number | ReadonlyArray<number>): number | undefined =>
   typeof value === "number" ? value : value[0]
 
-function ColorInput(props: { readonly value: string; readonly onChange: (value: string) => void }) {
+/**
+ * A colour setting that can be automatic (null): a swatch of the colour in use, opening the
+ * same picker as the item colour properties, with a way back to automatic.
+ */
+function ColorSetting(props: {
+  readonly label: string
+  readonly value: string | null
+  /** The colour automatic currently resolves to. */
+  readonly auto: string
+  readonly onChange: (value: string | null) => void
+}) {
+  const shown = props.value ?? props.auto
   return (
-    <Input
-      type="color"
-      className="h-7 w-14 p-0.5"
-      value={props.value}
-      onChange={(e) => props.onChange(e.target.value)}
-    />
+    <Popover>
+      <PopoverTrigger
+        aria-label={`${props.label}: ${props.value ?? `automatic (${props.auto})`}`}
+        className="flex h-7 w-36 cursor-pointer items-center gap-2 rounded-md border border-input px-2 text-xs transition-colors hover:border-ring/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+      >
+        <ColorSwatch color={shown} />
+        <span className={cn("font-mono", props.value === null && "text-muted-foreground")}>
+          {props.value ?? "Automatic"}
+        </span>
+      </PopoverTrigger>
+      <PopoverContent side="left" align="start" className="w-56 gap-2">
+        <ColorPicker value={shown} onCommit={props.onChange} />
+        <Button variant="outline" size="sm" disabled={props.value === null} onClick={() => props.onChange(null)}>
+          Use automatic
+        </Button>
+      </PopoverContent>
+    </Popover>
   )
 }
+
+const GRID_COLOR_DESCRIPTION = "Automatic suits the dark or light theme."
 
 /** A binding being captured: a fresh slot (`index` = bindings.length) or a replacement. */
 interface Listening {
@@ -159,6 +197,8 @@ export function SettingsDialog(props: {
   readonly onClose: () => void
 }) {
   const settings = useEditor((s) => s.settings)
+  const dark = useDarkTheme(settings.appearance.theme)
+  const autoGrid = gridColorsOf({ ...settings.appearance, gridCellColor: null, gridSectionColor: null }, dark)
   const keybinds = useEditor((s) => s.keybinds)
   const defaults = useEditor((s) => s.keybindDefaults)
   const [listening, setListening] = useState<Listening | null>(null)
@@ -275,6 +315,7 @@ export function SettingsDialog(props: {
     ]
     const presetItems = Object.fromEntries(presetEntries)
     const a = settings.appearance
+    const l = settings.lighting
     const customFovOff = c.fovPreset !== CUSTOM_FOV_PRESET
     return [
       {
@@ -541,15 +582,26 @@ export function SettingsDialog(props: {
         id: "gridCell",
         ...setting("appearance", "gridCellColor"),
         label: "Grid colour (1 m cells)",
-        control: <ColorInput value={a.gridCellColor} onChange={(v) => update("appearance", { gridCellColor: v })} />
+        description: GRID_COLOR_DESCRIPTION,
+        control: (
+          <ColorSetting
+            label="Grid colour (1 m cells)"
+            value={a.gridCellColor}
+            auto={autoGrid.cell}
+            onChange={(v) => update("appearance", { gridCellColor: v })}
+          />
+        )
       },
       {
         id: "gridSection",
         ...setting("appearance", "gridSectionColor"),
         label: "Grid colour (10 m sections)",
+        description: GRID_COLOR_DESCRIPTION,
         control: (
-          <ColorInput
+          <ColorSetting
+            label="Grid colour (10 m sections)"
             value={a.gridSectionColor}
+            auto={autoGrid.section}
             onChange={(v) => update("appearance", { gridSectionColor: v })}
           />
         )
@@ -561,15 +613,28 @@ export function SettingsDialog(props: {
         description:
           "The level's water surface. In game, pieces below it are hidden, and a ball that falls in respawns.",
         control: <Switch checked={a.waterVisible} onCheckedChange={(v) => update("appearance", { waterVisible: v })} />
+      },
+      {
+        id: "mapLighting",
+        ...setting("lighting", "mapLighting"),
+        label: "Map lighting",
+        description:
+          "Light the viewport with the map's sun and sky, as set in the inspector's Lighting section. Off: fixed studio lights.",
+        control: <Switch checked={l.mapLighting} onCheckedChange={(v) => update("lighting", { mapLighting: v })} />
+      },
+      {
+        id: "skyVisible",
+        ...setting("lighting", "skyVisible"),
+        label: "Show sky",
+        description: "The game's sky with the map's sun in it. Off: the theme's background.",
+        control: <Switch checked={l.skyVisible} onCheckedChange={(v) => update("lighting", { skyVisible: v })} />
       }
     ]
   })()
 
   const resetCategory = (category: SettingsCategory) => {
     if (category === "keybinds") void resetKeybinds()
-    else if (category === "general") void saveSettings({ ...settings, general: defaultSettings.general })
-    else if (category === "camera") void saveSettings({ ...settings, camera: defaultSettings.camera })
-    else void saveSettings({ ...settings, appearance: defaultSettings.appearance })
+    else void saveSettings({ ...settings, [category]: defaultSettings[category] })
   }
   return (
     <SettingsShell

@@ -1,4 +1,5 @@
 /** Resolves the appearance theme setting ("system" follows the OS) and tracks OS changes. */
+import { useSyncExternalStore } from "react"
 import type { Settings } from "../domain/Settings"
 
 export type Theme = Settings["appearance"]["theme"]
@@ -19,3 +20,14 @@ export const watchResolvedTheme = (theme: Theme, apply: (dark: boolean) => void)
   media.addEventListener("change", run)
   return () => media.removeEventListener("change", run)
 }
+
+const subscribeSystemDark = (onChange: () => void) => {
+  const media = window.matchMedia(DARK_QUERY)
+  media.addEventListener("change", onChange)
+  return () => media.removeEventListener("change", onChange)
+}
+const systemDark = () => window.matchMedia(DARK_QUERY).matches
+
+/** Whether `theme` resolves to dark, following the OS preference live for "system". */
+export const useDarkTheme = (theme: Theme): boolean =>
+  isDarkTheme(theme, useSyncExternalStore(subscribeSystemDark, systemDark, () => true))
