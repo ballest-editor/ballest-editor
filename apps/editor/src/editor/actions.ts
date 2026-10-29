@@ -197,12 +197,17 @@ const saveMapPrefs = Effect.gen(function*() {
   yield* MapPrefsStore.use((store) => store.save(mapPrefsKeyOf(doc.map), prefs))
 })
 
-/** Project settings: the map's level fields (one undo step) and the grid height (saved with the map's prefs). */
-export const saveProjectSettings = (levelData: LevelData, gridHeight: number) =>
-  run(
-    Effect.gen(function*() {
-      useEditor.getState().setLevelData(levelData)
-      useEditor.getState().setFloorHeight(gridHeight)
-      yield* saveMapPrefs
-    })
-  )
+/**
+ * Changes the map's level fields (one undo step). Its prefs are saved again under its
+ * (possibly new) name.
+ */
+export const setLevelData = (levelData: LevelData) => {
+  useEditor.getState().setLevelData(levelData)
+  return run(saveMapPrefs)
+}
+
+/** Moves the grid (and where pieces land); saved with the map's prefs, not in its history. */
+export const setGridHeight = (gridHeight: number) => {
+  useEditor.getState().setFloorHeight(gridHeight)
+  return run(saveMapPrefs)
+}

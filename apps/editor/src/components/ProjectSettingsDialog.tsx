@@ -1,22 +1,11 @@
-import { IconAlertTriangleFilled, IconRestore } from "@tabler/icons-react"
+import { IconAlertTriangleFilled, IconCheck, IconMap, IconTags } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
-import { Button } from "@workspace/ui/components/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
-import { Label } from "@workspace/ui/components/label"
-import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Toggle } from "@workspace/ui/components/toggle"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type ReactNode, useState } from "react"
+import { useState } from "react"
 import { withLevelNames } from "../domain/edits"
 import { isValidName, mapFileNameOf, NAME_RULE } from "../domain/factory"
 import { floorHeightOf } from "../domain/level"
@@ -27,38 +16,35 @@ import {
   difficultyOf,
   hasTag,
   TAG_GROUPS,
+  type TagGroup,
   tagNameOf,
   unknownTags,
   withDifficulty,
   withTag
 } from "../domain/mapTags"
-import { saveProjectSettings } from "../editor/actions"
+import { setGridHeight, setLevelData } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { NumberField } from "./NumberField"
+import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
-/** A group as the game's publish screen draws it: a lowercase title after a lime bar, then a framed box. */
-function TagSection(
-  { title, children }: { readonly title: string; readonly children: ReactNode }
-) {
-  return (
-    <section className="flex flex-col gap-1.5">
-      <h3 className="flex items-center gap-1.5 text-sm leading-none">
-        <span className="h-3.5 w-1 rounded-full bg-lime-400" aria-hidden />
-        {title}
-      </h3>
-      <div className="flex flex-wrap gap-1.5 rounded-md border border-border bg-muted/40 p-2">{children}</div>
-    </section>
-  )
+type ProjectCategory = "map" | "workshop"
+
+// A project is one map for now; its settings are the map's.
+const CATEGORIES: ReadonlyArray<SettingsCategoryInfo<ProjectCategory>> = [
+  { id: "map", label: "Map", icon: IconMap },
+  { id: "workshop", label: "Difficulty and tags", icon: IconTags }
+]
+
+const TAG_DESCRIPTIONS: Readonly<Record<TagGroup, string>> = {
+  Gameplay: "What playing the map is like.",
+  Mood: "The time of day it's set at.",
+  Routes: "How many ways there are through it.",
+  Props: "Special pieces it uses."
 }
 
-/** Selected chips fill in; the rest are outlined and dimmed (as in the game). */
-const CHIP =
-  "border-border text-muted-foreground aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:text-background aria-pressed:hover:bg-foreground/85 aria-pressed:hover:text-background"
-
-/** The bar colour per difficulty (white, green, blue, red); the fifth is a warning sign. */
+/** The bar colour per difficulty (white, green, blue, red), as the game draws them; the fifth is a warning sign. */
 const BAR_COLORS: Readonly<Record<Exclude<Difficulty, "baller">, string>> = {
-  // white bars turn dark on the selected (light) button
-  beginner: "bg-foreground group-aria-pressed/toggle:bg-background",
+  beginner: "bg-foreground",
   medium: "bg-emerald-400",
   advanced: "bg-blue-600",
   expert: "bg-red-600"
@@ -72,26 +58,101 @@ function DifficultyIcon({ difficulty }: { readonly difficulty: Difficulty }) {
       {[1, 2, 3, 4].map((bar) => (
         <span
           key={bar}
-          className={cn(
-            "h-3.5 w-1.5 rounded-[2px]",
-            bar <= filled ? BAR_COLORS[difficulty] : "bg-muted-foreground/30"
-          )}
+          className={cn("h-3.5 w-1.5 rounded-[2px]", bar <= filled ? BAR_COLORS[difficulty] : "bg-muted-foreground/30")}
         />
       ))}
     </span>
   )
 }
 
-interface Draft {
-  readonly name: string
-  readonly levelData: LevelData
-  readonly gridHeight: number
+/** The game's five difficulty icons; picking the chosen one again keeps it. */
+function DifficultyPicker(
+  { value, onChange }: { readonly value: Difficulty | undefined; readonly onChange: (d: Difficulty) => void }
+) {
+  return (
+    <ToggleGroup
+      value={value === undefined ? [] : [value]}
+      onValueChange={(next) => {
+        const picked = DIFFICULTIES.find((d) => next.includes(d.tag) && d.tag !== value)
+        if (picked !== undefined) onChange(picked.tag)
+      }}
+      spacing={1}
+    >
+      {DIFFICULTIES.map((d) => (
+        <Tooltip key={d.tag}>
+          <TooltipTrigger
+            render={
+              <ToggleGroupItem
+                value={d.tag}
+                variant="outline"
+                aria-label={d.level}
+                className="h-8 w-12 aria-pressed:border-primary aria-pressed:bg-primary/15"
+              />
+            }
+          >
+            <DifficultyIcon difficulty={d.tag} />
+          </TooltipTrigger>
+          <TooltipContent>{d.level}</TooltipContent>
+        </Tooltip>
+      ))}
+    </ToggleGroup>
+  )
+}
+
+function TagChips(
+  { group, levelData }: { readonly group: (typeof TAG_GROUPS)[number]; readonly levelData: LevelData }
+) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {group.tags.map((tag) => {
+        const name = tagNameOf(group.group, tag)
+        const on = hasTag(levelData, name)
+        return (
+          <Toggle
+            key={tag}
+            variant="outline"
+            pressed={on}
+            onPressedChange={(next) => void setLevelData(withTag(levelData, name, next))}
+            className="rounded-full px-3 aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/90 aria-pressed:hover:text-primary-foreground"
+          >
+            {on && <IconCheck data-icon="inline-start" />}
+            {tag}
+          </Toggle>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Commits on Enter or blur when the name is valid; Escape or an invalid name puts the map's back. */
+function NameInput({ value, onCommit }: { readonly value: string; readonly onCommit: (name: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const text = draft ?? value
+  return (
+    <Input
+      className="w-56"
+      value={text}
+      aria-invalid={!isValidName(text)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (draft !== null && draft !== value && isValidName(draft)) onCommit(draft)
+        setDraft(null)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur()
+        if (e.key === "Escape") {
+          e.stopPropagation() // just the edit, not the dialog
+          setDraft(null)
+        }
+      }}
+    />
+  )
 }
 
 /**
- * Project settings. A project is one map for now: its name, the editor's grid height for
- * it, and the difficulty and tags the game's publish screen sets. Changes apply on Save, the level fields as one
- * undo step.
+ * Project settings, laid out like the editor's settings and applied as they change (level
+ * fields as undo steps). A project is one map for now: its name and grid height, and the
+ * difficulty and tags the game's publish screen sets.
  */
 export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   const levelData = useEditor((s) => s.doc.map.worldSettings.levelData)
@@ -99,158 +160,102 @@ export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolea
   const startHeight = useEditor((s) => floorHeightOf(s.doc.map))
   const units = useEditor((s) => s.settings.general.units)
   const savedCreator = useEditor((s) => s.settings.general.creatorName.trim())
-  const fresh = (): Draft => ({ name: levelData.levelDisplayName, levelData, gridHeight: floorHeight })
-  const [draft, setDraft] = useState(fresh)
-  // Each time the dialog opens, start from the map as it is.
-  const [wasOpen, setWasOpen] = useState(open)
-  if (open !== wasOpen) {
-    setWasOpen(open)
-    if (open) setDraft(fresh())
-  }
-  const edit = (f: (levelData: LevelData) => LevelData) => setDraft((d) => ({ ...d, levelData: f(d.levelData) }))
+  const [category, setCategory] = useState<ProjectCategory>("map")
 
   // A map made before a creator was saved has none yet; it gets the saved one, as Export would.
   const creator = levelData.creatorName || savedCreator
   const perUnit = units === "m" ? 100 : 1
-  const difficulty = difficultyOf(draft.levelData)
-  const others = unknownTags(draft.levelData)
-  const canSave = isValidName(draft.name)
+  const difficulty = difficultyOf(levelData)
+  const others = unknownTags(levelData)
+  const fixed = { modified: false, reset: () => {} }
 
-  const save = async () => {
-    onClose()
-    await saveProjectSettings(withLevelNames(draft.levelData, draft.name, creator), draft.gridHeight)
-  }
+  const rows: ReadonlyArray<SettingsRow<ProjectCategory>> = [
+    {
+      id: "name",
+      category: "map",
+      label: "Name",
+      description: `Exports as ${mapFileNameOf(levelData.levelDisplayName, creator || "creator")} (${NAME_RULE}).`,
+      ...fixed,
+      control: (
+        <NameInput
+          value={levelData.levelDisplayName}
+          onCommit={(name) => void setLevelData(withLevelNames(levelData, name, creator))}
+        />
+      )
+    },
+    {
+      id: "gridHeight",
+      category: "map",
+      label: `Grid height (${units})`,
+      description:
+        "Where the grid is drawn and new pieces land. Defaults to the player start's height. Kept in this editor, not in the map file.",
+      modified: floorHeight !== startHeight,
+      reset: () => void setGridHeight(startHeight),
+      control: (
+        <div className="w-32">
+          <NumberField
+            label="Grid height"
+            value={floorHeight / perUnit}
+            digits={units === "m" ? 3 : 1}
+            onCommit={(value) => void setGridHeight(value * perUnit)}
+          />
+        </div>
+      )
+    },
+    {
+      id: "difficulty",
+      category: "workshop",
+      label: "Difficulty",
+      description: difficulty === undefined
+        ? "Not set."
+        : `${DIFFICULTIES.find((d) => d.tag === difficulty)?.level ?? difficulty}.`,
+      keywords: DIFFICULTIES.map((d) => d.level).join(" "),
+      ...fixed,
+      control: <DifficultyPicker value={difficulty} onChange={(d) => void setLevelData(withDifficulty(levelData, d))} />
+    },
+    ...TAG_GROUPS.map((group): SettingsRow<ProjectCategory> => {
+      const names = group.tags.map((tag) => tagNameOf(group.group, tag))
+      return {
+        id: `tags-${group.group}`,
+        category: "workshop",
+        group: "Tags",
+        label: group.group,
+        description: TAG_DESCRIPTIONS[group.group],
+        keywords: group.tags.join(" "),
+        wide: true,
+        modified: names.some((name) => hasTag(levelData, name)),
+        reset: () => void setLevelData(names.reduce((l, name) => withTag(l, name, false), levelData)),
+        control: <TagChips group={group} levelData={levelData} />
+      }
+    }),
+    ...(others.length === 0 ? [] : [
+      {
+        id: "tags-other",
+        category: "workshop",
+        group: "Tags",
+        label: "Other",
+        description: "Tags this editor doesn't know, such as the old ungrouped ones. They are kept as they are.",
+        keywords: others.join(" "),
+        wide: true,
+        ...fixed,
+        control: (
+          <div className="flex flex-wrap gap-1">
+            {others.map((name) => <Badge key={name} variant="outline" className="font-mono">{name}</Badge>)}
+          </div>
+        )
+      } satisfies SettingsRow<ProjectCategory>
+    ])
+  ]
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="flex h-[min(90svh,52rem)] flex-col gap-0 p-0 sm:max-w-md">
-        <form
-          className="flex min-h-0 flex-1 flex-col"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (canSave) void save()
-          }}
-        >
-          <DialogHeader className="p-4 pb-3">
-            <DialogTitle>Project settings</DialogTitle>
-            <DialogDescription>
-              Exports as{" "}
-              <code className="break-all">{mapFileNameOf(draft.name || "name", creator || "creator")}</code>. Difficulty
-              and tags are what the game's publish screen shows.
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="flex flex-col gap-4 px-4 pb-4">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="project-map-name">Map name</Label>
-                <Input
-                  id="project-map-name"
-                  value={draft.name}
-                  onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                  aria-invalid={!isValidName(draft.name)}
-                />
-                <span className="text-[0.7rem] text-muted-foreground">{NAME_RULE}</span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label>Grid height ({units})</Label>
-                <div className="flex items-center gap-2">
-                  <div className="w-32">
-                    <NumberField
-                      label="Grid height"
-                      value={draft.gridHeight / perUnit}
-                      digits={units === "m" ? 3 : 1}
-                      onCommit={(value) => setDraft((d) => ({ ...d, gridHeight: value * perUnit }))}
-                    />
-                  </div>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={draft.gridHeight === startHeight}
-                          onClick={() => setDraft((d) => ({ ...d, gridHeight: startHeight }))}
-                        />
-                      }
-                    >
-                      <IconRestore /> Player start
-                    </TooltipTrigger>
-                    <TooltipContent>Back to the player start's height</TooltipContent>
-                  </Tooltip>
-                </div>
-                <span className="text-[0.7rem] text-muted-foreground">
-                  Where the grid is drawn and new pieces land. Saved in this editor for this map, not in the file.
-                </span>
-              </div>
-
-              <TagSection title="difficulty">
-                <ToggleGroup
-                  value={difficulty === undefined ? [] : [difficulty]}
-                  onValueChange={(value) => {
-                    const next = DIFFICULTIES.find((d) => value.includes(d.tag) && d.tag !== difficulty)
-                    if (next !== undefined) edit((l) => withDifficulty(l, next.tag)) // clicking the chosen one keeps it
-                  }}
-                  spacing={1.5}
-                  className="w-full"
-                >
-                  {DIFFICULTIES.map((d) => (
-                    <Tooltip key={d.tag}>
-                      <TooltipTrigger
-                        render={
-                          <ToggleGroupItem
-                            value={d.tag}
-                            variant="outline"
-                            aria-label={d.level}
-                            className={cn("h-8 flex-1", CHIP)}
-                          />
-                        }
-                      >
-                        <DifficultyIcon difficulty={d.tag} />
-                      </TooltipTrigger>
-                      <TooltipContent>{d.level}</TooltipContent>
-                    </Tooltip>
-                  ))}
-                </ToggleGroup>
-              </TagSection>
-
-              {TAG_GROUPS.map(({ group, tags }) => (
-                <TagSection key={group} title={group.toLowerCase()}>
-                  {tags.map((tag) => {
-                    const name = tagNameOf(group, tag)
-                    return (
-                      <Toggle
-                        key={tag}
-                        variant="outline"
-                        pressed={hasTag(draft.levelData, name)}
-                        onPressedChange={(on) => edit((l) => withTag(l, name, on))}
-                        className={CHIP}
-                      >
-                        {tag.toLowerCase()}
-                      </Toggle>
-                    )
-                  })}
-                </TagSection>
-              ))}
-
-              {others.length > 0 && (
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[0.7rem] text-muted-foreground">
-                    Other tags in the file, kept as they are:
-                  </span>
-                  <div className="flex flex-wrap gap-1">
-                    {others.map((name) => <Badge key={name} variant="outline" className="font-mono">{name}</Badge>)}
-                  </div>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-          <DialogFooter className="border-t p-4">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={!canSave}>Save</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <SettingsShell
+      open={open}
+      onClose={onClose}
+      description="Project settings"
+      categories={CATEGORIES}
+      category={category}
+      onCategoryChange={setCategory}
+      rows={rows}
+    />
   )
 }
