@@ -15,8 +15,8 @@ import { type Sky, SKY_GAIN, SUN_RADIUS } from "../domain/sky"
  */
 export const SKY_DOME_RADIUS = 60_000
 
-/** How far above the grid's height (on the dome, cm) the sky fades in: about 12° of elevation, a soft edge without aliasing. */
-const SKY_FADE_HEIGHT = SKY_DOME_RADIUS * 0.2
+/** How far above the grid's height (on the dome, cm) the sky fades in: about 8° of elevation, a soft edge without aliasing. */
+const SKY_FADE_HEIGHT = SKY_DOME_RADIUS * 0.14
 
 /** Exposure on the visible sky; the game's auto exposure has no counterpart here. */
 const SKY_EXPOSURE = 1.6
