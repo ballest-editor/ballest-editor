@@ -36,3 +36,7 @@ export class MaterialLibraryLoadError
 export class SettingsStoreError extends Schema.TaggedError<SettingsStoreError>()("SettingsStoreError", {
   message: Schema.String
 }) {}
+
+export class MapPrefsStoreError extends Schema.TaggedError<MapPrefsStoreError>()("MapPrefsStoreError", {
+  message: Schema.String
+}) {}

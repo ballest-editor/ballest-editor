@@ -1,24 +1,11 @@
-import {
-  IconCamera,
-  IconKeyboard,
-  IconPalette,
-  IconPlus,
-  IconRestore,
-  IconSearch,
-  IconSettings,
-  IconX
-} from "@tabler/icons-react"
-import { Button } from "@workspace/ui/components/button"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@workspace/ui/components/dialog"
+import { IconCamera, IconKeyboard, IconPalette, IconPlus, IconSettings, IconX } from "@tabler/icons-react"
 import { Input } from "@workspace/ui/components/input"
-import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Slider } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { Struct } from "effect"
-import { type ReactNode, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { movementLookModes } from "../domain/flyKeys"
 import { namedActions } from "../domain/GameKeybinds"
 import {
@@ -40,6 +27,7 @@ import {
 import { CUSTOM_FOV_PRESET, defaultSettings, type Settings } from "../domain/Settings"
 import { resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
 import { type SettingsCategory, useEditor } from "../editor/store"
+import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
 const movementLookItems = {
   all: "All movement keys",
@@ -54,41 +42,18 @@ const movementLookDescriptions = {
   nothing: "No key needs look. Shared keys fly and pick their tool."
 } as const
 
-const CATEGORY_LABELS: Readonly<Record<SettingsCategory, string>> = {
-  general: "General",
-  camera: "Camera",
-  keybinds: "Keybinds",
-  appearance: "Appearance"
-}
-
-const CATEGORIES: ReadonlyArray<
-  { readonly id: SettingsCategory; readonly label: string; readonly icon: typeof IconSettings }
-> = [
-  { id: "general", label: CATEGORY_LABELS.general, icon: IconSettings },
-  { id: "camera", label: CATEGORY_LABELS.camera, icon: IconCamera },
-  { id: "keybinds", label: CATEGORY_LABELS.keybinds, icon: IconKeyboard },
-  { id: "appearance", label: CATEGORY_LABELS.appearance, icon: IconPalette }
+const CATEGORIES: ReadonlyArray<SettingsCategoryInfo<SettingsCategory>> = [
+  { id: "general", label: "General", icon: IconSettings },
+  { id: "camera", label: "Camera", icon: IconCamera },
+  { id: "keybinds", label: "Keybinds", icon: IconKeyboard },
+  { id: "appearance", label: "Appearance", icon: IconPalette }
 ]
+
+type Row = SettingsRow<SettingsCategory>
 
 /** base-ui sliders report a number, or an array for range sliders. */
 const sliderValue = (value: number | ReadonlyArray<number>): number | undefined =>
   typeof value === "number" ? value : value[0]
-
-/** One searchable setting. `group` is a sub-heading inside the category (keybind sections). */
-interface Row {
-  readonly id: string
-  readonly category: SettingsCategory
-  readonly group?: string
-  readonly label: string
-  readonly description?: string
-  /** Description shown as a hover tooltip on the label instead of under it. */
-  readonly tooltip?: boolean
-  readonly disabled?: boolean
-  /** Differs from its default; `reset` puts it back. */
-  readonly modified: boolean
-  readonly reset: () => void
-  readonly control: ReactNode
-}
 
 function ColorInput(props: { readonly value: string; readonly onChange: (value: string) => void }) {
   return (
@@ -105,72 +70,6 @@ function ColorInput(props: { readonly value: string; readonly onChange: (value: 
 interface Listening {
   readonly action: KeybindAction
   readonly index: number
-}
-
-function RowView({ row }: { readonly row: Row }) {
-  const label = (
-    <span className={cn("text-xs font-medium", row.disabled && "text-muted-foreground")}>
-      {row.label}
-    </span>
-  )
-  return (
-    <div className="group/row relative flex min-h-9 items-center gap-4 py-1 pl-3">
-      {row.modified && (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <span
-                className="absolute top-1/2 left-0 size-1.5 -translate-y-1/2 rounded-full bg-primary"
-                aria-label="Changed from default"
-              />
-            }
-          />
-          <TooltipContent side="left">Changed from default</TooltipContent>
-        </Tooltip>
-      )}
-      <div className="flex min-w-0 flex-1 flex-col">
-        {row.tooltip && row.description !== undefined
-          ? (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <span className="w-fit cursor-help underline decoration-dotted decoration-muted-foreground/50 underline-offset-4" />
-                }
-              >
-                {label}
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-xs">{row.description}</TooltipContent>
-            </Tooltip>
-          )
-          : label}
-        {!row.tooltip && row.description !== undefined && (
-          <span className={cn("text-[0.7rem] text-muted-foreground", row.disabled && "opacity-60")}>
-            {row.description}
-          </span>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {row.control}
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={cn("size-6 text-muted-foreground", !row.modified && "invisible")}
-                onClick={row.reset}
-                aria-label="Reset to default"
-                tabIndex={row.modified ? 0 : -1}
-              />
-            }
-          >
-            <IconRestore className="size-3.5" />
-          </TooltipTrigger>
-          <TooltipContent side="left">Reset to default</TooltipContent>
-        </Tooltip>
-      </div>
-    </div>
-  )
 }
 
 /**
@@ -261,9 +160,6 @@ export function SettingsDialog(props: {
   const settings = useEditor((s) => s.settings)
   const keybinds = useEditor((s) => s.keybinds)
   const defaults = useEditor((s) => s.keybindDefaults)
-  const [query, setQuery] = useState("")
-  /** While searching, a category narrows the results; null shows every match. */
-  const [scope, setScope] = useState<SettingsCategory | null>(null)
   const [listening, setListening] = useState<Listening | null>(null)
 
   const update = <K extends keyof Settings>(section: K, patch: Partial<Settings[K]>) =>
@@ -275,8 +171,7 @@ export function SettingsDialog(props: {
   /** The parts of a settings row that come from its field: category, modified flag, reset. */
   const setting = <K extends keyof Settings>(section: K, key: keyof Settings[K]) => ({
     category: section,
-    modified: !isDefault(section, key),
-    reset: () => resetField(section, key)
+    changes: { modified: !isDefault(section, key), reset: () => resetField(section, key) }
   })
 
   const setBindings = (action: KeybindAction, bindings: Bindings) =>
@@ -356,8 +251,10 @@ export function SettingsDialog(props: {
       label,
       description: keybindActionDescriptions[action],
       tooltip: true,
-      modified: !isDefaultBinding(keybinds, defaults.keybinds, action),
-      reset: () => setBindings(action, defaults.keybinds[action]),
+      changes: {
+        modified: !isDefaultBinding(keybinds, defaults.keybinds, action),
+        reset: () => setBindings(action, defaults.keybinds[action])
+      },
       control: (
         <KeybindControl
           action={action}
@@ -446,8 +343,7 @@ export function SettingsDialog(props: {
         label: "Autosave",
         description: "Coming later.",
         disabled: true,
-        modified: false,
-        reset: () => {},
+        changes: { modified: false, reset: () => {} },
         control: <Switch disabled checked={false} />
       },
       {
@@ -642,123 +538,24 @@ export function SettingsDialog(props: {
     ]
   })()
 
-  const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 0)
-  const searching = terms.length > 0
-  const matches = (r: Row) =>
-    terms.every((t) => `${r.label} ${r.description ?? ""} ${r.group ?? ""} ${r.category}`.toLowerCase().includes(t))
-  const matched = searching ? rows.filter(matches) : []
-  const hitsPerCategory = new Map<SettingsCategory, number>()
-  for (const r of matched) hitsPerCategory.set(r.category, (hitsPerCategory.get(r.category) ?? 0) + 1)
-  const visible = searching
-    ? matched.filter((r) => scope === null || r.category === scope)
-    : rows.filter((r) => r.category === props.category)
-
-  // Group: by category when searching, then by sub-group (keybind sections).
-  const groups: Array<{ key: string; title: string | undefined; rows: Array<Row> }> = []
-  for (const row of visible) {
-    const title = searching
-      ? [CATEGORY_LABELS[row.category], row.group].filter(Boolean).join(" › ")
-      : row.group
-    const last = groups.at(-1)
-    if (last !== undefined && last.title === title) last.rows.push(row)
-    else groups.push({ key: `${row.category}-${title ?? ""}`, title, rows: [row] })
-  }
-
-  const resetCurrent = () => {
-    if (props.category === "keybinds") void resetKeybinds()
-    else if (props.category === "general") void saveSettings({ ...settings, general: defaultSettings.general })
-    else if (props.category === "camera") void saveSettings({ ...settings, camera: defaultSettings.camera })
+  const resetCategory = (category: SettingsCategory) => {
+    if (category === "keybinds") void resetKeybinds()
+    else if (category === "general") void saveSettings({ ...settings, general: defaultSettings.general })
+    else if (category === "camera") void saveSettings({ ...settings, camera: defaultSettings.camera })
     else void saveSettings({ ...settings, appearance: defaultSettings.appearance })
   }
-  const modifiedIn = (category: SettingsCategory) => rows.some((r) => r.category === category && r.modified)
-
   return (
-    <Dialog open={props.open} onOpenChange={(next) => !next && listening === null && props.onClose()}>
-      <DialogContent className="flex h-[min(80vh,720px)] w-full gap-0 overflow-hidden p-0 sm:max-w-4xl" showCloseButton>
-        <nav className="flex w-56 shrink-0 flex-col gap-1 border-r bg-muted/30 p-3">
-          <div className="relative mb-2">
-            <IconSearch className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-7"
-              placeholder="Search settings"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value)
-                setScope(null)
-              }}
-              aria-label="Search settings"
-            />
-          </div>
-          {searching && (
-            <Button
-              variant={scope === null ? "secondary" : "ghost"}
-              className="justify-between"
-              onClick={() => setScope(null)}
-            >
-              <span>All results</span>
-              <span className="text-[0.65rem] text-muted-foreground tabular-nums">{matched.length}</span>
-            </Button>
-          )}
-          {CATEGORIES.map(({ id, label, icon: Icon }) => {
-            const hits = hitsPerCategory.get(id) ?? 0
-            const active = searching ? scope === id : props.category === id
-            return (
-              <Button
-                key={id}
-                variant={active ? "secondary" : "ghost"}
-                className={cn("justify-start", searching && hits === 0 && "text-muted-foreground/50")}
-                disabled={searching && hits === 0}
-                onClick={() => {
-                  if (searching) setScope(id)
-                  else props.onCategoryChange(id)
-                }}
-                data-category={id}
-              >
-                <Icon />
-                <span className="flex-1 text-left">{label}</span>
-                {searching
-                  ? hits > 0 && (
-                    <span className="rounded-full bg-primary/15 px-1.5 text-[0.65rem] text-primary tabular-nums">
-                      {hits}
-                    </span>
-                  )
-                  : modifiedIn(id) && (
-                    <span className="size-1.5 rounded-full bg-primary" aria-label="Has changed settings" />
-                  )}
-              </Button>
-            )
-          })}
-        </nav>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="border-b px-5 py-3">
-            <DialogTitle>{searching ? `Search: ${query}` : CATEGORY_LABELS[props.category]}</DialogTitle>
-            <DialogDescription className="sr-only">Editor settings</DialogDescription>
-          </div>
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="flex flex-col gap-5 px-5 py-3">
-              {groups.map((group) => (
-                <section key={group.key} className="flex flex-col">
-                  {group.title !== undefined && group.title !== "" && (
-                    <h3 className="mb-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
-                      {group.title}
-                    </h3>
-                  )}
-                  <div className="flex flex-col divide-y divide-border/50">
-                    {group.rows.map((row) => <RowView key={row.id} row={row} />)}
-                  </div>
-                </section>
-              ))}
-              {groups.length === 0 && <p className="text-xs text-muted-foreground">No settings match.</p>}
-            </div>
-          </ScrollArea>
-          <div className="flex justify-between border-t px-5 py-3">
-            <Button variant="outline" onClick={resetCurrent} disabled={searching || !modifiedIn(props.category)}>
-              Reset {CATEGORY_LABELS[props.category].toLowerCase()} to defaults
-            </Button>
-            <Button onClick={props.onClose} disabled={listening !== null}>Done</Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <SettingsShell
+      open={props.open}
+      onClose={props.onClose}
+      title="Settings"
+      description="Settings for the editor, kept in this browser."
+      categories={CATEGORIES}
+      category={props.category}
+      onCategoryChange={props.onCategoryChange}
+      rows={rows}
+      onResetCategory={resetCategory}
+      busy={listening !== null}
+    />
   )
 }

@@ -3,6 +3,7 @@ import { CatalogLoader } from "./CatalogLoader"
 import { KeybindStore } from "./KeybindStore"
 import { MapCodec } from "./MapCodec"
 import { MapExporter } from "./MapExporter"
+import { MapPrefsStore } from "./MapPrefsStore"
 import { MaterialLibrary } from "./MaterialLibrary"
 import { SettingsStore } from "./SettingsStore"
 
@@ -11,6 +12,7 @@ export const AppLayer = Layer.mergeAll(
   CatalogLoader.layer,
   KeybindStore.layer,
   MapExporter.layer,
+  MapPrefsStore.layer,
   MaterialLibrary.layer,
   SettingsStore.layer,
   DateTime.layerCurrentZoneLocal

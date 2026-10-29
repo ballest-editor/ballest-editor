@@ -14,6 +14,7 @@ import { Inspector } from "./Inspector"
 import { KeybindCheatSheet } from "./KeybindCheatSheet"
 import { NewMapDialog } from "./NewMapDialog"
 import { Palette } from "./Palette"
+import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
 import { SettingsDialog } from "./SettingsDialog"
 import { SidePanel } from "./SidePanel"
 import { TopBar } from "./TopBar"
@@ -107,6 +108,7 @@ export function Editor() {
       />
       <NewMapDialog open={dialog === "new"} onClose={close} />
       <ExportDialog open={dialog === "export"} onClose={close} />
+      <ProjectSettingsDialog open={dialog === "project"} onClose={close} />
       <SettingsDialog
         open={dialog === "settings"}
         category={settingsCategory}
