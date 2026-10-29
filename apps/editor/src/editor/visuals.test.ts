@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import { Catalog, indexCatalog } from "../domain/Catalog"
-import { itemFromPiece } from "../domain/factory"
+import { identityTransform, itemFromPiece } from "../domain/factory"
 import { visualsOf } from "./visuals"
 
 const CUBE = "/Engine/BasicShapes/Cube.Cube"
@@ -36,19 +36,19 @@ const catalog = Schema.decodeUnknownSync(Catalog)({
     }
   ]
 })
-const transform = {
-  translation: { x: 0, y: 0, z: 0 },
-  rotation: { x: 0, y: 0, z: 0, w: 1 },
-  scale3D: { x: 1, y: 1, z: 1 }
-}
 
 describe("visualsOf", () => {
   it("gives each extra mesh component its own slot materials, not the shared mesh's", () => {
     const index = indexCatalog(catalog)
     const [vent, checkpoint] = catalog.pieces
-    assert.deepStrictEqual(visualsOf(itemFromPiece(vent!, transform), index).map((v) => v.slotMaterials), [[BEAM]])
-    assert.deepStrictEqual(visualsOf(itemFromPiece(checkpoint!, transform), index).map((v) => v.slotMaterials), [[
-      GLOW
+    assert.deepStrictEqual(visualsOf(itemFromPiece(vent!, identityTransform()), index).map((v) => v.slotMaterials), [[
+      BEAM
     ]])
+    assert.deepStrictEqual(
+      visualsOf(itemFromPiece(checkpoint!, identityTransform()), index).map((v) => v.slotMaterials),
+      [[
+        GLOW
+      ]]
+    )
   })
 })
