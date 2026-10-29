@@ -42,6 +42,7 @@ describe("keybind table", () => {
       ["delete", ["Backspace", "Delete"]],
       ["duplicate", ["Ctrl+KeyD"]],
       ["copy", ["Ctrl+KeyC"]],
+      ["cut", ["Ctrl+KeyX"]], // editor only
       ["paste", ["Ctrl+KeyV"]],
       ["undo", ["Ctrl+KeyZ"]],
       ["redo", ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"]],

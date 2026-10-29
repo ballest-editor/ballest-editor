@@ -335,6 +335,22 @@ describe("editor store", () => {
       assert.deepStrictEqual(s().selectedIds, pasted)
     })
 
+    it("cuts the selection as one step, leaving the player start, and pastes it back in place", () => {
+      const { ids, steps } = setup()
+      s().select([s().doc.ids[0]!, ids[0]!, ids[2]!])
+      s().cutSelection()
+      assert.strictEqual(s().past.length, steps + 1)
+      assert.strictEqual(s().doc.map.items.length, 2)
+      assert.isTrue(isPlayerStart(s().doc.map.items[0]!))
+      assert.deepStrictEqual(s().selectedIds, [])
+      s().paste()
+      assert.deepStrictEqual(s().selectedIds.map((id) => transformOf(id).translation.x), [0, 200])
+      s().undo()
+      s().undo()
+      assert.strictEqual(s().doc.map.items.length, 4)
+      assert.deepStrictEqual(s().selectedIds, [s().doc.ids[0]!, ids[0]!, ids[2]!])
+    })
+
     it("keeps the clipboard across loading another map", () => {
       const { ids } = setup()
       s().select([ids[1]!])

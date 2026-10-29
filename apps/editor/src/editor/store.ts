@@ -127,6 +127,8 @@ export interface EditorState {
   readonly duplicateSelection: () => void
   /** Puts the selected items on the clipboard; the document is unchanged. */
   readonly copySelection: () => void
+  /** Puts the selected items on the clipboard and removes them (one undo step). */
+  readonly cutSelection: () => void
   /**
    * Adds the clipboard's items where they were copied, like the game (one undo step), and
    * selects them.
@@ -305,11 +307,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       const s = get()
       const indices = selectedIndices(s)
       if (indices.length === 0) return
-      const removed = new Set(indices)
-      commit(
-        { map: removeItems(s.doc.map, indices), ids: s.doc.ids.filter((_, i) => !removed.has(i)) },
-        { selectedIds: [] }
-      )
+      commit(withoutItems(s.doc, indices), { selectedIds: [] })
     },
 
     duplicateSelection: () => {
@@ -322,6 +320,14 @@ export const useEditor = create<EditorState>()((set, get) => {
       const s = get()
       const clip = copyItems(s.doc.map, copyableIndices(s))
       if (clip.items.length > 0) set({ clipboard: clip })
+    },
+
+    cutSelection: () => {
+      const s = get()
+      // only what was copied goes: cutting never removes the player start
+      const indices = copyableIndices(s)
+      if (indices.length === 0) return
+      commit(withoutItems(s.doc, indices), { selectedIds: [], clipboard: copyItems(s.doc.map, indices) })
     },
 
     paste: () => {
@@ -432,6 +438,12 @@ export const useEditor = create<EditorState>()((set, get) => {
 interface DocState {
   readonly doc: Doc
   readonly selectedIds: Selection
+}
+
+/** The doc without the items at `indices`. */
+const withoutItems = (doc: Doc, indices: ReadonlyArray<number>): Doc => {
+  const removed = new Set(indices)
+  return { map: removeItems(doc.map, indices), ids: doc.ids.filter((_, i) => !removed.has(i)) }
 }
 
 const INVALID_TRANSFORM = "That transform isn't valid for the game (non-finite or zero rotation)."

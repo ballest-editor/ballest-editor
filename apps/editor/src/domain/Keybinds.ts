@@ -32,6 +32,7 @@ export const keybindSections = [
       "deleteSelection",
       "duplicateSelection",
       "copySelection",
+      "cutSelection",
       "paste",
       "undo",
       "redo",
@@ -67,6 +68,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   deleteSelection: "delete",
   duplicateSelection: "duplicate",
   copySelection: "copy",
+  cutSelection: "cut",
   paste: "paste",
   undo: "undo",
   redo: "redo",
@@ -114,6 +116,8 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Copy the selected items in place and select the copies, ready to move. Ctrl+D, as in Unreal's editor; the game has no key for this and duplicates with Alt+drag on the translate gizmo (see General settings).",
   copySelection:
     "Copy the selected items, with their properties, so paste can add them again. Ctrl+C in the game's level editor.",
+  cutSelection:
+    "Copy the selected items, then delete them (one undo step); paste puts them back where they were. Editor only: the game has copy and paste but no cut.",
   paste:
     "Add the copied items where they were when copied, and select them. Ctrl+V in the game's level editor, which also pastes in place.",
   undo:
@@ -184,6 +188,7 @@ export const defaultKeybinds: Keybinds = {
   deleteSelection: ["Backspace", "Delete"],
   duplicateSelection: ["Ctrl+KeyD"],
   copySelection: ["Ctrl+KeyC"],
+  cutSelection: ["Ctrl+KeyX"],
   paste: ["Ctrl+KeyV"],
   undo: ["Ctrl+KeyZ"],
   redo: ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"],
