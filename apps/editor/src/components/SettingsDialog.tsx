@@ -548,7 +548,8 @@ export function SettingsDialog(props: {
     <SettingsShell
       open={props.open}
       onClose={props.onClose}
-      description="Editor settings"
+      title="Settings"
+      description="Settings for the editor, kept in this browser."
       categories={CATEGORIES}
       category={props.category}
       onCategoryChange={props.onCategoryChange}

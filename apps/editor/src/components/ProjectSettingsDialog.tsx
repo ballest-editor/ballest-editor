@@ -251,7 +251,8 @@ export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolea
     <SettingsShell
       open={open}
       onClose={onClose}
-      description="Project settings"
+      title="Project settings"
+      description="Settings for this project: its map's name, grid height, difficulty and tags."
       categories={CATEGORIES}
       category={category}
       onCategoryChange={setCategory}

@@ -1,4 +1,11 @@
 import { type Icon, IconRestore, IconSearch } from "@tabler/icons-react"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator
+} from "@workspace/ui/components/breadcrumb"
 import { Button } from "@workspace/ui/components/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
@@ -132,6 +139,8 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
 export function SettingsShell<C extends string>(props: {
   readonly open: boolean
   readonly onClose: () => void
+  /** The dialog's name, the first breadcrumb ("Settings", "Project settings"). */
+  readonly title: string
   /** For screen readers: what these settings are. */
   readonly description: string
   readonly categories: ReadonlyArray<SettingsCategoryInfo<C>>
@@ -236,7 +245,25 @@ export function SettingsShell<C extends string>(props: {
         </nav>
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="border-b px-5 py-3">
-            <DialogTitle>{searching ? `Search: ${query}` : labelOf(props.category)}</DialogTitle>
+            <Breadcrumb>
+              <BreadcrumbList className="text-sm">
+                <BreadcrumbItem>
+                  <DialogTitle className="font-normal text-muted-foreground">{props.title}</DialogTitle>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                {searching && (
+                  <>
+                    <BreadcrumbItem>Search</BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                  </>
+                )}
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="font-medium">
+                    {searching ? `“${query.trim()}”` : labelOf(props.category)}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
             <DialogDescription className="sr-only">{props.description}</DialogDescription>
           </div>
           <ScrollArea className="min-h-0 flex-1">
