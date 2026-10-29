@@ -49,8 +49,8 @@ const STUDIO_UPWARD_LIGHT = upwardLight(STUDIO_FILL, STUDIO_SUN_INTENSITY, STUDI
  * is dimmed to match.
  */
 export function SceneLights() {
-  const mapLighting = useEditor((s) => s.settings.appearance.mapLighting)
-  const skyVisible = useEditor((s) => s.settings.appearance.skyVisible)
+  const mapLighting = useEditor((s) => s.settings.lighting.mapLighting)
+  const skyVisible = useEditor((s) => s.settings.lighting.skyVisible)
   return (
     <>
       {skyVisible && <MapSky />}

@@ -17,6 +17,8 @@ import * as THREE from "three"
 import { toTuple3, ueToThreeVector } from "../domain/coords"
 import { isBound, mouseChordOf } from "../domain/Keybinds"
 import { WATER } from "../domain/level"
+import { gridBackdropOf, gridColorsOf } from "../domain/Settings"
+import { sunOf } from "../domain/sunlight"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { ItemObject } from "./ItemObject"
@@ -24,7 +26,8 @@ import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline } from "./selectionOutline"
-import { nextSelection, type SelectMode, useEditor } from "./store"
+import { nextSelection, type SelectMode, shownLighting, useEditor } from "./store"
+import { useDarkTheme } from "./theme"
 import { glbUrl, visualsOf } from "./visuals"
 import { waterTopMaterial, waterUnderMaterial } from "./water"
 
@@ -229,10 +232,17 @@ function ViewportBackground() {
   return null
 }
 
-/** The floor grid (1 m cells, 10 m sections) at the map's floor height, styled by the appearance settings. */
+/**
+ * The floor grid (1 m cells, 10 m sections) at the map's floor height, in the user's
+ * colours or ones picked for what it's seen against (the theme, or the sky by day or night).
+ */
 function ViewportGrid() {
   const appearance = useEditor((s) => s.settings.appearance)
+  const skyVisible = useEditor((s) => s.settings.lighting.skyVisible)
+  const sunElevation = useEditor((s) => sunOf(shownLighting(s)).elevation)
   const floorHeight = useEditor((s) => s.floorHeight)
+  const dark = useDarkTheme(appearance.theme)
+  const colors = gridColorsOf(appearance, gridBackdropOf(dark, skyVisible, sunElevation))
   if (!appearance.gridVisible) return null
   return (
     <Grid
@@ -243,8 +253,8 @@ function ViewportGrid() {
       sectionSize={1000}
       fadeDistance={60000}
       fadeStrength={2}
-      cellColor={appearance.gridCellColor}
-      sectionColor={appearance.gridSectionColor}
+      cellColor={colors.cell}
+      sectionColor={colors.section}
     />
   )
 }

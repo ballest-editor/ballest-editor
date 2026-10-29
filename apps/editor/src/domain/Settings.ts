@@ -42,17 +42,23 @@ export const CameraSettings = Schema.Struct({
   movementNeedsLook: Schema.Literals(movementLookModes)
 })
 
+const HexColor = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/))
+
 export const AppearanceSettings = Schema.Struct({
   theme: Schema.Literals(["dark", "light", "system"]),
+  gridVisible: Schema.Boolean,
+  /** The grid's colours; null picks one for what is behind the grid (see autoGridColors). */
+  gridCellColor: Schema.NullOr(HexColor),
+  gridSectionColor: Schema.NullOr(HexColor),
+  /** Whether the level's water (see domain/level) is drawn. */
+  waterVisible: Schema.Boolean
+})
+
+export const LightingSettings = Schema.Struct({
   /** Light the viewport with the map's sun and sky light instead of fixed studio lights. */
   mapLighting: Schema.Boolean,
   /** Whether the game's sky (with the map's sun in it) is drawn behind the scene. */
-  skyVisible: Schema.Boolean,
-  gridVisible: Schema.Boolean,
-  gridCellColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)),
-  gridSectionColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)),
-  /** Whether the level's water (see domain/level) is drawn. */
-  waterVisible: Schema.Boolean
+  skyVisible: Schema.Boolean
 })
 
 /** Changed from the tool bar rather than the settings dialog, but persisted with the rest. */
@@ -72,6 +78,7 @@ export const Settings = Schema.Struct({
   editor: EditorSettings,
   camera: CameraSettings,
   appearance: AppearanceSettings,
+  lighting: LightingSettings,
   snapping: SnappingSettings
 })
 export type Settings = typeof Settings.Type
@@ -90,13 +97,12 @@ export const defaultSettings: Settings = {
   },
   appearance: {
     theme: "dark",
-    mapLighting: true,
-    skyVisible: true,
     gridVisible: true,
-    gridCellColor: "#3a404a",
-    gridSectionColor: "#58606e",
+    gridCellColor: null,
+    gridSectionColor: null,
     waterVisible: true
   },
+  lighting: { mapLighting: true, skyVisible: true },
   snapping: {
     enabled: false,
     gridSize: DEFAULT_GRID_SIZE,
@@ -107,15 +113,63 @@ export const defaultSettings: Settings = {
 
 type Section = keyof Settings
 
-const sections: ReadonlyArray<Section> = ["general", "editor", "camera", "appearance", "snapping"]
+const sections: ReadonlyArray<Section> = ["general", "editor", "camera", "appearance", "lighting", "snapping"]
 
-/** Older saves kept `undoSelection` under general; it now lives under editor. */
+/** The fixed grid colours older saves stored; they now mean "automatic". */
+const LEGACY_GRID_COLORS = { gridCellColor: "#3a404a", gridSectionColor: "#58606e" } as const
+
+/**
+ * Older saves kept `undoSelection` under general (it now lives under editor), and stored the
+ * old fixed grid colours whether or not they were chosen (they become automatic).
+ */
 const migrate = (stored: unknown): unknown => {
   if (!Predicate.isObject(stored)) return stored
-  const general = stored["general"]
-  const editor = Predicate.isObject(stored["editor"]) ? stored["editor"] : {}
-  if (!Predicate.isObject(general) || !("undoSelection" in general) || "undoSelection" in editor) return stored
-  return { ...stored, editor: { ...editor, undoSelection: general["undoSelection"] } }
+  let out: Record<string, unknown> = stored
+  const general = out["general"]
+  const editor = Predicate.isObject(out["editor"]) ? out["editor"] : {}
+  if (Predicate.isObject(general) && "undoSelection" in general && !("undoSelection" in editor)) {
+    out = { ...out, editor: { ...editor, undoSelection: general["undoSelection"] } }
+  }
+  const appearance = out["appearance"]
+  if (Predicate.isObject(appearance)) {
+    const legacy = Object.entries(LEGACY_GRID_COLORS).filter(([key, hex]) => appearance[key] === hex)
+    if (legacy.length > 0) {
+      out = { ...out, appearance: { ...appearance, ...Object.fromEntries(legacy.map(([key]) => [key, null])) } }
+    }
+  }
+  return out
+}
+
+/** What the grid is seen against, which decides its automatic colours. */
+export type GridBackdrop = "dark" | "light" | "day sky" | "night sky"
+
+/**
+ * Automatic grid colours per backdrop: the theme's background when the sky is hidden, else
+ * the sky and water (the same for either theme), light by day and dark at night. Most of the
+ * grid is seen over the water, which tints the backdrop blue. Sections stand out more than
+ * cells: lighter on dark backdrops, darker on light ones.
+ */
+export const AUTO_GRID_COLORS: Readonly<Record<GridBackdrop, { readonly cell: string; readonly section: string }>> = {
+  dark: { cell: "#3a404a", section: "#58606e" },
+  light: { cell: "#93a4b5", section: "#5c6f82" },
+  "day sky": { cell: "#7d98a8", section: "#4a6272" },
+  "night sky": { cell: "#2c3a4d", section: "#4b5d75" }
+}
+
+/** Below this sun elevation (degrees, civil twilight) the sky counts as night for the grid. */
+const NIGHT_BELOW = -6
+
+/** The grid's backdrop: the theme's background, or the sky by day or night. */
+export const gridBackdropOf = (dark: boolean, skyVisible: boolean, sunElevation: number): GridBackdrop =>
+  skyVisible ? (sunElevation > NIGHT_BELOW ? "day sky" : "night sky") : dark ? "dark" : "light"
+
+/** The grid colours to draw: the user's, else the backdrop's automatic ones. */
+export const gridColorsOf = (
+  appearance: Settings["appearance"],
+  backdrop: GridBackdrop
+): { readonly cell: string; readonly section: string } => {
+  const auto = AUTO_GRID_COLORS[backdrop]
+  return { cell: appearance.gridCellColor ?? auto.cell, section: appearance.gridSectionColor ?? auto.section }
 }
 
 /** Stored JSON -> Settings, field by field; invalid or missing fields keep their defaults. */

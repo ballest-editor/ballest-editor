@@ -88,7 +88,7 @@ export function MenuBar() {
   const hasSelection = useEditor((s) => s.selectedIds.length > 0)
   const canPaste = useEditor((s) => s.clipboard !== null)
   const openDialog = useEditor((s) => s.openDialog)
-  const { snapping, appearance, general } = useEditor((s) => s.settings)
+  const { snapping, appearance, lighting, general } = useEditor((s) => s.settings)
 
   return (
     <Menubar
@@ -157,15 +157,15 @@ export function MenuBar() {
         <MenubarSeparator />
         <MenubarCheckboxItem
           closeOnClick
-          checked={appearance.mapLighting}
-          onCheckedChange={(mapLighting) => void updateSettings("appearance", { mapLighting })}
+          checked={lighting.mapLighting}
+          onCheckedChange={(mapLighting) => void updateSettings("lighting", { mapLighting })}
         >
           Map lighting
         </MenubarCheckboxItem>
         <MenubarCheckboxItem
           closeOnClick
-          checked={appearance.skyVisible}
-          onCheckedChange={(skyVisible) => void updateSettings("appearance", { skyVisible })}
+          checked={lighting.skyVisible}
+          onCheckedChange={(skyVisible) => void updateSettings("lighting", { skyVisible })}
         >
           Show sky
         </MenubarCheckboxItem>

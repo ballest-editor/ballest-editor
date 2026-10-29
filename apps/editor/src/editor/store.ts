@@ -70,7 +70,7 @@ export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
 export type Tool = "select" | "translate" | "rotate" | "scale"
 export type Dialog = "new" | "export" | "settings" | "project"
-export type SettingsCategory = "general" | "editor" | "camera" | "keybinds" | "appearance"
+export type SettingsCategory = "general" | "editor" | "camera" | "keybinds" | "appearance" | "lighting"
 
 const HISTORY_LIMIT = 200
 const SPEED_STEPS = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]

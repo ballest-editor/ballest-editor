@@ -28,7 +28,7 @@ const sliderValue = (value: number | ReadonlyArray<number>): number | undefined 
  */
 export function LightingSettings() {
   const shown = useEditor(useShallow(shownLighting))
-  const mapLighting = useEditor((s) => s.settings.appearance.mapLighting)
+  const mapLighting = useEditor((s) => s.settings.lighting.mapLighting)
 
   const committed = () => lightingOf(useEditor.getState().doc.map.worldSettings)
   const preview = (key: keyof Lighting, value: number | null) =>
