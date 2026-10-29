@@ -1,11 +1,11 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as THREE from "three"
-import { ueToScene, ueToThreeVector } from "../../domain/coords"
+import { ueToScene, ueToThreeQuat, ueToThreeVector } from "../../domain/coords"
 import type { UeTransform } from "../../domain/coords"
 import { applyGroupDelta } from "../../domain/groupTransform"
-import { rotateVec } from "../../domain/ueMath"
+import { rotateVec, rotatorToQuat } from "../../domain/ueMath"
 import { dragDelta, type DragStart, type PointerSample } from "./drag"
-import { GizmoObject, type GizmoSpace, SIZE, toolHandles } from "./handles"
+import { GizmoObject, type GizmoSpace, positiveTurn, SIZE, toolHandles } from "./handles"
 import { axisParamFromRay, axisWorldDir, gameDirToWorld, planeHit, screenAngle } from "./math"
 
 const v3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
@@ -77,6 +77,68 @@ describe("gizmo handles", () => {
     }
     // the gizmo has no mirrored transform anywhere
     gizmo.traverse((o) => expect(o.matrixWorld.determinant()).toBeGreaterThan(0))
+  })
+
+  it("labels each ring's axis with its letter, facing the camera", () => {
+    const cameraQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.6, 0.8, 0))
+    const local = { ...frame, space: "local" as const, gameRotation: rotatorToQuat({ roll: 20, pitch: -35, yaw: 70 }) }
+    for (const f of [frame, { ...frame, cameraQuaternion }, local]) {
+      const gizmo = new GizmoObject(toolHandles.rotate)
+      gizmo.update(f, null, null)
+      gizmo.updateMatrixWorld(true)
+      for (const axis of ["x", "y", "z"] as const) {
+        const handle = gizmo.handle(`r-${axis}`)!
+        const dir = axisWorldDir(axis, f.space === "local" ? f.gameRotation : undefined)
+        // the ring turns about its local +Z, which is the axis
+        const normal = handle.root.localToWorld(v3(0, 0, 1)).sub(f.origin).normalize()
+        expect(normal.distanceTo(dir)).toBeLessThan(1e-9)
+        const [label] = handle.billboards
+        const at = label!.getWorldPosition(v3(0, 0, 0)).sub(f.origin)
+        expect(at.clone().normalize().distanceTo(dir)).toBeLessThan(1e-9)
+        expect(at.length() / f.worldPerPixel).toBeGreaterThan(SIZE.stubLength)
+        const facing = label!.getWorldQuaternion(new THREE.Quaternion())
+        expect(facing.angleTo(f.cameraQuaternion)).toBeLessThan(1e-6)
+      }
+      gizmo.traverse((o) => expect(o.matrixWorld.determinant()).toBeGreaterThan(0))
+    }
+  })
+
+  it("matches the game's sense of positive roll, pitch and yaw", () => {
+    // UE: positive yaw turns X toward Y (right), seen from above that is clockwise
+    expect(positiveTurn("z")).toBe(-1)
+    expect(rotateVec(rotatorToQuat({ roll: 0, pitch: 0, yaw: 90 }), { x: 1, y: 0, z: 0 }).y).toBeCloseTo(1, 9)
+    expect(positiveTurn("y")).toBe(1)
+    expect(positiveTurn("x")).toBe(1)
+  })
+
+  it("points the ring arrowheads the way the inspector angle grows", () => {
+    const gizmo = new GizmoObject(toolHandles.rotate)
+    gizmo.update(frame, null, null)
+    gizmo.updateMatrixWorld(true)
+    for (const axis of ["x", "y", "z"] as const) {
+      const root = gizmo.handle(`r-${axis}`)!.root
+      const cones = root.children.filter((o): o is THREE.Mesh =>
+        o instanceof THREE.Mesh && o.geometry instanceof THREE.ConeGeometry
+      )
+      expect(cones).toHaveLength(4)
+      const turn = ueToThreeQuat(rotatorToQuat({ roll: +(axis === "x"), pitch: +(axis === "y"), yaw: +(axis === "z") }))
+      const q = new THREE.Quaternion(turn.x, turn.y, turn.z, turn.w)
+      for (const cone of cones) {
+        const geometry = cone.geometry
+        geometry.computeBoundingBox()
+        const center = geometry.boundingBox!.getCenter(v3(0, 0, 0))
+        // most of a cone's vertices are on its base, so their mean sits behind the centre
+        const positions = geometry.getAttribute("position")
+        const mean = v3(0, 0, 0)
+        for (let i = 0; i < positions.count; i++) mean.add(v3(positions.getX(i), positions.getY(i), positions.getZ(i)))
+        mean.divideScalar(positions.count)
+        const p = cone.localToWorld(center.clone()).sub(frame.origin)
+        const tip = cone.localToWorld(center.clone()).sub(cone.localToWorld(mean)).normalize()
+        expect(p.length() / frame.worldPerPixel).toBeCloseTo(SIZE.ring, 0)
+        // a small positive inspector turn moves the arrow's point along the arrow
+        expect(p.clone().applyQuaternion(q).sub(p).normalize().dot(tip)).toBeGreaterThan(0.9)
+      }
+    }
   })
 
   it("has one hit mesh per handle and highlights only the hovered one", () => {
