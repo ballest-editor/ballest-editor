@@ -13,6 +13,8 @@
  *   dominant axis, and (as the game's instances do) multiplied again by the piece's x/y scale;
  *   world-aligned projection for the few masters that use the world position;
  * - a second normal layer (the Env masters' fine x12 tiles, the metal's coarse ones);
+ * - colour layers: textures the base colour depends on, each added around its mean at the gain the
+ *   shader gives it (the pipes' grid lines, the air vent's slats);
  * - the grey mottle (T_MacroVariation) exactly as the game's shader forms it: a product of offset reads at
  *   three scales, times a gain, added to 1 and multiplied into the base colour;
  * - M_OutlineEdges' grey band along the UV border of a face.
@@ -61,6 +63,14 @@ export interface Patch {
     readonly uVariationShape: THREE.IUniform<THREE.Vector4>
     readonly uVariationMap: THREE.IUniform<THREE.Texture | null>
     readonly uNormalMap2: THREE.IUniform<THREE.Texture | null>
+    readonly uColorMap1: THREE.IUniform<THREE.Texture | null>
+    readonly uColorMap2: THREE.IUniform<THREE.Texture | null>
+    readonly uColor1Tiling: THREE.IUniform<THREE.Vector2>
+    readonly uColor2Tiling: THREE.IUniform<THREE.Vector2>
+    readonly uColor1Gain: THREE.IUniform<THREE.Vector3>
+    readonly uColor2Gain: THREE.IUniform<THREE.Vector3>
+    readonly uColor1Mean: THREE.IUniform<THREE.Vector3>
+    readonly uColor2Mean: THREE.IUniform<THREE.Vector3>
     readonly uNormal2Tiling: THREE.IUniform<THREE.Vector2>
     readonly uNormal2Strength: THREE.IUniform<number>
     readonly uOutlineInset: THREE.IUniform<THREE.Vector2>
@@ -74,7 +84,8 @@ const isOne = (p: Pair) => p[0] === 1 && p[1] === 1
 const patchOf = (
   spec: Omit<MaterialSpec, "path">,
   variation: THREE.Texture | null,
-  normal2: THREE.Texture | null
+  normal2: THREE.Texture | null,
+  colorMaps: ReadonlyArray<THREE.Texture>
 ): Patch | undefined => {
   const defines: Record<string, number> = {}
   const { tiling } = spec
@@ -89,6 +100,7 @@ const patchOf = (
     defines["BALLEST_VARIATION"] = Math.min(3, spec.variation.tilings.length)
   }
   if (normal2 !== null) defines["BALLEST_NORMAL2"] = 1
+  if (colorMaps.length > 0) defines["BALLEST_COLOR"] = colorMaps.length
   if (spec.outline !== undefined) defines["BALLEST_OUTLINE"] = 1
   if (Object.keys(defines).length === 0) return undefined
   const outline = spec.outline
@@ -114,6 +126,14 @@ const patchOf = (
       },
       uVariationMap: { value: variation },
       uNormalMap2: { value: normal2 },
+      uColorMap1: { value: colorMaps[0] ?? null },
+      uColorMap2: { value: colorMaps[1] ?? null },
+      uColor1Tiling: { value: vec2(spec.colorLayers[0]?.tiling ?? [1, 1]) },
+      uColor2Tiling: { value: vec2(spec.colorLayers[1]?.tiling ?? [1, 1]) },
+      uColor1Gain: { value: new THREE.Vector3(...(spec.colorLayers[0]?.gain ?? [0, 0, 0])) },
+      uColor2Gain: { value: new THREE.Vector3(...(spec.colorLayers[1]?.gain ?? [0, 0, 0])) },
+      uColor1Mean: { value: new THREE.Vector3(...(spec.colorLayers[0]?.mean ?? [0.5, 0.5, 0.5])) },
+      uColor2Mean: { value: new THREE.Vector3(...(spec.colorLayers[1]?.mean ?? [0.5, 0.5, 0.5])) },
       uNormal2Tiling: { value: vec2(spec.normalLayer?.tiling ?? [1, 1]) },
       uNormal2Strength: { value: spec.normalLayer?.strength ?? 0 },
       uOutlineInset: { value: new THREE.Vector2(outline?.inset[0] ?? 0, outline?.inset[1] ?? 0) },
@@ -161,6 +181,14 @@ uniform vec2 uVariationTiling3;
 uniform vec4 uVariationShape;
 uniform sampler2D uVariationMap;
 uniform sampler2D uNormalMap2;
+uniform sampler2D uColorMap1;
+uniform sampler2D uColorMap2;
+uniform vec2 uColor1Tiling;
+uniform vec2 uColor2Tiling;
+uniform vec3 uColor1Gain;
+uniform vec3 uColor2Gain;
+uniform vec3 uColor1Mean;
+uniform vec3 uColor2Mean;
 uniform vec2 uNormal2Tiling;
 uniform float uNormal2Strength;
 uniform vec2 uOutlineInset;
@@ -191,6 +219,13 @@ vec2 ballestUv( vec2 tiling ) {
 // The mottle is the game's own expression: (r1 + o1)(r2 + o2)(r3 + o3) * gain + 1 (the Env masters' gain is
 // ColorContrast - 1, the metal's -0.1: a few percent either way).
 const COLOR_EXTRAS = /* glsl */ `
+#ifdef BALLEST_COLOR
+  diffuseColor.rgb += uColor1Gain * ( texture2D( uColorMap1, ballestUv( uColor1Tiling ) ).rgb - uColor1Mean );
+  #if BALLEST_COLOR >= 2
+    diffuseColor.rgb += uColor2Gain * ( texture2D( uColorMap2, ballestUv( uColor2Tiling ) ).rgb - uColor2Mean );
+  #endif
+  diffuseColor.rgb = clamp( diffuseColor.rgb, 0.0, 1.0 );
+#endif
 #ifdef BALLEST_VARIATION
   #if BALLEST_VARIATION >= 3
     float ballestMottle3 = texture2D( uVariationMap, ballestUv( uVariationTiling3 ) ).r + uVariationShape.z;
@@ -214,6 +249,7 @@ const COLOR_EXTRAS = /* glsl */ `
 `
 // The tangent-space perturbation from the normal map(s): the second layer adds at its strength.
 const NORMAL_LAYERS = /* glsl */ `
+#ifdef USE_NORMALMAP
 vec3 ballestMapN() {
   vec3 mapN = texture2D( normalMap, ballestUv( uNormalTiling ) ).xyz * 2.0 - 1.0;
   #ifdef BALLEST_NORMAL2
@@ -222,6 +258,7 @@ vec3 ballestMapN() {
   mapN.xy *= normalScale;
   return mapN;
 }
+#endif
 `
 // Replaces three's normal_fragment_maps when projecting: the perturbation is applied in the projection
 // frame along the two axes the face is read through, then taken to view space.
@@ -387,7 +424,10 @@ const build = (
   const normal2 = spec.normalLayer === undefined || spec.normalTexture === undefined
     ? null
     : loadTexture(spec.normalLayer.texture, THREE.NoColorSpace, dropDefine("BALLEST_NORMAL2"))
-  const patch = patchOf(spec, variation, normal2)
+  const colorMaps = spec.colorLayers.map((layer) =>
+    loadTexture(layer.texture, colorSpaceOf(layer.texture, THREE.SRGBColorSpace), dropDefine("BALLEST_COLOR"))
+  )
+  const patch = patchOf(spec, variation, normal2, colorMaps)
   if (patch !== undefined) patchShader(material, patch)
   return material
 }

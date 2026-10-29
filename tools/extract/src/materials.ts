@@ -9,6 +9,8 @@ import { FileSystem } from "effect/FileSystem"
 import { Path } from "effect/Path"
 import type { Leaf } from "./dxil.ts"
 import { arr, bool, get, type JsonObject, nameOf, num, obj, refPath, str } from "./json.ts"
+import { chainOf, type Merged, paramValueOf } from "./params.ts"
+import { slotValue } from "./preshader.ts"
 import type { MaterialShaders, ShadersFile } from "./shaders.ts"
 
 export class MaterialsError extends Schema.TaggedError<MaterialsError>()("MaterialsError", {
@@ -137,125 +139,6 @@ export const materialsShaderList = Effect.fn("materialsShaderList")(function*({ 
   yield* Effect.logInfo(`[materials] ${paths.length} materials for shader analysis`)
 })
 
-// ------------------------------------------------------------------ build: one asset's own data
-type Rgba = [number, number, number, number]
-const color = (c: unknown): Rgba | null => {
-  const r = num(get(c, "R")), g = num(get(c, "G")), b = num(get(c, "B"))
-  return r === undefined || g === undefined || b === undefined ? null : [r, g, b, num(get(c, "A")) ?? 1]
-}
-const strip = (v: unknown): string | undefined => str(v)?.replace(/^[A-Za-z_]+::/, "")
-
-interface Own {
-  readonly path: string
-  readonly error?: string
-  readonly kind?: "instance" | "material"
-  readonly parent: string | null
-  readonly scalars: Record<string, number | null>
-  readonly vectors: Record<string, Rgba | null>
-  readonly textures: Record<string, string | null>
-  readonly switches: Record<string, boolean | null>
-  readonly errors?: unknown
-  readonly redirectedTo?: string
-  readonly blendMode?: string
-  readonly shadingModel?: string
-  readonly twoSided?: boolean
-  readonly opacityMaskClipValue?: number
-  readonly connectedOutputs?: ReadonlyArray<string>
-  /**
-   * The root material's texture table, in the order the shaders' texture slots index it (cooked
-   * `ReferencedDefaultTextures`; null where the slot is not a texture).
-   */
-  readonly referencedTextures: ReadonlyArray<string | null>
-}
-
-// EMaterialProperty order (UE 5.8 SceneTypes.h), used for PropertyConnectedMask bits.
-const MP = [
-  "EmissiveColor",
-  "Opacity",
-  "OpacityMask",
-  "DiffuseColor",
-  "SpecularColor",
-  "BaseColor",
-  "Metallic",
-  "Specular",
-  "Roughness",
-  "Anisotropy",
-  "Normal",
-  "Tangent",
-  "WorldPositionOffset",
-  "WorldDisplacement_DEPRECATED",
-  "TessellationMultiplier_DEPRECATED",
-  "SubsurfaceColor",
-  "CustomData0",
-  "CustomData1",
-  "AmbientOcclusion",
-  "Refraction",
-  "CustomizedUVs0"
-]
-const connected = (mask: unknown): Array<string> => {
-  const m = BigInt(typeof mask === "number" || typeof mask === "string" ? mask : 0)
-  return MP.filter((_, i) => ((m >> BigInt(i)) & 1n) === 1n)
-}
-
-const ownOf = (dump: unknown, path: string): Own => {
-  const entry = get(dump, "materials", path)
-  const base = { path, parent: null, scalars: {}, vectors: {}, textures: {}, switches: {}, referencedTextures: [] }
-  if (entry === undefined || get(entry, "error") !== undefined) {
-    return { ...base, error: str(get(entry, "error")) ?? "not loaded" }
-  }
-  const e = get(entry, "export")
-  const p = obj(get(e, "Properties")) ?? {}
-  const isInstance = (str(get(e, "Type")) ?? "").includes("MaterialInstance")
-  const o: {
-    -readonly [K in keyof Own]: Own[K]
-  } = {
-    ...base,
-    kind: isInstance ? "instance" : "material",
-    parent: refPath(p["Parent"]),
-    referencedTextures: arr(p["ReferencedDefaultTextures"] ?? get(e, "ReferencedTextures")).map(refPath)
-  }
-  const errors = get(entry, "errors")
-  if (errors !== undefined) o.errors = errors
-  const redirected = str(get(entry, "redirectedTo"))
-  if (redirected !== undefined) o.redirectedTo = redirected
-  const paramName = (s: unknown) => str(get(s, "ParameterInfo", "Name")) ?? ""
-  if (isInstance) {
-    for (const s of arr(p["ScalarParameterValues"])) o.scalars[paramName(s)] = num(get(s, "ParameterValue")) ?? null
-    for (const s of arr(p["VectorParameterValues"])) o.vectors[paramName(s)] = color(get(s, "ParameterValue"))
-    for (const s of arr(p["TextureParameterValues"])) o.textures[paramName(s)] = refPath(get(s, "ParameterValue"))
-    for (const s of arr(get(p["StaticParametersRuntime"], "StaticSwitchParameters"))) {
-      o.switches[paramName(s)] = bool(get(s, "Value")) ?? false
-    }
-    const b = obj(p["BasePropertyOverrides"]) ?? {}
-    if (b["bOverride_BlendMode"] === true) o.blendMode = strip(b["BlendMode"]) ?? "BLEND_Opaque"
-    if (b["bOverride_ShadingModel"] === true) o.shadingModel = strip(b["ShadingModel"]) ?? "MSM_DefaultLit"
-    if (b["bOverride_TwoSided"] === true) o.twoSided = b["TwoSided"] === true
-    const clip = num(b["OpacityMaskClipValue"])
-    if (b["bOverride_OpacityMaskClipValue"] === true && clip !== undefined) o.opacityMaskClipValue = clip
-  } else {
-    // Cooked UMaterial: no expression graph, but CachedExpressionData keeps the parameter names
-    // (RuntimeEntries[type].ParameterInfoSet) and default values.
-    const c = obj(get(e, "CachedExpressionData")) ?? {}
-    const names = (i: number) =>
-      arr(get(c[i === 0 ? "RuntimeEntries" : `RuntimeEntries[${i}]`], "ParameterInfoSet")).map((x) =>
-        str(get(x, "Name")) ?? ""
-      )
-    // EMaterialParameterType (5.8): 0 Scalar, 1 Vector, 2 DoubleVector, 3 Texture, ..., 8 StaticSwitch
-    names(0).forEach((n, i) => (o.scalars[n] = num(arr(c["ScalarValues"])[i]) ?? null))
-    names(1).forEach((n, i) => (o.vectors[n] = color(arr(c["VectorValues"])[i])))
-    names(3).forEach((n, i) => (o.textures[n] = refPath(arr(c["TextureValues"])[i])))
-    names(8).forEach((n, i) => (o.switches[n] = bool(arr(c["StaticSwitchValues"])[i]) ?? null))
-    o.blendMode = strip(p["BlendMode"]) ?? "BLEND_Opaque"
-    o.shadingModel = strip(p["ShadingModel"]) ??
-      (p["ShadingModels"] !== undefined ? "MSM_FromMaterialExpression?" : "MSM_DefaultLit")
-    o.twoSided = p["TwoSided"] === true
-    const clip = num(p["OpacityMaskClipValue"])
-    if (clip !== undefined) o.opacityMaskClipValue = clip
-    if (c["PropertyConnectedMask"] !== undefined) o.connectedOutputs = connected(c["PropertyConnectedMask"])
-  }
-  return o
-}
-
 // ------------------------------------------------------------------ build: texture reads from the shaders
 export type Projection = "uv" | "object" | "world"
 export type Role = "color" | "normal" | "orm" | "variation" | "opacity" | "mask"
@@ -274,13 +157,10 @@ export interface Read {
   readonly strength: number
   /** Constant-buffer values on the coordinate path the preshader did not resolve to a plain parameter. */
   readonly unresolved: ReadonlyArray<string>
-}
-
-interface Merged {
-  readonly scalars: Record<string, number | null>
-  readonly vectors: Record<string, Rgba | null>
-  readonly textures: Record<string, string | null>
-  readonly switches: Record<string, boolean | null>
+  /** Colour reads: what the read adds to the base colour going 0 -> 1 (from the evaluated surface); null = unknown. */
+  readonly gain: readonly [number, number, number] | null
+  /** The read's mean colour the surface was evaluated at (so colour = base + gain * (read - mean)). */
+  readonly mean: readonly [number, number, number] | null
 }
 
 interface Source {
@@ -324,15 +204,13 @@ const paramOf = (sh: MaterialShaders, merged: Merged, ref: string): number | und
   const buffer = sh.materialBuffer
   if (buffer === null || !ref.startsWith(buffer + "[")) return undefined
   const slot = sh.slots.find((s) => s.ref === ref.slice(buffer.length))
-  if (slot?.expression !== undefined) return undefined
-  if (slot?.constant !== undefined) return slot.constant
-  const name = slot?.param ?? ""
-  const scalar = merged.scalars[name]
-  if (typeof scalar === "number") return scalar
-  const m = name.match(/^(.*)\.([xyzw])$/)
-  if (m === null) return undefined
-  const vec = merged.vectors[m[1] ?? ""]
-  return vec == null ? undefined : vec["xyzw".indexOf(m[2] ?? "")]
+  if (slot === undefined) return undefined
+  return slotValue(
+    slot,
+    sh.paramNames,
+    (name) => paramValueOf(merged, name),
+    (name) => merged.vectors[name] ?? undefined
+  )
 }
 
 const readsOf = (
@@ -399,7 +277,9 @@ const readsOf = (
       scale: [u, v === 0 ? u : v],
       instanceScale,
       strength: role === "normal" && r.resultFactor !== null ? Math.abs(r.resultFactor) / 2 : 1,
-      unresolved: [...unresolved].sort()
+      unresolved: [...unresolved].sort(),
+      gain: null,
+      mean: null
     })
   }
   return { reads: out, index }
@@ -439,7 +319,8 @@ const variationOf = (
 }
 
 const isMaterialShaders = (v: unknown): v is MaterialShaders =>
-  typeof get(v, "pixel") === "string" && Array.isArray(get(v, "reads")) && Array.isArray(get(v, "textures"))
+  typeof get(v, "pixel") === "string" && Array.isArray(get(v, "reads")) && Array.isArray(get(v, "textures")) &&
+  Array.isArray(get(v, "paramNames"))
 
 const pick = <T>(
   entries: Record<string, T | null>,
@@ -467,26 +348,7 @@ export const materialsBuild = Effect.fn("materialsBuild")(
     const records: Array<JsonObject> = []
     let withShaders = 0
     for (const materialPath of roots) {
-      const chainOwn: Array<Own> = []
-      for (let p: string | null = materialPath, guard = 0; p !== null && guard < 16; guard++) {
-        const o = ownOf(dump, p)
-        chainOwn.push(o)
-        p = o.parent
-      }
-      const self = chainOwn[0] ?? ownOf(dump, materialPath)
-      const root = chainOwn[chainOwn.length - 1] ?? self
-      // Merge root -> leaf (instances only store overrides).
-      const merged: Merged = { scalars: {}, vectors: {}, textures: {}, switches: {} }
-      let blendMode = "BLEND_Opaque", shadingModel = "MSM_DefaultLit", twoSided = false
-      for (const o of chainOwn.toReversed()) {
-        Object.assign(merged.scalars, o.scalars)
-        Object.assign(merged.vectors, o.vectors)
-        Object.assign(merged.textures, o.textures)
-        Object.assign(merged.switches, o.switches)
-        if (o.blendMode !== undefined) blendMode = o.blendMode
-        if (o.shadingModel !== undefined) shadingModel = o.shadingModel
-        if (o.twoSided !== undefined) twoSided = o.twoSided
-      }
+      const { chain: chainOwn, self, root, merged, blendMode, shadingModel, twoSided } = chainOf(dump, materialPath)
       const recovered = self.error === undefined &&
         Object.keys(merged.scalars).length + Object.keys(merged.vectors).length + Object.keys(merged.textures).length >
           0
@@ -530,9 +392,14 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         : null
 
       // ---- textures, from the compiled shaders
-      const sh = chainOwn.flatMap((o) => [o.path, ...(o.redirectedTo === undefined ? [] : [o.redirectedTo])])
-        .map((p) => shaderMaterials[p])
-        .find((s): s is MaterialShaders => s !== undefined && !Object.hasOwn(s, "error"))
+      const sh = [
+        shaderMaterials[materialPath],
+        ...chainOwn.flatMap((o) => [o.path, ...(o.redirectedTo === undefined ? [] : [o.redirectedTo])]).map((p) =>
+          shaderMaterials[p]
+        )
+      ].find((s): s is MaterialShaders => s !== undefined && !Object.hasOwn(s, "error"))
+      // The surface evaluated from the compiled shader with this instance's parameters (opaque passes only).
+      const evaluated = sh?.surface ?? null
       const textureOf = (slot: number): string | null => {
         const t = sh?.textures[slot]
         if (t === undefined) return null
@@ -542,7 +409,10 @@ export const materialsBuild = Effect.fn("materialsBuild")(
       const traced: { reads: Array<Read>; index: Array<number> } = sh === undefined
         ? { reads: [], index: [] }
         : readsOf(sh, merged, textureOf, dump, isTranslucent)
-      const reads = traced.reads
+      const reads = traced.reads.map((r, i) => {
+        const g = evaluated?.gains[String(traced.index[i])]
+        return g === undefined ? r : { ...r, gain: g.gain, mean: g.mean }
+      })
       const variation = sh === undefined ? null : variationOf(sh, merged, reads, traced.index)
       if (sh !== undefined) withShaders++
       // Only reads whose coordinates are fully known can stand for a role.
@@ -550,12 +420,14 @@ export const materialsBuild = Effect.fn("materialsBuild")(
       // The main normal layer: strongest, then the coarsest (the Env masters add a fine x12 layer at full strength).
       const normals = byRole("normal").sort((a, b) => b.strength - a.strength || a.scale[0] - b.scale[0])
       const primary = (role: Role) => byRole(role)[0]
-      const baseColorRead = primary("color")
+      // Colour layers: reads the evaluated surface says add to the base colour (gain != 0). Without an
+      // evaluation (translucent passes) no colour texture is applied: the parameters alone are safer.
+      const colorLayers = reads.filter((r) => r.role !== "normal" && r.gain !== null && r.unresolved.length === 0)
       const normalRead = normals[0]
       const variationRead = primary("variation")
       const opacityRead = primary("opacity")
       const ormRead = primary("orm")
-      const projection: Projection = (baseColorRead ?? normalRead ?? variationRead ?? opacityRead)?.projection ?? "uv"
+      const projection: Projection = (normalRead ?? colorLayers[0] ?? variationRead ?? opacityRead)?.projection ?? "uv"
       // M_OutlineEdges: a band of OutlineBase grey along the UV border, `Size` being the un-banded fraction.
       const outlineBase = V["OutlineBase"]
       const sizeX = S["Size X"], sizeY = S["Size Y"]
@@ -563,26 +435,42 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         ? { inset: [(1 - sizeX) / 2, (1 - sizeY) / 2], color: outlineBase.slice(0, 3) }
         : null
       const tex = (r: Read | undefined) => (r === undefined ? null : texPath(r.texture))
+      const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
       const approx = {
-        // Emissive-only masters (BaseColor pin unconnected) render black + emissive in UE.
-        baseColor: emissiveOnly && emissiveColor ? [0, 0, 0] : (bc ?? [0.8, 0.8, 0.8, 1]).slice(0, 3),
-        metallic: met ?? 0,
-        roughness: rou ?? 0.6,
+        // The evaluated shader where there is one (opaque); else parameters picked by name. Emissive-only
+        // masters (BaseColor pin unconnected) render black + emissive in UE.
+        baseColor: evaluated !== null
+          ? evaluated.baseColor.map(clamp01)
+          : emissiveOnly && emissiveColor
+          ? [0, 0, 0]
+          : (bc ?? [0.8, 0.8, 0.8, 1]).slice(0, 3),
+        metallic: evaluated !== null ? clamp01(evaluated.metallic) : met ?? 0,
+        roughness: evaluated !== null ? clamp01(evaluated.roughness) : rou ?? 0.6,
+        evaluated: evaluated !== null,
         opacity: op ?? (isTranslucent ? 0.5 : 1),
         emissive: emissiveColor,
-        baseColorTexture: tex(baseColorRead),
+        baseColorTexture: null,
         normalTexture: tex(normalRead),
         ormTexture: tex(ormRead),
         variationTexture: tex(variationRead),
         opacityTexture: tex(opacityRead),
         tiling: {
-          baseColor: baseColorRead?.scale ?? [1, 1],
+          baseColor: [1, 1],
           normal: normalRead?.scale ?? [1, 1],
           variation: variationRead?.scale ?? [1, 1],
           opacity: opacityRead?.scale ?? [1, 1]
         },
         projection,
-        instanceScale: (baseColorRead ?? normalRead)?.instanceScale ?? 0,
+        instanceScale: (normalRead ?? colorLayers[0])?.instanceScale ?? 0,
+        // Textures added to the base colour, each scaled by what the shader adds for it (colour = base + sum gain_i * read_i).
+        colorLayers: colorLayers.map((r) => ({
+          texture: texPath(r.texture) ?? `missing:${r.texture}`,
+          tiling: r.scale,
+          projection: r.projection,
+          instanceScale: r.instanceScale,
+          gain: r.gain,
+          mean: r.mean
+        })),
         // The mottle exactly as the shader applies it: colour *= 1 + gain * product_i(texture(tilings_i) + offsets_i).
         variation: variation === null
           ? null
@@ -643,7 +531,8 @@ export const materialsBuild = Effect.fn("materialsBuild")(
       notes: [
         "scalars/vectors/textures/switches are effective values: root UMaterial defaults (from CachedExpressionData) overridden by each instance down the chain.",
         "vectors are linear RGBA as stored by UE. baseColor/emissive in approx are linear; set three.js colors with Color.setRGB(r,g,b, THREE.LinearSRGBColorSpace) (or the default working space).",
-        "approx.baseColor/metallic/roughness/opacity/emissive come from parameters picked by name (approx.keys says which; null = neutral default): the cooked material has no expression graph.",
+        "approx.baseColor/metallic/roughness are the compiled shader evaluated for the material's parameters and a facing view with every texture at its mean colour (approx.evaluated true); otherwise (translucent passes) parameters picked by name (approx.keys says which; null = neutral default). opacity/emissive are always picked by name.",
+        "approx.colorLayers are the texture reads the base colour depends on: colour = baseColor + sum of gain * (read - mean) (gain and mean from the evaluated shader; projection/tiling as for reads).",
         "approx.reads are the base-pass pixel shader's texture reads, traced through the compiled shader (tools/extract shaders): projection uv = mesh UV0 (scale in repeats per UV unit); object = object-aligned position, pivot at the object origin, rotating with the piece (scale in repeats per cm; instanceScale 1 = u, v also multiply by the piece's x, y scale); world. strength is a normal layer's blend strength. approx.*Texture/tiling/projection/instanceScale are the primary read per role; tiling is [u, v].",
         "Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).",
         "approx.variation is the grey mottle as the base pass applies it: colour *= 1 + gain * product over layers of (texture read at tilings[i] + offsets[i]); gain already includes the instance's parameter (ColorContrast - 1 for the Env masters).",

@@ -24,7 +24,76 @@ export interface Slot {
   readonly ref: string
   readonly param?: string
   readonly constant?: number
-  readonly expression?: true
+  /** A computed value: the preshader program (hex) and which component of its result this slot holds. */
+  readonly expression?: { readonly program: string; readonly component: number }
+}
+
+const OP_ADD = 0x04
+const OP_SUB = 0x05
+const OP_MUL = 0x06
+const OP_DIV = 0x07
+const OP_APPEND = 0x26
+
+/**
+ * Runs a preshader program on a stack of float vectors. Parameters come from `param(index)` (a scalar as
+ * [x], a vector as [r, g, b, a]). Returns the result vector, or null at an opcode this does not know.
+ */
+export const runPreshader = (
+  program: Uint8Array,
+  param: (index: number) => ReadonlyArray<number> | undefined
+): ReadonlyArray<number> | null => {
+  const view = new DataView(program.buffer, program.byteOffset, program.byteLength)
+  const stack: Array<ReadonlyArray<number>> = []
+  const binary = (f: (a: number, b: number) => number): boolean => {
+    const b = stack.pop(), a = stack.pop()
+    if (a === undefined || b === undefined) return false
+    const n = Math.max(a.length, b.length)
+    stack.push(Array.from({ length: n }, (_, i) => f(a[a.length === 1 ? 0 : i] ?? 0, b[b.length === 1 ? 0 : i] ?? 0)))
+    return true
+  }
+  for (let at = 0; at < program.length;) {
+    const op = program[at]
+    if (op === OP_CONSTANT) {
+      const width = program[at + 1] ?? 1
+      const v: Array<number> = []
+      for (let i = 0; i < width; i++) v.push(view.getFloat32(at + 2 + i * 4, true))
+      stack.push(v)
+      at += 2 + width * 4
+    } else if (op === OP_PARAMETER) {
+      const v = param(view.getUint16(at + 1, true))
+      if (v === undefined) return null
+      stack.push(v)
+      at += 3
+    } else if (op === OP_SWIZZLE) {
+      const src = stack.pop()
+      if (src === undefined) return null
+      const count = program[at + 1] ?? 0
+      const out: Array<number> = []
+      for (let i = 0; i < count; i++) out.push(src[program[at + 2 + i] ?? 0] ?? 0)
+      stack.push(out)
+      at += 6
+    } else if (op === OP_APPEND) {
+      const b = stack.pop(), a = stack.pop()
+      if (a === undefined || b === undefined) return null
+      stack.push([...a, ...b])
+      at += 1
+    } else if (op === OP_ADD || op === OP_SUB || op === OP_MUL || op === OP_DIV) {
+      const ok = binary(
+        op === OP_ADD
+          ? (a, b) => a + b
+          : op === OP_SUB
+          ? (a, b) => a - b
+          : op === OP_MUL
+          ? (a, b) => a * b
+          : (a, b) => (b === 0 ? 0 : a / b)
+      )
+      if (!ok) return null
+      at += 1
+    } else {
+      return null
+    }
+  }
+  return stack.length === 1 ? stack[0] ?? null : null
 }
 
 /** Which float of the material constant buffer each preshader writes, resolved to its parameter when trivial. */
@@ -60,7 +129,29 @@ export const decodePreshaders = (
       for (const ref of refs) out.push({ ref, constant: value })
       continue
     }
-    for (const ref of refs) out.push({ ref, expression: true })
+    const program = Buffer.from(data.subarray(p.OpcodeOffset, p.OpcodeOffset + p.OpcodeSize)).toString("hex")
+    refs.forEach((ref, i) => out.push({ ref, expression: { program, component: i } }))
   }
   return out
+}
+
+/** A slot's value for a material: its constant, its parameter, or its program run on the parameters. */
+export const slotValue = (
+  slot: Slot,
+  paramNames: ReadonlyArray<string>,
+  valueOf: (name: string) => number | undefined,
+  vectorOf: (name: string) => ReadonlyArray<number> | undefined
+): number | undefined => {
+  if (slot.constant !== undefined) return slot.constant
+  if (slot.param !== undefined) return valueOf(slot.param)
+  if (slot.expression === undefined) return undefined
+  const result = runPreshader(Uint8Array.from(Buffer.from(slot.expression.program, "hex")), (i) => {
+    const name = paramNames[i]
+    if (name === undefined) return undefined
+    const vec = vectorOf(name)
+    if (vec !== undefined) return vec
+    const scalar = valueOf(name)
+    return scalar === undefined ? undefined : [scalar]
+  })
+  return result === null ? undefined : result[slot.expression.component]
 }

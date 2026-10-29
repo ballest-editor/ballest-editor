@@ -138,7 +138,8 @@ cp -r "$WORK/textures" "$OUT/textures"
 log "analysing material shaders"
 tsx materials shader-list "$WORK"
 extract shaders --list "$WORK/shader-materials.txt" --out "$WORK/shaders" 2>"$WORK/shaders.log" || { tail -20 "$WORK/shaders.log" >&2; exit 1; }
-tsx shaders --dump "$WORK/shaders" --out "$WORK/shaders.json" --dxc "${BALLEST_DXC:-dxc}"
+tsx shaders --dump "$WORK/shaders" --out "$WORK/shaders.json" --dxc "${BALLEST_DXC:-dxc}" \
+  --materials "$WORK/materials-dump.json" --list "$WORK/materials.txt" --textures "$WORK/textures"
 tsx materials build "$WORK" "$OUT"
 
 # 7. Sanity checks.

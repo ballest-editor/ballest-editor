@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
 import { parseMaterialsFile } from "../domain/Materials"
-import { BLUE, GLASS, materialsFile, OUTLINE, TILES, WIND } from "../test/materials"
+import { BLUE, GLASS, materialsFile, OUTLINE, PIPE, TILES, WIND } from "../test/materials"
 import {
   applyShaderPatch,
   applySlotMaterials,
@@ -99,6 +99,30 @@ describe("three materials", () => {
     assert.notInclude(shader.fragmentShader, "#include <normal_fragment_maps>")
     assert.include(shader.fragmentShader, "vBallestNormalMatrix * pn")
     assert.include(shader.fragmentShader, "c *= vBallestScale.xy")
+  })
+
+  it("adds colour layers to the base colour at their gain", () => {
+    const table = parseMaterialsFile(materialsFile)
+    const pipe = materialFor(table, PIPE)
+    const patch = shaderPatchOf(pipe)
+    assert.isDefined(patch)
+    assert.deepStrictEqual(patch.defines, { BALLEST_COLOR: 1 })
+    assert.deepStrictEqual(patch.uniforms.uColor1Gain.value, new THREE.Vector3(0.83, 0.124, 0))
+    assert.isNull(pipe.map) // the layer is not three's own map
+    const shader: ShaderProgram = {
+      uniforms: {},
+      vertexShader: "#include <common>\n#include <project_vertex>",
+      fragmentShader:
+        "#include <common>\n#include <normalmap_pars_fragment>\n#include <map_fragment>\n#include <normal_fragment_maps>"
+    }
+    applyShaderPatch(shader, patch)
+    assert.include(
+      shader.fragmentShader,
+      "uColor1Gain * ( texture2D( uColorMap1, ballestUv( uColor1Tiling ) ).rgb - uColor1Mean )"
+    )
+    assert.deepStrictEqual(patch.uniforms.uColor1Mean.value, new THREE.Vector3(0.1, 0.1, 0.1))
+    // no normal map: the normal-layer helper must not reference one
+    assert.include(shader.fragmentShader, "#ifdef USE_NORMALMAP\nvec3 ballestMapN()")
   })
 
   it("shapes a translucent effect with its opacity texture and adds it to the scene", () => {

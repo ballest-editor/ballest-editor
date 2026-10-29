@@ -11,7 +11,13 @@ const shadersCommand = Command.make(
   {
     dump: Flag.String("dump").pipe(Flag.withDescription("the C# tool's `shaders` output dir (index.json + *.dxil)")),
     out: Flag.String("out").pipe(Flag.withDescription("shaders.json to write")),
-    dxc: Flag.String("dxc").pipe(Flag.withDescription("path to dxc (DirectX Shader Compiler)"), Flag.withDefault("dxc"))
+    dxc: Flag.String("dxc").pipe(
+      Flag.withDescription("path to dxc (DirectX Shader Compiler)"),
+      Flag.withDefault("dxc")
+    ),
+    materials: Flag.String("materials").pipe(Flag.withDescription("WORK/materials-dump.json (parameter values)")),
+    list: Flag.String("list").pipe(Flag.withDescription("WORK/materials.txt (materials to evaluate)")),
+    textures: Flag.String("textures").pipe(Flag.withDescription("WORK/textures (decoded PNGs, read at their mean)"))
   },
   shaders
 ).pipe(Command.withDescription("Trace texture coordinates through the materials' compiled shaders"))

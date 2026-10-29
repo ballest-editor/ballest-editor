@@ -9,7 +9,11 @@ import { FileSystem } from "effect/FileSystem"
 import { Path } from "effect/Path"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { type Leaf, type Module, type Mottle, mottleOf, outputsOf, parseModule, samples } from "./dxil.ts"
-import { decodePreshaders, type Slot } from "./preshader.ts"
+import { surfaceOf } from "./evaluate.ts"
+import { get, str } from "./json.ts"
+import { chainOf, paramValueOf } from "./params.ts"
+import { pngMean } from "./png.ts"
+import { decodePreshaders, type Slot, slotValue } from "./preshader.ts"
 
 const ShaderRecord = Schema.Struct({
   file: Schema.String,
@@ -75,6 +79,8 @@ export interface MaterialShaders {
   /** Material constant-buffer register in the pixel shader (`cb3`), so `params` refs can be matched to reads. */
   readonly materialBuffer: string | null
   readonly slots: ReadonlyArray<Slot>
+  /** The uniform numeric parameters by index, as the slot programs refer to them. */
+  readonly paramNames: ReadonlyArray<string>
   readonly reads: ReadonlyArray<TextureRead>
   /** The mottle chain (`1 + gain * product(read + offset)`) over `reads` indices, if the shader has one. */
   readonly mottle: {
@@ -84,6 +90,21 @@ export interface MaterialShaders {
   } | null
   /** Vertex-shader interpolants by `SEMANTIC.component`, each traced to its sources. */
   readonly interpolants: Record<string, ReadonlyArray<Leaf>>
+  /**
+   * The surface the shader produces for this material's parameters, seen head-on (opaque passes: GBuffer
+   * base colour with colour reads at 0, metallic, roughness; `gains` = how much each read, by index into
+   * `reads`, adds to the base colour at 1). Null when not evaluated (translucent passes).
+   */
+  readonly surface: {
+    readonly baseColor: readonly [number, number, number]
+    readonly metallic: number
+    readonly roughness: number
+    /** By read index: the colour the read adds going 0 -> 1, and the mean it was evaluated at. */
+    readonly gains: Record<
+      string,
+      { readonly gain: readonly [number, number, number]; readonly mean: readonly [number, number, number] }
+    >
+  } | null
 }
 
 export interface ShadersFile {
@@ -91,6 +112,8 @@ export interface ShadersFile {
   readonly notes: ReadonlyArray<string>
   readonly materials: Record<string, MaterialShaders | { readonly error: string }>
 }
+
+const isAnalysed = (e: MaterialShaders | { readonly error: string }): e is MaterialShaders => !Object.hasOwn(e, "error")
 
 /** Material textures are the highest-numbered Texture2D SRVs: UE binds the Material uniform buffer last. */
 const materialTextureRegisters = (m: Module, count: number): Array<number> =>
@@ -100,11 +123,24 @@ export const shaders = Effect.fn("shaders")(function*(options: {
   readonly dump: string
   readonly out: string
   readonly dxc: string
+  /** WORK/materials-dump.json: parameter values, to evaluate each material's surface. */
+  readonly materials: string
+  /** WORK/materials.txt: the materials to evaluate (instances included). */
+  readonly list: string
+  /** WORK/textures: the decoded PNGs, read at their mean colour during evaluation. */
+  readonly textures: string
 }) {
   const fs = yield* FileSystem
   const path = yield* Path
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const index = yield* fs.readFileString(path.join(options.dump, "index.json")).pipe(Effect.flatMap(decodeIndex))
+  const dump: unknown = JSON.parse(yield* fs.readFileString(options.materials))
+  const list = (yield* fs.readFileString(options.list)).split("\n").filter((l) => l !== "")
+  /** the analysed pixel shader of each material entry, kept for the per-instance evaluation */
+  const pixels = new Map<
+    string,
+    { module: Module; ir: string; sampleValues: ReadonlyArray<string>; mottle: ReadonlyArray<string> }
+  >()
   const disassemble = Effect.fn("disassemble")(function*(file: string) {
     const full = path.join(options.dump, `${file}.dxil`)
     return yield* spawner.string(ChildProcess.make(options.dxc, ["-dumpbin", full]))
@@ -153,7 +189,14 @@ export const shaders = Effect.fn("shaders")(function*(options: {
       const interpolants: Record<string, ReadonlyArray<Leaf>> = {}
       for (const o of vertex?.outputs ?? []) interpolants[`${o.semantic}.${o.component}`] = o.leaves
       const bytes = Uint8Array.from(Buffer.from(ues.UniformPreshaderData.Data, "base64"))
+      pixels.set(material, {
+        module: pixel.module,
+        ir: pixel.ir,
+        sampleValues: pixelSamples.map((s) => s.value),
+        mottle: mottle?.samples ?? []
+      })
       materials[material] = {
+        surface: null,
         pixel: pixel.shader.file,
         vertex: vertex?.shader.file ?? null,
         textures: textureParams.map((t) => ({
@@ -162,6 +205,7 @@ export const shaders = Effect.fn("shaders")(function*(options: {
         })),
         materialBuffer: materialCb === undefined ? null : `cb${materialCb.register}`,
         slots: decodePreshaders(bytes, ues.UniformPreshaders, ues.UniformNumericParameters),
+        paramNames: ues.UniformNumericParameters.map((p) => p.ParameterInfo.Name),
         reads,
         mottle: mottle === null ? null : {
           reads: mottle.samples.map((v) => pixelSamples.findIndex((s) => s.value === v)),
@@ -173,11 +217,81 @@ export const shaders = Effect.fn("shaders")(function*(options: {
       done++
       if (done % 20 === 0) yield* Effect.logInfo(`[shaders] ${done}/${entries.length}`)
     }), { concurrency: 4 })
+  // Texture means (linear), by texture object path.
+  const meanCache = new Map<string, readonly [number, number, number, number] | null>()
+  const meanOf = Effect.fn("meanOf")(function*(texturePath: string) {
+    const cached = meanCache.get(texturePath)
+    if (cached !== undefined) return cached
+    const info = get(dump, "textures", texturePath)
+    const png = str(get(info, "png"))
+    let mean: readonly [number, number, number, number] | null = null
+    if (png !== undefined) {
+      const bytes = yield* fs.readFile(path.join(options.textures, png)).pipe(Effect.orElseSucceed(() => null))
+      mean = bytes === null ? null : pngMean(bytes, get(info, "sRGB") !== false)?.mean ?? null
+      // A BC5 normal map samples as (x, y, 0, 1) on the GPU; the PNG has Z rebuilt, which the shader never sees.
+      if (mean !== null && (str(get(info, "format")) ?? "").startsWith("PF_BC5")) mean = [mean[0], mean[1], 0, 1]
+    }
+    meanCache.set(texturePath, mean)
+    return mean
+  })
+  // Every listed material, instances included: its parameters through its (or its parent's) shader.
+  let evaluated = 0
+  for (const material of list) {
+    const chain = chainOf(dump, material)
+    const key = chain.chain.flatMap((o) => [o.path, ...(o.redirectedTo === undefined ? [] : [o.redirectedTo])])
+      .find((p) => pixels.has(p))
+    const px = key === undefined ? undefined : pixels.get(key)
+    const entry = key === undefined ? undefined : materials[key]
+    if (px === undefined || entry === undefined || !isAnalysed(entry)) continue
+    const base = entry
+    const slots = new Map(base.slots.map((sl) => [sl.ref, sl]))
+    const cbuf = (ref: string): number | undefined => {
+      if (!ref.startsWith("Material[")) return undefined
+      const slot = slots.get(ref.slice("Material".length))
+      if (slot === undefined) return undefined
+      return slotValue(
+        slot,
+        base.paramNames,
+        (name) => paramValueOf(chain.merged, name),
+        (name) => chain.merged.vectors[name] ?? undefined
+      )
+    }
+    const mottle = new Set(px.mottle)
+    const colour = px.sampleValues.filter((v) => !mottle.has(v))
+    // each sample's texture mean: the texture slot it reads, through the instance's overrides
+    const means = new Map<string, readonly [number, number, number, number]>()
+    for (const [i, v] of px.sampleValues.entries()) {
+      const read = base.reads[i]
+      const slot = read === undefined || read.texture < 0 ? undefined : base.textures[read.texture]
+      if (slot === undefined) continue
+      const override = slot.param === null ? undefined : chain.merged.textures[slot.param]
+      const texture = override ?? chain.root.referencedTextures[slot.index] ?? null
+      const mean = texture === null ? null : yield* meanOf(texture)
+      if (mean !== null) means.set(v, mean)
+    }
+    const surface = surfaceOf(px.module, px.ir, cbuf, (v, ch) => means.get(v)?.[ch] ?? 0.5, colour)
+    const gains: Record<string, { gain: readonly [number, number, number]; mean: readonly [number, number, number] }> =
+      {}
+    for (const [v, gain] of Object.entries(surface?.gains ?? {})) {
+      if (gain.every((x) => Math.abs(x) < 1e-4)) continue
+      const m = means.get(v) ?? [0.5, 0.5, 0.5, 1]
+      gains[String(px.sampleValues.indexOf(v))] = { gain, mean: [m[0], m[1], m[2]] }
+    }
+    materials[material] = {
+      ...base,
+      surface: surface?.baseColor == null
+        ? null
+        : { baseColor: surface.baseColor, metallic: surface.metallic ?? 0, roughness: surface.roughness ?? 0.5, gains }
+    }
+    evaluated++
+  }
+  yield* Effect.logInfo(`[shaders] ${evaluated}/${list.length} materials evaluated`)
   const file: ShadersFile = {
     version: 1,
     notes: [
       "Per material: the base-pass pixel shader's texture reads (`reads`, texture = index into `textures`, -1 = an engine texture) with each coordinate traced to its sources (`leaves`), and the vertex shader's outputs (`interpolants`) traced the same way.",
       "A leaf is one source the coordinate depends on linearly: kind input (vertex attribute ATTRIBUTEn in the vertex shader, interpolant TEXCOORDn / SV_Position in the pixel shader), buffer (vertex fetch: UVs), sceneData (the primitive/instance transform), param (constant buffer), texture, constant. factor = product of the literal constants on the path; params = constant-buffer values on the path; sceneDepth = transform rows multiplied in (1: local->world, 2: ...->object); sceneScale = multiplied (1) / divided (-1) by the instance scale.",
+      "`surface` is the shader evaluated for this material's parameters and a facing view, every texture read at its mean colour: GBuffer base colour, metallic, roughness, and per read index the colour the read adds going 0 -> 1 (gain) around the mean it was evaluated at. Only opaque passes have a GBuffer; translucent entries have null.",
       "`mottle` is the grey-mottle chain where the base pass has one: reads (indices) offset by `offsets`, multiplied together, times `gain` (sign * constant * (param + paramAdd)) and added to 1, multiplying the base colour.",
       "`textures[i].index` indexes the root material's ReferencedTextures; `param` names the texture parameter an instance may override. `slots` name the Material constant-buffer floats (`[reg].c`) by parameter (from the preshader bytecode) where the expression is a plain parameter read."
     ],

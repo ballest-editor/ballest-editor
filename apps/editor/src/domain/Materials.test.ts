@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { BLUE, GLASS, materialsFile, OLD, OUTLINE, TILES, WIND } from "../test/materials"
+import { BLUE, GLASS, materialsFile, OLD, OUTLINE, PIPE, TILES, WIND } from "../test/materials"
 import { repoRoot } from "../test/samples"
 import { lookupMaterial, parseMaterialsFile } from "./Materials"
 
@@ -42,6 +42,11 @@ describe("materials", () => {
     assert.deepStrictEqual(tiles.normalLayer, { texture: "textures/tiles_n.png", tiling: [0.06, 0.06], strength: 1 })
     assert.strictEqual(tiles.variation?.tilings.length, 1)
     assert.isUndefined(blue.variation)
+    assert.deepStrictEqual(blue.colorLayers, [])
+    const pipe = lookupMaterial(table, PIPE)!
+    assert.deepStrictEqual(pipe.colorLayers, [
+      { texture: "textures/grid.png", tiling: [5, 5], gain: [0.83, 0.124, 0], mean: [0.1, 0.1, 0.1] }
+    ])
     assert.deepStrictEqual(outline.outline, { inset: [0, 0.1], color: [0.59, 0.59, 0.59] })
     const wind = lookupMaterial(table, WIND)!
     assert.isTrue(wind.translucent)

@@ -53,6 +53,16 @@ const Variation = open({
   gain: Schema.Finite
 })
 
+/** A texture added to the base colour: `colour += gain * read(tiling)`. */
+const ColorLayer = open({
+  texture: Schema.String,
+  tiling: Pair,
+  projection: Schema.optionalKey(Schema.NullOr(Projection)),
+  instanceScale: Num,
+  gain: Rgb,
+  mean: Schema.optionalKey(Schema.NullOr(Rgb))
+})
+
 export const MaterialApprox = open({
   baseColor: Schema.optionalKey(Schema.NullOr(Rgb)),
   metallic: Num,
@@ -78,6 +88,7 @@ export const MaterialApprox = open({
   /** Projected UVs also multiply by the piece's x and y scale (1), or divide (-1). */
   instanceScale: Num,
   variation: Schema.optionalKey(Schema.NullOr(Variation)),
+  colorLayers: Schema.optionalKey(Schema.NullOr(Schema.Array(ColorLayer))),
   /** Every texture read of the base pass, including the secondary layers the fields above don't name. */
   reads: Schema.optionalKey(Schema.NullOr(Schema.Array(Read))),
   /** M_OutlineEdges' grey band along the UV border: `inset` is its width as a fraction of U and V. */
@@ -100,6 +111,14 @@ const decodeEntry = Schema.decodeUnknownOption(MaterialEntry)
 
 export type Pair = readonly [number, number]
 export type TextureProjection = "uv" | "object" | "world"
+
+/** A texture the base colour depends on: `colour += gain * (read - mean)`. */
+export interface ColorLayer {
+  readonly texture: string
+  readonly tiling: Pair
+  readonly gain: readonly [number, number, number]
+  readonly mean: readonly [number, number, number]
+}
 
 /** The grey mottle: `colour *= 1 + gain * product over i of (texture read at tilings[i] + offsets[i])`. */
 export interface Variation {
@@ -144,6 +163,8 @@ export interface MaterialSpec {
   /** Projected coordinates also scale with the piece's x (u) and y (v) scale, as the game's instances do. */
   readonly instanceScale: boolean
   readonly normalLayer: NormalLayer | undefined
+  /** Textures the base colour depends on (the pipes' grid, the vent's slats), in the material's projection. */
+  readonly colorLayers: ReadonlyArray<ColorLayer>
   /** The mottle, as the game computes it; undefined when the shader has none (then no mottle is drawn). */
   readonly variation: Variation | undefined
   /** Grey band along the UV border (M_OutlineEdges): width per axis as a fraction, and its linear colour. */
@@ -195,6 +216,7 @@ export const NEUTRAL: Omit<MaterialSpec, "path"> = {
   projection: "uv",
   instanceScale: false,
   normalLayer: undefined,
+  colorLayers: [],
   variation: undefined,
   outline: undefined,
   translucent: false,
@@ -232,6 +254,15 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
   const second = normals.find((r) =>
     r.texture !== normalTexture || pair(r.scale, [1, 1])[0] !== pair(t.normal, [1, 1])[0]
   )
+  const colorLayers: Array<ColorLayer> = (a.colorLayers ?? [])
+    .filter((l) => projectionOf(l.projection) === projection && orUndefined(l.texture) !== undefined)
+    .slice(0, 2)
+    .map((l) => ({
+      texture: l.texture,
+      tiling: pair(l.tiling, [1, 1]),
+      gain: rgb(l.gain, [0, 0, 0]),
+      mean: rgb(l.mean, [0.5, 0.5, 0.5])
+    }))
   const v = a.variation
   const variation: Variation | undefined = v == null || v.tilings.length === 0 || v.gain === 0
     ? undefined
@@ -262,6 +293,7 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
     },
     projection,
     instanceScale: (a.instanceScale ?? 0) > 0,
+    colorLayers,
     normalLayer: second === undefined || normalTexture === undefined
       ? undefined
       : {

@@ -6,6 +6,8 @@ export const OLD = "/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurfac
 export const OUTLINE = "/Game/Art/Materials/Masters/M_OutlineEdges.M_OutlineEdges"
 /** A shaped translucent effect, like the air vent's wind column. */
 export const WIND = "/Game/Art/UsedMarketPlace/StylizedFX_Collection_q/M_AJ_LandRay.M_AJ_LandRay"
+/** A base colour with a grid texture added on top, like MI_Pipes. */
+export const PIPE = "/Game/Art/Materials/Instances/MI_Pipes.MI_Pipes"
 /** Object-aligned tiles that scale with the piece, like MI_Env_Blue_Tiles. */
 export const TILES = "/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Tiles.MI_Env_Blue_Tiles"
 export const materialsFile = {
@@ -93,6 +95,24 @@ export const materialsFile = {
           },
           { texture: "textures/macro.png", role: "variation", scale: [0.00105, 0.00105], projection: "object" }
         ]
+      },
+      recovered: true
+    },
+    {
+      path: PIPE,
+      blendMode: "BLEND_Opaque",
+      approx: {
+        baseColor: [0.17, 0.876, 1],
+        metallic: 0,
+        roughness: 0.8,
+        evaluated: true,
+        colorLayers: [{
+          texture: "textures/grid.png",
+          tiling: [5, 5],
+          projection: "uv",
+          gain: [0.83, 0.124, 0],
+          mean: [0.1, 0.1, 0.1]
+        }]
       },
       recovered: true
     },

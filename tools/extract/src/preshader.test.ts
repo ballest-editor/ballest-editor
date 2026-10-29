@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { decodePreshaders } from "./preshader.ts"
+import { decodePreshaders, runPreshader } from "./preshader.ts"
 
 // opcode bytes, grouped per preshader for readability
 const hex = (...parts: ReadonlyArray<string>) => Uint8Array.from(Buffer.from(parts.join(""), "hex"))
@@ -38,6 +38,20 @@ describe("preshader", () => {
       { ref: "[1].z", param: "TriPlanar Rotation.z" }
     ])
     assert.deepStrictEqual(slots[7], { ref: "[2].w", constant: 1 })
-    assert.deepStrictEqual(slots[8], { ref: "[3].x", expression: true })
+    assert.deepStrictEqual(slots[8], { ref: "[3].x", expression: { program: "030500030600", component: 0 } })
+  })
+
+  it("runs the arithmetic programs the masters use", () => {
+    const param = (i: number) => [[1, 0.5, 0, 1], [0.3]][i]
+    // 1.0 - FakeShadowStrength
+    assert.deepStrictEqual(runPreshader(hex("02010000803f", "030100", "05"), param), [0.7])
+    // BaseColor.xyz + 0.1
+    const r = runPreshader(hex("0300002503000102ff", "0201cdcccc3d", "04"), param)
+    assert.closeTo(r?.[0] ?? 0, 1.1, 1e-6)
+    assert.closeTo(r?.[1] ?? 0, 0.6, 1e-6)
+    assert.strictEqual(r?.length, 3)
+    // append and an unknown opcode
+    assert.deepStrictEqual(runPreshader(hex("030100", "030100", "26"), param), [0.3, 0.3])
+    assert.isNull(runPreshader(hex("030100", "1b"), param))
   })
 })
