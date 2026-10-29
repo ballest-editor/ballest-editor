@@ -13,7 +13,6 @@ import {
   type Bindings,
   defaultKeybinds,
   editorOverlayActions,
-  editorOverrides,
   heldActions,
   type KeybindAction,
   keybindActionLabels,
@@ -211,7 +210,7 @@ const GAME_ACTIONS: Readonly<Record<string, Resolver>> = {
   cameraspeedslower: fixed("speedSlower"),
   camera: mouseButtonOnly("look"), // Mouse2D in game; the browser needs a held button
   look: lookResolver,
-  centercamera: fixed("focusSelection"),
+  // IA_CenterCamera (C) is left out: the level editor's C switches local / world axes.
   // IMC_Universal
   pause: fixed("deselect"),
   // Editor actions the pak declares but no context maps yet (native SKG plugin hotkeys).
@@ -289,7 +288,7 @@ export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybi
         // A bare modifier key only works for held actions (e.g. LeftControl = fly down).
         if (MODIFIER_PREFIX[base] !== undefined && !heldActions.has(action)) continue
         // The first game mapping replaces the editor default; later ones become secondary
-        // bindings. Level-editor overlay hotkeys stay primary (F focus, then the camera's C).
+        // bindings. Level-editor overlay hotkeys stay primary.
         const first = !fromGame.has(action)
         const keep = first && !editorOverlayActions.has(action) ? [] : out[action]
         out[action] = uniqueBindings([...keep, chord])
@@ -318,12 +317,6 @@ export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybi
         })
       }
     }
-  }
-  for (const action of keybindActions) {
-    const bindings = editorOverrides[action]
-    if (bindings === undefined) continue
-    out[action] = bindings
-    fromGame.delete(action)
   }
   const fellBack = keybindActions.filter((a) => !fromGame.has(a))
   const sectionOrder = (file?.sections ?? []).map((s) => s.name).filter((name) => !/gamepad/i.test(name))
