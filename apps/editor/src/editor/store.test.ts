@@ -201,7 +201,7 @@ describe("editor store", () => {
     })
 
     const withUndoSelection = (on: boolean) =>
-      s().setSettings({ ...defaultSettings, general: { ...defaultSettings.general, undoSelection: on } })
+      s().setSettings({ ...defaultSettings, editor: { ...defaultSettings.editor, undoSelection: on } })
 
     it("doesn't record selection changes by default", () => {
       withUndoSelection(false)

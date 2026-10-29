@@ -14,6 +14,7 @@ import {
   mouseChordOf,
   wheelChordOf
 } from "../domain/Keybinds"
+import { placeDistanceFor, placementPoint } from "../domain/placement"
 import { editorVerticalFov } from "../domain/Settings"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
@@ -21,8 +22,7 @@ import { useEditor } from "./store"
 const FAST_MULTIPLIER = 4
 const LOOK_SENSITIVITY = 0.0025 // radians per pixel at sensitivity 1
 const KEY_LOOK_SPEED = 1.6 // radians per second for the arrow-key look actions
-const PLACE_DISTANCE = 1500
-const MAX_GROUND_HIT = 20000
+const ORBIT_DISTANCE = 1500 // orbit pivot ahead of the camera when the old one is behind it
 
 export const isTypingTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement &&
@@ -66,20 +66,20 @@ export function FlyCamera() {
   const target = useRef(new THREE.Vector3())
   const euler = useRef(new THREE.Euler(0, 0, 0, "YXZ"))
 
-  // Placement point: floor hit at screen centre, else a fixed distance ahead.
+  // Placement point: on the screen-centre ray, at the floor or a cap that fits the piece.
   useEffect(() => {
     sceneRegistry.camera = camera
-    const raycaster = new THREE.Raycaster()
-    const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
-    sceneRegistry.placementPoint = () => {
-      ground.constant = -useEditor.getState().floorHeight // the plane y = floorHeight
-      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera)
-      const hit = raycaster.ray.intersectPlane(ground, new THREE.Vector3())
-      const point = hit !== null && hit.distanceTo(camera.position) < MAX_GROUND_HIT
-        ? hit
-        : camera.position.clone().addScaledVector(raycaster.ray.direction, PLACE_DISTANCE)
-      const ue = threeToUeVector({ x: point.x, y: point.y, z: point.z })
-      return { x: Math.round(ue.x), y: Math.round(ue.y), z: Math.round(ue.z) }
+    sceneRegistry.placementPoint = (footprint) => {
+      const { floorHeight, settings } = useEditor.getState()
+      const vertical = camera instanceof THREE.PerspectiveCamera ? THREE.MathUtils.degToRad(camera.fov) : Math.PI / 3
+      const aspect = camera instanceof THREE.PerspectiveCamera ? camera.aspect : 1
+      const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * aspect)
+      return placementPoint(
+        threeToUeVector(camera.position),
+        threeToUeVector(camera.getWorldDirection(new THREE.Vector3())),
+        floorHeight,
+        placeDistanceFor(footprint, Math.min(vertical, horizontal), settings.editor.placeDistance)
+      )
     }
   }, [camera])
 
@@ -113,7 +113,7 @@ export function FlyCamera() {
         // keep the pivot if it's in front of us, otherwise orbit around a point ahead
         const forward = camera.getWorldDirection(new THREE.Vector3())
         if (target.current.clone().sub(camera.position).dot(forward) <= 0) {
-          target.current.copy(camera.position).addScaledVector(forward, PLACE_DISTANCE)
+          target.current.copy(camera.position).addScaledVector(forward, ORBIT_DISTANCE)
         }
       }
       el.setPointerCapture(e.pointerId)
