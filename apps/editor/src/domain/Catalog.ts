@@ -114,7 +114,8 @@ export interface MeshInfo {
   readonly slotDefaults: ReadonlyArray<string | undefined>
 }
 
-const slotDefaultsOf = (slots: ReadonlyArray<CatalogMaterialSlot> | undefined): Array<string | undefined> => {
+/** Default game material per UE slot index: the component's override, else the mesh's own material. */
+export const slotDefaultsOf = (slots: ReadonlyArray<CatalogMaterialSlot> | undefined): Array<string | undefined> => {
   const out: Array<string | undefined> = []
   for (const slot of slots ?? []) out[slot.index] = slot.defaultMaterial || slot.meshMaterial || undefined
   return out

@@ -14,7 +14,7 @@ import { MapExporter } from "../services/MapExporter"
 import { MaterialLibrary } from "../services/MaterialLibrary"
 import { type AppServices, runtime } from "../services/runtime"
 import { SettingsStore } from "../services/SettingsStore"
-import { useEditor } from "./store"
+import { type SlotPaint, useEditor } from "./store"
 
 const run = async <A, E>(effect: Effect.Effect<A, E, AppServices>): Promise<A | undefined> => {
   const exit = await runtime.runPromiseExit(effect)
@@ -31,6 +31,9 @@ const run = async <A, E>(effect: Effect.Effect<A, E, AppServices>): Promise<A | 
 
 export const transformSelection = (transforms: ReadonlyMap<string, UeTransform>): boolean =>
   useEditor.getState().transformItems(transforms)
+
+/** Sets material slots (one undo step); see `EditorState.paintSlots`. */
+export const paintSlots = (edits: ReadonlyArray<SlotPaint>): boolean => useEditor.getState().paintSlots(edits)
 
 /** Sets item properties on every selected item. */
 export const setSelectionProperties = (changes: ReadonlyArray<PropertyChange>): boolean =>
@@ -88,8 +91,8 @@ export const loadCatalog = () =>
 export const loadMaterials = () =>
   run(
     Effect.gen(function*() {
-      const table = yield* MaterialLibrary.use((library) => library.load)
-      useEditor.getState().setMaterialTable(table)
+      const { table, paint } = yield* MaterialLibrary.use((library) => library.load)
+      useEditor.getState().setMaterials(table, paint)
     })
   )
 

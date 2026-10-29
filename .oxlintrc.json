@@ -8,7 +8,7 @@
   },
   "options": { "typeAware": true },
   "env": { "browser": true, "es2024": true },
-  "ignorePatterns": ["repos/**", "samples/**", "assets/**", "tools/**", "**/routeTree.gen.ts"],
+  "ignorePatterns": ["repos/**", "samples/**", "assets/**", "tools/**/*.mjs", "**/routeTree.gen.ts"],
   "rules": {
     // typescript-eslint strict-type-checked, minus what tsc already covers
     "typescript/no-confusing-void-expression": ["error", { "ignoreArrowShorthand": true }],

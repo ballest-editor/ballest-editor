@@ -14,7 +14,8 @@
     let
       systems = [ "x86_64-linux" "aarch64-linux" ];
       forAll = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
-      toolsFor = pkgs: with pkgs; [ dotnet-sdk_10 nodejs_22 pnpm curl coreutils findutils gnugrep gnused ];
+      # directx-shader-compiler: dxc disassembles the cooked shaders (tools/extract/src/shaders.ts).
+      toolsFor = pkgs: with pkgs; [ dotnet-sdk_10 nodejs_22 pnpm curl coreutils findutils gnugrep gnused directx-shader-compiler ];
       # liboodle-data-shared.so (downloaded at runtime by CUE4Parse) links libstdc++.
       libPathFor = pkgs: pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib ];
     in

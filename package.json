@@ -39,6 +39,6 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,json,md}": "dprint fmt --allow-no-files",
-    "{apps,packages}/**/*.{ts,tsx}": "oxlint --type-aware --deny-warnings --disable-nested-config"
+    "{apps,packages,tools}/**/*.{ts,tsx}": "oxlint --type-aware --deny-warnings --disable-nested-config"
   }
 }

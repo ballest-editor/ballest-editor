@@ -19,17 +19,107 @@ const Rgb = Schema.Union([
   Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite, Schema.Finite])
 ])
 
+/** A texture's UV multiplier: one number (older files) or [u, v]. */
+const Pair = Schema.optionalKey(
+  Schema.NullOr(Schema.Union([Schema.Finite, Schema.Tuple([Schema.Finite, Schema.Finite])]))
+)
+const Tiling = open({
+  baseColor: Pair,
+  normal: Pair,
+  variation: Pair,
+  opacity: Pair
+})
+const Projection = Schema.Literals(["uv", "object", "world", "triplanar"])
+/** One texture read of the game's base pass, traced through its compiled shader (tools/extract shaders). */
+const Read = open({
+  texture: Str,
+  role: Str,
+  scale: Pair,
+  projection: Schema.optionalKey(Schema.NullOr(Projection)),
+  instanceScale: Num,
+  strength: Num
+})
+
+const Outline = open({
+  inset: Schema.Tuple([Schema.Finite, Schema.Finite]),
+  color: Rgb
+})
+
+/** The grey mottle as the base pass applies it: `colour *= 1 + gain * product(read(tilings[i]) + offsets[i])`. */
+const Variation = open({
+  texture: Schema.String,
+  tilings: Schema.Array(Schema.Tuple([Schema.Finite, Schema.Finite])),
+  offsets: Schema.Array(Schema.Finite),
+  gain: Schema.Finite
+})
+
+/** A texture added to the base colour: `colour += gain * read(tiling)`. */
+const ColorLayer = open({
+  texture: Schema.String,
+  tiling: Pair,
+  projection: Schema.optionalKey(Schema.NullOr(Projection)),
+  instanceScale: Num,
+  gain: Rgb,
+  mean: Schema.optionalKey(Schema.NullOr(Rgb))
+})
+
+/** A texture a translucent pass's alpha depends on: `alpha += gain * (read.r - mean)`. */
+const OpacityLayer = open({
+  texture: Schema.String,
+  tiling: Pair,
+  projection: Schema.optionalKey(Schema.NullOr(Projection)),
+  gain: Schema.Finite,
+  mean: Num
+})
+
+/** The compiled shader's own output math as GLSL: `f(vec2 uv, vec3 worldNormal, vec3 objectPos, float time)`. */
+const Program = open({
+  code: Schema.String,
+  textures: Schema.Array(open({ uniform: Schema.String, texture: Schema.String }))
+})
+
 export const MaterialApprox = open({
   baseColor: Schema.optionalKey(Schema.NullOr(Rgb)),
   metallic: Num,
   roughness: Num,
   opacity: Num,
+  /** 0..1: how much of the opacity (additive: the glow) is left on a face that looks up; null = all of it. */
+  upFade: Num,
   emissive: Schema.optionalKey(Schema.NullOr(Schema.Union([Rgb, Schema.Finite]))),
   baseColorTexture: Str,
   normalTexture: Str,
   ormTexture: Str,
   metallicRoughnessTexture: Str,
-  emissiveTexture: Str
+  emissiveTexture: Str,
+  /** Grey mottle multiplied into the base colour (T_MacroVariation). */
+  variationTexture: Str,
+  /** Alpha shape of a translucent effect (wind streaks, beam falloff). */
+  opacityTexture: Str,
+  /** UV multiplier per texture (repeats per UV unit, or per cm when projected); 1 when unknown. */
+  tiling: Schema.optionalKey(Schema.NullOr(Tiling)),
+  /**
+   * "uv": the mesh's own UVs. "object": object-aligned projection (pivot at the piece's origin, turning and
+   * scaling with it). "world": world-aligned. "triplanar" is what older files called "object".
+   */
+  projection: Schema.optionalKey(Schema.NullOr(Projection)),
+  /** Projected UVs also multiply by the piece's x and y scale (1), or divide (-1). */
+  instanceScale: Num,
+  variation: Schema.optionalKey(Schema.NullOr(Variation)),
+  colorLayers: Schema.optionalKey(Schema.NullOr(Schema.Array(ColorLayer))),
+  opacityLayers: Schema.optionalKey(Schema.NullOr(Schema.Array(OpacityLayer))),
+  /** Every texture read of the base pass, including the secondary layers the fields above don't name. */
+  reads: Schema.optionalKey(Schema.NullOr(Schema.Array(Read))),
+  /** M_OutlineEdges' grey band along the UV border: `inset` is its width as a fraction of U and V. */
+  outline: Schema.optionalKey(Schema.NullOr(Outline)),
+  /**
+   * The shader's own math where the fields above cannot say it: a translucent pass's `alpha` (the vent's
+   * streaks, for any frame via time), an additive pass's `glow`, an opaque `base` colour (the rubber block's cells).
+   */
+  programs: Schema.optionalKey(Schema.NullOr(open({
+    alpha: Schema.optionalKey(Schema.NullOr(Program)),
+    glow: Schema.optionalKey(Schema.NullOr(Program)),
+    base: Schema.optionalKey(Schema.NullOr(Program))
+  })))
 })
 
 export const MaterialEntry = open({
@@ -46,6 +136,47 @@ const decodeTexture = Schema.decodeUnknownOption(TextureEntry)
 
 const decodeEntry = Schema.decodeUnknownOption(MaterialEntry)
 
+export type Pair = readonly [number, number]
+export type TextureProjection = "uv" | "object" | "world"
+
+/** A texture the base colour depends on: `colour += gain * (read - mean)`. */
+export interface ColorLayer {
+  readonly texture: string
+  readonly tiling: Pair
+  readonly gain: readonly [number, number, number]
+  readonly mean: readonly [number, number, number]
+}
+
+/** A texture the alpha of a translucent material depends on: `alpha += gain * (read - mean)`. */
+export interface OpacityLayer {
+  readonly texture: string
+  readonly tiling: Pair
+  readonly gain: number
+  readonly mean: number
+}
+
+/** The grey mottle: `colour *= 1 + gain * product over i of (texture read at tilings[i] + offsets[i])`. */
+export interface Variation {
+  readonly texture: string
+  readonly tilings: ReadonlyArray<Pair>
+  readonly offsets: ReadonlyArray<number>
+  readonly gain: number
+}
+
+/** A second normal map blended over the first (the Env masters' fine x12 layer, the metal's coarse one). */
+export interface NormalLayer {
+  readonly texture: string
+  readonly tiling: Pair
+  /** 1 = full strength. */
+  readonly strength: number
+}
+
+/** A GLSL function `<float|vec3> name(vec2 uv, vec3 nrm, vec3 pos, float time)` and the samplers it reads. */
+export interface MaterialProgram {
+  readonly code: string
+  readonly textures: ReadonlyArray<{ readonly uniform: string; readonly texture: string }>
+}
+
 /** What the renderer needs for one material, with defaults filled in. Colours are linear RGB. */
 export interface MaterialSpec {
   readonly path: string
@@ -53,14 +184,48 @@ export interface MaterialSpec {
   readonly metallic: number
   readonly roughness: number
   readonly opacity: number
+  /** Fraction of the opacity left on a face whose normal points up (the beams mask their caps); 1 = none. */
+  readonly upFade: number
   readonly emissive: readonly [number, number, number]
   readonly baseColorTexture: string | undefined
   readonly normalTexture: string | undefined
   /** Occlusion/roughness/metallic in R/G/B (glTF convention). */
   readonly ormTexture: string | undefined
   readonly emissiveTexture: string | undefined
+  readonly variationTexture: string | undefined
+  readonly opacityTexture: string | undefined
+  /** UV multiplier per texture slot, [u, v]: repeats per UV unit, or per centimetre when projected. */
+  readonly tiling: {
+    readonly baseColor: Pair
+    readonly normal: Pair
+    readonly variation: Pair
+    readonly opacity: Pair
+  }
+  /** How texture coordinates are made: the mesh UVs, or a projection of the object/world position. */
+  readonly projection: TextureProjection
+  /** Projected coordinates also scale with the piece's x (u) and y (v) scale, as the game's instances do. */
+  readonly instanceScale: boolean
+  readonly normalLayer: NormalLayer | undefined
+  /** Textures the base colour depends on (the pipes' grid, the vent's slats), in the material's projection. */
+  readonly colorLayers: ReadonlyArray<ColorLayer>
+  /** Translucent materials: the texture the alpha follows (the vent's air streaks, the checkpoint's glow). */
+  readonly opacityLayer: OpacityLayer | undefined
+  /** The mottle, as the game computes it; undefined when the shader has none (then no mottle is drawn). */
+  readonly variation: Variation | undefined
+  /** Grey band along the UV border (M_OutlineEdges): width per axis as a fraction, and its linear colour. */
+  readonly outline:
+    | { readonly inset: readonly [number, number]; readonly color: readonly [number, number, number] }
+    | undefined
+  /** The shader's own math, run by the renderer: `alpha` (translucent), `glow` (additive) or `base` (opaque). */
+  readonly programs: {
+    readonly alpha?: MaterialProgram
+    readonly glow?: MaterialProgram
+    readonly base?: MaterialProgram
+  }
   /** Translucent blend modes render transparent. */
   readonly translucent: boolean
+  /** BLEND_Additive: the colour adds to what is behind it (glows). */
+  readonly additive: boolean
   /** The game material is two-sided (open/thin geometry such as glass panes). */
   readonly twoSided: boolean
   readonly recovered: boolean
@@ -93,12 +258,25 @@ export const NEUTRAL: Omit<MaterialSpec, "path"> = {
   metallic: 0,
   roughness: 0.75,
   opacity: 1,
+  upFade: 1,
   emissive: [0, 0, 0],
   baseColorTexture: undefined,
   normalTexture: undefined,
   ormTexture: undefined,
   emissiveTexture: undefined,
+  variationTexture: undefined,
+  opacityTexture: undefined,
+  tiling: { baseColor: [1, 1], normal: [1, 1], variation: [1, 1], opacity: [1, 1] },
+  projection: "uv",
+  instanceScale: false,
+  normalLayer: undefined,
+  colorLayers: [],
+  opacityLayer: undefined,
+  variation: undefined,
+  outline: undefined,
+  programs: {},
   translucent: false,
+  additive: false,
   twoSided: false,
   recovered: false
 }
@@ -117,18 +295,88 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
   // The extractor sometimes reports the normal map as ORM; that would wreck roughness/metalness.
   const orm = orUndefined(a.ormTexture ?? a.metallicRoughnessTexture)
   const opacity = clamp01(a.opacity ?? NEUTRAL.opacity)
+  const t = a.tiling ?? {}
+  const pair = (n: number | Pair | null | undefined, fallback: Pair): Pair => {
+    if (Predicate.isNumber(n)) return n > 0 ? [n, n] : fallback
+    if (n === null || n === undefined) return fallback
+    return n[0] > 0 ? [n[0], n[1] > 0 ? n[1] : n[0]] : fallback
+  }
+  const outline = a.outline ?? undefined
+  const projectionOf = (p: typeof Projection.Type | null | undefined): TextureProjection =>
+    p === "object" || p === "triplanar" ? "object" : p === "world" ? "world" : "uv"
+  const projection = projectionOf(a.projection)
+  const reads = (a.reads ?? []).filter((r) => projectionOf(r.projection) === projection)
+  const normals = reads.filter((r) => r.role === "normal" && orUndefined(r.texture) !== undefined)
+  // The primary normal map is `normalTexture`; the next distinct read is its second layer.
+  const second = normals.find((r) =>
+    r.texture !== normalTexture || pair(r.scale, [1, 1])[0] !== pair(t.normal, [1, 1])[0]
+  )
+  const colorLayers: Array<ColorLayer> = (a.colorLayers ?? [])
+    .filter((l) => projectionOf(l.projection) === projection && orUndefined(l.texture) !== undefined)
+    .slice(0, 2)
+    .map((l) => ({
+      texture: l.texture,
+      tiling: pair(l.tiling, [1, 1]),
+      gain: rgb(l.gain, [0, 0, 0]),
+      mean: rgb(l.mean, [0.5, 0.5, 0.5])
+    }))
+  const ol = (a.opacityLayers ?? []).find((l) =>
+    projectionOf(l.projection) === projection && orUndefined(l.texture) !== undefined
+  )
+  const opacityLayer: OpacityLayer | undefined = ol === undefined
+    ? undefined
+    : { texture: ol.texture, tiling: pair(ol.tiling, [1, 1]), gain: ol.gain, mean: ol.mean ?? 0.5 }
+  const v = a.variation
+  const variation: Variation | undefined = v == null || v.tilings.length === 0 || v.gain === 0
+    ? undefined
+    : {
+      texture: v.texture,
+      tilings: v.tilings.map((tt) => pair(tt, [1, 1])),
+      offsets: v.tilings.map((_, i) => v.offsets[i] ?? 0),
+      gain: v.gain
+    }
   return {
     path,
     baseColor: rgb(a.baseColor, NEUTRAL.baseColor),
     metallic: clamp01(a.metallic ?? NEUTRAL.metallic),
     roughness: clamp01(a.roughness ?? NEUTRAL.roughness),
     opacity,
+    upFade: clamp01(a.upFade ?? NEUTRAL.upFade),
     emissive,
     baseColorTexture: orUndefined(a.baseColorTexture),
     normalTexture,
     ormTexture: orm === normalTexture ? undefined : orm,
     emissiveTexture: orUndefined(a.emissiveTexture),
+    variationTexture: orUndefined(a.variationTexture),
+    opacityTexture: orUndefined(a.opacityTexture),
+    tiling: {
+      baseColor: pair(t.baseColor, [1, 1]),
+      normal: pair(t.normal, [1, 1]),
+      variation: pair(t.variation, [1, 1]),
+      opacity: pair(t.opacity, [1, 1])
+    },
+    projection,
+    instanceScale: (a.instanceScale ?? 0) > 0,
+    colorLayers,
+    opacityLayer,
+    normalLayer: second === undefined || normalTexture === undefined
+      ? undefined
+      : {
+        texture: second.texture ?? normalTexture,
+        tiling: pair(second.scale, [1, 1]),
+        strength: clamp01(second.strength ?? 1)
+      },
+    variation,
+    outline: outline === undefined || (outline.inset[0] <= 0 && outline.inset[1] <= 0)
+      ? undefined
+      : { inset: [clamp01(outline.inset[0]), clamp01(outline.inset[1])], color: rgb(outline.color, [0.5, 0.5, 0.5]) },
+    programs: {
+      ...(a.programs?.alpha ? { alpha: a.programs.alpha } : {}),
+      ...(a.programs?.glow ? { glow: a.programs.glow } : {}),
+      ...(a.programs?.base ? { base: a.programs.base } : {})
+    },
     translucent: opacity < 1 || /translucen|additive|modulate/i.test(entry.blendMode ?? ""),
+    additive: /additive/i.test(entry.blendMode ?? ""),
     twoSided: entry.twoSided ?? false,
     recovered: entry.recovered ?? false
   }

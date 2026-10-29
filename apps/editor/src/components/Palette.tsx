@@ -3,7 +3,7 @@ import { Button } from "@workspace/ui/components/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/ui/components/collapsible"
 import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
-import { type MouseEvent, useMemo, useState } from "react"
+import { type MouseEvent, useEffect, useMemo, useState } from "react"
 import {
   type CatalogPiece,
   paletteSections,
@@ -16,6 +16,7 @@ import { placementTransform } from "../domain/factory"
 import { preloadPiece } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
 import { useEditor } from "../editor/store"
+import { thumbnailFor } from "../editor/thumbnails"
 import { focusViewport } from "../editor/Viewport"
 import { PaletteSkeleton } from "./EditorSkeleton"
 
@@ -23,6 +24,32 @@ const matches = (piece: CatalogPiece, terms: ReadonlyArray<string>) => {
   const haystack = `${pieceLabelOf(piece)} ${piece.className} ${piece.meshAssetPath ?? ""} ${piece.category ?? ""}`
     .toLowerCase()
   return terms.every((t) => haystack.includes(t))
+}
+
+/**
+ * The in-game render when the catalog has one; otherwise one rendered here from the piece's
+ * meshes (see editor/thumbnails.ts), with a blank tile while it's in the queue.
+ */
+function Thumbnail({ piece }: { readonly piece: CatalogPiece }) {
+  const index = useEditor((s) => s.catalogIndex)
+  const table = useEditor((s) => s.materialTable)
+  const [rendered, setRendered] = useState<string | undefined>(undefined)
+  const shipped = piece.thumbnail ?? undefined
+  useEffect(() => {
+    if (shipped !== undefined || index === null || table === null) return
+    let cancelled = false
+    void thumbnailFor(piece, index, table).then((url) => {
+      if (!cancelled) setRendered(url)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [piece, shipped, index, table])
+  const src = shipped !== undefined ? `/assets/${shipped}` : rendered
+  const className = "size-8 shrink-0 rounded-sm bg-muted object-fill"
+  return src === undefined
+    ? <span className={className} />
+    : <img src={src} alt="" className={className} loading="lazy" />
 }
 
 function PieceButton({ piece, onPlace, onHover, unavailable, unverified }: {
@@ -34,7 +61,6 @@ function PieceButton({ piece, onPlace, onHover, unavailable, unverified }: {
   /** Hidden piece nobody has loaded in-game yet: placeable, but flagged. */
   readonly unverified?: boolean
 }) {
-  const thumbnail = piece.thumbnail ?? undefined
   const button = (
     <Button
       variant="ghost"
@@ -47,14 +73,7 @@ function PieceButton({ piece, onPlace, onHover, unavailable, unverified }: {
         if (e.key === " " || e.key === "Enter") e.preventDefault()
       }}
     >
-      {thumbnail !== undefined && (
-        <img
-          src={`/assets/${thumbnail}`}
-          alt=""
-          className="size-8 shrink-0 rounded-sm bg-muted object-fill"
-          loading="lazy"
-        />
-      )}
+      {unavailable === undefined && <Thumbnail piece={piece} />}
       <span className="flex min-w-0 flex-col">
         <span className="flex items-center gap-1.5 truncate text-xs font-medium">
           {pieceLabelOf(piece)}
@@ -67,7 +86,7 @@ function PieceButton({ piece, onPlace, onHover, unavailable, unverified }: {
             </span>
           )}
         </span>
-        {thumbnail === undefined && piece.displayName && piece.displayName !== piece.className && (
+        {!piece.thumbnail && piece.displayName && piece.displayName !== piece.className && (
           <span className="truncate text-[0.65rem] text-muted-foreground">{piece.className}</span>
         )}
       </span>

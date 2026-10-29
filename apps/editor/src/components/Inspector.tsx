@@ -35,6 +35,7 @@ import { glbUrl, visualsOf } from "../editor/visuals"
 import { ItemProperties } from "./ItemProperties"
 import { ShiftClick } from "./MouseButtonIcon"
 import { NumberField } from "./NumberField"
+import { PaintSection } from "./PaintSection"
 import { SectionTitle } from "./SectionTitle"
 
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
@@ -358,6 +359,7 @@ export function Inspector() {
     })
   ))
   const indices = useEditor(useShallow(selectedIndices))
+  const ids = useEditor(useShallow((s) => selectedIndices(s).map((i) => s.doc.ids[i] ?? "")))
   const transforms = useEditor(useShallow((s) => s.selectedIds.flatMap((id) => shownTransform(s, id) ?? [])))
   const units = useEditor((s) => s.settings.general.units)
   const catalogIndex = useEditor((s) => s.catalogIndex)
@@ -397,6 +399,9 @@ export function Inspector() {
           ))}
         </div>
 
+        <Separator />
+        <SectionTitle>Paint</SectionTitle>
+        <PaintSection selected={items.map((item, i) => ({ item, id: ids[i] ?? "" }))} />
         <ItemProperties
           properties={selectionProperties(
             items.map((item) => ({ item, piece: catalogIndex?.pieceByClass.get(item.actorToSpawn) }))

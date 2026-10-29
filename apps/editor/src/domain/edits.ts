@@ -4,8 +4,9 @@
  * schemas before they reach the document.
  */
 import { Option, Schema } from "effect"
+import { qualifyMaterialPath } from "./factory"
 import { type PropertyChange, withProperty } from "./itemProperties"
-import { Item, type ItemPivot, ItemTransform, type MapFile } from "./MapFile"
+import { Item, type ItemPivot, ItemTransform, type MapFile, type MeshComponent, objectPathOf } from "./MapFile"
 
 const decodeItem = Schema.decodeUnknownOption(Item)
 const decodeTransform = Schema.decodeUnknownOption(ItemTransform)
@@ -95,6 +96,48 @@ export const setProperties = (
     items[index] = item
   }
   return Option.some({ ...map, items })
+}
+
+/** One material slot of one item: `meshComponents[component].materials` entry `slot` (its materialIndex). */
+export interface SlotMaterial {
+  readonly index: number
+  readonly component: number
+  readonly slot: number
+  /** Class-qualified, as map files store it; a bare object path is qualified. */
+  readonly material: string
+}
+
+/** A mesh component with `slot` set to `material`, and `materialAssetPaths` kept in step (as the game writes it). */
+const withSlotMaterial = (mesh: MeshComponent, slot: number, material: string): MeshComponent => {
+  const existing = mesh.materials.some((m) => m.materialIndex === slot)
+  const materials = existing
+    ? mesh.materials.map((m) => (m.materialIndex === slot ? { ...m, material } : m))
+    : [...mesh.materials, { material, materialIndex: slot }].sort((a, b) => a.materialIndex - b.materialIndex)
+  return mesh.materialAssetPaths === undefined
+    ? { ...mesh, materials }
+    : { ...mesh, materials, materialAssetPaths: materials.map((m) => objectPathOf(m.material)) }
+}
+
+/**
+ * Sets material slots on several items at once, all or nothing: None when an item or mesh
+ * component doesn't exist. Slots that already hold the material are left alone, and the same
+ * map comes back when nothing changed.
+ */
+export const setSlotMaterials = (map: MapFile, edits: ReadonlyArray<SlotMaterial>): Option.Option<MapFile> => {
+  const items = map.items.slice()
+  let changed = false
+  for (const { index, component, slot, material } of edits) {
+    const item = items[index]
+    const mesh = item?.meshComponents[component]
+    if (item === undefined || mesh === undefined || !Number.isInteger(slot) || slot < 0) return Option.none()
+    const qualified = qualifyMaterialPath(material)
+    if (mesh.materials.find((m) => m.materialIndex === slot)?.material === qualified) continue
+    const meshComponents = item.meshComponents.slice()
+    meshComponents[component] = withSlotMaterial(mesh, slot, qualified)
+    items[index] = { ...item, meshComponents }
+    changed = true
+  }
+  return Option.some(changed ? { ...map, items } : map)
 }
 
 /**

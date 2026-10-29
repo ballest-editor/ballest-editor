@@ -2,6 +2,16 @@
 export const BLUE = "/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth"
 export const GLASS = "/Game/Art/Materials/M_GlassV2.M_GlassV2"
 export const OLD = "/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
+/** UV-tiled normals with the grey mottle and an outline band, like M_OutlineEdges. */
+export const OUTLINE = "/Game/Art/Materials/Masters/M_OutlineEdges.M_OutlineEdges"
+/** A shaped translucent effect, like the air vent's wind column. */
+export const WIND = "/Game/Art/UsedMarketPlace/StylizedFX_Collection_q/M_AJ_LandRay.M_AJ_LandRay"
+/** An additive glow panel that fades on its end caps, like the checkpoint's M_CheckpointPreGlow. */
+export const GLOW = "/Game/Art/Materials/VFX/M_CheckpointPreGlow.M_CheckpointPreGlow"
+/** A base colour with a grid texture added on top, like MI_Pipes. */
+export const PIPE = "/Game/Art/Materials/Instances/MI_Pipes.MI_Pipes"
+/** Object-aligned tiles that scale with the piece, like MI_Env_Blue_Tiles. */
+export const TILES = "/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Tiles.MI_Env_Blue_Tiles"
 export const materialsFile = {
   version: 1,
   materials: [
@@ -22,6 +32,122 @@ export const materialsFile = {
       blendMode: "BLEND_TranslucentGreyTransmittance",
       twoSided: true,
       approx: { baseColor: [0.8, 0.9, 1], opacity: 0.7, normalTexture: "textures/glass_n.png" },
+      recovered: true
+    },
+    {
+      path: OUTLINE,
+      blendMode: "BLEND_Opaque",
+      approx: {
+        baseColor: [0.16, 0.67, 1],
+        normalTexture: "textures/tiles_n.png",
+        variationTexture: "textures/macro.png",
+        tiling: { baseColor: 1, normal: 12, variation: [0.2134, 0.2134], opacity: 1 },
+        projection: "uv",
+        variation: {
+          texture: "textures/macro.png",
+          tilings: [[0.2134, 0.2134], [0.05341, 0.05341], [0.002, 0.002]],
+          offsets: [0.1, 0.2, 0.5],
+          gain: -0.1
+        },
+        reads: [
+          { texture: "textures/tiles_n.png", role: "normal", scale: [12, 12], projection: "uv", strength: 1 },
+          { texture: "textures/tiles_n.png", role: "normal", scale: [4, 4], projection: "uv", strength: 0.2 },
+          { texture: "textures/macro.png", role: "variation", scale: [0.2134, 0.2134], projection: "uv" },
+          { texture: "textures/macro.png", role: "variation", scale: [0.05341, 0.05341], projection: "uv" },
+          { texture: "textures/macro.png", role: "variation", scale: [0.002, 0.002], projection: "uv" }
+        ],
+        outline: { inset: [0, 0.1], color: [0.59, 0.59, 0.59] }
+      },
+      recovered: true
+    },
+    {
+      path: WIND,
+      blendMode: "BLEND_TranslucentGreyTransmittance",
+      twoSided: true,
+      approx: {
+        opacity: 0.5,
+        upFade: 0,
+        opacityTexture: "textures/ray.png",
+        tiling: { opacity: 0.25 },
+        opacityLayers: [{ texture: "textures/ray.png", tiling: [0.25, 0.25], projection: "uv", gain: 0.6, mean: 0.3 }],
+        programs: {
+          alpha: {
+            code:
+              "float ballestAlpha(vec2 uv, vec3 nrm, vec3 pos, float time) {\n  return texture2D(uTex0, vec2(uv.x, uv.y + time)).x * (1.0 - abs(nrm.z));\n}",
+            textures: [{ uniform: "uTex0", texture: "textures/ray.png" }]
+          }
+        }
+      },
+      recovered: false
+    },
+    {
+      path: GLOW,
+      blendMode: "BLEND_Additive",
+      approx: {
+        baseColor: [0, 0, 0],
+        emissive: [0.63, 0.03, 0.04],
+        opacity: 1,
+        upFade: 0,
+        evaluated: true,
+        programs: {
+          glow: {
+            code:
+              "vec3 ballestGlow(vec2 uv, vec3 nrm, vec3 pos, float time) {\n  return vec3(0.6, 0.0, 0.0) * texture2D(uTex0, uv).x;\n}",
+            textures: [{ uniform: "uTex0", texture: "textures/glow.png" }]
+          }
+        }
+      },
+      recovered: true
+    },
+    {
+      path: TILES,
+      blendMode: "BLEND_Opaque",
+      approx: {
+        baseColor: [0.02, 0.1, 0.8],
+        normalTexture: "textures/tiles_n.png",
+        variationTexture: "textures/macro.png",
+        tiling: { normal: [0.005, 0.005], variation: [0.00105, 0.00105] },
+        projection: "object",
+        instanceScale: 1,
+        variation: { texture: "textures/macro.png", tilings: [[0.00105, 0.00105]], offsets: [0.5], gain: -0.1 },
+        reads: [
+          {
+            texture: "textures/tiles_n.png",
+            role: "normal",
+            scale: [0.06, 0.06],
+            projection: "object",
+            instanceScale: 1,
+            strength: 1
+          },
+          {
+            texture: "textures/tiles_n.png",
+            role: "normal",
+            scale: [0.005, 0.005],
+            projection: "object",
+            instanceScale: 1,
+            strength: 1
+          },
+          { texture: "textures/macro.png", role: "variation", scale: [0.00105, 0.00105], projection: "object" }
+        ]
+      },
+      recovered: true
+    },
+    {
+      path: PIPE,
+      blendMode: "BLEND_Opaque",
+      approx: {
+        baseColor: [0.17, 0.876, 1],
+        metallic: 0,
+        roughness: 0.8,
+        evaluated: true,
+        colorLayers: [{
+          texture: "textures/grid.png",
+          tiling: [5, 5],
+          projection: "uv",
+          gain: [0.83, 0.124, 0],
+          mean: [0.1, 0.1, 0.1]
+        }]
+      },
       recovered: true
     },
     { path: "/Game/New/M_Metal.M_Metal", redirectedTo: OLD, approx: { baseColor: [0.5, 0.5, 0.5] } },

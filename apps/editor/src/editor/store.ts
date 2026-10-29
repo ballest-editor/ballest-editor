@@ -15,7 +15,9 @@ import {
   removeItems,
   setLevelNames,
   setProperties,
+  setSlotMaterials,
   setTransforms,
+  type SlotMaterial,
   validateItem
 } from "../domain/edits"
 import { itemFromPiece, newMapFile } from "../domain/factory"
@@ -26,6 +28,7 @@ import { floorHeightOf } from "../domain/level"
 import { LIMITS } from "../domain/limits"
 import { isPlayerStart, type ItemTransform, type MapFile } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
+import type { PaintPicker } from "../domain/Paint"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import type { LoadedCatalog } from "../services/CatalogLoader"
 
@@ -56,6 +59,9 @@ export interface Snapshot {
   readonly otherSelectedIds: Selection
   readonly selectionOnly: boolean
 }
+
+/** A material slot edit on the item with this id (see `SlotMaterial`). */
+export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
 export type Tool = "select" | "translate" | "rotate" | "scale"
 export type Dialog = "new" | "export" | "settings"
@@ -100,6 +106,8 @@ export interface EditorState {
   readonly booting: boolean
   /** Approximate game materials; null until loaded (everything renders neutral meanwhile). */
   readonly materialTable: MaterialTable | null
+  /** The game's material picker (finishes x colours); empty until loaded. */
+  readonly paint: PaintPicker
   readonly keybinds: Keybinds
   readonly settings: Settings
   /** The game's defaults (and which actions fell back to editor defaults). */
@@ -130,6 +138,11 @@ export interface EditorState {
    * nothing changed) when the game would reject any of them.
    */
   readonly transformItems: (transforms: ReadonlyMap<string, UeTransform>) => boolean
+  /**
+   * Sets material slots on several items as one undo step (none when nothing changes); false
+   * (with a notice, and nothing changed) when an item or mesh component doesn't exist.
+   */
+  readonly paintSlots: (edits: ReadonlyArray<SlotPaint>) => boolean
   /**
    * Sets properties on every selected item as one undo step (a colour's three channels are
    * one edit); false (with a notice, and nothing changed) when a value doesn't fit its property.
@@ -173,7 +186,7 @@ export interface EditorState {
   readonly setPreview: (preview: EditorState["preview"]) => void
   readonly setCatalog: (catalog: LoadedCatalog) => void
   readonly finishBoot: () => void
-  readonly setMaterialTable: (table: MaterialTable) => void
+  readonly setMaterials: (table: MaterialTable, paint: PaintPicker) => void
   readonly setKeybinds: (keybinds: Keybinds, defaults?: DerivedKeybinds) => void
   readonly setSettings: (settings: Settings) => void
   readonly reportMissingGlb: (url: string) => void
@@ -270,6 +283,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     catalogIndex: null,
     booting: true,
     materialTable: null,
+    paint: [],
     keybinds: fallbackDefaults.keybinds,
     settings: defaultSettings,
     keybindDefaults: fallbackDefaults,
@@ -318,6 +332,17 @@ export const useEditor = create<EditorState>()((set, get) => {
       }
       get().notify("error", INVALID_TRANSFORM)
       return false
+    },
+
+    paintSlots: (edits) => {
+      const { doc } = get()
+      const next = setSlotMaterials(doc.map, edits.map(({ id, ...edit }) => ({ ...edit, index: doc.ids.indexOf(id) })))
+      if (Option.isNone(next)) {
+        get().notify("error", "Those items no longer have that material slot.")
+        return false
+      }
+      if (next.value !== doc.map) commit({ map: next.value, ids: doc.ids })
+      return true
     },
 
     setSelectionProperties: (changes) => {
@@ -449,7 +474,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setPreview: (preview) => set({ preview }),
     setCatalog: (catalog) => set({ catalog, catalogIndex: indexCatalog(catalog.catalog) }),
     finishBoot: () => set({ booting: false }),
-    setMaterialTable: (materialTable) => set({ materialTable }),
+    setMaterials: (materialTable, paint) => set({ materialTable, paint }),
     setSettings: (settings) => set({ settings }),
     setKeybinds: (keybinds, defaults) => set((s) => ({ keybinds, keybindDefaults: defaults ?? s.keybindDefaults })),
     reportMissingGlb: (url) =>

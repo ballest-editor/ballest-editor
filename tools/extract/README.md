@@ -8,7 +8,7 @@ This pipeline reads the game's IoStore containers, resolves the level-editor pie
 - `assets/keybinds.json`: the default Enhanced Input bindings, with in-game labels, settings sections and camera presets.
 - `assets/strings.json`: the English locres strings.
 - `assets/registry.json`: the item class hierarchy, the in-game palette, and recipe-registry references (which pieces exist).
-- `assets/materials.json` + `assets/textures/**.png`: material parameters with a PBR approximation (the textures are gitignored, about 142 MB).
+- `assets/materials.json` + `assets/textures/**.png`: material parameters, plus how each texture is read (UV or object/world projection, scale, layers), traced through the game's compiled shaders (the textures are gitignored, about 142 MB).
 
 The current output has 200 pieces and 5 unresolved. 195 meshes were exported with 0 failures. That covers the 157 meshes referenced by the pieces, including their extra components, plus everything else in `/Game/Maps/_GENERATED/PC`. All files pass the Khronos glTF validator with no errors or warnings.
 
@@ -40,6 +40,7 @@ What `run.sh` does:
    4. `BallestExtract export` writes the glbs.
    5. `build-catalog.mjs catalog` writes `catalog.json`.
 5. Writes `assets/keybinds.json`, `assets/materials.json` + `assets/textures/`, and `assets/registry.json` (see below).
+   Materials go through `src/` (TypeScript + Effect, run by node directly): `materials list` collects the referenced materials, `BallestExtract materials` dumps them, `materials shader-list` + `BallestExtract shaders` dump every loaded material's cooked vertex/pixel shaders from the IoStore shader library, `shaders` disassembles them with `dxc` and traces each texture read back to its coordinate source, and `materials build` writes `materials.json` from both.
 6. Runs `verify.mjs`, which has no dependencies. It parses the GLB and recomputes bounds and the signed volume (winding) for `SM_500` and `SM_Start_Fixed`.
 
 The extractor also has debugging modes. Run them with `dotnet ~/.cache/ballest-editor/extract/bin/BallestExtract.dll MODE --paks DIR --oodle FILE --usmap FILE ...`:
@@ -49,6 +50,11 @@ The extractor also has debugging modes. Run them with `dotnet ~/.cache/ballest-e
 - `dump --prefix DIR --file PATH --out F` does the same for a whole directory, plus loose files, with errors captured.
 - `imports --prefix DIR [--props PKG] --out F` writes header-only dependency data (imports, name-map paths, export classes and supers).
 - `usmap-dump --types A B` prints the property layout the `.usmap` gives for those types.
+- `shaders --list FILE --out DIR` writes each listed material's base-pass shaders (`DIR/<asset>/*.dxil`) and `DIR/index.json` (shader map hashes, the uniform expression set with texture slots and preshader bytecode).
+
+## Shader analysis (`src/shaders.ts`)
+
+A cooked `UMaterial` has no expression graph, so UV tiling, projection and texture wiring can't be read from the asset. The compiled shader is the graph: `src/dxil.ts` parses `dxc -dumpbin` output and, for every `sample` in the base-pass pixel shader, walks the coordinate's SSA chain back to its sources (interpolants, vertex buffers, GPU-scene transforms, constant-buffer parameters, literals), keeping the product of literal factors along each path; the vertex shader's outputs are traced the same way so an interpolant resolves to the mesh UVs or to the object/world position. `src/preshader.ts` decodes the material preshader so constant-buffer slots map back to parameter names, and `src/materials.ts` folds the instance's parameter values in. The result per material is `approx.reads`: texture, role, projection (`uv` / `object` / `world`), scale in repeats per UV unit or per cm, whether the piece's instance scale multiplies in, and a normal layer's strength. `src/evaluate.ts` goes one step further and evaluates the pixel shader numerically for the material's own parameter values and a facing view (constant buffers from the preshader slots, texture reads at 0 or their mean, view terms at their engine defaults): the GBuffer outputs then give the base colour, metallic and roughness the game really produces, and how much each colour texture adds (`approx.colorLayers`), so a master that lerps two colours by a fresnel or scales a texture by a parameter is read correctly without naming heuristics. Translucent passes are evaluated twice, for a face looking up and a vertical one: the beam materials (the vent's air, the checkpoint glow) multiply their alpha by `1 - |world normal z|`, so a cube drawn with them shows only its sides; `approx.opacity` is the larger alpha and `approx.upFade` what is left on an up-facing face. An additive pass renders as its evaluated unlit colour. `src/glsl.ts` goes further where the linearised layers cannot: it emits the shader's own output chain as GLSL (`approx.programs`: a translucent pass's alpha, an additive glow, an opaque base colour whose reads the layers cannot place), folding every parameter, engine constant and scene value for a piece at the origin (SCENE_ROWS / ENGINE_DEFAULTS in `src/evaluate.ts`, phis resolved by walking the control flow) and leaving the UVs, world normal, object position, material texture reads and the game time as inputs; the renderer runs it per fragment, so the vent's streaks are the game's for any frame (`uBallestTime`). The few materials the cooked data cannot describe (`M_PlasticBase` samples its cell noise from the engine's placeholder texture) are overridden by name in `src/materials.ts` (`OVERRIDES`). Checked against the game: the Env masters' 200 cm object-aligned tiles (20 across the 10 m cube, 80/40/20 at scale 2,1,1), the metal master's 12 UV repeats (48 tiles).
 
 ## Coordinate convention (glb files)
 
@@ -247,8 +253,9 @@ Output shape:
 
 - all sample `materials[].material` entries
 - every `defaultMaterial`/`meshMaterial` in `catalog.json`, including `extraMeshes`
+- every material the in-game Paint picker offers (see below)
 
-That gives 116 paths now that the catalog covers all 200 pieces. `BallestExtract materials` follows each one's `Parent` chain up to the root `UMaterial` and dumps every asset in the chain. It also decodes every texture those assets reference: 55 textures, written as PNG to `assets/textures/` mirroring the UE path. Each PNG is the largest mip at or below `--tex-max`, which defaults to 2048 px. Textures with no mip that small (single-mip UI textures, for example) are resized with ImageSharp.
+That gives 122 paths now that the catalog covers all 200 pieces. `BallestExtract materials` follows each one's `Parent` chain up to the root `UMaterial` and dumps every asset in the chain. It also decodes every texture those assets reference: 55 textures, written as PNG to `assets/textures/` mirroring the UE path. Each PNG is the largest mip at or below `--tex-max`, which defaults to 2048 px. Textures with no mip that small (single-mip UI textures, for example) are resized with ImageSharp.
 
 The textures total about 142 MB, so `assets/textures/` is gitignored.
 
@@ -301,6 +308,14 @@ If the root's BaseColor pin isn't connected but EmissiveColor is (`M_Emissive_Li
 
   These are root materials with zero parameters; their look is built from constants inside the graph, which isn't cooked. Each still has `referencedTextures`, and `recovered: false`.
 - `approx` ignores UV tiling and world-aligned or triplanar mapping. Masters such as `M_Env_Material_Default` and `M_SmartMat` use world-space UVs, so textures on mesh UVs won't line up with the game. Flat colour is the reliable part.
+
+**The Paint picker (`paint`).** The level editor's Paint panel (`UI/Details/Material/WBP_CustomizeMaterial`, one row per mesh slot) offers a finish dropdown and a row of colour swatches. Its data:
+
+- `UI/Data/MaterialSelection/MaterialCategories_Library` (a `PDA_MaterialCategories`) lists the finishes in order. Each one is a `PDA_MaterialCategory` under `/Game/Art/DataAssets/BallestMaterials/`.
+- Each category's `ColorMaterialMap` maps an `EBallestMaterialColors` value to a material. `MaterialCategory` is an `EBallestMaterialCategories` value; `MaterialCategory_Smooth` leaves it unset, so it takes the first enumerator, `smooth`. `ColorColorMap` sets an explicit swatch colour, and only `special` uses it.
+- Category and colour names are the enums' display names. The `*_Dark` materials are listed as "Black". `MaterialName` says "emmissive", so the extractor uses the enum's name instead.
+
+`run.sh` dumps both directories to `paint-dump.json`. `build-materials.mjs` adds the picker's materials to the list and writes `paint: [{ name, colors: [{ color, material, displayColor? }] }]`, with `material` class-qualified the way map files store it. That's 7 finishes and 66 materials: smooth, rough, glossy, concrete, tiled and emissive in 10 colours each (White, Black, Red, Orange, Yellow, Lime, Blue, SkyBlue, Purple, Wine), and special in 5 (Aluminum, Copper, Iron, Concrete, Grey = `MI_Pipes`). The swatches' preview textures (`ColorPreviewTextureMap`) are empty in the cooked assets.
 
 **Usmap patches (`Program.cs`):** found by diffing against the 5.8.0-release headers.
 
