@@ -1,7 +1,7 @@
 import { Label } from "@workspace/ui/components/label"
 import { Slider } from "@workspace/ui/components/slider"
 import { useShallow } from "zustand/react/shallow"
-import { formatTimeOfDay, type Lighting, LIGHTING_RANGES, lightingOf } from "../domain/sunlight"
+import { type Lighting, LIGHTING_RANGES, lightingOf } from "../domain/sunlight"
 import { shownLighting, useEditor } from "../editor/store"
 import { NumberField } from "./NumberField"
 
@@ -23,8 +23,9 @@ const sliderValue = (value: number | ReadonlyArray<number>): number | undefined 
 
 /**
  * The map's sun, edited like the game's World Settings panel: a slider over the game's
- * range plus a number field that takes any value (new maps save sunlight 12, above the
- * game's slider). Dragging previews live in the viewport; each release is one undo step.
+ * range plus a number input that takes any value (new maps save sunlight 12, above the
+ * game's slider). Dragging a slider previews live in the viewport; each release, and each
+ * typed value, is one undo step.
  */
 export function LightingSettings() {
   const shown = useEditor(useShallow(shownLighting))
@@ -47,20 +48,14 @@ export function LightingSettings() {
         return (
           <div key={key} className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between gap-2">
-              <Label className="text-muted-foreground" title={title}>
-                {label}
-                {key === "timeOfDay" && (
-                  <span className="font-mono text-xs text-foreground tabular-nums">{formatTimeOfDay(value)}</span>
-                )}
-              </Label>
+              <Label className="text-muted-foreground" title={title}>{label}</Label>
               <div className="w-24">
                 <NumberField
                   label={label}
                   value={value}
-                  step={step}
                   digits={digits}
+                  handle={false}
                   onCommit={(v) => commit(key, v)}
-                  onScrub={(v) => preview(key, v)}
                 />
               </div>
             </div>

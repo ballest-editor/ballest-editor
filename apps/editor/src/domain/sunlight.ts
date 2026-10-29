@@ -107,13 +107,6 @@ export const sunOf = (lighting: Lighting): Sun => {
   }
 }
 
-/** `hours` as a 24-hour clock, e.g. 7.2997 -> "07:18". */
-export const formatTimeOfDay = (hours: number): string => {
-  const minutes = Math.round(clamp(hours, 0, 24) * 60)
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`
-}
-
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x))
 const smoothstep = (edge0: number, edge1: number, x: number) => {

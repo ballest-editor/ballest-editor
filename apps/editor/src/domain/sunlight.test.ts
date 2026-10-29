@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { Option } from "effect"
 import { setLighting } from "./edits"
 import { newMapFile } from "./factory"
-import { DEFAULT_LIGHT_ANGLE, formatTimeOfDay, lightingOf, skyLightIntensity, sunOf, sunPitch } from "./sunlight"
+import { DEFAULT_LIGHT_ANGLE, lightingOf, skyLightIntensity, sunOf, sunPitch } from "./sunlight"
 
 const EPSILON = 1e-4
 
@@ -53,13 +53,6 @@ describe("sunlight", () => {
     assert.closeTo(skyLightIntensity(18), 2, EPSILON)
     assert.closeTo(skyLightIntensity(6, 0), 1.5, EPSILON)
     assert.closeTo(skyLightIntensity(1, 0), 1, EPSILON) // clamped to at least 1
-  })
-
-  it("formats the time of day as a 24-hour clock", () => {
-    assert.strictEqual(formatTimeOfDay(7.299709320068359), "07:18")
-    assert.strictEqual(formatTimeOfDay(0), "00:00")
-    assert.strictEqual(formatTimeOfDay(24), "24:00")
-    assert.strictEqual(formatTimeOfDay(23.999), "24:00")
   })
 
   it("edits the lighting in worldSettings and rejects non-finite values", () => {
