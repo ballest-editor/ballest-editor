@@ -135,10 +135,14 @@ function ColorValue({ color, id }: { readonly color: ColorProperty; readonly id:
   return (
     <Popover>
       <PopoverTrigger
-        render={<Button id={id} variant="outline" size="sm" className="w-full justify-start gap-2 px-2 font-mono" />}
+        id={id}
+        aria-label={mixed ? `${color.label}: mixed` : `${color.label}: ${hex}`}
+        className="flex h-7 w-full min-w-0 cursor-pointer overflow-hidden rounded-md border border-input bg-input/20 text-left transition-colors hover:border-ring/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none dark:bg-input/30"
       >
-        <ColorSwatch color={mixed ? null : hex} />
-        {mixed ? <span className="font-sans text-muted-foreground">Mixed</span> : hex}
+        <ColorSwatch color={mixed ? null : hex} className="h-full w-5 rounded-none ring-0" />
+        <span className="flex-1 truncate px-2 text-right font-mono text-xs tabular-nums">
+          {mixed ? <span className="font-sans text-muted-foreground">Mixed</span> : hex}
+        </span>
       </PopoverTrigger>
       <PopoverContent side="left" align="start" className="w-56 gap-2">
         <ColorPicker value={hex} onCommit={commit} />

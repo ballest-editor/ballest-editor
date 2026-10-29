@@ -110,7 +110,7 @@ function ColorSwatch({
     <span
       data-slot="color-swatch"
       className={cn(
-        "inline-block size-4 shrink-0 rounded-sm ring-1 ring-foreground/20",
+        "inline-block size-4 shrink-0 rounded-sm ring-1 ring-foreground/20 ring-inset",
         color === null && "bg-[repeating-conic-gradient(var(--muted)_0_25%,var(--background)_0_50%)] bg-size-[8px_8px]",
         className
       )}
