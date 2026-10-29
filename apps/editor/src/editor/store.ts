@@ -22,6 +22,7 @@ import { itemFromPiece, newMapFile } from "../domain/factory"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
 import type { PropertyChange } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
+import { floorHeightOf } from "../domain/level"
 import { LIMITS } from "../domain/limits"
 import { isPlayerStart, type ItemTransform, type MapFile } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
@@ -72,6 +73,11 @@ export const initialMap = () => newMapFile({ displayName: "Untitled", creatorNam
 
 export interface EditorState {
   readonly doc: Doc
+  /**
+   * The height (UE cm) the grid is drawn at and palette pieces land on: the player start's,
+   * taken when the map loads so it stays put while the start is moved.
+   */
+  readonly floorHeight: number
   /** Undo stack, oldest first (at most HISTORY_LIMIT entries). */
   readonly past: ReadonlyArray<Snapshot>
   /** Redo stack, next first; cleared by any new edit. */
@@ -245,8 +251,11 @@ export const useEditor = create<EditorState>()((set, get) => {
 
   const fallbackDefaults = deriveKeybinds(undefined)
 
+  const startingMap = initialMap()
+
   return {
-    doc: docOf(initialMap()),
+    doc: docOf(startingMap),
+    floorHeight: floorHeightOf(startingMap),
     past: [],
     future: [],
     dirty: false,
@@ -274,6 +283,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     loadMap: (map, sourceName) =>
       set((s) => ({
         doc: docOf(map),
+        floorHeight: floorHeightOf(map),
         past: [],
         future: [],
         dirty: false,

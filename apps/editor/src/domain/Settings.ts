@@ -40,7 +40,9 @@ export const AppearanceSettings = Schema.Struct({
   theme: Schema.Literals(["dark", "light", "system"]),
   gridVisible: Schema.Boolean,
   gridCellColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)),
-  gridSectionColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/))
+  gridSectionColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)),
+  /** Whether the level's water (see domain/level) is drawn. */
+  waterVisible: Schema.Boolean
 })
 
 /** Changed from the tool bar rather than the settings dialog, but persisted with the rest. */
@@ -74,7 +76,13 @@ export const defaultSettings: Settings = {
     invertLookY: false,
     movementNeedsLook: "all"
   },
-  appearance: { theme: "dark", gridVisible: true, gridCellColor: "#3a404a", gridSectionColor: "#58606e" },
+  appearance: {
+    theme: "dark",
+    gridVisible: true,
+    gridCellColor: "#3a404a",
+    gridSectionColor: "#58606e",
+    waterVisible: true
+  },
   snapping: {
     enabled: false,
     gridSize: DEFAULT_GRID_SIZE,

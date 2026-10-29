@@ -14,8 +14,9 @@ import { identityTransform, newMapFile, playerStartItem } from "./factory"
 import type { MapFile } from "./MapFile"
 
 const withItems = (n: number): MapFile => {
-  let map = newMapFile({ displayName: "A", creatorName: "B", createdAt: "" })
-  for (let i = 1; i < n; i++) {
+  // item i sits at x = i
+  let map: MapFile = { ...newMapFile({ displayName: "A", creatorName: "B", createdAt: "" }), items: [] }
+  for (let i = 0; i < n; i++) {
     map = addItem(map, { ...playerStartItem(), itemTransform: identityTransform({ x: i, y: 0, z: 0 }) })
   }
   return {

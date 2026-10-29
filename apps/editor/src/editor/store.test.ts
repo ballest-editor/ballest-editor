@@ -42,6 +42,17 @@ describe("editor store", () => {
     assert.strictEqual(s().future.length, 0)
   })
 
+  it("builds at the loaded map's player start height, which stays put while the start moves", () => {
+    const s = () => useEditor.getState()
+    s().loadMap(initialMap(), null)
+    assert.strictEqual(s().floorHeight, 8615)
+    const start = s().doc.ids[0]!
+    moveItem(start, { x: 0, y: 0, z: 500 })
+    assert.strictEqual(s().floorHeight, 8615)
+    s().loadMap(s().doc.map, null)
+    assert.strictEqual(s().floorHeight, 500)
+  })
+
   it("reports whether a transform was accepted", () => {
     const s = () => useEditor.getState()
     s().loadMap(initialMap(), null)
