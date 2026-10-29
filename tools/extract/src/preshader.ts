@@ -114,13 +114,19 @@ export const decodePreshaders = (
     if (op === OP_PARAMETER && p.OpcodeOffset + 3 <= data.length) {
       const index = view.getUint16(p.OpcodeOffset + 1, true)
       const name = params[index]?.ParameterInfo.Name
-      // Parameter (3 bytes) followed only by swizzles (6 bytes each) is still a plain read of it.
+      // Parameter (3 bytes) followed only by swizzles (6 bytes each) is still a plain read of it: the
+      // swizzles compose into which component of the parameter each slot component holds.
       let trivial = (p.OpcodeSize - 3) % 6 === 0
+      let components = [0, 1, 2, 3]
       for (let at = p.OpcodeOffset + 3; trivial && at < p.OpcodeOffset + p.OpcodeSize; at += 6) {
         trivial = data[at] === OP_SWIZZLE
+        const count = data[at + 1] ?? 0
+        const previous = components
+        components = Array.from({ length: count }, (_, i) => previous[data[at + 2 + i] ?? 0] ?? 0)
       }
       if (name !== undefined && trivial) {
-        refs.forEach((ref, i) => out.push({ ref, param: width > 1 ? `${name}.${"xyzw"[i]}` : name }))
+        const vector = params[index]?.ParameterType === "Vector"
+        refs.forEach((ref, i) => out.push({ ref, param: vector ? `${name}.${"xyzw"[components[i] ?? i]}` : name }))
         continue
       }
     }

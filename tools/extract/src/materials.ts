@@ -93,7 +93,11 @@ const paintOf = (dump: unknown): Array<PaintCategory> => {
 const loadPaint = Effect.fn("loadPaint")(function*(work: string) {
   const path = yield* Path
   const dump = yield* readJsonIfExists(path.join(work, "paint-dump.json"))
-  return dump === undefined ? null : paintOf(dump)
+  if (dump === undefined) return null
+  return yield* Effect.try({
+    try: () => paintOf(dump),
+    catch: (e) => (e instanceof MaterialsError ? e : new MaterialsError({ message: `paint: ${String(e)}` }))
+  })
 })
 
 // ------------------------------------------------------------------ list
@@ -352,6 +356,19 @@ const pick = <T>(
   return [null, null]
 }
 
+/**
+ * Materials the cooked data cannot describe, by asset name, each a function of the instance's vectors.
+ * M_PlasticBase mixes BaseColor_Dark and BaseColor_Light per cell by noise it samples from the engine's
+ * placeholder DefaultWhiteGrid (the real texture is bound at runtime); the game shows the light colour
+ * with faint darker cells.
+ */
+const OVERRIDES: Record<
+  string,
+  { readonly baseColor?: (vectors: Merged["vectors"]) => ReadonlyArray<number> | undefined }
+> = {
+  M_PlasticBase: { baseColor: (V) => V["BaseColor_Light"]?.slice(0, 3) }
+}
+
 export const materialsBuild = Effect.fn("materialsBuild")(
   function*({ assets, work }: { work: string; assets: string }) {
     const fs = yield* FileSystem
@@ -372,6 +389,7 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         Object.keys(merged.scalars).length + Object.keys(merged.vectors).length + Object.keys(merged.textures).length >
           0
       const isTranslucent = /Translucent|Additive|Modulate/.test(blendMode)
+      const name = nameOf(materialPath)
 
       // ---- parameters -> PBR values (names: the graph's wiring is not in the cooked asset)
       const S = merged.scalars, V = merged.vectors
@@ -400,13 +418,14 @@ export const materialsBuild = Effect.fn("materialsBuild")(
       const [opKey, op] = pick(S, [/^opacity$/i, /^opacity[ _]?(value|amount)?$/i, /opacity/i], /DT\d|detail|mask/i)
       // Not /light colou?r/ unanchored: it matched M_OutlineEdges' HighlightColor, an inactive highlight tint.
       const [emKey, em] = pick(V, [/emiss/i, /glow/i, /^light[ _]?colou?r$/i], /highlight/i)
+      const isAdditive = blendMode.includes("Additive")
       const [emiKey, emi] = pick(S, [
         /emm?iss?ive[ _]?(intensity|strength|power|mult|brightness)/i,
         /light[ _]?emissive[ _]?intensity/i,
         /glow[ _]?(intensity|strength)/i,
         /^(intensity|brightness)$/i
       ])
-      const emissiveColor = em?.slice(0, 3).some((x) => x > 0)
+      const pickedEmissive = em?.slice(0, 3).some((x) => x > 0)
         ? em.slice(0, 3).map((x) => x * (emi ?? 1))
         : null
 
@@ -417,8 +436,26 @@ export const materialsBuild = Effect.fn("materialsBuild")(
           shaderMaterials[p]
         )
       ].find((s): s is MaterialShaders => s !== undefined && !Object.hasOwn(s, "error"))
-      // The surface evaluated from the compiled shader with this instance's parameters (opaque passes only).
+      // The surface evaluated from the compiled shader with this instance's parameters.
       const evaluated = sh?.surface ?? null
+      // A translucent effect shows on the faces where its alpha (additive: its glow) is largest: the vertical
+      // sides of a beam whose caps are masked by 1 - |world normal z|. upFade is what is left of that on a
+      // face that looks up; the mask is a shape, kept even when the evaluated alpha is too faint to use.
+      const alphaUp = evaluated?.opacity ?? null
+      const alphaSide = evaluated?.opacitySide ?? alphaUp
+      const alphaShown = alphaUp === null || alphaSide === null ? null : Math.max(alphaUp, alphaSide)
+      const glowUp = Math.max(...(evaluated?.emissive ?? [0]))
+      const glowSide = Math.max(...(evaluated?.emissiveSide ?? [0]))
+      const glowShown = Math.max(glowUp, glowSide)
+      // An additive pass adds its unlit scene colour: that is the glow, evaluated on the face that shows it.
+      const emissiveColor = isAdditive && evaluated !== null && glowShown > 0
+        ? glowSide > glowUp ? evaluated.emissiveSide : evaluated.emissive
+        : pickedEmissive
+      const upFade = isAdditive && glowShown > 0
+        ? Math.min(1, glowUp / glowShown)
+        : alphaSide !== null && alphaSide > (alphaUp ?? 0)
+        ? Math.min(1, (alphaUp ?? 0) / alphaSide)
+        : null
       const textureOf = (slot: number): string | null => {
         const t = sh?.textures[slot]
         if (t === undefined) return null
@@ -462,19 +499,23 @@ export const materialsBuild = Effect.fn("materialsBuild")(
       const approx = {
         // The evaluated shader where there is one (opaque); else parameters picked by name. Emissive-only
         // masters (BaseColor pin unconnected) render black + emissive in UE.
-        baseColor: evaluated !== null
+        baseColor: OVERRIDES[name]?.baseColor?.(V) ?? (evaluated !== null && !(isAdditive && emissiveColor)
           ? evaluated.baseColor.map(clamp01)
-          : emissiveOnly && emissiveColor
+          : (emissiveOnly || isAdditive) && emissiveColor
           ? [0, 0, 0]
-          : (bc ?? [0.8, 0.8, 0.8, 1]).slice(0, 3),
+          : (bc ?? [0.8, 0.8, 0.8, 1]).slice(0, 3)),
         metallic: evaluated?.metallic != null ? clamp01(evaluated.metallic) : met ?? 0,
         roughness: evaluated?.roughness != null ? clamp01(evaluated.roughness) : rou ?? 0.6,
         evaluated: evaluated !== null,
-        // A translucent pass whose alpha vanishes head-on (a view-angle beam like the vent's air) keeps the
-        // parameter's opacity: the evaluation is for one view, the piece is seen from all of them.
-        opacity: evaluated?.opacity != null && evaluated.opacity >= 0.02
-          ? clamp01(evaluated.opacity)
+        // An additive pass is all glow (its alpha is 0): drawn at full strength, faded by upFade. A translucent
+        // pass whose alpha vanishes on every face (a view-angle effect) keeps the parameter's opacity.
+        opacity: isAdditive && emissiveColor
+          ? 1
+          : alphaShown !== null && alphaShown >= 0.02
+          ? clamp01(alphaShown)
           : op ?? (isTranslucent ? 0.5 : 1),
+        // 0..1: how much of the opacity (additive: the glow) is left on a face that looks up; null = all of it.
+        upFade,
         emissive: emissiveColor,
         baseColorTexture: null,
         normalTexture: tex(normalRead),
@@ -489,16 +530,20 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         },
         projection,
         instanceScale: (normalRead ?? colorLayers[0])?.instanceScale ?? 0,
-        // Translucent: texture reads the alpha depends on (alpha = opacity + sum alphaGain * (read - mean)).
+        // Translucent: texture reads the alpha depends on (alpha = opacity + sum alphaGain * (read - mean)). An
+        // effect that multiplies sparse reads (ray streaks) swings far more where they all peak than any one
+        // read's gain says: the strongest read carries the whole swing (alphaRange) if that is larger.
         opacityLayers: reads
           .filter((r) => r.role !== "normal" && r.unresolved.length === 0 && Math.abs(r.alphaGain) >= 1e-4)
           .sort((a, b) => Math.abs(b.alphaGain) - Math.abs(a.alphaGain))
-          .map((r) => ({
+          .map((r, i) => ({
             texture: texPath(r.texture) ?? `missing:${r.texture}`,
             tiling: r.scale,
             projection: r.projection,
             instanceScale: r.instanceScale,
-            gain: r.alphaGain,
+            gain: i === 0 && evaluated?.alphaRange && r.alphaGain > 0
+              ? Math.max(r.alphaGain, evaluated.alphaRange[1] - evaluated.alphaRange[0])
+              : r.alphaGain,
             mean: r.mean === null ? 0.5 : r.mean[0]
           })),
         // Textures added to the base colour, each scaled by what the shader adds for it (colour = base + sum gain_i * read_i).
@@ -520,8 +565,8 @@ export const materialsBuild = Effect.fn("materialsBuild")(
           baseColor: evaluated === null ? bcKey : null,
           metallic: evaluated?.metallic == null ? metKey : null,
           roughness: evaluated?.roughness == null ? rouKey : null,
-          opacity: evaluated?.opacity == null ? opKey : null,
-          emissive: emKey,
+          opacity: alphaShown === null ? opKey : null,
+          emissive: isAdditive && emissiveColor !== pickedEmissive ? null : emKey,
           emissiveIntensity: emiKey
         }
       }
@@ -574,6 +619,8 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         "Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).",
         "approx.variation is the grey mottle as the base pass applies it: colour *= 1 + gain * product over layers of (texture read at tilings[i] + offsets[i]); gain already includes the instance's parameter (ColorContrast - 1 for the Env masters).",
         "approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).",
+        "approx.opacity is the evaluated alpha on the face that shows most (a beam masks its caps with 1 - |world normal z|: its sides); approx.upFade (0..1, null = 1) is the fraction left on a face that looks up. An additive pass renders as its evaluated glow (emissive, black base, opacity 1) faded the same way.",
+        "A few materials cannot be read from the cooked data and are overridden by name (OVERRIDES in tools/extract/src/materials.ts): M_PlasticBase's cell noise samples the engine's placeholder texture, so its base colour is taken as BaseColor_Light, the colour the game shows.",
         "paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap)."
       ],
       materials: records,

@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
 import { parseMaterialsFile } from "../domain/Materials"
-import { BLUE, GLASS, materialsFile, OUTLINE, PIPE, TILES, WIND } from "../test/materials"
+import { BLUE, GLASS, GLOW, materialsFile, OUTLINE, PIPE, TILES, WIND } from "../test/materials"
 import {
   applyShaderPatch,
   applySlotMaterials,
@@ -13,6 +13,14 @@ import {
 } from "./materials"
 
 describe("three materials", () => {
+  // What onBeforeCompile receives: includes still unexpanded.
+  const program = (): ShaderProgram => ({
+    uniforms: {},
+    vertexShader: "#include <common>\n#include <project_vertex>",
+    fragmentShader:
+      "#include <common>\n#include <normalmap_pars_fragment>\n#include <map_fragment>\n#include <alphamap_fragment>\n#include <normal_fragment_maps>"
+  })
+
   it("builds cached three materials: blue is blue, glass is translucent, unknown is neutral", () => {
     const table = parseMaterialsFile(materialsFile)
     const blue = materialFor(table, BLUE)
@@ -43,13 +51,6 @@ describe("three materials", () => {
     assert.isDefined(outline.normalMap)
     // Materials with different patches must not share a compiled program.
     assert.notStrictEqual(outline.customProgramCacheKey(), materialFor(table, BLUE).customProgramCacheKey())
-    // What onBeforeCompile receives: includes still unexpanded.
-    const program = (): ShaderProgram => ({
-      uniforms: {},
-      vertexShader: "#include <common>\n#include <project_vertex>",
-      fragmentShader:
-        "#include <common>\n#include <normalmap_pars_fragment>\n#include <map_fragment>\n#include <alphamap_fragment>\n#include <normal_fragment_maps>"
-    })
     const shader = program()
     const patch = shaderPatchOf(outline)
     assert.isDefined(patch)
@@ -132,9 +133,24 @@ describe("three materials", () => {
     assert.isNull(wind.alphaMap) // the alpha layer is the patch's, around the evaluated opacity
     assert.strictEqual(wind.blending, THREE.NormalBlending)
     assert.isFalse(wind.depthWrite)
-    assert.deepStrictEqual(shaderPatchOf(wind)?.defines, { BALLEST_TILING: 1, BALLEST_ALPHA: 1 })
+    assert.deepStrictEqual(shaderPatchOf(wind)?.defines, { BALLEST_TILING: 1, BALLEST_ALPHA: 1, BALLEST_UP_FADE: 1 })
     assert.deepStrictEqual(shaderPatchOf(wind)?.uniforms.uAlphaShape.value, new THREE.Vector2(0.6, 0.3))
+    assert.strictEqual(shaderPatchOf(wind)?.uniforms.uUpFade.value, 0)
     assert.strictEqual(wind.defines?.["STANDARD"], "") // three's own define survives the patch
+    const shader = program()
+    applyShaderPatch(shader, shaderPatchOf(wind)!)
+    assert.include(shader.vertexShader, "vBallestUp = abs( normalize( mat3( modelMatrix ) * objectNormal ).y )")
+    assert.include(shader.fragmentShader, "diffuseColor.a *= mix( 1.0, uUpFade, vBallestUp )")
+  })
+
+  it("adds an additive glow to the scene and fades its end caps", () => {
+    const table = parseMaterialsFile(materialsFile)
+    const glow = materialFor(table, GLOW)
+    assert.isTrue(glow.transparent)
+    assert.strictEqual(glow.blending, THREE.AdditiveBlending)
+    assert.strictEqual(glow.opacity, 1)
+    assert.deepStrictEqual(glow.emissive.toArray().map((c) => +c.toFixed(2)), [0.63, 0.03, 0.04])
+    assert.deepStrictEqual(shaderPatchOf(glow)?.defines, { BALLEST_UP_FADE: 1 })
   })
 
   it("assigns materials per primitive by UE slot index", () => {

@@ -41,6 +41,15 @@ describe("preshader", () => {
     assert.deepStrictEqual(slots[8], { ref: "[3].x", expression: { program: "030500030600", component: 0 } })
   })
 
+  it("keeps the component a swizzled vector parameter read lands in", () => {
+    // Parameter 0 (a vector) swizzled to .z into a Float1 slot: it is Name.z, not Name.
+    const data = hex("030000", "2501020000ff")
+    const slots = decodePreshaders(data, [{ Type: "Float1", BufferOffset: 0, OpcodeOffset: 0, OpcodeSize: 9 }], [
+      { ParameterInfo: { Name: "SizeNoise" }, ParameterType: "Vector" }
+    ])
+    assert.deepStrictEqual(slots, [{ ref: "[0].x", param: "SizeNoise.z" }])
+  })
+
   it("runs the arithmetic programs the masters use", () => {
     const param = (i: number) => [[1, 0.5, 0, 1], [0.3]][i]
     // 1.0 - FakeShadowStrength

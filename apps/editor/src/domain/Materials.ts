@@ -77,6 +77,8 @@ export const MaterialApprox = open({
   metallic: Num,
   roughness: Num,
   opacity: Num,
+  /** 0..1: how much of the opacity (additive: the glow) is left on a face that looks up; null = all of it. */
+  upFade: Num,
   emissive: Schema.optionalKey(Schema.NullOr(Schema.Union([Rgb, Schema.Finite]))),
   baseColorTexture: Str,
   normalTexture: Str,
@@ -161,6 +163,8 @@ export interface MaterialSpec {
   readonly metallic: number
   readonly roughness: number
   readonly opacity: number
+  /** Fraction of the opacity left on a face whose normal points up (the beams mask their caps); 1 = none. */
+  readonly upFade: number
   readonly emissive: readonly [number, number, number]
   readonly baseColorTexture: string | undefined
   readonly normalTexture: string | undefined
@@ -193,6 +197,8 @@ export interface MaterialSpec {
     | undefined
   /** Translucent blend modes render transparent. */
   readonly translucent: boolean
+  /** BLEND_Additive: the colour adds to what is behind it (glows). */
+  readonly additive: boolean
   /** The game material is two-sided (open/thin geometry such as glass panes). */
   readonly twoSided: boolean
   readonly recovered: boolean
@@ -225,6 +231,7 @@ export const NEUTRAL: Omit<MaterialSpec, "path"> = {
   metallic: 0,
   roughness: 0.75,
   opacity: 1,
+  upFade: 1,
   emissive: [0, 0, 0],
   baseColorTexture: undefined,
   normalTexture: undefined,
@@ -241,6 +248,7 @@ export const NEUTRAL: Omit<MaterialSpec, "path"> = {
   variation: undefined,
   outline: undefined,
   translucent: false,
+  additive: false,
   twoSided: false,
   recovered: false
 }
@@ -305,6 +313,7 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
     metallic: clamp01(a.metallic ?? NEUTRAL.metallic),
     roughness: clamp01(a.roughness ?? NEUTRAL.roughness),
     opacity,
+    upFade: clamp01(a.upFade ?? NEUTRAL.upFade),
     emissive,
     baseColorTexture: orUndefined(a.baseColorTexture),
     normalTexture,
@@ -334,6 +343,7 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
       ? undefined
       : { inset: [clamp01(outline.inset[0]), clamp01(outline.inset[1])], color: rgb(outline.color, [0.5, 0.5, 0.5]) },
     translucent: opacity < 1 || /translucen|additive|modulate/i.test(entry.blendMode ?? ""),
+    additive: /additive/i.test(entry.blendMode ?? ""),
     twoSided: entry.twoSided ?? false,
     recovered: entry.recovered ?? false
   }

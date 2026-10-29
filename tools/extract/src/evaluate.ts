@@ -1,8 +1,11 @@
 // Evaluates a pixel shader's scalar SSA values numerically, for a surface seen head-on: constant-buffer
 // parameters come from the material instance, texture reads from a supplied value per sample (its mean),
 // anything view- or position-dependent is taken at its "facing" value (a dot product of inputs reads 1,
-// an input itself 0). That is enough to read the material's base colour, metallic and roughness off the
-// GBuffer outputs, including how each texture read scales them.
+// an input itself 0). The one orientation that is kept is the surface's world normal (`Env.normal`): a dot
+// of the vertex normal with a row of the local-to-world transform reads that normal's component, which is
+// how the beam materials hide their end caps (alpha * (1 - |world normal z|)). That is enough to read the
+// material's base colour, metallic and roughness off the GBuffer outputs, including how each texture read
+// scales them.
 import { inputDependency, type Module, parseFloat } from "./dxil.ts"
 
 export interface Env {
@@ -10,7 +13,14 @@ export interface Env {
   readonly cbuf: (ref: string) => number | undefined
   /** Value of channel `channel` of the sample `value` (`%123`). */
   readonly sample: (value: string, channel: number) => number
+  /** The surface's world normal (UE frame, z up); default `UP`. */
+  readonly normal?: readonly [number, number, number]
 }
+
+/** A surface facing up (a cube's top, the normal the evaluator uses by default). */
+export const UP: readonly [number, number, number] = [0, 0, 1]
+/** A vertical surface (a cube's side). */
+export const SIDE: readonly [number, number, number] = [1, 0, 0]
 
 const UNARY: Record<string, (x: number) => number> = {
   "6": Math.abs,
@@ -35,6 +45,16 @@ const BINARY: Record<string, (a: number, b: number) => number> = {
 const num = (s: string | undefined) => Number.parseInt(s ?? "", 10)
 const g = (m: RegExpMatchArray, i: number): string => m[i] ?? ""
 
+// The input-dependency facts of a module, shared by the many evaluators a surface evaluation builds.
+const dependencies = new WeakMap<Module, ReturnType<typeof inputDependency>>()
+const dependencyOf = (m: Module) => {
+  const cached = dependencies.get(m)
+  if (cached !== undefined) return cached
+  const d = inputDependency(m)
+  dependencies.set(m, d)
+  return d
+}
+
 export class Evaluator {
   readonly #m: Module
   readonly #env: Env
@@ -47,7 +67,7 @@ export class Evaluator {
   constructor(m: Module, env: Env) {
     this.#m = m
     this.#env = env
-    const dependency = inputDependency(m)
+    const dependency = dependencyOf(m)
     this.#inputDependent = dependency.any
     this.#pureInput = dependency.pure
     for (const [v, h] of m.handles) {
@@ -110,10 +130,18 @@ export class Evaluator {
     if (mad) return this.value(g(mad, 1)) * this.value(g(mad, 2)) + this.value(g(mad, 3))
     const dot = d.match(/@dx\.op\.dot(\d)\.f32\(i32 \d+, (.*)\)/)
     if (dot) {
-      // N·V, N·L and friends: facing. A dot of known values is computed.
-      if (this.#inputDependent(v)) return 1
-      const ops = [...g(dot, 2).matchAll(/float (\S+)/g)].map((x) => this.value(g(x, 1)))
+      const operands = [...g(dot, 2).matchAll(/float ([^,)\s]+)/g)].map((x) => g(x, 1))
       const n = num(dot[1])
+      // A dot over the vertex normal (N·V, N·L, a fixed light direction) is an orientation: the normal
+      // against a transform row is a world normal component, anything else reads facing (1). Two
+      // input-derived vectors read facing too. Anything else (a luminance weighting of texture reads, a
+      // channel pick) is computed.
+      const both = operands.slice(0, n).some((o) => this.#inputDependent(o)) &&
+        operands.slice(n).some((o) => this.#inputDependent(o))
+      if (both || operands.some((o) => this.#reaches(o, 4, this.#isNormalInput))) {
+        return this.#worldNormalComponent(operands) ?? 1
+      }
+      const ops = operands.map((o) => this.value(o))
       let sum = 0
       for (let i = 0; i < n; i++) sum += (ops[i] ?? 0) * (ops[i + n] ?? 0)
       return sum
@@ -150,6 +178,45 @@ export class Evaluator {
     if (sig.name.startsWith("TEXCOORD10")) return component === 0 ? 1 : 0
     if (sig.name === "TEXCOORD") return 0.5
     return 0
+  }
+
+  /** A load of the vertex normal (UE's TEXCOORD11). */
+  readonly #isNormalInput = (d: string): boolean => {
+    const li = d.match(/loadInput\.f32\(i32 \d+, i32 (\d+),/)
+    return li !== null && (this.#m.inputs.find((x) => x.id === num(li[1]))?.name.startsWith("TEXCOORD11") ?? false)
+  }
+
+  /** Whether `pred` holds for `v`'s definition or one it reaches within `depth` operand steps. */
+  #reaches(v: string, depth: number, pred: (d: string) => boolean): boolean {
+    const d = this.#m.defs.get(v)
+    if (d === undefined) return false
+    if (pred(d)) return true
+    if (depth === 0) return false
+    return [...d.matchAll(/%[\w.]+/g)].some((o) => o[0] !== v && this.#reaches(o[0], depth - 1, pred))
+  }
+
+  /**
+   * A dot of the vertex normal (TEXCOORD11) with one component of three rows of the primitive's
+   * local-to-world transform (raw buffer loads): that component of the world normal, from `Env.normal`.
+   * Undefined for any other dot.
+   */
+  #worldNormalComponent(operands: ReadonlyArray<string>): number | undefined {
+    if (!operands.some((o) => this.#reaches(o, 3, this.#isNormalInput))) return undefined
+    const components = new Set(operands.map((o) => this.#rowComponent(o, 2)).filter((c) => c !== undefined))
+    if (components.size !== 1) return undefined
+    const [c] = components
+    return (this.#env.normal ?? UP)[c ?? 0]
+  }
+
+  /** The component `v` extracts from a raw buffer load (a transform row), possibly scaled; else undefined. */
+  #rowComponent(v: string, depth: number): number | undefined {
+    const d = this.#m.defs.get(v)
+    if (d === undefined) return undefined
+    const ev = d.match(/^extractvalue %dx\.types\.ResRet\.f32 (%[\w.]+), (\d)$/)
+    if (ev) return (this.#m.defs.get(g(ev, 1)) ?? "").includes("@dx.op.rawBufferLoad") ? num(ev[2]) : undefined
+    const mul = d.match(/^fmul (?:fast )?float (\S+), (\S+)$/)
+    if (!mul || depth === 0) return undefined
+    return this.#rowComponent(g(mul, 1), depth - 1) ?? this.#rowComponent(g(mul, 2), depth - 1)
   }
 
   /** Sum of 2..4 products of two input-dependent values, through fmul / fadd / fmad. */
@@ -266,12 +333,22 @@ export interface Surface {
   readonly baseColor: readonly [number, number, number] | null
   readonly metallic: number | null
   readonly roughness: number | null
-  /** Translucent passes: the alpha the pass writes (scene colour .a); null for opaque. */
+  /** Translucent passes: the alpha the pass writes (scene colour .a) for a surface facing up; null for opaque. */
   readonly opacity: number | null
-  /** Translucent passes: how much the alpha changes when a sample goes 0 -> 1. */
+  /** Translucent passes: the alpha for a vertical surface (the sides of a beam whose caps are masked). */
+  readonly opacitySide: number | null
+  /** Translucent passes: how much the alpha changes when a sample goes 0 -> 1 (at the orientation that shows). */
   readonly alphaGains: Record<string, number>
-  /** Scene colour with no lights: the emissive term (for a translucent pass, its unlit colour). */
+  /**
+   * Translucent passes: the alpha with every material texture read at 0, and at 1 (the orientation that
+   * shows). An effect that multiplies several sparse reads (the beam's ray streaks) swings far more where
+   * they all peak than any one read's gain says.
+   */
+  readonly alphaRange: readonly [number, number] | null
+  /** Scene colour with no lights, facing up: the emissive term (for a translucent pass, its unlit colour). */
   readonly emissive: readonly [number, number, number]
+  /** The same for a vertical surface. */
+  readonly emissiveSide: readonly [number, number, number]
   /** Per texture sample value: how much r, g, b of the base colour change when the sample goes 0 -> 1. */
   readonly gains: Record<string, readonly [number, number, number]>
 }
@@ -286,7 +363,9 @@ export const ENGINE_DEFAULTS: Record<string, number> = {
   "View[160].w": 1,
   // View.DiffuseOverrideParameter / SpecularOverrideParameter: (0, 0, 0, 1) = no override
   "View[161].w": 1,
-  "View[162].w": 1
+  "View[162].w": 1,
+  // The translucent passes clamp their scene colour to this maximum: effectively none.
+  "View[358].z": 1e6
 }
 
 /**
@@ -364,10 +443,11 @@ export const surfaceOf = (
   const diffuse = opaque ? null : diffuseOf(m)
   const base = opaque ? gbuffer : diffuse ?? [undefined, undefined, undefined]
   const alpha = opaque ? undefined : outs.get("0.w")
-  const at = (overrides: ReadonlyMap<string, number>) => {
+  const at = (overrides: ReadonlyMap<string, number>, normal: readonly [number, number, number]) => {
     const e = new Evaluator(m, {
       cbuf: (ref) => cbuf(ref) ?? ENGINE_DEFAULTS[ref],
-      sample: (v, ch) => overrides.get(v) ?? means(v, ch)
+      sample: (v, ch) => overrides.get(v) ?? means(v, ch),
+      normal
     })
     return {
       rgb: base.map((b) => (b === undefined ? 0 : e.value(b))),
@@ -379,23 +459,31 @@ export const surfaceOf = (
   }
   const hasBase = base.every((b) => b !== undefined)
   const rgb = (v: ReadonlyArray<number>): readonly [number, number, number] => [v[0] ?? 0, v[1] ?? 0, v[2] ?? 0]
-  const zero = at(new Map())
+  const zero = at(new Map(), UP)
+  // A translucent effect that masks its caps shows on its sides: that is where its texture reads matter.
+  const side = opaque ? zero : at(new Map(), SIDE)
+  const shows = (s: typeof zero) => s.alpha + Math.max(...s.scene)
+  const shown = shows(side) > shows(zero) ? SIDE : UP
   const gains: Record<string, readonly [number, number, number]> = {}
   const alphaGains: Record<string, number> = {}
   if (hasBase) {
     for (const s of colorSamples) {
-      const hi = at(new Map([[s, 1]])), lo = at(new Map([[s, 0]]))
+      const hi = at(new Map([[s, 1]]), shown), lo = at(new Map([[s, 0]]), shown)
       const h = rgb(hi.rgb), l = rgb(lo.rgb)
       gains[s] = [h[0] - l[0], h[1] - l[1], h[2] - l[2]]
       if (!opaque) alphaGains[s] = hi.alpha - lo.alpha
     }
   }
+  const corner = (value: number) => at(new Map(colorSamples.map((s) => [s, value])), shown).alpha
   return {
     baseColor: hasBase ? rgb(zero.rgb) : null,
     metallic: opaque ? zero.metallic : null,
     roughness: opaque ? zero.roughness : null,
     opacity: opaque ? null : zero.alpha,
+    opacitySide: opaque ? null : side.alpha,
+    alphaRange: opaque || !hasBase ? null : [corner(0), corner(1)],
     emissive: rgb(zero.scene),
+    emissiveSide: rgb(side.scene),
     gains,
     alphaGains
   }

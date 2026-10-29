@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { BLUE, GLASS, materialsFile, OLD, OUTLINE, PIPE, TILES, WIND } from "../test/materials"
+import { BLUE, GLASS, GLOW, materialsFile, OLD, OUTLINE, PIPE, TILES, WIND } from "../test/materials"
 import { repoRoot } from "../test/samples"
 import { lookupMaterial, parseMaterialsFile } from "./Materials"
 
@@ -58,6 +58,12 @@ describe("materials", () => {
       gain: 0.6,
       mean: 0.3
     })
+    assert.strictEqual(wind.upFade, 0)
+    assert.isFalse(wind.additive)
+    const glow = lookupMaterial(table, GLOW)!
+    assert.isTrue(glow.translucent && glow.additive)
+    assert.deepStrictEqual([glow.opacity, glow.upFade, glow.emissive], [1, 0, [0.63, 0.03, 0.04]])
+    assert.strictEqual(blue.upFade, 1)
     assert.strictEqual(parseMaterialsFile({ [BLUE]: materialsFile.materials[0] }).materials.size, 1) // bare map
     assert.strictEqual(parseMaterialsFile("nope").materials.size, 0)
   })

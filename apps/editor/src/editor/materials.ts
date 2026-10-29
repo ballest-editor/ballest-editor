@@ -75,6 +75,7 @@ export interface Patch {
     readonly uAlphaTiling: THREE.IUniform<THREE.Vector2>
     /** gain, mean */
     readonly uAlphaShape: THREE.IUniform<THREE.Vector2>
+    readonly uUpFade: THREE.IUniform<number>
     readonly uNormal2Tiling: THREE.IUniform<THREE.Vector2>
     readonly uNormal2Strength: THREE.IUniform<number>
     readonly uOutlineInset: THREE.IUniform<THREE.Vector2>
@@ -107,6 +108,7 @@ const patchOf = (
   if (normal2 !== null) defines["BALLEST_NORMAL2"] = 1
   if (colorMaps.length > 0) defines["BALLEST_COLOR"] = colorMaps.length
   if (alphaMap !== null) defines["BALLEST_ALPHA"] = 1
+  if (spec.translucent && spec.upFade < 1) defines["BALLEST_UP_FADE"] = 1
   if (spec.outline !== undefined) defines["BALLEST_OUTLINE"] = 1
   if (Object.keys(defines).length === 0) return undefined
   const outline = spec.outline
@@ -143,6 +145,7 @@ const patchOf = (
       uAlphaMap: { value: alphaMap },
       uAlphaTiling: { value: vec2(spec.opacityLayer?.tiling ?? [1, 1]) },
       uAlphaShape: { value: new THREE.Vector2(spec.opacityLayer?.gain ?? 0, spec.opacityLayer?.mean ?? 0.5) },
+      uUpFade: { value: spec.upFade },
       uNormal2Tiling: { value: vec2(spec.normalLayer?.tiling ?? [1, 1]) },
       uNormal2Strength: { value: spec.normalLayer?.strength ?? 0 },
       uOutlineInset: { value: new THREE.Vector2(outline?.inset[0] ?? 0, outline?.inset[1] ?? 0) },
@@ -162,6 +165,7 @@ varying vec3 vBallestNormal;
 varying vec3 vBallestScale;
 varying vec2 vBallestUv;
 varying mat3 vBallestNormalMatrix;
+varying float vBallestUp;
 `
 const VERTEX_BODY = /* glsl */ `
 vBallestScale = vec3( length( modelMatrix[ 0 ].xyz ), length( modelMatrix[ 1 ].xyz ), length( modelMatrix[ 2 ].xyz ) );
@@ -174,6 +178,8 @@ vBallestScale = vec3( length( modelMatrix[ 0 ].xyz ), length( modelMatrix[ 1 ].x
 #endif
 vBallestUv = uv;
 vBallestNormalMatrix = normalMatrix;
+// |world normal . up| (three's y is UE's z): the beams fade their end caps by it.
+vBallestUp = abs( normalize( mat3( modelMatrix ) * objectNormal ).y );
 `
 const FRAGMENT_DECLS = /* glsl */ `
 varying vec3 vBallestPos;
@@ -181,6 +187,7 @@ varying vec3 vBallestNormal;
 varying vec3 vBallestScale;
 varying vec2 vBallestUv;
 varying mat3 vBallestNormalMatrix;
+varying float vBallestUp;
 uniform vec2 uBaseColorTiling;
 uniform vec2 uNormalTiling;
 uniform vec2 uOpacityTiling;
@@ -201,6 +208,7 @@ uniform vec3 uColor2Mean;
 uniform sampler2D uAlphaMap;
 uniform vec2 uAlphaTiling;
 uniform vec2 uAlphaShape;
+uniform float uUpFade;
 uniform vec2 uNormal2Tiling;
 uniform float uNormal2Strength;
 uniform vec2 uOutlineInset;
@@ -241,6 +249,10 @@ const COLOR_EXTRAS = /* glsl */ `
 #ifdef BALLEST_ALPHA
   diffuseColor.a = clamp( diffuseColor.a + uAlphaShape.x * ( texture2D( uAlphaMap, ballestUv( uAlphaTiling ) ).r - uAlphaShape.y ), 0.0, 1.0 );
 #endif
+#ifdef BALLEST_UP_FADE
+  // The game's beams multiply their alpha by 1 - |world normal z|: only the vertical faces show.
+  diffuseColor.a *= mix( 1.0, uUpFade, vBallestUp );
+#endif
 #ifdef BALLEST_VARIATION
   #if BALLEST_VARIATION >= 3
     float ballestMottle3 = texture2D( uVariationMap, ballestUv( uVariationTiling3 ) ).r + uVariationShape.z;
@@ -270,8 +282,7 @@ vec3 ballestMapN() {
   #ifdef BALLEST_NORMAL2
     mapN.xy += ( texture2D( uNormalMap2, ballestUv( uNormal2Tiling ) ).xy * 2.0 - 1.0 ) * uNormal2Strength;
   #endif
-  mapN.xy *= normalScale;
-  return mapN;
+  return mapN; // three's own chunk applies normalScale after the read; PROJECTED_NORMAL does it itself
 }
 #endif
 `
@@ -285,6 +296,7 @@ const PROJECTED_NORMAL = /* glsl */ `
       n *= faceDirection;
     #endif
     vec3 mapN = ballestMapN();
+    mapN.xy *= normalScale;
     int a = ballestAxis();
     vec3 du = a == 2 ? vec3( 1.0, 0.0, 0.0 ) : ( a == 0 ? vec3( 0.0, 1.0, 0.0 ) : vec3( 1.0, 0.0, 0.0 ) );
     vec3 dv = a == 0 ? vec3( 0.0, 0.0, 1.0 ) : ( a == 1 ? vec3( 0.0, 0.0, 1.0 ) : vec3( 0.0, 1.0, 0.0 ) );
@@ -385,6 +397,7 @@ const build = (
     material.transparent = true
     material.opacity = spec.opacity
     material.depthWrite = false
+    if (spec.additive) material.blending = THREE.AdditiveBlending
   }
   const drop =
     (slot: "map" | "normalMap" | "roughnessMap" | "metalnessMap" | "aoMap" | "emissiveMap" | "alphaMap") => () => {

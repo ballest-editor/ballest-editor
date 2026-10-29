@@ -6,6 +6,8 @@ export const OLD = "/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurfac
 export const OUTLINE = "/Game/Art/Materials/Masters/M_OutlineEdges.M_OutlineEdges"
 /** A shaped translucent effect, like the air vent's wind column. */
 export const WIND = "/Game/Art/UsedMarketPlace/StylizedFX_Collection_q/M_AJ_LandRay.M_AJ_LandRay"
+/** An additive glow panel that fades on its end caps, like the checkpoint's M_CheckpointPreGlow. */
+export const GLOW = "/Game/Art/Materials/VFX/M_CheckpointPreGlow.M_CheckpointPreGlow"
 /** A base colour with a grid texture added on top, like MI_Pipes. */
 export const PIPE = "/Game/Art/Materials/Instances/MI_Pipes.MI_Pipes"
 /** Object-aligned tiles that scale with the piece, like MI_Env_Blue_Tiles. */
@@ -64,11 +66,18 @@ export const materialsFile = {
       twoSided: true,
       approx: {
         opacity: 0.5,
+        upFade: 0,
         opacityTexture: "textures/ray.png",
         tiling: { opacity: 0.25 },
         opacityLayers: [{ texture: "textures/ray.png", tiling: [0.25, 0.25], projection: "uv", gain: 0.6, mean: 0.3 }]
       },
       recovered: false
+    },
+    {
+      path: GLOW,
+      blendMode: "BLEND_Additive",
+      approx: { baseColor: [0, 0, 0], emissive: [0.63, 0.03, 0.04], opacity: 1, upFade: 0, evaluated: true },
+      recovered: true
     },
     {
       path: TILES,
