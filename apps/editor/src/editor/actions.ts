@@ -5,12 +5,15 @@ import { currentCreatedAt, newMapFile } from "../domain/factory"
 import { type Axis, type AxisEdit, selectionAxisEdit, type TransformField, writeField } from "../domain/groupTransform"
 import type { PropertyChange } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
-import { PLAYER_START_CLASS } from "../domain/MapFile"
+import { floorHeightOf } from "../domain/level"
+import { type LevelData, PLAYER_START_CLASS } from "../domain/MapFile"
+import { type MapPrefs, mapPrefsKeyOf } from "../domain/MapPrefs"
 import type { Settings } from "../domain/Settings"
 import { CatalogLoader } from "../services/CatalogLoader"
 import { KeybindStore } from "../services/KeybindStore"
 import { MapCodec } from "../services/MapCodec"
 import { MapExporter } from "../services/MapExporter"
+import { MapPrefsStore } from "../services/MapPrefsStore"
 import { MaterialLibrary } from "../services/MaterialLibrary"
 import { type AppServices, runtime } from "../services/runtime"
 import { SettingsStore } from "../services/SettingsStore"
@@ -157,7 +160,11 @@ export const importFile = (file: File) =>
     Effect.gen(function*() {
       const text = yield* Effect.promise(() => file.text())
       const map = yield* MapCodec.use((codec) => codec.decode(text))
-      useEditor.getState().loadMap(map, file.name)
+      // unreadable prefs only cost the saved grid height
+      const prefs = yield* MapPrefsStore.use((store) => store.load(mapPrefsKeyOf(map))).pipe(
+        Effect.orElseSucceed((): MapPrefs => ({}))
+      )
+      useEditor.getState().loadMap(map, file.name, prefs.gridHeight)
       useEditor.getState().notify("info", `Imported ${file.name} (${map.items.length} items)`)
     })
   )
@@ -175,5 +182,27 @@ export const exportMap = () =>
       setTimeout(() => URL.revokeObjectURL(url), 1_000)
       useEditor.getState().replaceMapSilently(result.map)
       useEditor.getState().notify("info", `Exported ${result.filename}`)
+      // the export may have renamed the map: its prefs follow it to the new name
+      yield* saveMapPrefs
+    })
+  )
+
+/**
+ * The open map's prefs, under its current name: the grid height when it isn't the player
+ * start's (what a load would pick anyway).
+ */
+const saveMapPrefs = Effect.gen(function*() {
+  const { doc, floorHeight } = useEditor.getState()
+  const prefs = floorHeight === floorHeightOf(doc.map) ? {} : { gridHeight: floorHeight }
+  yield* MapPrefsStore.use((store) => store.save(mapPrefsKeyOf(doc.map), prefs))
+})
+
+/** Map settings: the level fields (one undo step) and the grid height (saved with the map's prefs). */
+export const saveMapSettings = (levelData: LevelData, gridHeight: number) =>
+  run(
+    Effect.gen(function*() {
+      useEditor.getState().setLevelData(levelData)
+      useEditor.getState().setFloorHeight(gridHeight)
+      yield* saveMapPrefs
     })
   )

@@ -1,6 +1,7 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
 import { KeyValueStore } from "effect/persistence"
 import { defaultSettings, mergeSettings, Settings } from "../domain/Settings"
+import { browserStorage } from "./browserStorage"
 import { SettingsStoreError } from "./errors"
 
 export const SETTINGS_STORAGE_KEY = "ballest-editor.settings.v1"
@@ -47,13 +48,7 @@ export class SettingsStore extends Context.Service<SettingsStore, {
     })
   )
 
-  static readonly layer = this.layerNoDeps.pipe(
-    Layer.provide(
-      typeof globalThis.localStorage === "undefined"
-        ? KeyValueStore.layerMemory
-        : KeyValueStore.layerStorage(() => globalThis.localStorage)
-    )
-  )
+  static readonly layer = this.layerNoDeps.pipe(Layer.provide(browserStorage))
 
   static readonly layerTest = this.layerNoDeps.pipe(Layer.provideMerge(KeyValueStore.layerMemory))
 }

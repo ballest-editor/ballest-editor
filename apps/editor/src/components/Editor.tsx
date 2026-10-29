@@ -12,6 +12,7 @@ import { Viewport } from "../editor/Viewport"
 import { ExportDialog } from "./ExportDialog"
 import { Inspector } from "./Inspector"
 import { KeybindCheatSheet } from "./KeybindCheatSheet"
+import { MapSettingsDialog } from "./MapSettingsDialog"
 import { NewMapDialog } from "./NewMapDialog"
 import { Palette } from "./Palette"
 import { SettingsDialog } from "./SettingsDialog"
@@ -107,6 +108,7 @@ export function Editor() {
       />
       <NewMapDialog open={dialog === "new"} onClose={close} />
       <ExportDialog open={dialog === "export"} onClose={close} />
+      <MapSettingsDialog open={dialog === "map"} onClose={close} />
       <SettingsDialog
         open={dialog === "settings"}
         category={settingsCategory}

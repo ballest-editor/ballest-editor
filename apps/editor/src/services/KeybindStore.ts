@@ -2,6 +2,7 @@ import { Context, Effect, Layer, Option } from "effect"
 import { KeyValueStore } from "effect/persistence"
 import type { DerivedKeybinds } from "../domain/GameKeybinds"
 import { type Keybinds, mergeKeybinds, StoredKeybinds } from "../domain/Keybinds"
+import { browserStorage } from "./browserStorage"
 import { KeybindStoreError } from "./errors"
 import { GameKeybinds } from "./GameKeybinds"
 
@@ -57,15 +58,7 @@ export class KeybindStore extends Context.Service<KeybindStore, {
     })
   )
 
-  /** Browser localStorage; in-memory when there is none (SSR, tests). */
-  static readonly layer = this.layerNoDeps.pipe(
-    Layer.provide([
-      GameKeybinds.layer,
-      typeof globalThis.localStorage === "undefined"
-        ? KeyValueStore.layerMemory
-        : KeyValueStore.layerStorage(() => globalThis.localStorage)
-    ])
-  )
+  static readonly layer = this.layerNoDeps.pipe(Layer.provide([GameKeybinds.layer, browserStorage]))
 
   /** In-memory storage with the given game keybinds file (undefined = missing). */
   static readonly layerTest = (gameKeybindsJson?: string) =>

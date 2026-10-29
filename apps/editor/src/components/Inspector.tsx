@@ -1,5 +1,6 @@
 import {
   type Icon,
+  IconAdjustments,
   IconArrowsMaximize,
   IconArrowsMove,
   IconClipboard,
@@ -46,6 +47,7 @@ function MapSettings() {
   const hasEditorState = useEditor((s) => s.doc.map.editorState !== undefined)
   const sourceName = useEditor((s) => s.sourceName)
   const renameLevel = useEditor((s) => s.renameLevel)
+  const openDialog = useEditor((s) => s.openDialog)
   // An edit in progress; otherwise the input shows the map's name.
   const [draft, setDraft] = useState<string | null>(null)
   const name = draft ?? levelData.levelDisplayName
@@ -75,6 +77,9 @@ function MapSettings() {
           </div>
         ))}
       </dl>
+      <Button variant="outline" size="sm" className="self-start" onClick={() => openDialog("map")}>
+        <IconAdjustments /> Map settings…
+      </Button>
     </div>
   )
 }

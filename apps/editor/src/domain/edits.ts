@@ -4,9 +4,17 @@
  * schemas before they reach the document.
  */
 import { Option, Schema } from "effect"
-import { qualifyMaterialPath } from "./factory"
+import { qualifyMaterialPath, userLevelNameOf } from "./factory"
 import { type PropertyChange, withProperty } from "./itemProperties"
-import { Item, type ItemPivot, ItemTransform, type MapFile, type MeshComponent, objectPathOf } from "./MapFile"
+import {
+  Item,
+  type ItemPivot,
+  ItemTransform,
+  type LevelData,
+  type MapFile,
+  type MeshComponent,
+  objectPathOf
+} from "./MapFile"
 
 const decodeItem = Schema.decodeUnknownOption(Item)
 const decodeTransform = Schema.decodeUnknownOption(ItemTransform)
@@ -183,15 +191,18 @@ export const duplicateItems = (map: MapFile, indices: ReadonlyArray<number>): Ma
 /** Validates a freshly built item against the schema before it enters the document. */
 export const validateItem = (candidate: unknown): Option.Option<Item> => decodeItem(candidate)
 
-export const setLevelNames = (map: MapFile, displayName: string, creatorName: string): MapFile => ({
+export const setLevelData = (map: MapFile, levelData: LevelData): MapFile => ({
   ...map,
-  worldSettings: {
-    ...map.worldSettings,
-    levelData: {
-      ...map.worldSettings.levelData,
-      levelDisplayName: displayName,
-      creatorName,
-      userLevelName: `${displayName}_${creatorName}`
-    }
-  }
+  worldSettings: { ...map.worldSettings, levelData }
+})
+
+export const setLevelNames = (map: MapFile, displayName: string, creatorName: string): MapFile =>
+  setLevelData(map, withLevelNames(map.worldSettings.levelData, displayName, creatorName))
+
+/** The display and creator names, and `userLevelName` (`<displayName>_<creator>`) kept in step with them. */
+export const withLevelNames = (levelData: LevelData, displayName: string, creatorName: string): LevelData => ({
+  ...levelData,
+  levelDisplayName: displayName,
+  creatorName,
+  userLevelName: userLevelNameOf(displayName, creatorName)
 })
