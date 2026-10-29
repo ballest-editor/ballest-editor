@@ -10088,7 +10088,7 @@
         "opacityTexture": null,
         "tiling": {
           "baseColor": 1,
-          "normal": 4,
+          "normal": 12,
           "variation": 1,
           "opacity": 1
         },
@@ -10468,7 +10468,7 @@
         "opacityTexture": null,
         "tiling": {
           "baseColor": 1,
-          "normal": 4,
+          "normal": 12,
           "variation": 1,
           "opacity": 1
         },
@@ -10614,7 +10614,7 @@
         "opacityTexture": null,
         "tiling": {
           "baseColor": 1,
-          "normal": 4,
+          "normal": 12,
           "variation": 1,
           "opacity": 1
         },

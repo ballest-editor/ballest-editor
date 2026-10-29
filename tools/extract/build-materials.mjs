@@ -188,6 +188,8 @@ const pick = (obj, patterns, exclude = /$^/) => {
 }
 const linearToNum = (v) => (Array.isArray(v) ? v : null)
 
+// Master material name -> UV repeats per 0..1 measured in the game (see tilingOf below).
+const MEASURED_UV_REPEATS = { M_BaseSurface_Metal: 12, M_BaseSurface_Metal_Dim: 12 }
 const records = []
 const roots = readFileSync(join(work, "materials.txt"), "utf8").split("\n").filter(Boolean)
 for (const path of roots) {
@@ -289,6 +291,12 @@ for (const path of roots) {
   // Translucent effects (air-vent wind, light beams) shape their opacity with a streak/falloff texture.
   const opacityTex = isTranslucent && op == null ? findRef(/ray|falloff|gradient|beam|glow/i) : null
   const triplanar = chainOwn.some((o) => (o.functions ?? []).some((f) => /Triplanar|WorldAligned/i.test(f)))
+  // The streaming scale is UE's estimate and can lag the graph. Where the game itself was measured, the
+  // measurement wins: M_BaseSurface_Metal shows 48 concrete tiles (12 repeats of the 4-tile map) across the
+  // 10 m default cube's 0..1 face UVs, not the 4 repeats its TextureStreamingData reports; M_OutlineEdges,
+  // its sibling, reports 12.
+  const measuredUvRepeats = MEASURED_UV_REPEATS[nameOf(root.path)]
+  const tilingOf = (tex) => (tex && measuredUvRepeats !== undefined ? measuredUvRepeats : scaleOf(tex))
   // M_OutlineEdges: a band of OutlineBase grey along the UV border, `Size` being the un-banded fraction.
   const outline = V.OutlineBase && S["Size X"] != null && S["Size Y"] != null
     ? { inset: [(1 - S["Size X"]) / 2, (1 - S["Size Y"]) / 2], color: V.OutlineBase.slice(0, 3) }
@@ -309,7 +317,7 @@ for (const path of roots) {
     // "uv" = the mesh's own, "triplanar" = world-space projection (MF_Triplanar_UVs / WorldAligned*).
     tiling: {
       baseColor: scaleOf(baseColorTex),
-      normal: scaleOf(normalTex),
+      normal: tilingOf(normalTex),
       variation: scaleOf(variationTex),
       opacity: scaleOf(opacityTex)
     },
