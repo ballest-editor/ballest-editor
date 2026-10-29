@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { BLUE, GLASS, materialsFile, OLD } from "../test/materials"
+import { BLUE, GLASS, materialsFile, OLD, OUTLINE, WIND } from "../test/materials"
 import { repoRoot } from "../test/samples"
 import { lookupMaterial, parseMaterialsFile } from "./Materials"
 
@@ -18,6 +18,19 @@ describe("materials", () => {
     // moved asset: same name, different folder
     assert.strictEqual(lookupMaterial(table, "/Game/Elsewhere/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth"), blue)
     assert.isFalse(table.textureSrgb.get("textures/n.png"))
+    // defaults for the texturing keys older files lack
+    assert.deepStrictEqual(blue.tiling, { baseColor: 1, normal: 1, variation: 1, opacity: 1 })
+    assert.isFalse(blue.triplanar)
+    assert.isUndefined(blue.outline)
+    const outline = lookupMaterial(table, OUTLINE)!
+    assert.isTrue(outline.triplanar)
+    assert.strictEqual(outline.tiling.normal, 12)
+    assert.strictEqual(outline.variationTexture, "textures/macro.png")
+    assert.deepStrictEqual(outline.outline, { inset: [0, 0.1], color: [0.59, 0.59, 0.59] })
+    const wind = lookupMaterial(table, WIND)!
+    assert.isTrue(wind.translucent)
+    assert.strictEqual(wind.opacityTexture, "textures/ray.png")
+    assert.strictEqual(wind.tiling.opacity, 0.25)
     assert.strictEqual(parseMaterialsFile({ [BLUE]: materialsFile.materials[0] }).materials.size, 1) // bare map
     assert.strictEqual(parseMaterialsFile("nope").materials.size, 0)
   })

@@ -5,7 +5,8 @@
     "vectors are linear RGBA as stored by UE. baseColor/emissive in approx are linear; set three.js colors with Color.setRGB(r,g,b, THREE.LinearSRGBColorSpace) (or the default working space).",
     "approx is a heuristic: cooked UMaterials have no expression graph, so how parameters are combined (UV tiling, detail textures, fresnel, world-aligned textures, vertex colour) is unknown. approx.keys names the parameter each value came from (null = neutral default).",
     "Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).",
-    "UV tiling parameters (UV Scale / UV Tile U,V / Texture Scale X,Y / World Space Scale) are listed in scalars but not applied in approx; several masters use world-aligned or triplanar mapping, so mesh UVs alone will not match the game.",
+    "approx.tiling is each texture's UV multiplier from the cooked TextureStreamingData (1 when unknown); approx.projection is 'triplanar' for masters that call MF_Triplanar_*/WorldAligned* functions (sampled in world space, period unknown) and 'uv' otherwise. UV Scale / Tile scalars are listed but not applied.",
+    "approx.variationTexture is the grey mottle (T_MacroVariation) the Ballest masters multiply into the base colour; approx.opacityTexture shapes a translucent effect's alpha; approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).",
     "paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap)."
   ],
   "materials": [
@@ -50,6 +51,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "Color",
           "metallic": null,
@@ -97,8 +108,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/_Engine/EngineMaterials/T_Default_Material_Grid_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 10,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -107,7 +128,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -146,8 +167,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/_Engine/EngineMaterials/T_Default_Material_Grid_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -156,7 +187,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -220,6 +251,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "Color",
           "metallic": null,
@@ -276,6 +317,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -369,6 +420,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -460,8 +521,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 4,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -470,7 +541,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -555,6 +626,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -646,8 +727,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 4,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -656,7 +747,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -741,6 +832,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -832,8 +933,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 4,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -842,7 +953,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -927,6 +1038,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -1018,8 +1139,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 4,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -1028,7 +1159,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -1113,6 +1244,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -1204,8 +1345,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 4,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -1214,7 +1365,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -1299,6 +1450,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -1390,8 +1551,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 4,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -1400,7 +1571,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -1485,6 +1656,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -1576,8 +1757,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -1586,7 +1777,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -1671,6 +1862,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -1762,8 +1963,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 4,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -1772,7 +1983,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -1857,6 +2068,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -1948,8 +2169,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 4,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -1958,7 +2189,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -2043,6 +2274,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -2134,8 +2375,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 4,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -2144,7 +2395,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -2286,6 +2537,16 @@
         "baseColorTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
         "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Tint",
           "metallic": "Metal",
@@ -2436,6 +2697,16 @@
         "baseColorTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
         "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Tint",
           "metallic": "Metal",
@@ -2586,6 +2857,16 @@
         "baseColorTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
         "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Tint",
           "metallic": "Metal",
@@ -2736,6 +3017,16 @@
         "baseColorTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
         "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Tint",
           "metallic": "Metal",
@@ -2886,6 +3177,16 @@
         "baseColorTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
         "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Tint",
           "metallic": "Metal",
@@ -3036,6 +3337,16 @@
         "baseColorTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
         "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Tint",
           "metallic": "Metal",
@@ -3186,6 +3497,16 @@
         "baseColorTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
         "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Tint",
           "metallic": "Metal",
@@ -3336,6 +3657,16 @@
         "baseColorTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
         "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Tint",
           "metallic": "Metal",
@@ -3486,6 +3817,16 @@
         "baseColorTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
         "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Tint",
           "metallic": "Metal",
@@ -3636,6 +3977,16 @@
         "baseColorTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
         "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Tint",
           "metallic": "Metal",
@@ -3819,6 +4170,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -4008,6 +4369,16 @@
         "baseColorTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcrete_D.png",
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -4074,6 +4445,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4139,6 +4520,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4205,6 +4596,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4271,6 +4672,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4337,6 +4748,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4402,6 +4823,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4466,6 +4897,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4531,6 +4972,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4596,6 +5047,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4662,6 +5123,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -4848,6 +5319,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -5033,6 +5514,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -5218,6 +5709,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -5404,6 +5905,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -5590,6 +6101,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -5776,6 +6297,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -5962,6 +6493,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -6151,6 +6692,16 @@
         "baseColorTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcrete_D.png",
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -6334,6 +6885,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -6518,6 +7079,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -6707,6 +7278,16 @@
         "baseColorTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcrete_D.png",
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -6891,6 +7472,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -7075,6 +7666,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -7260,6 +7861,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -7444,6 +8055,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -7628,6 +8249,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -7812,6 +8443,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -7996,6 +8637,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -8180,6 +8831,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -8364,6 +9025,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -8548,6 +9219,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -8735,6 +9416,16 @@
         "baseColorTexture": null,
         "normalTexture": "textures/Packs/StarterContent/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -8924,6 +9615,16 @@
         "baseColorTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcrete_D.png",
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -9114,6 +9815,16 @@
         "baseColorTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcrete_D.png",
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -9303,6 +10014,16 @@
         "baseColorTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcrete_D.png",
         "normalTexture": "textures/Art/Materials/Environment/Textures/T_SmoothConcreteWall_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Base Color",
           "metallic": "Metallic",
@@ -9361,8 +10082,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 4,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
@@ -9371,7 +10102,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -9425,6 +10156,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
@@ -9486,6 +10227,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9566,23 +10317,39 @@
         "metallic": 0,
         "roughness": 0.6,
         "opacity": 1,
-        "emissive": [
-          1,
-          0.40011907,
-          0
-        ],
+        "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 12,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": {
+          "inset": [
+            0,
+            0.09999999999999998
+          ],
+          "color": [
+            0.5885417,
+            0.5885417,
+            0.5885417
+          ]
+        },
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
           "roughness": null,
           "opacity": null,
-          "emissive": "HighlightColor",
+          "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -9619,9 +10386,19 @@
         "roughness": 0.6,
         "opacity": 1,
         "emissive": null,
-        "baseColorTexture": null,
-        "normalTexture": null,
+        "baseColorTexture": "textures/Packs/Vefects/Easy_Shockwaves_VFX/Shared/Textures/T_VFX_Linear_Gradient_Mirror_Horizontal_01.png",
+        "normalTexture": "textures/Packs/StarterContent/Textures/T_Metal_Rust_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 30,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -9629,8 +10406,8 @@
           "opacity": null,
           "emissive": null,
           "emissiveIntensity": null,
-          "baseColorTexture": null,
-          "normalTexture": null,
+          "baseColorTexture": "referenced",
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -9685,8 +10462,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 4,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
@@ -9695,7 +10482,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -9750,8 +10537,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
@@ -9760,7 +10557,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -9811,8 +10608,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 4,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
@@ -9821,7 +10628,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -9876,6 +10683,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
@@ -9945,8 +10762,18 @@
         "opacity": 0.5,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Packs/Skatepark/Textures/Metal/T_metal_trim_01_Normal.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": "textures/Packs/Vefects/Anime_VFX/Shared/Textures/T_VFX_Gradient_03.png",
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
@@ -9955,7 +10782,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -10008,6 +10835,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -10085,6 +10922,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
@@ -10173,8 +11020,18 @@
         "opacity": 0.4,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Packs/StarterContent/Textures/T_Tech_Hex_Tile_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/_Engine/EngineMaterials/T_Default_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "ColorGlass",
           "metallic": null,
@@ -10183,7 +11040,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -10240,6 +11097,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "DiffuseColor",
           "metallic": null,
@@ -10317,23 +11184,39 @@
         "metallic": 0,
         "roughness": 0.6,
         "opacity": 1,
-        "emissive": [
-          1,
-          0.40011907,
-          0
-        ],
+        "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Concrete_Tiles_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 12,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": {
+          "inset": [
+            0,
+            0.09999999999999998
+          ],
+          "color": [
+            0.5885417,
+            0.5885417,
+            0.5885417
+          ]
+        },
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
           "roughness": null,
           "opacity": null,
-          "emissive": "HighlightColor",
+          "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -10462,8 +11345,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Packs/Vefects/Stylized_Galaxy_Shader/Demo/Scene/Textures/Grid/T_VFX_Grid_01_Normal.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor_Dark",
           "metallic": null,
@@ -10472,7 +11365,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -10521,8 +11414,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/T_Tech_Hex_Tile_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 60,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
@@ -10531,7 +11434,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -10673,6 +11576,16 @@
         "baseColorTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_BC.png",
         "normalTexture": "textures/Art/Materials/Textures/T_ConcreteTileable_N.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "Tint",
           "metallic": "Metal",
@@ -10764,8 +11677,18 @@
         "opacity": 0.6,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Packs/StarterContent/Textures/T_Tech_Hex_Tile_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/_Engine/EngineMaterials/T_Default_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "triplanar",
+        "outline": null,
         "keys": {
           "baseColor": "ColorGlass",
           "metallic": null,
@@ -10774,7 +11697,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -10827,8 +11750,18 @@
         "opacity": 0.5,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/_Engine/EngineMaterials/FlatNormal.png",
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
@@ -10837,7 +11770,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -10895,6 +11828,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
@@ -10954,6 +11897,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -11020,6 +11973,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": null,
@@ -11084,6 +12047,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -11148,6 +12121,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -11212,6 +12195,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -11295,8 +12288,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/Macro_N_normal.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -11305,7 +12308,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -11380,8 +12383,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/Macro_N_normal.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -11390,7 +12403,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -11467,6 +12480,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -11550,8 +12573,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/Macro_N_normal.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -11560,7 +12593,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -11638,6 +12671,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -11722,8 +12765,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/Macro_N_normal.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -11732,7 +12785,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -11809,6 +12862,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -11894,6 +12957,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -11979,6 +13052,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -12062,8 +13145,18 @@
         "opacity": 1,
         "emissive": null,
         "baseColorTexture": null,
-        "normalTexture": null,
+        "normalTexture": "textures/Art/Materials/Textures/Macro_N_normal.png",
         "ormTexture": null,
+        "variationTexture": "textures/Art/Materials/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -12072,7 +13165,7 @@
           "emissive": null,
           "emissiveIntensity": null,
           "baseColorTexture": null,
-          "normalTexture": null,
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }
@@ -12149,6 +13242,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "BaseColor",
           "metallic": "Metallic",
@@ -12200,6 +13303,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -12250,6 +13363,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": "textures/Art/UsedMarketPlace/StylizedFX_Collection_q/T_Ray_02.png",
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 0.25
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -12325,6 +13448,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "Color",
           "metallic": null,
@@ -12400,6 +13533,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "Color",
           "metallic": null,
@@ -12474,6 +13617,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "Tint",
           "metallic": null,
@@ -12551,6 +13704,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "Color",
           "metallic": null,
@@ -12602,6 +13765,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "Color",
           "metallic": null,
@@ -12657,6 +13830,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "Color",
           "metallic": null,
@@ -12712,6 +13895,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "Color",
           "metallic": null,
@@ -12767,6 +13960,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "Color",
           "metallic": null,
@@ -12821,6 +14024,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "Color",
           "metallic": null,
@@ -12882,6 +14095,16 @@
         "baseColorTexture": null,
         "normalTexture": null,
         "ormTexture": null,
+        "variationTexture": null,
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": "ColorGlass",
           "metallic": null,
@@ -12930,9 +14153,19 @@
         "roughness": 0.6,
         "opacity": 1,
         "emissive": null,
-        "baseColorTexture": null,
-        "normalTexture": null,
+        "baseColorTexture": "textures/Packs/StarterContent/Textures/T_Metal_Steel_D.png",
+        "normalTexture": "textures/Packs/StarterContent/Textures/T_Metal_Steel_N.png",
         "ormTexture": null,
+        "variationTexture": "textures/Packs/StarterContent/Textures/T_MacroVariation.png",
+        "opacityTexture": null,
+        "tiling": {
+          "baseColor": 1,
+          "normal": 1,
+          "variation": 1,
+          "opacity": 1
+        },
+        "projection": "uv",
+        "outline": null,
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -12940,8 +14173,8 @@
           "opacity": null,
           "emissive": null,
           "emissiveIntensity": null,
-          "baseColorTexture": null,
-          "normalTexture": null,
+          "baseColorTexture": "referenced",
+          "normalTexture": "referenced",
           "ormTexture": null
         }
       }

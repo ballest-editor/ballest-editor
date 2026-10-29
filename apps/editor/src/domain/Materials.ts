@@ -19,6 +19,18 @@ const Rgb = Schema.Union([
   Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite, Schema.Finite])
 ])
 
+const Tiling = open({
+  baseColor: Num,
+  normal: Num,
+  variation: Num,
+  opacity: Num
+})
+
+const Outline = open({
+  inset: Schema.Tuple([Schema.Finite, Schema.Finite]),
+  color: Rgb
+})
+
 export const MaterialApprox = open({
   baseColor: Schema.optionalKey(Schema.NullOr(Rgb)),
   metallic: Num,
@@ -29,7 +41,17 @@ export const MaterialApprox = open({
   normalTexture: Str,
   ormTexture: Str,
   metallicRoughnessTexture: Str,
-  emissiveTexture: Str
+  emissiveTexture: Str,
+  /** Grey mottle multiplied into the base colour (T_MacroVariation). */
+  variationTexture: Str,
+  /** Alpha shape of a translucent effect (wind streaks, beam falloff). */
+  opacityTexture: Str,
+  /** UV multiplier per texture; 1 when the extractor doesn't know. */
+  tiling: Schema.optionalKey(Schema.NullOr(Tiling)),
+  /** "uv": the mesh's own UVs. "triplanar": the game projects the textures in world space. */
+  projection: Schema.optionalKey(Schema.NullOr(Schema.Literals(["uv", "triplanar"]))),
+  /** M_OutlineEdges' grey band along the UV border: `inset` is its width as a fraction of U and V. */
+  outline: Schema.optionalKey(Schema.NullOr(Outline))
 })
 
 export const MaterialEntry = open({
@@ -59,6 +81,21 @@ export interface MaterialSpec {
   /** Occlusion/roughness/metallic in R/G/B (glTF convention). */
   readonly ormTexture: string | undefined
   readonly emissiveTexture: string | undefined
+  readonly variationTexture: string | undefined
+  readonly opacityTexture: string | undefined
+  /** UV multiplier for each texture slot (1 = the texture's own repeat). */
+  readonly tiling: {
+    readonly baseColor: number
+    readonly normal: number
+    readonly variation: number
+    readonly opacity: number
+  }
+  /** World-space projection instead of mesh UVs (the Env masters' triplanar mapping). */
+  readonly triplanar: boolean
+  /** Grey band along the UV border (M_OutlineEdges): width per axis as a fraction, and its linear colour. */
+  readonly outline:
+    | { readonly inset: readonly [number, number]; readonly color: readonly [number, number, number] }
+    | undefined
   /** Translucent blend modes render transparent. */
   readonly translucent: boolean
   /** The game material is two-sided (open/thin geometry such as glass panes). */
@@ -98,6 +135,11 @@ export const NEUTRAL: Omit<MaterialSpec, "path"> = {
   normalTexture: undefined,
   ormTexture: undefined,
   emissiveTexture: undefined,
+  variationTexture: undefined,
+  opacityTexture: undefined,
+  tiling: { baseColor: 1, normal: 1, variation: 1, opacity: 1 },
+  triplanar: false,
+  outline: undefined,
   translucent: false,
   twoSided: false,
   recovered: false
@@ -117,6 +159,12 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
   // The extractor sometimes reports the normal map as ORM; that would wreck roughness/metalness.
   const orm = orUndefined(a.ormTexture ?? a.metallicRoughnessTexture)
   const opacity = clamp01(a.opacity ?? NEUTRAL.opacity)
+  const t = a.tiling ?? {}
+  const positive = (
+    n: number | null | undefined,
+    fallback: number
+  ) => (n !== null && n !== undefined && n > 0 ? n : fallback)
+  const outline = a.outline ?? undefined
   return {
     path,
     baseColor: rgb(a.baseColor, NEUTRAL.baseColor),
@@ -128,6 +176,18 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
     normalTexture,
     ormTexture: orm === normalTexture ? undefined : orm,
     emissiveTexture: orUndefined(a.emissiveTexture),
+    variationTexture: orUndefined(a.variationTexture),
+    opacityTexture: orUndefined(a.opacityTexture),
+    tiling: {
+      baseColor: positive(t.baseColor, 1),
+      normal: positive(t.normal, 1),
+      variation: positive(t.variation, 1),
+      opacity: positive(t.opacity, 1)
+    },
+    triplanar: a.projection === "triplanar",
+    outline: outline === undefined || (outline.inset[0] <= 0 && outline.inset[1] <= 0)
+      ? undefined
+      : { inset: [clamp01(outline.inset[0]), clamp01(outline.inset[1])], color: rgb(outline.color, [0.5, 0.5, 0.5]) },
     translucent: opacity < 1 || /translucen|additive|modulate/i.test(entry.blendMode ?? ""),
     twoSided: entry.twoSided ?? false,
     recovered: entry.recovered ?? false

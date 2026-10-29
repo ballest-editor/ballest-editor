@@ -2,11 +2,29 @@
  * three.js materials for game materials, cached per material object path, plus a texture
  * cache. Base-colour textures are sRGB; normal and ORM textures stay linear. Anything
  * unknown renders with one shared neutral grey material.
+ *
+ * MeshStandardMaterial covers the PBR part. What it can't express on its own, the
+ * extractor's `approx` describes and a small shader patch (`patchShader`) adds:
+ *
+ * - per-texture UV tiling (the cooked material's TextureStreamingData scales);
+ * - world-space triplanar projection for the Env masters, whose textures never follow
+ *   mesh UVs in the game;
+ * - the grey mottle (T_MacroVariation) multiplied into the base colour;
+ * - M_OutlineEdges' grey band along the UV border of a face.
  */
 import * as THREE from "three"
 import { lookupMaterial, type MaterialSpec, type MaterialTable, NEUTRAL } from "../domain/Materials"
 import { textureUrl } from "./assetUrl"
 import { isMesh } from "./threeGuards"
+
+/**
+ * World-space period (cm) of a triplanar texture at tiling 1. The game's value isn't in the
+ * cooked data; 1024 cm is UE's WorldAlignedTexture default and gives the 4-per-repeat
+ * concrete tiles (tiling 4) a 64 cm pitch, which matches the in-game palette renders.
+ */
+export const TRIPLANAR_PERIOD_CM = 1024
+/** How much of the grey mottle shows (0 = none, 1 = multiplied in whole); tuned against the palette renders. */
+const VARIATION_STRENGTH = 0.45
 
 const textureLoader = new THREE.TextureLoader()
 const textures = new Map<string, THREE.Texture>()
@@ -28,6 +46,155 @@ const loadTexture = (path: string, colorSpace: THREE.ColorSpace, onError: () => 
   texture.wrapT = THREE.RepeatWrapping
   textures.set(key, texture)
   return texture
+}
+
+/** The shader patch's inputs; `defines` doubles as the program cache key. */
+export interface Patch {
+  readonly defines: Readonly<Record<string, 1>>
+  readonly uniforms: {
+    readonly uBaseColorTiling: THREE.IUniform<number>
+    readonly uNormalTiling: THREE.IUniform<number>
+    readonly uOpacityTiling: THREE.IUniform<number>
+    readonly uVariationTiling: THREE.IUniform<number>
+    readonly uVariationMap: THREE.IUniform<THREE.Texture | null>
+    readonly uOutlineInset: THREE.IUniform<THREE.Vector2>
+    readonly uOutlineColor: THREE.IUniform<THREE.Color>
+  }
+}
+
+const patchOf = (spec: Omit<MaterialSpec, "path">, variation: THREE.Texture | null): Patch | undefined => {
+  const defines: Record<string, 1> = {}
+  const { tiling } = spec
+  if (tiling.baseColor !== 1 || tiling.normal !== 1 || tiling.opacity !== 1) defines["BALLEST_TILING"] = 1
+  if (spec.triplanar && (spec.normalTexture !== undefined || variation !== null)) defines["BALLEST_TRIPLANAR"] = 1
+  if (variation !== null) defines["BALLEST_VARIATION"] = 1
+  if (spec.outline !== undefined) defines["BALLEST_OUTLINE"] = 1
+  if (Object.keys(defines).length === 0) return undefined
+  const outline = spec.outline
+  return {
+    defines,
+    uniforms: {
+      uBaseColorTiling: { value: tiling.baseColor },
+      uNormalTiling: { value: tiling.normal },
+      uOpacityTiling: { value: tiling.opacity },
+      uVariationTiling: { value: tiling.variation },
+      uVariationMap: { value: variation },
+      uOutlineInset: { value: new THREE.Vector2(outline?.inset[0] ?? 0, outline?.inset[1] ?? 0) },
+      uOutlineColor: {
+        value: new THREE.Color().setRGB(...(outline?.color ?? [0.5, 0.5, 0.5]), THREE.LinearSRGBColorSpace)
+      }
+    }
+  }
+}
+
+const VERTEX_DECLS = /* glsl */ `
+varying vec3 vBallestWorldPos;
+varying vec3 vBallestWorldNormal;
+varying vec2 vBallestUv;
+`
+const VERTEX_BODY = /* glsl */ `
+vBallestWorldPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+vBallestWorldNormal = normalize( mat3( modelMatrix ) * objectNormal );
+vBallestUv = uv;
+`
+const FRAGMENT_DECLS = /* glsl */ `
+varying vec3 vBallestWorldPos;
+varying vec3 vBallestWorldNormal;
+varying vec2 vBallestUv;
+uniform float uBaseColorTiling;
+uniform float uNormalTiling;
+uniform float uOpacityTiling;
+uniform float uVariationTiling;
+uniform sampler2D uVariationMap;
+uniform vec2 uOutlineInset;
+uniform vec3 uOutlineColor;
+// Blend weights of the three world-axis projections (sharpened so flat faces read one map).
+vec3 ballestTriplanarWeights( vec3 worldNormal ) {
+  vec3 w = pow( abs( worldNormal ), vec3( 4.0 ) );
+  return w / ( w.x + w.y + w.z );
+}
+vec4 ballestSample( sampler2D map, float tiling ) {
+  #ifdef BALLEST_TRIPLANAR
+    vec3 p = vBallestWorldPos / ${TRIPLANAR_PERIOD_CM.toFixed(1)} * tiling;
+    vec3 w = ballestTriplanarWeights( vBallestWorldNormal );
+    return texture2D( map, p.yz ) * w.x + texture2D( map, p.xz ) * w.y + texture2D( map, p.xy ) * w.z;
+  #else
+    return texture2D( map, vBallestUv * tiling );
+  #endif
+}
+`
+// After three's own map sampling: the mottle multiplies in, then the outline band paints over.
+// The mottle is blended towards white first: multiplied in whole it darkens the Env colours
+// well below the in-game renders, so the masters must mix it in at reduced strength.
+const COLOR_EXTRAS = /* glsl */ `
+#ifdef BALLEST_VARIATION
+  diffuseColor.rgb *= mix( vec3( 1.0 ), ballestSample( uVariationMap, uVariationTiling ).rgb, ${
+  VARIATION_STRENGTH.toFixed(2)
+} );
+#endif
+#ifdef BALLEST_OUTLINE
+  vec2 ballestEdge = min( vBallestUv, 1.0 - vBallestUv );
+  float ballestBand = max( step( ballestEdge.x, uOutlineInset.x ), step( ballestEdge.y, uOutlineInset.y ) );
+  diffuseColor.rgb = mix( diffuseColor.rgb, uOutlineColor, ballestBand );
+#endif
+`
+// Replaces three's normal_fragment_maps when projecting: three tangent-space samples, one per world
+// axis, blended as perturbations of the world normal (the "UDN" blend), then taken to view space.
+const TRIPLANAR_NORMAL = /* glsl */ `
+#ifdef USE_NORMALMAP
+  {
+    vec3 wn = normalize( vBallestWorldNormal );
+    #ifdef DOUBLE_SIDED
+      wn *= faceDirection;
+    #endif
+    vec3 p = vBallestWorldPos / ${TRIPLANAR_PERIOD_CM.toFixed(1)} * uNormalTiling;
+    vec3 w = ballestTriplanarWeights( wn );
+    vec3 tx = texture2D( normalMap, p.yz ).xyz * 2.0 - 1.0;
+    vec3 ty = texture2D( normalMap, p.xz ).xyz * 2.0 - 1.0;
+    vec3 tz = texture2D( normalMap, p.xy ).xyz * 2.0 - 1.0;
+    tx.xy *= normalScale; ty.xy *= normalScale; tz.xy *= normalScale;
+    vec3 worldN = normalize( wn + vec3( 0.0, tx.y, tx.x ) * w.x + vec3( ty.x, 0.0, ty.y ) * w.y + vec3( tz.x, tz.y, 0.0 ) * w.z );
+    normal = normalize( ( viewMatrix * vec4( worldN, 0.0 ) ).xyz );
+  }
+#endif
+`
+
+/** What three hands to `onBeforeCompile`, minus the parts the patch doesn't touch. */
+export interface ShaderProgram {
+  uniforms: Record<string, THREE.IUniform>
+  vertexShader: string
+  fragmentShader: string
+}
+
+/** Rewrites a MeshStandardMaterial program for `patch` (the body of `onBeforeCompile`). */
+export const applyShaderPatch = (shader: ShaderProgram, patch: Patch): void => {
+  Object.assign(shader.uniforms, patch.uniforms)
+  shader.vertexShader = shader.vertexShader
+    .replace("#include <common>", `#include <common>\n${VERTEX_DECLS}`)
+    .replace("#include <project_vertex>", `#include <project_vertex>\n${VERTEX_BODY}`)
+  shader.fragmentShader = shader.fragmentShader
+    .replace("#include <common>", `#include <common>\n${FRAGMENT_DECLS}`)
+    .replace("#include <map_fragment>", `#include <map_fragment>\n${COLOR_EXTRAS}`)
+    .replace("texture2D( map, vMapUv )", "texture2D( map, vMapUv * uBaseColorTiling )")
+    .replace("texture2D( alphaMap, vAlphaMapUv )", "texture2D( alphaMap, vAlphaMapUv * uOpacityTiling )")
+    .replace("texture2D( normalMap, vNormalMapUv )", "texture2D( normalMap, vNormalMapUv * uNormalTiling )")
+  if ("BALLEST_TRIPLANAR" in patch.defines) {
+    shader.fragmentShader = shader.fragmentShader.replace("#include <normal_fragment_maps>", TRIPLANAR_NORMAL)
+  }
+}
+
+const patches = new WeakMap<THREE.Material, Patch>()
+
+/** The shader patch installed on a material by `materialFor`, if it needed one. */
+export const shaderPatchOf = (material: THREE.Material): Patch | undefined => patches.get(material)
+
+/** Installs the patch on `material`; see the module comment for what it adds. */
+const patchShader = (material: THREE.MeshStandardMaterial, patch: Patch): void => {
+  material.defines = { ...material.defines, ...patch.defines }
+  const key = Object.keys(patch.defines).sort().join(",")
+  material.customProgramCacheKey = () => key
+  material.onBeforeCompile = (shader) => applyShaderPatch(shader, patch)
+  patches.set(material, patch)
 }
 
 const build = (
@@ -53,10 +220,11 @@ const build = (
     material.opacity = spec.opacity
     material.depthWrite = false
   }
-  const drop = (slot: "map" | "normalMap" | "roughnessMap" | "metalnessMap" | "aoMap" | "emissiveMap") => () => {
-    material[slot] = null
-    material.needsUpdate = true
-  }
+  const drop =
+    (slot: "map" | "normalMap" | "roughnessMap" | "metalnessMap" | "aoMap" | "emissiveMap" | "alphaMap") => () => {
+      material[slot] = null
+      material.needsUpdate = true
+    }
   if (spec.baseColorTexture !== undefined) {
     material.map = loadTexture(
       spec.baseColorTexture,
@@ -84,6 +252,21 @@ const build = (
     )
     if (spec.emissive.every((c) => c === 0)) material.emissive.setRGB(1, 1, 1)
   }
+  // A shaped translucent effect (the air vent's wind, light beams): its streak texture is the alpha,
+  // and it adds light rather than shading what's behind it.
+  if (spec.translucent && spec.opacityTexture !== undefined) {
+    material.alphaMap = loadTexture(spec.opacityTexture, THREE.NoColorSpace, drop("alphaMap"))
+    material.blending = THREE.AdditiveBlending
+  }
+  const variation = spec.variationTexture === undefined
+    ? null
+    : loadTexture(spec.variationTexture, colorSpaceOf(spec.variationTexture, THREE.SRGBColorSpace), () => {
+      material.defines = { ...material.defines }
+      delete material.defines["BALLEST_VARIATION"]
+      material.needsUpdate = true
+    })
+  const patch = patchOf(spec, variation)
+  if (patch !== undefined) patchShader(material, patch)
   return material
 }
 

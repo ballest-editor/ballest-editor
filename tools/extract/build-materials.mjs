@@ -138,6 +138,14 @@ function own(path) {
   // the graph, not exposed as parameters): CachedExpressionData.ReferencedTextures etc.
   o.referencedTextures = [...JSON.stringify(e).matchAll(/"ObjectName":"Texture[^']*'([^']+)'","ObjectPath":"([^"]+)"/g)]
     .map((m) => `${m[2].slice(0, m[2].lastIndexOf("."))}.${m[1].split(":").pop()}`)
+  // TextureStreamingData: the UV multiplier each sampled texture is read with (texture name -> scale).
+  // It is the only trace of the graph's UV tiling that survives cooking.
+  o.textureScales = Object.fromEntries((p.TextureStreamingData ?? []).map((t) => [t.TextureName, t.SamplingScale]))
+  // Material functions the graph calls: MF_Triplanar_* / WorldAligned* mean the textures are projected in
+  // world space, not read through the mesh UVs.
+  o.functions = (e.CachedExpressionData?.FunctionInfos ?? [])
+    .map((f) => f.Function?.ObjectName?.split("'")[1])
+    .filter(Boolean)
   return o
 }
 
@@ -224,7 +232,9 @@ for (const path of roots) {
     /rough/i
   ], /mult|max|high|contrast|offset|grunge|edge|angle|rain/i)
   const [opKey, op] = pick(S, [/^opacity$/i, /^opacity[ _]?(value|amount)?$/i, /opacity/i], /DT\d|detail|mask/i)
-  const [emKey, em] = pick(V, [/emiss/i, /glow/i, /light[ _]?colou?r/i])
+  // Not /light colou?r/ unanchored: it matched M_OutlineEdges' HighlightColor, an inactive highlight tint,
+  // and painted every outlined face orange.
+  const [emKey, em] = pick(V, [/emiss/i, /glow/i, /^light[ _]?colou?r$/i], /highlight/i)
   const [emiKey, emi] = pick(S, [
     /emm?iss?ive[ _]?(intensity|strength|power|mult|brightness)/i,
     /light[ _]?emissive[ _]?intensity/i,
@@ -250,6 +260,39 @@ for (const path of roots) {
     ? em.slice(0, 3).map((x) => x * (typeof emi === "number" ? emi : 1))
     : null
   const isTranslucent = /Translucent|Additive|Modulate/.test(blendMode)
+
+  // Textures the graph samples without exposing a parameter. The cooked material keeps the list
+  // (ReferencedTextures) and each one's UV multiplier (TextureStreamingData) but not the wiring, so
+  // what follows is name-based guessing, used only where no parameter answered above.
+  const referenced = [...new Set(chainOwn.flatMap((o) => o.referencedTextures ?? []))]
+  const scales = Object.assign({}, ...[...chainOwn].reverse().map((o) => o.textureScales ?? {}))
+  const nameOf = (p) => p.split(".").pop()
+  const scaleOf = (p) => (p && scales[nameOf(p)]) ?? 1
+  const findRef = (re, exclude = /$^/) => referenced.find((p) => re.test(nameOf(p)) && !exclude.test(nameOf(p))) ?? null
+  const switchedOff = (re) => Object.entries(merged.switches).some(([k, v]) => re.test(k) && v === false)
+  const connects = (prop) => !conn || conn.includes(prop)
+  // M_ArenaColorBase samples its concrete maps behind a `ConcreteValue` lerp, 0 in every instance seen.
+  const concreteOff = Object.entries(S).some(([k, v]) => /concrete/i.test(k) && v === 0)
+  // A normal map read straight from the graph (T_Concrete_Tiles_N, T_SmoothConcreteWall_N, Macro_N_normal).
+  // An instance that switches tiles off (MI_Env_*_Smooth: UseTiles=false) gets no tile normal.
+  const normalTex = nTex ??
+    (connects("Normal") && !switchedOff(/normal map/i) && !concreteOff
+      ? findRef(/(_N|_Normal|Normal)$/i, switchedOff(/tiles/i) ? /tile/i : /$^/)
+      : null)
+  // T_MacroVariation: a grey mottle the Ballest masters multiply into their base colour.
+  const variationTex = connects("BaseColor") && !concreteOff ? findRef(/MacroVariation/i) : null
+  // No colour parameter and no colour texture parameter: the graph reads a texture directly
+  // (M_Metal_Steel's T_Metal_Steel_D, M_AirventBlock's slat gradient). Skip data/noise/VFX maps.
+  const NOT_COLOR =
+    /(_N|_Normal|Normal|_M|_R|Roughness|Metallic|Falloff)$|noise|mask|macro|ray|wind|dirt|perlin|cloud|grid/i
+  const baseColorTex = bct ?? (bc == null && connects("BaseColor") ? findRef(/./, NOT_COLOR) : null)
+  // Translucent effects (air-vent wind, light beams) shape their opacity with a streak/falloff texture.
+  const opacityTex = isTranslucent && op == null ? findRef(/ray|falloff|gradient|beam|glow/i) : null
+  const triplanar = chainOwn.some((o) => (o.functions ?? []).some((f) => /Triplanar|WorldAligned/i.test(f)))
+  // M_OutlineEdges: a band of OutlineBase grey along the UV border, `Size` being the un-banded fraction.
+  const outline = V.OutlineBase && S["Size X"] != null && S["Size Y"] != null
+    ? { inset: [(1 - S["Size X"]) / 2, (1 - S["Size Y"]) / 2], color: V.OutlineBase.slice(0, 3) }
+    : null
   const approx = {
     // Emissive-only masters (BaseColor pin unconnected) render black + emissive in UE.
     baseColor: emissiveOnly && emissiveColor ? [0, 0, 0] : (linearToNum(bc) ?? [0.8, 0.8, 0.8]).slice(0, 3),
@@ -257,9 +300,21 @@ for (const path of roots) {
     roughness: typeof rou === "number" ? rou : 0.6,
     opacity: typeof op === "number" ? op : isTranslucent ? 0.5 : 1,
     emissive: emissiveColor,
-    baseColorTexture: texPath(bct),
-    normalTexture: texPath(nTex),
+    baseColorTexture: texPath(baseColorTex),
+    normalTexture: texPath(normalTex),
     ormTexture: texPath(orm),
+    variationTexture: texPath(variationTex),
+    opacityTexture: texPath(opacityTex),
+    // UV multiplier per texture (TextureStreamingData; 1 when unknown) and how UVs are made:
+    // "uv" = the mesh's own, "triplanar" = world-space projection (MF_Triplanar_UVs / WorldAligned*).
+    tiling: {
+      baseColor: scaleOf(baseColorTex),
+      normal: scaleOf(normalTex),
+      variation: scaleOf(variationTex),
+      opacity: scaleOf(opacityTex)
+    },
+    projection: triplanar ? "triplanar" : "uv",
+    outline,
     keys: {
       baseColor: bcKey,
       metallic: metKey,
@@ -267,8 +322,8 @@ for (const path of roots) {
       opacity: opKey,
       emissive: emKey,
       emissiveIntensity: emiKey,
-      baseColorTexture: bctKey,
-      normalTexture: nKey,
+      baseColorTexture: bctKey ?? (baseColorTex ? "referenced" : null),
+      normalTexture: nKey ?? (normalTex ? "referenced" : null),
       ormTexture: ormKey
     }
   }
@@ -290,7 +345,7 @@ for (const path of roots) {
     shadingModel,
     twoSided,
     connectedOutputs: root.connectedOutputs ?? null,
-    referencedTextures: [...new Set(chainOwn.flatMap((o) => o.referencedTextures ?? []))].map(texPath).filter(Boolean),
+    referencedTextures: referenced.map(texPath).filter(Boolean),
     approx,
     ...(chainOwn.some((o) => o.error || o.errors)
       ? {
@@ -322,7 +377,8 @@ const out = {
     "vectors are linear RGBA as stored by UE. baseColor/emissive in approx are linear; set three.js colors with Color.setRGB(r,g,b, THREE.LinearSRGBColorSpace) (or the default working space).",
     "approx is a heuristic: cooked UMaterials have no expression graph, so how parameters are combined (UV tiling, detail textures, fresnel, world-aligned textures, vertex colour) is unknown. approx.keys names the parameter each value came from (null = neutral default).",
     "Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).",
-    "UV tiling parameters (UV Scale / UV Tile U,V / Texture Scale X,Y / World Space Scale) are listed in scalars but not applied in approx; several masters use world-aligned or triplanar mapping, so mesh UVs alone will not match the game.",
+    "approx.tiling is each texture's UV multiplier from the cooked TextureStreamingData (1 when unknown); approx.projection is 'triplanar' for masters that call MF_Triplanar_*/WorldAligned* functions (sampled in world space, period unknown) and 'uv' otherwise. UV Scale / Tile scalars are listed but not applied.",
+    "approx.variationTexture is the grey mottle (T_MacroVariation) the Ballest masters multiply into the base colour; approx.opacityTexture shapes a translucent effect's alpha; approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).",
     "paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap)."
   ],
   materials: records,
