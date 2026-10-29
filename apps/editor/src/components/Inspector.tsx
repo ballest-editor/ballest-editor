@@ -33,6 +33,7 @@ import { selectedIndices, shownTransform, useEditor } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { ShiftClick } from "./MouseButtonIcon"
 import { NumberField } from "./NumberField"
+import { PaintSection } from "./PaintSection"
 
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
 
@@ -350,6 +351,7 @@ export function Inspector() {
     })
   ))
   const indices = useEditor(useShallow(selectedIndices))
+  const ids = useEditor(useShallow((s) => selectedIndices(s).map((i) => s.doc.ids[i] ?? "")))
   const transforms = useEditor(useShallow((s) => s.selectedIds.flatMap((id) => shownTransform(s, id) ?? [])))
   const units = useEditor((s) => s.settings.general.units)
 
@@ -387,6 +389,10 @@ export function Inspector() {
             />
           ))}
         </div>
+
+        <Separator />
+        <SectionTitle>Paint</SectionTitle>
+        <PaintSection selected={items.map((item, i) => ({ item, id: ids[i] ?? "" }))} />
 
         {items.length === 1 && (
           <>
