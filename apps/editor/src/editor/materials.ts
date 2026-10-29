@@ -30,28 +30,40 @@ const NORMAL_STRENGTH = 1.6
 const textureLoader = new THREE.TextureLoader()
 const textures = new Map<string, THREE.Texture>()
 const materials = new Map<string, THREE.MeshStandardMaterial>()
+/** Settles (never rejects) once the texture's image has loaded or its load has failed. */
+const loads = new WeakMap<THREE.Texture, Promise<void>>()
 
-const loadTexture = (
-  path: string,
-  colorSpace: THREE.ColorSpace,
-  onError: () => void,
-  // The glb UVs are UE's (origin top-left, copied as-is by the extractor). The programs run the game's own
-  // math on them, so their textures keep the PNG's row order; three's default flip is what the tiled reads
-  // were tuned with.
-  flipY = true
-): THREE.Texture => {
-  const key = `${colorSpace}|${flipY}|${path}`
+/** Resolves when `texture` has its image or has failed to load; at once for one that was never requested. */
+export const textureLoaded = (texture: THREE.Texture): Promise<void> => loads.get(texture) ?? Promise.resolve()
+
+/**
+ * One convention for every texture read, the game's: the glb UVs are UE's (origin top-left, copied as-is
+ * by the extractor) and the projected coordinates are the game's object / world positions, so textures
+ * keep the PNG's row order (`flipY` off) instead of three's default flip. The programs (`approx.programs`)
+ * run the game's own math on the same reads.
+ */
+const loadTexture = (path: string, colorSpace: THREE.ColorSpace, onError: () => void): THREE.Texture => {
+  const key = `${colorSpace}|${path}`
   const cached = textures.get(key)
   if (cached !== undefined) return cached
   // Without a DOM (unit tests) there's no image loader; keep an empty texture.
-  const texture = typeof document === "undefined"
-    ? new THREE.Texture()
-    : textureLoader.load(textureUrl(path), undefined, undefined, () => {
+  let texture: THREE.Texture
+  if (typeof document === "undefined") {
+    texture = new THREE.Texture()
+  } else {
+    let settle = (): void => {}
+    const load = new Promise<void>((resolve) => {
+      settle = resolve
+    })
+    texture = textureLoader.load(textureUrl(path), settle, undefined, () => {
       textures.delete(key)
       onError()
+      settle()
     })
+    loads.set(texture, load)
+  }
   texture.colorSpace = colorSpace
-  texture.flipY = flipY
+  texture.flipY = false
   texture.wrapS = THREE.RepeatWrapping
   texture.wrapT = THREE.RepeatWrapping
   textures.set(key, texture)
@@ -60,7 +72,7 @@ const loadTexture = (
 
 /** The shader patch's inputs; `defines` (and `glsl`, per material) make the program cache key. */
 export interface Patch {
-  readonly defines: Readonly<Record<string, number>>
+  readonly defines: Readonly<Record<string, number | string>>
   /** The material's own GLSL (an `approx.programs` function and its samplers), or "". */
   readonly glsl: string
   readonly uniforms: Record<string, THREE.IUniform> & {
@@ -111,7 +123,7 @@ const patchOf = (
     | { readonly kind: ProgramKind; readonly code: string; readonly maps: ReadonlyArray<[string, THREE.Texture]> }
     | null
 ): Patch | undefined => {
-  const defines: Record<string, number> = {}
+  const defines: Record<string, number | string> = {}
   const { tiling } = spec
   const projected = spec.projection !== "uv"
   if (projected || !isOne(tiling.baseColor) || !isOne(tiling.normal) || !isOne(tiling.opacity)) {
@@ -125,7 +137,11 @@ const patchOf = (
   }
   if (normal2 !== null) defines["BALLEST_NORMAL2"] = 1
   if (colorMaps.length > 0) defines["BALLEST_COLOR"] = colorMaps.length
-  if (alphaMap !== null) defines["BALLEST_ALPHA"] = 1
+  if (alphaMap !== null) {
+    defines["BALLEST_ALPHA"] = 1
+    // The channel the game's shader reads the alpha shape from (a swizzle, so a define).
+    defines["BALLEST_ALPHA_CHANNEL"] = spec.opacityLayer?.channel ?? "r"
+  }
   // A program carries the game's own cap mask; the up fade stands in only without one.
   if (spec.translucent && spec.upFade < 1 && program === null) defines["BALLEST_UP_FADE"] = 1
   if (spec.outline !== undefined) defines["BALLEST_OUTLINE"] = 1
@@ -284,7 +300,7 @@ const COLOR_EXTRAS = /* glsl */ `
   diffuseColor.rgb = clamp( diffuseColor.rgb, 0.0, 1.0 );
 #endif
 #ifdef BALLEST_ALPHA
-  diffuseColor.a = clamp( diffuseColor.a + uAlphaShape.x * ( texture2D( uAlphaMap, ballestUv( uAlphaTiling ) ).r - uAlphaShape.y ), 0.0, 1.0 );
+  diffuseColor.a = clamp( diffuseColor.a + uAlphaShape.x * ( texture2D( uAlphaMap, ballestUv( uAlphaTiling ) ).BALLEST_ALPHA_CHANNEL - uAlphaShape.y ), 0.0, 1.0 );
 #endif
 #ifdef BALLEST_UP_FADE
   // The game's beams multiply their alpha by 1 - |world normal z|: only the vertical faces show.
@@ -416,7 +432,8 @@ export const shaderPatchOf = (material: THREE.Material): Patch | undefined => pa
 const patchShader = (material: THREE.MeshStandardMaterial, patch: Patch): void => {
   material.defines = { ...material.defines, ...patch.defines }
   // Materials with their own GLSL cannot share a compiled program.
-  const key = Object.keys(patch.defines).sort().join(",") + (patch.glsl === "" ? "" : `|${material.name}`)
+  const key = Object.keys(patch.defines).sort().map((k) => `${k}=${patch.defines[k]}`).join(",") +
+    (patch.glsl === "" ? "" : `|${material.name}`)
   material.customProgramCacheKey = () => key
   material.onBeforeCompile = (shader) => applyShaderPatch(shader, patch)
   patches.set(material, patch)
@@ -460,7 +477,9 @@ const build = (
   }
   if (spec.normalTexture !== undefined) {
     material.normalMap = loadTexture(spec.normalTexture, THREE.NoColorSpace, drop("normalMap"))
-    material.normalScale.set(NORMAL_STRENGTH, -NORMAL_STRENGTH) // UE normal maps use DirectX green (-Y)
+    // UE normal maps use DirectX green (+Y = down the image); with the rows unflipped that is +v, three's
+    // bitangent, so no sign flip (three's default flip would need (1, -1)).
+    material.normalScale.set(NORMAL_STRENGTH, NORMAL_STRENGTH)
   }
   if (spec.ormTexture !== undefined) {
     const orm = loadTexture(spec.ormTexture, THREE.NoColorSpace, () => {
@@ -520,8 +539,7 @@ const build = (
         loadTexture(
           t.texture,
           colorSpaceOf(t.texture, THREE.SRGBColorSpace),
-          dropDefine(`BALLEST_PROGRAM_${programKind.toUpperCase()}`),
-          false
+          dropDefine(`BALLEST_PROGRAM_${programKind.toUpperCase()}`)
         )
       ])
     }

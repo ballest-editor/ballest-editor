@@ -63,11 +63,14 @@ const ColorLayer = open({
   mean: Schema.optionalKey(Schema.NullOr(Rgb))
 })
 
-/** A texture a translucent pass's alpha depends on: `alpha += gain * (read.r - mean)`. */
+const Channel = Schema.Literals(["r", "g", "b", "a"])
+
+/** A texture a translucent pass's alpha depends on: `alpha += gain * (read[channel] - mean)`; channel r when unsaid. */
 const OpacityLayer = open({
   texture: Schema.String,
   tiling: Pair,
   projection: Schema.optionalKey(Schema.NullOr(Projection)),
+  channel: Schema.optionalKey(Schema.NullOr(Channel)),
   gain: Schema.Finite,
   mean: Num
 })
@@ -147,10 +150,14 @@ export interface ColorLayer {
   readonly mean: readonly [number, number, number]
 }
 
-/** A texture the alpha of a translucent material depends on: `alpha += gain * (read - mean)`. */
+export type TextureChannel = typeof Channel.Type
+
+/** A texture the alpha of a translucent material depends on: `alpha += gain * (read[channel] - mean)`. */
 export interface OpacityLayer {
   readonly texture: string
   readonly tiling: Pair
+  /** The channel the shader reads. */
+  readonly channel: TextureChannel
   readonly gain: number
   readonly mean: number
 }
@@ -325,7 +332,13 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
   )
   const opacityLayer: OpacityLayer | undefined = ol === undefined
     ? undefined
-    : { texture: ol.texture, tiling: pair(ol.tiling, [1, 1]), gain: ol.gain, mean: ol.mean ?? 0.5 }
+    : {
+      texture: ol.texture,
+      tiling: pair(ol.tiling, [1, 1]),
+      channel: ol.channel ?? "r",
+      gain: ol.gain,
+      mean: ol.mean ?? 0.5
+    }
   const v = a.variation
   const variation: Variation | undefined = v == null || v.tilings.length === 0 || v.gain === 0
     ? undefined

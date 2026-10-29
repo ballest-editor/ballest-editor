@@ -6,7 +6,18 @@
 // how the beam materials hide their end caps (alpha * (1 - |world normal z|)). That is enough to read the
 // material's base colour, metallic and roughness off the GBuffer outputs, including how each texture read
 // scales them.
-import { inputDependency, type Module, parseFloat } from "./dxil.ts"
+import {
+  BINARY_OPS,
+  FCMP_OPS,
+  ICMP_OPS,
+  inputDependency,
+  type Instruction,
+  instructionOf,
+  INT_OPS,
+  type Module,
+  parseFloat,
+  UNARY_OPS
+} from "./dxil.ts"
 
 export interface Env {
   /** Value of a constant-buffer float by buffer type (`Material[4].w`, `View[164].y`); undefined = unknown (then 0). */
@@ -85,26 +96,6 @@ export const UP: readonly [number, number, number] = [0, 0, 1]
 /** A vertical surface (a cube's side). */
 export const SIDE: readonly [number, number, number] = [1, 0, 0]
 
-const UNARY: Record<string, (x: number) => number> = {
-  "6": Math.abs,
-  "7": (x) => Math.min(1, Math.max(0, x)),
-  "12": Math.cos,
-  "13": Math.sin,
-  "21": Math.exp,
-  "22": (x) => x - Math.floor(x),
-  "23": Math.log,
-  "24": Math.sqrt,
-  "25": (x) => 1 / Math.sqrt(x),
-  "26": Math.round,
-  "27": Math.floor,
-  "28": Math.ceil,
-  "29": Math.trunc
-}
-const BINARY: Record<string, (a: number, b: number) => number> = {
-  "35": Math.max,
-  "36": Math.min
-}
-
 const num = (s: string | undefined) => Number.parseInt(s ?? "", 10)
 const g = (m: RegExpMatchArray, i: number): string => m[i] ?? ""
 
@@ -153,92 +144,94 @@ export class Evaluator {
   }
 
   #compute(v: string): number {
-    const d = this.#m.defs.get(v)
-    if (d === undefined) return 0
-    if (d.includes("@dx.op.loadInput")) return this.#input(d)
-    const ev = d.match(/^extractvalue \S+ (%[\w.]+), (\d+)$/)
-    if (ev) {
-      const agg = this.#m.defs.get(g(ev, 1)) ?? ""
-      const ch = num(ev[2])
-      const cb = agg.match(/cbufferLoadLegacy\.\w+\(i32 \d+, %dx\.types\.Handle (%[\w.]+), i32 (\d+)\)/)
-      if (cb) return this.#env.cbuf(`${this.#handles.get(g(cb, 1)) ?? "?"}[${g(cb, 2)}].${"xyzw"[ch]}`) ?? 0
-      if (agg.includes("@dx.op.sample")) return this.#env.sample(g(ev, 1), ch)
-      const raw = agg.match(/@dx\.op\.rawBufferLoad\.f32\(i32 \d+, %dx\.types\.Handle %[\w.]+, i32 (\S+),/)
-      if (raw) {
-        const index = this.int(g(raw, 1))
-        return (this.#env.scene?.[index] ?? SCENE_ROWS[index])?.[ch] ?? 0
+    const i = instructionOf(this.#m, v)
+    if (i === undefined) return 0
+    switch (i.kind) {
+      case "input":
+        return this.#input(i)
+      case "extract": {
+        const agg = instructionOf(this.#m, i.aggregate)
+        if (agg?.kind === "cbuffer") return this.#env.cbuf(this.#cbufRef(agg, i.channel)) ?? 0
+        if (agg?.kind === "sample") return this.#env.sample(i.aggregate, i.channel)
+        if (agg?.kind === "rawLoad") {
+          const index = this.int(agg.index)
+          return (this.#env.scene?.[index] ?? SCENE_ROWS[index])?.[i.channel] ?? 0
+        }
+        return 0
       }
-      return 0
+      default:
+        break
     }
     // A dot product the compiler expanded into multiplies and adds of input-derived vectors (N·V and
     // friends) reads 1, like an explicit dot: the surface is seen head-on.
     if (this.#dotLike(v)) return 1
-    const bin = d.match(/^(fmul|fadd|fsub|fdiv) (?:fast )?float (\S+), (\S+)$/)
-    if (bin) {
-      const a = this.value(g(bin, 2)), b = this.value(g(bin, 3))
-      switch (bin[1]) {
-        case "fmul":
-          return a * b
-        case "fadd":
-          return a + b
-        case "fsub":
-          return a - b
-        default:
-          return b === 0 ? 0 : a / b
+    switch (i.kind) {
+      case "float": {
+        const a = this.value(i.a), b = this.value(i.b)
+        switch (i.op) {
+          case "fmul":
+            return a * b
+          case "fadd":
+            return a + b
+          case "fsub":
+            return a - b
+          default:
+            return b === 0 ? 0 : a / b
+        }
       }
-    }
-    const un = d.match(/@dx\.op\.unary\.f32\(i32 (\d+), float (\S+)\)/)
-    if (un) return (UNARY[g(un, 1)] ?? (() => 0))(this.value(g(un, 2)))
-    const bi = d.match(/@dx\.op\.binary\.f32\(i32 (\d+), float (\S+), float (\S+)\)/)
-    if (bi) return (BINARY[g(bi, 1)] ?? (() => 0))(this.value(g(bi, 2)), this.value(g(bi, 3)))
-    const mad = d.match(/@dx\.op\.tertiary\.f32\(i32 46, float (\S+), float (\S+), float (\S+)\)/)
-    if (mad) return this.value(g(mad, 1)) * this.value(g(mad, 2)) + this.value(g(mad, 3))
-    const dot = d.match(/@dx\.op\.dot(\d)\.f32\(i32 \d+, (.*)\)/)
-    if (dot) {
-      const operands = [...g(dot, 2).matchAll(/float ([^,)\s]+)/g)].map((x) => g(x, 1))
-      const n = num(dot[1])
-      // A dot over the vertex normal (N·V, N·L, a fixed light direction) is an orientation: the normal
-      // against a transform row is a world normal component, anything else reads facing (1). Two
-      // input-derived vectors read facing too. Anything else (a luminance weighting of texture reads, a
-      // channel pick) is computed.
-      const both = operands.slice(0, n).some((o) => this.#inputDependent(o)) &&
-        operands.slice(n).some((o) => this.#inputDependent(o))
-      if (both || operands.some((o) => this.#reaches(o, 4, this.#isNormalInput))) {
-        return this.#worldNormalComponent(operands) ?? 1
+      case "unary":
+        return (UNARY_OPS[i.op]?.fn ?? (() => 0))(this.value(i.x))
+      case "binary":
+        return (BINARY_OPS[i.op]?.fn ?? (() => 0))(this.value(i.a), this.value(i.b))
+      case "mad":
+        return this.value(i.a) * this.value(i.b) + this.value(i.c)
+      case "dot": {
+        // A dot over the vertex normal (N·V, N·L, a fixed light direction) is an orientation: the normal
+        // against a transform row is a world normal component, anything else reads facing (1). Two
+        // input-derived vectors read facing too. Anything else (a luminance weighting of texture reads, a
+        // channel pick) is computed.
+        const both = i.operands.slice(0, i.n).some((o) => this.#inputDependent(o)) &&
+          i.operands.slice(i.n).some((o) => this.#inputDependent(o))
+        if (both || i.operands.some((o) => this.#reaches(o, 4, this.#isNormalInput))) {
+          return this.#worldNormalComponent(i.operands) ?? 1
+        }
+        const ops = i.operands.map((o) => this.value(o))
+        let sum = 0
+        for (let k = 0; k < i.n; k++) sum += (ops[k] ?? 0) * (ops[k + i.n] ?? 0)
+        return sum
       }
-      const ops = operands.map((o) => this.value(o))
-      let sum = 0
-      for (let i = 0; i < n; i++) sum += (ops[i] ?? 0) * (ops[i + n] ?? 0)
-      return sum
+      case "select": {
+        if (i.type !== "float") return 0
+        const cond = this.bool(i.cond)
+        return cond === undefined ? this.value(i.b) : cond ? this.value(i.a) : this.value(i.b)
+      }
+      case "phi": {
+        const entry = this.phiEntry(v)
+        return entry === undefined ? 0 : this.value(entry)
+      }
+      case "toFloat":
+        return this.int(i.x)
+      case "bitcast":
+        return i.to === "float" ? bits(this.int(i.x)) : 0
+      default:
+        return 0
     }
-    const sel = d.match(/^select i1 (\S+), float (\S+), float (\S+)$/)
-    if (sel) {
-      const cond = this.bool(g(sel, 1))
-      return cond === undefined ? this.value(g(sel, 3)) : cond ? this.value(g(sel, 2)) : this.value(g(sel, 3))
-    }
-    if (d.startsWith("phi ")) {
-      const entry = this.phiEntry(v)
-      return entry === undefined ? 0 : this.value(entry)
-    }
-    const conv = d.match(/^(?:sitofp|uitofp) \S+ (\S+) to float$/)
-    if (conv) return this.int(g(conv, 1))
-    const fromBits = d.match(/^bitcast i32 (\S+) to float$/)
-    if (fromBits) return bits(this.int(g(fromBits, 1)))
-    return 0
+  }
+
+  /** `Material[4].w`, `View[164].y`: a constant-buffer float by the buffer's type name. */
+  #cbufRef(load: Extract<Instruction, { kind: "cbuffer" }>, channel: number): string {
+    return `${this.#handles.get(load.handle) ?? "?"}[${load.index}].${"xyzw"[channel]}`
   }
 
   /**
    * The surface seen head-on from above: the world normal (UE's TEXCOORD11, z up) is +z, the tangent
    * (TEXCOORD10) +x, texture coordinates sit mid-face, everything else (positions) is 0.
    */
-  #input(d: string): number {
-    const li = d.match(/loadInput\.f32\(i32 \d+, i32 (\d+), i32 \d+, i8 (\d+)/)
-    if (!li) return 0
-    const sig = this.#m.inputs.find((x) => x.id === num(li[1]))
-    const component = num(li[2])
+  #input(i: Extract<Instruction, { kind: "input" }>): number {
+    const sig = this.#m.inputs.find((x) => x.id === i.id)
     if (sig === undefined) return 0
-    if (sig.name.startsWith("TEXCOORD11")) return component === 2 ? 1 : 0
-    if (sig.name.startsWith("TEXCOORD10")) return component === 0 ? 1 : 0
+    if (sig.name.startsWith("TEXCOORD11")) return i.component === 2 ? 1 : 0
+    if (sig.name.startsWith("TEXCOORD10")) return i.component === 0 ? 1 : 0
     if (sig.name === "TEXCOORD") return 0.5
     return 0
   }
@@ -250,13 +243,13 @@ export class Evaluator {
    * incoming from the earliest block (the plain path, before the special cases branch off).
    */
   phiEntry(v: string): string | undefined {
-    const d = this.#m.defs.get(v) ?? ""
-    const incoming = [...d.matchAll(/\[ (\S+), %(\d+) \]/g)].map((i) => ({ value: g(i, 1), block: g(i, 2) }))
+    const phi = instructionOf(this.#m, v)
+    const incoming = phi?.kind === "phi" ? phi.incoming : []
     const block = this.#env.cfg?.blockOf.get(v)
     const pred = block === undefined ? undefined : this.#predecessors().get(block)
     const taken = pred === undefined ? undefined : incoming.find((i) => i.block === pred)
     if (taken !== undefined) return taken.value
-    return incoming.sort((a, b) => num(a.block) - num(b.block))[0]?.value
+    return incoming.toSorted((a, b) => num(a.block) - num(b.block))[0]?.value
   }
 
   #preds: Map<string, string> | undefined
@@ -283,16 +276,16 @@ export class Evaluator {
   }
 
   /** A load of the vertex normal (UE's TEXCOORD11). */
-  readonly #isNormalInput = (d: string): boolean => {
-    const li = d.match(/loadInput\.f32\(i32 \d+, i32 (\d+),/)
-    return li !== null && (this.#m.inputs.find((x) => x.id === num(li[1]))?.name.startsWith("TEXCOORD11") ?? false)
+  readonly #isNormalInput = (v: string): boolean => {
+    const i = instructionOf(this.#m, v)
+    return i?.kind === "input" && (this.#m.inputs.find((x) => x.id === i.id)?.name.startsWith("TEXCOORD11") ?? false)
   }
 
-  /** Whether `pred` holds for `v`'s definition or one it reaches within `depth` operand steps. */
-  #reaches(v: string, depth: number, pred: (d: string) => boolean): boolean {
+  /** Whether `pred` holds for `v` or a value it reaches within `depth` operand steps. */
+  #reaches(v: string, depth: number, pred: (v: string) => boolean): boolean {
     const d = this.#m.defs.get(v)
     if (d === undefined) return false
-    if (pred(d)) return true
+    if (pred(v)) return true
     if (depth === 0) return false
     return [...d.matchAll(/%[\w.]+/g)].some((o) => o[0] !== v && this.#reaches(o[0], depth - 1, pred))
   }
@@ -312,32 +305,28 @@ export class Evaluator {
 
   /** The component `v` extracts from a raw buffer load (a transform row), possibly scaled; else undefined. */
   #rowComponent(v: string, depth: number): number | undefined {
-    const d = this.#m.defs.get(v)
-    if (d === undefined) return undefined
-    const ev = d.match(/^extractvalue %dx\.types\.ResRet\.f32 (%[\w.]+), (\d)$/)
-    if (ev) return (this.#m.defs.get(g(ev, 1)) ?? "").includes("@dx.op.rawBufferLoad") ? num(ev[2]) : undefined
-    const mul = d.match(/^fmul (?:fast )?float (\S+), (\S+)$/)
-    if (!mul || depth === 0) return undefined
-    return this.#rowComponent(g(mul, 1), depth - 1) ?? this.#rowComponent(g(mul, 2), depth - 1)
+    const i = instructionOf(this.#m, v)
+    if (i?.kind === "extract") {
+      return instructionOf(this.#m, i.aggregate)?.kind === "rawLoad" ? i.channel : undefined
+    }
+    if (i?.kind !== "float" || i.op !== "fmul" || depth === 0) return undefined
+    return this.#rowComponent(i.a, depth - 1) ?? this.#rowComponent(i.b, depth - 1)
   }
 
   /** Sum of 2..4 products of two input-dependent values, through fmul / fadd / fmad. */
   #dotLike(v: string): boolean {
     const terms: Array<[string, string]> = []
     const walk = (x: string, depth: number): boolean => {
-      const d = this.#m.defs.get(x)
-      if (d === undefined || depth > 4) return false
-      const mul = d.match(/^fmul (?:fast )?float (\S+), (\S+)$/)
-      if (mul) {
-        terms.push([g(mul, 1), g(mul, 2)])
+      const i = instructionOf(this.#m, x)
+      if (i === undefined || depth > 4) return false
+      if (i.kind === "float" && i.op === "fmul") {
+        terms.push([i.a, i.b])
         return true
       }
-      const add = d.match(/^fadd (?:fast )?float (\S+), (\S+)$/)
-      if (add) return walk(g(add, 1), depth + 1) && walk(g(add, 2), depth + 1)
-      const mad = d.match(/@dx\.op\.tertiary\.f32\(i32 46, float (\S+), float (\S+), float (\S+)\)/)
-      if (mad) {
-        terms.push([g(mad, 1), g(mad, 2)])
-        return walk(g(mad, 3), depth + 1)
+      if (i.kind === "float" && i.op === "fadd") return walk(i.a, depth + 1) && walk(i.b, depth + 1)
+      if (i.kind === "mad") {
+        terms.push([i.a, i.b])
+        return walk(i.c, depth + 1)
       }
       return false
     }
@@ -347,97 +336,47 @@ export class Evaluator {
 
   /** An i1 value (a comparison, and/or of them); undefined when it is not one this evaluator understands. */
   bool(v: string): boolean | undefined {
-    const d = this.#m.defs.get(v)
-    if (d === undefined) return v === "true" ? true : v === "false" ? false : undefined
-    const cmp = d.match(/^fcmp (?:fast )?(\w+) float (\S+), (\S+)$/)
-    if (cmp) {
-      const a = this.value(g(cmp, 2)), b = this.value(g(cmp, 3))
-      switch (g(cmp, 1)) {
-        case "olt":
-        case "ult":
-          return a < b
-        case "ole":
-        case "ule":
-          return a <= b
-        case "ogt":
-        case "ugt":
-          return a > b
-        case "oge":
-        case "uge":
-          return a >= b
-        case "oeq":
-        case "ueq":
-          return a === b
-        case "one":
-        case "une":
-          return a !== b
-        default:
-          return undefined
+    const i = instructionOf(this.#m, v)
+    if (i === undefined) return v === "true" ? true : v === "false" ? false : undefined
+    switch (i.kind) {
+      case "fcmp":
+        return FCMP_OPS[i.pred]?.fn(this.value(i.a), this.value(i.b))
+      case "icmp":
+        return ICMP_OPS[i.pred]?.fn(this.int(i.a), this.int(i.b))
+      case "logic": {
+        const a = this.bool(i.a), b = this.bool(i.b)
+        if (a === undefined || b === undefined) return undefined
+        return i.op === "and" ? a && b : a || b
       }
+      default:
+        return undefined
     }
-    const icmp = d.match(/^icmp (\w+) i32 (\S+), (\S+)$/)
-    if (icmp) {
-      const a = this.int(g(icmp, 2)), b = this.int(g(icmp, 3))
-      switch (g(icmp, 1)) {
-        case "eq":
-          return a === b
-        case "ne":
-          return a !== b
-        default:
-          return undefined
-      }
-    }
-    const andOr = d.match(/^(and|or) i1 (\S+), (\S+)$/)
-    if (andOr) {
-      const a = this.bool(g(andOr, 2)), b = this.bool(g(andOr, 3))
-      if (a === undefined || b === undefined) return undefined
-      return andOr[1] === "and" ? a && b : a || b
-    }
-    return undefined
   }
 
   /** An i32 value: literals, integer constant-buffer loads, and integer arithmetic over them; 0 otherwise. */
   int(v: string): number {
     const n = Number(v)
     if (Number.isFinite(n)) return n
-    const d = this.#m.defs.get(v) ?? ""
-    const ev = d.match(/^extractvalue \S+ (%[\w.]+), (\d+)$/)
-    if (ev) {
-      const agg = this.#m.defs.get(g(ev, 1)) ?? ""
-      const cb = agg.match(/cbufferLoadLegacy\.i32\(i32 \d+, %dx\.types\.Handle (%[\w.]+), i32 (\d+)\)/)
-      if (cb) return this.#env.cbuf(`${this.#handles.get(g(cb, 1)) ?? "?"}[${g(cb, 2)}].${"xyzw"[num(ev[2])]}`) ?? 0
-    }
-    const toBits = d.match(/^bitcast float (\S+) to i32$/)
-    if (toBits) return bitsOf(this.value(g(toBits, 1)))
-    const sel = d.match(/^select i1 (\S+), i32 (\S+), i32 (\S+)$/)
-    if (sel) return this.bool(g(sel, 1)) === true ? this.int(g(sel, 2)) : this.int(g(sel, 3))
-    if (d.startsWith("phi ")) {
-      const entry = this.phiEntry(v)
-      return entry === undefined ? 0 : this.int(entry)
-    }
-    const bin = d.match(/^(and|or|xor|shl|lshr|add|sub|mul)(?: nuw)?(?: nsw)? i32 (\S+), (\S+)$/)
-    if (bin) {
-      const a = this.int(g(bin, 2)), b = this.int(g(bin, 3))
-      switch (bin[1]) {
-        case "and":
-          return a & b
-        case "or":
-          return a | b
-        case "shl":
-          return a << b
-        case "lshr":
-          return a >>> b
-        case "xor":
-          return a ^ b
-        case "add":
-          return (a + b) | 0
-        case "sub":
-          return (a - b) | 0
-        default:
-          return Math.imul(a, b)
+    const i = instructionOf(this.#m, v)
+    if (i === undefined) return 0
+    switch (i.kind) {
+      case "extract": {
+        const agg = instructionOf(this.#m, i.aggregate)
+        return agg?.kind === "cbuffer" && agg.type === "i32" ? this.#env.cbuf(this.#cbufRef(agg, i.channel)) ?? 0 : 0
       }
+      case "bitcast":
+        return i.to === "i32" ? bitsOf(this.value(i.x)) : 0
+      case "select":
+        return i.type === "i32" ? this.bool(i.cond) === true ? this.int(i.a) : this.int(i.b) : 0
+      case "phi": {
+        const entry = this.phiEntry(v)
+        return entry === undefined ? 0 : this.int(entry)
+      }
+      case "int":
+        return (INT_OPS[i.op]?.fn ?? (() => 0))(this.int(i.a), this.int(i.b))
+      default:
+        return 0
     }
-    return 0
   }
 }
 
@@ -510,34 +449,29 @@ export const ENGINE_DEFAULTS: Record<string, number> = {
  * base colour after its own math, the only place a translucent pass (no GBuffer) exposes it.
  */
 const diffuseOf = (m: Module): ReadonlyArray<string> | null => {
+  const names = bufferNames(m)
   const cbufComponent = (v: string): [string, number] | null => {
-    const d = m.defs.get(v)
-    const ev = d?.match(/^extractvalue \S+ (%[\w.]+), (\d+)$/)
-    if (!ev) return null
-    const agg = m.defs.get(g(ev, 1)) ?? ""
-    const cb = agg.match(/cbufferLoadLegacy\.\w+\(i32 \d+, %dx\.types\.Handle (%[\w.]+), i32 (\d+)\)/)
-    if (!cb) return null
-    const h = m.handles.get(g(cb, 1))
-    const type = m.cbuffers.find((c) => c.register === h?.register)?.type.replace(/^hostlayout\./, "")
-    return [`${type ?? "?"}[${g(cb, 2)}]`, num(ev[2])]
+    const i = instructionOf(m, v)
+    if (i?.kind !== "extract") return null
+    const agg = instructionOf(m, i.aggregate)
+    if (agg?.kind !== "cbuffer") return null
+    return [`${names.get(agg.handle) ?? "?"}[${agg.index}]`, i.channel]
+  }
+  const isOverrideW = (v: string) => {
+    const c = cbufComponent(v)
+    return c?.[0] === "View[161]" && c[1] === 3
   }
   const out: Array<string> = []
-  for (const [v, d] of m.defs) {
-    const mul = d.match(/^fmul (?:fast )?float (\S+), (\S+)$/)
-    if (!mul) continue
-    const [a, b] = [g(mul, 1), g(mul, 2)]
-    const w = cbufComponent(a)?.[1] === 3 && cbufComponent(a)?.[0] === "View[161]"
-      ? b
-      : cbufComponent(b)?.[1] === 3 && cbufComponent(b)?.[0] === "View[161]"
-      ? a
-      : undefined
+  for (const v of m.defs.keys()) {
+    const mul = instructionOf(m, v)
+    if (mul?.kind !== "float" || mul.op !== "fmul") continue
+    const w = isOverrideW(mul.a) ? mul.b : isOverrideW(mul.b) ? mul.a : undefined
     if (w === undefined) continue
     // which channel: the add of View[161].{x,y,z} that follows
-    for (const dd of m.defs.values()) {
-      const add = dd.match(/^fadd (?:fast )?float (\S+), (\S+)$/)
-      if (!add || (add[1] !== v && add[2] !== v)) continue
-      const other = add[1] === v ? g(add, 2) : g(add, 1)
-      const c = cbufComponent(other)
+    for (const u of m.defs.keys()) {
+      const add = instructionOf(m, u)
+      if (add?.kind !== "float" || add.op !== "fadd" || (add.a !== v && add.b !== v)) continue
+      const c = cbufComponent(add.a === v ? add.b : add.a)
       if (c?.[0] === "View[161]" && c[1] < 3 && out[c[1]] === undefined) out[c[1]] = w
     }
   }
