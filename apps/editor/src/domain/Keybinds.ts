@@ -114,9 +114,8 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   scaleMode:
     "Scale: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the game's level editor.",
   toggleGizmoSpace:
-    "Switch the translate, rotate and scale gizmos between the selected item's own axes (the last one picked, when several are selected) and the world axes. Editor only.",
-  focusSelection:
-    "Frame the current selection in the viewport. F in the game's level editor; its free camera calls this \"center camera\" (C).",
+    "Switch the translate, rotate and scale gizmos between the selected item's own axes (the last one picked, when several are selected) and the world axes. C in the game's level editor.",
+  focusSelection: "Frame the current selection in the viewport. F in the game's level editor.",
   addToSelection:
     "Click an item to add it to the selection (it becomes the active item). Shift+click, as in Unreal's editor; the game's key for this isn't recorded.",
   toggleSelection:
@@ -142,7 +141,7 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Hold and drag to turn the camera. The game uses plain mouse movement; in the browser a button has to be held. While it's held, the fly keys never trigger tool shortcuts.",
   moveUp: "Fly the camera straight up while held.",
   moveDown:
-    "Fly the camera straight down while held. The game uses Left Ctrl; the editor defaults to Left Shift so Ctrl+Z / Ctrl+Y never move the camera.",
+    "Fly the camera straight down while held. Left Ctrl, as in the game; when it's the modifier of a shortcut (Ctrl+Z, Ctrl+C...) it doesn't move the camera.",
   lookRight: "Turn the camera right while held.",
   lookLeft: "Turn the camera left while held.",
   lookUp: "Tilt the camera up while held.",
@@ -191,8 +190,8 @@ export const defaultKeybinds: Keybinds = {
   translateMode: ["KeyW"],
   rotateMode: ["KeyE"],
   scaleMode: ["KeyR"],
-  toggleGizmoSpace: ["KeyX"],
-  focusSelection: ["KeyF", "KeyC"],
+  toggleGizmoSpace: ["KeyC"],
+  focusSelection: ["KeyF"],
   addToSelection: ["Shift+Mouse0"],
   toggleSelection: ["Ctrl+Mouse0"],
   deleteSelection: ["Backspace", "Delete"],
@@ -209,7 +208,7 @@ export const defaultKeybinds: Keybinds = {
   moveRight: ["KeyD"],
   look: ["Mouse2"],
   moveUp: ["Space"],
-  moveDown: ["ShiftLeft"],
+  moveDown: ["ControlLeft"],
   lookRight: ["ArrowRight"],
   lookLeft: ["ArrowLeft"],
   lookUp: ["ArrowUp"],
@@ -224,12 +223,6 @@ export const defaultKeybinds: Keybinds = {
   exportMap: ["Ctrl+Shift+KeyE"],
   showKeybinds: ["Shift+Slash"]
 }
-
-/**
- * Editor decisions that win over the game's mappings in keybinds.json:
- * "down" is Left Shift (the game's Left Ctrl collides with Ctrl+Z / Ctrl+Y).
- */
-export const editorOverrides: Partial<Keybinds> = { moveDown: ["ShiftLeft"] }
 
 /** What's persisted: any subset, unknown actions ignored. Older saves stored one string. */
 export const StoredKeybinds = Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Array(Schema.String)]))
@@ -325,21 +318,24 @@ export const MODIFIER_HOLD_MS = 120
 
 /**
  * Tracks held keys for continuous actions. A bare modifier (Ctrl/Shift/Alt) bound to a
- * held action only counts once it has been held for MODIFIER_HOLD_MS; pressing a key that
- * completes a bound chord while it's down (Ctrl+Z when "down" is Left Ctrl) suppresses it
- * until it's released. Other keys (Shift+W flying down and forward) don't. So chords take
- * precedence over a modifier used as a movement key.
+ * held action only counts once it has been held for MODIFIER_HOLD_MS; pressing a key or
+ * button that makes it a chord while it's down (Ctrl+Z, Ctrl+C, Ctrl+click with "down" on
+ * Left Ctrl) suppresses it until it's released. Movement keys (Ctrl+W flying down and
+ * forward) don't. So chords take precedence over a modifier used as a movement key.
  */
 export class HeldKeys {
   private readonly downAt = new Map<string, number>()
   private readonly suppressed = new Set<string>()
 
-  /** `completesChord`: this press formed a bound one-shot chord with the held modifiers. */
-  press(code: string, now: number, completesChord = false): void {
+  /** `formsChord`: this press made a chord with the held modifiers (see `formsChord` in flyKeys). */
+  press(code: string, now: number, formsChord = false): void {
     if (!this.downAt.has(code)) this.downAt.set(code, now)
-    if (completesChord && !MODIFIER_CODES.has(code)) {
-      for (const held of this.downAt.keys()) if (MODIFIER_CODES.has(held)) this.suppressed.add(held)
-    }
+    if (formsChord && !MODIFIER_CODES.has(code)) this.suppressModifiers()
+  }
+
+  /** The held modifiers are part of a chord (a key or a click): none of them drive held actions until released. */
+  suppressModifiers(): void {
+    for (const held of this.downAt.keys()) if (MODIFIER_CODES.has(held)) this.suppressed.add(held)
   }
 
   release(code: string): void {

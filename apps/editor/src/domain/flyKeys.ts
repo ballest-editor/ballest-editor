@@ -6,7 +6,7 @@
  * another movement key is already flying the camera, and otherwise is left to its shortcut.
  * Under "nothing" it does both: it always flies, and its shortcut fires on press too.
  */
-import { isOneShotChord, type Keybinds } from "./Keybinds"
+import { baseCodeOf, isBoundChord, isOneShotChord, type Keybinds } from "./Keybinds"
 
 /** "all" matches the game: every movement key waits for the look button. */
 export const movementLookModes = ["all", "upDown", "conflicting", "nothing"] as const
@@ -43,3 +43,14 @@ export const flyingActions = (
 /** Is `chord` one of the movement bindings (so it flies instead of firing its shortcut while moving)? */
 export const isMovementChord = (keybinds: Keybinds, chord: string): boolean =>
   movementActions.some((action) => keybinds[action].includes(chord))
+
+/**
+ * Does this key press (chordOf) make the held modifiers a chord rather than movement keys?
+ * Bound shortcuts do (Ctrl+Z, Ctrl+D), and so does any other key that isn't a movement key
+ * (the browser's own Ctrl+F, Ctrl+L...), so Ctrl as "down" never moves the camera under them.
+ * Movement keys don't: Ctrl+W flies down and forward.
+ */
+export const formsChord = (keybinds: Keybinds, chord: string): boolean =>
+  isBoundChord(keybinds, chord) ||
+  (chord.includes("+") &&
+    !movementActions.some((action) => keybinds[action].some((binding) => baseCodeOf(binding) === baseCodeOf(chord))))

@@ -35,8 +35,8 @@ describe("keybind table", () => {
       ["translate", ["KeyW"]],
       ["rotate", ["KeyE"]],
       ["scale", ["KeyR"]],
-      ["local / world axes", ["KeyX"]], // editor only
-      ["focus selection", ["KeyF", "KeyC"]],
+      ["local / world axes", ["KeyC"]],
+      ["focus selection", ["KeyF"]],
       ["add to selection", ["Shift+Mouse0"]],
       ["toggle selection", ["Ctrl+Mouse0"]]
     ])
@@ -62,7 +62,7 @@ describe("keybind table", () => {
       ["right", ["KeyD"]],
       ["look", ["Mouse2"]],
       ["up", ["Space"]],
-      ["down", ["ShiftLeft"]]
+      ["down", ["ControlLeft"]]
     ])
     expect(keybindActionDescriptions.moveDown).toContain("Left Ctrl")
     expect(defaultKeybinds.fastMove).toEqual([])
@@ -77,7 +77,9 @@ describe("keybind table", () => {
     expect(shared).toEqual([["KeyW", ["translateMode", "moveForward"]]])
     expect(isOneShotChord(defaultKeybinds, "KeyW")).toBe(true)
     expect(isOneShotChord(defaultKeybinds, "KeyS")).toBe(false)
-    expect(actionsFor(defaultKeybinds, "KeyC")).toEqual(["focusSelection"])
+    expect(actionsFor(defaultKeybinds, "KeyC")).toEqual(["toggleGizmoSpace"])
+    expect(actionsFor(defaultKeybinds, "KeyF")).toEqual(["focusSelection"])
+    expect(actionsFor(defaultKeybinds, "KeyX")).toEqual([])
   })
 
   it("merges stored bindings, accepting the old single-string form", () => {
@@ -134,11 +136,18 @@ describe("HeldKeys: Left Ctrl = fly down vs Ctrl chords", () => {
     expect(keys.holds("ControlLeft", 2000 + MODIFIER_HOLD_MS)).toBe(true)
   })
 
-  it("Shift (down) + W flies down and forward: movement keys aren't chords", () => {
+  it("a click chord (Ctrl+click) suppresses it too", () => {
     const keys = new HeldKeys()
-    keys.press("ShiftLeft", 0)
-    expect(isBoundChord(defaultKeybinds, "Shift+KeyW")).toBe(false)
-    keys.press("KeyW", 10, isBoundChord(defaultKeybinds, "Shift+KeyW"))
+    keys.press("ControlLeft", 0)
+    keys.suppressModifiers()
+    expect(keys.holds("ControlLeft", 500)).toBe(false)
+  })
+
+  it("Ctrl (down) + W flies down and forward: movement keys aren't chords", () => {
+    const keys = new HeldKeys()
+    keys.press("ControlLeft", 0)
+    expect(isBoundChord(defaultKeybinds, "Ctrl+KeyW")).toBe(false)
+    keys.press("KeyW", 10, isBoundChord(defaultKeybinds, "Ctrl+KeyW"))
     expect(keys.holdsAny(defaultKeybinds.moveDown, 500)).toBe(true)
     expect(keys.holdsAny(defaultKeybinds.moveForward, 500)).toBe(true)
   })
