@@ -119,7 +119,8 @@ export function GizmoController() {
         worldPerPixel: worldPerPixel(camera, origin, height),
         gameRotation: target.rotation,
         space: useEditor.getState().gizmoSpace,
-        cameraQuaternion: camera.quaternion
+        cameraQuaternion: camera.quaternion,
+        toCamera: camera.position.clone().sub(origin).normalize()
       },
       hovered.current,
       drag.current?.id ?? null
