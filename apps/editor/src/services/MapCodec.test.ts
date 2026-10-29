@@ -1,10 +1,17 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
+import * as fs from "node:fs"
+import * as path from "node:path"
+import { setSlotMaterials, type SlotMaterial } from "../domain/edits"
+import { objectPathOf } from "../domain/MapFile"
+import { parsePaint } from "../domain/Paint"
 import { objectAt, parseJson } from "../test/json"
-import { listSamples, readSample } from "../test/samples"
+import { listSamples, readSample, repoRoot } from "../test/samples"
 import { MapCodec } from "./MapCodec"
 
 const samples = listSamples()
+const paintChoices = parsePaint(JSON.parse(fs.readFileSync(path.join(repoRoot, "assets", "materials.json"), "utf8")))
+  .flatMap((finish) => finish.colors.map((c) => c.material))
 
 describe("MapCodec", () => {
   it("finds the samples", () => {
@@ -35,6 +42,41 @@ describe("MapCodec", () => {
         const text = readSample(sample)
         const out = yield* codec.encode(yield* codec.decode(text))
         assert.isTrue(out === text, "encoded text differs from the in-game save")
+      }).pipe(Effect.provide(MapCodec.layer))
+  )
+
+  // Paint every slot of every item, cycling through the game's picker, and the file still
+  // round-trips: each slot and its materialAssetPaths entry carry the chosen material.
+  it.effect.each(samples.map((s) => [s.name, s] as const))(
+    "round-trips %s with every slot painted",
+    ([, sample]) =>
+      Effect.gen(function*() {
+        assert.isAbove(paintChoices.length, 0)
+        const codec = yield* MapCodec
+        const map = yield* codec.decode(readSample(sample))
+        let n = 0
+        const edits: Array<SlotMaterial> = map.items.flatMap((item, index) =>
+          item.meshComponents.flatMap((mesh, component) =>
+            mesh.materials.map(({ materialIndex: slot }) => ({
+              index,
+              component,
+              slot,
+              material: paintChoices[n++ % paintChoices.length]!
+            }))
+          )
+        )
+        const painted = Option.getOrThrow(setSlotMaterials(map, edits))
+        const text = yield* codec.encode(painted)
+        const decoded = yield* codec.decode(text)
+        assert.deepStrictEqual(decoded, painted)
+        assert.deepStrictEqual(parseJson(yield* codec.encode(decoded)), parseJson(text))
+        for (const { index, component, slot, material } of edits) {
+          const mesh = decoded.items[index]!.meshComponents[component]!
+          assert.strictEqual(mesh.materials.find((m) => m.materialIndex === slot)?.material, material)
+          if (mesh.materialAssetPaths !== undefined) {
+            assert.strictEqual(mesh.materialAssetPaths[slot], objectPathOf(material))
+          }
+        }
       }).pipe(Effect.provide(MapCodec.layer))
   )
 

@@ -154,6 +154,8 @@ public static partial class Program
         var provider = OpenProvider(args);
         switch (args[0])
         {
+            case "shaders":
+                return ExportShaders(args, provider);
             case "list":
             {
                 var filter = Opt(args, "--filter") ?? "";

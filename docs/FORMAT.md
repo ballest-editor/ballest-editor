@@ -79,6 +79,10 @@ Not every class lists them in its CDO. The probe map `samples/UserSavedMaps/...p
 - In the saved file every item except the two floors sat 170–400 cm higher than written (z only; the player start went from 0 to 170). Not yet explained. The probes also showed that z = 0 is under the default map's water: items placed at z ≈ 0 were hidden in it. That may be why the game raised them.
   Largest sample: 3750 items ("Ballest Of The Mall").
 
+## Materials (the in-game Paint panel)
+
+Each `meshComponents[].materials[]` entry is one UE material slot (`materialIndex`, contiguous from 0, in index order), and `materialAssetPaths` repeats the same materials as bare object paths in the same order. Every slot can be repainted independently, including outline strips such as `M_OutlineEdges`. The in-game Paint panel offers 7 finishes (smooth, rough, glossy, concrete, tiled, emissive, special) × colours, which come to 66 material instances, listed in `assets/materials.json` under `paint` (see `tools/extract/README.md`). Maps also carry materials outside that list: catalog defaults (`MI_ArenaOrange2`, `M_BaseSurface_Metal`, …) and older instances (`MI_Env_Smooth_Lime_OLD`).
+
 ## Hard limits (constants recovered from the shipping exe, build 0.4.0-playtest)
 
 Found by locating the `lea` that references each error string and reading the adjacent `cmp` immediate (`/tmp/ballest-re`, objdump).

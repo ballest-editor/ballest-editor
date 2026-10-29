@@ -9,7 +9,6 @@
   "workspaces": {
     ".": {
       "entry": [
-        "tools/extract/*.mjs",
         "tools/compress/*.mjs"
       ],
       "ignoreDependencies": [
@@ -21,6 +20,9 @@
         "tailwindcss"
       ]
     },
-    "packages/ui": {}
+    "packages/ui": {},
+    "tools/extract": {
+      "entry": ["src/main.ts", "*.mjs"]
+    }
   }
 }

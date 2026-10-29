@@ -2,7 +2,7 @@
  * What to draw for a map item, derived from the item and the catalog index. Pure data: no
  * three.js, no React, so the inspector and the preloader can share it with ItemObject.
  */
-import { type CatalogIndex, type MeshInfo, visibleExtras } from "../domain/Catalog"
+import { type CatalogIndex, type MeshInfo, slotDefaultsOf, visibleExtras } from "../domain/Catalog"
 import { type Tuple3, type Tuple4, ueToScene } from "../domain/coords"
 import type { Item } from "../domain/MapFile"
 import { assetUrl } from "./assetUrl"
@@ -45,7 +45,10 @@ export const visualsOf = (item: Item, index: CatalogIndex | null): ReadonlyArray
         bounds: extra.bounds ?? undefined,
         slotDefaults: []
       }
-    visuals.push({ key: `x${i}`, mesh, slotMaterials: mesh.slotDefaults, relative: rel })
+    // The component's own slot materials: the same engine cube is the vent's air beam and the
+    // checkpoint's glow panel, so the mesh-level defaults (first piece to use it) are not enough.
+    const own = slotDefaultsOf(extra.materialSlots)
+    visuals.push({ key: `x${i}`, mesh, slotMaterials: own.length > 0 ? own : mesh.slotDefaults, relative: rel })
   })
   return visuals
 }
