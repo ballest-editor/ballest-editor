@@ -44,7 +44,8 @@ export const keybindSections = [
   },
   { name: "mouse and keyboard bindings", actions: ["lookRight", "lookLeft", "lookUp", "lookDown"] },
   { name: "editor camera", actions: ["fastMove", "speedFaster", "speedSlower", "orbit", "pan"] },
-  { name: "file", actions: ["newMap", "importMap", "exportMap"] }
+  { name: "file", actions: ["newMap", "importMap", "exportMap"] },
+  { name: "help", actions: ["showKeybinds"] }
 ] as const
 
 export type KeybindAction = (typeof keybindSections)[number]["actions"][number]
@@ -88,7 +89,8 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   pan: "pan",
   newMap: "new map",
   importMap: "import map",
-  exportMap: "export map"
+  exportMap: "export map",
+  showKeybinds: "keybind cheat sheet"
 }
 
 /** What each action does in the editor (binding tooltips). */
@@ -138,7 +140,8 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   pan: "Hold and drag to slide the camera sideways and up/down.",
   newMap: "Start a new map.",
   importMap: "Open a .balledit or .ballmap file.",
-  exportMap: "Download the map as a .balledit file for the game."
+  exportMap: "Download the map as a .balledit file for the game.",
+  showKeybinds: "Hold to show every keybind over the viewport; release to hide it. Editor only."
 }
 
 /** Actions bound to a mouse click (with modifiers) on an item in the viewport. */
@@ -203,7 +206,8 @@ export const defaultKeybinds: Keybinds = {
   pan: ["Mouse1"],
   newMap: ["Alt+KeyN"],
   importMap: ["Ctrl+KeyO"],
-  exportMap: ["Ctrl+KeyS"]
+  exportMap: ["Ctrl+Shift+KeyE"],
+  showKeybinds: ["Shift+Slash"]
 }
 
 /**
@@ -236,6 +240,16 @@ export const sameBindings = (a: Bindings, b: Bindings): boolean =>
 /** True when the action's bindings are exactly its defaults. */
 export const isDefaultBinding = (keybinds: Keybinds, defaults: Keybinds, action: KeybindAction): boolean =>
   sameBindings(keybinds[action], defaults[action])
+
+const MODIFIER_NAME_CODES: Readonly<Record<string, ReadonlyArray<string>>> = {
+  Ctrl: ["ControlLeft", "ControlRight", "MetaLeft", "MetaRight"],
+  Alt: ["AltLeft", "AltRight"],
+  Shift: ["ShiftLeft", "ShiftRight"]
+}
+
+/** Does releasing key `code` end a hold of `binding` (its key, or one of its modifiers)? */
+export const releasesBinding = (binding: string, code: string): boolean =>
+  binding.split("+").some((part) => part === code || (MODIFIER_NAME_CODES[part]?.includes(code) ?? false))
 
 /** Is `chord` one of the action's bindings? */
 export const isBound = (keybinds: Keybinds, action: KeybindAction, chord: string): boolean =>
@@ -348,6 +362,24 @@ export class HeldKeys {
   }
 }
 
+const SYMBOLS: Readonly<Record<string, string>> = {
+  ArrowUp: "↑",
+  ArrowDown: "↓",
+  ArrowLeft: "←",
+  ArrowRight: "→",
+  Slash: "/",
+  Backslash: "\\",
+  Period: ".",
+  Comma: ",",
+  Semicolon: ";",
+  Quote: "'",
+  Backquote: "`",
+  BracketLeft: "[",
+  BracketRight: "]",
+  Minus: "-",
+  Equal: "="
+}
+
 /** Display form of one chord, e.g. "Ctrl + Z", "RMB", "←". */
 export const formatBinding = (binding: string): string =>
   binding.length === 0 ? "Unbound" : binding
@@ -359,8 +391,7 @@ export const formatBinding = (binding: string): string =>
       if (part === "Mouse1") return "MMB"
       if (part === "Mouse2") return "RMB"
       if (part.startsWith("Mouse")) return `Mouse ${Number(part.slice(5)) + 1}`
-      const arrows: Record<string, string> = { ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→" }
-      if (arrows[part] !== undefined) return arrows[part]
+      if (SYMBOLS[part] !== undefined) return SYMBOLS[part]
       if (part === "WheelUp") return "Wheel up"
       if (part === "WheelDown") return "Wheel down"
       if (part.endsWith("Left") && MODIFIER_CODES.has(part)) return part.replace("Left", "")
