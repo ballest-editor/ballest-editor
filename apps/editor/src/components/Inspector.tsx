@@ -131,8 +131,8 @@ const copiedRows = new Map<TransformField, Vec3>()
 /**
  * One editable row over the whole selection: a label icon whose menu (or Shift+click
  * shortcuts) copies and pastes all three axes, then an X/Y/Z field each. A typed value sets
- * every selected item; a scrub moves each by the same amount from where it was, so a mixed
- * selection keeps its spread; with snapping on, a scrub lands on the grid or rotation step
+ * every selected item; a scrub moves or turns the selection together like the gizmo, so a
+ * mixed selection keeps its spread; with snapping on, a scrub lands on the grid or rotation step
  * (a mixed selection moves in whole steps). `perUnit` converts display units to the stored value.
  */
 function TransformRow(props: {

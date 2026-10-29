@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import type { UeTransform, Vec3 } from "./coords"
-import { applyGroupDelta, editAxis, readField } from "./groupTransform"
-import { rotateVec } from "./ueMath"
+import { applyGroupDelta, type Axis, readField, selectionAxisEdit, type TransformField } from "./groupTransform"
+import { rotateVec, rotatorToQuat } from "./ueMath"
 
 const at = (x: number, y: number, z: number, rotation = { x: 0, y: 0, z: 0, w: 1 }): UeTransform => ({
   translation: { x, y, z },
@@ -58,16 +58,46 @@ describe("group transforms", () => {
     expect(out.scale3D.x).toBeGreaterThan(0)
   })
 
-  it("edits one axis by value or by offset", () => {
+  it("sets one axis on every item, or offsets the selection like the gizmo", () => {
     const t = at(10, 20, 30)
-    expect(editAxis(t, "translation", "y", { kind: "set", value: 5 }).translation).toEqual({ x: 10, y: 5, z: 30 })
-    expect(editAxis(t, "translation", "z", { kind: "offset", by: -5 }).translation).toEqual({ x: 10, y: 20, z: 25 })
-    expect(editAxis(t, "scale3D", "x", { kind: "set", value: 0 }).scale3D.x).toBeGreaterThan(0)
+    const set = (field: TransformField, axis: Axis, value: number) =>
+      selectionAxisEdit(t, field, axis, { kind: "set", value })(t)
+    const offset = (field: TransformField, axis: Axis, by: number, item = t) =>
+      selectionAxisEdit(t, field, axis, { kind: "offset", by })(item)
+    expect(set("translation", "y", 5).translation).toEqual({ x: 10, y: 5, z: 30 })
+    expect(offset("translation", "z", -5).translation).toEqual({ x: 10, y: 20, z: 25 })
+    expect(set("scale3D", "x", 0).scale3D.x).toBeGreaterThan(0)
+    expect(offset("scale3D", "x", 0.5, { ...t, scale3D: { x: 2, y: 1, z: 1 } }).scale3D).toEqual({ x: 2.5, y: 1, z: 1 })
     // rotation is edited in rotator degrees; a yaw of 90 is the quaternion (0, 0, sin 45, cos 45)
-    const turned = editAxis(t, "rotation", "z", { kind: "set", value: 90 })
+    const turned = set("rotation", "z", 90)
     expect(turned.rotation.z).toBeCloseTo(Math.SQRT1_2, 6)
     expect(turned.rotation.w).toBeCloseTo(Math.SQRT1_2, 6)
     expect(readField(turned, "rotation").z).toBeCloseTo(90, 6)
-    expect(readField(editAxis(turned, "rotation", "z", { kind: "offset", by: -30 }), "rotation").z).toBeCloseTo(60, 6)
+    const back = selectionAxisEdit(turned, "rotation", "z", { kind: "offset", by: -30 })(turned)
+    expectVec(readField(back, "rotation"), { x: 0, y: 0, z: 60 })
+    // another item turns with the active one about its origin
+    const other = selectionAxisEdit(turned, "rotation", "z", { kind: "offset", by: 90 })(
+      at(110, 20, 30, turned.rotation)
+    )
+    expectVec(other.translation, { x: 10, y: 120, z: 30 })
+    expectVec(rotateVec(other.rotation, { x: 1, y: 0, z: 0 }), { x: -1, y: 0, z: 0 }) // yaw 180
+  })
+
+  it("offsets one rotator angle of the active item, even at gimbal lock", () => {
+    for (const rotator of [{ roll: 0, pitch: 90, yaw: 30 }, { roll: 40, pitch: -90, yaw: -60 }]) {
+      const t = at(0, 0, 0, rotatorToQuat(rotator))
+      const start = readField(t, "rotation")
+      for (const axis of ["x", "y", "z"] as const) {
+        const out = selectionAxisEdit(t, "rotation", axis, { kind: "offset", by: 5 })(t)
+        const want = rotatorToQuat({
+          roll: start.x + (axis === "x" ? 5 : 0),
+          pitch: start.y + (axis === "y" ? 5 : 0),
+          yaw: start.z + (axis === "z" ? 5 : 0)
+        })
+        for (const v of [{ x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }]) {
+          expectVec(rotateVec(out.rotation, v), rotateVec(want, v))
+        }
+      }
+    }
   })
 })
