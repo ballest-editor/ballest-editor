@@ -30,6 +30,11 @@ const NORMAL_STRENGTH = 1.6
 const textureLoader = new THREE.TextureLoader()
 const textures = new Map<string, THREE.Texture>()
 const materials = new Map<string, THREE.MeshStandardMaterial>()
+/** Settles (never rejects) once the texture's image has loaded or its load has failed. */
+const loads = new WeakMap<THREE.Texture, Promise<void>>()
+
+/** Resolves when `texture` has its image or has failed to load; at once for one that was never requested. */
+export const textureLoaded = (texture: THREE.Texture): Promise<void> => loads.get(texture) ?? Promise.resolve()
 
 const loadTexture = (
   path: string,
@@ -44,12 +49,21 @@ const loadTexture = (
   const cached = textures.get(key)
   if (cached !== undefined) return cached
   // Without a DOM (unit tests) there's no image loader; keep an empty texture.
-  const texture = typeof document === "undefined"
-    ? new THREE.Texture()
-    : textureLoader.load(textureUrl(path), undefined, undefined, () => {
+  let texture: THREE.Texture
+  if (typeof document === "undefined") {
+    texture = new THREE.Texture()
+  } else {
+    let settle = (): void => {}
+    const load = new Promise<void>((resolve) => {
+      settle = resolve
+    })
+    texture = textureLoader.load(textureUrl(path), settle, undefined, () => {
       textures.delete(key)
       onError()
+      settle()
     })
+    loads.set(texture, load)
+  }
   texture.colorSpace = colorSpace
   texture.flipY = flipY
   texture.wrapS = THREE.RepeatWrapping

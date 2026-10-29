@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
 import { parseMaterialsFile } from "../domain/Materials"
-import { BLUE, GLASS, GLOW, materialsFile, OUTLINE, PIPE, TILES, WIND } from "../test/materials"
+import { BLUE, GLASS, GLOW, materialsFile, OUTLINE, PIPE, primitive, TILES, WIND } from "../test/materials"
 import {
   applyShaderPatch,
   applySlotMaterials,
@@ -176,9 +176,8 @@ describe("three materials", () => {
   it("assigns materials per primitive by UE slot index", () => {
     const table = parseMaterialsFile(materialsFile)
     const root = new THREE.Group()
-    const prim = (name: string) => new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ name }))
-    const a = prim("0:Base")
-    const b = prim("1:Glass")
+    const a = primitive("0:Base")
+    const b = primitive("1:Glass")
     root.add(a, b)
     assert.deepStrictEqual([slotIndexOf(a), slotIndexOf(b)], [0, 1])
     applySlotMaterials(root, table, [BLUE, GLASS])

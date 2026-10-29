@@ -5,7 +5,7 @@
  * per piece as a PNG data URL. Renders run one at a time off a queue so an expanded section
  * with a hundred pieces never stalls the UI.
  *
- * `frameBox` and `SerialQueue` are pure and unit-tested; the WebGL part is a thin wrapper.
+ * `frameBox`, `SerialQueue`, `texturesOf` and `whenTexturesReady` are unit-tested; the WebGL part is a thin wrapper.
  */
 import * as THREE from "three"
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js"
@@ -14,8 +14,8 @@ import { type CatalogIndex, type CatalogPiece, pieceIdOf } from "../domain/Catal
 import { type Tuple3, UE_TO_THREE_MATRIX, ueToScene } from "../domain/coords"
 import { itemFromPiece, placementTransform } from "../domain/factory"
 import type { MaterialTable } from "../domain/Materials"
-import { applySlotMaterials, shaderPatchOf } from "./materials"
-import { isMesh } from "./threeGuards"
+import { applySlotMaterials, shaderPatchOf, textureLoaded } from "./materials"
+import { isMesh, isTexture } from "./threeGuards"
 import { glbUrl, visualsOf } from "./visuals"
 import { fixSceneWinding } from "./winding"
 
@@ -131,31 +131,47 @@ const buildPiece = async (
   return root.children.length === 0 ? undefined : root
 }
 
-/** Every texture the object's materials sample, loaded or not. */
-const texturesOf = (object: THREE.Object3D): ReadonlyArray<THREE.Texture> => {
+/**
+ * Every texture the object's materials sample, loaded or not: three's own slots and every sampler the
+ * shader patch adds (the second normal layer, the colour and alpha layers, the mottle, a program's reads).
+ */
+export const texturesOf = (object: THREE.Object3D): ReadonlyArray<THREE.Texture> => {
   const out = new Set<THREE.Texture>()
   object.traverse((o) => {
     if (!isMesh(o)) return
     for (const material of Array.isArray(o.material) ? o.material : [o.material]) {
       if (!(material instanceof THREE.MeshStandardMaterial)) continue
-      for (const t of [material.map, material.normalMap, material.alphaMap, material.emissiveMap]) if (t) out.add(t)
-      const variation = shaderPatchOf(material)?.uniforms.uVariationMap.value
-      if (variation) out.add(variation)
+      const slots = [
+        material.map,
+        material.normalMap,
+        material.alphaMap,
+        material.emissiveMap,
+        material.roughnessMap,
+        material.metalnessMap,
+        material.aoMap
+      ]
+      for (const t of slots) if (t) out.add(t)
+      for (const uniform of Object.values(shaderPatchOf(material)?.uniforms ?? {})) {
+        const value: unknown = uniform.value
+        if (isTexture(value)) out.add(value)
+      }
     }
   })
   return [...out]
 }
 
-/** Resolves once every texture has an image (or has failed), or after `timeoutMs`. */
-const whenTexturesReady = (textures: ReadonlyArray<THREE.Texture>, timeoutMs: number): Promise<void> =>
+/** Resolves once every texture has loaded or failed (`loaded` settles for each), or after `timeoutMs`. */
+export const whenTexturesReady = (
+  textures: ReadonlyArray<THREE.Texture>,
+  timeoutMs: number,
+  loaded: (texture: THREE.Texture) => Promise<void> = textureLoaded
+): Promise<void> =>
   new Promise((resolve) => {
-    const start = performance.now()
-    const check = () => {
-      const pending = textures.some((t) => t.image === undefined || t.image === null)
-      if (!pending || performance.now() - start > timeoutMs) resolve()
-      else setTimeout(check, 50)
-    }
-    check()
+    const timer = setTimeout(resolve, timeoutMs)
+    void Promise.all(textures.map(loaded)).then(() => {
+      clearTimeout(timer)
+      resolve()
+    })
   })
 
 // ---------------------------------------------------------------------------

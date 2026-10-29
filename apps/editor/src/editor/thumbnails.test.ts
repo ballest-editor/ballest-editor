@@ -1,6 +1,10 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
-import { frameBox, SerialQueue, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH } from "./thumbnails"
+import { parseMaterialsFile } from "../domain/Materials"
+import { materialsFile, OUTLINE, PIPE, primitive, WIND } from "../test/materials"
+import { applySlotMaterials, materialFor, shaderPatchOf } from "./materials"
+import { isTexture } from "./threeGuards"
+import { frameBox, SerialQueue, texturesOf, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH, whenTexturesReady } from "./thumbnails"
 
 describe("thumbnail framing", () => {
   const fits = (min: readonly [number, number, number], max: readonly [number, number, number], aspect: number) => {
@@ -55,5 +59,44 @@ describe("SerialQueue", () => {
     assert.strictEqual(await b, "rejected b")
     assert.strictEqual(await c, "c")
     assert.deepStrictEqual(log, ["a", "b", "c"])
+  })
+})
+
+describe("texture readiness", () => {
+  it("collects every texture a piece's materials sample, patch samplers included", () => {
+    const table = parseMaterialsFile(materialsFile)
+    const root = new THREE.Group()
+    root.add(primitive("0:Outline"), primitive("1:Pipe"), primitive("2:Wind"))
+    applySlotMaterials(root, table, [OUTLINE, PIPE, WIND])
+    const textures = new Set(texturesOf(root))
+    const outline = materialFor(table, OUTLINE), pipe = materialFor(table, PIPE), wind = materialFor(table, WIND)
+    for (const t of [outline.normalMap, shaderPatchOf(outline)?.uniforms.uVariationMap.value]) {
+      assert.isTrue(textures.has(t!))
+    }
+    assert.isTrue(textures.has(shaderPatchOf(outline)!.uniforms.uNormalMap2.value!)) // the second normal layer
+    assert.isTrue(textures.has(shaderPatchOf(pipe)!.uniforms.uColorMap1.value!)) // a colour layer
+    assert.isTrue(textures.has(shaderPatchOf(wind)!.uniforms.uAlphaMap.value!)) // the alpha layer
+    const programRead: unknown = shaderPatchOf(wind)!.uniforms["uTex0"]!.value
+    assert.isTrue(isTexture(programRead) && textures.has(programRead)) // a program's read
+  })
+
+  it("waits for the textures to load or fail, and no longer than the timeout", async () => {
+    const a = new THREE.Texture(), b = new THREE.Texture()
+    const settled: Array<string> = []
+    const loaded = (t: THREE.Texture) =>
+      new Promise<void>((resolve) =>
+        setTimeout(() => {
+          settled.push(t === a ? "a" : "b")
+          resolve()
+        }, t === a ? 5 : 1000)
+      )
+    const start = performance.now()
+    await whenTexturesReady([a, b], 40, loaded)
+    const elapsed = performance.now() - start
+    assert.deepStrictEqual(settled, ["a"]) // b (a hung load) does not hold the queue past the timeout
+    assert.isBelow(elapsed, 500)
+    await whenTexturesReady([a], 1000, loaded) // all settled: back well before the timeout
+    assert.isBelow(performance.now() - start, 500)
+    await whenTexturesReady([], 1000, loaded)
   })
 })

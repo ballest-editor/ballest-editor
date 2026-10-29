@@ -7,3 +7,5 @@ import * as THREE from "three"
 export const isMesh = (object: THREE.Object3D): object is THREE.Mesh => object instanceof THREE.Mesh
 
 export const isLine = (object: THREE.Object3D): object is THREE.Line => object instanceof THREE.Line
+
+export const isTexture = (value: unknown): value is THREE.Texture => value instanceof THREE.Texture
