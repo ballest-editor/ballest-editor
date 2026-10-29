@@ -2,7 +2,18 @@
 // everything that depends on the fragment (UVs, the world normal, the object-space position, the
 // material's texture reads, the game time) is emitted as code; everything else (parameters, engine
 // constants, scene data for a piece at the origin) is folded to the number the Evaluator gives it.
-import { type Module, parseFloat } from "./dxil.ts"
+import {
+  BINARY_OPS,
+  FCMP_OPS,
+  ICMP_OPS,
+  type Instruction,
+  instructionOf,
+  INT_BINARY_OPS,
+  INT_OPS,
+  type Module,
+  parseFloat,
+  UNARY_OPS
+} from "./dxil.ts"
 import { bufferNames, type Evaluator } from "./evaluate.ts"
 
 export interface GlslProgram {
@@ -25,8 +36,6 @@ export interface GlslEnv {
   readonly isTime: (ref: string) => boolean
 }
 
-const num = (s: string | undefined) => Number.parseInt(s ?? "", 10)
-const g = (m: RegExpMatchArray, i: number): string => m[i] ?? ""
 const XYZW = ["x", "y", "z", "w"] as const
 
 /** A finite float as a GLSL literal (`1.0`, `2.5e-7`). */
@@ -36,56 +45,8 @@ export const glslFloat = (n: number): string => {
   return /[.e]/.test(s) ? (s.includes("e") && !s.includes(".") ? s.replace("e", ".0e") : s) : `${s}.0`
 }
 
-const UNARY: Record<string, (x: string) => string> = {
-  "6": (x) => `abs(${x})`,
-  "7": (x) => `clamp(${x}, 0.0, 1.0)`,
-  "12": (x) => `cos(${x})`,
-  "13": (x) => `sin(${x})`,
-  "15": (x) => `tan(${x})`,
-  "21": (x) => `exp(${x})`,
-  "22": (x) => `fract(${x})`,
-  "23": (x) => `log(${x})`,
-  "24": (x) => `sqrt(${x})`,
-  "25": (x) => `inversesqrt(${x})`,
-  "26": (x) => `floor(${x} + 0.5)`,
-  "27": (x) => `floor(${x})`,
-  "28": (x) => `ceil(${x})`,
-  "29": (x) => `(${x} < 0.0 ? ceil(${x}) : floor(${x}))`,
-  // DerivCoarseX / DerivCoarseY (texture bombing and mip selection)
-  "83": (x) => `dFdx(${x})`,
-  "84": (x) => `dFdy(${x})`
-}
-const BINARY: Record<string, (a: string, b: string) => string> = {
-  "35": (a, b) => `max(${a}, ${b})`,
-  "36": (a, b) => `min(${a}, ${b})`
-}
-const CMP: Record<string, string> = {
-  olt: "<",
-  ult: "<",
-  ole: "<=",
-  ule: "<=",
-  ogt: ">",
-  ugt: ">",
-  oge: ">=",
-  uge: ">=",
-  oeq: "==",
-  ueq: "==",
-  one: "!=",
-  une: "!="
-}
-
-const ICMP: Record<string, string> = {
-  eq: "==",
-  ne: "!=",
-  ult: "<",
-  ule: "<=",
-  ugt: ">",
-  uge: ">=",
-  slt: "<",
-  sle: "<=",
-  sgt: ">",
-  sge: ">="
-}
+type Input = Extract<Instruction, { kind: "input" }>
+type Sample = Extract<Instruction, { kind: "sample" }>
 
 class Emitter {
   readonly #m: Module
@@ -104,38 +65,30 @@ class Emitter {
     this.#handles = bufferNames(m)
   }
 
-  #input(d: string): { readonly sig: string; readonly index: number; readonly component: number } | undefined {
-    const li = d.match(/loadInput\.f32\(i32 \d+, i32 (\d+), i32 (\d+), i8 (\d+)/)
-    if (!li) return undefined
-    const sig = this.#m.inputs.find((x) => x.id === num(li[1]))
-    if (sig === undefined) return undefined
-    return { sig: sig.name, index: sig.indices[num(li[2])] ?? 0, component: num(li[3]) }
+  #at(v: string): Instruction | undefined {
+    return instructionOf(this.#m, v)
   }
 
   /** The GLSL for a fragment input, or undefined for one the renderer does not provide (folded). */
-  #inputExpr(d: string): string | undefined {
-    const i = this.#input(d)
-    if (i === undefined) return undefined
+  #inputExpr(i: Input): string | undefined {
+    const sig = this.#m.inputs.find((x) => x.id === i.id)
+    if (sig === undefined) return undefined
+    const index = sig.indices[i.row] ?? 0
     const c = XYZW[i.component] ?? "x"
-    if (i.sig === "TEXCOORD" && i.index === 0 && i.component < 2) return `uv.${c}`
+    if (sig.name === "TEXCOORD" && index === 0 && i.component < 2) return `uv.${c}`
     // UE's world position interpolant, and the one it rebuilds from SV_Position (identity, see ENGINE_DEFAULTS).
-    if (i.sig === "TEXCOORD" && i.index === 9 && i.component < 3) return `pos.${c}`
-    if (i.sig === "SV_Position") return i.component < 3 ? `pos.${c}` : "1.0"
-    if (i.sig.startsWith("TEXCOORD11") && i.component < 3) return `nrm.${c}`
+    if (sig.name === "TEXCOORD" && index === 9 && i.component < 3) return `pos.${c}`
+    if (sig.name === "SV_Position") return i.component < 3 ? `pos.${c}` : "1.0"
+    if (sig.name.startsWith("TEXCOORD11") && i.component < 3) return `nrm.${c}`
     return undefined
   }
 
-  #sampleRegister(agg: string): number | undefined {
-    const s = agg.match(
-      /@dx\.op\.sample\w*\.f32\(i32 \d+, %dx\.types\.Handle (%[\w.]+), %dx\.types\.Handle %[\w.]+, float (\S+), float (\S+)/
-    )
-    if (!s) return undefined
-    return this.#m.handles.get(g(s, 1))?.register
+  #sampleRegister(s: Sample): number | undefined {
+    return this.#m.handles.get(s.handle)?.register
   }
 
-  #cbufRef(agg: string, ch: number): string | undefined {
-    const cb = agg.match(/cbufferLoadLegacy\.\w+\(i32 \d+, %dx\.types\.Handle (%[\w.]+), i32 (\d+)\)/)
-    return cb ? `${this.#handles.get(g(cb, 1)) ?? "?"}[${g(cb, 2)}].${XYZW[ch] ?? "x"}` : undefined
+  #cbufRef(load: Extract<Instruction, { kind: "cbuffer" }>, ch: number): string {
+    return `${this.#handles.get(load.handle) ?? "?"}[${load.index}].${XYZW[ch] ?? "x"}`
   }
 
   /** Whether the value changes across the surface (then it is emitted; otherwise folded). */
@@ -150,7 +103,6 @@ class Emitter {
    * which has cycles through phis).
    */
   #computeDynamic(): void {
-    const operandsOf = new Map<string, Array<string>>()
     const users = new Map<string, Array<string>>()
     const worklist: Array<string> = []
     const mark = (v: string) => {
@@ -160,26 +112,25 @@ class Emitter {
     }
     for (const [v, d] of this.#m.defs) {
       const operands = [...d.matchAll(/%[\w.]+/g)].map((o) => o[0]).filter((o) => o !== v && !o.startsWith("%dx."))
-      operandsOf.set(v, operands)
       for (const o of operands) users.set(o, [...(users.get(o) ?? []), v])
-      if (d.includes("@dx.op.loadInput")) {
-        if (this.#inputExpr(d) !== undefined) mark(v)
-        continue
-      }
-      if (d.includes("@dx.op.sample")) {
-        const register = this.#sampleRegister(d)
+      const i = this.#at(v)
+      if (i === undefined) continue
+      if (i.kind === "input") {
+        if (this.#inputExpr(i) !== undefined) mark(v)
+      } else if (i.kind === "sample") {
+        const register = this.#sampleRegister(i)
         if (register !== undefined && this.#env.materialTextures.has(register)) mark(v)
-        continue
-      }
-      const ev = d.match(/^extractvalue \S+ (%[\w.]+), (\d+)$/)
-      if (ev) {
-        const ref = this.#cbufRef(this.#m.defs.get(g(ev, 1)) ?? "", num(ev[2]))
-        if (ref !== undefined && this.#env.isTime(ref)) mark(v)
+      } else if (i.kind === "extract") {
+        const agg = this.#at(i.aggregate)
+        if (agg?.kind === "cbuffer" && this.#env.isTime(this.#cbufRef(agg, i.channel))) mark(v)
       }
     }
     // Buffer and constant loads are static whatever indexes them (the instance id, an engine stencil read).
-    const isLoad = (u: string) =>
-      /@dx\.op\.(rawBufferLoad|cbufferLoadLegacy|bufferLoad|textureLoad)/.test(this.#m.defs.get(u) ?? "")
+    const isLoad = (u: string) => {
+      const kind = this.#at(u)?.kind
+      return kind === "rawLoad" || kind === "cbuffer" || kind === "bufferLoad" ||
+        (this.#m.defs.get(u) ?? "").includes("@dx.op.textureLoad")
+    }
     for (let v = worklist.pop(); v !== undefined; v = worklist.pop()) {
       for (const u of users.get(v) ?? []) if (!isLoad(u)) mark(u)
     }
@@ -213,30 +164,35 @@ class Emitter {
   }
 
   #emitInt(v: string): string {
-    const d = this.#m.defs.get(v) ?? ""
-    const conv = d.match(/^(fptosi|fptoui) float (\S+) to i32$/)
-    if (conv) return conv[1] === "fptosi" ? `uint(int(${this.expr(g(conv, 2))}))` : `uint(${this.expr(g(conv, 2))})`
-    const cast = d.match(/^bitcast float (\S+) to i32$/)
-    if (cast) return `floatBitsToUint(${this.expr(g(cast, 1))})`
-    const bin = d.match(/^(and|or|xor|shl|lshr|add|sub|mul)(?: nuw)?(?: nsw)? i32 (\S+), (\S+)$/)
-    if (bin) {
-      const a = this.intExpr(g(bin, 2)), b = this.intExpr(g(bin, 3))
-      const op = { and: "&", or: "|", xor: "^", shl: "<<", lshr: ">>", add: "+", sub: "-", mul: "*" }[g(bin, 1)] ?? "+"
-      return `(${a} ${op} ${b})`
-    }
-    const bi = d.match(/@dx\.op\.binary\.i32\(i32 (\d+), i32 (\S+), i32 (\S+)\)/)
-    if (bi) {
-      const f = { "37": "min", "38": "max", "39": "min", "40": "max" }[g(bi, 1)]
-      if (f !== undefined) return `${f}(${this.intExpr(g(bi, 2))}, ${this.intExpr(g(bi, 3))})`
-    }
-    const sel = d.match(/^select i1 (\S+), i32 (\S+), i32 (\S+)$/)
-    if (sel) return `(${this.#bool(g(sel, 1))} ? ${this.intExpr(g(sel, 2))} : ${this.intExpr(g(sel, 3))})`
-    if (d.startsWith("phi ")) {
-      const entry = this.#phiEntry(v)
-      return entry === undefined ? "0u" : this.intExpr(entry)
+    const i = this.#at(v)
+    switch (i?.kind) {
+      case "toInt":
+        return i.signed ? `uint(int(${this.expr(i.x)}))` : `uint(${this.expr(i.x)})`
+      case "bitcast":
+        if (i.to === "i32") return `floatBitsToUint(${this.expr(i.x)})`
+        break
+      case "int": {
+        const op = INT_OPS[i.op]
+        if (op !== undefined) return op.glsl(this.intExpr(i.a), this.intExpr(i.b))
+        break
+      }
+      case "ibinary": {
+        const op = INT_BINARY_OPS[i.op]
+        if (op !== undefined) return op.glsl(this.intExpr(i.a), this.intExpr(i.b))
+        break
+      }
+      case "select":
+        if (i.type === "i32") return `(${this.#bool(i.cond)} ? ${this.intExpr(i.a)} : ${this.intExpr(i.b)})`
+        break
+      case "phi": {
+        const entry = this.#phiEntry(v)
+        return entry === undefined ? "0u" : this.intExpr(entry)
+      }
+      default:
+        break
     }
     this.unsupported++
-    this.unsupportedOps.push(d.slice(0, 60))
+    this.unsupportedOps.push((this.#m.defs.get(v) ?? v).slice(0, 60))
     return `${this.#env.evaluator.int(v) >>> 0}u`
   }
 
@@ -260,91 +216,81 @@ class Emitter {
   }
 
   #emit(v: string): string {
-    const d = this.#m.defs.get(v) ?? ""
-    const input = this.#inputExpr(d)
-    if (input !== undefined) return input
-    const ev = d.match(/^extractvalue \S+ (%[\w.]+), (\d+)$/)
-    if (ev) {
-      const agg = this.#m.defs.get(g(ev, 1)) ?? ""
-      const ch = num(ev[2])
-      const register = this.#sampleRegister(agg)
-      if (register !== undefined) {
-        // An engine texture (scene depth, stencil) read at a fragment-dependent place still folds.
-        if (!this.#env.materialTextures.has(register)) return this.#fold(v)
-        if (this.#env.bc5.has(register) && ch >= 2) return ch === 2 ? "0.0" : "1.0"
-        return `${this.#sample(g(ev, 1), agg, register)}.${XYZW[ch] ?? "x"}`
+    const i = this.#at(v)
+    switch (i?.kind) {
+      case "input":
+        return this.#inputExpr(i) ?? this.#unsupported(v)
+      case "extract": {
+        const agg = this.#at(i.aggregate)
+        if (agg?.kind === "sample") {
+          const register = this.#sampleRegister(agg)
+          // An engine texture (scene depth, stencil) read at a fragment-dependent place still folds.
+          if (register === undefined || !this.#env.materialTextures.has(register)) return this.#fold(v)
+          if (this.#env.bc5.has(register) && i.channel >= 2) return i.channel === 2 ? "0.0" : "1.0"
+          return `${this.#sample(i.aggregate, agg, register)}.${XYZW[i.channel] ?? "x"}`
+        }
+        // Scene data and the other constant buffers fold (a piece at the origin); only the game time is live.
+        return agg?.kind === "cbuffer" && this.#env.isTime(this.#cbufRef(agg, i.channel)) ? "time" : this.#fold(v)
       }
-      const ref = this.#cbufRef(agg, ch)
-      // Scene data and the other constant buffers fold (a piece at the origin); only the game time is live.
-      return ref !== undefined && this.#env.isTime(ref) ? "time" : this.#fold(v)
-    }
-    const bin = d.match(/^(fmul|fadd|fsub|fdiv) (?:fast )?float (\S+), (\S+)$/)
-    if (bin) {
-      const a = this.expr(g(bin, 2)), b = this.expr(g(bin, 3))
-      // The folded scene data leaves many `x * 0.0` and `x + 0.0` behind: drop them here, not in the shader.
-      switch (bin[1]) {
-        case "fmul":
-          return a === "0.0" || b === "0.0" ? "0.0" : a === "1.0" ? b : b === "1.0" ? a : `(${a} * ${b})`
-        case "fadd":
-          return a === "0.0" ? b : b === "0.0" ? a : `(${a} + ${b})`
-        case "fsub":
-          return b === "0.0" ? a : `(${a} - ${b})`
-        default:
-          return b === "1.0" ? a : `(${a} / ${b})`
+      case "float": {
+        const a = this.expr(i.a), b = this.expr(i.b)
+        // The folded scene data leaves many `x * 0.0` and `x + 0.0` behind: drop them here, not in the shader.
+        switch (i.op) {
+          case "fmul":
+            return a === "0.0" || b === "0.0" ? "0.0" : a === "1.0" ? b : b === "1.0" ? a : `(${a} * ${b})`
+          case "fadd":
+            return a === "0.0" ? b : b === "0.0" ? a : `(${a} + ${b})`
+          case "fsub":
+            return b === "0.0" ? a : `(${a} - ${b})`
+          default:
+            return b === "1.0" ? a : `(${a} / ${b})`
+        }
       }
-    }
-    const un = d.match(/@dx\.op\.unary\.f32\(i32 (\d+), float (\S+)\)/)
-    if (un) {
-      const f = UNARY[g(un, 1)]
-      if (f === undefined) return this.#unsupported(v)
-      return f(this.expr(g(un, 2)))
-    }
-    const bi = d.match(/@dx\.op\.binary\.f32\(i32 (\d+), float (\S+), float (\S+)\)/)
-    if (bi) {
-      const f = BINARY[g(bi, 1)]
-      if (f === undefined) return this.#unsupported(v)
-      return f(this.expr(g(bi, 2)), this.expr(g(bi, 3)))
-    }
-    const mad = d.match(/@dx\.op\.tertiary\.f32\(i32 46, float (\S+), float (\S+), float (\S+)\)/)
-    if (mad) {
-      const a = this.expr(g(mad, 1)), b = this.expr(g(mad, 2)), c = this.expr(g(mad, 3))
-      const product = a === "0.0" || b === "0.0" ? "0.0" : a === "1.0" ? b : b === "1.0" ? a : `${a} * ${b}`
-      return product === "0.0" ? c : c === "0.0" ? `(${product})` : `(${product} + ${c})`
-    }
-    const dot = d.match(/@dx\.op\.dot(\d)\.f32\(i32 \d+, (.*)\)/)
-    if (dot) {
-      const ops = [...g(dot, 2).matchAll(/float ([^,)\s]+)/g)].map((x) => this.expr(g(x, 1)))
-      const n = num(dot[1])
-      const terms: Array<string> = []
-      for (let i = 0; i < n; i++) {
-        const a = ops[i] ?? "0.0", b = ops[i + n] ?? "0.0"
-        if (a === "0.0" || b === "0.0") continue
-        terms.push(a === "1.0" ? b : b === "1.0" ? a : `${a} * ${b}`)
+      case "unary": {
+        const op = UNARY_OPS[i.op]
+        return op === undefined ? this.#unsupported(v) : op.glsl(this.expr(i.x))
       }
-      return terms.length === 0 ? "0.0" : terms.length === 1 ? terms[0] ?? "0.0" : `(${terms.join(" + ")})`
+      case "binary": {
+        const op = BINARY_OPS[i.op]
+        return op === undefined ? this.#unsupported(v) : op.glsl(this.expr(i.a), this.expr(i.b))
+      }
+      case "mad": {
+        const a = this.expr(i.a), b = this.expr(i.b), c = this.expr(i.c)
+        const product = a === "0.0" || b === "0.0" ? "0.0" : a === "1.0" ? b : b === "1.0" ? a : `${a} * ${b}`
+        return product === "0.0" ? c : c === "0.0" ? `(${product})` : `(${product} + ${c})`
+      }
+      case "dot": {
+        const ops = i.operands.map((o) => this.expr(o))
+        const terms: Array<string> = []
+        for (let k = 0; k < i.n; k++) {
+          const a = ops[k] ?? "0.0", b = ops[k + i.n] ?? "0.0"
+          if (a === "0.0" || b === "0.0") continue
+          terms.push(a === "1.0" ? b : b === "1.0" ? a : `${a} * ${b}`)
+        }
+        return terms.length === 0 ? "0.0" : terms.length === 1 ? terms[0] ?? "0.0" : `(${terms.join(" + ")})`
+      }
+      case "select":
+        if (i.type === "float") return `(${this.#bool(i.cond)} ? ${this.expr(i.a)} : ${this.expr(i.b)})`
+        break
+      case "phi": {
+        const entry = this.#phiEntry(v)
+        return entry === undefined ? "0.0" : this.expr(entry)
+      }
+      case "toFloat":
+        return i.signed ? `float(int(${this.intExpr(i.x)}))` : `float(${this.intExpr(i.x)})`
+      case "bitcast":
+        if (i.to === "float") return `uintBitsToFloat(${this.intExpr(i.x)})`
+        break
+      default:
+        break
     }
-    const sel = d.match(/^select i1 (\S+), float (\S+), float (\S+)$/)
-    if (sel) return `(${this.#bool(g(sel, 1))} ? ${this.expr(g(sel, 2))} : ${this.expr(g(sel, 3))})`
-    if (d.startsWith("phi ")) {
-      const entry = this.#phiEntry(v)
-      return entry === undefined ? "0.0" : this.expr(entry)
-    }
-    const fromInt = d.match(/^(sitofp|uitofp) i32 (\S+) to float$/)
-    if (fromInt) {
-      return fromInt[1] === "sitofp"
-        ? `float(int(${this.intExpr(g(fromInt, 2))}))`
-        : `float(${this.intExpr(g(fromInt, 2))})`
-    }
-    const cast = d.match(/^bitcast i32 (\S+) to float$/)
-    if (cast) return `uintBitsToFloat(${this.intExpr(g(cast, 1))})`
     return this.#unsupported(v)
   }
 
-  #sample(v: string, agg: string, register: number): string {
+  #sample(v: string, s: Sample, register: number): string {
     const named = this.#names.get(v)
     if (named !== undefined) return named
-    const s = agg.match(/float (\S+), float (\S+), float/)
-    const u = s ? this.expr(g(s, 1)) : "0.0", w = s ? this.expr(g(s, 2)) : "0.0"
+    const u = this.expr(s.coords[0]), w = this.expr(s.coords[1])
     let uniform = this.textures.get(register)
     if (uniform === undefined) {
       uniform = `uTex${this.textures.size}`
@@ -357,29 +303,26 @@ class Emitter {
   }
 
   #bool(v: string): string {
-    const d = this.#m.defs.get(v)
-    if (d === undefined) return v === "true" ? "true" : "false"
+    const i = this.#at(v)
+    if (i === undefined) return v === "true" ? "true" : "false"
     if (!this.dynamic(v)) {
       const b = this.#env.evaluator.bool(v)
       return b === undefined ? "false" : String(b)
     }
-    const cmp = d.match(/^fcmp (?:fast )?(\w+) float (\S+), (\S+)$/)
-    if (cmp) {
-      const op = CMP[g(cmp, 1)]
-      if (op === undefined) return this.#unsupportedBool(v)
-      return `(${this.expr(g(cmp, 2))} ${op} ${this.expr(g(cmp, 3))})`
+    switch (i.kind) {
+      case "fcmp": {
+        const op = FCMP_OPS[i.pred]
+        return op === undefined ? this.#unsupportedBool(v) : op.glsl(this.expr(i.a), this.expr(i.b))
+      }
+      case "logic":
+        return `(${this.#bool(i.a)} ${i.op === "and" ? "&&" : "||"} ${this.#bool(i.b)})`
+      case "icmp": {
+        const op = ICMP_OPS[i.pred]
+        return op === undefined ? this.#unsupportedBool(v) : op.glsl(this.intExpr(i.a), this.intExpr(i.b))
+      }
+      default:
+        return this.#unsupportedBool(v)
     }
-    const andOr = d.match(/^(and|or) i1 (\S+), (\S+)$/)
-    if (andOr) return `(${this.#bool(g(andOr, 2))} ${andOr[1] === "and" ? "&&" : "||"} ${this.#bool(g(andOr, 3))})`
-    const icmp = d.match(/^icmp (\w+) i32 (\S+), (\S+)$/)
-    if (icmp) {
-      const op = ICMP[g(icmp, 1)]
-      if (op === undefined) return this.#unsupportedBool(v)
-      const signed = g(icmp, 1).startsWith("s")
-      const a = this.intExpr(g(icmp, 2)), b = this.intExpr(g(icmp, 3))
-      return signed ? `(int(${a}) ${op} int(${b}))` : `(${a} ${op} ${b})`
-    }
-    return this.#unsupportedBool(v)
   }
 
   #unsupported(v: string): string {

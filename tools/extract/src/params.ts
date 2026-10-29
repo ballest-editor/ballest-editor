@@ -1,7 +1,9 @@
 // A material's effective parameters: the root UMaterial's defaults (CachedExpressionData) overridden by
-// each instance down the parent chain. Shared by the shader analysis (which evaluates the compiled
-// shaders with these values) and the materials.json build.
+// each instance down the parent chain, and how the compiled shader's slots (constant-buffer floats, texture
+// registers) resolve against them. Shared by the shader analysis (which evaluates the compiled shaders with
+// these values) and the materials.json build.
 import { arr, bool, get, num, obj, refPath, str } from "./json.ts"
+import { type Slot, slotValue } from "./preshader.ts"
 
 export type Rgba = [number, number, number, number]
 const color = (c: unknown): Rgba | null => {
@@ -171,4 +173,43 @@ export const paramValueOf = (merged: Merged, name: string): number | undefined =
   if (m === null) return undefined
   const vec = merged.vectors[m[1] ?? ""]
   return vec == null ? undefined : vec["xyzw".indexOf(m[2] ?? "")]
+}
+
+/** A material texture slot of the compiled shader: the root's texture it holds and the parameter that may override it. */
+export interface TextureSlot {
+  /** Index into the root material's ReferencedTextures. */
+  readonly index: number
+  readonly param: string | null
+}
+
+/** The texture a shader slot holds for a material: the instance's override of its parameter, else the root's table. */
+export const slotTexture = (chain: Pick<Chain, "merged" | "root">, slot: TextureSlot | undefined): string | null => {
+  if (slot === undefined) return null
+  const override = slot.param === null ? undefined : chain.merged.textures[slot.param]
+  return override ?? chain.root.referencedTextures[slot.index] ?? null
+}
+
+/**
+ * The material constant buffer's values for a material: `buffer[reg].c` (the register `cb3`, or the type
+ * `Material`, whichever the caller's IR walk names it) through the preshader slot table and the merged
+ * parameters; undefined for a reference outside the buffer or a slot the parameters cannot fill.
+ */
+export const materialParams = (
+  buffer: string,
+  table: { readonly slots: ReadonlyArray<Slot>; readonly paramNames: ReadonlyArray<string> },
+  merged: Merged
+): (ref: string) => number | undefined => {
+  const byRef = new Map(table.slots.map((s) => [s.ref, s]))
+  const prefix = `${buffer}[`
+  return (ref) => {
+    if (!ref.startsWith(prefix)) return undefined
+    const slot = byRef.get(ref.slice(buffer.length))
+    if (slot === undefined) return undefined
+    return slotValue(
+      slot,
+      table.paramNames,
+      (name) => paramValueOf(merged, name),
+      (name) => merged.vectors[name] ?? undefined
+    )
+  }
 }

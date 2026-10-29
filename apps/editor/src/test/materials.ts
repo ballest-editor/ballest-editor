@@ -1,4 +1,10 @@
 /** A small extractor-style materials.json for the material tests. */
+import * as THREE from "three"
+
+/** A glb-style primitive: its material name carries the UE slot index (`"<i>:<slot>"`). */
+export const primitive = (name: string): THREE.Mesh =>
+  new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ name }))
+
 export const BLUE = "/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth"
 export const GLASS = "/Game/Art/Materials/M_GlassV2.M_GlassV2"
 export const OLD = "/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"

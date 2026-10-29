@@ -1,9 +1,11 @@
 // `shaders`: from the C# tool's shader dump (DIR/index.json + DIR/<asset>/*.dxil, one entry per material in
-// the list) to WORK/shaders.json: for every material, the base-pass pixel shader's texture reads traced to
-// their coordinate sources, the vertex shader's interpolants traced to vertex attributes / buffers / the
-// object transform, the material's texture slots, and the constant-buffer slots named by the preshader.
-// This is the deterministic replacement for guessing UV tiling from texture names and streaming data: the
-// cooked material has no expression graph, but its compiled shader is the graph.
+// the list) to WORK/shaders.json, the per-instance product `materials build` consumes. Per compiled base
+// pass (`shaders`): the pixel shader's texture reads traced to their coordinate sources, the vertex shader's
+// interpolants traced to vertex attributes / buffers / the object transform, the material's texture slots,
+// and the constant-buffer slots named by the preshader. Per listed material, instances included
+// (`materials`): which of those it runs and the surface evaluated for its own parameters. This is the
+// deterministic replacement for guessing UV tiling from texture names and streaming data: the cooked
+// material has no expression graph, but its compiled shader is the graph.
 import { Effect, Schema } from "effect"
 import { FileSystem } from "effect/FileSystem"
 import { Path } from "effect/Path"
@@ -12,9 +14,9 @@ import { type Leaf, type Module, type Mottle, mottleOf, outputsOf, parseModule, 
 import { cfgOf, ENGINE_DEFAULTS, Evaluator, outputs, surfaceOf } from "./evaluate.ts"
 import { emitProgram, type GlslEnv } from "./glsl.ts"
 import { get, str } from "./json.ts"
-import { chainOf, paramValueOf } from "./params.ts"
+import { chainOf, materialParams, slotTexture, type TextureSlot } from "./params.ts"
 import { pngMean } from "./png.ts"
-import { decodePreshaders, type Slot, slotValue } from "./preshader.ts"
+import { decodePreshaders, type Slot } from "./preshader.ts"
 
 const ShaderRecord = Schema.Struct({
   file: Schema.String,
@@ -73,10 +75,11 @@ export interface TextureRead {
   readonly resultFactor: number | null
 }
 
-export interface MaterialShaders {
+/** The trace of one compiled base pass: what every material running that shader shares. */
+export interface ShaderTrace {
   readonly pixel: string
   readonly vertex: string | null
-  readonly textures: ReadonlyArray<{ readonly index: number; readonly param: string | null }>
+  readonly textures: ReadonlyArray<TextureSlot>
   /** Material constant-buffer register in the pixel shader (`cb3`), so `params` refs can be matched to reads. */
   readonly materialBuffer: string | null
   readonly slots: ReadonlyArray<Slot>
@@ -91,40 +94,47 @@ export interface MaterialShaders {
   } | null
   /** Vertex-shader interpolants by `SEMANTIC.component`, each traced to its sources. */
   readonly interpolants: Record<string, ReadonlyArray<Leaf>>
+}
+
+/**
+ * The surface the shader produces for a material's parameters, seen head-on (opaque passes: GBuffer base
+ * colour with colour reads at 0, metallic, roughness; `gains` = how much each read, by index into `reads`,
+ * adds to the base colour at 1).
+ */
+export interface MaterialSurface {
+  readonly baseColor: readonly [number, number, number]
+  /** Opaque passes only (GBuffer); null for a translucent pass. */
+  readonly metallic: number | null
+  readonly roughness: number | null
+  /** Translucent passes: the alpha written for a surface facing up; null for opaque. */
+  readonly opacity: number | null
+  /** Translucent passes: the alpha for a vertical surface (a beam masks its caps with 1 - |world normal z|). */
+  readonly opacitySide: number | null
+  /** Translucent passes: the alpha with every material read at 0 and at 1, on the side that shows. */
+  readonly alphaRange: readonly [number, number] | null
+  /** Scene colour with no lights (facing up, and for a vertical surface): what an additive glow adds. */
+  readonly emissive: readonly [number, number, number]
+  readonly emissiveSide: readonly [number, number, number]
   /**
-   * The surface the shader produces for this material's parameters, seen head-on (opaque passes: GBuffer
-   * base colour with colour reads at 0, metallic, roughness; `gains` = how much each read, by index into
-   * `reads`, adds to the base colour at 1). Null when not evaluated (translucent passes).
+   * The shader's own math as GLSL, with this instance's parameters folded in: `alpha` (translucent), `glow`
+   * (additive: the unlit colour) or `base` (opaque: the GBuffer base colour); textures by material texture index.
    */
-  readonly surface: {
-    readonly baseColor: readonly [number, number, number]
-    /** Opaque passes only (GBuffer); null for a translucent pass. */
-    readonly metallic: number | null
-    readonly roughness: number | null
-    /** Translucent passes: the alpha written for a surface facing up; null for opaque. */
-    readonly opacity: number | null
-    /** Translucent passes: the alpha for a vertical surface (a beam masks its caps with 1 - |world normal z|). */
-    readonly opacitySide: number | null
-    /** Translucent passes: the alpha with every material read at 0 and at 1, on the side that shows. */
-    readonly alphaRange: readonly [number, number] | null
-    /** Scene colour with no lights (facing up, and for a vertical surface): what an additive glow adds. */
-    readonly emissive: readonly [number, number, number]
-    readonly emissiveSide: readonly [number, number, number]
-    /**
-     * The shader's own math as GLSL, with this instance's parameters folded in: `alpha` (translucent), `glow`
-     * (additive: the unlit colour) or `base` (opaque: the GBuffer base colour); textures by material texture index.
-     */
-    readonly programs: Partial<Record<"alpha" | "glow" | "base", GlslProgramRef>>
-    /** By read index: the colour (and, translucent, alpha) the read adds going 0 -> 1, and the mean it was evaluated at. */
-    readonly gains: Record<
-      string,
-      {
-        readonly gain: readonly [number, number, number]
-        readonly alpha: number
-        readonly mean: readonly [number, number, number]
-      }
-    >
-  } | null
+  readonly programs: Partial<Record<"alpha" | "glow" | "base", GlslProgramRef>>
+  /** By read index: the colour (and, translucent, alpha) the read adds going 0 -> 1, and the mean it was evaluated at. */
+  readonly gains: Record<
+    string,
+    {
+      readonly gain: readonly [number, number, number]
+      readonly alpha: number
+      readonly mean: readonly [number, number, number]
+    }
+  >
+}
+
+/** A listed material's trace with the surface evaluated for its own parameters: what `materials build` works from. */
+export interface MaterialShaders extends ShaderTrace {
+  /** Null when the shader's outputs could not be evaluated. */
+  readonly surface: MaterialSurface | null
 }
 
 export interface GlslProgramRef {
@@ -132,13 +142,22 @@ export interface GlslProgramRef {
   readonly textures: ReadonlyArray<{ readonly uniform: string; readonly texture: number }>
 }
 
-export interface ShadersFile {
-  readonly version: 1
-  readonly notes: ReadonlyArray<string>
-  readonly materials: Record<string, MaterialShaders | { readonly error: string }>
+export interface MaterialEntry {
+  /** The trace the material runs: a key of `ShadersFile.shaders` (itself, or the first ancestor with a shader map). */
+  readonly shader: string
+  readonly surface: MaterialSurface | null
 }
 
-const isAnalysed = (e: MaterialShaders | { readonly error: string }): e is MaterialShaders => !Object.hasOwn(e, "error")
+export interface ShadersFile {
+  readonly version: 2
+  readonly notes: ReadonlyArray<string>
+  /** By material the C# tool dumped shaders for (the roots, and the instances with their own shader map). */
+  readonly shaders: Record<string, ShaderTrace | { readonly error: string }>
+  /** By listed material, instances included: the per-instance product. */
+  readonly materials: Record<string, MaterialEntry>
+}
+
+const isAnalysed = (e: ShaderTrace | { readonly error: string }): e is ShaderTrace => !Object.hasOwn(e, "error")
 
 /** Material textures are the highest-numbered Texture2D SRVs: UE binds the Material uniform buffer last. */
 const materialTextureRegisters = (m: Module, count: number): Array<number> =>
@@ -170,14 +189,14 @@ export const shaders = Effect.fn("shaders")(function*(options: {
     const full = path.join(options.dump, `${file}.dxil`)
     return yield* spawner.string(ChildProcess.make(options.dxc, ["-dumpbin", full]))
   })
-  const materials: Record<string, MaterialShaders | { error: string }> = {}
+  const traces: Record<string, ShaderTrace | { error: string }> = {}
   let done = 0
   const entries = Object.entries(index)
   yield* Effect.forEach(entries, ([material, entry]) =>
     Effect.gen(function*() {
       const map = entry.shaderMaps?.find((m) => m.error === undefined && m.shaders !== undefined)
       if (map?.shaders === undefined || map.compilationOutput === undefined) {
-        materials[material] = { error: entry.error ?? map?.error ?? "no shader map" }
+        traces[material] = { error: entry.error ?? map?.error ?? "no shader map" }
         return
       }
       const ues = map.compilationOutput.UniformExpressionSet
@@ -191,7 +210,7 @@ export const shaders = Effect.fn("shaders")(function*(options: {
         .filter((m) => m.shader.frequency === "SF_Pixel" && m.module.cbuffers.some((c) => c.type.includes("BasePass")))
         .sort((a, b) => b.shader.size - a.shader.size)[0]
       if (pixel === undefined) {
-        materials[material] = { error: "no base-pass pixel shader" }
+        traces[material] = { error: "no base-pass pixel shader" }
         return
       }
       // The vertex shader of the same vertex factory with the most outputs feeds the pixel shader's interpolants.
@@ -220,8 +239,7 @@ export const shaders = Effect.fn("shaders")(function*(options: {
         sampleValues: pixelSamples.map((s) => s.value),
         mottle: mottle?.samples ?? []
       })
-      materials[material] = {
-        surface: null,
+      traces[material] = {
         pixel: pixel.shader.file,
         vertex: vertex?.shader.file ?? null,
         textures: textureParams.map((t) => ({
@@ -245,7 +263,7 @@ export const shaders = Effect.fn("shaders")(function*(options: {
       // One shader dxc cannot read must not take the other materials down with it.
       Effect.catch((e) =>
         Effect.sync(() => {
-          materials[material] = { error: `disassemble: ${String(e)}` }
+          traces[material] = { error: `disassemble: ${String(e)}` }
         })
       )
     ), { concurrency: 4 })
@@ -267,37 +285,23 @@ export const shaders = Effect.fn("shaders")(function*(options: {
     return mean
   })
   // Every listed material, instances included: its parameters through its (or its parent's) shader.
+  const materials: Record<string, MaterialEntry> = {}
   let evaluated = 0
   for (const material of list) {
     const chain = chainOf(dump, material)
     const key = chain.chain.flatMap((o) => [o.path, ...(o.redirectedTo === undefined ? [] : [o.redirectedTo])])
       .find((p) => pixels.has(p))
     const px = key === undefined ? undefined : pixels.get(key)
-    const entry = key === undefined ? undefined : materials[key]
-    if (px === undefined || entry === undefined || !isAnalysed(entry)) continue
-    const base = entry
-    const slots = new Map(base.slots.map((sl) => [sl.ref, sl]))
-    const cbuf = (ref: string): number | undefined => {
-      if (!ref.startsWith("Material[")) return undefined
-      const slot = slots.get(ref.slice("Material".length))
-      if (slot === undefined) return undefined
-      return slotValue(
-        slot,
-        base.paramNames,
-        (name) => paramValueOf(chain.merged, name),
-        (name) => chain.merged.vectors[name] ?? undefined
-      )
-    }
+    const base = key === undefined ? undefined : traces[key]
+    if (key === undefined || px === undefined || base === undefined || !isAnalysed(base)) continue
+    const cbuf = materialParams("Material", base, chain.merged)
     const mottle = new Set(px.mottle)
     const colour = px.sampleValues.filter((v) => !mottle.has(v))
     // each sample's texture mean: the texture slot it reads, through the instance's overrides
     const means = new Map<string, readonly [number, number, number, number]>()
     for (const [i, v] of px.sampleValues.entries()) {
       const read = base.reads[i]
-      const slot = read === undefined || read.texture < 0 ? undefined : base.textures[read.texture]
-      if (slot === undefined) continue
-      const override = slot.param === null ? undefined : chain.merged.textures[slot.param]
-      const texture = override ?? chain.root.referencedTextures[slot.index] ?? null
+      const texture = read === undefined ? null : slotTexture(chain, base.textures[read.texture])
       const mean = texture === null ? null : yield* meanOf(texture)
       if (mean !== null) means.set(v, mean)
     }
@@ -310,9 +314,7 @@ export const shaders = Effect.fn("shaders")(function*(options: {
     const registers = materialTextureRegisters(px.module, base.textures.length)
     const bc5 = new Set<number>()
     for (const [i, register] of registers.entries()) {
-      const slot = base.textures[i]
-      const override = slot?.param == null ? undefined : chain.merged.textures[slot.param]
-      const texture = slot === undefined ? null : override ?? chain.root.referencedTextures[slot.index] ?? null
+      const texture = slotTexture(chain, base.textures[i])
       const format = texture === null ? undefined : str(get(dump, "textures", texture, "format"))
       if ((format ?? "").startsWith("PF_BC5")) bc5.add(register)
     }
@@ -356,7 +358,7 @@ export const shaders = Effect.fn("shaders")(function*(options: {
       gains[String(px.sampleValues.indexOf(v))] = { gain, alpha, mean: [m[0], m[1], m[2]] }
     }
     materials[material] = {
-      ...base,
+      shader: key,
       surface: surface?.baseColor == null ? null : {
         baseColor: surface.baseColor,
         metallic: surface.metallic,
@@ -374,17 +376,18 @@ export const shaders = Effect.fn("shaders")(function*(options: {
   }
   yield* Effect.logInfo(`[shaders] ${evaluated}/${list.length} materials evaluated`)
   const file: ShadersFile = {
-    version: 1,
+    version: 2,
     notes: [
-      "Per material: the base-pass pixel shader's texture reads (`reads`, texture = index into `textures`, -1 = an engine texture) with each coordinate traced to its sources (`leaves`), and the vertex shader's outputs (`interpolants`) traced the same way.",
+      "`shaders`, per material the C# tool dumped shaders for (the roots and the instances with their own shader map): the base-pass pixel shader's texture reads (`reads`, texture = index into `textures`, -1 = an engine texture) with each coordinate traced to its sources (`leaves`), and the vertex shader's outputs (`interpolants`) traced the same way. `materials`, per listed material (instances included): the trace it runs (`shader`, a key of `shaders`: itself or its first ancestor with one) and its `surface`.",
       "A leaf is one source the coordinate depends on linearly: kind input (vertex attribute ATTRIBUTEn in the vertex shader, interpolant TEXCOORDn / SV_Position in the pixel shader), buffer (vertex fetch: UVs), sceneData (the primitive/instance transform), param (constant buffer), texture, constant. factor = product of the literal constants on the path; params = constant-buffer values on the path; sceneDepth = transform rows multiplied in (1: local->world, 2: ...->object); sceneScale = multiplied (1) / divided (-1) by the instance scale.",
       "`surface` is the shader evaluated for this material's parameters and a facing view, every texture read at its mean colour: base colour (the GBuffer's for opaque passes, the lit diffuse term for translucent ones), metallic and roughness (opaque), opacity (translucent; opacitySide for a vertical face, alphaRange with every read at 0 / 1, emissiveSide the unlit colour of a vertical face), and per read index the colour / alpha the read adds going 0 -> 1 (gain) around the mean it was evaluated at.",
       "`mottle` is the grey-mottle chain where the base pass has one: reads (indices) offset by `offsets`, multiplied together, times `gain` (sign * constant * (param + paramAdd)) and added to 1, multiplying the base colour.",
       "`textures[i].index` indexes the root material's ReferencedTextures; `param` names the texture parameter an instance may override. `slots` name the Material constant-buffer floats (`[reg].c`) by parameter (from the preshader bytecode) where the expression is a plain parameter read."
     ],
+    shaders: traces,
     materials
   }
   yield* fs.writeFileString(options.out, JSON.stringify(file, null, 2) + "\n")
-  const ok = Object.values(materials).filter((m) => !Object.hasOwn(m, "error")).length
-  yield* Effect.logInfo(`[shaders] ${ok}/${entries.length} materials analysed -> ${options.out}`)
+  const ok = Object.values(traces).filter(isAnalysed).length
+  yield* Effect.logInfo(`[shaders] ${ok}/${entries.length} shader maps traced -> ${options.out}`)
 })
