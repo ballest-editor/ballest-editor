@@ -434,4 +434,22 @@ describe("editor store", () => {
     s().closeDialog()
     assert.isNull(s().dialog)
   })
+
+  it("sets an item property on the whole selection as one undo step", () => {
+    const s = () => useEditor.getState()
+    s().loadMap(initialMap(), null)
+    for (const x of [0, 100]) s().placePiece(cube, placementTransform(cube, { x, y: 0, z: 0 }))
+    s().select(s().doc.ids.slice(1))
+    const before = s().past.length
+    const strength = { list: "floatProperties", name: "Strength", type: "Float" } as const
+    assert.isTrue(s().setSelectionProperty(strength, 2))
+    assert.deepStrictEqual(s().doc.map.items.map((i) => i.floatProperties.map((p) => p.currentValue)), [[], [2], [2]])
+    assert.strictEqual(s().past.length, before + 1)
+    assert.isTrue(s().setSelectionProperty(strength, 2)) // unchanged: no step
+    assert.strictEqual(s().past.length, before + 1)
+    assert.isFalse(s().setSelectionProperty(strength, "fast"))
+    assert.strictEqual(s().past.length, before + 1)
+    s().undo()
+    assert.deepStrictEqual(s().doc.map.items.map((i) => i.floatProperties.length), [0, 0, 0])
+  })
 })

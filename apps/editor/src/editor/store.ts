@@ -14,11 +14,13 @@ import {
   pasteItems,
   removeItems,
   setLevelNames,
+  setProperty,
   setTransforms,
   validateItem
 } from "../domain/edits"
 import { itemFromPiece, newMapFile } from "../domain/factory"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
+import type { ItemProperty } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { LIMITS } from "../domain/limits"
 import { isPlayerStart, type ItemTransform, type MapFile } from "../domain/MapFile"
@@ -122,6 +124,11 @@ export interface EditorState {
    * nothing changed) when the game would reject any of them.
    */
   readonly transformItems: (transforms: ReadonlyMap<string, UeTransform>) => boolean
+  /**
+   * Sets a property on every selected item as one undo step; false (with a notice, and
+   * nothing changed) when the value doesn't fit the property.
+   */
+  readonly setSelectionProperty: (property: Pick<ItemProperty, "list" | "name" | "type">, value: unknown) => boolean
   readonly deleteSelection: () => void
   /** Copies the selected items in place (one undo step) and selects the copies. */
   readonly duplicateSelection: () => void
@@ -301,6 +308,21 @@ export const useEditor = create<EditorState>()((set, get) => {
       }
       get().notify("error", INVALID_TRANSFORM)
       return false
+    },
+
+    setSelectionProperty: (property, value) => {
+      const s = get()
+      const indices = selectedIndices(s)
+      const next = setProperty(s.doc.map, indices, property, value)
+      if (Option.isNone(next)) {
+        s.notify("error", `${JSON.stringify(value)} isn't a valid value for ${property.name}.`)
+        return false
+      }
+      const unchanged = indices.every((i) =>
+        s.doc.map.items[i]?.[property.list].some((p) => p.propertyName === property.name && p.currentValue === value)
+      )
+      if (!unchanged) commit({ map: next.value, ids: s.doc.ids })
+      return true
     },
 
     deleteSelection: () => {

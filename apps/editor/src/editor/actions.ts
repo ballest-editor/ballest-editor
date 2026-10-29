@@ -3,6 +3,7 @@ import { Cause, Effect, Exit } from "effect"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { currentCreatedAt, newMapFile } from "../domain/factory"
 import { type Axis, type AxisEdit, editAxis, type TransformField, writeField } from "../domain/groupTransform"
+import type { ItemProperty } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { PLAYER_START_CLASS } from "../domain/MapFile"
 import type { Settings } from "../domain/Settings"
@@ -30,6 +31,10 @@ const run = async <A, E>(effect: Effect.Effect<A, E, AppServices>): Promise<A | 
 
 export const transformSelection = (transforms: ReadonlyMap<string, UeTransform>): boolean =>
   useEditor.getState().transformItems(transforms)
+
+/** Sets an item property on every selected item. */
+export const setSelectionProperty = (property: Pick<ItemProperty, "list" | "name" | "type">, value: unknown): boolean =>
+  useEditor.getState().setSelectionProperty(property, value)
 
 export const deleteSelection = () => useEditor.getState().deleteSelection()
 

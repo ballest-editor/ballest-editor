@@ -8,6 +8,7 @@
  * coords.ts converts them for rendering.
  */
 import { Option, Schema } from "effect"
+import { PropertyList } from "./MapFile"
 import { open } from "./schema"
 
 const Vec3Tuple = Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite])
@@ -53,6 +54,19 @@ export class ExtraMesh extends Schema.Opaque<ExtraMesh>()(open({
   bounds: NullableBounds
 })) {}
 
+/**
+ * A property the level editor exposes on a class (its CDO's `LevelEditorExposedProperties`),
+ * in the game's order. `list`/`type` are where and how the game writes it; null when the
+ * extractor couldn't map the Blueprint type. `hidden`: left out of the game's own panel.
+ */
+export class CatalogProperty extends Schema.Opaque<CatalogProperty>()(open({
+  name: Schema.String,
+  list: Schema.NullOr(PropertyList),
+  type: Schema.NullOr(Schema.String),
+  default: Schema.Unknown,
+  hidden: Schema.optionalKey(Schema.Boolean)
+})) {}
+
 export class CatalogPiece extends Schema.Opaque<CatalogPiece>()(open({
   classPath: Schema.String,
   className: Schema.String,
@@ -69,7 +83,9 @@ export class CatalogPiece extends Schema.Opaque<CatalogPiece>()(open({
   displayName: Schema.optionalKey(Schema.NullOr(Schema.String)),
   inPalette: Schema.optionalKey(Schema.NullOr(Schema.Boolean)),
   inRegistry: Schema.optionalKey(Schema.NullOr(Schema.Boolean)),
-  thumbnail: Schema.optionalKey(Schema.NullOr(Schema.String))
+  thumbnail: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  /** Exposed item properties with their defaults (newer catalogs). */
+  properties: Schema.optionalKey(Schema.Array(CatalogProperty))
 })) {}
 
 export class CatalogMesh extends Schema.Opaque<CatalogMesh>()(open({

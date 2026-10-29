@@ -4,6 +4,7 @@
  * schemas before they reach the document.
  */
 import { Option, Schema } from "effect"
+import { type ItemProperty, withProperty } from "./itemProperties"
 import { Item, type ItemPivot, ItemTransform, type MapFile } from "./MapFile"
 
 const decodeItem = Schema.decodeUnknownOption(Item)
@@ -69,6 +70,26 @@ export const setTransforms = (
     const t = validTransform(transform)
     if (item === undefined || Option.isNone(t)) return Option.none()
     items[index] = { ...item, itemTransform: { ...item.itemTransform, ...t.value } }
+  }
+  return Option.some({ ...map, items })
+}
+
+/**
+ * Sets one property to the same value on several items, all or nothing: None when any
+ * index is out of range or the value doesn't fit the property's list.
+ */
+export const setProperty = (
+  map: MapFile,
+  indices: ReadonlyArray<number>,
+  property: Pick<ItemProperty, "list" | "name" | "type">,
+  value: unknown
+): Option.Option<MapFile> => {
+  const items = map.items.slice()
+  for (const index of indices) {
+    const item = items[index]
+    const next = item === undefined ? Option.none() : withProperty(item, property, value)
+    if (Option.isNone(next)) return Option.none()
+    items[index] = next.value
   }
   return Option.some({ ...map, items })
 }
