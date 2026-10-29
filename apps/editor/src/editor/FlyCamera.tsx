@@ -2,7 +2,7 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useRef } from "react"
 import * as THREE from "three"
 import { threeToUeVector, ueToThreeVector } from "../domain/coords"
-import { flyingActions, type MovementAction } from "../domain/flyKeys"
+import { flyingActions, formsChord, type MovementAction } from "../domain/flyKeys"
 import {
   type Bindings,
   chordOf,
@@ -92,7 +92,7 @@ export function FlyCamera() {
       flyingNow(keybinds, pressed.current, drag.current !== null, performance.now()).size > 0
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (isEditorKeyEvent(e)) pressed.current.press(e.code, performance.now(), isBoundChord(keybinds, chordOf(e)))
+      if (isEditorKeyEvent(e)) pressed.current.press(e.code, performance.now(), formsChord(keybinds, chordOf(e)))
     }
     const onKeyUp = (e: KeyboardEvent) => pressed.current.release(e.code)
     const onBlur = () => pressed.current.clear()
@@ -100,6 +100,8 @@ export function FlyCamera() {
     const onPointerDown = (e: PointerEvent) => {
       // No gizmo check: the gizmo stops the left presses it takes, other buttons fall through.
       const chord = mouseChordOf(e)
+      // Ctrl+click and the like: the held modifier is the click's, not "down".
+      if (isBoundChord(keybinds, chord)) pressed.current.suppressModifiers()
       const mode = dragModes.find(([bindings]) => bindings.includes(chord))?.[1]
       if (mode === undefined) return
       drag.current = mode

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "@effect/vitest"
-import { flyingActions, isMovementChord, type MovementLookMode, needsLook, sharedKeysFlyFreely } from "./flyKeys"
+import {
+  flyingActions,
+  formsChord,
+  isMovementChord,
+  type MovementLookMode,
+  needsLook,
+  sharedKeysFlyFreely
+} from "./flyKeys"
 import { defaultKeybinds } from "./Keybinds"
 
 const flying = (mode: MovementLookMode, looking: boolean, ...held: ReadonlyArray<string>) =>
@@ -36,7 +43,7 @@ describe("flyingActions", () => {
   })
 
   it("upDown: up/down need look, and don't let W fly on their own", () => {
-    expect(flying("upDown", false, "Space", "ShiftLeft", "KeyS")).toEqual(["moveBack"])
+    expect(flying("upDown", false, "Space", "ControlLeft", "KeyS")).toEqual(["moveBack"])
     expect(flying("upDown", false, "KeyW", "Space")).toEqual([])
     expect(flying("upDown", false, "KeyW", "KeyA")).toEqual(["moveForward", "moveLeft"])
     expect(flying("upDown", true, "Space", "KeyW")).toEqual(["moveForward", "moveUp"])
@@ -52,5 +59,16 @@ describe("isMovementChord", () => {
   it("matches movement bindings only", () => {
     expect(isMovementChord(defaultKeybinds, "KeyW")).toBe(true)
     expect(isMovementChord(defaultKeybinds, "KeyE")).toBe(false)
+  })
+})
+
+describe("formsChord", () => {
+  it("shortcuts and non-movement keys make Ctrl a chord modifier; movement keys don't", () => {
+    const chords = ["Ctrl+KeyZ", "Ctrl+KeyY", "Ctrl+Shift+KeyZ", "Ctrl+KeyD", "Ctrl+KeyC", "Ctrl+KeyV"]
+    expect(chords.filter((chord) => !formsChord(defaultKeybinds, chord))).toEqual([])
+    expect(formsChord(defaultKeybinds, "Ctrl+KeyW")).toBe(false)
+    expect(formsChord(defaultKeybinds, "Ctrl+Space")).toBe(false)
+    expect(formsChord(defaultKeybinds, "KeyC")).toBe(false)
+    expect(formsChord(defaultKeybinds, "ShiftLeft")).toBe(false)
   })
 })

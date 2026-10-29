@@ -57,12 +57,13 @@ describe("GameKeybinds", () => {
     assert.deepStrictEqual(keybinds.moveLeft, ["ArrowLeft"])
     assert.deepStrictEqual(keybinds.moveRight, ["ArrowRight"])
     assert.deepStrictEqual(keybinds.moveUp, ["Space"])
-    assert.deepStrictEqual(keybinds.moveDown, ["ShiftLeft"]) // editor override beats the game's Left Ctrl
+    assert.deepStrictEqual(keybinds.moveDown, ["ControlLeft"])
     assert.deepStrictEqual(keybinds.look, defaultKeybinds.look) // Mouse2D has no button; IMC_Default ignored
     assert.deepStrictEqual(keybinds.speedFaster, ["WheelUp"])
     assert.deepStrictEqual(keybinds.speedSlower, ["WheelDown"])
-    // level-editor overlay hotkey stays primary; the free camera's "center camera" is secondary
-    assert.deepStrictEqual(keybinds.focusSelection, ["KeyF", "KeyC"])
+    // the free camera's "center camera" (C) is left out: C switches local / world axes
+    assert.deepStrictEqual(keybinds.focusSelection, ["KeyF"])
+    assert.deepStrictEqual(keybinds.toggleGizmoSpace, ["KeyC"])
     assert.deepStrictEqual(keybinds.deselect, ["Escape"])
     assert.strictEqual(fromGame.get("moveForward")?.context, "IMC_FreeCam")
     assert.strictEqual(fromGame.get("deselect")?.context, "IMC_Universal")
@@ -120,7 +121,7 @@ describe("GameKeybinds", () => {
         keybinds.moveUp,
         keybinds.moveDown
       ],
-      [["KeyW"], ["KeyA"], ["KeyS"], ["KeyD"], ["Space"], ["ShiftLeft"]]
+      [["KeyW"], ["KeyA"], ["KeyS"], ["KeyD"], ["Space"], ["ControlLeft"]]
     )
     assert.deepStrictEqual([keybinds.speedFaster, keybinds.speedSlower, keybinds.deselect], [
       ["WheelUp"],
@@ -128,8 +129,8 @@ describe("GameKeybinds", () => {
       ["Escape"]
     ])
     assert.deepStrictEqual(keybinds.translateMode, ["KeyW"]) // the game's editor overlay, untouched by the camera contexts
-    assert.deepStrictEqual(keybinds.focusSelection, ["KeyF", "KeyC"])
-    for (const action of ["moveForward", "moveUp", "speedFaster", "deselect"] as const) {
+    assert.deepStrictEqual(keybinds.focusSelection, ["KeyF"])
+    for (const action of ["moveForward", "moveUp", "moveDown", "speedFaster", "deselect"] as const) {
       assert.isTrue(fromGame.has(action), action)
     }
     // the game's own names and sections, lower-cased
