@@ -1,12 +1,49 @@
 /**
+ * The editor's commands: what a one-shot keybind runs, and what the menu bar runs for
+ * the same action, so the two can't drift apart.
+ */
+import type { KeybindAction } from "../domain/Keybinds"
+import { deleteSelection, duplicateSelection } from "./actions"
+import { useEditor } from "./store"
+
+/**
  * Commands that must run inside a user gesture on a DOM element the Editor component owns
  * (the hidden file input). Dialog state lives in the store (`openDialog`); this is only
  * what can't.
- *
- * TODO(menu-bar): a universal menu bar (File / Edit / View / ...) should call these same
- * entry points, e.g. File > Import… -> openImport(), Edit > Settings… -> openDialog("settings").
  */
 export const commands = {
   /** Opens the file picker. Registered by the Editor component in an effect. */
   openImport: (): void => {}
 }
+
+/**
+ * The command for each one-shot action. Held keys and mouse drags aren't here (FlyCamera
+ * runs them), nor are selection clicks (the viewport does).
+ */
+export const actionCommands = {
+  undo: () => useEditor.getState().undo(),
+  redo: () => useEditor.getState().redo(),
+  deleteSelection,
+  duplicateSelection,
+  focusSelection: () => useEditor.getState().requestFocus(),
+  deselect: () => useEditor.getState().select([]),
+  selectMode: () => useEditor.getState().setTool("select"),
+  translateMode: () => useEditor.getState().setTool("translate"),
+  rotateMode: () => useEditor.getState().setTool("rotate"),
+  scaleMode: () => useEditor.getState().setTool("scale"),
+  toggleGizmoSpace: () => useEditor.getState().toggleGizmoSpace(),
+  speedFaster: () => useEditor.getState().changeSpeed(1),
+  speedSlower: () => useEditor.getState().changeSpeed(-1),
+  newMap: () => useEditor.getState().openDialog("new"),
+  importMap: () => commands.openImport(),
+  exportMap: () => useEditor.getState().openDialog("export"),
+  showKeybinds: () => useEditor.getState().setCheatSheet(true)
+} satisfies Partial<Record<KeybindAction, () => void>>
+
+export type CommandAction = keyof typeof actionCommands
+
+const hasCommand = (action: KeybindAction): action is CommandAction => Object.hasOwn(actionCommands, action)
+
+/** The action's command, or undefined when it isn't a one-shot action. */
+export const commandFor = (action: KeybindAction): (() => void) | undefined =>
+  hasCommand(action) ? actionCommands[action] : undefined
