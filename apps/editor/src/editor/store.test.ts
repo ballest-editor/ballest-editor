@@ -4,6 +4,7 @@ import fixture from "../domain/bundledCatalog.json"
 import { Catalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { placementTransform } from "../domain/factory"
+import { isPlayerStart } from "../domain/MapFile"
 import { defaultSettings } from "../domain/Settings"
 import { initialMap, nextSelection, useEditor } from "./store"
 
@@ -314,6 +315,98 @@ describe("editor store", () => {
       assert.deepStrictEqual(s().selectedIds, ids)
     })
 
+    it("pastes copied items where they were copied, as one step, selecting them", () => {
+      const { ids, steps } = setup()
+      s().select([ids[2]!, ids[0]!])
+      s().copySelection()
+      assert.strictEqual(s().past.length, steps) // copying changes nothing
+      moveItem(ids[0]!, { x: 50, y: 0, z: 0 })
+      s().paste()
+      assert.strictEqual(s().doc.map.items.length, 6)
+      assert.strictEqual(s().past.length, steps + 2)
+      const pasted = s().selectedIds
+      assert.isFalse(pasted.some((id) => ids.includes(id)))
+      // the copy keeps the transform it had when copied, not the source's later move
+      assert.deepStrictEqual(pasted.map((id) => transformOf(id).translation.x), [200, 0])
+      s().paste()
+      assert.strictEqual(s().doc.map.items.length, 8)
+      s().undo()
+      assert.strictEqual(s().doc.map.items.length, 6)
+      assert.deepStrictEqual(s().selectedIds, pasted)
+    })
+
+    it("cuts the selection as one step, leaving the player start, and pastes it back in place", () => {
+      const { ids, steps } = setup()
+      s().select([s().doc.ids[0]!, ids[0]!, ids[2]!])
+      s().cutSelection()
+      assert.strictEqual(s().past.length, steps + 1)
+      assert.strictEqual(s().doc.map.items.length, 2)
+      assert.isTrue(isPlayerStart(s().doc.map.items[0]!))
+      assert.deepStrictEqual(s().selectedIds, [])
+      s().paste()
+      assert.deepStrictEqual(s().selectedIds.map((id) => transformOf(id).translation.x), [0, 200])
+      s().undo()
+      s().undo()
+      assert.strictEqual(s().doc.map.items.length, 4)
+      assert.deepStrictEqual(s().selectedIds, [s().doc.ids[0]!, ids[0]!, ids[2]!])
+    })
+
+    it("keeps the clipboard across loading another map", () => {
+      const { ids } = setup()
+      s().select([ids[1]!])
+      s().copySelection()
+      s().loadMap(initialMap(), null)
+      s().paste()
+      assert.strictEqual(s().doc.map.items.length, 2)
+      assert.strictEqual(transformOf(s().selectedIds[0]!).translation.x, 100)
+    })
+
+    it("does nothing on paste with an empty clipboard or copy with an empty selection", () => {
+      const { steps } = setup()
+      useEditor.setState({ clipboard: null })
+      s().paste()
+      s().select([])
+      s().copySelection()
+      assert.isNull(s().clipboard)
+      assert.strictEqual(s().doc.map.items.length, 4)
+      assert.strictEqual(s().past.length, steps)
+    })
+
+    it("commits an alt+drag duplicate and its move as one step", () => {
+      const { ids, steps } = setup()
+      const copies = s().beginDuplicateDrag()!
+      assert.deepStrictEqual([...copies.keys()], ids)
+      const copyIds = [...copies.values()]
+      assert.deepStrictEqual(s().selectedIds, copyIds)
+      assert.strictEqual(s().doc.map.items.length, 7)
+      assert.strictEqual(s().past.length, steps) // nothing committed mid-drag
+      const moved = new Map(copyIds.map((id) => [id, { ...transformOf(id), translation: { x: 9, y: 9, z: 9 } }]))
+      assert.isTrue(s().endDuplicateDrag(moved))
+      assert.strictEqual(s().past.length, steps + 1)
+      assert.deepStrictEqual(ids.map((id) => transformOf(id).translation.x), [0, 100, 200]) // originals stay
+      for (const id of copyIds) assert.deepStrictEqual(transformOf(id).translation, { x: 9, y: 9, z: 9 })
+      s().undo()
+      assert.strictEqual(s().doc.map.items.length, 4)
+      assert.deepStrictEqual(s().selectedIds, ids)
+      s().redo()
+      assert.deepStrictEqual(s().selectedIds, copyIds)
+    })
+
+    it("drops the copies of a cancelled or refused alt+drag", () => {
+      const { ids, steps } = setup()
+      s().beginDuplicateDrag()
+      assert.isFalse(s().endDuplicateDrag(null))
+      assert.strictEqual(s().doc.map.items.length, 4)
+      assert.deepStrictEqual(s().selectedIds, ids)
+
+      const copyIds = [...s().beginDuplicateDrag()!.values()]
+      const bad = new Map([[copyIds[0]!, { ...transformOf(copyIds[0]!), rotation: { x: 0, y: 0, z: 0, w: 0 } }]])
+      assert.isFalse(s().endDuplicateDrag(bad))
+      assert.strictEqual(s().doc.map.items.length, 4)
+      assert.deepStrictEqual(s().selectedIds, ids)
+      assert.strictEqual(s().past.length, steps)
+    })
+
     it("never duplicates the player start", () => {
       const { ids } = setup()
       s().select([s().doc.ids[0]!, ids[0]!])
@@ -323,6 +416,10 @@ describe("editor store", () => {
       const before = s().past.length
       s().duplicateSelection()
       assert.strictEqual(s().past.length, before)
+      assert.isUndefined(s().beginDuplicateDrag())
+      s().copySelection()
+      s().paste()
+      assert.strictEqual(s().doc.map.items.filter(isPlayerStart).length, 1)
     })
   })
 

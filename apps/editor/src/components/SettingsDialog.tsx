@@ -428,6 +428,19 @@ export function SettingsDialog(props: {
         )
       },
       {
+        id: "altDragDuplicates",
+        ...setting("general", "altDragDuplicates"),
+        label: "Alt+drag duplicates",
+        description:
+          "Holding Alt while dragging a translate handle moves a copy of the selection and leaves the original in place, like the game. Turn off to make Alt+drag a plain move.",
+        control: (
+          <Switch
+            checked={settings.general.altDragDuplicates}
+            onCheckedChange={(v) => update("general", { altDragDuplicates: v })}
+          />
+        )
+      },
+      {
         id: "autosave",
         category: "general",
         label: "Autosave",

@@ -10,12 +10,14 @@ import { Schema } from "effect"
 /**
  * Sections and names follow the game: the level editor's own hotkey overlay ("focus
  * selection", "delete"...) and its settings screen ("mouse and keyboard free camera":
- * "forward", "reverse"...). The tools are the exception: plain "select", "translate",
- * "rotate", "scale" instead of the overlay's "select mode", "move mode"... Game actions
- * that mean nothing in the editor (replay controls, nameplates) are omitted; editor-only
- * actions get plain lower-case names in the same style. keybinds.json `label`/`section`
- * fields, when the extractor provides them, override the camera names (see GameKeybinds);
- * level-editor names come from the in-game overlay and are fixed here.
+ * "forward", "reverse"...). The exceptions: the tools get plain "select", "translate",
+ * "rotate", "scale" instead of the overlay's "select mode", "move mode"..., and the
+ * overlay's edit commands (undo, copy, delete...) get their own "edit" section, in the
+ * Edit menu's order. Game actions that mean nothing in the editor (replay controls,
+ * nameplates) are omitted; editor-only actions get plain lower-case names in the same
+ * style. keybinds.json `label`/`section` fields, when the extractor provides them,
+ * override the camera names (see GameKeybinds); level-editor and edit names come from
+ * the in-game overlay and are fixed here.
  */
 export const keybindSections = [
   {
@@ -28,11 +30,19 @@ export const keybindSections = [
       "toggleGizmoSpace",
       "focusSelection",
       "addToSelection",
-      "toggleSelection",
-      "deleteSelection",
-      "duplicateSelection",
+      "toggleSelection"
+    ]
+  },
+  {
+    name: "edit",
+    actions: [
       "undo",
       "redo",
+      "cutSelection",
+      "copySelection",
+      "paste",
+      "duplicateSelection",
+      "deleteSelection",
       "deselect"
     ]
   },
@@ -50,7 +60,10 @@ export type KeybindAction = (typeof keybindSections)[number]["actions"][number]
 export const keybindActions: ReadonlyArray<KeybindAction> = keybindSections.flatMap((g) => g.actions)
 
 /** Actions named by the in-game level editor's hotkey overlay (keybinds.json naming doesn't apply). */
-export const editorOverlayActions: ReadonlySet<KeybindAction> = new Set(keybindSections[0].actions)
+export const editorOverlayActions: ReadonlySet<KeybindAction> = new Set([
+  ...keybindSections[0].actions,
+  ...keybindSections[1].actions
+])
 
 /** The name shown in the settings (the game's wording where the action exists in-game). */
 export const keybindActionLabels: Record<KeybindAction, string> = {
@@ -64,6 +77,9 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   toggleSelection: "toggle selection",
   deleteSelection: "delete",
   duplicateSelection: "duplicate",
+  copySelection: "copy",
+  cutSelection: "cut",
+  paste: "paste",
   undo: "undo",
   redo: "redo",
   deselect: "deselect",
@@ -107,7 +123,13 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Click an item to add it to the selection, or to remove it if it's already selected. Ctrl+click, which the game's level editor uses to deselect.",
   deleteSelection: "Delete the selected items. Backspace in the game's level editor; Delete also works.",
   duplicateSelection:
-    "Copy the selected items in place and select the copies, ready to move. Ctrl+D, as in Unreal's editor; the game's key for this isn't recorded.",
+    "Copy the selected items in place and select the copies, ready to move. Ctrl+D, as in Unreal's editor; the game has no key for this and duplicates with Alt+drag on the translate gizmo (see General settings).",
+  copySelection:
+    "Copy the selected items, with their properties, so paste can add them again. Ctrl+C in the game's level editor.",
+  cutSelection:
+    "Copy the selected items, then delete them (one undo step); paste puts them back where they were. Editor only: the game has copy and paste but no cut.",
+  paste:
+    "Add the copied items where they were when copied, and select them. Ctrl+V in the game's level editor, which also pastes in place.",
   undo:
     "Undo the last change. Ctrl+Z in the game's level editor; a whole gizmo drag or number-field scrub is one step.",
   redo: "Redo the last undone change. Ctrl+Y in the game's level editor; Ctrl+Shift+Z also works.",
@@ -175,6 +197,9 @@ export const defaultKeybinds: Keybinds = {
   toggleSelection: ["Ctrl+Mouse0"],
   deleteSelection: ["Backspace", "Delete"],
   duplicateSelection: ["Ctrl+KeyD"],
+  copySelection: ["Ctrl+KeyC"],
+  cutSelection: ["Ctrl+KeyX"],
+  paste: ["Ctrl+KeyV"],
   undo: ["Ctrl+KeyZ"],
   redo: ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"],
   deselect: ["Escape"],

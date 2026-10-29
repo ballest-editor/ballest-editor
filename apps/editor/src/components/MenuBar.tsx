@@ -86,6 +86,7 @@ export function MenuBar() {
   const canUndo = useEditor((s) => s.past.length > 0 && s.preview === null)
   const canRedo = useEditor((s) => s.future.length > 0 && s.preview === null)
   const hasSelection = useEditor((s) => s.selectedIds.length > 0)
+  const canPaste = useEditor((s) => s.clipboard !== null)
   const openDialog = useEditor((s) => s.openDialog)
   const { snapping, appearance, general } = useEditor((s) => s.settings)
 
@@ -110,6 +111,9 @@ export function MenuBar() {
         <CommandItem action="undo" disabled={!canUndo}>Undo</CommandItem>
         <CommandItem action="redo" disabled={!canRedo}>Redo</CommandItem>
         <MenubarSeparator />
+        <CommandItem action="cutSelection" disabled={!hasSelection}>Cut</CommandItem>
+        <CommandItem action="copySelection" disabled={!hasSelection}>Copy</CommandItem>
+        <CommandItem action="paste" disabled={!canPaste}>Paste</CommandItem>
         <CommandItem action="duplicateSelection" disabled={!hasSelection}>Duplicate</CommandItem>
         <CommandItem action="deleteSelection" disabled={!hasSelection}>Delete</CommandItem>
         <CommandItem action="deselect" disabled={!hasSelection}>Deselect</CommandItem>
