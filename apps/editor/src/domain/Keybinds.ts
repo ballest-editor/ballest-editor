@@ -196,7 +196,7 @@ export const defaultKeybinds: Keybinds = {
   pan: ["Mouse1"],
   newMap: ["Alt+KeyN"],
   importMap: ["Ctrl+KeyO"],
-  exportMap: ["Ctrl+KeyS"],
+  exportMap: ["Ctrl+Shift+KeyE"],
   showKeybinds: ["Shift+Slash"]
 }
 
