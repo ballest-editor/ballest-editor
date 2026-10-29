@@ -5,6 +5,7 @@
  */
 import { Option, Predicate, Schema } from "effect"
 import { movementLookModes } from "./flyKeys"
+import { PLACE_DISTANCE } from "./placement"
 import { DEFAULT_GRID_SIZE, DEFAULT_ROTATION_STEP, GRID_SIZES, ROTATION_STEPS } from "./snap"
 
 /** "Custom" uses CameraSettings.customFov instead of a preset's. */
@@ -15,10 +16,15 @@ export const GeneralSettings = Schema.Struct({
   units: Schema.Literals(["cm", "m"]),
   /** Your in-game name; written into every exported map's `creatorName` and file name. */
   creatorName: Schema.String,
-  /** Whether a selection change is its own undo step (edits always restore their selection). */
-  undoSelection: Schema.Boolean,
   /** Whether Alt+dragging a translate handle moves a copy and leaves the selection in place, like the game. */
   altDragDuplicates: Schema.Boolean
+})
+
+export const EditorSettings = Schema.Struct({
+  /** How far from the camera (cm) a palette piece may land; bigger pieces go further (see domain/placement). */
+  placeDistance: Schema.Finite.check(Schema.isBetween({ minimum: 500, maximum: 10000 })),
+  /** Whether a selection change is its own undo step (edits always restore their selection). */
+  undoSelection: Schema.Boolean
 })
 
 export const CameraSettings = Schema.Struct({
@@ -61,6 +67,7 @@ export const SnappingSettings = Schema.Struct({
 
 export const Settings = Schema.Struct({
   general: GeneralSettings,
+  editor: EditorSettings,
   camera: CameraSettings,
   appearance: AppearanceSettings,
   snapping: SnappingSettings
@@ -68,7 +75,8 @@ export const Settings = Schema.Struct({
 export type Settings = typeof Settings.Type
 
 export const defaultSettings: Settings = {
-  general: { units: "cm", creatorName: "", undoSelection: false, altDragDuplicates: true },
+  general: { units: "cm", creatorName: "", altDragDuplicates: true },
+  editor: { placeDistance: PLACE_DISTANCE, undoSelection: false },
   camera: {
     flySpeed: 2000,
     lookSensitivity: 1,
@@ -96,10 +104,20 @@ export const defaultSettings: Settings = {
 
 type Section = keyof Settings
 
-const sections: ReadonlyArray<Section> = ["general", "camera", "appearance", "snapping"]
+const sections: ReadonlyArray<Section> = ["general", "editor", "camera", "appearance", "snapping"]
+
+/** Older saves kept `undoSelection` under general; it now lives under editor. */
+const migrate = (stored: unknown): unknown => {
+  if (!Predicate.isObject(stored)) return stored
+  const general = stored["general"]
+  const editor = Predicate.isObject(stored["editor"]) ? stored["editor"] : {}
+  if (!Predicate.isObject(general) || !("undoSelection" in general) || "undoSelection" in editor) return stored
+  return { ...stored, editor: { ...editor, undoSelection: general["undoSelection"] } }
+}
 
 /** Stored JSON -> Settings, field by field; invalid or missing fields keep their defaults. */
-export const mergeSettings = (stored: unknown, defaults: Settings = defaultSettings): Settings => {
+export const mergeSettings = (raw: unknown, defaults: Settings = defaultSettings): Settings => {
+  const stored = migrate(raw)
   const out: Record<string, Record<string, unknown>> = {}
   for (const section of sections) {
     const from = Predicate.isObject(stored) ? stored[section] : undefined

@@ -5,6 +5,7 @@ import {
   IconClipboard,
   IconCopy,
   IconRefresh,
+  IconSettings,
   IconTrash
 } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
@@ -37,6 +38,7 @@ import { LightingSettings } from "./LightingSettings"
 import { ShiftClick } from "./MouseButtonIcon"
 import { NumberField } from "./NumberField"
 import { PaintSection } from "./PaintSection"
+import { PivotSection } from "./PivotSection"
 import { SectionTitle } from "./SectionTitle"
 
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
@@ -47,6 +49,7 @@ function MapSettings() {
   const hasEditorState = useEditor((s) => s.doc.map.editorState !== undefined)
   const sourceName = useEditor((s) => s.sourceName)
   const renameLevel = useEditor((s) => s.renameLevel)
+  const openDialog = useEditor((s) => s.openDialog)
   // An edit in progress; otherwise the input shows the map's name.
   const [draft, setDraft] = useState<string | null>(null)
   const name = draft ?? levelData.levelDisplayName
@@ -63,7 +66,25 @@ function MapSettings() {
   ]
   return (
     <div className="flex flex-col gap-3">
-      <SectionTitle>Map</SectionTitle>
+      <div className="-my-1.5 flex items-center justify-between">
+        <SectionTitle>Map</SectionTitle>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground"
+                aria-label="Project settings"
+                onClick={() => openDialog("project")}
+              />
+            }
+          >
+            <IconSettings />
+          </TooltipTrigger>
+          <TooltipContent side="left">Project settings</TooltipContent>
+        </Tooltip>
+      </div>
       <div className="flex flex-col gap-1">
         <Label htmlFor="map-name" className="text-muted-foreground">Name</Label>
         <Input id="map-name" value={name} onChange={(e) => setDraft(e.target.value)} onBlur={commit} />
@@ -402,6 +423,9 @@ export function Inspector() {
             />
           ))}
         </div>
+
+        <Separator />
+        <PivotSection />
 
         <Separator />
         <SectionTitle>Paint</SectionTitle>

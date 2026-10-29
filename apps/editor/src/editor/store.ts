@@ -13,8 +13,10 @@ import {
   copyItems,
   pasteItems,
   removeItems,
+  setLevelData,
   setLevelNames,
   setLighting,
+  setPivots,
   setProperties,
   setSlotMaterials,
   setTransforms,
@@ -27,9 +29,10 @@ import type { PropertyChange } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
 import { LIMITS } from "../domain/limits"
-import { isPlayerStart, type ItemTransform, type MapFile } from "../domain/MapFile"
+import { isPlayerStart, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
 import type { PaintPicker } from "../domain/Paint"
+import { type Pivot, pivotAt } from "../domain/pivot"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import type { LoadedCatalog } from "../services/CatalogLoader"
@@ -66,8 +69,8 @@ export interface Snapshot {
 export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
 export type Tool = "select" | "translate" | "rotate" | "scale"
-export type Dialog = "new" | "export" | "settings"
-export type SettingsCategory = "general" | "camera" | "keybinds" | "appearance"
+export type Dialog = "new" | "export" | "settings" | "project"
+export type SettingsCategory = "general" | "editor" | "camera" | "keybinds" | "appearance"
 
 const HISTORY_LIMIT = 200
 const SPEED_STEPS = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
@@ -82,8 +85,9 @@ export const initialMap = () => newMapFile({ displayName: "Untitled", creatorNam
 export interface EditorState {
   readonly doc: Doc
   /**
-   * The height (UE cm) the grid is drawn at and palette pieces land on: the player start's,
-   * taken when the map loads so it stays put while the start is moved.
+   * The height (UE cm) the grid is drawn at and palette pieces land on: by default the player
+   * start's, taken when the map loads so it stays put while the start is moved. Project settings
+   * can change it (kept per map in MapPrefsStore, not in the file or its history).
    */
   readonly floorHeight: number
   /** Undo stack, oldest first (at most HISTORY_LIMIT entries). */
@@ -134,7 +138,8 @@ export interface EditorState {
   readonly focusRequest: number
   readonly frameAllRequest: number
 
-  readonly loadMap: (map: MapFile, sourceName: string | null) => void
+  /** Replaces the document; `floorHeight` defaults to the map's player start height. */
+  readonly loadMap: (map: MapFile, sourceName: string | null, floorHeight?: number) => void
   readonly replaceMapSilently: (map: MapFile) => void
   readonly placePiece: (piece: CatalogPiece, transform: ItemTransform) => void
   /**
@@ -152,6 +157,8 @@ export interface EditorState {
    * one edit); false (with a notice, and nothing changed) when a value doesn't fit its property.
    */
   readonly setSelectionProperties: (changes: ReadonlyArray<PropertyChange>) => boolean
+  /** Sets the pivots of several items as one undo step (nothing when none changes). */
+  readonly setItemPivots: (pivots: ReadonlyMap<string, Pivot>) => void
   readonly deleteSelection: () => void
   /** Copies the selected items in place (one undo step) and selects the copies. */
   readonly duplicateSelection: () => void
@@ -178,10 +185,13 @@ export interface EditorState {
   readonly renameLevel: (displayName: string, creatorName: string) => void
   /** Sets the sun (time of day, brightness, yaw) as one undo step; non-finite values are ignored. */
   readonly setLighting: (lighting: Lighting) => void
+  /** Replaces `worldSettings.levelData` as one undo step (none when nothing changes). */
+  readonly setLevelData: (levelData: LevelData) => void
+  readonly setFloorHeight: (floorHeight: number) => void
   /** Restores the previous snapshot, including its selection. */
   readonly undo: () => void
   readonly redo: () => void
-  /** Changes the selection; its own undo step when settings.general.undoSelection is on. */
+  /** Changes the selection; its own undo step when settings.editor.undoSelection is on. */
   readonly select: (ids: Selection) => void
   readonly setTool: (tool: Tool) => void
   readonly toggleGizmoSpace: () => void
@@ -302,10 +312,10 @@ export const useEditor = create<EditorState>()((set, get) => {
     focusRequest: 0,
     frameAllRequest: 0,
 
-    loadMap: (map, sourceName) =>
+    loadMap: (map, sourceName, floorHeight) =>
       set((s) => ({
         doc: docOf(map),
-        floorHeight: floorHeightOf(map),
+        floorHeight: floorHeight ?? floorHeightOf(map),
         past: [],
         future: [],
         dirty: false,
@@ -369,6 +379,15 @@ export const useEditor = create<EditorState>()((set, get) => {
       )
       if (!unchanged) commit({ map: next.value, ids: s.doc.ids })
       return true
+    },
+
+    setItemPivots: (pivots) => {
+      const { doc } = get()
+      const entries = [...pivots].flatMap(([id, pivot]) => {
+        const index = doc.ids.indexOf(id)
+        return index < 0 || samePivot(pivotAt(doc.map, index), pivot) ? [] : [[index, pivot] as const]
+      })
+      if (entries.length > 0) commit({ map: setPivots(doc.map, entries), ids: doc.ids })
     },
 
     deleteSelection: () => {
@@ -451,6 +470,14 @@ export const useEditor = create<EditorState>()((set, get) => {
       commit({ map: next.value, ids: doc.ids })
     },
 
+    setLevelData: (levelData) => {
+      const { doc } = get()
+      if (JSON.stringify(levelData) === JSON.stringify(doc.map.worldSettings.levelData)) return
+      commit({ map: setLevelData(doc.map, levelData), ids: doc.ids })
+    },
+
+    setFloorHeight: (floorHeight) => set({ floorHeight }),
+
     undo: () =>
       set((s) => {
         const prev = s.past.at(-1)
@@ -471,7 +498,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       set((s) => {
         const selectedIds = [...new Set(ids)]
         if (sameSelection(selectedIds, s.selectedIds)) return s
-        if (!s.settings.general.undoSelection) return { selectedIds }
+        if (!s.settings.editor.undoSelection) return { selectedIds }
         const step: Snapshot = {
           doc: s.doc,
           selectedIds: s.selectedIds,
@@ -526,6 +553,8 @@ const INVALID_TRANSFORM = "That transform isn't valid for the game (non-finite o
 
 const sameVec = (a: Vec3, b: Vec3) => a.x === b.x && a.y === b.y && a.z === b.z
 
+const samePivot = (a: Pivot, b: Pivot) => a.choice === b.choice && sameVec(a.localPosition, b.localPosition)
+
 /** True when item `index` has the same transform in both maps (an edit that changed nothing). */
 const sameItemTransform = (before: MapFile, after: MapFile, index: number): boolean => {
   const a = before.items[index]?.itemTransform
@@ -566,6 +595,9 @@ export const activeId = (s: EditorState): string | undefined => s.selectedIds.at
 
 /** The sun as shown: the live preview, else the document. */
 export const shownLighting = (s: EditorState): Lighting => s.lightingPreview ?? lightingOf(s.doc.map.worldSettings)
+
+/** An item's pivot (Default when it has none, or isn't in the document). */
+export const pivotOf = (s: EditorState, id: string): Pivot => pivotAt(s.doc.map, s.doc.ids.indexOf(id))
 
 /** An item's transform as shown: the live preview, else the document. */
 export const shownTransform = (s: EditorState, id: string): UeTransform | undefined =>

@@ -2,8 +2,9 @@ import { assert, describe, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { setSlotMaterials, type SlotMaterial } from "../domain/edits"
+import { setLevelData, setSlotMaterials, type SlotMaterial, withLevelNames } from "../domain/edits"
 import { objectPathOf } from "../domain/MapFile"
+import { hasTag, TAG_GROUPS, tagNameOf, unknownTags, withDifficulty, withTag } from "../domain/mapTags"
 import { parsePaint } from "../domain/Paint"
 import { objectAt, parseJson } from "../test/json"
 import { listSamples, readSample, repoRoot } from "../test/samples"
@@ -77,6 +78,33 @@ describe("MapCodec", () => {
             assert.strictEqual(mesh.materialAssetPaths[slot], objectPathOf(material))
           }
         }
+      }).pipe(Effect.provide(MapCodec.layer))
+  )
+
+  // Set every map setting the editor offers, and the file still round-trips: the new names,
+  // difficulty and tags are written, and tags the editor doesn't know come back untouched.
+  it.effect.each(samples.map((s) => [s.name, s] as const))(
+    "round-trips %s with its map settings changed",
+    ([, sample]) =>
+      Effect.gen(function*() {
+        const codec = yield* MapCodec
+        const map = yield* codec.decode(readSample(sample))
+        const before = map.worldSettings.levelData
+        let levelData = withLevelNames(withDifficulty(before, "baller"), "Renamed Map", before.creatorName)
+        for (const { group, tags } of TAG_GROUPS) {
+          for (const tag of tags) {
+            levelData = withTag(levelData, tagNameOf(group, tag), !hasTag(levelData, tagNameOf(group, tag)))
+          }
+        }
+        const edited = setLevelData(map, levelData)
+        const text = yield* codec.encode(edited)
+        const decoded = yield* codec.decode(text)
+        assert.deepStrictEqual(decoded, edited)
+        const out = decoded.worldSettings.levelData
+        assert.strictEqual(out.userLevelName, `Renamed Map_${before.creatorName}`)
+        assert.strictEqual(out.levelDifficulty, "Baller")
+        assert.deepStrictEqual(unknownTags(out), unknownTags(before))
+        assert.deepStrictEqual(decoded.items, map.items)
       }).pipe(Effect.provide(MapCodec.layer))
   )
 

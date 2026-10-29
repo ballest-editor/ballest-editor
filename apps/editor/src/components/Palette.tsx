@@ -13,6 +13,7 @@ import {
   verificationOf
 } from "../domain/Catalog"
 import { placementTransform } from "../domain/factory"
+import { pieceFootprint } from "../domain/placement"
 import { preloadPiece } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
 import { useEditor } from "../editor/store"
@@ -125,7 +126,7 @@ export function Palette() {
     catalog === null || index === null ? undefined : unavailableReasonOf(index, piece, catalog.verified)
   const place = (piece: CatalogPiece, unavailable: string | undefined) => (e: MouseEvent<HTMLButtonElement>) => {
     if (e.detail === 0 || unavailable !== undefined) return
-    placePiece(piece, placementTransform(piece, sceneRegistry.placementPoint()))
+    placePiece(piece, placementTransform(piece, sceneRegistry.placementPoint(pieceFootprint(piece))))
     e.currentTarget.blur()
     focusViewport()
   }

@@ -2,19 +2,29 @@
 import { Cause, Effect, Exit } from "effect"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { currentCreatedAt, newMapFile } from "../domain/factory"
-import { type Axis, type AxisEdit, selectionAxisEdit, type TransformField, writeField } from "../domain/groupTransform"
+import {
+  type Axis,
+  type AxisEdit,
+  selectionAxisEdit,
+  type TransformField,
+  writeFieldAbout
+} from "../domain/groupTransform"
 import type { PropertyChange } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
-import { PLAYER_START_CLASS } from "../domain/MapFile"
+import { floorHeightOf } from "../domain/level"
+import { type LevelData, PLAYER_START_CLASS } from "../domain/MapFile"
+import { type MapPrefs, mapPrefsKeyOf } from "../domain/MapPrefs"
+import { localToWorld, type PivotChoice, pivotFor } from "../domain/pivot"
 import type { Settings } from "../domain/Settings"
 import { CatalogLoader } from "../services/CatalogLoader"
 import { KeybindStore } from "../services/KeybindStore"
 import { MapCodec } from "../services/MapCodec"
 import { MapExporter } from "../services/MapExporter"
+import { MapPrefsStore } from "../services/MapPrefsStore"
 import { MaterialLibrary } from "../services/MaterialLibrary"
 import { type AppServices, runtime } from "../services/runtime"
 import { SettingsStore } from "../services/SettingsStore"
-import { type SlotPaint, useEditor } from "./store"
+import { pivotOf, type SlotPaint, useEditor } from "./store"
 
 const run = async <A, E>(effect: Effect.Effect<A, E, AppServices>): Promise<A | undefined> => {
   const exit = await runtime.runPromiseExit(effect)
@@ -49,25 +59,33 @@ const docTransform = (id: string): UeTransform | undefined => {
   return doc.map.items[doc.ids.indexOf(id)]?.itemTransform
 }
 
-/** The selected items' document transforms, each put through `edit`. */
-const withSelectionEdit = (edit: (t: UeTransform) => UeTransform): ReadonlyMap<string, UeTransform> =>
+/** An item's own pivot, local and unscaled. */
+const localPivotOf = (id: string): Vec3 => pivotOf(useEditor.getState(), id).localPosition
+
+/** The selected items' document transforms, each put through `edit` (with the item's own pivot). */
+const withSelectionEdit = (
+  edit: (t: UeTransform, localPivot: Vec3) => UeTransform
+): ReadonlyMap<string, UeTransform> =>
   new Map(
     useEditor.getState().selectedIds.flatMap((id) => {
       const t = docTransform(id)
-      return t === undefined ? [] : [[id, edit(t)] as const]
+      return t === undefined ? [] : [[id, edit(t, localPivotOf(id))] as const]
     })
   )
 
-/** An axis edit made from the document transforms, about the active item like the gizmo. */
+/** An axis edit made from the document transforms, about the active item's pivot like the gizmo. */
 const withAxisEdit = (field: TransformField, axis: Axis, edit: AxisEdit) => {
   // the active item is the last selected one
-  const active = useEditor.getState().selectedIds.flatMap((id) => docTransform(id) ?? []).at(-1)
-  return active === undefined ? new Map() : withSelectionEdit(selectionAxisEdit(active, field, axis, edit))
+  const activeId = useEditor.getState().selectedIds.findLast((id) => docTransform(id) !== undefined)
+  const active = activeId === undefined ? undefined : docTransform(activeId)
+  if (activeId === undefined || active === undefined) return new Map()
+  const pivot = localToWorld(active, localPivotOf(activeId))
+  return withSelectionEdit(selectionAxisEdit(active, field, axis, edit, pivot))
 }
 
-/** Sets all three axes of `field` on every selected item (pasting a copied row). */
+/** Sets all three axes of `field` on every selected item (pasting a copied row), about each one's pivot. */
 export const setSelectionField = (field: TransformField, value: Vec3): boolean =>
-  transformSelection(withSelectionEdit((t) => writeField(t, field, value)))
+  transformSelection(withSelectionEdit((t, localPivot) => writeFieldAbout(t, field, value, localPivot)))
 
 /** Applies an axis edit (an inspector field) to every selected item. */
 export const editSelectionAxis = (field: TransformField, axis: Axis, edit: AxisEdit): boolean =>
@@ -79,6 +97,21 @@ export const editSelectionAxis = (field: TransformField, axis: Axis, edit: AxisE
  */
 export const previewSelectionAxis = (field: TransformField, axis: Axis, edit: AxisEdit | null): void =>
   useEditor.getState().setPreview(edit === null ? null : withAxisEdit(field, axis, edit))
+
+/**
+ * Sets the pivot `choice` on every selected item, measured on each one's own bounds (one
+ * undo step). Items whose bounds are unknown keep their pivot.
+ */
+export const setSelectionPivot = (choice: PivotChoice): void => {
+  const { doc, selectedIds, catalogIndex, setItemPivots } = useEditor.getState()
+  setItemPivots(
+    new Map(selectedIds.flatMap((id) => {
+      const item = doc.map.items[doc.ids.indexOf(id)]
+      const pivot = item === undefined ? undefined : pivotFor(item, catalogIndex, choice)
+      return pivot === undefined ? [] : [[id, pivot] as const]
+    }))
+  )
+}
 
 export const loadCatalog = () =>
   run(
@@ -157,7 +190,11 @@ export const importFile = (file: File) =>
     Effect.gen(function*() {
       const text = yield* Effect.promise(() => file.text())
       const map = yield* MapCodec.use((codec) => codec.decode(text))
-      useEditor.getState().loadMap(map, file.name)
+      // unreadable prefs only cost the saved grid height
+      const prefs = yield* MapPrefsStore.use((store) => store.load(mapPrefsKeyOf(map))).pipe(
+        Effect.orElseSucceed((): MapPrefs => ({}))
+      )
+      useEditor.getState().loadMap(map, file.name, prefs.gridHeight)
       useEditor.getState().notify("info", `Imported ${file.name} (${map.items.length} items)`)
     })
   )
@@ -175,5 +212,32 @@ export const exportMap = () =>
       setTimeout(() => URL.revokeObjectURL(url), 1_000)
       useEditor.getState().replaceMapSilently(result.map)
       useEditor.getState().notify("info", `Exported ${result.filename}`)
+      // the export may have renamed the map: its prefs follow it to the new name
+      yield* saveMapPrefs
     })
   )
+
+/**
+ * The open map's prefs, under its current name: the grid height when it isn't the player
+ * start's (what a load would pick anyway).
+ */
+const saveMapPrefs = Effect.gen(function*() {
+  const { doc, floorHeight } = useEditor.getState()
+  const prefs = floorHeight === floorHeightOf(doc.map) ? {} : { gridHeight: floorHeight }
+  yield* MapPrefsStore.use((store) => store.save(mapPrefsKeyOf(doc.map), prefs))
+})
+
+/**
+ * Changes the map's level fields (one undo step). Its prefs are saved again under its
+ * (possibly new) name.
+ */
+export const setLevelData = (levelData: LevelData) => {
+  useEditor.getState().setLevelData(levelData)
+  return run(saveMapPrefs)
+}
+
+/** Moves the grid (and where pieces land); saved with the map's prefs, not in its history. */
+export const setGridHeight = (gridHeight: number) => {
+  useEditor.getState().setFloorHeight(gridHeight)
+  return run(saveMapPrefs)
+}

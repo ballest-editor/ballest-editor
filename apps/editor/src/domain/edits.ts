@@ -4,9 +4,18 @@
  * schemas before they reach the document.
  */
 import { Option, Schema } from "effect"
-import { qualifyMaterialPath } from "./factory"
+import { defaultEditorState, qualifyMaterialPath, userLevelNameOf } from "./factory"
 import { type PropertyChange, withProperty } from "./itemProperties"
-import { Item, type ItemPivot, ItemTransform, type MapFile, type MeshComponent, objectPathOf } from "./MapFile"
+import {
+  Item,
+  type ItemPivot,
+  ItemTransform,
+  type LevelData,
+  type MapFile,
+  type MeshComponent,
+  objectPathOf
+} from "./MapFile"
+import type { Pivot } from "./pivot"
 import { DEFAULT_LIGHT_ANGLE, type Lighting } from "./sunlight"
 
 const decodeItem = Schema.decodeUnknownOption(Item)
@@ -165,36 +174,67 @@ export const copyItems = (map: MapFile, indices: ReadonlyArray<number>): Clip =>
 
 /**
  * Appends a clip's items where they were copied, with their pivots moved to the new
- * indices, so a copy keeps its original's pivot choice. A map without `editorState` (a
- * published .ballmap) has nowhere to keep pivots, so they are dropped.
+ * indices, so a copy keeps its original's pivot choice. A map without `editorState` (an
+ * imported .ballmap) gets the empty one the exporter would add anyway, but only when there
+ * are pivots to keep.
  */
 export const pasteItems = (map: MapFile, clip: Clip): MapFile => {
   if (clip.items.length === 0) return map
   const items = [...map.items, ...clip.items]
-  if (map.editorState === undefined) return { ...map, items }
+  if (clip.pivots.length === 0) return { ...map, items }
+  const editorState = map.editorState ?? defaultEditorState()
   const offset = map.items.length
   const pivots = clip.pivots.map((p) => ({ ...p, itemIndex: p.itemIndex + offset }))
-  return { ...map, items, editorState: { ...map.editorState, pivots: [...map.editorState.pivots, ...pivots] } }
+  // sorted by item index, as the game writes them (a clip lists them in selection order)
+  const all = [...editorState.pivots, ...pivots].sort((x, y) => x.itemIndex - y.itemIndex)
+  return { ...map, items, editorState: { ...editorState, pivots: all } }
 }
 
 /** Appends copies of items (in the given order), pivots included: copy, then paste. */
 export const duplicateItems = (map: MapFile, indices: ReadonlyArray<number>): MapFile =>
   pasteItems(map, copyItems(map, indices))
 
+/**
+ * Sets the pivots of several items (by index; out-of-range indices are skipped). Default
+ * drops the item's entry, as items without one are Default. A map without `editorState`
+ * (an imported `.ballmap`) gets the empty one the exporter would add anyway. Entries stay
+ * sorted by item index, as the game writes them.
+ */
+export const setPivots = (
+  map: MapFile,
+  entries: ReadonlyArray<readonly [index: number, pivot: Pivot]>
+): MapFile => {
+  const valid = entries.filter(([index]) => map.items[index] !== undefined)
+  if (valid.length === 0) return map
+  const changed = new Map(valid)
+  const editorState = map.editorState ?? defaultEditorState()
+  const kept = editorState.pivots.filter((p) => !changed.has(p.itemIndex))
+  const added: Array<ItemPivot> = [...changed].flatMap(([itemIndex, pivot]) =>
+    pivot.choice === "Default"
+      ? []
+      : [{ itemIndex, pivot: { choice: pivot.choice, localPosition: { ...pivot.localPosition } } }]
+  )
+  const pivots = [...kept, ...added].sort((a, b) => a.itemIndex - b.itemIndex)
+  return { ...map, editorState: { ...editorState, pivots } }
+}
+
 /** Validates a freshly built item against the schema before it enters the document. */
 export const validateItem = (candidate: unknown): Option.Option<Item> => decodeItem(candidate)
 
-export const setLevelNames = (map: MapFile, displayName: string, creatorName: string): MapFile => ({
+export const setLevelData = (map: MapFile, levelData: LevelData): MapFile => ({
   ...map,
-  worldSettings: {
-    ...map.worldSettings,
-    levelData: {
-      ...map.worldSettings.levelData,
-      levelDisplayName: displayName,
-      creatorName,
-      userLevelName: `${displayName}_${creatorName}`
-    }
-  }
+  worldSettings: { ...map.worldSettings, levelData }
+})
+
+export const setLevelNames = (map: MapFile, displayName: string, creatorName: string): MapFile =>
+  setLevelData(map, withLevelNames(map.worldSettings.levelData, displayName, creatorName))
+
+/** The display and creator names, and `userLevelName` (`<displayName>_<creator>`) kept in step with them. */
+export const withLevelNames = (levelData: LevelData, displayName: string, creatorName: string): LevelData => ({
+  ...levelData,
+  levelDisplayName: displayName,
+  creatorName,
+  userLevelName: userLevelNameOf(displayName, creatorName)
 })
 
 /**

@@ -3,10 +3,12 @@ import { Schema } from "effect"
 import fixture from "../domain/bundledCatalog.json"
 import { Catalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
+import { withLevelNames } from "../domain/edits"
 import { placementTransform } from "../domain/factory"
 import { isPlayerStart } from "../domain/MapFile"
+import { withDifficulty } from "../domain/mapTags"
 import { defaultSettings } from "../domain/Settings"
-import { initialMap, nextSelection, shownLighting, useEditor } from "./store"
+import { initialMap, nextSelection, pivotOf, shownLighting, useEditor } from "./store"
 
 const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!
 
@@ -63,6 +65,29 @@ describe("editor store", () => {
     assert.strictEqual(s().floorHeight, 500)
   })
 
+  it("loads a map at a saved grid height, and sets it without an undo step", () => {
+    const s = () => useEditor.getState()
+    s().loadMap(initialMap(), null, 1200)
+    assert.strictEqual(s().floorHeight, 1200)
+    s().setFloorHeight(-50)
+    assert.strictEqual(s().floorHeight, -50)
+    assert.strictEqual(s().past.length, 0)
+  })
+
+  it("changes the level data as one undo step, and not at all when nothing changed", () => {
+    const s = () => useEditor.getState()
+    s().loadMap(initialMap(), null)
+    const before = s().doc.map.worldSettings.levelData
+    s().setLevelData({ ...before })
+    assert.strictEqual(s().past.length, 0)
+    s().setLevelData(withLevelNames(withDifficulty(before, "expert"), "Night Run", "me"))
+    assert.strictEqual(s().past.length, 1)
+    assert.strictEqual(s().doc.map.worldSettings.levelData.userLevelName, "Night Run_me")
+    assert.strictEqual(s().doc.map.worldSettings.levelData.levelDifficulty, "Expert")
+    s().undo()
+    assert.deepStrictEqual(s().doc.map.worldSettings.levelData, before)
+  })
+
   it("reports whether a transform was accepted", () => {
     const s = () => useEditor.getState()
     mapWithCubes(0)
@@ -91,6 +116,21 @@ describe("editor store", () => {
     assert.isFalse(s().paintSlots([{ id: "nope", component: 0, slot: 0, material }]))
     s().undo()
     assert.deepStrictEqual([slotOf(1), slotOf(2)], [before, before])
+  })
+
+  it("sets pivots on several items as one undo step, and skips no-op changes", () => {
+    const s = state
+    mapWithCubes(0, 100)
+    const ids = s().doc.ids.slice(1)
+    const top = { choice: "Top", localPosition: { x: 0, y: 0, z: 1000 } }
+    const before = s().past.length
+    s().setItemPivots(new Map(ids.map((id) => [id, top])))
+    assert.strictEqual(s().past.length, before + 1)
+    assert.deepStrictEqual(ids.map((id) => pivotOf(s(), id).choice), ["Top", "Top"])
+    s().setItemPivots(new Map(ids.map((id) => [id, top])))
+    assert.strictEqual(s().past.length, before + 1)
+    s().undo()
+    assert.deepStrictEqual(ids.map((id) => pivotOf(s(), id).choice), ["Default", "Default"])
   })
 
   describe("history", () => {
@@ -176,7 +216,7 @@ describe("editor store", () => {
     })
 
     const withUndoSelection = (on: boolean) =>
-      s().setSettings({ ...defaultSettings, general: { ...defaultSettings.general, undoSelection: on } })
+      s().setSettings({ ...defaultSettings, editor: { ...defaultSettings.editor, undoSelection: on } })
 
     it("doesn't record selection changes by default", () => {
       withUndoSelection(false)

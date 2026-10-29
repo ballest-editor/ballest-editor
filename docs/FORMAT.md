@@ -27,7 +27,7 @@ Plain UTF-8 JSON, tab-indented, CRLF line endings, no BOM. `.balledit` and `.bal
     levelData: {
       systemLevelName: "Map_LevelEditorMain",
       userLevelName: "<displayName>_<creator>",
-      levelDifficulty: "Beginner",
+      levelDifficulty: "Beginner",                   // EBallgameDifficulty; see "Difficulty and tags"
       levelDescription: "",
       uploaderOnlyLevelPreviewImagePath: "",
       bValidated: bool,                              // true once a validation run has been completed in-game
@@ -79,6 +79,21 @@ The sky light is not a control. On load and on every time change the game sets i
 The sky is `BP_Sky_Sphere_Stylized`, a sphere drawn with the unlit `M_Sky_Panning_Clouds_Stylized`. Its `RefreshMaterial` sets the material from the sun: by day (4:00 to 20:00) the horizon and zenith colours are the engine's `C_Sky_Horizon_Color` / `C_Sky_Zenith_Color` curves (each channel clamped to 0–1) at the sun height elevation / 90, the horizon falloff is lerp(3, 7, |height|) and the sun brightness 20 (it sets the light to 12 first, so 10 × sky light × 12 always passes the clamp); at night the colours are fixed dark blues, the falloff 0.2 and the stars 25. The material's compiled pixel shader (dumped with `BallestExtract shaders`, read with `dxc -dumpbin`) then outputs `1.5 × (lerp(zenith + stars × "Sun height", horizon, pow(1 − saturate(view.z), falloff)) + sunColor × brightness × saturate(1 − |view · toSun − 1| / 0.0003))`, with panning cloud textures blended over by `saturate(cloud²)`. "Sun height" is |height| below the horizon and 0 above, so stars only show at night. The level's sky light is a real-time capture of this sky.
 
 The editor approximates all of this in `apps/editor/src/domain/sunlight.ts` and `sky.ts`: the sky is drawn without its clouds (their textures aren't served), with procedural stars, and lights the scene as an environment map captured from it.
+
+## Difficulty and tags
+
+The game's publish screen sets a difficulty and Workshop tags. Both end up in `levelData`.
+
+- **Difficulty:** five levels, from `EBallgameDifficulty` in the exe and the English locres. The names are Beginner, Medium, Advanced, Expert and Baller. Baller shows as a yellow warning sign; the other four show 1–4 bars in white, green, blue and red. The tag is `MapTags.UGCTags.Difficulty.<beginner|medium|advanced|expert|baller>`. Every sample has `levelDifficulty: "Beginner"`, even the published ones tagged medium, advanced or expert, so the tag is what the game uses. The editor writes both.
+- **Tags:** `MapTags.UGCTags.<Group>.<tag>`, in the screen's groups:
+  - Gameplay: balance, climb, downhill, endurance, flow, mini, ninja, out and back, pathfinding, practice, precision, puzzle, RPG, speed, tech, troll.
+  - Mood: day, night, sunrise, sunset.
+  - Routes: multiple, single, symmetrical.
+  - Props: rubber, vents.
+- **Map type tag:** every file with tags lists `UGCTypes.Map` first.
+- **Old tags:** older Workshop maps use an ungrouped form, `MapTags.UGCTags.<tag>`, e.g. `MapTags.UGCTags.expert`. The editor keeps those as they are.
+- **No limit found:** neither the exe nor the locres has a cap on the number of tags. One sample (A08 Lover 3) has 25 tags, including all 16 gameplay tags.
+- **Grid height:** the editor keeps it outside the file, in localStorage keyed by `userLevelName`. The file has no field for it, and the game validates `editorState` and rewrites it on every save.
 
 ## Catalog (from 22 sample maps, 9.9k items)
 
@@ -155,3 +170,7 @@ Pak: `Ballest/Content/Paks/Ballest-Windows.{pak,utoc,ucas}` — IoStore TOC v8, 
 Note: `itemTransform` in a map file is the piece's **Main component** world transform, not the actor transform (e.g. every AirVent item carries Main's scale 0.75,0.75,1).
 
 In-game console (`ballest.editor.*`): `saveprefab`, `spawnprefab`, `listprefabs`, `deleteprefab`, `pivot`.
+
+## Pivots (`editorState.pivots`)
+
+The in-game inspector sets a per-item pivot: Default, Center, Bottom, Top, Left, Right, Back or Front. The gizmo sits on it and rotates and scales the item about it. `localPosition` is that point in the item's local frame (the Main component, unscaled cm): the centre of the Main mesh's local bounds, or the centre of one face of them. Back is +X, Front −X, Right +Y, Left −Y, Top +Z, Bottom −Z. Every pivot in `samples/` matches the catalog's bounds this way (`apps/editor/src/domain/pivot.test.ts`). Items without an entry use Default (the origin), and no sample has a Default entry, so the editor drops the entry when a pivot goes back to Default. Entries are sorted by `itemIndex`. A map without `editorState` (an imported `.ballmap`) gets one when a pivot is set or pasted.
