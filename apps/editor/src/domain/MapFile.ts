@@ -150,6 +150,10 @@ export const PLAYER_START_CLASS =
 
 export const isPlayerStart = (item: Item): boolean => item.actorToSpawn === PLAYER_START_CLASS
 
+/** The goal ring. */
+export const GOAL_CLASS =
+  "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/MapTriggers/BP_Checkpoint.BP_Checkpoint_C'"
+
 /** `/Script/Engine.MaterialInstanceConstant'/Game/X.X'` -> `/Game/X.X` (as the game writes `materialAssetPaths`). */
 export const objectPathOf = (classQualifiedPath: string): string => {
   const match = /^[^']*'(.*)'$/.exec(classQualifiedPath)

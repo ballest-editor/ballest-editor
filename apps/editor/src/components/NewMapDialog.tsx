@@ -19,7 +19,7 @@ export function NewMapDialog({ open, onClose }: { readonly open: boolean; readon
       id="new"
       title="New map"
       fileNameLead="Exports as"
-      fileNameNote="Starts with the one player start the game requires. Unsaved changes in the current map are discarded."
+      fileNameNote="Starts like a new in-game map, with the player start and the goal ring where the game puts them. Unsaved changes in the current map are discarded."
       name={name}
       onNameChange={setName}
       creator={creator}

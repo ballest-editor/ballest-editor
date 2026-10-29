@@ -11,19 +11,24 @@ import { initialMap, nextSelection, useEditor } from "./store"
 const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!
 
 const state = () => useEditor.getState()
+/** A new map with only its player start, so these tests own every other item and index. */
+const startOnlyMap = () => {
+  const map = initialMap()
+  return { ...map, items: map.items.filter(isPlayerStart) }
+}
 const transformOf = (id: string) => state().doc.map.items[state().doc.ids.indexOf(id)]!.itemTransform
 const transformItem = (id: string, t: UeTransform) => state().transformItems(new Map([[id, t]]))
 const moveItem = (id: string, translation: Vec3) => transformItem(id, { ...transformOf(id), translation })
 /** A new map (player start only) with a cube placed at each x; the last one is selected. */
 const mapWithCubes = (...xs: ReadonlyArray<number>) => {
-  state().loadMap(initialMap(), null)
+  state().loadMap(startOnlyMap(), null)
   for (const x of xs) state().placePiece(cube, placementTransform(cube, { x, y: 0, z: 0 }))
 }
 
 describe("editor store", () => {
   it("places, moves, deletes, and undoes/redoes", () => {
     const s = () => useEditor.getState()
-    s().loadMap(initialMap(), null)
+    s().loadMap(startOnlyMap(), null)
     assert.strictEqual(s().doc.map.items.length, 1)
 
     s().placePiece(cube, placementTransform(cube, { x: 10, y: 20, z: 30 }))
@@ -49,7 +54,7 @@ describe("editor store", () => {
 
   it("builds at the loaded map's player start height, which stays put while the start moves", () => {
     const s = () => useEditor.getState()
-    s().loadMap(initialMap(), null)
+    s().loadMap(startOnlyMap(), null)
     assert.strictEqual(s().floorHeight, 8615)
     const start = s().doc.ids[0]!
     moveItem(start, { x: 0, y: 0, z: 500 })
@@ -97,7 +102,7 @@ describe("editor store", () => {
     const translationOf = (id: string) => s().doc.map.items[s().doc.ids.indexOf(id)]!.itemTransform.translation
 
     it("puts every kind of edit on the stack, and loading a map clears it", () => {
-      s().loadMap(initialMap(), null)
+      s().loadMap(startOnlyMap(), null)
       const id = place(0)
       moveItem(id, { x: 5, y: 0, z: 0 })
       const t = s().doc.map.items[1]!.itemTransform
@@ -105,14 +110,14 @@ describe("editor store", () => {
       s().renameLevel("Renamed", "me")
       s().deleteSelection()
       assert.strictEqual(s().past.length, 5)
-      s().loadMap(initialMap(), null)
+      s().loadMap(startOnlyMap(), null)
       assert.strictEqual(s().past.length, 0)
       assert.strictEqual(s().future.length, 0)
       assert.isFalse(s().dirty)
     })
 
     it("leaves no step for edits that change nothing", () => {
-      s().loadMap(initialMap(), null)
+      s().loadMap(startOnlyMap(), null)
       const id = place(10)
       const before = s().past.length
       moveItem(id, { x: 10, y: 0, z: 0 })
@@ -123,7 +128,7 @@ describe("editor store", () => {
     })
 
     it("clears the redo stack on a new edit", () => {
-      s().loadMap(initialMap(), null)
+      s().loadMap(startOnlyMap(), null)
       const id = place(0)
       moveItem(id, { x: 1, y: 0, z: 0 })
       s().undo()
@@ -135,7 +140,7 @@ describe("editor store", () => {
     })
 
     it("restores the selection that went with each step", () => {
-      s().loadMap(initialMap(), null)
+      s().loadMap(startOnlyMap(), null)
       const a = place(0)
       const b = place(100)
       s().select([a])
@@ -157,7 +162,7 @@ describe("editor store", () => {
     })
 
     it("waits while a gizmo drag or scrub is previewing", () => {
-      s().loadMap(initialMap(), null)
+      s().loadMap(startOnlyMap(), null)
       const id = place(0)
       const t = s().doc.map.items[1]!.itemTransform
       s().setPreview(new Map([[id, { ...t, translation: { x: 50, y: 0, z: 0 } }]]))
@@ -175,7 +180,7 @@ describe("editor store", () => {
 
     it("doesn't record selection changes by default", () => {
       withUndoSelection(false)
-      s().loadMap(initialMap(), null)
+      s().loadMap(startOnlyMap(), null)
       const a = place(0)
       const b = place(100)
       const before = s().past.length
@@ -188,7 +193,7 @@ describe("editor store", () => {
     it("records each selection change as its own step when enabled", () => {
       withUndoSelection(true)
       try {
-        s().loadMap(initialMap(), null)
+        s().loadMap(startOnlyMap(), null)
         const a = place(0)
         const b = place(100)
         s().select([])
@@ -219,7 +224,7 @@ describe("editor store", () => {
     it("doesn't mark the map dirty or leave a deleted selection behind", () => {
       withUndoSelection(true)
       try {
-        s().loadMap(initialMap(), null)
+        s().loadMap(startOnlyMap(), null)
         s().select([s().doc.ids[0]!])
         s().select([])
         s().undo()
@@ -255,7 +260,7 @@ describe("editor store", () => {
     it("counts selection steps against the 200-step limit", () => {
       withUndoSelection(true)
       try {
-        s().loadMap(initialMap(), null)
+        s().loadMap(startOnlyMap(), null)
         const a = place(0)
         for (let i = 0; i < 250; i++) s().select(i % 2 === 0 ? [] : [a])
         assert.strictEqual(s().past.length, 200)
@@ -265,7 +270,7 @@ describe("editor store", () => {
     })
 
     it("keeps at most 200 steps", () => {
-      s().loadMap(initialMap(), null)
+      s().loadMap(startOnlyMap(), null)
       const id = place(0)
       for (let i = 1; i <= 250; i++) moveItem(id, { x: i, y: 0, z: 0 })
       assert.strictEqual(s().past.length, 200)
@@ -284,7 +289,7 @@ describe("editor store", () => {
       return s().selectedIds[0]!
     }
     const setup = () => {
-      s().loadMap(initialMap(), null)
+      s().loadMap(startOnlyMap(), null)
       const ids = [place(0), place(100), place(200)]
       s().select(ids)
       return { ids, steps: s().past.length }
@@ -388,7 +393,7 @@ describe("editor store", () => {
       const { ids } = setup()
       s().select([ids[1]!])
       s().copySelection()
-      s().loadMap(initialMap(), null)
+      s().loadMap(startOnlyMap(), null)
       s().paste()
       assert.strictEqual(s().doc.map.items.length, 2)
       assert.strictEqual(transformOf(s().selectedIds[0]!).translation.x, 100)
@@ -470,7 +475,7 @@ describe("editor store", () => {
 
   it("sets an item property on the whole selection as one undo step", () => {
     const s = () => useEditor.getState()
-    s().loadMap(initialMap(), null)
+    s().loadMap(startOnlyMap(), null)
     for (const x of [0, 100]) s().placePiece(cube, placementTransform(cube, { x, y: 0, z: 0 }))
     s().select(s().doc.ids.slice(1))
     const before = s().past.length
