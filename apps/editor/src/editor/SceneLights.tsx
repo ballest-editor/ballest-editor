@@ -40,16 +40,36 @@ const upwardLight = (fill: number, sunIntensity: number, sunHeight: number) =>
 const STUDIO_UPWARD_LIGHT = upwardLight(STUDIO_FILL, STUDIO_SUN_INTENSITY, STUDIO_SUN[1] / Math.hypot(...STUDIO_SUN))
 
 /**
- * The viewport's lights. With the map-lighting setting, the game's: its sky drawn around the
- * camera with the sun disc in it, the sun as a directional light, and the sky light as an
- * environment map captured from that sky (as the game's sky light is), so every material,
- * the shader-patched game materials included, is lit and reflects it through three's own
- * light loop. Otherwise fixed studio lights on the theme's background. The unlit water is
- * dimmed to match.
+ * The viewport's sky and lights, each its own setting. The sky is the game's, drawn around
+ * the camera with the sun disc in it (hidden, the theme's background shows). Map lighting
+ * lights the scene the game's way: the sun as a directional light and the sky light as an
+ * environment map captured from that sky (as the game's sky light is, whether or not the sky
+ * is shown), so every material, the shader-patched game materials included, is lit and
+ * reflects it through three's own light loop. Otherwise fixed studio lights. The unlit water
+ * is dimmed to match.
  */
 export function SceneLights() {
   const mapLighting = useEditor((s) => s.settings.appearance.mapLighting)
-  return mapLighting ? <MapLights /> : <StudioLights />
+  const skyVisible = useEditor((s) => s.settings.appearance.skyVisible)
+  return (
+    <>
+      {skyVisible && <MapSky />}
+      {mapLighting ? <MapLights /> : <StudioLights />}
+    </>
+  )
+}
+
+/** The map's sun and the sky the game draws for it, following the lighting controls live. */
+const useMapSun = () => {
+  const lighting = useEditor(useShallow(shownLighting))
+  const sun = useMemo(() => sunOf(lighting), [lighting])
+  const sky = useMemo(() => skyOf(sun, lighting.timeOfDay), [sun, lighting.timeOfDay])
+  return { sun, sky }
+}
+
+function MapSky() {
+  const { sky } = useMapSun()
+  return <SkyDome sky={sky} />
 }
 
 function StudioLights() {
@@ -64,9 +84,7 @@ function StudioLights() {
 }
 
 function MapLights() {
-  const lighting = useEditor(useShallow(shownLighting))
-  const sun = useMemo(() => sunOf(lighting), [lighting])
-  const sky = useMemo(() => skyOf(sun, lighting.timeOfDay), [sun, lighting.timeOfDay])
+  const { sun, sky } = useMapSun()
   const sunIntensity = sun.intensity * SUN_PER_BRIGHTNESS
   const { x, y, z } = sun.toSun
   const position = toTuple3(ueToThreeVector({ x: x * SUN_DISTANCE, y: y * SUN_DISTANCE, z: z * SUN_DISTANCE }))
@@ -79,7 +97,6 @@ function MapLights() {
   )
   return (
     <>
-      <SkyDome sky={sky} />
       <SkyLight sky={sky} fill={fill} />
       <directionalLight position={position} color={color} intensity={sunIntensity} />
     </>

@@ -44,8 +44,10 @@ export const CameraSettings = Schema.Struct({
 
 export const AppearanceSettings = Schema.Struct({
   theme: Schema.Literals(["dark", "light", "system"]),
-  /** Draw the game's sky and light the viewport with the map's sun and sky light instead of fixed studio lights. */
+  /** Light the viewport with the map's sun and sky light instead of fixed studio lights. */
   mapLighting: Schema.Boolean,
+  /** Whether the game's sky (with the map's sun in it) is drawn behind the scene. */
+  skyVisible: Schema.Boolean,
   gridVisible: Schema.Boolean,
   gridCellColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)),
   gridSectionColor: Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)),
@@ -89,6 +91,7 @@ export const defaultSettings: Settings = {
   appearance: {
     theme: "dark",
     mapLighting: true,
+    skyVisible: true,
     gridVisible: true,
     gridCellColor: "#3a404a",
     gridSectionColor: "#58606e",

@@ -162,6 +162,20 @@ export function MenuBar() {
         >
           Map lighting
         </MenubarCheckboxItem>
+        <MenubarCheckboxItem
+          closeOnClick
+          checked={appearance.skyVisible}
+          onCheckedChange={(skyVisible) => void updateSettings("appearance", { skyVisible })}
+        >
+          Show sky
+        </MenubarCheckboxItem>
+        <MenubarCheckboxItem
+          closeOnClick
+          checked={appearance.waterVisible}
+          onCheckedChange={(waterVisible) => void updateSettings("appearance", { waterVisible })}
+        >
+          Show water
+        </MenubarCheckboxItem>
         <MenubarSub>
           <MenubarSubTrigger inset>Theme</MenubarSubTrigger>
           <MenubarSubContent>

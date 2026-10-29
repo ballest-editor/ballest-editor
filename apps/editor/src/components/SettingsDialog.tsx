@@ -535,9 +535,15 @@ export function SettingsDialog(props: {
         id: "mapLighting",
         ...setting("appearance", "mapLighting"),
         label: "Map lighting",
-        description:
-          "Draw the game's sky with the map's sun in it and light the viewport from them, as set under Lighting. Off: fixed studio lights.",
+        description: "Light the viewport with the map's sun and sky, as set under Lighting. Off: fixed studio lights.",
         control: <Switch checked={a.mapLighting} onCheckedChange={(v) => update("appearance", { mapLighting: v })} />
+      },
+      {
+        id: "skyVisible",
+        ...setting("appearance", "skyVisible"),
+        label: "Show sky",
+        description: "The game's sky with the map's sun in it. Off: the theme's background.",
+        control: <Switch checked={a.skyVisible} onCheckedChange={(v) => update("appearance", { skyVisible: v })} />
       },
       {
         id: "gridVisible",
