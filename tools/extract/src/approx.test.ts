@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { approxOf, layersOf, picksOf, readsOf, type Surface, translucencyOf } from "./approx.ts"
+import { approxOf, layersOf, picksOf, readsOf, sourceOf, type Surface, translucencyOf } from "./approx.ts"
 import type { Leaf } from "./dxil.ts"
 import type { Merged } from "./params.ts"
 import type { MaterialShaders } from "./shaders.ts"
@@ -99,6 +99,44 @@ const MERGED: Merged = {
   textures: { Normal: NORMAL },
   switches: {}
 }
+
+describe("sourceOf", () => {
+  it("names where a coordinate leaf comes from: the UVs, or a projection of the object / world position", () => {
+    assert.deepStrictEqual(sourceOf(SHADERS, leaf({ factor: 12 })), { projection: "uv", factor: 12, depth: 0 })
+    assert.deepStrictEqual(sourceOf(SHADERS, leaf({ source: "TEXCOORD1", factor: -0.5 })), {
+      projection: "world",
+      factor: 0.5,
+      depth: 1
+    })
+    assert.deepStrictEqual(sourceOf(SHADERS, leaf({ source: "SV_Position", factor: 0.01 })), {
+      projection: "world",
+      factor: 0.01,
+      depth: 0
+    })
+    assert.deepStrictEqual(sourceOf(SHADERS, leaf({ source: "SV_Position", factor: 0.01, sceneDepth: 2 })), {
+      projection: "object",
+      factor: 0.01,
+      depth: 2
+    })
+    assert.isUndefined(sourceOf(SHADERS, leaf({ kind: "param", source: "cb3[0].x" })))
+    assert.isUndefined(sourceOf(SHADERS, leaf({ source: "TEXCOORD7" }))) // no such interpolant
+  })
+
+  it("prefers the deeper of two equal-factor paths through an interpolant", () => {
+    const sh: MaterialShaders = {
+      ...SHADERS,
+      interpolants: {
+        "TEXCOORD2.x": [attribute0("x"), { ...attribute0("x"), sceneDepth: 2 }, buffer("x")]
+      }
+    }
+    assert.deepStrictEqual(sourceOf(sh, leaf({ source: "TEXCOORD2" })), { projection: "object", factor: 1, depth: 2 })
+    const scaled: MaterialShaders = {
+      ...sh,
+      interpolants: { "TEXCOORD2.x": [attribute0("x"), { ...buffer("x"), factor: 3 }] }
+    }
+    assert.deepStrictEqual(sourceOf(scaled, leaf({ source: "TEXCOORD2" })), { projection: "uv", factor: 3, depth: 0 })
+  })
+})
 
 describe("readsOf", () => {
   it("resolves each read's projection, scale, instance scale and role", () => {

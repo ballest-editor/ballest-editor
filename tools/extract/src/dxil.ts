@@ -218,7 +218,7 @@ const parseInstruction = (d: string): Instruction => {
   m = d.match(/@dx\.op\.cbufferLoadLegacy\.(\w+)\(i32 \d+, %dx\.types\.Handle (%[\w.]+), i32 (\d+)\)/)
   if (m) return { kind: "cbuffer", type: g(m, 1), handle: g(m, 2), index: num(m[3]) }
   m = d.match(
-    /@dx\.op\.(sample\w*)\.f32\(i32 \d+, %dx\.types\.Handle (%[\w.]+), %dx\.types\.Handle %[\w.]+, float (\S+), float (\S+), float (\S+)/
+    /@dx\.op\.(sample\w*)\.f32\(i32 \d+, %dx\.types\.Handle (%[\w.]+), %dx\.types\.Handle %[\w.]+, float (\S+), float (\S+), float ([^,)\s]+)/
   )
   if (m) return { kind: "sample", op: g(m, 1), handle: g(m, 2), coords: [g(m, 3), g(m, 4), g(m, 5)] }
   m = d.match(/@dx\.op\.(rawBufferLoad|bufferLoad)\.\w+\(i32 \d+, %dx\.types\.Handle (%[\w.]+), i32 ([^,)\s]+)/)
