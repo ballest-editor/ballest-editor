@@ -2,10 +2,12 @@
 export const BLUE = "/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Smooth.MI_Env_Blue_Smooth"
 export const GLASS = "/Game/Art/Materials/M_GlassV2.M_GlassV2"
 export const OLD = "/Game/Art/Materials/Masters/M_BaseSurface_Metal.M_BaseSurface_Metal"
-/** Triplanar tiles with the grey mottle and an outline band, like M_OutlineEdges. */
+/** UV-tiled normals with the grey mottle and an outline band, like M_OutlineEdges. */
 export const OUTLINE = "/Game/Art/Materials/Masters/M_OutlineEdges.M_OutlineEdges"
 /** A shaped translucent effect, like the air vent's wind column. */
 export const WIND = "/Game/Art/UsedMarketPlace/StylizedFX_Collection_q/M_AJ_LandRay.M_AJ_LandRay"
+/** Object-aligned tiles that scale with the piece, like MI_Env_Blue_Tiles. */
+export const TILES = "/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Tiles.MI_Env_Blue_Tiles"
 export const materialsFile = {
   version: 1,
   materials: [
@@ -35,8 +37,15 @@ export const materialsFile = {
         baseColor: [0.16, 0.67, 1],
         normalTexture: "textures/tiles_n.png",
         variationTexture: "textures/macro.png",
-        tiling: { baseColor: 1, normal: 12, variation: 1, opacity: 1 },
-        projection: "triplanar",
+        tiling: { baseColor: 1, normal: 12, variation: [0.2134, 0.2134], opacity: 1 },
+        projection: "uv",
+        reads: [
+          { texture: "textures/tiles_n.png", role: "normal", scale: [12, 12], projection: "uv", strength: 1 },
+          { texture: "textures/tiles_n.png", role: "normal", scale: [4, 4], projection: "uv", strength: 0.2 },
+          { texture: "textures/macro.png", role: "variation", scale: [0.2134, 0.2134], projection: "uv" },
+          { texture: "textures/macro.png", role: "variation", scale: [0.05341, 0.05341], projection: "uv" },
+          { texture: "textures/macro.png", role: "variation", scale: [0.002, 0.002], projection: "uv" }
+        ],
         outline: { inset: [0, 0.1], color: [0.59, 0.59, 0.59] }
       },
       recovered: true
@@ -47,6 +56,38 @@ export const materialsFile = {
       twoSided: true,
       approx: { opacity: 0.5, opacityTexture: "textures/ray.png", tiling: { opacity: 0.25 } },
       recovered: false
+    },
+    {
+      path: TILES,
+      blendMode: "BLEND_Opaque",
+      approx: {
+        baseColor: [0.02, 0.1, 0.8],
+        normalTexture: "textures/tiles_n.png",
+        variationTexture: "textures/macro.png",
+        tiling: { normal: [0.005, 0.005], variation: [0.00105, 0.00105] },
+        projection: "object",
+        instanceScale: 1,
+        reads: [
+          {
+            texture: "textures/tiles_n.png",
+            role: "normal",
+            scale: [0.06, 0.06],
+            projection: "object",
+            instanceScale: 1,
+            strength: 1
+          },
+          {
+            texture: "textures/tiles_n.png",
+            role: "normal",
+            scale: [0.005, 0.005],
+            projection: "object",
+            instanceScale: 1,
+            strength: 1
+          },
+          { texture: "textures/macro.png", role: "variation", scale: [0.00105, 0.00105], projection: "object" }
+        ]
+      },
+      recovered: true
     },
     { path: "/Game/New/M_Metal.M_Metal", redirectedTo: OLD, approx: { baseColor: [0.5, 0.5, 0.5] } },
     { path: "/Game/Broken.Broken", approx: { baseColor: "red" } }

@@ -19,11 +19,25 @@ const Rgb = Schema.Union([
   Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite, Schema.Finite])
 ])
 
+/** A texture's UV multiplier: one number (older files) or [u, v]. */
+const Pair = Schema.optionalKey(
+  Schema.NullOr(Schema.Union([Schema.Finite, Schema.Tuple([Schema.Finite, Schema.Finite])]))
+)
 const Tiling = open({
-  baseColor: Num,
-  normal: Num,
-  variation: Num,
-  opacity: Num
+  baseColor: Pair,
+  normal: Pair,
+  variation: Pair,
+  opacity: Pair
+})
+const Projection = Schema.Literals(["uv", "object", "world", "triplanar"])
+/** One texture read of the game's base pass, traced through its compiled shader (tools/extract shaders). */
+const Read = open({
+  texture: Str,
+  role: Str,
+  scale: Pair,
+  projection: Schema.optionalKey(Schema.NullOr(Projection)),
+  instanceScale: Num,
+  strength: Num
 })
 
 const Outline = open({
@@ -46,10 +60,17 @@ export const MaterialApprox = open({
   variationTexture: Str,
   /** Alpha shape of a translucent effect (wind streaks, beam falloff). */
   opacityTexture: Str,
-  /** UV multiplier per texture; 1 when the extractor doesn't know. */
+  /** UV multiplier per texture (repeats per UV unit, or per cm when projected); 1 when unknown. */
   tiling: Schema.optionalKey(Schema.NullOr(Tiling)),
-  /** "uv": the mesh's own UVs. "triplanar": the game projects the textures in world space. */
-  projection: Schema.optionalKey(Schema.NullOr(Schema.Literals(["uv", "triplanar"]))),
+  /**
+   * "uv": the mesh's own UVs. "object": object-aligned projection (pivot at the piece's origin, turning and
+   * scaling with it). "world": world-aligned. "triplanar" is what older files called "object".
+   */
+  projection: Schema.optionalKey(Schema.NullOr(Projection)),
+  /** Projected UVs also multiply by the piece's x and y scale (1), or divide (-1). */
+  instanceScale: Num,
+  /** Every texture read of the base pass, including the secondary layers the fields above don't name. */
+  reads: Schema.optionalKey(Schema.NullOr(Schema.Array(Read))),
   /** M_OutlineEdges' grey band along the UV border: `inset` is its width as a fraction of U and V. */
   outline: Schema.optionalKey(Schema.NullOr(Outline))
 })
@@ -68,6 +89,17 @@ const decodeTexture = Schema.decodeUnknownOption(TextureEntry)
 
 const decodeEntry = Schema.decodeUnknownOption(MaterialEntry)
 
+export type Pair = readonly [number, number]
+export type TextureProjection = "uv" | "object" | "world"
+
+/** A second normal map blended over the first (the Env masters' fine x12 layer, the metal's coarse one). */
+export interface NormalLayer {
+  readonly texture: string
+  readonly tiling: Pair
+  /** 1 = full strength. */
+  readonly strength: number
+}
+
 /** What the renderer needs for one material, with defaults filled in. Colours are linear RGB. */
 export interface MaterialSpec {
   readonly path: string
@@ -83,15 +115,20 @@ export interface MaterialSpec {
   readonly emissiveTexture: string | undefined
   readonly variationTexture: string | undefined
   readonly opacityTexture: string | undefined
-  /** UV multiplier for each texture slot (1 = the texture's own repeat). */
+  /** UV multiplier per texture slot, [u, v]: repeats per UV unit, or per centimetre when projected. */
   readonly tiling: {
-    readonly baseColor: number
-    readonly normal: number
-    readonly variation: number
-    readonly opacity: number
+    readonly baseColor: Pair
+    readonly normal: Pair
+    readonly variation: Pair
+    readonly opacity: Pair
   }
-  /** World-space projection instead of mesh UVs (the Env masters' triplanar mapping). */
-  readonly triplanar: boolean
+  /** How texture coordinates are made: the mesh UVs, or a projection of the object/world position. */
+  readonly projection: TextureProjection
+  /** Projected coordinates also scale with the piece's x (u) and y (v) scale, as the game's instances do. */
+  readonly instanceScale: boolean
+  readonly normalLayer: NormalLayer | undefined
+  /** The mottle's extra octaves: tilings of the second and third variation reads, if the game makes them. */
+  readonly variationTilings: ReadonlyArray<Pair>
   /** Grey band along the UV border (M_OutlineEdges): width per axis as a fraction, and its linear colour. */
   readonly outline:
     | { readonly inset: readonly [number, number]; readonly color: readonly [number, number, number] }
@@ -137,8 +174,11 @@ export const NEUTRAL: Omit<MaterialSpec, "path"> = {
   emissiveTexture: undefined,
   variationTexture: undefined,
   opacityTexture: undefined,
-  tiling: { baseColor: 1, normal: 1, variation: 1, opacity: 1 },
-  triplanar: false,
+  tiling: { baseColor: [1, 1], normal: [1, 1], variation: [1, 1], opacity: [1, 1] },
+  projection: "uv",
+  instanceScale: false,
+  normalLayer: undefined,
+  variationTilings: [],
   outline: undefined,
   translucent: false,
   twoSided: false,
@@ -160,11 +200,22 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
   const orm = orUndefined(a.ormTexture ?? a.metallicRoughnessTexture)
   const opacity = clamp01(a.opacity ?? NEUTRAL.opacity)
   const t = a.tiling ?? {}
-  const positive = (
-    n: number | null | undefined,
-    fallback: number
-  ) => (n !== null && n !== undefined && n > 0 ? n : fallback)
+  const pair = (n: number | Pair | null | undefined, fallback: Pair): Pair => {
+    if (Predicate.isNumber(n)) return n > 0 ? [n, n] : fallback
+    if (n === null || n === undefined) return fallback
+    return n[0] > 0 ? [n[0], n[1] > 0 ? n[1] : n[0]] : fallback
+  }
   const outline = a.outline ?? undefined
+  const projectionOf = (p: typeof Projection.Type | null | undefined): TextureProjection =>
+    p === "object" || p === "triplanar" ? "object" : p === "world" ? "world" : "uv"
+  const projection = projectionOf(a.projection)
+  const reads = (a.reads ?? []).filter((r) => projectionOf(r.projection) === projection)
+  const normals = reads.filter((r) => r.role === "normal" && orUndefined(r.texture) !== undefined)
+  // The primary normal map is `normalTexture`; the next distinct read is its second layer.
+  const second = normals.find((r) =>
+    r.texture !== normalTexture || pair(r.scale, [1, 1])[0] !== pair(t.normal, [1, 1])[0]
+  )
+  const variations = reads.filter((r) => r.role === "variation").map((r) => pair(r.scale, [1, 1]))
   return {
     path,
     baseColor: rgb(a.baseColor, NEUTRAL.baseColor),
@@ -179,12 +230,21 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
     variationTexture: orUndefined(a.variationTexture),
     opacityTexture: orUndefined(a.opacityTexture),
     tiling: {
-      baseColor: positive(t.baseColor, 1),
-      normal: positive(t.normal, 1),
-      variation: positive(t.variation, 1),
-      opacity: positive(t.opacity, 1)
+      baseColor: pair(t.baseColor, [1, 1]),
+      normal: pair(t.normal, [1, 1]),
+      variation: pair(t.variation, [1, 1]),
+      opacity: pair(t.opacity, [1, 1])
     },
-    triplanar: a.projection === "triplanar",
+    projection,
+    instanceScale: (a.instanceScale ?? 0) > 0,
+    normalLayer: second === undefined || normalTexture === undefined
+      ? undefined
+      : {
+        texture: second.texture ?? normalTexture,
+        tiling: pair(second.scale, [1, 1]),
+        strength: clamp01(second.strength ?? 1)
+      },
+    variationTilings: variations.slice(1, 3),
     outline: outline === undefined || (outline.inset[0] <= 0 && outline.inset[1] <= 0)
       ? undefined
       : { inset: [clamp01(outline.inset[0]), clamp01(outline.inset[1])], color: rgb(outline.color, [0.5, 0.5, 0.5]) },
