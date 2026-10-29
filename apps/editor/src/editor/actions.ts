@@ -2,7 +2,7 @@
 import { Cause, Effect, Exit } from "effect"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { currentCreatedAt, newMapFile } from "../domain/factory"
-import { type Axis, type AxisEdit, editAxis, type TransformField, writeField } from "../domain/groupTransform"
+import { type Axis, type AxisEdit, selectionAxisEdit, type TransformField, writeField } from "../domain/groupTransform"
 import type { PropertyChange } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { PLAYER_START_CLASS } from "../domain/MapFile"
@@ -40,17 +40,27 @@ export const deleteSelection = () => useEditor.getState().deleteSelection()
 
 export const duplicateSelection = () => useEditor.getState().duplicateSelection()
 
-/** The selected items' document transforms, each put through `edit`. */
-const withSelectionEdit = (edit: (t: UeTransform) => UeTransform): ReadonlyMap<string, UeTransform> => {
-  const { doc, selectedIds } = useEditor.getState()
-  return new Map(selectedIds.flatMap((id) => {
-    const t = doc.map.items[doc.ids.indexOf(id)]?.itemTransform
-    return t === undefined ? [] : [[id, edit(t)] as const]
-  }))
+/** An item's document transform: never the live preview. */
+const docTransform = (id: string): UeTransform | undefined => {
+  const { doc } = useEditor.getState()
+  return doc.map.items[doc.ids.indexOf(id)]?.itemTransform
 }
 
-const withAxisEdit = (field: TransformField, axis: Axis, edit: AxisEdit) =>
-  withSelectionEdit((t) => editAxis(t, field, axis, edit))
+/** The selected items' document transforms, each put through `edit`. */
+const withSelectionEdit = (edit: (t: UeTransform) => UeTransform): ReadonlyMap<string, UeTransform> =>
+  new Map(
+    useEditor.getState().selectedIds.flatMap((id) => {
+      const t = docTransform(id)
+      return t === undefined ? [] : [[id, edit(t)] as const]
+    })
+  )
+
+/** An axis edit made from the document transforms, about the active item like the gizmo. */
+const withAxisEdit = (field: TransformField, axis: Axis, edit: AxisEdit) => {
+  // the active item is the last selected one
+  const active = useEditor.getState().selectedIds.flatMap((id) => docTransform(id) ?? []).at(-1)
+  return active === undefined ? new Map() : withSelectionEdit(selectionAxisEdit(active, field, axis, edit))
+}
 
 /** Sets all three axes of `field` on every selected item (pasting a copied row). */
 export const setSelectionField = (field: TransformField, value: Vec3): boolean =>
@@ -60,7 +70,10 @@ export const setSelectionField = (field: TransformField, value: Vec3): boolean =
 export const editSelectionAxis = (field: TransformField, axis: Axis, edit: AxisEdit): boolean =>
   transformSelection(withAxisEdit(field, axis, edit))
 
-/** Shows an axis edit live (a scrub) without committing it; null ends the preview. */
+/**
+ * Shows an axis edit live (a scrub) without committing it; null ends the preview. The edit is
+ * the whole scrub so far, from the document, not a step on top of the last preview.
+ */
 export const previewSelectionAxis = (field: TransformField, axis: Axis, edit: AxisEdit | null): void =>
   useEditor.getState().setPreview(edit === null ? null : withAxisEdit(field, axis, edit))
 
