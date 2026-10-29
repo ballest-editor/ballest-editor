@@ -166,6 +166,18 @@ export interface ShaderProgram {
   fragmentShader: string
 }
 
+/**
+ * A three.js chunk with one texture read scaled by a tiling uniform. The program handed to
+ * `onBeforeCompile` still has its `#include`s unexpanded, so the chunk text has to be brought
+ * in here for the substitution to find anything.
+ */
+const tiled = (chunk: keyof typeof THREE.ShaderChunk, read: string, uniform: string): string => {
+  const source = THREE.ShaderChunk[chunk]
+  if (!source.includes(read)) throw new Error(`three's ${chunk} no longer reads "${read}"`)
+  // Every occurrence: normal_fragment_maps reads the map once per branch (object space, tangent space).
+  return source.replaceAll(read, `${read.slice(0, -2)} * ${uniform} )`)
+}
+
 /** Rewrites a MeshStandardMaterial program for `patch` (the body of `onBeforeCompile`). */
 export const applyShaderPatch = (shader: ShaderProgram, patch: Patch): void => {
   Object.assign(shader.uniforms, patch.uniforms)
@@ -174,13 +186,20 @@ export const applyShaderPatch = (shader: ShaderProgram, patch: Patch): void => {
     .replace("#include <project_vertex>", `#include <project_vertex>\n${VERTEX_BODY}`)
   shader.fragmentShader = shader.fragmentShader
     .replace("#include <common>", `#include <common>\n${FRAGMENT_DECLS}`)
-    .replace("#include <map_fragment>", `#include <map_fragment>\n${COLOR_EXTRAS}`)
-    .replace("texture2D( map, vMapUv )", "texture2D( map, vMapUv * uBaseColorTiling )")
-    .replace("texture2D( alphaMap, vAlphaMapUv )", "texture2D( alphaMap, vAlphaMapUv * uOpacityTiling )")
-    .replace("texture2D( normalMap, vNormalMapUv )", "texture2D( normalMap, vNormalMapUv * uNormalTiling )")
-  if ("BALLEST_TRIPLANAR" in patch.defines) {
-    shader.fragmentShader = shader.fragmentShader.replace("#include <normal_fragment_maps>", TRIPLANAR_NORMAL)
-  }
+    .replace(
+      "#include <map_fragment>",
+      `${tiled("map_fragment", "texture2D( map, vMapUv )", "uBaseColorTiling")}\n${COLOR_EXTRAS}`
+    )
+    .replace(
+      "#include <alphamap_fragment>",
+      tiled("alphamap_fragment", "texture2D( alphaMap, vAlphaMapUv )", "uOpacityTiling")
+    )
+    .replace(
+      "#include <normal_fragment_maps>",
+      "BALLEST_TRIPLANAR" in patch.defines
+        ? TRIPLANAR_NORMAL
+        : tiled("normal_fragment_maps", "texture2D( normalMap, vNormalMapUv )", "uNormalTiling")
+    )
 }
 
 const patches = new WeakMap<THREE.Material, Patch>()

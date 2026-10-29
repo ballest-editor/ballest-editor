@@ -43,12 +43,14 @@ describe("three materials", () => {
     assert.isDefined(outline.normalMap)
     // Materials with different patches must not share a compiled program.
     assert.notStrictEqual(outline.customProgramCacheKey(), materialFor(table, BLUE).customProgramCacheKey())
-    const shader: ShaderProgram = {
+    // What onBeforeCompile receives: includes still unexpanded.
+    const program = (): ShaderProgram => ({
       uniforms: {},
       vertexShader: "#include <common>\n#include <project_vertex>",
       fragmentShader:
-        "#include <common>\n#include <map_fragment>\n#include <normal_fragment_maps>\ntexture2D( normalMap, vNormalMapUv )"
-    }
+        "#include <common>\n#include <map_fragment>\n#include <alphamap_fragment>\n#include <normal_fragment_maps>"
+    })
+    const shader = program()
     const patch = shaderPatchOf(outline)
     assert.isDefined(patch)
     applyShaderPatch(shader, patch)
@@ -57,7 +59,19 @@ describe("three materials", () => {
     assert.include(shader.fragmentShader, "uOutlineColor")
     assert.include(shader.fragmentShader, "uVariationMap")
     assert.notInclude(shader.fragmentShader, "#include <normal_fragment_maps>") // replaced by the triplanar normal
+    assert.include(shader.fragmentShader, "p.yz") // the three projections
     assert.include(shader.vertexShader, "vBallestWorldPos")
+    // A UV-projected material tiles three's own normal-map read.
+    const uv = program()
+    const windPatch = shaderPatchOf(materialFor(table, WIND))
+    assert.isDefined(windPatch)
+    applyShaderPatch(uv, windPatch)
+    // Both of three's reads (object-space and tangent-space branches); the tangent-space one is the live one.
+    assert.include(uv.fragmentShader, "vec3 mapN = texture2D( normalMap, vNormalMapUv * uNormalTiling )")
+    assert.notInclude(uv.fragmentShader, "texture2D( normalMap, vNormalMapUv )")
+    assert.include(uv.fragmentShader, "texture2D( alphaMap, vAlphaMapUv * uOpacityTiling )")
+    assert.include(uv.fragmentShader, "texture2D( map, vMapUv * uBaseColorTiling )")
+    assert.notInclude(uv.fragmentShader, "#include <map_fragment>")
   })
 
   it("shapes a translucent effect with its opacity texture and adds it to the scene", () => {
