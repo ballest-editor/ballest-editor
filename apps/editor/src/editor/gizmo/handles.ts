@@ -4,7 +4,8 @@ import { AXIS_COLORS } from "../axisColors"
  *
  * A tool is a list of HandleSpecs; handles are independent, so a combined tool is just the
  * concatenation of lists. Visuals are built in "pixel" units along local +X (axis
- * handles), in the local XY plane (plane handles), or around local +Z (rings), and are
+ * handles), in the local XY plane (plane handles), or around local +Z (rings; like the
+ * game's, a rotate ring shows only its quarter facing the camera until it is dragged), and are
  * oriented every frame from world-space directions computed from the GAME basis via
  * coords.ts. The gizmo lives in plain world space (never under a mirror), is scaled to a
  * constant screen size, renders on top, and is grabbed through invisible fatter hit meshes.
@@ -58,6 +59,7 @@ export const SIZE = {
   ring: 78,
   viewRing: 94,
   ringTube: 1.2,
+  arcTube: 2.2,
   uniform: 14,
   hitRadius: 7
 } as const
@@ -67,10 +69,14 @@ export const pairOf = (
   axis: Axis
 ): readonly [Axis, Axis] => (axis === "x" ? ["y", "z"] : axis === "y" ? ["z", "x"] : ["x", "y"])
 
+type ActivePart = THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
+
 export interface Handle {
   readonly spec: HandleSpec
   readonly root: THREE.Group
   readonly hits: ReadonlyArray<THREE.Mesh>
+  /** Parts shown only while the handle is being dragged, in the plain axis colour (own materials). */
+  readonly activeParts: ReadonlyArray<ActivePart>
   readonly baseColor: THREE.Color
   readonly materials: ReadonlyArray<THREE.MeshBasicMaterial>
 }
@@ -88,7 +94,7 @@ const visualMaterial = (color: THREE.Color) =>
 /** Never rendered, but raycastable (Mesh.raycast ignores material.visible). */
 const hitMaterial = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
 
-const mesh = (geometry: THREE.BufferGeometry, material: THREE.Material) => {
+const mesh = <M extends THREE.Material>(geometry: THREE.BufferGeometry, material: M) => {
   const m = new THREE.Mesh(geometry, material)
   m.renderOrder = RENDER_ORDER
   return m
@@ -101,7 +107,7 @@ const alongX = (geometry: THREE.BufferGeometry, x0: number, x1: number) =>
 const buildVisual = (
   spec: HandleSpec,
   material: THREE.MeshBasicMaterial
-): { parts: Array<THREE.Mesh>; hits: Array<THREE.Mesh> } => {
+): { parts: Array<THREE.Mesh>; hits: Array<THREE.Mesh>; activeParts?: Array<ActivePart> } => {
   const S = SIZE
   switch (spec.kind) {
     case "translateAxis":
@@ -127,11 +133,17 @@ const buildVisual = (
       const hit = new THREE.PlaneGeometry(S.plane + 6, S.plane + 6).translate(center, center, 0)
       return { parts: [mesh(square, material)], hits: [mesh(hit, hitMaterial)] }
     }
-    case "rotateAxis":
+    case "rotateAxis": {
+      // The quarter of the ring between local +X and +Y (turned to face the camera), and the
+      // whole ring while dragging.
+      const arc = new THREE.TorusGeometry(S.ring, S.arcTube, 8, 32, Math.PI / 2)
+      const ring = mesh(new THREE.TorusGeometry(S.ring, S.ringTube, 6, 96), material.clone())
+      const hit = new THREE.TorusGeometry(S.ring, S.hitRadius, 6, 16, Math.PI / 2)
+      return { parts: [mesh(arc, material), ring], hits: [mesh(hit, hitMaterial)], activeParts: [ring] }
+    }
     case "rotateView": {
-      const radius = spec.kind === "rotateAxis" ? S.ring : S.viewRing
-      const ring = new THREE.TorusGeometry(radius, S.ringTube, 6, 96)
-      const hit = new THREE.TorusGeometry(radius, S.hitRadius, 6, 48)
+      const ring = new THREE.TorusGeometry(S.viewRing, S.ringTube, 6, 96)
+      const hit = new THREE.TorusGeometry(S.viewRing, S.hitRadius, 6, 48)
       return { parts: [mesh(ring, material)], hits: [mesh(hit, hitMaterial)] }
     }
     case "scaleUniform": {
@@ -145,14 +157,14 @@ const buildVisual = (
 export const makeHandle = (spec: HandleSpec): Handle => {
   const baseColor = new THREE.Color(spec.axis === undefined ? VIEW_COLOR : AXIS_COLORS[spec.axis])
   const material = visualMaterial(baseColor)
-  const { parts, hits } = buildVisual(spec, material)
+  const { activeParts = [], hits, parts } = buildVisual(spec, material)
   const root = new THREE.Group()
   root.name = spec.id
   for (const part of [...parts, ...hits]) {
     part.userData["handleId"] = spec.id
     root.add(part)
   }
-  return { spec, root, hits, baseColor, materials: [material] }
+  return { spec, root, hits, activeParts, baseColor, materials: [material] }
 }
 
 /** Everything a handle needs to place itself this frame. */
@@ -164,10 +176,11 @@ export interface GizmoFrame {
   readonly gameRotation: Quat4
   readonly space: GizmoSpace
   readonly cameraQuaternion: THREE.Quaternion
+  /** Unit vector from the origin toward the camera. */
+  readonly toCamera: THREE.Vector3
 }
 
 const X = new THREE.Vector3(1, 0, 0)
-const Z = new THREE.Vector3(0, 0, 1)
 
 const spaceRotation = (gameRotation: Quat4, space: GizmoSpace): Quat4 | undefined =>
   space === "local" ? gameRotation : undefined
@@ -175,6 +188,13 @@ const spaceRotation = (gameRotation: Quat4, space: GizmoSpace): Quat4 | undefine
 /** World direction a handle acts along (its axis, ring normal, or plane normal) in `space`. */
 export const handleWorldDir = (spec: HandleSpec, gameRotation: Quat4, space: GizmoSpace): THREE.Vector3 | undefined =>
   spec.axis === undefined ? undefined : axisWorldDir(spec.axis, spaceRotation(gameRotation, space))
+
+/** World directions of the two axes spanning the plane with normal `axis`, in the frame's space. */
+const pairWorldDirs = (axis: Axis, frame: GizmoFrame): readonly [THREE.Vector3, THREE.Vector3] => {
+  const rotation = spaceRotation(frame.gameRotation, frame.space)
+  const [a, b] = pairOf(axis)
+  return [axisWorldDir(a, rotation), axisWorldDir(b, rotation)]
+}
 
 export const orientHandle = (handle: Handle, frame: GizmoFrame): void => {
   const { spec, root } = handle
@@ -186,16 +206,20 @@ export const orientHandle = (handle: Handle, frame: GizmoFrame): void => {
       return
     }
     case "rotateAxis": {
-      const dir = handleWorldDir(spec, frame.gameRotation, frame.space)
-      if (dir !== undefined) root.quaternion.setFromUnitVectors(Z, dir)
+      if (spec.axis === undefined) return
+      // Local +X and +Y along the other two axes, each flipped toward the camera, so the
+      // arc spans the octant the camera looks at. Local +Z (the ring's normal) stays on the
+      // axis, up to sign.
+      const towardCamera = (d: THREE.Vector3) => (d.dot(frame.toCamera) < 0 ? d.negate() : d)
+      const [a, b] = pairWorldDirs(spec.axis, frame)
+      const u = towardCamera(a)
+      const v = towardCamera(b)
+      root.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(u, v, u.clone().cross(v)))
       return
     }
     case "translatePlane": {
       if (spec.axis === undefined) return
-      const [a, b] = pairOf(spec.axis)
-      const rotation = spaceRotation(frame.gameRotation, frame.space)
-      const u = axisWorldDir(a, rotation)
-      const v = axisWorldDir(b, rotation)
+      const [u, v] = pairWorldDirs(spec.axis, frame)
       // proper rotation (no mirror): third column is u x v
       root.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(u, v, u.clone().cross(v)))
       return
@@ -215,6 +239,7 @@ export const styleHandle = (handle: Handle, state: HandleState): void => {
     if (state === "hover" || state === "active") material.color.lerp(HOVER_TINT, 0.7)
     material.opacity = state === "dimmed" ? 0.25 : 1
   }
+  for (const part of handle.activeParts) part.visible = state === "active"
 }
 
 /**
@@ -292,7 +317,7 @@ export class GizmoObject extends THREE.Group {
     this.traverse((o) => {
       if (isMesh(o) || isLine(o)) o.geometry.dispose()
     })
-    for (const h of this.handles) for (const m of h.materials) m.dispose()
+    for (const h of this.handles) for (const m of [...h.materials, ...h.activeParts.map((p) => p.material)]) m.dispose()
     this.guide.material.dispose()
     super.dispose()
   }
