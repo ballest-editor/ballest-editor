@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ballest Editor</title>
+    <script>
+      // Expose the saved panel widths (SidePanel's localStorage keys) as --panel-<id> on <html> before first
+      // paint, so the loading skeleton lays out like the editor will.
+      try {
+        for (var i = 0; i < localStorage.length; i++) {
+          var key = localStorage.key(i)
+          var prefix = "ballest-editor.panel."
+          if (key && key.indexOf(prefix) === 0) {
+            var width = Number(localStorage.getItem(key))
+            if (width > 0) document.documentElement.style.setProperty("--panel-" + key.slice(prefix.length), width + "px")
+          }
+        }
+      } catch (e) {}
+    </script>
+  </head>
+  <body class="overflow-hidden">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
