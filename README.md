@@ -8,7 +8,7 @@ A standalone, CAD-style map editor for [Ballest of Them All](https://store.steam
 - `apps/desktop/` — the Electron shell around it (in progress, see [docs/DESKTOP.md](docs/DESKTOP.md))
 - `packages/contracts/` — schemas and the `DesktopBridge` interface shared by the desktop main process, preload and renderer
 - `tools/extract/` — pulls piece meshes out of the game pak (Nix flake)
-- `tools/compress/` — compresses the extracted meshes and textures and publishes them to Vercel Blob
+- `tools/compress/` — compresses the extracted meshes and textures and publishes them as a GitHub release asset pack
 
 Contributors and coding agents: read [AGENTS.md](AGENTS.md).
 

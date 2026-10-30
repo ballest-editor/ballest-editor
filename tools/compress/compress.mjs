@@ -6,8 +6,8 @@
 //   textures/**.png  -> AVIF, 4:4:4, quality 80 (avifenc; .png -> .avif, the editor asks for .avif)
 // Everything else under assets/ (catalog, materials, keybinds, thumbs, ...) is small and committed, and is
 // served from assets/ directly. OUT_DIR is owned by this script and rebuilt from scratch on every run. It is
-// gitignored: `pnpm assets:upload` publishes it to Vercel Blob (see README.md), which deployments and clones
-// without it use instead.
+// gitignored: `pnpm assets:publish` publishes it as a GitHub release asset pack (see README.md), which
+// download.mjs fetches on machines without the raw files.
 import { pack } from "gltfpack"
 import { execFileSync, spawn } from "node:child_process"
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
@@ -75,9 +75,7 @@ if (!existsSync(join(assets, "catalog.json"))) {
 const raw = ["pieces", "textures"].filter((dir) => existsSync(join(assets, dir)))
 if (raw.length === 0) {
   log(
-    `no ${assets}/pieces or textures (not extracted here): ${
-      existsSync(out) ? `keeping ${out}` : "using Vercel Blob (web-assets.json)"
-    }`
+    `no ${assets}/pieces or textures (not extracted here): ${"download.mjs fetches the published pack"}`
   )
   process.exit(0)
 }
@@ -110,4 +108,4 @@ if (pngs.length > 0) {
   })
 }
 log(`${pngs.length} textures`)
-log(`wrote ${out}; run \`pnpm assets:upload\` to publish it`)
+log(`wrote ${out}; run \`pnpm assets:publish\` to publish it`)

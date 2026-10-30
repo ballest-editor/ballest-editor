@@ -28,8 +28,7 @@
         "$TURBO_ROOT$/tsconfig.base.json",
         ".env*",
         "$TURBO_ROOT$/assets/**",
-        "$TURBO_ROOT$/web-assets/**",
-        "$TURBO_ROOT$/web-assets.json"
+        "$TURBO_ROOT$/web-assets/**"
       ],
       "outputs": ["dist/**"]
     },
@@ -46,9 +45,17 @@
     },
 
     // Repo-wide tools, run once from the root.
-    // tools/compress: the extractor's raw meshes and textures -> web-assets/ (gitignored; absent on CI and Vercel).
+    // tools/compress: the extractor's raw meshes and textures -> web-assets/ (gitignored). Where they are absent
+    // (CI, Vercel, a fresh clone) it downloads the asset pack web-assets.json points at instead.
     "//#assets": {
-      "inputs": ["tools/compress/compress.mjs", "assets/pieces/**", "assets/textures/**"],
+      "inputs": [
+        "tools/compress/compress.mjs",
+        "tools/compress/download.mjs",
+        "tools/compress/pack.mjs",
+        "web-assets.json",
+        "assets/pieces/**",
+        "assets/textures/**"
+      ],
       "outputs": ["web-assets/**"]
     },
     "//#lint": {
