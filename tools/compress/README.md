@@ -14,7 +14,7 @@ pnpm assets:upload    # node tools/compress/upload.mjs web-assets web-assets.jso
 
 ## Where the editor reads from
 
-`apps/editor/src/editor/assetUrl.ts` is the one place that decides. Paths are always the extractor's (`pieces/...glb`, `textures/...png`); textures are requested as `.avif`.
+`apps/web/src/editor/assetUrl.ts` is the one place that decides. Paths are always the extractor's (`pieces/...glb`, `textures/...png`); textures are requested as `.avif`.
 
 - `web-assets/` on disk (you ran `pnpm assets`): `vite dev`, `vite preview` and `vite build` serve it at `/assets/*` next to the committed files.
 - Otherwise (Vercel, CI, a fresh clone): `vite.config.ts` reads `web-assets.json` and builds the client with `VITE_ASSETS_BASE` set to that URL, so meshes and textures are fetched from the blob store.

@@ -1,4 +1,4 @@
-# Ballest editor (apps/editor)
+# Ballest editor (apps/web)
 
 Web map editor for _Ballest of Them All_. A React SPA (Vite, TanStack Router), three.js via
 @react-three/fiber + drei, Effect v4 for services, schemas and errors. The UI chrome is
@@ -15,13 +15,13 @@ pnpm dev         # turbo dev       -> http://localhost:3000
 pnpm test        # turbo test      (vitest + @effect/vitest)
 pnpm typecheck   # turbo typecheck (tsc --noEmit in every package)
 pnpm lint        # turbo lint      (eslint)
-pnpm build       # turbo build     -> apps/editor/dist
+pnpm build       # turbo build     -> apps/web/dist
 ```
 
-Inside `apps/editor` the same scripts exist (`pnpm dev`, `pnpm test`, …), and
+Inside `apps/web` the same scripts exist (`pnpm dev`, `pnpm test`, …), and
 `pnpm start` runs `vite preview` on the build.
 
-To add shadcn components, run `pnpm dlx shadcn@latest add <name>` in `apps/editor`.
+To add shadcn components, run `pnpm dlx shadcn@latest add <name>` in `apps/web`.
 They're installed into `packages/ui/src/components` (see both `components.json` files).
 The preset is `b6nCVm82TK` (style `base-mira`, tabler icons).
 

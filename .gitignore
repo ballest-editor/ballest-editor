@@ -3,6 +3,7 @@ node_modules/
 .env*.local
 .tanstack/
 dist/
+dist-electron/
 result
 .direnv/
 *.log

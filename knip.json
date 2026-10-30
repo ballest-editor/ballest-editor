@@ -15,11 +15,15 @@
         "@effect/language-service"
       ]
     },
-    "apps/editor": {
+    "apps/web": {
       "ignoreDependencies": [
         "tailwindcss"
       ]
     },
+    "apps/desktop": {
+      "entry": ["src/main.ts", "src/preload.ts"]
+    },
+    "packages/contracts": {},
     "packages/ui": {},
     "tools/extract": {
       "entry": ["src/main.ts", "*.mjs"]

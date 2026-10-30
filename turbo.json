@@ -33,6 +33,12 @@
       ],
       "outputs": ["dist/**"]
     },
+    // The desktop app packages the renderer build and the assets, so it builds after both.
+    "@ballest/desktop#build": {
+      "dependsOn": ["^build", "@ballest/web#build", "//#assets"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tsconfig.base.json"],
+      "outputs": ["dist-electron/**"]
+    },
     "dev": {
       "dependsOn": ["//#assets"],
       "cache": false,
@@ -57,7 +63,8 @@
         "packages/**/*.{ts,tsx,js,mjs}",
         "tools/**/*.ts",
         "!**/node_modules/**",
-        "!**/dist/**"
+        "!**/dist/**",
+        "!**/dist-electron/**"
       ]
     },
     "//#knip": {
@@ -74,11 +81,20 @@
         "tools/extract/**",
         "tools/compress/**",
         "!**/node_modules/**",
-        "!**/dist/**"
+        "!**/dist/**",
+        "!**/dist-electron/**"
       ]
     },
     "//#dupes": {
-      "inputs": [".jscpd.json", "apps/editor/src/**", "packages/ui/src/**", "tools/extract/**", "tools/compress/**"]
+      "inputs": [
+        ".jscpd.json",
+        "apps/web/src/**",
+        "apps/desktop/src/**",
+        "packages/ui/src/**",
+        "packages/contracts/src/**",
+        "tools/extract/**",
+        "tools/compress/**"
+      ]
     },
     "//#format:check": {
       "inputs": [
@@ -89,7 +105,8 @@
         "!assets/**",
         "!web-assets/**",
         "!**/node_modules/**",
-        "!**/dist/**"
+        "!**/dist/**",
+        "!**/dist-electron/**"
       ]
     }
   }

@@ -19,6 +19,7 @@
     "web-assets",
     "**/node_modules",
     "**/dist",
+    "**/dist-electron",
     "**/.tanstack",
     "**/routeTree.gen.ts",
     "pnpm-lock.yaml"
