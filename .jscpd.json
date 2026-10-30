@@ -1,5 +1,13 @@
 {
-  "path": ["apps/editor/src", "packages/ui/src", "tools/extract", "tools/compress"],
+  "path": [
+    "apps/web/src",
+    "apps/desktop/src",
+    "apps/desktop/scripts",
+    "packages/ui/src",
+    "packages/contracts/src",
+    "tools/extract",
+    "tools/compress"
+  ],
   "format": ["typescript", "tsx", "javascript"],
   "ignore": ["**/routeTree.gen.ts", "packages/ui/src/components/**"],
   "minTokens": 50,

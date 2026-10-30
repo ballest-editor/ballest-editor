@@ -9,6 +9,9 @@ allowBuilds:
   unrs-resolver: true
   msw: false
   dprint: false
+  # Its postinstall downloads the binary; `pnpm --filter @ballest/desktop ensure:electron` does that on demand,
+  # so installs that never launch the app (lint, typecheck, the web build) skip the ~100 MB download.
+  electron: false
 
 minimumReleaseAgeExclude:
   - "@effect/tsgo-darwin-arm64@0.61.0"

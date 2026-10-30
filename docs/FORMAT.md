@@ -78,7 +78,7 @@ The sky light is not a control. On load and on every time change the game sets i
 
 The sky is `BP_Sky_Sphere_Stylized`, a sphere drawn with the unlit `M_Sky_Panning_Clouds_Stylized`. Its `RefreshMaterial` sets the material from the sun: by day (4:00 to 20:00) the horizon and zenith colours are the engine's `C_Sky_Horizon_Color` / `C_Sky_Zenith_Color` curves (each channel clamped to 0–1) at the sun height elevation / 90, the horizon falloff is lerp(3, 7, |height|) and the sun brightness 20 (it sets the light to 12 first, so 10 × sky light × 12 always passes the clamp); at night the colours are fixed dark blues, the falloff 0.2 and the stars 25. The material's compiled pixel shader (dumped with `BallestExtract shaders`, read with `dxc -dumpbin`) then outputs `1.5 × (lerp(zenith + stars × "Sun height", horizon, pow(1 − saturate(view.z), falloff)) + sunColor × brightness × saturate(1 − |view · toSun − 1| / 0.0003))`, with panning cloud textures blended over by `saturate(cloud²)`. "Sun height" is |height| below the horizon and 0 above, so stars only show at night. The level's sky light is a real-time capture of this sky.
 
-The editor approximates all of this in `apps/editor/src/domain/sunlight.ts` and `sky.ts`: the sky is drawn without its clouds (their textures aren't served), with procedural stars, and lights the scene as an environment map captured from it.
+The editor approximates all of this in `apps/web/src/domain/sunlight.ts` and `sky.ts`: the sky is drawn without its clouds (their textures aren't served), with procedural stars, and lights the scene as an environment map captured from it.
 
 ## Difficulty and tags
 
@@ -138,7 +138,7 @@ The in-game item browser is one table of 11 categories → data assets listing *
 
 ## The level (`Map_LevelEditorMain`)
 
-Every map is spawned into `/Game/Maps/LevelEditor/Map_LevelEditorMain`. Read from its cooked assets with `BallestExtract probe` (UE cm, world space). The editor's copies are in `apps/editor/src/domain/level.ts`.
+Every map is spawned into `/Game/Maps/LevelEditor/Map_LevelEditorMain`. Read from its cooked assets with `BallestExtract probe` (UE cm, world space). The editor's copies are in `apps/web/src/domain/level.ts`.
 
 | What                          | Where it comes from                                           | Value                                               |
 | ----------------------------- | ------------------------------------------------------------- | --------------------------------------------------- |
@@ -173,4 +173,4 @@ In-game console (`ballest.editor.*`): `saveprefab`, `spawnprefab`, `listprefabs`
 
 ## Pivots (`editorState.pivots`)
 
-The in-game inspector sets a per-item pivot: Default, Center, Bottom, Top, Left, Right, Back or Front. The gizmo sits on it and rotates and scales the item about it. `localPosition` is that point in the item's local frame (the Main component, unscaled cm): the centre of the Main mesh's local bounds, or the centre of one face of them. Back is +X, Front −X, Right +Y, Left −Y, Top +Z, Bottom −Z. Every pivot in `samples/` matches the catalog's bounds this way (`apps/editor/src/domain/pivot.test.ts`). Items without an entry use Default (the origin), and no sample has a Default entry, so the editor drops the entry when a pivot goes back to Default. Entries are sorted by `itemIndex`. A map without `editorState` (an imported `.ballmap`) gets one when a pivot is set or pasted.
+The in-game inspector sets a per-item pivot: Default, Center, Bottom, Top, Left, Right, Back or Front. The gizmo sits on it and rotates and scales the item about it. `localPosition` is that point in the item's local frame (the Main component, unscaled cm): the centre of the Main mesh's local bounds, or the centre of one face of them. Back is +X, Front −X, Right +Y, Left −Y, Top +Z, Bottom −Z. Every pivot in `samples/` matches the catalog's bounds this way (`apps/web/src/domain/pivot.test.ts`). Items without an entry use Default (the origin), and no sample has a Default entry, so the editor drops the entry when a pivot goes back to Default. Entries are sorted by `itemIndex`. A map without `editorState` (an imported `.ballmap`) gets one when a pivot is set or pasted.

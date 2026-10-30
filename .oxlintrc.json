@@ -8,7 +8,15 @@
   },
   "options": { "typeAware": true },
   "env": { "browser": true, "es2024": true },
-  "ignorePatterns": ["repos/**", "samples/**", "assets/**", "tools/**/*.mjs", "**/routeTree.gen.ts"],
+  "ignorePatterns": [
+    "repos/**",
+    "samples/**",
+    "assets/**",
+    "tools/**/*.mjs",
+    "apps/*/scripts/*.mjs",
+    "**/dist-electron/**",
+    "**/routeTree.gen.ts"
+  ],
   "rules": {
     // typescript-eslint strict-type-checked, minus what tsc already covers
     "typescript/no-confusing-void-expression": ["error", { "ignoreArrowShorthand": true }],
@@ -128,7 +136,7 @@
     },
     {
       // react-three-fiber scene components mutate three objects in effects and useFrame by design.
-      "files": ["apps/editor/src/editor/**/*.tsx"],
+      "files": ["apps/web/src/editor/**/*.tsx"],
       "rules": { "react/immutability": "off" }
     },
     {
@@ -139,14 +147,85 @@
         "react/jsx-no-constructed-context-values": "off"
       }
     },
-    // Module boundaries: domain <- services <- editor <- components <- routes; ui knows none of them.
+    // apps/web is the renderer for both the web build and the desktop app.
     {
-      "files": ["apps/editor/src/domain/**"],
+      "files": ["apps/web/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
           {
             "patterns": [
+              {
+                "group": ["electron", "electron/*", "@ballest/desktop", "@ballest/desktop/*"],
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
+              {
+                "regex": "^(\\.\\./)+(apps/)?desktop(/|$)",
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
+              {
+                "regex": "(^|/)repos/",
+                "message": "repos/ is vendored reference material; import the npm package instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    // Shared by the main process, the sandboxed preload and the renderer: schemas and types over effect, nothing else.
+    {
+      "files": ["packages/contracts/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "electron",
+                  "electron/*",
+                  "@ballest/*",
+                  "@workspace/*",
+                  "react",
+                  "react/*",
+                  "three",
+                  "three/*"
+                ],
+                "message": "@ballest/contracts depends on effect only; main, preload and renderer all import it."
+              },
+              {
+                "regex": "^node:",
+                "message": "@ballest/contracts depends on effect only; main, preload and renderer all import it."
+              },
+              {
+                "regex": "^(\\.\\./)+(apps|packages)/",
+                "message": "@ballest/contracts depends on effect only; main, preload and renderer all import it."
+              },
+              {
+                "regex": "(^|/)repos/",
+                "message": "repos/ is vendored reference material; import the npm package instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    // Module boundaries: domain <- services <- editor <- components <- routes; ui knows none of them.
+    {
+      "files": ["apps/web/src/domain/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["electron", "electron/*", "@ballest/desktop", "@ballest/desktop/*"],
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
+              {
+                "regex": "^(\\.\\./)+(apps/)?desktop(/|$)",
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
               {
                 "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)editor(/|$)",
                 "message": "domain/ is the game's data model: pure TypeScript + Effect, no renderer, UI or app layers."
@@ -190,12 +269,20 @@
       }
     },
     {
-      "files": ["apps/editor/src/domain/**/*.test.ts"],
+      "files": ["apps/web/src/domain/**/*.test.ts"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
           {
             "patterns": [
+              {
+                "group": ["electron", "electron/*", "@ballest/desktop", "@ballest/desktop/*"],
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
+              {
+                "regex": "^(\\.\\./)+(apps/)?desktop(/|$)",
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
               {
                 "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)editor(/|$)",
                 "message": "domain/ is the game's data model: pure TypeScript + Effect, no renderer, UI or app layers."
@@ -226,12 +313,20 @@
       }
     },
     {
-      "files": ["apps/editor/src/services/**"],
+      "files": ["apps/web/src/services/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
           {
             "patterns": [
+              {
+                "group": ["electron", "electron/*", "@ballest/desktop", "@ballest/desktop/*"],
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
+              {
+                "regex": "^(\\.\\./)+(apps/)?desktop(/|$)",
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
               {
                 "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)editor(/|$)",
                 "message": "services/ are Effect services over domain/; they don't know about the scene or the UI."
@@ -271,12 +366,20 @@
       }
     },
     {
-      "files": ["apps/editor/src/services/**/*.test.ts"],
+      "files": ["apps/web/src/services/**/*.test.ts"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
           {
             "patterns": [
+              {
+                "group": ["electron", "electron/*", "@ballest/desktop", "@ballest/desktop/*"],
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
+              {
+                "regex": "^(\\.\\./)+(apps/)?desktop(/|$)",
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
               {
                 "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)editor(/|$)",
                 "message": "services/ are Effect services over domain/; they don't know about the scene or the UI."
@@ -311,12 +414,20 @@
       }
     },
     {
-      "files": ["apps/editor/src/editor/**"],
+      "files": ["apps/web/src/editor/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
           {
             "patterns": [
+              {
+                "group": ["electron", "electron/*", "@ballest/desktop", "@ballest/desktop/*"],
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
+              {
+                "regex": "^(\\.\\./)+(apps/)?desktop(/|$)",
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
               {
                 "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)components(/|$)",
                 "message": "editor/ (scene, store, actions) sits below the UI: components/ and routes/ import it, not the reverse."
@@ -340,12 +451,20 @@
       }
     },
     {
-      "files": ["apps/editor/src/editor/**/*.test.ts"],
+      "files": ["apps/web/src/editor/**/*.test.ts"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
           {
             "patterns": [
+              {
+                "group": ["electron", "electron/*", "@ballest/desktop", "@ballest/desktop/*"],
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
+              {
+                "regex": "^(\\.\\./)+(apps/)?desktop(/|$)",
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
               {
                 "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)components(/|$)",
                 "message": "editor/ (scene, store, actions) sits below the UI: components/ and routes/ import it, not the reverse."
@@ -364,12 +483,20 @@
       }
     },
     {
-      "files": ["apps/editor/src/components/**"],
+      "files": ["apps/web/src/components/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
           {
             "patterns": [
+              {
+                "group": ["electron", "electron/*", "@ballest/desktop", "@ballest/desktop/*"],
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
+              {
+                "regex": "^(\\.\\./)+(apps/)?desktop(/|$)",
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
               {
                 "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)services(/|$)",
                 "message": "components/ is React UI: reach services through editor/actions and keep three.js in editor/."
@@ -397,12 +524,20 @@
       }
     },
     {
-      "files": ["apps/editor/src/routes/**", "apps/editor/src/main.tsx"],
+      "files": ["apps/web/src/routes/**", "apps/web/src/main.tsx"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
           {
             "patterns": [
+              {
+                "group": ["electron", "electron/*", "@ballest/desktop", "@ballest/desktop/*"],
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
+              {
+                "regex": "^(\\.\\./)+(apps/)?desktop(/|$)",
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
               { "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)domain(/|$)", "message": "routes/ only compose components/." },
               { "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)editor(/|$)", "message": "routes/ only compose components/." },
               { "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)services(/|$)", "message": "routes/ only compose components/." },

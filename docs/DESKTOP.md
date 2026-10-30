@@ -18,7 +18,7 @@ Mirrors [t3-code](https://github.com/pingdotgg/t3code) (`apps/web` + `apps/deskt
 
 ```
 apps/
-  web/        the renderer: today's apps/editor minus TanStack Start (plain Vite SPA + TanStack Router)
+  web/        the renderer: the editor, formerly apps/editor (plain Vite SPA + TanStack Router)
               layers as now: domain/ ← services/ ← editor/ ← components/ ← routes/
   desktop/    Electron main + preload. Effect main process (@effect/platform-node), no React
 packages/
