@@ -2,7 +2,6 @@
   "path": [
     "apps/web/src",
     "apps/desktop/src",
-    "apps/desktop/scripts",
     "packages/ui/src",
     "packages/contracts/src",
     "tools/extract",

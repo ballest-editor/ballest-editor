@@ -5,7 +5,6 @@
   "main": "dist-electron/main.cjs",
   "scripts": {
     "build": "vite build",
-    "ensure:electron": "node scripts/ensure-electron.mjs",
     "typecheck": "effect-tsgo tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests"
   },

@@ -21,7 +21,7 @@
       ]
     },
     "apps/desktop": {
-      "entry": ["src/main.ts", "src/preload.ts", "scripts/*.mjs"]
+      "entry": ["src/main.ts", "src/preload.ts"]
     },
     "packages/contracts": {},
     "packages/ui": {},
