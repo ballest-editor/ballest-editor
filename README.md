@@ -9,3 +9,5 @@ A standalone, CAD-style map editor for [Ballest of Them All](https://store.steam
 - `tools/compress/` — compresses the extracted meshes and textures and publishes them to Vercel Blob
 
 Contributors and coding agents: read [AGENTS.md](AGENTS.md).
+
+The game, its name and its content belong to its developers. See [NOTICE.md](NOTICE.md) for what this repository includes from the game and from Workshop creators, and for the license status.
