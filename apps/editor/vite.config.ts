@@ -1,7 +1,6 @@
 import tailwindcss from "@tailwindcss/vite"
-import { tanstackStart } from "@tanstack/react-start/plugin/vite"
+import { tanstackRouter } from "@tanstack/router-plugin/vite"
 import viteReact from "@vitejs/plugin-react"
-import { nitro } from "nitro/vite"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { type Connect, defineConfig, type Plugin } from "vite"
@@ -34,7 +33,7 @@ const types: Record<string, string> = {
 /**
  * Serves `/assets/*` from `assets/` (except its raw `pieces/` and `textures/`) and from `web-assets/`, straight
  * from disk, in `vite dev` and `vite preview`; unknown paths fall through to Vite (whose own chunks also live
- * under /assets/). `vite build` copies the same files into the client output so deployments serve them too.
+ * under /assets/). `vite build` copies the same files into `dist/` so deployments serve them too.
  *
  * Meshes and textures come from `web-assets/` when it is on disk. When it isn't (Vercel, CI, a fresh clone)
  * the client is built with `VITE_ASSETS_BASE` pointing at the published copy on Vercel Blob instead; see
@@ -68,8 +67,7 @@ const repoAssets = (): Plugin => {
     name: "ballest:repo-assets",
     configureServer: (server) => void server.middlewares.use(middleware),
     configurePreviewServer: (server) => void server.middlewares.use(middleware),
-    generateBundle(this) {
-      if (this.environment.name !== "client") return
+    generateBundle() {
       for (const root of roots) {
         if (!fs.existsSync(root)) continue
         for (const entry of fs.readdirSync(root, { recursive: true, withFileTypes: true })) {
@@ -88,7 +86,7 @@ const repoAssets = (): Plugin => {
   }
 }
 
-export default defineConfig(({ command }) => {
+export default defineConfig(() => {
   const local = fs.existsSync(path.join(webAssets, "pieces"))
   const base = local ? undefined : blobBase()
   if (!local && base === undefined) {
@@ -99,12 +97,6 @@ export default defineConfig(({ command }) => {
     preview: { port: 3000 },
     resolve: { tsconfigPaths: true },
     define: { "import.meta.env.VITE_ASSETS_BASE": JSON.stringify(base ?? "") },
-    // Build only: bundle every server dependency. Otherwise the SSR build inlines CJS deps it treats as framework
-    // packages (e.g. base-ui's use-sync-external-store shim) but leaves their `require("react")` to runtime, and the
-    // Vercel function ships no node_modules to satisfy it. Dev must keep deps external: its module runner can't
-    // evaluate inlined CJS like react/index.js. Bundling only the offenders plus react doesn't work either: Nitro
-    // traces react-router as a separate library with its own React, and SSR fails with hooks reading `null`.
-    ...(command === "build" ? { ssr: { noExternal: true } } : {}),
-    plugins: [repoAssets(), tailwindcss(), tanstackStart(), nitro(), viteReact()]
+    plugins: [repoAssets(), tailwindcss(), tanstackRouter({ target: "react", autoCodeSplitting: true }), viteReact()]
   }
 })

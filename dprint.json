@@ -19,7 +19,6 @@
     "web-assets",
     "**/node_modules",
     "**/dist",
-    "**/.output",
     "**/.tanstack",
     "**/routeTree.gen.ts",
     "pnpm-lock.yaml"

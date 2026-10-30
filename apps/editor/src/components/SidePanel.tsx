@@ -1,29 +1,18 @@
 import { cn } from "@workspace/ui/lib/utils"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 
+/** index.html reads the same keys before first paint; keep the two in step. */
 const STORAGE_PREFIX = "ballest-editor.panel."
 /** The viewport never gets narrower than this when a sidebar is dragged wider. */
 const MIN_VIEWPORT = 320
 
-/** localStorage, or undefined during server rendering. */
-const storage = (): Storage | undefined => (typeof localStorage === "undefined" ? undefined : localStorage)
-
 const readWidth = (id: string, fallback: number): number => {
-  const stored = Number(storage()?.getItem(STORAGE_PREFIX + id))
+  const stored = Number(localStorage.getItem(STORAGE_PREFIX + id))
   return Number.isFinite(stored) && stored > 0 ? stored : fallback
 }
 
-/** A panel's width as CSS: its saved width once `panelWidthsScript` has run, else the default. */
+/** A panel's width as CSS: its saved width once index.html's inline script has run, else the default. */
 export const panelWidthVar = (id: string, defaultWidth: number): string => `var(--panel-${id}, ${defaultWidth}px)`
-
-/**
- * Inline <head> script that exposes the saved panel widths as `--panel-<id>` on <html>
- * before first paint, so the server-rendered loading shell lays out like the editor will.
- */
-export const panelWidthsScript =
-  `try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf(${
-    JSON.stringify(STORAGE_PREFIX)
-  })===0){var w=Number(localStorage.getItem(k));if(w>0)document.documentElement.style.setProperty("--panel-"+k.slice(${STORAGE_PREFIX.length}),w+"px")}}}catch(e){}`
 
 /**
  * A fixed-pixel sidebar with a drag handle on its inner edge. Plain CSS width, so window
@@ -42,7 +31,7 @@ export function SidePanel(props: {
   const drag = useRef<{ startX: number; startWidth: number } | null>(null)
 
   useEffect(() => {
-    storage()?.setItem(STORAGE_PREFIX + props.id, String(Math.round(width)))
+    localStorage.setItem(STORAGE_PREFIX + props.id, String(Math.round(width)))
   }, [props.id, width])
 
   const clamp = (w: number) => {

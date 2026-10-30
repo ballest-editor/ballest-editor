@@ -1,7 +1,7 @@
 /**
  * Loading placeholders shaped like the real UI, so nothing jumps when the content arrives.
- * Server-rendered as the route's pending shell, so keep this module free of WebGL and
- * browser-only imports.
+ * The route's pending component, in the first chunk the page loads, so keep this module
+ * free of WebGL imports: they belong in the editor's chunk.
  */
 import { buttonVariants } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
@@ -46,8 +46,8 @@ export function PaletteSkeleton() {
 
 /**
  * The editor's layout with placeholder content, shown while the editor's code loads. Panel
- * widths come from the CSS variables set by `panelWidthsScript`, so they match the saved
- * widths the real panels will use.
+ * widths come from the CSS variables index.html sets from localStorage, so they match the
+ * saved widths the real panels will use.
  */
 export function EditorSkeleton() {
   return (

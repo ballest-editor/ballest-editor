@@ -1,8 +1,6 @@
 node_modules/
-.output/
 .vercel/
 .env*.local
-.vinxi/
 .tanstack/
 dist/
 result

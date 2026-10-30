@@ -89,6 +89,8 @@
     "import/no-duplicates": "error",
     "import/no-self-import": "error",
     "import/first": "error",
+    // Stylesheets are imported for their side effect (main.tsx's globals.css).
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
 
     "eslint/eqeqeq": ["error", "always", { "null": "ignore" }],
     "eslint/no-var": "error",
@@ -395,7 +397,7 @@
       }
     },
     {
-      "files": ["apps/editor/src/routes/**", "apps/editor/src/router.tsx"],
+      "files": ["apps/editor/src/routes/**", "apps/editor/src/main.tsx"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
