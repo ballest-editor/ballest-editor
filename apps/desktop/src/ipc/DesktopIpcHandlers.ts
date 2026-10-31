@@ -11,6 +11,7 @@ import {
   resetGamePath,
   revealGamePath
 } from "./methods/game"
+import { loadNotifications, saveNotifications } from "./methods/notifications"
 import { ping } from "./methods/ping"
 import {
   chooseProject,
@@ -62,6 +63,8 @@ export const installDesktopIpcHandlers = Effect.fn("installDesktopIpcHandlers")(
   yield* ipc.handle(findCreator)
   yield* ipc.handle(pluginStatus)
   yield* ipc.handle(installPlugin)
+  yield* ipc.handle(loadNotifications)
+  yield* ipc.handle(saveNotifications)
   yield* ipc.handle(getUpdateState)
   yield* ipc.handle(downloadUpdate)
   yield* ipc.handle(installUpdate)

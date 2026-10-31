@@ -1,18 +1,20 @@
 import { Badge } from "@workspace/ui/components/badge"
-import { useEditor } from "../editor/store"
+import { useEditor, useOpenMapLabel } from "../editor/store"
 import { MenuBar } from "./MenuBar"
-import { UpdatePill } from "./UpdatePill"
 
-/** The open file's name, with a dot while it has unsaved changes; its path (desktop) on hover. */
+/** The open map's name, with a dot while it has unsaved changes; its file's path (desktop) on hover. */
 function FileName() {
   const file = useEditor((s) => s.file)
   const dirty = useEditor((s) => s.dirty)
+  const mapOpen = useEditor((s) => s.mapOpen)
+  const label = useOpenMapLabel()
+  if (!mapOpen) return null
   return (
     <span
       className="ml-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
       title={file?.path ?? undefined}
     >
-      <span className="truncate">{file?.name ?? "Untitled"}</span>
+      <span className="truncate">{label}</span>
       {dirty && <span className="size-1.5 shrink-0 rounded-full bg-foreground/60" aria-label="unsaved changes" />}
     </span>
   )
@@ -44,7 +46,6 @@ export function TopBar() {
             Fixture catalog
           </Badge>
         )}
-        <UpdatePill />
       </div>
     </header>
   )

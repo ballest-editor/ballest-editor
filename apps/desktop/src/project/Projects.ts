@@ -81,6 +81,19 @@ const PublishedId = Schema.fromJsonString(Schema.Struct({
   worldSettings: Schema.Struct({ levelData: Schema.Struct({ levelPublishedFileId: Schema.Finite }) })
 }))
 
+/** A map file's `levelPublishedFileId`; -1 (never published) when it has none or doesn't decode. */
+const publishedIdOf = (text: string): number =>
+  Schema.decodeOption(PublishedId)(text).pipe(
+    Option.map((map) => map.worldSettings.levelData.levelPublishedFileId),
+    Option.getOrElse(() => -1)
+  )
+
+/** What `listMaps` reports of a map's bytes. */
+interface MapContents {
+  readonly hash: string
+  readonly publishedFileId: number
+}
+
 type ProjectEffect<A> = Effect.Effect<A, ProjectError | MapLinkError | BackupError>
 
 /**
@@ -207,13 +220,31 @@ export class Projects extends Context.Service<Projects, {
       return path.join(mapsDir(project), fileName)
     })
 
+    /** What a map's bytes say, by path; a file read again only once its time or size changes. */
+    const contents = new Map<string, MapContents & { readonly stamp: string }>()
+    const contentsOf = Effect.fnUntraced(function*(file: string, stamp: string) {
+      const known = contents.get(file)
+      if (known?.stamp === stamp) return known
+      const bytes = yield* fs.readFile(file).pipe(Effect.mapError(fail("read", file)))
+      const read = { stamp, hash: sha256(bytes), publishedFileId: publishedIdOf(new TextDecoder().decode(bytes)) }
+      contents.set(file, read)
+      return read
+    })
+
     const mapInfo = Effect.fnUntraced(function*(project: string, fileName: string, link?: MapLink | null) {
       const file = path.join(mapsDir(project), fileName)
       const stat = yield* fs.stat(file).pipe(Effect.mapError(fail("read", file)))
+      const modifiedAt = Option.getOrElse(stat.mtime, () => new Date(0)).toISOString()
+      const { hash, publishedFileId } = yield* contentsOf(
+        file,
+        `${modifiedAt} ${stat.size} ${Option.getOrElse(stat.ino, () => 0n)}`
+      )
       return {
         fileName,
         path: file,
-        modifiedAt: Option.getOrElse(stat.mtime, () => new Date(0)).toISOString(),
+        modifiedAt,
+        hash,
+        publishedFileId,
         link: link === undefined ? (yield* links.all(project))[fileName] ?? null : link
       } satisfies ProjectMap
     })

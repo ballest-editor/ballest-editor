@@ -14,6 +14,8 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
   readonly settingsPath: string
   /** `userData/backups`: the files Export wrote over in the game's maps folder (project/Backups.ts). */
   readonly exportBackupsDir: string
+  /** `userData/notifications.json`: the bell's last notifications. */
+  readonly notificationsPath: string
   /** `Documents/Ballest Editor/Maps`: the project used until the user picks another (docs/PROJECTS.md). */
   readonly defaultProjectDir: string
   readonly preloadPath: string
@@ -46,6 +48,7 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
           userData: metadata.userData,
           settingsPath: path.join(metadata.userData, "desktop-settings.json"),
           exportBackupsDir: path.join(metadata.userData, "backups"),
+          notificationsPath: path.join(metadata.userData, "notifications.json"),
           defaultProjectDir: path.join(metadata.documents, "Ballest Editor", "Maps"),
           preloadPath: path.join(dirname, "preload.cjs"),
           iconPath: path.join(dirname, "icon.png"),

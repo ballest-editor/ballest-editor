@@ -10,6 +10,7 @@ import type {
   InstallPluginResult,
   MapBackupFile,
   MapBackups,
+  NotificationRecords,
   OpenedMapFile,
   PluginStatus,
   ProjectMap,
@@ -30,6 +31,9 @@ export type {
   GamePaths,
   InstallPluginResult,
   MapBackup,
+  NotificationAction,
+  NotificationCommand,
+  NotificationRecord,
   PluginStatus,
   ProjectMap,
   ProjectMapFile,
@@ -151,6 +155,10 @@ export class Platform extends Context.Service<Platform, {
   readonly pluginStatus: Effect.Effect<PluginStatus, PlatformError>
   /** Installs the app's copy of the plugin, or updates an older one; fails without the plugin manager. */
   readonly installPlugin: Effect.Effect<InstallPluginResult, PlatformError>
+  /** The notifications kept from earlier runs, newest first (desktop: `notifications.json`); none in a browser. */
+  readonly loadNotifications: Effect.Effect<NotificationRecords, PlatformError>
+  /** Keeps `records` for the next run (desktop); a browser keeps them in memory only. */
+  readonly saveNotifications: (records: NotificationRecords) => Effect.Effect<void, PlatformError>
   /** The updater's state now, then every change to it (desktop); a browser's ends at once. */
   readonly updates: Stream.Stream<UpdateState, PlatformError>
   /** Starts downloading the release on offer; the progress arrives on `updates`. */
@@ -261,6 +269,8 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
     findCreator: bridgeCall(() => bridge.findCreator()).pipe(Effect.map(Option.fromNullOr)),
     pluginStatus: bridgeCall(() => bridge.pluginStatus()),
     installPlugin: bridgeCall(() => bridge.installPlugin()),
+    loadNotifications: bridgeCall(() => bridge.loadNotifications()),
+    saveNotifications: (records) => bridgeCall(() => bridge.saveNotifications(records)),
     updates: updateStates(bridge),
     downloadUpdate: bridgeCall(() => bridge.downloadUpdate()),
     installUpdate: bridgeCall(() => bridge.installUpdate())
@@ -341,6 +351,8 @@ const makeBrowser = (): Platform["Service"] =>
     findCreator: Effect.succeedNone,
     pluginStatus: desktopOnly,
     installPlugin: desktopOnly,
+    loadNotifications: Effect.succeed([]),
+    saveNotifications: () => Effect.void,
     updates: Stream.empty,
     downloadUpdate: Effect.void,
     installUpdate: Effect.void

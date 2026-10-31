@@ -97,7 +97,9 @@ export function FlyCamera() {
       flyingNow(keybinds, pressed.current, drag.current !== null, performance.now()).size > 0
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (isEditorKeyEvent(e)) pressed.current.press(e.code, performance.now(), formsChord(keybinds, chordOf(e)))
+      if (isEditorKeyEvent(e) && useEditor.getState().activeTab === "map") {
+        pressed.current.press(e.code, performance.now(), formsChord(keybinds, chordOf(e)))
+      }
     }
     const onKeyUp = (e: KeyboardEvent) => pressed.current.release(e.code)
     const onBlur = () => pressed.current.clear()

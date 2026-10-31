@@ -122,7 +122,7 @@ A sandboxed preload can `require("electron")` and nothing else, and it has to be
 
 ## Updates
 
-An installed app updates itself from this repository's GitHub Releases. `DesktopUpdates` (`src/updates/`) checks 15 s after start and every 4 minutes until it finds a newer release, then waits for the user: the page's title bar offers it, downloads it on Download and installs it on Restart. `electron-updater` does the work through `ElectronUpdater`; electron-builder wrote the feed into `resources/app-update.yml`.
+An installed app updates itself from this repository's GitHub Releases. `DesktopUpdates` (`src/updates/`) checks 15 s after start and every 4 minutes until it finds a newer release, then waits for the user: the page's status bar offers it, downloads it on Download and installs it on Restart. `electron-updater` does the work through `ElectronUpdater`; electron-builder wrote the feed into `resources/app-update.yml`.
 
 | State         | When                                            | The page shows                                                  |
 | ------------- | ----------------------------------------------- | --------------------------------------------------------------- |
@@ -164,6 +164,7 @@ src/
   game/       SteamLibrary (Steam's libraries, the game's install), GamePaths (install, maps and plugins folders,
               overrides), GameProcess (is the game running), vdf (Steam's KeyValues format)
   ipc/        DesktopIpc (handle + makeIpcMethod), channels, methods/
+  notifications/ NotificationLog (notifications.json: the bell's last 100, kept for the page)
   project/    Projects (the project folder: its maps, Import, Export to game, backups), MapLinks (.ballest/link.json),
               files (map file names, atomic writes, hashes)
   protocol/   serveStatic: files for ballest://, no Electron import, tested

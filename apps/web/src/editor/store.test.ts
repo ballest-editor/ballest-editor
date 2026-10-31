@@ -552,4 +552,52 @@ describe("editor store", () => {
     s().undo()
     assert.deepStrictEqual(s().doc.map.items.map((i) => i.floatProperties.length), [0, 0, 0])
   })
+
+  it("opens a map in its tab, and closing it shows Start with a blank map", () => {
+    const s = () => useEditor.getState()
+    mapWithCubes(0)
+    assert.include(s(), { mapOpen: true, activeTab: "map", startOpen: true })
+    s().closeStart()
+    assert.include(s(), { startOpen: false, activeTab: "map" })
+    s().showStart()
+    assert.include(s(), { startOpen: true, activeTab: "start", mapOpen: true })
+    s().showMapTab()
+    assert.strictEqual(s().activeTab, "map")
+    s().closeMap()
+    assert.include(s(), { mapOpen: false, startOpen: true, activeTab: "start", dirty: false, file: null })
+    assert.deepStrictEqual(s().past, [])
+    assert.strictEqual(s().doc.map.items.length, initialMap().items.length)
+    // Start stays while no map is open
+    s().closeStart()
+    s().showMapTab()
+    assert.include(s(), { startOpen: true, activeTab: "start" })
+  })
+
+  it("records every notification, newest first; a persistent kind pins until resolved", () => {
+    const s = () => useEditor.getState()
+    s().clearNotifications()
+    s().notify("info", "Saved Big Loop", {
+      kind: "mapSaved",
+      actions: [{ label: "Reveal", command: { _tag: "RevealProject" } }]
+    })
+    s().notify("error", "The game wasn't found", { kind: "gameNotFound", persistent: true, body: "Choose its folder." })
+    s().notify("error", "Something failed")
+    assert.deepStrictEqual(s().notifications.map((n) => [n.kind, n.level, n.title]), [
+      ["error", "error", "Something failed"],
+      ["gameNotFound", "error", "The game wasn't found"],
+      ["mapSaved", "info", "Saved Big Loop"]
+    ])
+    assert.deepInclude(s().notifications[1], { body: "Choose its folder.", persistent: true, resolvedAt: null })
+    assert.deepStrictEqual(s().notifications[2]?.actions, [{ label: "Reveal", command: { _tag: "RevealProject" } }])
+
+    s().markNotificationsRead([s().notifications[0]!.id])
+    assert.deepStrictEqual(s().notifications.map((n) => n.read), [true, false, false])
+    s().clearNotifications()
+    assert.deepStrictEqual(s().notifications.map((n) => n.kind), ["gameNotFound"])
+    s().resolveNotifications("gameNotFound")
+    assert.isNotNull(s().notifications[0]?.resolvedAt)
+    s().markNotificationsRead()
+    s().clearNotifications()
+    assert.deepStrictEqual(s().notifications, [])
+  })
 })

@@ -21,6 +21,7 @@ import { GameLink } from "../game/GameLink"
 import { GamePaths } from "../game/GamePaths"
 import { GameProcess } from "../game/GameProcess"
 import { SteamLibrary } from "../game/SteamLibrary"
+import { NotificationLog } from "../notifications/NotificationLog"
 import { Backups } from "../project/Backups"
 import { sha256 } from "../project/files"
 import { LinkFile, MapLinks } from "../project/MapLinks"
@@ -174,7 +175,14 @@ const withHandlers = <A, E>(
       )
     const services = projects.pipe(
       Layer.provideMerge(Layer.effect(DesktopSettings, DesktopSettings.make(path.join(dir, "desktop-settings.json")))),
-      Layer.merge(Layer.mergeAll(dialogs.layer, shellLayer, windowLayer, updatesLayer, DesktopIpc.layer(fake.ipcMain)))
+      Layer.merge(Layer.mergeAll(
+        dialogs.layer,
+        shellLayer,
+        windowLayer,
+        updatesLayer,
+        Layer.effect(NotificationLog, NotificationLog.make(path.join(dir, "notifications.json"))),
+        DesktopIpc.layer(fake.ipcMain)
+      ))
     )
     yield* Effect.scoped(
       Effect.gen(function*() {
@@ -230,7 +238,13 @@ describe("DesktopIpc", () => {
         assert.isFalse(yield* fake.invoke(channels.REVEAL_PROJECT_CHANNEL))
 
         const created = yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text })
-        assert.deepInclude(created, { fileName: name, path: path.join(project, "maps", name), link: null })
+        assert.deepInclude(created, {
+          fileName: name,
+          path: path.join(project, "maps", name),
+          hash: sha256(new TextEncoder().encode(text)),
+          publishedFileId: -1,
+          link: null
+        })
         assert.strictEqual(yield* fs.readFileString(path.join(project, "maps", name)), text)
         assert.deepStrictEqual(JSON.parse(yield* fs.readFileString(path.join(project, "ballest-project.json"))), {
           formatVersion: 1,
@@ -269,6 +283,13 @@ describe("DesktopIpc", () => {
           assert.match(String(error.cause), /isn't a map file name/, bad)
         }
         assert.isFalse(yield* fs.exists(path.join(project, "x.balledit")))
+
+        // The hash follows the bytes, and the published id is read from them.
+        const published = "{\"worldSettings\":{\"levelData\":{\"levelPublishedFileId\":3456}}}"
+        assert.deepInclude(yield* fake.invoke(channels.SAVE_MAP_CHANNEL, { fileName: renamed, text: published }), {
+          hash: sha256(new TextEncoder().encode(published)),
+          publishedFileId: 3456
+        })
       })
     ))
 
@@ -421,25 +442,30 @@ describe("DesktopIpc", () => {
       })
     ))
 
-  it.effect("every sample goes into the backups and comes back byte for byte", () =>
-    withHandlers(({ fake }) =>
-      Effect.gen(function*() {
-        const samples = Fs.readdirSync(samplesDir, { recursive: true, encoding: "utf8" })
-          .filter((file) => /\.(balledit|ballmap)$/.test(file))
-        assert.isAbove(samples.length, 0)
-        for (const [i, sample] of samples.entries()) {
-          const text = Fs.readFileSync(`${samplesDir}/${sample}`, "utf8")
-          const fileName = `Map_LevelEditorMain&Sample ${i}_me.balledit`
-          yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName, text })
-          yield* fake.invoke(channels.SAVE_MAP_CHANNEL, { fileName, text: "{}" })
-          const backups = yield* fake.invokeAs(MapBackups, channels.LIST_BACKUPS_CHANNEL)
-          const backup = backups.find((b) => b.fileName === fileName)
-          assert.isDefined(backup, sample)
-          const read = yield* fake.invokeAs(MapBackupFile, channels.READ_BACKUP_CHANNEL, backup)
-          assert.isTrue(read.text === text, `${sample} differs after the backup`)
-        }
-      })
-    ))
+  it.effect(
+    "every sample goes into the backups and comes back byte for byte",
+    () =>
+      withHandlers(({ fake }) =>
+        Effect.gen(function*() {
+          const samples = Fs.readdirSync(samplesDir, { recursive: true, encoding: "utf8" })
+            .filter((file) => /\.(balledit|ballmap)$/.test(file))
+          assert.isAbove(samples.length, 0)
+          for (const [i, sample] of samples.entries()) {
+            const text = Fs.readFileSync(`${samplesDir}/${sample}`, "utf8")
+            const fileName = `Map_LevelEditorMain&Sample ${i}_me.balledit`
+            yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName, text })
+            yield* fake.invoke(channels.SAVE_MAP_CHANNEL, { fileName, text: "{}" })
+            const backups = yield* fake.invokeAs(MapBackups, channels.LIST_BACKUPS_CHANNEL)
+            const backup = backups.find((b) => b.fileName === fileName)
+            assert.isDefined(backup, sample)
+            const read = yield* fake.invokeAs(MapBackupFile, channels.READ_BACKUP_CHANNEL, backup)
+            assert.isTrue(read.text === text, `${sample} differs after the backup`)
+          }
+        })
+      ),
+    // every sample is written, hashed and read back: tens of MB, slow on a CI runner
+    60_000
+  )
 
   it.effect("chooses another project folder, refuses the game's maps folder and switches back", () =>
     withHandlers(({ fake, dialogs, dir, project, steam }) =>
@@ -626,6 +652,41 @@ describe("DesktopIpc", () => {
           String((yield* Effect.flip(fake.invoke(channels.DOWNLOAD_UPDATE_CHANNEL, { now: true }))).cause),
           /undefined/
         )
+      })
+    ))
+
+  it.effect("keeps the notifications in notifications.json, dropping entries it can't read", () =>
+    withHandlers(({ fake, dir }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const file = path.join(dir, "notifications.json")
+        const record = {
+          id: "n1",
+          kind: "mapExported",
+          level: "info",
+          title: "Exported Big Loop to the game's maps folder",
+          body: null,
+          at: "2026-10-31T12:00:00.000Z",
+          read: false,
+          persistent: false,
+          resolvedAt: null,
+          actions: [{ label: "Reveal", command: { _tag: "RevealGamePath", which: "mapsFolder" } }]
+        }
+        assert.deepStrictEqual(yield* fake.invoke(channels.LOAD_NOTIFICATIONS_CHANNEL), [])
+        assert.isUndefined(yield* fake.invoke(channels.SAVE_NOTIFICATIONS_CHANNEL, { records: [record] }))
+        assert.deepStrictEqual(yield* fake.invoke(channels.LOAD_NOTIFICATIONS_CHANNEL), [record])
+
+        // A newer version's action, and a broken entry, are dropped; the rest survive.
+        const newer = { ...record, id: "n2", actions: [{ label: "Re-import", command: { _tag: "Later" } }] }
+        yield* fs.writeFileString(file, JSON.stringify({ formatVersion: 1, notifications: [newer, 3, record] }))
+        assert.deepStrictEqual(yield* fake.invoke(channels.LOAD_NOTIFICATIONS_CHANNEL), [record])
+        yield* fs.writeFileString(file, "{ not json")
+        assert.deepStrictEqual(yield* fake.invoke(channels.LOAD_NOTIFICATIONS_CHANNEL), [])
+
+        const tooMany = Array.from({ length: 101 }, (_, i) => ({ ...record, id: `n${i}` }))
+        const error = yield* Effect.flip(fake.invoke(channels.SAVE_NOTIFICATIONS_CHANNEL, { records: tooMany }))
+        assert.match(String(error.cause), /length/)
       })
     ))
 })

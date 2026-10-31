@@ -5,6 +5,7 @@ import type {
   GamePaths,
   MapBackupFile,
   MapLink,
+  NotificationRecords,
   OpenedMapFile,
   PluginStatus,
   ProjectInfo,
@@ -41,6 +42,8 @@ export interface TestDisk {
    * the game's maps folder's (Export). Like main, nothing is kept when the bytes don't change.
    */
   readonly backups: Array<MapBackupFile>
+  /** What `notifications.json` holds. */
+  notifications: NotificationRecords
   project: { current: string; recent: Array<string> }
   /**
    * `creator`: what `findCreator` answers. `plugin`: the editor-link plugin's status; installing it makes it `current`,
@@ -112,6 +115,7 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   unload: makeTestUnload(),
   links: new Map(),
   backups: [],
+  notifications: [],
   project: { current: TEST_PROJECT, recent: [] },
   game: {
     paths: testGamePaths,
@@ -180,12 +184,17 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     disk.project = { current: path, recent: [path, ...disk.project.recent.filter((p) => p !== path)] }
     return Promise.resolve(state())
   }
-  const mapOf = (fileName: string): ProjectMap => ({
-    fileName,
-    path: projectFile(fileName, disk.project.current),
-    modifiedAt: TIME,
-    link: linksOf(disk.project.current).get(fileName) ?? null
-  })
+  const mapOf = (fileName: string): ProjectMap => {
+    const text = disk.files.get(projectFile(fileName, disk.project.current)) ?? ""
+    return {
+      fileName,
+      path: projectFile(fileName, disk.project.current),
+      modifiedAt: TIME,
+      hash: testHash(text),
+      publishedFileId: publishedIdOf(text),
+      link: linksOf(disk.project.current).get(fileName) ?? null
+    }
+  }
   const has = (fileName: string) => disk.files.has(projectFile(fileName, disk.project.current))
   /** Keeps the file at `path` before something else is written there, as main's `Backups` does. */
   const backUp = (place: BackupPlace, path: string, next: string | null) => {
@@ -335,6 +344,11 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       disk.game.pluginInstalls++
       disk.game.plugin = { ...plugin, status: "current", installedVersion: plugin.bundledVersion }
       return Promise.resolve({ plugin: disk.game.plugin, restartGame: disk.game.running })
+    },
+    loadNotifications: () => Promise.resolve(disk.notifications),
+    saveNotifications: (records) => {
+      disk.notifications = records
+      return Promise.resolve()
     },
     getUpdateState: () => Promise.resolve(disk.updater.state),
     downloadUpdate: () => {

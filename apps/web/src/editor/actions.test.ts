@@ -2,6 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { DateTime, Effect, Fiber, Layer, Option } from "effect"
 import { TestClock } from "effect/testing"
 import { creatorOf } from "../domain/creator"
+import { linkStateOf } from "../domain/linkState"
 import { defaultSettings } from "../domain/Settings"
 import { lightingOf } from "../domain/sunlight"
 import { MapCodec } from "../services/MapCodec"
@@ -20,6 +21,7 @@ import {
 import { listSamples, readSample } from "../test/samples"
 import {
   answerUnloadRequest,
+  closeMapTabEffect,
   createNewMap,
   describeBackupEffect,
   duplicateMapEffect,
@@ -30,7 +32,9 @@ import {
   importAsCopyEffect,
   importMapFile,
   installPluginEffect,
+  keepNotifications,
   launchGameEffect,
+  openProjectMap,
   openProjectMapFile,
   recoverBackupEffect,
   replaceOnImportEffect,
@@ -252,6 +256,80 @@ describe("project actions", () => {
       assert.strictEqual(disk.files.get(inGame), disk.files.get(projectFile(name)))
       const exported = yield* MapCodec.use((codec) => codec.decode(disk.files.get(inGame)!))
       assert.strictEqual(exported.worldSettings.directionalLight.timeOfDay, 5)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("the open map's link state follows exports and saves, and each export is a notification with Reveal", () => {
+    const sample = balledits[0]!
+    const name = fileNameOf(sample)
+    const disk = makeTestDisk({ [projectFile(name)]: readSample(sample) })
+    const stateNow = () => {
+      const map = s().projectMaps.find((m) => m.fileName === name)!
+      return linkStateOf(map, { unsaved: s().dirty })
+    }
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(name)
+      // a save lists the project's maps again
+      yield* saveMapFile
+      assert.strictEqual(stateNow(), "notExported")
+      yield* exportToGameEffect(false)
+      assert.strictEqual(stateNow(), "inSync")
+      assert.deepInclude(s().notifications[0], {
+        kind: "mapExported",
+        level: "info",
+        actions: [{ label: "Reveal", command: { _tag: "RevealGamePath", which: "mapsFolder" } }]
+      })
+
+      s().setLighting({ ...lightingOf(s().doc.map.worldSettings), timeOfDay: 7 })
+      assert.strictEqual(stateNow(), "editedSinceExport")
+      yield* saveMapFile
+      assert.isFalse(s().dirty)
+      assert.strictEqual(stateNow(), "editedSinceExport")
+      assert.strictEqual(s().notifications[0]?.kind, "mapSaved")
+      yield* exportToGameEffect(false)
+      assert.strictEqual(stateNow(), "inSync")
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("closing a map's tab asks about unsaved edits with the shared prompt, then shows Start", () => {
+    const name = fileNameOf(balledits[0]!)
+    const disk = makeTestDisk({ [projectFile(name)]: readSample(balledits[0]!) })
+    const editTo = (timeOfDay: number) => s().setLighting({ ...lightingOf(s().doc.map.worldSettings), timeOfDay })
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(name)
+      // opening the map that is open only brings its tab forward
+      s().showStart()
+      openProjectMap(name)
+      assert.strictEqual(s().activeTab, "map")
+
+      editTo(9)
+      disk.promptAnswers.push("cancel", "save")
+      yield* closeMapTabEffect
+      assert.include(s(), { mapOpen: true, dirty: true })
+      assert.match(disk.prompts[0]?.message ?? "", /before closing the map\?$/)
+      // Save: written first, then the tab closes and Start shows
+      yield* closeMapTabEffect
+      assert.include(s(), { mapOpen: false, activeTab: "start", dirty: false })
+      const saved = yield* MapCodec.use((codec) => codec.decode(disk.files.get(projectFile(name))!))
+      assert.strictEqual(saved.worldSettings.directionalLight.timeOfDay, 9)
+
+      // Don't save: the file keeps its last save
+      yield* openProjectMapFile(name)
+      editTo(2)
+      const before = disk.files.get(projectFile(name))
+      disk.promptAnswers.push("discard")
+      yield* closeMapTabEffect
+      assert.include(s(), { mapOpen: false, dirty: false })
+      assert.strictEqual(disk.files.get(projectFile(name)), before)
+
+      // a clean map closes without asking
+      yield* openProjectMapFile(name)
+      const asked = disk.prompts.length
+      yield* closeMapTabEffect
+      assert.include(s(), { mapOpen: false })
+      assert.strictEqual(disk.prompts.length, asked)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
@@ -614,5 +692,49 @@ describe("unsaved changes", () => {
       edit()
       assert.isFalse(holdsUnload())
     }).pipe(Effect.provide(layerLeavingInto(disk, left)))
+  })
+})
+
+describe("notification actions", () => {
+  it.effect("keeps the notifications across a restart: the kept ones under this session's, then every change", () => {
+    const disk = makeTestDisk()
+    const kept = {
+      id: "kept-1",
+      kind: "mapExported",
+      level: "info" as const,
+      title: "Exported Big Loop to the game's maps folder",
+      body: null,
+      at: "2026-10-30T12:00:00.000Z",
+      read: true,
+      persistent: false,
+      resolvedAt: null,
+      actions: [{ label: "Reveal", command: { _tag: "RevealGamePath" as const, which: "mapsFolder" as const } }]
+    }
+    disk.notifications = [kept]
+    const until = (done: () => boolean) =>
+      Effect.promise(() => new Promise((resolve) => setTimeout(resolve, 1))).pipe(
+        Effect.repeat({ until: done, times: 100 })
+      )
+    return Effect.gen(function*() {
+      s().clearNotifications()
+      s().notify("error", "Before the kept ones were read")
+      const fiber = yield* Effect.forkChild(keepNotifications)
+      yield* until(() => disk.notifications.length === 2)
+      assert.deepStrictEqual(s().notifications.map((n) => n.title), [
+        "Before the kept ones were read",
+        kept.title
+      ])
+      assert.deepStrictEqual(disk.notifications, s().notifications)
+
+      s().notify("info", "Saved Big Loop", { kind: "mapSaved" })
+      yield* until(() => disk.notifications.length === 3)
+      s().markNotificationsRead()
+      yield* until(() => disk.notifications.every((n) => n.read))
+      yield* Fiber.interrupt(fiber)
+      s().clearNotifications()
+      yield* Effect.promise(() => new Promise((resolve) => setTimeout(resolve, 5)))
+      // stopped: the clear isn't written
+      assert.strictEqual(disk.notifications.length, 3)
+    }).pipe(Effect.provide(layerFor(disk)))
   })
 })

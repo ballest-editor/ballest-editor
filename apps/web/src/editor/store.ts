@@ -2,9 +2,8 @@
  * Editor document + UI state. The document is a MapFile (schema-typed) plus a parallel
  * array of stable ids for React keys and selection. All edits go through domain/edits.
  */
-import type { UpdateState } from "@ballest/contracts"
+import { NOTIFICATION_LIMIT, type UpdateState } from "@ballest/contracts"
 import { type Effect, Option } from "effect"
-import { toast } from "sonner"
 import { create } from "zustand"
 import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
@@ -25,25 +24,43 @@ import {
   type SlotMaterial,
   validateItem
 } from "../domain/edits"
-import { itemFromPiece, newMapFile } from "../domain/factory"
+import { itemFromPiece, mapLabelOf, newMapFile } from "../domain/factory"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
 import type { PropertyChange } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
 import { LIMITS } from "../domain/limits"
+import { type LinkState, linkStateOf } from "../domain/linkState"
 import { isPlayerStart, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
+import { addNotice, clearNotices, markRead, mergeNotices, resolveNotices } from "../domain/notifications"
 import type { PaintPicker } from "../domain/Paint"
 import { type Pivot, pivotAt } from "../domain/pivot"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import type { LoadedCatalog } from "../services/CatalogLoader"
-import type { GamePaths, PlatformCapabilities, PluginStatus, ProjectMap, ProjectState } from "../services/Platform"
+import type {
+  GamePaths,
+  NotificationAction,
+  NotificationRecord,
+  PlatformCapabilities,
+  PluginStatus,
+  ProjectMap,
+  ProjectState
+} from "../services/Platform"
 
 import type { GizmoSpace } from "./gizmo/handles"
 
 /** The game folder types, for components (which reach services only through editor/). */
-export type { GamePath, GamePathKind, GamePaths, PluginStatus } from "../services/Platform"
+export type {
+  GamePath,
+  GamePathKind,
+  GamePaths,
+  NotificationAction,
+  NotificationRecord,
+  PluginStatus,
+  ProjectMap
+} from "../services/Platform"
 export interface Doc {
   readonly map: MapFile
   readonly ids: ReadonlyArray<string>
@@ -119,11 +136,23 @@ export interface ImportClash {
   readonly map: MapFile
 }
 
-/** Something a notification offers to do (a toast's button), like showing the folder a file went to. */
-export interface NoticeAction {
-  readonly label: string
-  readonly run: () => void
+/** What `notify` records besides the level and title (docs/PROJECTS.md § Shell). */
+export interface NotifyOptions {
+  /** What it is about (`mapSaved`, `gameNotFound`, ...); the level (`info`, `error`) when not given. */
+  readonly kind?: string
+  /** A second line under the title. */
+  readonly body?: string
+  /**
+   * Pinned to the top of the notification centre until `resolveNotifications(kind)` says its cause has gone away; a
+   * later one of the same kind replaces it.
+   */
+  readonly persistent?: boolean
+  /** Its buttons, in the toast (the first) and in the notification centre (all, after a restart too). */
+  readonly actions?: ReadonlyArray<NotificationAction>
 }
+
+/** The document tabs: the Start tab, and the open map's. */
+export type DocumentTab = "start" | "map"
 
 let nextId = 0
 const freshId = () => `item-${++nextId}`
@@ -168,6 +197,16 @@ export interface EditorState {
   readonly publishedDraft: PublishedDraft | null
   /** The desktop updater's state, once main has sent it; null in a browser. */
   readonly update: UpdateState | null
+  /** Every notification (each toast is one), newest first, at most `NOTIFICATION_LIMIT`. */
+  readonly notifications: ReadonlyArray<NotificationRecord>
+  /**
+   * Whether a map is open in its tab. The document always holds a map; with no tab open it is a blank one nobody sees,
+   * and the map commands are off.
+   */
+  readonly mapOpen: boolean
+  /** Whether the Start tab is in the tab strip; it is whenever no map is open. */
+  readonly startOpen: boolean
+  readonly activeTab: DocumentTab
   readonly selectedIds: Selection
   readonly tool: Tool
   /** Whether the gizmo follows the selected item's axes or the world's. */
@@ -216,7 +255,7 @@ export interface EditorState {
   readonly frameAllRequest: number
 
   /**
-   * Replaces the document; `floorHeight` defaults to the map's player start height. `dirty` opens it as unsaved edits
+   * Replaces the document and shows it in its tab; `floorHeight` defaults to the map's player start height. `dirty` opens it as unsaved edits
    * of `file` (a recovered version), so the next Save writes it there.
    */
   readonly loadMap: (
@@ -247,6 +286,13 @@ export interface EditorState {
   /** Asks whether to replace a published map's draft in the maps folder (null forgets it). */
   readonly setPublishedDraft: (draft: PublishedDraft | null) => void
   readonly setUpdate: (update: UpdateState) => void
+  /** Shows the Start tab, adding it to the strip if it was closed (View › Start). */
+  readonly showStart: () => void
+  /** Takes the Start tab out of the strip; only while a map is open, which then shows. */
+  readonly closeStart: () => void
+  readonly showMapTab: () => void
+  /** Closes the map's tab, discarding unsaved edits (actions asks first); Start shows. */
+  readonly closeMap: () => void
   readonly placePiece: (piece: CatalogPiece, transform: ItemTransform) => void
   /**
    * Replaces the transforms of several items as one undo step; false (with a notice, and
@@ -317,7 +363,16 @@ export interface EditorState {
   readonly setKeybinds: (keybinds: Keybinds, defaults?: DerivedKeybinds) => void
   readonly setSettings: (settings: Settings) => void
   readonly reportMissingGlb: (url: string) => void
-  readonly notify: (kind: "info" | "error", text: string, action?: NoticeAction) => void
+  /** Records a notification; editor/actions toasts each new one and keeps the list (desktop: across restarts). */
+  readonly notify: (level: "info" | "error", title: string, options?: NotifyOptions) => void
+  /** Unpins the persistent notifications of `kind`: what they were about has gone away. */
+  readonly resolveNotifications: (kind: string) => void
+  /** Marks `ids` read, or every notification. */
+  readonly markNotificationsRead: (ids?: ReadonlyArray<string>) => void
+  /** Removes every notification but the pinned ones. */
+  readonly clearNotifications: () => void
+  /** Adds the notifications kept from earlier runs under this session's. */
+  readonly restoreNotifications: (kept: ReadonlyArray<NotificationRecord>) => void
   readonly changeSpeed: (direction: 1 | -1) => void
   readonly requestFocus: () => void
   readonly requestFrameAll: () => void
@@ -410,6 +465,10 @@ export const useEditor = create<EditorState>()((set, get) => {
     pluginStatus: null,
     publishedDraft: null,
     update: null,
+    notifications: [],
+    mapOpen: false,
+    startOpen: true,
+    activeTab: "start",
     selectedIds: [],
     tool: "translate",
     gizmoSpace: "world",
@@ -443,6 +502,8 @@ export const useEditor = create<EditorState>()((set, get) => {
         file,
         exportOnSave: options?.exportOnSave ?? false,
         selectedIds: [],
+        mapOpen: true,
+        activeTab: "map",
         frameAllRequest: s.frameAllRequest + 1
       })),
 
@@ -459,6 +520,27 @@ export const useEditor = create<EditorState>()((set, get) => {
     setPublishedDraft: (publishedDraft) =>
       set({ publishedDraft, dialog: publishedDraft === null ? null : "replacePublished" }),
     setUpdate: (update) => set({ update }),
+    showStart: () => set({ startOpen: true, activeTab: "start" }),
+    closeStart: () => set((s) => s.mapOpen ? { startOpen: false, activeTab: "map" } : s),
+    showMapTab: () => set((s) => s.mapOpen ? { activeTab: "map" } : s),
+    closeMap: () => {
+      const blank = initialMap()
+      set({
+        doc: docOf(blank),
+        floorHeight: floorHeightOf(blank),
+        past: [],
+        future: [],
+        dirty: false,
+        file: null,
+        exportOnSave: false,
+        selectedIds: [],
+        preview: null,
+        lightingPreview: null,
+        mapOpen: false,
+        startOpen: true,
+        activeTab: "start"
+      })
+    },
 
     placePiece: (piece, transform) => {
       const item = validateItem(itemFromPiece(piece, transform))
@@ -668,11 +750,28 @@ export const useEditor = create<EditorState>()((set, get) => {
     setKeybinds: (keybinds, defaults) => set((s) => ({ keybinds, keybindDefaults: defaults ?? s.keybindDefaults })),
     reportMissingGlb: (url) =>
       set((s) => (s.missingGlbs.has(url) ? s : { missingGlbs: new Set([...s.missingGlbs, url]) })),
-    notify: (kind, text, action) => {
-      const options = action === undefined ? {} : { action: { label: action.label, onClick: action.run } }
-      if (kind === "error") toast.error(text, options)
-      else toast(text, options)
+    notify: (level, title, options = {}) => {
+      const record: NotificationRecord = {
+        id: crypto.randomUUID(),
+        kind: options.kind ?? level,
+        level,
+        title,
+        body: options.body ?? null,
+        at: new Date().toISOString(),
+        read: false,
+        persistent: options.persistent ?? false,
+        resolvedAt: null,
+        actions: options.actions ?? []
+      }
+      set((s) => ({ notifications: addNotice(s.notifications, record, NOTIFICATION_LIMIT) }))
     },
+    resolveNotifications: (kind) =>
+      set((s) => ({ notifications: resolveNotices(s.notifications, kind, new Date().toISOString()) })),
+    markNotificationsRead: (ids) =>
+      set((s) => ({ notifications: markRead(s.notifications, ids === undefined ? undefined : new Set(ids)) })),
+    clearNotifications: () => set((s) => ({ notifications: clearNotices(s.notifications) })),
+    restoreNotifications: (kept) =>
+      set((s) => ({ notifications: mergeNotices(s.notifications, kept, NOTIFICATION_LIMIT) })),
     changeSpeed: (direction) =>
       set((s) => {
         const i = SPEED_STEPS.indexOf(s.cameraSpeed)
@@ -758,4 +857,23 @@ export const useCreator = (): Creator => {
   const setting = useEditor((s) => s.settings.general.creatorName)
   const found = useEditor((s) => s.foundCreator)
   return creatorOf(setting, found)
+}
+
+/**
+ * The open map's entry in the project (desktop) and its link state; unsaved edits count as edits since the export.
+ * Null with no map open, in a browser, and for a map that isn't in the project yet.
+ */
+export const useOpenProjectMap = (): { readonly map: ProjectMap; readonly state: LinkState } | null => {
+  const fileName = useEditor((s) => s.mapOpen ? s.file?.name ?? null : null)
+  const maps = useEditor((s) => s.projectMaps)
+  const dirty = useEditor((s) => s.dirty)
+  const map = fileName === null ? undefined : maps.find((m) => m.fileName === fileName)
+  return map === undefined ? null : { map, state: linkStateOf(map, { unsaved: dirty }) }
+}
+
+/** The open map's name as its tab and the title bar show it. */
+export const useOpenMapLabel = (): string => {
+  const fileName = useEditor((s) => s.file?.name ?? null)
+  const displayName = useEditor((s) => s.doc.map.worldSettings.levelData.levelDisplayName)
+  return fileName === null ? displayName.trim() || "Untitled" : mapLabelOf(fileName)
 }
