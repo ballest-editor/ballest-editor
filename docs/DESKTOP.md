@@ -83,7 +83,7 @@ So **Play** in the desktop app:
 2. Writes `<plugins>/ballest-editor-link/play.json`: `{ "map": "Map_LevelEditorMain&<name>_<creator>.balledit", "nonce": <n> }`.
 3. If the game isn't running (no `Ballest-Win64-Shipping.exe` process), opens `steam://rungameid/3339810`.
 
-The plugin, `ballest-editor-link` (its own repo, as the registry requires; `info.toml` + `main.as`), polls `play.json` from `Update(dt)` twice a second, and on a new nonce calls `Tracks::OpenLocal`. It uses no `Console::` (the registry refuses that). Without the plugin manager installed, Play degrades to Save-to-game plus launch, and the editor says so.
+The plugin, `ballest-editor-link` (`packages/ballest-editor-link/`: `info.toml` + `main.as`), polls `play.json` from `Update(dt)` twice a second, and on a new nonce calls `Tracks::OpenLocal`. It uses no `Console::` and no network. It isn't published to the plugin manager's registry: the app bundles it in `extraResources` and, when the user asks, copies it into `<plugins>/ballest-editor-link/` (the plugin manager picks up a hand-installed folder when the game starts). Without the plugin manager installed, Play degrades to Save-to-game plus launch, and the editor says so.
 
 Later: an `Editor::OpenLocal` host API for "open in the in-game editor", and a file-changed callback instead of polling. Both are upstream requests, not blockers.
 

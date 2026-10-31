@@ -18,6 +18,7 @@ A standalone map editor for _Ballest of Them All_ (Steam 3339810, UE 5.8). Read 
 - `apps/desktop/` — Electron main process and preload (`docs/DESKTOP.md`). Bundled to CJS in `dist-electron/` by `vite build`. The `electron` package has no install script: it downloads the binary (~100 MB, cached in `~/.cache/electron`) the first time it is launched or `require`d from Node.
 - `packages/contracts/` — `@ballest/contracts`: Effect schemas and the `DesktopBridge` interface shared by main, preload and renderer. Depends on `effect` only; exports `src/` directly, no build.
 - `packages/ui/` — shadcn/ui (`@workspace/ui`, preset `b6nCVm82TK`). All UI chrome comes from here.
+- `packages/ballest-editor-link/` — AngelScript plugin for the Ballest plugin manager (`info.toml` + `main.as`): races the map when the desktop app's Play writes `play.json`. Not on the plugin manager's registry; the desktop app bundles it and installs it into the game's plugins folder on demand (#118).
 - `tools/extract/` — pak → glTF/catalog/keybinds pipeline, run via the Nix flake (`nix run .#extract`).
 - `tools/compress/` — `assets/{pieces,textures}` → `web-assets/` (`pnpm assets`, the turbo task `//#assets` that `dev` and `build` depend on) downloading the published pack when the raw files are absent; `pnpm assets:publish` → GitHub release `assets-<hash>` + `web-assets.json`.
 - `repos/` — vendored read-only references (see below).
