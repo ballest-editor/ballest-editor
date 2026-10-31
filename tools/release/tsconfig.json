@@ -18,7 +18,10 @@
           "effect/process",
           "effect/process/ChildProcess",
           "effect/process/ChildProcessSpawner",
-          "effect/cli"
+          "effect/cli",
+          "effect/http/HttpRouter",
+          "effect/http/HttpServer",
+          "effect/http/HttpStaticServer"
         ],
         "ignoreEffectSuggestionsInTscExitCode": false,
         "ignoreEffectWarningsInTscExitCode": false

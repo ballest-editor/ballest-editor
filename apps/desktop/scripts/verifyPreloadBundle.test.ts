@@ -12,7 +12,14 @@ const valid = `
     writeMap: (path, text) => electron.ipcRenderer.invoke("ballest:fs:writeText", { path, text }),
     recentMaps: () => electron.ipcRenderer.invoke("ballest:recentMaps"),
     setWindowTheme: (dark) => electron.ipcRenderer.invoke("ballest:window:setTheme", { dark }),
-    openExternal: (url) => electron.ipcRenderer.invoke("ballest:shell:openExternal", { url })
+    openExternal: (url) => electron.ipcRenderer.invoke("ballest:shell:openExternal", { url }),
+    getUpdateState: () => electron.ipcRenderer.invoke("ballest:update:get"),
+    downloadUpdate: () => electron.ipcRenderer.invoke("ballest:update:download"),
+    installUpdate: () => electron.ipcRenderer.invoke("ballest:update:install"),
+    onUpdateState: (listener) => {
+      electron.ipcRenderer.on("ballest:update:state", listener)
+      return () => electron.ipcRenderer.removeListener("ballest:update:state", listener)
+    }
   })
 `
 

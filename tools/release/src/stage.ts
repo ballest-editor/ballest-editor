@@ -1,7 +1,7 @@
 // Lays out the app electron-builder packages: package.json (with the config), the main and preload bundles, the
 // renderer build, the game assets beside it and the icons.
 import { Effect, FileSystem, Path, Schema } from "effect"
-import { type Platform, stageLayout, stagePackageJson } from "./config.ts"
+import { type Platform, stageLayout, stagePackageJson, type UpdateFeed } from "./config.ts"
 import { writeIcons } from "./icons.ts"
 
 export const repoRoot = Effect.gen(function*() {
@@ -56,6 +56,7 @@ export interface StageOptions {
   readonly version: string
   /** Where electron-builder writes the installers. */
   readonly output: string
+  readonly feed: UpdateFeed
   /** An empty directory to stage into. */
   readonly directory: string
 }

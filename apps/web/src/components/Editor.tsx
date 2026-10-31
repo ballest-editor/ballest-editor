@@ -1,7 +1,15 @@
 import { Toaster } from "@workspace/ui/components/sonner"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
 import { useEffect } from "react"
-import { loadCatalog, loadKeybinds, loadMaterials, loadPlatform, loadSettings, setWindowTheme } from "../editor/actions"
+import {
+  followUpdates,
+  loadCatalog,
+  loadKeybinds,
+  loadMaterials,
+  loadPlatform,
+  loadSettings,
+  setWindowTheme
+} from "../editor/actions"
 import { warmCatalog } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
 import { useEditor } from "../editor/store"
@@ -84,6 +92,7 @@ export function Editor() {
     void loadKeybinds()
     void loadPlatform()
   }, [])
+  useEffect(() => followUpdates(), [])
 
   return (
     <TooltipProvider>

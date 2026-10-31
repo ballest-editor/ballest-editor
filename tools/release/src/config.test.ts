@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
-import { builderConfig, installerName, releaseFiles, stagePackageJson } from "./config.ts"
+import { builderConfig, githubFeed, installerName, mockFeed, releaseFiles, stagePackageJson } from "./config.ts"
 
-const options = { version: "0.2.0-rc.1", electronVersion: "45.1.0", output: "/repo/release" }
+const options = { version: "0.2.0-rc.1", electronVersion: "45.1.0", output: "/repo/release", feed: githubFeed }
 
 describe("stagePackageJson", () => {
   it("points main at the bundle and carries the config", () => {
@@ -18,6 +18,15 @@ describe("builderConfig", () => {
     assert.deepStrictEqual(config.extraResources, [{ from: "assets", to: "assets" }])
     assert.notInclude(config.files, "assets/**")
     assert.include(config.files, "!**/*.map")
+  })
+
+  it("feeds updates from this repository's releases, or from the mock server with --mock-updates", () => {
+    assert.deepStrictEqual(builderConfig({ ...options, platform: "win" }).publish, [
+      { provider: "github", owner: "ballest-editor", repo: "ballest-editor" }
+    ])
+    const mock = builderConfig({ ...options, platform: "linux", feed: mockFeed(4848) })
+    assert.deepStrictEqual(mock.publish, [{ provider: "generic", url: "http://127.0.0.1:4848/" }])
+    assert.isString(mock.releaseInfo?.releaseNotes)
   })
 
   it("configures only the platform being built", () => {

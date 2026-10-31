@@ -23,3 +23,5 @@ tools/probe/
 web-assets/
 # tools/release output: installers, update manifests, unpacked apps (`pnpm dist:desktop:<platform>`)
 /release/
+# `--mock-updates` builds, served by `pnpm release:mock-server`
+/release-mock/

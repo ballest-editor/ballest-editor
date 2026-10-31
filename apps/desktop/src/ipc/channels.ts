@@ -8,3 +8,8 @@ export const WRITE_MAP_CHANNEL = "ballest:fs:writeText"
 export const RECENT_MAPS_CHANNEL = "ballest:recentMaps"
 export const OPEN_EXTERNAL_CHANNEL = "ballest:shell:openExternal"
 export const SET_WINDOW_THEME_CHANNEL = "ballest:window:setTheme"
+export const GET_UPDATE_STATE_CHANNEL = "ballest:update:get"
+export const DOWNLOAD_UPDATE_CHANNEL = "ballest:update:download"
+export const INSTALL_UPDATE_CHANNEL = "ballest:update:install"
+/** Main → renderer: every new update state (`webContents.send`). */
+export const UPDATE_STATE_CHANNEL = "ballest:update:state"

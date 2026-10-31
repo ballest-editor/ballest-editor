@@ -4,6 +4,7 @@ import { ElectronApp } from "../electron/ElectronApp"
 /** Where things are, decided once at startup. Everything else asks this service instead of Electron or `process`. */
 export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
   readonly isPackaged: boolean
+  readonly platform: NodeJS.Platform
   /** `VITE_DEV_SERVER_URL`, set by the dev runner: the renderer is proxied from Vite instead of read from disk. */
   readonly devServerUrl: Option.Option<URL>
   readonly isDevelopment: boolean
@@ -27,6 +28,7 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
         const devServerUrl = yield* Config.URL("VITE_DEV_SERVER_URL").pipe(Config.option)
         return DesktopEnvironment.of({
           isPackaged: metadata.isPackaged,
+          platform: process.platform,
           devServerUrl,
           isDevelopment: Option.isSome(devServerUrl),
           appVersion: metadata.appVersion,
