@@ -4,7 +4,7 @@
 
 ```sh
 pnpm assets           # compress.mjs assets web-assets, then download.mjs
-pnpm assets:publish   # publish.mjs web-assets web-assets.json  (needs `gh`, logged in)
+pnpm assets:publish   # publish.mjs web-assets tools/compress/web-assets.json  (needs `gh`, logged in)
 ```
 
 | `assets/`         | `web-assets/`                            | size (Oct 2026) |
@@ -25,7 +25,7 @@ Vercel's build command (`apps/web/vercel.json`) runs `turbo run build --filter=@
 
 ## Publishing: GitHub release
 
-`publish.mjs` hashes the whole tree (every path and its bytes; 16 hex digits) and tars it with sorted entries, mtime 0 and portable modes, gzip level 9 (about 40 MB: meshopt output still compresses). It creates a prerelease tagged `assets-<hash>`, never marked latest, with `web-assets.tar.gz` attached, and writes `web-assets.json`:
+`publish.mjs` hashes the whole tree (every path and its bytes; 16 hex digits) and tars it with sorted entries, mtime 0 and portable modes, gzip level 9 (about 40 MB: meshopt output still compresses). It creates a prerelease tagged `assets-<hash>`, never marked latest, with `web-assets.tar.gz` attached, and writes `tools/compress/web-assets.json`:
 
 ```json
 { "tag": "assets-<hash>", "sha256": "<tarball sha256>", "size": <bytes> }

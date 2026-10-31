@@ -10,13 +10,13 @@
     },
     "typecheck": {
       "dependsOn": ["transit"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tsconfig.base.json"]
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.config/tsconfig.base.json"]
     },
     "test": {
       "dependsOn": ["transit"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/tsconfig.base.json",
+        "$TURBO_ROOT$/.config/tsconfig.base.json",
         "$TURBO_ROOT$/samples/**",
         "$TURBO_ROOT$/assets/**"
       ]
@@ -25,7 +25,7 @@
       "dependsOn": ["^build", "//#assets"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/tsconfig.base.json",
+        "$TURBO_ROOT$/.config/tsconfig.base.json",
         ".env*",
         "$TURBO_ROOT$/assets/**",
         "$TURBO_ROOT$/web-assets/**"
@@ -35,7 +35,7 @@
     // The desktop app packages the renderer build and the assets, so it builds after both.
     "@ballest/desktop#build": {
       "dependsOn": ["^build", "@ballest/web#build", "//#assets"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tsconfig.base.json"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.config/tsconfig.base.json"],
       "outputs": ["dist-electron/**"]
     },
     // Run through tools/dev/src/dev-runner.ts (`pnpm dev`, `pnpm dev:desktop`), which sets PORT, HOST and
@@ -48,13 +48,13 @@
 
     // Repo-wide tools, run once from the root.
     // tools/compress: the extractor's raw meshes and textures -> web-assets/ (gitignored). Where they are absent
-    // (CI, Vercel, a fresh clone) it downloads the asset pack web-assets.json points at instead.
+    // (CI, Vercel, a fresh clone) it downloads the asset pack tools/compress/web-assets.json points at instead.
     "//#assets": {
       "inputs": [
         "tools/compress/compress.mjs",
         "tools/compress/download.mjs",
         "tools/compress/pack.mjs",
-        "web-assets.json",
+        "tools/compress/web-assets.json",
         "assets/pieces/**",
         "assets/textures/**"
       ],
@@ -62,8 +62,9 @@
     },
     "//#lint": {
       "inputs": [
-        ".oxlintrc.json",
-        "tsconfig.base.json",
+        ".config/oxlintrc.json",
+        "package.json",
+        ".config/tsconfig.base.json",
         "pnpm-lock.yaml",
         "apps/*/tsconfig.json",
         "packages/*/tsconfig.json",
@@ -78,10 +79,10 @@
     },
     "//#knip": {
       "inputs": [
-        "knip.json",
+        ".config/knip.json",
         "package.json",
         "pnpm-lock.yaml",
-        "tsconfig.base.json",
+        ".config/tsconfig.base.json",
         "*.config.{js,mjs,ts}",
         ".husky/*",
         ".github/workflows/**",
@@ -90,6 +91,7 @@
         "tools/extract/**",
         "tools/compress/**",
         "tools/dev/**",
+        "tools/release/**",
         "!**/node_modules/**",
         "!**/dist/**",
         "!**/dist-electron/**"
@@ -97,14 +99,15 @@
     },
     "//#dupes": {
       "inputs": [
-        ".jscpd.json",
+        ".config/jscpd.json",
         "apps/web/src/**",
         "apps/desktop/src/**",
         "packages/ui/src/**",
         "packages/contracts/src/**",
         "tools/extract/**",
         "tools/compress/**",
-        "tools/dev/src/**"
+        "tools/dev/src/**",
+        "tools/release/src/**"
       ]
     },
     "//#format:check": {
@@ -115,6 +118,7 @@
         "!samples/**",
         "!assets/**",
         "!web-assets/**",
+        "!release/**",
         "!**/node_modules/**",
         "!**/dist/**",
         "!**/dist-electron/**"

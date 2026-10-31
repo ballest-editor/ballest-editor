@@ -29,6 +29,7 @@
     "packages/ui": {},
     "tools/extract": {
       "entry": ["src/main.ts", "*.mjs"]
-    }
+    },
+    "tools/release": {}
   }
 }

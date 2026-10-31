@@ -1,7 +1,7 @@
 name: Conventional titles
 
 # PR titles become the commit subject on main (squash merge), so they follow
-# Conventional Commits; commitlint.config.mjs is the single source of rules.
+# Conventional Commits; the `commitlint` key in package.json is the single source of rules.
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize]

@@ -6,22 +6,24 @@ A standalone map editor for _Ballest of Them All_ (Steam 3339810, UE 5.8). Read 
 
 - **Never write to the game install** at `~/.local/share/Steam/steamapps/common/Ballest of Them All`. Copy what you need to `/tmp`.
 - Map samples live in `samples/` (`UserSavedMaps/*.balledit` drafts, `Workshop/*.ballmap` published). They are test fixtures; don't edit them.
-- Game-derived assets live in `assets/` (`catalog.json`, `pieces/*.glb`), produced by `tools/extract/`. `tools/compress/` turns the gitignored meshes and textures into `web-assets/` (meshopt, AVIF; also gitignored) and publishes it as an asset pack (a GitHub release tarball), recorded in `web-assets.json`; machines without the game download that instead. The app serves everything at `/assets/*` (`apps/web/src/editor/assetUrl.ts`). None of these are edited by hand.
+- Game-derived assets live in `assets/` (`catalog.json`, `pieces/*.glb`), produced by `tools/extract/`. `tools/compress/` turns the gitignored meshes and textures into `web-assets/` (meshopt, AVIF; also gitignored) and publishes it as an asset pack (a GitHub release tarball), recorded in `tools/compress/web-assets.json`; machines without the game download that instead. The app serves everything at `/assets/*` (`apps/web/src/editor/assetUrl.ts`). None of these are edited by hand.
 - Keep the game's conventions: positions in centimetres, rotations as unit quaternions, UE left-handed Z-up. Convert to the renderer's frame in exactly one place.
 
 ## Layout
 
 - Turborepo + pnpm workspace. Run `pnpm dev|dev:desktop|test|typecheck|build|lint|knip|dupes|format` from the root; `pnpm check:everything` runs format check, lint, knip, duplicate detection, typecheck, tests and build (in parallel, cached by turbo), and must pass before committing.
-- Typecheck is `effect-tsgo tsc` (TypeScript 7 + Effect diagnostics; config in `tsconfig.base.json`). Lint is type-aware oxlint (`.oxlintrc.json`). Formatting is dprint (`dprint.json`, Effect's style). Duplicate code is jscpd (`.jscpd.json`: exact token clones plus structurally similar functions; shadcn components excluded). Don't run `effect-tsgo patch`: pnpm hard-links node_modules to the global store.
-- `apps/web/` — React SPA (Vite + TanStack Router) + Three.js editor. Effect for all non-trivial logic (services, schema, errors). It never imports `electron` or `apps/desktop`.
-  Layers, enforced by `no-restricted-imports` in `.oxlintrc.json`: `domain/` (data model; no renderer, UI or node builtins) ← `services/` (Effect services) ← `editor/` (scene, store, actions) ← `components/` (React UI; reaches services through `editor/actions`) ← `routes/`. `src/test/` helpers are for tests only; nothing imports `repos/`.
+- Typecheck is `effect-tsgo tsc` (TypeScript 7 + Effect diagnostics; config in `.config/tsconfig.base.json`). Lint is type-aware oxlint (`.config/oxlintrc.json`). Formatting is dprint (`dprint.json`, Effect's style). Duplicate code is jscpd (`.config/jscpd.json`: exact token clones plus structurally similar functions; shadcn components excluded). Don't run `effect-tsgo patch`: pnpm hard-links node_modules to the global store.
+- Keep the root short: tool configs go in `.config/` (the script passes `--config`) or a `package.json` key (`commitlint`, `lint-staged`). oxlint matches globs against paths relative to its config's folder, so `.config/oxlintrc.json` starts its `overrides` globs with `**/`, and ignores go in `--ignore-pattern` flags in the `lint` script and lint-staged. `dprint.json` stays at the root: the dprint VS Code extension only formats files under the folder that holds the config, and it has no setting to point it elsewhere. `CLAUDE.md` is `.claude/CLAUDE.md`, a symlink to `AGENTS.md`.
+- `apps/web/` — React SPA (Vite + TanStack Router) + Three.js editor. Effect for all non-trivial logic (services, schema, errors). It never imports `electron` or `apps/desktop`. The desktop app is the product; the web build is a review build that Vercel deploys for pull requests and `main` (`apps/web/vercel.json`). Don't add web-only features.
+  Layers, enforced by `no-restricted-imports` in `.config/oxlintrc.json`: `domain/` (data model; no renderer, UI or node builtins) ← `services/` (Effect services) ← `editor/` (scene, store, actions) ← `components/` (React UI; reaches services through `editor/actions`) ← `routes/`. `src/test/` helpers are for tests only; nothing imports `repos/`.
 - `apps/desktop/` — Electron main process and preload (`docs/DESKTOP.md`). Bundled to CJS in `dist-electron/` by `vite build`. The `electron` package has no install script: it downloads the binary (~100 MB, cached in `~/.cache/electron`) the first time it is launched or `require`d from Node.
 - `packages/contracts/` — `@ballest/contracts`: Effect schemas and the `DesktopBridge` interface shared by main, preload and renderer. Depends on `effect` only; exports `src/` directly, no build.
 - `packages/ui/` — shadcn/ui (`@workspace/ui`, preset `b6nCVm82TK`). All UI chrome comes from here.
 - `packages/ballest-editor-link/` — AngelScript plugin for the Ballest plugin manager (`info.toml` + `main.as`): races the map when the desktop app's Play writes `play.json`. Not on the plugin manager's registry; the desktop app bundles it and installs it into the game's plugins folder on demand (#118).
 - `tools/extract/` — pak → glTF/catalog/keybinds pipeline, run via the Nix flake (`nix run .#extract`).
 - `tools/dev/` — the `pnpm dev` / `pnpm dev:desktop` runner: picks the checkout's port (3000, or one per linked worktree) and runs the `dev` tasks through turbo.
-- `tools/compress/` — `assets/{pieces,textures}` → `web-assets/` (`pnpm assets`, the turbo task `//#assets` that `dev` and `build` depend on) downloading the published pack when the raw files are absent; `pnpm assets:publish` → GitHub release `assets-<hash>` + `web-assets.json`.
+- `tools/compress/` — `assets/{pieces,textures}` → `web-assets/` (`pnpm assets`, the turbo task `//#assets` that `dev` and `build` depend on) downloading the published pack when the raw files are absent; `pnpm assets:publish` → GitHub release `assets-<hash>` + `tools/compress/web-assets.json`.
+- `tools/release/` — packages the desktop app with electron-builder (`pnpm dist:desktop:win|linux`, `pnpm release:smoke`) and checks a release's assets; `.github/workflows/release.yml` runs it on `v*.*.*` tags.
 - `repos/` — vendored read-only references (see below).
 - `docs/` — format, vision, decisions.
 
@@ -42,8 +44,8 @@ We use **Effect v4** (`effect@^4`). Before writing Effect code, read `repos/effe
 
 ## Conventions
 
-- TypeScript strict (see `tsconfig.base.json`); pnpm; vitest (`@effect/vitest`) for tests. Fix lint findings rather than disabling rules; a disable comment needs a `-- reason`.
+- TypeScript strict (see `.config/tsconfig.base.json`); pnpm; vitest (`@effect/vitest`) for tests. Fix lint findings rather than disabling rules; a disable comment needs a `-- reason`.
 - Errors are `Schema.TaggedError` classes; no thrown exceptions across service boundaries.
 - Map file I/O goes through a single `MapFile` schema (`Schema.Class`) that decodes the game JSON and encodes it back; the catalog through a `Catalog` schema. Add a round-trip test against every file in `samples/` when touching either.
-- Commit only when asked. Commit messages, PR titles and issue titles follow Conventional Commits (`commitlint.config.mjs`); PRs are squash-merged with the PR title as the commit on `main`. `main` only changes through PRs that pass CI.
+- Commit only when asked. Commit messages, PR titles and issue titles follow Conventional Commits (`commitlint` in `package.json`); PRs are squash-merged with the PR title as the commit on `main`. `main` only changes through PRs that pass CI.
 - Git hooks (husky): pre-commit formats and lints staged files (lint-staged), commit-msg runs commitlint, pre-push runs `pnpm check:everything`.

@@ -38,6 +38,11 @@ export const CameraSettings = Schema.Struct({
   customFov: Schema.Finite.check(Schema.isBetween({ minimum: 30, maximum: 140 })),
   invertLookX: Schema.Boolean,
   invertLookY: Schema.Boolean,
+  /**
+   * When look, orbit and pan drags hide the cursor and keep it in place (Pointer Lock).
+   * Browsers announce every lock with a banner, so by default only the desktop app locks.
+   */
+  lockPointer: Schema.Literals(["desktop", "always", "never"]),
   /** Which movement keys only fly while the look button is held (see flyKeys). */
   movementNeedsLook: Schema.Literals(movementLookModes)
 })
@@ -93,6 +98,7 @@ export const defaultSettings: Settings = {
     customFov: 90,
     invertLookX: false,
     invertLookY: false,
+    lockPointer: "desktop",
     movementNeedsLook: "all"
   },
   appearance: {

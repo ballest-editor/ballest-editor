@@ -17,6 +17,8 @@ pnpm build                              # apps/web/dist, then dist-electron/
 pnpm --filter @ballest/desktop start    # downloads the Electron binary on first run (~100 MB)
 ```
 
+Installers (`pnpm dist:desktop:win`, `pnpm dist:desktop:linux`) and releases are [tools/release](../../tools/release/README.md)'s job.
+
 ## Two processes
 
 An Electron app is two kinds of process. The main process is Node with full access to the machine. The renderer is a Chromium tab, sandboxed, with no Node and no file access. They can't call each other's functions, so they talk in two ways.
@@ -134,6 +136,8 @@ src/
   protocol/   serveStatic: files for ballest://, no Electron import, tested
   settings/   desktop-settings.json
   window/     DesktopWindow: the editor window and its bounds; chrome: title bar overlay, F11 and Ctrl+Q
+resources/
+  icon.svg                the app icon; tools/release renders the .ico and PNGs from it
 scripts/
   electron.ts             the Electron binary and its environment, minus ELECTRON_RUN_AS_NODE, which
                           Electron-based terminals export and which turns the binary into plain Node

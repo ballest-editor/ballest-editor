@@ -1,5 +1,5 @@
 {
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "$schema": "../node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "react", "import", "unicorn", "oxc", "eslint", "vitest"],
   "categories": {
     "correctness": "error",
@@ -8,14 +8,6 @@
   },
   "options": { "typeAware": true },
   "env": { "browser": true, "es2024": true },
-  "ignorePatterns": [
-    "repos/**",
-    "samples/**",
-    "assets/**",
-    "tools/**/*.mjs",
-    "**/dist-electron/**",
-    "**/routeTree.gen.ts"
-  ],
   "rules": {
     // typescript-eslint strict-type-checked, minus what tsc already covers
     "typescript/no-confusing-void-expression": ["error", { "ignoreArrowShorthand": true }],
@@ -135,12 +127,12 @@
     },
     {
       // react-three-fiber scene components mutate three objects in effects and useFrame by design.
-      "files": ["apps/web/src/editor/**/*.tsx"],
+      "files": ["**/apps/web/src/editor/**/*.tsx"],
       "rules": { "react/immutability": "off" }
     },
     {
       // shadcn-generated; kept as upstream ships it so `shadcn add` updates apply cleanly.
-      "files": ["packages/ui/src/components/**"],
+      "files": ["**/packages/ui/src/components/**"],
       "rules": {
         "typescript/no-unsafe-type-assertion": "off",
         "react/jsx-no-constructed-context-values": "off"
@@ -148,7 +140,7 @@
     },
     // apps/web is the renderer for both the web build and the desktop app.
     {
-      "files": ["apps/web/**"],
+      "files": ["**/apps/web/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
@@ -173,7 +165,7 @@
     },
     // Shared by the main process, the sandboxed preload and the renderer: schemas and types over effect, nothing else.
     {
-      "files": ["packages/contracts/**"],
+      "files": ["**/packages/contracts/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
@@ -211,7 +203,7 @@
     },
     // Module boundaries: domain <- services <- editor <- components <- routes; ui knows none of them.
     {
-      "files": ["apps/web/src/domain/**"],
+      "files": ["**/apps/web/src/domain/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
@@ -268,7 +260,7 @@
       }
     },
     {
-      "files": ["apps/web/src/domain/**/*.test.ts"],
+      "files": ["**/apps/web/src/domain/**/*.test.ts"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
@@ -312,7 +304,7 @@
       }
     },
     {
-      "files": ["apps/web/src/services/**"],
+      "files": ["**/apps/web/src/services/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
@@ -365,7 +357,7 @@
       }
     },
     {
-      "files": ["apps/web/src/services/**/*.test.ts"],
+      "files": ["**/apps/web/src/services/**/*.test.ts"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
@@ -413,7 +405,7 @@
       }
     },
     {
-      "files": ["apps/web/src/editor/**"],
+      "files": ["**/apps/web/src/editor/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
@@ -450,7 +442,7 @@
       }
     },
     {
-      "files": ["apps/web/src/editor/**/*.test.ts"],
+      "files": ["**/apps/web/src/editor/**/*.test.ts"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
@@ -482,7 +474,7 @@
       }
     },
     {
-      "files": ["apps/web/src/components/**"],
+      "files": ["**/apps/web/src/components/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
@@ -523,7 +515,7 @@
       }
     },
     {
-      "files": ["apps/web/src/routes/**", "apps/web/src/main.tsx"],
+      "files": ["**/apps/web/src/routes/**", "**/apps/web/src/main.tsx"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
@@ -555,7 +547,7 @@
       }
     },
     {
-      "files": ["packages/ui/**"],
+      "files": ["**/packages/ui/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
