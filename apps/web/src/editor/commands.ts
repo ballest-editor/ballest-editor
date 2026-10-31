@@ -3,18 +3,8 @@
  * the same action, so the two can't drift apart.
  */
 import type { KeybindAction } from "../domain/Keybinds"
-import { deleteSelection, duplicateSelection } from "./actions"
+import { deleteSelection, duplicateSelection, openMap, saveMap } from "./actions"
 import { useEditor } from "./store"
-
-/**
- * Commands that must run inside a user gesture on a DOM element the Editor component owns
- * (the hidden file input). Dialog state lives in the store (`openDialog`); this is only
- * what can't.
- */
-export const commands = {
-  /** Opens the file picker. Registered by the Editor component in an effect. */
-  openImport: (): void => {}
-}
 
 /**
  * The command for each one-shot action. Held keys and mouse drags aren't here (FlyCamera
@@ -38,8 +28,9 @@ export const actionCommands = {
   speedFaster: () => useEditor.getState().changeSpeed(1),
   speedSlower: () => useEditor.getState().changeSpeed(-1),
   newMap: () => useEditor.getState().openDialog("new"),
-  importMap: () => commands.openImport(),
-  exportMap: () => useEditor.getState().openDialog("export"),
+  openMap: () => void openMap(),
+  saveMap: () => void saveMap(),
+  saveMapAs: () => useEditor.getState().openDialog("saveAs"),
   showKeybinds: () => useEditor.getState().setCheatSheet(true)
 } satisfies Partial<Record<KeybindAction, () => void>>
 

@@ -18,7 +18,7 @@ describe("DesktopSettings", () => {
     Effect.gen(function*() {
       const { fs, dir, file, settings } = yield* withSettings
       assert.deepStrictEqual(yield* settings.get, {})
-      yield* settings.set({ window })
+      yield* settings.update(() => ({ window }))
       assert.deepStrictEqual(yield* settings.get, { window })
       assert.deepStrictEqual(JSON.parse(yield* fs.readFileString(file)), { window })
       // The temp file was renamed over the target, not left behind.
@@ -31,10 +31,20 @@ describe("DesktopSettings", () => {
   it.effect("ignores a file that doesn't decode", () =>
     Effect.gen(function*() {
       const { fs, file, settings } = yield* withSettings
-      yield* settings.set({ window })
+      yield* settings.update(() => ({ window }))
       for (const bad of ["{", "[]", JSON.stringify({ window: { ...window, width: 0 } })]) {
         yield* fs.writeFileString(file, bad)
         assert.deepStrictEqual(yield* settings.get, {})
       }
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)))
+
+  it.effect("runs concurrent updates one after the other, so none is lost", () =>
+    Effect.gen(function*() {
+      const { settings } = yield* withSettings
+      yield* Effect.all([
+        settings.update((s) => ({ ...s, window })),
+        settings.update((s) => ({ ...s, recentMaps: ["/maps/a.balledit"] }))
+      ], { concurrency: "unbounded" })
+      assert.deepStrictEqual(yield* settings.get, { window, recentMaps: ["/maps/a.balledit"] })
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)))
 })

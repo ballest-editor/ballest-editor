@@ -1,3 +1,10 @@
 // IPC channel names, shared by the main process handlers and the preload. One constant per channel.
 
 export const PING_CHANNEL = "ballest:ping"
+export const OPEN_MAP_CHANNEL = "ballest:dialog:openMap"
+export const SAVE_MAP_CHANNEL = "ballest:dialog:saveMap"
+export const READ_MAP_CHANNEL = "ballest:fs:readText"
+export const WRITE_MAP_CHANNEL = "ballest:fs:writeText"
+export const RECENT_MAPS_CHANNEL = "ballest:recentMaps"
+export const OPEN_EXTERNAL_CHANNEL = "ballest:shell:openExternal"
+export const SET_WINDOW_THEME_CHANNEL = "ballest:window:setTheme"

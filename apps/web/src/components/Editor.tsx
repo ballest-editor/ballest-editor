@@ -1,20 +1,19 @@
 import { Toaster } from "@workspace/ui/components/sonner"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
-import { useEffect, useRef } from "react"
-import { importFile, loadCatalog, loadKeybinds, loadMaterials, loadSettings } from "../editor/actions"
-import { commands } from "../editor/commands"
+import { useEffect } from "react"
+import { loadCatalog, loadKeybinds, loadMaterials, loadPlatform, loadSettings, setWindowTheme } from "../editor/actions"
 import { warmCatalog } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
 import { useEditor } from "../editor/store"
 import { watchResolvedTheme } from "../editor/theme"
 import { useActionKeys } from "../editor/useActionKeys"
 import { Viewport } from "../editor/Viewport"
-import { ExportDialog } from "./ExportDialog"
 import { Inspector } from "./Inspector"
 import { KeybindCheatSheet } from "./KeybindCheatSheet"
 import { NewMapDialog } from "./NewMapDialog"
 import { Palette } from "./Palette"
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
+import { SaveAsDialog } from "./SaveAsDialog"
 import { SettingsDialog } from "./SettingsDialog"
 import { SidePanel } from "./SidePanel"
 import { TopBar } from "./TopBar"
@@ -41,10 +40,23 @@ const useBlurButtonsAfterClick = () =>
     return () => document.removeEventListener("pointerup", onPointerUp)
   }, [])
 
-/** Applies the theme setting to <html> (the ui preset styles `.dark`). */
+/** Applies the theme setting to <html> (the ui preset styles `.dark`), and to the desktop window's controls. */
 const useTheme = () => {
   const theme = useEditor((s) => s.settings.appearance.theme)
-  useEffect(() => watchResolvedTheme(theme, (dark) => document.documentElement.classList.toggle("dark", dark)), [theme])
+  useEffect(() =>
+    watchResolvedTheme(theme, (dark) => {
+      document.documentElement.classList.toggle("dark", dark)
+      void setWindowTheme(dark)
+    }), [theme])
+}
+
+/** The window title: the open file, marked while it has unsaved changes. */
+const useDocumentTitle = () => {
+  const name = useEditor((s) => s.file?.name ?? "Untitled")
+  const dirty = useEditor((s) => s.dirty)
+  useEffect(() => {
+    document.title = `${dirty ? "• " : ""}${name} — Ballest Editor`
+  }, [name, dirty])
 }
 
 export function Editor() {
@@ -52,16 +64,9 @@ export function Editor() {
   const settingsCategory = useEditor((s) => s.settingsCategory)
   const setSettingsCategory = useEditor((s) => s.setSettingsCategory)
   const close = useEditor((s) => s.closeDialog)
-  const fileInput = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    commands.openImport = () => fileInput.current?.click()
-    return () => {
-      commands.openImport = () => {}
-    }
-  }, [])
 
   useActionKeys()
+  useDocumentTitle()
   useTheme()
   useBlurButtonsAfterClick()
 
@@ -77,6 +82,7 @@ export function Editor() {
     // The viewport holds its first reveal until these have settled (see Viewport.tsx).
     void Promise.all([loadCatalog(), loadMaterials(), loadSettings()]).then(() => useEditor.getState().finishBoot())
     void loadKeybinds()
+    void loadPlatform()
   }, [])
 
   return (
@@ -95,19 +101,8 @@ export function Editor() {
           </SidePanel>
         </div>
       </div>
-      <input
-        ref={fileInput}
-        type="file"
-        accept=".balledit,.ballmap,.json"
-        hidden
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          e.target.value = ""
-          if (file !== undefined) void importFile(file)
-        }}
-      />
       <NewMapDialog open={dialog === "new"} onClose={close} />
-      <ExportDialog open={dialog === "export"} onClose={close} />
+      <SaveAsDialog open={dialog === "saveAs"} onClose={close} />
       <ProjectSettingsDialog open={dialog === "project"} onClose={close} />
       <SettingsDialog
         open={dialog === "settings"}

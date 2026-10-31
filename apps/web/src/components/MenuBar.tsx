@@ -17,14 +17,14 @@ import type { ReactNode } from "react"
 import { formatBinding, type KeybindAction } from "../domain/Keybinds"
 import type { Settings } from "../domain/Settings"
 import { formatGridSize, GRID_SIZES, type GridSize } from "../domain/snap"
-import { updateSettings } from "../editor/actions"
+import { openRecent, updateSettings } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { useEditor } from "../editor/store"
 
 /** The action's primary binding, as the menu shows it (nothing when unbound). */
 function Shortcut({ action }: { readonly action: KeybindAction }) {
   const binding = useEditor((s) => s.keybinds[action][0])
-  return binding === undefined ? null : <MenubarShortcut>{formatBinding(binding)}</MenubarShortcut>
+  return binding === undefined ? null : <MenubarShortcut className="pl-6">{formatBinding(binding)}</MenubarShortcut>
 }
 
 /** A menu item that runs the same command as the action's keybind, and shows that keybind. */
@@ -65,10 +65,32 @@ function Menu({ title, children }: { readonly title: string; readonly children: 
       }}
     >
       <MenubarTrigger className="px-2.5">{title}</MenubarTrigger>
-      <MenubarContent className="min-w-40" finalFocus={(closeType) => closeType === "keyboard"}>
+      {/* Sized to the longest row (label and shortcut on one line), not to the menu's title. */}
+      <MenubarContent className="w-max min-w-40" finalFocus={(closeType) => closeType === "keyboard"}>
         {children}
       </MenubarContent>
     </MenubarMenu>
+  )
+}
+
+/** Desktop only: the last files opened or saved, by name (the path is the tooltip). */
+function RecentFilesMenu() {
+  const recentFiles = useEditor((s) => s.recentFiles)
+  return (
+    <MenubarSub>
+      <MenubarSubTrigger disabled={recentFiles.length === 0}>Open recent</MenubarSubTrigger>
+      <MenubarSubContent className="w-max max-w-96">
+        {recentFiles.map((file) => (
+          <MenubarItem
+            key={file.path}
+            title={file.path}
+            onClick={() => void openRecent(file.path)}
+          >
+            <span className="truncate">{file.name}</span>
+          </MenubarItem>
+        ))}
+      </MenubarSubContent>
+    </MenubarSub>
   )
 }
 
@@ -89,6 +111,7 @@ export function MenuBar() {
   const canPaste = useEditor((s) => s.clipboard !== null)
   const openDialog = useEditor((s) => s.openDialog)
   const { snapping, appearance, lighting, general } = useEditor((s) => s.settings)
+  const filePaths = useEditor((s) => s.capabilities.filePaths)
 
   return (
     <Menubar
@@ -104,8 +127,11 @@ export function MenuBar() {
     >
       <Menu title="File">
         <CommandItem action="newMap">New map…</CommandItem>
-        <CommandItem action="importMap">Import…</CommandItem>
-        <CommandItem action="exportMap">Export…</CommandItem>
+        <CommandItem action="openMap">Open…</CommandItem>
+        {filePaths && <RecentFilesMenu />}
+        <MenubarSeparator />
+        <CommandItem action="saveMap">Save</CommandItem>
+        <CommandItem action="saveMapAs">Save as…</CommandItem>
         <MenubarSeparator />
         <MenubarItem onClick={() => openDialog("project")}>Project settings…</MenubarItem>
       </Menu>

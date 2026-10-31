@@ -1,6 +1,7 @@
 import { Cause, Effect, Option } from "effect"
 import { ElectronApp } from "../electron/ElectronApp"
 import { ElectronDialog } from "../electron/ElectronDialog"
+import { ElectronMenu } from "../electron/ElectronMenu"
 import { type DesktopProtocolSource, ElectronProtocol } from "../electron/ElectronProtocol"
 import { installDesktopIpcHandlers } from "../ipc/DesktopIpcHandlers"
 import { DesktopWindow } from "../window/DesktopWindow"
@@ -31,6 +32,9 @@ const run = Effect.gen(function*() {
   yield* app.on("will-quit", (event) => event.preventDefault())
 
   yield* app.whenReady
+  // Installed builds have no application menu: the page's menu bar is the UI, and Electron's default one would
+  // reload or close the window behind the editor's back. DesktopWindow handles F11 and Ctrl+Q instead.
+  if (environment.isPackaged) yield* (yield* ElectronMenu).remove
   yield* (yield* ElectronProtocol).register(protocolSource(environment))
   yield* installDesktopIpcHandlers()
   yield* (yield* DesktopWindow).runMain

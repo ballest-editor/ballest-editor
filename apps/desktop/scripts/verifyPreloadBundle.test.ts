@@ -5,7 +5,14 @@ const valid = `
   const electron = require("electron")
   electron.contextBridge.exposeInMainWorld("ballest", {
     versions: { electron: process.versions.electron },
-    ping: (message) => electron.ipcRenderer.invoke("ballest:ping", { message })
+    ping: (message) => electron.ipcRenderer.invoke("ballest:ping", { message }),
+    openMap: () => electron.ipcRenderer.invoke("ballest:dialog:openMap"),
+    saveMap: (payload) => electron.ipcRenderer.invoke("ballest:dialog:saveMap", payload),
+    readMap: (path) => electron.ipcRenderer.invoke("ballest:fs:readText", { path }),
+    writeMap: (path, text) => electron.ipcRenderer.invoke("ballest:fs:writeText", { path, text }),
+    recentMaps: () => electron.ipcRenderer.invoke("ballest:recentMaps"),
+    setWindowTheme: (dark) => electron.ipcRenderer.invoke("ballest:window:setTheme", { dark }),
+    openExternal: (url) => electron.ipcRenderer.invoke("ballest:shell:openExternal", { url })
   })
 `
 

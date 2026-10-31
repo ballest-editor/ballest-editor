@@ -91,6 +91,14 @@ describe("keybind table", () => {
     expect(isDefaultBinding(merged, defaultKeybinds, "moveForward")).toBe(true)
   })
 
+  it("keeps bindings saved under the file actions' old names", () => {
+    const merged = mergeKeybinds({ importMap: ["Ctrl+KeyI"], exportMap: ["Ctrl+Shift+KeyE"] })
+    expect(merged.openMap).toEqual(["Ctrl+KeyI"])
+    expect(merged.saveMapAs).toEqual(["Ctrl+Shift+KeyE"])
+    expect(merged.saveMap).toEqual(["Ctrl+KeyS"])
+    expect(mergeKeybinds({ importMap: ["Ctrl+KeyI"], openMap: ["Ctrl+KeyP"] }).openMap).toEqual(["Ctrl+KeyP"])
+  })
+
   it("formats bindings for display", () => {
     expect(formatBinding("Ctrl+KeyZ")).toBe("Ctrl + Z")
     expect(formatBinding("Alt+Mouse0")).toBe("Alt + LMB")

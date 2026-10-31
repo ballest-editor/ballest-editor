@@ -8,7 +8,14 @@ import * as vm from "node:vm"
  */
 const members = {
   versions: "object",
-  ping: "function"
+  ping: "function",
+  openMap: "function",
+  saveMap: "function",
+  readMap: "function",
+  writeMap: "function",
+  recentMaps: "function",
+  setWindowTheme: "function",
+  openExternal: "function"
 } as const satisfies Record<keyof DesktopBridge, "object" | "function">
 
 /** A sandboxed preload can require these and nothing else. */
