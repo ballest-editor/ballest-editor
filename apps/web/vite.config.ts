@@ -13,15 +13,6 @@ const webAssets = path.join(repoRoot, "web-assets")
 /** The raw meshes and textures are gitignored and never served: the compressed ones are. */
 const rawOnly = new Set(["pieces", "textures"])
 
-/** Base URL of the published web-assets/ on Vercel Blob (tools/compress/upload.mjs writes it). */
-const blobBase = (): string | undefined => {
-  const file = path.join(repoRoot, "web-assets.json")
-  if (!fs.existsSync(file)) return undefined
-  const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf8"))
-  if (typeof parsed !== "object" || parsed === null || !("base" in parsed)) return undefined
-  return typeof parsed.base === "string" ? parsed.base : undefined
-}
-
 const types: Record<string, string> = {
   ".json": "application/json",
   ".glb": "model/gltf-binary",
@@ -35,9 +26,8 @@ const types: Record<string, string> = {
  * from disk, in `vite dev` and `vite preview`; unknown paths fall through to Vite (whose own chunks also live
  * under /assets/). `vite build` copies the same files into `dist/` so deployments serve them too.
  *
- * Meshes and textures come from `web-assets/` when it is on disk. When it isn't (Vercel, CI, a fresh clone)
- * the client is built with `VITE_ASSETS_BASE` pointing at the published copy on Vercel Blob instead; see
- * `src/editor/assetUrl.ts`.
+ * Meshes and textures come from `web-assets/`: `pnpm assets` (turbo's `//#assets`, which `dev` and `build`
+ * depend on) compresses them there or, without the game, downloads the published asset pack.
  */
 const repoAssets = (): Plugin => {
   const roots = [rawAssets, webAssets]
@@ -87,16 +77,13 @@ const repoAssets = (): Plugin => {
 }
 
 export default defineConfig(() => {
-  const local = fs.existsSync(path.join(webAssets, "pieces"))
-  const base = local ? undefined : blobBase()
-  if (!local && base === undefined) {
-    console.warn("[ballest] no web-assets/ and no web-assets.json: meshes and textures will 404 (run `pnpm assets`)")
+  if (!fs.existsSync(path.join(webAssets, "pieces"))) {
+    console.warn("[ballest] no web-assets/: meshes and textures will 404 (run `pnpm assets`)")
   }
   return {
     server: { port: 3000 },
     preview: { port: 3000 },
     resolve: { tsconfigPaths: true },
-    define: { "import.meta.env.VITE_ASSETS_BASE": JSON.stringify(base ?? "") },
     plugins: [repoAssets(), tailwindcss(), tanstackRouter({ target: "react", autoCodeSplitting: true }), viteReact()]
   }
 })

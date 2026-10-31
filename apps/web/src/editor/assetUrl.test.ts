@@ -1,9 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import { assetUrl, textureUrl } from "./assetUrl"
 
-// VITE_ASSETS_BASE is unset under vitest, so everything resolves to the app's own /assets/.
 describe("asset urls", () => {
-  it("serves every asset from /assets/ without a blob base", () => {
+  it("serves every asset from the app's own /assets/", () => {
     expect(assetUrl("catalog.json")).toBe("/assets/catalog.json")
     expect(assetUrl("pieces/Maps/SM_500.glb")).toBe("/assets/pieces/Maps/SM_500.glb")
   })

@@ -30,17 +30,16 @@ export const registerSchemePrivileges = () =>
   )
 
 /**
- * The editor loads nothing from the network but its meshes and textures, which are still on Vercel Blob when the
- * build didn't have `web-assets/` (https:). GLTFLoader decodes embedded textures through blob: URLs and the meshopt
- * decoder is WebAssembly. index.html's panel-width script is inline. In development Vite's HMR client talks to its
- * own port over ws:.
+ * The editor loads nothing from the network: meshes and textures are served at `/assets/*` like everything else.
+ * GLTFLoader decodes embedded textures through blob: URLs and the meshopt decoder is WebAssembly. index.html's
+ * panel-width script is inline. In development Vite's HMR client talks to its own port over ws:.
  */
 const contentSecurityPolicy = (isDevelopment: boolean) =>
   [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
-    `connect-src 'self' blob: data: https:${isDevelopment ? " ws:" : ""}`,
-    "img-src 'self' blob: data: https:",
+    `connect-src 'self' blob: data:${isDevelopment ? " ws:" : ""}`,
+    "img-src 'self' blob: data:",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
     "worker-src 'self' blob:",

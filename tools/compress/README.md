@@ -1,10 +1,10 @@
 # tools/compress: the extractor's meshes and textures, ready to serve
 
-`tools/extract/` writes the raw game data to `assets/`. Its small files (catalog, materials, keybinds, strings, registry, thumbs) are committed and the editor serves them itself at `/assets/*`. Its meshes (`assets/pieces/`, 89 MB) and textures (`assets/textures/`, 148 MB) are gitignored. This step compresses those two into `web-assets/` (about 53 MB, also gitignored), and `upload.mjs` publishes that to a public Vercel Blob store, which is where deployments and clones without the raw data get them from.
+`tools/extract/` writes the raw game data to `assets/`. Its small files (catalog, materials, keybinds, strings, registry, thumbs) are committed and the editor serves them itself at `/assets/*`. Its meshes (`assets/pieces/`, 89 MB) and textures (`assets/textures/`, 148 MB) are gitignored. This step compresses those two into `web-assets/` (about 53 MB, also gitignored), and `publish.mjs` publishes that as the **asset pack**: a tarball on a GitHub release, which machines without the game download instead.
 
 ```sh
-pnpm assets           # node tools/compress/compress.mjs assets web-assets
-pnpm assets:upload    # node tools/compress/upload.mjs web-assets web-assets.json  (needs BLOB_READ_WRITE_TOKEN)
+pnpm assets           # compress.mjs assets web-assets, then download.mjs
+pnpm assets:publish   # publish.mjs web-assets web-assets.json  (needs `gh`, logged in)
 ```
 
 | `assets/`         | `web-assets/`                            | size (Oct 2026) |
@@ -14,20 +14,26 @@ pnpm assets:upload    # node tools/compress/upload.mjs web-assets web-assets.jso
 
 ## Where the editor reads from
 
-`apps/web/src/editor/assetUrl.ts` is the one place that decides. Paths are always the extractor's (`pieces/...glb`, `textures/...png`); textures are requested as `.avif`.
+Always `/assets/*` (`apps/web/src/editor/assetUrl.ts`). Paths are the extractor's (`pieces/...glb`, `textures/...png`); textures are requested as `.avif`. `vite dev` and `vite preview` serve `assets/` and `web-assets/` from disk, `vite build` copies both into `dist/`, and the desktop app serves the same paths through its protocol handler. Nothing is fetched from another origin.
 
-- `web-assets/` on disk (you ran `pnpm assets`): `vite dev`, `vite preview` and `vite build` serve it at `/assets/*` next to the committed files.
-- Otherwise (Vercel, CI, a fresh clone): `vite.config.ts` reads `web-assets.json` and builds the client with `VITE_ASSETS_BASE` set to that URL, so meshes and textures are fetched from the blob store.
+`pnpm assets` is the turbo task `//#assets` that `dev` and `build` depend on. Turbo caches it by the scripts, `web-assets.json` and the raw files.
 
-`pnpm assets` is the turbo task `//#assets` that `dev` and `build` depend on. It is a no-op when `assets/pieces/` and `assets/textures/` are absent, and fails if only one of them is. Turbo caches it by their contents and by `compress.mjs`.
+- With `assets/pieces/` and `assets/textures/` on disk (the game was extracted here), `compress.mjs` rebuilds `web-assets/` from them and `download.mjs` does nothing, except point out that the tree isn't the published one yet. `compress.mjs` fails if only one of the two directories is present.
+- Without them (CI, Vercel, a fresh clone), `download.mjs` fetches the pack `web-assets.json` names, checks its size and SHA-256, unpacks it and checks the tree hash against the tag. It skips the download when `web-assets/` already has that hash, and fails the build when the pack can't be fetched or doesn't verify.
 
-## Publishing: Vercel Blob
+Vercel's build command (`apps/web/vercel.json`) runs `turbo run build --filter=@ballest/web` from the repo root so that `//#assets` runs before `vite build`.
 
-The store is `ballest-assets` (public, `iad1`), connected to the `ballest-editor` project. `vercel link` writes its `BLOB_READ_WRITE_TOKEN` to `.env.local`, which `pnpm assets:upload` loads.
+## Publishing: GitHub release
 
-`upload.mjs` hashes the whole tree and uploads under `<hash>/`, so blobs are immutable and served with a one-year cache; a re-extract gets a new prefix and never fights the CDN or browser cache. It skips blobs that already exist, then writes the base URL to `web-assets.json`. **Commit `web-assets.json` after a re-extract**, together with `assets/`. Old prefixes are not deleted automatically: `vercel blob list --prefix <old>/` and `vercel blob delete` once the deployment that used it is gone (deletes are free).
+`publish.mjs` hashes the whole tree (every path and its bytes; 16 hex digits) and tars it with sorted entries, mtime 0 and portable modes, gzip level 9 (about 40 MB: meshopt output still compresses). It creates a prerelease tagged `assets-<hash>`, never marked latest, with `web-assets.tar.gz` attached, and writes `web-assets.json`:
 
-Free (Hobby) plan limits, shared with everything else on the account: 1 GB stored, 10 GB downloaded a month, 10,000 cache-miss reads, 2,000 writes. One tree is 53 MB and about 250 writes; a user's first load of a full map is up to 53 MB, after which the one-year cache keeps repeats off the meter. Vercel emails as limits approach and switches Blob off for 30 days once they are exceeded, so watch the Observability page if usage grows.
+```json
+{ "tag": "assets-<hash>", "sha256": "<tarball sha256>", "size": <bytes> }
+```
+
+It is idempotent: when the release already has the tarball, it records GitHub's digest for it and uploads nothing; when the release exists without one (an interrupted run), it uploads. **Commit `web-assets.json` after a re-extract**, together with `assets/`. Old `assets-*` releases can be deleted once no branch's `web-assets.json` names them (`gh release delete <tag> --cleanup-tag`).
+
+Release downloads are free and need no token, so forks and contributors without the game build with the same meshes. The pack is only fetched at build time; browsers load the files from the deployment itself (GitHub's download URLs send no CORS headers, so they couldn't be fetched from the page anyway).
 
 ## Meshes: lossless
 

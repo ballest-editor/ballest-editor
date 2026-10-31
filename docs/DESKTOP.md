@@ -89,7 +89,7 @@ Later: an `Editor::OpenLocal` host API for "open in the in-game editor", and a f
 
 ### Assets
 
-The extractor's output can't be rebuilt on CI (it needs the game). The compressed tree (`web-assets/`, meshopt + AVIF, 53 MB) is published as an **asset pack**: a tarball attached to a GitHub release tagged `assets-<tree-hash>`, with `web-assets.json` recording the tag and the tarball's SHA-256. `tools/compress/download.mjs` fetches and verifies it when `web-assets/` is missing; `//#assets` in turbo tries the local extractor output first, then the download. Desktop builds copy `assets/` (small committed files) and `web-assets/` into `extraResources`. The web build inlines the same files as static output, as today.
+The extractor's output can't be rebuilt on CI (it needs the game). The compressed tree (`web-assets/`, meshopt + AVIF, 53 MB) is published as an **asset pack**: a tarball attached to a GitHub release tagged `assets-<tree-hash>`, with `web-assets.json` recording the tag and the tarball's SHA-256. `tools/compress/download.mjs` fetches and verifies it when `web-assets/` is missing; `//#assets` in turbo tries the local extractor output first, then the download. Desktop builds copy `assets/` (small committed files) and `web-assets/` into `extraResources`. The web build inlines the same files as static output, as today. Vercel builds through `turbo run build --filter=@ballest/web` (`apps/web/vercel.json`) so the download runs first.
 
 Vercel Blob is retired: GitHub release downloads are free, and contributors without the game can build. `assetUrl.ts` loses its Blob branch; both platforms address assets at `/assets/*` (the protocol handler maps that on desktop).
 

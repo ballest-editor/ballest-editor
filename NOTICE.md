@@ -6,7 +6,7 @@ ballest-editor is an independent map editor for [Ballest of Them All](https://st
 
 - `assets/thumbs/` holds the game's content-browser icons. They are redistributed with the developers' permission.
 - `assets/*.json` (the piece catalog, item registry, materials, keybinds and UI strings) is data `tools/extract/` reads from the game's files so that maps made in the editor load in the game.
-- The editor downloads piece meshes and textures extracted from the game when it runs. They are not in this repository.
+- Piece meshes and textures extracted from the game are not in this repository. They are published as a release asset (`assets-<hash>` tags), which builds download and bundle into the editor.
 
 ## Sample maps
 
