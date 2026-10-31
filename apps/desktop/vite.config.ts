@@ -1,3 +1,4 @@
+import { Resvg } from "@resvg/resvg-js"
 import { spawn } from "node:child_process"
 import * as fs from "node:fs"
 import * as path from "node:path"
@@ -38,6 +39,19 @@ const checkPreload = (): Plugin => ({
   }
 })
 
+/** The window's icon (`DesktopEnvironment.iconPath`), rendered from the same SVG as the installers' icons. */
+const windowIcon = (): Plugin => ({
+  name: "ballest:window-icon",
+  applyToEnvironment: (environment) => environment.name === "main",
+  generateBundle() {
+    const file = path.join(import.meta.dirname, "resources/icon.svg")
+    this.addWatchFile(file)
+    const svg = fs.readFileSync(file, "utf8")
+    const png = new Resvg(svg, { fitTo: { mode: "width", value: 256 } }).render().asPng()
+    this.emitFile({ type: "asset", fileName: "icon.png", source: png })
+  }
+})
+
 const entries = { main: "src/main.ts", preload: "src/preload.ts" }
 
 /**
@@ -69,7 +83,7 @@ const devElectron = (): Plugin => {
 }
 
 export default defineConfig({
-  plugins: [checkPreload(), devElectron()],
+  plugins: [checkPreload(), windowIcon(), devElectron()],
   environments: { main: cjsEnvironment(entries.main), preload: cjsEnvironment(entries.preload) },
   builder: {
     // Both environments write into one directory, so it is emptied once here instead of by each build.

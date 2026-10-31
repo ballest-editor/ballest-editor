@@ -28,7 +28,7 @@ import {
 } from "./methods/project"
 import { openExternal } from "./methods/shell"
 import { downloadUpdate, getUpdateState, installUpdate } from "./methods/updates"
-import { setWindowTheme } from "./methods/window"
+import { confirmUnsaved, setWindowTheme } from "./methods/window"
 
 /** Registers every IPC method for the lifetime of the current scope. Runs before the first window loads. */
 export const installDesktopIpcHandlers = Effect.fn("installDesktopIpcHandlers")(function*() {
@@ -48,6 +48,7 @@ export const installDesktopIpcHandlers = Effect.fn("installDesktopIpcHandlers")(
   yield* ipc.handle(exportMap)
   yield* ipc.handle(openExternal)
   yield* ipc.handle(setWindowTheme)
+  yield* ipc.handle(confirmUnsaved)
   yield* ipc.handle(gamePaths)
   yield* ipc.handle(chooseGamePath)
   yield* ipc.handle(resetGamePath)

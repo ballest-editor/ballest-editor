@@ -8,6 +8,7 @@ import {
   type ElectronWindowCreateError,
   type ElectronWindowLoadError
 } from "../electron/ElectronWindow"
+import { UNLOAD_REQUEST_CHANNEL } from "../ipc/channels"
 import { DesktopSettings, type WindowState } from "../settings/DesktopSettings"
 import { titleBarOverlay, windowBackground, windowShortcutOf } from "./chrome"
 
@@ -61,6 +62,8 @@ export class DesktopWindow extends Context.Service<DesktopWindow, {
           }),
           ...MIN_SIZE,
           title: "Ballest Editor",
+          // Windows takes the taskbar icon from the exe; Linux (and every unpackaged run) from this.
+          icon: environment.iconPath,
           show: false,
           // No native title bar: the page's top bar is the title bar, and Electron draws the window controls over
           // its end (on the side the desktop puts them). The page starts dark and reports its theme (setWindowTheme).
@@ -77,8 +80,18 @@ export class DesktopWindow extends Context.Service<DesktopWindow, {
 
         // Captured on `close`, while the window still has bounds; written once it is gone.
         let lastState: WindowState | undefined
+        // Whether the unload the page is holding is a close (the close button, Alt+F4, Ctrl+Q) or a reload.
+        let closing = false
         window.on("close", () => {
           lastState = windowState(window)
+          closing = true
+        })
+        // The page holds the unload (its `beforeunload` cancels it) while the open map has unsaved edits. Electron
+        // then keeps the window open, and the page asks Save / Don't save / Cancel before closing or reloading itself.
+        window.webContents.on("will-prevent-unload", () => {
+          const kind = closing ? "close" : "reload"
+          closing = false
+          window.webContents.send(UNLOAD_REQUEST_CHANNEL, kind)
         })
         yield* Effect.addFinalizer(() =>
           Effect.suspend(() => {

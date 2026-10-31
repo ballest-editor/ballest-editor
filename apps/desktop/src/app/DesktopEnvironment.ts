@@ -15,6 +15,8 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
   /** `Documents/Ballest Editor/Maps`: the project used until the user picks another (docs/PROJECTS.md). */
   readonly defaultProjectDir: string
   readonly preloadPath: string
+  /** The window's icon: `icon.png`, rendered from `resources/icon.svg` by the build next to `main.cjs`. */
+  readonly iconPath: string
   /** The renderer build (`apps/web/dist`, or its copy inside `app.asar`). */
   readonly rendererDir: string
   /** The game-derived assets, served at `/assets/*` next to the renderer's own chunks; none when unpackaged. */
@@ -43,6 +45,7 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
           settingsPath: path.join(metadata.userData, "desktop-settings.json"),
           defaultProjectDir: path.join(metadata.documents, "Ballest Editor", "Maps"),
           preloadPath: path.join(dirname, "preload.cjs"),
+          iconPath: path.join(dirname, "icon.png"),
           // Unpackaged, `vite build` of apps/web has already copied the assets into dist/assets.
           rendererDir: metadata.isPackaged
             ? path.join(metadata.appPath, "web")

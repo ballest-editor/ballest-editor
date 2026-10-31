@@ -3,7 +3,7 @@
  * the same action, so the two can't drift apart.
  */
 import type { KeybindAction } from "../domain/Keybinds"
-import { deleteSelection, duplicateSelection, importMap, saveMap } from "./actions"
+import { deleteSelection, duplicateSelection, importMap, saveMap, startNewMap } from "./actions"
 import { useEditor } from "./store"
 
 /**
@@ -27,7 +27,7 @@ export const actionCommands = {
   toggleGizmoSpace: () => useEditor.getState().toggleGizmoSpace(),
   speedFaster: () => useEditor.getState().changeSpeed(1),
   speedSlower: () => useEditor.getState().changeSpeed(-1),
-  newMap: () => useEditor.getState().openDialog("new"),
+  newMap: () => void startNewMap(),
   /** Import… on desktop, Open… in a browser. */
   openMap: () => void importMap(),
   saveMap: () => void saveMap(),

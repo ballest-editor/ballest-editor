@@ -30,6 +30,7 @@ export function NameMapDialog(
   const projectName = useEditor((s) => s.project?.current.name ?? "the project")
   const projectMaps = useEditor((s) => s.projectMaps)
   const fileName = useEditor((s) => s.file?.name ?? null)
+  const takeAfterSave = useEditor((s) => s.takeAfterSave)
   const risky = useMemo(
     () =>
       riskyClassesIn(
@@ -72,6 +73,12 @@ export function NameMapDialog(
     }
   }
 
+  // Cancelled: what the unsaved-changes prompt's Save was going to do next (close, a new map...) doesn't happen.
+  const cancel = () => {
+    takeAfterSave()
+    onClose()
+  }
+
   const copy = {
     saveAs: projects
       ? { title: "Save map", note: `Saves it in ${projectName}.`, submit: "Save" }
@@ -96,7 +103,7 @@ export function NameMapDialog(
   return (
     <MapNameDialog
       open={open}
-      onClose={onClose}
+      onClose={cancel}
       id={mode}
       title={copy.title}
       fileNameLead="Exports as"

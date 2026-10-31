@@ -13,9 +13,12 @@ import type {
   ProjectMapFile,
   ProjectMaps,
   ProjectState,
+  UnloadKind,
+  UnsavedChoice,
   UpdateState
 } from "@ballest/contracts"
 import { Context, Effect, Layer, Option, Queue, Schema, Stream } from "effect"
+import { discardQuestionOf, type UnsavedAction, unsavedPromptOf } from "../domain/unsaved"
 
 export type {
   FoundCreator,
@@ -26,7 +29,9 @@ export type {
   PluginStatus,
   ProjectMap,
   ProjectMapFile,
-  ProjectState
+  ProjectState,
+  UnloadKind,
+  UnsavedChoice
 } from "@ballest/contracts"
 
 /** What this platform can do; the menus hide what it can't. */
@@ -101,6 +106,18 @@ export class Platform extends Context.Service<Platform, {
     fileName: string,
     options: { readonly replacePublished: boolean }
   ) => Effect.Effect<ExportMapResult, PlatformError>
+  /**
+   * Asks whether to save the open map's edits before `action`: the desktop's native Save / Don't save / Cancel box. A
+   * browser's `confirm` has no Save: OK is Don't save.
+   */
+  readonly confirmUnsaved: (action: UnsavedAction, map: string) => Effect.Effect<UnsavedChoice, PlatformError>
+  /**
+   * Each close or reload the page held because of unsaved edits (its `beforeunload`), for the page to ask about (desktop).
+   * A browser asks with its own dialog, so its stream ends at once.
+   */
+  readonly unloadRequests: Stream.Stream<UnloadKind, PlatformError>
+  /** Closes the window or reloads the page; the page must have stopped holding the unload first. */
+  readonly leave: (kind: UnloadKind) => Effect.Effect<void>
   readonly openExternal: (url: string) => Effect.Effect<void, PlatformError>
   /** Tells the desktop window the page's resolved theme (its window controls follow it); nothing in a browser. */
   readonly setWindowTheme: (dark: boolean) => Effect.Effect<void, PlatformError>
@@ -187,6 +204,16 @@ const updateStates = (bridge: DesktopBridge) =>
     })
   )
 
+const unloadRequests = (bridge: DesktopBridge) =>
+  Stream.callback<UnloadKind, PlatformError>((queue) =>
+    Effect.acquireRelease(
+      Effect.sync(() => bridge.onUnloadRequest((kind) => Queue.offerUnsafe(queue, kind))),
+      (unsubscribe) => Effect.sync(unsubscribe)
+    )
+  )
+
+const leave = (kind: UnloadKind) => Effect.sync(() => kind === "close" ? window.close() : window.location.reload())
+
 const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
   Platform.of({
     capabilities: { ...browserCapabilities, projects: true, exportToGame: true, launchGame: true, updates: true },
@@ -206,6 +233,9 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
     importMap: (payload) => bridgeCall(() => bridge.importMap(payload)),
     exportMap: (fileName, { replacePublished }) => bridgeCall(() => bridge.exportMap({ fileName, replacePublished })),
     setWindowTheme: (dark) => bridgeCall(() => bridge.setWindowTheme(dark)),
+    confirmUnsaved: (action, map) => bridgeCall(() => bridge.confirmUnsaved(unsavedPromptOf(action, map))),
+    unloadRequests: unloadRequests(bridge),
+    leave,
     openExternal: (url) => bridgeCheck(() => bridge.openExternal(url), `Couldn't open ${url}.`),
     gamePaths: bridgeCall(() => bridge.gamePaths()),
     chooseGamePath: (which) => bridgeCall(() => bridge.chooseGamePath(which)).pipe(Effect.map(Option.fromNullOr)),
@@ -283,6 +313,10 @@ const makeBrowser = (): Platform["Service"] =>
     importMap: () => noProject,
     exportMap: () => desktopOnly,
     setWindowTheme: () => Effect.void,
+    confirmUnsaved: (action, map) =>
+      Effect.sync(() => window.confirm(discardQuestionOf(action, map)) ? "discard" : "cancel"),
+    unloadRequests: Stream.empty,
+    leave,
     openExternal: (url) => Effect.sync(() => void window.open(url, "_blank", "noopener,noreferrer")),
     gamePaths: desktopOnly,
     chooseGamePath: () => desktopOnly,

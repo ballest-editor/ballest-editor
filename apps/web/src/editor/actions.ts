@@ -17,6 +17,7 @@ import { type LevelData, type MapFile, PLAYER_START_CLASS } from "../domain/MapF
 import { type MapPrefs, mapPrefsKeyOf } from "../domain/MapPrefs"
 import { localToWorld, type PivotChoice, pivotFor } from "../domain/pivot"
 import type { Settings } from "../domain/Settings"
+import type { UnsavedAction } from "../domain/unsaved"
 import { CatalogLoader } from "../services/CatalogLoader"
 import { KeybindStore } from "../services/KeybindStore"
 import { MapCodec } from "../services/MapCodec"
@@ -29,7 +30,8 @@ import {
   Platform,
   type PlatformError,
   type ProjectMap,
-  type ProjectState
+  type ProjectState,
+  type UnloadKind
 } from "../services/Platform"
 import { type AppServices, runtime } from "../services/runtime"
 import { SettingsStore } from "../services/SettingsStore"
@@ -43,16 +45,26 @@ import {
   useEditor
 } from "./store"
 
-const run = async <A, E>(effect: Effect.Effect<A, E, AppServices>): Promise<A | undefined> => {
-  const exit = await runtime.runPromiseExit(effect)
-  if (Exit.isSuccess(exit)) return exit.value
-  const error = Cause.squash(exit.cause)
+const notifyFailure = <E>(cause: Cause.Cause<E>) => {
+  const error = Cause.squash(cause)
   const message = typeof error === "object" && error !== null && "message" in error
     ? String(error.message)
     : String(error)
   useEditor.getState().notify("error", message)
+}
+
+const run = async <A, E>(effect: Effect.Effect<A, E, AppServices>): Promise<A | undefined> => {
+  const exit = await runtime.runPromiseExit(effect)
+  if (Exit.isSuccess(exit)) return exit.value
+  notifyFailure(exit.cause)
   return undefined
 }
+
+/**
+ * Set once the page is about to close or reload after all (the prompt was answered, or the update pill restarts):
+ * from then on it doesn't hold the unload.
+ */
+let leaving = false
 
 // --- selection edits: each is one undo step, however many items it touches ---------------
 
@@ -236,15 +248,21 @@ export const followUpdates = (): () => void => {
 }
 
 const updateStep = (step: "downloadUpdate" | "installUpdate") =>
-  run(Effect.gen(function*() {
+  Effect.gen(function*() {
     yield* (yield* Platform)[step]
-  }))
+  })
 
 /** Starts downloading the release on offer; the pill follows its progress. */
-export const downloadUpdate = () => updateStep("downloadUpdate")
+export const downloadUpdate = () => run(updateStep("downloadUpdate"))
 
-/** Quits, installs the downloaded release and starts it; unsaved edits are lost. */
-export const installUpdate = () => updateStep("installUpdate")
+/** Quits, installs the downloaded release and starts it; unsaved edits are lost (the update pill says so first). */
+export const installUpdate = () =>
+  run(
+    Effect.sync(() => void (leaving = true)).pipe(
+      Effect.andThen(updateStep("installUpdate")),
+      Effect.tapError(() => Effect.sync(() => void (leaving = false)))
+    )
+  )
 
 // --- maps, the project and exports (docs/PROJECTS.md) ---------------------------------------
 
@@ -317,7 +335,7 @@ export const openProjectMapFile = Effect.fn("openProjectMapFile")(function*(file
 })
 
 export const openProjectMap = (fileName: string) =>
-  run(openProjectMapFile(fileName).pipe(Effect.ensuring(Effect.ignore(refreshProject))))
+  run(unlessCancelled("openMap", openProjectMapFile(fileName)).pipe(Effect.ensuring(Effect.ignore(refreshProject))))
 
 /** Copies a picked file into the project (or reports the clash) and opens the copy. */
 const importInto = Effect.fn("importInto")(function*(pending: ImportClash, replace: boolean) {
@@ -363,7 +381,7 @@ export const importMapFile = Effect.gen(function*() {
   yield* importInto({ source: path.value, ...pending }, false)
 })
 
-export const importMap = () => run(importMapFile)
+export const importMap = () => run(unlessCancelled("openMap", importMapFile))
 
 /** The clash dialog's Replace: the project's map of that name goes to backups. */
 export const replaceOnImportEffect = Effect.gen(function*() {
@@ -441,33 +459,96 @@ const downloadOpenMap = Effect.gen(function*() {
 })
 
 /**
- * Save: on desktop, writes the project file and asks nothing (a map that has no file yet is named first, in the
- * `saveAs` dialog). In a browser, downloads it, asking for the name first unless it is the file's.
+ * Save, then `then`: on desktop, writes the project file and asks nothing (a map that has no file yet is named first,
+ * in the `saveAs` dialog, and `then` waits for it). In a browser, downloads it, asking for the name first unless it
+ * is the file's.
  */
-export const saveMapFile = Effect.gen(function*() {
-  const platform = yield* Platform
-  const { doc, file, openDialog } = useEditor.getState()
-  if (platform.capabilities.projects) {
-    if (file === null) openDialog("saveAs")
-    else yield* writeOpenMap(file, { exportAfter: true })
-    return
-  }
-  const { levelDisplayName, creatorName } = doc.map.worldSettings.levelData
-  if (file?.name === mapFileNameOf(levelDisplayName.trim(), creatorName.trim())) yield* downloadOpenMap
-  else openDialog("saveAs")
-})
+const saveOpenMapThen = <E, R>(then: Effect.Effect<void, E, R>) =>
+  Effect.gen(function*() {
+    const platform = yield* Platform
+    const { doc, file, nameThen } = useEditor.getState()
+    // It may run later, from the dialog: it takes its services along.
+    const nameFirst = Effect.gen(function*() {
+      nameThen(Effect.provideContext(then, yield* Effect.context<R>()))
+    })
+    if (platform.capabilities.projects) {
+      if (file === null) return yield* nameFirst
+      yield* writeOpenMap(file, { exportAfter: true })
+      return yield* then
+    }
+    const { levelDisplayName, creatorName } = doc.map.worldSettings.levelData
+    if (file?.name !== mapFileNameOf(levelDisplayName.trim(), creatorName.trim())) return yield* nameFirst
+    yield* downloadOpenMap
+    yield* then
+  })
+
+export const saveMapFile = saveOpenMapThen(Effect.void)
 
 export const saveMap = () => run(saveMapFile)
 
 /** The `saveAs` dialog's last step, once the name is confirmed: into the project (desktop) or a download (browser). */
 export const saveMapAsEffect = Effect.gen(function*() {
   const platform = yield* Platform
-  if (!platform.capabilities.projects) return yield* downloadOpenMap
-  const { file } = useEditor.getState()
-  yield* file === null ? createFromOpenMap : writeOpenMap(file, { exportAfter: true }).pipe(Effect.asVoid)
+  const { file, takeAfterSave } = useEditor.getState()
+  const then = takeAfterSave()
+  if (!platform.capabilities.projects) yield* downloadOpenMap
+  else yield* file === null ? createFromOpenMap : writeOpenMap(file, { exportAfter: true }).pipe(Effect.asVoid)
+  if (then !== null) yield* then
 })
 
 export const saveMapAs = () => run(saveMapAsEffect)
+
+// --- unsaved changes: one prompt before anything that would lose them ------------------------
+
+/** The open map's name, as the prompt shows it. */
+const openMapName = () => useEditor.getState().doc.map.worldSettings.levelData.levelDisplayName.trim() || "Untitled"
+
+/**
+ * Runs `next` unless the open map has unsaved edits and the user cancels. With unsaved edits the platform asks first
+ * (Save, Don't save, Cancel): Save saves the map, naming it first if it has to, then goes on; Don't save goes on.
+ */
+export const unlessCancelled = <E, R>(action: UnsavedAction, next: Effect.Effect<void, E, R>) =>
+  Effect.gen(function*() {
+    if (!useEditor.getState().dirty) return yield* next
+    const choice = yield* (yield* Platform).confirmUnsaved(action, openMapName())
+    if (choice === "save") yield* saveOpenMapThen(next)
+    else if (choice === "discard") yield* next
+  })
+
+/** Whether the page holds a close or a reload (its `beforeunload` cancels it) so the prompt can ask first. */
+export const holdsUnload = () => useEditor.getState().dirty && !leaving
+
+/** The desktop window held a close or a reload: asks, then closes or reloads unless the user cancelled. */
+export const answerUnloadRequest = (kind: UnloadKind) =>
+  unlessCancelled(
+    kind,
+    Effect.gen(function*() {
+      leaving = true
+      yield* (yield* Platform).leave(kind)
+    })
+  )
+
+/** Answers the window's held closes and reloads (`answerUnloadRequest`) until the returned function is called. */
+export const followUnloadRequests = (): () => void => {
+  const fiber = runtime.runFork(
+    Effect.gen(function*() {
+      yield* (yield* Platform).unloadRequests.pipe(
+        Stream.runForEach((kind) =>
+          answerUnloadRequest(kind).pipe(Effect.catchCause((cause) => Effect.sync(() => notifyFailure(cause))))
+        )
+      )
+    }).pipe(Effect.catch((error) => Effect.logWarning("Stopped following the window's close requests", error)))
+  )
+  return () => void runtime.runFork(Fiber.interrupt(fiber))
+}
+
+/** New map: asks about unsaved edits first, then the New map dialog (name and creator). */
+export const startNewMapEffect = unlessCancelled(
+  "newMap",
+  Effect.sync(() => useEditor.getState().openDialog("new"))
+)
+
+export const startNewMap = () => run(startNewMapEffect)
 
 /** Rename: new name and creator, then the file moves to match (the old one goes to backups). */
 export const renameOpenMap = (displayName: string, creatorName: string) => {
@@ -542,11 +623,15 @@ export const setExportOnSave = (exportOnSave: boolean) => {
   return run(saveMapPrefs)
 }
 
-/** Uses another project from now on. The open map stays open; it belonged to the old project, so it is unsaved here. */
+/**
+ * Uses another project from now on, asking about unsaved edits first (Save writes them into the project being left).
+ * The open map stays open; it belonged to the old project, so it is unsaved here.
+ */
 const changeProject = (
   change: (platform: Platform["Service"]) => Effect.Effect<Option.Option<ProjectState>, PlatformError>
 ) =>
-  run(
+  run(unlessCancelled(
+    "switchProject",
     Effect.gen(function*() {
       const before = useEditor.getState().project?.current.path
       const next = yield* change(yield* Platform)
@@ -555,12 +640,16 @@ const changeProject = (
       yield* refreshProject
       useEditor.getState().notify("info", `Using the project ${next.value.current.name}`, revealIn("project"))
     })
-  )
+  ))
 
 /** A folder dialog; the chosen folder becomes the project (the game's maps folder is refused, with the reason). */
 export const chooseProject = () => changeProject((platform) => platform.chooseProject)
 
-export const switchProject = (path: string) => changeProject((platform) => Effect.asSome(platform.switchProject(path)))
+/** Goes back to a recent project; the one in use already is left alone. */
+export const switchProject = (path: string) =>
+  path === useEditor.getState().project?.current.path
+    ? Promise.resolve(undefined)
+    : changeProject((platform) => Effect.asSome(platform.switchProject(path)))
 
 export const revealProject = () =>
   run(

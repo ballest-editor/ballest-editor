@@ -19,6 +19,8 @@ const valid = `
     importMap: (payload) => electron.ipcRenderer.invoke("ballest:project:importMap", payload),
     exportMap: (payload) => electron.ipcRenderer.invoke("ballest:project:exportMap", payload),
     setWindowTheme: (dark) => electron.ipcRenderer.invoke("ballest:window:setTheme", { dark }),
+    confirmUnsaved: (prompt) => electron.ipcRenderer.invoke("ballest:window:confirmUnsaved", prompt),
+    onUnloadRequest: () => () => {},
     openExternal: (url) => electron.ipcRenderer.invoke("ballest:shell:openExternal", { url }),
     gamePaths: () => electron.ipcRenderer.invoke("ballest:game:paths"),
     chooseGamePath: (which) => electron.ipcRenderer.invoke("ballest:game:choosePath", { which }),

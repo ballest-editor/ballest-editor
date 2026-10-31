@@ -164,6 +164,24 @@ export type ExportMapResult = typeof ExportMapResult.Type
 export const WindowThemePayload = Schema.Struct({ dark: Schema.Boolean })
 export type WindowThemePayload = typeof WindowThemePayload.Type
 
+/** `confirmUnsaved`: the question and the line under it, worded by the page; main shows them with its three buttons. */
+export const UnsavedPrompt = Schema.Struct({
+  message: Schema.String.check(Schema.isMaxLength(1024)),
+  detail: Schema.String.check(Schema.isMaxLength(1024))
+})
+export type UnsavedPrompt = typeof UnsavedPrompt.Type
+
+/** The unsaved-changes prompt's answer: Save, Don't save, or Cancel (also Escape and closing the box). */
+export const UnsavedChoice = Schema.Literals(["save", "discard", "cancel"])
+export type UnsavedChoice = typeof UnsavedChoice.Type
+
+/**
+ * Main → renderer: the page held a window close or a reload (its `beforeunload` cancelled it) because the open map
+ * has unsaved edits. The page asks, then closes or reloads itself.
+ */
+export const UnloadKind = Schema.Literals(["close", "reload"])
+export type UnloadKind = typeof UnloadKind.Type
+
 export const OpenExternalPayload = Schema.Struct({ url: Schema.String.check(Schema.isMaxLength(8192)) })
 export type OpenExternalPayload = typeof OpenExternalPayload.Type
 
@@ -318,6 +336,10 @@ export interface DesktopBridge {
   readonly exportMap: (payload: ExportMapPayload) => Promise<ExportMapResult>
   /** The page's resolved theme: the window controls drawn over its top bar, and the window background, follow it. */
   readonly setWindowTheme: (dark: boolean) => Promise<void>
+  /** The native Save / Don't save / Cancel box, modal to the window. */
+  readonly confirmUnsaved: (prompt: UnsavedPrompt) => Promise<UnsavedChoice>
+  /** Calls `listener` each time the page held a close or a reload with unsaved edits, until the returned function is called. */
+  readonly onUnloadRequest: (listener: (kind: UnloadKind) => void) => () => void
   /** Opens an http(s) URL in the default browser; false when it is refused or fails to open. */
   readonly openExternal: (url: string) => Promise<boolean>
   /** Where the game, its maps folder and the plugins folder are, and how each was found. */

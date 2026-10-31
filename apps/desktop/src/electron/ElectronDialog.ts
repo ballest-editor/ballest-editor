@@ -2,7 +2,7 @@ import { Context, Effect, Layer, Option, Schema } from "effect"
 import * as Electron from "electron"
 
 export class ElectronDialogError extends Schema.TaggedError<ElectronDialogError>()("ElectronDialogError", {
-  kind: Schema.Literals(["open", "save", "folder"]),
+  kind: Schema.Literals(["open", "save", "folder", "message"]),
   cause: Schema.Defect()
 }) {
   override get message(): string {
@@ -17,6 +17,18 @@ export interface FileDialogOptions {
   /** A folder, or a file in the folder to start in (the save dialog suggests its name). */
   readonly defaultPath: Option.Option<string>
   readonly filters: ReadonlyArray<Electron.FileFilter>
+}
+
+export interface MessageBoxOptions {
+  /** The `webContents` that asked: the box is modal to its window. */
+  readonly owner: number
+  readonly type: "none" | "info" | "error" | "question" | "warning"
+  readonly message: string
+  readonly detail: string
+  /** Left to right as Windows draws them; the first is the default (Enter). */
+  readonly buttons: ReadonlyArray<string>
+  /** The button Escape (or closing the box) stands for. */
+  readonly cancelId: number
 }
 
 const ownerWindow = (id: number): Electron.BrowserWindow | undefined => {
@@ -46,6 +58,8 @@ export class ElectronDialog extends Context.Service<ElectronDialog, {
   readonly showOpenFile: (options: FileDialogOptions) => Effect.Effect<Option.Option<string>, ElectronDialogError>
   /** The native open dialog for one folder (`filters` are ignored); none when cancelled. */
   readonly showOpenFolder: (options: FileDialogOptions) => Effect.Effect<Option.Option<string>, ElectronDialogError>
+  /** A native message box with `buttons`; the index of the one picked. */
+  readonly showMessageBox: (options: MessageBoxOptions) => Effect.Effect<number, ElectronDialogError>
   /** The native save dialog (it asks before replacing a file); none when cancelled. */
   readonly showSaveFile: (options: FileDialogOptions) => Effect.Effect<Option.Option<string>, ElectronDialogError>
 }>()("ballest/desktop/electron/ElectronDialog") {
@@ -61,6 +75,18 @@ export class ElectronDialog extends Context.Service<ElectronDialog, {
           { ...dialogOptions({ ...options, filters: [] }), properties: ["openDirectory"] },
           options.owner
         ),
+      showMessageBox: ({ owner: ownerId, buttons, ...options }) =>
+        Effect.tryPromise({
+          try: () => {
+            const owner = ownerWindow(ownerId)
+            // `noLink`: Windows would otherwise turn the buttons into command links.
+            const opts: Electron.MessageBoxOptions = { ...options, buttons: [...buttons], defaultId: 0, noLink: true }
+            return owner === undefined
+              ? Electron.dialog.showMessageBox(opts)
+              : Electron.dialog.showMessageBox(owner, opts)
+          },
+          catch: (cause) => new ElectronDialogError({ kind: "message", cause })
+        }).pipe(Effect.map(({ response }) => response)),
       showSaveFile: (options) =>
         Effect.tryPromise({
           try: () => {

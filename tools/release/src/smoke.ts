@@ -21,6 +21,7 @@ export const smoke = Effect.fn("smoke")(function*() {
   const expectStaged = [
     `${stageLayout.main}/main.cjs`,
     `${stageLayout.main}/preload.cjs`,
+    `${stageLayout.main}/icon.png`,
     `${stageLayout.renderer}/index.html`,
     `${stageLayout.assets}/catalog.json`,
     `${stageLayout.plugins}/ballest-editor-link/info.toml`,
