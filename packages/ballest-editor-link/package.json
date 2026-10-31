@@ -1,0 +1,6 @@
+{
+  "name": "@ballest/editor-link",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The ballest-editor-link plugin for the Ballest plugin manager (AngelScript): races the map when the desktop app's Play writes play.json"
+}
