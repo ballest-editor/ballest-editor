@@ -1,7 +1,8 @@
 # Projects, maps and exports
 
 Status: long-term design, written 2026-10-31. Phase 1 and 2 are milestone 0.2 work; the rest is
-sequenced below. [DESKTOP.md](DESKTOP.md) describes the shell this runs in; [FORMAT.md](FORMAT.md) the
+sequenced below. Phase 1's project folder, save flow, Import and Export to game are built (#132; backups on
+overwrite, #137, and the close prompt, #70, are still open). [DESKTOP.md](DESKTOP.md) describes the shell this runs in; [FORMAT.md](FORMAT.md) the
 game's file format, which none of this changes.
 
 ## The three nouns
@@ -29,6 +30,29 @@ The link between a map and its export, which is machine-specific and never share
     backups/                   previous versions of overwritten files (#137)
   .gitignore                   .ballest/
 ```
+
+### The files
+
+What phase 1 writes (`apps/desktop/src/project/`). Main reads and writes only these, the game's maps folder, and a
+file the user picked to import; the page names maps by file name, never by path.
+
+- **`ballest-project.json`**, written once when the project is first made, indented:
+  `{ "formatVersion": 1, "name": "<folder name>", "exportTarget": "game" }`. `defaultCreator` is in the schema but
+  not written yet (new maps take the creator from Settings › General, or Steam, #133). The project is made, with `maps/`, `.ballest/`
+  and a `.gitignore` of `.ballest/`, by the first New map or Import into it.
+- **`.ballest/link.json`**: `{ "formatVersion": 1, "maps": { "<file name>": <link> } }`, where a link is
+  `{ "origin", "export", "lastSeenHash" }`. `origin` and `export` are each null or `{ "path", "hash", "at" }`: the
+  file's absolute path, the SHA-256 of its bytes (lowercase hex) and an ISO 8601 UTC time. Import sets `origin`;
+  Export to game sets `export` and `lastSeenHash` to the bytes it wrote; a map imported from the game's maps folder
+  under its own name gets `export` (and `lastSeenHash`) equal to its `origin`, so it is linked from the start. Rename
+  moves the entry to the new file name. The `MapLinks` service owns the file: one update at a time, atomic writes,
+  and a file that doesn't decode reads as empty. Sync detection (#141) compares a game file's hash with
+  `export.hash` and `lastSeenHash`.
+- **`.ballest/backups/<time> <file name>`**: the old file after a Rename, or the project's copy when an Import
+  replaces it. #137 adds backups on overwrite here and Recover.
+
+The project in use and the recent ones (at most 8) are in `desktop-settings.json` under `project.recent`, the one in
+use first; an empty list means the default project.
 
 A project is never the game's maps folder. The game loads only from `UserSavedMaps`, so a map must be
 exported to be played, and a project inside that folder would make the game edit project files

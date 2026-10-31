@@ -20,11 +20,17 @@ export const GamePathOverrides = Schema.Struct({
 })
 export type GamePathOverrides = typeof GamePathOverrides.Type
 
+/** The projects used on this machine (project/Projects.ts). */
+export const ProjectSettings = Schema.Struct({
+  /** Project folders, the one in use first (at most 8). Empty: the default project. */
+  recent: Schema.optional(Schema.Array(Schema.String))
+})
+export type ProjectSettings = typeof ProjectSettings.Type
+
 /** `desktop-settings.json`: what the main process remembers between runs. The renderer's settings live in its own storage. */
 export const DesktopSettingsFile = Schema.Struct({
   window: Schema.optional(WindowState),
-  /** Map files opened or saved, most recent first (files/MapFiles.ts keeps at most 8). */
-  recentMaps: Schema.optional(Schema.Array(Schema.String)),
+  project: Schema.optional(ProjectSettings),
   game: Schema.optional(GamePathOverrides)
 })
 export type DesktopSettingsFile = typeof DesktopSettingsFile.Type
@@ -45,7 +51,7 @@ export class DesktopSettings extends Context.Service<DesktopSettings, {
   readonly get: Effect.Effect<DesktopSettingsFile>
   /**
    * Reads the file, applies `f` and writes the result back. Updates run one at a time, so two of them (the window's
-   * bounds, a recent file) never lose each other's change. The write is atomic: a crash mid-write leaves the previous
+   * bounds, a recent project) never lose each other's change. The write is atomic: a crash mid-write leaves the previous
    * settings, never half a file.
    */
   readonly update: (

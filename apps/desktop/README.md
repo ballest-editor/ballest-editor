@@ -104,12 +104,12 @@ flowchart TB
 
 ## Adding a method the page can call
 
-One IPC method is one `makeIpcMethod`. Adding `saveToGame` touches five files:
+One IPC method is one `makeIpcMethod`. Adding `exportMap` touches five files:
 
 1. `packages/contracts/src/DesktopBridge.ts`. Payload and result schemas, plus a member on the interface.
 2. `src/ipc/channels.ts`. The channel name.
 3. `src/ipc/methods/<area>.ts`. `makeIpcMethod({ channel, payload, result, handler })`. The handler is where the work happens, with whatever services it needs.
-4. `src/ipc/DesktopIpcHandlers.ts`. One `yield* ipc.handle(saveToGame)` line.
+4. `src/ipc/DesktopIpcHandlers.ts`. One `yield* ipc.handle(exportMap)` line.
 5. `src/preload.ts`. One line forwarding to `ipcRenderer.invoke`.
 
 The compiler catches a missing bridge member in the preload and in the build check. It doesn't catch a forgotten step 4; the call would reject with "no handler registered".
@@ -149,8 +149,8 @@ Trying it without a release is [tools/release](../../tools/release/README.md#try
 - `contextIsolation`, `sandbox`, `nodeIntegration: false`. The page and the preload run in separate JavaScript worlds, with no Node in either.
 - Navigation and `window.open` to anything but `ballest://app` go to the system browser. No other page can load inside the window and pick up `window.ballest`.
 - Main decodes every IPC payload with its schema before a handler runs.
-- Main reads and writes only map files the user picked in one of its dialogs (or picked before: the recent files), and only `.balledit`, `.ballmap` and `.json` ones. `fs:readText` with any other path is refused, so a compromised page can't read the disk.
-- Save to game takes a file name, not a path: a `.balledit` name with no separators, written into the maps folder main found (or the user chose in a folder dialog). The game folders are only ever chosen in a dialog, never typed by the page, and Reveal opens one of those three folders only. Nothing writes into the game's install.
+- Map files are named by file name, never by path: a `.balledit` name with no separators, joined to the current project's `maps/` folder (New map, Save, Rename, Import) or to the game's maps folder (Export to game). The project folder is the default one, or one the user picked in a folder dialog (the recent projects); `ballest:project:switch` with any other folder is refused. Import reads only a file the user picked in its open dialog this session, so a compromised page can't read the disk.
+- The game folders are only ever chosen in a dialog, never typed by the page, and Reveal opens one of those three folders or the project's `maps/` only. Nothing writes into the game's install.
 - CSP allows scripts from the app's own origin only. `'unsafe-inline'` is still on for the panel-width script in `index.html`; moving that script out would let us drop it.
 
 ## Layout
@@ -161,10 +161,11 @@ src/
   preload.ts              window.ballest; must stay self-contained
   app/        DesktopApp (the program), DesktopEnvironment (paths)
   electron/   one service per Electron API
-  files/      MapFiles: which map files the page may touch, reads, atomic writes, recent files
   game/       SteamLibrary (Steam's libraries, the game's install), GamePaths (install, maps and plugins folders,
-              overrides), GameProcess (is the game running), saveToMaps, vdf (Steam's KeyValues format)
+              overrides), GameProcess (is the game running), vdf (Steam's KeyValues format)
   ipc/        DesktopIpc (handle + makeIpcMethod), channels, methods/
+  project/    Projects (the project folder: its maps, Import, Export to game, backups), MapLinks (.ballest/link.json),
+              files (map file names, atomic writes, hashes)
   protocol/   serveStatic: files for ballest://, no Electron import, tested
   settings/   desktop-settings.json
   updates/    DesktopUpdates (the updater: when it checks, what the page is told), updateMachine (its states)
@@ -179,4 +180,4 @@ scripts/
   verifyPreloadBundle.ts  the build check above
 ```
 
-Tests (`pnpm --filter @ballest/desktop test`) cover the IPC methods against a fake `ipcMain` and fake dialogs (ping, open and save, recent files, external links, the window theme, the game folders, save to game, launch), the game lookups (vdf and manifest fixtures in `src/game/fixtures/`, Windows path rules through `node:path`'s `win32`, and a fake Steam tree and `/proc` in a temp folder), map files (byte-for-byte writes, which paths are allowed), file serving and path escapes, the settings file, the window shortcuts, the updater (when it checks, download and install, failures, when it is off) and the preload check. None of them load `electron`: the tests that import an Electron service mock the module.
+Tests (`pnpm --filter @ballest/desktop test`) cover the IPC methods against a fake `ipcMain` and fake dialogs (ping, the project: New map, Save, Rename, Import from the game and elsewhere, Export to game and the published-draft check, choosing and switching projects; external links, the window theme, the game folders, launch), the game lookups (vdf and manifest fixtures in `src/game/fixtures/`, Windows path rules through `node:path`'s `win32`, and a fake Steam tree and `/proc` in a temp folder), file serving and path escapes, the settings file, the window shortcuts, the updater (when it checks, download and install, failures, when it is off) and the preload check. None of them load `electron`: the tests that import an Electron service mock the module.

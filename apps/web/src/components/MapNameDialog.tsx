@@ -40,7 +40,7 @@ export const useMapCreator = (): MapCreator => {
 }
 
 /**
- * The name + creator form shared by New map and Export. Both names go into the file name
+ * The name + creator form shared by New map, Save, Rename, Duplicate and Export. Both names go into the file name
  * (`mapFileNameOf`), which the game checks against the names inside the file.
  */
 export function MapNameDialog(props: {
@@ -57,6 +57,8 @@ export function MapNameDialog(props: {
   readonly creator: MapCreator
   /** Shown instead of the creator input when a creator is saved. */
   readonly savedCreator?: ReactNode
+  /** Under the creator input; by default, that what is typed is saved to Settings › General. */
+  readonly creatorHint?: string
   /** Extra content above the buttons. */
   readonly children?: ReactNode
   readonly submitLabel: string
@@ -103,7 +105,9 @@ export function MapNameDialog(props: {
                   onChange={(e) => creator.setDraft(e.target.value)}
                   aria-invalid={creator.draft !== "" && !isValidName(creator.name)}
                 />
-                <span className="text-[0.7rem] text-muted-foreground">Saved to Settings › General.</span>
+                <span className="text-[0.7rem] text-muted-foreground">
+                  {props.creatorHint ?? "Saved to Settings › General."}
+                </span>
               </div>
             )
             : props.savedCreator}

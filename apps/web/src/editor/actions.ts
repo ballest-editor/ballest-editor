@@ -1,7 +1,8 @@
 /** UI-facing operations that run Effects through the single app runtime. */
 import { Cause, Effect, Exit, Fiber, Option, Stream } from "effect"
 import type { UeTransform, Vec3 } from "../domain/coords"
-import { currentCreatedAt, mapFileNameOf, newMapFile } from "../domain/factory"
+import { setLevelNames } from "../domain/edits"
+import { copyNameOf, currentCreatedAt, mapFileNameOf, mapLabelOf, newMapFile } from "../domain/factory"
 import {
   type Axis,
   type AxisEdit,
@@ -12,20 +13,35 @@ import {
 import type { PropertyChange } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
-import { type LevelData, PLAYER_START_CLASS } from "../domain/MapFile"
+import { type LevelData, type MapFile, PLAYER_START_CLASS } from "../domain/MapFile"
 import { type MapPrefs, mapPrefsKeyOf } from "../domain/MapPrefs"
 import { localToWorld, type PivotChoice, pivotFor } from "../domain/pivot"
 import type { Settings } from "../domain/Settings"
 import { CatalogLoader } from "../services/CatalogLoader"
 import { KeybindStore } from "../services/KeybindStore"
 import { MapCodec } from "../services/MapCodec"
-import { MapExporter } from "../services/MapExporter"
+import { type ExportedMap, MapExporter } from "../services/MapExporter"
 import { MapPrefsStore } from "../services/MapPrefsStore"
 import { MaterialLibrary } from "../services/MaterialLibrary"
-import { type GamePathKind, type GamePaths, type OpenedMap, Platform } from "../services/Platform"
+import {
+  type GamePathKind,
+  type GamePaths,
+  Platform,
+  type PlatformError,
+  type ProjectMap,
+  type ProjectState
+} from "../services/Platform"
 import { type AppServices, runtime } from "../services/runtime"
 import { SettingsStore } from "../services/SettingsStore"
-import { pivotOf, type SlotPaint, useEditor } from "./store"
+import {
+  type Doc,
+  type ImportClash,
+  type NoticeAction,
+  type OpenFile,
+  pivotOf,
+  type SlotPaint,
+  useEditor
+} from "./store"
 
 const run = async <A, E>(effect: Effect.Effect<A, E, AppServices>): Promise<A | undefined> => {
   const exit = await runtime.runPromiseExit(effect)
@@ -176,16 +192,6 @@ export const saveKeybinds = (keybinds: Keybinds) =>
 
 export const resetKeybinds = () => applyKeybinds("reset")
 
-export const newMap = (displayName: string, creatorName: string) =>
-  run(
-    Effect.gen(function*() {
-      const createdAt = yield* currentCreatedAt
-      const catalog = useEditor.getState().catalog?.catalog
-      const playerStartPiece = catalog?.pieces.find((p) => p.classPath === PLAYER_START_CLASS)
-      useEditor.getState().loadMap(newMapFile({ displayName, creatorName, createdAt, playerStartPiece }), null)
-    })
-  )
-
 /** The resolved theme to the desktop window's controls; cosmetic, so a failure is only logged. */
 export const setWindowTheme = (dark: boolean) =>
   run(
@@ -194,12 +200,12 @@ export const setWindowTheme = (dark: boolean) =>
     }).pipe(Effect.catch((error) => Effect.logWarning("Couldn't recolour the window controls", error)))
   )
 
-/** What the platform offers, its recent files and the creator name it finds, into the store. */
+/** What the platform offers, the project with its maps (desktop) and the creator name it finds, into the store. */
 export const loadPlatform = () =>
   run(
     Effect.gen(function*() {
       useEditor.getState().setCapabilities((yield* Platform).capabilities)
-      yield* refreshRecentFiles
+      yield* refreshProject
       yield* findCreatorEffect
     })
   )
@@ -240,115 +246,328 @@ export const downloadUpdate = () => updateStep("downloadUpdate")
 /** Quits, installs the downloaded release and starts it; unsaved edits are lost. */
 export const installUpdate = () => updateStep("installUpdate")
 
-const refreshRecentFiles = Effect.gen(function*() {
+// --- maps, the project and exports (docs/PROJECTS.md) ---------------------------------------
+
+/** The project in use, the recent ones and its maps into the store (desktop). */
+const refreshProject = Effect.gen(function*() {
   const platform = yield* Platform
-  if (!platform.capabilities.filePaths) return
-  useEditor.getState().setRecentFiles(yield* platform.recentMaps)
+  if (!platform.capabilities.projects) return
+  useEditor.getState().setProject(yield* platform.projectState, yield* platform.listMaps)
 })
 
-const loadOpened = Effect.fn("loadOpened")(function*(opened: OpenedMap) {
-  const map = yield* MapCodec.use((codec) => codec.decode(opened.text))
-  // unreadable prefs only cost the saved grid height
+const fileOf = (map: ProjectMap): OpenFile => ({ name: map.fileName, path: map.path })
+
+/** A toast's Reveal: the project's maps folder, or the game's. */
+const revealIn = (where: "project" | "game"): NoticeAction => ({
+  label: "Reveal",
+  run: () => void (where === "project" ? revealProject() : revealGamePath("mapsFolder"))
+})
+
+const projectName = () => useEditor.getState().project?.current.name ?? "the project"
+
+/** The open map encoded the way the game wants it written, with the document it was made from. */
+const exportOpenMap = Effect.gen(function*() {
+  const { doc } = useEditor.getState()
+  const result = yield* (yield* MapExporter).prepare(doc.map)
+  return { doc, result }
+})
+
+/** Puts a map into the editor, with the prefs saved for it. */
+const showMap = Effect.fn("showMap")(function*(map: MapFile, file: OpenFile | null) {
+  // unreadable prefs only cost the saved grid height and Export on save
   const prefs = yield* MapPrefsStore.use((store) => store.load(mapPrefsKeyOf(map))).pipe(
     Effect.orElseSucceed((): MapPrefs => ({}))
   )
-  useEditor.getState().loadMap(map, { name: opened.name, path: Option.getOrNull(opened.path) }, prefs.gridHeight)
-  useEditor.getState().notify("info", `Opened ${opened.name} (${map.items.length} items)`)
-})
-
-/** Asks for a map file (the open dialog, or the browser's file picker) and opens it. */
-export const openMapFile = Effect.gen(function*() {
-  const opened = yield* Platform.use((platform) => platform.openMap)
-  if (Option.isNone(opened)) return
-  yield* loadOpened(opened.value).pipe(Effect.ensuring(Effect.ignore(refreshRecentFiles)))
-})
-
-/** Opens one of the recent files; one that has gone drops off the list. */
-export const openRecentFile = (path: string) =>
-  Effect.gen(function*() {
-    yield* loadOpened(yield* (yield* Platform).openRecent(path))
-  }).pipe(Effect.ensuring(Effect.ignore(refreshRecentFiles)))
-
-/** The open map encoded the way the game wants it written, with the document and file it was made from. */
-const exportOpenMap = Effect.gen(function*() {
-  const { doc, file } = useEditor.getState()
-  const result = yield* (yield* MapExporter).prepare(doc.map)
-  return { doc, file, result }
+  useEditor.getState().loadMap(map, file, prefs.gridHeight, { exportOnSave: prefs.exportOnSave === true })
 })
 
 /**
- * Saves the open map. Save as asks where (desktop) or downloads (browser); Save writes over the open file, unless the
- * map has been renamed since (the game only loads a file named after the map inside it) or it isn't a `.balledit`.
- * Then it asks too, starting in the open file's folder.
+ * New map: starts it the way the in-game editor does and, on desktop, saves it into the project at once (making the
+ * project the first time). A browser keeps it in memory.
  */
-export const saveMapFile = (mode: "save" | "saveAs") =>
-  Effect.gen(function*() {
-    const platform = yield* Platform
-    const { doc, file, result } = yield* exportOpenMap
-    const overwrite = mode === "save" && file?.name === result.filename
-    const saved = yield* platform.saveMap(
-      { name: result.filename, text: result.text },
-      { path: Option.fromNullOr(overwrite ? file.path : null), near: Option.fromNullOr(file?.path ?? null) }
-    )
-    if (Option.isNone(saved)) return
-    const { name, path } = saved.value
-    useEditor.getState().markSaved(doc, result.map, { name, path: Option.getOrNull(path) })
-    useEditor.getState().notify("info", `${platform.capabilities.filePaths ? "Saved" : "Downloaded"} ${name}`)
-    // the save may have renamed the map: its prefs follow it to the new name
-    yield* saveMapPrefs
-    yield* refreshRecentFiles
-  })
-
-export const openMap = () => run(openMapFile)
-
-export const openRecent = (path: string) => run(openRecentFile(path))
-
-/**
- * Save: writes over the open file when it is named after the map; otherwise opens the Save as dialog, which confirms
- * the map's name first.
- */
-export const saveMap = () => {
-  const { doc, file, openDialog } = useEditor.getState()
-  const { levelDisplayName, creatorName } = doc.map.worldSettings.levelData
-  if (file?.name !== mapFileNameOf(levelDisplayName.trim(), creatorName.trim())) {
-    openDialog("saveAs")
-    return Promise.resolve(undefined)
+export const createNewMap = Effect.fn("createNewMap")(function*(displayName: string, creatorName: string) {
+  const platform = yield* Platform
+  const createdAt = yield* currentCreatedAt
+  const catalog = useEditor.getState().catalog?.catalog
+  const playerStartPiece = catalog?.pieces.find((p) => p.classPath === PLAYER_START_CLASS)
+  const map = newMapFile({ displayName, creatorName, createdAt, playerStartPiece })
+  if (!platform.capabilities.projects) {
+    useEditor.getState().loadMap(map, null)
+    return
   }
-  return run(saveMapFile("save"))
+  const result = yield* (yield* MapExporter).prepare(map)
+  const created = yield* platform.createMap({ fileName: result.filename, text: result.text })
+  yield* showMap(result.map, fileOf(created))
+  yield* refreshProject
+  useEditor.getState().notify(
+    "info",
+    `Created ${mapLabelOf(created.fileName)} in ${projectName()}`,
+    revealIn("project")
+  )
+})
+
+export const newMap = (displayName: string, creatorName: string) => run(createNewMap(displayName, creatorName))
+
+/** Opens one of the project's maps. */
+export const openProjectMapFile = Effect.fn("openProjectMapFile")(function*(fileName: string) {
+  const file = yield* (yield* Platform).readMap(fileName)
+  const map = yield* MapCodec.use((codec) => codec.decode(file.text))
+  yield* showMap(map, fileOf(file))
+  useEditor.getState().notify("info", `Opened ${mapLabelOf(file.fileName)} (${map.items.length} items)`)
+})
+
+export const openProjectMap = (fileName: string) =>
+  run(openProjectMapFile(fileName).pipe(Effect.ensuring(Effect.ignore(refreshProject))))
+
+/** Copies a picked file into the project (or reports the clash) and opens the copy. */
+const importInto = Effect.fn("importInto")(function*(pending: ImportClash, replace: boolean) {
+  const platform = yield* Platform
+  const { source, fileName, text, map } = pending
+  const result = yield* platform.importMap({ source, fileName, text, replace })
+  if (result._tag === "Clash") {
+    useEditor.getState().setImportClash(pending)
+    return
+  }
+  yield* showMap(map, fileOf(result.map))
+  yield* refreshProject
+  useEditor.getState().notify(
+    "info",
+    `Imported ${mapLabelOf(fileName)} into ${projectName()} (${map.items.length} items)`,
+    revealIn("project")
+  )
+})
+
+/**
+ * Open… in a browser: the file input, then the map in memory. Import… on desktop: a map file from anywhere is copied
+ * into the project under the game's file name for it and opened from there; nothing outside the project is edited in
+ * place. A `.balledit` is copied byte for byte; a `.ballmap` (a Workshop map) is written as the `.balledit` the game
+ * would make of it.
+ */
+export const importMapFile = Effect.gen(function*() {
+  const platform = yield* Platform
+  const picked = yield* platform.pickMapFile
+  if (Option.isNone(picked)) return
+  const { name, path, text } = picked.value
+  const map = yield* MapCodec.use((codec) => codec.decode(text))
+  if (Option.isNone(path)) {
+    yield* showMap(map, { name, path: null })
+    useEditor.getState().notify("info", `Opened ${name} (${map.items.length} items)`)
+    return
+  }
+  const { levelDisplayName, creatorName } = map.worldSettings.levelData
+  const pending = name.toLowerCase().endsWith(".balledit")
+    ? { fileName: mapFileNameOf(levelDisplayName.trim(), creatorName.trim()), text, map }
+    : yield* (yield* MapExporter).prepare(map).pipe(
+      Effect.map((prepared) => ({ fileName: prepared.filename, text: prepared.text, map: prepared.map }))
+    )
+  yield* importInto({ source: path.value, ...pending }, false)
+})
+
+export const importMap = () => run(importMapFile)
+
+/** The clash dialog's Replace: the project's map of that name goes to backups. */
+export const replaceOnImportEffect = Effect.gen(function*() {
+  const { importClash, setImportClash } = useEditor.getState()
+  if (importClash === null) return
+  setImportClash(null)
+  yield* importInto(importClash, true)
+})
+
+export const replaceOnImport = () => run(replaceOnImportEffect)
+
+/** The clash dialog's Import as copy: the imported map is renamed `<name> 2` (or the next free number). */
+export const importAsCopyEffect = Effect.gen(function*() {
+  const { importClash, setImportClash, projectMaps } = useEditor.getState()
+  if (importClash === null) return
+  setImportClash(null)
+  const { levelDisplayName, creatorName } = importClash.map.worldSettings.levelData
+  const creator = creatorName.trim()
+  const taken = new Set(projectMaps.map((m) => m.fileName))
+  const name = copyNameOf(levelDisplayName.trim(), creator, taken)
+  const prepared = yield* (yield* MapExporter).prepare(setLevelNames(importClash.map, name, creator))
+  yield* importInto({ ...importClash, fileName: prepared.filename, text: prepared.text, map: prepared.map }, false)
+})
+
+export const importAsCopy = () => run(importAsCopyEffect)
+
+/** Writes `result` (made from `doc`) into the project as a new map, which the editor then has open. */
+const createAsOpenMap = Effect.fn("createAsOpenMap")(function*(doc: Doc, result: ExportedMap) {
+  const created = yield* (yield* Platform).createMap({ fileName: result.filename, text: result.text })
+  useEditor.getState().markSaved(doc, result.map, fileOf(created))
+  yield* saveMapPrefs
+  yield* refreshProject
+  return created
+})
+
+/** A new project map from the open one (it had no file yet): the `saveAs` dialog's last step on desktop. */
+const createFromOpenMap = Effect.gen(function*() {
+  const { doc, result } = yield* exportOpenMap
+  const created = yield* createAsOpenMap(doc, result)
+  useEditor.getState().notify("info", `Saved ${mapLabelOf(created.fileName)} in ${projectName()}`, revealIn("project"))
+})
+
+/**
+ * Writes the open map over its project file. When its name or creator changed since (Rename, Map settings), the file
+ * moves to the new name first and the old one goes to the project's backups: the game loads only a file named after
+ * the map inside it. Export on save then exports it too.
+ */
+const writeOpenMap = Effect.fn("writeOpenMap")(function*(file: OpenFile, options: { readonly exportAfter: boolean }) {
+  const platform = yield* Platform
+  const { doc, result } = yield* exportOpenMap
+  const saved = result.filename === file.name
+    ? yield* platform.saveMap({ fileName: file.name, text: result.text })
+    : yield* platform.renameMap({ from: file.name, to: result.filename, text: result.text })
+  useEditor.getState().markSaved(doc, result.map, fileOf(saved))
+  // a rename moves the prefs to the new name
+  yield* saveMapPrefs
+  yield* refreshProject
+  const label = mapLabelOf(saved.fileName)
+  useEditor.getState().notify(
+    "info",
+    saved.fileName === file.name ? `Saved ${label}` : `Renamed ${mapLabelOf(file.name)} to ${label}`,
+    revealIn("project")
+  )
+  if (options.exportAfter && useEditor.getState().exportOnSave) yield* exportProjectMap(saved.fileName, false)
+  return saved
+})
+
+/** A browser's Save and Export: the open map as a download, named the way the game wants it. */
+const downloadOpenMap = Effect.gen(function*() {
+  const { doc, result } = yield* exportOpenMap
+  yield* (yield* Platform).download({ name: result.filename, text: result.text })
+  useEditor.getState().markSaved(doc, result.map, { name: result.filename, path: null })
+  yield* saveMapPrefs
+  useEditor.getState().notify("info", `Downloaded ${result.filename}`)
+})
+
+/**
+ * Save: on desktop, writes the project file and asks nothing (a map that has no file yet is named first, in the
+ * `saveAs` dialog). In a browser, downloads it, asking for the name first unless it is the file's.
+ */
+export const saveMapFile = Effect.gen(function*() {
+  const platform = yield* Platform
+  const { doc, file, openDialog } = useEditor.getState()
+  if (platform.capabilities.projects) {
+    if (file === null) openDialog("saveAs")
+    else yield* writeOpenMap(file, { exportAfter: true })
+    return
+  }
+  const { levelDisplayName, creatorName } = doc.map.worldSettings.levelData
+  if (file?.name === mapFileNameOf(levelDisplayName.trim(), creatorName.trim())) yield* downloadOpenMap
+  else openDialog("saveAs")
+})
+
+export const saveMap = () => run(saveMapFile)
+
+/** The `saveAs` dialog's last step, once the name is confirmed: into the project (desktop) or a download (browser). */
+export const saveMapAsEffect = Effect.gen(function*() {
+  const platform = yield* Platform
+  if (!platform.capabilities.projects) return yield* downloadOpenMap
+  const { file } = useEditor.getState()
+  yield* file === null ? createFromOpenMap : writeOpenMap(file, { exportAfter: true }).pipe(Effect.asVoid)
+})
+
+export const saveMapAs = () => run(saveMapAsEffect)
+
+/** Rename: new name and creator, then the file moves to match (the old one goes to backups). */
+export const renameOpenMap = (displayName: string, creatorName: string) => {
+  useEditor.getState().renameLevel(displayName, creatorName)
+  return saveMapAs()
 }
 
-/** The Save as dialog's last step, once the name is confirmed. */
-export const saveMapAs = () => run(saveMapFile("saveAs"))
+/**
+ * Duplicate: the open map, as it is now, saved into the project under a new name; editing goes on in the copy. The
+ * original file keeps its last save.
+ */
+export const duplicateMapEffect = Effect.fn("duplicateMapEffect")(function*(displayName: string, creatorName: string) {
+  const { doc, file } = useEditor.getState()
+  const result = yield* (yield* MapExporter).prepare(setLevelNames(doc.map, displayName, creatorName))
+  const created = yield* createAsOpenMap(doc, result)
+  const from = file === null ? "" : ` from ${mapLabelOf(file.name)}`
+  useEditor.getState().notify(
+    "info",
+    `Duplicated${from}: now editing ${mapLabelOf(created.fileName)}`,
+    revealIn("project")
+  )
+})
+
+export const duplicateMap = (displayName: string, creatorName: string) =>
+  run(duplicateMapEffect(displayName, creatorName))
+
+/** Copies a saved project map into the game's maps folder; a published map's draft there asks first. */
+const exportProjectMap = Effect.fn("exportProjectMap")(function*(fileName: string, replacePublished: boolean) {
+  const exported = yield* (yield* Platform).exportMap(fileName, { replacePublished })
+  if (exported._tag === "Published") {
+    useEditor.getState().setPublishedDraft({ name: exported.file.name, publishedFileId: exported.publishedFileId })
+    return
+  }
+  yield* refreshProject
+  useEditor.getState().notify(
+    "info",
+    `Exported ${mapLabelOf(fileName)} to the game's maps folder`,
+    revealIn("game")
+  )
+})
 
 /**
- * Save to game: writes the map into the game's UserSavedMaps folder, named the way the game expects, where the in-game
- * editor lists it. A copy: the open file stays the one Save writes to, unless there was none or it is that same file.
- * When the file there is the draft of a published map, the replacePublished dialog asks first.
+ * Export to game: writes the map into the game's UserSavedMaps folder under the game's file name, where the in-game
+ * editor lists it. The export is a copy of the project file, so unsaved edits are saved first. A map with no file yet
+ * is named first.
  */
-export const saveToGameFile = (replacePublished: boolean) =>
+export const exportToGameEffect = (replacePublished: boolean) =>
   Effect.gen(function*() {
-    const platform = yield* Platform
-    const { doc, file, result } = yield* exportOpenMap
-    const saved = yield* platform.saveToGame({ name: result.filename, text: result.text }, { replacePublished })
-    if (saved._tag === "Published") {
-      useEditor.getState().setPublishedDraft({ name: saved.file.name, publishedFileId: saved.publishedFileId })
+    const { doc, file, dirty, openDialog } = useEditor.getState()
+    if (file === null) {
+      openDialog("saveAs")
       return
     }
-    if (file === null || file.path === saved.file.path) {
-      useEditor.getState().markSaved(doc, result.map, saved.file)
-      yield* saveMapPrefs
-    }
-    useEditor.getState().notify("info", `Saved ${saved.file.name} to the game's maps folder`)
-    yield* refreshRecentFiles
+    const { levelDisplayName, creatorName } = doc.map.worldSettings.levelData
+    const current = dirty || file.name !== mapFileNameOf(levelDisplayName.trim(), creatorName.trim())
+      ? (yield* writeOpenMap(file, { exportAfter: false })).fileName
+      : file.name
+    yield* exportProjectMap(current, replacePublished)
   })
 
-export const saveToGame = () => run(saveToGameFile(false))
+export const exportToGame = () => run(exportToGameEffect(false))
 
 /** The replacePublished dialog's answer: replace the published map's draft after all. */
 export const replacePublishedDraft = () => {
   useEditor.getState().setPublishedDraft(null)
-  return run(saveToGameFile(true))
+  return run(exportToGameEffect(true))
 }
+
+/** Export on save for the open map, kept with its prefs. */
+export const setExportOnSave = (exportOnSave: boolean) => {
+  useEditor.getState().setExportOnSave(exportOnSave)
+  return run(saveMapPrefs)
+}
+
+/** Uses another project from now on. The open map stays open; it belonged to the old project, so it is unsaved here. */
+const changeProject = (
+  change: (platform: Platform["Service"]) => Effect.Effect<Option.Option<ProjectState>, PlatformError>
+) =>
+  run(
+    Effect.gen(function*() {
+      const before = useEditor.getState().project?.current.path
+      const next = yield* change(yield* Platform)
+      if (Option.isNone(next)) return
+      if (next.value.current.path !== before) useEditor.getState().detachFile()
+      yield* refreshProject
+      useEditor.getState().notify("info", `Using the project ${next.value.current.name}`, revealIn("project"))
+    })
+  )
+
+/** A folder dialog; the chosen folder becomes the project (the game's maps folder is refused, with the reason). */
+export const chooseProject = () => changeProject((platform) => platform.chooseProject)
+
+export const switchProject = (path: string) => changeProject((platform) => Effect.asSome(platform.switchProject(path)))
+
+export const revealProject = () =>
+  run(
+    Effect.gen(function*() {
+      yield* (yield* Platform).revealProject
+    })
+  )
 
 /** Starts the game through Steam, unless it is already running. */
 export const launchGameEffect = Effect.gen(function*() {
@@ -426,11 +645,14 @@ export const revealGamePath = (which: GamePathKind) =>
 
 /**
  * The open map's prefs, under its current name: the grid height when it isn't the player
- * start's (what a load would pick anyway).
+ * start's (what a load would pick anyway), and Export on save when it is on.
  */
 const saveMapPrefs = Effect.gen(function*() {
-  const { doc, floorHeight } = useEditor.getState()
-  const prefs = floorHeight === floorHeightOf(doc.map) ? {} : { gridHeight: floorHeight }
+  const { doc, floorHeight, exportOnSave } = useEditor.getState()
+  const prefs: MapPrefs = {
+    ...(floorHeight !== floorHeightOf(doc.map) && { gridHeight: floorHeight }),
+    ...(exportOnSave && { exportOnSave })
+  }
   yield* MapPrefsStore.use((store) => store.save(mapPrefsKeyOf(doc.map), prefs))
 })
 

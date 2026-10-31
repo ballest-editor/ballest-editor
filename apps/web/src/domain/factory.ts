@@ -48,6 +48,21 @@ export const userLevelNameOf = (displayName: string, creatorName: string): strin
 export const mapFileNameOf = (displayName: string, creatorName: string): string =>
   `${SYSTEM_LEVEL_NAME}&${userLevelNameOf(displayName, creatorName)}.balledit`
 
+/** A map file name without the game's prefix and extension (`Big Loop_Isaac`), for lists. */
+export const mapLabelOf = (fileName: string): string => {
+  const prefix = `${SYSTEM_LEVEL_NAME}&`
+  return (fileName.startsWith(prefix) ? fileName.slice(prefix.length) : fileName).replace(/\.balledit$/i, "")
+}
+
+/** The first of `<name> 2`, `<name> 3`, ... whose file name isn't `taken`: the name a copy gets. */
+export const copyNameOf = (displayName: string, creatorName: string, taken: ReadonlySet<string>): string => {
+  const base = displayName.replace(/ \d+$/, "")
+  for (let n = 2;; n++) {
+    const name = `${base} ${n}`
+    if (!taken.has(mapFileNameOf(name, creatorName))) return name
+  }
+}
+
 export const identityTransform = (translation = { x: 0, y: 0, z: 0 }): ItemTransform => ({
   rotation: { x: 0, y: 0, z: 0, w: 1 },
   translation,

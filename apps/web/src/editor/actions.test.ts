@@ -7,18 +7,31 @@ import { lightingOf } from "../domain/sunlight"
 import { MapCodec } from "../services/MapCodec"
 import { MapExporter } from "../services/MapExporter"
 import { MapPrefsStore } from "../services/MapPrefsStore"
-import { makeTestDisk, Platform, TEST_MAPS_FOLDER, type TestDisk } from "../services/Platform"
+import { Platform } from "../services/Platform"
+import {
+  makeTestDisk,
+  projectFile,
+  TEST_MAPS_FOLDER,
+  TEST_PROJECT,
+  testBridge,
+  type TestDisk,
+  testHash
+} from "../test/desktopBridge"
 import { listSamples, readSample } from "../test/samples"
 import {
+  createNewMap,
+  duplicateMapEffect,
+  exportToGameEffect,
   findCreatorEffect,
   followUpdateState,
+  importAsCopyEffect,
+  importMapFile,
   installPluginEffect,
   launchGameEffect,
-  openMapFile,
-  openRecentFile,
-  saveMap,
-  saveMapFile,
-  saveToGameFile
+  openProjectMapFile,
+  replaceOnImportEffect,
+  saveMapAsEffect,
+  saveMapFile
 } from "./actions"
 import { useEditor } from "./store"
 
@@ -26,7 +39,7 @@ const s = () => useEditor.getState()
 
 const layerFor = (disk: TestDisk) =>
   Layer.mergeAll(
-    Platform.layerTest(disk),
+    Platform.layerDesktop(testBridge(disk)),
     MapPrefsStore.layerTest,
     MapExporter.layerNoDeps.pipe(Layer.provideMerge(Layer.mergeAll(MapCodec.layer, DateTime.layerCurrentZoneOffset(0))))
   )
@@ -38,157 +51,200 @@ const createdAtTime = (createdAt: string) => {
 }
 
 const balledits = listSamples().filter((sample) => sample.kind === "balledit")
-const DIR = "/home/me/UserSavedMaps"
+const ballmaps = listSamples().filter((sample) => sample.kind === "ballmap")
+const fileNameOf = (sample: { readonly name: string }) => sample.name.split("/").pop()!
 
-describe("file actions", () => {
+/** A fresh editor for each test: the store outlives the layers. */
+const reset = Effect.sync(() => {
+  s().loadMap(s().doc.map, null)
+  s().setImportClash(null)
+  s().setPublishedDraft(null)
+  s().closeDialog()
+})
+
+/** Imports `path` through the dialog. */
+const importFrom = (disk: TestDisk, path: string) =>
+  Effect.gen(function*() {
+    disk.answers.push(path)
+    yield* importMapFile
+  })
+
+describe("project actions", () => {
   it.effect.each(balledits.map((sample) => [sample.name, sample] as const))(
-    "opens %s and saves it back over the same file, byte for byte",
+    "imports %s from the game linked to it, saves it and exports it back, byte for byte",
     ([, sample]) => {
-      const name = sample.name.split("/").pop()!
-      const path = `${DIR}/${name}`
+      const name = fileNameOf(sample)
+      const inGame = `${TEST_MAPS_FOLDER}/${name}`
       const text = readSample(sample)
-      const disk = makeTestDisk({ [path]: text })
+      const disk = makeTestDisk({ [inGame]: text })
       return Effect.gen(function*() {
-        disk.answers.push(path)
-        yield* openMapFile
-        assert.deepStrictEqual(s().file, { name, path })
-        assert.isFalse(s().dirty)
+        yield* reset
+        yield* importFrom(disk, inGame)
+        assert.deepStrictEqual(s().file, { name, path: projectFile(name) })
+        assert.isTrue(disk.files.get(projectFile(name)) === text, "the imported copy differs from the game's")
+        assert.deepInclude(disk.links.get(TEST_PROJECT)?.get(name), {
+          origin: { path: inGame, hash: testHash(text), at: "2026-10-31T12:00:00.000Z" },
+          export: { path: inGame, hash: testHash(text), at: "2026-10-31T12:00:00.000Z" }
+        })
+        assert.deepStrictEqual(s().projectMaps.map((m) => m.fileName), [name])
 
         yield* TestClock.setTime(createdAtTime(s().doc.map.worldSettings.levelData.createdAt))
-        yield* saveMapFile("save")
-        // No save dialog: Save wrote over the open file.
-        assert.deepStrictEqual(disk.dialogs.map((d) => d.kind), ["open"])
-        assert.isTrue(disk.files.get(path) === text, "the saved file differs from the game's")
-        assert.deepStrictEqual(disk.recent, [path])
+        yield* saveMapFile
+        assert.deepStrictEqual(disk.dialogs.map((d) => d.kind), ["import"])
+        assert.isTrue(disk.files.get(projectFile(name)) === text, "the saved file differs from the game's")
+
+        disk.files.set(inGame, "changed in the game")
+        yield* exportToGameEffect(false)
+        assert.isTrue(disk.files.get(inGame) === text, "the export differs from the project file")
+        assert.strictEqual(disk.links.get(TEST_PROJECT)?.get(name)?.export?.hash, testHash(text))
       }).pipe(Effect.provide(layerFor(disk)))
     }
   )
 
-  it.effect("marks edits dirty until saved; Save as asks next to the open file and moves the document there", () => {
-    const sample = balledits[0]!
-    const path = `${DIR}/${sample.name.split("/").pop()!}`
-    const disk = makeTestDisk({ [path]: readSample(sample) })
-    return Effect.gen(function*() {
-      disk.answers.push(path)
-      yield* openMapFile
-      const before = lightingOf(s().doc.map.worldSettings)
-      s().setLighting({ ...before, timeOfDay: (before.timeOfDay + 1) % 24 })
-      assert.isTrue(s().dirty)
-
-      yield* saveMapFile("save")
-      assert.isFalse(s().dirty)
-      const saved = yield* MapCodec.use((codec) => codec.decode(disk.files.get(path)!))
-      assert.strictEqual(saved.worldSettings.directionalLight.timeOfDay, (before.timeOfDay + 1) % 24)
-
-      // Cancelling Save as changes nothing.
-      disk.answers.push(null)
-      yield* saveMapFile("saveAs")
-      assert.strictEqual(s().file?.path, path)
-
-      const copy = "/home/me/backup/copy.balledit"
-      disk.answers.push(copy)
-      yield* saveMapFile("saveAs")
-      assert.deepStrictEqual(disk.dialogs.slice(1).map((d) => [d.kind, d.near]), [["save", path], ["save", path]])
-      assert.strictEqual(disk.dialogs[1]?.name, sample.name.split("/").pop())
-      assert.deepStrictEqual(s().file, { name: "copy.balledit", path: copy })
-      assert.strictEqual(disk.files.get(copy), disk.files.get(path))
-      assert.deepStrictEqual(s().recentFiles.map((f) => f.path), [copy, path])
-    }).pipe(Effect.provide(layerFor(disk)))
-  })
-
-  it.effect("Save asks for a name instead of writing over a file the map no longer matches", () => {
-    const sample = balledits[0]!
-    const path = `${DIR}/${sample.name.split("/").pop()!}`
-    const text = readSample(sample)
-    const disk = makeTestDisk({ [path]: text })
-    return Effect.gen(function*() {
-      disk.answers.push(path)
-      yield* openMapFile
-      s().closeDialog()
-      const { creatorName } = s().doc.map.worldSettings.levelData
-      s().renameLevel("Renamed", creatorName)
-      yield* Effect.promise(saveMap)
-      assert.strictEqual(s().dialog, "saveAs")
-      assert.strictEqual(disk.files.get(path), text)
-      s().closeDialog()
-
-      // The Save as dialog's own save suggests the new name, in the same folder.
-      disk.answers.push(`${DIR}/Map_LevelEditorMain&Renamed_${creatorName}.balledit`)
-      yield* saveMapFile("saveAs")
-      assert.deepStrictEqual(disk.dialogs.at(-1), {
-        kind: "save",
-        name: `Map_LevelEditorMain&Renamed_${creatorName}.balledit`,
-        near: path
-      })
-      assert.strictEqual(disk.files.get(path), text)
-      assert.strictEqual(s().file?.name, `Map_LevelEditorMain&Renamed_${creatorName}.balledit`)
-    }).pipe(Effect.provide(layerFor(disk)))
-  })
-
-  it.effect("a cancelled open keeps the document; a recent file that has gone fails and drops off the list", () => {
+  it.effect("New map saves into the project at once; Save, Rename and Duplicate ask nothing more", () => {
     const disk = makeTestDisk()
     return Effect.gen(function*() {
-      const doc = s().doc
-      disk.answers.push(null)
-      yield* openMapFile
-      assert.strictEqual(s().doc, doc)
-
-      disk.recent.push("/gone.balledit")
-      s().setRecentFiles([{ name: "gone.balledit", path: "/gone.balledit" }])
-      disk.recent.splice(0)
-      const error = yield* Effect.flip(openRecentFile("/gone.balledit"))
-      assert.strictEqual(error._tag, "PlatformError")
-      assert.strictEqual(error.message, "/gone.balledit doesn't exist any more.")
-      assert.deepStrictEqual(s().recentFiles, [])
-      assert.strictEqual(s().doc, doc)
-    }).pipe(Effect.provide(layerFor(disk)))
-  })
-
-  it.effect("Save to game writes a copy into the maps folder; a map never saved moves there", () => {
-    const sample = balledits[0]!
-    const name = sample.name.split("/").pop()!
-    const path = `${DIR}/${name}`
-    const disk = makeTestDisk({ [path]: readSample(sample) })
-    return Effect.gen(function*() {
-      disk.answers.push(path)
-      yield* openMapFile
-      s().setLighting({ ...lightingOf(s().doc.map.worldSettings), timeOfDay: 3 })
-      yield* saveToGameFile(false)
-      const inGame = `${TEST_MAPS_FOLDER}/${name}`
-      const copy = yield* MapCodec.use((codec) => codec.decode(disk.files.get(inGame)!))
-      assert.strictEqual(copy.worldSettings.directionalLight.timeOfDay, 3)
-      // Still the file Save writes to, and still unsaved there.
-      assert.deepStrictEqual(s().file, { name, path })
-      assert.isTrue(s().dirty)
-      assert.deepStrictEqual(s().recentFiles.map((f) => f.path), [inGame, path])
-
-      s().loadMap(copy, null)
-      s().setLighting({ ...lightingOf(s().doc.map.worldSettings), timeOfDay: 4 })
-      yield* saveToGameFile(false)
-      assert.deepStrictEqual(s().file, { name, path: inGame })
+      yield* reset
+      yield* createNewMap("Big Loop", "Isaac")
+      const first = "Map_LevelEditorMain&Big Loop_Isaac.balledit"
+      assert.deepStrictEqual(s().file, { name: first, path: projectFile(first) })
       assert.isFalse(s().dirty)
+      const created = yield* MapCodec.use((codec) => codec.decode(disk.files.get(projectFile(first))!))
+      assert.strictEqual(created.worldSettings.levelData.levelDisplayName, "Big Loop")
+
+      s().setLighting({ ...lightingOf(s().doc.map.worldSettings), timeOfDay: 3 })
+      assert.isTrue(s().dirty)
+      yield* saveMapFile
+      assert.isFalse(s().dirty)
+      const saved = yield* MapCodec.use((codec) => codec.decode(disk.files.get(projectFile(first))!))
+      assert.strictEqual(saved.worldSettings.directionalLight.timeOfDay, 3)
+
+      // Rename: the file moves to the new name; the old one is gone from the project.
+      s().renameLevel("Hairpin", "Isaac")
+      yield* saveMapAsEffect
+      const renamed = "Map_LevelEditorMain&Hairpin_Isaac.balledit"
+      assert.deepStrictEqual(s().file, { name: renamed, path: projectFile(renamed) })
+      assert.isFalse(disk.files.has(projectFile(first)))
+      assert.isTrue(disk.files.has(projectFile(renamed)))
+
+      // Duplicate: a second file, and editing goes on in it.
+      yield* duplicateMapEffect("Hairpin 2", "Isaac")
+      const copy = "Map_LevelEditorMain&Hairpin 2_Isaac.balledit"
+      assert.deepStrictEqual(s().file, { name: copy, path: projectFile(copy) })
+      assert.deepStrictEqual(s().projectMaps.map((m) => m.fileName).sort(), [copy, renamed].sort())
+      assert.deepStrictEqual(disk.dialogs, [])
+
+      // A name the project has is refused, and nothing is overwritten.
+      const before = disk.files.get(projectFile(renamed))
+      const error = yield* Effect.flip(createNewMap("Hairpin", "Isaac"))
+      assert.match(error.message, /already has a map called/)
+      assert.strictEqual(disk.files.get(projectFile(renamed)), before)
+
+      yield* openProjectMapFile(renamed)
+      assert.strictEqual(s().doc.map.worldSettings.levelData.levelDisplayName, "Hairpin")
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("Save to game asks before replacing a published map's draft", () => {
+  it.effect("Save names a map that has no file yet first, then writes it into the project", () => {
+    const disk = makeTestDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* saveMapFile
+      assert.strictEqual(s().dialog, "saveAs")
+      assert.strictEqual(disk.files.size, 0)
+      s().closeDialog()
+
+      s().renameLevel("Fresh", "Isaac")
+      yield* saveMapAsEffect
+      const name = "Map_LevelEditorMain&Fresh_Isaac.balledit"
+      assert.deepStrictEqual(s().file, { name, path: projectFile(name) })
+      assert.isTrue(disk.files.has(projectFile(name)))
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a name clash on import asks; Import as copy renames the map, Replace keeps the name", () => {
     const sample = balledits[0]!
-    const name = sample.name.split("/").pop()!
+    const name = fileNameOf(sample)
+    const download = `/home/me/Downloads/${name}`
+    const disk = makeTestDisk({ [download]: readSample(sample), [projectFile(name)]: "{}" })
+    return Effect.gen(function*() {
+      yield* reset
+      yield* importFrom(disk, download)
+      assert.strictEqual(s().dialog, "importClash")
+      assert.strictEqual(s().importClash?.fileName, name)
+      assert.strictEqual(disk.files.get(projectFile(name)), "{}")
+
+      yield* importAsCopyEffect
+      const { levelDisplayName, creatorName } = s().doc.map.worldSettings.levelData
+      const copy = `Map_LevelEditorMain&${levelDisplayName}_${creatorName}.balledit`
+      assert.notStrictEqual(copy, name)
+      assert.match(levelDisplayName, / 2$/)
+      assert.deepStrictEqual(s().file, { name: copy, path: projectFile(copy) })
+      // Imported from elsewhere: an origin, no export.
+      assert.deepInclude(disk.links.get(TEST_PROJECT)?.get(copy), { export: null, lastSeenHash: null })
+      assert.strictEqual(disk.links.get(TEST_PROJECT)?.get(copy)?.origin?.path, download)
+
+      yield* importFrom(disk, download)
+      assert.strictEqual(s().dialog, "importClash")
+      yield* replaceOnImportEffect
+      assert.isTrue(disk.files.get(projectFile(name)) === readSample(sample))
+      assert.strictEqual(s().file?.name, name)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect.each(ballmaps.slice(0, 3).map((sample) => [sample.name, sample] as const))(
+    "imports the Workshop map %s as the .balledit the game would make of it",
+    ([, sample]) => {
+      const source = `/workshop/${fileNameOf(sample)}`
+      const disk = makeTestDisk({ [source]: readSample(sample) })
+      return Effect.gen(function*() {
+        yield* reset
+        yield* importFrom(disk, source)
+        const name = s().file?.name ?? ""
+        assert.match(name, /^Map_LevelEditorMain&.*\.balledit$/)
+        const written = yield* MapCodec.use((codec) => codec.decode(disk.files.get(projectFile(name))!))
+        assert.isDefined(written.editorState)
+        assert.strictEqual(written.items.length, s().doc.map.items.length)
+      }).pipe(Effect.provide(layerFor(disk)))
+    }
+  )
+
+  it.effect("Export saves unsaved edits first, and asks before replacing a published map's draft", () => {
+    const sample = balledits[0]!
+    const name = fileNameOf(sample)
     const inGame = `${TEST_MAPS_FOLDER}/${name}`
     const published = JSON.stringify({ worldSettings: { levelData: { levelPublishedFileId: 3561234567 } } })
-    const disk = makeTestDisk({ [`${DIR}/${name}`]: readSample(sample), [inGame]: published })
+    const disk = makeTestDisk({ [projectFile(name)]: readSample(sample), [inGame]: published })
     return Effect.gen(function*() {
-      disk.answers.push(`${DIR}/${name}`)
-      yield* openMapFile
-      yield* saveToGameFile(false)
+      yield* reset
+      yield* openProjectMapFile(name)
+      s().setLighting({ ...lightingOf(s().doc.map.worldSettings), timeOfDay: 5 })
+      yield* exportToGameEffect(false)
+      assert.isFalse(s().dirty)
       assert.deepStrictEqual(s().publishedDraft, { name, publishedFileId: 3561234567 })
       assert.strictEqual(s().dialog, "replacePublished")
       assert.strictEqual(disk.files.get(inGame), published)
 
       s().setPublishedDraft(null)
-      assert.strictEqual(s().dialog, null)
-      yield* saveToGameFile(true)
-      const replaced = yield* MapCodec.use((codec) => codec.decode(disk.files.get(inGame)!))
-      assert.strictEqual(replaced.items.length, s().doc.map.items.length)
+      yield* exportToGameEffect(true)
+      assert.strictEqual(disk.files.get(inGame), disk.files.get(projectFile(name)))
+      const exported = yield* MapCodec.use((codec) => codec.decode(disk.files.get(inGame)!))
+      assert.strictEqual(exported.worldSettings.directionalLight.timeOfDay, 5)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("Export on save exports every save of that map", () => {
+    const disk = makeTestDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* createNewMap("Shuttle", "Isaac")
+      const name = "Map_LevelEditorMain&Shuttle_Isaac.balledit"
+      yield* saveMapFile
+      assert.isFalse(disk.files.has(`${TEST_MAPS_FOLDER}/${name}`))
+
+      s().setExportOnSave(true)
+      yield* saveMapFile
+      assert.strictEqual(disk.files.get(`${TEST_MAPS_FOLDER}/${name}`), disk.files.get(projectFile(name)))
     }).pipe(Effect.provide(layerFor(disk)))
   })
 

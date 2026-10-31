@@ -100,9 +100,9 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   orbit: "orbit",
   pan: "pan",
   newMap: "new map",
-  openMap: "open map",
+  openMap: "import map",
   saveMap: "save map",
-  saveMapAs: "save map as",
+  saveMapAs: "duplicate map",
   showKeybinds: "keybind cheat sheet"
 }
 
@@ -153,10 +153,12 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   orbit: "Hold and drag to orbit around the focus point.",
   pan: "Hold and drag to slide the camera sideways and up/down.",
   newMap: "Start a new map.",
-  openMap: "Open a .balledit or .ballmap file.",
+  openMap:
+    "Import a .balledit or .ballmap file: it is copied into the project and opened from there. In the browser, open it.",
   saveMap:
-    "Save the map over the file it was opened from or last saved to. The first time, or after the map is renamed, it asks for the name and the place like Save as. In the browser it downloads the file.",
-  saveMapAs: "Confirm the map's name, then save it as a new .balledit file for the game (in the browser, a download).",
+    "Save the map into the project, asking nothing; after a rename the file moves to match. In the browser, download it.",
+  saveMapAs:
+    "Copy the map into the project under a new name and go on editing the copy. In the browser, export it (a download).",
   showKeybinds: "Hold to show every keybind over the viewport; release to hide it. Editor only."
 }
 

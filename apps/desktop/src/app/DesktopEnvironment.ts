@@ -12,6 +12,8 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
   readonly userData: string
   /** `userData/desktop-settings.json`: window bounds and other main-process state. */
   readonly settingsPath: string
+  /** `Documents/Ballest Editor/Maps`: the project used until the user picks another (docs/PROJECTS.md). */
+  readonly defaultProjectDir: string
   readonly preloadPath: string
   /** The renderer build (`apps/web/dist`, or its copy inside `app.asar`). */
   readonly rendererDir: string
@@ -39,6 +41,7 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
           appVersion: metadata.appVersion,
           userData: metadata.userData,
           settingsPath: path.join(metadata.userData, "desktop-settings.json"),
+          defaultProjectDir: path.join(metadata.documents, "Ballest Editor", "Maps"),
           preloadPath: path.join(dirname, "preload.cjs"),
           // Unpackaged, `vite build` of apps/web has already copied the assets into dist/assets.
           rendererDir: metadata.isPackaged

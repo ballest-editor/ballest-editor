@@ -43,8 +43,8 @@ describe("DesktopSettings", () => {
       const { settings } = yield* withSettings
       yield* Effect.all([
         settings.update((s) => ({ ...s, window })),
-        settings.update((s) => ({ ...s, recentMaps: ["/maps/a.balledit"] }))
+        settings.update((s) => ({ ...s, project: { recent: ["/maps"] } }))
       ], { concurrency: "unbounded" })
-      assert.deepStrictEqual(yield* settings.get, { window, recentMaps: ["/maps/a.balledit"] })
+      assert.deepStrictEqual(yield* settings.get, { window, project: { recent: ["/maps"] } })
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)))
 })
