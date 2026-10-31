@@ -1,16 +1,16 @@
 {
   "path": [
-    "apps/web/src",
-    "apps/desktop/src",
-    "packages/ui/src",
-    "packages/contracts/src",
-    "tools/extract",
-    "tools/compress",
-    "tools/dev/src",
-    "tools/release/src"
+    "../apps/web/src",
+    "../apps/desktop/src",
+    "../packages/ui/src",
+    "../packages/contracts/src",
+    "../tools/extract",
+    "../tools/compress",
+    "../tools/dev/src",
+    "../tools/release/src"
   ],
   "format": ["typescript", "tsx", "javascript"],
-  "ignore": ["**/routeTree.gen.ts", "packages/ui/src/components/**"],
+  "ignore": ["**/routeTree.gen.ts", "../packages/ui/src/components/**"],
   "minTokens": 50,
   "minLines": 3,
   "similarity": 0.8,

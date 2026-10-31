@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // usage: node tools/compress/download.mjs [WEB_ASSETS_DIR] [POINTER_FILE] [ASSETS_DIR]
-//        (defaults: ./web-assets ./web-assets.json ./assets)
+//        (defaults: ./web-assets ./tools/compress/web-assets.json ./assets)
 //
 // Fetches the asset pack web-assets.json points at (publish.mjs made it) into web-assets/, for machines without
 // the game: CI, Vercel, a fresh clone. Runs after compress.mjs in `pnpm assets`, and does nothing when the raw
@@ -15,7 +15,7 @@ import { pipeline } from "node:stream/promises"
 import { extract } from "tar"
 import { downloadUrl, readPointer, tagOf, treeHash } from "./pack.mjs"
 
-const [dir = "web-assets", pointer = "web-assets.json", assets = "assets"] = process.argv
+const [dir = "web-assets", pointer = "tools/compress/web-assets.json", assets = "assets"] = process.argv
   .slice(2)
   .map((p) => resolve(p))
 const log = (msg) => console.error(`[download] ${msg}`)

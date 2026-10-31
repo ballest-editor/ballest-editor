@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// usage: node tools/compress/publish.mjs [WEB_ASSETS_DIR] [POINTER_FILE]   (defaults: ./web-assets ./web-assets.json)
+// usage: node tools/compress/publish.mjs [WEB_ASSETS_DIR] [POINTER_FILE]   (defaults: ./web-assets ./tools/compress/web-assets.json)
 //
 // Publishes web-assets/ (tools/compress's output) as the asset pack: a tarball (sorted entries, mtime 0, portable
 // modes) attached to a prerelease tagged `assets-<tree hash>` on GitHub, never marked latest. Writes the tag and the
@@ -16,7 +16,7 @@ import { join, resolve } from "node:path"
 import { create } from "tar"
 import { ASSET, REPO, tagOf, treeFiles, treeHash } from "./pack.mjs"
 
-const [dir = "web-assets", pointer = "web-assets.json"] = process.argv.slice(2).map((p) => resolve(p))
+const [dir = "web-assets", pointer = "tools/compress/web-assets.json"] = process.argv.slice(2).map((p) => resolve(p))
 const log = (msg) => console.error(`[publish] ${msg}`)
 const gh = (args) => execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
 

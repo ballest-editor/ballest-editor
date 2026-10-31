@@ -13,12 +13,12 @@
     "release:smoke": "node tools/release/src/main.ts smoke",
     "test": "turbo test",
     "typecheck": "turbo typecheck",
-    "lint": "oxlint --type-aware --deny-warnings --disable-nested-config",
-    "knip": "knip --treat-config-hints-as-errors",
+    "lint": "oxlint -c .config/oxlintrc.json --type-aware --deny-warnings --disable-nested-config --ignore-pattern \"**/routeTree.gen.ts\" --ignore-pattern \"tools/**/*.mjs\" apps packages tools",
+    "knip": "knip --config .config/knip.json --treat-config-hints-as-errors",
     "format": "dprint fmt",
     "format:check": "dprint check",
     "check:everything": "turbo run format:check lint knip dupes typecheck test build --continue",
-    "dupes": "jscpd",
+    "dupes": "jscpd --config .config/jscpd.json",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -41,8 +41,11 @@
   "engines": {
     "node": ">=22.18.0"
   },
+  "commitlint": {
+    "extends": ["@commitlint/config-conventional"]
+  },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,json,md}": "dprint fmt --allow-no-files",
-    "{apps,packages,tools}/**/*.{ts,tsx}": "oxlint --type-aware --deny-warnings --disable-nested-config"
+    "{apps,packages,tools}/**/*.{ts,tsx}": "oxlint -c .config/oxlintrc.json --type-aware --deny-warnings --disable-nested-config --ignore-pattern \"**/routeTree.gen.ts\""
   }
 }

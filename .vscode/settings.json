@@ -5,6 +5,9 @@
   "files.watcherExclude": { "repos/**": true },
   "search.exclude": { "repos/**": true },
 
+  // oxlint's config lives in .config/ (the lint script passes -c).
+  "oxc.configPath": ".config/oxlintrc.json",
+
   // TypeScript 7 language server with the Effect language service (needs the
   // TypeScript (Native Preview) extension). The launcher runs `effect-tsgo tsc`.
   "js/ts.experimental.useTsgo": true,
