@@ -17,9 +17,11 @@ import {
   createMap,
   exportMap,
   importMap,
+  listBackups,
   listMaps,
   pickImport,
   projectState,
+  readBackup,
   readMap,
   renameMap,
   revealProject,
@@ -46,6 +48,8 @@ export const installDesktopIpcHandlers = Effect.fn("installDesktopIpcHandlers")(
   yield* ipc.handle(pickImport)
   yield* ipc.handle(importMap)
   yield* ipc.handle(exportMap)
+  yield* ipc.handle(listBackups)
+  yield* ipc.handle(readBackup)
   yield* ipc.handle(openExternal)
   yield* ipc.handle(setWindowTheme)
   yield* ipc.handle(confirmUnsaved)

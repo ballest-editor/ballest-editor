@@ -1,9 +1,12 @@
 import {
+  BackupRef,
   ChooseProjectResult,
   ExportMapPayload,
   ExportMapResult,
   ImportMapPayload,
   ImportMapResult,
+  MapBackupFile,
+  MapBackups,
   MapFileNamePayload,
   PickImportResult,
   ProjectMap,
@@ -25,9 +28,11 @@ import {
   CREATE_MAP_CHANNEL,
   EXPORT_MAP_CHANNEL,
   IMPORT_MAP_CHANNEL,
+  LIST_BACKUPS_CHANNEL,
   LIST_MAPS_CHANNEL,
   PICK_IMPORT_CHANNEL,
   PROJECT_STATE_CHANNEL,
+  READ_BACKUP_CHANNEL,
   READ_MAP_CHANNEL,
   RENAME_MAP_CHANNEL,
   REVEAL_PROJECT_CHANNEL,
@@ -167,5 +172,23 @@ export const exportMap = makeIpcMethod({
   result: ExportMapResult,
   handler: Effect.fn("ipc.exportMap")(function*(payload) {
     return yield* (yield* Projects).exportMap(payload)
+  })
+})
+
+export const listBackups = makeIpcMethod({
+  channel: LIST_BACKUPS_CHANNEL,
+  payload: Schema.Undefined,
+  result: MapBackups,
+  handler: Effect.fn("ipc.listBackups")(function*() {
+    return yield* (yield* Projects).backups
+  })
+})
+
+export const readBackup = makeIpcMethod({
+  channel: READ_BACKUP_CHANNEL,
+  payload: BackupRef,
+  result: MapBackupFile,
+  handler: Effect.fn("ipc.readBackup")(function*(ref) {
+    return yield* (yield* Projects).readBackup(ref)
   })
 })

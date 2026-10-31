@@ -270,6 +270,7 @@ export function MenuBar() {
           <>
             <MenubarItem inset onClick={() => openDialog(hasFile ? "rename" : "saveAs")}>Rename…</MenubarItem>
             <CommandItem action="saveMapAs" inset>Duplicate…</CommandItem>
+            <MenubarItem inset onClick={() => openDialog("recover")}>Recover previous version…</MenubarItem>
           </>
         )}
         <MenubarItem {...(projects && { inset: true })} onClick={() => openDialog("mapSettings")}>

@@ -18,6 +18,8 @@ const valid = `
     pickImport: () => electron.ipcRenderer.invoke("ballest:project:pickImport"),
     importMap: (payload) => electron.ipcRenderer.invoke("ballest:project:importMap", payload),
     exportMap: (payload) => electron.ipcRenderer.invoke("ballest:project:exportMap", payload),
+    listBackups: () => electron.ipcRenderer.invoke("ballest:project:listBackups"),
+    readBackup: (ref) => electron.ipcRenderer.invoke("ballest:project:readBackup", ref),
     setWindowTheme: (dark) => electron.ipcRenderer.invoke("ballest:window:setTheme", { dark }),
     confirmUnsaved: (prompt) => electron.ipcRenderer.invoke("ballest:window:confirmUnsaved", prompt),
     onUnloadRequest: () => () => {},

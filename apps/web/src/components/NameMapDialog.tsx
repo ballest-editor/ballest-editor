@@ -62,10 +62,12 @@ export function NameMapDialog(
 
   const target = mapFileNameOf(name.trim(), creator.name)
   const clash = projects && target !== fileName && taken.has(target)
+  // Duplicate may write over another map (it goes to the backups); Rename and Save never do.
+  const replaces = clash && mode === "duplicate"
   const submit = async () => {
     await creator.persist()
     onClose()
-    if (mode === "duplicate") await duplicateMap(name, creator.name)
+    if (mode === "duplicate") await duplicateMap(name, creator.name, replaces)
     else if (mode === "rename") await renameOpenMap(name, creator.name)
     else {
       useEditor.getState().renameLevel(name, creator.name)
@@ -124,11 +126,19 @@ export function NameMapDialog(
           </button>
         </div>
       }
-      submitLabel={copy.submit}
-      canSubmit={isValidName(name) && isValidName(creator.name) && risky.rejected.length === 0 && !clash}
+      submitLabel={replaces ? "Replace" : copy.submit}
+      canSubmit={isValidName(name) && isValidName(creator.name) && risky.rejected.length === 0 &&
+        (!clash || replaces)}
       onSubmit={submit}
     >
-      {clash && (
+      {replaces && (
+        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          The project already has a map called {name.trim()} by{" "}
+          {creator.name}. Duplicate replaces it, and its file goes to the project's backups (Map › Recover previous
+          version…).
+        </p>
+      )}
+      {clash && !replaces && (
         <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           The project already has a map called {name.trim()} by {creator.name}.
         </p>

@@ -1,9 +1,9 @@
 # Projects, maps and exports
 
 Status: long-term design, written 2026-10-31. Phase 1 and 2 are milestone 0.2 work; the rest is
-sequenced below. Phase 1's project folder, save flow, Import and Export to game are built (#132), and so is the
-unsaved-changes prompt before closing or replacing the open map (#70; [DESKTOP.md](DESKTOP.md) § Window). Backups on
-overwrite, #137, are still open. [DESKTOP.md](DESKTOP.md) describes the shell this runs in; [FORMAT.md](FORMAT.md) the
+sequenced below. Phase 1's project folder, save flow, Import and Export to game are built (#132), and so are the
+unsaved-changes prompt before closing or replacing the open map (#70; [DESKTOP.md](DESKTOP.md) § Window) and backups
+on overwrite with Recover (#137; [DESKTOP.md](DESKTOP.md) § Backups). [DESKTOP.md](DESKTOP.md) describes the shell this runs in; [FORMAT.md](FORMAT.md) the
 game's file format, which none of this changes.
 
 ## The three nouns
@@ -49,8 +49,12 @@ file the user picked to import; the page names maps by file name, never by path.
   moves the entry to the new file name. The `MapLinks` service owns the file: one update at a time, atomic writes,
   and a file that doesn't decode reads as empty. Sync detection (#141) compares a game file's hash with
   `export.hash` and `lastSeenHash`.
-- **`.ballest/backups/<time> <file name>`**: the old file after a Rename, or the project's copy when an Import
-  replaces it. #137 adds backups on overwrite here and Recover.
+- **`.ballest/backups/<time> <file name>`**: the project's copy of a map before anything wrote over it (Save,
+  Duplicate over it, Import replacing it, later Re-import) and the old file after a Rename. The game's copy before an
+  Export (or Play) wrote over it goes to `<userData>/backups/` under the same naming, since it belongs to this machine,
+  not the project. Both go through one step, `Backups.overwrite`; unchanged bytes keep nothing; each folder keeps 20
+  versions per file for 30 days (`desktop-settings.json` › `backups`). Map › Recover previous version… opens one as
+  unsaved edits ([DESKTOP.md](DESKTOP.md) § Backups).
 
 The project in use and the recent ones (at most 8) are in `desktop-settings.json` under `project.recent`, the one in
 use first; an empty list means the default project.
@@ -195,7 +199,7 @@ run because this is already in front of the user; later launches notify only whe
 **Settings tiers.** _Settings_ (the app: keybinds, camera, appearance, game folders), _Project
 settings_ (name, folder, default creator, export target; later git), _Map settings_ (what today's
 "Project settings…" edits: level data, difficulty, tags, grid height, Export on save). A **Map** menu
-holds Rename, Duplicate, Map settings, Export to game and Re-import; **Game** keeps Launch, Play and
+holds Rename, Duplicate, Recover previous version, Map settings, Export to game and Re-import; **Game** keeps Launch, Play and
 Install plugin.
 
 ## Phases

@@ -17,6 +17,7 @@ import { GamePaths } from "./game/GamePaths"
 import { GameProcess } from "./game/GameProcess"
 import { SteamLibrary } from "./game/SteamLibrary"
 import { DesktopIpc } from "./ipc/DesktopIpc"
+import { Backups } from "./project/Backups"
 import { MapLinks } from "./project/MapLinks"
 import { Projects } from "./project/Projects"
 import { DesktopSettings } from "./settings/DesktopSettings"
@@ -49,7 +50,10 @@ const layerGame = Layer.mergeAll(GameCreator.layer, GameLink.layer).pipe(
   Layer.provideMerge(GameHost.layer)
 )
 
-const layerProjects = Projects.layer.pipe(Layer.provide(MapLinks.layer), Layer.provideMerge(layerGame))
+const layerProjects = Projects.layer.pipe(
+  Layer.provide(Layer.mergeAll(MapLinks.layer, Backups.layer)),
+  Layer.provideMerge(layerGame)
+)
 
 const layerDesktopRuntime = Layer.mergeAll(DesktopWindow.layer, DesktopUpdates.layer, layerProjects).pipe(
   Layer.provideMerge(DesktopSettings.layer),
