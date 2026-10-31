@@ -17,6 +17,11 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
   readonly rendererDir: string
   /** The game-derived assets, served at `/assets/*` next to the renderer's own chunks; none when unpackaged. */
   readonly assetsDir: Option.Option<string>
+  /**
+   * The `ballest-editor-link` plugin the app installs into the game (`resources/plugins/ballest-editor-link`;
+   * unpackaged, packages/ballest-editor-link's build).
+   */
+  readonly pluginDir: string
 }>()("ballest/desktop/app/DesktopEnvironment") {
   /** `dirname` is the bundle's directory (`dist-electron/`), where the preload sits next to `main.cjs`. */
   static readonly layer = (dirname: string) =>
@@ -39,7 +44,10 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
           rendererDir: metadata.isPackaged
             ? path.join(metadata.appPath, "web")
             : path.resolve(dirname, "../../web/dist"),
-          assetsDir: metadata.isPackaged ? Option.some(path.join(metadata.resourcesPath, "assets")) : Option.none()
+          assetsDir: metadata.isPackaged ? Option.some(path.join(metadata.resourcesPath, "assets")) : Option.none(),
+          pluginDir: metadata.isPackaged
+            ? path.join(metadata.resourcesPath, "plugins", "ballest-editor-link")
+            : path.resolve(dirname, "../../../packages/ballest-editor-link/dist/ballest-editor-link")
         })
       })
     )

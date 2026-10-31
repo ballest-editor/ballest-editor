@@ -23,6 +23,8 @@ export const smoke = Effect.fn("smoke")(function*() {
     `${stageLayout.main}/preload.cjs`,
     `${stageLayout.renderer}/index.html`,
     `${stageLayout.assets}/catalog.json`,
+    `${stageLayout.plugins}/ballest-editor-link/info.toml`,
+    `${stageLayout.plugins}/ballest-editor-link/main.as`,
     `${stageLayout.buildResources}/icon.ico`,
     `${stageLayout.buildResources}/icons/512x512.png`
   ]
@@ -31,7 +33,13 @@ export const smoke = Effect.fn("smoke")(function*() {
 
   yield* electronBuilder(app, ["--linux", "dir", "--x64"])
   const resources = path.join(output, "linux-unpacked", "resources")
-  const expectPackaged = ["app.asar", "app-update.yml", "assets/catalog.json"]
+  const expectPackaged = [
+    "app.asar",
+    "app-update.yml",
+    "assets/catalog.json",
+    "plugins/ballest-editor-link/info.toml",
+    "plugins/ballest-editor-link/main.as"
+  ]
 
   const problems = [
     ...yield* Effect.filter(expectStaged, (file) => Effect.map(fs.exists(path.join(app, file)), (ok) => !ok)),

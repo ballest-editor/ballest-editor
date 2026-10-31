@@ -24,6 +24,8 @@ const members = {
   launchGame: "function",
   isGameRunning: "function",
   findCreator: "function",
+  pluginStatus: "function",
+  installPlugin: "function",
   getUpdateState: "function",
   downloadUpdate: "function",
   installUpdate: "function",

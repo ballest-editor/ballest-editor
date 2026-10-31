@@ -2,5 +2,13 @@
   "name": "@ballest/editor-link",
   "version": "0.0.0",
   "private": true,
-  "description": "The ballest-editor-link plugin for the Ballest plugin manager (AngelScript): races the map when the desktop app's Play writes play.json"
+  "type": "module",
+  "description": "The ballest-editor-link plugin for the Ballest plugin manager (AngelScript): races the map when the desktop app's Play writes play.json",
+  "scripts": {
+    "build": "node scripts/stage.ts",
+    "typecheck": "effect-tsgo tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5"
+  }
 }

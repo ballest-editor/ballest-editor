@@ -1,7 +1,9 @@
-import { Effect, FileSystem, Layer, Path } from "effect"
+import { NodeServices } from "@effect/platform-node"
+import { Effect, FileSystem, Layer, Path, type Scope } from "effect"
 import { DesktopSettings } from "../settings/DesktopSettings"
 import { GameHost } from "./GameHost"
 import { GamePaths } from "./GamePaths"
+import { GameProcess } from "./GameProcess"
 import type { HostInfo } from "./locations"
 import { SteamLibrary } from "./SteamLibrary"
 
@@ -15,7 +17,10 @@ export const makeFakeSteam = Effect.fn("makeFakeSteam")(function*(root: string, 
   readonly game: "steam" | "second" | "none"
   /** The game has run: its `Saved` folder exists in the prefix. */
   readonly ran?: boolean
+  /** The plugins folder exists. */
   readonly plugins?: boolean
+  /** The plugin manager is installed: `version.dll` next to the exe, and the plugins folder. */
+  readonly pluginManager?: boolean
   readonly installDir?: string
 }) {
   const fs = yield* FileSystem.FileSystem
@@ -45,8 +50,11 @@ export const makeFakeSteam = Effect.fn("makeFakeSteam")(function*(root: string, 
       `"AppState"\n{\n\t"appid"\t\t"3339810"\n\t"installdir"\t\t"${installDir}"\n}\n`
     )
     yield* write(path.join(install, "Ballest", "Binaries", "Win64", "Ballest-Win64-Shipping.exe"), "")
-    if (options.plugins === true) {
+    if (options.plugins === true || options.pluginManager === true) {
       yield* fs.makeDirectory(path.join(install, "Ballest", "Binaries", "Win64", "plugins"), { recursive: true })
+    }
+    if (options.pluginManager === true) {
+      yield* write(path.join(install, "Ballest", "Binaries", "Win64", "version.dll"), "")
     }
     if (options.ran === true) yield* fs.makeDirectory(saved, { recursive: true })
   }
@@ -58,13 +66,32 @@ export const makeFakeSteam = Effect.fn("makeFakeSteam")(function*(root: string, 
     procDir: path.join(root, "proc")
   }
   yield* fs.makeDirectory(host.procDir, { recursive: true })
-  return { host, steam, second, library, install, maps: path.join(saved, "UserSavedMaps") }
+  const plugins = path.join(install, "Ballest", "Binaries", "Win64", "plugins")
+  return { host, steam, second, library, install, plugins, maps: path.join(saved, "UserSavedMaps") }
 })
 
-/** GamePaths and SteamLibrary over a fake Steam's `host`, with the desktop settings in `settingsFile`. */
+/** The app's copy of the editor-link plugin, at `version`, in a fresh folder under `root`; returns its folder. */
+export const makeFakePluginBundle = Effect.fn("makeFakePluginBundle")(function*(root: string, version: string) {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const dir = path.join(root, "bundle", "ballest-editor-link")
+  yield* fs.makeDirectory(dir, { recursive: true })
+  yield* fs.writeFileString(
+    path.join(dir, "info.toml"),
+    `[meta]\nname = "Ballest Editor link"\nversion = "${version}" # bumped per release\n\n[script]\nfiles = ["main.as"]\n`
+  )
+  yield* fs.writeFileString(path.join(dir, "main.as"), `// ${version}\nvoid Main() {}\n`)
+  return dir
+})
+
+/** GamePaths, GameProcess and SteamLibrary over a fake Steam's `host`, with the desktop settings in `settingsFile`. */
 export const layerFakeGamePaths = (host: HostInfo & { readonly procDir: string }, settingsFile: string) =>
-  GamePaths.layer.pipe(
+  Layer.mergeAll(GamePaths.layer, GameProcess.layer).pipe(
     Layer.provideMerge(SteamLibrary.layer),
     Layer.provide(Layer.succeed(GameHost, GameHost.of(host))),
     Layer.provide(Layer.effect(DesktopSettings, DesktopSettings.make(settingsFile)))
   )
+
+/** Runs a test over the real file system, closing its scope (and temp folders) at the end. */
+export const runScoped = <A, E>(effect: Effect.Effect<A, E, Scope.Scope | NodeServices.NodeServices>) =>
+  effect.pipe(Effect.scoped, Effect.provide(NodeServices.layer))

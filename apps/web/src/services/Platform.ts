@@ -3,15 +3,24 @@ import type {
   FoundCreator,
   GamePathKind,
   GamePaths,
+  InstallPluginResult,
   MapFileRef,
   OpenedMapFile,
+  PluginStatus,
   RecentMapFiles,
   SaveToGameResult,
   UpdateState
 } from "@ballest/contracts"
 import { Context, Effect, Layer, Option, Queue, Schema, Stream } from "effect"
 
-export type { FoundCreator, GamePath, GamePathKind, GamePaths } from "@ballest/contracts"
+export type {
+  FoundCreator,
+  GamePath,
+  GamePathKind,
+  GamePaths,
+  InstallPluginResult,
+  PluginStatus
+} from "@ballest/contracts"
 
 /** What this platform can do beyond opening and saving files; the menus hide what it can't. */
 export interface PlatformCapabilities {
@@ -95,6 +104,10 @@ export class Platform extends Context.Service<Platform, {
    * name) and where it was found (desktop); none in a browser, or when nothing names one.
    */
   readonly findCreator: Effect.Effect<Option.Option<FoundCreator>, PlatformError>
+  /** Whether the `ballest-editor-link` plugin Play needs is installed, and as new as the app's copy (desktop). */
+  readonly pluginStatus: Effect.Effect<PluginStatus, PlatformError>
+  /** Installs the app's copy of the plugin, or updates an older one; fails without the plugin manager. */
+  readonly installPlugin: Effect.Effect<InstallPluginResult, PlatformError>
   /** The updater's state now, then every change to it (desktop); a browser's ends at once. */
   readonly updates: Stream.Stream<UpdateState, PlatformError>
   /** Starts downloading the release on offer; the progress arrives on `updates`. */
@@ -201,6 +214,8 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
     ),
     isGameRunning: bridgeCall(() => bridge.isGameRunning()),
     findCreator: bridgeCall(() => bridge.findCreator()).pipe(Effect.map(Option.fromNullOr)),
+    pluginStatus: bridgeCall(() => bridge.pluginStatus()),
+    installPlugin: bridgeCall(() => bridge.installPlugin()),
     updates: updateStates(bridge),
     downloadUpdate: bridgeCall(() => bridge.downloadUpdate()),
     installUpdate: bridgeCall(() => bridge.installUpdate())
@@ -263,6 +278,8 @@ const makeBrowser = (): Platform["Service"] =>
     launchGame: desktopOnly,
     isGameRunning: Effect.succeed(false),
     findCreator: Effect.succeedNone,
+    pluginStatus: desktopOnly,
+    installPlugin: desktopOnly,
     updates: Stream.empty,
     downloadUpdate: Effect.void,
     installUpdate: Effect.void
@@ -281,8 +298,18 @@ export interface TestDisk {
   >
   readonly recent: Array<string>
   readonly external: Array<string>
-  /** `creator`: what `findCreator` answers. */
-  game: { paths: GamePaths; running: boolean; launches: number; creator: FoundCreator | null }
+  /**
+   * `creator`: what `findCreator` answers. `plugin`: the editor-link plugin's status; installing it makes it `current`,
+   * counted in `pluginInstalls`.
+   */
+  game: {
+    paths: GamePaths
+    running: boolean
+    launches: number
+    creator: FoundCreator | null
+    plugin: PluginStatus
+    pluginInstalls: number
+  }
   /** The updater: `push` sends a new state to the page, as main does. Downloads and installs are counted. */
   readonly updater: {
     state: UpdateState
@@ -307,7 +334,19 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   dialogs: [],
   recent: [],
   external: [],
-  game: { paths: testGamePaths, running: false, launches: 0, creator: null },
+  game: {
+    paths: testGamePaths,
+    running: false,
+    launches: 0,
+    creator: null,
+    plugin: {
+      status: "missing",
+      bundledVersion: "0.2.0",
+      installedVersion: null,
+      folder: "/game/Ballest/Binaries/Win64/plugins/ballest-editor-link"
+    },
+    pluginInstalls: 0
+  },
   updater: makeTestUpdater()
 })
 
@@ -414,6 +453,16 @@ const testBridge = (disk: TestDisk): DesktopBridge => {
     },
     isGameRunning: () => Promise.resolve(disk.game.running),
     findCreator: () => Promise.resolve(disk.game.creator),
+    pluginStatus: () => Promise.resolve(disk.game.plugin),
+    installPlugin: () => {
+      const { plugin } = disk.game
+      if (plugin.status === "noGame" || plugin.status === "noPluginManager") {
+        return Promise.reject(new Error("GameLinkError: The Ballest plugin manager isn't installed."))
+      }
+      disk.game.pluginInstalls++
+      disk.game.plugin = { ...plugin, status: "current", installedVersion: plugin.bundledVersion }
+      return Promise.resolve({ plugin: disk.game.plugin, restartGame: disk.game.running })
+    },
     getUpdateState: () => Promise.resolve(disk.updater.state),
     downloadUpdate: () => {
       disk.updater.downloads++

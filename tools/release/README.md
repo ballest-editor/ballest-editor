@@ -14,7 +14,7 @@ node tools/release/src/main.ts --help
 
 ## What `desktop` does
 
-1. `turbo run build --filter=@ballest/desktop`: the asset pack, `apps/web/dist`, `apps/desktop/dist-electron`. Cached as usual.
+1. `turbo run build --filter=@ballest/desktop`: the asset pack, `apps/web/dist`, `packages/ballest-editor-link/dist`, `apps/desktop/dist-electron`. Cached as usual.
 2. Stages the app in a temp directory:
 
    | Staged           | From                                                              | Ships as                         |
@@ -23,6 +23,7 @@ node tools/release/src/main.ts --help
    | `dist-electron/` | `apps/desktop/dist-electron` (main.cjs, preload.cjs)              | `app.asar`                       |
    | `web/`           | `apps/web/dist` without the game assets                           | `app.asar`                       |
    | `assets/`        | `assets/` (minus raw `pieces/`, `textures/`) + `web-assets/`      | `resources/assets`               |
+   | `plugins/`       | `packages/ballest-editor-link/dist` (info.toml, main.as)          | `resources/plugins`              |
    | `build/`         | `apps/desktop/resources/icon.svg`, rendered by `src/icons.ts`     | exe, installer and desktop icons |
 
    `DesktopEnvironment` reads the renderer from `<app.asar>/web` and the assets from `resources/assets` when packaged, so the 53 MB of meshes and textures ship once. There is no `node_modules`: the main and preload bundles inline every dependency except `electron`.
@@ -51,7 +52,7 @@ After 15 s the title bar offers 0.2.1; Download, then Restart, replaces the AppI
 
 Push a tag: `git tag v0.2.0-rc.1 && git push origin v0.2.0-rc.1`, or run the **Release** workflow by hand with a tag (created on the branch's head if new). `.github/workflows/release.yml`, only in `ballest-editor/ballest-editor`:
 
-1. **build bundle** checks the tag is `vX.Y.Z` or `vX.Y.Z-pre` (`main.ts version`), builds once, runs the smoke check and uploads `apps/web/dist`, `apps/desktop/dist-electron` and `web-assets/`.
+1. **build bundle** checks the tag is `vX.Y.Z` or `vX.Y.Z-pre` (`main.ts version`), builds once, runs the smoke check and uploads `apps/web/dist`, `apps/desktop/dist-electron`, `packages/ballest-editor-link/dist` and `web-assets/`.
 2. **desktop win x64** (`windows-latest`) and **desktop linux x64** (`ubuntu-latest`) run `release-desktop.yml`, which packages with `--skip-build` and uploads the installer, blockmap and manifest.
 3. **publish release** runs `main.ts verify`: both installers, the Windows blockmap and both manifests exist, the manifests are for this version and point at files that exist. It writes `SHA256SUMS` and uploads everything to a draft release, then publishes it. A version with a pre-release part (`-rc.1`) is a GitHub prerelease and never "latest".
 

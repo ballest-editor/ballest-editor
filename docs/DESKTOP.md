@@ -60,7 +60,7 @@ Effect layers, same shape as t3-code:
 
 - `electron/*`: one `Context.Service` per Electron API we touch (`ElectronApp`, `ElectronWindow`, `ElectronProtocol`, `ElectronDialog`, `ElectronShell`, `ElectronUpdater`). Listeners are scoped with `acquireRelease`.
 - `app/`: `DesktopEnvironment` (paths: `userData`, `resourcesPath`, `isPackaged`, dev server URL from `VITE_DEV_SERVER_URL`), `DesktopApp.program` (whenReady → protocol → IPC handlers → window → updater), fatal errors to `dialog.showErrorBox`.
-- `game/`: `SteamLibrary` (finds the install from `libraryfolders.vdf` + `appmanifest_3339810.acf`, like the plugin manager's `find_game.sh`), `GamePaths` (maps folder, plugins folder; Windows and Proton variants, see below), `GameLink` (play handoff).
+- `game/`: `SteamLibrary` (finds the install from `libraryfolders.vdf` + `appmanifest_3339810.acf`, like the plugin manager's `find_game.sh`), `GamePaths` (maps folder, plugins folder; Windows and Proton variants, see below), `GameLink` (the plugin's status and install, later the play handoff).
 - `ipc/`: `makeIpcMethod({ channel, payload: Schema, result: Schema, handler })`, decode in, encode out, `ipcMain.handle` inside `acquireRelease`. Main pushes to the renderer with `webContents.send`.
 - Entry: `Effect.provide(layerDesktopRuntime)` then `NodeRuntime.runMain`. `registerSchemesAsPrivileged` runs before `whenReady`.
 
@@ -89,7 +89,7 @@ The renderer gets each folder as `found | overridden | missing`, with the path i
 
 **Save to game** (File menu) writes the map into the maps folder under the game's file name. It is a copy: the open file stays the one Save writes to, unless the map had no file yet. A file there whose `levelPublishedFileId` is above 0 is a published map's draft, and the editor asks before replacing it. **Launch game** (Game menu) opens `steam://rungameid/3339810`, or says the game is already running.
 
-The app never touches the install except the plugin folder below.
+The app never touches the install except the plugin's own folder below, and only through `GameLink`.
 
 ### Play: the plugin handoff
 
@@ -104,7 +104,25 @@ So **Play** in the desktop app:
 2. Writes `<plugins>/ballest-editor-link/play.json`: `{ "map": "Map_LevelEditorMain&<name>_<creator>.balledit", "nonce": <n> }`.
 3. If the game isn't running (no `Ballest-Win64-Shipping.exe` process), opens `steam://rungameid/3339810`.
 
-The plugin, `ballest-editor-link` (`packages/ballest-editor-link/`: `info.toml` + `main.as`), polls `play.json` from `Update(dt)` twice a second, and on a new nonce calls `Tracks::OpenLocal`. It uses no `Console::` and no network. It isn't published to the plugin manager's registry: the app bundles it in `extraResources` and, when the user asks, copies it into `<plugins>/ballest-editor-link/` (the plugin manager picks up a hand-installed folder when the game starts). Without the plugin manager installed, Play degrades to Save-to-game plus launch, and the editor says so.
+The plugin, `ballest-editor-link` (`packages/ballest-editor-link/`: `info.toml` + `main.as`), polls `play.json` from `Update(dt)` twice a second, and on a new nonce calls `Tracks::OpenLocal`. It uses no `Console::` and no network. Without the plugin manager installed, Play degrades to Save-to-game plus launch, and the editor says so.
+
+#### Installing the plugin
+
+It isn't published to the plugin manager's registry: the app ships it and installs it when the user asks.
+
+- **Shipped.** The package's `build` (`scripts/stage.ts`) copies `info.toml` and the scripts its `[script] files` lists into `dist/ballest-editor-link/`; `apps/desktop#build` and `#dev` depend on it in turbo. `tools/release` stages that folder as `plugins/ballest-editor-link`, which electron-builder ships beside `app.asar` (`extraResources`). `DesktopEnvironment.pluginDir` is `resources/plugins/ballest-editor-link` when packaged, the package's `dist/` otherwise.
+- **Status** (`GameLink.pluginStatus`, IPC `ballest:game:pluginStatus`), read the way the plugin manager's host reads manifests (the same TOML subset, `version` defaulting to 0.0.0, its `CompareVersions`: dot-separated numbers, a missing one counting as 0):
+
+  | Status            | When                                                                                 |
+  | ----------------- | ------------------------------------------------------------------------------------ |
+  | `noGame`          | the install wasn't found                                                             |
+  | `noPluginManager` | no `version.dll` next to `Ballest-Win64-Shipping.exe`, or no plugins folder          |
+  | `missing`         | no `<plugins>/ballest-editor-link/info.toml`, or a file the app's copy has is absent |
+  | `outdated`        | the installed `[meta] version` is older than the app's copy                          |
+  | `current`         | as new or newer (a newer one, say a developer's, is left alone)                      |
+
+- **Install** (`GameLink.installPlugin`, IPC `ballest:game:installPlugin`), only on the user's click, refused with `noGame` or `noPluginManager`. The files are copied into a `.ballest-editor-link-*` folder beside the plugin (same drive; the host skips folders starting with a dot) and each is renamed over its old copy, `info.toml` last, so a folder left half-updated still reads as the old version. Anything else in the folder, `play.json` included, stays; the plugin's last nonce lives in the plugin manager's storage, outside the folder. Nothing outside `<plugins>/ballest-editor-link/` is written. The plugin manager loads a folder copied in by hand only when the game starts, so the result says whether the game is running and the editor says "Restart the game to use Play".
+- **UI.** Settings › Game has an **Editor plugin** row under the three folders: the folder, the status, **Install** or **Update**, and **Install steps** (the plugin manager's site) when the plugin manager is missing. The Game link checklist on the Start tab (#134, docs/PROJECTS.md) shows the same `Platform.pluginStatus` / `installPlugin` as one of its rows.
 
 Later: an `Editor::OpenLocal` host API for "open in the in-game editor", and a file-changed callback instead of polling. Both are upstream requests, not blockers.
 

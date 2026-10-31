@@ -12,6 +12,7 @@ import { listSamples, readSample } from "../test/samples"
 import {
   findCreatorEffect,
   followUpdateState,
+  installPluginEffect,
   launchGameEffect,
   openMapFile,
   openRecentFile,
@@ -219,6 +220,50 @@ describe("creator actions", () => {
         source: "steam",
         valid: true
       })
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+})
+
+/** Collects what the store would toast, for the rest of the effect. */
+const noticesWhile = <A, E, R>(body: (notices: Array<string>) => Effect.Effect<A, E, R>) =>
+  Effect.acquireUseRelease(
+    Effect.sync(() => {
+      const notify = s().notify
+      const notices: Array<string> = []
+      useEditor.setState({ notify: (_kind, text) => void notices.push(text) })
+      return { notify, notices }
+    }),
+    ({ notices }) => body(notices),
+    ({ notify }) => Effect.sync(() => useEditor.setState({ notify }))
+  )
+
+describe("plugin actions", () => {
+  it.effect("Install puts the plugin in, and says when the game must restart to load it", () => {
+    const disk = makeTestDisk()
+    return noticesWhile((notices) =>
+      Effect.gen(function*() {
+        s().setPluginStatus(disk.game.plugin)
+        yield* installPluginEffect
+        assert.strictEqual(disk.game.pluginInstalls, 1)
+        assert.deepInclude(s().pluginStatus, { status: "current", installedVersion: "0.2.0" })
+        assert.deepStrictEqual(notices, ["Installed the editor's plugin"])
+
+        disk.game.plugin = { ...disk.game.plugin, status: "outdated", installedVersion: "0.1.0" }
+        disk.game.running = true
+        s().setPluginStatus(disk.game.plugin)
+        yield* installPluginEffect
+        assert.strictEqual(notices[1], "Updated the editor's plugin to 0.2.0. Restart the game to use Play.")
+      })
+    ).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("Install fails without the plugin manager, and installs nothing", () => {
+    const disk = makeTestDisk()
+    disk.game.plugin = { ...disk.game.plugin, status: "noPluginManager" }
+    return Effect.gen(function*() {
+      const error = yield* Effect.flip(installPluginEffect)
+      assert.match(error.message, /plugin manager isn't installed/)
+      assert.strictEqual(disk.game.pluginInstalls, 0)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 })

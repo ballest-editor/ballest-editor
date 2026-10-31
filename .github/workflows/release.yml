@@ -55,7 +55,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           node tools/release/src/main.ts version "$TAG" >> "$GITHUB_OUTPUT"
 
-      # apps/web and apps/desktop, after //#assets fetches the asset pack.
+      # apps/web, the editor-link plugin and apps/desktop, after //#assets fetches the asset pack.
       - run: pnpm exec turbo run build --filter=@ballest/desktop
 
       # Stages that build and lays it out unpacked with electron-builder (tools/release/src/smoke.ts), so a broken
@@ -68,6 +68,7 @@ jobs:
           path: |
             apps/web/dist
             apps/desktop/dist-electron
+            packages/ballest-editor-link/dist
             web-assets
           if-no-files-found: error
           retention-days: 1

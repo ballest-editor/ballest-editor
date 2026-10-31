@@ -32,16 +32,26 @@
       ],
       "outputs": ["dist/**"]
     },
-    // The desktop app packages the renderer build and the assets, so it builds after both.
+    // The desktop app packages the renderer build, the assets and the editor-link plugin, so it builds after them.
     "@ballest/desktop#build": {
-      "dependsOn": ["^build", "@ballest/web#build", "//#assets"],
+      "dependsOn": ["^build", "@ballest/web#build", "@ballest/editor-link#build", "//#assets"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.config/tsconfig.base.json"],
       "outputs": ["dist-electron/**"]
+    },
+    // Copies info.toml and main.as into dist/ballest-editor-link/; needs none of the game assets.
+    "@ballest/editor-link#build": {
+      "outputs": ["dist/**"]
     },
     // Run through tools/dev/src/dev-runner.ts (`pnpm dev`, `pnpm dev:desktop`), which sets PORT, HOST and
     // VITE_DEV_SERVER_URL and passes --env-mode=loose so they reach the tasks.
     "dev": {
       "dependsOn": ["//#assets"],
+      "cache": false,
+      "persistent": true
+    },
+    // Unpackaged, the desktop app installs the plugin from packages/ballest-editor-link/dist.
+    "@ballest/desktop#dev": {
+      "dependsOn": ["//#assets", "@ballest/editor-link#build"],
       "cache": false,
       "persistent": true
     },

@@ -1,5 +1,5 @@
 // Lays out the app electron-builder packages: package.json (with the config), the main and preload bundles, the
-// renderer build, the game assets beside it and the icons.
+// renderer build, the game assets and the editor-link plugin beside it, and the icons.
 import { Effect, FileSystem, Path, Schema } from "effect"
 import { type Platform, stageLayout, stagePackageJson, type UpdateFeed } from "./config.ts"
 import { writeIcons } from "./icons.ts"
@@ -75,6 +75,7 @@ export const stage = Effect.fn("stage")(function*(options: StageOptions) {
     renderer: path.join(root, "apps/web/dist"),
     assets: path.join(root, "assets"),
     webAssets: path.join(root, "web-assets"),
+    plugin: path.join(root, "packages/ballest-editor-link/dist/ballest-editor-link"),
     icon: path.join(root, "apps/desktop/resources/icon.svg")
   }
   const required = [
@@ -82,7 +83,8 @@ export const stage = Effect.fn("stage")(function*(options: StageOptions) {
     { file: path.join(from.main, "preload.cjs"), hint: "build apps/desktop (`pnpm build`)" },
     { file: path.join(from.renderer, "index.html"), hint: "build apps/web (`pnpm build`)" },
     { file: path.join(from.assets, "catalog.json"), hint: "assets/ is committed; is this the repo root?" },
-    { file: path.join(from.webAssets, "pieces"), hint: "fetch or compress the meshes and textures (`pnpm assets`)" }
+    { file: path.join(from.webAssets, "pieces"), hint: "fetch or compress the meshes and textures (`pnpm assets`)" },
+    { file: path.join(from.plugin, "info.toml"), hint: "build packages/ballest-editor-link (`pnpm build`)" }
   ]
   for (const { file, hint } of required) {
     if (!(yield* fs.exists(file))) return yield* new MissingBuild({ file, hint })
@@ -99,6 +101,11 @@ export const stage = Effect.fn("stage")(function*(options: StageOptions) {
   const renderer = (yield* filesUnder(from.renderer)).filter((file) => !shipped.has(file))
   yield* copyFiles(from.renderer, to(stageLayout.renderer), renderer)
   yield* copyFiles(from.main, to(stageLayout.main), yield* filesUnder(from.main))
+  yield* copyFiles(
+    from.plugin,
+    path.join(to(stageLayout.plugins), "ballest-editor-link"),
+    yield* filesUnder(from.plugin)
+  )
   yield* writeIcons(from.icon, to(stageLayout.buildResources))
 
   // The pinned Electron (apps/desktop's devDependency) is what the packaged app runs on.

@@ -363,14 +363,21 @@ export const launchGameEffect = Effect.gen(function*() {
 
 export const launchGame = () => run(launchGameEffect)
 
-/** Runs a lookup that may return the game's folders (none: the user cancelled) and shows them. */
+/** Looks the editor-link plugin up again: it depends on the game folders. */
+const refreshPluginStatus = Effect.gen(function*() {
+  useEditor.getState().setPluginStatus(yield* (yield* Platform).pluginStatus)
+})
+
+/** Runs a lookup that may return the game's folders (none: the user cancelled) and shows them, and the plugin. */
 const showGamePaths = <E>(
   lookup: (platform: Platform["Service"]) => Effect.Effect<Option.Option<GamePaths>, E, AppServices>
 ) =>
   run(
     Effect.gen(function*() {
       const paths = yield* lookup(yield* Platform)
-      if (Option.isSome(paths)) useEditor.getState().setGamePaths(paths.value)
+      if (Option.isNone(paths)) return
+      useEditor.getState().setGamePaths(paths.value)
+      yield* refreshPluginStatus
     })
   )
 
@@ -384,6 +391,30 @@ export const chooseGamePath = (which: GamePathKind) => showGamePaths((platform) 
 export const resetGamePaths = (kinds: ReadonlyArray<GamePathKind>) =>
   showGamePaths((platform) =>
     Effect.forEach(kinds, platform.resetGamePath).pipe(Effect.andThen(Effect.asSome(platform.gamePaths)))
+  )
+
+/**
+ * Install / Update in Settings › Game: copies the app's editor-link plugin into the game's plugins folder. Only ever
+ * run when the user asks. The plugin manager loads a plugin copied in by hand when the game starts, hence the restart.
+ */
+export const installPluginEffect = Effect.gen(function*() {
+  const { status } = useEditor.getState().pluginStatus ?? {}
+  const { plugin, restartGame } = yield* (yield* Platform).installPlugin
+  useEditor.getState().setPluginStatus(plugin)
+  const done = status === "outdated"
+    ? `Updated the editor's plugin to ${plugin.bundledVersion}`
+    : "Installed the editor's plugin"
+  useEditor.getState().notify("info", restartGame ? `${done}. Restart the game to use Play.` : done)
+})
+
+export const installPlugin = () => run(installPluginEffect)
+
+/** Opens a web page in the browser (the desktop app's default browser). */
+export const openExternalLink = (url: string) =>
+  run(
+    Effect.gen(function*() {
+      yield* (yield* Platform).openExternal(url)
+    })
   )
 
 export const revealGamePath = (which: GamePathKind) =>

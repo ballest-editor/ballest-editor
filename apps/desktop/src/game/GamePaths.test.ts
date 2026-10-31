@@ -1,7 +1,6 @@
-import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, FileSystem, Option, Path, type Scope } from "effect"
-import { layerFakeGamePaths, makeFakeSteam } from "./fakeSteam"
+import { Effect, FileSystem, Option, Path } from "effect"
+import { layerFakeGamePaths, makeFakeSteam, runScoped } from "./fakeSteam"
 import { GamePaths } from "./GamePaths"
 import { SteamLibrary } from "./SteamLibrary"
 
@@ -17,12 +16,9 @@ const setup = (options: Parameters<typeof makeFakeSteam>[1]) =>
     return { fs, path, dir, fake, paths, steam }
   })
 
-const run = <A, E>(effect: Effect.Effect<A, E, Scope.Scope | NodeServices.NodeServices>) =>
-  effect.pipe(Effect.scoped, Effect.provide(NodeServices.layer))
-
 describe("GamePaths", () => {
   it.effect("finds every folder when the game is in Steam's own library and has run", () =>
-    run(Effect.gen(function*() {
+    runScoped(Effect.gen(function*() {
       const { fake, paths, steam } = yield* setup({ game: "steam", ran: true, plugins: true })
       // ~/.steam/steam links to ~/.local/share/Steam: listed once.
       assert.deepStrictEqual(yield* steam.libraries, [fake.steam, fake.second])
@@ -34,7 +30,7 @@ describe("GamePaths", () => {
     })))
 
   it.effect("finds the game in another library, under the install folder its manifest names", () =>
-    run(Effect.gen(function*() {
+    runScoped(Effect.gen(function*() {
       const { fake, paths } = yield* setup({ game: "second", ran: true, installDir: "Ballest" })
       assert.isTrue(fake.install.endsWith("games/SteamLibrary/steamapps/common/Ballest"))
       const found = yield* paths.get
@@ -48,7 +44,7 @@ describe("GamePaths", () => {
     })))
 
   it.effect("reports a maps folder that doesn't exist yet as missing, at the path it would have", () =>
-    run(Effect.gen(function*() {
+    runScoped(Effect.gen(function*() {
       const { fake, paths } = yield* setup({ game: "steam" })
       assert.deepStrictEqual((yield* paths.get).mapsFolder, { status: "missing", path: fake.maps })
       const error = yield* Effect.flip(paths.mapsFolderForWrite)
@@ -56,7 +52,7 @@ describe("GamePaths", () => {
     })))
 
   it.effect("creates UserSavedMaps when the game has run but never saved a map", () =>
-    run(Effect.gen(function*() {
+    runScoped(Effect.gen(function*() {
       const { fs, fake, paths } = yield* setup({ game: "steam", ran: true })
       assert.isFalse(yield* fs.exists(fake.maps))
       assert.strictEqual(yield* paths.mapsFolderForWrite, fake.maps)
@@ -64,7 +60,7 @@ describe("GamePaths", () => {
     })))
 
   it.effect("reports everything missing without the game", () =>
-    run(Effect.gen(function*() {
+    runScoped(Effect.gen(function*() {
       const { fake, paths } = yield* setup({ game: "none" })
       const found = yield* paths.get
       assert.deepStrictEqual(found.install, { status: "missing", path: null })
@@ -74,7 +70,7 @@ describe("GamePaths", () => {
     })))
 
   it.effect("uses folders chosen in settings, and goes back to the ones found", () =>
-    run(Effect.gen(function*() {
+    runScoped(Effect.gen(function*() {
       const { fs, path, dir, fake, paths } = yield* setup({ game: "steam", ran: true })
       const maps = path.join(dir, "my maps")
       const plugins = path.join(dir, "plugins")
@@ -91,7 +87,7 @@ describe("GamePaths", () => {
     })))
 
   it.effect("accepts only a folder with the game's exe as the install, and follows it to its library", () =>
-    run(Effect.gen(function*() {
+    runScoped(Effect.gen(function*() {
       const { fs, path, dir, paths } = yield* setup({ game: "none" })
       const error = yield* Effect.flip(paths.setOverride("install", Option.some(dir)))
       assert.strictEqual(error.reason, "notInstall")
