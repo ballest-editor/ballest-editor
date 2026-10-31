@@ -5,6 +5,7 @@ import { MapCodec } from "./MapCodec"
 import { MapExporter } from "./MapExporter"
 import { MapPrefsStore } from "./MapPrefsStore"
 import { MaterialLibrary } from "./MaterialLibrary"
+import { Platform } from "./Platform"
 import { SettingsStore } from "./SettingsStore"
 
 export const AppLayer = Layer.mergeAll(
@@ -14,6 +15,7 @@ export const AppLayer = Layer.mergeAll(
   MapExporter.layer,
   MapPrefsStore.layer,
   MaterialLibrary.layer,
+  Platform.layer,
   SettingsStore.layer,
   DateTime.layerCurrentZoneLocal
 )

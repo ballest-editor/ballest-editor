@@ -47,7 +47,7 @@ function MapSettings() {
   const levelData = useEditor((s) => s.doc.map.worldSettings.levelData)
   const itemCount = useEditor((s) => s.doc.map.items.length)
   const hasEditorState = useEditor((s) => s.doc.map.editorState !== undefined)
-  const sourceName = useEditor((s) => s.sourceName)
+  const fileName = useEditor((s) => s.file?.name ?? null)
   const renameLevel = useEditor((s) => s.renameLevel)
   const openDialog = useEditor((s) => s.openDialog)
   // An edit in progress; otherwise the input shows the map's name.
@@ -62,7 +62,7 @@ function MapSettings() {
     ["Items", String(itemCount)],
     ["Created", levelData.createdAt || "on export"],
     ["Validated", levelData.bValidated ? "yes" : "no"],
-    ["Source", `${sourceName ?? "new map"}${hasEditorState ? "" : " (no editorState)"}`]
+    ["Source", `${fileName ?? "new map"}${hasEditorState ? "" : " (no editorState)"}`]
   ]
   return (
     <div className="flex flex-col gap-3">

@@ -1,4 +1,4 @@
-import { Context, Effect, FileSystem, Layer, Path, Schema } from "effect"
+import { Context, Effect, FileSystem, Layer, Path, Schema, Semaphore } from "effect"
 import { DesktopEnvironment } from "../app/DesktopEnvironment"
 
 const Size = Schema.Int.check(Schema.isGreaterThan(0))
@@ -14,7 +14,9 @@ export type WindowState = typeof WindowState.Type
 
 /** `desktop-settings.json`: what the main process remembers between runs. The renderer's settings live in its own storage. */
 export const DesktopSettingsFile = Schema.Struct({
-  window: Schema.optional(WindowState)
+  window: Schema.optional(WindowState),
+  /** Map files opened or saved, most recent first (files/MapFiles.ts keeps at most 8). */
+  recentMaps: Schema.optional(Schema.Array(Schema.String))
 })
 export type DesktopSettingsFile = typeof DesktopSettingsFile.Type
 
@@ -32,8 +34,14 @@ export class DesktopSettingsWriteError extends Schema.TaggedError<DesktopSetting
 export class DesktopSettings extends Context.Service<DesktopSettings, {
   /** The saved settings; empty when the file is missing or doesn't decode (it is only ever a convenience). */
   readonly get: Effect.Effect<DesktopSettingsFile>
-  /** Replaces the file atomically: a crash mid-write leaves the previous settings, never half a file. */
-  readonly set: (settings: DesktopSettingsFile) => Effect.Effect<void, DesktopSettingsWriteError>
+  /**
+   * Reads the file, applies `f` and writes the result back. Updates run one at a time, so two of them (the window's
+   * bounds, a recent file) never lose each other's change. The write is atomic: a crash mid-write leaves the previous
+   * settings, never half a file.
+   */
+  readonly update: (
+    f: (settings: DesktopSettingsFile) => DesktopSettingsFile
+  ) => Effect.Effect<DesktopSettingsFile, DesktopSettingsWriteError>
 }>()("ballest/desktop/settings/DesktopSettings") {
   static readonly make = Effect.fn("DesktopSettings.make")(function*(file: string) {
     const fs = yield* FileSystem.FileSystem
@@ -51,7 +59,7 @@ export class DesktopSettings extends Context.Service<DesktopSettings, {
       })
     )
 
-    const set = (settings: DesktopSettingsFile) => {
+    const write = (settings: DesktopSettingsFile) => {
       const temp = `${file}.${process.pid}.tmp`
       return Schema.encodeEffect(SettingsJson)(settings).pipe(
         Effect.tap(() => fs.makeDirectory(path.dirname(file), { recursive: true })),
@@ -61,7 +69,15 @@ export class DesktopSettings extends Context.Service<DesktopSettings, {
       )
     }
 
-    return DesktopSettings.of({ get, set })
+    const lock = yield* Semaphore.make(1)
+    const update = (f: (settings: DesktopSettingsFile) => DesktopSettingsFile) =>
+      Effect.gen(function*() {
+        const next = f(yield* get)
+        yield* write(next)
+        return next
+      }).pipe(lock.withPermits(1))
+
+    return DesktopSettings.of({ get, update })
   })
 
   static readonly layer = Layer.effect(

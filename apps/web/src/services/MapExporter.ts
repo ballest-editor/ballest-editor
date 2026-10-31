@@ -15,7 +15,6 @@ import { MapCodec } from "./MapCodec"
 export interface ExportedMap {
   readonly filename: string
   readonly text: string
-  readonly blob: Blob
   /** The map as written (with the export-time level fields applied). */
   readonly map: MapFile
 }
@@ -67,7 +66,6 @@ export class MapExporter extends Context.Service<MapExporter, {
         return {
           filename: mapFileNameOf(displayName, creatorName),
           text,
-          blob: new Blob([text], { type: "application/json" }),
           map: out
         } satisfies ExportedMap
       })

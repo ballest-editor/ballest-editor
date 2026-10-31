@@ -30,7 +30,6 @@ describe("MapExporter", () => {
       assert.strictEqual(levelData.createdAt, "2026.10.26-17.04.05")
       assert.match(levelData.createdAt, /^\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}\.\d{2}$/)
       assert.isTrue(result.text.startsWith("{\r\n\t\"worldSettings\":\r\n\t{\r\n"))
-      assert.strictEqual(result.blob.size, new TextEncoder().encode(result.text).length)
       // the output decodes again and keeps exactly one player start
       assert.strictEqual(decoded.items.filter(isPlayerStart).length, 1)
       assert.isDefined(decoded.editorState)

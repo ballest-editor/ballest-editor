@@ -9,6 +9,7 @@ import {
   type ElectronWindowLoadError
 } from "../electron/ElectronWindow"
 import { DesktopSettings, type WindowState } from "../settings/DesktopSettings"
+import { titleBarOverlay, windowBackground, windowShortcutOf } from "./chrome"
 
 const DEFAULT_SIZE = { width: 1440, height: 900 }
 /** The editor's panels and viewport need about this much room. */
@@ -61,8 +62,11 @@ export class DesktopWindow extends Context.Service<DesktopWindow, {
           ...MIN_SIZE,
           title: "Ballest Editor",
           show: false,
-          backgroundColor: "#0a0a0a",
-          autoHideMenuBar: true,
+          // No native title bar: the page's top bar is the title bar, and Electron draws the window controls over
+          // its end (on the side the desktop puts them). The page starts dark and reports its theme (setWindowTheme).
+          titleBarStyle: "hidden",
+          titleBarOverlay: titleBarOverlay(true),
+          backgroundColor: windowBackground(true),
           webPreferences: {
             preload: environment.preloadPath,
             contextIsolation: true,
@@ -77,11 +81,24 @@ export class DesktopWindow extends Context.Service<DesktopWindow, {
           lastState = windowState(window)
         })
         yield* Effect.addFinalizer(() =>
-          Effect.suspend(() => lastState === undefined ? Effect.void : settings.set({ ...saved, window: lastState }))
-            .pipe(
-              Effect.catchTag("DesktopSettingsWriteError", (error) => Effect.logWarning(error.message, error.cause))
-            )
+          Effect.suspend(() => {
+            const state = lastState
+            return state === undefined ? Effect.void : settings.update((current) => ({ ...current, window: state }))
+          }).pipe(
+            Effect.asVoid,
+            Effect.catchTag("DesktopSettingsWriteError", (error) => Effect.logWarning(error.message, error.cause))
+          )
         )
+
+        // A menu bar never shows. Unpackaged builds keep Electron's default menu for its reload and DevTools keys.
+        window.setMenuBarVisibility(false)
+        window.webContents.on("before-input-event", (event, input) => {
+          const shortcut = windowShortcutOf(input)
+          if (shortcut === undefined) return
+          event.preventDefault()
+          if (shortcut === "quit") window.close()
+          else window.setFullScreen(!window.isFullScreen())
+        })
 
         window.once("ready-to-show", () => {
           if (Option.isSome(restored) && restored.value.maximized) window.maximize()

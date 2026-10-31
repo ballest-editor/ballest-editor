@@ -89,7 +89,7 @@ flowchart TB
   program[DesktopApp.program] --> window[DesktopWindow<br/>creates the window, saves its bounds]
   window --> settings[DesktopSettings<br/>desktop-settings.json, atomic writes]
   settings --> env[DesktopEnvironment<br/>paths, dev server URL]
-  env --> electron["ElectronApp · ElectronWindow · ElectronProtocol<br/>ElectronDialog · ElectronShell · DesktopIpc"]
+  env --> electron["ElectronApp · ElectronWindow · ElectronProtocol<br/>ElectronDialog · ElectronShell · ElectronMenu · DesktopIpc"]
   electron --> node[NodeServices<br/>FileSystem, Path]
 ```
 
@@ -118,6 +118,7 @@ A sandboxed preload can `require("electron")` and nothing else, and it has to be
 - `contextIsolation`, `sandbox`, `nodeIntegration: false`. The page and the preload run in separate JavaScript worlds, with no Node in either.
 - Navigation and `window.open` to anything but `ballest://app` go to the system browser. No other page can load inside the window and pick up `window.ballest`.
 - Main decodes every IPC payload with its schema before a handler runs.
+- Main reads and writes only map files the user picked in one of its dialogs (or picked before: the recent files), and only `.balledit`, `.ballmap` and `.json` ones. `fs:readText` with any other path is refused, so a compromised page can't read the disk.
 - CSP allows scripts from the app's own origin only. `'unsafe-inline'` is still on for the panel-width script in `index.html`; moving that script out would let us drop it.
 
 ## Layout
@@ -128,10 +129,11 @@ src/
   preload.ts              window.ballest; must stay self-contained
   app/        DesktopApp (the program), DesktopEnvironment (paths)
   electron/   one service per Electron API
+  files/      MapFiles: which map files the page may touch, reads, atomic writes, recent files
   ipc/        DesktopIpc (handle + makeIpcMethod), channels, methods/
   protocol/   serveStatic: files for ballest://, no Electron import, tested
   settings/   desktop-settings.json
-  window/     DesktopWindow: the editor window and its bounds
+  window/     DesktopWindow: the editor window and its bounds; chrome: title bar overlay, F11 and Ctrl+Q
 scripts/
   electron.ts             the Electron binary and its environment, minus ELECTRON_RUN_AS_NODE, which
                           Electron-based terminals export and which turns the binary into plain Node
@@ -140,4 +142,4 @@ scripts/
   verifyPreloadBundle.ts  the build check above
 ```
 
-Tests (`pnpm --filter @ballest/desktop test`) cover the ping round trip against a fake `ipcMain`, file serving and path escapes, the settings file, and the preload check. None of them load `electron`.
+Tests (`pnpm --filter @ballest/desktop test`) cover the IPC methods against a fake `ipcMain` and fake dialogs (ping, open and save, recent files, external links, the window theme), map files (byte-for-byte writes, which paths are allowed), file serving and path escapes, the settings file, the window shortcuts, and the preload check. None of them load `electron`: the tests that import an Electron service mock the module.

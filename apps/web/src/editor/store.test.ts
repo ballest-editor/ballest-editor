@@ -526,7 +526,7 @@ describe("editor store", () => {
     s().openDialog("settings", "keybinds")
     assert.strictEqual(s().dialog, "settings")
     assert.strictEqual(s().settingsCategory, "keybinds")
-    s().openDialog("export")
+    s().openDialog("saveAs")
     assert.strictEqual(s().settingsCategory, "keybinds") // unchanged when no category is given
     s().closeDialog()
     assert.isNull(s().dialog)

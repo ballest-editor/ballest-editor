@@ -29,6 +29,11 @@ export class ElectronWindow extends Context.Service<ElectronWindow, {
   readonly closed: (window: Electron.BrowserWindow) => Effect.Effect<void>
   /** Each display's work area, for checking that saved bounds are still on screen. */
   readonly workAreas: Effect.Effect<ReadonlyArray<Electron.Rectangle>>
+  /** Recolours the window showing `webContentsId`: its title bar overlay and background. Nothing if it has none. */
+  readonly setColors: (
+    webContentsId: number,
+    colors: { readonly overlay: Electron.TitleBarOverlayOptions; readonly background: string }
+  ) => Effect.Effect<void>
 }>()("ballest/desktop/electron/ElectronWindow") {
   static readonly layer = Layer.succeed(
     ElectronWindow,
@@ -61,7 +66,15 @@ export class ElectronWindow extends Context.Service<ElectronWindow, {
             if (!window.isDestroyed()) window.removeListener("closed", listener)
           })
         }),
-      workAreas: Effect.sync(() => Electron.screen.getAllDisplays().map((display) => display.workArea))
+      workAreas: Effect.sync(() => Electron.screen.getAllDisplays().map((display) => display.workArea)),
+      setColors: (webContentsId, { overlay, background }) =>
+        Effect.sync(() => {
+          const contents = Electron.webContents.fromId(webContentsId)
+          const window = contents === undefined ? null : Electron.BrowserWindow.fromWebContents(contents)
+          if (window === null || window.isDestroyed()) return
+          window.setBackgroundColor(background)
+          window.setTitleBarOverlay(overlay)
+        })
     })
   )
 }

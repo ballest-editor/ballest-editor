@@ -1,7 +1,7 @@
 /** UI-facing operations that run Effects through the single app runtime. */
-import { Cause, Effect, Exit } from "effect"
+import { Cause, Effect, Exit, Option } from "effect"
 import type { UeTransform, Vec3 } from "../domain/coords"
-import { currentCreatedAt, newMapFile } from "../domain/factory"
+import { currentCreatedAt, mapFileNameOf, newMapFile } from "../domain/factory"
 import {
   type Axis,
   type AxisEdit,
@@ -22,6 +22,7 @@ import { MapCodec } from "../services/MapCodec"
 import { MapExporter } from "../services/MapExporter"
 import { MapPrefsStore } from "../services/MapPrefsStore"
 import { MaterialLibrary } from "../services/MaterialLibrary"
+import { type OpenedMap, Platform } from "../services/Platform"
 import { type AppServices, runtime } from "../services/runtime"
 import { SettingsStore } from "../services/SettingsStore"
 import { pivotOf, type SlotPaint, useEditor } from "./store"
@@ -185,37 +186,96 @@ export const newMap = (displayName: string, creatorName: string) =>
     })
   )
 
-export const importFile = (file: File) =>
+/** The resolved theme to the desktop window's controls; cosmetic, so a failure is only logged. */
+export const setWindowTheme = (dark: boolean) =>
   run(
     Effect.gen(function*() {
-      const text = yield* Effect.promise(() => file.text())
-      const map = yield* MapCodec.use((codec) => codec.decode(text))
-      // unreadable prefs only cost the saved grid height
-      const prefs = yield* MapPrefsStore.use((store) => store.load(mapPrefsKeyOf(map))).pipe(
-        Effect.orElseSucceed((): MapPrefs => ({}))
-      )
-      useEditor.getState().loadMap(map, file.name, prefs.gridHeight)
-      useEditor.getState().notify("info", `Imported ${file.name} (${map.items.length} items)`)
+      yield* (yield* Platform).setWindowTheme(dark)
+    }).pipe(Effect.catch((error) => Effect.logWarning("Couldn't recolour the window controls", error)))
+  )
+
+/** What the platform offers, and its recent files, into the store. */
+export const loadPlatform = () =>
+  run(
+    Effect.gen(function*() {
+      useEditor.getState().setCapabilities((yield* Platform).capabilities)
+      yield* refreshRecentFiles
     })
   )
 
-export const exportMap = () =>
-  run(
-    Effect.gen(function*() {
-      const { map } = useEditor.getState().doc
-      const result = yield* MapExporter.use((exporter) => exporter.prepare(map))
-      const url = URL.createObjectURL(result.blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = result.filename
-      a.click()
-      setTimeout(() => URL.revokeObjectURL(url), 1_000)
-      useEditor.getState().replaceMapSilently(result.map)
-      useEditor.getState().notify("info", `Exported ${result.filename}`)
-      // the export may have renamed the map: its prefs follow it to the new name
-      yield* saveMapPrefs
-    })
+const refreshRecentFiles = Effect.gen(function*() {
+  const platform = yield* Platform
+  if (!platform.capabilities.filePaths) return
+  useEditor.getState().setRecentFiles(yield* platform.recentMaps)
+})
+
+const loadOpened = Effect.fn("loadOpened")(function*(opened: OpenedMap) {
+  const map = yield* MapCodec.use((codec) => codec.decode(opened.text))
+  // unreadable prefs only cost the saved grid height
+  const prefs = yield* MapPrefsStore.use((store) => store.load(mapPrefsKeyOf(map))).pipe(
+    Effect.orElseSucceed((): MapPrefs => ({}))
   )
+  useEditor.getState().loadMap(map, { name: opened.name, path: Option.getOrNull(opened.path) }, prefs.gridHeight)
+  useEditor.getState().notify("info", `Opened ${opened.name} (${map.items.length} items)`)
+})
+
+/** Asks for a map file (the open dialog, or the browser's file picker) and opens it. */
+export const openMapFile = Effect.gen(function*() {
+  const opened = yield* Platform.use((platform) => platform.openMap)
+  if (Option.isNone(opened)) return
+  yield* loadOpened(opened.value).pipe(Effect.ensuring(Effect.ignore(refreshRecentFiles)))
+})
+
+/** Opens one of the recent files; one that has gone drops off the list. */
+export const openRecentFile = (path: string) =>
+  Effect.gen(function*() {
+    yield* loadOpened(yield* (yield* Platform).openRecent(path))
+  }).pipe(Effect.ensuring(Effect.ignore(refreshRecentFiles)))
+
+/**
+ * Saves the open map. Save as asks where (desktop) or downloads (browser); Save writes over the open file, unless the
+ * map has been renamed since (the game only loads a file named after the map inside it) or it isn't a `.balledit`.
+ * Then it asks too, starting in the open file's folder.
+ */
+export const saveMapFile = (mode: "save" | "saveAs") =>
+  Effect.gen(function*() {
+    const platform = yield* Platform
+    const { doc, file } = useEditor.getState()
+    const result = yield* MapExporter.use((exporter) => exporter.prepare(doc.map))
+    const overwrite = mode === "save" && file?.name === result.filename
+    const saved = yield* platform.saveMap(
+      { name: result.filename, text: result.text },
+      { path: Option.fromNullOr(overwrite ? file.path : null), near: Option.fromNullOr(file?.path ?? null) }
+    )
+    if (Option.isNone(saved)) return
+    const { name, path } = saved.value
+    useEditor.getState().markSaved(doc, result.map, { name, path: Option.getOrNull(path) })
+    useEditor.getState().notify("info", `${platform.capabilities.filePaths ? "Saved" : "Downloaded"} ${name}`)
+    // the save may have renamed the map: its prefs follow it to the new name
+    yield* saveMapPrefs
+    yield* refreshRecentFiles
+  })
+
+export const openMap = () => run(openMapFile)
+
+export const openRecent = (path: string) => run(openRecentFile(path))
+
+/**
+ * Save: writes over the open file when it is named after the map; otherwise opens the Save as dialog, which confirms
+ * the map's name first.
+ */
+export const saveMap = () => {
+  const { doc, file, openDialog } = useEditor.getState()
+  const { levelDisplayName, creatorName } = doc.map.worldSettings.levelData
+  if (file?.name !== mapFileNameOf(levelDisplayName.trim(), creatorName.trim())) {
+    openDialog("saveAs")
+    return Promise.resolve(undefined)
+  }
+  return run(saveMapFile("save"))
+}
+
+/** The Save as dialog's last step, once the name is confirmed. */
+export const saveMapAs = () => run(saveMapFile("saveAs"))
 
 /**
  * The open map's prefs, under its current name: the grid height when it isn't the player

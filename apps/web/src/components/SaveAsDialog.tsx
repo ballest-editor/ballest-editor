@@ -2,15 +2,16 @@ import { useMemo, useState } from "react"
 import { riskyClassesIn } from "../domain/Catalog"
 import { isValidName } from "../domain/factory"
 import { classNameOf } from "../domain/MapFile"
-import { exportMap } from "../editor/actions"
+import { saveMapAs } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { MapNameDialog, useMapCreator } from "./MapNameDialog"
 
 /**
- * Export always confirms the map name, so a renamed file never disagrees with the names
+ * Save as always confirms the map name, so a renamed file never disagrees with the names
  * inside it (the game refuses to load those). The creator comes from Settings › General.
+ * Then the desktop app asks where; a browser downloads the file.
  */
-export function ExportDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
+export function SaveAsDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   const displayName = useEditor((s) => s.doc.map.worldSettings.levelData.levelDisplayName)
   const renameLevel = useEditor((s) => s.renameLevel)
   const openDialog = useEditor((s) => s.openDialog)
@@ -25,6 +26,7 @@ export function ExportDialog({ open, onClose }: { readonly open: boolean; readon
       ),
     [items, catalog]
   )
+  const filePaths = useEditor((s) => s.capabilities.filePaths)
   const creator = useMapCreator()
   const [name, setName] = useState(displayName)
   // Each time the dialog opens, start from the map's current name.
@@ -37,17 +39,19 @@ export function ExportDialog({ open, onClose }: { readonly open: boolean; readon
     await creator.persist()
     renameLevel(name, creator.name)
     onClose()
-    await exportMap()
+    await saveMapAs()
   }
 
   return (
     <MapNameDialog
       open={open}
       onClose={onClose}
-      id="export"
-      title="Export map"
+      id="save-as"
+      title="Save map as"
       fileNameLead="Saves"
-      fileNameNote="Drop it in the game's UserSavedMaps folder; don't rename the file afterwards."
+      fileNameNote={filePaths
+        ? "Save it in the game's UserSavedMaps folder under this name; the game doesn't load a renamed file."
+        : "Drop it in the game's UserSavedMaps folder; don't rename the file afterwards."}
       name={name}
       onNameChange={setName}
       creator={creator}
@@ -63,7 +67,7 @@ export function ExportDialog({ open, onClose }: { readonly open: boolean; readon
           </button>
         </div>
       }
-      submitLabel="Export"
+      submitLabel={filePaths ? "Save…" : "Download"}
       canSubmit={isValidName(name) && isValidName(creator.name) && risky.rejected.length === 0}
       onSubmit={submit}
     >

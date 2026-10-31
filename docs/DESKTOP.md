@@ -44,7 +44,15 @@ The renderer never imports `electron`. It gets a `Platform` service (`apps/web/s
 | Open external link | `window.open`       | `shell.openExternal`                                         |
 | Updates            | none                | electron-updater state stream                                |
 
-`Platform.layer` is picked at module load: `window.ballest !== undefined` means desktop (the preload runs before any page script, so that test is reliable). Components still reach it through `editor/actions`; `exportMap` and `importFile` become `Platform` calls instead of DOM tricks. Settings, keybinds and map prefs stay in `localStorage` (Electron persists it under `userData`); nothing to migrate.
+`Platform.layer` is picked at module load: `window.ballest !== undefined` means desktop (the preload runs before any page script, so that test is reliable). Components still reach it through `editor/actions`: Open, Save and Save as are `Platform` calls instead of DOM tricks. Settings, keybinds and map prefs stay in `localStorage` (Electron persists it under `userData`); nothing to migrate.
+
+Main reads and writes only the map files the user picked in one of its dialogs, this session or before (the recent files, the last 8 in `desktop-settings.json`), and only `.balledit`, `.ballmap` and `.json`. The page can't name a path main hasn't handed it. Save writes over the open file while it is named after the map inside it (the game loads nothing else); after a rename, or for a `.ballmap`, it asks like Save as.
+
+### Window
+
+The page's top bar is the window's title bar. The window has `titleBarStyle: "hidden"` and a `titleBarOverlay`: Electron draws only the window controls, over one end of the top bar, on the side the desktop puts them (GTK's button layout on Linux). The top bar is a drag region (`-webkit-app-region: drag`, buttons `no-drag`) and pads itself clear of the controls with `env(titlebar-area-x/width)`, which a browser leaves undefined. The page reports its resolved theme (`setWindowTheme`) and main recolours the controls and the window background to match. Same approach as t3-code's.
+
+Installed builds have no application menu (`Menu.setApplicationMenu(null)`): the page's menu bar is the UI, and Electron's default menu would reload or close the window behind the editor's back. Main handles the two window shortcuts it would have given, F11 (fullscreen) and Ctrl+Q (quit), in `before-input-event`. Unpackaged builds keep the default menu, hidden, for its reload and DevTools keys. Alt+F4 and window snapping come from the OS, not the menu.
 
 ### Main process
 

@@ -52,7 +52,7 @@ export const keybindSections = [
   },
   { name: "mouse and keyboard bindings", actions: ["lookRight", "lookLeft", "lookUp", "lookDown"] },
   { name: "editor camera", actions: ["fastMove", "speedFaster", "speedSlower", "orbit", "pan"] },
-  { name: "file", actions: ["newMap", "importMap", "exportMap"] },
+  { name: "file", actions: ["newMap", "openMap", "saveMap", "saveMapAs"] },
   { name: "help", actions: ["showKeybinds"] }
 ] as const
 
@@ -100,8 +100,9 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   orbit: "orbit",
   pan: "pan",
   newMap: "new map",
-  importMap: "import map",
-  exportMap: "export map",
+  openMap: "open map",
+  saveMap: "save map",
+  saveMapAs: "save map as",
   showKeybinds: "keybind cheat sheet"
 }
 
@@ -152,8 +153,10 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   orbit: "Hold and drag to orbit around the focus point.",
   pan: "Hold and drag to slide the camera sideways and up/down.",
   newMap: "Start a new map.",
-  importMap: "Open a .balledit or .ballmap file.",
-  exportMap: "Download the map as a .balledit file for the game.",
+  openMap: "Open a .balledit or .ballmap file.",
+  saveMap:
+    "Save the map over the file it was opened from or last saved to. The first time, or after the map is renamed, it asks for the name and the place like Save as. In the browser it downloads the file.",
+  saveMapAs: "Confirm the map's name, then save it as a new .balledit file for the game (in the browser, a download).",
   showKeybinds: "Hold to show every keybind over the viewport; release to hide it. Editor only."
 }
 
@@ -219,8 +222,9 @@ export const defaultKeybinds: Keybinds = {
   orbit: ["Alt+Mouse0"],
   pan: ["Mouse1"],
   newMap: ["Alt+KeyN"],
-  importMap: ["Ctrl+KeyO"],
-  exportMap: ["Ctrl+Shift+KeyE"],
+  openMap: ["Ctrl+KeyO"],
+  saveMap: ["Ctrl+KeyS"],
+  saveMapAs: ["Ctrl+Shift+KeyS"],
   showKeybinds: ["Shift+Slash"]
 }
 
@@ -232,10 +236,14 @@ export const uniqueBindings = (
   bindings: ReadonlyArray<string>
 ): Bindings => [...new Set(bindings.filter((b) => b.length > 0))]
 
+/** Actions saved under an older name: their bindings carry over when the new name has none saved. */
+const RENAMED_ACTIONS: Partial<Record<KeybindAction, string>> = { openMap: "importMap", saveMapAs: "exportMap" }
+
 export const mergeKeybinds = (stored: StoredKeybinds, defaults: Keybinds = defaultKeybinds): Keybinds => {
   const out: Record<KeybindAction, Bindings> = { ...defaults }
   for (const action of keybindActions) {
-    const value = stored[action]
+    const renamed = RENAMED_ACTIONS[action]
+    const value = stored[action] ?? (renamed === undefined ? undefined : stored[renamed])
     if (value === undefined) continue
     out[action] = uniqueBindings(typeof value === "string" ? [value] : value)
   }

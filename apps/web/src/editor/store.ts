@@ -36,6 +36,7 @@ import { type Pivot, pivotAt } from "../domain/pivot"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import type { LoadedCatalog } from "../services/CatalogLoader"
+import type { PlatformCapabilities } from "../services/Platform"
 
 import type { GizmoSpace } from "./gizmo/handles"
 export interface Doc {
@@ -69,11 +70,26 @@ export interface Snapshot {
 export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
 export type Tool = "select" | "translate" | "rotate" | "scale"
-export type Dialog = "new" | "export" | "settings" | "project"
+export type Dialog = "new" | "saveAs" | "settings" | "project"
 export type SettingsCategory = "general" | "editor" | "camera" | "keybinds" | "appearance" | "lighting"
 
 const HISTORY_LIMIT = 200
 const SPEED_STEPS = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
+
+/**
+ * The file the open map was read from or last saved to. `path` is where Save writes (desktop only; a browser never
+ * sees one).
+ */
+export interface OpenFile {
+  readonly name: string
+  readonly path: string | null
+}
+
+/** A recently opened or saved file (desktop). */
+export interface RecentFile {
+  readonly name: string
+  readonly path: string
+}
 
 let nextId = 0
 const freshId = () => `item-${++nextId}`
@@ -94,8 +110,13 @@ export interface EditorState {
   readonly past: ReadonlyArray<Snapshot>
   /** Redo stack, next first; cleared by any new edit. */
   readonly future: ReadonlyArray<Snapshot>
+  /** Edited since it was opened or last saved. */
   readonly dirty: boolean
-  readonly sourceName: string | null
+  /** Null for a map that was never opened or saved. */
+  readonly file: OpenFile | null
+  readonly recentFiles: ReadonlyArray<RecentFile>
+  /** What the platform (browser or desktop app) offers; the browser's until the startup load says otherwise. */
+  readonly capabilities: PlatformCapabilities
   readonly selectedIds: Selection
   readonly tool: Tool
   /** Whether the gizmo follows the selected item's axes or the world's. */
@@ -139,8 +160,15 @@ export interface EditorState {
   readonly frameAllRequest: number
 
   /** Replaces the document; `floorHeight` defaults to the map's player start height. */
-  readonly loadMap: (map: MapFile, sourceName: string | null, floorHeight?: number) => void
-  readonly replaceMapSilently: (map: MapFile) => void
+  readonly loadMap: (map: MapFile, file: OpenFile | null, floorHeight?: number) => void
+  /**
+   * The map was saved as `map` (the export-time level fields applied to `from`) into `file`. When the document is
+   * still `from`, `map` replaces it without an undo step and the document is clean; when it was edited meanwhile, only
+   * the file is remembered.
+   */
+  readonly markSaved: (from: Doc, map: MapFile, file: OpenFile) => void
+  readonly setRecentFiles: (recentFiles: ReadonlyArray<RecentFile>) => void
+  readonly setCapabilities: (capabilities: PlatformCapabilities) => void
   readonly placePiece: (piece: CatalogPiece, transform: ItemTransform) => void
   /**
    * Replaces the transforms of several items as one undo step; false (with a notice, and
@@ -289,7 +317,9 @@ export const useEditor = create<EditorState>()((set, get) => {
     past: [],
     future: [],
     dirty: false,
-    sourceName: null,
+    file: null,
+    recentFiles: [],
+    capabilities: { filePaths: false, saveToGame: false, launchGame: false, play: false },
     selectedIds: [],
     tool: "translate",
     gizmoSpace: "world",
@@ -312,19 +342,22 @@ export const useEditor = create<EditorState>()((set, get) => {
     focusRequest: 0,
     frameAllRequest: 0,
 
-    loadMap: (map, sourceName, floorHeight) =>
+    loadMap: (map, file, floorHeight) =>
       set((s) => ({
         doc: docOf(map),
         floorHeight: floorHeight ?? floorHeightOf(map),
         past: [],
         future: [],
         dirty: false,
-        sourceName,
+        file,
         selectedIds: [],
         frameAllRequest: s.frameAllRequest + 1
       })),
 
-    replaceMapSilently: (map) => set((s) => ({ doc: { ...s.doc, map } })),
+    markSaved: (from, map, file) =>
+      set((s) => s.doc === from ? { doc: { ...s.doc, map }, dirty: false, file } : { file }),
+    setRecentFiles: (recentFiles) => set({ recentFiles }),
+    setCapabilities: (capabilities) => set({ capabilities }),
 
     placePiece: (piece, transform) => {
       const item = validateItem(itemFromPiece(piece, transform))

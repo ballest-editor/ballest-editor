@@ -5,9 +5,11 @@ import { program } from "./app/DesktopApp"
 import { DesktopEnvironment } from "./app/DesktopEnvironment"
 import { ElectronApp } from "./electron/ElectronApp"
 import { ElectronDialog } from "./electron/ElectronDialog"
+import { ElectronMenu } from "./electron/ElectronMenu"
 import { ElectronProtocol, registerSchemePrivileges } from "./electron/ElectronProtocol"
 import { ElectronShell } from "./electron/ElectronShell"
 import { ElectronWindow } from "./electron/ElectronWindow"
+import { MapFiles } from "./files/MapFiles"
 import { DesktopIpc } from "./ipc/DesktopIpc"
 import { DesktopSettings } from "./settings/DesktopSettings"
 import { DesktopWindow } from "./window/DesktopWindow"
@@ -24,13 +26,14 @@ if (userDataDir !== undefined) Electron.app.setPath("userData", userDataDir)
 const layerElectron = Layer.mergeAll(
   ElectronApp.layer,
   ElectronDialog.layer,
+  ElectronMenu.layer,
   ElectronShell.layer,
   ElectronWindow.layer,
   ElectronProtocol.layer,
   DesktopIpc.layer(Electron.ipcMain)
 )
 
-const layerDesktopRuntime = DesktopWindow.layer.pipe(
+const layerDesktopRuntime = Layer.mergeAll(DesktopWindow.layer, MapFiles.layer).pipe(
   Layer.provideMerge(DesktopSettings.layer),
   Layer.provideMerge(DesktopEnvironment.layer(__dirname)),
   Layer.provideMerge(layerElectron),
