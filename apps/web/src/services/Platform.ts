@@ -1,4 +1,5 @@
 import type {
+  BackupRef,
   DesktopBridge,
   ExportMapResult,
   FoundCreator,
@@ -7,6 +8,8 @@ import type {
   ImportMapPayload,
   ImportMapResult,
   InstallPluginResult,
+  MapBackupFile,
+  MapBackups,
   OpenedMapFile,
   PluginStatus,
   ProjectMap,
@@ -26,6 +29,7 @@ export type {
   GamePathKind,
   GamePaths,
   InstallPluginResult,
+  MapBackup,
   PluginStatus,
   ProjectMap,
   ProjectMapFile,
@@ -118,6 +122,12 @@ export class Platform extends Context.Service<Platform, {
   readonly unloadRequests: Stream.Stream<UnloadKind, PlatformError>
   /** Closes the window or reloads the page; the page must have stopped holding the unload first. */
   readonly leave: (kind: UnloadKind) => Effect.Effect<void>
+  /**
+   * The versions main kept of the files it wrote over (the project's and the exports'), newest first; always empty in
+   * a browser.
+   */
+  readonly listBackups: Effect.Effect<MapBackups, PlatformError>
+  readonly readBackup: (ref: BackupRef) => Effect.Effect<MapBackupFile, PlatformError>
   readonly openExternal: (url: string) => Effect.Effect<void, PlatformError>
   /** Tells the desktop window the page's resolved theme (its window controls follow it); nothing in a browser. */
   readonly setWindowTheme: (dark: boolean) => Effect.Effect<void, PlatformError>
@@ -232,6 +242,8 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
     renameMap: (file) => bridgeCall(() => bridge.renameMap(file)),
     importMap: (payload) => bridgeCall(() => bridge.importMap(payload)),
     exportMap: (fileName, { replacePublished }) => bridgeCall(() => bridge.exportMap({ fileName, replacePublished })),
+    listBackups: bridgeCall(() => bridge.listBackups()),
+    readBackup: ({ place, id }) => bridgeCall(() => bridge.readBackup({ place, id })),
     setWindowTheme: (dark) => bridgeCall(() => bridge.setWindowTheme(dark)),
     confirmUnsaved: (action, map) => bridgeCall(() => bridge.confirmUnsaved(unsavedPromptOf(action, map))),
     unloadRequests: unloadRequests(bridge),
@@ -312,6 +324,8 @@ const makeBrowser = (): Platform["Service"] =>
     renameMap: () => noProject,
     importMap: () => noProject,
     exportMap: () => desktopOnly,
+    listBackups: Effect.succeed([]),
+    readBackup: () => noProject,
     setWindowTheme: () => Effect.void,
     confirmUnsaved: (action, map) =>
       Effect.sync(() => window.confirm(discardQuestionOf(action, map)) ? "discard" : "cancel"),

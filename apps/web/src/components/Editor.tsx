@@ -25,6 +25,7 @@ import { MapSettingsDialog } from "./MapSettingsDialog"
 import { NameMapDialog } from "./NameMapDialog"
 import { NewMapDialog } from "./NewMapDialog"
 import { Palette } from "./Palette"
+import { RecoverDialog } from "./RecoverDialog"
 import { ReplacePublishedDialog } from "./ReplacePublishedDialog"
 import { SettingsDialog } from "./SettingsDialog"
 import { SidePanel } from "./SidePanel"
@@ -139,6 +140,7 @@ export function Editor() {
       <MapSettingsDialog open={dialog === "mapSettings"} onClose={close} />
       <ReplacePublishedDialog open={dialog === "replacePublished"} onClose={close} />
       <ImportClashDialog open={dialog === "importClash"} onClose={close} />
+      <RecoverDialog open={dialog === "recover"} onClose={close} />
       <SettingsDialog
         open={dialog === "settings"}
         category={settingsCategory}

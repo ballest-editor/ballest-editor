@@ -27,11 +27,21 @@ export const ProjectSettings = Schema.Struct({
 })
 export type ProjectSettings = typeof ProjectSettings.Type
 
+/** How long the backups of overwritten map files are kept (project/Backups.ts); unset, the defaults there. */
+export const BackupSettings = Schema.Struct({
+  /** Versions kept per file, newest first. */
+  keep: Schema.optional(Size),
+  /** Backups older than this many days are removed. */
+  maxAgeDays: Schema.optional(Size)
+})
+export type BackupSettings = typeof BackupSettings.Type
+
 /** `desktop-settings.json`: what the main process remembers between runs. The renderer's settings live in its own storage. */
 export const DesktopSettingsFile = Schema.Struct({
   window: Schema.optional(WindowState),
   project: Schema.optional(ProjectSettings),
-  game: Schema.optional(GamePathOverrides)
+  game: Schema.optional(GamePathOverrides),
+  backups: Schema.optional(BackupSettings)
 })
 export type DesktopSettingsFile = typeof DesktopSettingsFile.Type
 

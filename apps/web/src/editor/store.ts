@@ -77,7 +77,7 @@ export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 export type Tool = "select" | "translate" | "rotate" | "scale"
 /**
  * `saveAs` names a map that has no file yet before it goes into the project (desktop), or before it is downloaded
- * (browser: Export). `rename` and `duplicate` are the Map menu's (desktop).
+ * (browser: Export). `rename`, `duplicate` and `recover` are the Map menu's (desktop).
  */
 export type Dialog =
   | "new"
@@ -88,6 +88,7 @@ export type Dialog =
   | "mapSettings"
   | "replacePublished"
   | "importClash"
+  | "recover"
 export type SettingsCategory = "general" | "editor" | "camera" | "keybinds" | "appearance" | "lighting" | "game"
 
 const HISTORY_LIMIT = 200
@@ -214,12 +215,15 @@ export interface EditorState {
   readonly focusRequest: number
   readonly frameAllRequest: number
 
-  /** Replaces the document; `floorHeight` defaults to the map's player start height. */
+  /**
+   * Replaces the document; `floorHeight` defaults to the map's player start height. `dirty` opens it as unsaved edits
+   * of `file` (a recovered version), so the next Save writes it there.
+   */
   readonly loadMap: (
     map: MapFile,
     file: OpenFile | null,
     floorHeight?: number,
-    options?: { readonly exportOnSave?: boolean }
+    options?: { readonly exportOnSave?: boolean; readonly dirty?: boolean }
   ) => void
   /**
    * The map was saved as `map` (the export-time level fields applied to `from`) into `file`. When the document is
@@ -435,7 +439,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         floorHeight: floorHeight ?? floorHeightOf(map),
         past: [],
         future: [],
-        dirty: false,
+        dirty: options?.dirty ?? false,
         file,
         exportOnSave: options?.exportOnSave ?? false,
         selectedIds: [],

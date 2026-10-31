@@ -161,6 +161,35 @@ export const ExportMapResult = Schema.TaggedUnion({
 })
 export type ExportMapResult = typeof ExportMapResult.Type
 
+/**
+ * Where a backup is kept: `project`, the project's `.ballest/backups/` (the project's own copy, before Save, Rename or
+ * an Import wrote over it); `export`, `<userData>/backups/` (the game's maps folder's copy, before an Export did).
+ */
+export const BackupPlace = Schema.Literals(["project", "export"])
+export type BackupPlace = typeof BackupPlace.Type
+
+/** A backup's name in its folder, `<time> <file name>`. Never a path: main only reads names it wrote itself. */
+export const BackupId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(512))
+
+export const BackupRef = Schema.Struct({ place: BackupPlace, id: BackupId })
+export type BackupRef = typeof BackupRef.Type
+
+/** A previous version of a map file: which file it was, and when it was backed up. */
+export const MapBackup = Schema.Struct({
+  ...BackupRef.fields,
+  /** The file it is a version of: a project map's file name, which is also its name in the game's maps folder. */
+  fileName: MapFileName,
+  at: IsoTime
+})
+export type MapBackup = typeof MapBackup.Type
+
+export const MapBackups = Schema.Array(MapBackup)
+export type MapBackups = typeof MapBackups.Type
+
+/** A backup that was read, with its text (the old file's bytes). */
+export const MapBackupFile = Schema.Struct({ ...MapBackup.fields, text: MapText })
+export type MapBackupFile = typeof MapBackupFile.Type
+
 export const WindowThemePayload = Schema.Struct({ dark: Schema.Boolean })
 export type WindowThemePayload = typeof WindowThemePayload.Type
 
@@ -304,7 +333,8 @@ export type UpdateState = typeof UpdateState.Type
  * with the schemas above; a payload that fails to decode rejects the returned promise.
  *
  * Main reads and writes map files only in the current project's `maps/` folder (named by file name, never by path) and
- * in the game's maps folder (Export to game), and reads only the files the user picked in its Import dialog.
+ * in the game's maps folder (Export to game), and reads only the files the user picked in its Import dialog. The files
+ * it writes over are kept in its own backups folders, which the page reaches by backup name only.
  */
 export interface DesktopBridge {
   readonly versions: DesktopVersions
@@ -324,16 +354,26 @@ export interface DesktopBridge {
   readonly readMap: (fileName: string) => Promise<ProjectMapFile>
   /** Writes a new map into the project, making the project first if needed; fails when one of that name exists. */
   readonly createMap: (payload: WriteMapPayload) => Promise<ProjectMap>
-  /** Writes over a project map (Save). The text is written as is: same bytes, no BOM. Atomic, like every write. */
+  /**
+   * Writes over a project map (Save), or writes it if it has gone. The text is written as is: same bytes, no BOM.
+   * Atomic, like every write. The file it replaces goes to the project's backups first; the same text writes nothing.
+   */
   readonly saveMap: (payload: WriteMapPayload) => Promise<ProjectMap>
   /** Writes the map under its new file name and moves the old file to the project's backups; its link moves with it. */
   readonly renameMap: (payload: RenameMapPayload) => Promise<ProjectMap>
   /** The native open dialog for a map file anywhere; null when cancelled. The file may then be imported. */
   readonly pickImport: () => Promise<OpenedMapFile | null>
-  /** Copies a picked file into the project and records where it came from. */
+  /** Copies a picked file into the project and records where it came from (a map it replaces goes to backups). */
   readonly importMap: (payload: ImportMapPayload) => Promise<ImportMapResult>
-  /** Copies a project map byte for byte into the game's maps folder and records the export in its link. */
+  /**
+   * Copies a project map byte for byte into the game's maps folder and records the export in its link. The file it
+   * replaces there goes to `<userData>/backups/` first.
+   */
   readonly exportMap: (payload: ExportMapPayload) => Promise<ExportMapResult>
+  /** The current project's backups and the exports' (docs/PROJECTS.md § The files), newest first. */
+  readonly listBackups: () => Promise<MapBackups>
+  /** Reads a backup `listBackups` named. */
+  readonly readBackup: (ref: BackupRef) => Promise<MapBackupFile>
   /** The page's resolved theme: the window controls drawn over its top bar, and the window background, follow it. */
   readonly setWindowTheme: (dark: boolean) => Promise<void>
   /** The native Save / Don't save / Cancel box, modal to the window. */

@@ -21,6 +21,8 @@ const members = {
   pickImport: "function",
   importMap: "function",
   exportMap: "function",
+  listBackups: "function",
+  readBackup: "function",
   setWindowTheme: "function",
   confirmUnsaved: "function",
   onUnloadRequest: "function",

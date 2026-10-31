@@ -27,6 +27,7 @@ import { MaterialLibrary } from "../services/MaterialLibrary"
 import {
   type GamePathKind,
   type GamePaths,
+  type MapBackup,
   Platform,
   type PlatformError,
   type ProjectMap,
@@ -290,13 +291,20 @@ const exportOpenMap = Effect.gen(function*() {
   return { doc, result }
 })
 
-/** Puts a map into the editor, with the prefs saved for it. */
-const showMap = Effect.fn("showMap")(function*(map: MapFile, file: OpenFile | null) {
+/** Puts a map into the editor, with the prefs saved for it; `dirty` opens it as unsaved edits of `file`. */
+const showMap = Effect.fn("showMap")(function*(
+  map: MapFile,
+  file: OpenFile | null,
+  options?: { readonly dirty: boolean }
+) {
   // unreadable prefs only cost the saved grid height and Export on save
   const prefs = yield* MapPrefsStore.use((store) => store.load(mapPrefsKeyOf(map))).pipe(
     Effect.orElseSucceed((): MapPrefs => ({}))
   )
-  useEditor.getState().loadMap(map, file, prefs.gridHeight, { exportOnSave: prefs.exportOnSave === true })
+  useEditor.getState().loadMap(map, file, prefs.gridHeight, {
+    exportOnSave: prefs.exportOnSave === true,
+    dirty: options?.dirty === true
+  })
 })
 
 /**
@@ -408,9 +416,14 @@ export const importAsCopyEffect = Effect.gen(function*() {
 
 export const importAsCopy = () => run(importAsCopyEffect)
 
-/** Writes `result` (made from `doc`) into the project as a new map, which the editor then has open. */
-const createAsOpenMap = Effect.fn("createAsOpenMap")(function*(doc: Doc, result: ExportedMap) {
-  const created = yield* (yield* Platform).createMap({ fileName: result.filename, text: result.text })
+/**
+ * Writes `result` (made from `doc`) into the project as a new map, which the editor then has open. `replace` writes
+ * over a map of that name instead (it goes to the project's backups).
+ */
+const createAsOpenMap = Effect.fn("createAsOpenMap")(function*(doc: Doc, result: ExportedMap, replace = false) {
+  const platform = yield* Platform
+  const file = { fileName: result.filename, text: result.text }
+  const created = yield* replace ? platform.saveMap(file) : platform.createMap(file)
   useEditor.getState().markSaved(doc, result.map, fileOf(created))
   yield* saveMapPrefs
   yield* refreshProject
@@ -558,22 +571,26 @@ export const renameOpenMap = (displayName: string, creatorName: string) => {
 
 /**
  * Duplicate: the open map, as it is now, saved into the project under a new name; editing goes on in the copy. The
- * original file keeps its last save.
+ * original file keeps its last save. `replace` writes over a map the project has under that name (it goes to the
+ * project's backups).
  */
-export const duplicateMapEffect = Effect.fn("duplicateMapEffect")(function*(displayName: string, creatorName: string) {
-  const { doc, file } = useEditor.getState()
-  const result = yield* (yield* MapExporter).prepare(setLevelNames(doc.map, displayName, creatorName))
-  const created = yield* createAsOpenMap(doc, result)
-  const from = file === null ? "" : ` from ${mapLabelOf(file.name)}`
-  useEditor.getState().notify(
-    "info",
-    `Duplicated${from}: now editing ${mapLabelOf(created.fileName)}`,
-    revealIn("project")
-  )
-})
+export const duplicateMapEffect = Effect.fn("duplicateMapEffect")(
+  function*(displayName: string, creatorName: string, replace = false) {
+    const { doc, file } = useEditor.getState()
+    const result = yield* (yield* MapExporter).prepare(setLevelNames(doc.map, displayName, creatorName))
+    const created = yield* createAsOpenMap(doc, result, replace)
+    const from = file === null ? "" : ` from ${mapLabelOf(file.name)}`
+    const over = replace ? " (the map it replaced went to the backups)" : ""
+    useEditor.getState().notify(
+      "info",
+      `Duplicated${from}: now editing ${mapLabelOf(created.fileName)}${over}`,
+      revealIn("project")
+    )
+  }
+)
 
-export const duplicateMap = (displayName: string, creatorName: string) =>
-  run(duplicateMapEffect(displayName, creatorName))
+export const duplicateMap = (displayName: string, creatorName: string, replace = false) =>
+  run(duplicateMapEffect(displayName, creatorName, replace))
 
 /** Copies a saved project map into the game's maps folder; a published map's draft there asks first. */
 const exportProjectMap = Effect.fn("exportProjectMap")(function*(fileName: string, replacePublished: boolean) {
@@ -616,6 +633,55 @@ export const replacePublishedDraft = () => {
   useEditor.getState().setPublishedDraft(null)
   return run(exportToGameEffect(true))
 }
+
+// --- backups and Recover (docs/PROJECTS.md § The files) --------------------------------------
+
+/** The versions main kept of the files it wrote over, newest first, for the Recover dialog (desktop). */
+export const listBackups = () =>
+  run(Effect.gen(function*() {
+    return yield* (yield* Platform).listBackups
+  }))
+
+/** What a backup holds, decoded the way Open would: its map's names and item count, or why it can't be opened. */
+export type BackupSummary =
+  | {
+    readonly _tag: "Map"
+    readonly displayName: string
+    readonly creatorName: string
+    readonly items: number
+  }
+  | { readonly _tag: "Unreadable"; readonly message: string }
+
+export const describeBackupEffect = Effect.fn("describeBackupEffect")(function*(backup: MapBackup) {
+  const file = yield* (yield* Platform).readBackup(backup)
+  const map = yield* MapCodec.use((codec) => codec.decode(file.text))
+  const { levelDisplayName, creatorName } = map.worldSettings.levelData
+  return { _tag: "Map", displayName: levelDisplayName, creatorName, items: map.items.length } satisfies BackupSummary
+}, Effect.catch((error) => Effect.succeed({ _tag: "Unreadable", message: error.message } satisfies BackupSummary)))
+
+export const describeBackup = (backup: MapBackup) => run(describeBackupEffect(backup))
+
+/**
+ * Recover: opens a backup as unsaved edits of the project map it is a version of, so Save writes it over that map
+ * (whose file is backed up first). A map no longer in the project opens as a new one, named on Save. `recoverBackup`
+ * asks about the open map's unsaved edits first, like opening any other map.
+ */
+export const recoverBackupEffect = Effect.fn("recoverBackupEffect")(function*(backup: MapBackup) {
+  const file = yield* (yield* Platform).readBackup(backup)
+  const map = yield* MapCodec.use((codec) => codec.decode(file.text))
+  yield* refreshProject
+  const inProject = useEditor.getState().projectMaps.find((m) => m.fileName === backup.fileName)
+  yield* showMap(map, inProject === undefined ? null : fileOf(inProject), { dirty: true })
+  const label = mapLabelOf(backup.fileName)
+  useEditor.getState().notify(
+    "info",
+    inProject === undefined
+      ? `Opened a previous version of ${label} (${map.items.length} items). It is no longer in the project: Save adds it.`
+      : `Opened a previous version of ${label} (${map.items.length} items), unsaved. Save writes it over the map; the current file is backed up first.`
+  )
+})
+
+export const recoverBackup = (backup: MapBackup) => run(unlessCancelled("openMap", recoverBackupEffect(backup)))
 
 /** Export on save for the open map, kept with its prefs. */
 export const setExportOnSave = (exportOnSave: boolean) => {

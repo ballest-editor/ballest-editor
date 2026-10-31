@@ -1,7 +1,9 @@
 import type {
+  BackupPlace,
   DesktopBridge,
   FoundCreator,
   GamePaths,
+  MapBackupFile,
   MapLink,
   OpenedMapFile,
   PluginStatus,
@@ -34,6 +36,11 @@ export interface TestDisk {
   }
   /** Link records by project, then by map file name, as main keeps them in `.ballest/link.json`. */
   readonly links: Map<string, Map<string, MapLink>>
+  /**
+   * What main kept of the files it wrote over, newest first: the project's (Save, Rename, Import replacing a map) and
+   * the game's maps folder's (Export). Like main, nothing is kept when the bytes don't change.
+   */
+  readonly backups: Array<MapBackupFile>
   project: { current: string; recent: Array<string> }
   /**
    * `creator`: what `findCreator` answers. `plugin`: the editor-link plugin's status; installing it makes it `current`,
@@ -104,6 +111,7 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   promptAnswers: [],
   unload: makeTestUnload(),
   links: new Map(),
+  backups: [],
   project: { current: TEST_PROJECT, recent: [] },
   game: {
     paths: testGamePaths,
@@ -179,8 +187,17 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     link: linksOf(disk.project.current).get(fileName) ?? null
   })
   const has = (fileName: string) => disk.files.has(projectFile(fileName, disk.project.current))
+  /** Keeps the file at `path` before something else is written there, as main's `Backups` does. */
+  const backUp = (place: BackupPlace, path: string, next: string | null) => {
+    const old = disk.files.get(path)
+    if (old === undefined || old === next) return
+    const fileName = nameOf(path)
+    disk.backups.unshift({ place, id: `${disk.backups.length} ${fileName}`, fileName, at: TIME, text: old })
+  }
   const write = (fileName: string, text: string) => {
-    disk.files.set(projectFile(fileName, disk.project.current), text)
+    const path = projectFile(fileName, disk.project.current)
+    backUp("project", path, text)
+    disk.files.set(path, text)
     return Promise.resolve(mapOf(fileName))
   }
   const ask = (kind: TestDisk["dialogs"][number]["kind"]) => {
@@ -221,6 +238,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     renameMap: ({ from, to, text }) => {
       if (from === to) return write(to, text)
       if (has(to)) return exists(to)
+      backUp("project", projectFile(from, disk.project.current), null)
       disk.files.delete(projectFile(from, disk.project.current))
       const links = linksOf(disk.project.current)
       const moved = links.get(from)
@@ -260,12 +278,18 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       if (!replacePublished && publishedFileId > 0) {
         return Promise.resolve({ _tag: "Published", file: { path, name: fileName }, publishedFileId } as const)
       }
+      backUp("export", path, text)
       disk.files.set(path, text)
       const exported = { path, hash: testHash(text), at: TIME }
       const links = linksOf(disk.project.current)
       const link = { ...(links.get(fileName) ?? emptyLink), export: exported, lastSeenHash: exported.hash }
       links.set(fileName, link)
       return Promise.resolve({ _tag: "Exported", file: { path, name: fileName }, link } as const)
+    },
+    listBackups: () => Promise.resolve(disk.backups.map(({ text: _, ...backup }) => backup)),
+    readBackup: ({ place, id }) => {
+      const backup = disk.backups.find((b) => b.place === place && b.id === id)
+      return backup === undefined ? fail(`${id} doesn't exist any more.`) : Promise.resolve(backup)
     },
     setWindowTheme: () => Promise.resolve(),
     confirmUnsaved: (prompt) => {

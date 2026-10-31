@@ -1,8 +1,12 @@
 import type {
+  BackupRef,
   ExportMapPayload,
   ExportMapResult,
   ImportMapPayload,
   ImportMapResult,
+  MapBackup,
+  MapBackupFile,
+  MapBackups,
   MapLink,
   OpenedMapFile,
   ProjectInfo,
@@ -15,6 +19,7 @@ import { Context, DateTime, Effect, FileSystem, Layer, Option, Path, Schema } fr
 import { DesktopEnvironment } from "../app/DesktopEnvironment"
 import { type GamePathError, GamePaths } from "../game/GamePaths"
 import { DesktopSettings, type ProjectSettings } from "../settings/DesktopSettings"
+import { type Backup, type BackupError, Backups, parseBackupId } from "./Backups"
 import { isMapFileName, isWithin, MAP_EXTENSIONS, MAX_MAP_BYTES, sha256, writeAtomic, writeJson } from "./files"
 import { emptyLink, type MapLinkError, MapLinks } from "./MapLinks"
 
@@ -76,13 +81,14 @@ const PublishedId = Schema.fromJsonString(Schema.Struct({
   worldSettings: Schema.Struct({ levelData: Schema.Struct({ levelPublishedFileId: Schema.Finite }) })
 }))
 
-type ProjectEffect<A> = Effect.Effect<A, ProjectError | MapLinkError>
+type ProjectEffect<A> = Effect.Effect<A, ProjectError | MapLinkError | BackupError>
 
 /**
  * The project folder and the maps in it (docs/PROJECTS.md). One project is in use at a time: the default
  * (`Documents/Ballest Editor/Maps`) until the user picks another. A project exists on disk from the first New map or
- * Import. Main touches only its `maps/` and `.ballest/` folders, the game's maps folder (Export), and the files the
- * user picks in the Import dialog (read only). Maps are named by file name, never by path.
+ * Import. Main touches only its `maps/` and `.ballest/` folders, the game's maps folder (Export), the backups of the
+ * files Export wrote over there (`<userData>/backups/`), and the files the user picks in the Import dialog (read only).
+ * Maps are named by file name, never by path. Every write over a map goes through `Backups.overwrite`.
  */
 export class Projects extends Context.Service<Projects, {
   readonly state: Effect.Effect<ProjectState>
@@ -96,7 +102,7 @@ export class Projects extends Context.Service<Projects, {
   readonly read: (fileName: string) => Effect.Effect<ProjectMapFile, ProjectError>
   /** Writes a new map; fails when the project has one of that name. Makes the project first when needed. */
   readonly create: (fileName: string, text: string) => ProjectEffect<ProjectMap>
-  /** Writes over a map (or writes it, if it has gone). */
+  /** Writes over a map (or writes it, if it has gone); the old file goes to the project's backups. */
   readonly save: (fileName: string, text: string) => ProjectEffect<ProjectMap>
   /** Writes `to`, moves `from` to the backups and its link to `to`. Fails when `to` exists. */
   readonly rename: (from: string, to: string, text: string) => ProjectEffect<ProjectMap>
@@ -106,15 +112,24 @@ export class Projects extends Context.Service<Projects, {
   /** Copies a map byte for byte into the game's maps folder and records the export in its link. */
   readonly exportMap: (
     payload: ExportMapPayload
-  ) => Effect.Effect<ExportMapResult, ProjectError | MapLinkError | GamePathError>
+  ) => Effect.Effect<ExportMapResult, ProjectError | MapLinkError | BackupError | GamePathError>
+  /** The current project's backups and the exports', newest first. */
+  readonly backups: Effect.Effect<MapBackups>
+  /** Reads a backup `backups` listed; any other name is refused. */
+  readonly readBackup: (ref: BackupRef) => Effect.Effect<MapBackupFile, ProjectError>
 }>()("ballest/desktop/project/Projects") {
-  /** `platform` decides how paths compare (Windows: case-insensitively). */
-  static readonly make = Effect.fn("Projects.make")(function*(defaultFolder: string, platform: NodeJS.Platform) {
+  /** `platform` decides how paths compare (Windows: case-insensitively); `exportBackups` keeps what Export wrote over. */
+  static readonly make = Effect.fn("Projects.make")(function*(
+    defaultFolder: string,
+    platform: NodeJS.Platform,
+    exportBackups: string
+  ) {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const settings = yield* DesktopSettings
     const links = yield* MapLinks
     const game = yield* GamePaths
+    const backupStore = yield* Backups
 
     const picked = new Set<string>()
     const same = (a: string, b: string) => isWithin(path, a, b, platform) && isWithin(path, b, a, platform)
@@ -238,15 +253,9 @@ export class Projects extends Context.Service<Projects, {
 
     const exists = (file: string) => fs.exists(file).pipe(Effect.mapError(fail("read", file)))
 
-    /** Moves a file out of `maps/` into `.ballest/backups/`, stamped with the time; #137 builds on this. */
-    const backUp = Effect.fnUntraced(function*(project: string, file: string) {
-      const stamp = DateTime.formatIso(yield* DateTime.now).replace(/[:.]/g, "-")
-      const dir = path.join(project, ".ballest", "backups")
-      yield* fs.makeDirectory(dir, { recursive: true }).pipe(
-        Effect.andThen(fs.rename(file, path.join(dir, `${stamp} ${path.basename(file)}`))),
-        Effect.mapError(fail("write", file))
-      )
-    })
+    const projectBackups = (project: string) => path.join(project, ".ballest", "backups")
+    const backupsIn = (place: BackupRef["place"], project: string) =>
+      place === "project" ? projectBackups(project) : exportBackups
 
     const create = Effect.fn("Projects.create")(function*(fileName: string, text: string) {
       const project = yield* ensure
@@ -258,7 +267,7 @@ export class Projects extends Context.Service<Projects, {
 
     const save = Effect.fn("Projects.save")(function*(fileName: string, text: string) {
       const project = yield* ensure
-      yield* write(yield* target(project, fileName), text)
+      yield* backupStore.overwrite(projectBackups(project), yield* target(project, fileName), text)
       return yield* mapInfo(project, fileName)
     })
 
@@ -269,7 +278,7 @@ export class Projects extends Context.Service<Projects, {
       const next = yield* target(project, to)
       if (yield* exists(next)) return yield* fail("exists", to)()
       yield* write(next, text)
-      if (yield* exists(old)) yield* backUp(project, old)
+      yield* backupStore.retire(projectBackups(project), old)
       yield* links.rename(project, from, to)
       return yield* mapInfo(project, to)
     })
@@ -290,12 +299,9 @@ export class Projects extends Context.Service<Projects, {
         const file = yield* target(project, fileName)
         // Importing a file of this very project changes nothing.
         if (same(source, file)) return { _tag: "Imported", map: yield* mapInfo(project, fileName) } as const
-        if (yield* exists(file)) {
-          if (!replace) return { _tag: "Clash", fileName } as const
-          yield* backUp(project, file)
-        }
+        if (!replace && (yield* exists(file))) return { _tag: "Clash", fileName } as const
         const bytes = yield* fs.readFile(source).pipe(Effect.mapError(fail("read", source)))
-        yield* write(file, text)
+        yield* backupStore.overwrite(projectBackups(project), file, text)
 
         const origin = { path: source, hash: sha256(bytes), at: DateTime.formatIso(yield* DateTime.now) }
         // A map imported from the game's maps folder under its own name is that file's export from the start.
@@ -333,7 +339,7 @@ export class Projects extends Context.Service<Projects, {
         }
       }
 
-      yield* write(file, bytes)
+      yield* backupStore.overwrite(exportBackups, file, bytes)
       const exported = { path: file, hash: sha256(bytes), at: DateTime.formatIso(yield* DateTime.now) }
       const link = yield* links.modify(project, fileName, (previous) => ({
         ...(previous ?? emptyLink),
@@ -353,6 +359,27 @@ export class Projects extends Context.Service<Projects, {
       )
     )
 
+    const backupOf = (place: BackupRef["place"]) => ({ id, fileName, at }: Backup): MapBackup => ({
+      place,
+      id,
+      fileName,
+      at
+    })
+
+    const backups = Effect.gen(function*() {
+      const project = yield* current
+      const inProject = (yield* backupStore.list(projectBackups(project))).map(backupOf("project"))
+      const exported = (yield* backupStore.list(exportBackups)).map(backupOf("export"))
+      return [...inProject, ...exported].sort((a, b) => b.at.localeCompare(a.at))
+    }).pipe(Effect.withSpan("Projects.backups"))
+
+    const readBackup = Effect.fn("Projects.readBackup")(function*({ place, id }: BackupRef) {
+      const file = path.join(backupsIn(place, yield* current), id)
+      const backup = parseBackupId(id)
+      if (Option.isNone(backup)) return yield* fail("notFound", file)()
+      return { ...backupOf(place)(backup.value), text: yield* readText(file) } satisfies MapBackupFile
+    })
+
     return Projects.of({
       state,
       use,
@@ -365,15 +392,17 @@ export class Projects extends Context.Service<Projects, {
       rename,
       pick,
       importMap,
-      exportMap
+      exportMap,
+      backups,
+      readBackup
     })
   })
 
   static readonly layer = Layer.effect(
     Projects,
     Effect.gen(function*() {
-      const { defaultProjectDir, platform } = yield* DesktopEnvironment
-      return yield* Projects.make(defaultProjectDir, platform)
+      const { defaultProjectDir, platform, exportBackupsDir } = yield* DesktopEnvironment
+      return yield* Projects.make(defaultProjectDir, platform, exportBackupsDir)
     })
   )
 }

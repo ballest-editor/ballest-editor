@@ -1,7 +1,15 @@
-import { ExportMapResult, ImportMapResult, ProjectMaps, ProjectState } from "@ballest/contracts"
+import {
+  ExportMapResult,
+  ImportMapResult,
+  MapBackupFile,
+  MapBackups,
+  ProjectMaps,
+  ProjectState
+} from "@ballest/contracts"
 import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, FileSystem, Layer, Option, Path, Schema } from "effect"
+import * as Fs from "node:fs"
 import { vi } from "vitest"
 import { ElectronDialog, type FileDialogOptions, type MessageBoxOptions } from "../electron/ElectronDialog"
 import { ElectronShell, parseExternalUrl } from "../electron/ElectronShell"
@@ -13,6 +21,7 @@ import { GameLink } from "../game/GameLink"
 import { GamePaths } from "../game/GamePaths"
 import { GameProcess } from "../game/GameProcess"
 import { SteamLibrary } from "../game/SteamLibrary"
+import { Backups } from "../project/Backups"
 import { sha256 } from "../project/files"
 import { LinkFile, MapLinks } from "../project/MapLinks"
 import { Projects } from "../project/Projects"
@@ -22,6 +31,8 @@ import * as channels from "./channels"
 import { DesktopIpc, type DesktopIpcHandleListener, type DesktopIpcMain } from "./DesktopIpc"
 import { installDesktopIpcHandlers } from "./DesktopIpcHandlers"
 import { ping } from "./methods/ping"
+
+const samplesDir = `${import.meta.dirname}/../../../../samples`
 
 // The services' layers call Electron; these tests replace them, so only the module import needs a stand-in
 // (requiring the real package from Node would download the binary).
@@ -156,10 +167,11 @@ const withHandlers = <A, E>(
       Layer.provide(Layer.succeed(GameHost, GameHost.of(steam.host)))
     )
     const project = path.join(dir, "Documents", "Ballest Editor", "Maps")
-    const projects = Layer.effect(Projects, Projects.make(project, "linux")).pipe(
-      Layer.provide(MapLinks.layer),
-      Layer.provideMerge(game)
-    )
+    const projects = Layer.effect(Projects, Projects.make(project, "linux", path.join(dir, "userData", "backups")))
+      .pipe(
+        Layer.provide(Layer.mergeAll(MapLinks.layer, Backups.layer)),
+        Layer.provideMerge(game)
+      )
     const services = projects.pipe(
       Layer.provideMerge(Layer.effect(DesktopSettings, DesktopSettings.make(path.join(dir, "desktop-settings.json")))),
       Layer.merge(Layer.mergeAll(dialogs.layer, shellLayer, windowLayer, updatesLayer, DesktopIpc.layer(fake.ipcMain)))
@@ -241,9 +253,15 @@ describe("DesktopIpc", () => {
         assert.deepStrictEqual((yield* fake.invokeAs(ProjectMaps, channels.LIST_MAPS_CHANNEL)).map((m) => m.fileName), [
           renamed
         ])
-        const [backup, ...more] = yield* fs.readDirectory(path.join(project, ".ballest", "backups"))
-        assert.strictEqual(more.length, 0)
-        assert.isTrue(backup?.endsWith(` ${name}`))
+        // The Save kept the file it wrote over, the Rename the file it moved away from: newest first.
+        const backups = yield* fake.invokeAs(MapBackups, channels.LIST_BACKUPS_CHANNEL)
+        assert.deepStrictEqual(backups.map((b) => [b.place, b.fileName]), [["project", name], ["project", name]])
+        const texts = yield* Effect.forEach(backups, ({ place, id }) =>
+          fake.invokeAs(MapBackupFile, channels.READ_BACKUP_CHANNEL, { place, id }).pipe(Effect.map((b) =>
+            b.text
+          )))
+        assert.deepStrictEqual(texts, [`${text}\r\n`, text])
+        assert.lengthOf(yield* fs.readDirectory(path.join(project, ".ballest", "backups")), 2)
 
         // Names only: nothing reaches outside maps/.
         for (const bad of ["../x.balledit", "a/b.balledit", "x.json", ".balledit", "con:.balledit"]) {
@@ -369,6 +387,57 @@ describe("DesktopIpc", () => {
           replacePublished: false
         })
         assert.strictEqual(again._tag, "Exported")
+      })
+    ))
+
+  it.effect("Export keeps the game's copy it writes over in userData's backups, once per change", () =>
+    withHandlers(({ fake, dir, steam }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const name = "Map_LevelEditorMain&Track_me.balledit"
+        yield* fs.makeDirectory(steam.maps, { recursive: true })
+        yield* fs.writeFileString(path.join(steam.maps, name), "{\"edited\":\"in game\"}")
+        yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text: "{\"v\":1}" })
+
+        const exportIt = fake.invoke(channels.EXPORT_MAP_CHANNEL, { fileName: name, replacePublished: false })
+        yield* exportIt
+        // The same bytes again: nothing to keep.
+        yield* exportIt
+        const backups = yield* fake.invokeAs(MapBackups, channels.LIST_BACKUPS_CHANNEL)
+        assert.deepStrictEqual(backups.map((b) => [b.place, b.fileName]), [["export", name]])
+        const [backup] = backups
+        const read = yield* fake.invokeAs(MapBackupFile, channels.READ_BACKUP_CHANNEL, backup)
+        assert.strictEqual(read.text, "{\"edited\":\"in game\"}")
+        assert.lengthOf(yield* fs.readDirectory(path.join(dir, "userData", "backups")), 1)
+
+        // Only names main wrote in its own folders.
+        for (const id of ["../desktop-settings.json", `../../${name}`, name, "notes.txt"]) {
+          const error = yield* Effect.flip(fake.invoke(channels.READ_BACKUP_CHANNEL, { place: "export", id }))
+          assert.match(String(error.cause), /doesn't exist/, id)
+        }
+        const unknown = { place: "project", id: `2026-10-31T12-00-00-000Z ${name}` }
+        assert.match(String((yield* Effect.flip(fake.invoke(channels.READ_BACKUP_CHANNEL, unknown))).cause), /exist/)
+      })
+    ))
+
+  it.effect("every sample goes into the backups and comes back byte for byte", () =>
+    withHandlers(({ fake }) =>
+      Effect.gen(function*() {
+        const samples = Fs.readdirSync(samplesDir, { recursive: true, encoding: "utf8" })
+          .filter((file) => /\.(balledit|ballmap)$/.test(file))
+        assert.isAbove(samples.length, 0)
+        for (const [i, sample] of samples.entries()) {
+          const text = Fs.readFileSync(`${samplesDir}/${sample}`, "utf8")
+          const fileName = `Map_LevelEditorMain&Sample ${i}_me.balledit`
+          yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName, text })
+          yield* fake.invoke(channels.SAVE_MAP_CHANNEL, { fileName, text: "{}" })
+          const backups = yield* fake.invokeAs(MapBackups, channels.LIST_BACKUPS_CHANNEL)
+          const backup = backups.find((b) => b.fileName === fileName)
+          assert.isDefined(backup, sample)
+          const read = yield* fake.invokeAs(MapBackupFile, channels.READ_BACKUP_CHANNEL, backup)
+          assert.isTrue(read.text === text, `${sample} differs after the backup`)
+        }
       })
     ))
 
