@@ -5,7 +5,7 @@ A standalone, CAD-style map editor for [Ballest of Them All](https://store.steam
 - [docs/FORMAT.md](docs/FORMAT.md) — the map format, hard limits, where files live
 - [docs/VISION.md](docs/VISION.md) — feature roadmap
 - `apps/web/` — the editor (React SPA on Vite + TanStack Router, Three.js, Effect)
-- `apps/desktop/` — the Electron shell around it (in progress, see [docs/DESKTOP.md](docs/DESKTOP.md))
+- `apps/desktop/` — the Electron shell around it ([apps/desktop/README.md](apps/desktop/README.md) explains how it works; plan in [docs/DESKTOP.md](docs/DESKTOP.md))
 - `packages/contracts/` — schemas and the `DesktopBridge` interface shared by the desktop main process, preload and renderer
 - `tools/extract/` — pulls piece meshes out of the game pak (Nix flake)
 - `tools/compress/` — compresses the extracted meshes and textures and publishes them as a GitHub release asset pack
