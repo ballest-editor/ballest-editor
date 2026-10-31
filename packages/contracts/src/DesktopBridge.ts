@@ -73,6 +73,41 @@ export const OpenExternalPayload = Schema.Struct({ url: Schema.String.check(Sche
 export type OpenExternalPayload = typeof OpenExternalPayload.Type
 
 /**
+ * Where the in-app updater is (docs/DESKTOP.md § Packaging and release). `idle` until a check finds a newer release
+ * (`available`), then `downloading` once the user asks for it and `ready` once it is on disk; restarting installs it.
+ * `error` is a failed check, retried by the next one. `disabled` never changes: dev, unpackaged, turned off with
+ * `BALLEST_DISABLE_AUTO_UPDATE`, or Linux but not the AppImage.
+ */
+export const UpdateStatus = Schema.Literals([
+  "disabled",
+  "idle",
+  "checking",
+  "available",
+  "downloading",
+  "ready",
+  "error"
+])
+export type UpdateStatus = typeof UpdateStatus.Type
+
+export const UpdateState = Schema.Struct({
+  status: UpdateStatus,
+  /** The running app's version. */
+  currentVersion: Schema.String,
+  /** The newer release on offer, from `available` on. */
+  availableVersion: Schema.NullOr(Schema.String),
+  /** That release's notes (its GitHub release body) as plain text; null when it has none. */
+  releaseNotes: Schema.NullOr(Schema.String),
+  /** 0 to 100 while `downloading`. */
+  downloadPercent: Schema.NullOr(Schema.Finite),
+  /**
+   * Why updates are `disabled`, why the check failed (`error`), or why the last download (`available`) or install
+   * (`ready`) failed; null otherwise.
+   */
+  message: Schema.NullOr(Schema.String)
+})
+export type UpdateState = typeof UpdateState.Type
+
+/**
  * What the desktop preload exposes to the renderer as `window.ballest`. The renderer only sees this interface, so
  * everything crossing it is plain data (structured-clone safe). Main decodes every payload and encodes every result
  * with the schemas above; a payload that fails to decode rejects the returned promise.
@@ -97,4 +132,12 @@ export interface DesktopBridge {
   readonly setWindowTheme: (dark: boolean) => Promise<void>
   /** Opens an http(s) URL in the default browser; false when it is refused or fails to open. */
   readonly openExternal: (url: string) => Promise<boolean>
+  /** The updater's state now. */
+  readonly getUpdateState: () => Promise<UpdateState>
+  /** Starts downloading the release on offer (`available`); progress and the outcome arrive through `onUpdateState`. */
+  readonly downloadUpdate: () => Promise<void>
+  /** Quits, installs the downloaded release (`ready`) and starts it. Unsaved edits are lost. */
+  readonly installUpdate: () => Promise<void>
+  /** Calls `listener` with every later state, until the returned function is called. */
+  readonly onUpdateState: (listener: (state: UpdateState) => void) => () => void
 }

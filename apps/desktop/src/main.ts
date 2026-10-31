@@ -8,10 +8,12 @@ import { ElectronDialog } from "./electron/ElectronDialog"
 import { ElectronMenu } from "./electron/ElectronMenu"
 import { ElectronProtocol, registerSchemePrivileges } from "./electron/ElectronProtocol"
 import { ElectronShell } from "./electron/ElectronShell"
+import { ElectronUpdater } from "./electron/ElectronUpdater"
 import { ElectronWindow } from "./electron/ElectronWindow"
 import { MapFiles } from "./files/MapFiles"
 import { DesktopIpc } from "./ipc/DesktopIpc"
 import { DesktopSettings } from "./settings/DesktopSettings"
+import { DesktopUpdates } from "./updates/DesktopUpdates"
 import { DesktopWindow } from "./window/DesktopWindow"
 
 // The Electron main process (docs/DESKTOP.md § Main process). Electron only grants scheme privileges before
@@ -28,12 +30,13 @@ const layerElectron = Layer.mergeAll(
   ElectronDialog.layer,
   ElectronMenu.layer,
   ElectronShell.layer,
+  ElectronUpdater.layer,
   ElectronWindow.layer,
   ElectronProtocol.layer,
   DesktopIpc.layer(Electron.ipcMain)
 )
 
-const layerDesktopRuntime = Layer.mergeAll(DesktopWindow.layer, MapFiles.layer).pipe(
+const layerDesktopRuntime = Layer.mergeAll(DesktopWindow.layer, MapFiles.layer, DesktopUpdates.layer).pipe(
   Layer.provideMerge(DesktopSettings.layer),
   Layer.provideMerge(DesktopEnvironment.layer(__dirname)),
   Layer.provideMerge(layerElectron),

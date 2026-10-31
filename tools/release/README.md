@@ -31,6 +31,22 @@ node tools/release/src/main.ts --help
 
 The NSIS installer is assisted (pick a directory) with differential updates; the AppImage uses the static runtime (`toolsets.appimage`), so hosts with only FUSE 3 run it. `publish` names this repository so electron-builder writes `app-update.yml` and the `latest*.yml` feeds for electron-updater (#68).
 
+## Trying updates
+
+The in-app updater (apps/desktop/README.md § Updates) can be run end to end on one machine, against a mock feed instead of GitHub:
+
+```sh
+pnpm dist:desktop:linux --app-version 0.2.0 --mock-updates   # release-mock/, feed http://127.0.0.1:4848/
+cp release-mock/Ballest-Editor-0.2.0-x86_64.AppImage /tmp/   # keep the old one out of the feed directory
+pnpm dist:desktop:linux --app-version 0.2.1 --mock-updates --skip-build   # latest-linux.yml now offers 0.2.1
+pnpm release:mock-server                                     # serves release-mock/ until Ctrl+C
+BALLEST_MOCK_UPDATES=1 /tmp/Ballest-Editor-0.2.0-x86_64.AppImage
+```
+
+After 15 s the title bar offers 0.2.1; Download, then Restart, replaces the AppImage with 0.2.1 and starts it. On Windows, install the 0.2.0 setup instead of copying it, and use `dist:desktop:win`.
+
+`--mock-updates` writes to `release-mock/` and points the build's feed (`app-update.yml`) at the mock server (`--mock-update-port`, default 4848), so it never looks at GitHub. `BALLEST_MOCK_UPDATES=1` points any installed build there. The mock server serves files only, without multi-range requests, so downloads from it are always full, never differential. On NixOS the AppImage runs inside `appimage-run`'s sandbox, which takes the restarted app down with the old one: the update is installed, but you start it yourself.
+
 ## Releasing
 
 Push a tag: `git tag v0.2.0-rc.1 && git push origin v0.2.0-rc.1`, or run the **Release** workflow by hand with a tag (created on the branch's head if new). `.github/workflows/release.yml`, only in `ballest-editor/ballest-editor`:

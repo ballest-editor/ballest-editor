@@ -9,6 +9,19 @@ export const repository = { owner: "ballest-editor", repo: "ballest-editor" } as
 
 export const productName = "Ballest Editor"
 
+/** Where the packaged app looks for updates; electron-builder writes it into `resources/app-update.yml`. */
+export type UpdateFeed =
+  | { readonly _tag: "GitHub" }
+  /** The mock update server on this machine (`--mock-updates`), to try the update flow before a real release. */
+  | { readonly _tag: "Mock"; readonly url: string }
+
+export const githubFeed: UpdateFeed = { _tag: "GitHub" }
+
+/** `pnpm release:mock-server`'s port; apps/desktop's `BALLEST_MOCK_UPDATES` defaults to it too. */
+export const MOCK_UPDATE_SERVER_PORT = 4848
+
+export const mockFeed = (port: number): UpdateFeed => ({ _tag: "Mock", url: `http://127.0.0.1:${port}/` })
+
 /** The installer or AppImage a platform's build must produce, named by `artifactName` (AppImage says x86_64). */
 export const installerName = (platform: Platform, version: string) =>
   platform === "win" ? `Ballest-Editor-${version}-x64.exe` : `Ballest-Editor-${version}-x86_64.AppImage`
@@ -41,6 +54,7 @@ export const builderConfig = (options: {
   readonly platform: Platform
   readonly electronVersion: string
   readonly output: string
+  readonly feed: UpdateFeed
 }): Configuration => ({
   appId: "com.spigelli.ballest-editor",
   productName,
@@ -58,7 +72,13 @@ export const builderConfig = (options: {
   extraResources: [{ from: stageLayout.assets, to: "assets" }],
   npmRebuild: false,
   electronLanguages: ["en-US"],
-  publish: [{ provider: "github", ...repository }],
+  ...(options.feed._tag === "GitHub"
+    ? { publish: [{ provider: "github", ...repository }] }
+    : {
+      publish: [{ provider: "generic", url: options.feed.url }],
+      // GitHub's feed carries the release body; a generic one only what latest*.yml says.
+      releaseInfo: { releaseNotes: "A mock release, built with --mock-updates and served by pnpm release:mock-server." }
+    }),
   ...(options.platform === "win"
     ? {
       win: { target: [{ target: "nsis", arch: ["x64"] }], icon: "icon.ico" },
@@ -84,6 +104,7 @@ export const stagePackageJson = (options: {
   readonly version: string
   readonly electronVersion: string
   readonly output: string
+  readonly feed: UpdateFeed
 }) => ({
   name: "ballest-editor",
   productName,

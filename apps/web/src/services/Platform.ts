@@ -1,5 +1,5 @@
-import type { DesktopBridge, MapFileRef, OpenedMapFile, RecentMapFiles } from "@ballest/contracts"
-import { Context, Effect, Layer, Option, Schema } from "effect"
+import type { DesktopBridge, MapFileRef, OpenedMapFile, RecentMapFiles, UpdateState } from "@ballest/contracts"
+import { Context, Effect, Layer, Option, Queue, Schema, Stream } from "effect"
 
 /** What this platform can do beyond opening and saving files; the menus hide what it can't. */
 export interface PlatformCapabilities {
@@ -14,6 +14,8 @@ export interface PlatformCapabilities {
   readonly launchGame: boolean
   /** Racing the open map in the game through the plugin manager (#66). */
   readonly play: boolean
+  /** Updating itself from GitHub Releases; whether this build actually does is the update state's `disabled`. */
+  readonly updates: boolean
 }
 
 /** A map file the user opened. `path` is none in a browser, which never sees one. */
@@ -57,6 +59,12 @@ export class Platform extends Context.Service<Platform, {
   readonly openExternal: (url: string) => Effect.Effect<void, PlatformError>
   /** Tells the desktop window the page's resolved theme (its window controls follow it); nothing in a browser. */
   readonly setWindowTheme: (dark: boolean) => Effect.Effect<void, PlatformError>
+  /** The updater's state now, then every change to it (desktop); a browser's ends at once. */
+  readonly updates: Stream.Stream<UpdateState, PlatformError>
+  /** Starts downloading the release on offer; the progress arrives on `updates`. */
+  readonly downloadUpdate: Effect.Effect<void, PlatformError>
+  /** Quits the app, installs the downloaded release and starts it. */
+  readonly installUpdate: Effect.Effect<void, PlatformError>
 }>()("ballest/services/Platform") {
   static readonly layerBrowser = Layer.sync(Platform, () => makeBrowser())
 
@@ -76,7 +84,8 @@ const browserCapabilities: PlatformCapabilities = {
   filePaths: false,
   saveToGame: false,
   launchGame: false,
-  play: false
+  play: false,
+  updates: false
 }
 
 /** Main's `MapFileError` arrives as "Error invoking remote method '<channel>': MapFileError: <message>". */
@@ -96,9 +105,27 @@ const openedMap = (file: OpenedMapFile): OpenedMap => ({
 
 const savedMap = (file: MapFileRef): SavedMap => ({ name: file.name, path: Option.some(file.path) })
 
+/**
+ * Listens before asking for the current state. A state pushed while the request is out is at least as new as its
+ * answer, so the answer is then dropped.
+ */
+const updateStates = (bridge: DesktopBridge) =>
+  Stream.callback<UpdateState, PlatformError>((queue) =>
+    Effect.gen(function*() {
+      const seen = { pushed: false }
+      const unsubscribe = bridge.onUpdateState((state) => {
+        seen.pushed = true
+        Queue.offerUnsafe(queue, state)
+      })
+      yield* Effect.addFinalizer(() => Effect.sync(unsubscribe))
+      const current = yield* bridgeCall(() => bridge.getUpdateState())
+      if (!seen.pushed) Queue.offerUnsafe(queue, current)
+    })
+  )
+
 const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
   Platform.of({
-    capabilities: { ...browserCapabilities, filePaths: true },
+    capabilities: { ...browserCapabilities, filePaths: true, updates: true },
     openMap: bridgeCall(() => bridge.openMap()).pipe(
       Effect.map((file) => Option.map(Option.fromNullOr(file), openedMap))
     ),
@@ -118,7 +145,10 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
       bridgeCall(() => bridge.openExternal(url)).pipe(
         Effect.filterOrFail((opened) => opened, () => new PlatformError({ message: `Couldn't open ${url}.` })),
         Effect.asVoid
-      )
+      ),
+    updates: updateStates(bridge),
+    downloadUpdate: bridgeCall(() => bridge.downloadUpdate()),
+    installUpdate: bridgeCall(() => bridge.installUpdate())
   })
 
 /** A one-shot `<input type=file>`: resolves with the picked file, or none when the picker is dismissed. */
@@ -167,7 +197,10 @@ const makeBrowser = (): Platform["Service"] =>
     saveMap: ({ name, text }) => download(name, text).pipe(Effect.as(Option.some({ name, path: Option.none() }))),
     recentMaps: Effect.succeed([]),
     setWindowTheme: () => Effect.void,
-    openExternal: (url) => Effect.sync(() => void window.open(url, "_blank", "noopener,noreferrer"))
+    openExternal: (url) => Effect.sync(() => void window.open(url, "_blank", "noopener,noreferrer")),
+    updates: Stream.empty,
+    downloadUpdate: Effect.void,
+    installUpdate: Effect.void
   })
 
 /**
@@ -180,6 +213,14 @@ export interface TestDisk {
   readonly dialogs: Array<{ readonly kind: "open" | "save"; readonly name?: string; readonly near?: string }>
   readonly recent: Array<string>
   readonly external: Array<string>
+  /** The updater: `push` sends a new state to the page, as main does. Downloads and installs are counted. */
+  readonly updater: {
+    state: UpdateState
+    readonly listeners: Set<(state: UpdateState) => void>
+    readonly push: (state: UpdateState) => void
+    downloads: number
+    installs: number
+  }
 }
 
 export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
@@ -187,8 +228,30 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   answers: [],
   dialogs: [],
   recent: [],
-  external: []
+  external: [],
+  updater: makeTestUpdater()
 })
+
+const makeTestUpdater = (): TestDisk["updater"] => {
+  const updater: TestDisk["updater"] = {
+    state: {
+      status: "idle",
+      currentVersion: "0.2.0",
+      availableVersion: null,
+      releaseNotes: null,
+      downloadPercent: null,
+      message: null
+    },
+    listeners: new Set(),
+    push: (state) => {
+      updater.state = state
+      updater.listeners.forEach((listener) => listener(state))
+    },
+    downloads: 0,
+    installs: 0
+  }
+  return updater
+}
 
 const testBridge = (disk: TestDisk): DesktopBridge => {
   const nameOf = (path: string) => path.split(/[\\/]/).pop() ?? path
@@ -226,6 +289,19 @@ const testBridge = (disk: TestDisk): DesktopBridge => {
     openExternal: (url) => {
       disk.external.push(url)
       return Promise.resolve(true)
+    },
+    getUpdateState: () => Promise.resolve(disk.updater.state),
+    downloadUpdate: () => {
+      disk.updater.downloads++
+      return Promise.resolve()
+    },
+    installUpdate: () => {
+      disk.updater.installs++
+      return Promise.resolve()
+    },
+    onUpdateState: (listener) => {
+      disk.updater.listeners.add(listener)
+      return () => void disk.updater.listeners.delete(listener)
     }
   }
 }

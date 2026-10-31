@@ -1,5 +1,5 @@
 /** UI-facing operations that run Effects through the single app runtime. */
-import { Cause, Effect, Exit, Option } from "effect"
+import { Cause, Effect, Exit, Fiber, Option, Stream } from "effect"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { currentCreatedAt, mapFileNameOf, newMapFile } from "../domain/factory"
 import {
@@ -202,6 +202,31 @@ export const loadPlatform = () =>
       yield* refreshRecentFiles
     })
   )
+
+/** The desktop updater's state into the store, now and on every change; a browser's has none. */
+export const followUpdateState = Effect.gen(function*() {
+  const platform = yield* Platform
+  yield* platform.updates.pipe(Stream.runForEach((state) => Effect.sync(() => useEditor.getState().setUpdate(state))))
+})
+
+/** Follows the updater (`followUpdateState`) until the returned function is called: a React effect's cleanup. */
+export const followUpdates = (): () => void => {
+  const fiber = runtime.runFork(
+    followUpdateState.pipe(Effect.catch((error) => Effect.logWarning("Stopped following the updater", error)))
+  )
+  return () => void runtime.runFork(Fiber.interrupt(fiber))
+}
+
+const updateStep = (step: "downloadUpdate" | "installUpdate") =>
+  run(Effect.gen(function*() {
+    yield* (yield* Platform)[step]
+  }))
+
+/** Starts downloading the release on offer; the pill follows its progress. */
+export const downloadUpdate = () => updateStep("downloadUpdate")
+
+/** Quits, installs the downloaded release and starts it; unsaved edits are lost. */
+export const installUpdate = () => updateStep("installUpdate")
 
 const refreshRecentFiles = Effect.gen(function*() {
   const platform = yield* Platform

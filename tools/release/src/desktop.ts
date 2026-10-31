@@ -3,7 +3,7 @@
 import { Effect, FileSystem, Path, Schema } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { createRequire } from "node:module"
-import type { Platform } from "./config.ts"
+import type { Platform, UpdateFeed } from "./config.ts"
 import { ReleaseAssetsInvalid, releaseProblems } from "./releaseAssets.ts"
 import { repoRoot, stage } from "./stage.ts"
 
@@ -62,6 +62,7 @@ export const packageDesktop = Effect.fn("packageDesktop")(function*(options: {
   /** Relative to the repo root. */
   readonly output: string
   readonly build: boolean
+  readonly feed: UpdateFeed
 }) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
@@ -69,7 +70,13 @@ export const packageDesktop = Effect.fn("packageDesktop")(function*(options: {
   if (options.build) yield* buildApp()
 
   const directory = yield* fs.makeTempDirectoryScoped({ prefix: "ballest-release-" })
-  const staged = yield* stage({ platform: options.platform, version: options.version, output, directory })
+  const staged = yield* stage({
+    platform: options.platform,
+    version: options.version,
+    output,
+    feed: options.feed,
+    directory
+  })
   yield* Effect.logInfo(
     `Staged ${options.version} in ${directory}: ${staged.renderer} renderer files, ${staged.assets} assets`
   )

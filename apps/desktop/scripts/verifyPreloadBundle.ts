@@ -15,7 +15,11 @@ const members = {
   writeMap: "function",
   recentMaps: "function",
   setWindowTheme: "function",
-  openExternal: "function"
+  openExternal: "function",
+  getUpdateState: "function",
+  downloadUpdate: "function",
+  installUpdate: "function",
+  onUpdateState: "function"
 } as const satisfies Record<keyof DesktopBridge, "object" | "function">
 
 /** A sandboxed preload can require these and nothing else. */

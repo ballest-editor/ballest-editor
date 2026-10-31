@@ -7,7 +7,11 @@ import { ElectronShell, parseExternalUrl } from "../electron/ElectronShell"
 import { ElectronWindow } from "../electron/ElectronWindow"
 import { MapFiles } from "../files/MapFiles"
 import { DesktopSettings } from "../settings/DesktopSettings"
+import { DesktopUpdates } from "../updates/DesktopUpdates"
 import {
+  DOWNLOAD_UPDATE_CHANNEL,
+  GET_UPDATE_STATE_CHANNEL,
+  INSTALL_UPDATE_CHANNEL,
   OPEN_EXTERNAL_CHANNEL,
   OPEN_MAP_CHANNEL,
   PING_CHANNEL,
@@ -72,14 +76,27 @@ const shellLayer = Layer.succeed(
 
 /** Only `setColors` is reached from IPC; it records what each window was given. */
 const recoloured: Array<readonly [number, unknown]> = []
-const windowLayer = Layer.succeed(
-  ElectronWindow,
-  ElectronWindow.of({
-    create: () => Effect.die("unused"),
-    load: () => Effect.die("unused"),
-    closed: () => Effect.die("unused"),
-    workAreas: Effect.succeed([]),
-    setColors: (id, colors) => Effect.sync(() => void recoloured.push([id, colors]))
+const windowLayer = ElectronWindow.layerTest({
+  setColors: (id, colors) => Effect.sync(() => void recoloured.push([id, colors]))
+})
+
+/** Answers with a fixed state and counts the downloads and installs it was asked for. */
+const updateCalls = { download: 0, install: 0 }
+const updatesLayer = Layer.succeed(
+  DesktopUpdates,
+  DesktopUpdates.of({
+    state: Effect.succeed({
+      status: "available",
+      currentVersion: "0.2.0",
+      availableVersion: "0.2.1",
+      releaseNotes: null,
+      downloadPercent: null,
+      message: null
+    }),
+    run: Effect.die("unused"),
+    check: Effect.die("unused"),
+    download: Effect.sync(() => void updateCalls.download++),
+    install: Effect.sync(() => void updateCalls.install++)
   })
 )
 
@@ -99,7 +116,7 @@ const withHandlers = <A, E>(
     const dialogs = fakeDialogs()
     const services = MapFiles.layer.pipe(
       Layer.provideMerge(Layer.effect(DesktopSettings, DesktopSettings.make(path.join(dir, "desktop-settings.json")))),
-      Layer.merge(Layer.mergeAll(dialogs.layer, shellLayer, windowLayer, DesktopIpc.layer(fake.ipcMain)))
+      Layer.merge(Layer.mergeAll(dialogs.layer, shellLayer, windowLayer, updatesLayer, DesktopIpc.layer(fake.ipcMain)))
     )
     yield* Effect.scoped(
       Effect.gen(function*() {
@@ -226,6 +243,23 @@ describe("DesktopIpc", () => {
         assert.match(
           String((yield* Effect.flip(fake.invoke(SET_WINDOW_THEME_CHANNEL, { dark: "yes" }))).cause),
           /boolean/
+        )
+      })
+    ))
+
+  it.effect("reports the update state and passes on download and install", () =>
+    withHandlers(({ fake }) =>
+      Effect.gen(function*() {
+        assert.deepInclude(yield* fake.invoke(GET_UPDATE_STATE_CHANNEL), {
+          status: "available",
+          availableVersion: "0.2.1"
+        })
+        assert.isUndefined(yield* fake.invoke(DOWNLOAD_UPDATE_CHANNEL))
+        assert.isUndefined(yield* fake.invoke(INSTALL_UPDATE_CHANNEL))
+        assert.deepStrictEqual(updateCalls, { download: 1, install: 1 })
+        assert.match(
+          String((yield* Effect.flip(fake.invoke(DOWNLOAD_UPDATE_CHANNEL, { now: true }))).cause),
+          /undefined/
         )
       })
     ))
