@@ -21,9 +21,11 @@
       ]
     },
     "apps/desktop": {
-      "entry": ["src/main.ts", "src/preload.ts"]
+      // dev-electron.ts is spawned by vite.config.ts in watch mode.
+      "entry": ["src/main.ts", "src/preload.ts", "scripts/dev-electron.ts"]
     },
     "packages/contracts": {},
+    "tools/dev": {},
     "packages/ui": {},
     "tools/extract": {
       "entry": ["src/main.ts", "*.mjs"]

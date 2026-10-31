@@ -11,7 +11,7 @@ A standalone map editor for _Ballest of Them All_ (Steam 3339810, UE 5.8). Read 
 
 ## Layout
 
-- Turborepo + pnpm workspace. Run `pnpm dev|test|typecheck|build|lint|knip|dupes|format` from the root; `pnpm check:everything` runs format check, lint, knip, duplicate detection, typecheck, tests and build (in parallel, cached by turbo), and must pass before committing.
+- Turborepo + pnpm workspace. Run `pnpm dev|dev:desktop|test|typecheck|build|lint|knip|dupes|format` from the root; `pnpm check:everything` runs format check, lint, knip, duplicate detection, typecheck, tests and build (in parallel, cached by turbo), and must pass before committing.
 - Typecheck is `effect-tsgo tsc` (TypeScript 7 + Effect diagnostics; config in `tsconfig.base.json`). Lint is type-aware oxlint (`.oxlintrc.json`). Formatting is dprint (`dprint.json`, Effect's style). Duplicate code is jscpd (`.jscpd.json`: exact token clones plus structurally similar functions; shadcn components excluded). Don't run `effect-tsgo patch`: pnpm hard-links node_modules to the global store.
 - `apps/web/` — React SPA (Vite + TanStack Router) + Three.js editor. Effect for all non-trivial logic (services, schema, errors). It never imports `electron` or `apps/desktop`.
   Layers, enforced by `no-restricted-imports` in `.oxlintrc.json`: `domain/` (data model; no renderer, UI or node builtins) ← `services/` (Effect services) ← `editor/` (scene, store, actions) ← `components/` (React UI; reaches services through `editor/actions`) ← `routes/`. `src/test/` helpers are for tests only; nothing imports `repos/`.
@@ -20,6 +20,7 @@ A standalone map editor for _Ballest of Them All_ (Steam 3339810, UE 5.8). Read 
 - `packages/ui/` — shadcn/ui (`@workspace/ui`, preset `b6nCVm82TK`). All UI chrome comes from here.
 - `packages/ballest-editor-link/` — AngelScript plugin for the Ballest plugin manager (`info.toml` + `main.as`): races the map when the desktop app's Play writes `play.json`. Not on the plugin manager's registry; the desktop app bundles it and installs it into the game's plugins folder on demand (#118).
 - `tools/extract/` — pak → glTF/catalog/keybinds pipeline, run via the Nix flake (`nix run .#extract`).
+- `tools/dev/` — the `pnpm dev` / `pnpm dev:desktop` runner: picks the checkout's port (3000, or one per linked worktree) and runs the `dev` tasks through turbo.
 - `tools/compress/` — `assets/{pieces,textures}` → `web-assets/` (`pnpm assets`, the turbo task `//#assets` that `dev` and `build` depend on) downloading the published pack when the raw files are absent; `pnpm assets:publish` → GitHub release `assets-<hash>` + `web-assets.json`.
 - `repos/` — vendored read-only references (see below).
 - `docs/` — format, vision, decisions.
