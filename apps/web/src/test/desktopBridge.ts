@@ -7,6 +7,9 @@ import type {
   PluginStatus,
   ProjectInfo,
   ProjectMap,
+  UnloadKind,
+  UnsavedChoice,
+  UnsavedPrompt,
   UpdateState
 } from "@ballest/contracts"
 import { Option, Schema } from "effect"
@@ -21,6 +24,14 @@ export interface TestDisk {
   readonly answers: Array<string | null>
   readonly dialogs: Array<{ readonly kind: "import" | "project" | "folder" }>
   readonly external: Array<string>
+  /** The unsaved-changes prompts shown, and what the next ones answer (Cancel once the list runs out). */
+  readonly prompts: Array<UnsavedPrompt>
+  readonly promptAnswers: Array<UnsavedChoice>
+  /** `push` tells the page, as main does, that it held a close or a reload. */
+  readonly unload: {
+    readonly listeners: Set<(kind: UnloadKind) => void>
+    readonly push: (kind: UnloadKind) => void
+  }
   /** Link records by project, then by map file name, as main keeps them in `.ballest/link.json`. */
   readonly links: Map<string, Map<string, MapLink>>
   project: { current: string; recent: Array<string> }
@@ -79,11 +90,19 @@ const makeTestUpdater = (): TestDisk["updater"] => {
   return updater
 }
 
+const makeTestUnload = (): TestDisk["unload"] => {
+  const listeners = new Set<(kind: UnloadKind) => void>()
+  return { listeners, push: (kind) => listeners.forEach((listener) => listener(kind)) }
+}
+
 export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   files: new Map(Object.entries(files)),
   answers: [],
   dialogs: [],
   external: [],
+  prompts: [],
+  promptAnswers: [],
+  unload: makeTestUnload(),
   links: new Map(),
   project: { current: TEST_PROJECT, recent: [] },
   game: {
@@ -249,6 +268,14 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       return Promise.resolve({ _tag: "Exported", file: { path, name: fileName }, link } as const)
     },
     setWindowTheme: () => Promise.resolve(),
+    confirmUnsaved: (prompt) => {
+      disk.prompts.push(prompt)
+      return Promise.resolve(disk.promptAnswers.shift() ?? "cancel")
+    },
+    onUnloadRequest: (listener) => {
+      disk.unload.listeners.add(listener)
+      return () => void disk.unload.listeners.delete(listener)
+    },
     openExternal: (url) => {
       disk.external.push(url)
       return Promise.resolve(true)

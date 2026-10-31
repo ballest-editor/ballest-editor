@@ -3,7 +3,7 @@ import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, FileSystem, Layer, Option, Path, Schema } from "effect"
 import { vi } from "vitest"
-import { ElectronDialog, type FileDialogOptions } from "../electron/ElectronDialog"
+import { ElectronDialog, type FileDialogOptions, type MessageBoxOptions } from "../electron/ElectronDialog"
 import { ElectronShell, parseExternalUrl } from "../electron/ElectronShell"
 import { ElectronWindow } from "../electron/ElectronWindow"
 import { makeFakePluginBundle, makeFakeSteam } from "../game/fakeSteam"
@@ -57,10 +57,15 @@ const hasTag = <A extends { readonly _tag: string }, T extends A["_tag"]>(
 const expectTag = <A extends { readonly _tag: string }, T extends A["_tag"]>(value: A, tag: T) =>
   hasTag(value, tag) ? value : assert.fail(`expected ${tag}, got ${value._tag}`)
 
-/** Dialogs that answer from a queue (a path, or null for cancel) and record what they were asked. */
+/**
+ * Dialogs that answer from a queue (a path, or null for cancel; a message box, the button's index) and record what
+ * they were asked.
+ */
 const fakeDialogs = () => {
   const answers: Array<string | null> = []
   const asked: Array<FileDialogOptions & { readonly kind: "open" | "save" | "folder" }> = []
+  const buttons: Array<number> = []
+  const messages: Array<MessageBoxOptions> = []
   const answer = (kind: "open" | "save" | "folder") => (options: FileDialogOptions) =>
     Effect.sync(() => {
       asked.push({ ...options, kind })
@@ -72,10 +77,15 @@ const fakeDialogs = () => {
       showErrorBox: () => Effect.void,
       showOpenFile: answer("open"),
       showOpenFolder: answer("folder"),
+      showMessageBox: (options) =>
+        Effect.sync(() => {
+          messages.push(options)
+          return buttons.shift() ?? options.cancelId
+        }),
       showSaveFile: answer("save")
     })
   )
-  return { answers, asked, layer }
+  return { answers, asked, buttons, messages, layer }
 }
 
 /** What the shell was asked to open: web links, the game, folders. */
@@ -513,6 +523,23 @@ describe("DesktopIpc", () => {
           String((yield* Effect.flip(fake.invoke(channels.SET_WINDOW_THEME_CHANNEL, { dark: "yes" }))).cause),
           /boolean/
         )
+      })
+    ))
+
+  it.effect("asks Save / Don't save / Cancel in a box modal to the sender's window", () =>
+    withHandlers(({ fake, dialogs }) =>
+      Effect.gen(function*() {
+        const prompt = { message: "Save the changes to Big Loop before closing?", detail: "Or lose them." }
+        dialogs.buttons.push(0, 1, 2)
+        const choices = yield* Effect.forEach([1, 2, 3, 4], () => fake.invoke(channels.CONFIRM_UNSAVED_CHANNEL, prompt))
+        // the fourth box was closed with Escape
+        assert.deepStrictEqual(choices, ["save", "discard", "cancel", "cancel"])
+        assert.deepInclude(dialogs.messages[0], {
+          owner: 1,
+          ...prompt,
+          buttons: ["Save", "Don't save", "Cancel"],
+          cancelId: 2
+        })
       })
     ))
 

@@ -15,6 +15,7 @@ export const IMPORT_MAP_CHANNEL = "ballest:project:importMap"
 export const EXPORT_MAP_CHANNEL = "ballest:project:exportMap"
 export const OPEN_EXTERNAL_CHANNEL = "ballest:shell:openExternal"
 export const SET_WINDOW_THEME_CHANNEL = "ballest:window:setTheme"
+export const CONFIRM_UNSAVED_CHANNEL = "ballest:window:confirmUnsaved"
 export const GAME_PATHS_CHANNEL = "ballest:game:paths"
 export const CHOOSE_GAME_PATH_CHANNEL = "ballest:game:choosePath"
 export const RESET_GAME_PATH_CHANNEL = "ballest:game:resetPath"
@@ -29,3 +30,5 @@ export const DOWNLOAD_UPDATE_CHANNEL = "ballest:update:download"
 export const INSTALL_UPDATE_CHANNEL = "ballest:update:install"
 /** Main → renderer: every new update state (`webContents.send`). */
 export const UPDATE_STATE_CHANNEL = "ballest:update:state"
+/** Main → renderer: the page held a close or a reload with unsaved edits (`webContents.send`). */
+export const UNLOAD_REQUEST_CHANNEL = "ballest:window:unloadRequest"

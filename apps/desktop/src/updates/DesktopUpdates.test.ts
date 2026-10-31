@@ -23,6 +23,7 @@ const installedBuild = {
   settingsPath: "/user/desktop-settings.json",
   defaultProjectDir: "/home/me/Documents/Ballest Editor/Maps",
   preloadPath: "/app/preload.cjs",
+  iconPath: "/app/icon.png",
   rendererDir: "/app/web",
   assetsDir: Option.none(),
   pluginDir: "/resources/plugins/ballest-editor-link"

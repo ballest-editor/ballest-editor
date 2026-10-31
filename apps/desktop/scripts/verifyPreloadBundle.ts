@@ -22,6 +22,8 @@ const members = {
   importMap: "function",
   exportMap: "function",
   setWindowTheme: "function",
+  confirmUnsaved: "function",
+  onUnloadRequest: "function",
   openExternal: "function",
   gamePaths: "function",
   chooseGamePath: "function",

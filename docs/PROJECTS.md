@@ -1,8 +1,9 @@
 # Projects, maps and exports
 
 Status: long-term design, written 2026-10-31. Phase 1 and 2 are milestone 0.2 work; the rest is
-sequenced below. Phase 1's project folder, save flow, Import and Export to game are built (#132; backups on
-overwrite, #137, and the close prompt, #70, are still open). [DESKTOP.md](DESKTOP.md) describes the shell this runs in; [FORMAT.md](FORMAT.md) the
+sequenced below. Phase 1's project folder, save flow, Import and Export to game are built (#132), and so is the
+unsaved-changes prompt before closing or replacing the open map (#70; [DESKTOP.md](DESKTOP.md) § Window). Backups on
+overwrite, #137, are still open. [DESKTOP.md](DESKTOP.md) describes the shell this runs in; [FORMAT.md](FORMAT.md) the
 game's file format, which none of this changes.
 
 ## The three nouns

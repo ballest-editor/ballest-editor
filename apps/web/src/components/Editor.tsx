@@ -2,7 +2,9 @@ import { Toaster } from "@workspace/ui/components/sonner"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
 import { useEffect } from "react"
 import {
+  followUnloadRequests,
   followUpdates,
+  holdsUnload,
   loadCatalog,
   loadKeybinds,
   loadMaterials,
@@ -69,6 +71,23 @@ const useDocumentTitle = () => {
   }, [name, dirty])
 }
 
+/**
+ * While the map has unsaved edits the page holds a window close or a reload (`beforeunload`). A browser then asks with
+ * its own dialog; the desktop window tells the page, which asks Save / Don't save / Cancel and then closes or reloads.
+ */
+const useUnsavedGuard = () =>
+  useEffect(() => {
+    const hold = (e: BeforeUnloadEvent) => {
+      if (holdsUnload()) e.preventDefault()
+    }
+    window.addEventListener("beforeunload", hold)
+    const stop = followUnloadRequests()
+    return () => {
+      window.removeEventListener("beforeunload", hold)
+      stop()
+    }
+  }, [])
+
 export function Editor() {
   const dialog = useEditor((s) => s.dialog)
   const settingsCategory = useEditor((s) => s.settingsCategory)
@@ -77,6 +96,7 @@ export function Editor() {
 
   useActionKeys()
   useDocumentTitle()
+  useUnsavedGuard()
   useTheme()
   useBlurButtonsAfterClick()
 

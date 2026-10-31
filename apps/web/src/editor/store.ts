@@ -3,7 +3,7 @@
  * array of stable ids for React keys and selection. All edits go through domain/edits.
  */
 import type { UpdateState } from "@ballest/contracts"
-import { Option } from "effect"
+import { type Effect, Option } from "effect"
 import { toast } from "sonner"
 import { create } from "zustand"
 import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Catalog"
@@ -173,6 +173,11 @@ export interface EditorState {
   readonly gizmoSpace: GizmoSpace
   /** The open modal dialog; editor keybinds are suspended while one is open. */
   readonly dialog: Dialog | null
+  /**
+   * What the unsaved-changes prompt's Save goes on to do (close, start a new map...) when the map had to be named
+   * first: runs once the `saveAs` dialog has saved it, and is dropped when that dialog is cancelled or another opens.
+   */
+  readonly afterSave: Effect.Effect<void, unknown> | null
   readonly settingsCategory: SettingsCategory
   /** The keybind cheat sheet: shown while its binding is held. */
   readonly cheatSheet: boolean
@@ -294,6 +299,10 @@ export interface EditorState {
   readonly toggleGizmoSpace: () => void
   readonly openDialog: (dialog: Dialog, category?: SettingsCategory) => void
   readonly closeDialog: () => void
+  /** Opens the `saveAs` dialog to name the map, with what to do once it is saved. */
+  readonly nameThen: (afterSave: Effect.Effect<void, unknown>) => void
+  /** `afterSave`, cleared: the `saveAs` dialog takes it before saving. */
+  readonly takeAfterSave: () => Effect.Effect<void, unknown> | null
   readonly setCheatSheet: (cheatSheet: boolean) => void
   readonly setSettingsCategory: (category: SettingsCategory) => void
   readonly setPreview: (preview: EditorState["preview"]) => void
@@ -401,6 +410,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     tool: "translate",
     gizmoSpace: "world",
     dialog: null,
+    afterSave: null,
     settingsCategory: "general",
     cheatSheet: false,
     catalog: null,
@@ -629,8 +639,20 @@ export const useEditor = create<EditorState>()((set, get) => {
       }),
     setTool: (tool) => set({ tool }),
     toggleGizmoSpace: () => set((s) => ({ gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
-    openDialog: (dialog, category) => set((s) => ({ dialog, settingsCategory: category ?? s.settingsCategory })),
+    openDialog: (dialog, category) =>
+      set((s) => ({
+        dialog,
+        settingsCategory: category ?? s.settingsCategory,
+        afterSave: dialog === "saveAs" ? s.afterSave : null
+      })),
+    // The saveAs dialog closes itself before it saves, so this keeps `afterSave`; its Cancel drops it.
     closeDialog: () => set({ dialog: null }),
+    nameThen: (afterSave) => set({ dialog: "saveAs", afterSave }),
+    takeAfterSave: () => {
+      const { afterSave } = get()
+      set({ afterSave: null })
+      return afterSave
+    },
     setCheatSheet: (cheatSheet) => set({ cheatSheet }),
     setSettingsCategory: (settingsCategory) => set({ settingsCategory }),
     setPreview: (preview) => set({ preview }),
