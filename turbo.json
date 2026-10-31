@@ -90,6 +90,7 @@
         "tools/extract/**",
         "tools/compress/**",
         "tools/dev/**",
+        "tools/release/**",
         "!**/node_modules/**",
         "!**/dist/**",
         "!**/dist-electron/**"
@@ -104,7 +105,8 @@
         "packages/contracts/src/**",
         "tools/extract/**",
         "tools/compress/**",
-        "tools/dev/src/**"
+        "tools/dev/src/**",
+        "tools/release/src/**"
       ]
     },
     "//#format:check": {
@@ -115,6 +117,7 @@
         "!samples/**",
         "!assets/**",
         "!web-assets/**",
+        "!release/**",
         "!**/node_modules/**",
         "!**/dist/**",
         "!**/dist-electron/**"
