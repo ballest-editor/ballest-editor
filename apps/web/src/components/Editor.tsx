@@ -2,6 +2,7 @@ import { Toaster } from "@workspace/ui/components/sonner"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
 import { useEffect } from "react"
 import {
+  followNotifications,
   followUnloadRequests,
   followUpdates,
   holdsUnload,
@@ -10,14 +11,16 @@ import {
   loadMaterials,
   loadPlatform,
   loadSettings,
-  setWindowTheme
+  setWindowTheme,
+  showToasts
 } from "../editor/actions"
 import { warmCatalog } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
-import { useEditor } from "../editor/store"
+import { useEditor, useOpenMapLabel } from "../editor/store"
 import { watchResolvedTheme } from "../editor/theme"
 import { useActionKeys } from "../editor/useActionKeys"
 import { Viewport } from "../editor/Viewport"
+import { DocumentTabs } from "./DocumentTabs"
 import { ImportClashDialog } from "./ImportClashDialog"
 import { Inspector } from "./Inspector"
 import { KeybindCheatSheet } from "./KeybindCheatSheet"
@@ -29,6 +32,8 @@ import { RecoverDialog } from "./RecoverDialog"
 import { ReplacePublishedDialog } from "./ReplacePublishedDialog"
 import { SettingsDialog } from "./SettingsDialog"
 import { SidePanel } from "./SidePanel"
+import { StartTab } from "./StartTab"
+import { StatusBar } from "./StatusBar"
 import { TopBar } from "./TopBar"
 import { ViewportControls } from "./ViewControls"
 
@@ -63,13 +68,14 @@ const useTheme = () => {
     }), [theme])
 }
 
-/** The window title: the open file, marked while it has unsaved changes. */
+/** The window title: the open map, marked while it has unsaved changes; Start with none open. */
 const useDocumentTitle = () => {
-  const name = useEditor((s) => s.file?.name ?? "Untitled")
+  const label = useOpenMapLabel()
+  const mapOpen = useEditor((s) => s.mapOpen)
   const dirty = useEditor((s) => s.dirty)
   useEffect(() => {
-    document.title = `${dirty ? "• " : ""}${name} — Ballest Editor`
-  }, [name, dirty])
+    document.title = mapOpen ? `${dirty ? "• " : ""}${label} — Ballest Editor` : "Ballest Editor"
+  }, [label, mapOpen, dirty])
 }
 
 /**
@@ -94,6 +100,8 @@ export function Editor() {
   const settingsCategory = useEditor((s) => s.settingsCategory)
   const setSettingsCategory = useEditor((s) => s.setSettingsCategory)
   const close = useEditor((s) => s.closeDialog)
+  // The Start tab covers the viewport, which stays mounted; the side panels hide their contents until a map shows.
+  const onStart = useEditor((s) => s.activeTab === "start")
 
   useActionKeys()
   useDocumentTitle()
@@ -109,6 +117,9 @@ export function Editor() {
     [catalog, catalogIndex]
   )
 
+  // Before the startup loads, so a failing one is toasted and kept.
+  useEffect(() => showToasts(), [])
+  useEffect(() => followNotifications(), [])
   useEffect(() => {
     // The viewport holds its first reveal until these have settled (see Viewport.tsx).
     void Promise.all([loadCatalog(), loadMaterials(), loadSettings()]).then(() => useEditor.getState().finishBoot())
@@ -123,15 +134,24 @@ export function Editor() {
         <TopBar />
         <div className="flex min-h-0 flex-1">
           <SidePanel id="palette" side="left" defaultWidth={260} minWidth={180} maxWidth={560}>
-            <Palette />
+            <div className={onStart ? "invisible h-full" : "h-full"} inert={onStart}>
+              <Palette />
+            </div>
           </SidePanel>
-          <div className="min-w-0 flex-1">
-            <Viewport controls={ViewportControls} />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <DocumentTabs />
+            <div className="relative min-h-0 flex-1">
+              <Viewport controls={ViewportControls} />
+              {onStart && <StartTab />}
+            </div>
           </div>
           <SidePanel id="inspector" side="right" defaultWidth={300} minWidth={220} maxWidth={640}>
-            <Inspector />
+            <div className={onStart ? "invisible h-full" : "h-full"} inert={onStart}>
+              <Inspector />
+            </div>
           </SidePanel>
         </div>
+        <StatusBar />
       </div>
       <NewMapDialog open={dialog === "new"} onClose={close} />
       <NameMapDialog mode="saveAs" open={dialog === "saveAs"} onClose={close} />
@@ -148,7 +168,8 @@ export function Editor() {
         onClose={close}
       />
       <KeybindCheatSheet />
-      <Toaster position="bottom-right" />
+      {/* clear of the status bar */}
+      <Toaster position="bottom-right" offset={{ bottom: 40 }} />
     </TooltipProvider>
   )
 }

@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 import { isMovementChord, sharedKeysFlyFreely } from "../domain/flyKeys"
 import { actionsFor, chordOf, releasesBinding } from "../domain/Keybinds"
-import { commandFor } from "./commands"
+import { commandFor, worksOnStart } from "./commands"
 import { isEditorKeyEvent } from "./FlyCamera"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
@@ -12,7 +12,8 @@ const interactionActive = () => sceneRegistry.gizmoDragActive() || useEditor.get
  * One-shot actions, matched on the full chord. Ignored in text fields, dialogs and menus,
  * while a look drag is active (the fly keys own the keyboard then), and while a gizmo drag
  * or number-field scrub is in progress (it commits as one undo step on release; undo or
- * delete mid-interaction would be overwritten or orphan it). The cheat sheet is the one
+ * delete mid-interaction would be overwritten or orphan it). With the Start tab in front,
+ * only the actions that need no map run. The cheat sheet is the one
  * held action here: it hides when a key of its binding is released or the window blurs.
  */
 export function useActionKeys() {
@@ -20,7 +21,7 @@ export function useActionKeys() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!isEditorKeyEvent(e) || e.repeat || sceneRegistry.lookDragActive() || interactionActive()) return
       const chord = chordOf(e)
-      const { keybinds, settings } = useEditor.getState()
+      const { keybinds, settings, activeTab } = useEditor.getState()
       // A movement key that is also a tool shortcut (W: forward + translate) joins an ongoing
       // flight instead of switching tool, unless no movement key needs look: then it does both.
       if (
@@ -30,7 +31,7 @@ export function useActionKeys() {
       ) return
       for (const action of actionsFor(keybinds, chord)) {
         const run = commandFor(action)
-        if (run === undefined) continue
+        if (run === undefined || (activeTab !== "map" && !worksOnStart(action))) continue
         e.preventDefault()
         run()
         return

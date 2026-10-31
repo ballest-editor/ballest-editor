@@ -1,5 +1,6 @@
 /** UI-facing operations that run Effects through the single app runtime. */
-import { Cause, Effect, Exit, Fiber, Option, Stream } from "effect"
+import { Cause, Effect, Exit, Fiber, Option, Queue, Stream } from "effect"
+import { toast } from "sonner"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { setLevelNames } from "../domain/edits"
 import { copyNameOf, currentCreatedAt, mapFileNameOf, mapLabelOf, newMapFile } from "../domain/factory"
@@ -28,6 +29,9 @@ import {
   type GamePathKind,
   type GamePaths,
   type MapBackup,
+  type NotificationAction,
+  type NotificationCommand,
+  type NotificationRecord,
   Platform,
   type PlatformError,
   type ProjectMap,
@@ -36,15 +40,7 @@ import {
 } from "../services/Platform"
 import { type AppServices, runtime } from "../services/runtime"
 import { SettingsStore } from "../services/SettingsStore"
-import {
-  type Doc,
-  type ImportClash,
-  type NoticeAction,
-  type OpenFile,
-  pivotOf,
-  type SlotPaint,
-  useEditor
-} from "./store"
+import { type Doc, type ImportClash, type OpenFile, pivotOf, type SlotPaint, useEditor } from "./store"
 
 const notifyFailure = <E>(cause: Cause.Cause<E>) => {
   const error = Cause.squash(cause)
@@ -213,11 +209,16 @@ export const setWindowTheme = (dark: boolean) =>
     }).pipe(Effect.catch((error) => Effect.logWarning("Couldn't recolour the window controls", error)))
   )
 
-/** What the platform offers, the project with its maps (desktop) and the creator name it finds, into the store. */
+/**
+ * What the platform offers, the project with its maps (desktop) and the creator name it finds, into the store. The
+ * desktop app starts on the Start tab; a browser, which has no project, on its one map.
+ */
 export const loadPlatform = () =>
   run(
     Effect.gen(function*() {
-      useEditor.getState().setCapabilities((yield* Platform).capabilities)
+      const { capabilities } = yield* Platform
+      useEditor.getState().setCapabilities(capabilities)
+      if (!capabilities.projects) useEditor.getState().loadMap(useEditor.getState().doc.map, null)
       yield* refreshProject
       yield* findCreatorEffect
     })
@@ -240,13 +241,14 @@ export const followUpdateState = Effect.gen(function*() {
   yield* platform.updates.pipe(Stream.runForEach((state) => Effect.sync(() => useEditor.getState().setUpdate(state))))
 })
 
-/** Follows the updater (`followUpdateState`) until the returned function is called: a React effect's cleanup. */
-export const followUpdates = (): () => void => {
-  const fiber = runtime.runFork(
-    followUpdateState.pipe(Effect.catch((error) => Effect.logWarning("Stopped following the updater", error)))
-  )
+/** Runs `effect` in the background until the returned function is called (a React effect's cleanup); failures are logged. */
+const runUntilCleanup = <E>(effect: Effect.Effect<void, E, AppServices>, failure: string): () => void => {
+  const fiber = runtime.runFork(effect.pipe(Effect.catch((error) => Effect.logWarning(failure, error))))
   return () => void runtime.runFork(Fiber.interrupt(fiber))
 }
+
+/** Follows the updater (`followUpdateState`) until the returned function is called: a React effect's cleanup. */
+export const followUpdates = () => runUntilCleanup(followUpdateState, "Stopped following the updater")
 
 const updateStep = (step: "downloadUpdate" | "installUpdate") =>
   Effect.gen(function*() {
@@ -276,10 +278,10 @@ const refreshProject = Effect.gen(function*() {
 
 const fileOf = (map: ProjectMap): OpenFile => ({ name: map.fileName, path: map.path })
 
-/** A toast's Reveal: the project's maps folder, or the game's. */
-const revealIn = (where: "project" | "game"): NoticeAction => ({
+/** A notification's Reveal: the project's maps folder, or the game's. */
+const revealIn = (where: "project" | "game"): NotificationAction => ({
   label: "Reveal",
-  run: () => void (where === "project" ? revealProject() : revealGamePath("mapsFolder"))
+  command: where === "project" ? { _tag: "RevealProject" } : { _tag: "RevealGamePath", which: "mapsFolder" }
 })
 
 const projectName = () => useEditor.getState().project?.current.name ?? "the project"
@@ -325,11 +327,10 @@ export const createNewMap = Effect.fn("createNewMap")(function*(displayName: str
   const created = yield* platform.createMap({ fileName: result.filename, text: result.text })
   yield* showMap(result.map, fileOf(created))
   yield* refreshProject
-  useEditor.getState().notify(
-    "info",
-    `Created ${mapLabelOf(created.fileName)} in ${projectName()}`,
-    revealIn("project")
-  )
+  useEditor.getState().notify("info", `Created ${mapLabelOf(created.fileName)} in ${projectName()}`, {
+    kind: "mapCreated",
+    actions: [revealIn("project")]
+  })
 })
 
 export const newMap = (displayName: string, creatorName: string) => run(createNewMap(displayName, creatorName))
@@ -339,11 +340,29 @@ export const openProjectMapFile = Effect.fn("openProjectMapFile")(function*(file
   const file = yield* (yield* Platform).readMap(fileName)
   const map = yield* MapCodec.use((codec) => codec.decode(file.text))
   yield* showMap(map, fileOf(file))
-  useEditor.getState().notify("info", `Opened ${mapLabelOf(file.fileName)} (${map.items.length} items)`)
+  useEditor.getState().notify("info", `Opened ${mapLabelOf(file.fileName)} (${map.items.length} items)`, {
+    kind: "mapOpened"
+  })
 })
 
-export const openProjectMap = (fileName: string) =>
-  run(unlessCancelled("openMap", openProjectMapFile(fileName)).pipe(Effect.ensuring(Effect.ignore(refreshProject))))
+/**
+ * Opens one of the project's maps in the map tab (there is one), asking about the open map's unsaved edits first;
+ * when it is that map, its tab shows.
+ */
+export const openProjectMap = (fileName: string) => {
+  const { mapOpen, file, showMapTab } = useEditor.getState()
+  if (mapOpen && file?.name === fileName) showMapTab()
+  else {void run(
+      unlessCancelled("openMap", openProjectMapFile(fileName)).pipe(Effect.ensuring(Effect.ignore(refreshProject)))
+    )}
+}
+
+/** Closes the map's tab, and Start shows; unsaved edits ask first (the shared prompt, `unlessCancelled`). */
+export const closeMapTabEffect = Effect.suspend(() =>
+  unlessCancelled("closeMap", Effect.sync(() => useEditor.getState().closeMap()))
+)
+
+export const closeMapTab = () => run(closeMapTabEffect)
 
 /** Copies a picked file into the project (or reports the clash) and opens the copy. */
 const importInto = Effect.fn("importInto")(function*(pending: ImportClash, replace: boolean) {
@@ -359,7 +378,7 @@ const importInto = Effect.fn("importInto")(function*(pending: ImportClash, repla
   useEditor.getState().notify(
     "info",
     `Imported ${mapLabelOf(fileName)} into ${projectName()} (${map.items.length} items)`,
-    revealIn("project")
+    { kind: "mapImported", actions: [revealIn("project")] }
   )
 })
 
@@ -377,7 +396,7 @@ export const importMapFile = Effect.gen(function*() {
   const map = yield* MapCodec.use((codec) => codec.decode(text))
   if (Option.isNone(path)) {
     yield* showMap(map, { name, path: null })
-    useEditor.getState().notify("info", `Opened ${name} (${map.items.length} items)`)
+    useEditor.getState().notify("info", `Opened ${name} (${map.items.length} items)`, { kind: "mapOpened" })
     return
   }
   const { levelDisplayName, creatorName } = map.worldSettings.levelData
@@ -434,7 +453,10 @@ const createAsOpenMap = Effect.fn("createAsOpenMap")(function*(doc: Doc, result:
 const createFromOpenMap = Effect.gen(function*() {
   const { doc, result } = yield* exportOpenMap
   const created = yield* createAsOpenMap(doc, result)
-  useEditor.getState().notify("info", `Saved ${mapLabelOf(created.fileName)} in ${projectName()}`, revealIn("project"))
+  useEditor.getState().notify("info", `Saved ${mapLabelOf(created.fileName)} in ${projectName()}`, {
+    kind: "mapSaved",
+    actions: [revealIn("project")]
+  })
 })
 
 /**
@@ -456,7 +478,7 @@ const writeOpenMap = Effect.fn("writeOpenMap")(function*(file: OpenFile, options
   useEditor.getState().notify(
     "info",
     saved.fileName === file.name ? `Saved ${label}` : `Renamed ${mapLabelOf(file.name)} to ${label}`,
-    revealIn("project")
+    { kind: saved.fileName === file.name ? "mapSaved" : "mapRenamed", actions: [revealIn("project")] }
   )
   if (options.exportAfter && useEditor.getState().exportOnSave) yield* exportProjectMap(saved.fileName, false)
   return saved
@@ -468,7 +490,7 @@ const downloadOpenMap = Effect.gen(function*() {
   yield* (yield* Platform).download({ name: result.filename, text: result.text })
   useEditor.getState().markSaved(doc, result.map, { name: result.filename, path: null })
   yield* saveMapPrefs
-  useEditor.getState().notify("info", `Downloaded ${result.filename}`)
+  useEditor.getState().notify("info", `Downloaded ${result.filename}`, { kind: "mapDownloaded" })
 })
 
 /**
@@ -584,7 +606,7 @@ export const duplicateMapEffect = Effect.fn("duplicateMapEffect")(
     useEditor.getState().notify(
       "info",
       `Duplicated${from}: now editing ${mapLabelOf(created.fileName)}${over}`,
-      revealIn("project")
+      { kind: "mapDuplicated", actions: [revealIn("project")] }
     )
   }
 )
@@ -600,11 +622,10 @@ const exportProjectMap = Effect.fn("exportProjectMap")(function*(fileName: strin
     return
   }
   yield* refreshProject
-  useEditor.getState().notify(
-    "info",
-    `Exported ${mapLabelOf(fileName)} to the game's maps folder`,
-    revealIn("game")
-  )
+  useEditor.getState().notify("info", `Exported ${mapLabelOf(fileName)} to the game's maps folder`, {
+    kind: "mapExported",
+    actions: [revealIn("game")]
+  })
 })
 
 /**
@@ -704,7 +725,10 @@ const changeProject = (
       if (Option.isNone(next)) return
       if (next.value.current.path !== before) useEditor.getState().detachFile()
       yield* refreshProject
-      useEditor.getState().notify("info", `Using the project ${next.value.current.name}`, revealIn("project"))
+      useEditor.getState().notify("info", `Using the project ${next.value.current.name}`, {
+        kind: "projectChanged",
+        actions: [revealIn("project")]
+      })
     })
   ))
 
@@ -728,11 +752,11 @@ export const revealProject = () =>
 export const launchGameEffect = Effect.gen(function*() {
   const platform = yield* Platform
   if (yield* platform.isGameRunning) {
-    useEditor.getState().notify("info", "Ballest of Them All is already running")
+    useEditor.getState().notify("info", "Ballest of Them All is already running", { kind: "gameLaunch" })
     return
   }
   yield* platform.launchGame
-  useEditor.getState().notify("info", "Starting Ballest of Them All through Steam")
+  useEditor.getState().notify("info", "Starting Ballest of Them All through Steam", { kind: "gameLaunch" })
 })
 
 export const launchGame = () => run(launchGameEffect)
@@ -778,7 +802,9 @@ export const installPluginEffect = Effect.gen(function*() {
   const done = status === "outdated"
     ? `Updated the editor's plugin to ${plugin.bundledVersion}`
     : "Installed the editor's plugin"
-  useEditor.getState().notify("info", restartGame ? `${done}. Restart the game to use Play.` : done)
+  useEditor.getState().notify("info", restartGame ? `${done}. Restart the game to use Play.` : done, {
+    kind: "pluginInstalled"
+  })
 })
 
 export const installPlugin = () => run(installPluginEffect)
@@ -825,3 +851,96 @@ export const setGridHeight = (gridHeight: number) => {
   useEditor.getState().setFloorHeight(gridHeight)
   return run(saveMapPrefs)
 }
+
+// --- notifications (docs/PROJECTS.md § Shell) ------------------------------------------------
+
+/** Runs a notification's button. */
+export const runNotificationCommand = (command: NotificationCommand): void => {
+  switch (command._tag) {
+    case "RevealProject":
+      void revealProject()
+      return
+    case "RevealGamePath":
+      void revealGamePath(command.which)
+      return
+    case "ChooseGamePath":
+      void chooseGamePath(command.which)
+      return
+    case "OpenMap":
+      openProjectMap(command.fileName)
+  }
+}
+
+/** A notification's button, from its toast or the notification centre: it is read once acted on. */
+export const runNotificationAction = (notice: NotificationRecord, action: NotificationAction) => {
+  useEditor.getState().markNotificationsRead([notice.id])
+  runNotificationCommand(action.command)
+}
+
+const toastNotification = (notice: NotificationRecord) => {
+  const [first] = notice.actions
+  const options = {
+    ...(notice.body !== null && { description: notice.body }),
+    ...(first !== undefined && {
+      action: { label: first.label, onClick: () => runNotificationAction(notice, first) }
+    })
+  }
+  if (notice.level === "error") toast.error(notice.title, options)
+  else toast(notice.title, options)
+}
+
+/** When this run of the editor began: a notification from before it was kept from an earlier run, not news. */
+const sessionStart = Date.now()
+
+/**
+ * Toasts each new notification (its first button on the toast) until the returned function is called: a React effect's
+ * cleanup. The toast goes away by itself; the notification stays in the notification centre.
+ */
+export const showToasts = (): () => void => {
+  const shown = new Set<string>()
+  const showNew = (log: ReadonlyArray<NotificationRecord>) => {
+    // oldest first, so the newest is on top
+    for (const notice of log.toReversed()) {
+      if (shown.has(notice.id) || Date.parse(notice.at) < sessionStart) continue
+      shown.add(notice.id)
+      toastNotification(notice)
+    }
+  }
+  showNew(useEditor.getState().notifications)
+  return useEditor.subscribe((state, previous) => {
+    if (state.notifications !== previous.notifications) showNew(state.notifications)
+  })
+}
+
+/**
+ * Restores the notifications kept from earlier runs under this session's, then keeps the list after every change, one
+ * write at a time (desktop: `notifications.json`; a browser forgets them). Runs until interrupted. A failed write is
+ * only logged: reporting it would be another notification to write.
+ */
+export const keepNotifications = Effect.gen(function*() {
+  const platform = yield* Platform
+  const kept = yield* platform.loadNotifications
+  const changes = Stream.callback<ReadonlyArray<NotificationRecord>>((queue) =>
+    Effect.acquireRelease(
+      Effect.sync(() => {
+        const unsubscribe = useEditor.subscribe((state, previous) => {
+          if (state.notifications !== previous.notifications) Queue.offerUnsafe(queue, state.notifications)
+        })
+        // the merged list is the first change written
+        useEditor.getState().restoreNotifications(kept)
+        return unsubscribe
+      }),
+      (unsubscribe) => Effect.sync(unsubscribe)
+    )
+  )
+  yield* changes.pipe(
+    Stream.runForEach((records) =>
+      platform.saveNotifications(records).pipe(
+        Effect.catch((error) => Effect.logWarning("Couldn't keep the notifications", error))
+      )
+    )
+  )
+})
+
+/** Keeps the notifications (`keepNotifications`) until the returned function is called: a React effect's cleanup. */
+export const followNotifications = () => runUntilCleanup(keepNotifications, "Couldn't read the kept notifications")

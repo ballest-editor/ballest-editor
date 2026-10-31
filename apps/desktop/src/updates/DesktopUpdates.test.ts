@@ -22,6 +22,7 @@ const installedBuild = {
   userData: "/user",
   settingsPath: "/user/desktop-settings.json",
   exportBackupsDir: "/user/backups",
+  notificationsPath: "/user/notifications.json",
   defaultProjectDir: "/home/me/Documents/Ballest Editor/Maps",
   preloadPath: "/app/preload.cjs",
   iconPath: "/app/icon.png",

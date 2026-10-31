@@ -46,3 +46,8 @@ const hasCommand = (action: KeybindAction): action is CommandAction => Object.ha
 /** The action's command, or undefined when it isn't a one-shot action. */
 export const commandFor = (action: KeybindAction): (() => void) | undefined =>
   hasCommand(action) ? actionCommands[action] : undefined
+
+const WITHOUT_MAP: ReadonlySet<KeybindAction> = new Set(["newMap", "openMap", "showKeybinds"])
+
+/** Whether the action's keybind works with the Start tab in front; the others act on the map, which it covers. */
+export const worksOnStart = (action: KeybindAction): boolean => WITHOUT_MAP.has(action)

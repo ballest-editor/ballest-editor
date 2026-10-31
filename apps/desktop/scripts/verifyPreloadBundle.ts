@@ -36,6 +36,8 @@ const members = {
   findCreator: "function",
   pluginStatus: "function",
   installPlugin: "function",
+  loadNotifications: "function",
+  saveNotifications: "function",
   getUpdateState: "function",
   downloadUpdate: "function",
   installUpdate: "function",

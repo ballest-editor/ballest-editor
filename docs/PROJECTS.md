@@ -3,7 +3,9 @@
 Status: long-term design, written 2026-10-31. Phase 1 and 2 are milestone 0.2 work; the rest is
 sequenced below. Phase 1's project folder, save flow, Import and Export to game are built (#132), and so are the
 unsaved-changes prompt before closing or replacing the open map (#70; [DESKTOP.md](DESKTOP.md) § Window) and backups
-on overwrite with Recover (#137; [DESKTOP.md](DESKTOP.md) § Backups). [DESKTOP.md](DESKTOP.md) describes the shell this runs in; [FORMAT.md](FORMAT.md) the
+on overwrite with Recover (#137; [DESKTOP.md](DESKTOP.md) § Backups). Of phase 2, the status bar, the notification
+centre, the Start tab (plain list) and the document tabs are built (#140; [DESKTOP.md](DESKTOP.md) § Renderer describes
+them); the Game link checklist (#134) is a placeholder row on the Start tab. [DESKTOP.md](DESKTOP.md) describes the shell this runs in; [FORMAT.md](FORMAT.md) the
 game's file format, which none of this changes.
 
 ## The three nouns
@@ -233,7 +235,7 @@ disk (a folder, one JSON file, a hash) and large in how the app reads; that is t
 | #142 map settings, #143 new and open project    | New, phases 5 and 6; #21's dialog becomes Map settings.                                                                                             |
 | #136 restyle the update pill                    | Keep; the pill moves to the status bar.                                                                                                             |
 | #118 install the plugin, #66 Play               | Keep; Play exports first and records the link. Install plugin is a Game link row.                                                                   |
-| #140 status bar, notifications, Start tab       | New, phase 2.                                                                                                                                       |
+| #140 status bar, notifications, Start tab       | Done (phase 2).                                                                                                                                     |
 | #134 game link checklist                        | #135 merged into it; the Game link checklist on the Start tab plus notifications when a result changes. Phase 2.                                    |
 | #141 sync detection, Export confirm, Re-import  | New, phase 3.                                                                                                                                       |
 | #112 sidecar                                    | Move to 0.4; add "re-match on Re-import" to its scope.                                                                                              |

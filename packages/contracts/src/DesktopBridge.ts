@@ -99,11 +99,17 @@ export const ChooseProjectResult = Schema.NullOr(ProjectState)
 export const ProjectPathPayload = Schema.Struct({ path: FilePath })
 export type ProjectPathPayload = typeof ProjectPathPayload.Type
 
-/** A map in the project: its file in `maps/`, when that last changed, and its link record. */
+/**
+ * A map in the project: its file in `maps/`, when that last changed, the SHA-256 of its bytes (compared with the last
+ * export's to tell whether it was edited since), its `levelPublishedFileId` (-1 when it was never published, or the
+ * file doesn't decode), and its link record.
+ */
 export const ProjectMap = Schema.Struct({
   fileName: MapFileName,
   path: FilePath,
   modifiedAt: IsoTime,
+  hash: FileHash,
+  publishedFileId: Schema.Finite,
   link: Schema.NullOr(MapLink)
 })
 export type ProjectMap = typeof ProjectMap.Type
@@ -243,6 +249,53 @@ export type GamePathPayload = typeof GamePathPayload.Type
 
 /** `chooseGamePath`'s result: null when the user cancelled the dialog. */
 export const ChooseGamePathResult = Schema.NullOr(GamePaths)
+
+/**
+ * What a notification's button does (docs/PROJECTS.md § Shell). Data, not a function, so a notification read back from
+ * `notifications.json` after a restart still has live actions; the renderer runs each one.
+ */
+export const NotificationCommand = Schema.TaggedUnion({
+  /** Shows the project's `maps/` folder. */
+  RevealProject: {},
+  /** Shows one of the game's folders. */
+  RevealGamePath: { which: GamePathKind },
+  /** A folder dialog for one of the game's folders (Choose folder…). */
+  ChooseGamePath: { which: GamePathKind },
+  /** Opens one of the project's maps. */
+  OpenMap: { fileName: MapFileName }
+})
+export type NotificationCommand = typeof NotificationCommand.Type
+
+export const NotificationAction = Schema.Struct({
+  label: Schema.String.check(Schema.isMaxLength(64)),
+  command: NotificationCommand
+})
+export type NotificationAction = typeof NotificationAction.Type
+
+/**
+ * One notification, as the bell lists it and `notifications.json` keeps it. `kind` names what it is about (`mapSaved`,
+ * `error`, ...; a later "don't show again" is per kind). A `persistent` one stays pinned to the top of the list until
+ * `resolvedAt` is set, when its cause has gone away; notifying the same persistent kind again updates it in place.
+ */
+export const NotificationRecord = Schema.Struct({
+  id: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(64)),
+  kind: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(64)),
+  level: Schema.Literals(["info", "error"]),
+  title: Schema.String.check(Schema.isMaxLength(4096)),
+  body: Schema.NullOr(Schema.String.check(Schema.isMaxLength(16384))),
+  at: IsoTime,
+  read: Schema.Boolean,
+  persistent: Schema.Boolean,
+  resolvedAt: Schema.NullOr(IsoTime),
+  actions: Schema.Array(NotificationAction).check(Schema.isMaxLength(4))
+})
+export type NotificationRecord = typeof NotificationRecord.Type
+
+/** How many notifications the bell keeps, across restarts on desktop. */
+export const NOTIFICATION_LIMIT = 100
+
+export const NotificationRecords = Schema.Array(NotificationRecord).check(Schema.isMaxLength(NOTIFICATION_LIMIT))
+export type NotificationRecords = typeof NotificationRecords.Type
 
 /**
  * Where the creator name the game writes into maps was found: the persona name of the account Steam last logged in
@@ -403,6 +456,10 @@ export interface DesktopBridge {
    * Rejects when the plugin manager isn't installed. Only ever writes inside `<plugins>/ballest-editor-link`.
    */
   readonly installPlugin: () => Promise<InstallPluginResult>
+  /** The notifications kept in `<userData>/notifications.json`, newest first; empty when there are none yet. */
+  readonly loadNotifications: () => Promise<NotificationRecords>
+  /** Replaces the kept notifications (at most `NOTIFICATION_LIMIT`). */
+  readonly saveNotifications: (records: NotificationRecords) => Promise<void>
   /** The updater's state now. */
   readonly getUpdateState: () => Promise<UpdateState>
   /** Starts downloading the release on offer (`available`); progress and the outcome arrive through `onUpdateState`. */

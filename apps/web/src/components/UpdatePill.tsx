@@ -41,7 +41,7 @@ function DownloadProgress({ percent }: { readonly percent: number }) {
 }
 
 /**
- * The desktop updater in the title bar (docs/DESKTOP.md § Packaging and release): "Update available", then the
+ * The desktop updater in the status bar (docs/DESKTOP.md § Packaging and release): "Update available", then the
  * download's progress, then "Restart to update". Its popover has the release notes and the next step. Nothing in a
  * browser, or while there is no newer release.
  */
