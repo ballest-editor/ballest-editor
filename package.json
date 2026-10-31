@@ -3,7 +3,8 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "node tools/dev/src/dev-runner.ts dev",
+    "dev:desktop": "node tools/dev/src/dev-runner.ts dev:desktop",
     "build": "turbo build",
     "assets": "node tools/compress/compress.mjs && node tools/compress/download.mjs",
     "assets:publish": "node tools/compress/publish.mjs",
@@ -35,7 +36,7 @@
   },
   "packageManager": "pnpm@12.9.0",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.18.0"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,json,md}": "dprint fmt --allow-no-files",

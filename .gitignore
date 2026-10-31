@@ -4,6 +4,8 @@ node_modules/
 .tanstack/
 dist/
 dist-electron/
+# apps/desktop's dev profile (scripts/dev-electron.ts)
+.dev-user-data/
 result
 .direnv/
 *.log

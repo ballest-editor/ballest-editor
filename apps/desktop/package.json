@@ -5,7 +5,8 @@
   "main": "dist-electron/main.cjs",
   "scripts": {
     "build": "vite build",
-    "start": "node scripts/start-electron.mjs",
+    "dev": "vite build --watch",
+    "start": "node scripts/start-electron.ts",
     "typecheck": "effect-tsgo tsc -p tsconfig.json",
     "test": "vitest run"
   },

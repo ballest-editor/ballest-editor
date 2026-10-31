@@ -1,0 +1,14 @@
+{
+  "name": "@ballest/dev",
+  "private": true,
+  "type": "module",
+  "description": "The `pnpm dev` and `pnpm dev:desktop` runner: picks this checkout's dev server port, then runs turbo",
+  "scripts": {
+    "typecheck": "effect-tsgo tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "vitest": "^5.0.5"
+  }
+}
