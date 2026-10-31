@@ -50,6 +50,7 @@ Roughly in the order we expect to tackle them. Items marked ✅ are in the first
 
 ### Organisation
 
+- Projects: a folder of maps with their editor-only data, exports into the game's maps folder, and sync with edits made in the in-game editor. Design in [PROJECTS.md](PROJECTS.md).
 - Groups (the format already has `editorState.groups`) and nested groups.
 - Layers with visibility/lock, not persisted by the game but kept in a sidecar so round-tripping through the in-game editor doesn't lose them.
 - Prefabs: import/export the game's `BallestPrefab` JSON.
