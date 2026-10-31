@@ -1,6 +1,7 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { defineConfig, type EnvironmentOptions } from "vite"
+import { defineConfig, type EnvironmentOptions, type Plugin } from "vite"
+import { verifyPreloadBundle } from "./scripts/verifyPreloadBundle"
 
 const outDir = path.join(import.meta.dirname, "dist-electron")
 
@@ -8,7 +9,7 @@ const outDir = path.join(import.meta.dirname, "dist-electron")
  * Main and preload are separate environments so neither shares chunks with the other: a sandboxed preload can't
  * `require` anything but `electron`. Both bundle every dependency into one CommonJS file in `dist-electron/`.
  */
-const bundle = (entry: string): EnvironmentOptions => ({
+const cjsEnvironment = (entry: string): EnvironmentOptions => ({
   consumer: "server",
   resolve: { noExternal: true, external: ["electron"] },
   build: {
@@ -25,10 +26,22 @@ const bundle = (entry: string): EnvironmentOptions => ({
   }
 })
 
+/** Fails the preload build if the bundle couldn't run sandboxed or doesn't expose the whole DesktopBridge. */
+const checkPreload = (): Plugin => ({
+  name: "ballest:check-preload",
+  applyToEnvironment: (environment) => environment.name === "preload",
+  generateBundle(_options, bundle) {
+    for (const chunk of Object.values(bundle)) {
+      if (chunk.type === "chunk" && chunk.isEntry) verifyPreloadBundle(chunk.code)
+    }
+  }
+})
+
 export default defineConfig({
+  plugins: [checkPreload()],
   environments: {
-    main: bundle("src/main.ts"),
-    preload: bundle("src/preload.ts")
+    main: cjsEnvironment("src/main.ts"),
+    preload: cjsEnvironment("src/preload.ts")
   },
   builder: {
     // Both environments write into one directory, so it is emptied once here instead of by each build.
