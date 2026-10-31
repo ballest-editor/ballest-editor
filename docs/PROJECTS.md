@@ -201,13 +201,12 @@ disk (a folder, one JSON file, a hash) and large in how the app reads; that is t
 | #137 back up before overwriting                 | Keep; backups go under `<project>/.ballest/backups/` for project files and `<userData>/backups/` for exports. Recover lives in the Map menu.        |
 | #70 close prompt                                | Keep as is.                                                                                                                                         |
 | #133 creator from Steam                         | Keep the discovery; the UI is a Game link row, not a Settings-only field.                                                                           |
-| #134 report found folders, #135 choose folder   | Merge into one issue: the Game link checklist on the Start tab plus notifications when a result changes. Drop the startup toasts.                   |
+| #142 map settings, #143 new and open project    | New, phases 5 and 6; #21's dialog becomes Map settings.                                                                                             |
 | #136 restyle the update pill                    | Keep; the pill moves to the status bar.                                                                                                             |
 | #118 install the plugin, #66 Play               | Keep; Play exports first and records the link. Install plugin is a Game link row.                                                                   |
-| new: status bar and notification centre         | Phase 2.                                                                                                                                            |
-| new: Start tab (list version) and Game link     | Phase 2.                                                                                                                                            |
-| new: sync detection, Export confirm, Re-import  | Phase 3.                                                                                                                                            |
+| #140 status bar, notifications, Start tab       | New, phase 2.                                                                                                                                       |
+| #134 game link checklist                        | #135 merged into it; the Game link checklist on the Start tab plus notifications when a result changes. Phase 2.                                    |
+| #141 sync detection, Export confirm, Re-import  | New, phase 3.                                                                                                                                       |
 | #112 sidecar                                    | Move to 0.4; add "re-match on Re-import" to its scope.                                                                                              |
 | #81, #111 hide, lock, layers                    | Move to 0.4.                                                                                                                                        |
 | #103 Workshop browser, #104 multi-map, #105 git | Move to 0.5; #103 gains "the maps folder list on the Start tab" as its first slice.                                                                 |
-| #21 project settings (closed)                   | The dialog it built becomes Map settings; Project settings is a new, smaller dialog in 0.5.                                                         |
