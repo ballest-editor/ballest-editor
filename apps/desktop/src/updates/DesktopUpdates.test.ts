@@ -23,7 +23,8 @@ const installedBuild = {
   settingsPath: "/user/desktop-settings.json",
   preloadPath: "/app/preload.cjs",
   rendererDir: "/app/web",
-  assetsDir: Option.none()
+  assetsDir: Option.none(),
+  pluginDir: "/resources/plugins/ballest-editor-link"
 }
 
 /** An updater whose feed answers from `releases` and whose downloads finish when the test says so. */

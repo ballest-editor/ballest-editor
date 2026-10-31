@@ -13,9 +13,12 @@ describe("stagePackageJson", () => {
 })
 
 describe("builderConfig", () => {
-  it("ships the assets beside app.asar, not in it", () => {
+  it("ships the assets and the editor-link plugin beside app.asar, not in it", () => {
     const config = builderConfig({ ...options, platform: "win" })
-    assert.deepStrictEqual(config.extraResources, [{ from: "assets", to: "assets" }])
+    assert.deepStrictEqual(config.extraResources, [{ from: "assets", to: "assets" }, {
+      from: "plugins",
+      to: "plugins"
+    }])
     assert.notInclude(config.files, "assets/**")
     assert.include(config.files, "!**/*.map")
   })

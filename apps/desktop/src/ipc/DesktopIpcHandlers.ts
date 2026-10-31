@@ -5,8 +5,10 @@ import {
   chooseGamePath,
   findCreator,
   gamePaths,
+  installPlugin,
   isGameRunning,
   launchGame,
+  pluginStatus,
   resetGamePath,
   revealGamePath,
   saveToGame
@@ -35,6 +37,8 @@ export const installDesktopIpcHandlers = Effect.fn("installDesktopIpcHandlers")(
   yield* ipc.handle(launchGame)
   yield* ipc.handle(isGameRunning)
   yield* ipc.handle(findCreator)
+  yield* ipc.handle(pluginStatus)
+  yield* ipc.handle(installPlugin)
   yield* ipc.handle(getUpdateState)
   yield* ipc.handle(downloadUpdate)
   yield* ipc.handle(installUpdate)

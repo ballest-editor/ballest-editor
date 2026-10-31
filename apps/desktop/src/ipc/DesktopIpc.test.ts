@@ -6,9 +6,10 @@ import { ElectronDialog, type FileDialogOptions } from "../electron/ElectronDial
 import { ElectronShell, parseExternalUrl } from "../electron/ElectronShell"
 import { ElectronWindow } from "../electron/ElectronWindow"
 import { MapFiles } from "../files/MapFiles"
-import { makeFakeSteam } from "../game/fakeSteam"
+import { makeFakePluginBundle, makeFakeSteam } from "../game/fakeSteam"
 import { GameCreator } from "../game/GameCreator"
 import { GameHost } from "../game/GameHost"
+import { GameLink } from "../game/GameLink"
 import { GamePaths } from "../game/GamePaths"
 import { GameProcess } from "../game/GameProcess"
 import { SteamLibrary } from "../game/SteamLibrary"
@@ -20,12 +21,14 @@ import {
   FIND_CREATOR_CHANNEL,
   GAME_PATHS_CHANNEL,
   GET_UPDATE_STATE_CHANNEL,
+  INSTALL_PLUGIN_CHANNEL,
   INSTALL_UPDATE_CHANNEL,
   IS_GAME_RUNNING_CHANNEL,
   LAUNCH_GAME_CHANNEL,
   OPEN_EXTERNAL_CHANNEL,
   OPEN_MAP_CHANNEL,
   PING_CHANNEL,
+  PLUGIN_STATUS_CHANNEL,
   READ_MAP_CHANNEL,
   RECENT_MAPS_CHANNEL,
   RESET_GAME_PATH_CHANNEL,
@@ -138,7 +141,8 @@ const withHandlers = <A, E>(
     const fake = fakeIpcMain()
     const dialogs = fakeDialogs()
     const steam = yield* makeFakeSteam(path.join(dir, "machine"), { game: "steam", ran: true })
-    const game = GameCreator.layer.pipe(
+    const bundle = yield* makeFakePluginBundle(dir, "0.2.0")
+    const game = Layer.mergeAll(GameCreator.layer, Layer.effect(GameLink, GameLink.make(bundle))).pipe(
       Layer.provideMerge(Layer.mergeAll(GamePaths.layer, GameProcess.layer)),
       Layer.provide(SteamLibrary.layer),
       Layer.provide(Layer.succeed(GameHost, GameHost.of(steam.host)))
@@ -382,6 +386,37 @@ describe("DesktopIpc", () => {
           `"users"\n{\n\t"76561198000000001"\n\t{\n\t\t"PersonaName"\t\t"Marble"\n\t\t"MostRecent"\t\t"1"\n\t}\n}\n`
         )
         assert.deepStrictEqual(yield* fake.invoke(FIND_CREATOR_CHANNEL), { name: "Marble", source: "steam" })
+      })
+    ))
+
+  it.effect("reports the plugin and installs it once the plugin manager is there", () =>
+    withHandlers(({ fake, steam }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const folder = path.join(steam.plugins, "ballest-editor-link")
+        assert.deepStrictEqual(yield* fake.invoke(PLUGIN_STATUS_CHANNEL), {
+          status: "noPluginManager",
+          bundledVersion: "0.2.0",
+          installedVersion: null,
+          folder
+        })
+        assert.match(
+          String((yield* Effect.flip(fake.invoke(INSTALL_PLUGIN_CHANNEL))).cause),
+          /plugin manager isn't installed/
+        )
+
+        yield* fs.makeDirectory(steam.plugins)
+        yield* fs.writeFileString(path.join(path.dirname(steam.plugins), "version.dll"), "")
+        assert.deepInclude(yield* fake.invoke(PLUGIN_STATUS_CHANNEL), { status: "missing" })
+        assert.deepStrictEqual(yield* fake.invoke(INSTALL_PLUGIN_CHANNEL), {
+          plugin: { status: "current", bundledVersion: "0.2.0", installedVersion: "0.2.0", folder },
+          restartGame: false
+        })
+        assert.match(
+          String((yield* Effect.flip(fake.invoke(PLUGIN_STATUS_CHANNEL, { folder: "/etc" }))).cause),
+          /undefined/
+        )
       })
     ))
 

@@ -46,6 +46,8 @@ export const stageLayout = {
   renderer: "web",
   /** The game assets, shipped beside app.asar as `resources/assets` (`DesktopEnvironment.assetsDir`). */
   assets: "assets",
+  /** The editor-link plugin the app installs into the game, as `resources/plugins` (`DesktopEnvironment.pluginDir`). */
+  plugins: "plugins",
   /** Icons, generated from apps/desktop/resources/icon.svg. */
   buildResources: "build"
 } as const
@@ -69,7 +71,7 @@ export const builderConfig = (options: {
     "!**/*.map",
     "!**/*.d.ts"
   ],
-  extraResources: [{ from: stageLayout.assets, to: "assets" }],
+  extraResources: [{ from: stageLayout.assets, to: "assets" }, { from: stageLayout.plugins, to: "plugins" }],
   npmRebuild: false,
   electronLanguages: ["en-US"],
   ...(options.feed._tag === "GitHub"

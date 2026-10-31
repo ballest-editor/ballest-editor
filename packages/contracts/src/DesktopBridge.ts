@@ -140,6 +140,36 @@ export type FoundCreator = typeof FoundCreator.Type
 export const FindCreatorResult = Schema.NullOr(FoundCreator)
 
 /**
+ * The `ballest-editor-link` plugin Play needs (docs/DESKTOP.md § Play), compared with the copy the app ships:
+ * - `noGame`: the game's install wasn't found, so neither can the plugin manager be.
+ * - `noPluginManager`: no `version.dll` next to the game's exe, or no plugins folder. Install is refused.
+ * - `missing`: not in the plugins folder, or some of its files aren't.
+ * - `outdated`: installed, but older than the app's copy.
+ * - `current`: installed, as new as the app's copy or newer.
+ */
+export const PluginState = Schema.Literals(["noGame", "noPluginManager", "missing", "outdated", "current"])
+export type PluginState = typeof PluginState.Type
+
+export const PluginStatus = Schema.Struct({
+  status: PluginState,
+  /** The version (`info.toml`'s `[meta] version`) the app installs. */
+  bundledVersion: Schema.String,
+  /** The installed copy's version; null when it has no `info.toml`. */
+  installedVersion: Schema.NullOr(Schema.String),
+  /** `<plugins>/ballest-editor-link`, where it is or would go; null without the plugins folder's path. */
+  folder: Schema.NullOr(FilePath)
+})
+export type PluginStatus = typeof PluginStatus.Type
+
+/** `installPlugin`'s result: the plugin's status afterwards, and whether the game must restart to load it. */
+export const InstallPluginResult = Schema.Struct({
+  plugin: PluginStatus,
+  /** The game was running: the plugin manager only picks up a folder copied in by hand when the game starts. */
+  restartGame: Schema.Boolean
+})
+export type InstallPluginResult = typeof InstallPluginResult.Type
+
+/**
  * Where the in-app updater is (docs/DESKTOP.md § Packaging and release). `idle` until a check finds a newer release
  * (`available`), then `downloading` once the user asks for it and `ready` once it is on disk; restarting installs it.
  * `error` is a failed check, retried by the next one. `disabled` never changes: dev, unpackaged, turned off with
@@ -218,6 +248,13 @@ export interface DesktopBridge {
   readonly isGameRunning: () => Promise<boolean>
   /** The creator name the game would write (the Steam persona name), and where it was found; null when none was. */
   readonly findCreator: () => Promise<FoundCreator | null>
+  /** Whether the `ballest-editor-link` plugin is installed, and as new as the app's copy. */
+  readonly pluginStatus: () => Promise<PluginStatus>
+  /**
+   * Copies the app's `ballest-editor-link` into the plugins folder, over an older copy (its `play.json` is kept).
+   * Rejects when the plugin manager isn't installed. Only ever writes inside `<plugins>/ballest-editor-link`.
+   */
+  readonly installPlugin: () => Promise<InstallPluginResult>
   /** The updater's state now. */
   readonly getUpdateState: () => Promise<UpdateState>
   /** Starts downloading the release on offer (`available`); progress and the outcome arrive through `onUpdateState`. */

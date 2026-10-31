@@ -218,9 +218,10 @@ export function SettingsDialog(props: {
   const gamePaths = useEditor((s) => s.gamePaths)
   const creator = useCreator()
   const foundCreator = useEditor((s) => s.foundCreator)
+  const pluginStatus = useEditor((s) => s.pluginStatus)
 
-  // The game may have been installed, run or moved since, and Steam logged in as someone else: look its folders and
-  // the creator name up each time the dialog opens.
+  // The game or the plugin manager may have been installed, run or moved since, and Steam logged in as someone else:
+  // look the folders, the plugin and the creator name up each time the dialog opens.
   useEffect(() => {
     if (props.open && hasGame) void Promise.all([loadGamePaths(), findCreator()])
   }, [props.open, hasGame])
@@ -665,7 +666,7 @@ export function SettingsDialog(props: {
         description: "The game's sky with the map's sun in it. Off: the theme's background.",
         control: <Switch checked={l.skyVisible} onCheckedChange={(v) => update("lighting", { skyVisible: v })} />
       },
-      ...(hasGame ? gameSettingsRows(gamePaths) : [])
+      ...(hasGame ? gameSettingsRows(gamePaths, pluginStatus) : [])
     ]
   })()
 

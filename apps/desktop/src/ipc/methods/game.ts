@@ -4,6 +4,8 @@ import {
   type GamePathKind,
   GamePathPayload,
   GamePaths as GamePathsSchema,
+  InstallPluginResult,
+  PluginStatus,
   SaveToGamePayload,
   SaveToGameResult
 } from "@ballest/contracts"
@@ -11,6 +13,7 @@ import { Effect, Option, Schema } from "effect"
 import { ElectronDialog } from "../../electron/ElectronDialog"
 import { ElectronShell } from "../../electron/ElectronShell"
 import { GameCreator } from "../../game/GameCreator"
+import { GameLink } from "../../game/GameLink"
 import { GamePaths } from "../../game/GamePaths"
 import { GameProcess } from "../../game/GameProcess"
 import { saveToMaps } from "../../game/saveToMaps"
@@ -18,8 +21,10 @@ import {
   CHOOSE_GAME_PATH_CHANNEL,
   FIND_CREATOR_CHANNEL,
   GAME_PATHS_CHANNEL,
+  INSTALL_PLUGIN_CHANNEL,
   IS_GAME_RUNNING_CHANNEL,
   LAUNCH_GAME_CHANNEL,
+  PLUGIN_STATUS_CHANNEL,
   RESET_GAME_PATH_CHANNEL,
   REVEAL_GAME_PATH_CHANNEL,
   SAVE_TO_GAME_CHANNEL
@@ -112,5 +117,24 @@ export const findCreator = makeIpcMethod({
   result: FindCreatorResult,
   handler: Effect.fn("ipc.findCreator")(function*() {
     return Option.getOrNull(yield* (yield* GameCreator).find)
+  })
+})
+
+export const pluginStatus = makeIpcMethod({
+  channel: PLUGIN_STATUS_CHANNEL,
+  payload: Schema.Undefined,
+  result: PluginStatus,
+  handler: Effect.fn("ipc.pluginStatus")(function*() {
+    return yield* (yield* GameLink).pluginStatus
+  })
+})
+
+/** Only when the user asks (Install / Update); nothing installs or updates the plugin on its own. */
+export const installPlugin = makeIpcMethod({
+  channel: INSTALL_PLUGIN_CHANNEL,
+  payload: Schema.Undefined,
+  result: InstallPluginResult,
+  handler: Effect.fn("ipc.installPlugin")(function*() {
+    return yield* (yield* GameLink).installPlugin
   })
 })

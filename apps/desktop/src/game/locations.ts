@@ -76,6 +76,10 @@ export const gameExeOf = (install: string, path: PathRules): string =>
 export const pluginsFolderOf = (install: string, path: PathRules): string =>
   path.join(install, "Ballest", "Binaries", "Win64", "plugins")
 
+/** The plugin manager's loader, `version.dll` next to the game's exe (which loads it as a system DLL). */
+export const pluginManagerDllOf = (install: string, path: PathRules): string =>
+  path.join(install, "Ballest", "Binaries", "Win64", "version.dll")
+
 /** The library an install folder sits in, when it has Steam's `<library>/steamapps/common/<dir>` shape. */
 export const libraryOfInstall = (install: string, path: PathRules): Option.Option<string> => {
   const common = path.dirname(install)

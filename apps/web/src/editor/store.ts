@@ -38,12 +38,12 @@ import { type Pivot, pivotAt } from "../domain/pivot"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import type { LoadedCatalog } from "../services/CatalogLoader"
-import type { GamePaths, PlatformCapabilities } from "../services/Platform"
+import type { GamePaths, PlatformCapabilities, PluginStatus } from "../services/Platform"
 
 import type { GizmoSpace } from "./gizmo/handles"
 
 /** The game folder types, for components (which reach services only through editor/). */
-export type { GamePath, GamePathKind, GamePaths } from "../services/Platform"
+export type { GamePath, GamePathKind, GamePaths, PluginStatus } from "../services/Platform"
 export interface Doc {
   readonly map: MapFile
   readonly ids: ReadonlyArray<string>
@@ -132,6 +132,8 @@ export interface EditorState {
   readonly gamePaths: GamePaths | null
   /** The creator name found on this machine (desktop: the Steam persona name), as last looked up; none until then. */
   readonly foundCreator: Option.Option<FoundCreator>
+  /** The editor-link plugin, as last looked up (desktop; null until Settings › Game asks). */
+  readonly pluginStatus: PluginStatus | null
   /** Save to game found a published map's draft under the map's file name; the replacePublished dialog asks. */
   readonly publishedDraft: PublishedDraft | null
   /** The desktop updater's state, once main has sent it; null in a browser. */
@@ -190,6 +192,7 @@ export interface EditorState {
   readonly setCapabilities: (capabilities: PlatformCapabilities) => void
   readonly setGamePaths: (gamePaths: GamePaths) => void
   readonly setFoundCreator: (foundCreator: Option.Option<FoundCreator>) => void
+  readonly setPluginStatus: (pluginStatus: PluginStatus) => void
   /** Asks whether to replace a published map's draft in the maps folder (null forgets it). */
   readonly setPublishedDraft: (draft: PublishedDraft | null) => void
   readonly setUpdate: (update: UpdateState) => void
@@ -346,6 +349,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     capabilities: { filePaths: false, saveToGame: false, launchGame: false, play: false, updates: false },
     gamePaths: null,
     foundCreator: Option.none(),
+    pluginStatus: null,
     publishedDraft: null,
     update: null,
     selectedIds: [],
@@ -388,6 +392,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setCapabilities: (capabilities) => set({ capabilities }),
     setGamePaths: (gamePaths) => set({ gamePaths }),
     setFoundCreator: (foundCreator) => set({ foundCreator }),
+    setPluginStatus: (pluginStatus) => set({ pluginStatus }),
     setPublishedDraft: (publishedDraft) =>
       set({ publishedDraft, dialog: publishedDraft === null ? null : "replacePublished" }),
     setUpdate: (update) => set({ update }),
