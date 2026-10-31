@@ -13,6 +13,7 @@ import { KeybindCheatSheet } from "./KeybindCheatSheet"
 import { NewMapDialog } from "./NewMapDialog"
 import { Palette } from "./Palette"
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
+import { ReplacePublishedDialog } from "./ReplacePublishedDialog"
 import { SaveAsDialog } from "./SaveAsDialog"
 import { SettingsDialog } from "./SettingsDialog"
 import { SidePanel } from "./SidePanel"
@@ -104,6 +105,7 @@ export function Editor() {
       <NewMapDialog open={dialog === "new"} onClose={close} />
       <SaveAsDialog open={dialog === "saveAs"} onClose={close} />
       <ProjectSettingsDialog open={dialog === "project"} onClose={close} />
+      <ReplacePublishedDialog open={dialog === "replacePublished"} onClose={close} />
       <SettingsDialog
         open={dialog === "settings"}
         category={settingsCategory}

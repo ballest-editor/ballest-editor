@@ -14,7 +14,10 @@
           "@effect/platform-node",
           "effect/FileSystem",
           "effect/Path",
-          "effect/http/Mime"
+          "effect/http/Mime",
+          "effect/process",
+          "effect/process/ChildProcess",
+          "effect/process/ChildProcessSpawner"
         ],
         "ignoreEffectSuggestionsInTscExitCode": false,
         "ignoreEffectWarningsInTscExitCode": false

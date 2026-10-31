@@ -22,7 +22,7 @@ import { MapCodec } from "../services/MapCodec"
 import { MapExporter } from "../services/MapExporter"
 import { MapPrefsStore } from "../services/MapPrefsStore"
 import { MaterialLibrary } from "../services/MaterialLibrary"
-import { type OpenedMap, Platform } from "../services/Platform"
+import { type GamePathKind, type GamePaths, type OpenedMap, Platform } from "../services/Platform"
 import { type AppServices, runtime } from "../services/runtime"
 import { SettingsStore } from "../services/SettingsStore"
 import { pivotOf, type SlotPaint, useEditor } from "./store"
@@ -232,6 +232,13 @@ export const openRecentFile = (path: string) =>
     yield* loadOpened(yield* (yield* Platform).openRecent(path))
   }).pipe(Effect.ensuring(Effect.ignore(refreshRecentFiles)))
 
+/** The open map encoded the way the game wants it written, with the document and file it was made from. */
+const exportOpenMap = Effect.gen(function*() {
+  const { doc, file } = useEditor.getState()
+  const result = yield* (yield* MapExporter).prepare(doc.map)
+  return { doc, file, result }
+})
+
 /**
  * Saves the open map. Save as asks where (desktop) or downloads (browser); Save writes over the open file, unless the
  * map has been renamed since (the game only loads a file named after the map inside it) or it isn't a `.balledit`.
@@ -240,8 +247,7 @@ export const openRecentFile = (path: string) =>
 export const saveMapFile = (mode: "save" | "saveAs") =>
   Effect.gen(function*() {
     const platform = yield* Platform
-    const { doc, file } = useEditor.getState()
-    const result = yield* MapExporter.use((exporter) => exporter.prepare(doc.map))
+    const { doc, file, result } = yield* exportOpenMap
     const overwrite = mode === "save" && file?.name === result.filename
     const saved = yield* platform.saveMap(
       { name: result.filename, text: result.text },
@@ -276,6 +282,79 @@ export const saveMap = () => {
 
 /** The Save as dialog's last step, once the name is confirmed. */
 export const saveMapAs = () => run(saveMapFile("saveAs"))
+
+/**
+ * Save to game: writes the map into the game's UserSavedMaps folder, named the way the game expects, where the in-game
+ * editor lists it. A copy: the open file stays the one Save writes to, unless there was none or it is that same file.
+ * When the file there is the draft of a published map, the replacePublished dialog asks first.
+ */
+export const saveToGameFile = (replacePublished: boolean) =>
+  Effect.gen(function*() {
+    const platform = yield* Platform
+    const { doc, file, result } = yield* exportOpenMap
+    const saved = yield* platform.saveToGame({ name: result.filename, text: result.text }, { replacePublished })
+    if (saved._tag === "Published") {
+      useEditor.getState().setPublishedDraft({ name: saved.file.name, publishedFileId: saved.publishedFileId })
+      return
+    }
+    if (file === null || file.path === saved.file.path) {
+      useEditor.getState().markSaved(doc, result.map, saved.file)
+      yield* saveMapPrefs
+    }
+    useEditor.getState().notify("info", `Saved ${saved.file.name} to the game's maps folder`)
+    yield* refreshRecentFiles
+  })
+
+export const saveToGame = () => run(saveToGameFile(false))
+
+/** The replacePublished dialog's answer: replace the published map's draft after all. */
+export const replacePublishedDraft = () => {
+  useEditor.getState().setPublishedDraft(null)
+  return run(saveToGameFile(true))
+}
+
+/** Starts the game through Steam, unless it is already running. */
+export const launchGameEffect = Effect.gen(function*() {
+  const platform = yield* Platform
+  if (yield* platform.isGameRunning) {
+    useEditor.getState().notify("info", "Ballest of Them All is already running")
+    return
+  }
+  yield* platform.launchGame
+  useEditor.getState().notify("info", "Starting Ballest of Them All through Steam")
+})
+
+export const launchGame = () => run(launchGameEffect)
+
+/** Runs a lookup that may return the game's folders (none: the user cancelled) and shows them. */
+const showGamePaths = <E>(
+  lookup: (platform: Platform["Service"]) => Effect.Effect<Option.Option<GamePaths>, E, AppServices>
+) =>
+  run(
+    Effect.gen(function*() {
+      const paths = yield* lookup(yield* Platform)
+      if (Option.isSome(paths)) useEditor.getState().setGamePaths(paths.value)
+    })
+  )
+
+/** Looks the game's folders up again, for Settings › Game. */
+export const loadGamePaths = () => showGamePaths((platform) => Effect.asSome(platform.gamePaths))
+
+/** A folder dialog; the chosen folder replaces the one found for `which`. */
+export const chooseGamePath = (which: GamePathKind) => showGamePaths((platform) => platform.chooseGamePath(which))
+
+/** Goes back to the folders found through Steam, one after the other (each reset rewrites the desktop settings). */
+export const resetGamePaths = (kinds: ReadonlyArray<GamePathKind>) =>
+  showGamePaths((platform) =>
+    Effect.forEach(kinds, platform.resetGamePath).pipe(Effect.andThen(Effect.asSome(platform.gamePaths)))
+  )
+
+export const revealGamePath = (which: GamePathKind) =>
+  run(
+    Effect.gen(function*() {
+      yield* (yield* Platform).revealGamePath(which)
+    })
+  )
 
 /**
  * The open map's prefs, under its current name: the grid height when it isn't the player

@@ -72,13 +72,62 @@ export type WindowThemePayload = typeof WindowThemePayload.Type
 export const OpenExternalPayload = Schema.Struct({ url: Schema.String.check(Schema.isMaxLength(8192)) })
 export type OpenExternalPayload = typeof OpenExternalPayload.Type
 
+/** The three game folders the desktop app looks up (docs/DESKTOP.md § Game paths). */
+export const GamePathKind = Schema.Literals(["install", "mapsFolder", "pluginsFolder"])
+export type GamePathKind = typeof GamePathKind.Type
+
+/**
+ * How a game folder was found: through Steam (`found`), chosen in settings (`overridden`), or not at all (`missing`).
+ * A missing folder still has a `path` when main knows where it would be (the plugins folder of a found install).
+ */
+export const GamePath = Schema.Struct({
+  status: Schema.Literals(["found", "overridden", "missing"]),
+  path: Schema.NullOr(FilePath)
+})
+export type GamePath = typeof GamePath.Type
+
+export const GamePaths = Schema.Struct({
+  /** The game's install folder (`…/steamapps/common/Ballest of Them All`). */
+  install: GamePath,
+  /** `UserSavedMaps`, where the in-game editor lists drafts. Found once the game has run (it may not exist yet). */
+  mapsFolder: GamePath,
+  /** The plugin manager's `plugins` folder next to the game's exe; missing without the plugin manager. */
+  pluginsFolder: GamePath
+})
+export type GamePaths = typeof GamePaths.Type
+
+export const GamePathPayload = Schema.Struct({ which: GamePathKind })
+export type GamePathPayload = typeof GamePathPayload.Type
+
+/** `chooseGamePath`'s result: null when the user cancelled the dialog. */
+export const ChooseGamePathResult = Schema.NullOr(GamePaths)
+
+/** `saveToGame`'s payload: the map's file name (no folders) and its text. */
+export const SaveToGamePayload = Schema.Struct({
+  name: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255)),
+  text: MapText,
+  /** Replace a file that is a published map's draft (`levelPublishedFileId` > 0); otherwise main asks first. */
+  replacePublished: Schema.Boolean
+})
+export type SaveToGamePayload = typeof SaveToGamePayload.Type
+
+/**
+ * `saveToGame`'s result: `Saved`, or `Published` when nothing was written because the file in the maps folder is the
+ * draft of a published map and `replacePublished` wasn't set.
+ */
+export const SaveToGameResult = Schema.TaggedUnion({
+  Saved: { file: MapFileRef },
+  Published: { file: MapFileRef, publishedFileId: Schema.Finite }
+})
+export type SaveToGameResult = typeof SaveToGameResult.Type
+
 /**
  * What the desktop preload exposes to the renderer as `window.ballest`. The renderer only sees this interface, so
  * everything crossing it is plain data (structured-clone safe). Main decodes every payload and encodes every result
  * with the schemas above; a payload that fails to decode rejects the returned promise.
  *
- * Main reads and writes only the files the user picked in one of its dialogs (or picked before: the recent files),
- * and only `.balledit`, `.ballmap` and `.json` ones. Reading or saving a file puts it first in the recent files.
+ * Main reads and writes only the files the user picked in one of its dialogs (or picked before: the recent files)
+ * and the ones it saved into the game's maps folder, and only `.balledit`, `.ballmap` and `.json` ones. Reading or saving a file puts it first in the recent files.
  */
 export interface DesktopBridge {
   readonly versions: DesktopVersions
@@ -97,4 +146,21 @@ export interface DesktopBridge {
   readonly setWindowTheme: (dark: boolean) => Promise<void>
   /** Opens an http(s) URL in the default browser; false when it is refused or fails to open. */
   readonly openExternal: (url: string) => Promise<boolean>
+  /** Where the game, its maps folder and the plugins folder are, and how each was found. */
+  readonly gamePaths: () => Promise<GamePaths>
+  /** A folder dialog, then `which` uses the chosen folder instead of the one found; null when cancelled. */
+  readonly chooseGamePath: (which: GamePathKind) => Promise<GamePaths | null>
+  /** Goes back to the folder found through Steam. */
+  readonly resetGamePath: (which: GamePathKind) => Promise<GamePaths>
+  /** Shows the folder in the file manager; false when it doesn't exist or fails to open. */
+  readonly revealGamePath: (which: GamePathKind) => Promise<boolean>
+  /**
+   * Writes the map into the game's maps folder under `name` (atomically, like `writeMap`). The file then counts as
+   * picked: it is in the recent files and `readMap` / `writeMap` may use it.
+   */
+  readonly saveToGame: (payload: SaveToGamePayload) => Promise<SaveToGameResult>
+  /** Starts the game through Steam (`steam://rungameid/3339810`); false when Steam couldn't be asked. */
+  readonly launchGame: () => Promise<boolean>
+  /** Whether the game (`Ballest-Win64-Shipping.exe`) is running. */
+  readonly isGameRunning: () => Promise<boolean>
 }

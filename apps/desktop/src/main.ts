@@ -10,6 +10,10 @@ import { ElectronProtocol, registerSchemePrivileges } from "./electron/ElectronP
 import { ElectronShell } from "./electron/ElectronShell"
 import { ElectronWindow } from "./electron/ElectronWindow"
 import { MapFiles } from "./files/MapFiles"
+import { GameHost } from "./game/GameHost"
+import { GamePaths } from "./game/GamePaths"
+import { GameProcess } from "./game/GameProcess"
+import { SteamLibrary } from "./game/SteamLibrary"
 import { DesktopIpc } from "./ipc/DesktopIpc"
 import { DesktopSettings } from "./settings/DesktopSettings"
 import { DesktopWindow } from "./window/DesktopWindow"
@@ -33,7 +37,12 @@ const layerElectron = Layer.mergeAll(
   DesktopIpc.layer(Electron.ipcMain)
 )
 
-const layerDesktopRuntime = Layer.mergeAll(DesktopWindow.layer, MapFiles.layer).pipe(
+const layerGame = Layer.mergeAll(GamePaths.layer, GameProcess.layer).pipe(
+  Layer.provide(SteamLibrary.layer),
+  Layer.provideMerge(GameHost.layer)
+)
+
+const layerDesktopRuntime = Layer.mergeAll(DesktopWindow.layer, MapFiles.layer, layerGame).pipe(
   Layer.provideMerge(DesktopSettings.layer),
   Layer.provideMerge(DesktopEnvironment.layer(__dirname)),
   Layer.provideMerge(layerElectron),

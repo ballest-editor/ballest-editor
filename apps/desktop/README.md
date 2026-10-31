@@ -89,6 +89,9 @@ Every Electron API we touch has a thin Effect service around it in `src/electron
 ```mermaid
 flowchart TB
   program[DesktopApp.program] --> window[DesktopWindow<br/>creates the window, saves its bounds]
+  program --> game[GamePaths · GameProcess<br/>the game's folders, is it running]
+  game --> steam[SteamLibrary<br/>libraryfolders.vdf, app manifest]
+  game --> settings
   window --> settings[DesktopSettings<br/>desktop-settings.json, atomic writes]
   settings --> env[DesktopEnvironment<br/>paths, dev server URL]
   env --> electron["ElectronApp · ElectronWindow · ElectronProtocol<br/>ElectronDialog · ElectronShell · ElectronMenu · DesktopIpc"]
@@ -121,6 +124,7 @@ A sandboxed preload can `require("electron")` and nothing else, and it has to be
 - Navigation and `window.open` to anything but `ballest://app` go to the system browser. No other page can load inside the window and pick up `window.ballest`.
 - Main decodes every IPC payload with its schema before a handler runs.
 - Main reads and writes only map files the user picked in one of its dialogs (or picked before: the recent files), and only `.balledit`, `.ballmap` and `.json` ones. `fs:readText` with any other path is refused, so a compromised page can't read the disk.
+- Save to game takes a file name, not a path: a `.balledit` name with no separators, written into the maps folder main found (or the user chose in a folder dialog). The game folders are only ever chosen in a dialog, never typed by the page, and Reveal opens one of those three folders only. Nothing writes into the game's install.
 - CSP allows scripts from the app's own origin only. `'unsafe-inline'` is still on for the panel-width script in `index.html`; moving that script out would let us drop it.
 
 ## Layout
@@ -132,6 +136,8 @@ src/
   app/        DesktopApp (the program), DesktopEnvironment (paths)
   electron/   one service per Electron API
   files/      MapFiles: which map files the page may touch, reads, atomic writes, recent files
+  game/       SteamLibrary (Steam's libraries, the game's install), GamePaths (install, maps and plugins folders,
+              overrides), GameProcess (is the game running), saveToMaps, vdf (Steam's KeyValues format)
   ipc/        DesktopIpc (handle + makeIpcMethod), channels, methods/
   protocol/   serveStatic: files for ballest://, no Electron import, tested
   settings/   desktop-settings.json
@@ -146,4 +152,4 @@ scripts/
   verifyPreloadBundle.ts  the build check above
 ```
 
-Tests (`pnpm --filter @ballest/desktop test`) cover the IPC methods against a fake `ipcMain` and fake dialogs (ping, open and save, recent files, external links, the window theme), map files (byte-for-byte writes, which paths are allowed), file serving and path escapes, the settings file, the window shortcuts, and the preload check. None of them load `electron`: the tests that import an Electron service mock the module.
+Tests (`pnpm --filter @ballest/desktop test`) cover the IPC methods against a fake `ipcMain` and fake dialogs (ping, open and save, recent files, external links, the window theme, the game folders, save to game, launch), the game lookups (vdf and manifest fixtures in `src/game/fixtures/`, Windows path rules through `node:path`'s `win32`, and a fake Steam tree and `/proc` in a temp folder), map files (byte-for-byte writes, which paths are allowed), file serving and path escapes, the settings file, the window shortcuts, and the preload check. None of them load `electron`: the tests that import an Electron service mock the module.

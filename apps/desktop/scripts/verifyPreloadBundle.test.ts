@@ -12,7 +12,14 @@ const valid = `
     writeMap: (path, text) => electron.ipcRenderer.invoke("ballest:fs:writeText", { path, text }),
     recentMaps: () => electron.ipcRenderer.invoke("ballest:recentMaps"),
     setWindowTheme: (dark) => electron.ipcRenderer.invoke("ballest:window:setTheme", { dark }),
-    openExternal: (url) => electron.ipcRenderer.invoke("ballest:shell:openExternal", { url })
+    openExternal: (url) => electron.ipcRenderer.invoke("ballest:shell:openExternal", { url }),
+    gamePaths: () => electron.ipcRenderer.invoke("ballest:game:paths"),
+    chooseGamePath: (which) => electron.ipcRenderer.invoke("ballest:game:choosePath", { which }),
+    resetGamePath: (which) => electron.ipcRenderer.invoke("ballest:game:resetPath", { which }),
+    revealGamePath: (which) => electron.ipcRenderer.invoke("ballest:game:revealPath", { which }),
+    saveToGame: (payload) => electron.ipcRenderer.invoke("ballest:game:saveToMaps", payload),
+    launchGame: () => electron.ipcRenderer.invoke("ballest:game:launch"),
+    isGameRunning: () => electron.ipcRenderer.invoke("ballest:game:isRunning")
   })
 `
 

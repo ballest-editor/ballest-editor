@@ -1,5 +1,15 @@
-import type { DesktopBridge, MapFileRef, OpenedMapFile, RecentMapFiles } from "@ballest/contracts"
+import type {
+  DesktopBridge,
+  GamePathKind,
+  GamePaths,
+  MapFileRef,
+  OpenedMapFile,
+  RecentMapFiles,
+  SaveToGameResult
+} from "@ballest/contracts"
 import { Context, Effect, Layer, Option, Schema } from "effect"
+
+export type { GamePath, GamePathKind, GamePaths } from "@ballest/contracts"
 
 /** What this platform can do beyond opening and saving files; the menus hide what it can't. */
 export interface PlatformCapabilities {
@@ -8,9 +18,9 @@ export interface PlatformCapabilities {
    * browser, opening is the file input and saving is a download.
    */
   readonly filePaths: boolean
-  /** Writing straight into the game's UserSavedMaps folder (#64). */
+  /** Finding the game's folders, and writing straight into its UserSavedMaps folder. */
   readonly saveToGame: boolean
-  /** Starting the game through Steam (#64). */
+  /** Starting the game through Steam. */
   readonly launchGame: boolean
   /** Racing the open map in the game through the plugin manager (#66). */
   readonly play: boolean
@@ -57,6 +67,25 @@ export class Platform extends Context.Service<Platform, {
   readonly openExternal: (url: string) => Effect.Effect<void, PlatformError>
   /** Tells the desktop window the page's resolved theme (its window controls follow it); nothing in a browser. */
   readonly setWindowTheme: (dark: boolean) => Effect.Effect<void, PlatformError>
+  /** The game's install, maps and plugins folders and how each was found (desktop). */
+  readonly gamePaths: Effect.Effect<GamePaths, PlatformError>
+  /** Asks for a folder to use as `which` instead of the one found; none when the user cancels. */
+  readonly chooseGamePath: (which: GamePathKind) => Effect.Effect<Option.Option<GamePaths>, PlatformError>
+  /** Goes back to the folder found through Steam. */
+  readonly resetGamePath: (which: GamePathKind) => Effect.Effect<GamePaths, PlatformError>
+  /** Shows the folder in the file manager. */
+  readonly revealGamePath: (which: GamePathKind) => Effect.Effect<void, PlatformError>
+  /**
+   * Writes `text` into the game's maps folder as `name`. `Published` (nothing written) when the file there is a
+   * published map's draft and `replacePublished` is false.
+   */
+  readonly saveToGame: (
+    file: { readonly name: string; readonly text: string },
+    options: { readonly replacePublished: boolean }
+  ) => Effect.Effect<SaveToGameResult, PlatformError>
+  /** Starts the game through Steam. */
+  readonly launchGame: Effect.Effect<void, PlatformError>
+  readonly isGameRunning: Effect.Effect<boolean, PlatformError>
 }>()("ballest/services/Platform") {
   static readonly layerBrowser = Layer.sync(Platform, () => makeBrowser())
 
@@ -98,7 +127,7 @@ const savedMap = (file: MapFileRef): SavedMap => ({ name: file.name, path: Optio
 
 const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
   Platform.of({
-    capabilities: { ...browserCapabilities, filePaths: true },
+    capabilities: { ...browserCapabilities, filePaths: true, saveToGame: true, launchGame: true },
     openMap: bridgeCall(() => bridge.openMap()).pipe(
       Effect.map((file) => Option.map(Option.fromNullOr(file), openedMap))
     ),
@@ -118,7 +147,25 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
       bridgeCall(() => bridge.openExternal(url)).pipe(
         Effect.filterOrFail((opened) => opened, () => new PlatformError({ message: `Couldn't open ${url}.` })),
         Effect.asVoid
-      )
+      ),
+    gamePaths: bridgeCall(() => bridge.gamePaths()),
+    chooseGamePath: (which) => bridgeCall(() => bridge.chooseGamePath(which)).pipe(Effect.map(Option.fromNullOr)),
+    resetGamePath: (which) => bridgeCall(() => bridge.resetGamePath(which)),
+    revealGamePath: (which) =>
+      bridgeCall(() => bridge.revealGamePath(which)).pipe(
+        Effect.filterOrFail((shown) => shown, () => new PlatformError({ message: "Couldn't show that folder." })),
+        Effect.asVoid
+      ),
+    saveToGame: ({ name, text }, { replacePublished }) =>
+      bridgeCall(() => bridge.saveToGame({ name, text, replacePublished })),
+    launchGame: bridgeCall(() => bridge.launchGame()).pipe(
+      Effect.filterOrFail(
+        (launched) => launched,
+        () => new PlatformError({ message: "Couldn't ask Steam to start the game. Is Steam installed?" })
+      ),
+      Effect.asVoid
+    ),
+    isGameRunning: bridgeCall(() => bridge.isGameRunning())
   })
 
 /** A one-shot `<input type=file>`: resolves with the picked file, or none when the picker is dismissed. */
@@ -150,6 +197,8 @@ const download = (name: string, text: string) =>
     setTimeout(() => URL.revokeObjectURL(url), 1_000)
   })
 
+const desktopOnly = Effect.fail(new PlatformError({ message: "Only the desktop app can reach the game." }))
+
 const makeBrowser = (): Platform["Service"] =>
   Platform.of({
     capabilities: browserCapabilities,
@@ -167,19 +216,38 @@ const makeBrowser = (): Platform["Service"] =>
     saveMap: ({ name, text }) => download(name, text).pipe(Effect.as(Option.some({ name, path: Option.none() }))),
     recentMaps: Effect.succeed([]),
     setWindowTheme: () => Effect.void,
-    openExternal: (url) => Effect.sync(() => void window.open(url, "_blank", "noopener,noreferrer"))
+    openExternal: (url) => Effect.sync(() => void window.open(url, "_blank", "noopener,noreferrer")),
+    gamePaths: desktopOnly,
+    chooseGamePath: () => desktopOnly,
+    resetGamePath: () => desktopOnly,
+    revealGamePath: () => desktopOnly,
+    saveToGame: () => desktopOnly,
+    launchGame: desktopOnly,
+    isGameRunning: Effect.succeed(false)
   })
 
 /**
  * An in-memory disk for `Platform.layerTest`: `files` by path, and what the next dialogs answer (a path, or null for
- * cancel), taken in order. The disk records what was asked so a test can check it.
+ * cancel), taken in order. The disk records what was asked so a test can check it. The game is installed, its maps
+ * folder is `/game/UserSavedMaps`, and choosing a folder takes the next answer too.
  */
 export interface TestDisk {
   readonly files: Map<string, string>
   readonly answers: Array<string | null>
-  readonly dialogs: Array<{ readonly kind: "open" | "save"; readonly name?: string; readonly near?: string }>
+  readonly dialogs: Array<
+    { readonly kind: "open" | "save" | "folder"; readonly name?: string; readonly near?: string }
+  >
   readonly recent: Array<string>
   readonly external: Array<string>
+  game: { paths: GamePaths; running: boolean; launches: number }
+}
+
+export const TEST_MAPS_FOLDER = "/game/UserSavedMaps"
+
+const testGamePaths: GamePaths = {
+  install: { status: "found", path: "/game" },
+  mapsFolder: { status: "found", path: TEST_MAPS_FOLDER },
+  pluginsFolder: { status: "missing", path: "/game/Ballest/Binaries/Win64/plugins" }
 }
 
 export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
@@ -187,8 +255,20 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   answers: [],
   dialogs: [],
   recent: [],
-  external: []
+  external: [],
+  game: { paths: testGamePaths, running: false, launches: 0 }
 })
+
+const PublishedId = Schema.fromJsonString(Schema.Struct({
+  worldSettings: Schema.Struct({ levelData: Schema.Struct({ levelPublishedFileId: Schema.Finite }) })
+}))
+
+/** `levelPublishedFileId` of a map's text, as main reads it before replacing a file in the maps folder. */
+const publishedIdOf = (text: string): number =>
+  Option.match(Schema.decodeOption(PublishedId)(text), {
+    onNone: () => -1,
+    onSome: (file) => file.worldSettings.levelData.levelPublishedFileId
+  })
 
 const testBridge = (disk: TestDisk): DesktopBridge => {
   const nameOf = (path: string) => path.split(/[\\/]/).pop() ?? path
@@ -226,6 +306,39 @@ const testBridge = (disk: TestDisk): DesktopBridge => {
     openExternal: (url) => {
       disk.external.push(url)
       return Promise.resolve(true)
-    }
+    },
+    gamePaths: () => Promise.resolve(disk.game.paths),
+    chooseGamePath: (which) => {
+      disk.dialogs.push({ kind: "folder" })
+      const path = disk.answers.shift() ?? null
+      if (path === null) return Promise.resolve(null)
+      disk.game.paths = { ...disk.game.paths, [which]: { status: "overridden", path } }
+      return Promise.resolve(disk.game.paths)
+    },
+    resetGamePath: (which) => {
+      disk.game.paths = { ...disk.game.paths, [which]: testGamePaths[which] }
+      return Promise.resolve(disk.game.paths)
+    },
+    revealGamePath: (which) => {
+      const { status, path } = disk.game.paths[which]
+      if (status !== "missing" && path !== null) disk.external.push(path)
+      return Promise.resolve(status !== "missing")
+    },
+    saveToGame: ({ name, text, replacePublished }) => {
+      const folder = disk.game.paths.mapsFolder.path
+      if (folder === null) return Promise.reject(new Error("GamePathError: Couldn't find the game's maps folder."))
+      const path = `${folder}/${name}`
+      const existing = disk.files.get(path)
+      const publishedFileId = existing === undefined ? -1 : publishedIdOf(existing)
+      if (!replacePublished && publishedFileId > 0) {
+        return Promise.resolve({ _tag: "Published", file: { path, name }, publishedFileId } as const)
+      }
+      return write(path, text).then((file) => ({ _tag: "Saved", file }) as const)
+    },
+    launchGame: () => {
+      disk.game.launches++
+      return Promise.resolve(true)
+    },
+    isGameRunning: () => Promise.resolve(disk.game.running)
   }
 }

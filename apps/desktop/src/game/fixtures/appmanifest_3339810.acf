@@ -1,0 +1,24 @@
+"AppState"
+{
+	"appid"		"3339810"
+	"universe"		"1"
+	"name"		"Ballest of Them All"
+	"StateFlags"		"4"
+	"installdir"		"Ballest of Them All"
+	"LastUpdated"		"1792505187"
+	"SizeOnDisk"		"1940960780"
+	"buildid"		"25918124"
+	"InstalledDepots"
+	{
+		"3339811"
+		{
+			"manifest"		"1097595162025930090"
+			"size"		"1940960780"
+		}
+	}
+	"UserConfig"
+	{
+		"language"		"english"
+		"BetaKey"		"fixed-step"
+	}
+}

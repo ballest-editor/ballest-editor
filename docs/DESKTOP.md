@@ -76,7 +76,19 @@ The window loads `ballest://app/` in production and `ballest-dev://app/` in dev.
 | Maps    | `%LOCALAPPDATA%\Ballest\Saved\UserSavedMaps`     | `<library>/steamapps/compatdata/3339810/pfx/drive_c/users/steamuser/AppData/Local/Ballest/Saved/UserSavedMaps` |
 | Plugins | `<install>/Ballest/Binaries/Win64/plugins`       | same                                                                                                           |
 
-Both are overridable in settings. The app never touches the install except the plugin folder below.
+`apps/desktop/src/game/` finds them without configuration:
+
+- **Steam's folder.** Windows: the registry (`HKCU\Software\Valve\Steam` `SteamPath`, then `HKLM` `InstallPath`), then `%ProgramFiles(x86)%\Steam` and `%ProgramFiles%\Steam`. Linux: `~/.local/share/Steam`, `~/.steam/steam`, `~/.steam/root`, the Flatpak (`~/.var/app/com.valvesoftware.Steam/.local/share/Steam`) and the Snap. Folders that resolve to the same place count once.
+- **The game.** Every library `steamapps/libraryfolders.vdf` lists (current and pre-2021 formats); the first with `steamapps/appmanifest_3339810.acf` whose `installdir` holds `Ballest/Binaries/Win64/Ballest-Win64-Shipping.exe`. The same algorithm as the plugin manager's `tools/find_game.sh`.
+- **Maps.** Found when the game's `Ballest/Saved` folder exists (the game makes it on its first run); Save to game creates `UserSavedMaps` in it if the in-game editor never saved a map. Under Proton the prefix is looked for in the game's library first, then in every other library.
+- **Plugins.** Found when the folder exists, which means the plugin manager is installed.
+- **Running.** Windows: `tasklist` for `Ballest-Win64-Shipping.exe`. Linux: a `/proc/*/cmdline` naming that exe (Proton runs it as an argument, so the process name doesn't match).
+
+The renderer gets each folder as `found | overridden | missing`, with the path it is or would be at. Settings › Game shows the three with **Choose…** (a folder dialog; an install must contain the game's exe), **Reveal** and reset. Overrides live in `desktop-settings.json` under `game`; overriding the install moves the other two with it unless they are overridden too.
+
+**Save to game** (File menu) writes the map into the maps folder under the game's file name. It is a copy: the open file stays the one Save writes to, unless the map had no file yet. A file there whose `levelPublishedFileId` is above 0 is a published map's draft, and the editor asks before replacing it. **Launch game** (Game menu) opens `steam://rungameid/3339810`, or says the game is already running.
+
+The app never touches the install except the plugin folder below.
 
 ### Play: the plugin handoff
 

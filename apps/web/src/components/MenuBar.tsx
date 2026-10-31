@@ -17,7 +17,7 @@ import type { ReactNode } from "react"
 import { formatBinding, type KeybindAction } from "../domain/Keybinds"
 import type { Settings } from "../domain/Settings"
 import { formatGridSize, GRID_SIZES, type GridSize } from "../domain/snap"
-import { openRecent, updateSettings } from "../editor/actions"
+import { launchGame, openRecent, saveToGame, updateSettings } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { useEditor } from "../editor/store"
 
@@ -101,7 +101,7 @@ const THEMES: ReadonlyArray<{ readonly theme: Settings["appearance"]["theme"]; r
 ]
 
 /**
- * File / Edit / View. Every item calls the entry point its keybind or button
+ * File / Edit / View, and Game on desktop. Every item calls the entry point its keybind or button
  * uses (`actionCommands`, the store, the settings), so the three never disagree.
  */
 export function MenuBar() {
@@ -111,7 +111,7 @@ export function MenuBar() {
   const canPaste = useEditor((s) => s.clipboard !== null)
   const openDialog = useEditor((s) => s.openDialog)
   const { snapping, appearance, lighting, general } = useEditor((s) => s.settings)
-  const filePaths = useEditor((s) => s.capabilities.filePaths)
+  const { filePaths, saveToGame: canSaveToGame, launchGame: canLaunchGame } = useEditor((s) => s.capabilities)
 
   return (
     <Menubar
@@ -132,6 +132,7 @@ export function MenuBar() {
         <MenubarSeparator />
         <CommandItem action="saveMap">Save</CommandItem>
         <CommandItem action="saveMapAs">Save as…</CommandItem>
+        {canSaveToGame && <MenubarItem onClick={() => void saveToGame()}>Save to game</MenubarItem>}
         <MenubarSeparator />
         <MenubarItem onClick={() => openDialog("project")}>Project settings…</MenubarItem>
       </Menu>
@@ -216,6 +217,13 @@ export function MenuBar() {
           </MenubarSubContent>
         </MenubarSub>
       </Menu>
+      {canLaunchGame && (
+        <Menu title="Game">
+          <MenubarItem onClick={() => void launchGame()}>Launch game</MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem onClick={() => openDialog("settings", "game")}>Game folders…</MenubarItem>
+        </Menu>
+      )}
     </Menubar>
   )
 }

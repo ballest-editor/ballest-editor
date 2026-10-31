@@ -15,7 +15,14 @@ const members = {
   writeMap: "function",
   recentMaps: "function",
   setWindowTheme: "function",
-  openExternal: "function"
+  openExternal: "function",
+  gamePaths: "function",
+  chooseGamePath: "function",
+  resetGamePath: "function",
+  revealGamePath: "function",
+  saveToGame: "function",
+  launchGame: "function",
+  isGameRunning: "function"
 } as const satisfies Record<keyof DesktopBridge, "object" | "function">
 
 /** A sandboxed preload can require these and nothing else. */
