@@ -1,4 +1,6 @@
+import { IconDownload } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
+import { buttonVariants } from "@workspace/ui/components/button"
 import { useEditor } from "../editor/store"
 import { MenuBar } from "./MenuBar"
 
@@ -21,13 +23,19 @@ export function TopBar() {
           </Badge>
         )}
         {isReviewBuild && (
-          <Badge
-            variant="outline"
-            title="This web build is for reviewing changes. The editor is the desktop app."
-            render={<a href={latestRelease} target="_blank" rel="noreferrer" />}
-          >
-            Review build: download the desktop app
-          </Badge>
+          <>
+            <span className="text-xs text-muted-foreground">Review build</span>
+            <a
+              href={latestRelease}
+              target="_blank"
+              rel="noreferrer"
+              title="This web build is for reviewing changes. The editor is the desktop app."
+              className={buttonVariants({ variant: "ghost", className: "text-muted-foreground" })}
+            >
+              <IconDownload data-icon="inline-start" />
+              Download the desktop app
+            </a>
+          </>
         )}
       </div>
     </header>
