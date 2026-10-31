@@ -14,10 +14,20 @@ import {
   MenubarTrigger
 } from "@workspace/ui/components/menubar"
 import type { ReactNode } from "react"
+import { mapLabelOf } from "../domain/factory"
 import { formatBinding, type KeybindAction } from "../domain/Keybinds"
 import type { Settings } from "../domain/Settings"
 import { formatGridSize, GRID_SIZES, type GridSize } from "../domain/snap"
-import { launchGame, openRecent, saveToGame, updateSettings } from "../editor/actions"
+import {
+  chooseProject,
+  exportToGame,
+  launchGame,
+  openProjectMap,
+  revealProject,
+  setExportOnSave,
+  switchProject,
+  updateSettings
+} from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { useEditor } from "../editor/store"
 
@@ -73,20 +83,43 @@ function Menu({ title, children }: { readonly title: string; readonly children: 
   )
 }
 
-/** Desktop only: the last files opened or saved, by name (the path is the tooltip). */
-function RecentFilesMenu() {
-  const recentFiles = useEditor((s) => s.recentFiles)
+/** Desktop only: the project's maps, most recently changed first (the path is the tooltip). */
+function OpenMapMenu() {
+  const maps = useEditor((s) => s.projectMaps)
+  const open = useEditor((s) => s.file?.name ?? null)
   return (
     <MenubarSub>
-      <MenubarSubTrigger disabled={recentFiles.length === 0}>Open recent</MenubarSubTrigger>
+      <MenubarSubTrigger disabled={maps.length === 0}>Open map</MenubarSubTrigger>
       <MenubarSubContent className="w-max max-w-96">
-        {recentFiles.map((file) => (
+        {maps.map((map) => (
           <MenubarItem
-            key={file.path}
-            title={file.path}
-            onClick={() => void openRecent(file.path)}
+            key={map.fileName}
+            title={map.path}
+            disabled={map.fileName === open}
+            onClick={() => void openProjectMap(map.fileName)}
           >
-            <span className="truncate">{file.name}</span>
+            <span className="truncate">{mapLabelOf(map.fileName)}</span>
+          </MenubarItem>
+        ))}
+      </MenubarSubContent>
+    </MenubarSub>
+  )
+}
+
+/** Desktop only: the projects used before, by name (the folder is the tooltip). */
+function RecentProjectsMenu() {
+  const recent = useEditor((s) => s.project?.recent ?? [])
+  return (
+    <MenubarSub>
+      <MenubarSubTrigger disabled={recent.length === 0}>Recent projects</MenubarSubTrigger>
+      <MenubarSubContent className="w-max max-w-96">
+        {recent.map((project) => (
+          <MenubarItem
+            key={project.path}
+            title={project.path}
+            onClick={() => void switchProject(project.path)}
+          >
+            <span className="truncate">{project.name}{project.isDefault ? " (default)" : ""}</span>
           </MenubarItem>
         ))}
       </MenubarSubContent>
@@ -101,7 +134,8 @@ const THEMES: ReadonlyArray<{ readonly theme: Settings["appearance"]["theme"]; r
 ]
 
 /**
- * File / Edit / View, and Game on desktop. Every item calls the entry point its keybind or button
+ * File / Edit / View / Map, and Game on desktop. The menus use the three nouns of docs/PROJECTS.md: a project holds
+ * maps, a map is exported to the game. Every item calls the entry point its keybind or button
  * uses (`actionCommands`, the store, the settings), so the three never disagree.
  */
 export function MenuBar() {
@@ -111,7 +145,9 @@ export function MenuBar() {
   const canPaste = useEditor((s) => s.clipboard !== null)
   const openDialog = useEditor((s) => s.openDialog)
   const { snapping, appearance, lighting, general } = useEditor((s) => s.settings)
-  const { filePaths, saveToGame: canSaveToGame, launchGame: canLaunchGame } = useEditor((s) => s.capabilities)
+  const { projects, exportToGame: canExport, launchGame: canLaunchGame } = useEditor((s) => s.capabilities)
+  const hasFile = useEditor((s) => s.file !== null)
+  const exportOnSave = useEditor((s) => s.exportOnSave)
 
   return (
     <Menubar
@@ -125,17 +161,29 @@ export function MenuBar() {
         if (e.key === "Escape" && onClosedTitle) target.blur()
       }}
     >
-      <Menu title="File">
-        <CommandItem action="newMap">New map…</CommandItem>
-        <CommandItem action="openMap">Open…</CommandItem>
-        {filePaths && <RecentFilesMenu />}
-        <MenubarSeparator />
-        <CommandItem action="saveMap">Save</CommandItem>
-        <CommandItem action="saveMapAs">Save as…</CommandItem>
-        {canSaveToGame && <MenubarItem onClick={() => void saveToGame()}>Save to game</MenubarItem>}
-        <MenubarSeparator />
-        <MenubarItem onClick={() => openDialog("project")}>Project settings…</MenubarItem>
-      </Menu>
+      {projects
+        ? (
+          <Menu title="File">
+            <CommandItem action="newMap">New map…</CommandItem>
+            <OpenMapMenu />
+            <CommandItem action="openMap">Import…</CommandItem>
+            <MenubarSeparator />
+            <CommandItem action="saveMap">Save</CommandItem>
+            <MenubarSeparator />
+            <MenubarItem onClick={() => void chooseProject()}>Choose project folder…</MenubarItem>
+            <RecentProjectsMenu />
+            <MenubarItem onClick={() => void revealProject()}>Show project folder</MenubarItem>
+          </Menu>
+        )
+        : (
+          <Menu title="File">
+            <CommandItem action="newMap">New map…</CommandItem>
+            <CommandItem action="openMap">Open…</CommandItem>
+            <MenubarSeparator />
+            <CommandItem action="saveMap">Save</CommandItem>
+            <CommandItem action="saveMapAs">Export…</CommandItem>
+          </Menu>
+        )}
       <Menu title="Edit">
         <CommandItem action="undo" disabled={!canUndo}>Undo</CommandItem>
         <CommandItem action="redo" disabled={!canRedo}>Redo</CommandItem>
@@ -216,6 +264,30 @@ export function MenuBar() {
             </MenubarRadioGroup>
           </MenubarSubContent>
         </MenubarSub>
+      </Menu>
+      <Menu title="Map">
+        {projects && (
+          <>
+            <MenubarItem inset onClick={() => openDialog(hasFile ? "rename" : "saveAs")}>Rename…</MenubarItem>
+            <CommandItem action="saveMapAs" inset>Duplicate…</CommandItem>
+          </>
+        )}
+        <MenubarItem {...(projects && { inset: true })} onClick={() => openDialog("mapSettings")}>
+          Map settings…
+        </MenubarItem>
+        {canExport && (
+          <>
+            <MenubarSeparator />
+            <MenubarItem inset onClick={() => void exportToGame()}>Export to game</MenubarItem>
+            <MenubarCheckboxItem
+              closeOnClick
+              checked={exportOnSave}
+              onCheckedChange={(on) => void setExportOnSave(on)}
+            >
+              Export on save
+            </MenubarCheckboxItem>
+          </>
+        )}
       </Menu>
       {canLaunchGame && (
         <Menu title="Game">

@@ -214,7 +214,7 @@ export function SettingsDialog(props: {
   const keybinds = useEditor((s) => s.keybinds)
   const defaults = useEditor((s) => s.keybindDefaults)
   const [listening, setListening] = useState<Listening | null>(null)
-  const hasGame = useEditor((s) => s.capabilities.saveToGame)
+  const hasGame = useEditor((s) => s.capabilities.exportToGame)
   const gamePaths = useEditor((s) => s.gamePaths)
   const creator = useCreator()
   const foundCreator = useEditor((s) => s.foundCreator)

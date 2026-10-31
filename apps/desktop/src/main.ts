@@ -10,7 +10,6 @@ import { ElectronProtocol, registerSchemePrivileges } from "./electron/ElectronP
 import { ElectronShell } from "./electron/ElectronShell"
 import { ElectronUpdater } from "./electron/ElectronUpdater"
 import { ElectronWindow } from "./electron/ElectronWindow"
-import { MapFiles } from "./files/MapFiles"
 import { GameCreator } from "./game/GameCreator"
 import { GameHost } from "./game/GameHost"
 import { GameLink } from "./game/GameLink"
@@ -18,6 +17,8 @@ import { GamePaths } from "./game/GamePaths"
 import { GameProcess } from "./game/GameProcess"
 import { SteamLibrary } from "./game/SteamLibrary"
 import { DesktopIpc } from "./ipc/DesktopIpc"
+import { MapLinks } from "./project/MapLinks"
+import { Projects } from "./project/Projects"
 import { DesktopSettings } from "./settings/DesktopSettings"
 import { DesktopUpdates } from "./updates/DesktopUpdates"
 import { DesktopWindow } from "./window/DesktopWindow"
@@ -48,7 +49,9 @@ const layerGame = Layer.mergeAll(GameCreator.layer, GameLink.layer).pipe(
   Layer.provideMerge(GameHost.layer)
 )
 
-const layerDesktopRuntime = Layer.mergeAll(DesktopWindow.layer, MapFiles.layer, DesktopUpdates.layer, layerGame).pipe(
+const layerProjects = Projects.layer.pipe(Layer.provide(MapLinks.layer), Layer.provideMerge(layerGame))
+
+const layerDesktopRuntime = Layer.mergeAll(DesktopWindow.layer, DesktopUpdates.layer, layerProjects).pipe(
   Layer.provideMerge(DesktopSettings.layer),
   Layer.provideMerge(DesktopEnvironment.layer(__dirname)),
   Layer.provideMerge(layerElectron),

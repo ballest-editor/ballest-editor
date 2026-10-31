@@ -37,16 +37,25 @@ The renderer never imports `electron`. It gets a `Platform` service (`apps/web/s
 
 | Capability         | Browser layer       | Desktop layer (through `window.ballest`, the preload bridge) |
 | ------------------ | ------------------- | ------------------------------------------------------------ |
-| Open a map         | `<input type=file>` | native open dialog, path remembered                          |
-| Save / Save as     | download link       | native save dialog; subsequent saves overwrite               |
-| Save to game       | hidden              | writes into `UserSavedMaps`                                  |
+| Open / Import      | `<input type=file>` | native open dialog; the file is copied into the project      |
+| Save               | download link       | writes the map in the project, asking nothing                |
+| Export to game     | hidden              | copies the project map into `UserSavedMaps`                  |
 | Launch game, Play  | hidden              | `steam://rungameid/3339810`, plugin handoff                  |
 | Open external link | `window.open`       | `shell.openExternal`                                         |
 | Updates            | none                | electron-updater state stream                                |
 
-`Platform.layer` is picked at module load: `window.ballest !== undefined` means desktop (the preload runs before any page script, so that test is reliable). Components still reach it through `editor/actions`: Open, Save and Save as are `Platform` calls instead of DOM tricks. Settings, keybinds and map prefs stay in `localStorage` (Electron persists it under `userData`); nothing to migrate.
+`Platform.layer` is picked at module load: `window.ballest !== undefined` means desktop (the preload runs before any page script, so that test is reliable). Components still reach it through `editor/actions`. Settings, keybinds and map prefs stay in `localStorage` (Electron persists it under `userData`); nothing to migrate.
 
-Main reads and writes only the map files the user picked in one of its dialogs, this session or before (the recent files, the last 8 in `desktop-settings.json`), and only `.balledit`, `.ballmap` and `.json`. The page can't name a path main hasn't handed it. Save writes over the open file while it is named after the map inside it (the game loads nothing else); after a rename, or for a `.ballmap`, it asks like Save as.
+On desktop the maps live in a **project folder** ([PROJECTS.md](PROJECTS.md), phase 1): `Documents/Ballest Editor/Maps` by default, made on disk by the first New map or Import, or a folder chosen with File › Choose project folder… (the recent ones are under File › Recent projects). The game's maps folder, or a folder inside it, is refused with the reason: the game scans its subfolders and rewrites what it finds. The flow:
+
+- **New map** asks for the name and creator and saves the map into the project at once; the dialog shows the file name it exports as.
+- **Save** (Ctrl+S) writes the project file and asks nothing. A map that has no file yet (the starting map) is named first. After the name or creator changed, Save moves the file to the new name and the old one goes to `<project>/.ballest/backups/`.
+- **Rename** and **Duplicate** (Map menu) replace Save as: Rename changes the name or creator and moves the file; Duplicate saves a copy under a new name and editing goes on in the copy.
+- **Import** (File menu, Ctrl+O) replaces Open: a `.balledit`, `.ballmap` or `.json` from anywhere is copied into `maps/` under the game's file name for it (a `.balledit` byte for byte; a `.ballmap` as the `.balledit` the game would make of it) and opened from there. Its origin goes into `.ballest/link.json`; a file imported from the game's maps folder under its own name is linked as that file's export from the start. A name the project already has asks: Replace (the project's copy goes to backups) or Import as copy (`<name> 2`).
+- **Export to game** (Map menu) saves unsaved edits, then copies the project file byte for byte into the maps folder (below) and records the export's path, hash and time in `link.json`. **Export on save** (Map menu, or Map settings; off by default, kept with the map's prefs) makes every Save export too.
+- Toasts name the project or the maps folder and offer Reveal.
+
+Main touches map files only inside the project's `maps/` and `.ballest/` folders and in the game's maps folder, named by file name, never by path; Import reads a file the user picked in its open dialog. The browser review build has no project: one map in memory, Open is the file input and Export (or Save) is a download.
 
 ### Window
 
@@ -80,14 +89,14 @@ The window loads `ballest://app/` in production and `ballest-dev://app/` in dev.
 
 - **Steam's folder.** Windows: the registry (`HKCU\Software\Valve\Steam` `SteamPath`, then `HKLM` `InstallPath`), then `%ProgramFiles(x86)%\Steam` and `%ProgramFiles%\Steam`. Linux: `~/.local/share/Steam`, `~/.steam/steam`, `~/.steam/root`, the Flatpak (`~/.var/app/com.valvesoftware.Steam/.local/share/Steam`) and the Snap. Folders that resolve to the same place count once.
 - **The game.** Every library `steamapps/libraryfolders.vdf` lists (current and pre-2021 formats); the first with `steamapps/appmanifest_3339810.acf` whose `installdir` holds `Ballest/Binaries/Win64/Ballest-Win64-Shipping.exe`. The same algorithm as the plugin manager's `tools/find_game.sh`.
-- **Maps.** Found when the game's `Ballest/Saved` folder exists (the game makes it on its first run); Save to game creates `UserSavedMaps` in it if the in-game editor never saved a map. Under Proton the prefix is looked for in the game's library first, then in every other library.
+- **Maps.** Found when the game's `Ballest/Saved` folder exists (the game makes it on its first run); Export to game creates `UserSavedMaps` in it if the in-game editor never saved a map. Under Proton the prefix is looked for in the game's library first, then in every other library.
 - **Plugins.** Found when the folder exists, which means the plugin manager is installed.
 - **Running.** Windows: `tasklist` for `Ballest-Win64-Shipping.exe`. Linux: a `/proc/*/cmdline` naming that exe (Proton runs it as an argument, so the process name doesn't match).
 - **Creator.** The game writes the Steam persona name into every map's `creatorName` and file name, so `GameCreator` reads it from `<steam>/config/loginusers.vdf` in each of Steam's own folders (the same ones above, registry included): the user with `MostRecent "1"`, else the newest `Timestamp` (Steam on Linux writes no `MostRecent`). Without a login file, it takes the creator most `.balledit` file names in the maps folder end in. The renderer gets `{ name, source: "steam" | "mapsFolder" }` or null (`findCreator`), unchecked: Settings › General › Creator name shows it ("From Steam") until the user types another name, which then sticks; "Use Steam name" goes back. A found name with characters a map file name can't hold isn't used, and the row says why. New map only asks for a creator when there is no usable one. `domain/creator.ts`'s `creatorOf` combines the setting and the found name into `{ name, source: "steam" | "mapsFolder" | "user" | "none", valid }`, the shape the Game link checklist's creator row (#134) shows.
 
 The renderer gets each folder as `found | overridden | missing`, with the path it is or would be at. Settings › Game shows the three with **Choose…** (a folder dialog; an install must contain the game's exe), **Reveal** and reset. Overrides live in `desktop-settings.json` under `game`; overriding the install moves the other two with it unless they are overridden too.
 
-**Save to game** (File menu) writes the map into the maps folder under the game's file name. It is a copy: the open file stays the one Save writes to, unless the map had no file yet. A file there whose `levelPublishedFileId` is above 0 is a published map's draft, and the editor asks before replacing it. **Launch game** (Game menu) opens `steam://rungameid/3339810`, or says the game is already running.
+**Export to game** (Map menu) writes the map into the maps folder under the game's file name, as a copy of the project file (see § Renderer). A file there whose `levelPublishedFileId` is above 0 is a published map's draft, and the editor asks before replacing it. **Launch game** (Game menu) opens `steam://rungameid/3339810`, or says the game is already running.
 
 The app never touches the install except the plugin's own folder below, and only through `GameLink`.
 
@@ -100,11 +109,11 @@ The [Ballest plugin manager](https://anythinggoes-ballest.github.io/ballest-plug
 
 So **Play** in the desktop app:
 
-1. Saves the map into the maps folder (its `levelPublishedFileId` is -1; the host refuses anything else).
+1. Exports the map into the maps folder (its `levelPublishedFileId` is -1; the host refuses anything else).
 2. Writes `<plugins>/ballest-editor-link/play.json`: `{ "map": "Map_LevelEditorMain&<name>_<creator>.balledit", "nonce": <n> }`.
 3. If the game isn't running (no `Ballest-Win64-Shipping.exe` process), opens `steam://rungameid/3339810`.
 
-The plugin, `ballest-editor-link` (`packages/ballest-editor-link/`: `info.toml` + `main.as`), polls `play.json` from `Update(dt)` twice a second, and on a new nonce calls `Tracks::OpenLocal`. It uses no `Console::` and no network. Without the plugin manager installed, Play degrades to Save-to-game plus launch, and the editor says so.
+The plugin, `ballest-editor-link` (`packages/ballest-editor-link/`: `info.toml` + `main.as`), polls `play.json` from `Update(dt)` twice a second, and on a new nonce calls `Tracks::OpenLocal`. It uses no `Console::` and no network. Without the plugin manager installed, Play degrades to Export to game plus launch, and the editor says so.
 
 #### Installing the plugin
 
@@ -158,7 +167,7 @@ Turbo: `apps/desktop#build` depends on `apps/web#build` and `//#assets`; `//#ass
 2. Split into `apps/web`, `apps/desktop`, `packages/contracts`; Electron shell that loads the web build. First window.
 3. `Platform` service with both layers; native open/save.
 4. Asset pack on GitHub Releases; bundle into the app; the web build serves them itself.
-5. Game paths, Save to game, Launch game.
+5. Game paths, Save to game (now Export to game, #132), Launch game.
 6. `ballest-editor-link` plugin and Play.
 7. Packaging, release workflow, updates, CI smoke.
 8. Docs: VISION, README, CLAUDE.md, FORMAT's "where files live".

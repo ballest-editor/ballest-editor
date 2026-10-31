@@ -38,7 +38,7 @@ import { type Pivot, pivotAt } from "../domain/pivot"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import type { LoadedCatalog } from "../services/CatalogLoader"
-import type { GamePaths, PlatformCapabilities, PluginStatus } from "../services/Platform"
+import type { GamePaths, PlatformCapabilities, PluginStatus, ProjectMap, ProjectState } from "../services/Platform"
 
 import type { GizmoSpace } from "./gizmo/handles"
 
@@ -75,15 +75,27 @@ export interface Snapshot {
 export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
 export type Tool = "select" | "translate" | "rotate" | "scale"
-export type Dialog = "new" | "saveAs" | "settings" | "project" | "replacePublished"
+/**
+ * `saveAs` names a map that has no file yet before it goes into the project (desktop), or before it is downloaded
+ * (browser: Export). `rename` and `duplicate` are the Map menu's (desktop).
+ */
+export type Dialog =
+  | "new"
+  | "saveAs"
+  | "rename"
+  | "duplicate"
+  | "settings"
+  | "mapSettings"
+  | "replacePublished"
+  | "importClash"
 export type SettingsCategory = "general" | "editor" | "camera" | "keybinds" | "appearance" | "lighting" | "game"
 
 const HISTORY_LIMIT = 200
 const SPEED_STEPS = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
 
 /**
- * The file the open map was read from or last saved to. `path` is where Save writes (desktop only; a browser never
- * sees one).
+ * The file the open map was read from or last saved to. On desktop it is the map's file in the project (`name` is its
+ * file name there, which Save writes); a browser never sees a path.
  */
 export interface OpenFile {
   readonly name: string
@@ -96,10 +108,20 @@ export interface PublishedDraft {
   readonly publishedFileId: number
 }
 
-/** A recently opened or saved file (desktop). */
-export interface RecentFile {
-  readonly name: string
-  readonly path: string
+/** An import whose file name the project already has: the clash dialog asks to replace that map or import a copy. */
+export interface ImportClash {
+  /** The picked file. */
+  readonly source: string
+  readonly fileName: string
+  /** What would be written under `fileName`, and the map it decodes to (a copy is renamed from it). */
+  readonly text: string
+  readonly map: MapFile
+}
+
+/** Something a notification offers to do (a toast's button), like showing the folder a file went to. */
+export interface NoticeAction {
+  readonly label: string
+  readonly run: () => void
 }
 
 let nextId = 0
@@ -125,7 +147,14 @@ export interface EditorState {
   readonly dirty: boolean
   /** Null for a map that was never opened or saved. */
   readonly file: OpenFile | null
-  readonly recentFiles: ReadonlyArray<RecentFile>
+  /** The project in use and the recent ones (desktop; null until the startup load, and in a browser). */
+  readonly project: ProjectState | null
+  /** The project's maps, most recently changed first (desktop). */
+  readonly projectMaps: ReadonlyArray<ProjectMap>
+  /** The open map's "Export on save" (desktop, off by default; kept with the map's prefs). */
+  readonly exportOnSave: boolean
+  /** An import waiting on the clash dialog. */
+  readonly importClash: ImportClash | null
   /** What the platform (browser or desktop app) offers; the browser's until the startup load says otherwise. */
   readonly capabilities: PlatformCapabilities
   /** The game's folders as last looked up (desktop; null until Settings › Game asks). */
@@ -134,7 +163,7 @@ export interface EditorState {
   readonly foundCreator: Option.Option<FoundCreator>
   /** The editor-link plugin, as last looked up (desktop; null until Settings › Game asks). */
   readonly pluginStatus: PluginStatus | null
-  /** Save to game found a published map's draft under the map's file name; the replacePublished dialog asks. */
+  /** Export found a published map's draft under the map's file name; the replacePublished dialog asks. */
   readonly publishedDraft: PublishedDraft | null
   /** The desktop updater's state, once main has sent it; null in a browser. */
   readonly update: UpdateState | null
@@ -181,14 +210,27 @@ export interface EditorState {
   readonly frameAllRequest: number
 
   /** Replaces the document; `floorHeight` defaults to the map's player start height. */
-  readonly loadMap: (map: MapFile, file: OpenFile | null, floorHeight?: number) => void
+  readonly loadMap: (
+    map: MapFile,
+    file: OpenFile | null,
+    floorHeight?: number,
+    options?: { readonly exportOnSave?: boolean }
+  ) => void
   /**
    * The map was saved as `map` (the export-time level fields applied to `from`) into `file`. When the document is
    * still `from`, `map` replaces it without an undo step and the document is clean; when it was edited meanwhile, only
    * the file is remembered.
    */
   readonly markSaved: (from: Doc, map: MapFile, file: OpenFile) => void
-  readonly setRecentFiles: (recentFiles: ReadonlyArray<RecentFile>) => void
+  readonly setProject: (project: ProjectState, maps: ReadonlyArray<ProjectMap>) => void
+  /**
+   * The open map no longer has a file: it stays open with its edits as unsaved, and the next Save names it into the
+   * project in use (after switching to another project).
+   */
+  readonly detachFile: () => void
+  readonly setExportOnSave: (exportOnSave: boolean) => void
+  /** Asks how to import a file whose name the project has (null forgets it). */
+  readonly setImportClash: (clash: ImportClash | null) => void
   readonly setCapabilities: (capabilities: PlatformCapabilities) => void
   readonly setGamePaths: (gamePaths: GamePaths) => void
   readonly setFoundCreator: (foundCreator: Option.Option<FoundCreator>) => void
@@ -262,7 +304,7 @@ export interface EditorState {
   readonly setKeybinds: (keybinds: Keybinds, defaults?: DerivedKeybinds) => void
   readonly setSettings: (settings: Settings) => void
   readonly reportMissingGlb: (url: string) => void
-  readonly notify: (kind: "info" | "error", text: string) => void
+  readonly notify: (kind: "info" | "error", text: string, action?: NoticeAction) => void
   readonly changeSpeed: (direction: 1 | -1) => void
   readonly requestFocus: () => void
   readonly requestFrameAll: () => void
@@ -345,8 +387,11 @@ export const useEditor = create<EditorState>()((set, get) => {
     future: [],
     dirty: false,
     file: null,
-    recentFiles: [],
-    capabilities: { filePaths: false, saveToGame: false, launchGame: false, play: false, updates: false },
+    project: null,
+    projectMaps: [],
+    exportOnSave: false,
+    importClash: null,
+    capabilities: { projects: false, exportToGame: false, launchGame: false, play: false, updates: false },
     gamePaths: null,
     foundCreator: Option.none(),
     pluginStatus: null,
@@ -374,7 +419,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     focusRequest: 0,
     frameAllRequest: 0,
 
-    loadMap: (map, file, floorHeight) =>
+    loadMap: (map, file, floorHeight, options) =>
       set((s) => ({
         doc: docOf(map),
         floorHeight: floorHeight ?? floorHeightOf(map),
@@ -382,13 +427,17 @@ export const useEditor = create<EditorState>()((set, get) => {
         future: [],
         dirty: false,
         file,
+        exportOnSave: options?.exportOnSave ?? false,
         selectedIds: [],
         frameAllRequest: s.frameAllRequest + 1
       })),
 
     markSaved: (from, map, file) =>
       set((s) => s.doc === from ? { doc: { ...s.doc, map }, dirty: false, file } : { file }),
-    setRecentFiles: (recentFiles) => set({ recentFiles }),
+    setProject: (project, projectMaps) => set({ project, projectMaps }),
+    detachFile: () => set((s) => s.file === null ? s : { file: null, dirty: true }),
+    setExportOnSave: (exportOnSave) => set({ exportOnSave }),
+    setImportClash: (importClash) => set({ importClash, dialog: importClash === null ? null : "importClash" }),
     setCapabilities: (capabilities) => set({ capabilities }),
     setGamePaths: (gamePaths) => set({ gamePaths }),
     setFoundCreator: (foundCreator) => set({ foundCreator }),
@@ -593,9 +642,10 @@ export const useEditor = create<EditorState>()((set, get) => {
     setKeybinds: (keybinds, defaults) => set((s) => ({ keybinds, keybindDefaults: defaults ?? s.keybindDefaults })),
     reportMissingGlb: (url) =>
       set((s) => (s.missingGlbs.has(url) ? s : { missingGlbs: new Set([...s.missingGlbs, url]) })),
-    notify: (kind, text) => {
-      if (kind === "error") toast.error(text)
-      else toast(text)
+    notify: (kind, text, action) => {
+      const options = action === undefined ? {} : { action: { label: action.label, onClick: action.run } }
+      if (kind === "error") toast.error(text, options)
+      else toast(text, options)
     },
     changeSpeed: (direction) =>
       set((s) => {

@@ -75,14 +75,14 @@ function MapSettings() {
                 variant="ghost"
                 size="icon-sm"
                 className="text-muted-foreground"
-                aria-label="Project settings"
-                onClick={() => openDialog("project")}
+                aria-label="Map settings"
+                onClick={() => openDialog("mapSettings")}
               />
             }
           >
             <IconSettings />
           </TooltipTrigger>
-          <TooltipContent side="left">Project settings</TooltipContent>
+          <TooltipContent side="left">Map settings</TooltipContent>
         </Tooltip>
       </div>
       <div className="flex flex-col gap-1">

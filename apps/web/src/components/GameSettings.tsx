@@ -23,7 +23,7 @@ const describe = (which: GamePathKind, { status, path }: GamePath): string => {
         ? "Found through Steam."
         : "Steam doesn't list Ballest of Them All in any of its libraries. Choose the folder that holds Ballest/Binaries/Win64/Ballest-Win64-Shipping.exe."
     case "mapsFolder":
-      if (status === "found") return "Save to game writes here, and the in-game editor lists the maps in it."
+      if (status === "found") return "Export to game writes here, and the in-game editor lists the maps in it."
       return path === null
         ? "Couldn't work out where the game keeps its maps. Choose its UserSavedMaps folder."
         : "The game makes it the first time it runs. Start the game once, or choose the folder."

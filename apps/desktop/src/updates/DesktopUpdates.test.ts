@@ -21,6 +21,7 @@ const installedBuild = {
   appVersion: "0.2.0",
   userData: "/user",
   settingsPath: "/user/desktop-settings.json",
+  defaultProjectDir: "/home/me/Documents/Ballest Editor/Maps",
   preloadPath: "/app/preload.cjs",
   rendererDir: "/app/web",
   assetsDir: Option.none(),

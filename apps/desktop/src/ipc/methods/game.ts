@@ -5,9 +5,7 @@ import {
   GamePathPayload,
   GamePaths as GamePathsSchema,
   InstallPluginResult,
-  PluginStatus,
-  SaveToGamePayload,
-  SaveToGameResult
+  PluginStatus
 } from "@ballest/contracts"
 import { Effect, Option, Schema } from "effect"
 import { ElectronDialog } from "../../electron/ElectronDialog"
@@ -16,7 +14,6 @@ import { GameCreator } from "../../game/GameCreator"
 import { GameLink } from "../../game/GameLink"
 import { GamePaths } from "../../game/GamePaths"
 import { GameProcess } from "../../game/GameProcess"
-import { saveToMaps } from "../../game/saveToMaps"
 import {
   CHOOSE_GAME_PATH_CHANNEL,
   FIND_CREATOR_CHANNEL,
@@ -26,8 +23,7 @@ import {
   LAUNCH_GAME_CHANNEL,
   PLUGIN_STATUS_CHANNEL,
   RESET_GAME_PATH_CHANNEL,
-  REVEAL_GAME_PATH_CHANNEL,
-  SAVE_TO_GAME_CHANNEL
+  REVEAL_GAME_PATH_CHANNEL
 } from "../channels"
 import { makeIpcMethod } from "../DesktopIpc"
 
@@ -84,13 +80,6 @@ export const revealGamePath = makeIpcMethod({
     if (status === "missing" || path === null) return false
     return yield* (yield* ElectronShell).openFolder(path)
   })
-})
-
-export const saveToGame = makeIpcMethod({
-  channel: SAVE_TO_GAME_CHANNEL,
-  payload: SaveToGamePayload,
-  result: SaveToGameResult,
-  handler: saveToMaps
 })
 
 export const launchGame = makeIpcMethod({

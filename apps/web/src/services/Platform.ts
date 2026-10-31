@@ -1,14 +1,18 @@
 import type {
   DesktopBridge,
+  ExportMapResult,
   FoundCreator,
   GamePathKind,
   GamePaths,
+  ImportMapPayload,
+  ImportMapResult,
   InstallPluginResult,
-  MapFileRef,
   OpenedMapFile,
   PluginStatus,
-  RecentMapFiles,
-  SaveToGameResult,
+  ProjectMap,
+  ProjectMapFile,
+  ProjectMaps,
+  ProjectState,
   UpdateState
 } from "@ballest/contracts"
 import { Context, Effect, Layer, Option, Queue, Schema, Stream } from "effect"
@@ -19,18 +23,21 @@ export type {
   GamePathKind,
   GamePaths,
   InstallPluginResult,
-  PluginStatus
+  PluginStatus,
+  ProjectMap,
+  ProjectMapFile,
+  ProjectState
 } from "@ballest/contracts"
 
-/** What this platform can do beyond opening and saving files; the menus hide what it can't. */
+/** What this platform can do; the menus hide what it can't. */
 export interface PlatformCapabilities {
   /**
-   * Native open and save dialogs: the open map keeps its path, Save overwrites it, recent files are listed. In a
-   * browser, opening is the file input and saving is a download.
+   * A project folder on disk (docs/PROJECTS.md): New map saves into it, Save writes there, Import copies a file in. A
+   * browser has none: one map in memory, Open is the file input and Export is a download.
    */
-  readonly filePaths: boolean
-  /** Finding the game's folders, and writing straight into its UserSavedMaps folder. */
-  readonly saveToGame: boolean
+  readonly projects: boolean
+  /** Finding the game's folders, and exporting a map into its UserSavedMaps folder. */
+  readonly exportToGame: boolean
   /** Starting the game through Steam. */
   readonly launchGame: boolean
   /** Racing the open map in the game through the plugin manager (#66). */
@@ -39,17 +46,11 @@ export interface PlatformCapabilities {
   readonly updates: boolean
 }
 
-/** A map file the user opened. `path` is none in a browser, which never sees one. */
+/** A map file the user picked to open (browser) or import (desktop). `path` is none in a browser, which never sees one. */
 export interface OpenedMap {
   readonly name: string
   readonly path: Option.Option<string>
   readonly text: string
-}
-
-/** Where a map was saved: its file name (the user may have changed it in the dialog), and its path on desktop. */
-export interface SavedMap {
-  readonly name: string
-  readonly path: Option.Option<string>
 }
 
 export class PlatformError extends Schema.TaggedError<PlatformError>()("PlatformError", {
@@ -57,26 +58,49 @@ export class PlatformError extends Schema.TaggedError<PlatformError>()("Platform
 }) {}
 
 /**
- * The renderer's way out of the page: files, links, and later the game. Two implementations behind one interface, so
- * nothing above `services/` asks which one it runs in: `layerBrowser` (file input, download, `window.open`) and
- * `layerDesktop` (the preload bridge, `window.ballest`).
+ * The renderer's way out of the page: the project and its maps, links, the game. Two implementations behind one
+ * interface, so nothing above `services/` asks which one it runs in: `layerBrowser` (file input, download,
+ * `window.open`) and `layerDesktop` (the preload bridge, `window.ballest`).
  */
 export class Platform extends Context.Service<Platform, {
   readonly capabilities: PlatformCapabilities
-  /** Asks for a map file to open; none when the user cancels. */
-  readonly openMap: Effect.Effect<Option.Option<OpenedMap>, PlatformError>
-  /** Opens a file from `recentMaps` (desktop). */
-  readonly openRecent: (path: string) => Effect.Effect<OpenedMap, PlatformError>
-  /**
-   * Saves `text` as `name`. With `path` (desktop), overwrites that file without asking; without, asks where (desktop)
-   * or downloads it (browser). None when the user cancels.
-   */
+  /** Asks for a map file anywhere (the desktop's import dialog, the browser's file input); none when cancelled. */
+  readonly pickMapFile: Effect.Effect<Option.Option<OpenedMap>, PlatformError>
+  /** Downloads `text` as `name` (browser: its Export). */
+  readonly download: (file: { readonly name: string; readonly text: string }) => Effect.Effect<void, PlatformError>
+  /** The project in use and the recent ones (desktop). */
+  readonly projectState: Effect.Effect<ProjectState, PlatformError>
+  /** Asks for a folder to use as the project; none when the user cancels. */
+  readonly chooseProject: Effect.Effect<Option.Option<ProjectState>, PlatformError>
+  /** Goes back to a recent project, or the default. */
+  readonly switchProject: (path: string) => Effect.Effect<ProjectState, PlatformError>
+  /** Shows the project's maps folder in the file manager. */
+  readonly revealProject: Effect.Effect<void, PlatformError>
+  /** The project's maps, most recently changed first; always empty in a browser. */
+  readonly listMaps: Effect.Effect<ProjectMaps, PlatformError>
+  readonly readMap: (fileName: string) => Effect.Effect<ProjectMapFile, PlatformError>
+  /** Writes a new map into the project (making the project first); fails when one of that name exists. */
+  readonly createMap: (
+    file: { readonly fileName: string; readonly text: string }
+  ) => Effect.Effect<ProjectMap, PlatformError>
+  /** Writes over a project map. */
   readonly saveMap: (
-    file: { readonly name: string; readonly text: string },
-    options: { readonly path: Option.Option<string>; readonly near: Option.Option<string> }
-  ) => Effect.Effect<Option.Option<SavedMap>, PlatformError>
-  /** Recently opened or saved files, most recent first; always empty in a browser. */
-  readonly recentMaps: Effect.Effect<RecentMapFiles, PlatformError>
+    file: { readonly fileName: string; readonly text: string }
+  ) => Effect.Effect<ProjectMap, PlatformError>
+  /** Moves a project map to a new file name with new text; the old file goes to the project's backups. */
+  readonly renameMap: (
+    file: { readonly from: string; readonly to: string; readonly text: string }
+  ) => Effect.Effect<ProjectMap, PlatformError>
+  /** Copies a picked file into the project. `Clash` (nothing written) when it has a map of that name and not `replace`. */
+  readonly importMap: (payload: ImportMapPayload) => Effect.Effect<ImportMapResult, PlatformError>
+  /**
+   * Copies a project map into the game's maps folder and records the export. `Published` (nothing written) when the
+   * file there is a published map's draft and `replacePublished` is false.
+   */
+  readonly exportMap: (
+    fileName: string,
+    options: { readonly replacePublished: boolean }
+  ) => Effect.Effect<ExportMapResult, PlatformError>
   readonly openExternal: (url: string) => Effect.Effect<void, PlatformError>
   /** Tells the desktop window the page's resolved theme (its window controls follow it); nothing in a browser. */
   readonly setWindowTheme: (dark: boolean) => Effect.Effect<void, PlatformError>
@@ -88,14 +112,6 @@ export class Platform extends Context.Service<Platform, {
   readonly resetGamePath: (which: GamePathKind) => Effect.Effect<GamePaths, PlatformError>
   /** Shows the folder in the file manager. */
   readonly revealGamePath: (which: GamePathKind) => Effect.Effect<void, PlatformError>
-  /**
-   * Writes `text` into the game's maps folder as `name`. `Published` (nothing written) when the file there is a
-   * published map's draft and `replacePublished` is false.
-   */
-  readonly saveToGame: (
-    file: { readonly name: string; readonly text: string },
-    options: { readonly replacePublished: boolean }
-  ) => Effect.Effect<SaveToGameResult, PlatformError>
   /** Starts the game through Steam. */
   readonly launchGame: Effect.Effect<void, PlatformError>
   readonly isGameRunning: Effect.Effect<boolean, PlatformError>
@@ -124,20 +140,17 @@ export class Platform extends Context.Service<Platform, {
     const bridge = typeof window === "undefined" ? undefined : window.ballest
     return bridge === undefined ? Platform.layerBrowser : Platform.layerDesktop(bridge)
   })
-
-  /** The desktop layer over an in-memory disk, with scripted dialog answers. */
-  static readonly layerTest = (disk: TestDisk) => Platform.layerDesktop(testBridge(disk))
 }
 
 const browserCapabilities: PlatformCapabilities = {
-  filePaths: false,
-  saveToGame: false,
+  projects: false,
+  exportToGame: false,
   launchGame: false,
   play: false,
   updates: false
 }
 
-/** Main's `MapFileError` arrives as "Error invoking remote method '<channel>': MapFileError: <message>". */
+/** Main's errors arrive as "Error invoking remote method '<channel>': ProjectError: <message>". */
 const bridgeErrorMessage = (cause: unknown): string => {
   const message = cause instanceof Error ? cause.message : String(cause)
   return message.replace(/^Error invoking remote method '[^']*': /, "").replace(/^\w*Error: /, "")
@@ -152,7 +165,9 @@ const openedMap = (file: OpenedMapFile): OpenedMap => ({
   text: file.text
 })
 
-const savedMap = (file: MapFileRef): SavedMap => ({ name: file.name, path: Option.some(file.path) })
+/** A bridge call answering whether it worked; false becomes `message`. */
+const bridgeCheck = (call: () => Promise<boolean>, message: string) =>
+  bridgeCall(call).pipe(Effect.filterOrFail((ok) => ok, () => new PlatformError({ message })), Effect.asVoid)
 
 /**
  * Listens before asking for the current state. A state pushed while the request is out is at least as new as its
@@ -174,43 +189,31 @@ const updateStates = (bridge: DesktopBridge) =>
 
 const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
   Platform.of({
-    capabilities: { ...browserCapabilities, filePaths: true, saveToGame: true, launchGame: true, updates: true },
-    openMap: bridgeCall(() => bridge.openMap()).pipe(
+    capabilities: { ...browserCapabilities, projects: true, exportToGame: true, launchGame: true, updates: true },
+    pickMapFile: bridgeCall(() => bridge.pickImport()).pipe(
       Effect.map((file) => Option.map(Option.fromNullOr(file), openedMap))
     ),
-    openRecent: (path) => bridgeCall(() => bridge.readMap(path)).pipe(Effect.map(openedMap)),
-    saveMap: ({ name, text }, { path, near }) =>
-      Option.match(path, {
-        onSome: (target) => bridgeCall(() => bridge.writeMap(target, text)).pipe(Effect.map(savedMap), Effect.asSome),
-        onNone: () =>
-          bridgeCall(() =>
-            bridge.saveMap({ name, text, ...Option.match(near, { onNone: () => ({}), onSome: (p) => ({ near: p }) }) })
-          )
-            .pipe(Effect.map((file) => Option.map(Option.fromNullOr(file), savedMap)))
-      }),
-    recentMaps: bridgeCall(() => bridge.recentMaps()),
+    download: () => Effect.fail(new PlatformError({ message: "The desktop app saves into the project." })),
+    projectState: bridgeCall(() => bridge.projectState()),
+    chooseProject: bridgeCall(() => bridge.chooseProject()).pipe(Effect.map(Option.fromNullOr)),
+    switchProject: (path) => bridgeCall(() => bridge.switchProject(path)),
+    revealProject: bridgeCheck(() => bridge.revealProject(), "The project has no maps folder yet."),
+    listMaps: bridgeCall(() => bridge.listMaps()),
+    readMap: (fileName) => bridgeCall(() => bridge.readMap(fileName)),
+    createMap: (file) => bridgeCall(() => bridge.createMap(file)),
+    saveMap: (file) => bridgeCall(() => bridge.saveMap(file)),
+    renameMap: (file) => bridgeCall(() => bridge.renameMap(file)),
+    importMap: (payload) => bridgeCall(() => bridge.importMap(payload)),
+    exportMap: (fileName, { replacePublished }) => bridgeCall(() => bridge.exportMap({ fileName, replacePublished })),
     setWindowTheme: (dark) => bridgeCall(() => bridge.setWindowTheme(dark)),
-    openExternal: (url) =>
-      bridgeCall(() => bridge.openExternal(url)).pipe(
-        Effect.filterOrFail((opened) => opened, () => new PlatformError({ message: `Couldn't open ${url}.` })),
-        Effect.asVoid
-      ),
+    openExternal: (url) => bridgeCheck(() => bridge.openExternal(url), `Couldn't open ${url}.`),
     gamePaths: bridgeCall(() => bridge.gamePaths()),
     chooseGamePath: (which) => bridgeCall(() => bridge.chooseGamePath(which)).pipe(Effect.map(Option.fromNullOr)),
     resetGamePath: (which) => bridgeCall(() => bridge.resetGamePath(which)),
-    revealGamePath: (which) =>
-      bridgeCall(() => bridge.revealGamePath(which)).pipe(
-        Effect.filterOrFail((shown) => shown, () => new PlatformError({ message: "Couldn't show that folder." })),
-        Effect.asVoid
-      ),
-    saveToGame: ({ name, text }, { replacePublished }) =>
-      bridgeCall(() => bridge.saveToGame({ name, text, replacePublished })),
-    launchGame: bridgeCall(() => bridge.launchGame()).pipe(
-      Effect.filterOrFail(
-        (launched) => launched,
-        () => new PlatformError({ message: "Couldn't ask Steam to start the game. Is Steam installed?" })
-      ),
-      Effect.asVoid
+    revealGamePath: (which) => bridgeCheck(() => bridge.revealGamePath(which), "Couldn't show that folder."),
+    launchGame: bridgeCheck(
+      () => bridge.launchGame(),
+      "Couldn't ask Steam to start the game. Is Steam installed?"
     ),
     isGameRunning: bridgeCall(() => bridge.isGameRunning()),
     findCreator: bridgeCall(() => bridge.findCreator()).pipe(Effect.map(Option.fromNullOr)),
@@ -252,10 +255,12 @@ const download = (name: string, text: string) =>
 
 const desktopOnly = Effect.fail(new PlatformError({ message: "Only the desktop app can reach the game." }))
 
+const noProject = Effect.fail(new PlatformError({ message: "Only the desktop app keeps maps in a project." }))
+
 const makeBrowser = (): Platform["Service"] =>
   Platform.of({
     capabilities: browserCapabilities,
-    openMap: pickFile(".balledit,.ballmap,.json").pipe(
+    pickMapFile: pickFile(".balledit,.ballmap,.json").pipe(
       Effect.flatMap(Option.match({
         onNone: () => Effect.succeedNone,
         onSome: (file) =>
@@ -265,16 +270,24 @@ const makeBrowser = (): Platform["Service"] =>
           }).pipe(Effect.map((text) => Option.some({ name: file.name, path: Option.none(), text })))
       }))
     ),
-    openRecent: () => Effect.fail(new PlatformError({ message: "The browser has no recent files." })),
-    saveMap: ({ name, text }) => download(name, text).pipe(Effect.as(Option.some({ name, path: Option.none() }))),
-    recentMaps: Effect.succeed([]),
+    download: ({ name, text }) => download(name, text),
+    projectState: noProject,
+    chooseProject: noProject,
+    switchProject: () => noProject,
+    revealProject: noProject,
+    listMaps: Effect.succeed([]),
+    readMap: () => noProject,
+    createMap: () => noProject,
+    saveMap: () => noProject,
+    renameMap: () => noProject,
+    importMap: () => noProject,
+    exportMap: () => desktopOnly,
     setWindowTheme: () => Effect.void,
     openExternal: (url) => Effect.sync(() => void window.open(url, "_blank", "noopener,noreferrer")),
     gamePaths: desktopOnly,
     chooseGamePath: () => desktopOnly,
     resetGamePath: () => desktopOnly,
     revealGamePath: () => desktopOnly,
-    saveToGame: () => desktopOnly,
     launchGame: desktopOnly,
     isGameRunning: Effect.succeed(false),
     findCreator: Effect.succeedNone,
@@ -284,197 +297,3 @@ const makeBrowser = (): Platform["Service"] =>
     downloadUpdate: Effect.void,
     installUpdate: Effect.void
   })
-
-/**
- * An in-memory disk for `Platform.layerTest`: `files` by path, and what the next dialogs answer (a path, or null for
- * cancel), taken in order. The disk records what was asked so a test can check it. The game is installed, its maps
- * folder is `/game/UserSavedMaps`, and choosing a folder takes the next answer too.
- */
-export interface TestDisk {
-  readonly files: Map<string, string>
-  readonly answers: Array<string | null>
-  readonly dialogs: Array<
-    { readonly kind: "open" | "save" | "folder"; readonly name?: string; readonly near?: string }
-  >
-  readonly recent: Array<string>
-  readonly external: Array<string>
-  /**
-   * `creator`: what `findCreator` answers. `plugin`: the editor-link plugin's status; installing it makes it `current`,
-   * counted in `pluginInstalls`.
-   */
-  game: {
-    paths: GamePaths
-    running: boolean
-    launches: number
-    creator: FoundCreator | null
-    plugin: PluginStatus
-    pluginInstalls: number
-  }
-  /** The updater: `push` sends a new state to the page, as main does. Downloads and installs are counted. */
-  readonly updater: {
-    state: UpdateState
-    readonly listeners: Set<(state: UpdateState) => void>
-    readonly push: (state: UpdateState) => void
-    downloads: number
-    installs: number
-  }
-}
-
-export const TEST_MAPS_FOLDER = "/game/UserSavedMaps"
-
-const testGamePaths: GamePaths = {
-  install: { status: "found", path: "/game" },
-  mapsFolder: { status: "found", path: TEST_MAPS_FOLDER },
-  pluginsFolder: { status: "missing", path: "/game/Ballest/Binaries/Win64/plugins" }
-}
-
-export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
-  files: new Map(Object.entries(files)),
-  answers: [],
-  dialogs: [],
-  recent: [],
-  external: [],
-  game: {
-    paths: testGamePaths,
-    running: false,
-    launches: 0,
-    creator: null,
-    plugin: {
-      status: "missing",
-      bundledVersion: "0.2.0",
-      installedVersion: null,
-      folder: "/game/Ballest/Binaries/Win64/plugins/ballest-editor-link"
-    },
-    pluginInstalls: 0
-  },
-  updater: makeTestUpdater()
-})
-
-const PublishedId = Schema.fromJsonString(Schema.Struct({
-  worldSettings: Schema.Struct({ levelData: Schema.Struct({ levelPublishedFileId: Schema.Finite }) })
-}))
-
-/** `levelPublishedFileId` of a map's text, as main reads it before replacing a file in the maps folder. */
-const publishedIdOf = (text: string): number =>
-  Option.match(Schema.decodeOption(PublishedId)(text), {
-    onNone: () => -1,
-    onSome: (file) => file.worldSettings.levelData.levelPublishedFileId
-  })
-
-const makeTestUpdater = (): TestDisk["updater"] => {
-  const updater: TestDisk["updater"] = {
-    state: {
-      status: "idle",
-      currentVersion: "0.2.0",
-      availableVersion: null,
-      releaseNotes: null,
-      downloadPercent: null,
-      message: null
-    },
-    listeners: new Set(),
-    push: (state) => {
-      updater.state = state
-      updater.listeners.forEach((listener) => listener(state))
-    },
-    downloads: 0,
-    installs: 0
-  }
-  return updater
-}
-
-const testBridge = (disk: TestDisk): DesktopBridge => {
-  const nameOf = (path: string) => path.split(/[\\/]/).pop() ?? path
-  const touch = (path: string) => {
-    disk.recent.splice(0, disk.recent.length, path, ...disk.recent.filter((p) => p !== path))
-  }
-  const read = (path: string): Promise<OpenedMapFile> => {
-    const text = disk.files.get(path)
-    if (text === undefined) return Promise.reject(new Error(`MapFileError: ${path} doesn't exist any more.`))
-    touch(path)
-    return Promise.resolve({ path, name: nameOf(path), text })
-  }
-  const write = (path: string, text: string): Promise<MapFileRef> => {
-    disk.files.set(path, text)
-    touch(path)
-    return Promise.resolve({ path, name: nameOf(path) })
-  }
-  return {
-    versions: { electron: "test", chrome: "test", node: "test" },
-    ping: (message) => Promise.resolve({ message }),
-    openMap: () => {
-      disk.dialogs.push({ kind: "open" })
-      const path = disk.answers.shift() ?? null
-      return path === null ? Promise.resolve(null) : read(path)
-    },
-    saveMap: ({ name, text, near }) => {
-      disk.dialogs.push({ kind: "save", name, ...(near === undefined ? {} : { near }) })
-      const path = disk.answers.shift() ?? null
-      return path === null ? Promise.resolve(null) : write(path, text)
-    },
-    readMap: read,
-    writeMap: write,
-    recentMaps: () => Promise.resolve(disk.recent.map((path) => ({ path, name: nameOf(path) }))),
-    setWindowTheme: () => Promise.resolve(),
-    openExternal: (url) => {
-      disk.external.push(url)
-      return Promise.resolve(true)
-    },
-    gamePaths: () => Promise.resolve(disk.game.paths),
-    chooseGamePath: (which) => {
-      disk.dialogs.push({ kind: "folder" })
-      const path = disk.answers.shift() ?? null
-      if (path === null) return Promise.resolve(null)
-      disk.game.paths = { ...disk.game.paths, [which]: { status: "overridden", path } }
-      return Promise.resolve(disk.game.paths)
-    },
-    resetGamePath: (which) => {
-      disk.game.paths = { ...disk.game.paths, [which]: testGamePaths[which] }
-      return Promise.resolve(disk.game.paths)
-    },
-    revealGamePath: (which) => {
-      const { status, path } = disk.game.paths[which]
-      if (status !== "missing" && path !== null) disk.external.push(path)
-      return Promise.resolve(status !== "missing")
-    },
-    saveToGame: ({ name, text, replacePublished }) => {
-      const folder = disk.game.paths.mapsFolder.path
-      if (folder === null) return Promise.reject(new Error("GamePathError: Couldn't find the game's maps folder."))
-      const path = `${folder}/${name}`
-      const existing = disk.files.get(path)
-      const publishedFileId = existing === undefined ? -1 : publishedIdOf(existing)
-      if (!replacePublished && publishedFileId > 0) {
-        return Promise.resolve({ _tag: "Published", file: { path, name }, publishedFileId } as const)
-      }
-      return write(path, text).then((file) => ({ _tag: "Saved", file }) as const)
-    },
-    launchGame: () => {
-      disk.game.launches++
-      return Promise.resolve(true)
-    },
-    isGameRunning: () => Promise.resolve(disk.game.running),
-    findCreator: () => Promise.resolve(disk.game.creator),
-    pluginStatus: () => Promise.resolve(disk.game.plugin),
-    installPlugin: () => {
-      const { plugin } = disk.game
-      if (plugin.status === "noGame" || plugin.status === "noPluginManager") {
-        return Promise.reject(new Error("GameLinkError: The Ballest plugin manager isn't installed."))
-      }
-      disk.game.pluginInstalls++
-      disk.game.plugin = { ...plugin, status: "current", installedVersion: plugin.bundledVersion }
-      return Promise.resolve({ plugin: disk.game.plugin, restartGame: disk.game.running })
-    },
-    getUpdateState: () => Promise.resolve(disk.updater.state),
-    downloadUpdate: () => {
-      disk.updater.downloads++
-      return Promise.resolve()
-    },
-    installUpdate: () => {
-      disk.updater.installs++
-      return Promise.resolve()
-    },
-    onUpdateState: (listener) => {
-      disk.updater.listeners.add(listener)
-      return () => void disk.updater.listeners.delete(listener)
-    }
-  }
-}

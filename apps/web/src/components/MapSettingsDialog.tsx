@@ -2,6 +2,7 @@ import { IconAlertTriangleFilled, IconCheck, IconMap } from "@tabler/icons-react
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
+import { Switch } from "@workspace/ui/components/switch"
 import { Toggle } from "@workspace/ui/components/toggle"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
@@ -24,16 +25,13 @@ import {
   withDifficulty,
   withTag
 } from "../domain/mapTags"
-import { setGridHeight, setLevelData } from "../editor/actions"
+import { setExportOnSave, setGridHeight, setLevelData } from "../editor/actions"
 import { useCreator, useEditor } from "../editor/store"
 import { NumberField } from "./NumberField"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
-/**
- * One category per map, under "Maps". A project is one map for now; project-wide categories
- * go above the maps once there are any.
- */
-type ProjectCategory = "map"
+/** The open map's category, under "Maps"; project settings go above it once there are any (#143). */
+type MapCategory = "map"
 
 const TAG_DESCRIPTIONS: Readonly<Record<TagGroup, string>> = {
   Gameplay: "What playing the map is like.",
@@ -150,18 +148,20 @@ function NameInput({ value, onCommit }: { readonly value: string; readonly onCom
 }
 
 /**
- * Project settings, laid out like the editor's settings and applied as they change (level
- * fields as undo steps). A project is one map for now: its name and grid height, and the
- * difficulty and tags the game's publish screen sets.
+ * Map settings, laid out like the editor's settings and applied as they change (level
+ * fields as undo steps): the open map's name and grid height, Export on save (desktop), and
+ * the difficulty and tags the game's publish screen sets.
  */
-export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
+export function MapSettingsDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   const levelData = useEditor((s) => s.doc.map.worldSettings.levelData)
   const floorHeight = useEditor((s) => s.floorHeight)
   const startHeight = useEditor((s) => floorHeightOf(s.doc.map))
   const units = useEditor((s) => s.settings.general.units)
   const savedCreator = usableCreatorName(useCreator())
-  const [category, setCategory] = useState<ProjectCategory>("map")
-  const categories: ReadonlyArray<SettingsCategoryInfo<ProjectCategory>> = [
+  const canExport = useEditor((s) => s.capabilities.exportToGame)
+  const exportOnSave = useEditor((s) => s.exportOnSave)
+  const [category, setCategory] = useState<MapCategory>("map")
+  const categories: ReadonlyArray<SettingsCategoryInfo<MapCategory>> = [
     { id: "map", label: levelData.levelDisplayName, icon: IconMap, section: "Maps" }
   ]
 
@@ -171,7 +171,7 @@ export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolea
   const difficulty = difficultyOf(levelData)
   const others = unknownTags(levelData)
 
-  const rows: ReadonlyArray<SettingsRow<ProjectCategory>> = [
+  const rows: ReadonlyArray<SettingsRow<MapCategory>> = [
     {
       id: "name",
       category: "map",
@@ -213,6 +213,19 @@ export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolea
         </div>
       )
     },
+    ...(canExport
+      ? [
+        {
+          id: "exportOnSave",
+          category: "map",
+          group: "General",
+          label: "Export on save",
+          description:
+            "Save also exports the map to the game's maps folder, for going back and forth with the in-game editor. Kept in this editor, not in the map file.",
+          control: <Switch checked={exportOnSave} onCheckedChange={(on) => void setExportOnSave(on)} />
+        } satisfies SettingsRow<MapCategory>
+      ]
+      : []),
     {
       id: "difficulty",
       category: "map",
@@ -224,7 +237,7 @@ export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolea
       keywords: DIFFICULTIES.map((d) => d.level).join(" "),
       control: <DifficultyPicker value={difficulty} onChange={(d) => void setLevelData(withDifficulty(levelData, d))} />
     },
-    ...TAG_GROUPS.map((group): SettingsRow<ProjectCategory> => {
+    ...TAG_GROUPS.map((group): SettingsRow<MapCategory> => {
       const names = group.tags.map((tag) => tagNameOf(group.group, tag))
       return {
         id: `tags-${group.group}`,
@@ -261,7 +274,7 @@ export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolea
             {others.map((name) => <Badge key={name} variant="outline" className="font-mono">{name}</Badge>)}
           </div>
         )
-      } satisfies SettingsRow<ProjectCategory>
+      } satisfies SettingsRow<MapCategory>
     ])
   ]
 
@@ -269,8 +282,8 @@ export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolea
     <SettingsShell
       open={open}
       onClose={onClose}
-      title="Project settings"
-      description="Settings for this project and its map: name, grid height, difficulty and tags."
+      title="Map settings"
+      description="Settings for the open map: name, grid height, difficulty and tags."
       categories={categories}
       category={category}
       onCategoryChange={setCategory}

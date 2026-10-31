@@ -1,11 +1,11 @@
+import { ExportMapResult, ImportMapResult, ProjectMaps, ProjectState } from "@ballest/contracts"
 import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, FileSystem, Layer, Option, Path } from "effect"
+import { Effect, FileSystem, Layer, Option, Path, Schema } from "effect"
 import { vi } from "vitest"
 import { ElectronDialog, type FileDialogOptions } from "../electron/ElectronDialog"
 import { ElectronShell, parseExternalUrl } from "../electron/ElectronShell"
 import { ElectronWindow } from "../electron/ElectronWindow"
-import { MapFiles } from "../files/MapFiles"
 import { makeFakePluginBundle, makeFakeSteam } from "../game/fakeSteam"
 import { GameCreator } from "../game/GameCreator"
 import { GameHost } from "../game/GameHost"
@@ -13,31 +13,12 @@ import { GameLink } from "../game/GameLink"
 import { GamePaths } from "../game/GamePaths"
 import { GameProcess } from "../game/GameProcess"
 import { SteamLibrary } from "../game/SteamLibrary"
+import { sha256 } from "../project/files"
+import { LinkFile, MapLinks } from "../project/MapLinks"
+import { Projects } from "../project/Projects"
 import { DesktopSettings } from "../settings/DesktopSettings"
 import { DesktopUpdates } from "../updates/DesktopUpdates"
-import {
-  CHOOSE_GAME_PATH_CHANNEL,
-  DOWNLOAD_UPDATE_CHANNEL,
-  FIND_CREATOR_CHANNEL,
-  GAME_PATHS_CHANNEL,
-  GET_UPDATE_STATE_CHANNEL,
-  INSTALL_PLUGIN_CHANNEL,
-  INSTALL_UPDATE_CHANNEL,
-  IS_GAME_RUNNING_CHANNEL,
-  LAUNCH_GAME_CHANNEL,
-  OPEN_EXTERNAL_CHANNEL,
-  OPEN_MAP_CHANNEL,
-  PING_CHANNEL,
-  PLUGIN_STATUS_CHANNEL,
-  READ_MAP_CHANNEL,
-  RECENT_MAPS_CHANNEL,
-  RESET_GAME_PATH_CHANNEL,
-  REVEAL_GAME_PATH_CHANNEL,
-  SAVE_MAP_CHANNEL,
-  SAVE_TO_GAME_CHANNEL,
-  SET_WINDOW_THEME_CHANNEL,
-  WRITE_MAP_CHANNEL
-} from "./channels"
+import * as channels from "./channels"
 import { DesktopIpc, type DesktopIpcHandleListener, type DesktopIpcMain } from "./DesktopIpc"
 import { installDesktopIpcHandlers } from "./DesktopIpcHandlers"
 import { ping } from "./methods/ping"
@@ -58,8 +39,23 @@ const fakeIpcMain = () => {
     if (handler === undefined) return Effect.die(new Error(`no handler on ${channel}`))
     return Effect.tryPromise(() => handler({ sender: { id: 1 } }, raw))
   }
-  return { handlers, ipcMain, invoke }
+  /** `invoke`, with the result decoded as `schema` (the shape the contract promises the page). */
+  const invokeAs = <S extends Schema.Top & { readonly DecodingServices: never }>(
+    schema: S,
+    channel: string,
+    raw?: unknown
+  ) => invoke(channel, raw).pipe(Effect.flatMap(Schema.decodeUnknownEffect(schema)))
+  return { handlers, ipcMain, invoke, invokeAs }
 }
+
+const hasTag = <A extends { readonly _tag: string }, T extends A["_tag"]>(
+  value: A,
+  tag: T
+): value is Extract<A, { readonly _tag: T }> => value._tag === tag
+
+/** Narrows a tagged result, failing the test on any other tag. */
+const expectTag = <A extends { readonly _tag: string }, T extends A["_tag"]>(value: A, tag: T) =>
+  hasTag(value, tag) ? value : assert.fail(`expected ${tag}, got ${value._tag}`)
 
 /** Dialogs that answer from a queue (a path, or null for cancel) and record what they were asked. */
 const fakeDialogs = () => {
@@ -131,6 +127,8 @@ const withHandlers = <A, E>(
     readonly fake: ReturnType<typeof fakeIpcMain>
     readonly dialogs: ReturnType<typeof fakeDialogs>
     readonly dir: string
+    /** The default project: `Documents/Ballest Editor/Maps` in the temp folder. */
+    readonly project: string
     readonly steam: Effect.Success<ReturnType<typeof makeFakeSteam>>
   }) => Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>
 ) =>
@@ -147,14 +145,19 @@ const withHandlers = <A, E>(
       Layer.provide(SteamLibrary.layer),
       Layer.provide(Layer.succeed(GameHost, GameHost.of(steam.host)))
     )
-    const services = Layer.mergeAll(MapFiles.layer, game).pipe(
+    const project = path.join(dir, "Documents", "Ballest Editor", "Maps")
+    const projects = Layer.effect(Projects, Projects.make(project, "linux")).pipe(
+      Layer.provide(MapLinks.layer),
+      Layer.provideMerge(game)
+    )
+    const services = projects.pipe(
       Layer.provideMerge(Layer.effect(DesktopSettings, DesktopSettings.make(path.join(dir, "desktop-settings.json")))),
       Layer.merge(Layer.mergeAll(dialogs.layer, shellLayer, windowLayer, updatesLayer, DesktopIpc.layer(fake.ipcMain)))
     )
     yield* Effect.scoped(
       Effect.gen(function*() {
         yield* installDesktopIpcHandlers()
-        yield* body({ fake, dialogs, dir, steam })
+        yield* body({ fake, dialogs, dir, project, steam })
       })
     ).pipe(Effect.provide(services))
     return fake
@@ -165,10 +168,10 @@ describe("DesktopIpc", () => {
     Effect.gen(function*() {
       const ipc = yield* withHandlers(({ fake }) =>
         Effect.gen(function*() {
-          assert.deepStrictEqual(yield* fake.invoke(PING_CHANNEL, { message: "hello" }), { message: "hello" })
+          assert.deepStrictEqual(yield* fake.invoke(channels.PING_CHANNEL, { message: "hello" }), { message: "hello" })
 
           for (const invalid of [undefined, "hello", { message: 1 }, { message: "x".repeat(1025) }]) {
-            const error = yield* Effect.flip(fake.invoke(PING_CHANNEL, invalid))
+            const error = yield* Effect.flip(fake.invoke(channels.PING_CHANNEL, invalid))
             assert.match(String(error.cause), /Expected|length/)
           }
         })
@@ -180,108 +183,146 @@ describe("DesktopIpc", () => {
   it.effect("replaces a handler left on the channel", () =>
     Effect.gen(function*() {
       const fake = fakeIpcMain()
-      fake.ipcMain.handle(PING_CHANNEL, () => Promise.resolve("stale"))
+      fake.ipcMain.handle(channels.PING_CHANNEL, () => Promise.resolve("stale"))
       yield* Effect.scoped(
         Effect.gen(function*() {
           yield* (yield* DesktopIpc).handle(ping)
-          assert.deepStrictEqual(yield* fake.invoke(PING_CHANNEL, { message: "fresh" }), { message: "fresh" })
+          assert.deepStrictEqual(yield* fake.invoke(channels.PING_CHANNEL, { message: "fresh" }), { message: "fresh" })
         })
       ).pipe(Effect.provide(DesktopIpc.layer(fake.ipcMain)))
     }))
 
-  it.effect("opens a picked map, saves it back over the same file and lists it as recent", () =>
-    withHandlers(({ fake, dialogs, dir }) =>
-      Effect.gen(function*() {
-        const fs = yield* FileSystem.FileSystem
-        const path = yield* Path.Path
-        const file = path.join(dir, "Map_LevelEditorMain&Track_me.balledit")
-        const text = "{\r\n\t\"items\": [ \"é\" ]\r\n}"
-        yield* fs.writeFileString(file, text)
-
-        dialogs.answers.push(null)
-        assert.isNull(yield* fake.invoke(OPEN_MAP_CHANNEL))
-        // Not picked yet: the page can't name a path itself.
-        assert.match(String((yield* Effect.flip(fake.invoke(READ_MAP_CHANNEL, { path: file }))).cause), /picked/)
-
-        dialogs.answers.push(file)
-        assert.deepStrictEqual(yield* fake.invoke(OPEN_MAP_CHANNEL), {
-          path: file,
-          name: "Map_LevelEditorMain&Track_me.balledit",
-          text
-        })
-        assert.deepStrictEqual(yield* fake.invoke(WRITE_MAP_CHANNEL, { path: file, text: `${text}\r\n` }), {
-          path: file,
-          name: "Map_LevelEditorMain&Track_me.balledit"
-        })
-        assert.strictEqual(yield* fs.readFileString(file), `${text}\r\n`)
-        assert.deepStrictEqual(yield* fake.invoke(RECENT_MAPS_CHANNEL), [
-          { path: file, name: "Map_LevelEditorMain&Track_me.balledit" }
-        ])
-        assert.deepStrictEqual(dialogs.asked.map((d) => [d.kind, Option.getOrNull(d.defaultPath)]), [
-          ["open", null],
-          ["open", null]
-        ])
-      })
-    ))
-
-  it.effect("save as asks where, starting next to the open map, and writes the chosen file", () =>
-    withHandlers(({ fake, dialogs, dir }) =>
-      Effect.gen(function*() {
-        const fs = yield* FileSystem.FileSystem
-        const path = yield* Path.Path
-        const near = path.join(dir, "maps", "old.balledit")
-        const chosen = path.join(dir, "elsewhere.balledit")
-        const payload = { name: "Map_LevelEditorMain&New_me.balledit", text: "{}", near }
-
-        dialogs.answers.push(null)
-        assert.isNull(yield* fake.invoke(SAVE_MAP_CHANNEL, payload))
-        dialogs.answers.push(chosen)
-        assert.deepStrictEqual(yield* fake.invoke(SAVE_MAP_CHANNEL, payload), {
-          path: chosen,
-          name: "elsewhere.balledit"
-        })
-        assert.strictEqual(yield* fs.readFileString(chosen), "{}")
-        assert.strictEqual(
-          Option.getOrNull(dialogs.asked[0]!.defaultPath),
-          path.join(dir, "maps", "Map_LevelEditorMain&New_me.balledit")
-        )
-        // Without an open map, the dialog starts next to the last recent file.
-        dialogs.answers.push(null)
-        yield* fake.invoke(SAVE_MAP_CHANNEL, { name: "x.balledit", text: "{}" })
-        assert.strictEqual(Option.getOrNull(dialogs.asked[2]!.defaultPath), path.join(dir, "x.balledit"))
-
-        const notMap = { ...payload, name: "x.balledit" }
-        dialogs.answers.push(path.join(dir, "x.exe"))
-        assert.match(String((yield* Effect.flip(fake.invoke(SAVE_MAP_CHANNEL, notMap))).cause), /isn't a map file/)
-      })
-    ))
-
-  it.effect("saves into the game's maps folder, then treats the file as picked", () =>
-    withHandlers(({ fake, steam }) =>
+  it.effect("New map makes the default project on disk, and Save, Rename and list keep to its maps folder", () =>
+    withHandlers(({ fake, project }) =>
       Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
         const path = yield* Path.Path
         const name = "Map_LevelEditorMain&Track_me.balledit"
-        const target = path.join(steam.maps, name)
-        const text = "{\r\n\t\"items\": []\r\n}"
-        assert.deepStrictEqual(
-          yield* fake.invoke(SAVE_TO_GAME_CHANNEL, { name, text, replacePublished: false }),
-          { _tag: "Saved", file: { path: target, name } }
-        )
-        assert.strictEqual(yield* fs.readFileString(target), text)
-        assert.deepStrictEqual(yield* fake.invoke(RECENT_MAPS_CHANNEL), [{ path: target, name }])
-        assert.deepStrictEqual(yield* fake.invoke(READ_MAP_CHANNEL, { path: target }), { path: target, name, text })
+        const text = "{\r\n\t\"items\": [ \"é\" ]\r\n}"
 
+        assert.deepStrictEqual(yield* fake.invoke(channels.PROJECT_STATE_CHANNEL), {
+          current: { path: project, name: "Maps", exists: false, isDefault: true },
+          recent: []
+        })
+        assert.deepStrictEqual(yield* fake.invoke(channels.LIST_MAPS_CHANNEL), [])
+        assert.isFalse(yield* fake.invoke(channels.REVEAL_PROJECT_CHANNEL))
+
+        const created = yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text })
+        assert.deepInclude(created, { fileName: name, path: path.join(project, "maps", name), link: null })
+        assert.strictEqual(yield* fs.readFileString(path.join(project, "maps", name)), text)
+        assert.deepStrictEqual(JSON.parse(yield* fs.readFileString(path.join(project, "ballest-project.json"))), {
+          formatVersion: 1,
+          name: "Maps",
+          exportTarget: "game"
+        })
+        assert.strictEqual(yield* fs.readFileString(path.join(project, ".gitignore")), ".ballest/\n")
+        assert.deepInclude((yield* fake.invokeAs(ProjectState, channels.PROJECT_STATE_CHANNEL)).current, {
+          exists: true
+        })
+        // A second New map of the same name is refused.
+        const clash = yield* Effect.flip(fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text: "{}" }))
+        assert.match(String(clash.cause), /already has a map called/)
+
+        yield* fake.invoke(channels.SAVE_MAP_CHANNEL, { fileName: name, text: `${text}\r\n` })
+        assert.deepInclude(yield* fake.invoke(channels.READ_MAP_CHANNEL, { fileName: name }), { text: `${text}\r\n` })
+
+        const renamed = "Map_LevelEditorMain&Loop_me.balledit"
+        yield* fake.invoke(channels.RENAME_MAP_CHANNEL, { from: name, to: renamed, text: "{\"renamed\":1}" })
+        assert.deepStrictEqual((yield* fake.invokeAs(ProjectMaps, channels.LIST_MAPS_CHANNEL)).map((m) => m.fileName), [
+          renamed
+        ])
+        const [backup, ...more] = yield* fs.readDirectory(path.join(project, ".ballest", "backups"))
+        assert.strictEqual(more.length, 0)
+        assert.isTrue(backup?.endsWith(` ${name}`))
+
+        // Names only: nothing reaches outside maps/.
         for (const bad of ["../x.balledit", "a/b.balledit", "x.json", ".balledit", "con:.balledit"]) {
-          const error = yield* Effect.flip(
-            fake.invoke(SAVE_TO_GAME_CHANNEL, { name: bad, text, replacePublished: false })
-          )
+          const error = yield* Effect.flip(fake.invoke(channels.SAVE_MAP_CHANNEL, { fileName: bad, text }))
           assert.match(String(error.cause), /isn't a map file name/, bad)
         }
+        assert.isFalse(yield* fs.exists(path.join(project, "x.balledit")))
       })
     ))
 
-  it.effect("asks before replacing the draft of a published map", () =>
+  it.effect("imports a map from the game's maps folder linked to it, and exports it back with its hash", () =>
+    withHandlers(({ fake, dialogs, dir, project, steam }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const name = "Map_LevelEditorMain&Track_me.balledit"
+        const inGame = path.join(steam.maps, name)
+        const original = "{\r\n\t\"items\": []\r\n}"
+        yield* fs.makeDirectory(steam.maps, { recursive: true })
+        yield* fs.writeFileString(inGame, original)
+
+        // Not picked: the page can't name a file to import.
+        const unpicked = { source: inGame, fileName: name, text: original, replace: false }
+        assert.match(String((yield* Effect.flip(fake.invoke(channels.IMPORT_MAP_CHANNEL, unpicked))).cause), /picked/)
+
+        dialogs.answers.push(null)
+        assert.isNull(yield* fake.invoke(channels.PICK_IMPORT_CHANNEL))
+        dialogs.answers.push(inGame)
+        assert.deepStrictEqual(yield* fake.invoke(channels.PICK_IMPORT_CHANNEL), { path: inGame, name, text: original })
+        assert.strictEqual(Option.getOrNull(dialogs.asked[0]!.defaultPath), steam.maps)
+
+        const imported = expectTag(
+          yield* fake.invokeAs(ImportMapResult, channels.IMPORT_MAP_CHANNEL, unpicked),
+          "Imported"
+        )
+        const hash = sha256(new TextEncoder().encode(original))
+        assert.deepInclude(imported.map.link?.origin, { path: inGame, hash })
+        assert.deepInclude(imported.map.link?.export, { path: inGame, hash })
+        assert.strictEqual(imported.map.link?.lastSeenHash, hash)
+        assert.strictEqual(yield* fs.readFileString(path.join(project, "maps", name)), original)
+        const links = yield* fs.readFileString(path.join(project, ".ballest", "link.json")).pipe(
+          Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(LinkFile)))
+        )
+        assert.deepStrictEqual(Object.keys(links.maps), [name])
+
+        // The same name again: reported, then replaced on request with the old copy in backups.
+        const again = { ...unpicked, text: "{\"v\":2}" }
+        assert.deepStrictEqual(yield* fake.invoke(channels.IMPORT_MAP_CHANNEL, again), {
+          _tag: "Clash",
+          fileName: name
+        })
+        yield* fake.invoke(channels.IMPORT_MAP_CHANNEL, { ...again, replace: true })
+        assert.strictEqual(yield* fs.readFileString(path.join(project, "maps", name)), "{\"v\":2}")
+        assert.lengthOf(yield* fs.readDirectory(path.join(project, ".ballest", "backups")), 1)
+
+        // A file from elsewhere has an origin but no export.
+        const download = path.join(dir, "Downloads", "Map_LevelEditorMain&Other_me.balledit")
+        yield* fs.makeDirectory(path.dirname(download), { recursive: true })
+        yield* fs.writeFileString(download, "{}")
+        dialogs.answers.push(download)
+        yield* fake.invoke(channels.PICK_IMPORT_CHANNEL)
+        const other = expectTag(
+          yield* fake.invokeAs(ImportMapResult, channels.IMPORT_MAP_CHANNEL, {
+            source: download,
+            fileName: path.basename(download),
+            text: "{}",
+            replace: false
+          }),
+          "Imported"
+        )
+        assert.deepInclude(other.map.link, { export: null, lastSeenHash: null })
+
+        const exported = expectTag(
+          yield* fake.invokeAs(ExportMapResult, channels.EXPORT_MAP_CHANNEL, {
+            fileName: name,
+            replacePublished: false
+          }),
+          "Exported"
+        )
+        const exportedHash = sha256(new TextEncoder().encode("{\"v\":2}"))
+        assert.deepStrictEqual(exported.file, { path: inGame, name })
+        assert.deepInclude(exported.link.export, { path: inGame, hash: exportedHash })
+        assert.strictEqual(exported.link.lastSeenHash, exportedHash)
+        assert.deepInclude(exported.link.origin, { path: inGame, hash })
+        assert.strictEqual(yield* fs.readFileString(inGame), "{\"v\":2}")
+      })
+    ))
+
+  it.effect("asks before exporting over the draft of a published map", () =>
     withHandlers(({ fake, steam }) =>
       Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
@@ -294,20 +335,18 @@ describe("DesktopIpc", () => {
         })
         yield* fs.makeDirectory(steam.maps, { recursive: true })
         yield* fs.writeFileString(target, published)
+        yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text: "{}" })
 
         assert.deepStrictEqual(
-          yield* fake.invoke(SAVE_TO_GAME_CHANNEL, { name, text: "{}", replacePublished: false }),
-          {
-            _tag: "Published",
-            file: { path: target, name },
-            publishedFileId: 3561234567
-          }
+          yield* fake.invoke(channels.EXPORT_MAP_CHANNEL, { fileName: name, replacePublished: false }),
+          { _tag: "Published", file: { path: target, name }, publishedFileId: 3561234567 }
         )
         assert.strictEqual(yield* fs.readFileString(target), published)
-        assert.deepStrictEqual(yield* fake.invoke(SAVE_TO_GAME_CHANNEL, { name, text: "{}", replacePublished: true }), {
-          _tag: "Saved",
-          file: { path: target, name }
+        const replaced = yield* fake.invokeAs(ExportMapResult, channels.EXPORT_MAP_CHANNEL, {
+          fileName: name,
+          replacePublished: true
         })
+        assert.strictEqual(replaced._tag, "Exported")
         assert.strictEqual(yield* fs.readFileString(target), "{}")
 
         // A never-published draft (-1) is replaced without asking.
@@ -315,13 +354,45 @@ describe("DesktopIpc", () => {
           target,
           JSON.stringify({ worldSettings: { levelData: { levelPublishedFileId: -1 } } })
         )
-        assert.deepStrictEqual(
-          yield* fake.invoke(SAVE_TO_GAME_CHANNEL, { name, text: "{}", replacePublished: false }),
-          {
-            _tag: "Saved",
-            file: { path: target, name }
-          }
+        const again = yield* fake.invokeAs(ExportMapResult, channels.EXPORT_MAP_CHANNEL, {
+          fileName: name,
+          replacePublished: false
+        })
+        assert.strictEqual(again._tag, "Exported")
+      })
+    ))
+
+  it.effect("chooses another project folder, refuses the game's maps folder and switches back", () =>
+    withHandlers(({ fake, dialogs, dir, project, steam }) =>
+      Effect.gen(function*() {
+        const path = yield* Path.Path
+        const other = path.join(dir, "Elsewhere")
+
+        dialogs.answers.push(null)
+        assert.isNull(yield* fake.invoke(channels.CHOOSE_PROJECT_CHANNEL))
+        // The project doesn't exist yet, so the dialog starts in its parent.
+        assert.strictEqual(Option.getOrNull(dialogs.asked[0]!.defaultPath), path.dirname(project))
+
+        for (const refused of [steam.maps, path.join(steam.maps, "sub")]) {
+          dialogs.answers.push(refused)
+          const error = yield* Effect.flip(fake.invoke(channels.CHOOSE_PROJECT_CHANNEL))
+          assert.match(String(error.cause), /game's maps folder or inside it/)
+        }
+
+        dialogs.answers.push(other)
+        const chosen = yield* fake.invoke(channels.CHOOSE_PROJECT_CHANNEL)
+        assert.deepStrictEqual(chosen, {
+          current: { path: other, name: "Elsewhere", exists: false, isDefault: false },
+          recent: [{ path: project, name: "Maps", exists: false, isDefault: true }]
+        })
+        // Only a recent project or the default can be switched to by path.
+        const error = yield* Effect.flip(
+          fake.invoke(channels.SWITCH_PROJECT_CHANNEL, { path: path.join(dir, "Random") })
         )
+        assert.match(String(error.cause), /picked/)
+        const back = yield* fake.invokeAs(ProjectState, channels.SWITCH_PROJECT_CHANNEL, { path: project })
+        assert.strictEqual(back.current.path, project)
+        assert.deepStrictEqual(back.recent.map((p) => p.path), [other])
       })
     ))
 
@@ -333,12 +404,12 @@ describe("DesktopIpc", () => {
           mapsFolder: { status: "found", path: steam.maps },
           pluginsFolder: { status: "missing", path: `${steam.install}/Ballest/Binaries/Win64/plugins` }
         }
-        assert.deepStrictEqual(yield* fake.invoke(GAME_PATHS_CHANNEL), found)
+        assert.deepStrictEqual(yield* fake.invoke(channels.GAME_PATHS_CHANNEL), found)
 
         dialogs.answers.push(null)
-        assert.isNull(yield* fake.invoke(CHOOSE_GAME_PATH_CHANNEL, { which: "mapsFolder" }))
+        assert.isNull(yield* fake.invoke(channels.CHOOSE_GAME_PATH_CHANNEL, { which: "mapsFolder" }))
         dialogs.answers.push(dir)
-        assert.deepStrictEqual(yield* fake.invoke(CHOOSE_GAME_PATH_CHANNEL, { which: "mapsFolder" }), {
+        assert.deepStrictEqual(yield* fake.invoke(channels.CHOOSE_GAME_PATH_CHANNEL, { which: "mapsFolder" }), {
           ...found,
           mapsFolder: { status: "overridden", path: dir }
         })
@@ -348,15 +419,15 @@ describe("DesktopIpc", () => {
         ])
         // Not the game: refused, and the install stays as found.
         dialogs.answers.push(dir)
-        const error = yield* Effect.flip(fake.invoke(CHOOSE_GAME_PATH_CHANNEL, { which: "install" }))
+        const error = yield* Effect.flip(fake.invoke(channels.CHOOSE_GAME_PATH_CHANNEL, { which: "install" }))
         assert.match(String(error.cause), /isn't Ballest of Them All's folder/)
-        assert.deepStrictEqual(yield* fake.invoke(RESET_GAME_PATH_CHANNEL, { which: "mapsFolder" }), found)
+        assert.deepStrictEqual(yield* fake.invoke(channels.RESET_GAME_PATH_CHANNEL, { which: "mapsFolder" }), found)
 
         opened.length = 0
-        assert.isTrue(yield* fake.invoke(REVEAL_GAME_PATH_CHANNEL, { which: "mapsFolder" }))
-        assert.isFalse(yield* fake.invoke(REVEAL_GAME_PATH_CHANNEL, { which: "pluginsFolder" }))
+        assert.isTrue(yield* fake.invoke(channels.REVEAL_GAME_PATH_CHANNEL, { which: "mapsFolder" }))
+        assert.isFalse(yield* fake.invoke(channels.REVEAL_GAME_PATH_CHANNEL, { which: "pluginsFolder" }))
         assert.match(
-          String((yield* Effect.flip(fake.invoke(REVEAL_GAME_PATH_CHANNEL, { which: "/etc" }))).cause),
+          String((yield* Effect.flip(fake.invoke(channels.REVEAL_GAME_PATH_CHANNEL, { which: "/etc" }))).cause),
           /Expected/
         )
         assert.deepStrictEqual(opened, [steam.maps])
@@ -367,8 +438,8 @@ describe("DesktopIpc", () => {
     withHandlers(({ fake }) =>
       Effect.gen(function*() {
         opened.length = 0
-        assert.isFalse(yield* fake.invoke(IS_GAME_RUNNING_CHANNEL))
-        assert.isTrue(yield* fake.invoke(LAUNCH_GAME_CHANNEL))
+        assert.isFalse(yield* fake.invoke(channels.IS_GAME_RUNNING_CHANNEL))
+        assert.isTrue(yield* fake.invoke(channels.LAUNCH_GAME_CHANNEL))
         assert.deepStrictEqual(opened, ["steam://rungameid/3339810"])
       })
     ))
@@ -378,14 +449,14 @@ describe("DesktopIpc", () => {
       Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
         const path = yield* Path.Path
-        assert.isNull(yield* fake.invoke(FIND_CREATOR_CHANNEL))
+        assert.isNull(yield* fake.invoke(channels.FIND_CREATOR_CHANNEL))
         const config = path.join(steam.steam, "config")
         yield* fs.makeDirectory(config)
         yield* fs.writeFileString(
           path.join(config, "loginusers.vdf"),
           `"users"\n{\n\t"76561198000000001"\n\t{\n\t\t"PersonaName"\t\t"Marble"\n\t\t"MostRecent"\t\t"1"\n\t}\n}\n`
         )
-        assert.deepStrictEqual(yield* fake.invoke(FIND_CREATOR_CHANNEL), { name: "Marble", source: "steam" })
+        assert.deepStrictEqual(yield* fake.invoke(channels.FIND_CREATOR_CHANNEL), { name: "Marble", source: "steam" })
       })
     ))
 
@@ -395,26 +466,26 @@ describe("DesktopIpc", () => {
         const fs = yield* FileSystem.FileSystem
         const path = yield* Path.Path
         const folder = path.join(steam.plugins, "ballest-editor-link")
-        assert.deepStrictEqual(yield* fake.invoke(PLUGIN_STATUS_CHANNEL), {
+        assert.deepStrictEqual(yield* fake.invoke(channels.PLUGIN_STATUS_CHANNEL), {
           status: "noPluginManager",
           bundledVersion: "0.2.0",
           installedVersion: null,
           folder
         })
         assert.match(
-          String((yield* Effect.flip(fake.invoke(INSTALL_PLUGIN_CHANNEL))).cause),
+          String((yield* Effect.flip(fake.invoke(channels.INSTALL_PLUGIN_CHANNEL))).cause),
           /plugin manager isn't installed/
         )
 
         yield* fs.makeDirectory(steam.plugins)
         yield* fs.writeFileString(path.join(path.dirname(steam.plugins), "version.dll"), "")
-        assert.deepInclude(yield* fake.invoke(PLUGIN_STATUS_CHANNEL), { status: "missing" })
-        assert.deepStrictEqual(yield* fake.invoke(INSTALL_PLUGIN_CHANNEL), {
+        assert.deepInclude(yield* fake.invoke(channels.PLUGIN_STATUS_CHANNEL), { status: "missing" })
+        assert.deepStrictEqual(yield* fake.invoke(channels.INSTALL_PLUGIN_CHANNEL), {
           plugin: { status: "current", bundledVersion: "0.2.0", installedVersion: "0.2.0", folder },
           restartGame: false
         })
         assert.match(
-          String((yield* Effect.flip(fake.invoke(PLUGIN_STATUS_CHANNEL, { folder: "/etc" }))).cause),
+          String((yield* Effect.flip(fake.invoke(channels.PLUGIN_STATUS_CHANNEL, { folder: "/etc" }))).cause),
           /undefined/
         )
       })
@@ -424,8 +495,8 @@ describe("DesktopIpc", () => {
     withHandlers(({ fake }) =>
       Effect.gen(function*() {
         opened.length = 0
-        assert.isTrue(yield* fake.invoke(OPEN_EXTERNAL_CHANNEL, { url: "https://example.com/a" }))
-        assert.isFalse(yield* fake.invoke(OPEN_EXTERNAL_CHANNEL, { url: "file:///etc/passwd" }))
+        assert.isTrue(yield* fake.invoke(channels.OPEN_EXTERNAL_CHANNEL, { url: "https://example.com/a" }))
+        assert.isFalse(yield* fake.invoke(channels.OPEN_EXTERNAL_CHANNEL, { url: "file:///etc/passwd" }))
         assert.deepStrictEqual(opened, ["https://example.com/a"])
       })
     ))
@@ -433,13 +504,13 @@ describe("DesktopIpc", () => {
   it.effect("recolours the sender's window to the page theme", () =>
     withHandlers(({ fake }) =>
       Effect.gen(function*() {
-        yield* fake.invoke(SET_WINDOW_THEME_CHANNEL, { dark: false })
+        yield* fake.invoke(channels.SET_WINDOW_THEME_CHANNEL, { dark: false })
         assert.deepStrictEqual(recoloured, [[1, {
           overlay: { color: "#01000000", symbolColor: "#09090b", height: 40 },
           background: "#ffffff"
         }]])
         assert.match(
-          String((yield* Effect.flip(fake.invoke(SET_WINDOW_THEME_CHANNEL, { dark: "yes" }))).cause),
+          String((yield* Effect.flip(fake.invoke(channels.SET_WINDOW_THEME_CHANNEL, { dark: "yes" }))).cause),
           /boolean/
         )
       })
@@ -448,15 +519,15 @@ describe("DesktopIpc", () => {
   it.effect("reports the update state and passes on download and install", () =>
     withHandlers(({ fake }) =>
       Effect.gen(function*() {
-        assert.deepInclude(yield* fake.invoke(GET_UPDATE_STATE_CHANNEL), {
+        assert.deepInclude(yield* fake.invoke(channels.GET_UPDATE_STATE_CHANNEL), {
           status: "available",
           availableVersion: "0.2.1"
         })
-        assert.isUndefined(yield* fake.invoke(DOWNLOAD_UPDATE_CHANNEL))
-        assert.isUndefined(yield* fake.invoke(INSTALL_UPDATE_CHANNEL))
+        assert.isUndefined(yield* fake.invoke(channels.DOWNLOAD_UPDATE_CHANNEL))
+        assert.isUndefined(yield* fake.invoke(channels.INSTALL_UPDATE_CHANNEL))
         assert.deepStrictEqual(updateCalls, { download: 1, install: 1 })
         assert.match(
-          String((yield* Effect.flip(fake.invoke(DOWNLOAD_UPDATE_CHANNEL, { now: true }))).cause),
+          String((yield* Effect.flip(fake.invoke(channels.DOWNLOAD_UPDATE_CHANNEL, { now: true }))).cause),
           /undefined/
         )
       })

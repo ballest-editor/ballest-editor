@@ -40,31 +40,126 @@ export const OpenedMapFile = Schema.Struct({
 })
 export type OpenedMapFile = typeof OpenedMapFile.Type
 
-/** `openMap`'s result: null when the user cancelled the dialog. */
-export const OpenMapResult = Schema.NullOr(OpenedMapFile)
+/** `pickImport`'s result: null when the user cancelled the dialog. */
+export const PickImportResult = Schema.NullOr(OpenedMapFile)
 
-/** `saveMap`'s payload: the file to write and where the dialog starts. */
-export const SaveMapPayload = Schema.Struct({
-  /** The file name the dialog suggests (the game's `Map_LevelEditorMain&<name>_<creator>.balledit`). */
-  name: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255)),
-  text: MapText,
-  /** The open map's file, if any: the dialog starts in its folder. */
-  near: Schema.optionalKey(FilePath)
+/**
+ * A map's file name in a project's `maps/` folder, which is also its name in the game's maps folder
+ * (`Map_LevelEditorMain&<name>_<creator>.balledit`). Never a path: main joins it to the folder after checking it.
+ */
+export const MapFileName = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255))
+
+/** An instant as ISO 8601 UTC text (`2026-10-31T12:00:00.000Z`). */
+export const IsoTime = Schema.String.check(Schema.isMaxLength(64))
+
+/** The SHA-256 of a file's bytes, as lowercase hex. */
+export const FileHash = Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/))
+
+/** A file the link record points at, the hash of its bytes then, and when that was. */
+export const LinkedFile = Schema.Struct({ path: FilePath, hash: FileHash, at: IsoTime })
+export type LinkedFile = typeof LinkedFile.Type
+
+/**
+ * What a project map is linked to on this machine (`<project>/.ballest/link.json`, docs/PROJECTS.md): where it was
+ * imported from, where and what it was last exported as, and the export's hash when the editor last looked at it. Sync
+ * detection compares the game file's hash with `export.hash` and `lastSeenHash`, so one change is reported once.
+ */
+export const MapLink = Schema.Struct({
+  /** The file it was imported from; null for a map made in the editor. */
+  origin: Schema.NullOr(LinkedFile),
+  /** The last export (Export to game). A map imported from the game's maps folder is linked to that file from the start. */
+  export: Schema.NullOr(LinkedFile),
+  /** The exported file's hash when the editor last read it; null before the first export. */
+  lastSeenHash: Schema.NullOr(FileHash)
 })
-export type SaveMapPayload = typeof SaveMapPayload.Type
+export type MapLink = typeof MapLink.Type
 
-/** `saveMap`'s result: null when the user cancelled the dialog. */
-export const SaveMapResult = Schema.NullOr(MapFileRef)
+/** The folder the user works in (docs/PROJECTS.md). It is made on disk by the first New map or Import. */
+export const ProjectInfo = Schema.Struct({
+  path: FilePath,
+  /** `ballest-project.json`'s name; the folder's name until that file exists. */
+  name: Schema.String,
+  /** Whether the folder is a project on disk yet (it has `ballest-project.json`). */
+  exists: Schema.Boolean,
+  /** `Documents/Ballest Editor/Maps`, the project used until the user picks another. */
+  isDefault: Schema.Boolean
+})
+export type ProjectInfo = typeof ProjectInfo.Type
 
-export const ReadMapPayload = Schema.Struct({ path: FilePath })
-export type ReadMapPayload = typeof ReadMapPayload.Type
+/** The project in use and the ones used before it, most recent first (the default is always among them). */
+export const ProjectState = Schema.Struct({
+  current: ProjectInfo,
+  recent: Schema.Array(ProjectInfo)
+})
+export type ProjectState = typeof ProjectState.Type
 
-export const WriteMapPayload = Schema.Struct({ path: FilePath, text: MapText })
+/** `chooseProject`'s result: null when the user cancelled the dialog. */
+export const ChooseProjectResult = Schema.NullOr(ProjectState)
+
+export const ProjectPathPayload = Schema.Struct({ path: FilePath })
+export type ProjectPathPayload = typeof ProjectPathPayload.Type
+
+/** A map in the project: its file in `maps/`, when that last changed, and its link record. */
+export const ProjectMap = Schema.Struct({
+  fileName: MapFileName,
+  path: FilePath,
+  modifiedAt: IsoTime,
+  link: Schema.NullOr(MapLink)
+})
+export type ProjectMap = typeof ProjectMap.Type
+
+export const ProjectMaps = Schema.Array(ProjectMap)
+export type ProjectMaps = typeof ProjectMaps.Type
+
+/** A project map that was read, with its text. */
+export const ProjectMapFile = Schema.Struct({ ...ProjectMap.fields, text: MapText })
+export type ProjectMapFile = typeof ProjectMapFile.Type
+
+export const MapFileNamePayload = Schema.Struct({ fileName: MapFileName })
+export type MapFileNamePayload = typeof MapFileNamePayload.Type
+
+/** `createMap` and `saveMap`: the map's file name in the project and its text. */
+export const WriteMapPayload = Schema.Struct({ fileName: MapFileName, text: MapText })
 export type WriteMapPayload = typeof WriteMapPayload.Type
 
-/** The files recently opened or saved, most recent first. */
-export const RecentMapFiles = Schema.Array(MapFileRef)
-export type RecentMapFiles = typeof RecentMapFiles.Type
+/** `renameMap`: the file the map was in, the one it moves to (named after its new name), and its new text. */
+export const RenameMapPayload = Schema.Struct({ from: MapFileName, to: MapFileName, text: MapText })
+export type RenameMapPayload = typeof RenameMapPayload.Type
+
+/** `importMap`: a file `pickImport` returned, the project file name it goes in under, and the text written there. */
+export const ImportMapPayload = Schema.Struct({
+  source: FilePath,
+  fileName: MapFileName,
+  text: MapText,
+  /** Replace a project map of the same name (it goes to backups); otherwise main reports the clash. */
+  replace: Schema.Boolean
+})
+export type ImportMapPayload = typeof ImportMapPayload.Type
+
+/** `importMap`'s result: `Imported`, or `Clash` when nothing was written because the project has a map of that name. */
+export const ImportMapResult = Schema.TaggedUnion({
+  Imported: { map: ProjectMap },
+  Clash: { fileName: MapFileName }
+})
+export type ImportMapResult = typeof ImportMapResult.Type
+
+/** `exportMap`: the project map to copy into the game's maps folder. */
+export const ExportMapPayload = Schema.Struct({
+  fileName: MapFileName,
+  /** Replace a file that is a published map's draft (`levelPublishedFileId` > 0); otherwise main asks first. */
+  replacePublished: Schema.Boolean
+})
+export type ExportMapPayload = typeof ExportMapPayload.Type
+
+/**
+ * `exportMap`'s result: `Exported` with the file written and the map's new link record, or `Published` when nothing
+ * was written because the file in the maps folder is the draft of a published map and `replacePublished` wasn't set.
+ */
+export const ExportMapResult = Schema.TaggedUnion({
+  Exported: { file: MapFileRef, link: MapLink },
+  Published: { file: MapFileRef, publishedFileId: Schema.Finite }
+})
+export type ExportMapResult = typeof ExportMapResult.Type
 
 export const WindowThemePayload = Schema.Struct({ dark: Schema.Boolean })
 export type WindowThemePayload = typeof WindowThemePayload.Type
@@ -101,25 +196,6 @@ export type GamePathPayload = typeof GamePathPayload.Type
 
 /** `chooseGamePath`'s result: null when the user cancelled the dialog. */
 export const ChooseGamePathResult = Schema.NullOr(GamePaths)
-
-/** `saveToGame`'s payload: the map's file name (no folders) and its text. */
-export const SaveToGamePayload = Schema.Struct({
-  name: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255)),
-  text: MapText,
-  /** Replace a file that is a published map's draft (`levelPublishedFileId` > 0); otherwise main asks first. */
-  replacePublished: Schema.Boolean
-})
-export type SaveToGamePayload = typeof SaveToGamePayload.Type
-
-/**
- * `saveToGame`'s result: `Saved`, or `Published` when nothing was written because the file in the maps folder is the
- * draft of a published map and `replacePublished` wasn't set.
- */
-export const SaveToGameResult = Schema.TaggedUnion({
-  Saved: { file: MapFileRef },
-  Published: { file: MapFileRef, publishedFileId: Schema.Finite }
-})
-export type SaveToGameResult = typeof SaveToGameResult.Type
 
 /**
  * Where the creator name the game writes into maps was found: the persona name of the account Steam last logged in
@@ -209,22 +285,37 @@ export type UpdateState = typeof UpdateState.Type
  * everything crossing it is plain data (structured-clone safe). Main decodes every payload and encodes every result
  * with the schemas above; a payload that fails to decode rejects the returned promise.
  *
- * Main reads and writes only the files the user picked in one of its dialogs (or picked before: the recent files)
- * and the ones it saved into the game's maps folder, and only `.balledit`, `.ballmap` and `.json` ones. Reading or saving a file puts it first in the recent files.
+ * Main reads and writes map files only in the current project's `maps/` folder (named by file name, never by path) and
+ * in the game's maps folder (Export to game), and reads only the files the user picked in its Import dialog.
  */
 export interface DesktopBridge {
   readonly versions: DesktopVersions
   /** Echoes `message` back from the main process. */
   readonly ping: (message: string) => Promise<PingResult>
-  /** The native open dialog, then the chosen file's text; null when cancelled. */
-  readonly openMap: () => Promise<OpenedMapFile | null>
-  /** The native save dialog, then writes `text` to the chosen file; null when cancelled. */
-  readonly saveMap: (payload: SaveMapPayload) => Promise<MapFileRef | null>
-  /** Reads a file the user picked before (a recent file). */
-  readonly readMap: (path: string) => Promise<OpenedMapFile>
-  /** Overwrites a file the user picked before (Save). The text is written as is: same bytes, no BOM. */
-  readonly writeMap: (path: string, text: string) => Promise<MapFileRef>
-  readonly recentMaps: () => Promise<RecentMapFiles>
+  /** The project in use and the recent ones. */
+  readonly projectState: () => Promise<ProjectState>
+  /** A folder dialog, then uses the chosen folder as the project; null when cancelled. The game's maps folder is refused. */
+  readonly chooseProject: () => Promise<ProjectState | null>
+  /** Goes back to a recent project (or the default one). */
+  readonly switchProject: (path: string) => Promise<ProjectState>
+  /** Shows the project's `maps/` folder in the file manager; false when it doesn't exist or fails to open. */
+  readonly revealProject: () => Promise<boolean>
+  /** The project's maps, most recently changed first; empty when the project isn't on disk yet. */
+  readonly listMaps: () => Promise<ProjectMaps>
+  /** Reads a project map. */
+  readonly readMap: (fileName: string) => Promise<ProjectMapFile>
+  /** Writes a new map into the project, making the project first if needed; fails when one of that name exists. */
+  readonly createMap: (payload: WriteMapPayload) => Promise<ProjectMap>
+  /** Writes over a project map (Save). The text is written as is: same bytes, no BOM. Atomic, like every write. */
+  readonly saveMap: (payload: WriteMapPayload) => Promise<ProjectMap>
+  /** Writes the map under its new file name and moves the old file to the project's backups; its link moves with it. */
+  readonly renameMap: (payload: RenameMapPayload) => Promise<ProjectMap>
+  /** The native open dialog for a map file anywhere; null when cancelled. The file may then be imported. */
+  readonly pickImport: () => Promise<OpenedMapFile | null>
+  /** Copies a picked file into the project and records where it came from. */
+  readonly importMap: (payload: ImportMapPayload) => Promise<ImportMapResult>
+  /** Copies a project map byte for byte into the game's maps folder and records the export in its link. */
+  readonly exportMap: (payload: ExportMapPayload) => Promise<ExportMapResult>
   /** The page's resolved theme: the window controls drawn over its top bar, and the window background, follow it. */
   readonly setWindowTheme: (dark: boolean) => Promise<void>
   /** Opens an http(s) URL in the default browser; false when it is refused or fails to open. */
@@ -237,11 +328,6 @@ export interface DesktopBridge {
   readonly resetGamePath: (which: GamePathKind) => Promise<GamePaths>
   /** Shows the folder in the file manager; false when it doesn't exist or fails to open. */
   readonly revealGamePath: (which: GamePathKind) => Promise<boolean>
-  /**
-   * Writes the map into the game's maps folder under `name` (atomically, like `writeMap`). The file then counts as
-   * picked: it is in the recent files and `readMap` / `writeMap` may use it.
-   */
-  readonly saveToGame: (payload: SaveToGamePayload) => Promise<SaveToGameResult>
   /** Starts the game through Steam (`steam://rungameid/3339810`); false when Steam couldn't be asked. */
   readonly launchGame: () => Promise<boolean>
   /** Whether the game (`Ballest-Win64-Shipping.exe`) is running. */

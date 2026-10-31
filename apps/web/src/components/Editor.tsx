@@ -16,13 +16,14 @@ import { useEditor } from "../editor/store"
 import { watchResolvedTheme } from "../editor/theme"
 import { useActionKeys } from "../editor/useActionKeys"
 import { Viewport } from "../editor/Viewport"
+import { ImportClashDialog } from "./ImportClashDialog"
 import { Inspector } from "./Inspector"
 import { KeybindCheatSheet } from "./KeybindCheatSheet"
+import { MapSettingsDialog } from "./MapSettingsDialog"
+import { NameMapDialog } from "./NameMapDialog"
 import { NewMapDialog } from "./NewMapDialog"
 import { Palette } from "./Palette"
-import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
 import { ReplacePublishedDialog } from "./ReplacePublishedDialog"
-import { SaveAsDialog } from "./SaveAsDialog"
 import { SettingsDialog } from "./SettingsDialog"
 import { SidePanel } from "./SidePanel"
 import { TopBar } from "./TopBar"
@@ -112,9 +113,12 @@ export function Editor() {
         </div>
       </div>
       <NewMapDialog open={dialog === "new"} onClose={close} />
-      <SaveAsDialog open={dialog === "saveAs"} onClose={close} />
-      <ProjectSettingsDialog open={dialog === "project"} onClose={close} />
+      <NameMapDialog mode="saveAs" open={dialog === "saveAs"} onClose={close} />
+      <NameMapDialog mode="rename" open={dialog === "rename"} onClose={close} />
+      <NameMapDialog mode="duplicate" open={dialog === "duplicate"} onClose={close} />
+      <MapSettingsDialog open={dialog === "mapSettings"} onClose={close} />
       <ReplacePublishedDialog open={dialog === "replacePublished"} onClose={close} />
+      <ImportClashDialog open={dialog === "importClash"} onClose={close} />
       <SettingsDialog
         open={dialog === "settings"}
         category={settingsCategory}

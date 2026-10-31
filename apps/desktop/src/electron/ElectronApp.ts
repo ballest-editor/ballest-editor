@@ -5,6 +5,8 @@ export interface ElectronAppMetadata {
   readonly appVersion: string
   readonly appPath: string
   readonly userData: string
+  /** The user's documents folder, where the default project goes. */
+  readonly documents: string
   readonly isPackaged: boolean
   readonly resourcesPath: string
 }
@@ -34,6 +36,7 @@ export class ElectronApp extends Context.Service<ElectronApp, {
         appVersion: Electron.app.getVersion(),
         appPath: Electron.app.getAppPath(),
         userData: Electron.app.getPath("userData"),
+        documents: Electron.app.getPath("documents"),
         isPackaged: Electron.app.isPackaged,
         resourcesPath: process.resourcesPath
       })),
