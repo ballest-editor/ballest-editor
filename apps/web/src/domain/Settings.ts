@@ -38,6 +38,8 @@ export const CameraSettings = Schema.Struct({
   customFov: Schema.Finite.check(Schema.isBetween({ minimum: 30, maximum: 140 })),
   invertLookX: Schema.Boolean,
   invertLookY: Schema.Boolean,
+  /** Hide the cursor and keep it in place during look, orbit and pan drags (Pointer Lock). */
+  lockPointer: Schema.Boolean,
   /** Which movement keys only fly while the look button is held (see flyKeys). */
   movementNeedsLook: Schema.Literals(movementLookModes)
 })
@@ -93,6 +95,7 @@ export const defaultSettings: Settings = {
     customFov: 90,
     invertLookX: false,
     invertLookY: false,
+    lockPointer: true,
     movementNeedsLook: "all"
   },
   appearance: {

@@ -101,6 +101,20 @@ export function FlyCamera() {
     const onKeyUp = (e: KeyboardEvent) => pressed.current.release(e.code)
     const onBlur = () => pressed.current.clear()
 
+    // Pointer lock (the "lock pointer" setting) hides the cursor and keeps it in place while
+    // dragging, so a long look never hits the edge of the screen. Locking releases the pointer
+    // capture; losing the lock mid-drag (Esc) takes the capture back.
+    let dragPointer: number | null = null
+    const locked = () => document.pointerLockElement === el
+    const onLockChange = () => {
+      if (locked()) {
+        // granted after a quick click was already released
+        if (drag.current === null) document.exitPointerLock()
+      } else if (dragPointer !== null && !el.hasPointerCapture(dragPointer)) {
+        el.setPointerCapture(dragPointer)
+      }
+    }
+
     const onPointerDown = (e: PointerEvent) => {
       // No gizmo check: the gizmo stops the left presses it takes, other buttons fall through.
       const chord = mouseChordOf(e)
@@ -116,7 +130,12 @@ export function FlyCamera() {
           target.current.copy(camera.position).addScaledVector(forward, ORBIT_DISTANCE)
         }
       }
+      dragPointer = e.pointerId
       el.setPointerCapture(e.pointerId)
+      // Denied (no support, the Esc cool-down) is fine: the drag carries on with the capture.
+      if (useEditor.getState().settings.camera.lockPointer) {
+        void Promise.resolve(el.requestPointerLock()).catch(() => undefined)
+      }
       euler.current.setFromQuaternion(camera.quaternion, "YXZ")
       e.preventDefault()
     }
@@ -153,6 +172,8 @@ export function FlyCamera() {
     const onPointerUp = (e: PointerEvent) => {
       if (drag.current === null) return
       drag.current = null
+      dragPointer = null
+      if (locked()) document.exitPointerLock()
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
     }
     const onContextMenu = (e: Event) => e.preventDefault()
@@ -181,6 +202,7 @@ export function FlyCamera() {
     el.addEventListener("pointerup", onPointerUp)
     el.addEventListener("contextmenu", onContextMenu)
     el.addEventListener("wheel", onWheel, { passive: false })
+    document.addEventListener("pointerlockchange", onLockChange)
     return () => {
       window.removeEventListener("keydown", onKeyDown)
       window.removeEventListener("keyup", onKeyUp)
@@ -190,6 +212,8 @@ export function FlyCamera() {
       el.removeEventListener("pointerup", onPointerUp)
       el.removeEventListener("contextmenu", onContextMenu)
       el.removeEventListener("wheel", onWheel)
+      document.removeEventListener("pointerlockchange", onLockChange)
+      if (locked()) document.exitPointerLock()
     }
   }, [camera, gl, keybinds])
 

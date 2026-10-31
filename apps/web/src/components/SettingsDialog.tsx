@@ -524,6 +524,13 @@ export function SettingsDialog(props: {
         control: <Switch checked={c.invertLookY} onCheckedChange={(v) => update("camera", { invertLookY: v })} />
       },
       {
+        id: "lockPointer",
+        ...setting("camera", "lockPointer"),
+        label: "Lock pointer while looking",
+        description: "Hide the cursor and keep it in place while dragging the camera.",
+        control: <Switch checked={c.lockPointer} onCheckedChange={(v) => update("camera", { lockPointer: v })} />
+      },
+      {
         id: "movementNeedsLook",
         ...setting("camera", "movementNeedsLook"),
         label: "Fly only while looking",
