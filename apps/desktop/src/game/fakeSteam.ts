@@ -1,5 +1,9 @@
-import { Effect, FileSystem, Path } from "effect"
+import { Effect, FileSystem, Layer, Path } from "effect"
+import { DesktopSettings } from "../settings/DesktopSettings"
+import { GameHost } from "./GameHost"
+import { GamePaths } from "./GamePaths"
 import type { HostInfo } from "./locations"
+import { SteamLibrary } from "./SteamLibrary"
 
 /**
  * Builds a Linux Steam layout under `home` for tests, like this machine's: Steam in `~/.local/share/Steam` (with the
@@ -56,3 +60,11 @@ export const makeFakeSteam = Effect.fn("makeFakeSteam")(function*(root: string, 
   yield* fs.makeDirectory(host.procDir, { recursive: true })
   return { host, steam, second, library, install, maps: path.join(saved, "UserSavedMaps") }
 })
+
+/** GamePaths and SteamLibrary over a fake Steam's `host`, with the desktop settings in `settingsFile`. */
+export const layerFakeGamePaths = (host: HostInfo & { readonly procDir: string }, settingsFile: string) =>
+  GamePaths.layer.pipe(
+    Layer.provideMerge(SteamLibrary.layer),
+    Layer.provide(Layer.succeed(GameHost, GameHost.of(host))),
+    Layer.provide(Layer.effect(DesktopSettings, DesktopSettings.make(settingsFile)))
+  )

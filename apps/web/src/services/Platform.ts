@@ -1,5 +1,6 @@
 import type {
   DesktopBridge,
+  FoundCreator,
   GamePathKind,
   GamePaths,
   MapFileRef,
@@ -10,7 +11,7 @@ import type {
 } from "@ballest/contracts"
 import { Context, Effect, Layer, Option, Queue, Schema, Stream } from "effect"
 
-export type { GamePath, GamePathKind, GamePaths } from "@ballest/contracts"
+export type { FoundCreator, GamePath, GamePathKind, GamePaths } from "@ballest/contracts"
 
 /** What this platform can do beyond opening and saving files; the menus hide what it can't. */
 export interface PlatformCapabilities {
@@ -89,6 +90,11 @@ export class Platform extends Context.Service<Platform, {
   /** Starts the game through Steam. */
   readonly launchGame: Effect.Effect<void, PlatformError>
   readonly isGameRunning: Effect.Effect<boolean, PlatformError>
+  /**
+   * The creator name the game writes into maps (the Steam persona name, else the one most maps in the maps folder
+   * name) and where it was found (desktop); none in a browser, or when nothing names one.
+   */
+  readonly findCreator: Effect.Effect<Option.Option<FoundCreator>, PlatformError>
   /** The updater's state now, then every change to it (desktop); a browser's ends at once. */
   readonly updates: Stream.Stream<UpdateState, PlatformError>
   /** Starts downloading the release on offer; the progress arrives on `updates`. */
@@ -194,6 +200,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
       Effect.asVoid
     ),
     isGameRunning: bridgeCall(() => bridge.isGameRunning()),
+    findCreator: bridgeCall(() => bridge.findCreator()).pipe(Effect.map(Option.fromNullOr)),
     updates: updateStates(bridge),
     downloadUpdate: bridgeCall(() => bridge.downloadUpdate()),
     installUpdate: bridgeCall(() => bridge.installUpdate())
@@ -255,6 +262,7 @@ const makeBrowser = (): Platform["Service"] =>
     saveToGame: () => desktopOnly,
     launchGame: desktopOnly,
     isGameRunning: Effect.succeed(false),
+    findCreator: Effect.succeedNone,
     updates: Stream.empty,
     downloadUpdate: Effect.void,
     installUpdate: Effect.void
@@ -273,7 +281,8 @@ export interface TestDisk {
   >
   readonly recent: Array<string>
   readonly external: Array<string>
-  game: { paths: GamePaths; running: boolean; launches: number }
+  /** `creator`: what `findCreator` answers. */
+  game: { paths: GamePaths; running: boolean; launches: number; creator: FoundCreator | null }
   /** The updater: `push` sends a new state to the page, as main does. Downloads and installs are counted. */
   readonly updater: {
     state: UpdateState
@@ -298,7 +307,7 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   dialogs: [],
   recent: [],
   external: [],
-  game: { paths: testGamePaths, running: false, launches: 0 },
+  game: { paths: testGamePaths, running: false, launches: 0, creator: null },
   updater: makeTestUpdater()
 })
 
@@ -404,6 +413,7 @@ const testBridge = (disk: TestDisk): DesktopBridge => {
       return Promise.resolve(true)
     },
     isGameRunning: () => Promise.resolve(disk.game.running),
+    findCreator: () => Promise.resolve(disk.game.creator),
     getUpdateState: () => Promise.resolve(disk.updater.state),
     downloadUpdate: () => {
       disk.updater.downloads++

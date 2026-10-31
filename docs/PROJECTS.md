@@ -200,7 +200,7 @@ disk (a folder, one JSON file, a hash) and large in how the app reads; that is t
 | #132 save to a default folder                   | Rewrite as phase 1: the project folder, New saves at once, Rename and Duplicate, Import, Export to game. Its "decide first" list is answered above. |
 | #137 back up before overwriting                 | Keep; backups go under `<project>/.ballest/backups/` for project files and `<userData>/backups/` for exports. Recover lives in the Map menu.        |
 | #70 close prompt                                | Keep as is.                                                                                                                                         |
-| #133 creator from Steam                         | Keep the discovery; the UI is a Game link row, not a Settings-only field.                                                                           |
+| #133 creator from Steam                         | Keep the discovery; the UI is a Game link row, not a Settings-only field. Done: `useCreator()` is what the row shows (DESKTOP.md § Game paths).     |
 | #142 map settings, #143 new and open project    | New, phases 5 and 6; #21's dialog becomes Map settings.                                                                                             |
 | #136 restyle the update pill                    | Keep; the pill moves to the status bar.                                                                                                             |
 | #118 install the plugin, #66 Play               | Keep; Play exports first and records the link. Install plugin is a Game link row.                                                                   |

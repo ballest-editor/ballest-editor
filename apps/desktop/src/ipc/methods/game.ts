@@ -1,5 +1,6 @@
 import {
   ChooseGamePathResult,
+  FindCreatorResult,
   type GamePathKind,
   GamePathPayload,
   GamePaths as GamePathsSchema,
@@ -9,11 +10,13 @@ import {
 import { Effect, Option, Schema } from "effect"
 import { ElectronDialog } from "../../electron/ElectronDialog"
 import { ElectronShell } from "../../electron/ElectronShell"
+import { GameCreator } from "../../game/GameCreator"
 import { GamePaths } from "../../game/GamePaths"
 import { GameProcess } from "../../game/GameProcess"
 import { saveToMaps } from "../../game/saveToMaps"
 import {
   CHOOSE_GAME_PATH_CHANNEL,
+  FIND_CREATOR_CHANNEL,
   GAME_PATHS_CHANNEL,
   IS_GAME_RUNNING_CHANNEL,
   LAUNCH_GAME_CHANNEL,
@@ -100,5 +103,14 @@ export const isGameRunning = makeIpcMethod({
   result: Schema.Boolean,
   handler: Effect.fn("ipc.isGameRunning")(function*() {
     return yield* (yield* GameProcess).isRunning
+  })
+})
+
+export const findCreator = makeIpcMethod({
+  channel: FIND_CREATOR_CHANNEL,
+  payload: Schema.Undefined,
+  result: FindCreatorResult,
+  handler: Effect.fn("ipc.findCreator")(function*() {
+    return Option.getOrNull(yield* (yield* GameCreator).find)
   })
 })

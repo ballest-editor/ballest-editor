@@ -11,7 +11,6 @@ import {
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { ColorPicker, ColorSwatch } from "@workspace/ui/components/color-picker"
-import { Input } from "@workspace/ui/components/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Slider } from "@workspace/ui/components/slider"
@@ -38,9 +37,17 @@ import {
   wheelChordOf
 } from "../domain/Keybinds"
 import { CUSTOM_FOV_PRESET, defaultSettings, gridColorsOf, type Settings } from "../domain/Settings"
-import { loadGamePaths, resetGamePaths, resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
-import { type SettingsCategory, useEditor } from "../editor/store"
+import {
+  findCreator,
+  loadGamePaths,
+  resetGamePaths,
+  resetKeybinds,
+  saveKeybinds,
+  saveSettings
+} from "../editor/actions"
+import { type SettingsCategory, useCreator, useEditor } from "../editor/store"
 import { useDarkTheme } from "../editor/theme"
+import { creatorSettingsRow } from "./CreatorSetting"
 import { GAME_PATH_KINDS, gameSettingsRows } from "./GameSettings"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
@@ -209,10 +216,13 @@ export function SettingsDialog(props: {
   const [listening, setListening] = useState<Listening | null>(null)
   const hasGame = useEditor((s) => s.capabilities.saveToGame)
   const gamePaths = useEditor((s) => s.gamePaths)
+  const creator = useCreator()
+  const foundCreator = useEditor((s) => s.foundCreator)
 
-  // The game may have been installed, run or moved since: look its folders up each time the dialog opens.
+  // The game may have been installed, run or moved since, and Steam logged in as someone else: look its folders and
+  // the creator name up each time the dialog opens.
   useEffect(() => {
-    if (props.open && hasGame) void loadGamePaths()
+    if (props.open && hasGame) void Promise.all([loadGamePaths(), findCreator()])
   }, [props.open, hasGame])
 
   const update = <K extends keyof Settings>(section: K, patch: Partial<Settings[K]>) =>
@@ -351,21 +361,12 @@ export function SettingsDialog(props: {
           </Select>
         )
       },
-      {
-        id: "creatorName",
-        ...setting("general", "creatorName"),
-        label: "Creator name",
-        description:
-          "Your in-game name. Written into every exported map and its file name (letters, digits and spaces).",
-        control: (
-          <Input
-            className="w-56"
-            value={settings.general.creatorName}
-            placeholder="your in-game name"
-            onChange={(e) => update("general", { creatorName: e.target.value })}
-          />
-        )
-      },
+      creatorSettingsRow({
+        creator,
+        setting: settings.general.creatorName,
+        found: foundCreator,
+        onChange: (creatorName) => update("general", { creatorName })
+      }),
       {
         id: "altDragDuplicates",
         ...setting("general", "altDragDuplicates"),

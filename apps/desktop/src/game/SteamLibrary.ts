@@ -26,7 +26,12 @@ export interface SteamGame {
  * Looked up on every call, so a game installed or moved while the app runs is found.
  */
 export class SteamLibrary extends Context.Service<SteamLibrary, {
-  /** Every Steam library, Steam's own folder first; each listed once, however many links lead to it. */
+  /**
+   * Steam's own folders (where it keeps `config/`), usually one: a native install and a Flatpak can both be there.
+   * Each listed once, however many links lead to it.
+   */
+  readonly roots: Effect.Effect<ReadonlyArray<string>>
+  /** Every Steam library, Steam's own folders first; each listed once, however many links lead to it. */
   readonly libraries: Effect.Effect<ReadonlyArray<string>>
   readonly findGame: Effect.Effect<Option.Option<SteamGame>>
 }>()("ballest/desktop/game/SteamLibrary") {
@@ -53,28 +58,36 @@ export class SteamLibrary extends Context.Service<SteamLibrary, {
         : Effect.succeed([])
     )
 
-    const libraries = Effect.gen(function*() {
-      const roots = steamRootCandidates(host, yield* registry, path)
+    /** The folders of `dirs` that are Steam libraries (they have `steamapps`), each once however many links lead to it. */
+    const distinctLibraries = Effect.fn(function*(dirs: Iterable<string>) {
       const seen = new Set<string>()
       const out: Array<string> = []
-      const add = Effect.fn(function*(dir: string) {
-        if (!(yield* isDirectory(path.join(dir, "steamapps")))) return
+      for (const dir of dirs) {
+        if (!(yield* isDirectory(path.join(dir, "steamapps")))) continue
         const real = yield* fs.realPath(dir).pipe(Effect.orElseSucceed(() => dir))
         // Windows paths differ in case only between the registry's and the vdf's spelling.
         const key = host.platform === "win32" ? real.toLowerCase() : real
-        if (seen.has(key)) return
+        if (seen.has(key)) continue
         seen.add(key)
         out.push(dir)
-      })
-      for (const root of roots) {
-        if (!(yield* isDirectory(path.join(root, "steamapps")))) continue
-        yield* add(root)
-        const vdf = yield* readText(path.join(root, "steamapps", "libraryfolders.vdf"))
-        for (const library of Option.match(vdf, { onNone: () => [], onSome: libraryFoldersOf })) {
-          yield* add(path.normalize(library))
-        }
       }
       return out
+    })
+
+    const roots = Effect.gen(function*() {
+      return yield* distinctLibraries(steamRootCandidates(host, yield* registry, path))
+    }).pipe(Effect.withSpan("SteamLibrary.roots"))
+
+    const libraries = Effect.gen(function*() {
+      const own = yield* roots
+      const listed: Array<string> = []
+      for (const root of own) {
+        const vdf = yield* readText(path.join(root, "steamapps", "libraryfolders.vdf"))
+        for (const library of Option.match(vdf, { onNone: () => [], onSome: libraryFoldersOf })) {
+          listed.push(path.normalize(library))
+        }
+      }
+      return yield* distinctLibraries([...own, ...listed])
     }).pipe(Effect.withSpan("SteamLibrary.libraries"))
 
     const findGame = Effect.gen(function*() {
@@ -91,7 +104,7 @@ export class SteamLibrary extends Context.Service<SteamLibrary, {
       return Option.none()
     }).pipe(Effect.withSpan("SteamLibrary.findGame"))
 
-    return SteamLibrary.of({ libraries, findGame })
+    return SteamLibrary.of({ roots, libraries, findGame })
   })
 
   static readonly layer = Layer.effect(SteamLibrary, SteamLibrary.make)

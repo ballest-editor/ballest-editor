@@ -20,6 +20,7 @@ const valid = `
     saveToGame: (payload) => electron.ipcRenderer.invoke("ballest:game:saveToMaps", payload),
     launchGame: () => electron.ipcRenderer.invoke("ballest:game:launch"),
     isGameRunning: () => electron.ipcRenderer.invoke("ballest:game:isRunning"),
+    findCreator: () => electron.ipcRenderer.invoke("ballest:game:findCreator"),
     getUpdateState: () => electron.ipcRenderer.invoke("ballest:update:get"),
     downloadUpdate: () => electron.ipcRenderer.invoke("ballest:update:download"),
     installUpdate: () => electron.ipcRenderer.invoke("ballest:update:install"),

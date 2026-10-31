@@ -1,6 +1,8 @@
 import { assert, describe, it } from "@effect/vitest"
-import { DateTime, Effect, Fiber, Layer } from "effect"
+import { DateTime, Effect, Fiber, Layer, Option } from "effect"
 import { TestClock } from "effect/testing"
+import { creatorOf } from "../domain/creator"
+import { defaultSettings } from "../domain/Settings"
 import { lightingOf } from "../domain/sunlight"
 import { MapCodec } from "../services/MapCodec"
 import { MapExporter } from "../services/MapExporter"
@@ -8,6 +10,7 @@ import { MapPrefsStore } from "../services/MapPrefsStore"
 import { makeTestDisk, Platform, TEST_MAPS_FOLDER, type TestDisk } from "../services/Platform"
 import { listSamples, readSample } from "../test/samples"
 import {
+  findCreatorEffect,
   followUpdateState,
   launchGameEffect,
   openMapFile,
@@ -197,6 +200,25 @@ describe("file actions", () => {
       disk.game.running = false
       yield* launchGameEffect
       assert.strictEqual(disk.game.launches, 1)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+})
+
+describe("creator actions", () => {
+  it.effect("puts the creator found on the machine in the store, until the user types one", () => {
+    const disk = makeTestDisk()
+    return Effect.gen(function*() {
+      s().setSettings(defaultSettings)
+      yield* findCreatorEffect
+      assert.isTrue(Option.isNone(s().foundCreator))
+
+      disk.game.creator = { name: "Speedy Marble", source: "steam" }
+      yield* findCreatorEffect
+      assert.deepStrictEqual(creatorOf(s().settings.general.creatorName, s().foundCreator), {
+        name: "Speedy Marble",
+        source: "steam",
+        valid: true
+      })
     }).pipe(Effect.provide(layerFor(disk)))
   })
 })

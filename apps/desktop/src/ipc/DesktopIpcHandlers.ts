@@ -3,6 +3,7 @@ import { DesktopIpc } from "./DesktopIpc"
 import { openMap, readMap, recentMaps, saveMap, writeMap } from "./methods/files"
 import {
   chooseGamePath,
+  findCreator,
   gamePaths,
   isGameRunning,
   launchGame,
@@ -33,6 +34,7 @@ export const installDesktopIpcHandlers = Effect.fn("installDesktopIpcHandlers")(
   yield* ipc.handle(saveToGame)
   yield* ipc.handle(launchGame)
   yield* ipc.handle(isGameRunning)
+  yield* ipc.handle(findCreator)
   yield* ipc.handle(getUpdateState)
   yield* ipc.handle(downloadUpdate)
   yield* ipc.handle(installUpdate)

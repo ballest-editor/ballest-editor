@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from "electron"
 import {
   CHOOSE_GAME_PATH_CHANNEL,
   DOWNLOAD_UPDATE_CHANNEL,
+  FIND_CREATOR_CHANNEL,
   GAME_PATHS_CHANNEL,
   GET_UPDATE_STATE_CHANNEL,
   INSTALL_UPDATE_CHANNEL,
@@ -47,6 +48,7 @@ contextBridge.exposeInMainWorld(
     saveToGame: (payload) => ipcRenderer.invoke(SAVE_TO_GAME_CHANNEL, payload),
     launchGame: () => ipcRenderer.invoke(LAUNCH_GAME_CHANNEL),
     isGameRunning: () => ipcRenderer.invoke(IS_GAME_RUNNING_CHANNEL),
+    findCreator: () => ipcRenderer.invoke(FIND_CREATOR_CHANNEL),
     getUpdateState: () => ipcRenderer.invoke(GET_UPDATE_STATE_CHANNEL),
     downloadUpdate: () => ipcRenderer.invoke(DOWNLOAD_UPDATE_CHANNEL),
     installUpdate: () => ipcRenderer.invoke(INSTALL_UPDATE_CHANNEL),

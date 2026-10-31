@@ -7,6 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-gr
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { useState } from "react"
+import { usableCreatorName } from "../domain/creator"
 import { withLevelNames } from "../domain/edits"
 import { isValidName, mapFileNameOf, NAME_RULE } from "../domain/factory"
 import { floorHeightOf } from "../domain/level"
@@ -24,7 +25,7 @@ import {
   withTag
 } from "../domain/mapTags"
 import { setGridHeight, setLevelData } from "../editor/actions"
-import { useEditor } from "../editor/store"
+import { useCreator, useEditor } from "../editor/store"
 import { NumberField } from "./NumberField"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
@@ -158,7 +159,7 @@ export function ProjectSettingsDialog({ open, onClose }: { readonly open: boolea
   const floorHeight = useEditor((s) => s.floorHeight)
   const startHeight = useEditor((s) => floorHeightOf(s.doc.map))
   const units = useEditor((s) => s.settings.general.units)
-  const savedCreator = useEditor((s) => s.settings.general.creatorName.trim())
+  const savedCreator = usableCreatorName(useCreator())
   const [category, setCategory] = useState<ProjectCategory>("map")
   const categories: ReadonlyArray<SettingsCategoryInfo<ProjectCategory>> = [
     { id: "map", label: levelData.levelDisplayName, icon: IconMap, section: "Maps" }
