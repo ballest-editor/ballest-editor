@@ -13,6 +13,7 @@
     "samples/**",
     "assets/**",
     "tools/**/*.mjs",
+    "apps/*/scripts/*.mjs",
     "**/dist-electron/**",
     "**/routeTree.gen.ts"
   ],
