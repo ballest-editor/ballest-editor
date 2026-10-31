@@ -14,7 +14,8 @@
   "dependencies": {
     "@ballest/contracts": "workspace:*",
     "@effect/platform-node": "^4.0.7",
-    "effect": "^4.0.6"
+    "effect": "^4.0.6",
+    "electron-updater": "6.8.11"
   },
   "devDependencies": {
     "@effect/vitest": "^4.0.6",

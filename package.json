@@ -11,6 +11,7 @@
     "dist:desktop:win": "node tools/release/src/main.ts desktop --platform win",
     "dist:desktop:linux": "node tools/release/src/main.ts desktop --platform linux",
     "release:smoke": "node tools/release/src/main.ts smoke",
+    "release:mock-server": "node tools/release/src/main.ts mock-server",
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "lint": "oxlint -c .config/oxlintrc.json --type-aware --deny-warnings --disable-nested-config --ignore-pattern \"**/routeTree.gen.ts\" --ignore-pattern \"tools/**/*.mjs\" apps packages tools",

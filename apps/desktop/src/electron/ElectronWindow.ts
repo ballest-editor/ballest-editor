@@ -34,6 +34,8 @@ export class ElectronWindow extends Context.Service<ElectronWindow, {
     webContentsId: number,
     colors: { readonly overlay: Electron.TitleBarOverlayOptions; readonly background: string }
   ) => Effect.Effect<void>
+  /** Sends `payload` on `channel` to every window's page (main → renderer). */
+  readonly sendAll: (channel: string, payload: unknown) => Effect.Effect<void>
 }>()("ballest/desktop/electron/ElectronWindow") {
   static readonly layer = Layer.succeed(
     ElectronWindow,
@@ -74,7 +76,28 @@ export class ElectronWindow extends Context.Service<ElectronWindow, {
           if (window === null || window.isDestroyed()) return
           window.setBackgroundColor(background)
           window.setTitleBarOverlay(overlay)
+        }),
+      sendAll: (channel, payload) =>
+        Effect.sync(() => {
+          for (const window of Electron.BrowserWindow.getAllWindows()) {
+            if (!window.isDestroyed()) window.webContents.send(channel, payload)
+          }
         })
     })
   )
+
+  /** For tests: `methods`, and a defect from anything else. */
+  static readonly layerTest = (methods: Partial<ElectronWindow["Service"]>) =>
+    Layer.succeed(
+      ElectronWindow,
+      ElectronWindow.of({
+        create: () => Effect.die("unused"),
+        load: () => Effect.die("unused"),
+        closed: () => Effect.die("unused"),
+        workAreas: Effect.succeed([]),
+        setColors: () => Effect.die("unused"),
+        sendAll: () => Effect.die("unused"),
+        ...methods
+      })
+    )
 }

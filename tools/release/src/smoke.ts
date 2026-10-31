@@ -2,7 +2,7 @@
 // app into a temp directory and has electron-builder lay it out unpacked for Linux, then checks the result has what
 // the packaged app reads. It catches a bad config, a renamed bundle or a lost asset without building an installer.
 import { Effect, FileSystem, Path } from "effect"
-import { stageLayout } from "./config.ts"
+import { githubFeed, stageLayout } from "./config.ts"
 import { electronBuilder } from "./desktop.ts"
 import { ReleaseAssetsInvalid } from "./releaseAssets.ts"
 import { stage } from "./stage.ts"
@@ -16,7 +16,7 @@ export const smoke = Effect.fn("smoke")(function*() {
   const app = path.join(directory, "app")
   const output = path.join(directory, "release")
   yield* fs.makeDirectory(app)
-  const staged = yield* stage({ platform: "linux", version: SMOKE_VERSION, output, directory: app })
+  const staged = yield* stage({ platform: "linux", version: SMOKE_VERSION, output, feed: githubFeed, directory: app })
 
   const expectStaged = [
     `${stageLayout.main}/main.cjs`,

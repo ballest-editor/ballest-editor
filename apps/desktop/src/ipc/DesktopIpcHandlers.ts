@@ -12,6 +12,7 @@ import {
 } from "./methods/game"
 import { ping } from "./methods/ping"
 import { openExternal } from "./methods/shell"
+import { downloadUpdate, getUpdateState, installUpdate } from "./methods/updates"
 import { setWindowTheme } from "./methods/window"
 
 /** Registers every IPC method for the lifetime of the current scope. Runs before the first window loads. */
@@ -32,4 +33,7 @@ export const installDesktopIpcHandlers = Effect.fn("installDesktopIpcHandlers")(
   yield* ipc.handle(saveToGame)
   yield* ipc.handle(launchGame)
   yield* ipc.handle(isGameRunning)
+  yield* ipc.handle(getUpdateState)
+  yield* ipc.handle(downloadUpdate)
+  yield* ipc.handle(installUpdate)
 })

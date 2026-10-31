@@ -5,9 +5,10 @@ import type {
   MapFileRef,
   OpenedMapFile,
   RecentMapFiles,
-  SaveToGameResult
+  SaveToGameResult,
+  UpdateState
 } from "@ballest/contracts"
-import { Context, Effect, Layer, Option, Schema } from "effect"
+import { Context, Effect, Layer, Option, Queue, Schema, Stream } from "effect"
 
 export type { GamePath, GamePathKind, GamePaths } from "@ballest/contracts"
 
@@ -24,6 +25,8 @@ export interface PlatformCapabilities {
   readonly launchGame: boolean
   /** Racing the open map in the game through the plugin manager (#66). */
   readonly play: boolean
+  /** Updating itself from GitHub Releases; whether this build actually does is the update state's `disabled`. */
+  readonly updates: boolean
 }
 
 /** A map file the user opened. `path` is none in a browser, which never sees one. */
@@ -86,6 +89,12 @@ export class Platform extends Context.Service<Platform, {
   /** Starts the game through Steam. */
   readonly launchGame: Effect.Effect<void, PlatformError>
   readonly isGameRunning: Effect.Effect<boolean, PlatformError>
+  /** The updater's state now, then every change to it (desktop); a browser's ends at once. */
+  readonly updates: Stream.Stream<UpdateState, PlatformError>
+  /** Starts downloading the release on offer; the progress arrives on `updates`. */
+  readonly downloadUpdate: Effect.Effect<void, PlatformError>
+  /** Quits the app, installs the downloaded release and starts it. */
+  readonly installUpdate: Effect.Effect<void, PlatformError>
 }>()("ballest/services/Platform") {
   static readonly layerBrowser = Layer.sync(Platform, () => makeBrowser())
 
@@ -105,7 +114,8 @@ const browserCapabilities: PlatformCapabilities = {
   filePaths: false,
   saveToGame: false,
   launchGame: false,
-  play: false
+  play: false,
+  updates: false
 }
 
 /** Main's `MapFileError` arrives as "Error invoking remote method '<channel>': MapFileError: <message>". */
@@ -125,9 +135,27 @@ const openedMap = (file: OpenedMapFile): OpenedMap => ({
 
 const savedMap = (file: MapFileRef): SavedMap => ({ name: file.name, path: Option.some(file.path) })
 
+/**
+ * Listens before asking for the current state. A state pushed while the request is out is at least as new as its
+ * answer, so the answer is then dropped.
+ */
+const updateStates = (bridge: DesktopBridge) =>
+  Stream.callback<UpdateState, PlatformError>((queue) =>
+    Effect.gen(function*() {
+      const seen = { pushed: false }
+      const unsubscribe = bridge.onUpdateState((state) => {
+        seen.pushed = true
+        Queue.offerUnsafe(queue, state)
+      })
+      yield* Effect.addFinalizer(() => Effect.sync(unsubscribe))
+      const current = yield* bridgeCall(() => bridge.getUpdateState())
+      if (!seen.pushed) Queue.offerUnsafe(queue, current)
+    })
+  )
+
 const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
   Platform.of({
-    capabilities: { ...browserCapabilities, filePaths: true, saveToGame: true, launchGame: true },
+    capabilities: { ...browserCapabilities, filePaths: true, saveToGame: true, launchGame: true, updates: true },
     openMap: bridgeCall(() => bridge.openMap()).pipe(
       Effect.map((file) => Option.map(Option.fromNullOr(file), openedMap))
     ),
@@ -165,7 +193,10 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
       ),
       Effect.asVoid
     ),
-    isGameRunning: bridgeCall(() => bridge.isGameRunning())
+    isGameRunning: bridgeCall(() => bridge.isGameRunning()),
+    updates: updateStates(bridge),
+    downloadUpdate: bridgeCall(() => bridge.downloadUpdate()),
+    installUpdate: bridgeCall(() => bridge.installUpdate())
   })
 
 /** A one-shot `<input type=file>`: resolves with the picked file, or none when the picker is dismissed. */
@@ -223,7 +254,10 @@ const makeBrowser = (): Platform["Service"] =>
     revealGamePath: () => desktopOnly,
     saveToGame: () => desktopOnly,
     launchGame: desktopOnly,
-    isGameRunning: Effect.succeed(false)
+    isGameRunning: Effect.succeed(false),
+    updates: Stream.empty,
+    downloadUpdate: Effect.void,
+    installUpdate: Effect.void
   })
 
 /**
@@ -240,6 +274,14 @@ export interface TestDisk {
   readonly recent: Array<string>
   readonly external: Array<string>
   game: { paths: GamePaths; running: boolean; launches: number }
+  /** The updater: `push` sends a new state to the page, as main does. Downloads and installs are counted. */
+  readonly updater: {
+    state: UpdateState
+    readonly listeners: Set<(state: UpdateState) => void>
+    readonly push: (state: UpdateState) => void
+    downloads: number
+    installs: number
+  }
 }
 
 export const TEST_MAPS_FOLDER = "/game/UserSavedMaps"
@@ -256,7 +298,8 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   dialogs: [],
   recent: [],
   external: [],
-  game: { paths: testGamePaths, running: false, launches: 0 }
+  game: { paths: testGamePaths, running: false, launches: 0 },
+  updater: makeTestUpdater()
 })
 
 const PublishedId = Schema.fromJsonString(Schema.Struct({
@@ -269,6 +312,27 @@ const publishedIdOf = (text: string): number =>
     onNone: () => -1,
     onSome: (file) => file.worldSettings.levelData.levelPublishedFileId
   })
+
+const makeTestUpdater = (): TestDisk["updater"] => {
+  const updater: TestDisk["updater"] = {
+    state: {
+      status: "idle",
+      currentVersion: "0.2.0",
+      availableVersion: null,
+      releaseNotes: null,
+      downloadPercent: null,
+      message: null
+    },
+    listeners: new Set(),
+    push: (state) => {
+      updater.state = state
+      updater.listeners.forEach((listener) => listener(state))
+    },
+    downloads: 0,
+    installs: 0
+  }
+  return updater
+}
 
 const testBridge = (disk: TestDisk): DesktopBridge => {
   const nameOf = (path: string) => path.split(/[\\/]/).pop() ?? path
@@ -339,6 +403,19 @@ const testBridge = (disk: TestDisk): DesktopBridge => {
       disk.game.launches++
       return Promise.resolve(true)
     },
-    isGameRunning: () => Promise.resolve(disk.game.running)
+    isGameRunning: () => Promise.resolve(disk.game.running),
+    getUpdateState: () => Promise.resolve(disk.updater.state),
+    downloadUpdate: () => {
+      disk.updater.downloads++
+      return Promise.resolve()
+    },
+    installUpdate: () => {
+      disk.updater.installs++
+      return Promise.resolve()
+    },
+    onUpdateState: (listener) => {
+      disk.updater.listeners.add(listener)
+      return () => void disk.updater.listeners.delete(listener)
+    }
   }
 }

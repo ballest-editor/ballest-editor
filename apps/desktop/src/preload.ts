@@ -1,8 +1,11 @@
-import type { DesktopBridge } from "@ballest/contracts"
+import type { DesktopBridge, UpdateState } from "@ballest/contracts"
 import { contextBridge, ipcRenderer } from "electron"
 import {
   CHOOSE_GAME_PATH_CHANNEL,
+  DOWNLOAD_UPDATE_CHANNEL,
   GAME_PATHS_CHANNEL,
+  GET_UPDATE_STATE_CHANNEL,
+  INSTALL_UPDATE_CHANNEL,
   IS_GAME_RUNNING_CHANNEL,
   LAUNCH_GAME_CHANNEL,
   OPEN_EXTERNAL_CHANNEL,
@@ -15,6 +18,7 @@ import {
   SAVE_MAP_CHANNEL,
   SAVE_TO_GAME_CHANNEL,
   SET_WINDOW_THEME_CHANNEL,
+  UPDATE_STATE_CHANNEL,
   WRITE_MAP_CHANNEL
 } from "./ipc/channels"
 
@@ -42,6 +46,15 @@ contextBridge.exposeInMainWorld(
     revealGamePath: (which) => ipcRenderer.invoke(REVEAL_GAME_PATH_CHANNEL, { which }),
     saveToGame: (payload) => ipcRenderer.invoke(SAVE_TO_GAME_CHANNEL, payload),
     launchGame: () => ipcRenderer.invoke(LAUNCH_GAME_CHANNEL),
-    isGameRunning: () => ipcRenderer.invoke(IS_GAME_RUNNING_CHANNEL)
+    isGameRunning: () => ipcRenderer.invoke(IS_GAME_RUNNING_CHANNEL),
+    getUpdateState: () => ipcRenderer.invoke(GET_UPDATE_STATE_CHANNEL),
+    downloadUpdate: () => ipcRenderer.invoke(DOWNLOAD_UPDATE_CHANNEL),
+    installUpdate: () => ipcRenderer.invoke(INSTALL_UPDATE_CHANNEL),
+    onUpdateState: (listener) => {
+      // The page gets the state, not the IPC event (which holds the sender).
+      const forward = (_event: unknown, state: UpdateState) => listener(state)
+      ipcRenderer.on(UPDATE_STATE_CHANNEL, forward)
+      return () => void ipcRenderer.removeListener(UPDATE_STATE_CHANNEL, forward)
+    }
   } satisfies DesktopBridge
 )

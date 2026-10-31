@@ -2,6 +2,7 @@
  * Editor document + UI state. The document is a MapFile (schema-typed) plus a parallel
  * array of stable ids for React keys and selection. All edits go through domain/edits.
  */
+import type { UpdateState } from "@ballest/contracts"
 import { Option } from "effect"
 import { toast } from "sonner"
 import { create } from "zustand"
@@ -130,6 +131,8 @@ export interface EditorState {
   readonly gamePaths: GamePaths | null
   /** Save to game found a published map's draft under the map's file name; the replacePublished dialog asks. */
   readonly publishedDraft: PublishedDraft | null
+  /** The desktop updater's state, once main has sent it; null in a browser. */
+  readonly update: UpdateState | null
   readonly selectedIds: Selection
   readonly tool: Tool
   /** Whether the gizmo follows the selected item's axes or the world's. */
@@ -185,6 +188,7 @@ export interface EditorState {
   readonly setGamePaths: (gamePaths: GamePaths) => void
   /** Asks whether to replace a published map's draft in the maps folder (null forgets it). */
   readonly setPublishedDraft: (draft: PublishedDraft | null) => void
+  readonly setUpdate: (update: UpdateState) => void
   readonly placePiece: (piece: CatalogPiece, transform: ItemTransform) => void
   /**
    * Replaces the transforms of several items as one undo step; false (with a notice, and
@@ -335,9 +339,10 @@ export const useEditor = create<EditorState>()((set, get) => {
     dirty: false,
     file: null,
     recentFiles: [],
-    capabilities: { filePaths: false, saveToGame: false, launchGame: false, play: false },
+    capabilities: { filePaths: false, saveToGame: false, launchGame: false, play: false, updates: false },
     gamePaths: null,
     publishedDraft: null,
+    update: null,
     selectedIds: [],
     tool: "translate",
     gizmoSpace: "world",
@@ -379,6 +384,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setGamePaths: (gamePaths) => set({ gamePaths }),
     setPublishedDraft: (publishedDraft) =>
       set({ publishedDraft, dialog: publishedDraft === null ? null : "replacePublished" }),
+    setUpdate: (update) => set({ update }),
 
     placePiece: (piece, transform) => {
       const item = validateItem(itemFromPiece(piece, transform))
@@ -656,3 +662,6 @@ export const pivotOf = (s: EditorState, id: string): Pivot => pivotAt(s.doc.map,
 /** An item's transform as shown: the live preview, else the document. */
 export const shownTransform = (s: EditorState, id: string): UeTransform | undefined =>
   s.preview?.get(id) ?? s.doc.map.items[s.doc.ids.indexOf(id)]?.itemTransform
+
+/** The desktop updater's state; null in a browser, and until main has answered. */
+export const useUpdateState = () => useEditor((s) => s.update)

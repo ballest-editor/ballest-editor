@@ -94,8 +94,10 @@ flowchart TB
   game --> settings
   window --> settings[DesktopSettings<br/>desktop-settings.json, atomic writes]
   settings --> env[DesktopEnvironment<br/>paths, dev server URL]
-  env --> electron["ElectronApp · ElectronWindow · ElectronProtocol<br/>ElectronDialog · ElectronShell · ElectronMenu · DesktopIpc"]
+  env --> electron["ElectronApp · ElectronWindow · ElectronProtocol<br/>ElectronDialog · ElectronShell · ElectronMenu<br/>ElectronUpdater · DesktopIpc"]
   electron --> node[NodeServices<br/>FileSystem, Path]
+  program --> updates[DesktopUpdates<br/>checks, downloads, installs; pushes its state]
+  updates --> electron
 ```
 
 `src/main.ts` stacks these as layers and hands the program to `NodeRuntime.runMain`. The shape is copied from [t3-code](https://github.com/pingdotgg/t3code)'s `apps/desktop`, which runs Effect v4 in its main process the same way, at about fifty times the size.
@@ -112,11 +114,35 @@ One IPC method is one `makeIpcMethod`. Adding `saveToGame` touches five files:
 
 The compiler catches a missing bridge member in the preload and in the build check. It doesn't catch a forgotten step 4; the call would reject with "no handler registered".
 
-Main pushing to the page (update progress, later) goes the other way: `webContents.send` in main, and an `on`/`removeListener` pair in the preload.
+Main pushing to the page goes the other way: `webContents.send` in main (`ElectronWindow.sendAll`), and an `on`/`removeListener` pair in the preload. `onUpdateState` is the one example.
 
 ## The preload build check
 
 A sandboxed preload can `require("electron")` and nothing else, and it has to be one file. `scripts/verifyPreloadBundle.ts` runs on every `vite build`, parses `preload.cjs`, refuses any other `require` or a dynamic `import()`, then runs the bundle in a Node VM against a stub `electron` and checks that `window.ballest` has every `DesktopBridge` member. Rename `ping` in the preload and the build fails. This is a packaging check, not a security one; anyone who can edit `preload.cjs` on disk can edit `main.cjs` too.
+
+## Updates
+
+An installed app updates itself from this repository's GitHub Releases. `DesktopUpdates` (`src/updates/`) checks 15 s after start and every 4 minutes until it finds a newer release, then waits for the user: the page's title bar offers it, downloads it on Download and installs it on Restart. `electron-updater` does the work through `ElectronUpdater`; electron-builder wrote the feed into `resources/app-update.yml`.
+
+| State         | When                                            | The page shows                                                  |
+| ------------- | ----------------------------------------------- | --------------------------------------------------------------- |
+| `disabled`    | dev, unpackaged, turned off, Linux not AppImage | nothing                                                         |
+| `idle`        | up to date                                      | nothing                                                         |
+| `checking`    | a check is out                                  | nothing                                                         |
+| `error`       | the check failed (offline); the next retries    | nothing                                                         |
+| `available`   | a newer release; also after a failed download   | "Update available" ("Update failed" after one), notes, Download |
+| `downloading` | after Download                                  | "Downloading n%"                                                |
+| `ready`       | downloaded; also after a failed install         | "Restart to update"                                             |
+
+Every change goes to the page on `ballest:update:state`; the page asks for the current state once (`ballest:update:get`) when it starts listening. Release notes arrive as GitHub's HTML and reach the page as plain text.
+
+| Variable                          | Effect                                                               |
+| --------------------------------- | -------------------------------------------------------------------- |
+| `BALLEST_DISABLE_AUTO_UPDATE=1`   | no checks                                                            |
+| `BALLEST_MOCK_UPDATES=1`          | checks `http://127.0.0.1:4848/` (`pnpm release:mock-server`) instead |
+| `BALLEST_MOCK_UPDATE_SERVER_PORT` | that port                                                            |
+
+Trying it without a release is [tools/release](../../tools/release/README.md#trying-updates)'s job.
 
 ## Security settings
 
@@ -141,6 +167,7 @@ src/
   ipc/        DesktopIpc (handle + makeIpcMethod), channels, methods/
   protocol/   serveStatic: files for ballest://, no Electron import, tested
   settings/   desktop-settings.json
+  updates/    DesktopUpdates (the updater: when it checks, what the page is told), updateMachine (its states)
   window/     DesktopWindow: the editor window and its bounds; chrome: title bar overlay, F11 and Ctrl+Q
 resources/
   icon.svg                the app icon; tools/release renders the .ico and PNGs from it
@@ -152,4 +179,4 @@ scripts/
   verifyPreloadBundle.ts  the build check above
 ```
 
-Tests (`pnpm --filter @ballest/desktop test`) cover the IPC methods against a fake `ipcMain` and fake dialogs (ping, open and save, recent files, external links, the window theme, the game folders, save to game, launch), the game lookups (vdf and manifest fixtures in `src/game/fixtures/`, Windows path rules through `node:path`'s `win32`, and a fake Steam tree and `/proc` in a temp folder), map files (byte-for-byte writes, which paths are allowed), file serving and path escapes, the settings file, the window shortcuts, and the preload check. None of them load `electron`: the tests that import an Electron service mock the module.
+Tests (`pnpm --filter @ballest/desktop test`) cover the IPC methods against a fake `ipcMain` and fake dialogs (ping, open and save, recent files, external links, the window theme, the game folders, save to game, launch), the game lookups (vdf and manifest fixtures in `src/game/fixtures/`, Windows path rules through `node:path`'s `win32`, and a fake Steam tree and `/proc` in a temp folder), map files (byte-for-byte writes, which paths are allowed), file serving and path escapes, the settings file, the window shortcuts, the updater (when it checks, download and install, failures, when it is off) and the preload check. None of them load `electron`: the tests that import an Electron service mock the module.

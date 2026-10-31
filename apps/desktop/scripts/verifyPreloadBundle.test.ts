@@ -19,7 +19,14 @@ const valid = `
     revealGamePath: (which) => electron.ipcRenderer.invoke("ballest:game:revealPath", { which }),
     saveToGame: (payload) => electron.ipcRenderer.invoke("ballest:game:saveToMaps", payload),
     launchGame: () => electron.ipcRenderer.invoke("ballest:game:launch"),
-    isGameRunning: () => electron.ipcRenderer.invoke("ballest:game:isRunning")
+    isGameRunning: () => electron.ipcRenderer.invoke("ballest:game:isRunning"),
+    getUpdateState: () => electron.ipcRenderer.invoke("ballest:update:get"),
+    downloadUpdate: () => electron.ipcRenderer.invoke("ballest:update:download"),
+    installUpdate: () => electron.ipcRenderer.invoke("ballest:update:install"),
+    onUpdateState: (listener) => {
+      electron.ipcRenderer.on("ballest:update:state", listener)
+      return () => electron.ipcRenderer.removeListener("ballest:update:state", listener)
+    }
   })
 `
 

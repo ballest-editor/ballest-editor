@@ -15,3 +15,8 @@ export const REVEAL_GAME_PATH_CHANNEL = "ballest:game:revealPath"
 export const SAVE_TO_GAME_CHANNEL = "ballest:game:saveToMaps"
 export const LAUNCH_GAME_CHANNEL = "ballest:game:launch"
 export const IS_GAME_RUNNING_CHANNEL = "ballest:game:isRunning"
+export const GET_UPDATE_STATE_CHANNEL = "ballest:update:get"
+export const DOWNLOAD_UPDATE_CHANNEL = "ballest:update:download"
+export const INSTALL_UPDATE_CHANNEL = "ballest:update:install"
+/** Main → renderer: every new update state (`webContents.send`). */
+export const UPDATE_STATE_CHANNEL = "ballest:update:state"

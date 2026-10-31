@@ -4,6 +4,7 @@ import { ElectronDialog } from "../electron/ElectronDialog"
 import { ElectronMenu } from "../electron/ElectronMenu"
 import { type DesktopProtocolSource, ElectronProtocol } from "../electron/ElectronProtocol"
 import { installDesktopIpcHandlers } from "../ipc/DesktopIpcHandlers"
+import { DesktopUpdates } from "../updates/DesktopUpdates"
 import { DesktopWindow } from "../window/DesktopWindow"
 import { DesktopEnvironment } from "./DesktopEnvironment"
 
@@ -37,10 +38,12 @@ const run = Effect.gen(function*() {
   if (environment.isPackaged) yield* (yield* ElectronMenu).remove
   yield* (yield* ElectronProtocol).register(protocolSource(environment))
   yield* installDesktopIpcHandlers()
+  // The first check waits a while, so the page is up to show what it finds.
+  yield* (yield* DesktopUpdates).run
   yield* (yield* DesktopWindow).runMain
 }).pipe(Effect.scoped)
 
-/** whenReady → protocol → IPC handlers → window, until the window closes. Any failure is shown, then the app quits. */
+/** whenReady → protocol → IPC handlers → updater → window, until the window closes. Any failure is shown, then the app quits. */
 export const program = Effect.gen(function*() {
   const app = yield* ElectronApp
   const dialog = yield* ElectronDialog

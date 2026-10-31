@@ -1,6 +1,7 @@
 import { Badge } from "@workspace/ui/components/badge"
 import { useEditor } from "../editor/store"
 import { MenuBar } from "./MenuBar"
+import { UpdatePill } from "./UpdatePill"
 
 /** The open file's name, with a dot while it has unsaved changes; its path (desktop) on hover. */
 function FileName() {
@@ -37,11 +38,14 @@ export function TopBar() {
       <span className="mr-2 px-1 text-sm font-semibold">Ballest Editor</span>
       <MenuBar />
       <FileName />
-      {catalog?.warning !== undefined && (
-        <Badge variant="outline" className="ml-auto text-amber-500" title={catalog.warning}>
-          Fixture catalog
-        </Badge>
-      )}
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        {catalog?.warning !== undefined && (
+          <Badge variant="outline" className="text-amber-500" title={catalog.warning}>
+            Fixture catalog
+          </Badge>
+        )}
+        <UpdatePill />
+      </div>
     </header>
   )
 }
