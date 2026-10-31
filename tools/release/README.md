@@ -5,7 +5,7 @@ Packages the desktop app with [electron-builder](https://www.electron.build) and
 ```sh
 pnpm dist:desktop:linux     # release/Ballest-Editor-<version>-x86_64.AppImage + latest-linux.yml
 pnpm dist:desktop:win       # release/Ballest-Editor-<version>-x64.exe + .blockmap + latest.yml (Wine off Windows)
-pnpm release:smoke          # stage the current build, lay it out unpacked, check it (CI runs this)
+pnpm release:smoke          # stage the current build, lay it out unpacked, check it (release.yml runs this)
 
 node tools/release/src/main.ts --help
 ```
@@ -35,7 +35,7 @@ The NSIS installer is assisted (pick a directory) with differential updates; the
 
 Push a tag: `git tag v0.2.0-rc.1 && git push origin v0.2.0-rc.1`, or run the **Release** workflow by hand with a tag (created on the branch's head if new). `.github/workflows/release.yml`, only in `ballest-editor/ballest-editor`:
 
-1. **build bundle** checks the tag is `vX.Y.Z` or `vX.Y.Z-pre` (`main.ts version`), builds once and uploads `apps/web/dist`, `apps/desktop/dist-electron` and `web-assets/`.
+1. **build bundle** checks the tag is `vX.Y.Z` or `vX.Y.Z-pre` (`main.ts version`), builds once, runs the smoke check and uploads `apps/web/dist`, `apps/desktop/dist-electron` and `web-assets/`.
 2. **desktop win x64** (`windows-latest`) and **desktop linux x64** (`ubuntu-latest`) run `release-desktop.yml`, which packages with `--skip-build` and uploads the installer, blockmap and manifest.
 3. **publish release** runs `main.ts verify`: both installers, the Windows blockmap and both manifests exist, the manifests are for this version and point at files that exist. It writes `SHA256SUMS` and uploads everything to a draft release, then publishes it. A version with a pre-release part (`-rc.1`) is a GitHub prerelease and never "latest".
 

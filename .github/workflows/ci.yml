@@ -16,7 +16,7 @@ jobs:
   check:
     name: check:everything
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     env:
       TURBO_TELEMETRY_DISABLED: "1"
       HUSKY: "0"
@@ -49,12 +49,3 @@ jobs:
           key: dprint-${{ runner.os }}-${{ hashFiles('dprint.json') }}
 
       - run: pnpm check:everything
-
-      # electron-builder's Electron download for the smoke check (~100 MB), keyed by the pinned version.
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/electron
-          key: electron-${{ runner.os }}-${{ hashFiles('apps/desktop/package.json') }}
-
-      # Stages the build above and lays it out unpacked with electron-builder (tools/release/src/smoke.ts).
-      - run: pnpm release:smoke

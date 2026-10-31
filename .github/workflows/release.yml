@@ -58,6 +58,10 @@ jobs:
       # apps/web and apps/desktop, after //#assets fetches the asset pack.
       - run: pnpm exec turbo run build --filter=@ballest/desktop
 
+      # Stages that build and lays it out unpacked with electron-builder (tools/release/src/smoke.ts), so a broken
+      # config or a missing bundle or asset fails here, before the platform jobs start.
+      - run: pnpm release:smoke
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bundle

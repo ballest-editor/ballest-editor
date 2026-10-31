@@ -1,6 +1,6 @@
-// `release smoke` (`pnpm release:smoke`, run by CI after the build): stages the built app into a temp directory and
-// has electron-builder lay it out unpacked for Linux, then checks the result has what the packaged app reads. It
-// catches a bad config, a renamed bundle or a lost asset without building an installer.
+// `release smoke` (`pnpm release:smoke`; release.yml runs it after the build, before packaging): stages the built
+// app into a temp directory and has electron-builder lay it out unpacked for Linux, then checks the result has what
+// the packaged app reads. It catches a bad config, a renamed bundle or a lost asset without building an installer.
 import { Effect, FileSystem, Path } from "effect"
 import { stageLayout } from "./config.ts"
 import { electronBuilder } from "./desktop.ts"
