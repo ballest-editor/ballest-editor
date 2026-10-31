@@ -22,6 +22,7 @@ A standalone map editor for _Ballest of Them All_ (Steam 3339810, UE 5.8). Read 
 - `tools/extract/` — pak → glTF/catalog/keybinds pipeline, run via the Nix flake (`nix run .#extract`).
 - `tools/dev/` — the `pnpm dev` / `pnpm dev:desktop` runner: picks the checkout's port (3000, or one per linked worktree) and runs the `dev` tasks through turbo.
 - `tools/compress/` — `assets/{pieces,textures}` → `web-assets/` (`pnpm assets`, the turbo task `//#assets` that `dev` and `build` depend on) downloading the published pack when the raw files are absent; `pnpm assets:publish` → GitHub release `assets-<hash>` + `web-assets.json`.
+- `tools/release/` — packages the desktop app with electron-builder (`pnpm dist:desktop:win|linux`, `pnpm release:smoke`) and checks a release's assets; `.github/workflows/release.yml` runs it on `v*.*.*` tags.
 - `repos/` — vendored read-only references (see below).
 - `docs/` — format, vision, decisions.
 

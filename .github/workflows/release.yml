@@ -1,0 +1,141 @@
+name: Release
+
+# A version tag (v0.2.0, v0.2.0-rc.1) becomes a GitHub release with the Windows installer, the Linux AppImage, their
+# update manifests and SHA256SUMS (docs/DESKTOP.md § Packaging and release). Unsigned for now.
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to release (v1.2.3 or v1.2.3-rc.1); created on the chosen branch's head if it doesn't exist
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # The JS is built once, here; the platform jobs only package it.
+  build_bundle:
+    name: build bundle
+    # Forks get the workflow file too; only this repository publishes.
+    if: github.repository == 'ballest-editor/ballest-editor'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    env:
+      TURBO_TELEMETRY_DISABLED: "1"
+      HUSKY: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          cache: true
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - run: pnpm install --frozen-lockfile
+
+      # Fails on anything that isn't vX.Y.Z or vX.Y.Z-pre before anything is built.
+      - id: version
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          node tools/release/src/main.ts version "$TAG" >> "$GITHUB_OUTPUT"
+
+      # apps/web and apps/desktop, after //#assets fetches the asset pack.
+      - run: pnpm exec turbo run build --filter=@ballest/desktop
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bundle
+          path: |
+            apps/web/dist
+            apps/desktop/dist-electron
+            web-assets
+          if-no-files-found: error
+          retention-days: 1
+
+  desktop_win_x64:
+    name: desktop win x64
+    needs: build_bundle
+    uses: ./.github/workflows/release-desktop.yml
+    with:
+      platform: win
+      runner: windows-latest
+      version: ${{ needs.build_bundle.outputs.version }}
+
+  desktop_linux_x64:
+    name: desktop linux x64
+    needs: build_bundle
+    uses: ./.github/workflows/release-desktop.yml
+    with:
+      platform: linux
+      runner: ubuntu-latest
+      version: ${{ needs.build_bundle.outputs.version }}
+
+  release:
+    name: publish release
+    needs: [build_bundle, desktop_win_x64, desktop_linux_x64]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      HUSKY: "0"
+      TAG: ${{ needs.build_bundle.outputs.tag }}
+      VERSION: ${{ needs.build_bundle.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          cache: true
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - run: pnpm install --frozen-lockfile --filter @ballest/release...
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: release-assets
+
+      # Both installers, the Windows blockmap and both update manifests, all for this version; then SHA256SUMS.
+      - run: node tools/release/src/main.ts verify release-assets --app-version "$VERSION"
+
+      # A draft until every file is attached, so nobody (and no updater) sees a half-uploaded release.
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
+          name: Ballest Editor ${{ env.VERSION }}
+          draft: true
+          prerelease: ${{ needs.build_bundle.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.build_bundle.outputs.prerelease == 'true' && 'false' || 'true' }}
+          generate_release_notes: true
+          files: release-assets/*
+          fail_on_unmatched_files: true
+
+      # A prerelease is never "latest": electron-updater's GitHub provider follows latest unless allowPrerelease is set.
+      - name: Publish the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          LATEST: ${{ needs.build_bundle.outputs.prerelease == 'true' && 'false' || 'true' }}
+        run: gh release edit "$TAG" --draft=false --latest="$LATEST"

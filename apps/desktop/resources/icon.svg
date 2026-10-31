@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b3a67"/>
+      <stop offset="1" stop-color="#121a33"/>
+    </linearGradient>
+    <linearGradient id="track" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5ec8d8"/>
+      <stop offset="1" stop-color="#9be7c4"/>
+    </linearGradient>
+    <radialGradient id="ball" cx="0.36" cy="0.32" r="0.75">
+      <stop offset="0" stop-color="#fff3d6"/>
+      <stop offset="0.25" stop-color="#ffb347"/>
+      <stop offset="1" stop-color="#d9480f"/>
+    </radialGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="104" fill="url(#bg)"/>
+  <g stroke="#ffffff" stroke-opacity="0.07" stroke-width="4">
+    <path d="M128 40v432M256 40v432M384 40v432M40 128h432M40 256h432M40 384h432"/>
+  </g>
+  <path d="M60 400C160 400 200 300 300 300S420 260 452 180" fill="none" stroke="url(#track)" stroke-width="44"
+    stroke-linecap="round"/>
+  <ellipse cx="292" cy="296" rx="70" ry="14" fill="#000000" fill-opacity="0.25"/>
+  <circle cx="292" cy="212" r="80" fill="url(#ball)"/>
+</svg>

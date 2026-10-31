@@ -10,6 +10,7 @@ A standalone, CAD-style map editor for [Ballest of Them All](https://store.steam
 - `tools/extract/` — pulls piece meshes out of the game pak (Nix flake)
 - `tools/dev/` — the `pnpm dev` and `pnpm dev:desktop` runner (one dev port per checkout, so worktrees run side by side)
 - `tools/compress/` — compresses the extracted meshes and textures and publishes them as a GitHub release asset pack
+- `tools/release/` — builds the Windows installer and Linux AppImage; a `v*.*.*` tag publishes them as a GitHub release
 
 Contributors and coding agents: read [AGENTS.md](AGENTS.md).
 

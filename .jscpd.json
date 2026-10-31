@@ -6,7 +6,8 @@
     "packages/contracts/src",
     "tools/extract",
     "tools/compress",
-    "tools/dev/src"
+    "tools/dev/src",
+    "tools/release/src"
   ],
   "format": ["typescript", "tsx", "javascript"],
   "ignore": ["**/routeTree.gen.ts", "packages/ui/src/components/**"],
