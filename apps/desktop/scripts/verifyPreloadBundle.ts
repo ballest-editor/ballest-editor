@@ -23,6 +23,7 @@ const members = {
   saveToGame: "function",
   launchGame: "function",
   isGameRunning: "function",
+  findCreator: "function",
   getUpdateState: "function",
   downloadUpdate: "function",
   installUpdate: "function",

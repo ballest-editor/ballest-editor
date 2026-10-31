@@ -10,28 +10,31 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { type ReactNode, useState } from "react"
+import { usableCreatorName } from "../domain/creator"
 import { isValidName, mapFileNameOf, NAME_RULE } from "../domain/factory"
-import { saveSettings } from "../editor/actions"
-import { useEditor } from "../editor/store"
+import { updateSettings } from "../editor/actions"
+import { useCreator } from "../editor/store"
 
 export interface MapCreator {
-  /** The creator saved in Settings › General ("" when unset). */
+  /**
+   * The creator in use: typed in Settings › General, else the one found (the Steam name). "" when there is none a map
+   * can use, and the dialog asks.
+   */
   readonly saved: string
   readonly draft: string
   readonly setDraft: (draft: string) => void
   /** The saved creator, else what was typed here. */
   readonly name: string
-  /** Saves a typed creator to Settings › General (no-op when one is already saved). */
+  /** Saves a typed creator to Settings › General (no-op when there already is one). */
   readonly persist: () => Promise<void>
 }
 
 export const useMapCreator = (): MapCreator => {
-  const settings = useEditor((s) => s.settings)
-  const saved = settings.general.creatorName.trim()
+  const saved = usableCreatorName(useCreator())
   const [draft, setDraft] = useState("")
   const name = saved || draft.trim()
   const persist = async () => {
-    if (saved === "") await saveSettings({ ...settings, general: { ...settings.general, creatorName: name } })
+    if (saved === "") await updateSettings("general", { creatorName: name })
   }
   return { saved, draft, setDraft, name, persist }
 }

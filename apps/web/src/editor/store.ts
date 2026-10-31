@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { create } from "zustand"
 import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
+import { type Creator, creatorOf, type FoundCreator } from "../domain/creator"
 import {
   addItem,
   type Clip,
@@ -129,6 +130,8 @@ export interface EditorState {
   readonly capabilities: PlatformCapabilities
   /** The game's folders as last looked up (desktop; null until Settings › Game asks). */
   readonly gamePaths: GamePaths | null
+  /** The creator name found on this machine (desktop: the Steam persona name), as last looked up; none until then. */
+  readonly foundCreator: Option.Option<FoundCreator>
   /** Save to game found a published map's draft under the map's file name; the replacePublished dialog asks. */
   readonly publishedDraft: PublishedDraft | null
   /** The desktop updater's state, once main has sent it; null in a browser. */
@@ -186,6 +189,7 @@ export interface EditorState {
   readonly setRecentFiles: (recentFiles: ReadonlyArray<RecentFile>) => void
   readonly setCapabilities: (capabilities: PlatformCapabilities) => void
   readonly setGamePaths: (gamePaths: GamePaths) => void
+  readonly setFoundCreator: (foundCreator: Option.Option<FoundCreator>) => void
   /** Asks whether to replace a published map's draft in the maps folder (null forgets it). */
   readonly setPublishedDraft: (draft: PublishedDraft | null) => void
   readonly setUpdate: (update: UpdateState) => void
@@ -341,6 +345,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     recentFiles: [],
     capabilities: { filePaths: false, saveToGame: false, launchGame: false, play: false, updates: false },
     gamePaths: null,
+    foundCreator: Option.none(),
     publishedDraft: null,
     update: null,
     selectedIds: [],
@@ -382,6 +387,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setRecentFiles: (recentFiles) => set({ recentFiles }),
     setCapabilities: (capabilities) => set({ capabilities }),
     setGamePaths: (gamePaths) => set({ gamePaths }),
+    setFoundCreator: (foundCreator) => set({ foundCreator }),
     setPublishedDraft: (publishedDraft) =>
       set({ publishedDraft, dialog: publishedDraft === null ? null : "replacePublished" }),
     setUpdate: (update) => set({ update }),
@@ -665,3 +671,10 @@ export const shownTransform = (s: EditorState, id: string): UeTransform | undefi
 
 /** The desktop updater's state; null in a browser, and until main has answered. */
 export const useUpdateState = () => useEditor((s) => s.update)
+
+/** The creator in use: the one typed in Settings › General, else the one found (domain/creator). */
+export const useCreator = (): Creator => {
+  const setting = useEditor((s) => s.settings.general.creatorName)
+  const found = useEditor((s) => s.foundCreator)
+  return creatorOf(setting, found)
+}

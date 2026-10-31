@@ -122,6 +122,24 @@ export const SaveToGameResult = Schema.TaggedUnion({
 export type SaveToGameResult = typeof SaveToGameResult.Type
 
 /**
+ * Where the creator name the game writes into maps was found: the persona name of the account Steam last logged in
+ * with (`steam`), or, without Steam's login file, the creator most of the maps in the game's maps folder name
+ * (`mapsFolder`).
+ */
+export const CreatorSource = Schema.Literals(["steam", "mapsFolder"])
+export type CreatorSource = typeof CreatorSource.Type
+
+/** The creator name found on this machine. Not checked against the editor's name rule: the renderer says what's wrong. */
+export const FoundCreator = Schema.Struct({
+  name: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(256)),
+  source: CreatorSource
+})
+export type FoundCreator = typeof FoundCreator.Type
+
+/** `findCreator`'s result: null when neither Steam nor the maps folder names one. */
+export const FindCreatorResult = Schema.NullOr(FoundCreator)
+
+/**
  * Where the in-app updater is (docs/DESKTOP.md § Packaging and release). `idle` until a check finds a newer release
  * (`available`), then `downloading` once the user asks for it and `ready` once it is on disk; restarting installs it.
  * `error` is a failed check, retried by the next one. `disabled` never changes: dev, unpackaged, turned off with
@@ -198,6 +216,8 @@ export interface DesktopBridge {
   readonly launchGame: () => Promise<boolean>
   /** Whether the game (`Ballest-Win64-Shipping.exe`) is running. */
   readonly isGameRunning: () => Promise<boolean>
+  /** The creator name the game would write (the Steam persona name), and where it was found; null when none was. */
+  readonly findCreator: () => Promise<FoundCreator | null>
   /** The updater's state now. */
   readonly getUpdateState: () => Promise<UpdateState>
   /** Starts downloading the release on offer (`available`); progress and the outcome arrive through `onUpdateState`. */

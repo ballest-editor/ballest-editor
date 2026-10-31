@@ -1,0 +1,22 @@
+"users"
+{
+	"76561198000000001"
+	{
+		"AccountName"		"old_account"
+		"PersonaName"		"Old Name"
+		"RememberPassword"		"1"
+		"MostRecent"		"0"
+		"Timestamp"		"1790000000"
+	}
+	"76561198000000002"
+	{
+		"AccountName"		"player_two"
+		"PersonaName"		"Speedy Marble"
+		"RememberPassword"		"1"
+		"WantsOfflineMode"		"0"
+		"SkipOfflineModeWarning"		"0"
+		"AllowAutoLogin"		"1"
+		"MostRecent"		"1"
+		"Timestamp"		"1780000000"
+	}
+}

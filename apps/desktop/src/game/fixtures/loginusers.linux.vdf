@@ -1,0 +1,21 @@
+"users"
+{
+	"76561198000000003"
+	{
+		"AccountName"		"first"
+		"PersonaName"		"Rolling Stone"
+		"RememberPassword"		"1"
+		"WantsOfflineMode"		"0"
+		"SkipOfflineModeWarning"		"0"
+		"AutoLogin"		"1"
+		"timestamp"		"1793418427"
+	}
+	"76561198000000004"
+	{
+		"AccountName"		"second"
+		"PersonaName"		"Older Login"
+		"RememberPassword"		"1"
+		"AutoLogin"		"0"
+		"timestamp"		"1700000000"
+	}
+}

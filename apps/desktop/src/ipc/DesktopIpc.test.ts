@@ -7,6 +7,7 @@ import { ElectronShell, parseExternalUrl } from "../electron/ElectronShell"
 import { ElectronWindow } from "../electron/ElectronWindow"
 import { MapFiles } from "../files/MapFiles"
 import { makeFakeSteam } from "../game/fakeSteam"
+import { GameCreator } from "../game/GameCreator"
 import { GameHost } from "../game/GameHost"
 import { GamePaths } from "../game/GamePaths"
 import { GameProcess } from "../game/GameProcess"
@@ -16,6 +17,7 @@ import { DesktopUpdates } from "../updates/DesktopUpdates"
 import {
   CHOOSE_GAME_PATH_CHANNEL,
   DOWNLOAD_UPDATE_CHANNEL,
+  FIND_CREATOR_CHANNEL,
   GAME_PATHS_CHANNEL,
   GET_UPDATE_STATE_CHANNEL,
   INSTALL_UPDATE_CHANNEL,
@@ -136,7 +138,8 @@ const withHandlers = <A, E>(
     const fake = fakeIpcMain()
     const dialogs = fakeDialogs()
     const steam = yield* makeFakeSteam(path.join(dir, "machine"), { game: "steam", ran: true })
-    const game = Layer.mergeAll(GamePaths.layer, GameProcess.layer).pipe(
+    const game = GameCreator.layer.pipe(
+      Layer.provideMerge(Layer.mergeAll(GamePaths.layer, GameProcess.layer)),
       Layer.provide(SteamLibrary.layer),
       Layer.provide(Layer.succeed(GameHost, GameHost.of(steam.host)))
     )
@@ -363,6 +366,22 @@ describe("DesktopIpc", () => {
         assert.isFalse(yield* fake.invoke(IS_GAME_RUNNING_CHANNEL))
         assert.isTrue(yield* fake.invoke(LAUNCH_GAME_CHANNEL))
         assert.deepStrictEqual(opened, ["steam://rungameid/3339810"])
+      })
+    ))
+
+  it.effect("finds the creator from Steam's login file", () =>
+    withHandlers(({ fake, steam }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        assert.isNull(yield* fake.invoke(FIND_CREATOR_CHANNEL))
+        const config = path.join(steam.steam, "config")
+        yield* fs.makeDirectory(config)
+        yield* fs.writeFileString(
+          path.join(config, "loginusers.vdf"),
+          `"users"\n{\n\t"76561198000000001"\n\t{\n\t\t"PersonaName"\t\t"Marble"\n\t\t"MostRecent"\t\t"1"\n\t}\n}\n`
+        )
+        assert.deepStrictEqual(yield* fake.invoke(FIND_CREATOR_CHANNEL), { name: "Marble", source: "steam" })
       })
     ))
 

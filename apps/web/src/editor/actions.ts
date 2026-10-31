@@ -194,14 +194,26 @@ export const setWindowTheme = (dark: boolean) =>
     }).pipe(Effect.catch((error) => Effect.logWarning("Couldn't recolour the window controls", error)))
   )
 
-/** What the platform offers, and its recent files, into the store. */
+/** What the platform offers, its recent files and the creator name it finds, into the store. */
 export const loadPlatform = () =>
   run(
     Effect.gen(function*() {
       useEditor.getState().setCapabilities((yield* Platform).capabilities)
       yield* refreshRecentFiles
+      yield* findCreatorEffect
     })
   )
+
+/**
+ * Looks up the creator name the game would use (the Steam persona name). Settings › General shows it until the user
+ * types their own. Nothing to report when it fails: the user can still type a name.
+ */
+export const findCreatorEffect = Effect.gen(function*() {
+  useEditor.getState().setFoundCreator(yield* (yield* Platform).findCreator)
+}).pipe(Effect.catch((error) => Effect.logWarning("Couldn't look up the creator name", error)))
+
+/** Looks the creator name up again, for Settings › General: the user may have logged in to Steam since. */
+export const findCreator = () => run(findCreatorEffect)
 
 /** The desktop updater's state into the store, now and on every change; a browser's has none. */
 export const followUpdateState = Effect.gen(function*() {

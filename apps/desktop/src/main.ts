@@ -11,6 +11,7 @@ import { ElectronShell } from "./electron/ElectronShell"
 import { ElectronUpdater } from "./electron/ElectronUpdater"
 import { ElectronWindow } from "./electron/ElectronWindow"
 import { MapFiles } from "./files/MapFiles"
+import { GameCreator } from "./game/GameCreator"
 import { GameHost } from "./game/GameHost"
 import { GamePaths } from "./game/GamePaths"
 import { GameProcess } from "./game/GameProcess"
@@ -40,7 +41,8 @@ const layerElectron = Layer.mergeAll(
   DesktopIpc.layer(Electron.ipcMain)
 )
 
-const layerGame = Layer.mergeAll(GamePaths.layer, GameProcess.layer).pipe(
+const layerGame = GameCreator.layer.pipe(
+  Layer.provideMerge(Layer.mergeAll(GamePaths.layer, GameProcess.layer)),
   Layer.provide(SteamLibrary.layer),
   Layer.provideMerge(GameHost.layer)
 )

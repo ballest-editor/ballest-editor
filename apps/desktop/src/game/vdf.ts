@@ -94,3 +94,35 @@ export const installDirOf = (text: string): Option.Option<string> =>
     const dir = state === undefined ? undefined : vdfGet(state, "installdir")
     return typeof dir === "string" && dir.length > 0 ? Option.some(dir) : Option.none()
   })
+
+/** A Steam user's 64-bit id: the key of each entry in `loginusers.vdf`. */
+const STEAM_ID = /^\d+$/
+
+/**
+ * The display name (`PersonaName`) of the account Steam last logged in with, from `config/loginusers.vdf`: the user
+ * marked `MostRecent "1"`, else the one with the newest `Timestamp` (Steam on Linux writes no `MostRecent`). None when
+ * the file lists nobody with a name. Not trimmed: the caller checks the name as the game would write it.
+ */
+export const personaNameOf = (text: string): Option.Option<string> =>
+  Option.flatMap(parseVdf(text), (root) => {
+    const users = vdfObject(vdfGet(root, "users"))
+    if (users === undefined) return Option.none()
+    const named = Object.entries(users).flatMap(([id, user]) => {
+      if (!STEAM_ID.test(id) || typeof user !== "object") return []
+      const name = vdfGet(user, "PersonaName")
+      if (typeof name !== "string" || name.length === 0) return []
+      const timestamp = Number(vdfGet(user, "Timestamp"))
+      return [{
+        name,
+        mostRecent: vdfGet(user, "MostRecent") === "1",
+        timestamp: Number.isFinite(timestamp) ? timestamp : 0
+      }]
+    })
+    const mostRecent = named.find((user) => user.mostRecent)
+    if (mostRecent !== undefined) return Option.some(mostRecent.name)
+    const newest = named.reduce<(typeof named)[number] | undefined>(
+      (best, user) => best === undefined || user.timestamp > best.timestamp ? user : best,
+      undefined
+    )
+    return Option.fromUndefinedOr(newest?.name)
+  })

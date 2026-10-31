@@ -14,8 +14,11 @@ export const CUSTOM_FOV_PRESET = "Custom"
 export const GeneralSettings = Schema.Struct({
   /** How lengths are shown in the inspector (the map file always stores cm). */
   units: Schema.Literals(["cm", "m"]),
-  /** Your in-game name; written into every exported map's `creatorName` and file name. */
-  creatorName: Schema.String,
+  /**
+   * Your in-game name, as typed in Settings; written into every exported map's `creatorName` and file name. Null (the
+   * default) uses the name found on this machine instead, the Steam persona name the game writes (see domain/creator).
+   */
+  creatorName: Schema.NullOr(Schema.String),
   /** Whether Alt+dragging a translate handle moves a copy and leaves the selection in place, like the game. */
   altDragDuplicates: Schema.Boolean
 })
@@ -89,7 +92,7 @@ export const Settings = Schema.Struct({
 export type Settings = typeof Settings.Type
 
 export const defaultSettings: Settings = {
-  general: { units: "cm", creatorName: "", altDragDuplicates: true },
+  general: { units: "cm", creatorName: null, altDragDuplicates: true },
   editor: { placeDistance: PLACE_DISTANCE, undoSelection: false },
   camera: {
     flySpeed: 2000,
@@ -125,8 +128,9 @@ const sections: ReadonlyArray<Section> = ["general", "editor", "camera", "appear
 const LEGACY_GRID_COLORS = { gridCellColor: "#3a404a", gridSectionColor: "#58606e" } as const
 
 /**
- * Older saves kept `undoSelection` under general (it now lives under editor), and stored the
- * old fixed grid colours whether or not they were chosen (they become automatic).
+ * Older saves kept `undoSelection` under general (it now lives under editor), stored the
+ * old fixed grid colours whether or not they were chosen (they become automatic), and stored
+ * an unset creator as "" (now null: use the name found).
  */
 const migrate = (stored: unknown): unknown => {
   if (!Predicate.isObject(stored)) return stored
@@ -135,6 +139,9 @@ const migrate = (stored: unknown): unknown => {
   const editor = Predicate.isObject(out["editor"]) ? out["editor"] : {}
   if (Predicate.isObject(general) && "undoSelection" in general && !("undoSelection" in editor)) {
     out = { ...out, editor: { ...editor, undoSelection: general["undoSelection"] } }
+  }
+  if (Predicate.isObject(general) && general["creatorName"] === "") {
+    out = { ...out, general: { ...general, creatorName: null } }
   }
   const appearance = out["appearance"]
   if (Predicate.isObject(appearance)) {

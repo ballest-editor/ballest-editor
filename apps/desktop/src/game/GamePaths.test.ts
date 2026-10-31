@@ -1,9 +1,7 @@
 import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, FileSystem, Layer, Option, Path, type Scope } from "effect"
-import { DesktopSettings } from "../settings/DesktopSettings"
-import { makeFakeSteam } from "./fakeSteam"
-import { GameHost } from "./GameHost"
+import { Effect, FileSystem, Option, Path, type Scope } from "effect"
+import { layerFakeGamePaths, makeFakeSteam } from "./fakeSteam"
 import { GamePaths } from "./GamePaths"
 import { SteamLibrary } from "./SteamLibrary"
 
@@ -14,11 +12,7 @@ const setup = (options: Parameters<typeof makeFakeSteam>[1]) =>
     const path = yield* Path.Path
     const dir = yield* fs.makeTempDirectoryScoped()
     const fake = yield* makeFakeSteam(dir, options)
-    const services = GamePaths.layer.pipe(
-      Layer.provideMerge(SteamLibrary.layer),
-      Layer.provide(Layer.succeed(GameHost, GameHost.of(fake.host))),
-      Layer.provide(Layer.effect(DesktopSettings, DesktopSettings.make(path.join(dir, "desktop-settings.json"))))
-    )
+    const services = layerFakeGamePaths(fake.host, path.join(dir, "desktop-settings.json"))
     const { paths, steam } = yield* Effect.all({ paths: GamePaths, steam: SteamLibrary }).pipe(Effect.provide(services))
     return { fs, path, dir, fake, paths, steam }
   })
