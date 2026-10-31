@@ -1,5 +1,6 @@
 import {
   IconCamera,
+  IconDeviceGamepad2,
   IconKeyboard,
   IconPalette,
   IconPencil,
@@ -37,9 +38,10 @@ import {
   wheelChordOf
 } from "../domain/Keybinds"
 import { CUSTOM_FOV_PRESET, defaultSettings, gridColorsOf, type Settings } from "../domain/Settings"
-import { resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
+import { loadGamePaths, resetGamePaths, resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
 import { type SettingsCategory, useEditor } from "../editor/store"
 import { useDarkTheme } from "../editor/theme"
+import { GAME_PATH_KINDS, gameSettingsRows } from "./GameSettings"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
 const movementLookItems = {
@@ -63,6 +65,9 @@ const CATEGORIES: ReadonlyArray<SettingsCategoryInfo<SettingsCategory>> = [
   { id: "appearance", label: "Appearance", icon: IconPalette },
   { id: "lighting", label: "Lighting", icon: IconSun }
 ]
+
+/** Desktop only: the game's folders. */
+const GAME_CATEGORY: SettingsCategoryInfo<SettingsCategory> = { id: "game", label: "Game", icon: IconDeviceGamepad2 }
 
 type Row = SettingsRow<SettingsCategory>
 
@@ -202,6 +207,13 @@ export function SettingsDialog(props: {
   const keybinds = useEditor((s) => s.keybinds)
   const defaults = useEditor((s) => s.keybindDefaults)
   const [listening, setListening] = useState<Listening | null>(null)
+  const hasGame = useEditor((s) => s.capabilities.saveToGame)
+  const gamePaths = useEditor((s) => s.gamePaths)
+
+  // The game may have been installed, run or moved since: look its folders up each time the dialog opens.
+  useEffect(() => {
+    if (props.open && hasGame) void loadGamePaths()
+  }, [props.open, hasGame])
 
   const update = <K extends keyof Settings>(section: K, patch: Partial<Settings[K]>) =>
     void saveSettings({ ...settings, [section]: { ...settings[section], ...patch } })
@@ -651,13 +663,16 @@ export function SettingsDialog(props: {
         label: "Show sky",
         description: "The game's sky with the map's sun in it. Off: the theme's background.",
         control: <Switch checked={l.skyVisible} onCheckedChange={(v) => update("lighting", { skyVisible: v })} />
-      }
+      },
+      ...(hasGame ? gameSettingsRows(gamePaths) : [])
     ]
   })()
 
   const resetCategory = (category: SettingsCategory) => {
     if (category === "keybinds") void resetKeybinds()
-    else void saveSettings({ ...settings, [category]: defaultSettings[category] })
+    else if (category === "game") {
+      void resetGamePaths(GAME_PATH_KINDS.filter((which) => gamePaths?.[which].status === "overridden"))
+    } else void saveSettings({ ...settings, [category]: defaultSettings[category] })
   }
   return (
     <SettingsShell
@@ -665,7 +680,7 @@ export function SettingsDialog(props: {
       onClose={props.onClose}
       title="Settings"
       description="Settings for the editor, kept in this browser."
-      categories={CATEGORIES}
+      categories={hasGame ? [...CATEGORIES, GAME_CATEGORY] : CATEGORIES}
       category={props.category}
       onCategoryChange={props.onCategoryChange}
       rows={rows}

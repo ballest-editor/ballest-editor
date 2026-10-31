@@ -1,6 +1,15 @@
 import { Effect } from "effect"
 import { DesktopIpc } from "./DesktopIpc"
 import { openMap, readMap, recentMaps, saveMap, writeMap } from "./methods/files"
+import {
+  chooseGamePath,
+  gamePaths,
+  isGameRunning,
+  launchGame,
+  resetGamePath,
+  revealGamePath,
+  saveToGame
+} from "./methods/game"
 import { ping } from "./methods/ping"
 import { openExternal } from "./methods/shell"
 import { downloadUpdate, getUpdateState, installUpdate } from "./methods/updates"
@@ -17,6 +26,13 @@ export const installDesktopIpcHandlers = Effect.fn("installDesktopIpcHandlers")(
   yield* ipc.handle(recentMaps)
   yield* ipc.handle(openExternal)
   yield* ipc.handle(setWindowTheme)
+  yield* ipc.handle(gamePaths)
+  yield* ipc.handle(chooseGamePath)
+  yield* ipc.handle(resetGamePath)
+  yield* ipc.handle(revealGamePath)
+  yield* ipc.handle(saveToGame)
+  yield* ipc.handle(launchGame)
+  yield* ipc.handle(isGameRunning)
   yield* ipc.handle(getUpdateState)
   yield* ipc.handle(downloadUpdate)
   yield* ipc.handle(installUpdate)

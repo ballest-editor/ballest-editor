@@ -2,7 +2,7 @@ import { Context, Effect, Layer, Option, Schema } from "effect"
 import * as Electron from "electron"
 
 export class ElectronDialogError extends Schema.TaggedError<ElectronDialogError>()("ElectronDialogError", {
-  kind: Schema.Literals(["open", "save"]),
+  kind: Schema.Literals(["open", "save", "folder"]),
   cause: Schema.Defect()
 }) {
   override get message(): string {
@@ -30,11 +30,22 @@ const dialogOptions = (options: FileDialogOptions) => ({
   ...Option.match(options.defaultPath, { onNone: () => ({}), onSome: (defaultPath) => ({ defaultPath }) })
 })
 
+const showOpen = (kind: "open" | "folder", opts: Electron.OpenDialogOptions, ownerId: number) =>
+  Effect.tryPromise({
+    try: () => {
+      const owner = ownerWindow(ownerId)
+      return owner === undefined ? Electron.dialog.showOpenDialog(opts) : Electron.dialog.showOpenDialog(owner, opts)
+    },
+    catch: (cause) => new ElectronDialogError({ kind, cause })
+  }).pipe(Effect.map(({ canceled, filePaths }) => canceled ? Option.none() : Option.fromNullishOr(filePaths[0])))
+
 export class ElectronDialog extends Context.Service<ElectronDialog, {
   /** A blocking native error box; safe to call before `ready`, so fatal startup errors use it. */
   readonly showErrorBox: (title: string, content: string) => Effect.Effect<void>
   /** The native open dialog for one file; none when cancelled. */
   readonly showOpenFile: (options: FileDialogOptions) => Effect.Effect<Option.Option<string>, ElectronDialogError>
+  /** The native open dialog for one folder (`filters` are ignored); none when cancelled. */
+  readonly showOpenFolder: (options: FileDialogOptions) => Effect.Effect<Option.Option<string>, ElectronDialogError>
   /** The native save dialog (it asks before replacing a file); none when cancelled. */
   readonly showSaveFile: (options: FileDialogOptions) => Effect.Effect<Option.Option<string>, ElectronDialogError>
 }>()("ballest/desktop/electron/ElectronDialog") {
@@ -43,16 +54,13 @@ export class ElectronDialog extends Context.Service<ElectronDialog, {
     ElectronDialog.of({
       showErrorBox: (title, content) => Effect.sync(() => Electron.dialog.showErrorBox(title, content)),
       showOpenFile: (options) =>
-        Effect.tryPromise({
-          try: () => {
-            const owner = ownerWindow(options.owner)
-            const opts: Electron.OpenDialogOptions = { ...dialogOptions(options), properties: ["openFile"] }
-            return owner === undefined
-              ? Electron.dialog.showOpenDialog(opts)
-              : Electron.dialog.showOpenDialog(owner, opts)
-          },
-          catch: (cause) => new ElectronDialogError({ kind: "open", cause })
-        }).pipe(Effect.map(({ canceled, filePaths }) => canceled ? Option.none() : Option.fromNullishOr(filePaths[0]))),
+        showOpen("open", { ...dialogOptions(options), properties: ["openFile"] }, options.owner),
+      showOpenFolder: (options) =>
+        showOpen(
+          "folder",
+          { ...dialogOptions({ ...options, filters: [] }), properties: ["openDirectory"] },
+          options.owner
+        ),
       showSaveFile: (options) =>
         Effect.tryPromise({
           try: () => {

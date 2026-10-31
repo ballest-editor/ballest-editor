@@ -37,9 +37,12 @@ import { type Pivot, pivotAt } from "../domain/pivot"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import type { LoadedCatalog } from "../services/CatalogLoader"
-import type { PlatformCapabilities } from "../services/Platform"
+import type { GamePaths, PlatformCapabilities } from "../services/Platform"
 
 import type { GizmoSpace } from "./gizmo/handles"
+
+/** The game folder types, for components (which reach services only through editor/). */
+export type { GamePath, GamePathKind, GamePaths } from "../services/Platform"
 export interface Doc {
   readonly map: MapFile
   readonly ids: ReadonlyArray<string>
@@ -71,8 +74,8 @@ export interface Snapshot {
 export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
 export type Tool = "select" | "translate" | "rotate" | "scale"
-export type Dialog = "new" | "saveAs" | "settings" | "project"
-export type SettingsCategory = "general" | "editor" | "camera" | "keybinds" | "appearance" | "lighting"
+export type Dialog = "new" | "saveAs" | "settings" | "project" | "replacePublished"
+export type SettingsCategory = "general" | "editor" | "camera" | "keybinds" | "appearance" | "lighting" | "game"
 
 const HISTORY_LIMIT = 200
 const SPEED_STEPS = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
@@ -84,6 +87,12 @@ const SPEED_STEPS = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
 export interface OpenFile {
   readonly name: string
   readonly path: string | null
+}
+
+/** A file in the game's maps folder that is the draft of a published map (`levelPublishedFileId` > 0). */
+export interface PublishedDraft {
+  readonly name: string
+  readonly publishedFileId: number
 }
 
 /** A recently opened or saved file (desktop). */
@@ -118,6 +127,10 @@ export interface EditorState {
   readonly recentFiles: ReadonlyArray<RecentFile>
   /** What the platform (browser or desktop app) offers; the browser's until the startup load says otherwise. */
   readonly capabilities: PlatformCapabilities
+  /** The game's folders as last looked up (desktop; null until Settings › Game asks). */
+  readonly gamePaths: GamePaths | null
+  /** Save to game found a published map's draft under the map's file name; the replacePublished dialog asks. */
+  readonly publishedDraft: PublishedDraft | null
   /** The desktop updater's state, once main has sent it; null in a browser. */
   readonly update: UpdateState | null
   readonly selectedIds: Selection
@@ -172,6 +185,9 @@ export interface EditorState {
   readonly markSaved: (from: Doc, map: MapFile, file: OpenFile) => void
   readonly setRecentFiles: (recentFiles: ReadonlyArray<RecentFile>) => void
   readonly setCapabilities: (capabilities: PlatformCapabilities) => void
+  readonly setGamePaths: (gamePaths: GamePaths) => void
+  /** Asks whether to replace a published map's draft in the maps folder (null forgets it). */
+  readonly setPublishedDraft: (draft: PublishedDraft | null) => void
   readonly setUpdate: (update: UpdateState) => void
   readonly placePiece: (piece: CatalogPiece, transform: ItemTransform) => void
   /**
@@ -324,6 +340,8 @@ export const useEditor = create<EditorState>()((set, get) => {
     file: null,
     recentFiles: [],
     capabilities: { filePaths: false, saveToGame: false, launchGame: false, play: false, updates: false },
+    gamePaths: null,
+    publishedDraft: null,
     update: null,
     selectedIds: [],
     tool: "translate",
@@ -363,6 +381,9 @@ export const useEditor = create<EditorState>()((set, get) => {
       set((s) => s.doc === from ? { doc: { ...s.doc, map }, dirty: false, file } : { file }),
     setRecentFiles: (recentFiles) => set({ recentFiles }),
     setCapabilities: (capabilities) => set({ capabilities }),
+    setGamePaths: (gamePaths) => set({ gamePaths }),
+    setPublishedDraft: (publishedDraft) =>
+      set({ publishedDraft, dialog: publishedDraft === null ? null : "replacePublished" }),
     setUpdate: (update) => set({ update }),
 
     placePiece: (piece, transform) => {

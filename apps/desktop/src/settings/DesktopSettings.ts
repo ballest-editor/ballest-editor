@@ -12,11 +12,20 @@ export const WindowState = Schema.Struct({
 })
 export type WindowState = typeof WindowState.Type
 
+/** Game folders chosen in settings in place of the ones found through Steam (game/GamePaths.ts). */
+export const GamePathOverrides = Schema.Struct({
+  install: Schema.optional(Schema.String),
+  mapsFolder: Schema.optional(Schema.String),
+  pluginsFolder: Schema.optional(Schema.String)
+})
+export type GamePathOverrides = typeof GamePathOverrides.Type
+
 /** `desktop-settings.json`: what the main process remembers between runs. The renderer's settings live in its own storage. */
 export const DesktopSettingsFile = Schema.Struct({
   window: Schema.optional(WindowState),
   /** Map files opened or saved, most recent first (files/MapFiles.ts keeps at most 8). */
-  recentMaps: Schema.optional(Schema.Array(Schema.String))
+  recentMaps: Schema.optional(Schema.Array(Schema.String)),
+  game: Schema.optional(GamePathOverrides)
 })
 export type DesktopSettingsFile = typeof DesktopSettingsFile.Type
 
