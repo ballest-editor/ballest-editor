@@ -2,11 +2,11 @@
 
 Status: planned (milestone 0.2, GitHub project [Ballest Editor](https://github.com/orgs/ballest-editor/projects/1)). Written 2026-10-30.
 
-The editor becomes an Electron app for Windows and Linux. The web build stays, but only as a review preview for pull requests. This page is the design; the issues under milestone 0.2 are the work.
+The editor becomes an Electron app for Windows and Linux. The web build stays, but only as a review build for pull requests and `main`. This page is the design; the issues under milestone 0.2 are the work.
 
 ## Why
 
-- **Egress.** The game's meshes and textures (53 MB compressed) are served to every browser session from Vercel Blob. Once the editor is open source and public, a website would pay for that on every visit. A desktop app ships them once, inside the installer.
+- **Egress.** The game's meshes and textures (53 MB compressed) were served to every browser session from a hosted object store. Once the editor is open source and public, a website would pay for that on every visit. A desktop app ships them once, inside the installer.
 - **The game is local.** The maps folder, the game launch and the plugin manager's play handoff (below) all need the file system and the shell, which a browser doesn't get.
 - **No server.** The app has one route and no server functions; SSR buys nothing for a WebGL editor and costs a hydration workaround (`panelWidthsScript`).
 
@@ -89,9 +89,9 @@ Later: an `Editor::OpenLocal` host API for "open in the in-game editor", and a f
 
 ### Assets
 
-The extractor's output can't be rebuilt on CI (it needs the game). The compressed tree (`web-assets/`, meshopt + AVIF, 53 MB) is published as an **asset pack**: a tarball attached to a GitHub release tagged `assets-<tree-hash>`, with `tools/compress/web-assets.json` recording the tag and the tarball's SHA-256. `tools/compress/download.mjs` fetches and verifies it when `web-assets/` is missing; `//#assets` in turbo tries the local extractor output first, then the download. Desktop builds copy `assets/` (small committed files) and `web-assets/` into `extraResources`. The web build inlines the same files as static output, as today. Vercel builds through `turbo run build --filter=@ballest/web` (`apps/web/vercel.json`) so the download runs first.
+The extractor's output can't be rebuilt on CI (it needs the game). The compressed tree (`web-assets/`, meshopt + AVIF, 53 MB) is published as an **asset pack**: a tarball attached to a GitHub release tagged `assets-<tree-hash>`, with `tools/compress/web-assets.json` recording the tag and the tarball's SHA-256. `tools/compress/download.mjs` fetches and verifies it when `web-assets/` is missing; `//#assets` in turbo tries the local extractor output first, then the download. Desktop builds copy `assets/` (small committed files) and `web-assets/` into `extraResources`. The web build inlines the same files as static output. Vercel builds it through `turbo run build --filter=@ballest/web` (`apps/web/vercel.json`) so the download runs first.
 
-Vercel Blob is retired: GitHub release downloads are free, and contributors without the game can build. `assetUrl.ts` loses its Blob branch; both platforms address assets at `/assets/*` (the protocol handler maps that on desktop).
+Release downloads are free, and contributors without the game can build. `assetUrl.ts` addresses every asset at `/assets/*` on both platforms (the protocol handler maps that on desktop).
 
 ### Packaging and release
 
@@ -100,6 +100,7 @@ Vercel Blob is retired: GitHub release downloads are free, and contributors with
 - **Workflow `release.yml`:** on tag `v*.*.*` (or by hand with a tag), only in `ballest-editor/ballest-editor`. Builds the JS once, then one job per target (`release-desktop.yml`), then a release job that checks the installers, the Windows blockmap and `latest.yml` / `latest-linux.yml` against the version, writes `SHA256SUMS`, and publishes with `softprops/action-gh-release`. Drafted until every asset is attached; `-rc.N` tags are prereleases, never "latest".
 - **Updates:** `electron-updater` against GitHub Releases (`autoDownload: false`; the menu bar shows "update available → download → restart"). Disabled in dev, when unpackaged, and when `BALLEST_DISABLE_AUTO_UPDATE` is set. A mock update server (`tools/release/mock-update-server.ts`, generic provider on localhost) exercises the flow before a real release.
 - **Signing:** unsigned at first (SmartScreen warns on Windows). Signing is an open-source milestone item: SignPath's OSS program or Azure Trusted Signing, done in the Windows job with env-gated secrets so fork PRs never see them.
+- **Web review build:** Vercel deploys the web build for every pull request (a preview URL) and for `main` (production), so a change can be tried without installing anything. It isn't the product; users install the desktop app from the latest release.
 - **CI on PRs:** still to come (#69): build the desktop bundle unpacked on Linux and Windows runners and launch it under Xvfb for a smoke check (window appears, catalog loads). Packaging and signing only on tags. Until then, `pnpm release:smoke` (stage the build, lay it out unpacked with electron-builder, check the config, bundles and assets are in place) runs in the release workflow before packaging, and locally when packaging changes.
   - **Xvfb has no GPU, so the editor can't render there as-is.** Found while testing `pnpm dev:desktop` under Xvfb (2026-10-30): Chromium logs `WebGL2 blocklisted`, three.js fails to create its context, and the editor's error boundary replaces the page ("Something went wrong"). The window, the protocol handler, IPC and the catalog fetch all still work. So the smoke check either asserts only on those, or turns on software GL and also checks that the canvas mounted: `--use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist` renders the editor under Xvfb (checked against the packaged AppImage, #124). `start-electron.ts` passes its arguments through to Electron; `dev-electron.ts` doesn't take extra flags yet.
   - Running it locally on a Wayland desktop: Electron picks Wayland whenever `WAYLAND_DISPLAY` or `XDG_SESSION_TYPE=wayland` is set, even with `DISPLAY=:99`, and the window opens on the real screen. Unset both and set `ELECTRON_OZONE_PLATFORM_HINT=x11` to keep it on Xvfb. CI runners have no Wayland session, so this only matters on a developer machine.
@@ -117,7 +118,7 @@ Turbo: `apps/desktop#build` depends on `apps/web#build` and `//#assets`; `//#ass
 1. Drop TanStack Start; plain Vite SPA. Small and independently reviewable; everything else assumes it.
 2. Split into `apps/web`, `apps/desktop`, `packages/contracts`; Electron shell that loads the web build. First window.
 3. `Platform` service with both layers; native open/save.
-4. Asset pack on GitHub Releases; bundle into the app; retire Blob.
+4. Asset pack on GitHub Releases; bundle into the app; the web build serves them itself.
 5. Game paths, Save to game, Launch game.
 6. `ballest-editor-link` plugin and Play.
 7. Packaging, release workflow, updates, CI smoke.
@@ -129,6 +130,6 @@ Not desktop work, but it falls out of the same decision; tracked as issues under
 
 - **Rights.** Confirm with the developers, in writing, that permission covers redistributing extracted meshes, textures and shaders (the asset pack) and the Workshop maps in `samples/` by other creators. Pick a license for our code (MIT like the plugin manager, or Apache-2.0); state that game assets are the game's.
 - **Fork-safe CI.** `pull_request` jobs get no secrets; anything with `pull_request_target` never checks out PR code; one required check job (`Check`, `if: always()`); "require approval for first-time contributors" on Actions; branch protection on `main` (PRs only, required check, linear history). Release workflow guarded by `github.repository == 'ballest-editor/ballest-editor'`.
-- **Repo hygiene.** Audit history for tokens (`.env.local`, Blob tokens), rotate anything found. `CONTRIBUTING.md` (scope rules, one problem per PR, screenshots for UI), issue and PR templates, `SECURITY.md`, `CODEOWNERS`, Dependabot or Renovate.
+- **Repo hygiene.** Audit history for tokens (`.env.local`, storage tokens), rotate anything found. `CONTRIBUTING.md` (scope rules, one problem per PR, screenshots for UI), issue and PR templates, `SECURITY.md`, `CODEOWNERS`, Dependabot or Renovate.
 - **Signing.** See above.
 - **Vendored `repos/`.** Keep (they're MIT) but say so in a `third-party-licenses` note; add a `pnpm licenses` sync.
