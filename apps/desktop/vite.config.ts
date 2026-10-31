@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { defineConfig, type EnvironmentOptions, type Plugin } from "vite"
@@ -37,12 +38,39 @@ const checkPreload = (): Plugin => ({
   }
 })
 
+const entries = { main: "src/main.ts", preload: "src/preload.ts" }
+
+/**
+ * `vite build --watch` (`pnpm dev:desktop`) runs Electron alongside itself, like tsdown's `onSuccess`, once both
+ * bundles are on disk: `builder.build` returns as soon as a watcher is set up, before anything is written. The runner
+ * restarts Electron when the bundles change and exits when this process does (its IPC channel closes). If it gives up
+ * (no dev server), so does the watch build, and turbo stops the session.
+ */
+const devElectron = (): Plugin => {
+  const written = new Set<string>()
+  let started = false
+  return {
+    name: "ballest:dev-electron",
+    // One instance for both environments, so it sees each one's first write.
+    sharedDuringBuild: true,
+    writeBundle() {
+      if (!this.meta.watchMode || started) return
+      written.add(this.environment.name)
+      if (written.size < Object.keys(entries).length) return
+      started = true
+      const child = spawn(process.execPath, [path.join(import.meta.dirname, "scripts/dev-electron.ts")], {
+        stdio: ["inherit", "inherit", "inherit", "ipc"]
+      })
+      child.on("exit", (code) => {
+        if (code !== 0) process.exit(code ?? 1)
+      })
+    }
+  }
+}
+
 export default defineConfig({
-  plugins: [checkPreload()],
-  environments: {
-    main: cjsEnvironment("src/main.ts"),
-    preload: cjsEnvironment("src/preload.ts")
-  },
+  plugins: [checkPreload(), devElectron()],
+  environments: { main: cjsEnvironment(entries.main), preload: cjsEnvironment(entries.preload) },
   builder: {
     // Both environments write into one directory, so it is emptied once here instead of by each build.
     buildApp: async (builder) => {

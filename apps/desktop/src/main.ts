@@ -16,6 +16,11 @@ import { DesktopWindow } from "./window/DesktopWindow"
 // `ready`, so this runs synchronously at load, before the runtime starts.
 registerSchemePrivileges()
 
+// scripts/dev-electron.ts keeps each checkout's dev profile in that checkout. Set before `ready`, so the session's
+// storage (localStorage) moves with it.
+const userDataDir = process.env["BALLEST_USER_DATA_DIR"]
+if (userDataDir !== undefined) Electron.app.setPath("userData", userDataDir)
+
 const layerElectron = Layer.mergeAll(
   ElectronApp.layer,
   ElectronDialog.layer,

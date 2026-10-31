@@ -76,12 +76,24 @@ const repoAssets = (): Plugin => {
   }
 }
 
+/**
+ * `pnpm dev` and `pnpm dev:desktop` (tools/dev) pick a port per checkout and pass it in `PORT` and `HOST`. The port
+ * is strict: the Electron window is pointed at this exact URL, and falling back to the next port would show it
+ * whatever else holds this one. In Electron the page's own URL (`ballest-dev://app/`) has no host or port, so the HMR
+ * client is told where the socket is.
+ */
+const devServer = () => {
+  const host = process.env["HOST"] ?? "localhost"
+  const port = Number(process.env["PORT"] ?? 3000)
+  return { host, port, strictPort: true, ws: { host, clientPort: port } }
+}
+
 export default defineConfig(() => {
   if (!fs.existsSync(path.join(webAssets, "pieces"))) {
     console.warn("[ballest] no web-assets/: meshes and textures will 404 (run `pnpm assets`)")
   }
   return {
-    server: { port: 3000 },
+    server: devServer(),
     preview: { port: 3000 },
     resolve: { tsconfigPaths: true },
     plugins: [repoAssets(), tailwindcss(), tanstackRouter({ target: "react", autoCodeSplitting: true }), viteReact()]

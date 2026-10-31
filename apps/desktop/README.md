@@ -2,7 +2,15 @@
 
 The Electron shell around the editor. It opens a window, serves the web build into it, and gives the page a small, typed API for things a browser can't do (files, the game, the shell). The editor itself is `apps/web`; nothing React lives here.
 
-Run it against the production web build:
+Develop it from the repo root:
+
+```sh
+pnpm dev:desktop    # Vite for the page, a watch build for main and preload, and Electron
+```
+
+Edits to the page hot-reload in the window. Edits under `src/` here rebuild `main.cjs` or `preload.cjs`, and Electron restarts. Ctrl+C stops everything. Each checkout gets its own port (3000 for the main one, a fixed one per worktree) and its own profile in `.dev-user-data/`, so worktrees can run side by side. `BALLEST_REMOTE_DEBUGGING_PORT=9222 pnpm dev:desktop` lets Chrome DevTools (or a CDP script) attach on that port.
+
+Or run it against the production web build:
 
 ```sh
 pnpm build                              # apps/web/dist, then dist-electron/
@@ -43,7 +51,7 @@ The preload is the only code that holds `ipcRenderer`, so the page can only send
 | Scheme           | Serves                                        | When                        |
 | ---------------- | --------------------------------------------- | --------------------------- |
 | `ballest://`     | `apps/web/dist` from disk                     | `pnpm start`, installed app |
-| `ballest-dev://` | forwards every request to the Vite dev server | `VITE_DEV_SERVER_URL` set   |
+| `ballest-dev://` | forwards every request to the Vite dev server | `pnpm dev:desktop`          |
 
 They are separate schemes because Chromium keys localStorage by origin. A dev run can't overwrite the settings and keybinds of the installed copy. And only the production scheme turns on V8's code cache, which only pays off for files that don't change.
 
@@ -125,8 +133,10 @@ src/
   settings/   desktop-settings.json
   window/     DesktopWindow: the editor window and its bounds
 scripts/
-  start-electron.mjs      launches Electron; clears ELECTRON_RUN_AS_NODE, which
+  electron.ts             the Electron binary and its environment, minus ELECTRON_RUN_AS_NODE, which
                           Electron-based terminals export and which turns the binary into plain Node
+  start-electron.ts       `pnpm start`: Electron against the production build
+  dev-electron.ts         `pnpm dev:desktop`: Electron against Vite, restarted when the bundles change
   verifyPreloadBundle.ts  the build check above
 ```
 
