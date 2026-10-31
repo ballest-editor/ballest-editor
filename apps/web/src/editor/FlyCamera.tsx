@@ -23,6 +23,7 @@ const FAST_MULTIPLIER = 4
 const LOOK_SENSITIVITY = 0.0025 // radians per pixel at sensitivity 1
 const KEY_LOOK_SPEED = 1.6 // radians per second for the arrow-key look actions
 const ORBIT_DISTANCE = 1500 // orbit pivot ahead of the camera when the old one is behind it
+const LOCK_SETTLE_MS = 50 // moves dropped after a pointer lock is asked for, taken or lost
 
 export const isTypingTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement &&
@@ -103,10 +104,31 @@ export function FlyCamera() {
 
     // Pointer lock (the "lock pointer" setting) hides the cursor and keeps it in place while
     // dragging, so a long look never hits the edge of the screen. Locking releases the pointer
-    // capture; losing the lock mid-drag (Esc) takes the capture back.
+    // capture; losing the lock mid-drag (Esc) takes the capture back. Browsers report the
+    // cursor's jump into and out of the lock as movement, so moves are dropped around a change.
     let dragPointer: number | null = null
+    let settleUntil = 0
+    const settle = () => {
+      settleUntil = performance.now() + LOCK_SETTLE_MS
+    }
     const locked = () => document.pointerLockElement === el
+    const wantsLock = () => {
+      const mode = useEditor.getState().settings.camera.lockPointer
+      return mode === "always" || (mode === "desktop" && window.ballest !== undefined)
+    }
+    // Raw input where the browser has it: Firefox rounds each locked move to whole pixels, so
+    // slow diagonals come out as staircases. Denied (no support, the Esc cool-down) is fine:
+    // the drag carries on with the capture. Safari returns no promise and ignores the option.
+    const lock = () => {
+      settle()
+      void Promise.resolve(el.requestPointerLock({ unadjustedMovement: true })).catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "NotSupportedError" && drag.current !== null) {
+          void Promise.resolve(el.requestPointerLock()).catch(() => undefined)
+        }
+      })
+    }
     const onLockChange = () => {
+      settle()
       if (locked()) {
         // granted after a quick click was already released
         if (drag.current === null) document.exitPointerLock()
@@ -132,15 +154,13 @@ export function FlyCamera() {
       }
       dragPointer = e.pointerId
       el.setPointerCapture(e.pointerId)
-      // Denied (no support, the Esc cool-down) is fine: the drag carries on with the capture.
-      if (useEditor.getState().settings.camera.lockPointer) {
-        void Promise.resolve(el.requestPointerLock()).catch(() => undefined)
-      }
+      if (wantsLock()) lock()
       euler.current.setFromQuaternion(camera.quaternion, "YXZ")
       e.preventDefault()
     }
     const onPointerMove = (e: PointerEvent) => {
       if (drag.current === null) return
+      if (performance.now() < settleUntil) return
       if (drag.current === "pan") {
         const scale = Math.max(1, camera.position.distanceTo(target.current) * 0.0015)
         const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion)

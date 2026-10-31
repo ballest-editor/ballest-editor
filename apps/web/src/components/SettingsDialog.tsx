@@ -527,8 +527,24 @@ export function SettingsDialog(props: {
         id: "lockPointer",
         ...setting("camera", "lockPointer"),
         label: "Lock pointer while looking",
-        description: "Hide the cursor and keep it in place while dragging the camera.",
-        control: <Switch checked={c.lockPointer} onCheckedChange={(v) => update("camera", { lockPointer: v })} />
+        description:
+          "Hide the cursor and keep it in place while dragging the camera. Browsers show a notice on every lock, and Firefox on Linux turns slow diagonal looks into steps.",
+        control: (
+          <Select
+            value={c.lockPointer}
+            items={{ desktop: "Desktop app only", always: "Always", never: "Never" }}
+            onValueChange={(v) => v !== null && update("camera", { lockPointer: v })}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="desktop">Desktop app only</SelectItem>
+              <SelectItem value="always">Always</SelectItem>
+              <SelectItem value="never">Never</SelectItem>
+            </SelectContent>
+          </Select>
+        )
       },
       {
         id: "movementNeedsLook",
