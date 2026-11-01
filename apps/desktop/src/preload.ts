@@ -1,6 +1,7 @@
 import type { DesktopBridge, PlaySessionEnded, UnloadKind, UpdateState } from "@ballest/contracts"
 import { contextBridge, ipcRenderer } from "electron"
 import {
+  CHECK_EXPORTS_CHANNEL,
   CHOOSE_GAME_PATH_CHANNEL,
   CHOOSE_PROJECT_CHANNEL,
   CONFIRM_UNSAVED_CHANNEL,
@@ -29,6 +30,7 @@ import {
   PROJECT_STATE_CHANNEL,
   READ_BACKUP_CHANNEL,
   READ_MAP_CHANNEL,
+  REIMPORT_MAP_CHANNEL,
   REMEMBER_GAME_LINK_CHANNEL,
   RENAME_MAP_CHANNEL,
   RESET_GAME_PATH_CHANNEL,
@@ -82,6 +84,8 @@ contextBridge.exposeInMainWorld(
     pickImport: () => ipcRenderer.invoke(PICK_IMPORT_CHANNEL),
     importMap: (payload) => ipcRenderer.invoke(IMPORT_MAP_CHANNEL, payload),
     exportMap: (payload) => ipcRenderer.invoke(EXPORT_MAP_CHANNEL, payload),
+    checkExports: () => ipcRenderer.invoke(CHECK_EXPORTS_CHANNEL),
+    reimportMap: (fileName) => ipcRenderer.invoke(REIMPORT_MAP_CHANNEL, { fileName }),
     listBackups: () => ipcRenderer.invoke(LIST_BACKUPS_CHANNEL),
     readBackup: (ref) => ipcRenderer.invoke(READ_BACKUP_CHANNEL, ref),
     setWindowTheme: (dark) => ipcRenderer.invoke(SET_WINDOW_THEME_CHANNEL, { dark }),

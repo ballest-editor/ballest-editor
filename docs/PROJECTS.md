@@ -6,7 +6,8 @@ unsaved-changes prompt before closing or replacing the open map (#70; [DESKTOP.m
 on overwrite with Recover (#137; [DESKTOP.md](DESKTOP.md) § Backups). Of phase 2, the status bar, the notification
 centre, the Start tab (plain list) and the document tabs are built (#140; [DESKTOP.md](DESKTOP.md) § Renderer describes
 them), and so is the Game link checklist with its notifications (#134; [DESKTOP.md](DESKTOP.md) § Renderer). Play
-is built (#66; [DESKTOP.md](DESKTOP.md) § Play), with the end of its game session as the hook for sync detection (#141). [DESKTOP.md](DESKTOP.md) describes the shell this runs in; [FORMAT.md](FORMAT.md) the
+is built (#66; [DESKTOP.md](DESKTOP.md) § Play). Phase 3, sync with the in-game editor, is built too (#141; § Sync
+below, [DESKTOP.md](DESKTOP.md) § Sync). [DESKTOP.md](DESKTOP.md) describes the shell this runs in; [FORMAT.md](FORMAT.md) the
 game's file format, which none of this changes.
 
 ## The three nouns
@@ -51,9 +52,10 @@ file the user picked to import; the page names maps by file name, never by path.
   under its own name gets `export` (and `lastSeenHash`) equal to its `origin`, so it is linked from the start. Rename
   moves the entry to the new file name. The `MapLinks` service owns the file: one update at a time, atomic writes,
   and a file that doesn't decode reads as empty. Sync detection (#141) compares a game file's hash with
-  `export.hash` and `lastSeenHash`.
+  `export.hash` and `lastSeenHash`, and keeps the hash it saw in `lastSeenHash`; Re-import sets `export` and
+  `lastSeenHash` to the game file it took; an export found gone sets both to null (`origin` stays).
 - **`.ballest/backups/<time> <file name>`**: the project's copy of a map before anything wrote over it (Save,
-  Duplicate over it, Import replacing it, later Re-import) and the old file after a Rename. The game's copy before an
+  Duplicate over it, Import replacing it, Re-import) and the old file after a Rename. The game's copy before an
   Export (or Play) wrote over it goes to `<userData>/backups/` under the same naming, since it belongs to this machine,
   not the project. Both go through one step, `Backups.overwrite`; unchanged bytes keep nothing; each folder keeps 20
   versions per file for 30 days (`desktop-settings.json` › `backups`). Map › Recover previous version… opens one as
@@ -144,6 +146,27 @@ before git.
 Link states, shown in the status bar and on the Start tab: **Not exported**, **In sync**, **Edited
 since export**, **Changed in game**, **Both changed**, **Published draft** (the export has a
 `levelPublishedFileId`).
+
+What is built (#141; [DESKTOP.md](DESKTOP.md) § Sync):
+
+- **The check** is main's `checkExports`: for every map whose link has an export in the game's maps folder, the
+  export's SHA-256 against `export.hash` and `lastSeenHash`, by bytes. The game rewriting `editorState` on its own save
+  counts as a change; nothing is normalised. The hash seen goes into `lastSeenHash`, so a version is reported once
+  however many checks see it. Checks run one at a time in main, and the page joins a check already running rather
+  than starting another (the game closing brings both the focus and the end of Play's session).
+- **The state** comes from the link alone: an export whose `lastSeenHash` differs from `export.hash` is Changed in
+  game, or Both changed when the project map was saved or has unsaved edits since the export.
+- **The notification** is one per change, kind `changedInGame`, not pinned: **Re-import** and **Ignore**. Ignore only
+  marks it read; the state stays Changed in game until a Re-import or an Export settles it.
+- **Export deleted in the game** drops `export` and `lastSeenHash`, with no notification. A maps folder that isn't
+  there (the game not found, a library drive unmounted) drops nothing: nothing is checked.
+- **The Export confirm** also guards Play's export and Export on save. Main answers `ChangedInGame` instead of writing
+  (and marks the version seen, so the next focus doesn't report it again). Back up and overwrite exports after all,
+  through the same backup step; Re-import first re-imports and exports nothing. A game file that already holds the
+  bytes being exported doesn't ask.
+- **Re-import** (the notification, the status bar popover, Map › Re-import from game) asks about the open map's unsaved
+  edits first when it is the one re-imported, then copies the game's file into the project byte for byte through
+  `Backups.overwrite`, records it as the export and reloads the open map.
 
 A third out-of-band case, the project file itself changing under the editor (git pull, another
 tool), is reloaded when the open map has no unsaved edits and reported otherwise. Deferred until git.
@@ -238,7 +261,7 @@ disk (a folder, one JSON file, a hash) and large in how the app reads; that is t
 | #118 install the plugin, #66 Play               | Keep; Play exports first and records the link. Install plugin is a Game link row.                                                                   |
 | #140 status bar, notifications, Start tab       | Done (phase 2).                                                                                                                                     |
 | #134 game link checklist                        | Done (phase 2; #135 merged into it): the checklist on the Start tab, and notifications when a result changes between launches.                      |
-| #141 sync detection, Export confirm, Re-import  | New, phase 3.                                                                                                                                       |
+| #141 sync detection, Export confirm, Re-import  | Done (phase 3).                                                                                                                                     |
 | #112 sidecar                                    | Move to 0.4; add "re-match on Re-import" to its scope.                                                                                              |
 | #81, #111 hide, lock, layers                    | Move to 0.4.                                                                                                                                        |
 | #103 Workshop browser, #104 multi-map, #105 git | Move to 0.5; #103 gains "the maps folder list on the Start tab" as its first slice.                                                                 |

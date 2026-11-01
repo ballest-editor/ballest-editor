@@ -24,13 +24,14 @@ import {
   exportToGame,
   launchGame,
   openProjectMap,
+  reimportMap,
   revealProject,
   setExportOnSave,
   switchProject,
   updateSettings
 } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
-import { useEditor } from "../editor/store"
+import { useEditor, useOpenProjectMap } from "../editor/store"
 
 /** The action's primary binding, as the menu shows it (nothing when unbound). */
 function Shortcut({ action }: { readonly action: KeybindAction }) {
@@ -152,6 +153,9 @@ export function MenuBar() {
   const hasFile = useEditor((s) => s.file !== null)
   const exportOnSave = useEditor((s) => s.exportOnSave)
   const mapOpen = useEditor((s) => s.mapOpen)
+  // Re-import needs an export to take the map from
+  const exportedFile = useOpenProjectMap()?.map
+  const reimportable = exportedFile?.link?.export != null ? exportedFile.fileName : null
   // the Edit and View commands act on the map in front; Start may cover it
   const onMap = useEditor((s) => s.activeTab === "map")
   const showStart = useEditor((s) => s.showStart)
@@ -294,6 +298,13 @@ export function MenuBar() {
           <>
             <MenubarSeparator />
             <MenubarItem inset disabled={!mapOpen} onClick={() => void exportToGame()}>Export to game</MenubarItem>
+            <MenubarItem
+              inset
+              disabled={reimportable === null}
+              onClick={() => reimportable !== null && void reimportMap(reimportable)}
+            >
+              Re-import from game
+            </MenubarItem>
             <MenubarCheckboxItem
               closeOnClick
               disabled={!mapOpen}

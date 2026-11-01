@@ -96,7 +96,7 @@ describe("GamePlay.play", () => {
     runScoped(Effect.gen(function*() {
       const { fs, path, steam, game, link, play, playJson } = yield* setup
       yield* link.installPlugin
-      const result = played(yield* play.play({ fileName: name, replacePublished: false }))
+      const result = played(yield* play.play({ fileName: name, replacePublished: false, overwriteChanged: false }))
       const exported = path.join(steam.maps, name)
       assert.strictEqual(yield* fs.readFileString(exported), mapText(-1))
       assert.deepStrictEqual(result.file, { path: exported, name })
@@ -109,7 +109,7 @@ describe("GamePlay.play", () => {
 
       // Again, with the game up: a new nonce, no second launch.
       game.running = true
-      const again = played(yield* play.play({ fileName: name, replacePublished: false }))
+      const again = played(yield* play.play({ fileName: name, replacePublished: false, overwriteChanged: false }))
       assert.strictEqual(again.launch, "running")
       assert.strictEqual(game.launches, 1)
       const second = yield* readPlay(fs, playJson)
@@ -125,7 +125,7 @@ describe("GamePlay.play", () => {
   it.effect("without the plugin, exports and starts the game but writes nothing into the plugins folder", () =>
     runScoped(Effect.gen(function*() {
       const { fs, path, steam, game, play } = yield* setup
-      const result = played(yield* play.play({ fileName: name, replacePublished: false }))
+      const result = played(yield* play.play({ fileName: name, replacePublished: false, overwriteChanged: false }))
       assert.deepInclude(result, { sent: false, launch: "launched" })
       assert.strictEqual(result.plugin.status, "missing")
       assert.isTrue(yield* fs.exists(path.join(steam.maps, name)))
@@ -137,7 +137,10 @@ describe("GamePlay.play", () => {
     runScoped(Effect.gen(function*() {
       const { game, play } = yield* setup
       game.steamAnswers = false
-      assert.strictEqual(played(yield* play.play({ fileName: name, replacePublished: false })).launch, "failed")
+      assert.strictEqual(
+        played(yield* play.play({ fileName: name, replacePublished: false, overwriteChanged: false })).launch,
+        "failed"
+      )
     })))
 
   it.effect("refuses a published map, which the plugin manager won't race, and writes nothing", () =>
@@ -145,7 +148,7 @@ describe("GamePlay.play", () => {
       const { fs, path, steam, game, projects, link, play, playJson } = yield* setup
       yield* link.installPlugin
       yield* projects.save(name, mapText(3561234567))
-      assert.deepStrictEqual(yield* play.play({ fileName: name, replacePublished: false }), {
+      assert.deepStrictEqual(yield* play.play({ fileName: name, replacePublished: false, overwriteChanged: false }), {
         _tag: "PublishedMap",
         fileName: name,
         publishedFileId: 3561234567
@@ -162,13 +165,13 @@ describe("GamePlay.play", () => {
       const draft = path.join(steam.maps, name)
       yield* fs.makeDirectory(steam.maps, { recursive: true })
       yield* fs.writeFileString(draft, mapText(3561234567))
-      assert.deepStrictEqual(yield* play.play({ fileName: name, replacePublished: false }), {
+      assert.deepStrictEqual(yield* play.play({ fileName: name, replacePublished: false, overwriteChanged: false }), {
         _tag: "Published",
         file: { path: draft, name },
         publishedFileId: 3561234567
       })
       assert.isFalse(yield* fs.exists(playJson))
-      played(yield* play.play({ fileName: name, replacePublished: true }))
+      played(yield* play.play({ fileName: name, replacePublished: true, overwriteChanged: false }))
       assert.strictEqual(yield* fs.readFileString(draft), mapText(-1))
       // The game's copy it wrote over is in the backups.
       assert.lengthOf(yield* fs.readDirectory(path.join(dir, "userData", "backups")), 1)
@@ -184,13 +187,13 @@ describe("GamePlay.sessionEnds", () => {
       const ends = yield* Stream.runCollect(Stream.take(play.sessionEnds, 1)).pipe(Effect.forkChild)
       yield* settle
 
-      yield* play.play({ fileName: name, replacePublished: false })
+      yield* play.play({ fileName: name, replacePublished: false, overwriteChanged: false })
       yield* settle
       // The game takes a while to start.
       yield* TestClock.adjust(SESSION_POLL)
       game.running = true
       yield* TestClock.adjust(SESSION_POLL)
-      yield* play.play({ fileName: other, replacePublished: false })
+      yield* play.play({ fileName: other, replacePublished: false, overwriteChanged: false })
       yield* TestClock.adjust("1 minute")
       assert.lengthOf(sent, 0)
 
@@ -212,7 +215,7 @@ describe("GamePlay.sessionEnds", () => {
   it.effect("drops a session whose game never started, and follows the next Play's", () =>
     runScoped(Effect.gen(function*() {
       const { game, sent, play } = yield* setup
-      yield* play.play({ fileName: name, replacePublished: false })
+      yield* play.play({ fileName: name, replacePublished: false, overwriteChanged: false })
       yield* settle
       yield* TestClock.adjust("10 minutes")
       game.running = true
@@ -222,7 +225,7 @@ describe("GamePlay.sessionEnds", () => {
       assert.lengthOf(sent, 0)
 
       game.running = true
-      yield* play.play({ fileName: name, replacePublished: false })
+      yield* play.play({ fileName: name, replacePublished: false, overwriteChanged: false })
       yield* settle
       game.running = false
       yield* TestClock.adjust(SESSION_POLL)

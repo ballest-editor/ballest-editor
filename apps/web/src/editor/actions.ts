@@ -1,5 +1,5 @@
 /** UI-facing operations that run Effects through the single app runtime. */
-import { Cause, Effect, Exit, Fiber, Option, Queue, Stream } from "effect"
+import { Cause, Deferred, Effect, Exit, Fiber, Option, Queue, Stream } from "effect"
 import { toast } from "sonner"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { asNewDraft, isNeverPublished, setLevelNames } from "../domain/edits"
@@ -36,6 +36,7 @@ import { type ExportedMap, MapExporter } from "../services/MapExporter"
 import { MapPrefsStore } from "../services/MapPrefsStore"
 import { MaterialLibrary } from "../services/MaterialLibrary"
 import {
+  type ExportOptions,
   type GamePathKind,
   type GamePaths,
   type MapBackup,
@@ -233,6 +234,7 @@ export const loadPlatform = () =>
       yield* refreshProject
       yield* findCreatorEffect
       if (capabilities.exportToGame) yield* checkGameLinkEffect
+      yield* checkExportsEffect
     })
   )
 
@@ -492,7 +494,7 @@ const writeOpenMap = Effect.fn("writeOpenMap")(function*(file: OpenFile, options
     saved.fileName === file.name ? `Saved ${label}` : `Renamed ${mapLabelOf(file.name)} to ${label}`,
     { kind: saved.fileName === file.name ? "mapSaved" : "mapRenamed", actions: [revealIn("project")] }
   )
-  if (options.exportAfter && useEditor.getState().exportOnSave) yield* exportProjectMap(saved.fileName, false)
+  if (options.exportAfter && useEditor.getState().exportOnSave) yield* exportProjectMap(saved.fileName, ASK_FIRST)
   return saved
 })
 
@@ -627,14 +629,28 @@ export const duplicateMapEffect = Effect.fn("duplicateMapEffect")(
 export const duplicateMap = (displayName: string, creatorName: string, replace = false) =>
   run(duplicateMapEffect(displayName, creatorName, replace))
 
-/** Copies a saved project map into the game's maps folder; a published map's draft there asks first. */
-const exportProjectMap = Effect.fn("exportProjectMap")(function*(fileName: string, replacePublished: boolean) {
-  const exported = yield* (yield* Platform).exportMap(fileName, { replacePublished })
+/** Export and Play write over nothing they weren't told to: a published map's draft and a changed export ask first. */
+const ASK_FIRST: ExportOptions = { replacePublished: false, overwriteChanged: false }
+
+/**
+ * Copies a saved project map into the game's maps folder. A published map's draft there asks first, and so does an
+ * export the game changed since the last export.
+ */
+const exportProjectMap = Effect.fn("exportProjectMap")(function*(fileName: string, options: ExportOptions) {
+  const exported = yield* (yield* Platform).exportMap(fileName, options)
   if (exported._tag === "Published") {
     useEditor.getState().setPublishedDraft({
       name: exported.file.name,
       publishedFileId: exported.publishedFileId,
       from: "export"
+    })
+    return
+  }
+  if (exported._tag === "ChangedInGame") {
+    useEditor.getState().setChangedExport({
+      name: exported.file.name,
+      from: "export",
+      replacePublished: options.replacePublished
     })
     return
   }
@@ -674,8 +690,8 @@ const withSavedOpenMap = <E, R>(then: (fileName: string) => Effect.Effect<void, 
  * editor lists it. The export is a copy of the project file, so unsaved edits are saved first. A map with no file yet
  * is named first.
  */
-export const exportToGameEffect = (replacePublished: boolean) =>
-  withSavedOpenMap((fileName) => exportProjectMap(fileName, replacePublished))
+export const exportToGameEffect = (replacePublished: boolean, overwriteChanged = false) =>
+  withSavedOpenMap((fileName) => exportProjectMap(fileName, { replacePublished, overwriteChanged }))
 
 export const exportToGame = () => run(exportToGameEffect(false))
 
@@ -685,6 +701,29 @@ export const replacePublishedDraft = () => {
   useEditor.getState().setPublishedDraft(null)
   return run(from === "play" ? playEffect(true) : exportToGameEffect(true))
 }
+
+/**
+ * The overwriteChanged dialog's Back up and overwrite: Export (or Play) writes over the game's changed copy after all;
+ * that copy goes to the backups, as everything Export writes over does.
+ */
+export const overwriteChangedEffect = Effect.suspend(() => {
+  const changed = useEditor.getState().changedExport
+  useEditor.getState().setChangedExport(null)
+  if (changed === null) return Effect.void
+  const { from, replacePublished } = changed
+  return from === "play" ? playEffect(replacePublished, true) : exportToGameEffect(replacePublished, true)
+})
+
+export const overwriteChangedExport = () => run(overwriteChangedEffect)
+
+/** The overwriteChanged dialog's Re-import first: the game's version replaces the project's; nothing is exported. */
+export const reimportFirstEffect = Effect.suspend(() => {
+  const changed = useEditor.getState().changedExport
+  useEditor.getState().setChangedExport(null)
+  return changed === null ? Effect.void : reimportMapEffect(changed.name)
+})
+
+export const reimportFirst = () => run(reimportFirstEffect)
 
 // --- Play (docs/DESKTOP.md § Play) -----------------------------------------------------------
 
@@ -711,15 +750,25 @@ const notifyPlayed = (fileName: string, played: Extract<PlayResult, { readonly _
   }
 }
 
-/** Exports a saved project map and races it in the game; a published map's draft in the maps folder asks first. */
-const playProjectMap = Effect.fn("playProjectMap")(function*(fileName: string, replacePublished: boolean) {
-  const result = yield* (yield* Platform).play(fileName, { replacePublished })
+/**
+ * Exports a saved project map and races it in the game; a published map's draft in the maps folder asks first, and so
+ * does an export the game changed since the last export.
+ */
+const playProjectMap = Effect.fn("playProjectMap")(function*(fileName: string, options: ExportOptions) {
+  const result = yield* (yield* Platform).play(fileName, options)
   switch (result._tag) {
     case "Published":
       useEditor.getState().setPublishedDraft({
         name: result.file.name,
         publishedFileId: result.publishedFileId,
         from: "play"
+      })
+      return
+    case "ChangedInGame":
+      useEditor.getState().setChangedExport({
+        name: result.file.name,
+        from: "play",
+        replacePublished: options.replacePublished
       })
       return
     case "PublishedMap":
@@ -736,10 +785,10 @@ const playProjectMap = Effect.fn("playProjectMap")(function*(fileName: string, r
  * game, which starts if it isn't running. The plugin manager only races maps never published, so a published map's
  * draft offers to save a new draft of it instead (the `newDraft` dialog).
  */
-export const playEffect = (replacePublished: boolean) =>
+export const playEffect = (replacePublished: boolean, overwriteChanged = false) =>
   Effect.suspend(() =>
     isNeverPublished(useEditor.getState().doc.map.worldSettings.levelData.levelPublishedFileId)
-      ? withSavedOpenMap((fileName) => playProjectMap(fileName, replacePublished))
+      ? withSavedOpenMap((fileName) => playProjectMap(fileName, { replacePublished, overwriteChanged }))
       : Effect.sync(() => useEditor.getState().openDialog("newDraft"))
   )
 
@@ -751,22 +800,93 @@ export const playAsNewDraft = (displayName: string, creatorName: string, replace
 
 /**
  * A game session Play started or joined has ended: the game may have changed the export (the in-game editor saves
- * over it), so the project's maps are listed again. Sync detection (#141) runs its check here.
+ * over it), so the exports are checked.
  */
-const playSessionEnded = refreshProject
+const playSessionEnded = Effect.suspend(() => checkExportsEffect)
+
+// --- sync: maps changed in the in-game editor (docs/PROJECTS.md § Sync) ----------------------
+
+/** Tells that the game changed a map's export, with Re-import and Ignore. */
+const notifyChangedInGame = (fileName: string) =>
+  useEditor.getState().notify("info", `${mapLabelOf(fileName)} was changed in the game`, {
+    kind: "changedInGame",
+    body: "Re-import replaces the map in the project with the game's version; the project's goes to the backups.",
+    actions: [
+      { label: "Re-import", command: { _tag: "ReimportMap", fileName } },
+      { label: "Ignore", command: { _tag: "Dismiss" } }
+    ]
+  })
+
+/**
+ * One look at the exports (desktop): main hashes each linked map's export and reports what the game changed since the
+ * last look, each change once; a map whose export is gone shows Not exported from then on. The maps are listed again,
+ * so the status bar and the Start tab show the states. A failure is only logged: the next focus looks again.
+ */
+const checkExportsOnce = Effect.gen(function*() {
+  const platform = yield* Platform
+  if (!platform.capabilities.projects) return
+  const { changed } = yield* platform.checkExports
+  yield* refreshProject
+  for (const fileName of changed) notifyChangedInGame(fileName)
+}).pipe(Effect.catch((error) => Effect.logWarning("Couldn't check the maps exported to the game", error)))
+
+/** The check running now, if any. */
+let runningCheck: Deferred.Deferred<void> | null = null
+
+/**
+ * Sync detection, on launch, on window focus and when a Play's game session ends. A check asked for while one runs
+ * joins it rather than looking again: the game closing usually brings both the focus and the end of the session.
+ */
+export const checkExportsEffect: Effect.Effect<void, never, Platform> = Effect.suspend(() => {
+  if (runningCheck !== null) return Deferred.await(runningCheck)
+  const done = Deferred.makeUnsafe<void>()
+  runningCheck = done
+  return checkExportsOnce.pipe(
+    Effect.ensuring(Effect.suspend(() => {
+      runningCheck = null
+      return Deferred.succeed(done, undefined)
+    }))
+  )
+})
+
+/** The window got the focus back: the user may have saved a map in the in-game editor meanwhile. */
+export const checkExports = () => run(checkExportsEffect)
+
+/**
+ * Re-import: the game's version of a map replaces the project's (which goes to the project's backups), and the link
+ * records it as in sync. The open map is reloaded from it, after asking about its unsaved edits.
+ */
+export const reimportMapEffect = (fileName: string) =>
+  Effect.suspend(() => {
+    const isOpen = () => useEditor.getState().mapOpen && useEditor.getState().file?.name === fileName
+    const reimport = Effect.gen(function*() {
+      const file = yield* (yield* Platform).reimportMap(fileName)
+      const open = isOpen()
+      if (open) yield* showMap(yield* MapCodec.use((codec) => codec.decode(file.text)), fileOf(file))
+      yield* refreshProject
+      useEditor.getState().notify("info", `Re-imported ${mapLabelOf(fileName)} from the game`, {
+        kind: "mapReimported",
+        body: "The project's previous version is in the backups (Map › Recover previous version…).",
+        actions: open ? [] : [{ label: "Open", command: { _tag: "OpenMap", fileName } }]
+      })
+    })
+    return isOpen() ? unlessCancelled("reimport", reimport) : reimport
+  })
+
+export const reimportMap = (fileName: string) => run(reimportMapEffect(fileName))
+
+/** Runs `playSessionEnded` at the end of each game session Play started, until interrupted. */
+export const followPlaySessionsEffect = Effect.gen(function*() {
+  yield* (yield* Platform).playSessionEnds.pipe(
+    Stream.runForEach(() =>
+      playSessionEnded.pipe(Effect.catchCause((cause) => Effect.sync(() => notifyFailure(cause))))
+    )
+  )
+})
 
 /** Follows the end of each game session Play started (`playSessionEnded`) until the returned function is called. */
 export const followPlaySessions = () =>
-  runUntilCleanup(
-    Effect.gen(function*() {
-      yield* (yield* Platform).playSessionEnds.pipe(
-        Stream.runForEach(() =>
-          playSessionEnded.pipe(Effect.catchCause((cause) => Effect.sync(() => notifyFailure(cause))))
-        )
-      )
-    }),
-    "Stopped following the game sessions Play started"
-  )
+  runUntilCleanup(followPlaySessionsEffect, "Stopped following the game sessions Play started")
 
 // --- backups and Recover (docs/PROJECTS.md § The files) --------------------------------------
 
@@ -1060,6 +1180,11 @@ export const runNotificationCommand = (command: NotificationCommand): void => {
       return
     case "OpenMap":
       openProjectMap(command.fileName)
+      return
+    case "ReimportMap":
+      void reimportMap(command.fileName)
+      return
+    case "Dismiss":
       return
     case "OpenExternal":
       void openExternalLink(command.url)

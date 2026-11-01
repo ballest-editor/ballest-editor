@@ -23,6 +23,7 @@ import {
 import { listSamples, readSample } from "../test/samples"
 import {
   answerUnloadRequest,
+  checkExportsEffect,
   checkGameLinkEffect,
   chooseGameLinkFolderEffect,
   closeMapTabEffect,
@@ -31,6 +32,7 @@ import {
   duplicateMapEffect,
   exportToGameEffect,
   findCreatorEffect,
+  followPlaySessionsEffect,
   followUpdateState,
   holdsUnload,
   importAsCopyEffect,
@@ -41,8 +43,11 @@ import {
   muteNotificationKindEffect,
   openProjectMap,
   openProjectMapFile,
+  overwriteChangedEffect,
   playEffect,
   recoverBackupEffect,
+  reimportFirstEffect,
+  reimportMapEffect,
   replaceOnImportEffect,
   saveMapAsEffect,
   saveMapFile,
@@ -91,6 +96,7 @@ const reset = Effect.sync(() => {
   s().loadMap(s().doc.map, null)
   s().setImportClash(null)
   s().setPublishedDraft(null)
+  s().setChangedExport(null)
   s().closeDialog()
 })
 
@@ -125,8 +131,13 @@ describe("project actions", () => {
         assert.deepStrictEqual(disk.dialogs.map((d) => d.kind), ["import"])
         assert.isTrue(disk.files.get(projectFile(name)) === text, "the saved file differs from the game's")
 
+        // the game changed it since: Export asks, and Back up and overwrite writes the project file over it
         disk.files.set(inGame, "changed in the game")
         yield* exportToGameEffect(false)
+        assert.strictEqual(s().dialog, "overwriteChanged")
+        assert.strictEqual(disk.files.get(inGame), "changed in the game")
+        s().setChangedExport(null)
+        yield* exportToGameEffect(false, true)
         assert.isTrue(disk.files.get(inGame) === text, "the export differs from the project file")
         assert.strictEqual(disk.links.get(TEST_PROJECT)?.get(name)?.export?.hash, testHash(text))
       }).pipe(Effect.provide(layerFor(disk)))
@@ -838,11 +849,158 @@ describe("Play", () => {
   })
 })
 
-/** Waits, in real time, for the store's update state to reach `status`: the bridge answers with promises. */
-const untilUpdate = (status: string) =>
+/** Waits, in real time, until `done()`: the bridge answers with promises, and pushes run in their own fiber. */
+const untilTrue = (done: () => boolean) =>
   Effect.promise(() => new Promise((resolve) => setTimeout(resolve, 1))).pipe(
-    Effect.repeat({ until: () => s().update?.status === status, times: 100 })
+    Effect.repeat({ until: done, times: 100 })
   )
+
+/** Waits, in real time, for the store's update state to reach `status`: the bridge answers with promises. */
+const untilUpdate = (status: string) => untilTrue(() => s().update?.status === status)
+
+/** The in-game editor saving `text` again: it rewrites the file, here with another time of day (the sample has one). */
+const savedInGame = (text: string, timeOfDay: number) => {
+  const saved = text.replace(/"timeOfDay": [-+.\deE]+/, `"timeOfDay": ${timeOfDay}`)
+  assert.notStrictEqual(saved, text)
+  return saved
+}
+
+describe("sync", () => {
+  const { name, label, text } = playSample()
+  const inGame = `${TEST_MAPS_FOLDER}/${name}`
+  const stateNow = () => linkStateOf(s().projectMaps.find((m) => m.fileName === name)!, { unsaved: s().dirty })
+  const reported = () => s().notifications.filter((n) => n.kind === "changedInGame" && n.title.startsWith(label))
+  /** The sample, open and exported. */
+  const exported = (disk: TestDisk) =>
+    Effect.gen(function*() {
+      yield* reset
+      useEditor.setState({ notifications: [] })
+      yield* openProjectMapFile(name)
+      yield* exportToGameEffect(false)
+      yield* checkExportsEffect
+      assert.strictEqual(stateNow(), "inSync")
+      assert.lengthOf(reported(), 0)
+      return disk
+    })
+
+  it.effect("reports a map saved in the in-game editor once, and Re-import loads the game's version", () => {
+    const disk = diskWithPlugin({ [projectFile(name)]: text })
+    return Effect.gen(function*() {
+      yield* exported(disk)
+      const saved = savedInGame(text, 3.5)
+      disk.files.set(inGame, saved)
+      // two focuses in a row
+      yield* checkExportsEffect
+      yield* checkExportsEffect
+      assert.lengthOf(reported(), 1)
+      assert.deepInclude(reported()[0], {
+        title: `${label} was changed in the game`,
+        actions: [
+          { label: "Re-import", command: { _tag: "ReimportMap", fileName: name } },
+          { label: "Ignore", command: { _tag: "Dismiss" } }
+        ]
+      })
+      assert.strictEqual(stateNow(), "changedInGame")
+      edit()
+      assert.strictEqual(stateNow(), "bothChanged")
+
+      // Re-import asks about the unsaved edits first; Don't save drops them
+      disk.promptAnswers.push("discard")
+      yield* reimportMapEffect(name)
+      assert.match(disk.prompts[0]?.message ?? "", /before re-importing it from the game\?$/)
+      assert.strictEqual(disk.files.get(projectFile(name)), saved)
+      assert.strictEqual(s().doc.map.worldSettings.directionalLight.timeOfDay, 3.5)
+      assert.isFalse(s().dirty)
+      assert.strictEqual(stateNow(), "inSync")
+      assert.deepInclude(disk.backups[0], { place: "project", fileName: name, text })
+      assert.strictEqual(s().notifications[0]?.kind, "mapReimported")
+      yield* checkExportsEffect
+      assert.lengthOf(reported(), 1)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("Export over a changed export asks: Back up and overwrite keeps the game's version, Re-import first takes it", () => {
+    const disk = diskWithPlugin({ [projectFile(name)]: text })
+    return Effect.gen(function*() {
+      yield* exported(disk)
+      const saved = savedInGame(text, 4)
+      disk.files.set(inGame, saved)
+      yield* exportToGameEffect(false)
+      assert.strictEqual(s().dialog, "overwriteChanged")
+      assert.deepStrictEqual(s().changedExport, { name, from: "export", replacePublished: false })
+      assert.strictEqual(disk.files.get(inGame), saved)
+      // the dialog showed the change: the next focus doesn't report it again
+      yield* checkExportsEffect
+      assert.lengthOf(reported(), 0)
+
+      yield* overwriteChangedEffect
+      assert.isNull(s().changedExport)
+      assert.strictEqual(disk.files.get(inGame), text)
+      assert.deepInclude(disk.backups[0], { place: "export", fileName: name, text: saved })
+      assert.strictEqual(stateNow(), "inSync")
+
+      const again = savedInGame(text, 5)
+      disk.files.set(inGame, again)
+      yield* exportToGameEffect(false)
+      yield* reimportFirstEffect
+      assert.strictEqual(disk.files.get(projectFile(name)), again)
+      assert.strictEqual(disk.files.get(inGame), again)
+      assert.strictEqual(s().doc.map.worldSettings.directionalLight.timeOfDay, 5)
+      assert.strictEqual(stateNow(), "inSync")
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("Play over a changed export asks the same, then goes on with Play", () => {
+    const disk = diskWithPlugin({ [projectFile(name)]: text })
+    return Effect.gen(function*() {
+      yield* exported(disk)
+      disk.files.set(inGame, savedInGame(text, 6))
+      yield* playEffect(false)
+      assert.deepStrictEqual(s().changedExport, { name, from: "play", replacePublished: false })
+      assert.deepStrictEqual(disk.game.races, [])
+      yield* overwriteChangedEffect
+      assert.deepStrictEqual(disk.game.races, [name])
+      assert.strictEqual(disk.files.get(inGame), text)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("the end of a Play's game session checks; a check asked for while one runs joins it", () => {
+    const disk = diskWithPlugin({ [projectFile(name)]: text })
+    return Effect.gen(function*() {
+      yield* exported(disk)
+      const fiber = yield* Effect.forkChild(followPlaySessionsEffect)
+      yield* untilTrue(() => disk.playSessions.listeners.size > 0)
+      disk.files.set(inGame, savedInGame(text, 8))
+      const before = disk.exportChecks
+      disk.playSessions.push({ fileName: name, endedAt: "2026-10-31T12:00:00.000Z" })
+      yield* untilTrue(() => reported().length > 0)
+      assert.strictEqual(disk.exportChecks, before + 1)
+      assert.strictEqual(stateNow(), "changedInGame")
+      yield* Fiber.interrupt(fiber)
+
+      // the window's focus and the session's end at once: one look
+      disk.files.set(inGame, savedInGame(text, 9))
+      yield* Effect.all([checkExportsEffect, checkExportsEffect], { concurrency: "unbounded" })
+      assert.strictEqual(disk.exportChecks, before + 2)
+      assert.lengthOf(reported(), 2)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("an export deleted in the game shows the map as not exported, without a notification", () => {
+    const disk = diskWithPlugin({ [projectFile(name)]: text })
+    return Effect.gen(function*() {
+      yield* exported(disk)
+      disk.files.delete(inGame)
+      yield* checkExportsEffect
+      assert.strictEqual(stateNow(), "notExported")
+      assert.lengthOf(reported(), 0)
+      // the next Export writes it again, asking nothing
+      yield* exportToGameEffect(false)
+      assert.strictEqual(disk.files.get(inGame), text)
+      assert.strictEqual(stateNow(), "inSync")
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+})
 
 describe("update actions", () => {
   it.effect("follow the desktop updater's state into the store, and stop when interrupted", () => {
@@ -993,15 +1151,11 @@ describe("notification actions", () => {
       actions: [{ label: "Reveal", command: { _tag: "RevealGamePath" as const, which: "mapsFolder" as const } }]
     }
     disk.notifications = [kept]
-    const until = (done: () => boolean) =>
-      Effect.promise(() => new Promise((resolve) => setTimeout(resolve, 1))).pipe(
-        Effect.repeat({ until: done, times: 100 })
-      )
     return Effect.gen(function*() {
       s().clearNotifications()
       s().notify("error", "Before the kept ones were read")
       const fiber = yield* Effect.forkChild(keepNotifications)
-      yield* until(() => disk.notifications.length === 2)
+      yield* untilTrue(() => disk.notifications.length === 2)
       assert.deepStrictEqual(s().notifications.map((n) => n.title), [
         "Before the kept ones were read",
         kept.title
@@ -1009,9 +1163,9 @@ describe("notification actions", () => {
       assert.deepStrictEqual(disk.notifications, s().notifications)
 
       s().notify("info", "Saved Big Loop", { kind: "mapSaved" })
-      yield* until(() => disk.notifications.length === 3)
+      yield* untilTrue(() => disk.notifications.length === 3)
       s().markNotificationsRead()
-      yield* until(() => disk.notifications.every((n) => n.read))
+      yield* untilTrue(() => disk.notifications.every((n) => n.read))
       yield* Fiber.interrupt(fiber)
       s().clearNotifications()
       yield* Effect.promise(() => new Promise((resolve) => setTimeout(resolve, 5)))

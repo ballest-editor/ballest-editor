@@ -24,8 +24,10 @@ export const LINK_STATE_HELP: Record<LinkState, string> = {
   notExported: "The game's maps folder doesn't have this map yet. Export it to open or race it in the game.",
   inSync: "The game's maps folder has this map exactly as it is saved here.",
   editedSinceExport: "The map has changed since it was exported; the game still has the earlier version.",
-  changedInGame: "The in-game editor has changed the exported copy since the last export.",
-  bothChanged: "The map has changed here and in the game since the last export.",
+  changedInGame:
+    "The in-game editor has changed the exported copy since the last export. Re-import takes the game's version; Export asks before writing over it.",
+  bothChanged:
+    "The map has changed here and in the game since the last export. Re-import takes the game's version (this one goes to the backups); Export asks before writing over the game's.",
   publishedDraft: "The export is the draft of a map published to the Workshop."
 }
 

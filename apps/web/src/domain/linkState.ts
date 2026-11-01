@@ -16,7 +16,11 @@ export interface LinkedMap {
   readonly hash: string
   /** The project file's `levelPublishedFileId` (above 0: a published map's draft). */
   readonly publishedFileId: number
-  readonly link: { readonly export: LinkedFile | null } | null
+  /**
+   * Its link record: the last export, and the export's hash when the editor last looked at the game's copy (sync
+   * detection keeps it up to date; docs/PROJECTS.md § Sync).
+   */
+  readonly link: { readonly export: LinkedFile | null; readonly lastSeenHash: string | null } | null
 }
 
 /**
@@ -47,16 +51,25 @@ export const LINK_STATE_LABELS: Record<LinkState, string> = {
 export interface LinkCheck {
   /** The map is open with edits that aren't saved yet, so they aren't in the export either. */
   readonly unsaved?: boolean
-  /** The hash of the export as it is in the game's maps folder now; undefined when nobody has looked (sync, #141). */
-  readonly gameHash?: string
 }
 
-/** The state of `map`. A change in the game outranks the published flag, which outranks the project side. */
+/** Whether the game's copy of `map`, as last seen, differs from what was exported (the in-game editor saved it). */
+export const changedInGame = (map: LinkedMap): boolean => {
+  const exported = map.link?.export ?? null
+  const seen = map.link?.lastSeenHash ?? null
+  return exported !== null && seen !== null && seen !== exported.hash
+}
+
+/**
+ * The state of `map`. The game's side is the export's hash when the editor last looked at it (`lastSeenHash`), so a
+ * change shows from the first check that saw it. A change in the game outranks the published flag, which outranks the
+ * project side.
+ */
 export const linkStateOf = (map: LinkedMap, check: LinkCheck = {}): LinkState => {
   const exported = map.link?.export ?? null
   if (exported === null) return "notExported"
   const edited = check.unsaved === true || map.hash !== exported.hash
-  if (check.gameHash !== undefined && check.gameHash !== exported.hash) return edited ? "bothChanged" : "changedInGame"
+  if (changedInGame(map)) return edited ? "bothChanged" : "changedInGame"
   if (map.publishedFileId > 0) return "publishedDraft"
   return edited ? "editedSinceExport" : "inSync"
 }
