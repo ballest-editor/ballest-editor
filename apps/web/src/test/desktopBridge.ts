@@ -49,6 +49,8 @@ export interface TestDisk {
    * the game's maps folder's (Export). Like main, nothing is kept when the bytes don't change.
    */
   readonly backups: Array<MapBackupFile>
+  /** How many times the page asked main to check the exports (`checkExports`). */
+  exportChecks: number
   /** What `notifications.json` holds. */
   notifications: NotificationRecords
   /**
@@ -135,6 +137,7 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   playSessions: makeTestPush<PlaySessionEnded>(),
   links: new Map(),
   backups: [],
+  exportChecks: 0,
   notifications: [],
   gameLink: { last: null, muted: [] },
   project: { current: TEST_PROJECT, recent: [] },
@@ -298,7 +301,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       })
       return { _tag: "Imported", map: mapOf(fileName) } as const
     },
-    exportMap: ({ fileName, replacePublished }) => {
+    exportMap: ({ fileName, replacePublished, overwriteChanged }) => {
       const folder = disk.game.paths.mapsFolder.path
       if (folder === null) return Promise.reject(new Error("GamePathError: Couldn't find the game's maps folder."))
       const text = disk.files.get(projectFile(fileName, disk.project.current))
@@ -309,13 +312,50 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       if (!replacePublished && publishedFileId > 0) {
         return Promise.resolve({ _tag: "Published", file: { path, name: fileName }, publishedFileId } as const)
       }
+      const links = linksOf(disk.project.current)
+      const last = links.get(fileName)
+      const seen = existing === undefined ? null : testHash(existing)
+      if (
+        !overwriteChanged && last?.export?.path === path && seen !== null && seen !== last.export.hash &&
+        seen !== testHash(text)
+      ) {
+        links.set(fileName, { ...last, lastSeenHash: seen })
+        return Promise.resolve({ _tag: "ChangedInGame", file: { path, name: fileName } } as const)
+      }
       backUp("export", path, text)
       disk.files.set(path, text)
       const exported = { path, hash: testHash(text), at: TIME }
-      const links = linksOf(disk.project.current)
       const link = { ...(links.get(fileName) ?? emptyLink), export: exported, lastSeenHash: exported.hash }
       links.set(fileName, link)
       return Promise.resolve({ _tag: "Exported", file: { path, name: fileName }, link } as const)
+    },
+    checkExports: () => {
+      disk.exportChecks++
+      const changed: Array<string> = []
+      const missing: Array<string> = []
+      const folder = disk.game.paths.mapsFolder.path
+      const links = linksOf(disk.project.current)
+      for (const [fileName, link] of links) {
+        if (folder === null || link.export?.path !== `${folder}/${fileName}`) continue
+        const text = disk.files.get(link.export.path)
+        if (text === undefined) {
+          links.set(fileName, { ...link, export: null, lastSeenHash: null })
+          missing.push(fileName)
+        } else if (testHash(text) !== link.lastSeenHash) {
+          links.set(fileName, { ...link, lastSeenHash: testHash(text) })
+          if (testHash(text) !== link.export.hash) changed.push(fileName)
+        }
+      }
+      return Promise.resolve({ changed, missing })
+    },
+    reimportMap: async (fileName) => {
+      const link = linksOf(disk.project.current).get(fileName) ?? emptyLink
+      const text = link.export === null ? undefined : disk.files.get(link.export.path)
+      if (link.export === null || text === undefined) return fail(`${fileName} has no export to re-import.`)
+      await write(fileName, text)
+      const seen = { ...link.export, hash: testHash(text) }
+      linksOf(disk.project.current).set(fileName, { ...link, export: seen, lastSeenHash: seen.hash })
+      return { ...mapOf(fileName), text }
     },
     listBackups: () => Promise.resolve(disk.backups.map(({ text: _, ...backup }) => backup)),
     readBackup: ({ place, id }) => {
@@ -372,11 +412,11 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       disk.game.plugin = { ...plugin, status: "current", installedVersion: plugin.bundledVersion }
       return Promise.resolve({ plugin: disk.game.plugin, restartGame: disk.game.running })
     },
-    play: async ({ fileName, replacePublished }) => {
+    play: async ({ fileName, replacePublished, overwriteChanged }) => {
       const publishedFileId = publishedIdOf(disk.files.get(projectFile(fileName, disk.project.current)) ?? "")
       if (publishedFileId >= 0) return { _tag: "PublishedMap", fileName, publishedFileId } as const
-      const exported = await bridge.exportMap({ fileName, replacePublished })
-      if (exported._tag === "Published") return exported
+      const exported = await bridge.exportMap({ fileName, replacePublished, overwriteChanged })
+      if (exported._tag !== "Exported") return exported
       const { plugin } = disk.game
       const sent = plugin.status === "current" || plugin.status === "outdated"
       if (sent) disk.game.races.push(fileName)

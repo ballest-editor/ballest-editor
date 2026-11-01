@@ -106,6 +106,7 @@ export type Dialog =
   | "settings"
   | "mapSettings"
   | "replacePublished"
+  | "overwriteChanged"
   | "newDraft"
   | "importClash"
   | "recover"
@@ -131,6 +132,17 @@ export interface PublishedDraft {
   readonly name: string
   readonly publishedFileId: number
   readonly from: "export" | "play"
+}
+
+/**
+ * An export the game changed since the last export (the in-game editor saved it), found by Export or by Play's export
+ * (`from`): the overwriteChanged dialog asks to back it up and overwrite it, or to re-import it first. `replacePublished`
+ * is what the export that found it was already allowed to replace.
+ */
+export interface ChangedExport {
+  readonly name: string
+  readonly from: "export" | "play"
+  readonly replacePublished: boolean
 }
 
 /** An import whose file name the project already has: the clash dialog asks to replace that map or import a copy. */
@@ -209,6 +221,8 @@ export interface EditorState {
   readonly gamePathProblem: { readonly which: GamePathKind; readonly message: string } | null
   /** Export found a published map's draft under the map's file name; the replacePublished dialog asks. */
   readonly publishedDraft: PublishedDraft | null
+  /** Export found the game changed the export since the last one; the overwriteChanged dialog asks. */
+  readonly changedExport: ChangedExport | null
   /** The desktop updater's state, once main has sent it; null in a browser. */
   readonly update: UpdateState | null
   /** Every notification (each toast is one), newest first, at most `NOTIFICATION_LIMIT`. */
@@ -303,6 +317,7 @@ export interface EditorState {
   readonly setGamePathProblem: (problem: EditorState["gamePathProblem"]) => void
   /** Asks whether to replace a published map's draft in the maps folder (null forgets it). */
   readonly setPublishedDraft: (draft: PublishedDraft | null) => void
+  readonly setChangedExport: (changed: ChangedExport | null) => void
   readonly setUpdate: (update: UpdateState) => void
   /** Shows the Start tab, adding it to the strip if it was closed (View › Start). */
   readonly showStart: () => void
@@ -486,6 +501,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     gameLink: { firstRun: true, last: null },
     gamePathProblem: null,
     publishedDraft: null,
+    changedExport: null,
     update: null,
     notifications: [],
     mutedNotificationKinds: new Set(),
@@ -544,6 +560,8 @@ export const useEditor = create<EditorState>()((set, get) => {
     setGamePathProblem: (gamePathProblem) => set({ gamePathProblem }),
     setPublishedDraft: (publishedDraft) =>
       set({ publishedDraft, dialog: publishedDraft === null ? null : "replacePublished" }),
+    setChangedExport: (changedExport) =>
+      set({ changedExport, dialog: changedExport === null ? null : "overwriteChanged" }),
     setUpdate: (update) => set({ update }),
     showStart: () => set({ startOpen: true, activeTab: "start" }),
     closeStart: () => set((s) => s.mapOpen ? { startOpen: false, activeTab: "map" } : s),

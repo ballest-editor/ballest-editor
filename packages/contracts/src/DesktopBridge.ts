@@ -153,19 +153,35 @@ export type ImportMapResult = typeof ImportMapResult.Type
 export const ExportMapPayload = Schema.Struct({
   fileName: MapFileName,
   /** Replace a file that is a published map's draft (`levelPublishedFileId` > 0); otherwise main asks first. */
-  replacePublished: Schema.Boolean
+  replacePublished: Schema.Boolean,
+  /** Write over an export the game changed since the last export (it goes to backups); otherwise main asks first. */
+  overwriteChanged: Schema.Boolean
 })
 export type ExportMapPayload = typeof ExportMapPayload.Type
 
 /**
- * `exportMap`'s result: `Exported` with the file written and the map's new link record, or `Published` when nothing
- * was written because the file in the maps folder is the draft of a published map and `replacePublished` wasn't set.
+ * `exportMap`'s result: `Exported` with the file written and the map's new link record. Nothing is written when the
+ * file in the maps folder is the draft of a published map and `replacePublished` wasn't set (`Published`), or when the
+ * game changed it since the last export (the in-game editor saved it) and `overwriteChanged` wasn't set
+ * (`ChangedInGame`).
  */
 export const ExportMapResult = Schema.TaggedUnion({
   Exported: { file: MapFileRef, link: MapLink },
-  Published: { file: MapFileRef, publishedFileId: Schema.Finite }
+  Published: { file: MapFileRef, publishedFileId: Schema.Finite },
+  ChangedInGame: { file: MapFileRef }
 })
 export type ExportMapResult = typeof ExportMapResult.Type
+
+/**
+ * `checkExports`' result (docs/PROJECTS.md § Sync): the maps whose export the game changed since the editor last
+ * looked (each change is reported once: the link's `lastSeenHash` keeps what was seen), and the maps whose export is
+ * gone from the maps folder (their link's export was dropped, so they show Not exported).
+ */
+export const ExportChecks = Schema.Struct({
+  changed: Schema.Array(MapFileName),
+  missing: Schema.Array(MapFileName)
+})
+export type ExportChecks = typeof ExportChecks.Type
 
 /**
  * Where a backup is kept: `project`, the project's `.ballest/backups/` (the project's own copy, before Save, Rename or
@@ -263,6 +279,10 @@ export const NotificationCommand = Schema.TaggedUnion({
   ChooseGamePath: { which: GamePathKind },
   /** Opens one of the project's maps. */
   OpenMap: { fileName: MapFileName },
+  /** Replaces a project map with its export as the game changed it (Re-import). */
+  ReimportMap: { fileName: MapFileName },
+  /** Nothing besides marking the notification read (Ignore). */
+  Dismiss: {},
   /** Opens a web page in the default browser (the plugin manager's install steps). */
   OpenExternal: { url: OpenExternalPayload.fields.url },
   /** Installs (or updates) the `ballest-editor-link` plugin Play needs. */
@@ -376,8 +396,11 @@ export const InstallPluginResult = Schema.Struct({
 })
 export type InstallPluginResult = typeof InstallPluginResult.Type
 
-/** `play`: the project map to export and race, and whether to replace a published map's draft in the maps folder. */
-export const PlayPayload = Schema.Struct({ fileName: MapFileName, replacePublished: Schema.Boolean })
+/**
+ * `play`: the project map to export and race, whether to replace a published map's draft in the maps folder, and
+ * whether to write over an export the game changed since the last export (as `exportMap`).
+ */
+export const PlayPayload = Schema.Struct({ ...ExportMapPayload.fields })
 export type PlayPayload = typeof PlayPayload.Type
 
 /**
@@ -392,19 +415,21 @@ export type PlayLaunch = typeof PlayLaunch.Type
  * - `Played`: exported (`file`, the map's new `link`), then `sent` the race to the plugin through its `play.json` when
  *   the plugin is installed (`plugin` says how it stands otherwise), and started the game unless it was running.
  * - `Published`: nothing written: the file in the maps folder is a published map's draft, as Export reports it.
+ * - `ChangedInGame`: nothing written: the game changed the export since the last export, as Export reports it.
  * - `PublishedMap`: nothing written: the project map itself is a published map's (`levelPublishedFileId` above -1),
  *   which the plugin manager won't race. A copy saved as a new draft can be.
  */
 export const PlayResult = Schema.TaggedUnion({
   Played: { file: MapFileRef, link: MapLink, plugin: PluginStatus, sent: Schema.Boolean, launch: PlayLaunch },
   Published: { file: MapFileRef, publishedFileId: Schema.Finite },
+  ChangedInGame: { file: MapFileRef },
   PublishedMap: { fileName: MapFileName, publishedFileId: Schema.Finite }
 })
 export type PlayResult = typeof PlayResult.Type
 
 /**
  * Main → renderer: the game session a Play ran in has ended (the game's process exited). `fileName` is the map the
- * last Play of that session raced. Sync detection (#141) checks the exports then.
+ * last Play of that session raced. The page checks the exports then (`checkExports`).
  */
 export const PlaySessionEnded = Schema.Struct({ fileName: MapFileName, endedAt: IsoTime })
 export type PlaySessionEnded = typeof PlaySessionEnded.Type
@@ -538,6 +563,17 @@ export interface DesktopBridge {
    * replaces there goes to `<userData>/backups/` first.
    */
   readonly exportMap: (payload: ExportMapPayload) => Promise<ExportMapResult>
+  /**
+   * Sync detection: hashes every linked map's export in the game's maps folder and compares it with the last export
+   * and the last seen hash, keeping what it saw in the link. A changed export is reported once; a missing one has its
+   * export dropped from the link. Nothing is checked while the maps folder isn't there.
+   */
+  readonly checkExports: () => Promise<ExportChecks>
+  /**
+   * Re-import: replaces a project map with its export in the game's maps folder, byte for byte (the project's file goes
+   * to the project's backups first), and records the export as in sync. Fails for a map that has no export.
+   */
+  readonly reimportMap: (fileName: string) => Promise<ProjectMapFile>
   /** The current project's backups and the exports' (docs/PROJECTS.md § The files), newest first. */
   readonly listBackups: () => Promise<MapBackups>
   /** Reads a backup `listBackups` named. */

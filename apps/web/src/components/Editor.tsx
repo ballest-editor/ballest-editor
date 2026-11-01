@@ -2,6 +2,7 @@ import { Toaster } from "@workspace/ui/components/sonner"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
 import { useEffect } from "react"
 import {
+  checkExports,
   followNotifications,
   followPlaySessions,
   followUnloadRequests,
@@ -28,6 +29,7 @@ import { KeybindCheatSheet } from "./KeybindCheatSheet"
 import { MapSettingsDialog } from "./MapSettingsDialog"
 import { NameMapDialog } from "./NameMapDialog"
 import { NewMapDialog } from "./NewMapDialog"
+import { OverwriteChangedDialog } from "./OverwriteChangedDialog"
 import { Palette } from "./Palette"
 import { RecoverDialog } from "./RecoverDialog"
 import { ReplacePublishedDialog } from "./ReplacePublishedDialog"
@@ -96,6 +98,17 @@ const useUnsavedGuard = () =>
     }
   }, [])
 
+/**
+ * Back from the game (or anywhere) the window gets the focus: the in-game editor may have saved a map meanwhile, so the
+ * exports are checked (docs/PROJECTS.md § Sync). A browser has none to check.
+ */
+const useCheckExportsOnFocus = () =>
+  useEffect(() => {
+    const check = () => void checkExports()
+    window.addEventListener("focus", check)
+    return () => window.removeEventListener("focus", check)
+  }, [])
+
 export function Editor() {
   const dialog = useEditor((s) => s.dialog)
   const settingsCategory = useEditor((s) => s.settingsCategory)
@@ -129,6 +142,7 @@ export function Editor() {
   }, [])
   useEffect(() => followUpdates(), [])
   useEffect(() => followPlaySessions(), [])
+  useCheckExportsOnFocus()
 
   return (
     <TooltipProvider>
@@ -162,6 +176,7 @@ export function Editor() {
       <NameMapDialog mode="newDraft" open={dialog === "newDraft"} onClose={close} />
       <MapSettingsDialog open={dialog === "mapSettings"} onClose={close} />
       <ReplacePublishedDialog open={dialog === "replacePublished"} onClose={close} />
+      <OverwriteChangedDialog open={dialog === "overwriteChanged"} onClose={close} />
       <ImportClashDialog open={dialog === "importClash"} onClose={close} />
       <RecoverDialog open={dialog === "recover"} onClose={close} />
       <SettingsDialog

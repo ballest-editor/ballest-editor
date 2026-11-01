@@ -78,12 +78,13 @@ export class GamePlay extends Context.Service<GamePlay, {
         return Effect.asVoid(Effect.forkIn(follow, scope))
       })
 
-    const play = Effect.fn("GamePlay.play")(function*({ fileName, replacePublished }: PlayPayload) {
+    const play = Effect.fn("GamePlay.play")(function*(payload: PlayPayload) {
+      const { fileName } = payload
       const { publishedFileId } = yield* projects.read(fileName)
       if (!isNeverPublished(publishedFileId)) return { _tag: "PublishedMap", fileName, publishedFileId } as const
 
-      const exported = yield* projects.exportMap({ fileName, replacePublished })
-      if (exported._tag === "Published") return exported
+      const exported = yield* projects.exportMap(payload)
+      if (exported._tag !== "Exported") return exported
 
       const { plugin, sent } = yield* link.requestRace(fileName)
       const launch: PlayLaunch = (yield* game.isRunning)

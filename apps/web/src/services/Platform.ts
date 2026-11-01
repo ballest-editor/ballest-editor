@@ -1,6 +1,7 @@
 import type {
   BackupRef,
   DesktopBridge,
+  ExportChecks,
   ExportMapResult,
   FoundCreator,
   GameLinkMemory,
@@ -68,6 +69,15 @@ export interface PlatformCapabilities {
   readonly updates: boolean
 }
 
+/**
+ * What may be written over when exporting: a published map's draft in the maps folder (`replacePublished`), and an
+ * export the game changed since the last export (`overwriteChanged`). Main asks first about each that isn't set.
+ */
+export interface ExportOptions {
+  readonly replacePublished: boolean
+  readonly overwriteChanged: boolean
+}
+
 /** A map file the user picked to open (browser) or import (desktop). `path` is none in a browser, which never sees one. */
 export interface OpenedMap {
   readonly name: string
@@ -116,13 +126,18 @@ export class Platform extends Context.Service<Platform, {
   /** Copies a picked file into the project. `Clash` (nothing written) when it has a map of that name and not `replace`. */
   readonly importMap: (payload: ImportMapPayload) => Effect.Effect<ImportMapResult, PlatformError>
   /**
-   * Copies a project map into the game's maps folder and records the export. `Published` (nothing written) when the
-   * file there is a published map's draft and `replacePublished` is false.
+   * Copies a project map into the game's maps folder and records the export. Nothing is written when the file there is
+   * a published map's draft and not `replacePublished` (`Published`), or the game changed it since the last export and
+   * not `overwriteChanged` (`ChangedInGame`).
    */
-  readonly exportMap: (
-    fileName: string,
-    options: { readonly replacePublished: boolean }
-  ) => Effect.Effect<ExportMapResult, PlatformError>
+  readonly exportMap: (fileName: string, options: ExportOptions) => Effect.Effect<ExportMapResult, PlatformError>
+  /**
+   * Sync detection (desktop): looks at every linked map's export in the game's maps folder, and reports the ones the
+   * game changed since the last look (each change once) and the ones gone (their export is dropped). None in a browser.
+   */
+  readonly checkExports: Effect.Effect<ExportChecks, PlatformError>
+  /** Re-import: replaces a project map with its export as the game has it (the project's file goes to backups). */
+  readonly reimportMap: (fileName: string) => Effect.Effect<ProjectMapFile, PlatformError>
   /**
    * Asks whether to save the open map's edits before `action`: the desktop's native Save / Don't save / Cancel box. A
    * browser's `confirm` has no Save: OK is Don't save.
@@ -168,10 +183,7 @@ export class Platform extends Context.Service<Platform, {
    * Play: exports a project map as `exportMap` does, asks the plugin to race it and starts the game if it isn't
    * running (desktop). Without the plugin it still exports and starts the game; the result says so.
    */
-  readonly play: (
-    fileName: string,
-    options: { readonly replacePublished: boolean }
-  ) => Effect.Effect<PlayResult, PlatformError>
+  readonly play: (fileName: string, options: ExportOptions) => Effect.Effect<PlayResult, PlatformError>
   /** Each end of a game session a Play started or joined (desktop); a browser's ends at once. */
   readonly playSessionEnds: Stream.Stream<PlaySessionEnded, PlatformError>
   /** The notifications kept from earlier runs, newest first (desktop: `notifications.json`); none in a browser. */
@@ -282,7 +294,9 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
     saveMap: (file) => bridgeCall(() => bridge.saveMap(file)),
     renameMap: (file) => bridgeCall(() => bridge.renameMap(file)),
     importMap: (payload) => bridgeCall(() => bridge.importMap(payload)),
-    exportMap: (fileName, { replacePublished }) => bridgeCall(() => bridge.exportMap({ fileName, replacePublished })),
+    exportMap: (fileName, options) => bridgeCall(() => bridge.exportMap({ fileName, ...options })),
+    checkExports: bridgeCall(() => bridge.checkExports()),
+    reimportMap: (fileName) => bridgeCall(() => bridge.reimportMap(fileName)),
     listBackups: bridgeCall(() => bridge.listBackups()),
     readBackup: ({ place, id }) => bridgeCall(() => bridge.readBackup({ place, id })),
     setWindowTheme: (dark) => bridgeCall(() => bridge.setWindowTheme(dark)),
@@ -302,7 +316,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
     findCreator: bridgeCall(() => bridge.findCreator()).pipe(Effect.map(Option.fromNullOr)),
     pluginStatus: bridgeCall(() => bridge.pluginStatus()),
     installPlugin: bridgeCall(() => bridge.installPlugin()),
-    play: (fileName, { replacePublished }) => bridgeCall(() => bridge.play({ fileName, replacePublished })),
+    play: (fileName, options) => bridgeCall(() => bridge.play({ fileName, ...options })),
     playSessionEnds: pushed((listener) => bridge.onPlaySessionEnded(listener)),
     loadNotifications: bridgeCall(() => bridge.loadNotifications()),
     saveNotifications: (records) => bridgeCall(() => bridge.saveNotifications(records)),
@@ -374,6 +388,8 @@ const makeBrowser = (): Platform["Service"] => {
     renameMap: () => noProject,
     importMap: () => noProject,
     exportMap: () => desktopOnly,
+    checkExports: Effect.succeed({ changed: [], missing: [] }),
+    reimportMap: () => desktopOnly,
     listBackups: Effect.succeed([]),
     readBackup: () => noProject,
     setWindowTheme: () => Effect.void,

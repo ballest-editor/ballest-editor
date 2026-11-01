@@ -1,5 +1,6 @@
 import {
   ChooseGamePathResult,
+  ExportChecks,
   ExportMapResult,
   GamePaths as GamePathsSchema,
   ImportMapResult,
@@ -7,6 +8,7 @@ import {
   MapBackups,
   PlayResult,
   PluginStatus,
+  ProjectMapFile,
   ProjectMaps,
   ProjectState
 } from "@ballest/contracts"
@@ -376,7 +378,8 @@ describe("DesktopIpc", () => {
         const exported = expectTag(
           yield* fake.invokeAs(ExportMapResult, channels.EXPORT_MAP_CHANNEL, {
             fileName: name,
-            replacePublished: false
+            replacePublished: false,
+            overwriteChanged: false
           }),
           "Exported"
         )
@@ -405,27 +408,129 @@ describe("DesktopIpc", () => {
         yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text: "{}" })
 
         assert.deepStrictEqual(
-          yield* fake.invoke(channels.EXPORT_MAP_CHANNEL, { fileName: name, replacePublished: false }),
+          yield* fake.invoke(channels.EXPORT_MAP_CHANNEL, {
+            fileName: name,
+            replacePublished: false,
+            overwriteChanged: false
+          }),
           { _tag: "Published", file: { path: target, name }, publishedFileId: 3561234567 }
         )
         assert.strictEqual(yield* fs.readFileString(target), published)
         const replaced = yield* fake.invokeAs(ExportMapResult, channels.EXPORT_MAP_CHANNEL, {
           fileName: name,
-          replacePublished: true
+          replacePublished: true,
+          overwriteChanged: false
         })
         assert.strictEqual(replaced._tag, "Exported")
         assert.strictEqual(yield* fs.readFileString(target), "{}")
 
-        // A never-published draft (-1) is replaced without asking.
+        // A never-published draft (-1) is replaced without the published question (the game changed the export, so
+        // only that is asked).
         yield* fs.writeFileString(
           target,
           JSON.stringify({ worldSettings: { levelData: { levelPublishedFileId: -1 } } })
         )
         const again = yield* fake.invokeAs(ExportMapResult, channels.EXPORT_MAP_CHANNEL, {
           fileName: name,
-          replacePublished: false
+          replacePublished: false,
+          overwriteChanged: true
         })
         assert.strictEqual(again._tag, "Exported")
+      })
+    ))
+
+  it.effect("reports an export the game changed once, asks before exporting over it, and re-imports it", () =>
+    withHandlers(({ fake, project, steam }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const name = "Map_LevelEditorMain&Sync_me.balledit"
+        const inGame = path.join(steam.maps, name)
+        const inProject = path.join(project, "maps", name)
+        const hashOf = (text: string) => sha256(new TextEncoder().encode(text))
+        const check = fake.invokeAs(ExportChecks, channels.CHECK_EXPORTS_CHANNEL)
+        const exportIt = (overwriteChanged: boolean) =>
+          fake.invokeAs(ExportMapResult, channels.EXPORT_MAP_CHANNEL, {
+            fileName: name,
+            replacePublished: false,
+            overwriteChanged
+          })
+        const linkOf = Effect.gen(function*() {
+          const maps = yield* fake.invokeAs(ProjectMaps, channels.LIST_MAPS_CHANNEL)
+          return maps.find((m) => m.fileName === name)?.link
+        })
+        yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text: "{\"v\":1}" })
+        expectTag(yield* exportIt(false), "Exported")
+        assert.deepStrictEqual(yield* check, { changed: [], missing: [] })
+
+        // The in-game editor saves it: reported once, however often it is looked at.
+        const saved = "{\"v\":1,\"editorState\":{}}"
+        yield* fs.writeFileString(inGame, saved)
+        const [first, second] = yield* Effect.all([check, check], { concurrency: "unbounded" })
+        assert.deepStrictEqual([first, second].flatMap((c) => c.changed), [name])
+        assert.deepStrictEqual(yield* check, { changed: [], missing: [] })
+        assert.deepInclude(yield* linkOf, { lastSeenHash: hashOf(saved) })
+        assert.strictEqual((yield* linkOf)?.export?.hash, hashOf("{\"v\":1}"))
+
+        // Export asks first; overwriting keeps the game's version in the backups.
+        assert.deepStrictEqual(yield* exportIt(false), { _tag: "ChangedInGame", file: { path: inGame, name } })
+        assert.strictEqual(yield* fs.readFileString(inGame), saved)
+        expectTag(yield* exportIt(true), "Exported")
+        assert.strictEqual(yield* fs.readFileString(inGame), "{\"v\":1}")
+        const backups = yield* fake.invokeAs(MapBackups, channels.LIST_BACKUPS_CHANNEL)
+        const [kept] = backups
+        assert.deepInclude(kept, { place: "export", fileName: name })
+        assert.strictEqual((yield* fake.invokeAs(MapBackupFile, channels.READ_BACKUP_CHANNEL, kept)).text, saved)
+
+        // Saved in the game again, and seen by an Export first: the check doesn't report it again.
+        const again = "{\"v\":1,\"editorState\":{\"again\":1}}"
+        yield* fs.writeFileString(inGame, again)
+        expectTag(yield* exportIt(false), "ChangedInGame")
+        assert.deepStrictEqual(yield* check, { changed: [], missing: [] })
+
+        // Re-import: the game's version replaces the project's, which goes to the project's backups.
+        const reimported = yield* fake.invokeAs(ProjectMapFile, channels.REIMPORT_MAP_CHANNEL, { fileName: name })
+        assert.strictEqual(reimported.text, again)
+        assert.strictEqual(yield* fs.readFileString(inProject), again)
+        assert.deepInclude(reimported.link?.export, { path: inGame, hash: hashOf(again) })
+        assert.strictEqual(reimported.link?.lastSeenHash, hashOf(again))
+        const projectBackup = (yield* fake.invokeAs(MapBackups, channels.LIST_BACKUPS_CHANNEL)).find((b) =>
+          b.place === "project"
+        )
+        assert.strictEqual(
+          (yield* fake.invokeAs(MapBackupFile, channels.READ_BACKUP_CHANNEL, projectBackup)).text,
+          "{\"v\":1}"
+        )
+        expectTag(yield* exportIt(false), "Exported")
+
+        // Deleted in the game: the link's export is dropped, once.
+        yield* fs.remove(inGame)
+        assert.deepStrictEqual(yield* check, { changed: [], missing: [name] })
+        assert.deepInclude(yield* linkOf, { export: null, lastSeenHash: null })
+        assert.deepStrictEqual(yield* check, { changed: [], missing: [] })
+        const refused = yield* Effect.flip(fake.invoke(channels.REIMPORT_MAP_CHANNEL, { fileName: name }))
+        assert.match(String(refused.cause), /no export/)
+      })
+    ))
+
+  it.effect("drops no link while the game's maps folder isn't there", () =>
+    withHandlers(({ fake, steam }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const name = "Map_LevelEditorMain&Away_me.balledit"
+        yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text: "{}" })
+        yield* fake.invoke(channels.EXPORT_MAP_CHANNEL, {
+          fileName: name,
+          replacePublished: false,
+          overwriteChanged: false
+        })
+        yield* fs.remove(steam.maps, { recursive: true })
+        assert.deepStrictEqual(yield* fake.invokeAs(ExportChecks, channels.CHECK_EXPORTS_CHANNEL), {
+          changed: [],
+          missing: []
+        })
+        const [map] = yield* fake.invokeAs(ProjectMaps, channels.LIST_MAPS_CHANNEL)
+        assert.isNotNull(map?.link?.export)
       })
     ))
 
@@ -439,7 +544,11 @@ describe("DesktopIpc", () => {
         yield* fs.writeFileString(path.join(steam.maps, name), "{\"edited\":\"in game\"}")
         yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text: "{\"v\":1}" })
 
-        const exportIt = fake.invoke(channels.EXPORT_MAP_CHANNEL, { fileName: name, replacePublished: false })
+        const exportIt = fake.invoke(channels.EXPORT_MAP_CHANNEL, {
+          fileName: name,
+          replacePublished: false,
+          overwriteChanged: false
+        })
         yield* exportIt
         // The same bytes again: nothing to keep.
         yield* exportIt
@@ -628,7 +737,11 @@ describe("DesktopIpc", () => {
         yield* fake.invoke(channels.INSTALL_PLUGIN_CHANNEL)
 
         const result = expectTag(
-          yield* fake.invokeAs(PlayResult, channels.PLAY_CHANNEL, { fileName: name, replacePublished: false }),
+          yield* fake.invokeAs(PlayResult, channels.PLAY_CHANNEL, {
+            fileName: name,
+            replacePublished: false,
+            overwriteChanged: false
+          }),
           "Played"
         )
         assert.deepInclude(result, { sent: true, launch: "launched" })
@@ -642,7 +755,11 @@ describe("DesktopIpc", () => {
         assert.deepStrictEqual(opened, ["steam://rungameid/3339810"])
         // Only a project map's file name.
         const bad = yield* Effect.flip(
-          fake.invoke(channels.PLAY_CHANNEL, { fileName: "../x.balledit", replacePublished: false })
+          fake.invoke(channels.PLAY_CHANNEL, {
+            fileName: "../x.balledit",
+            replacePublished: false,
+            overwriteChanged: false
+          })
         )
         assert.match(String(bad.cause), /isn't a map file name/)
       })

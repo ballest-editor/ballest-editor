@@ -21,6 +21,7 @@ import {
 } from "./methods/notifications"
 import { ping } from "./methods/ping"
 import {
+  checkExports,
   chooseProject,
   createMap,
   exportMap,
@@ -31,6 +32,7 @@ import {
   projectState,
   readBackup,
   readMap,
+  reimportMap,
   renameMap,
   revealProject,
   saveMap,
@@ -56,6 +58,8 @@ export const installDesktopIpcHandlers = Effect.fn("installDesktopIpcHandlers")(
   yield* ipc.handle(pickImport)
   yield* ipc.handle(importMap)
   yield* ipc.handle(exportMap)
+  yield* ipc.handle(checkExports)
+  yield* ipc.handle(reimportMap)
   yield* ipc.handle(listBackups)
   yield* ipc.handle(readBackup)
   yield* ipc.handle(openExternal)

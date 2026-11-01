@@ -1,6 +1,7 @@
 import {
   BackupRef,
   ChooseProjectResult,
+  ExportChecks,
   ExportMapPayload,
   ExportMapResult,
   ImportMapPayload,
@@ -24,6 +25,7 @@ import { GamePaths } from "../../game/GamePaths"
 import { MAP_EXTENSIONS } from "../../project/files"
 import { Projects } from "../../project/Projects"
 import {
+  CHECK_EXPORTS_CHANNEL,
   CHOOSE_PROJECT_CHANNEL,
   CREATE_MAP_CHANNEL,
   EXPORT_MAP_CHANNEL,
@@ -34,6 +36,7 @@ import {
   PROJECT_STATE_CHANNEL,
   READ_BACKUP_CHANNEL,
   READ_MAP_CHANNEL,
+  REIMPORT_MAP_CHANNEL,
   RENAME_MAP_CHANNEL,
   REVEAL_PROJECT_CHANNEL,
   SAVE_MAP_CHANNEL,
@@ -172,6 +175,25 @@ export const exportMap = makeIpcMethod({
   result: ExportMapResult,
   handler: Effect.fn("ipc.exportMap")(function*(payload) {
     return yield* (yield* Projects).exportMap(payload)
+  })
+})
+
+/** Sync detection: the exports the game changed since the last look, and the ones gone (docs/PROJECTS.md § Sync). */
+export const checkExports = makeIpcMethod({
+  channel: CHECK_EXPORTS_CHANNEL,
+  payload: Schema.Undefined,
+  result: ExportChecks,
+  handler: Effect.fn("ipc.checkExports")(function*() {
+    return yield* (yield* Projects).checkExports
+  })
+})
+
+export const reimportMap = makeIpcMethod({
+  channel: REIMPORT_MAP_CHANNEL,
+  payload: MapFileNamePayload,
+  result: ProjectMapFile,
+  handler: Effect.fn("ipc.reimportMap")(function*({ fileName }) {
+    return yield* (yield* Projects).reimportMap(fileName)
   })
 })
 
