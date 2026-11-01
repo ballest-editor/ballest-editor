@@ -8,6 +8,7 @@ import type {
   MapLink,
   NotificationRecords,
   OpenedMapFile,
+  PlaySessionEnded,
   PluginStatus,
   ProjectInfo,
   ProjectMap,
@@ -36,6 +37,11 @@ export interface TestDisk {
     readonly listeners: Set<(kind: UnloadKind) => void>
     readonly push: (kind: UnloadKind) => void
   }
+  /** `push` tells the page, as main does, that the game session a Play started has ended. */
+  readonly playSessions: {
+    readonly listeners: Set<(ended: PlaySessionEnded) => void>
+    readonly push: (ended: PlaySessionEnded) => void
+  }
   /** Link records by project, then by map file name, as main keeps them in `.ballest/link.json`. */
   readonly links: Map<string, Map<string, MapLink>>
   /**
@@ -53,7 +59,7 @@ export interface TestDisk {
   project: { current: string; recent: Array<string> }
   /**
    * `creator`: what `findCreator` answers. `plugin`: the editor-link plugin's status; installing it makes it `current`,
-   * counted in `pluginInstalls`.
+   * counted in `pluginInstalls`. `races`: the maps Play asked the plugin to race (its `play.json`s), in order.
    */
   game: {
     paths: GamePaths
@@ -62,6 +68,7 @@ export interface TestDisk {
     creator: FoundCreator | null
     plugin: PluginStatus
     pluginInstalls: number
+    races: Array<string>
   }
   /** The updater: `push` sends a new state to the page, as main does. Downloads and installs are counted. */
   readonly updater: {
@@ -111,9 +118,10 @@ const makeTestUpdater = (): TestDisk["updater"] => {
   return updater
 }
 
-const makeTestUnload = (): TestDisk["unload"] => {
-  const listeners = new Set<(kind: UnloadKind) => void>()
-  return { listeners, push: (kind) => listeners.forEach((listener) => listener(kind)) }
+/** Listeners to something main pushes, and a `push` that tells them all. */
+const makeTestPush = <A>() => {
+  const listeners = new Set<(value: A) => void>()
+  return { listeners, push: (value: A) => listeners.forEach((listener) => listener(value)) }
 }
 
 export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
@@ -123,7 +131,8 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   external: [],
   prompts: [],
   promptAnswers: [],
-  unload: makeTestUnload(),
+  unload: makeTestPush<UnloadKind>(),
+  playSessions: makeTestPush<PlaySessionEnded>(),
   links: new Map(),
   backups: [],
   notifications: [],
@@ -140,7 +149,8 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
       installedVersion: null,
       folder: "/game/Ballest/Binaries/Win64/plugins/ballest-editor-link"
     },
-    pluginInstalls: 0
+    pluginInstalls: 0,
+    races: []
   },
   updater: makeTestUpdater()
 })
@@ -227,7 +237,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
   }
   const exists = (fileName: string) => fail(`The project already has a map called ${fileName}.`)
 
-  return {
+  const bridge: DesktopBridge = {
     versions: { electron: "test", chrome: "test", node: "test" },
     ping: (message) => Promise.resolve({ message }),
     projectState: () => Promise.resolve(state()),
@@ -362,6 +372,22 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       disk.game.plugin = { ...plugin, status: "current", installedVersion: plugin.bundledVersion }
       return Promise.resolve({ plugin: disk.game.plugin, restartGame: disk.game.running })
     },
+    play: async ({ fileName, replacePublished }) => {
+      const publishedFileId = publishedIdOf(disk.files.get(projectFile(fileName, disk.project.current)) ?? "")
+      if (publishedFileId >= 0) return { _tag: "PublishedMap", fileName, publishedFileId } as const
+      const exported = await bridge.exportMap({ fileName, replacePublished })
+      if (exported._tag === "Published") return exported
+      const { plugin } = disk.game
+      const sent = plugin.status === "current" || plugin.status === "outdated"
+      if (sent) disk.game.races.push(fileName)
+      const launch = disk.game.running ? "running" : "launched"
+      if (launch === "launched") disk.game.launches++
+      return { _tag: "Played", file: exported.file, link: exported.link, plugin, sent, launch } as const
+    },
+    onPlaySessionEnded: (listener) => {
+      disk.playSessions.listeners.add(listener)
+      return () => void disk.playSessions.listeners.delete(listener)
+    },
     loadNotifications: () => Promise.resolve(disk.notifications),
     saveNotifications: (records) => {
       disk.notifications = records
@@ -390,4 +416,5 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       return () => void disk.updater.listeners.delete(listener)
     }
   }
+  return bridge
 }

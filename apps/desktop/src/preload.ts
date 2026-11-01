@@ -1,4 +1,4 @@
-import type { DesktopBridge, UnloadKind, UpdateState } from "@ballest/contracts"
+import type { DesktopBridge, PlaySessionEnded, UnloadKind, UpdateState } from "@ballest/contracts"
 import { contextBridge, ipcRenderer } from "electron"
 import {
   CHOOSE_GAME_PATH_CHANNEL,
@@ -23,6 +23,8 @@ import {
   OPEN_EXTERNAL_CHANNEL,
   PICK_IMPORT_CHANNEL,
   PING_CHANNEL,
+  PLAY_CHANNEL,
+  PLAY_SESSION_ENDED_CHANNEL,
   PLUGIN_STATUS_CHANNEL,
   PROJECT_STATE_CHANNEL,
   READ_BACKUP_CHANNEL,
@@ -44,6 +46,7 @@ import {
 interface Pushed {
   readonly [UPDATE_STATE_CHANNEL]: UpdateState
   readonly [UNLOAD_REQUEST_CHANNEL]: UnloadKind
+  readonly [PLAY_SESSION_ENDED_CHANNEL]: PlaySessionEnded
 }
 
 /**
@@ -94,6 +97,8 @@ contextBridge.exposeInMainWorld(
     findCreator: () => ipcRenderer.invoke(FIND_CREATOR_CHANNEL),
     pluginStatus: () => ipcRenderer.invoke(PLUGIN_STATUS_CHANNEL),
     installPlugin: () => ipcRenderer.invoke(INSTALL_PLUGIN_CHANNEL),
+    play: (payload) => ipcRenderer.invoke(PLAY_CHANNEL, payload),
+    onPlaySessionEnded: (listener) => subscribe(PLAY_SESSION_ENDED_CHANNEL, listener),
     loadNotifications: () => ipcRenderer.invoke(LOAD_NOTIFICATIONS_CHANNEL),
     saveNotifications: (records) => ipcRenderer.invoke(SAVE_NOTIFICATIONS_CHANNEL, { records }),
     muteNotifications: (kind) => ipcRenderer.invoke(MUTE_NOTIFICATIONS_CHANNEL, { kind }),

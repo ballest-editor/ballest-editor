@@ -264,7 +264,9 @@ export const NotificationCommand = Schema.TaggedUnion({
   /** Opens one of the project's maps. */
   OpenMap: { fileName: MapFileName },
   /** Opens a web page in the default browser (the plugin manager's install steps). */
-  OpenExternal: { url: OpenExternalPayload.fields.url }
+  OpenExternal: { url: OpenExternalPayload.fields.url },
+  /** Installs (or updates) the `ballest-editor-link` plugin Play needs. */
+  InstallPlugin: {}
 })
 export type NotificationCommand = typeof NotificationCommand.Type
 
@@ -374,6 +376,39 @@ export const InstallPluginResult = Schema.Struct({
 })
 export type InstallPluginResult = typeof InstallPluginResult.Type
 
+/** `play`: the project map to export and race, and whether to replace a published map's draft in the maps folder. */
+export const PlayPayload = Schema.Struct({ fileName: MapFileName, replacePublished: Schema.Boolean })
+export type PlayPayload = typeof PlayPayload.Type
+
+/**
+ * Whether Play had to start the game: it was `running`, Play `launched` it through Steam, or Steam couldn't be asked
+ * (`failed`).
+ */
+export const PlayLaunch = Schema.Literals(["running", "launched", "failed"])
+export type PlayLaunch = typeof PlayLaunch.Type
+
+/**
+ * `play`'s result (docs/DESKTOP.md § Play):
+ * - `Played`: exported (`file`, the map's new `link`), then `sent` the race to the plugin through its `play.json` when
+ *   the plugin is installed (`plugin` says how it stands otherwise), and started the game unless it was running.
+ * - `Published`: nothing written: the file in the maps folder is a published map's draft, as Export reports it.
+ * - `PublishedMap`: nothing written: the project map itself is a published map's (`levelPublishedFileId` above -1),
+ *   which the plugin manager won't race. A copy saved as a new draft can be.
+ */
+export const PlayResult = Schema.TaggedUnion({
+  Played: { file: MapFileRef, link: MapLink, plugin: PluginStatus, sent: Schema.Boolean, launch: PlayLaunch },
+  Published: { file: MapFileRef, publishedFileId: Schema.Finite },
+  PublishedMap: { fileName: MapFileName, publishedFileId: Schema.Finite }
+})
+export type PlayResult = typeof PlayResult.Type
+
+/**
+ * Main → renderer: the game session a Play ran in has ended (the game's process exited). `fileName` is the map the
+ * last Play of that session raced. Sync detection (#141) checks the exports then.
+ */
+export const PlaySessionEnded = Schema.Struct({ fileName: MapFileName, endedAt: IsoTime })
+export type PlaySessionEnded = typeof PlaySessionEnded.Type
+
 /**
  * Where the in-app updater is (docs/DESKTOP.md § Packaging and release). `idle` until a check finds a newer release
  * (`available`), then `downloading` once the user asks for it and `ready` once it is on disk; restarting installs it.
@@ -465,8 +500,9 @@ export type UpdateState = typeof UpdateState.Type
  * with the schemas above; a payload that fails to decode rejects the returned promise.
  *
  * Main reads and writes map files only in the current project's `maps/` folder (named by file name, never by path) and
- * in the game's maps folder (Export to game), and reads only the files the user picked in its Import dialog. The files
- * it writes over are kept in its own backups folders, which the page reaches by backup name only.
+ * in the game's maps folder (Export to game, Play), and reads only the files the user picked in its Import dialog. The
+ * files it writes over are kept in its own backups folders, which the page reaches by backup name only. In the game's
+ * install it writes only inside `<plugins>/ballest-editor-link/` (Install plugin, Play's `play.json`).
  */
 export interface DesktopBridge {
   readonly versions: DesktopVersions
@@ -535,6 +571,14 @@ export interface DesktopBridge {
    * Rejects when the plugin manager isn't installed. Only ever writes inside `<plugins>/ballest-editor-link`.
    */
   readonly installPlugin: () => Promise<InstallPluginResult>
+  /**
+   * Play: exports a project map like `exportMap` (backups, link record, the published-draft question), writes
+   * `<plugins>/ballest-editor-link/play.json` for the plugin to race it, and starts the game if it isn't running.
+   * Without the plugin it still exports and starts the game; `play.json` is only written into an installed plugin.
+   */
+  readonly play: (payload: PlayPayload) => Promise<PlayResult>
+  /** Calls `listener` each time the game session a Play started or joined ends, until the returned function is called. */
+  readonly onPlaySessionEnded: (listener: (ended: PlaySessionEnded) => void) => () => void
   /** The notifications kept in `<userData>/notifications.json`, newest first; empty when there are none yet. */
   readonly loadNotifications: () => Promise<NotificationRecords>
   /** Replaces the kept notifications (at most `NOTIFICATION_LIMIT`). */

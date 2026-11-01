@@ -106,6 +106,7 @@ export type Dialog =
   | "settings"
   | "mapSettings"
   | "replacePublished"
+  | "newDraft"
   | "importClash"
   | "recover"
 export type SettingsCategory = "general" | "editor" | "camera" | "keybinds" | "appearance" | "lighting" | "game"
@@ -122,10 +123,14 @@ export interface OpenFile {
   readonly path: string | null
 }
 
-/** A file in the game's maps folder that is the draft of a published map (`levelPublishedFileId` > 0). */
+/**
+ * A file in the game's maps folder that is the draft of a published map (`levelPublishedFileId` > 0), found by Export
+ * or by Play's export (`from`): replacing it goes on with the one that found it.
+ */
 export interface PublishedDraft {
   readonly name: string
   readonly publishedFileId: number
+  readonly from: "export" | "play"
 }
 
 /** An import whose file name the project already has: the clash dialog asks to replace that map or import a copy. */

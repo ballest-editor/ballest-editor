@@ -9,19 +9,20 @@ import {
 } from "@workspace/ui/components/popover"
 import { LINK_STATE_LABELS } from "../domain/linkState"
 import { formatAgo, formatDateTime } from "../domain/time"
-import { exportToGame, revealGamePath } from "../editor/actions"
+import { exportToGame, playMap, revealGamePath } from "../editor/actions"
 import { useEditor, useOpenProjectMap } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { LINK_STATE_HELP, LinkStateBadge } from "./LinkStateBadge"
 
 /**
  * The open map's link to its export (docs/PROJECTS.md § Sync), in the middle of the status bar: the state and when it
- * was last exported. Its popover has the export's path and time, Export to game and Reveal. Desktop only.
+ * was last exported. Its popover has the export's path and time, Export to game, Play and Reveal. Desktop only.
  */
 export function LinkStatus() {
   const open = useOpenProjectMap()
   const mapOpen = useEditor((s) => s.mapOpen)
   const canExport = useEditor((s) => s.capabilities.exportToGame)
+  const canPlay = useEditor((s) => s.capabilities.play)
   const now = useNow()
   if (!canExport || !mapOpen) return null
   if (open === null) return <span className="text-muted-foreground">Not saved in the project yet</span>
@@ -55,7 +56,8 @@ export function LinkStatus() {
           {exported !== null && (
             <Button variant="outline" onClick={() => void revealGamePath("mapsFolder")}>Reveal</Button>
           )}
-          <Button onClick={() => void exportToGame()}>Export to game</Button>
+          <Button variant={canPlay ? "outline" : "default"} onClick={() => void exportToGame()}>Export to game</Button>
+          {canPlay && <Button onClick={() => void playMap()}>Play</Button>}
         </div>
       </PopoverContent>
     </Popover>

@@ -146,7 +146,9 @@ export function MenuBar() {
   const canPaste = useEditor((s) => s.clipboard !== null)
   const openDialog = useEditor((s) => s.openDialog)
   const { snapping, appearance, lighting, general } = useEditor((s) => s.settings)
-  const { projects, exportToGame: canExport, launchGame: canLaunchGame } = useEditor((s) => s.capabilities)
+  const { projects, exportToGame: canExport, launchGame: canLaunchGame, play: canPlay } = useEditor((s) =>
+    s.capabilities
+  )
   const hasFile = useEditor((s) => s.file !== null)
   const exportOnSave = useEditor((s) => s.exportOnSave)
   const mapOpen = useEditor((s) => s.mapOpen)
@@ -305,6 +307,7 @@ export function MenuBar() {
       </Menu>
       {canLaunchGame && (
         <Menu title="Game">
+          {canPlay && <CommandItem action="playMap" disabled={!mapOpen}>Play</CommandItem>}
           <MenubarItem onClick={() => void launchGame()}>Launch game</MenubarItem>
           <MenubarSeparator />
           <MenubarItem onClick={() => openDialog("settings", "game")}>Game folders…</MenubarItem>

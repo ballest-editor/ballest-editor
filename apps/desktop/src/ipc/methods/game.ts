@@ -5,6 +5,8 @@ import {
   GamePathPayload,
   GamePaths as GamePathsSchema,
   InstallPluginResult,
+  PlayPayload,
+  PlayResult,
   PluginStatus
 } from "@ballest/contracts"
 import { Effect, Option, Schema } from "effect"
@@ -13,6 +15,7 @@ import { ElectronShell } from "../../electron/ElectronShell"
 import { GameCreator } from "../../game/GameCreator"
 import { GameLink } from "../../game/GameLink"
 import { GamePaths } from "../../game/GamePaths"
+import { GamePlay } from "../../game/GamePlay"
 import { GameProcess } from "../../game/GameProcess"
 import {
   CHOOSE_GAME_PATH_CHANNEL,
@@ -21,6 +24,7 @@ import {
   INSTALL_PLUGIN_CHANNEL,
   IS_GAME_RUNNING_CHANNEL,
   LAUNCH_GAME_CHANNEL,
+  PLAY_CHANNEL,
   PLUGIN_STATUS_CHANNEL,
   RESET_GAME_PATH_CHANNEL,
   REVEAL_GAME_PATH_CHANNEL
@@ -125,5 +129,15 @@ export const installPlugin = makeIpcMethod({
   result: InstallPluginResult,
   handler: Effect.fn("ipc.installPlugin")(function*() {
     return yield* (yield* GameLink).installPlugin
+  })
+})
+
+/** Export to game, then the plugin handoff and the game (docs/DESKTOP.md § Play). */
+export const play = makeIpcMethod({
+  channel: PLAY_CHANNEL,
+  payload: PlayPayload,
+  result: PlayResult,
+  handler: Effect.fn("ipc.play")(function*(payload) {
+    return yield* (yield* GamePlay).play(payload)
   })
 })

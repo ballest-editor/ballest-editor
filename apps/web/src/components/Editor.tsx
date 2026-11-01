@@ -3,6 +3,7 @@ import { TooltipProvider } from "@workspace/ui/components/tooltip"
 import { useEffect } from "react"
 import {
   followNotifications,
+  followPlaySessions,
   followUnloadRequests,
   followUpdates,
   holdsUnload,
@@ -127,6 +128,7 @@ export function Editor() {
     void loadPlatform()
   }, [])
   useEffect(() => followUpdates(), [])
+  useEffect(() => followPlaySessions(), [])
 
   return (
     <TooltipProvider>
@@ -157,6 +159,7 @@ export function Editor() {
       <NameMapDialog mode="saveAs" open={dialog === "saveAs"} onClose={close} />
       <NameMapDialog mode="rename" open={dialog === "rename"} onClose={close} />
       <NameMapDialog mode="duplicate" open={dialog === "duplicate"} onClose={close} />
+      <NameMapDialog mode="newDraft" open={dialog === "newDraft"} onClose={close} />
       <MapSettingsDialog open={dialog === "mapSettings"} onClose={close} />
       <ReplacePublishedDialog open={dialog === "replacePublished"} onClose={close} />
       <ImportClashDialog open={dialog === "importClash"} onClose={close} />

@@ -5,6 +5,7 @@ import {
   ImportMapResult,
   MapBackupFile,
   MapBackups,
+  PlayResult,
   PluginStatus,
   ProjectMaps,
   ProjectState
@@ -20,8 +21,9 @@ import { ElectronWindow } from "../electron/ElectronWindow"
 import { makeFakePluginBundle, makeFakeSteam } from "../game/fakeSteam"
 import { GameCreator } from "../game/GameCreator"
 import { GameHost } from "../game/GameHost"
-import { GameLink } from "../game/GameLink"
+import { GameLink, PlayFile } from "../game/GameLink"
 import { GamePaths } from "../game/GamePaths"
+import { GamePlay } from "../game/GamePlay"
 import { GameProcess } from "../game/GameProcess"
 import { SteamLibrary } from "../game/SteamLibrary"
 import { NotificationLog } from "../notifications/NotificationLog"
@@ -130,7 +132,8 @@ const shellLayer = Layer.succeed(
 /** Only `setColors` is reached from IPC; it records what each window was given. */
 const recoloured: Array<readonly [number, unknown]> = []
 const windowLayer = ElectronWindow.layerTest({
-  setColors: (id, colors) => Effect.sync(() => void recoloured.push([id, colors]))
+  setColors: (id, colors) => Effect.sync(() => void recoloured.push([id, colors])),
+  sendAll: () => Effect.void
 })
 
 /** Answers with a fixed state and counts the downloads and installs it was asked for. */
@@ -186,7 +189,9 @@ const withHandlers = <A, E>(
         Layer.provide(Layer.mergeAll(MapLinks.layer, Backups.layer)),
         Layer.provideMerge(game)
       )
-    const services = projects.pipe(
+    const services = Layer.effect(GamePlay, GamePlay.make).pipe(
+      Layer.provideMerge(projects),
+      Layer.provide(Layer.mergeAll(shellLayer, windowLayer)),
       Layer.provideMerge(Layer.effect(DesktopSettings, DesktopSettings.make(path.join(dir, "desktop-settings.json")))),
       Layer.merge(Layer.mergeAll(
         dialogs.layer,
@@ -606,6 +611,40 @@ describe("DesktopIpc", () => {
           String((yield* Effect.flip(fake.invoke(channels.PLUGIN_STATUS_CHANNEL, { folder: "/etc" }))).cause),
           /undefined/
         )
+      })
+    ))
+
+  it.effect("Play exports the map, hands it to the installed plugin and starts the game", () =>
+    withHandlers(({ fake, steam }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        opened.length = 0
+        const name = "Map_LevelEditorMain&Track_me.balledit"
+        const text = JSON.stringify({ worldSettings: { levelData: { levelPublishedFileId: -1 } }, items: [] })
+        yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text })
+        yield* fs.makeDirectory(steam.plugins)
+        yield* fs.writeFileString(path.join(path.dirname(steam.plugins), "version.dll"), "")
+        yield* fake.invoke(channels.INSTALL_PLUGIN_CHANNEL)
+
+        const result = expectTag(
+          yield* fake.invokeAs(PlayResult, channels.PLAY_CHANNEL, { fileName: name, replacePublished: false }),
+          "Played"
+        )
+        assert.deepInclude(result, { sent: true, launch: "launched" })
+        assert.deepStrictEqual(result.file, { path: path.join(steam.maps, name), name })
+        assert.strictEqual(result.link.export?.hash, sha256(new TextEncoder().encode(text)))
+        assert.strictEqual(yield* fs.readFileString(path.join(steam.maps, name)), text)
+        const play = yield* fs.readFileString(path.join(steam.plugins, "ballest-editor-link", "play.json")).pipe(
+          Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(PlayFile)))
+        )
+        assert.strictEqual(play.map, name)
+        assert.deepStrictEqual(opened, ["steam://rungameid/3339810"])
+        // Only a project map's file name.
+        const bad = yield* Effect.flip(
+          fake.invoke(channels.PLAY_CHANNEL, { fileName: "../x.balledit", replacePublished: false })
+        )
+        assert.match(String(bad.cause), /isn't a map file name/)
       })
     ))
 

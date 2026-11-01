@@ -5,7 +5,8 @@ sequenced below. Phase 1's project folder, save flow, Import and Export to game 
 unsaved-changes prompt before closing or replacing the open map (#70; [DESKTOP.md](DESKTOP.md) § Window) and backups
 on overwrite with Recover (#137; [DESKTOP.md](DESKTOP.md) § Backups). Of phase 2, the status bar, the notification
 centre, the Start tab (plain list) and the document tabs are built (#140; [DESKTOP.md](DESKTOP.md) § Renderer describes
-them), and so is the Game link checklist with its notifications (#134; [DESKTOP.md](DESKTOP.md) § Renderer). [DESKTOP.md](DESKTOP.md) describes the shell this runs in; [FORMAT.md](FORMAT.md) the
+them), and so is the Game link checklist with its notifications (#134; [DESKTOP.md](DESKTOP.md) § Renderer). Play
+is built (#66; [DESKTOP.md](DESKTOP.md) § Play), with the end of its game session as the hook for sync detection (#141). [DESKTOP.md](DESKTOP.md) describes the shell this runs in; [FORMAT.md](FORMAT.md) the
 game's file format, which none of this changes.
 
 ## The three nouns

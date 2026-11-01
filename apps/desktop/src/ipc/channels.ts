@@ -27,6 +27,7 @@ export const IS_GAME_RUNNING_CHANNEL = "ballest:game:isRunning"
 export const FIND_CREATOR_CHANNEL = "ballest:game:findCreator"
 export const PLUGIN_STATUS_CHANNEL = "ballest:game:pluginStatus"
 export const INSTALL_PLUGIN_CHANNEL = "ballest:game:installPlugin"
+export const PLAY_CHANNEL = "ballest:game:play"
 export const LOAD_NOTIFICATIONS_CHANNEL = "ballest:notifications:load"
 export const SAVE_NOTIFICATIONS_CHANNEL = "ballest:notifications:save"
 export const MUTE_NOTIFICATIONS_CHANNEL = "ballest:notifications:mute"
@@ -39,3 +40,5 @@ export const INSTALL_UPDATE_CHANNEL = "ballest:update:install"
 export const UPDATE_STATE_CHANNEL = "ballest:update:state"
 /** Main → renderer: the page held a close or a reload with unsaved edits (`webContents.send`). */
 export const UNLOAD_REQUEST_CHANNEL = "ballest:window:unloadRequest"
+/** Main → renderer: the game session a Play started or joined has ended (`webContents.send`). */
+export const PLAY_SESSION_ENDED_CHANNEL = "ballest:game:playSessionEnded"

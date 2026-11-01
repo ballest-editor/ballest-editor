@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import { heldActions, keybindActions, mouseClickActions, mouseDragActions } from "../domain/Keybinds"
-import { commandFor } from "./commands"
+import { commandFor, runsHere } from "./commands"
 import { initialMap, useEditor } from "./store"
 
 describe("commands", () => {
@@ -9,6 +9,16 @@ describe("commands", () => {
       const oneShot = !heldActions.has(action) && !mouseDragActions.has(action) && !mouseClickActions.has(action)
       assert.strictEqual(commandFor(action) !== undefined, oneShot, action)
     }
+  })
+
+  it("runs Play only where the game can be reached", () => {
+    const s = () => useEditor.getState()
+    const before = s().capabilities
+    assert.isFalse(runsHere("playMap"))
+    assert.isTrue(runsHere("saveMap"))
+    s().setCapabilities({ ...before, play: true })
+    assert.isTrue(runsHere("playMap"))
+    s().setCapabilities(before)
   })
 
   it("runs the same store entry points as the keybinds", () => {
