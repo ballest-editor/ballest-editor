@@ -20,6 +20,16 @@ export const githubFeed: UpdateFeed = { _tag: "GitHub" }
 /** `pnpm release:mock-server`'s port; apps/desktop's `BALLEST_MOCK_UPDATES` defaults to it too. */
 export const MOCK_UPDATE_SERVER_PORT = 4848
 
+/** The release body a `--mock-updates` build carries, as GitHub's HTML. */
+const MOCK_RELEASE_NOTES = [
+  "<h2>What's Changed</h2>",
+  "<ul>",
+  "<li>A mock release, built with <code>--mock-updates</code> and served by <code>pnpm release:mock-server</code></li>",
+  "<li><strong>Nothing</strong> in it changed; it only has a newer version</li>",
+  "</ul>",
+  `<p><strong>Full Changelog</strong>: <a href="https://github.com/${repository.owner}/${repository.repo}/releases">releases</a></p>`
+].join("\n")
+
 export const mockFeed = (port: number): UpdateFeed => ({ _tag: "Mock", url: `http://127.0.0.1:${port}/` })
 
 /** The installer or AppImage a platform's build must produce, named by `artifactName` (AppImage says x86_64). */
@@ -78,8 +88,9 @@ export const builderConfig = (options: {
     ? { publish: [{ provider: "github", ...repository }] }
     : {
       publish: [{ provider: "generic", url: options.feed.url }],
-      // GitHub's feed carries the release body; a generic one only what latest*.yml says.
-      releaseInfo: { releaseNotes: "A mock release, built with --mock-updates and served by pnpm release:mock-server." }
+      // GitHub's feed carries the release body; a generic one only what latest*.yml says. Shaped like GitHub's
+      // generated notes, so the update popover shows its headings, list and links.
+      releaseInfo: { releaseNotes: MOCK_RELEASE_NOTES }
     }),
   ...(options.platform === "win"
     ? {

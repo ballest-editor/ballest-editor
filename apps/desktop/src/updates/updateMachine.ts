@@ -1,6 +1,19 @@
 // The updater's state transitions, as plain functions of the state (see `UpdateState` in packages/contracts).
-import type { UpdateState } from "@ballest/contracts"
+import type { ReleaseNoteBlock, UpdateState } from "@ballest/contracts"
 import { Option, Predicate } from "effect"
+import type { UpdateInfo } from "../electron/ElectronUpdater"
+import { releaseNotesToBlocks } from "./releaseNotes"
+
+/** This repository's GitHub Releases, the feed the packaged app checks. */
+export const RELEASES_URL = "https://github.com/ballest-editor/ballest-editor/releases"
+
+/** A newer release, as the page shows it. */
+export interface Release {
+  readonly version: string
+  readonly notes: ReadonlyArray<ReleaseNoteBlock> | null
+  /** ISO 8601, when the feed says. */
+  readonly date: string | null
+}
 
 /** What decides whether this copy of the app can update itself. */
 export interface UpdateEnvironment {
@@ -27,6 +40,8 @@ export const initialState = (currentVersion: string, disabled: Option.Option<str
   currentVersion,
   availableVersion: null,
   releaseNotes: null,
+  releaseDate: null,
+  releaseUrl: null,
   downloadPercent: null,
   message: Option.getOrNull(disabled)
 })
@@ -47,11 +62,13 @@ export const onCheckFailed = (state: UpdateState, message: string): UpdateState 
 
 export const onUpToDate = (state: UpdateState): UpdateState => ({ ...state, status: "idle", message: null })
 
-export const onAvailable = (state: UpdateState, version: string, releaseNotes: string | null): UpdateState => ({
+export const onAvailable = (state: UpdateState, release: Release): UpdateState => ({
   ...state,
   status: "available",
-  availableVersion: version,
-  releaseNotes,
+  availableVersion: release.version,
+  releaseNotes: release.notes,
+  releaseDate: release.date,
+  releaseUrl: releaseUrlOf(release.version),
   downloadPercent: null,
   message: null
 })
@@ -83,34 +100,6 @@ export const onDownloadFailed = (state: UpdateState, message: string): UpdateSta
 /** Still `ready`: the download is on disk, and restarting tries the installer again. */
 export const onInstallFailed = (state: UpdateState, message: string): UpdateState => ({ ...state, message })
 
-const ENTITIES: Readonly<Record<string, string>> = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " " }
-
-const decodeEntity = (entity: string): string => {
-  const code = entity.startsWith("#x")
-    ? Number.parseInt(entity.slice(2), 16)
-    : entity.startsWith("#")
-    ? Number.parseInt(entity.slice(1), 10)
-    : Number.NaN
-  if (Number.isInteger(code) && code >= 0 && code <= 0x10ffff) return String.fromCodePoint(code)
-  return ENTITIES[entity] ?? `&${entity};`
-}
-
-/** GitHub's release body arrives as HTML; the page shows it as text, so nothing in it can run or load. */
-const htmlToText = (html: string): string =>
-  html
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<li\b[^>]*>/gi, "\n- ")
-    .replace(/<\/(?:p|div|h[1-6]|ul|ol|pre|blockquote)>/gi, "\n")
-    .replace(/<[^>]*>/g, "")
-    .replace(/&([a-z]+|#\d+|#x[\da-f]+);/gi, (_, entity: string) => decodeEntity(entity))
-    .split("\n")
-    .map((line) => line.trimEnd())
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim()
-
-const MAX_NOTES_LENGTH = 4000
-
 const noteOf = (raw: unknown, version: string): unknown => {
   if (!Array.isArray(raw)) return raw
   const entries: ReadonlyArray<unknown> = raw
@@ -119,13 +108,23 @@ const noteOf = (raw: unknown, version: string): unknown => {
 }
 
 /**
- * The release notes as plain text: a string as is, or from a full changelog (one note per release) the newest
- * `version`'s. Null when there are none.
+ * The release notes as blocks for the page (see `releaseNotes.ts`): from a string (GitHub's HTML release body, or a
+ * generic feed's plain text), or from a full changelog (one note per release) the newest `version`'s. Null when there
+ * are none.
  */
-export const releaseNotesText = (raw: unknown, version: string): string | null => {
+export const releaseNotesOf = (raw: unknown, version: string): ReadonlyArray<ReleaseNoteBlock> | null => {
   const note = noteOf(raw, version)
   if (typeof note !== "string") return null
-  const text = htmlToText(note)
-  if (text === "") return null
-  return text.length > MAX_NOTES_LENGTH ? `${text.slice(0, MAX_NOTES_LENGTH - 1).trimEnd()}…` : text
+  const blocks = releaseNotesToBlocks(note)
+  return blocks.length === 0 ? null : blocks
 }
+
+/** The release's page: the release workflow tags every version `v<version>`. */
+export const releaseUrlOf = (version: string): string => `${RELEASES_URL}/tag/v${encodeURIComponent(version)}`
+
+/** What the page shows of the release a check found. */
+export const releaseOf = (info: UpdateInfo): Release => ({
+  version: info.version,
+  notes: releaseNotesOf(info.releaseNotes, info.version),
+  date: Number.isNaN(Date.parse(info.releaseDate)) ? null : info.releaseDate
+})

@@ -23,8 +23,12 @@ export const formatAgo = (iso: string, now: number): string => {
   if (days === 0) return `${Math.floor(elapsed / HOUR)} h ago`
   if (days === 1) return "yesterday"
   if (days < 7) return `${days} d ago`
-  return new Date(time).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+  return formatDate(iso)
 }
+
+/** The date alone, `31 Oct 2026` (or the locale's way of writing it). */
+export const formatDate = (iso: string): string =>
+  new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
 
 /** The heading a day's notifications go under: `Today`, `Yesterday`, else the date. */
 export const dayLabel = (iso: string, now: number): string => {

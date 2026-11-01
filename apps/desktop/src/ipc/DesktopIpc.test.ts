@@ -143,6 +143,8 @@ const updatesLayer = Layer.succeed(
       currentVersion: "0.2.0",
       availableVersion: "0.2.1",
       releaseNotes: null,
+      releaseDate: null,
+      releaseUrl: null,
       downloadPercent: null,
       message: null
     }),
