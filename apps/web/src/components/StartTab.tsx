@@ -7,6 +7,7 @@ import { formatAgo, formatDateTime } from "../domain/time"
 import { importMap, openProjectMap, startNewMap } from "../editor/actions"
 import { type ProjectMap, useEditor } from "../editor/store"
 import { useNow } from "../editor/useNow"
+import { GameLink } from "./GameLink"
 import { LinkStateBadge } from "./LinkStateBadge"
 
 function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }) {
@@ -53,25 +54,6 @@ function ProjectMaps() {
 }
 
 /**
- * Where the Game link checklist goes (#134: the game, the maps folder, the creator, the plugin manager and the
- * plugin). Until then it points at Settings › Game, which shows the same things.
- */
-function GameLinkSlot() {
-  const openDialog = useEditor((s) => s.openDialog)
-  return (
-    <section aria-labelledby="start-game-link" className="flex items-center gap-3 rounded-lg border px-4 py-3">
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <h2 id="start-game-link" className="text-sm font-medium">Game link</h2>
-        <p className="text-muted-foreground">
-          The game, its maps folder and the editor's plugin are in Settings › Game.
-        </p>
-      </div>
-      <Button variant="outline" onClick={() => openDialog("settings", "game")}>Game settings…</Button>
-    </section>
-  )
-}
-
-/**
  * The Start tab (docs/PROJECTS.md § Shell), shown when no map is open and from View › Start. On desktop: the maps in
  * the project, New map, Import… and the Game link. In a browser, which has no project: New map and Open….
  */
@@ -105,7 +87,7 @@ export function StartTab() {
               </p>
             )}
         </section>
-        {projects && <GameLinkSlot />}
+        {projects && <GameLink />}
       </div>
     </div>
   )

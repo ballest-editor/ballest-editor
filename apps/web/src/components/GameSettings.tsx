@@ -2,6 +2,7 @@ import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { useState } from "react"
+import { PLUGIN_MANAGER_URL } from "../domain/gameLink"
 import { chooseGamePath, installPlugin, openExternalLink, resetGamePaths, revealGamePath } from "../editor/actions"
 import type { GamePath, GamePathKind, GamePaths, PluginStatus, SettingsCategory } from "../editor/store"
 import type { SettingsRow } from "./SettingsShell"
@@ -76,9 +77,6 @@ function GamePathControl({ which, path }: { readonly which: GamePathKind; readon
     </div>
   )
 }
-
-/** The plugin manager's site, which has its install steps. */
-const PLUGIN_MANAGER_URL = "https://anythinggoes-ballest.github.io/ballest-plugin-manager/"
 
 const PLAY_NEEDS_IT = "Play races the open map in the game through this plugin."
 

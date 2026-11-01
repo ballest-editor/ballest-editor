@@ -33,6 +33,10 @@ export const resolveNotices = <N extends Notice>(log: ReadonlyArray<N>, kind: st
     ? log.map((n) => n.kind === kind && isPinned(n) ? { ...n, resolvedAt: at } : n)
     : log
 
+/** Without the notifications of `kinds` ("Don't show again"), pinned ones too. */
+export const dropNotices = <N extends Notice>(log: ReadonlyArray<N>, kinds: ReadonlySet<string>): ReadonlyArray<N> =>
+  log.some((n) => kinds.has(n.kind)) ? log.filter((n) => !kinds.has(n.kind)) : log
+
 /** Marks `ids` read (every notification when absent). */
 export const markRead = <N extends Notice>(log: ReadonlyArray<N>, ids?: ReadonlySet<string>): ReadonlyArray<N> =>
   log.some((n) => !n.read && (ids === undefined || ids.has(n.id)))

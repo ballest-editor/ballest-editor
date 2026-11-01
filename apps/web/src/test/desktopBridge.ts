@@ -2,6 +2,7 @@ import type {
   BackupPlace,
   DesktopBridge,
   FoundCreator,
+  GameLinkResult,
   GamePaths,
   MapBackupFile,
   MapLink,
@@ -44,6 +45,11 @@ export interface TestDisk {
   readonly backups: Array<MapBackupFile>
   /** What `notifications.json` holds. */
   notifications: NotificationRecords
+  /**
+   * What `desktop-settings.json` holds for the Game link: the last launch's result (null before the first) and the
+   * muted notification kinds.
+   */
+  gameLink: { last: GameLinkResult | null; muted: Array<string> }
   project: { current: string; recent: Array<string> }
   /**
    * `creator`: what `findCreator` answers. `plugin`: the editor-link plugin's status; installing it makes it `current`,
@@ -72,6 +78,9 @@ export const TEST_PROJECT = "/home/me/Documents/Ballest Editor/Maps"
 
 /** Where a project map is: `<project>/maps/<file name>`. */
 export const projectFile = (fileName: string, project = TEST_PROJECT) => `${project}/maps/${fileName}`
+
+/** What an install folder must hold for `chooseGamePath` to take it, as main checks. */
+export const GAME_EXE = "Ballest/Binaries/Win64/Ballest-Win64-Shipping.exe"
 
 const testGamePaths: GamePaths = {
   install: { status: "found", path: "/game" },
@@ -116,6 +125,7 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   links: new Map(),
   backups: [],
   notifications: [],
+  gameLink: { last: null, muted: [] },
   project: { current: TEST_PROJECT, recent: [] },
   game: {
     paths: testGamePaths,
@@ -317,6 +327,11 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     chooseGamePath: (which) => {
       const path = ask("folder")
       if (path === null) return Promise.resolve(null)
+      if (which === "install" && !disk.files.has(`${path}/${GAME_EXE}`)) {
+        return Promise.reject(
+          new Error(`Error invoking remote method 'x': GamePathError: ${path} isn't Ballest of Them All's folder.`)
+        )
+      }
       disk.game.paths = { ...disk.game.paths, [which]: { status: "overridden", path } }
       return Promise.resolve(disk.game.paths)
     },
@@ -348,6 +363,15 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     loadNotifications: () => Promise.resolve(disk.notifications),
     saveNotifications: (records) => {
       disk.notifications = records
+      return Promise.resolve()
+    },
+    muteNotifications: (kind) => {
+      if (!disk.gameLink.muted.includes(kind)) disk.gameLink.muted.push(kind)
+      return Promise.resolve([...disk.gameLink.muted])
+    },
+    gameLinkMemory: () => Promise.resolve({ last: disk.gameLink.last, muted: [...disk.gameLink.muted] }),
+    rememberGameLink: (result) => {
+      disk.gameLink.last = result
       return Promise.resolve()
     },
     getUpdateState: () => Promise.resolve(disk.updater.state),

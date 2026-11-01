@@ -262,7 +262,9 @@ export const NotificationCommand = Schema.TaggedUnion({
   /** A folder dialog for one of the game's folders (Choose folder…). */
   ChooseGamePath: { which: GamePathKind },
   /** Opens one of the project's maps. */
-  OpenMap: { fileName: MapFileName }
+  OpenMap: { fileName: MapFileName },
+  /** Opens a web page in the default browser (the plugin manager's install steps). */
+  OpenExternal: { url: OpenExternalPayload.fields.url }
 })
 export type NotificationCommand = typeof NotificationCommand.Type
 
@@ -277,9 +279,12 @@ export type NotificationAction = typeof NotificationAction.Type
  * `error`, ...; a later "don't show again" is per kind). A `persistent` one stays pinned to the top of the list until
  * `resolvedAt` is set, when its cause has gone away; notifying the same persistent kind again updates it in place.
  */
+/** What a notification is about (`mapSaved`, `gameNotFound`, ...); "Don't show again" mutes a kind. */
+export const NotificationKind = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(64))
+
 export const NotificationRecord = Schema.Struct({
   id: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(64)),
-  kind: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(64)),
+  kind: NotificationKind,
   level: Schema.Literals(["info", "error"]),
   title: Schema.String.check(Schema.isMaxLength(4096)),
   body: Schema.NullOr(Schema.String.check(Schema.isMaxLength(16384))),
@@ -296,6 +301,30 @@ export const NOTIFICATION_LIMIT = 100
 
 export const NotificationRecords = Schema.Array(NotificationRecord).check(Schema.isMaxLength(NOTIFICATION_LIMIT))
 export type NotificationRecords = typeof NotificationRecords.Type
+
+/** The notification kinds the user asked not to be shown again ("Don't show again"), kept in `desktop-settings.json`. */
+export const MutedNotificationKinds = Schema.Array(NotificationKind).check(Schema.isMaxLength(64))
+export type MutedNotificationKinds = typeof MutedNotificationKinds.Type
+
+export const NotificationKindPayload = Schema.Struct({ kind: NotificationKind })
+export type NotificationKindPayload = typeof NotificationKindPayload.Type
+
+/**
+ * What the Game link checklist (docs/PROJECTS.md § Shell) found: whether the game's install and the plugin manager
+ * are there. Kept in `desktop-settings.json` from one launch to the next, so the editor notifies only when one changes.
+ */
+export const GameLinkResult = Schema.Struct({
+  game: Schema.Boolean,
+  pluginManager: Schema.Boolean
+})
+export type GameLinkResult = typeof GameLinkResult.Type
+
+/** What the last launch found (null before the first check), and the notification kinds muted. */
+export const GameLinkMemory = Schema.Struct({
+  last: Schema.NullOr(GameLinkResult),
+  muted: MutedNotificationKinds
+})
+export type GameLinkMemory = typeof GameLinkMemory.Type
 
 /**
  * Where the creator name the game writes into maps was found: the persona name of the account Steam last logged in
@@ -460,6 +489,12 @@ export interface DesktopBridge {
   readonly loadNotifications: () => Promise<NotificationRecords>
   /** Replaces the kept notifications (at most `NOTIFICATION_LIMIT`). */
   readonly saveNotifications: (records: NotificationRecords) => Promise<void>
+  /** "Don't show again": mutes a notification kind from now on, across restarts; the kinds muted afterwards. */
+  readonly muteNotifications: (kind: string) => Promise<MutedNotificationKinds>
+  /** What the Game link found last time (null on the first launch), and the muted notification kinds. */
+  readonly gameLinkMemory: () => Promise<GameLinkMemory>
+  /** Keeps what the Game link found, for the next launch to compare with. */
+  readonly rememberGameLink: (result: GameLinkResult) => Promise<void>
   /** The updater's state now. */
   readonly getUpdateState: () => Promise<UpdateState>
   /** Starts downloading the release on offer (`available`); progress and the outcome arrive through `onUpdateState`. */

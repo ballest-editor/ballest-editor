@@ -1,8 +1,11 @@
 import {
+  ChooseGamePathResult,
   ExportMapResult,
+  GamePaths as GamePathsSchema,
   ImportMapResult,
   MapBackupFile,
   MapBackups,
+  PluginStatus,
   ProjectMaps,
   ProjectState
 } from "@ballest/contracts"
@@ -26,7 +29,7 @@ import { Backups } from "../project/Backups"
 import { sha256 } from "../project/files"
 import { LinkFile, MapLinks } from "../project/MapLinks"
 import { Projects } from "../project/Projects"
-import { DesktopSettings } from "../settings/DesktopSettings"
+import { DesktopSettings, DesktopSettingsFile } from "../settings/DesktopSettings"
 import { DesktopUpdates } from "../updates/DesktopUpdates"
 import * as channels from "./channels"
 import { DesktopIpc, type DesktopIpcHandleListener, type DesktopIpcMain } from "./DesktopIpc"
@@ -59,6 +62,13 @@ const fakeIpcMain = () => {
   ) => invoke(channel, raw).pipe(Effect.flatMap(Schema.decodeUnknownEffect(schema)))
   return { handlers, ipcMain, invoke, invokeAs }
 }
+
+/** What `desktop-settings.json` in the test's folder holds. */
+const readSettings = (fs: FileSystem.FileSystem, dir: string) =>
+  fs.readFileString(`${dir}/desktop-settings.json`).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(Schema.fromJsonString(DesktopSettingsFile))),
+    Effect.orElseSucceed((): DesktopSettingsFile => ({}))
+  )
 
 const hasTag = <A extends { readonly _tag: string }, T extends A["_tag"]>(
   value: A,
@@ -152,7 +162,8 @@ const withHandlers = <A, E>(
     /** The default project: `Documents/Ballest Editor/Maps` in the temp folder. */
     readonly project: string
     readonly steam: Effect.Success<ReturnType<typeof makeFakeSteam>>
-  }) => Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>
+  }) => Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>,
+  machine: Parameters<typeof makeFakeSteam>[1] = { game: "steam", ran: true }
 ) =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
@@ -160,7 +171,7 @@ const withHandlers = <A, E>(
     const dir = yield* fs.makeTempDirectoryScoped()
     const fake = fakeIpcMain()
     const dialogs = fakeDialogs()
-    const steam = yield* makeFakeSteam(path.join(dir, "machine"), { game: "steam", ran: true })
+    const steam = yield* makeFakeSteam(path.join(dir, "machine"), machine)
     const bundle = yield* makeFakePluginBundle(dir, "0.2.0")
     const game = Layer.mergeAll(GameCreator.layer, Layer.effect(GameLink, GameLink.make(bundle))).pipe(
       Layer.provideMerge(Layer.mergeAll(GamePaths.layer, GameProcess.layer)),
@@ -651,6 +662,66 @@ describe("DesktopIpc", () => {
         assert.match(
           String((yield* Effect.flip(fake.invoke(channels.DOWNLOAD_UPDATE_CHANNEL, { now: true }))).cause),
           /undefined/
+        )
+      })
+    ))
+
+  it.effect("without a game install, the install can be chosen; a folder without the exe isn't saved", () =>
+    withHandlers(({ fake, dialogs, dir, steam }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const paths = yield* fake.invokeAs(GamePathsSchema, channels.GAME_PATHS_CHANNEL)
+        assert.deepStrictEqual(paths.install, { status: "missing", path: null })
+        assert.strictEqual((yield* fake.invokeAs(PluginStatus, channels.PLUGIN_STATUS_CHANNEL)).status, "noGame")
+
+        dialogs.answers.push(dir)
+        const error = yield* Effect.flip(fake.invoke(channels.CHOOSE_GAME_PATH_CHANNEL, { which: "install" }))
+        assert.match(String(error.cause), /isn't Ballest of Them All's folder/)
+        assert.isUndefined((yield* readSettings(fs, dir)).game)
+
+        // the folder the fixture would have put the game in, with the exe: taken, and kept as the override
+        const exe = `${steam.install}/Ballest/Binaries/Win64/Ballest-Win64-Shipping.exe`
+        yield* fs.makeDirectory(exe.slice(0, exe.lastIndexOf("/")), { recursive: true })
+        yield* fs.writeFileString(exe, "")
+        dialogs.answers.push(steam.install)
+        const chosen = yield* fake.invokeAs(ChooseGamePathResult, channels.CHOOSE_GAME_PATH_CHANNEL, {
+          which: "install"
+        })
+        assert.deepStrictEqual(chosen?.install, { status: "overridden", path: steam.install })
+        assert.deepStrictEqual((yield* readSettings(fs, dir)).game, { install: steam.install })
+      }), { game: "none" }))
+
+  it.effect("keeps the Game link's last result and the muted notification kinds in desktop-settings.json", () =>
+    withHandlers(({ fake, dir }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        assert.deepStrictEqual(yield* fake.invoke(channels.GAME_LINK_MEMORY_CHANNEL), { last: null, muted: [] })
+        const last = { game: true, pluginManager: false }
+        assert.isUndefined(yield* fake.invoke(channels.REMEMBER_GAME_LINK_CHANNEL, last))
+        assert.deepStrictEqual(
+          yield* fake.invoke(channels.MUTE_NOTIFICATIONS_CHANNEL, { kind: "pluginManagerMissing" }),
+          [
+            "pluginManagerMissing"
+          ]
+        )
+        // muting twice keeps one
+        assert.deepStrictEqual(
+          yield* fake.invoke(channels.MUTE_NOTIFICATIONS_CHANNEL, { kind: "pluginManagerMissing" }),
+          [
+            "pluginManagerMissing"
+          ]
+        )
+        assert.deepStrictEqual(yield* fake.invoke(channels.GAME_LINK_MEMORY_CHANNEL), {
+          last,
+          muted: ["pluginManagerMissing"]
+        })
+        assert.deepInclude(yield* readSettings(fs, dir), {
+          gameLink: { last },
+          notifications: { muted: ["pluginManagerMissing"] }
+        })
+        assert.match(
+          String((yield* Effect.flip(fake.invoke(channels.REMEMBER_GAME_LINK_CHANNEL, { game: "yes" }))).cause),
+          /Expected/
         )
       })
     ))
