@@ -1,6 +1,7 @@
 import type { InstallPluginResult, PluginStatus } from "@ballest/contracts"
-import { Context, Effect, FileSystem, Layer, Option, Path, Schema } from "effect"
+import { Clock, Context, Effect, FileSystem, Layer, Option, Path, Schema } from "effect"
 import { DesktopEnvironment } from "../app/DesktopEnvironment"
+import { writeAtomic } from "../project/files"
 import { GamePaths } from "./GamePaths"
 import { GameProcess } from "./GameProcess"
 import { pluginManagerDllOf } from "./locations"
@@ -8,7 +9,7 @@ import { compareVersions, isPluginFileName, MANIFEST, parseManifest, PLUGIN_ID }
 import * as probe from "./probe"
 
 export class GameLinkError extends Schema.TaggedError<GameLinkError>()("GameLinkError", {
-  reason: Schema.Literals(["noPluginManager", "bundle", "install"]),
+  reason: Schema.Literals(["noPluginManager", "bundle", "install", "play"]),
   path: Schema.NullOr(Schema.String),
   cause: Schema.optional(Schema.Defect())
 }) {
@@ -20,19 +21,37 @@ export class GameLinkError extends Schema.TaggedError<GameLinkError>()("GameLink
         return `The app's copy of the ${PLUGIN_ID} plugin is missing or broken (${this.path}).`
       case "install":
         return `Couldn't copy the ${PLUGIN_ID} plugin into ${this.path}.`
+      case "play":
+        return `Couldn't ask the ${PLUGIN_ID} plugin to race the map (${this.path}).`
     }
   }
+}
+
+/** The file Play writes into the plugin's folder, and what is in it: the map to race and a nonce the plugin hasn't seen. */
+export const PLAY_FILE = "play.json"
+export const PlayFile = Schema.Struct({ map: Schema.String, nonce: Schema.Finite })
+export type PlayFile = typeof PlayFile.Type
+
+/** What `requestRace` did: the plugin's status, and whether `play.json` was written. */
+export interface RaceRequest {
+  readonly plugin: PluginStatus
+  readonly sent: boolean
 }
 
 /**
  * The editor's side of the plugin handoff (docs/DESKTOP.md § Play): the `ballest-editor-link` plugin the app ships in
  * `bundleDir`, and the copy of it in the game's plugins folder. `installPlugin` is the one place the app writes into
- * the game's install, and only inside `<plugins>/ballest-editor-link`.
+ * the game's install, and only inside `<plugins>/ballest-editor-link`: the plugin's files, and `play.json`.
  */
 export class GameLink extends Context.Service<GameLink, {
   readonly pluginStatus: Effect.Effect<PluginStatus, GameLinkError>
   /** Copies the app's plugin in, over an older copy; refused without the plugin manager. */
   readonly installPlugin: Effect.Effect<InstallPluginResult, GameLinkError>
+  /**
+   * Asks the plugin to race `fileName`, a map in the game's maps folder: writes `play.json` with a nonce it hasn't
+   * seen. Only into an installed plugin (`current` or `outdated`); otherwise nothing is written and `sent` is false.
+   */
+  readonly requestRace: (fileName: string) => Effect.Effect<RaceRequest, GameLinkError>
 }>()("ballest/desktop/game/GameLink") {
   static readonly make = (bundleDir: string) =>
     Effect.gen(function*() {
@@ -111,7 +130,23 @@ export class GameLink extends Context.Service<GameLink, {
         return { plugin: yield* pluginStatus, restartGame: yield* game.isRunning } satisfies InstallPluginResult
       }).pipe(Effect.withSpan("GameLink.installPlugin"))
 
-      return GameLink.of({ pluginStatus, installPlugin })
+      // The plugin races any nonce other than the last it handled; the time in ms, never the same twice in a row.
+      let lastNonce = 0
+      const requestRace = Effect.fn("GameLink.requestRace")(function*(fileName: string) {
+        const plugin = yield* pluginStatus
+        if ((plugin.status !== "current" && plugin.status !== "outdated") || plugin.folder === null) {
+          return { plugin, sent: false } satisfies RaceRequest
+        }
+        lastNonce = Math.max(yield* Clock.currentTimeMillis, lastNonce + 1)
+        const file = path.join(plugin.folder, PLAY_FILE)
+        const request: PlayFile = { map: fileName, nonce: lastNonce }
+        yield* writeAtomic(fs, file, `${JSON.stringify(request)}\n`).pipe(
+          Effect.mapError((cause) => new GameLinkError({ reason: "play", path: file, cause }))
+        )
+        return { plugin, sent: true } satisfies RaceRequest
+      })
+
+      return GameLink.of({ pluginStatus, installPlugin, requestRace })
     })
 
   /** Installs from the plugin the app ships (`DesktopEnvironment.pluginDir`). */

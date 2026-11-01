@@ -2,8 +2,10 @@ import { assert, describe, it } from "@effect/vitest"
 import { Option } from "effect"
 import {
   addItem,
+  asNewDraft,
   copyItems,
   duplicateItems,
+  isNeverPublished,
   pasteItems,
   removeItems,
   setLevelNames,
@@ -128,5 +130,21 @@ describe("edits", () => {
     assert.isTrue(Option.isSome(validateItem(playerStartItem())))
     assert.isTrue(Option.isNone(validateItem({ actorToSpawn: 1 })))
     assert.strictEqual(setLevelNames(withItems(1), "X", "Y").worldSettings.levelData.userLevelName, "X_Y")
+  })
+
+  it("makes a published map's draft a new one, which Play can race", () => {
+    const map = withItems(2)
+    const published = {
+      ...map,
+      worldSettings: {
+        ...map.worldSettings,
+        levelData: { ...map.worldSettings.levelData, levelPublishedFileId: 3561234567 }
+      }
+    }
+    assert.isFalse(isNeverPublished(published.worldSettings.levelData.levelPublishedFileId))
+    const draft = asNewDraft(published)
+    assert.isTrue(isNeverPublished(draft.worldSettings.levelData.levelPublishedFileId))
+    assert.strictEqual(draft.items, published.items)
+    assert.isFalse(isNeverPublished(0))
   })
 })

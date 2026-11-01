@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 import { isMovementChord, sharedKeysFlyFreely } from "../domain/flyKeys"
 import { actionsFor, chordOf, releasesBinding } from "../domain/Keybinds"
-import { commandFor, worksOnStart } from "./commands"
+import { commandFor, runsHere, worksOnStart } from "./commands"
 import { isEditorKeyEvent } from "./FlyCamera"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
@@ -31,7 +31,7 @@ export function useActionKeys() {
       ) return
       for (const action of actionsFor(keybinds, chord)) {
         const run = commandFor(action)
-        if (run === undefined || (activeTab !== "map" && !worksOnStart(action))) continue
+        if (run === undefined || !runsHere(action) || (activeTab !== "map" && !worksOnStart(action))) continue
         e.preventDefault()
         run()
         return

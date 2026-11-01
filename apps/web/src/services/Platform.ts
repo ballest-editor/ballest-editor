@@ -15,6 +15,8 @@ import type {
   MutedNotificationKinds,
   NotificationRecords,
   OpenedMapFile,
+  PlayResult,
+  PlaySessionEnded,
   PluginStatus,
   ProjectMap,
   ProjectMapFile,
@@ -39,6 +41,8 @@ export type {
   NotificationAction,
   NotificationCommand,
   NotificationRecord,
+  PlayResult,
+  PlaySessionEnded,
   PluginStatus,
   ProjectMap,
   ProjectMapFile,
@@ -58,7 +62,7 @@ export interface PlatformCapabilities {
   readonly exportToGame: boolean
   /** Starting the game through Steam. */
   readonly launchGame: boolean
-  /** Racing the open map in the game through the plugin manager (#66). */
+  /** Racing the open map in the game through the plugin manager (docs/DESKTOP.md § Play). */
   readonly play: boolean
   /** Updating itself from GitHub Releases; whether this build actually does is the update state's `disabled`. */
   readonly updates: boolean
@@ -160,6 +164,16 @@ export class Platform extends Context.Service<Platform, {
   readonly pluginStatus: Effect.Effect<PluginStatus, PlatformError>
   /** Installs the app's copy of the plugin, or updates an older one; fails without the plugin manager. */
   readonly installPlugin: Effect.Effect<InstallPluginResult, PlatformError>
+  /**
+   * Play: exports a project map as `exportMap` does, asks the plugin to race it and starts the game if it isn't
+   * running (desktop). Without the plugin it still exports and starts the game; the result says so.
+   */
+  readonly play: (
+    fileName: string,
+    options: { readonly replacePublished: boolean }
+  ) => Effect.Effect<PlayResult, PlatformError>
+  /** Each end of a game session a Play started or joined (desktop); a browser's ends at once. */
+  readonly playSessionEnds: Stream.Stream<PlaySessionEnded, PlatformError>
   /** The notifications kept from earlier runs, newest first (desktop: `notifications.json`); none in a browser. */
   readonly loadNotifications: Effect.Effect<NotificationRecords, PlatformError>
   /** Keeps `records` for the next run (desktop); a browser keeps them in memory only. */
@@ -233,10 +247,11 @@ const updateStates = (bridge: DesktopBridge) =>
     })
   )
 
-const unloadRequests = (bridge: DesktopBridge) =>
-  Stream.callback<UnloadKind, PlatformError>((queue) =>
+/** What main pushes through one of the bridge's `on…` subscriptions, while the stream runs. */
+const pushed = <A>(subscribe: (listener: (value: A) => void) => () => void) =>
+  Stream.callback<A, PlatformError>((queue) =>
     Effect.acquireRelease(
-      Effect.sync(() => bridge.onUnloadRequest((kind) => Queue.offerUnsafe(queue, kind))),
+      Effect.sync(() => subscribe((value) => Queue.offerUnsafe(queue, value))),
       (unsubscribe) => Effect.sync(unsubscribe)
     )
   )
@@ -245,7 +260,14 @@ const leave = (kind: UnloadKind) => Effect.sync(() => kind === "close" ? window.
 
 const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
   Platform.of({
-    capabilities: { ...browserCapabilities, projects: true, exportToGame: true, launchGame: true, updates: true },
+    capabilities: {
+      ...browserCapabilities,
+      projects: true,
+      exportToGame: true,
+      launchGame: true,
+      play: true,
+      updates: true
+    },
     pickMapFile: bridgeCall(() => bridge.pickImport()).pipe(
       Effect.map((file) => Option.map(Option.fromNullOr(file), openedMap))
     ),
@@ -265,7 +287,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
     readBackup: ({ place, id }) => bridgeCall(() => bridge.readBackup({ place, id })),
     setWindowTheme: (dark) => bridgeCall(() => bridge.setWindowTheme(dark)),
     confirmUnsaved: (action, map) => bridgeCall(() => bridge.confirmUnsaved(unsavedPromptOf(action, map))),
-    unloadRequests: unloadRequests(bridge),
+    unloadRequests: pushed((listener) => bridge.onUnloadRequest(listener)),
     leave,
     openExternal: (url) => bridgeCheck(() => bridge.openExternal(url), `Couldn't open ${url}.`),
     gamePaths: bridgeCall(() => bridge.gamePaths()),
@@ -280,6 +302,8 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
     findCreator: bridgeCall(() => bridge.findCreator()).pipe(Effect.map(Option.fromNullOr)),
     pluginStatus: bridgeCall(() => bridge.pluginStatus()),
     installPlugin: bridgeCall(() => bridge.installPlugin()),
+    play: (fileName, { replacePublished }) => bridgeCall(() => bridge.play({ fileName, replacePublished })),
+    playSessionEnds: pushed((listener) => bridge.onPlaySessionEnded(listener)),
     loadNotifications: bridgeCall(() => bridge.loadNotifications()),
     saveNotifications: (records) => bridgeCall(() => bridge.saveNotifications(records)),
     muteNotifications: (kind) => bridgeCall(() => bridge.muteNotifications(kind)),
@@ -367,6 +391,8 @@ const makeBrowser = (): Platform["Service"] => {
     findCreator: Effect.succeedNone,
     pluginStatus: desktopOnly,
     installPlugin: desktopOnly,
+    play: () => desktopOnly,
+    playSessionEnds: Stream.empty,
     loadNotifications: Effect.succeed([]),
     saveNotifications: () => Effect.void,
     muteNotifications: (kind) => Effect.sync(() => [...muted.add(kind)]),

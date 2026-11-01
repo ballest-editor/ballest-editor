@@ -2,9 +2,18 @@
 import { Cause, Effect, Exit, Fiber, Option, Queue, Stream } from "effect"
 import { toast } from "sonner"
 import type { UeTransform, Vec3 } from "../domain/coords"
-import { setLevelNames } from "../domain/edits"
+import { asNewDraft, isNeverPublished, setLevelNames } from "../domain/edits"
 import { copyNameOf, currentCreatedAt, mapFileNameOf, mapLabelOf, newMapFile } from "../domain/factory"
-import { gameLinkChanges, type GameLinkResult, gameLinkResultOf, sameGameLinkResult } from "../domain/gameLink"
+import {
+  gameLinkChanges,
+  type GameLinkNotice,
+  type GameLinkResult,
+  gameLinkResultOf,
+  playWithoutPluginNotice,
+  PLUGIN_MISSING,
+  RESOLVED_BY_PLAY,
+  sameGameLinkResult
+} from "../domain/gameLink"
 import {
   type Axis,
   type AxisEdit,
@@ -35,6 +44,7 @@ import {
   type NotificationRecord,
   Platform,
   type PlatformError,
+  type PlayResult,
   type ProjectMap,
   type ProjectState,
   type UnloadKind
@@ -599,15 +609,16 @@ export const renameOpenMap = (displayName: string, creatorName: string) => {
  * project's backups).
  */
 export const duplicateMapEffect = Effect.fn("duplicateMapEffect")(
-  function*(displayName: string, creatorName: string, replace = false) {
+  function*(displayName: string, creatorName: string, replace = false, newDraft = false) {
     const { doc, file } = useEditor.getState()
-    const result = yield* (yield* MapExporter).prepare(setLevelNames(doc.map, displayName, creatorName))
+    const named = setLevelNames(doc.map, displayName, creatorName)
+    const result = yield* (yield* MapExporter).prepare(newDraft ? asNewDraft(named) : named)
     const created = yield* createAsOpenMap(doc, result, replace)
     const from = file === null ? "" : ` from ${mapLabelOf(file.name)}`
     const over = replace ? " (the map it replaced went to the backups)" : ""
     useEditor.getState().notify(
       "info",
-      `Duplicated${from}: now editing ${mapLabelOf(created.fileName)}${over}`,
+      `${newDraft ? "Saved a new draft" : "Duplicated"}${from}: now editing ${mapLabelOf(created.fileName)}${over}`,
       { kind: "mapDuplicated", actions: [revealIn("project")] }
     )
   }
@@ -620,7 +631,11 @@ export const duplicateMap = (displayName: string, creatorName: string, replace =
 const exportProjectMap = Effect.fn("exportProjectMap")(function*(fileName: string, replacePublished: boolean) {
   const exported = yield* (yield* Platform).exportMap(fileName, { replacePublished })
   if (exported._tag === "Published") {
-    useEditor.getState().setPublishedDraft({ name: exported.file.name, publishedFileId: exported.publishedFileId })
+    useEditor.getState().setPublishedDraft({
+      name: exported.file.name,
+      publishedFileId: exported.publishedFileId,
+      from: "export"
+    })
     return
   }
   yield* refreshProject
@@ -631,31 +646,127 @@ const exportProjectMap = Effect.fn("exportProjectMap")(function*(fileName: strin
 })
 
 /**
+ * Runs `then` with the open map's project file name, for Export and Play, which copy that file: unsaved edits are
+ * saved first. A map with no file yet is named first, and `then` runs once the Save map dialog has saved it.
+ */
+const withSavedOpenMap = <E, R>(then: (fileName: string) => Effect.Effect<void, E, R>) =>
+  Effect.gen(function*() {
+    const { doc, file, dirty, nameThen } = useEditor.getState()
+    if (file === null) {
+      const named = Effect.suspend(() => {
+        const saved = useEditor.getState().file
+        return saved === null ? Effect.void : then(saved.name)
+      })
+      // It runs later, from the dialog: it takes its services along.
+      nameThen(Effect.provideContext(named, yield* Effect.context<R>()))
+      return
+    }
+    const { levelDisplayName, creatorName } = doc.map.worldSettings.levelData
+    yield* then(
+      dirty || file.name !== mapFileNameOf(levelDisplayName.trim(), creatorName.trim())
+        ? (yield* writeOpenMap(file, { exportAfter: false })).fileName
+        : file.name
+    )
+  })
+
+/**
  * Export to game: writes the map into the game's UserSavedMaps folder under the game's file name, where the in-game
  * editor lists it. The export is a copy of the project file, so unsaved edits are saved first. A map with no file yet
  * is named first.
  */
 export const exportToGameEffect = (replacePublished: boolean) =>
-  Effect.gen(function*() {
-    const { doc, file, dirty, openDialog } = useEditor.getState()
-    if (file === null) {
-      openDialog("saveAs")
-      return
-    }
-    const { levelDisplayName, creatorName } = doc.map.worldSettings.levelData
-    const current = dirty || file.name !== mapFileNameOf(levelDisplayName.trim(), creatorName.trim())
-      ? (yield* writeOpenMap(file, { exportAfter: false })).fileName
-      : file.name
-    yield* exportProjectMap(current, replacePublished)
-  })
+  withSavedOpenMap((fileName) => exportProjectMap(fileName, replacePublished))
 
 export const exportToGame = () => run(exportToGameEffect(false))
 
-/** The replacePublished dialog's answer: replace the published map's draft after all. */
+/** The replacePublished dialog's answer: replace the published map's draft after all, and go on with Export or Play. */
 export const replacePublishedDraft = () => {
+  const from = useEditor.getState().publishedDraft?.from ?? "export"
   useEditor.getState().setPublishedDraft(null)
-  return run(exportToGameEffect(true))
+  return run(from === "play" ? playEffect(true) : exportToGameEffect(true))
 }
+
+// --- Play (docs/DESKTOP.md § Play) -----------------------------------------------------------
+
+/** Tells how Play went: racing, starting the game to race, or exported only because the plugin can't be reached. */
+const notifyPlayed = (fileName: string, played: Extract<PlayResult, { readonly _tag: "Played" }>) => {
+  const { notify, resolveNotifications } = useEditor.getState()
+  const label = mapLabelOf(fileName)
+  const { plugin, sent, launch } = played
+  if (launch === "failed") {
+    notify("error", `Exported ${label}, but couldn't ask Steam to start the game. Is Steam running?`, {
+      kind: "play",
+      actions: [revealIn("game")]
+    })
+  } else if (sent) {
+    for (const kind of RESOLVED_BY_PLAY) resolveNotifications(kind)
+    const outdated = plugin.status === "outdated"
+    notify("info", launch === "running" ? `Racing ${label} in the game` : `Starting the game to race ${label}`, {
+      kind: "play",
+      ...(launch === "launched" && { body: "The race starts once the game and the plugin manager are up." }),
+      ...(outdated && { actions: [{ label: "Update plugin", command: { _tag: "InstallPlugin" } }] })
+    })
+  } else {
+    notifyNotice(playWithoutPluginNotice(label, launch === "launched", plugin.status))
+  }
+}
+
+/** Exports a saved project map and races it in the game; a published map's draft in the maps folder asks first. */
+const playProjectMap = Effect.fn("playProjectMap")(function*(fileName: string, replacePublished: boolean) {
+  const result = yield* (yield* Platform).play(fileName, { replacePublished })
+  switch (result._tag) {
+    case "Published":
+      useEditor.getState().setPublishedDraft({
+        name: result.file.name,
+        publishedFileId: result.publishedFileId,
+        from: "play"
+      })
+      return
+    case "PublishedMap":
+      useEditor.getState().openDialog("newDraft")
+      return
+    case "Played":
+      yield* refreshProject
+      notifyPlayed(fileName, result)
+  }
+})
+
+/**
+ * Play: Export to game (saving unsaved edits first, naming a map with no file yet), then the plugin races it in the
+ * game, which starts if it isn't running. The plugin manager only races maps never published, so a published map's
+ * draft offers to save a new draft of it instead (the `newDraft` dialog).
+ */
+export const playEffect = (replacePublished: boolean) =>
+  Effect.suspend(() =>
+    isNeverPublished(useEditor.getState().doc.map.worldSettings.levelData.levelPublishedFileId)
+      ? withSavedOpenMap((fileName) => playProjectMap(fileName, replacePublished))
+      : Effect.sync(() => useEditor.getState().openDialog("newDraft"))
+  )
+
+export const playMap = () => run(playEffect(false))
+
+/** The newDraft dialog's answer: a copy of the map that was never published, under a new name; then Play races it. */
+export const playAsNewDraft = (displayName: string, creatorName: string, replace = false) =>
+  run(duplicateMapEffect(displayName, creatorName, replace, true).pipe(Effect.andThen(playEffect(false))))
+
+/**
+ * A game session Play started or joined has ended: the game may have changed the export (the in-game editor saves
+ * over it), so the project's maps are listed again. Sync detection (#141) runs its check here.
+ */
+const playSessionEnded = refreshProject
+
+/** Follows the end of each game session Play started (`playSessionEnded`) until the returned function is called. */
+export const followPlaySessions = () =>
+  runUntilCleanup(
+    Effect.gen(function*() {
+      yield* (yield* Platform).playSessionEnds.pipe(
+        Stream.runForEach(() =>
+          playSessionEnded.pipe(Effect.catchCause((cause) => Effect.sync(() => notifyFailure(cause))))
+        )
+      )
+    }),
+    "Stopped following the game sessions Play started"
+  )
 
 // --- backups and Recover (docs/PROJECTS.md § The files) --------------------------------------
 
@@ -778,14 +889,16 @@ const rememberGameLink = (current: GameLinkResult) =>
     yield* (yield* Platform).rememberGameLink(current)
   }).pipe(Effect.catch((error) => Effect.logWarning("Couldn't keep the Game link's result", error)))
 
+/** Records a Game link notice (or one of Play's, which share its kinds) in the notification centre. */
+const notifyNotice = ({ level, title, kind, body, persistent, actions }: GameLinkNotice) =>
+  useEditor.getState().notify(level, title, { kind, persistent, actions, ...(body !== undefined && { body }) })
+
 /** Tells the notification centre what `previous` → `current` changed: new notices, and pinned ones resolved. */
 const reportGameLink = (previous: GameLinkResult | null, current: GameLinkResult) => {
   const { notices, resolve } = gameLinkChanges(previous, current)
-  const { notify, resolveNotifications } = useEditor.getState()
+  const { resolveNotifications } = useEditor.getState()
   for (const kind of resolve) resolveNotifications(kind)
-  for (const { level, title, kind, body, persistent, actions } of notices) {
-    notify(level, title, { kind, persistent, actions, ...(body !== undefined && { body }) })
-  }
+  for (const notice of notices) notifyNotice(notice)
 }
 
 /**
@@ -877,6 +990,7 @@ export const installPluginEffect = Effect.gen(function*() {
   const { plugin, restartGame } = yield* (yield* Platform).installPlugin
   useEditor.getState().setPluginStatus(plugin)
   yield* noteGameLink
+  useEditor.getState().resolveNotifications(PLUGIN_MISSING)
   const done = status === "outdated"
     ? `Updated the editor's plugin to ${plugin.bundledVersion}`
     : "Installed the editor's plugin"
@@ -949,6 +1063,9 @@ export const runNotificationCommand = (command: NotificationCommand): void => {
       return
     case "OpenExternal":
       void openExternalLink(command.url)
+      return
+    case "InstallPlugin":
+      void installPlugin()
   }
 }
 

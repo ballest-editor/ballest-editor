@@ -53,6 +53,7 @@ export const keybindSections = [
   { name: "mouse and keyboard bindings", actions: ["lookRight", "lookLeft", "lookUp", "lookDown"] },
   { name: "editor camera", actions: ["fastMove", "speedFaster", "speedSlower", "orbit", "pan"] },
   { name: "file", actions: ["newMap", "openMap", "saveMap", "saveMapAs"] },
+  { name: "game", actions: ["playMap"] },
   { name: "help", actions: ["showKeybinds"] }
 ] as const
 
@@ -103,6 +104,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   openMap: "import map",
   saveMap: "save map",
   saveMapAs: "duplicate map",
+  playMap: "play",
   showKeybinds: "keybind cheat sheet"
 }
 
@@ -159,6 +161,8 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Save the map into the project, asking nothing; after a rename the file moves to match. In the browser, download it.",
   saveMapAs:
     "Copy the map into the project under a new name and go on editing the copy. In the browser, export it (a download).",
+  playMap:
+    "Export the map to the game and race it there through the plugin manager, starting the game if it isn't running. Desktop app only.",
   showKeybinds: "Hold to show every keybind over the viewport; release to hide it. Editor only."
 }
 
@@ -227,6 +231,7 @@ export const defaultKeybinds: Keybinds = {
   openMap: ["Ctrl+KeyO"],
   saveMap: ["Ctrl+KeyS"],
   saveMapAs: ["Ctrl+Shift+KeyS"],
+  playMap: ["F5"],
   showKeybinds: ["Shift+Slash"]
 }
 

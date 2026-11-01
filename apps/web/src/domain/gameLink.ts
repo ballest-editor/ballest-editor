@@ -259,13 +259,19 @@ export const GAME_FOUND = "gameFound"
 /** The plugin manager is gone (persistent). */
 export const PLUGIN_MANAGER_MISSING = "pluginManagerMissing"
 export const PLUGIN_MANAGER_FOUND = "pluginManagerFound"
+/**
+ * Play exported a map but the editor's plugin isn't installed to race it (persistent: Install, or a Play that reaches
+ * the plugin, resolves it).
+ */
+export const PLUGIN_MISSING = "pluginMissing"
 
 /** The notification kinds whose notifications offer "Don't show again". */
 export const MUTABLE_KINDS: ReadonlySet<string> = new Set([
   GAME_NOT_FOUND,
   GAME_FOUND,
   PLUGIN_MANAGER_MISSING,
-  PLUGIN_MANAGER_FOUND
+  PLUGIN_MANAGER_FOUND,
+  PLUGIN_MISSING
 ])
 
 /** A notification's button (`NotificationCommand` in @ballest/contracts). */
@@ -273,6 +279,7 @@ export type GameLinkCommand =
   | { readonly _tag: "ChooseGamePath"; readonly which: "install" }
   | { readonly _tag: "RevealGamePath"; readonly which: GameFolderKind }
   | { readonly _tag: "OpenExternal"; readonly url: string }
+  | { readonly _tag: "InstallPlugin" }
 
 export interface GameLinkNotice {
   readonly kind: string
@@ -339,3 +346,42 @@ export const gameLinkChanges = (
   }
   return { notices, resolve }
 }
+
+/**
+ * What Play says when it exported a map (`label`; `started`: and started the game) but couldn't hand it to the editor's
+ * plugin. A missing game or plugin manager is the Game link's own pinned notice, under its kind, so there is one per
+ * cause however it was found and the Game link resolves it; only a missing plugin is Play's own.
+ */
+export const playWithoutPluginNotice = (
+  label: string,
+  started: boolean,
+  status: PluginLookup["status"]
+): GameLinkNotice => {
+  const exported = `Exported ${label}${started ? " and started the game" : ""}.`
+  switch (status) {
+    case "noGame":
+      return {
+        ...gameLost,
+        title: `${exported} Play couldn't find Ballest of Them All to race it`,
+        body: "Choose the game's folder, so Play can find the plugin manager in it."
+      }
+    case "noPluginManager":
+      return {
+        ...pluginManagerLost,
+        title: `${exported} Play needs the Ballest plugin manager to race it`,
+        body: "It runs the editor's plugin inside the game. Its site has the install steps."
+      }
+    default:
+      return {
+        kind: PLUGIN_MISSING,
+        level: "info",
+        title: `${exported} Install the editor's plugin and Play races it for you`,
+        body: "Until then, open it from the in-game editor. The game loads the plugin the next time it starts.",
+        persistent: true,
+        actions: [{ label: "Install plugin", command: { _tag: "InstallPlugin" } }]
+      }
+  }
+}
+
+/** The pinned notices a Play that reached the plugin shows are out of date: the game, its plugin manager and the plugin are all there. */
+export const RESOLVED_BY_PLAY: ReadonlyArray<string> = [GAME_NOT_FOUND, PLUGIN_MANAGER_MISSING, PLUGIN_MISSING]

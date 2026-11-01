@@ -2,16 +2,18 @@ import { useMemo, useState } from "react"
 import { riskyClassesIn } from "../domain/Catalog"
 import { copyNameOf, isValidName, mapFileNameOf } from "../domain/factory"
 import { classNameOf } from "../domain/MapFile"
-import { duplicateMap, renameOpenMap, saveMapAs } from "../editor/actions"
+import { duplicateMap, playAsNewDraft, renameOpenMap, saveMapAs } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { type MapCreator, MapNameDialog, useMapCreator } from "./MapNameDialog"
 
 /**
  * Names the open map before it is written: `saveAs` for a map that has no file yet (desktop: into the project) or for
- * a browser's Export (a download); `rename` and `duplicate` from the Map menu. Every mode confirms the name, so a file
- * never disagrees with the names inside it (the game refuses to load those).
+ * a browser's Export (a download); `rename` and `duplicate` from the Map menu; `newDraft`, Play's way out for a
+ * published map's draft (the plugin manager races only maps never published): a duplicate that isn't linked to the
+ * Workshop item, raced once it is saved. Every mode confirms the name, so a file never disagrees with the names inside
+ * it (the game refuses to load those).
  */
-export type NameMapMode = "saveAs" | "rename" | "duplicate"
+export type NameMapMode = "saveAs" | "rename" | "duplicate" | "newDraft"
 
 /** The map's own creator, editable: Rename and Duplicate may change it. */
 const useOwnCreator = (initial: string): MapCreator => {
@@ -45,8 +47,10 @@ export function NameMapDialog(
   const ownCreator = useOwnCreator(mapCreator || settingsCreator.name)
   const creator = mode === "saveAs" ? settingsCreator : ownCreator
   const taken = useMemo(() => new Set(projectMaps.map((m) => m.fileName)), [projectMaps])
+  // a copy: a new draft is one too
+  const copies = mode === "duplicate" || mode === "newDraft"
   const startName = () =>
-    mode === "duplicate"
+    copies
       ? copyNameOf(levelData.levelDisplayName.trim(), mapCreator || settingsCreator.name, taken)
       : levelData.levelDisplayName
   const [name, setName] = useState(startName)
@@ -63,11 +67,12 @@ export function NameMapDialog(
   const target = mapFileNameOf(name.trim(), creator.name)
   const clash = projects && target !== fileName && taken.has(target)
   // Duplicate may write over another map (it goes to the backups); Rename and Save never do.
-  const replaces = clash && mode === "duplicate"
+  const replaces = clash && copies
   const submit = async () => {
     await creator.persist()
     onClose()
     if (mode === "duplicate") await duplicateMap(name, creator.name, replaces)
+    else if (mode === "newDraft") await playAsNewDraft(name, creator.name, replaces)
     else if (mode === "rename") await renameOpenMap(name, creator.name)
     else {
       useEditor.getState().renameLevel(name, creator.name)
@@ -99,6 +104,12 @@ export function NameMapDialog(
       note:
         "Saves a copy of the map as it is now in the project, and goes on editing the copy. The original keeps its last save.",
       submit: "Duplicate"
+    },
+    newDraft: {
+      title: "Play a new draft",
+      note:
+        "Saves a copy of the map as a new draft in the project, goes on editing the copy and races it. The published map's draft keeps its last save.",
+      submit: "Save and play"
     }
   }[mode]
 
@@ -131,11 +142,18 @@ export function NameMapDialog(
         (!clash || replaces)}
       onSubmit={submit}
     >
+      {mode === "newDraft" && (
+        <p className="text-xs text-muted-foreground">
+          {levelData.levelDisplayName} is the draft of a map published to the Workshop (item{" "}
+          {levelData.levelPublishedFileId}). The plugin manager only races maps that were never published, so Play races
+          a new draft of it instead: a copy under another name, not linked to the Workshop item.
+        </p>
+      )}
       {replaces && (
         <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-          The project already has a map called {name.trim()} by{" "}
-          {creator.name}. Duplicate replaces it, and its file goes to the project's backups (Map › Recover previous
-          version…).
+          The project already has a map called {name.trim()} by {creator.name}.{" "}
+          {mode === "newDraft" ? "Save and play" : "Duplicate"}{" "}
+          replaces it, and its file goes to the project's backups (Map › Recover previous version…).
         </p>
       )}
       {clash && !replaces && (

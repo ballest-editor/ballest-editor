@@ -14,6 +14,7 @@ import { GameCreator } from "./game/GameCreator"
 import { GameHost } from "./game/GameHost"
 import { GameLink } from "./game/GameLink"
 import { GamePaths } from "./game/GamePaths"
+import { GamePlay } from "./game/GamePlay"
 import { GameProcess } from "./game/GameProcess"
 import { SteamLibrary } from "./game/SteamLibrary"
 import { DesktopIpc } from "./ipc/DesktopIpc"
@@ -60,7 +61,7 @@ const layerDesktopRuntime = Layer.mergeAll(
   DesktopWindow.layer,
   DesktopUpdates.layer,
   NotificationLog.layer,
-  layerProjects
+  GamePlay.layer.pipe(Layer.provideMerge(layerProjects))
 ).pipe(
   Layer.provideMerge(DesktopSettings.layer),
   Layer.provideMerge(DesktopEnvironment.layer(__dirname)),

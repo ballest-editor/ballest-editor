@@ -33,6 +33,8 @@ const valid = `
     findCreator: () => electron.ipcRenderer.invoke("ballest:game:findCreator"),
     pluginStatus: () => electron.ipcRenderer.invoke("ballest:game:pluginStatus"),
     installPlugin: () => electron.ipcRenderer.invoke("ballest:game:installPlugin"),
+    play: (payload) => electron.ipcRenderer.invoke("ballest:game:play", payload),
+    onPlaySessionEnded: () => () => {},
     loadNotifications: () => electron.ipcRenderer.invoke("ballest:notifications:load"),
     saveNotifications: (records) => electron.ipcRenderer.invoke("ballest:notifications:save", { records }),
     muteNotifications: (kind) => electron.ipcRenderer.invoke("ballest:notifications:mute", { kind }),

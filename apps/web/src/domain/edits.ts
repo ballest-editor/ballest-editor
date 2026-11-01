@@ -229,6 +229,16 @@ export const setLevelData = (map: MapFile, levelData: LevelData): MapFile => ({
 export const setLevelNames = (map: MapFile, displayName: string, creatorName: string): MapFile =>
   setLevelData(map, withLevelNames(map.worldSettings.levelData, displayName, creatorName))
 
+/** Whether a map was never published (`levelPublishedFileId` -1): the plugin manager races no other kind. */
+export const isNeverPublished = (publishedFileId: number): boolean => publishedFileId < 0
+
+/**
+ * The map as a draft that was never published (`levelPublishedFileId` -1), the only kind the plugin manager races: Play's
+ * "save as a new draft" for a published map's draft.
+ */
+export const asNewDraft = (map: MapFile): MapFile =>
+  setLevelData(map, { ...map.worldSettings.levelData, levelPublishedFileId: -1 })
+
 /** The display and creator names, and `userLevelName` (`<displayName>_<creator>`) kept in step with them. */
 export const withLevelNames = (levelData: LevelData, displayName: string, creatorName: string): LevelData => ({
   ...levelData,

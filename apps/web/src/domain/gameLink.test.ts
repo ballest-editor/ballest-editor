@@ -10,8 +10,11 @@ import {
   gameLinkResultOf,
   type GameLinkRow,
   gameLinkRows,
+  MUTABLE_KINDS,
+  playWithoutPluginNotice,
   PLUGIN_MANAGER_FOUND,
   PLUGIN_MANAGER_MISSING,
+  PLUGIN_MISSING,
   type PluginLookup
 } from "./gameLink"
 
@@ -175,5 +178,27 @@ describe("Game link notifications", () => {
       gameLinkResultOf({ ...everything, install: { status: "overridden", path: "/elsewhere" } }, plugin("current")),
       found
     )
+  })
+})
+
+describe("Play without the plugin", () => {
+  it("shares the Game link's kind for a missing game or plugin manager, and has its own for the plugin", () => {
+    const notice = (status: Parameters<typeof playWithoutPluginNotice>[2]) =>
+      playWithoutPluginNotice("Big Loop", true, status)
+    assert.deepStrictEqual(
+      (["noGame", "noPluginManager", "missing"] as const).map((status) => [
+        notice(status).kind,
+        notice(status).persistent,
+        notice(status).actions.map((a) => a.command._tag)
+      ]),
+      [
+        [GAME_NOT_FOUND, true, ["ChooseGamePath"]],
+        [PLUGIN_MANAGER_MISSING, true, ["OpenExternal"]],
+        [PLUGIN_MISSING, true, ["InstallPlugin"]]
+      ]
+    )
+    assert.match(notice("missing").title, /^Exported Big Loop and started the game\. Install the editor's plugin/)
+    assert.isFalse(playWithoutPluginNotice("Big Loop", false, "missing").title.includes("started"))
+    assert.isTrue(MUTABLE_KINDS.has(PLUGIN_MISSING))
   })
 })
