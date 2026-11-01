@@ -142,7 +142,8 @@ describe("DesktopUpdates", () => {
         Effect.gen(function*() {
           fake.releases.push(null, new Error("net::ERR_INTERNET_DISCONNECTED\nmore detail"), {
             version: "0.2.1",
-            releaseNotes: "<p>Fixes &amp; features</p>"
+            releaseNotes: "<p>Fixes &amp; features</p>",
+            releaseDate: "2026-10-31T12:00:00.000Z"
           })
           yield* updates.run
           assert.deepStrictEqual(fake.feeds, [Option.none()])
@@ -160,7 +161,12 @@ describe("DesktopUpdates", () => {
             status: "available",
             currentVersion: "0.2.0",
             availableVersion: "0.2.1",
-            releaseNotes: "Fixes & features",
+            releaseNotes: [{
+              _tag: "Paragraph",
+              spans: [{ text: "Fixes & features", strong: false, emphasis: false, code: false, href: null }]
+            }],
+            releaseDate: "2026-10-31T12:00:00.000Z",
+            releaseUrl: "https://github.com/ballest-editor/ballest-editor/releases/tag/v0.2.1",
             downloadPercent: null,
             message: null
           })
@@ -185,7 +191,7 @@ describe("DesktopUpdates", () => {
         yield* updates.install
         assert.deepStrictEqual([fake.download, fake.installs], [undefined, 0])
 
-        fake.releases.push({ version: "0.2.1", releaseNotes: null })
+        fake.releases.push({ version: "0.2.1", releaseNotes: null, releaseDate: "" })
         yield* updates.check
         yield* updates.download
         yield* settle
@@ -211,7 +217,7 @@ describe("DesktopUpdates", () => {
   it.effect("offers the download again after it fails, and the restart after the installer fails", () =>
     withUpdates({}, ({ updates, fake }) =>
       Effect.gen(function*() {
-        fake.releases.push({ version: "0.2.1", releaseNotes: null })
+        fake.releases.push({ version: "0.2.1", releaseNotes: null, releaseDate: "" })
         yield* updates.check
         yield* updates.download
         yield* settle

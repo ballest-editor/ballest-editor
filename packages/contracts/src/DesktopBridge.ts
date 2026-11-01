@@ -362,14 +362,64 @@ export const UpdateStatus = Schema.Literals([
 ])
 export type UpdateStatus = typeof UpdateStatus.Type
 
+/**
+ * A run of text in release notes with its formatting. `href` makes it a link, always http(s); the page opens it in
+ * the browser, never in the window.
+ */
+export const ReleaseNoteSpan = Schema.Struct({
+  text: Schema.String,
+  strong: Schema.Boolean,
+  emphasis: Schema.Boolean,
+  code: Schema.Boolean,
+  href: Schema.NullOr(Schema.String)
+})
+export type ReleaseNoteSpan = typeof ReleaseNoteSpan.Type
+
+/** A bulleted (`ordered: false`) or numbered list; an item's own lists follow its text. */
+export interface ReleaseNoteList {
+  readonly _tag: "List"
+  readonly ordered: boolean
+  readonly items: ReadonlyArray<ReleaseNoteItem>
+}
+export interface ReleaseNoteItem {
+  readonly spans: ReadonlyArray<ReleaseNoteSpan>
+  readonly lists: ReadonlyArray<ReleaseNoteList>
+}
+
+const ReleaseNoteItem = Schema.Struct({
+  spans: Schema.Array(ReleaseNoteSpan),
+  lists: Schema.Array(Schema.suspend((): Schema.Codec<ReleaseNoteList> => ReleaseNoteList))
+})
+
+export const ReleaseNoteList: Schema.Codec<ReleaseNoteList> = Schema.TaggedStruct("List", {
+  ordered: Schema.Boolean,
+  items: Schema.Array(ReleaseNoteItem)
+})
+
+/**
+ * One block of a release's notes: what main keeps of GitHub's HTML release body (docs/DESKTOP.md § Packaging and
+ * release). Plain data, so nothing in the notes can run script or load anything.
+ */
+export const ReleaseNoteBlock = Schema.Union([
+  Schema.TaggedStruct("Heading", { level: Schema.Literals([1, 2, 3, 4]), spans: Schema.Array(ReleaseNoteSpan) }),
+  Schema.TaggedStruct("Paragraph", { spans: Schema.Array(ReleaseNoteSpan) }),
+  ReleaseNoteList,
+  Schema.TaggedStruct("Code", { text: Schema.String })
+])
+export type ReleaseNoteBlock = typeof ReleaseNoteBlock.Type
+
 export const UpdateState = Schema.Struct({
   status: UpdateStatus,
   /** The running app's version. */
   currentVersion: Schema.String,
   /** The newer release on offer, from `available` on. */
   availableVersion: Schema.NullOr(Schema.String),
-  /** That release's notes (its GitHub release body) as plain text; null when it has none. */
-  releaseNotes: Schema.NullOr(Schema.String),
+  /** That release's notes (its GitHub release body); null when it has none. */
+  releaseNotes: Schema.NullOr(Schema.Array(ReleaseNoteBlock)),
+  /** When that release was published (ISO 8601), if the feed says. */
+  releaseDate: Schema.NullOr(Schema.String),
+  /** That release's page on GitHub. */
+  releaseUrl: Schema.NullOr(Schema.String),
   /** 0 to 100 while `downloading`. */
   downloadPercent: Schema.NullOr(Schema.Finite),
   /**
