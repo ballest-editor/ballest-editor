@@ -2,6 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import {
   addNotice,
   clearNotices,
+  dropNotices,
   markRead,
   mergeNotices,
   type Notice,
@@ -49,6 +50,16 @@ describe("notifications", () => {
     assert.strictEqual(unreadCount(markRead(log)), 0)
     assert.strictEqual(markRead(markRead(log)).length, 3)
     assert.deepStrictEqual(ids(clearNotices(log)), ["b"])
+  })
+
+  it("drops every notification of a muted kind, pinned ones too", () => {
+    const log = [
+      notice("a", { kind: "gameFound" }),
+      notice("p", { kind: "gameNotFound", persistent: true }),
+      notice("b")
+    ]
+    assert.deepStrictEqual(ids(dropNotices(log, new Set(["gameNotFound", "gameFound"]))), ["b"])
+    assert.strictEqual(dropNotices(log, new Set(["other"])), log)
   })
 
   it("puts this session's notifications over the kept ones, without duplicates", () => {

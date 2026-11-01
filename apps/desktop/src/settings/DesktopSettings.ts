@@ -1,3 +1,4 @@
+import { GameLinkResult, MutedNotificationKinds } from "@ballest/contracts"
 import { Context, Effect, FileSystem, Layer, Path, Schema, Semaphore } from "effect"
 import { DesktopEnvironment } from "../app/DesktopEnvironment"
 
@@ -36,12 +37,22 @@ export const BackupSettings = Schema.Struct({
 })
 export type BackupSettings = typeof BackupSettings.Type
 
+/** The Game link checklist's last result (docs/PROJECTS.md § Shell), so a launch can tell what changed since. */
+export const GameLinkSettings = Schema.Struct({ last: Schema.optional(GameLinkResult) })
+export type GameLinkSettings = typeof GameLinkSettings.Type
+
+/** The notification centre's "Don't show again", per notification kind. */
+export const NotificationSettings = Schema.Struct({ muted: Schema.optional(MutedNotificationKinds) })
+export type NotificationSettings = typeof NotificationSettings.Type
+
 /** `desktop-settings.json`: what the main process remembers between runs. The renderer's settings live in its own storage. */
 export const DesktopSettingsFile = Schema.Struct({
   window: Schema.optional(WindowState),
   project: Schema.optional(ProjectSettings),
   game: Schema.optional(GamePathOverrides),
-  backups: Schema.optional(BackupSettings)
+  backups: Schema.optional(BackupSettings),
+  gameLink: Schema.optional(GameLinkSettings),
+  notifications: Schema.optional(NotificationSettings)
 })
 export type DesktopSettingsFile = typeof DesktopSettingsFile.Type
 

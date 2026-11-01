@@ -2,6 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { DateTime, Effect, Fiber, Layer, Option } from "effect"
 import { TestClock } from "effect/testing"
 import { creatorOf } from "../domain/creator"
+import { allFound, GAME_NOT_FOUND, gameLinkRows, PLUGIN_MANAGER_MISSING } from "../domain/gameLink"
 import { linkStateOf } from "../domain/linkState"
 import { defaultSettings } from "../domain/Settings"
 import { lightingOf } from "../domain/sunlight"
@@ -10,6 +11,7 @@ import { MapExporter } from "../services/MapExporter"
 import { MapPrefsStore } from "../services/MapPrefsStore"
 import { Platform } from "../services/Platform"
 import {
+  GAME_EXE,
   makeTestDisk,
   projectFile,
   TEST_MAPS_FOLDER,
@@ -21,6 +23,8 @@ import {
 import { listSamples, readSample } from "../test/samples"
 import {
   answerUnloadRequest,
+  checkGameLinkEffect,
+  chooseGameLinkFolderEffect,
   closeMapTabEffect,
   createNewMap,
   describeBackupEffect,
@@ -34,6 +38,7 @@ import {
   installPluginEffect,
   keepNotifications,
   launchGameEffect,
+  muteNotificationKindEffect,
   openProjectMap,
   openProjectMapFile,
   recoverBackupEffect,
@@ -552,6 +557,132 @@ describe("plugin actions", () => {
       const error = yield* Effect.flip(installPluginEffect)
       assert.match(error.message, /plugin manager isn't installed/)
       assert.strictEqual(disk.game.pluginInstalls, 0)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+})
+
+describe("game link actions", () => {
+  const found = { game: true, pluginManager: true }
+  const installed = (disk: TestDisk) => {
+    disk.game.paths = {
+      ...disk.game.paths,
+      pluginsFolder: { status: "found", path: "/game/Ballest/Binaries/Win64/plugins" }
+    }
+    disk.game.plugin = { ...disk.game.plugin, status: "current", installedVersion: "0.2.0" }
+  }
+  /** What a restart forgets: the store's lookups and notifications (the disk keeps its own). */
+  const restart = Effect.sync(() =>
+    useEditor.setState({
+      notifications: [],
+      mutedNotificationKinds: new Set(),
+      gameLink: { firstRun: true, last: null },
+      gamePathProblem: null,
+      gamePaths: null,
+      pluginStatus: null
+    })
+  )
+  const kinds = () => s().notifications.map((n) => n.kind)
+  const pinned = () => s().notifications.filter((n) => n.persistent && n.resolvedAt === null).map((n) => n.kind)
+
+  it.effect("the first launch shows every row found and notifies nothing; the next one starts collapsed", () => {
+    const disk = makeTestDisk()
+    installed(disk)
+    s().setSettings({ ...defaultSettings, general: { ...defaultSettings.general, creatorName: "Isaac" } })
+    return Effect.gen(function*() {
+      yield* restart
+      yield* checkGameLinkEffect
+      assert.isTrue(s().gameLink.firstRun)
+      assert.isTrue(allFound(gameLinkRows(s().gamePaths, s().pluginStatus, creatorOf("Isaac", Option.none()))))
+      assert.deepStrictEqual(kinds(), [])
+      assert.deepStrictEqual(disk.gameLink.last, found)
+
+      yield* restart
+      yield* checkGameLinkEffect
+      assert.isFalse(s().gameLink.firstRun)
+      assert.deepStrictEqual(kinds(), [])
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a lost game is pinned; a folder without the exe is refused with the reason, the game's resolves it", () => {
+    const disk = makeTestDisk({ [`/games/Ballest of Them All/${GAME_EXE}`]: "" })
+    disk.gameLink.last = found
+    disk.game.paths = {
+      install: { status: "missing", path: null },
+      mapsFolder: { status: "missing", path: null },
+      pluginsFolder: { status: "missing", path: null }
+    }
+    disk.game.plugin = { ...disk.game.plugin, status: "noGame", folder: null }
+    return Effect.gen(function*() {
+      yield* restart
+      yield* checkGameLinkEffect
+      assert.deepStrictEqual(pinned(), [GAME_NOT_FOUND])
+      assert.deepStrictEqual(disk.gameLink.last, { game: false, pluginManager: false })
+
+      disk.answers.push("/home/me/Downloads")
+      yield* chooseGameLinkFolderEffect("install")
+      assert.deepInclude(s().gamePathProblem, { which: "install" })
+      assert.match(s().gamePathProblem!.message, /^\/home\/me\/Downloads isn't Ballest of Them All's folder/)
+      assert.strictEqual(disk.game.paths.install.status, "missing")
+      assert.deepStrictEqual(pinned(), [GAME_NOT_FOUND])
+
+      disk.answers.push("/games/Ballest of Them All")
+      yield* chooseGameLinkFolderEffect("install")
+      assert.isNull(s().gamePathProblem)
+      assert.deepStrictEqual(s().gamePaths?.install, { status: "overridden", path: "/games/Ballest of Them All" })
+      assert.deepStrictEqual(pinned(), [])
+      assert.strictEqual(disk.gameLink.last?.game, true)
+
+      // found again by the next launch: no news, since this session already kept it
+      yield* restart
+      yield* checkGameLinkEffect
+      assert.deepStrictEqual(kinds(), [])
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  /** A launch that finds the plugin manager gone since the last one, which found everything. */
+  const pluginManagerLost = () => {
+    const disk = makeTestDisk()
+    disk.gameLink.last = found
+    disk.game.plugin = { ...disk.game.plugin, status: "noPluginManager" }
+    const launch = Effect.gen(function*() {
+      yield* restart
+      yield* checkGameLinkEffect
+      assert.deepStrictEqual(pinned(), [PLUGIN_MANAGER_MISSING])
+    })
+    return { disk, launch }
+  }
+
+  it.effect("Don't show again keeps the plugin manager's notification hidden across restarts", () => {
+    const { disk, launch } = pluginManagerLost()
+    return Effect.gen(function*() {
+      yield* launch
+      assert.strictEqual(s().notifications[0]?.actions[0]?.command._tag, "OpenExternal")
+
+      yield* muteNotificationKindEffect(PLUGIN_MANAGER_MISSING)
+      assert.deepStrictEqual(kinds(), [])
+      assert.deepStrictEqual(disk.gameLink.muted, [PLUGIN_MANAGER_MISSING])
+
+      // it comes back, then goes again: muted, so nothing shows
+      disk.gameLink.last = found
+      yield* restart
+      yield* checkGameLinkEffect
+      assert.deepStrictEqual(kinds(), [])
+      assert.isTrue(s().mutedNotificationKinds.has(PLUGIN_MANAGER_MISSING))
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("installing the plugin manager resolves its pinned notification on the next look", () => {
+    const { disk, launch } = pluginManagerLost()
+    return Effect.gen(function*() {
+      yield* launch
+      disk.game.plugin = { ...disk.game.plugin, status: "missing" }
+      yield* chooseGameLinkFolderEffect("mapsFolder")
+      // cancelled: nothing looked up again
+      assert.deepStrictEqual(pinned(), [PLUGIN_MANAGER_MISSING])
+      disk.answers.push("/elsewhere/UserSavedMaps")
+      yield* chooseGameLinkFolderEffect("mapsFolder")
+      assert.deepStrictEqual(pinned(), [])
+      assert.deepStrictEqual(disk.gameLink.last, found)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 })

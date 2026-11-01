@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { setLevelNames } from "../domain/edits"
 import { copyNameOf, currentCreatedAt, mapFileNameOf, mapLabelOf, newMapFile } from "../domain/factory"
+import { gameLinkChanges, type GameLinkResult, gameLinkResultOf, sameGameLinkResult } from "../domain/gameLink"
 import {
   type Axis,
   type AxisEdit,
@@ -221,6 +222,7 @@ export const loadPlatform = () =>
       if (!capabilities.projects) useEditor.getState().loadMap(useEditor.getState().doc.map, null)
       yield* refreshProject
       yield* findCreatorEffect
+      if (capabilities.exportToGame) yield* checkGameLinkEffect
     })
   )
 
@@ -766,24 +768,99 @@ const refreshPluginStatus = Effect.gen(function*() {
   useEditor.getState().setPluginStatus(yield* (yield* Platform).pluginStatus)
 })
 
+// --- the Game link (docs/PROJECTS.md § Shell) ---------------------------------------------
+
+/** Keeps `current` for the next launch to compare with, unless it is what was kept already; a failure is only logged. */
+const rememberGameLink = (current: GameLinkResult) =>
+  Effect.gen(function*() {
+    if (sameGameLinkResult(useEditor.getState().gameLink.last, current)) return
+    useEditor.getState().setGameLink({ last: current })
+    yield* (yield* Platform).rememberGameLink(current)
+  }).pipe(Effect.catch((error) => Effect.logWarning("Couldn't keep the Game link's result", error)))
+
+/** Tells the notification centre what `previous` → `current` changed: new notices, and pinned ones resolved. */
+const reportGameLink = (previous: GameLinkResult | null, current: GameLinkResult) => {
+  const { notices, resolve } = gameLinkChanges(previous, current)
+  const { notify, resolveNotifications } = useEditor.getState()
+  for (const kind of resolve) resolveNotifications(kind)
+  for (const { level, title, kind, body, persistent, actions } of notices) {
+    notify(level, title, { kind, persistent, actions, ...(body !== undefined && { body }) })
+  }
+}
+
+/**
+ * After the game's folders or the plugin were looked up again in this session: the pinned notifications whose cause
+ * is gone resolve themselves, and the result is kept. Nothing new is notified; the checklist already shows it.
+ */
+const noteGameLink = Effect.gen(function*() {
+  const { gamePaths, pluginStatus } = useEditor.getState()
+  if (gamePaths === null || pluginStatus === null) return
+  const current = gameLinkResultOf(gamePaths, pluginStatus)
+  reportGameLink(null, current)
+  yield* rememberGameLink(current)
+})
+
+/**
+ * The startup check behind the Start tab's Game link (desktop): looks up the game's folders and the plugin, and
+ * notifies only what changed since the last launch (none on the first, when the checklist itself is in front of the
+ * user). Persistent notices (game not found, plugin manager missing) stay pinned until their cause goes away.
+ */
+export const checkGameLinkEffect = Effect.gen(function*() {
+  const platform = yield* Platform
+  const memory = yield* platform.gameLinkMemory
+  useEditor.getState().muteNotifications(memory.muted)
+  useEditor.getState().setGameLink({ firstRun: memory.last === null, last: memory.last })
+  const paths = yield* platform.gamePaths
+  useEditor.getState().setGamePaths(paths)
+  const plugin = yield* platform.pluginStatus
+  useEditor.getState().setPluginStatus(plugin)
+  const current = gameLinkResultOf(paths, plugin)
+  reportGameLink(memory.last, current)
+  yield* rememberGameLink(current)
+}).pipe(Effect.catch((error) => Effect.logWarning("Couldn't check the Game link", error)))
+
 /** Runs a lookup that may return the game's folders (none: the user cancelled) and shows them, and the plugin. */
+const gamePathsShown = <E, R>(
+  lookup: (platform: Platform["Service"]) => Effect.Effect<Option.Option<GamePaths>, E, R>
+) =>
+  Effect.gen(function*() {
+    const paths = yield* lookup(yield* Platform)
+    if (Option.isNone(paths)) return
+    useEditor.getState().setGamePaths(paths.value)
+    useEditor.getState().setGamePathProblem(null)
+    yield* refreshPluginStatus
+    yield* noteGameLink
+  })
+
 const showGamePaths = <E>(
   lookup: (platform: Platform["Service"]) => Effect.Effect<Option.Option<GamePaths>, E, AppServices>
-) =>
-  run(
-    Effect.gen(function*() {
-      const paths = yield* lookup(yield* Platform)
-      if (Option.isNone(paths)) return
-      useEditor.getState().setGamePaths(paths.value)
-      yield* refreshPluginStatus
-    })
-  )
+) => run(gamePathsShown(lookup))
 
 /** Looks the game's folders up again, for Settings › Game. */
 export const loadGamePaths = () => showGamePaths((platform) => Effect.asSome(platform.gamePaths))
 
 /** A folder dialog; the chosen folder replaces the one found for `which`. */
 export const chooseGamePath = (which: GamePathKind) => showGamePaths((platform) => platform.chooseGamePath(which))
+
+/**
+ * Choose folder… on the Start tab's Game link: `chooseGamePath`, but a folder main refuses (not the game's) is shown on
+ * the checklist's row instead of toasted, and nothing is saved.
+ */
+export const chooseGameLinkFolderEffect = (which: GamePathKind) =>
+  gamePathsShown((platform) =>
+    platform.chooseGamePath(which).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => useEditor.getState().setGamePathProblem({ which, message: error.message })).pipe(
+          Effect.as(Option.none<GamePaths>())
+        )
+      )
+    )
+  )
+
+export const chooseGameLinkFolder = (which: GamePathKind) => run(chooseGameLinkFolderEffect(which))
+
+/** Check again on the Game link: the folders, the plugin and the creator, looked up afresh. */
+export const refreshGameLink = () => Promise.all([loadGamePaths(), findCreator()])
 
 /** Goes back to the folders found through Steam, one after the other (each reset rewrites the desktop settings). */
 export const resetGamePaths = (kinds: ReadonlyArray<GamePathKind>) =>
@@ -799,6 +876,7 @@ export const installPluginEffect = Effect.gen(function*() {
   const { status } = useEditor.getState().pluginStatus ?? {}
   const { plugin, restartGame } = yield* (yield* Platform).installPlugin
   useEditor.getState().setPluginStatus(plugin)
+  yield* noteGameLink
   const done = status === "outdated"
     ? `Updated the editor's plugin to ${plugin.bundledVersion}`
     : "Installed the editor's plugin"
@@ -868,8 +946,19 @@ export const runNotificationCommand = (command: NotificationCommand): void => {
       return
     case "OpenMap":
       openProjectMap(command.fileName)
+      return
+    case "OpenExternal":
+      void openExternalLink(command.url)
   }
 }
+
+/** "Don't show again" on a notification: its kind is muted from now on, across restarts (desktop). */
+export const muteNotificationKindEffect = (kind: string) =>
+  Effect.gen(function*() {
+    useEditor.getState().muteNotifications(yield* (yield* Platform).muteNotifications(kind))
+  })
+
+export const muteNotificationKind = (kind: string) => run(muteNotificationKindEffect(kind))
 
 /** A notification's button, from its toast or the notification centre: it is read once acted on. */
 export const runNotificationAction = (notice: NotificationRecord, action: NotificationAction) => {

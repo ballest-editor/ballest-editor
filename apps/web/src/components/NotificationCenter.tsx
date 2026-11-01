@@ -2,14 +2,16 @@ import { IconAlertCircle, IconBell, IconInfoCircle, IconPin } from "@tabler/icon
 import { Button } from "@workspace/ui/components/button"
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
+import { MUTABLE_KINDS } from "../domain/gameLink"
 import { panelSections, unreadCount } from "../domain/notifications"
 import { dayLabel, formatClock, formatDateTime } from "../domain/time"
-import { runNotificationAction } from "../editor/actions"
+import { muteNotificationKind, runNotificationAction } from "../editor/actions"
 import { type NotificationRecord, useEditor } from "../editor/store"
 import { useNow } from "../editor/useNow"
 
 function NotificationItem({ notice }: { readonly notice: NotificationRecord }) {
   const Icon = notice.level === "error" ? IconAlertCircle : IconInfoCircle
+  const mutable = MUTABLE_KINDS.has(notice.kind)
   return (
     <li className={cn("flex gap-2 rounded-md px-2 py-1.5", !notice.read && "bg-muted/60")}>
       <Icon
@@ -30,7 +32,7 @@ function NotificationItem({ notice }: { readonly notice: NotificationRecord }) {
           </time>
         </div>
         {notice.body !== null && <p className="break-words text-muted-foreground">{notice.body}</p>}
-        {notice.actions.length > 0 && (
+        {(notice.actions.length > 0 || mutable) && (
           <div className="flex flex-wrap gap-1">
             {notice.actions.map((action) => (
               <Button
@@ -42,6 +44,11 @@ function NotificationItem({ notice }: { readonly notice: NotificationRecord }) {
                 {action.label}
               </Button>
             ))}
+            {mutable && (
+              <Button variant="ghost" size="xs" onClick={() => void muteNotificationKind(notice.kind)}>
+                Don't show again
+              </Button>
+            )}
           </div>
         )}
       </div>

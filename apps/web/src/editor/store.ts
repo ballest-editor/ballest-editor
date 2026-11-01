@@ -26,6 +26,7 @@ import {
 } from "../domain/edits"
 import { itemFromPiece, mapLabelOf, newMapFile } from "../domain/factory"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
+import type { GameLinkResult } from "../domain/gameLink"
 import type { PropertyChange } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
@@ -33,13 +34,14 @@ import { LIMITS } from "../domain/limits"
 import { type LinkState, linkStateOf } from "../domain/linkState"
 import { isPlayerStart, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
-import { addNotice, clearNotices, markRead, mergeNotices, resolveNotices } from "../domain/notifications"
+import { addNotice, clearNotices, dropNotices, markRead, mergeNotices, resolveNotices } from "../domain/notifications"
 import type { PaintPicker } from "../domain/Paint"
 import { type Pivot, pivotAt } from "../domain/pivot"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import type { LoadedCatalog } from "../services/CatalogLoader"
 import type {
+  GamePathKind,
   GamePaths,
   NotificationAction,
   NotificationRecord,
@@ -191,14 +193,23 @@ export interface EditorState {
   readonly gamePaths: GamePaths | null
   /** The creator name found on this machine (desktop: the Steam persona name), as last looked up; none until then. */
   readonly foundCreator: Option.Option<FoundCreator>
-  /** The editor-link plugin, as last looked up (desktop; null until Settings › Game asks). */
+  /** The editor-link plugin, as last looked up (desktop; null until the startup check, and in a browser). */
   readonly pluginStatus: PluginStatus | null
+  /**
+   * The Game link checklist's memory (desktop): whether this is the first launch that looked (the checklist then
+   * starts expanded), and what was last found and kept for the next launch.
+   */
+  readonly gameLink: { readonly firstRun: boolean; readonly last: GameLinkResult | null }
+  /** Why the folder last chosen for `which` on the Start tab was refused (it isn't the game's); null once one is used. */
+  readonly gamePathProblem: { readonly which: GamePathKind; readonly message: string } | null
   /** Export found a published map's draft under the map's file name; the replacePublished dialog asks. */
   readonly publishedDraft: PublishedDraft | null
   /** The desktop updater's state, once main has sent it; null in a browser. */
   readonly update: UpdateState | null
   /** Every notification (each toast is one), newest first, at most `NOTIFICATION_LIMIT`. */
   readonly notifications: ReadonlyArray<NotificationRecord>
+  /** The kinds "Don't show again" muted: `notify` drops them. */
+  readonly mutedNotificationKinds: ReadonlySet<string>
   /**
    * Whether a map is open in its tab. The document always holds a map; with no tab open it is a blank one nobody sees,
    * and the map commands are off.
@@ -283,6 +294,8 @@ export interface EditorState {
   readonly setGamePaths: (gamePaths: GamePaths) => void
   readonly setFoundCreator: (foundCreator: Option.Option<FoundCreator>) => void
   readonly setPluginStatus: (pluginStatus: PluginStatus) => void
+  readonly setGameLink: (gameLink: Partial<EditorState["gameLink"]>) => void
+  readonly setGamePathProblem: (problem: EditorState["gamePathProblem"]) => void
   /** Asks whether to replace a published map's draft in the maps folder (null forgets it). */
   readonly setPublishedDraft: (draft: PublishedDraft | null) => void
   readonly setUpdate: (update: UpdateState) => void
@@ -367,6 +380,8 @@ export interface EditorState {
   readonly notify: (level: "info" | "error", title: string, options?: NotifyOptions) => void
   /** Unpins the persistent notifications of `kind`: what they were about has gone away. */
   readonly resolveNotifications: (kind: string) => void
+  /** "Don't show again": drops the notifications of each muted kind, and `notify` ignores them from now on. */
+  readonly muteNotifications: (kinds: ReadonlyArray<string>) => void
   /** Marks `ids` read, or every notification. */
   readonly markNotificationsRead: (ids?: ReadonlyArray<string>) => void
   /** Removes every notification but the pinned ones. */
@@ -463,9 +478,12 @@ export const useEditor = create<EditorState>()((set, get) => {
     gamePaths: null,
     foundCreator: Option.none(),
     pluginStatus: null,
+    gameLink: { firstRun: true, last: null },
+    gamePathProblem: null,
     publishedDraft: null,
     update: null,
     notifications: [],
+    mutedNotificationKinds: new Set(),
     mapOpen: false,
     startOpen: true,
     activeTab: "start",
@@ -517,6 +535,8 @@ export const useEditor = create<EditorState>()((set, get) => {
     setGamePaths: (gamePaths) => set({ gamePaths }),
     setFoundCreator: (foundCreator) => set({ foundCreator }),
     setPluginStatus: (pluginStatus) => set({ pluginStatus }),
+    setGameLink: (gameLink) => set((s) => ({ gameLink: { ...s.gameLink, ...gameLink } })),
+    setGamePathProblem: (gamePathProblem) => set({ gamePathProblem }),
     setPublishedDraft: (publishedDraft) =>
       set({ publishedDraft, dialog: publishedDraft === null ? null : "replacePublished" }),
     setUpdate: (update) => set({ update }),
@@ -751,6 +771,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     reportMissingGlb: (url) =>
       set((s) => (s.missingGlbs.has(url) ? s : { missingGlbs: new Set([...s.missingGlbs, url]) })),
     notify: (level, title, options = {}) => {
+      if (get().mutedNotificationKinds.has(options.kind ?? level)) return
       const record: NotificationRecord = {
         id: crypto.randomUUID(),
         kind: options.kind ?? level,
@@ -767,11 +788,18 @@ export const useEditor = create<EditorState>()((set, get) => {
     },
     resolveNotifications: (kind) =>
       set((s) => ({ notifications: resolveNotices(s.notifications, kind, new Date().toISOString()) })),
+    muteNotifications: (kinds) =>
+      set((s) => {
+        const muted = new Set([...s.mutedNotificationKinds, ...kinds])
+        return { mutedNotificationKinds: muted, notifications: dropNotices(s.notifications, muted) }
+      }),
     markNotificationsRead: (ids) =>
       set((s) => ({ notifications: markRead(s.notifications, ids === undefined ? undefined : new Set(ids)) })),
     clearNotifications: () => set((s) => ({ notifications: clearNotices(s.notifications) })),
     restoreNotifications: (kept) =>
-      set((s) => ({ notifications: mergeNotices(s.notifications, kept, NOTIFICATION_LIMIT) })),
+      set((s) => ({
+        notifications: dropNotices(mergeNotices(s.notifications, kept, NOTIFICATION_LIMIT), s.mutedNotificationKinds)
+      })),
     changeSpeed: (direction) =>
       set((s) => {
         const i = SPEED_STEPS.indexOf(s.cameraSpeed)

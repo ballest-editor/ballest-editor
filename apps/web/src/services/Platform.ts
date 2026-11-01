@@ -3,6 +3,8 @@ import type {
   DesktopBridge,
   ExportMapResult,
   FoundCreator,
+  GameLinkMemory,
+  GameLinkResult,
   GamePathKind,
   GamePaths,
   ImportMapPayload,
@@ -10,6 +12,7 @@ import type {
   InstallPluginResult,
   MapBackupFile,
   MapBackups,
+  MutedNotificationKinds,
   NotificationRecords,
   OpenedMapFile,
   PluginStatus,
@@ -26,6 +29,8 @@ import { discardQuestionOf, type UnsavedAction, unsavedPromptOf } from "../domai
 
 export type {
   FoundCreator,
+  GameLinkMemory,
+  GameLinkResult,
   GamePath,
   GamePathKind,
   GamePaths,
@@ -159,6 +164,12 @@ export class Platform extends Context.Service<Platform, {
   readonly loadNotifications: Effect.Effect<NotificationRecords, PlatformError>
   /** Keeps `records` for the next run (desktop); a browser keeps them in memory only. */
   readonly saveNotifications: (records: NotificationRecords) => Effect.Effect<void, PlatformError>
+  /** "Don't show again" for a notification kind, across restarts (desktop); the kinds muted afterwards. */
+  readonly muteNotifications: (kind: string) => Effect.Effect<MutedNotificationKinds, PlatformError>
+  /** What the Game link found on the last launch (null on the first) and the muted notification kinds (desktop). */
+  readonly gameLinkMemory: Effect.Effect<GameLinkMemory, PlatformError>
+  /** Keeps what the Game link found, for the next launch to compare with (desktop). */
+  readonly rememberGameLink: (result: GameLinkResult) => Effect.Effect<void, PlatformError>
   /** The updater's state now, then every change to it (desktop); a browser's ends at once. */
   readonly updates: Stream.Stream<UpdateState, PlatformError>
   /** Starts downloading the release on offer; the progress arrives on `updates`. */
@@ -271,6 +282,9 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
     installPlugin: bridgeCall(() => bridge.installPlugin()),
     loadNotifications: bridgeCall(() => bridge.loadNotifications()),
     saveNotifications: (records) => bridgeCall(() => bridge.saveNotifications(records)),
+    muteNotifications: (kind) => bridgeCall(() => bridge.muteNotifications(kind)),
+    gameLinkMemory: bridgeCall(() => bridge.gameLinkMemory()),
+    rememberGameLink: (result) => bridgeCall(() => bridge.rememberGameLink(result)),
     updates: updateStates(bridge),
     downloadUpdate: bridgeCall(() => bridge.downloadUpdate()),
     installUpdate: bridgeCall(() => bridge.installUpdate())
@@ -309,8 +323,10 @@ const desktopOnly = Effect.fail(new PlatformError({ message: "Only the desktop a
 
 const noProject = Effect.fail(new PlatformError({ message: "Only the desktop app keeps maps in a project." }))
 
-const makeBrowser = (): Platform["Service"] =>
-  Platform.of({
+const makeBrowser = (): Platform["Service"] => {
+  // a browser has no game to link; "Don't show again" lasts until the page closes
+  const muted = new Set<string>()
+  return Platform.of({
     capabilities: browserCapabilities,
     pickMapFile: pickFile(".balledit,.ballmap,.json").pipe(
       Effect.flatMap(Option.match({
@@ -353,7 +369,11 @@ const makeBrowser = (): Platform["Service"] =>
     installPlugin: desktopOnly,
     loadNotifications: Effect.succeed([]),
     saveNotifications: () => Effect.void,
+    muteNotifications: (kind) => Effect.sync(() => [...muted.add(kind)]),
+    gameLinkMemory: Effect.sync(() => ({ last: null, muted: [...muted] })),
+    rememberGameLink: () => Effect.void,
     updates: Stream.empty,
     downloadUpdate: Effect.void,
     installUpdate: Effect.void
   })
+}
