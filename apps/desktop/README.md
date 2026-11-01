@@ -124,17 +124,17 @@ A sandboxed preload can `require("electron")` and nothing else, and it has to be
 
 An installed app updates itself from this repository's GitHub Releases. `DesktopUpdates` (`src/updates/`) checks 15 s after start and every 4 minutes until it finds a newer release, then waits for the user: the page's status bar offers it, downloads it on Download and installs it on Restart. `electron-updater` does the work through `ElectronUpdater`; electron-builder wrote the feed into `resources/app-update.yml`.
 
-| State         | When                                            | The page shows                                                  |
-| ------------- | ----------------------------------------------- | --------------------------------------------------------------- |
-| `disabled`    | dev, unpackaged, turned off, Linux not AppImage | nothing                                                         |
-| `idle`        | up to date                                      | nothing                                                         |
-| `checking`    | a check is out                                  | nothing                                                         |
-| `error`       | the check failed (offline); the next retries    | nothing                                                         |
-| `available`   | a newer release; also after a failed download   | "Update available" ("Update failed" after one), notes, Download |
-| `downloading` | after Download                                  | "Downloading n%"                                                |
-| `ready`       | downloaded; also after a failed install         | "Restart to update"                                             |
+| State         | When                                            | The page shows                                        |
+| ------------- | ----------------------------------------------- | ----------------------------------------------------- |
+| `disabled`    | dev, unpackaged, turned off, Linux not AppImage | nothing                                               |
+| `idle`        | up to date                                      | nothing                                               |
+| `checking`    | a check is out                                  | nothing                                               |
+| `error`       | the check failed (offline); the next retries    | nothing                                               |
+| `available`   | a newer release; also after a failed download   | "Update" ("Update failed" after one), notes, Download |
+| `downloading` | after Download                                  | a progress ring and "n%"                              |
+| `ready`       | downloaded; also after a failed install         | "Restart to update", accented                         |
 
-Every change goes to the page on `ballest:update:state`; the page asks for the current state once (`ballest:update:get`) when it starts listening. Release notes arrive as GitHub's HTML and reach the page as plain text.
+Every change goes to the page on `ballest:update:state`; the page asks for the current state once (`ballest:update:get`) when it starts listening. Release notes arrive as GitHub's HTML (a generic feed's may be plain text); `updates/releaseNotes.ts` keeps headings, paragraphs, lists, code blocks and, in their text, bold, italics, code and http(s) links, and sends them as `ReleaseNoteBlock`s. Any other element is unwrapped to its text; `script`, `style`, `iframe`, `svg` and the like go with their content, images and non-web links are dropped, and the text is capped at 4000 characters. The state also carries the release's date (from the feed) and its page (`releases/tag/v<version>`), for the popover's View on GitHub.
 
 | Variable                          | Effect                                                               |
 | --------------------------------- | -------------------------------------------------------------------- |

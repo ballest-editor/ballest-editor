@@ -44,7 +44,7 @@ pnpm release:mock-server                                     # serves release-mo
 BALLEST_MOCK_UPDATES=1 /tmp/Ballest-Editor-0.2.0-x86_64.AppImage
 ```
 
-After 15 s the title bar offers 0.2.1; Download, then Restart, replaces the AppImage with 0.2.1 and starts it. On Windows, install the 0.2.0 setup instead of copying it, and use `dist:desktop:win`.
+After 15 s the status bar offers 0.2.1, with the mock release's notes (a heading, a list and a link) in its popover; Download, then Restart, replaces the AppImage with 0.2.1 and starts it. On Windows, install the 0.2.0 setup instead of copying it, and use `dist:desktop:win`.
 
 `--mock-updates` writes to `release-mock/` and points the build's feed (`app-update.yml`) at the mock server (`--mock-update-port`, default 4848), so it never looks at GitHub. `BALLEST_MOCK_UPDATES=1` points any installed build there. The mock server serves files only, without multi-range requests, so downloads from it are always full, never differential. On NixOS the AppImage runs inside `appimage-run`'s sandbox, which takes the restarted app down with the old one: the update is installed, but you start it yourself.
 

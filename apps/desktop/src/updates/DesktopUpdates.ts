@@ -85,9 +85,9 @@ export class DesktopUpdates extends Context.Service<DesktopUpdates, {
         yield* Option.match(found, {
           onNone: () => update(Machine.onUpToDate),
           onSome: (info) =>
-            update((current) =>
-              Machine.onAvailable(current, info.version, Machine.releaseNotesText(info.releaseNotes, info.version))
-            ).pipe(Effect.tap(() => Effect.logInfo(`Update ${info.version} available`)))
+            update((current) => Machine.onAvailable(current, Machine.releaseOf(info))).pipe(
+              Effect.tap(() => Effect.logInfo(`Update ${info.version} available`))
+            )
         })
       }).pipe(Effect.withSpan("DesktopUpdates.check"))
 

@@ -6,6 +6,8 @@ export interface UpdateInfo {
   readonly version: string
   /** A string (GitHub: the release body as HTML), a list of `{ version, note }` with a full changelog, or nothing. */
   readonly releaseNotes: unknown
+  /** When it was published (ISO 8601); electron-updater fills it from the feed, an empty string when unknown. */
+  readonly releaseDate: string
 }
 
 /** electron-updater's errors carry the HTTP request and response after the first line. */
@@ -53,7 +55,11 @@ export class ElectronUpdater extends Context.Service<ElectronUpdater, {
         // null: the updater is inactive (no app-update.yml, or Linux outside an AppImage).
         Effect.map((result) =>
           result?.isUpdateAvailable === true
-            ? Option.some({ version: result.updateInfo.version, releaseNotes: result.updateInfo.releaseNotes })
+            ? Option.some({
+              version: result.updateInfo.version,
+              releaseNotes: result.updateInfo.releaseNotes,
+              releaseDate: result.updateInfo.releaseDate
+            })
             : Option.none()
         )
       ),

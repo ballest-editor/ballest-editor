@@ -86,6 +86,8 @@ const makeTestUpdater = (): TestDisk["updater"] => {
       currentVersion: "0.2.0",
       availableVersion: null,
       releaseNotes: null,
+      releaseDate: null,
+      releaseUrl: null,
       downloadPercent: null,
       message: null
     },
