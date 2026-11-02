@@ -70,9 +70,28 @@ function StateGlyph({ state }: { readonly state: LinkState }) {
   )
 }
 
-/** The dot a map carries while it is open with unsaved edits. */
+/** The dot a map carries while it is open with unsaved edits, or isn't saved anywhere yet (the tab shows the same). */
 function UnsavedDot() {
-  return <span className="size-1.5 shrink-0 rounded-full bg-foreground/70" aria-label="unsaved changes" />
+  return <span className="size-1.5 shrink-0 rounded-full bg-foreground/70" aria-label="unsaved" />
+}
+
+/** What the row has no room for: the full name, where the file is (or that it isn't saved), when it was edited. */
+function RowDetails(
+  { name, path, edited, unsaved }: {
+    readonly name: string
+    readonly path: string | null
+    readonly edited: string | null
+    readonly unsaved: boolean
+  }
+) {
+  return (
+    <div className="flex max-w-xs flex-col gap-0.5">
+      <span className="font-medium">{name}</span>
+      {path !== null && <span className="font-mono text-[0.65rem] break-all opacity-80">{path}</span>}
+      {unsaved && <span className="opacity-80">{path === null ? "Not saved yet" : "Unsaved edits"}</span>}
+      {edited !== null && <span className="opacity-80">edited {edited}</span>}
+    </div>
+  )
 }
 
 const ROW_CLASSES =
@@ -89,7 +108,8 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
   const canPlay = useEditor((s) => s.capabilities.play)
   const menuButton = useRef<HTMLButtonElement>(null)
   const label = mapLabelOf(map.fileName)
-  const state = linkStateOf(map, { unsaved: isOpen && dirty })
+  const unsaved = isOpen && dirty
+  const state = linkStateOf(map, { unsaved })
   // right-click opens the same menu the ⋮ button does
   const onContextMenu = (e: MouseEvent) => {
     e.preventDefault()
@@ -97,19 +117,29 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
   }
   return (
     <li className={cn(ROW_CLASSES, isOpen && "bg-muted/40")} onContextMenu={onContextMenu}>
-      <button
-        type="button"
-        className="flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none"
-        title={`${map.path}\nedited ${formatDateTime(map.modifiedAt)}`}
-        onClick={() => void openProjectMap(map.fileName)}
-      >
-        <IconMap className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className={cn("truncate", isOpen && "font-medium")}>{label}</span>
-        {isOpen && dirty && <UnsavedDot />}
-        <span className="ml-auto shrink-0 pl-2 text-[0.65rem] text-muted-foreground">
-          {formatAgo(map.modifiedAt, now)}
-        </span>
-      </button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none"
+              onClick={() => void openProjectMap(map.fileName)}
+            />
+          }
+        >
+          <IconMap className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className={cn("truncate", isOpen && "font-medium")}>{label}</span>
+          {unsaved && <UnsavedDot />}
+        </TooltipTrigger>
+        <TooltipContent side="right" align="start">
+          <RowDetails
+            name={label}
+            path={map.path}
+            edited={`${formatAgo(map.modifiedAt, now)} (${formatDateTime(map.modifiedAt)})`}
+            unsaved={unsaved}
+          />
+        </TooltipContent>
+      </Tooltip>
       <StateGlyph state={state} />
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -155,13 +185,18 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
 /** The open map while it has no file yet (a fresh map, or any map in Untitled Project): a row of its own. */
 function UnsavedRow() {
   const label = useOpenMapLabel()
-  const dirty = useEditor((s) => s.dirty)
   return (
-    <li className={cn(ROW_CLASSES, "bg-muted/40")} title="Not saved yet: Save names it into the project.">
-      <IconMap className="size-3.5 shrink-0 text-muted-foreground" />
-      <span className="truncate font-medium italic">{label}</span>
-      {dirty && <UnsavedDot />}
-      <span className="ml-auto shrink-0 pl-2 text-[0.65rem] text-muted-foreground">unsaved</span>
+    <li className={cn(ROW_CLASSES, "bg-muted/40")}>
+      <Tooltip>
+        <TooltipTrigger render={<span className="flex min-w-0 flex-1 items-center gap-1.5" />}>
+          <IconMap className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate font-medium italic">{label}</span>
+          <UnsavedDot />
+        </TooltipTrigger>
+        <TooltipContent side="right" align="start">
+          <RowDetails name={label} path={null} edited={null} unsaved />
+        </TooltipContent>
+      </Tooltip>
     </li>
   )
 }

@@ -31,7 +31,6 @@ import {
   checkExportsEffect,
   checkGameLinkEffect,
   chooseGameLinkFolderEffect,
-  closeMapTabEffect,
   createNewMap,
   describeBackupEffect,
   duplicateMapEffect,
@@ -40,6 +39,7 @@ import {
   followOpenMapEffect,
   followPlaySessionsEffect,
   followUpdateState,
+  freshMapEffect,
   holdsUnload,
   importAsCopyEffect,
   importMapFile,
@@ -366,14 +366,16 @@ describe("project actions", () => {
       yield* Effect.promise(() => openProjectMap(name))
       assert.strictEqual(s().file?.name, name)
 
+      // leaving the map for a fresh one (what New map does) asks first
+      const leave = unlessCancelled("newMap", freshMapEffect)
       editTo(9)
       disk.promptAnswers.push("cancel", "save")
-      yield* closeMapTabEffect
+      yield* leave
       assert.include(s(), { dirty: true })
       assert.strictEqual(s().file?.name, name)
-      assert.match(disk.prompts[0]?.message ?? "", /before closing the map\?$/)
+      assert.match(disk.prompts[0]?.message ?? "", /before starting a new map\?$/)
       // Save: written first, then the tab shows a fresh unsaved map
-      yield* closeMapTabEffect
+      yield* leave
       assert.include(s(), { file: null, dirty: false })
       assert.strictEqual(s().doc.map.worldSettings.levelData.levelDisplayName, "Untitled")
       const saved = yield* MapCodec.use((codec) => codec.decode(disk.files.get(projectFile(name))!))
@@ -384,14 +386,14 @@ describe("project actions", () => {
       editTo(2)
       const before = disk.files.get(projectFile(name))
       disk.promptAnswers.push("discard")
-      yield* closeMapTabEffect
+      yield* leave
       assert.include(s(), { file: null, dirty: false })
       assert.strictEqual(disk.files.get(projectFile(name)), before)
 
       // a clean map closes without asking
       yield* openProjectMapFile(name)
       const asked = disk.prompts.length
-      yield* closeMapTabEffect
+      yield* leave
       assert.isNull(s().file)
       assert.strictEqual(disk.prompts.length, asked)
     }).pipe(Effect.provide(layerFor(disk)))
@@ -448,7 +450,7 @@ describe("project actions", () => {
       yield* openProjectMapFile(second)
       yield* Effect.yieldNow
       assert.deepStrictEqual(disk.project.lastOpenMap, { [TEST_PROJECT]: second })
-      yield* closeMapTabEffect
+      yield* freshMapEffect
       yield* Effect.yieldNow
       assert.deepStrictEqual(disk.project.lastOpenMap, {})
       stop()

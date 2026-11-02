@@ -4,8 +4,8 @@ import { Palette } from "./Palette"
 import { ProjectPanel } from "./ProjectPanel"
 
 const TABS: ReadonlyArray<{ readonly id: LeftTab; readonly label: string }> = [
-  { id: "pieces", label: "Pieces" },
-  { id: "project", label: "Project" }
+  { id: "project", label: "Project" },
+  { id: "pieces", label: "Pieces" }
 ]
 
 /**
@@ -17,7 +17,8 @@ export function LeftDock() {
   const setTab = useEditor((s) => s.setLeftTab)
   return (
     <div className="flex h-full min-w-0 flex-col bg-card">
-      <div role="tablist" aria-label="Left panel" className="flex shrink-0 gap-1 border-b px-2 pt-1">
+      {/* the same height as the document tabs, so the two strips line up across the window */}
+      <div role="tablist" aria-label="Left panel" className="flex h-8 shrink-0 items-stretch border-b px-2">
         {TABS.map(({ id, label }) => (
           <button
             key={id}
@@ -25,7 +26,7 @@ export function LeftDock() {
             role="tab"
             aria-selected={tab === id}
             className={cn(
-              "-mb-px border-b-2 px-1 py-1 text-[0.65rem] font-semibold tracking-wider uppercase outline-none",
+              "-mb-px border-b-2 px-2 text-[0.65rem] font-semibold tracking-wider uppercase outline-none",
               tab === id
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"

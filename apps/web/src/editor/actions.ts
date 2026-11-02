@@ -450,10 +450,6 @@ export const followOpenMapEffect = Effect.gen(function*() {
  * Closes the map's tab: the tab then shows a fresh unsaved map, as New map would without its dialog; unsaved edits ask
  * first (the shared prompt, `unlessCancelled`).
  */
-export const closeMapTabEffect = Effect.suspend(() => unlessCancelled("closeMap", freshMapEffect))
-
-export const closeMapTab = () => run(closeMapTabEffect)
-
 /**
  * Rename… or Duplicate… for one of the project's maps from the Maps dialog or Project settings: the dialogs name the
  * open map, so the map is opened first (asking about the open map's unsaved edits), then its dialog.
