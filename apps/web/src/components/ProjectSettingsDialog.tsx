@@ -26,8 +26,10 @@ import {
   withDifficulty,
   withTag
 } from "../domain/mapTags"
+import { isProjectName } from "../domain/project"
 import {
   chooseProject,
+  nameProject,
   nameProjectMap,
   patchProjectMap,
   type ProjectMapSettings,
@@ -415,20 +417,29 @@ const mapRows = (
   ]
 }
 
-/** The project's name, written to its file when the field is left or Enter pressed; blank keeps the name as it was. */
-function ProjectNameField({ name }: { readonly name: string }) {
+/**
+ * The project's name, committed when the field is left or Enter pressed; blank keeps the name as it was. For a named
+ * project it renames it in its file; for Untitled Project (`name` null) it names one, making its folder.
+ */
+function ProjectNameField({ name }: { readonly name: string | null }) {
   const [draft, setDraft] = useState<string | null>(null)
-  const value = draft ?? name
+  const value = draft ?? name ?? ""
+  const trimmed = value.trim()
+  const valid = trimmed === "" || isProjectName(trimmed)
   const commit = () => {
-    const trimmed = value.trim()
-    if (trimmed !== "" && trimmed !== name) void renameProject(trimmed)
+    if (valid && trimmed !== "" && trimmed !== name) {
+      void (name === null ? nameProject(trimmed) : renameProject(trimmed))
+    }
     setDraft(null)
   }
   return (
     <Input
       className="w-56"
       value={value}
+      placeholder={name === null ? "Untitled Project" : undefined}
       aria-label="Project name"
+      aria-invalid={!valid}
+      title={valid ? undefined : "Letters, digits, spaces, - and _ only."}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
@@ -455,6 +466,7 @@ export function ProjectSettingsDialog(
   const projects = useEditor((s) => s.capabilities.projects)
   const canExport = useEditor((s) => s.capabilities.exportToGame)
   const project = useEditor((s) => s.project?.current ?? null)
+  const projectsFolder = useEditor((s) => s.project?.projectsFolder ?? "Documents/Ballest Editor")
   const maps = useEditor((s) => s.projectMaps)
   const units = useEditor((s) => s.settings.general.units)
   const creator = useCreator()
@@ -481,9 +493,7 @@ export function ProjectSettingsDialog(
 
   const mapEntries = maps.map((m) => m.fileName)
   const categories: ReadonlyArray<SettingsCategoryInfo<Category>> = [
-    ...(projects && project !== null
-      ? [{ id: "project" as const, label: "General", icon: IconFolder, section: "Project" }]
-      : []),
+    ...(projects ? [{ id: "project" as const, label: "General", icon: IconFolder, section: "Project" }] : []),
     ...(openMap.fileName === null || !projects
       ? [{ id: openMap.category, label: openMap.label, icon: IconMap, section: "Maps" }]
       : []),
@@ -509,7 +519,8 @@ export function ProjectSettingsDialog(
     description: string,
     path: string | null,
     reveal: () => void,
-    extra?: ReactNode
+    extra?: ReactNode,
+    missing = "Not found"
   ): Row => ({
     id,
     category: "project",
@@ -522,7 +533,7 @@ export function ProjectSettingsDialog(
           className="min-w-0 flex-1 truncate font-mono text-[0.6875rem] text-muted-foreground"
           title={path ?? undefined}
         >
-          {path ?? "Not found"}
+          {path ?? missing}
         </span>
         <Button variant="outline" size="sm" disabled={path === null} onClick={reveal}>
           <IconFolderOpen data-icon="inline-start" />
@@ -533,19 +544,23 @@ export function ProjectSettingsDialog(
     )
   })
 
-  const projectRows: ReadonlyArray<Row> = project === null ? [] : [
+  // Untitled Project has no folder yet: its rows say so, and naming it makes one
+  const unnamed = "Made when the project is named"
+  const projectRows: ReadonlyArray<Row> = !projects ? [] : [
     {
       id: "projectName",
       category: "project",
       label: "Name",
-      description: "Shown in the title bar and in Recent projects. The folder keeps its name.",
-      control: <ProjectNameField name={project.name} />
+      description: project === null
+        ? `Naming the project makes its folder in ${projectsFolder}; the map is saved there from then on.`
+        : "Shown in the title bar and in Recent projects. The folder keeps its name.",
+      control: <ProjectNameField name={project?.name ?? null} />
     },
     folderRow(
       "folder",
       "Project folder",
       "The project: ballest-project.json, its maps and its backups. Change… uses another folder as the project.",
-      project.path,
+      project?.path ?? null,
       () => void revealProject("project"),
       <Button
         variant="outline"
@@ -556,21 +571,26 @@ export function ProjectSettingsDialog(
         }}
       >
         Change…
-      </Button>
+      </Button>,
+      unnamed
     ),
     folderRow(
       "mapsFolder",
       "Maps",
       "The project's maps, one .balledit each.",
-      `${project.path}/maps`,
-      () => void revealProject("maps")
+      project === null ? null : `${project.path}/maps`,
+      () => void revealProject("maps"),
+      undefined,
+      unnamed
     ),
     folderRow(
       "backupsFolder",
       "Backups",
       "The versions Save, Rename and Re-import wrote over (Recover previous version… lists them).",
-      `${project.path}/.ballest/backups`,
-      () => void revealProject("backups")
+      project === null ? null : `${project.path}/.ballest/backups`,
+      () => void revealProject("backups"),
+      undefined,
+      unnamed
     ),
     folderRow(
       "exportsFolder",
