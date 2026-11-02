@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Start tab — wireframe directions</title>
+<style>
+  :root { --ink: #ccc; --dim: #777; --line: #555; --fill: #2a2a2a; --fill2: #333; --acc: #6ea8ff; --ok: #6c6; --warn: #db5; }
+  body { font: 13px/1.4 ui-monospace, monospace; color: var(--ink); margin: 0; }
+  h2 { font: 600 15px/1.3 system-ui, sans-serif; margin: 28px 0 4px; }
+  h2 small { font-weight: 400; color: var(--dim); margin-left: 8px; }
+  p.note { font: 12px/1.5 system-ui, sans-serif; color: var(--dim); margin: 0 0 10px; max-width: 70ch; }
+  p.note b { color: var(--ink); font-weight: 500; }
+  .win { border: 1px solid var(--line); border-radius: 6px; background: #1b1b1b; overflow: hidden; width: 100%; aspect-ratio: 16 / 9.4; display: flex; flex-direction: column; }
+  .bar { height: 28px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 14px; padding: 0 10px; color: var(--dim); flex: none; }
+  .bar b { color: var(--ink); font-weight: 600; }
+  .tabs { height: 24px; border-bottom: 1px solid var(--line); display: flex; align-items: stretch; flex: none; }
+  .tab { padding: 0 10px; display: flex; align-items: center; border-right: 1px solid var(--line); }
+  .tab.on { background: #1b1b1b; color: var(--ink); }
+  .status { height: 22px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 14px; padding: 0 10px; color: var(--dim); flex: none; }
+  .status .r { margin-left: auto; }
+  .body { flex: 1; min-height: 0; display: flex; }
+  .pane { flex: 1; min-width: 0; padding: 18px 28px; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row .sp { flex: 1; }
+  .h { font: 600 14px system-ui, sans-serif; color: var(--ink); }
+  .sub { color: var(--dim); font-size: 11px; }
+  .btn { border: 1px solid var(--line); border-radius: 4px; padding: 3px 9px; color: var(--ink); white-space: nowrap; }
+  .btn.p { background: var(--acc); border-color: var(--acc); color: #000; }
+  .box { border: 1px solid var(--line); border-radius: 6px; }
+  .dash { border: 1px dashed var(--line); border-radius: 6px; }
+  .empty { padding: 26px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .list { display: flex; flex-direction: column; }
+  .li { display: grid; grid-template-columns: 1fr auto auto; gap: 18px; padding: 6px 10px; border-bottom: 1px solid #2c2c2c; }
+  .li:last-child { border-bottom: 0; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .dim { color: var(--dim); }
+  .thumb { width: 44px; height: 28px; background: var(--fill2); border-radius: 3px; display: inline-block; vertical-align: middle; margin-right: 8px; }
+  .card { background: var(--fill); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .card .img { height: 64px; background: var(--fill2); border-radius: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .side { width: 150px; flex: none; border-right: 1px solid var(--line); padding: 12px 0; display: flex; flex-direction: column; }
+  .nav { padding: 5px 14px; color: var(--dim); }
+  .nav.on { color: var(--ink); background: var(--fill); }
+  .cols { display: flex; gap: 22px; flex: 1; min-height: 0; }
+  .cols > * { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  .cols > .narrow { flex: 0 0 38%; }
+  .strip { display: flex; gap: 16px; padding: 7px 10px; }
+  .vp { flex: 1; background: repeating-linear-gradient(45deg, #202020 0 10px, #1d1d1d 10px 20px); display: flex; align-items: center; justify-content: center; color: var(--dim); }
+  .side-dim { width: 120px; flex: none; border-left: 1px solid var(--line); border-right: 1px solid var(--line); background: #171717; }
+</style>
+</head>
+<body>
+
+<h2>0 · Today<small>for reference</small></h2>
+<p class="note">Side panels keep their width while hidden, the heading reads "Maps in Maps", and the Game link box with its red ✗ is the heaviest thing on the page.</p>
+<div class="win">
+  <div class="bar"><b>Ballest Editor</b> File Edit View Map Game</div>
+  <div class="body">
+    <div class="side-dim"></div>
+    <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+      <div class="tabs"><div class="tab on">Start</div></div>
+      <div class="pane">
+        <div class="row"><span class="h">Maps in Maps</span><span class="sp"></span><span class="btn">Import…</span><span class="btn p">+ New map</span></div>
+        <div class="sub">No maps yet. New map starts one here; Import… copies one in from the game's maps folder or anywhere else.</div>
+        <div class="box">
+          <div class="row" style="padding:8px 10px"><span class="h">Game link</span><span class="sub">Export, Launch game and Play need these.</span></div>
+          <div class="list" style="border-top:1px solid var(--line)">
+            <div class="li"><span><span class="ok">✓</span> Game — Ballest of Them All</span><span class="btn">Reveal</span><span></span></div>
+            <div class="li"><span><span class="ok">✓</span> Maps folder — UserSavedMaps</span><span class="btn">Reveal</span><span></span></div>
+            <div class="li"><span><span class="ok">✓</span> Creator — spigipple…</span><span class="btn">Change…</span><span></span></div>
+            <div class="li"><span><span style="color:#e55">✗</span> Plugin manager — Play needs it</span><span class="btn p">Install docs</span><span></span></div>
+            <div class="li"><span class="dim">◌ Editor plugin — waits for the plugin manager</span><span></span><span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="side-dim"></div>
+  </div>
+  <div class="status">Maps <span class="r">🔔</span></div>
+</div>
+
+<h2>A · Project page<small>full width, the list is the page</small></h2>
+<p class="note"><b>Closest to PROJECTS.md.</b> Panels collapse on Start. Heading is the project with its folder underneath. An empty state with its own buttons replaces the grey sentence. Game link is one row once Export's needs are met; the plugin manager is "optional, for Play", never red. Grows into the 0.5 version by adding thumbnails and an "In the game" section.</p>
+<div class="win">
+  <div class="bar"><b>Ballest Editor</b> File Edit View Map Game</div>
+  <div class="tabs"><div class="tab on">Start</div></div>
+  <div class="body"><div class="pane" style="max-width:760px;margin:0 auto;width:100%">
+    <div class="row"><div><div class="h">Maps</div><div class="sub">~/Documents/Ballest Editor/Maps · <u>Reveal</u> · <u>Change…</u></div></div><span class="sp"></span><span class="btn">Import…</span><span class="btn p">+ New map</span></div>
+    <div class="dash empty">
+      <div class="h">No maps yet</div>
+      <div class="sub">Start a new one, or import one from the game's maps folder.</div>
+      <div class="row"><span class="btn p">+ New map</span><span class="btn">Import…</span></div>
+    </div>
+    <div class="sub" style="margin-top:4px">— with maps, the same slot holds —</div>
+    <div class="box list">
+      <div class="li"><span>Big Loop</span><span class="warn">⟳ changed in game</span><span class="dim">2 h ago</span></div>
+      <div class="li"><span>Golf base</span><span class="ok">✓ in sync</span><span class="dim">yesterday</span></div>
+      <div class="li"><span>Spiral test</span><span class="dim">· not exported</span><span class="dim">3 d ago</span></div>
+    </div>
+    <div class="box strip"><span>▸ Game link</span><span class="ok">✓ game</span><span class="ok">✓ maps folder</span><span class="ok">✓ creator spigipple…</span><span class="dim">○ plugin manager <i>(for Play)</i> · <u>Set up…</u></span></div>
+  </div></div>
+  <div class="status">Maps <span class="r">🔔</span></div>
+</div>
+
+<h2>B · Hub<small>Godot / Roblox Studio: a sidebar with sections</small></h2>
+<p class="note"><b>Most room to grow.</b> A left nav holds the sections the design will accumulate: this project's maps, maps in the game not yet imported (#103), Workshop later, Recent projects, Game link. Each gets its own page with its own actions. Costs a sidebar that is empty-ish until 0.5.</p>
+<div class="win">
+  <div class="bar"><b>Ballest Editor</b> File Edit View Map Game</div>
+  <div class="tabs"><div class="tab on">Start</div></div>
+  <div class="body">
+    <div class="side">
+      <div class="nav" style="color:var(--ink);font-weight:600">Maps</div>
+      <div class="nav on">This project</div>
+      <div class="nav">In the game <span class="dim">2</span></div>
+      <div class="nav dim">Workshop <i>(0.5)</i></div>
+      <div class="nav" style="margin-top:14px;color:var(--ink);font-weight:600">Projects</div>
+      <div class="nav">Recent</div>
+      <div class="nav dim">New · Open <i>(0.5)</i></div>
+      <div class="nav" style="margin-top:auto"><span class="warn">●</span> Game link</div>
+    </div>
+    <div class="pane">
+      <div class="row"><div><div class="h">This project</div><div class="sub">~/Documents/Ballest Editor/Maps</div></div><span class="sp"></span><span class="btn">Import…</span><span class="btn p">+ New map</span></div>
+      <div class="box list">
+        <div class="li"><span>Big Loop</span><span class="warn">⟳ changed in game</span><span class="dim">2 h ago</span></div>
+        <div class="li"><span>Golf base</span><span class="ok">✓ in sync</span><span class="dim">yesterday</span></div>
+        <div class="li"><span>Spiral test</span><span class="dim">· not exported</span><span class="dim">3 d ago</span></div>
+      </div>
+      <div class="sub">"In the game" page: the two UserSavedMaps files not in the project, each with Import. "Game link" page: today's checklist.</div>
+    </div>
+  </div>
+  <div class="status">Maps <span class="r">🔔</span></div>
+</div>
+
+<h2>C · Two columns<small>Trackmania / Fusion: work left, environment right</small></h2>
+<p class="note"><b>Keeps everything on one screen.</b> Left is the project's maps. Right is a narrow column of context: the Game link checklist (compact), then what's in the game and not imported. The split says "your maps" vs "the game" without a nav. Tight on narrow windows; the right column would stack below.</p>
+<div class="win">
+  <div class="bar"><b>Ballest Editor</b> File Edit View Map Game</div>
+  <div class="tabs"><div class="tab on">Start</div></div>
+  <div class="body"><div class="pane"><div class="cols">
+    <div>
+      <div class="row"><div><div class="h">Maps</div><div class="sub">~/Documents/Ballest Editor/Maps</div></div><span class="sp"></span><span class="btn">Import…</span><span class="btn p">+ New map</span></div>
+      <div class="box list">
+        <div class="li"><span><span class="thumb"></span>Big Loop</span><span class="warn">⟳ changed</span><span class="dim">2 h</span></div>
+        <div class="li"><span><span class="thumb"></span>Golf base</span><span class="ok">✓ in sync</span><span class="dim">1 d</span></div>
+        <div class="li"><span><span class="thumb"></span>Spiral test</span><span class="dim">· not exported</span><span class="dim">3 d</span></div>
+      </div>
+    </div>
+    <div class="narrow">
+      <div class="h">Game</div>
+      <div class="box list">
+        <div class="li" style="grid-template-columns:1fr auto"><span><span class="ok">✓</span> Ballest of Them All</span><span class="dim">Steam</span></div>
+        <div class="li" style="grid-template-columns:1fr auto"><span><span class="ok">✓</span> Maps folder</span><span class="dim">Reveal</span></div>
+        <div class="li" style="grid-template-columns:1fr auto"><span><span class="ok">✓</span> Creator spigipple…</span><span class="dim">Change</span></div>
+        <div class="li" style="grid-template-columns:1fr auto"><span><span class="dim">○</span> Plugin manager <span class="dim">for Play</span></span><span class="dim">Set up</span></div>
+      </div>
+      <div class="h" style="margin-top:6px">In the game, not imported</div>
+      <div class="box list">
+        <div class="li" style="grid-template-columns:1fr auto"><span>Hairpin_Isaac</span><span class="dim">Import</span></div>
+        <div class="li" style="grid-template-columns:1fr auto"><span>Test3_Isaac</span><span class="dim">Import</span></div>
+      </div>
+    </div>
+  </div></div></div>
+  <div class="status">Maps <span class="r">🔔</span></div>
+</div>
+
+<h2>D · Gallery<small>Blender-style: cards, the viewport stays behind</small></h2>
+<p class="note"><b>Most "creative tool".</b> Maps are thumbnail cards over a dimmed viewport, the empty state is a single big New map card. The Game link shrinks to a status pill in the corner that expands on click. Least room for lists and text; needs thumbnails, which are 0.5, so phase 2 would show placeholder cards.</p>
+<div class="win">
+  <div class="bar"><b>Ballest Editor</b> File Edit View Map Game</div>
+  <div class="tabs"><div class="tab on">Start</div></div>
+  <div class="body" style="position:relative">
+    <div class="vp" style="position:absolute;inset:0;opacity:.5"></div>
+    <div class="pane" style="position:relative">
+      <div class="row"><span class="h">Maps</span><span class="sub">· ~/Documents/Ballest Editor/Maps</span><span class="sp"></span><span class="btn">Import…</span></div>
+      <div class="grid">
+        <div class="card dash" style="background:none;align-items:center;justify-content:center;min-height:98px"><span class="btn p">+ New map</span></div>
+        <div class="card"><div class="img"></div><div class="row"><span>Big Loop</span><span class="sp"></span><span class="warn">⟳</span></div><div class="sub">2 h ago</div></div>
+        <div class="card"><div class="img"></div><div class="row"><span>Golf base</span><span class="sp"></span><span class="ok">✓</span></div><div class="sub">yesterday</div></div>
+        <div class="card"><div class="img"></div><div class="row"><span>Spiral test</span><span class="sp"></span><span class="dim">·</span></div><div class="sub">3 d ago</div></div>
+      </div>
+      <div class="row" style="margin-top:auto"><span class="sp"></span><span class="box strip" style="padding:4px 10px"><span class="ok">✓</span> Game linked · <span class="dim">○ Play needs the plugin manager</span> ▾</span></div>
+    </div>
+  </div>
+  <div class="status">Maps <span class="r">🔔</span></div>
+</div>
+
+</body>
+</html>

@@ -2,8 +2,11 @@ import { assert, describe, it } from "@effect/vitest"
 import { DateTime, Effect, Fiber, Layer, Option } from "effect"
 import { TestClock } from "effect/testing"
 import { creatorOf } from "../domain/creator"
+import { setLevelData, setLevelNames } from "../domain/edits"
 import { allFound, GAME_NOT_FOUND, gameLinkRows, PLUGIN_MANAGER_MISSING, PLUGIN_MISSING } from "../domain/gameLink"
 import { linkStateOf } from "../domain/linkState"
+import type { MapFile } from "../domain/MapFile"
+import { type Difficulty, difficultyOf, withDifficulty } from "../domain/mapTags"
 import { defaultSettings } from "../domain/Settings"
 import { lightingOf } from "../domain/sunlight"
 import { MapCodec } from "../services/MapCodec"
@@ -32,6 +35,7 @@ import {
   duplicateMapEffect,
   exportToGameEffect,
   findCreatorEffect,
+  followOpenMapEffect,
   followPlaySessionsEffect,
   followUpdateState,
   holdsUnload,
@@ -43,9 +47,12 @@ import {
   muteNotificationKindEffect,
   openProjectMap,
   openProjectMapFile,
+  openStartingMap,
   overwriteChangedEffect,
+  patchProjectMapEffect,
   playEffect,
   recoverBackupEffect,
+  refreshProjectEffect,
   reimportFirstEffect,
   reimportMapEffect,
   replaceOnImportEffect,
@@ -309,26 +316,27 @@ describe("project actions", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("closing a map's tab asks about unsaved edits with the shared prompt, then shows Start", () => {
+  it.effect("closing a map's tab asks about unsaved edits with the shared prompt, then shows a fresh map", () => {
     const name = fileNameOf(balledits[0]!)
     const disk = makeTestDisk({ [projectFile(name)]: readSample(balledits[0]!) })
     const editTo = (timeOfDay: number) => s().setLighting({ ...lightingOf(s().doc.map.worldSettings), timeOfDay })
     return Effect.gen(function*() {
       yield* reset
       yield* openProjectMapFile(name)
-      // opening the map that is open only brings its tab forward
-      s().showStart()
-      openProjectMap(name)
-      assert.strictEqual(s().activeTab, "map")
+      // opening the map that is open does nothing
+      yield* Effect.promise(() => openProjectMap(name))
+      assert.strictEqual(s().file?.name, name)
 
       editTo(9)
       disk.promptAnswers.push("cancel", "save")
       yield* closeMapTabEffect
-      assert.include(s(), { mapOpen: true, dirty: true })
+      assert.include(s(), { dirty: true })
+      assert.strictEqual(s().file?.name, name)
       assert.match(disk.prompts[0]?.message ?? "", /before closing the map\?$/)
-      // Save: written first, then the tab closes and Start shows
+      // Save: written first, then the tab shows a fresh unsaved map
       yield* closeMapTabEffect
-      assert.include(s(), { mapOpen: false, activeTab: "start", dirty: false })
+      assert.include(s(), { file: null, dirty: false })
+      assert.strictEqual(s().doc.map.worldSettings.levelData.levelDisplayName, "Untitled")
       const saved = yield* MapCodec.use((codec) => codec.decode(disk.files.get(projectFile(name))!))
       assert.strictEqual(saved.worldSettings.directionalLight.timeOfDay, 9)
 
@@ -338,15 +346,110 @@ describe("project actions", () => {
       const before = disk.files.get(projectFile(name))
       disk.promptAnswers.push("discard")
       yield* closeMapTabEffect
-      assert.include(s(), { mapOpen: false, dirty: false })
+      assert.include(s(), { file: null, dirty: false })
       assert.strictEqual(disk.files.get(projectFile(name)), before)
 
       // a clean map closes without asking
       yield* openProjectMapFile(name)
       const asked = disk.prompts.length
       yield* closeMapTabEffect
-      assert.include(s(), { mapOpen: false })
+      assert.isNull(s().file)
       assert.strictEqual(disk.prompts.length, asked)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  /** A project with the first two sample maps in it. */
+  const twoMaps = () => {
+    const first = fileNameOf(balledits[0]!)
+    const second = fileNameOf(balledits[1]!)
+    const disk = makeTestDisk({
+      [projectFile(first)]: readSample(balledits[0]!),
+      [projectFile(second)]: readSample(balledits[1]!)
+    })
+    return { first, second, disk }
+  }
+
+  it.effect("starts on the map last open, else the most recently edited one, else a fresh map, and keeps the open one", () => {
+    const { first, second, disk } = twoMaps()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* refreshProjectEffect
+      // nothing kept: the first of the list (the most recently changed)
+      yield* openStartingMap
+      assert.strictEqual(s().file?.name, s().projectMaps[0]?.fileName)
+
+      // the kept map wins
+      disk.project.lastOpenMap = { [TEST_PROJECT]: second }
+      yield* refreshProjectEffect
+      yield* openStartingMap
+      assert.strictEqual(s().file?.name, second)
+
+      // a kept map that is gone from the project is passed over
+      disk.project.lastOpenMap = { [TEST_PROJECT]: "Map_LevelEditorMain&Gone_me.balledit" }
+      yield* refreshProjectEffect
+      yield* openStartingMap
+      assert.strictEqual(s().file?.name, s().projectMaps[0]?.fileName)
+
+      // an empty project starts on a fresh unsaved map, named Untitled with the creator in use
+      disk.files.clear()
+      disk.project.lastOpenMap = {}
+      yield* refreshProjectEffect
+      yield* openStartingMap
+      assert.include(s(), { file: null, dirty: false })
+      assert.strictEqual(s().doc.map.worldSettings.levelData.levelDisplayName, "Untitled")
+
+      // what is open is kept for the next launch, from the startup load on
+      disk.files.set(projectFile(first), readSample(balledits[0]!))
+      disk.files.set(projectFile(second), readSample(balledits[1]!))
+      disk.project.lastOpenMap = { [TEST_PROJECT]: first }
+      yield* refreshProjectEffect
+      yield* openStartingMap
+      const stop = yield* followOpenMapEffect
+      assert.strictEqual(s().file?.name, first)
+      yield* openProjectMapFile(second)
+      yield* Effect.yieldNow
+      assert.deepStrictEqual(disk.project.lastOpenMap, { [TEST_PROJECT]: second })
+      yield* closeMapTabEffect
+      yield* Effect.yieldNow
+      assert.deepStrictEqual(disk.project.lastOpenMap, {})
+      stop()
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("Project settings edits a map that isn't open on disk, through the save path; the open map's unsaved edits refuse", () => {
+    const { first, second, disk } = twoMaps()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(first)
+      const before = disk.files.get(projectFile(second))
+      // another map: patched on disk, the editor untouched
+      const harder = (difficulty: Difficulty) => (map: MapFile) =>
+        setLevelData(map, withDifficulty(map.worldSettings.levelData, difficulty))
+      const saved = yield* patchProjectMapEffect(second, harder("expert"))
+      assert.strictEqual(saved.fileName, second)
+      assert.notStrictEqual(disk.files.get(projectFile(second)), before)
+      const patched = yield* MapCodec.use((codec) => codec.decode(disk.files.get(projectFile(second))!))
+      assert.strictEqual(difficultyOf(patched.worldSettings.levelData), "expert")
+      assert.strictEqual(s().file?.name, first)
+      assert.isFalse(s().dirty)
+
+      // a rename moves the file, and the old one goes to the backups
+      const renamed = yield* patchProjectMapEffect(second, (map) => setLevelNames(map, "Moved", "me"))
+      assert.strictEqual(renamed.fileName, "Map_LevelEditorMain&Moved_me.balledit")
+      assert.isFalse(disk.files.has(projectFile(second)))
+      assert.strictEqual(disk.backups[0]?.fileName, second)
+
+      // the open map, clean: written and reloaded
+      yield* patchProjectMapEffect(first, harder("baller"))
+      assert.strictEqual(difficultyOf(s().doc.map.worldSettings.levelData), "baller")
+      assert.isFalse(s().dirty)
+
+      // the open map, dirty: refused, nothing written
+      edit()
+      const was = disk.files.get(projectFile(first))
+      const error = yield* Effect.flip(patchProjectMapEffect(first, harder("medium")))
+      assert.match(error.message, /unsaved edits/)
+      assert.strictEqual(disk.files.get(projectFile(first)), was)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
@@ -596,7 +699,7 @@ describe("game link actions", () => {
   const kinds = () => s().notifications.map((n) => n.kind)
   const pinned = () => s().notifications.filter((n) => n.persistent && n.resolvedAt === null).map((n) => n.kind)
 
-  it.effect("the first launch shows every row found and notifies nothing; the next one starts collapsed", () => {
+  it.effect("the first launch opens the checklist and notifies nothing; the next one opens nothing", () => {
     const disk = makeTestDisk()
     installed(disk)
     s().setSettings({ ...defaultSettings, general: { ...defaultSettings.general, creatorName: "Isaac" } })
@@ -607,11 +710,15 @@ describe("game link actions", () => {
       assert.isTrue(allFound(gameLinkRows(s().gamePaths, s().pluginStatus, creatorOf("Isaac", Option.none()))))
       assert.deepStrictEqual(kinds(), [])
       assert.deepStrictEqual(disk.gameLink.last, found)
+      // the checklist opens as a dialog on the first launch only, while everything Export needs is there
+      assert.strictEqual(s().dialog, "gameLink")
+      s().closeDialog()
 
       yield* restart
       yield* checkGameLinkEffect
       assert.isFalse(s().gameLink.firstRun)
       assert.deepStrictEqual(kinds(), [])
+      assert.isNull(s().dialog)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 

@@ -9,6 +9,7 @@ import {
   MapBackupFile,
   MapBackups,
   MapFileNamePayload,
+  OpenMapPayload,
   PickImportResult,
   ProjectMap,
   ProjectMapFile,
@@ -37,6 +38,7 @@ import {
   READ_BACKUP_CHANNEL,
   READ_MAP_CHANNEL,
   REIMPORT_MAP_CHANNEL,
+  REMEMBER_OPEN_MAP_CHANNEL,
   RENAME_MAP_CHANNEL,
   REVEAL_PROJECT_CHANNEL,
   SAVE_MAP_CHANNEL,
@@ -94,6 +96,16 @@ export const revealProject = makeIpcMethod({
     const folder = yield* (yield* Projects).mapsFolder
     if (Option.isNone(folder)) return false
     return yield* (yield* ElectronShell).openFolder(folder.value)
+  })
+})
+
+/** Keeps which map is open in the project, so the next launch opens it again. */
+export const rememberOpenMap = makeIpcMethod({
+  channel: REMEMBER_OPEN_MAP_CHANNEL,
+  payload: OpenMapPayload,
+  result: Schema.Void,
+  handler: Effect.fn("ipc.rememberOpenMap")(function*({ fileName }) {
+    yield* (yield* Projects).rememberOpenMap(fileName)
   })
 })
 

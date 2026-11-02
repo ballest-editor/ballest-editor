@@ -3,6 +3,7 @@ import { Option } from "effect"
 import { creatorOf } from "./creator"
 import {
   allFound,
+  anythingMissing,
   GAME_FOUND,
   GAME_NOT_FOUND,
   type GameFolders,
@@ -97,11 +98,14 @@ describe("Game link checklist", () => {
   it("without the plugin manager links to its install docs; the plugin waits for it", () => {
     const paths: GameFolders = { ...everything, pluginsFolder: { status: "missing", path: PLUGINS } }
     const { pluginManager, plugin: editorPlugin } = byId(gameLinkRows(paths, plugin("noPluginManager"), isaac))
+    // optional: only Play needs it, so nothing is wrong, but the row still carries the fix
     assert.deepInclude(pluginManager, {
-      state: "missing",
-      title: "Play needs the Ballest plugin manager",
+      state: "optional",
+      title: "Not installed (optional, for Play)",
       fix: { _tag: "OpenPluginDocs" }
     })
+    assert.isFalse(anythingMissing(gameLinkRows(paths, plugin("noPluginManager"), isaac)))
+    assert.isFalse(allFound(gameLinkRows(paths, plugin("noPluginManager"), isaac)))
     assert.deepInclude(editorPlugin, { state: "waiting", fix: null })
   })
 

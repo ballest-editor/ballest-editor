@@ -21,11 +21,10 @@ import { LINK_STATE_HELP, LinkStateBadge } from "./LinkStateBadge"
  */
 export function LinkStatus() {
   const open = useOpenProjectMap()
-  const mapOpen = useEditor((s) => s.mapOpen)
   const canExport = useEditor((s) => s.capabilities.exportToGame)
   const canPlay = useEditor((s) => s.capabilities.play)
   const now = useNow()
-  if (!canExport || !mapOpen) return null
+  if (!canExport) return null
   if (open === null) return <span className="text-muted-foreground">Not saved in the project yet</span>
 
   const { state, map } = open

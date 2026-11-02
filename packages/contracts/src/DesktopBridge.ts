@@ -89,7 +89,9 @@ export type ProjectInfo = typeof ProjectInfo.Type
 /** The project in use and the ones used before it, most recent first (the default is always among them). */
 export const ProjectState = Schema.Struct({
   current: ProjectInfo,
-  recent: Schema.Array(ProjectInfo)
+  recent: Schema.Array(ProjectInfo),
+  /** The map last open in the current project (its file name), for the next launch to open again; null when none was. */
+  lastOpenMap: Schema.NullOr(MapFileName)
 })
 export type ProjectState = typeof ProjectState.Type
 
@@ -123,6 +125,10 @@ export type ProjectMapFile = typeof ProjectMapFile.Type
 
 export const MapFileNamePayload = Schema.Struct({ fileName: MapFileName })
 export type MapFileNamePayload = typeof MapFileNamePayload.Type
+
+/** `rememberOpenMap`: the map now open in the project, or null for a map that isn't in it. */
+export const OpenMapPayload = Schema.Struct({ fileName: Schema.NullOr(MapFileName) })
+export type OpenMapPayload = typeof OpenMapPayload.Type
 
 /** `createMap` and `saveMap`: the map's file name in the project and its text. */
 export const WriteMapPayload = Schema.Struct({ fileName: MapFileName, text: MapText })
@@ -541,6 +547,8 @@ export interface DesktopBridge {
   readonly switchProject: (path: string) => Promise<ProjectState>
   /** Shows the project's `maps/` folder in the file manager; false when it doesn't exist or fails to open. */
   readonly revealProject: () => Promise<boolean>
+  /** Keeps which map is open in the project, so the next launch opens it again (`ProjectState.lastOpenMap`). */
+  readonly rememberOpenMap: (fileName: string | null) => Promise<void>
   /** The project's maps, most recently changed first; empty when the project isn't on disk yet. */
   readonly listMaps: () => Promise<ProjectMaps>
   /** Reads a project map. */

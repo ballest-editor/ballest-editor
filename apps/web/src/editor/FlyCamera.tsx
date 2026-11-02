@@ -97,7 +97,7 @@ export function FlyCamera() {
       flyingNow(keybinds, pressed.current, drag.current !== null, performance.now()).size > 0
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (isEditorKeyEvent(e) && useEditor.getState().activeTab === "map") {
+      if (isEditorKeyEvent(e)) {
         pressed.current.press(e.code, performance.now(), formsChord(keybinds, chordOf(e)))
       }
     }

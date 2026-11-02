@@ -2,9 +2,11 @@
 import { Cause, Deferred, Effect, Exit, Fiber, Option, Queue, Stream } from "effect"
 import { toast } from "sonner"
 import type { UeTransform, Vec3 } from "../domain/coords"
+import { creatorOf, usableCreatorName } from "../domain/creator"
 import { asNewDraft, isNeverPublished, setLevelNames } from "../domain/edits"
 import { copyNameOf, currentCreatedAt, mapFileNameOf, mapLabelOf, newMapFile } from "../domain/factory"
 import {
+  exportReady,
   gameLinkChanges,
   type GameLinkNotice,
   type GameLinkResult,
@@ -44,7 +46,7 @@ import {
   type NotificationCommand,
   type NotificationRecord,
   Platform,
-  type PlatformError,
+  PlatformError,
   type PlayResult,
   type ProjectMap,
   type ProjectState,
@@ -222,17 +224,20 @@ export const setWindowTheme = (dark: boolean) =>
   )
 
 /**
- * What the platform offers, the project with its maps (desktop) and the creator name it finds, into the store. The
- * desktop app starts on the Start tab; a browser, which has no project, on its one map.
+ * What the platform offers, the project with its maps (desktop) and the creator name it finds, into the store, then
+ * the map to start on (`openStartingMap`). A browser, which has no project, keeps its one map.
  */
 export const loadPlatform = () =>
   run(
     Effect.gen(function*() {
       const { capabilities } = yield* Platform
       useEditor.getState().setCapabilities(capabilities)
-      if (!capabilities.projects) useEditor.getState().loadMap(useEditor.getState().doc.map, null)
       yield* refreshProject
       yield* findCreatorEffect
+      if (capabilities.projects) {
+        yield* openStartingMap
+        yield* followOpenMapEffect
+      }
       if (capabilities.exportToGame) yield* checkGameLinkEffect
       yield* checkExportsEffect
     })
@@ -289,6 +294,8 @@ const refreshProject = Effect.gen(function*() {
   if (!platform.capabilities.projects) return
   useEditor.getState().setProject(yield* platform.projectState, yield* platform.listMaps)
 })
+
+export const refreshProjectEffect = refreshProject
 
 const fileOf = (map: ProjectMap): OpenFile => ({ name: map.fileName, path: map.path })
 
@@ -349,11 +356,17 @@ export const createNewMap = Effect.fn("createNewMap")(function*(displayName: str
 
 export const newMap = (displayName: string, creatorName: string) => run(createNewMap(displayName, creatorName))
 
-/** Opens one of the project's maps. */
-export const openProjectMapFile = Effect.fn("openProjectMapFile")(function*(fileName: string) {
+/** Reads one of the project's maps into the editor, quietly. */
+const readProjectMapIntoEditor = Effect.fn("readProjectMapIntoEditor")(function*(fileName: string) {
   const file = yield* (yield* Platform).readMap(fileName)
   const map = yield* MapCodec.use((codec) => codec.decode(file.text))
   yield* showMap(map, fileOf(file))
+  return { file, map }
+})
+
+/** Opens one of the project's maps. */
+export const openProjectMapFile = Effect.fn("openProjectMapFile")(function*(fileName: string) {
+  const { file, map } = yield* readProjectMapIntoEditor(fileName)
   useEditor.getState().notify("info", `Opened ${mapLabelOf(file.fileName)} (${map.items.length} items)`, {
     kind: "mapOpened"
   })
@@ -361,22 +374,157 @@ export const openProjectMapFile = Effect.fn("openProjectMapFile")(function*(file
 
 /**
  * Opens one of the project's maps in the map tab (there is one), asking about the open map's unsaved edits first;
- * when it is that map, its tab shows.
+ * the open map itself is left alone.
  */
-export const openProjectMap = (fileName: string) => {
-  const { mapOpen, file, showMapTab } = useEditor.getState()
-  if (mapOpen && file?.name === fileName) showMapTab()
-  else {void run(
+export const openProjectMap = (fileName: string) =>
+  useEditor.getState().file?.name === fileName
+    ? Promise.resolve(undefined)
+    : run(
       unlessCancelled("openMap", openProjectMapFile(fileName)).pipe(Effect.ensuring(Effect.ignore(refreshProject)))
-    )}
-}
+    )
 
-/** Closes the map's tab, and Start shows; unsaved edits ask first (the shared prompt, `unlessCancelled`). */
-export const closeMapTabEffect = Effect.suspend(() =>
-  unlessCancelled("closeMap", Effect.sync(() => useEditor.getState().closeMap()))
-)
+/**
+ * A fresh, unsaved map in the editor, the way New map starts one (the player start and the goal ring where the game
+ * puts them, the creator in use) but with a default name and nothing written: what the tab shows when there is no map
+ * to open. Its first Save names it into the project.
+ */
+export const freshMapEffect = Effect.gen(function*() {
+  const { catalog, settings, foundCreator } = useEditor.getState()
+  const playerStartPiece = catalog?.catalog.pieces.find((p) => p.classPath === PLAYER_START_CLASS)
+  const creatorName = usableCreatorName(creatorOf(settings.general.creatorName, foundCreator))
+  const createdAt = yield* currentCreatedAt
+  useEditor.getState().loadMap(newMapFile({ displayName: "Untitled", creatorName, createdAt, playerStartPiece }), null)
+})
+
+/**
+ * The map the desktop app starts on (docs/PROJECTS.md § Shell): the one open when it last ran, else the project's
+ * most recently edited one, else a fresh unsaved map. One that can't be read any more is reported, and the next
+ * choice is taken.
+ */
+export const openStartingMap = Effect.gen(function*() {
+  const { project, projectMaps } = useEditor.getState()
+  const last = project?.lastOpenMap ?? null
+  const candidates = [
+    ...(last !== null && projectMaps.some((m) => m.fileName === last) ? [last] : []),
+    ...projectMaps.filter((m) => m.fileName !== last).map((m) => m.fileName)
+  ]
+  for (const fileName of candidates) {
+    const opened = yield* readProjectMapIntoEditor(fileName).pipe(
+      Effect.as(true),
+      Effect.catchCause((cause) => Effect.sync(() => notifyFailure(cause)).pipe(Effect.as(false)))
+    )
+    if (opened) return
+    // only the kept map and the most recent one are tried: the rest are the user's to pick
+    if (fileName !== last) break
+  }
+  yield* freshMapEffect
+})
+
+/**
+ * Keeps which map is open in the project (`Platform.rememberOpenMap`) as it changes, from now on: the next launch
+ * opens it again. Started once the starting map is open, so the memory isn't wiped before it is read. The returned
+ * function stops it.
+ */
+export const followOpenMapEffect = Effect.gen(function*() {
+  const platform = yield* Platform
+  const runFork = Effect.runForkWith(yield* Effect.context())
+  let known = useEditor.getState().file?.name ?? null
+  return useEditor.subscribe((s) => {
+    const fileName = s.file?.name ?? null
+    if (fileName === known) return
+    known = fileName
+    runFork(
+      platform.rememberOpenMap(fileName).pipe(
+        Effect.catch((error) => Effect.logWarning("Couldn't keep which map is open", error))
+      )
+    )
+  })
+})
+
+/**
+ * Closes the map's tab: the tab then shows a fresh unsaved map, as New map would without its dialog; unsaved edits ask
+ * first (the shared prompt, `unlessCancelled`).
+ */
+export const closeMapTabEffect = Effect.suspend(() => unlessCancelled("closeMap", freshMapEffect))
 
 export const closeMapTab = () => run(closeMapTabEffect)
+
+/**
+ * Rename… or Duplicate… for one of the project's maps from the Maps dialog or Project settings: the dialogs name the
+ * open map, so the map is opened first (asking about the open map's unsaved edits), then its dialog.
+ */
+export const nameProjectMap = (fileName: string, mode: "rename" | "duplicate") =>
+  run(
+    Effect.gen(function*() {
+      if (useEditor.getState().file?.name !== fileName) {
+        yield* unlessCancelled("openMap", openProjectMapFile(fileName))
+        if (useEditor.getState().file?.name !== fileName) return
+      }
+      useEditor.getState().openDialog(mode)
+    })
+  )
+
+/** A project map as Project settings edits it: the file decoded, with the prefs kept for it. */
+export interface ProjectMapSettings {
+  readonly map: MapFile
+  readonly prefs: MapPrefs
+}
+
+/** Reads a project map and its prefs for Project settings, without opening it. */
+export const readProjectMapSettings = (fileName: string) =>
+  run(
+    Effect.gen(function*() {
+      const file = yield* (yield* Platform).readMap(fileName)
+      const map = yield* MapCodec.use((codec) => codec.decode(file.text))
+      const prefs = yield* MapPrefsStore.use((store) => store.load(mapPrefsKeyOf(map))).pipe(
+        Effect.orElseSucceed((): MapPrefs => ({}))
+      )
+      return { map, prefs } satisfies ProjectMapSettings
+    })
+  )
+
+/**
+ * Project settings editing a map that isn't the open one: the file is read, `patch` applied and the result written
+ * through the same path as Save (its name may change, moving the file; the old one goes to the backups). The open map
+ * with unsaved edits is refused: Save it first. A clean open map is reloaded from the write.
+ */
+export const patchProjectMapEffect = Effect.fn("patchProjectMapEffect")(
+  function*(fileName: string, patch: (map: MapFile) => MapFile) {
+    const platform = yield* Platform
+    const { file: openFile, dirty } = useEditor.getState()
+    const isOpen = openFile?.name === fileName
+    if (isOpen && dirty) {
+      return yield* new PlatformError({
+        message: `${
+          mapLabelOf(fileName)
+        } is open with unsaved edits. Save it first, or change its settings in the editor.`
+      })
+    }
+    const read = yield* platform.readMap(fileName)
+    const map = yield* MapCodec.use((codec) => codec.decode(read.text))
+    const result = yield* (yield* MapExporter).prepare(patch(map))
+    const saved = result.filename === fileName
+      ? yield* platform.saveMap({ fileName, text: result.text })
+      : yield* platform.renameMap({ from: fileName, to: result.filename, text: result.text })
+    if (isOpen) yield* showMap(result.map, fileOf(saved))
+    yield* refreshProject
+    return saved
+  }
+)
+
+export const patchProjectMap = (fileName: string, patch: (map: MapFile) => MapFile) =>
+  run(patchProjectMapEffect(fileName, patch))
+
+/** Project settings changing a map's prefs (grid height, Export on save) without opening it; the open map's go through the editor. */
+export const saveProjectMapPrefs = (key: string, prefs: MapPrefs) =>
+  run(
+    Effect.gen(function*() {
+      yield* (yield* MapPrefsStore).save(key, prefs)
+    })
+  )
+
+/** File › Quit: the same as closing the window, so unsaved edits ask first (docs/DESKTOP.md § Window). */
+export const quitApp = () => run(answerUnloadRequest("close"))
 
 /** Copies a picked file into the project (or reports the clash) and opens the copy. */
 const importInto = Effect.fn("importInto")(function*(pending: ImportClash, replace: boolean) {
@@ -820,7 +968,7 @@ const notifyChangedInGame = (fileName: string) =>
 /**
  * One look at the exports (desktop): main hashes each linked map's export and reports what the game changed since the
  * last look, each change once; a map whose export is gone shows Not exported from then on. The maps are listed again,
- * so the status bar and the Start tab show the states. A failure is only logged: the next focus looks again.
+ * so the status bar and the Maps dialog show the states. A failure is only logged: the next focus looks again.
  */
 const checkExportsOnce = Effect.gen(function*() {
   const platform = yield* Platform
@@ -858,7 +1006,7 @@ export const checkExports = () => run(checkExportsEffect)
  */
 export const reimportMapEffect = (fileName: string) =>
   Effect.suspend(() => {
-    const isOpen = () => useEditor.getState().mapOpen && useEditor.getState().file?.name === fileName
+    const isOpen = () => useEditor.getState().file?.name === fileName
     const reimport = Effect.gen(function*() {
       const file = yield* (yield* Platform).reimportMap(fileName)
       const open = isOpen()
@@ -866,7 +1014,7 @@ export const reimportMapEffect = (fileName: string) =>
       yield* refreshProject
       useEditor.getState().notify("info", `Re-imported ${mapLabelOf(fileName)} from the game`, {
         kind: "mapReimported",
-        body: "The project's previous version is in the backups (Map › Recover previous version…).",
+        body: "The project's previous version is in the backups (Project › Recover previous version…).",
         actions: open ? [] : [{ label: "Open", command: { _tag: "OpenMap", fileName } }]
       })
     })
@@ -1034,9 +1182,11 @@ const noteGameLink = Effect.gen(function*() {
 })
 
 /**
- * The startup check behind the Start tab's Game link (desktop): looks up the game's folders and the plugin, and
- * notifies only what changed since the last launch (none on the first, when the checklist itself is in front of the
- * user). Persistent notices (game not found, plugin manager missing) stay pinned until their cause goes away.
+ * The startup check behind the Game link (desktop): looks up the game's folders and the plugin, and notifies only
+ * what changed since the last launch (none on the first, when the checklist itself is in front of the user).
+ * Persistent notices (game not found, plugin manager missing) stay pinned until their cause goes away. The Game link
+ * dialog opens by itself on the first launch, and whenever a folder Export needs is missing; the plugin manager, which
+ * only Play needs, never opens it.
  */
 export const checkGameLinkEffect = Effect.gen(function*() {
   const platform = yield* Platform
@@ -1050,6 +1200,7 @@ export const checkGameLinkEffect = Effect.gen(function*() {
   const current = gameLinkResultOf(paths, plugin)
   reportGameLink(memory.last, current)
   yield* rememberGameLink(current)
+  if (memory.last === null || !exportReady(paths)) useEditor.getState().openDialog("gameLink")
 }).pipe(Effect.catch((error) => Effect.logWarning("Couldn't check the Game link", error)))
 
 /** Runs a lookup that may return the game's folders (none: the user cancelled) and shows them, and the plugin. */
@@ -1076,8 +1227,8 @@ export const loadGamePaths = () => showGamePaths((platform) => Effect.asSome(pla
 export const chooseGamePath = (which: GamePathKind) => showGamePaths((platform) => platform.chooseGamePath(which))
 
 /**
- * Choose folder… on the Start tab's Game link: `chooseGamePath`, but a folder main refuses (not the game's) is shown on
- * the checklist's row instead of toasted, and nothing is saved.
+ * Choose folder… in the Game link: `chooseGamePath`, but a folder main refuses (not the game's) is shown on the
+ * checklist's row instead of toasted, and nothing is saved.
  */
 export const chooseGameLinkFolderEffect = (which: GamePathKind) =>
   gamePathsShown((platform) =>
@@ -1179,7 +1330,7 @@ export const runNotificationCommand = (command: NotificationCommand): void => {
       void chooseGamePath(command.which)
       return
     case "OpenMap":
-      openProjectMap(command.fileName)
+      void openProjectMap(command.fileName)
       return
     case "ReimportMap":
       void reimportMap(command.fileName)
