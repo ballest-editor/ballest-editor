@@ -58,7 +58,8 @@ export interface TestDisk {
    * muted notification kinds.
    */
   gameLink: { last: GameLinkResult | null; muted: Array<string> }
-  project: { current: string; recent: Array<string> }
+  /** The project in use, the recent ones, and the map last open in each (as `desktop-settings.json` keeps them). */
+  project: { current: string; recent: Array<string>; lastOpenMap: Record<string, string> }
   /**
    * `creator`: what `findCreator` answers. `plugin`: the editor-link plugin's status; installing it makes it `current`,
    * counted in `pluginInstalls`. `races`: the maps Play asked the plugin to race (its `play.json`s), in order.
@@ -140,7 +141,7 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   exportChecks: 0,
   notifications: [],
   gameLink: { last: null, muted: [] },
-  project: { current: TEST_PROJECT, recent: [] },
+  project: { current: TEST_PROJECT, recent: [], lastOpenMap: {} },
   game: {
     paths: testGamePaths,
     running: false,
@@ -202,11 +203,15 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     const recent = others.includes(TEST_PROJECT) || disk.project.current === TEST_PROJECT
       ? others
       : [...others, TEST_PROJECT]
-    return { current: info(disk.project.current), recent: recent.map(info) }
+    return {
+      current: info(disk.project.current),
+      recent: recent.map(info),
+      lastOpenMap: disk.project.lastOpenMap[disk.project.current] ?? null
+    }
   }
   const select = (path: string) => {
     if (path.startsWith(TEST_MAPS_FOLDER)) return fail(`${path} is the game's maps folder or inside it.`)
-    disk.project = { current: path, recent: [path, ...disk.project.recent.filter((p) => p !== path)] }
+    disk.project = { ...disk.project, current: path, recent: [path, ...disk.project.recent.filter((p) => p !== path)] }
     return Promise.resolve(state())
   }
   const mapOf = (fileName: string): ProjectMap => {
@@ -254,6 +259,11 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       if (!info(current).exists) return Promise.resolve(false)
       disk.external.push(`${current}/maps`)
       return Promise.resolve(true)
+    },
+    rememberOpenMap: (fileName) => {
+      const { [disk.project.current]: _previous, ...others } = disk.project.lastOpenMap
+      disk.project.lastOpenMap = fileName === null ? others : { ...others, [disk.project.current]: fileName }
+      return Promise.resolve()
     },
     listMaps: () => {
       const prefix = `${disk.project.current}/maps/`

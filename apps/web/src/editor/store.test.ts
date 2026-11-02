@@ -553,24 +553,16 @@ describe("editor store", () => {
     assert.deepStrictEqual(s().doc.map.items.map((i) => i.floatProperties.length), [0, 0, 0])
   })
 
-  it("opens a map in its tab, and closing it shows Start with a blank map", () => {
+  it("loading a map replaces the document, its history and any live interaction", () => {
     const s = () => useEditor.getState()
-    mapWithCubes(0)
-    assert.include(s(), { mapOpen: true, activeTab: "map", startOpen: true })
-    s().closeStart()
-    assert.include(s(), { startOpen: false, activeTab: "map" })
-    s().showStart()
-    assert.include(s(), { startOpen: true, activeTab: "start", mapOpen: true })
-    s().showMapTab()
-    assert.strictEqual(s().activeTab, "map")
-    s().closeMap()
-    assert.include(s(), { mapOpen: false, startOpen: true, activeTab: "start", dirty: false, file: null })
+    mapWithCubes(2)
+    s().select([s().doc.ids[0]!])
+    s().setPreview(new Map())
+    s().loadMap(initialMap(), null)
+    assert.include(s(), { dirty: false, file: null, preview: null, lightingPreview: null })
     assert.deepStrictEqual(s().past, [])
+    assert.deepStrictEqual(s().selectedIds, [])
     assert.strictEqual(s().doc.map.items.length, initialMap().items.length)
-    // Start stays while no map is open
-    s().closeStart()
-    s().showMapTab()
-    assert.include(s(), { startOpen: true, activeTab: "start" })
   })
 
   it("records every notification, newest first; a persistent kind pins until resolved", () => {

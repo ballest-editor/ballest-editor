@@ -1,5 +1,5 @@
 /**
- * The Game link checklist on the Start tab (docs/PROJECTS.md § Shell): the game's install, its maps folder, the
+ * The Game link checklist (docs/PROJECTS.md § Shell; a dialog on desktop): the game's install, its maps folder, the
  * creator name, the plugin manager and the editor's plugin, each found or not, with the fix for a missing one. And
  * what changed since the last launch, which is what the notification centre is told about.
  */
@@ -50,10 +50,11 @@ export type GameLinkFix =
   | { readonly _tag: "EditCreator" }
 
 /**
- * `ok`: found. `missing`: not found, or not usable; the row carries the fix. `waiting`: still being looked up, or
- * waiting on a row above it (no plugin manager without the game).
+ * `ok`: found. `missing`: not found, or not usable; the row carries the fix. `optional`: not found, but only Play
+ * needs it (the plugin manager), so nothing is wrong; the row carries the fix all the same. `waiting`: still being
+ * looked up, or waiting on a row above it (no plugin manager without the game).
  */
-export type GameLinkRowState = "ok" | "missing" | "waiting"
+export type GameLinkRowState = "ok" | "missing" | "optional" | "waiting"
 
 export interface GameLinkRow {
   readonly id: "install" | "mapsFolder" | "creator" | "pluginManager" | "plugin"
@@ -184,9 +185,9 @@ const pluginManagerRow = (paths: GameFolders | null, plugin: PluginLookup | null
       return row("pluginManager", label, { state: "waiting", title: "Looked for once the game is found" })
     case "noPluginManager":
       return row("pluginManager", label, {
-        state: "missing",
-        title: "Play needs the Ballest plugin manager",
-        note: "It runs the editor's plugin inside the game. Its site has the install steps.",
+        state: "optional",
+        title: "Not installed (optional, for Play)",
+        note: "Play races the open map through it. Export doesn't need it. Its site has the install steps.",
         fix: { _tag: "OpenPluginDocs" }
       })
     default:
@@ -249,7 +250,15 @@ export const gameLinkRows = (
   pluginRow(plugin)
 ]
 
+/** Whether everything is there, the optional plugin manager included. */
 export const allFound = (rows: ReadonlyArray<GameLinkRow>): boolean => rows.every((r) => r.state === "ok")
+
+/** Whether anything is missing that Export, Launch game or Play need; the optional plugin manager doesn't count. */
+export const anythingMissing = (rows: ReadonlyArray<GameLinkRow>): boolean => rows.some((r) => r.state === "missing")
+
+/** Whether the folders Export needs, the game's install and its maps folder, are both there. */
+export const exportReady = (paths: GameFolders): boolean =>
+  paths.install.status !== "missing" && paths.mapsFolder.status !== "missing"
 
 // --- notifications: only when a result changes between launches ---------------------------
 

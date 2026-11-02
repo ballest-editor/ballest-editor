@@ -23,19 +23,20 @@ import { watchResolvedTheme } from "../editor/theme"
 import { useActionKeys } from "../editor/useActionKeys"
 import { Viewport } from "../editor/Viewport"
 import { DocumentTabs } from "./DocumentTabs"
+import { GameLinkDialog } from "./GameLinkDialog"
 import { ImportClashDialog } from "./ImportClashDialog"
 import { Inspector } from "./Inspector"
 import { KeybindCheatSheet } from "./KeybindCheatSheet"
-import { MapSettingsDialog } from "./MapSettingsDialog"
+import { MapsDialog } from "./MapsDialog"
 import { NameMapDialog } from "./NameMapDialog"
 import { NewMapDialog } from "./NewMapDialog"
 import { OverwriteChangedDialog } from "./OverwriteChangedDialog"
 import { Palette } from "./Palette"
+import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
 import { RecoverDialog } from "./RecoverDialog"
 import { ReplacePublishedDialog } from "./ReplacePublishedDialog"
 import { SettingsDialog } from "./SettingsDialog"
 import { SidePanel } from "./SidePanel"
-import { StartTab } from "./StartTab"
 import { StatusBar } from "./StatusBar"
 import { TopBar } from "./TopBar"
 import { ViewportControls } from "./ViewControls"
@@ -71,14 +72,13 @@ const useTheme = () => {
     }), [theme])
 }
 
-/** The window title: the open map, marked while it has unsaved changes; Start with none open. */
+/** The window title: the open map, marked while it has unsaved changes. */
 const useDocumentTitle = () => {
   const label = useOpenMapLabel()
-  const mapOpen = useEditor((s) => s.mapOpen)
   const dirty = useEditor((s) => s.dirty)
   useEffect(() => {
-    document.title = mapOpen ? `${dirty ? "• " : ""}${label} — Ballest Editor` : "Ballest Editor"
-  }, [label, mapOpen, dirty])
+    document.title = `${dirty ? "• " : ""}${label} — Ballest Editor`
+  }, [label, dirty])
 }
 
 /**
@@ -114,8 +114,6 @@ export function Editor() {
   const settingsCategory = useEditor((s) => s.settingsCategory)
   const setSettingsCategory = useEditor((s) => s.setSettingsCategory)
   const close = useEditor((s) => s.closeDialog)
-  // The Start tab covers the viewport, which stays mounted; the side panels hide their contents until a map shows.
-  const onStart = useEditor((s) => s.activeTab === "start")
 
   useActionKeys()
   useDocumentTitle()
@@ -150,7 +148,7 @@ export function Editor() {
         <TopBar />
         <div className="flex min-h-0 flex-1">
           <SidePanel id="palette" side="left" defaultWidth={260} minWidth={180} maxWidth={560}>
-            <div className={onStart ? "invisible h-full" : "h-full"} inert={onStart}>
+            <div className="h-full">
               <Palette />
             </div>
           </SidePanel>
@@ -158,11 +156,10 @@ export function Editor() {
             <DocumentTabs />
             <div className="relative min-h-0 flex-1">
               <Viewport controls={ViewportControls} />
-              {onStart && <StartTab />}
             </div>
           </div>
           <SidePanel id="inspector" side="right" defaultWidth={300} minWidth={220} maxWidth={640}>
-            <div className={onStart ? "invisible h-full" : "h-full"} inert={onStart}>
+            <div className="h-full">
               <Inspector />
             </div>
           </SidePanel>
@@ -174,7 +171,13 @@ export function Editor() {
       <NameMapDialog mode="rename" open={dialog === "rename"} onClose={close} />
       <NameMapDialog mode="duplicate" open={dialog === "duplicate"} onClose={close} />
       <NameMapDialog mode="newDraft" open={dialog === "newDraft"} onClose={close} />
-      <MapSettingsDialog open={dialog === "mapSettings"} onClose={close} />
+      <ProjectSettingsDialog
+        open={dialog === "projectSettings" || dialog === "mapSettings"}
+        page={dialog === "mapSettings" ? "openMap" : "project"}
+        onClose={close}
+      />
+      <MapsDialog open={dialog === "maps"} onClose={close} />
+      <GameLinkDialog open={dialog === "gameLink"} onClose={close} />
       <ReplacePublishedDialog open={dialog === "replacePublished"} onClose={close} />
       <OverwriteChangedDialog open={dialog === "overwriteChanged"} onClose={close} />
       <ImportClashDialog open={dialog === "importClash"} onClose={close} />

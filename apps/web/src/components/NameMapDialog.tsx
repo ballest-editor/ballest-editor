@@ -9,7 +9,7 @@ import { type MapCreator, MapNameDialog, useMapCreator } from "./MapNameDialog"
 
 /**
  * Names the open map before it is written: `saveAs` for a map that has no file yet (desktop: into the project) or for
- * a browser's Export (a download); `rename` and `duplicate` from the Map menu; `newDraft`, Play's way out for a
+ * a browser's Export (a download); `rename` and `duplicate` from the Project menu; `newDraft`, Play's way out for a
  * published map's draft (the plugin manager races only maps never published): a duplicate that isn't linked to the
  * Workshop item, raced once it is saved. Every mode confirms the name, so a file never disagrees with the names inside
  * it (the game refuses to load those).
@@ -151,7 +151,7 @@ export function NameMapDialog(
         <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
           The project already has a map called {name.trim()} by {creator.name}.{" "}
           {mode === "newDraft" ? "Save and play" : "Duplicate"}{" "}
-          replaces it, and its file goes to the project's backups (Map › Recover previous version…).
+          replaces it, and its file goes to the project's backups (Project › Recover previous version…).
         </p>
       )}
       {clash && !replaces && (

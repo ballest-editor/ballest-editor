@@ -65,7 +65,7 @@ const groupByFile = (backups: ReadonlyArray<MapBackup>, open: string | null) => 
 }
 
 /**
- * Map › Recover previous version… (desktop): the versions the app kept of a map file before writing over it, newest
+ * Project › Recover previous version… (desktop): the versions the app kept of a map file before writing over it, newest
  * first, for the open map or any backed-up one. Opening one makes it the open map's unsaved edits; Save keeps it.
  */
 export function RecoverDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {

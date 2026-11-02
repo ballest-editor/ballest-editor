@@ -114,6 +114,8 @@ export class Projects extends Context.Service<Projects, {
   readonly use: (folder: string) => Effect.Effect<ProjectState, ProjectError>
   /** Goes back to a recent project, or the default; any other folder is refused. */
   readonly switchTo: (folder: string) => Effect.Effect<ProjectState, ProjectError>
+  /** Keeps which map is open in the current project (`ProjectState.lastOpenMap`); null forgets it. */
+  readonly rememberOpenMap: (fileName: string | null) => Effect.Effect<void, ProjectError>
   /** The current project's `maps/` folder, when it exists. */
   readonly mapsFolder: Effect.Effect<Option.Option<string>>
   readonly list: Effect.Effect<ProjectMaps, ProjectError>
@@ -179,10 +181,22 @@ export class Projects extends Context.Service<Projects, {
       const before = same(folder, defaultFolder) || others.some((p) => same(p, defaultFolder))
         ? others
         : [...others, defaultFolder]
+      const lastOpenMap = (yield* remembered).lastOpenMap?.[folder] ?? null
       return {
         current: yield* info(folder),
-        recent: yield* Effect.forEach(before, info)
+        recent: yield* Effect.forEach(before, info),
+        lastOpenMap: lastOpenMap !== null && isMapFileName(lastOpenMap) ? lastOpenMap : null
       } satisfies ProjectState
+    })
+
+    const rememberOpenMap = Effect.fn("Projects.rememberOpenMap")(function*(fileName: string | null) {
+      const project = yield* current
+      if (fileName !== null && !isMapFileName(fileName)) return yield* fail("fileName", fileName)()
+      yield* settings.update((s) => {
+        const { [project]: _previous, ...others } = s.project?.lastOpenMap ?? {}
+        const lastOpenMap = fileName === null ? others : { ...others, [project]: fileName }
+        return { ...s, project: { ...s.project, lastOpenMap } }
+      }).pipe(Effect.mapError(fail("write", project)))
     })
 
     /** Refuses the game's maps folder and anything inside it (wherever it is now, found or not). */
@@ -535,6 +549,7 @@ export class Projects extends Context.Service<Projects, {
       state,
       use,
       switchTo,
+      rememberOpenMap,
       mapsFolder,
       list,
       read,
