@@ -27,12 +27,11 @@ import { GameLinkDialog } from "./GameLinkDialog"
 import { ImportClashDialog } from "./ImportClashDialog"
 import { Inspector } from "./Inspector"
 import { KeybindCheatSheet } from "./KeybindCheatSheet"
-import { MapsDialog } from "./MapsDialog"
+import { LeftDock } from "./LeftDock"
 import { NameMapDialog } from "./NameMapDialog"
 import { NewMapDialog } from "./NewMapDialog"
 import { NewProjectDialog } from "./NewProjectDialog"
 import { OverwriteChangedDialog } from "./OverwriteChangedDialog"
-import { Palette } from "./Palette"
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
 import { RecoverDialog } from "./RecoverDialog"
 import { ReplacePublishedDialog } from "./ReplacePublishedDialog"
@@ -149,9 +148,7 @@ export function Editor() {
         <TopBar />
         <div className="flex min-h-0 flex-1">
           <SidePanel id="palette" side="left" defaultWidth={260} minWidth={180} maxWidth={560}>
-            <div className="h-full">
-              <Palette />
-            </div>
+            <LeftDock />
           </SidePanel>
           <div className="flex min-w-0 flex-1 flex-col">
             <DocumentTabs />
@@ -177,7 +174,6 @@ export function Editor() {
         page={dialog === "mapSettings" ? "openMap" : "project"}
         onClose={close}
       />
-      <MapsDialog open={dialog === "maps"} onClose={close} />
       <GameLinkDialog open={dialog === "gameLink"} onClose={close} />
       <NewProjectDialog open={dialog === "newProject"} onClose={close} />
       <ReplacePublishedDialog open={dialog === "replacePublished"} onClose={close} />

@@ -459,13 +459,21 @@ export const closeMapTab = () => run(closeMapTabEffect)
  * open map, so the map is opened first (asking about the open map's unsaved edits), then its dialog.
  */
 export const nameProjectMap = (fileName: string, mode: "rename" | "duplicate" | "recover") =>
+  withProjectMapOpen(fileName, Effect.sync(() => useEditor.getState().openDialog(mode)))
+
+/**
+ * Runs `then` with the project map `fileName` open: it is opened first when another is (asking about that one's
+ * unsaved edits; a cancel runs nothing). The Project panel's per-map actions go through this, since Export, Play and
+ * the name dialogs act on the open map.
+ */
+const withProjectMapOpen = (fileName: string, then: Effect.Effect<void, unknown, AppServices>) =>
   run(
     Effect.gen(function*() {
       if (useEditor.getState().file?.name !== fileName) {
         yield* unlessCancelled("openMap", openProjectMapFile(fileName))
         if (useEditor.getState().file?.name !== fileName) return
       }
-      useEditor.getState().openDialog(mode)
+      yield* then
     })
   )
 
@@ -951,6 +959,12 @@ export const playEffect = (replacePublished: boolean, overwriteChanged = false) 
   )
 
 export const playMap = () => run(playEffect(false))
+
+/** The Project panel's Export to game on a map: opened first, then exported as the open map is. */
+export const exportProjectMapFromPanel = (fileName: string) => withProjectMapOpen(fileName, exportToGameEffect(false))
+
+/** The Project panel's Play on a map: opened first, then played as the open map is. */
+export const playProjectMapFromPanel = (fileName: string) => withProjectMapOpen(fileName, playEffect(false))
 
 /** The newDraft dialog's answer: a copy of the map that was never published, under a new name; then Play races it. */
 export const playAsNewDraft = (displayName: string, creatorName: string, replace = false) =>

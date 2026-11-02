@@ -122,6 +122,7 @@ export function MenuBar() {
   const hasSelection = useEditor((s) => s.selectedIds.length > 0)
   const canPaste = useEditor((s) => s.clipboard !== null)
   const openDialog = useEditor((s) => s.openDialog)
+  const setLeftTab = useEditor((s) => s.setLeftTab)
   const { snapping, appearance, lighting, general } = useEditor((s) => s.settings)
   const { projects, exportToGame: canExport, launchGame: canLaunchGame, play: canPlay } = useEditor((s) =>
     s.capabilities
@@ -181,6 +182,9 @@ export function MenuBar() {
       </Menu>
       <Menu title="View">
         <CommandItem action="focusSelection" disabled={!hasSelection} inset>Focus selection</CommandItem>
+        <MenubarSeparator />
+        <MenubarItem inset onClick={() => setLeftTab("pieces")}>Pieces</MenubarItem>
+        <MenubarItem inset onClick={() => setLeftTab("project")}>Project</MenubarItem>
         <MenubarSeparator />
         <MenubarCheckboxItem
           closeOnClick
@@ -250,7 +254,6 @@ export function MenuBar() {
       {projects
         ? (
           <Menu title="Project">
-            <MenubarItem inset onClick={() => openDialog("maps")}>Maps…</MenubarItem>
             <CommandItem action="newMap" inset>New map…</CommandItem>
             <CommandItem action="openMap" inset>Import map…</CommandItem>
             {canExport && (

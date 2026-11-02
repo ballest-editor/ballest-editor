@@ -133,7 +133,6 @@ export function Palette() {
 
   return (
     <aside className="flex h-full min-w-0 flex-col gap-2 bg-card p-2">
-      <div className="px-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">Pieces</div>
       <Input type="search" placeholder="Search pieces…" value={query} onChange={(e) => setQuery(e.target.value)} />
       {catalog === null && !booting && (
         <div className="px-1 text-xs text-muted-foreground">The piece catalog couldn't be loaded.</div>

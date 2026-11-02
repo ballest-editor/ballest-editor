@@ -98,9 +98,9 @@ export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 export type Tool = "select" | "translate" | "rotate" | "scale"
 /**
  * `saveAs` names a map that has no file yet before it goes into the project (desktop), or before it is downloaded
- * (browser: Export). `rename`, `duplicate` and `recover` are the Project menu's (desktop), and so are `maps` (Project ›
- * Maps…) and `gameLink`. `projectSettings` opens Project settings on the project's page, `mapSettings` on the open map's
- * entry in it.
+ * (browser: Export). `rename`, `duplicate` and `recover` are the Project panel's per-map items (desktop); `gameLink`
+ * is File › Game link…. `projectSettings` opens Project settings on the project's page, `mapSettings` on the open
+ * map's entry in it.
  */
 export type Dialog =
   | "new"
@@ -110,7 +110,6 @@ export type Dialog =
   | "settings"
   | "projectSettings"
   | "mapSettings"
-  | "maps"
   | "gameLink"
   | "newProject"
   | "replacePublished"
@@ -118,6 +117,7 @@ export type Dialog =
   | "newDraft"
   | "importClash"
   | "recover"
+export type LeftTab = "pieces" | "project"
 export type SettingsCategory = "general" | "editor" | "camera" | "keybinds" | "appearance" | "lighting" | "game"
 
 const HISTORY_LIMIT = 200
@@ -238,6 +238,8 @@ export interface EditorState {
   readonly tool: Tool
   /** Whether the gizmo follows the selected item's axes or the world's. */
   readonly gizmoSpace: GizmoSpace
+  /** The left dock's tab: the piece palette, or the project's maps (docs/PROJECTS.md § Shell). */
+  readonly leftTab: LeftTab
   /** The open modal dialog; editor keybinds are suspended while one is open. */
   readonly dialog: Dialog | null
   /**
@@ -372,6 +374,7 @@ export interface EditorState {
   readonly select: (ids: Selection) => void
   readonly setTool: (tool: Tool) => void
   readonly toggleGizmoSpace: () => void
+  readonly setLeftTab: (tab: LeftTab) => void
   readonly openDialog: (dialog: Dialog, category?: SettingsCategory) => void
   readonly closeDialog: () => void
   /** Opens the `saveAs` dialog to name the map, with what to do once it is saved. */
@@ -500,6 +503,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     selectedIds: [],
     tool: "translate",
     gizmoSpace: "world",
+    leftTab: "pieces",
     dialog: null,
     afterSave: null,
     settingsCategory: "general",
@@ -745,6 +749,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       }),
     setTool: (tool) => set({ tool }),
     toggleGizmoSpace: () => set((s) => ({ gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
+    setLeftTab: (leftTab) => set({ leftTab }),
     openDialog: (dialog, category) =>
       set((s) => ({
         dialog,
