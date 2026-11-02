@@ -175,7 +175,7 @@
         },
         {
           "label": "Look",
-          "action": "IA_Camera",
+          "action": "IA_CameraMouse",
           "key": "Mouse2D",
           "context": "IMC_FreeCam",
           "mappingName": "LookMNK"
@@ -235,6 +235,13 @@
           "key": "T",
           "context": "IMC_GhostPOV",
           "mappingName": "POV_CameraMode_Keyboard"
+        },
+        {
+          "label": "Show/Hide Overlay",
+          "action": "IA_POV_ToggleOverlay",
+          "key": "H",
+          "context": "IMC_GhostPOV",
+          "mappingName": "POV_ToggleOverlay_Keyboard"
         }
       ]
     },
@@ -435,6 +442,13 @@
           "key": "Gamepad_FaceButton_Top",
           "context": "IMC_GhostPOV",
           "mappingName": "POV_CameraMode_Controller"
+        },
+        {
+          "label": "Show/Hide Overlay",
+          "action": "IA_POV_ToggleOverlay",
+          "key": "Gamepad_LeftThumbstick",
+          "context": "IMC_GhostPOV",
+          "mappingName": "POV_ToggleOverlay_Controller"
         }
       ]
     }
@@ -597,7 +611,8 @@
           "modifiers": [
             "BallestInputModifierStickDeadzone",
             "InputModifierScalar",
-            "BallestInputModifierLookSensitivity"
+            "BallestInputModifierLookSensitivity",
+            "BallestInputModifierControllerLookRate"
           ],
           "triggers": [],
           "modifierSettings": [
@@ -620,6 +635,10 @@
               "type": "BallestInputModifierLookSensitivity",
               "settings": null,
               "error": "Could not read \"BallestInputModifierLookSensitivity\" named \"UserLook_Gamepad_Right2D\" correctly | ParserException: Missing prop mappings for type BallestInputModifierLookSensitivity"
+            },
+            {
+              "type": "BallestInputModifierControllerLookRate",
+              "settings": {}
             }
           ],
           "triggerSettings": [],
@@ -1271,11 +1290,12 @@
           "section": "gamepad free camera"
         },
         {
-          "action": "IA_Camera",
+          "action": "IA_CameraMouse",
           "key": "Mouse2D",
           "modifiers": [
             "InputModifierNegate",
-            "InputModifierScalar"
+            "InputModifierScalar",
+            "BallestInputModifierLookSensitivity"
           ],
           "triggers": [],
           "modifierSettings": [
@@ -1296,6 +1316,10 @@
                   "Z": 1
                 }
               }
+            },
+            {
+              "type": "BallestInputModifierLookSensitivity",
+              "settings": {}
             }
           ],
           "triggerSettings": [],
@@ -1312,7 +1336,8 @@
           "key": "Gamepad_Right2D",
           "modifiers": [
             "InputModifierDeadZone",
-            "InputModifierScalar"
+            "InputModifierScalar",
+            "BallestInputModifierControllerLookRate"
           ],
           "triggers": [],
           "modifierSettings": [
@@ -1333,6 +1358,10 @@
                   "Z": 0.6
                 }
               }
+            },
+            {
+              "type": "BallestInputModifierControllerLookRate",
+              "settings": {}
             }
           ],
           "triggerSettings": [],
@@ -1729,6 +1758,36 @@
           },
           "label": "Replay Camera Mode",
           "section": "gamepad free camera"
+        },
+        {
+          "action": "IA_POV_ToggleOverlay",
+          "key": "H",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "POV_ToggleOverlay_Keyboard",
+            "displayName": "Show/Hide Overlay",
+            "category": "SpectatorMNK"
+          },
+          "label": "Show/Hide Overlay",
+          "section": "mouse and keyboard free camera"
+        },
+        {
+          "action": "IA_POV_ToggleOverlay",
+          "key": "Gamepad_LeftThumbstick",
+          "modifiers": [],
+          "triggers": [],
+          "modifierSettings": [],
+          "triggerSettings": [],
+          "mappable": {
+            "name": "POV_ToggleOverlay_Controller",
+            "displayName": "Show/Hide Overlay",
+            "category": "SpectatorController"
+          },
+          "label": "Show/Hide Overlay",
+          "section": "gamepad free camera"
         }
       ]
     },
@@ -2003,8 +2062,28 @@
       ],
       "label": "Look",
       "sections": [
-        "mouse and keyboard free camera",
         "gamepad free camera"
+      ],
+      "section": "gamepad free camera"
+    },
+    {
+      "name": "IA_CameraMouse",
+      "path": "/Game/Core/Input/FreeCanActions/IA_CameraMouse",
+      "valueType": "Axis2D",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": false,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Look"
+      ],
+      "label": "Look",
+      "sections": [
+        "mouse and keyboard free camera"
       ],
       "section": "mouse and keyboard free camera"
     },
@@ -2452,6 +2531,28 @@
         "Replay forward 5 seconds"
       ],
       "label": "Replay forward 5 seconds",
+      "sections": [
+        "mouse and keyboard free camera",
+        "gamepad free camera"
+      ],
+      "section": "mouse and keyboard free camera"
+    },
+    {
+      "name": "IA_POV_ToggleOverlay",
+      "path": "/Game/Core/Input/Actions/IA_POV_ToggleOverlay",
+      "valueType": "Boolean",
+      "description": null,
+      "consumeInput": true,
+      "triggerWhenPaused": true,
+      "accumulationBehavior": "TakeHighestAbsoluteValue",
+      "modifiers": [],
+      "triggers": [],
+      "modifierSettings": [],
+      "triggerSettings": [],
+      "labels": [
+        "Show/Hide Overlay"
+      ],
+      "label": "Show/Hide Overlay",
       "sections": [
         "mouse and keyboard free camera",
         "gamepad free camera"

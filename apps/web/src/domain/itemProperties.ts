@@ -7,6 +7,8 @@
 import { Option, Predicate } from "effect"
 import type { CatalogPiece } from "./Catalog"
 import type { Item, PropertyList } from "./MapFile"
+import { MIRROR_X, MIRROR_Y } from "./mirror"
+import { SURFACE_PROPERTY } from "./surface"
 
 /** A property as the inspector shows it, across one or more items. */
 export interface ItemProperty {
@@ -20,34 +22,50 @@ export interface ItemProperty {
   readonly default: unknown
   /** Left out of the game's own property panel (the decal's size follows its scale there). */
   readonly hidden: boolean
-  /** Labels by value for an integer the game edits as a dropdown; undefined for a plain number. */
-  readonly options: ReadonlyArray<string> | undefined
+  /** Labels by value for an integer the game edits as a dropdown (null: not a choice); undefined for a plain number. */
+  readonly options: Options | undefined
+  /** A native property the game loads the item without (catalog `optional`): new items leave it out. */
+  readonly optional?: boolean
 }
+
+/** Dropdown labels by value; null where a value isn't one of the game's choices. */
+export type Options = ReadonlyArray<string | null>
 
 /**
  * Dropdown labels for integer properties, by class and property name. None of them are in the
- * game data, so they come from in-game probe maps (build 0.4.0-playtest): the decal style
- * names are the game's own dropdown labels; the shape decal's shape and fill are sliders in
- * game, named here after what each value draws. Larger values draw the last option.
+ * game data, so they come from in-game probe maps: the decal style names (0.4.0-playtest) are
+ * the game's own dropdown labels; the shape decal's shape and fill are sliders in game, named
+ * here after what each value draws; the elevator's speeds (0.4.1) are its dropdown's labels for
+ * the values it saved. Larger values draw the last option.
  */
-const PROPERTY_OPTIONS: Readonly<Record<string, Readonly<Record<string, ReadonlyArray<string>>>>> = {
+const PROPERTY_OPTIONS: Readonly<Record<string, Readonly<Record<string, Options>>>> = {
   BP_UGCCircuitDecal: { DecalStyle: ["Arrow", "Scratch Marks", "Stripes"] },
   BP_UGCShapeDecal: {
     DecalShapeType: ["Square", "Circle", "Hexagon", "Parallelogram", "Triangle"],
     DecalFillType: ["Filled", "Outline"]
-  }
+  },
+  BP_Elevator: { PhysicsElevatorSpeedTier: [null, "Slow", "Normal", "Fast"] }
+}
+
+/** Dropdowns every class shares: the item surface (0.4.1; values from the probe, names from materials.json). */
+const SHARED_OPTIONS: Readonly<Record<string, Options>> = {
+  [SURFACE_PROPERTY]: ["None", "Magnet", "Ice", "Grippy"]
 }
 
 /** The label for an option value: the game draws values past the end as the last option. */
-export const optionLabel = (options: ReadonlyArray<string>, value: number): string => {
+export const optionLabel = (options: Options, value: number): string => {
   const label = options[value]
-  if (label !== undefined) return label
+  if (typeof label === "string") return label
   const last = options.at(-1)
-  return value > 0 && last !== undefined ? `${value} (draws as ${last})` : `${value} (unknown)`
+  return label === undefined && value > 0 && typeof last === "string"
+    ? `${value} (draws as ${last})`
+    : `${value} (unknown)`
 }
 
 const optionsOf = (piece: CatalogPiece | undefined, list: PropertyList, name: string) =>
-  list === "intProperties" && piece !== undefined ? PROPERTY_OPTIONS[piece.className]?.[name] : undefined
+  list !== "intProperties"
+    ? undefined
+    : (piece === undefined ? undefined : PROPERTY_OPTIONS[piece.className]?.[name]) ?? SHARED_OPTIONS[name]
 
 export const PROPERTY_LISTS: ReadonlyArray<PropertyList> = [
   "boolProperties",
@@ -85,14 +103,18 @@ const knownProperties = (piece: CatalogPiece | undefined) =>
         type: p.type,
         default: p.default,
         hidden: p.hidden === true,
-        options: optionsOf(piece, p.list, p.name)
+        options: optionsOf(piece, p.list, p.name),
+        optional: p.optional === true
       }]
       : []
   )
 
-/** The property lists a freshly placed piece carries: every exposed property at its default, as the game saves them. */
+/**
+ * The property lists a freshly placed piece carries: every exposed property at its default, as
+ * the game saves them. Optional ones (native properties not yet seen on the class) are left out.
+ */
 export const defaultProperties = (piece: CatalogPiece): Pick<Item, PropertyList> => {
-  const known = knownProperties(piece)
+  const known = knownProperties(piece).filter((p) => !p.optional)
   const entries = <A>(list: PropertyList, is: (value: unknown) => value is A) =>
     known.flatMap((p) =>
       p.list === list && is(p.default)
@@ -231,6 +253,41 @@ export const propertyRows = (properties: ReadonlyArray<ItemProperty>): ReadonlyA
   })
 }
 
+/** The game's own labels where a name doesn't read as one (its property panel, 0.4.1). */
+const PROPERTY_LABELS: Readonly<Record<string, string>> = {
+  [SURFACE_PROPERTY]: "Surface",
+  [MIRROR_X]: "Mirror X",
+  [MIRROR_Y]: "Mirror Y",
+  PhysicsElevatorExtensionLength: "Travel Height",
+  PhysicsElevatorSpeedTier: "Speed",
+  PhysicsCylinderSpinSpeed: "Spin Speed",
+  PhysicsPaddleSpeedMultiplier: "Paddle Speed",
+  PhysicsVariantCount: "Paddles / Doors"
+}
+
 /** A readable label for a property name: `bFacingOnly` -> `Facing Only`, `DecalWidth` -> `Decal Width`. */
 export const propertyLabel = (name: string): string =>
-  name.replace(/^b(?=[A-Z])/, "").replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+  PROPERTY_LABELS[name] ?? name.replace(/^b(?=[A-Z])/, "").replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+
+/**
+ * Pieces in a map carrying a native property no game save of their class has shown yet
+ * (catalog `optional`), as `Class (Property)`: the game rejects an item with a property its
+ * class doesn't have, and then discards the whole map.
+ */
+export const unconfirmedPropertiesIn = (
+  items: ReadonlyArray<Item>,
+  pieces: ReadonlyArray<CatalogPiece>
+): ReadonlyArray<string> => {
+  const byClass = new Map(pieces.map((p) => [p.classPath, p]))
+  const out = new Set<string>()
+  for (const item of items) {
+    const piece = byClass.get(item.actorToSpawn)
+    const optional = (piece?.properties ?? []).filter((p) => p.optional === true)
+    for (const p of optional) {
+      if (p.list !== null && item[p.list].some((entry) => entry.propertyName === p.name)) {
+        out.add(`${piece?.className} (${propertyLabel(p.name)})`)
+      }
+    }
+  }
+  return [...out]
+}

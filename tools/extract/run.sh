@@ -100,6 +100,8 @@ extract classes --classes "$WORK/classes.txt" --report "$WORK/classes.json" 2>"$
 node "$here/build-catalog.mjs" meshes "$WORK"
 include=(--include-dir Ballest/Content/Maps/_GENERATED/PC)
 ((PIECES_ONLY)) && include=()
+# The level editor's baked mirror meshes: build-catalog pairs them with their sources, then they're dropped.
+include+=(--include-dir Ballest/Content/LevelEditor/Mirror/Meshes)
 log "exporting meshes"
 mkdir -p "$WORK/pieces"
 extract export --meshes "$WORK/meshes.txt" "${include[@]}" --out "$WORK/pieces" --report "$WORK/meshes.json" 2>"$WORK/export.log" || { tail -20 "$WORK/export.log" >&2; exit 1; }
@@ -109,6 +111,7 @@ mkdir -p "$OUT"
 rm -rf "$OUT/pieces"
 cp -r "$WORK/pieces" "$OUT/pieces"
 node "$here/build-catalog.mjs" catalog "$WORK" "$OUT"
+rm -rf "$OUT/pieces/LevelEditor/Mirror"
 
 # 5. Default keybinds (Enhanced Input assets + DefaultInput.ini + level-editor widgets).
 log "dumping input assets"
@@ -122,12 +125,13 @@ node "$here/build-keybinds.mjs" "$WORK/input-dump.json" "$OUT/keybinds.json"
 # All English game strings (Localization/Game/en/Game.locres): { namespace: { key: text } }.
 extract locres --file Ballest/Content/Localization/Game/en/Game.locres --out "$OUT/strings.json" 2>>"$WORK/input.log"
 
-# 6. Materials: every material referenced by samples + catalog + the in-game paint picker, parent chains,
-#    textures -> PNG. The picker's data assets (categories x colours -> material) go into materials.json too.
+# 6. Materials: every material referenced by samples + catalog + the in-game paint picker + the item surfaces,
+#    parent chains, textures -> PNG. The picker's data assets (categories x colours -> material) and the surfaces
+#    (DefaultGame.ini's material overrides) go into materials.json too.
 #    Then the compiled shaders of every loaded material (shader library + dxc) tell how each texture is read.
 log "exporting materials and textures"
 extract dump --prefix Ballest/Content/LevelEditor/PackageAssets/MultiplayerLevelEditor/UI/Data/MaterialSelection \
-  --prefix Ballest/Content/Art/DataAssets/BallestMaterials \
+  --prefix Ballest/Content/Art/DataAssets/BallestMaterials --file Ballest/Config/DefaultGame.ini \
   --out "$WORK/paint-dump.json" 2>"$WORK/paint.log" || { tail -20 "$WORK/paint.log" >&2; exit 1; }
 tsx materials list "$WORK" "$OUT"
 mkdir -p "$WORK/textures"

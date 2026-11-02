@@ -10,6 +10,7 @@ import {
   propertyLabel,
   propertyRows,
   selectionProperties,
+  unconfirmedPropertiesIn,
   validPropertyValue,
   withProperty
 } from "./itemProperties"
@@ -193,6 +194,68 @@ describe("item properties", () => {
     assert.deepStrictEqual(
       rowNames(["Red", "Green", "Blue"].map((c) => property(`Tint${c}`, "intProperties"))),
       ["TintRed", "TintGreen", "TintBlue"]
+    )
+  })
+})
+
+describe("0.4.1 native properties", () => {
+  const elevator = Schema.decodeSync(CatalogPiece)({
+    classPath: "/Script/Engine.BlueprintGeneratedClass'/Game/X/BP_Elevator.BP_Elevator_C'",
+    className: "BP_Elevator",
+    meshAssetPath: null,
+    materialSlots: [],
+    bounds: null,
+    properties: [
+      { name: "bMirror", list: "boolProperties", type: "Bool", default: false, source: "native" },
+      { name: "PhysicsElevatorSpeedTier", list: "intProperties", type: "Integer", default: 1 },
+      { name: "SurfaceAssignment", list: "intProperties", type: "Integer", default: 0, source: "native" }
+    ]
+  })
+  // a class no 0.4.1 save has shown: its native properties are optional
+  const track = Schema.decodeSync(CatalogPiece)({
+    ...elevator,
+    classPath: "/Script/Engine.BlueprintGeneratedClass'/Game/X/BP_Track_Curve1.BP_Track_Curve1_C'",
+    className: "BP_Track_Curve1",
+    properties: [
+      { name: "bMirror", list: "boolProperties", type: "Bool", default: false, optional: true },
+      { name: "SurfaceAssignment", list: "intProperties", type: "Integer", default: 0, optional: true }
+    ]
+  })
+
+  it("writes them on new items where a save showed them, and leaves optional ones out", () => {
+    assert.deepStrictEqual(defaultProperties(elevator).intProperties.map((p) => p.propertyName), [
+      "PhysicsElevatorSpeedTier",
+      "SurfaceAssignment"
+    ])
+    const fresh = defaultProperties(track)
+    assert.deepStrictEqual([...fresh.boolProperties, ...fresh.intProperties], [])
+  })
+
+  it("still lists optional ones, so setting one writes it", () => {
+    const item = itemFromPiece(track, identityTransform())
+    const surface = selectionProperties([{ item, piece: track }]).find((p) => p.name === "SurfaceAssignment")!
+    assert.deepStrictEqual(surface.values, [0])
+    assert.deepStrictEqual(surface.options, ["None", "Magnet", "Ice", "Grippy"])
+    const set = Option.getOrThrow(withProperty(item, surface, 2))
+    assert.deepStrictEqual(set.intProperties, [{
+      currentValue: 2,
+      propertyName: "SurfaceAssignment",
+      propertyType: "Integer"
+    }])
+    // export warns about it until a game save shows the class with one
+    assert.deepStrictEqual(unconfirmedPropertiesIn([item, set], [track, elevator]), ["BP_Track_Curve1 (Surface)"])
+  })
+
+  it("names the elevator's speeds from 1, and the game's labels", () => {
+    const item = itemFromPiece(elevator, identityTransform())
+    const speed = selectionProperties([{ item, piece: elevator }]).find((p) => p.name === "PhysicsElevatorSpeedTier")!
+    assert.deepStrictEqual(speed.options, [null, "Slow", "Normal", "Fast"])
+    assert.strictEqual(optionLabel(speed.options!, 1), "Slow")
+    assert.strictEqual(optionLabel(speed.options!, 0), "0 (unknown)")
+    assert.strictEqual(optionLabel(speed.options!, 4), "4 (draws as Fast)")
+    assert.deepStrictEqual(
+      ["bMirror", "bMirrorX", "SurfaceAssignment", "PhysicsElevatorExtensionLength"].map(propertyLabel),
+      ["Mirror Y", "Mirror X", "Surface", "Travel Height"]
     )
   })
 })

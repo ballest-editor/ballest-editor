@@ -8,6 +8,7 @@
 // WORK/classes.json + meshes.json + thumbs.json (BallestExtract).
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { MIRROR_DIR, pairMirrors } from "./mirrors.mjs"
 
 const [mode, work, assets] = process.argv.slice(2)
 const readJson = (f) => JSON.parse(readFileSync(join(work, f), "utf8"))
@@ -120,9 +121,63 @@ const propertiesOf = (cls, sample) => {
   })
 }
 
+// Item properties 0.4.1's native code saves beside a class's own, from the "new pieces probe" draft saved in game
+// on 2026-11-02 (samples/UserSavedMaps): SurfaceAssignment (Integer: 0 none, 1 magnet, 2 ice, 3 grippy) after the
+// class's own ints on every item, the player start and goal included; Mirror Y and Mirror X as bMirror and bMirrorX
+// after its own bools, except on the player start and checkpoints, and only bMirrorX on a physics prop with its own
+// PhysicsFlip. A class a 0.4.1 save shows keeps exactly the layout the game wrote. On the others these follow the
+// rule above and are `optional`: the game rejects an item carrying a property its class doesn't have, and loads one
+// without them (every 0.4.0 map), so new items leave them out until they're set.
+const NATIVE = {
+  SurfaceAssignment: { list: "intProperties", type: "Integer", default: 0 },
+  bMirror: { list: "boolProperties", type: "Bool", default: false },
+  bMirrorX: { list: "boolProperties", type: "Bool", default: false }
+}
+const CHECKPOINT_BASE = "/Game/Core/Gameplay/MapTriggers/BP_ActualCheckpointBase.BP_ActualCheckpointBase_C"
+// Defaults native code sets over the Blueprint's (the probe's untouched point light: shadows off, 10 m reach).
+const DEFAULT_OVERRIDES = { MP_RawPointLight: { bLightCastsShadows: false, LightAttenuationRadius: 1000 } }
+
+const nativeEntry = (name, optional) => ({
+  name,
+  ...NATIVE[name],
+  ueType: null,
+  hidden: false,
+  source: "native",
+  ...(optional ? { optional: true } : {})
+})
+
+const withNative = (own, className, chain, sample) => {
+  const overrides = DEFAULT_OVERRIDES[className] ?? {}
+  if (sample?.savedBy041) {
+    // The layout a 0.4.1 save shows: its names, lists and order; defaults from the class or the native table.
+    const byName = new Map(own.map((p) => [p.name, p]))
+    return sample.properties.map((p) => {
+      const known = NATIVE[p.name] ? nativeEntry(p.name, false) : byName.get(p.name)
+      const entry = known ?? { name: p.name, ueType: null, default: null, hidden: false, source: "samples" }
+      const agrees = entry.list === p.list && entry.type === p.type
+      return {
+        ...entry,
+        list: p.list,
+        type: p.type,
+        default: p.name in overrides ? overrides[p.name] : agrees ? entry.default : null
+      }
+    })
+  }
+  const mirror = className === "MP_PlayerStart" || chain.includes(CHECKPOINT_BASE)
+    ? []
+    : own.some((p) => p.name === "PhysicsFlip")
+    ? ["bMirrorX"]
+    : ["bMirror", "bMirrorX"]
+  return [
+    ...own.map((p) => (p.name in overrides ? { ...p, default: overrides[p.name] } : p)),
+    ...[...mirror, "SurfaceAssignment"].map((name) => nativeEntry(name, true))
+  ]
+}
+
 const pieces = []
 const unresolved = []
 const registry = JSON.parse(readFileSync(join(assets, "registry.json"), "utf8"))
+const chainOf = new Map(registry.levelEditorItems.map((i) => [i.class, i.parentChain]))
 const thumbs = (() => {
   try {
     return readJson("thumbs.json")
@@ -177,7 +232,7 @@ for (const o of pieceOrder(registry)) {
         bounds: meshes.get(m.staticMesh)?.bounds ?? null
       })),
     sampleProperties: Object.keys(s.propertyNames).sort(),
-    properties: propertiesOf(cls, s)
+    properties: withNative(propertiesOf(cls, s), s.className.replace(/_C$/, ""), chainOf.get(s.objectPath) ?? [], s)
   }
   if (cls?.error) piece.classError = cls.error
   if (!meshAssetPath) {
@@ -187,7 +242,9 @@ for (const o of pieceOrder(registry)) {
     if (!piece.extraMeshes.length) {
       unresolved.push({
         classPath: s.classPath,
-        reason: cls?.error
+        reason: cls?.error?.includes("There is no game file")
+          ? "removed from the game: its Blueprint is no longer in the game's files, so maps using it won't load"
+          : cls?.error
           ? `class: ${cls.error}`
           : "no StaticMeshComponent with a mesh (light/volume/decal-only actor, or visuals created in native code)"
       })
@@ -198,9 +255,18 @@ for (const o of pieceOrder(registry)) {
   pieces.push(piece)
 }
 
+const mirrored = pairMirrors([...meshes.values()], join(work, "pieces"))
+// Materials the game swaps when it mirrors an item, by slot (the probe's spinning cylinder: Mirror X kept its
+// mesh and turned its cap to the flipped one, which shows the spin the other way round).
+const CYLINDER_CAPS = "/Game/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/Materials/Surfaces/SpinningCylinder"
+const MIRROR_MATERIALS = [{
+  material: `${CYLINDER_CAPS}/MI_SpinningCylinderCap_Normal.MI_SpinningCylinderCap_Normal`,
+  mirrored: `${CYLINDER_CAPS}/MI_SpinningCylinderCap_Flipped.MI_SpinningCylinderCap_Flipped`
+}]
+
 const catalog = {
   version: 1,
-  game: "Ballest of Them All 0.4.0-playtest (UE 5.8, ++UE5+Release-5.8-CL-56702186)",
+  game: "Ballest of Them All 0.4.1 (UE 5.8, ++UE5+Release-5.8-CL-56702186)",
   units: "cm",
   coordinateSystem:
     "Unreal native: left-handed, +X forward, +Y right, +Z up. glb files are NOT converted to glTF Y-up.",
@@ -208,8 +274,15 @@ const catalog = {
     "itemTransform in map files is the world transform of the Main component; extraMeshes[].transformRelativeToMain is relative to that.",
   pieces,
   unresolved,
+  mirrors: {
+    note:
+      "Mirror X / Mirror Y (bMirrorX / bMirror) negate the item's local x / y. An item mirrored on one axis saves its mesh as the baked copy here (mirrorMeshAssetPath; axes = the local axis the bake negates, xy for a symmetric source); on both, or on none, the original. Pairs are matched by geometry (tools/extract/mirrors.mjs); the bakes themselves aren't exported. materials: slot materials the game swaps on a mirrored item.",
+    meshes: mirrored.pairs,
+    unpaired: mirrored.unpaired,
+    materials: MIRROR_MATERIALS
+  },
   meshes: [...meshes.values()]
-    .filter((m) => m.glb)
+    .filter((m) => m.glb && !m.meshAssetPath.startsWith(MIRROR_DIR))
     .map((m) => ({
       meshAssetPath: m.meshAssetPath,
       glb: glbPath(m),
@@ -226,5 +299,5 @@ const catalog = {
 }
 writeFileSync(join(assets, "catalog.json"), JSON.stringify(catalog, null, 2) + "\n")
 console.error(
-  `[catalog] ${pieces.length} pieces, ${unresolved.length} unresolved, ${catalog.meshes.length} meshes, ${catalog.meshErrors.length} mesh errors`
+  `[catalog] ${pieces.length} pieces, ${unresolved.length} unresolved, ${catalog.meshes.length} meshes, ${catalog.meshErrors.length} mesh errors, ${mirrored.pairs.length} mirror pairs (${mirrored.unpaired.length} bakes unpaired)`
 )

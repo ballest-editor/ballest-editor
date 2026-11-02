@@ -3,16 +3,16 @@
 This pipeline reads the game's IoStore containers, resolves the level-editor piece Blueprints, and writes:
 
 - `assets/pieces/**.glb`: one file per StaticMesh (LOD0). The path mirrors the UE package path without `/Game/`, so `/Game/Maps/_GENERATED/PC/SM_500.SM_500` becomes `pieces/Maps/_GENERATED/PC/SM_500.glb`, and `/Engine/...` becomes `pieces/_Engine/...`.
-- `assets/catalog.json`: one entry per level-editor item class: the 200 the recipe registry references, which include all 91 classes seen in `samples/`. Every exported mesh is listed too.
+- `assets/catalog.json`: one entry per level-editor item class: the 237 the recipe registry references, plus `MP_PinballPaddle`, which a sample uses but 0.4.1 removed from the game. Together they cover all 102 classes seen in `samples/`. Every exported mesh is listed too.
 - `assets/thumbs/*.png`: the content-browser icons, at most 256 px and about 3 MB. They are committable.
 - `assets/keybinds.json`: the default Enhanced Input bindings, with in-game labels, settings sections and camera presets.
 - `assets/strings.json`: the English locres strings.
 - `assets/registry.json`: the item class hierarchy, the in-game palette, and recipe-registry references (which pieces exist).
-- `assets/materials.json` + `assets/textures/**.png`: material parameters, plus how each texture is read (UV or object/world projection, scale, layers), traced through the game's compiled shaders (the textures are gitignored, about 142 MB).
+- `assets/materials.json` + `assets/textures/**.png`: material parameters, plus how each texture is read (UV or object/world projection, scale, layers), traced through the game's compiled shaders, the Paint picker and the item surfaces (the textures are gitignored, about 180 MB).
 
-The current output has 200 pieces and 5 unresolved. 195 meshes were exported with 0 failures. That covers the 157 meshes referenced by the pieces, including their extra components, plus everything else in `/Game/Maps/_GENERATED/PC`. All files pass the Khronos glTF validator with no errors or warnings.
+The current output (game 0.4.1) has 238 pieces and 6 unresolved. 230 meshes were exported with 0 failures. That covers the 192 meshes referenced by the pieces, including their extra components, plus everything else in `/Game/Maps/_GENERATED/PC`. The 0.4.0 export passed the Khronos glTF validator with no errors or warnings; the writer hasn't changed since.
 
-`assets/pieces/` is about 86 MB, so it is listed in `.gitignore`. Of that, 34 MB is `/Game/Maps/_GENERATED/PC/Box`, a 1.2M-triangle mesh that no piece uses. The glbs referenced by the catalog total about 49 MB.
+`assets/pieces/` is about 96 MB, so it is listed in `.gitignore`. Of that, 33 MB is `/Game/Maps/_GENERATED/PC/Box`, a 1.2M-triangle mesh that no piece uses. The glbs referenced by the catalog total about 59 MB.
 
 ## Running it
 
@@ -110,6 +110,8 @@ The top level is an object, not a bare array:
 ```
 { version, game, units: "cm", coordinateSystem, transformNote,
   pieces: [Piece], unresolved: [{classPath, meshAssetPath?, reason}],
+  mirrors: { note, meshes: [{meshAssetPath, mirrorMeshAssetPath, axes}], unpaired: [path],
+             materials: [{material, mirrored}] },                          // 0.4.1 Mirror X / Y, see below
   meshes: [{meshAssetPath, glb, vertices, triangles, bounds, materialSlots}],   // every exported mesh
   meshErrors: [] }
 
@@ -134,35 +136,42 @@ Piece = {
   extraMeshes: [{ name, meshAssetPath, glb, visible, hiddenInGame,
                   transformRelativeToMain: {location, quat, scale}, materialSlots, bounds }]
   sampleProperties     // "propertyName:type" pairs seen in samples
-  properties: [{ name, list, type, ueType, default, hidden, source }]
+  properties: [{ name, list, type, ueType, default, hidden, source, optional? }]
                        // the CDO's LevelEditorExposedProperties, in order: list/type are where and how
                        // map files store it ("floatProperties"/"Float", "intProperties"/"Integer",
                        // "boolProperties"/"Bool"; null for other Blueprint types), default is the CDO
                        // value (0/false when unversioned serialization omitted it), hidden = listed in
-                       // LevelEditorHiddenProperties (left out of the in-game property panel)
+                       // LevelEditorHiddenProperties (left out of the in-game property panel); then the
+                       // native ones 0.4.1 adds (source "native": SurfaceAssignment, bMirror, bMirrorX),
+                       // optional where no 0.4.1 save of the class has shown them
 }
 ```
 
-**`properties`:** where the CDO lists `LevelEditorExposedProperties` (the air vent, the circuit decal, five light classes) they come from there (`source: "cdo"`). Some classes expose properties from native code instead (the shape decal, the light cards): for those the names, lists and order are the ones the game wrote into the samples, and the defaults are the Blueprint variables' CDO values (`source: "samples"`; the class's `variables` in `classes.json`). Every sample item's properties match these names, lists and order, and unedited sample items carry exactly these defaults.
+**`properties`:** where the CDO lists `LevelEditorExposedProperties` (the air vent, the circuit decal, five light classes, and 0.4.1's elevator, spinning cylinder, paddle and spinning paddles) they come from there (`source: "cdo"`). Some classes expose properties from native code instead (the shape decal, the light cards): for those the names, lists and order are the ones the game wrote into the samples, and the defaults are the Blueprint variables' CDO values (`source: "samples"`; the class's `variables` in `classes.json`). Every sample item's properties match these names, lists and order, and unedited sample items carry exactly these defaults.
 
-**Piece order:** palette order first, category by category, following `DT_MapItems` rows and the items within each. Then the 100 registry-only ("hidden") items, alphabetically.
+**Native properties (0.4.1).** The game saves an item surface (`SurfaceAssignment`) on every item and the Mirror Y / X flags (`bMirror`, `bMirrorX`) on most, from native code (docs/FORMAT.md, "0.4.1"). `scan-samples.mjs` records each class's property layout from a 0.4.1 save when the samples have one (`savedBy041`: the item carries `SurfaceAssignment`), and `build-catalog.mjs` (`withNative`) keeps that layout exactly. Every other class gets the native properties by rule, marked `optional`. `DEFAULT_OVERRIDES` holds defaults the native code sets over the Blueprint's (the point light's shadows off and its 1000 cm attenuation radius).
 
-The pieces are the classes referenced by `DA_UGCPlaybackRecipeRegistry`. Every one of them descends from `BP_BaseItem`. The one item class missing from the registry, `BP_TwoCubeTwoColor_2`, is left out, and so are non-item classes such as `BP_KillZone`.
+**Mirrors (`mirrors`).** `run.sh` also exports `/Game/LevelEditor/Mirror/Meshes` (the game's 193 baked mirror meshes). `mirrors.mjs` pairs each with its source by geometry: the same triangle count, bounds mirrored in local x or y, and the same distinct vertex positions with that axis negated (allowing 0.5%, since the bake welds a little differently); where several sources share a shape, the one whose vertex count and slot names also match the bake wins. That pairs 186 one to one; the 7 left mirror meshes nothing exports (`SM_Paddle_Flipped`, for one). The bakes are then dropped from `assets/pieces/`: the editor draws a mirrored item as its source scaled by -1, and only needs the pairs to write the path the game saves. `materials` is the one slot swap the probe showed (the spinning cylinder's cap).
 
-**`unresolved` (5):** classes with no mesh in any StaticMeshComponent:
+**Piece order:** palette order first, category by category, following `DT_MapItems` rows and the items within each. Then the 97 registry-only ("hidden") items, alphabetically, then sampled classes that are in neither (`MP_PinballPaddle`).
+
+The pieces are the classes referenced by `DA_UGCPlaybackRecipeRegistry`. Every one of them descends from `BP_BaseItem`. The one item class missing from the registry, `BP_TwoCubeTwoColor_2`, is left out, and so are non-item classes such as `BP_KillZone`. (Its name-map entry, `.../BP_TwoCubeTwoColor`, is also the real `BP_TwoCubeTwoColor`'s, so whether the registry means `_2` too can't be told; see registry.json.)
+
+**`unresolved` (6):** classes with no mesh in any StaticMeshComponent, or no class at all:
 
 - `BP_ActualCheckpointBase` and `BP_PhysicsPropBase`: abstract bases; their subclasses are pieces.
 - `BaseSplineActor` and `BaseSplineActor2`: the geometry is generated at runtime.
 - `MP_CheckpointStrip`
+- `MP_PinballPaddle`: 0.4.1 moved its Blueprint to `/Game/Uncooked/PhysicsProps/OLDORREMOVED`, so it is no longer in the pak ("removed from the game"). `BP_PhysicsPaddle` replaces it.
 
-All five are registry-only.
+All six are hidden (not in the palette).
 
 Nine pieces have a meshless `Main` and are drawn only from `extraMeshes`:
 
 - `MP_AirVent`, `BP_AirVent`
 - `MP_ActualCheckpoint_Strip`, `MP_ActualCheckpoint_Disc`
 - `BP_UGCCircuitDecal`, `BP_UGCShapeDecal`
-- `BP_CircularFlexiblePlatform`, `MP_OrangeSign`, `MP_PinballPaddle`
+- `BP_CircularFlexiblePlatform`, `MP_OrangeSign`, `MP_MoveableKillzone`
 
 In each glb, `materials[i]` is UE material slot `i`. The material is named `"<i>:<slotName>"` and carries `extras.ueMaterial`. Each section is one primitive with `material` set to the UE section's material index, also stored in `extras.ueMaterialIndex`. The materials themselves are flat placeholders, because no textures or material graphs are extracted.
 
@@ -249,15 +258,16 @@ Output shape:
 
 ## materials.json and textures
 
-`run.sh` collects material paths from two sources:
+`run.sh` collects material paths from these sources:
 
 - all sample `materials[].material` entries
 - every `defaultMaterial`/`meshMaterial` in `catalog.json`, including `extraMeshes`
 - every material the in-game Paint picker offers (see below)
+- every item surface's material (see below)
 
-That gives 122 paths now that the catalog covers all 200 pieces. `BallestExtract materials` follows each one's `Parent` chain up to the root `UMaterial` and dumps every asset in the chain. It also decodes every texture those assets reference: 55 textures, written as PNG to `assets/textures/` mirroring the UE path. Each PNG is the largest mip at or below `--tex-max`, which defaults to 2048 px. Textures with no mip that small (single-mip UI textures, for example) are resized with ImageSharp.
+That gives 135 paths. `BallestExtract materials` follows each one's `Parent` chain up to the root `UMaterial` and dumps every asset in the chain. It also decodes every texture those assets reference: 83 of 85, written as PNG to `assets/textures/` mirroring the UE path. Each PNG is the largest mip at or below `--tex-max`, which defaults to 2048 px. Textures with no mip that small (single-mip UI textures, for example) are resized with ImageSharp. The two left out are not failures, and `verify.mjs` accepts them: `M_PaddleBase` names a Quixel Bridge `FlatNormal` default the game never cooked, and `M_PanelTrim_Shared`'s `T_SharedIslandData` is float data (`PF_A32B32G32R32F`, values −4638 to 323503), not an image, so it is recorded as `skipped`.
 
-The textures total about 142 MB, so `assets/textures/` is gitignored.
+The textures total about 180 MB, so `assets/textures/` is gitignored.
 
 Decoding uses CUE4Parse-Conversion's managed AssetRipper BCn decoder (`TextureDecoder.UseAssetRipperTextureDecoder = true`), and the PNGs are written with ImageSharp. Neither SkiaSharp nor any native library is needed, so the flake doesn't add one.
 
@@ -299,7 +309,7 @@ If the root's BaseColor pin isn't connected but EmissiveColor is (`M_Emissive_Li
 
 **Results:**
 
-- 116 materials, 111 recovered, 35 with textures.
+- 135 materials, 129 recovered, 81 with a base colour or normal texture.
 - Every instance chain resolves.
 - Old map files reference `/Game/Art/Materials/Masters/M_BaseSurface_Metal`, which no longer exists. The extractor applies `DefaultEngine.ini`'s `+PackageRedirects` and reports the new path as `redirectedTo`.
 - **Not recovered (5):**
@@ -316,6 +326,8 @@ If the root's BaseColor pin isn't connected but EmissiveColor is (`M_Emissive_Li
 - Category and colour names are the enums' display names. The `*_Dark` materials are listed as "Black". `MaterialName` says "emmissive", so the extractor uses the enum's name instead.
 
 `run.sh` dumps both directories to `paint-dump.json`. `build-materials.mjs` adds the picker's materials to the list and writes `paint: [{ name, colors: [{ color, material, displayColor? }] }]`, with `material` class-qualified the way map files store it. That's 7 finishes and 66 materials: smooth, rough, glossy, concrete, tiled and emissive in 10 colours each (White, Black, Red, Orange, Yellow, Lime, Blue, SkyBlue, Purple, Wine), and special in 5 (Aluminum, Copper, Iron, Concrete, Grey = `MI_Pipes`). The swatches' preview textures (`ColorPreviewTextureMap`) are empty in the cooked assets.
+
+**Item surfaces (`surfaces`).** 0.4.1 added physics surfaces that the level editor assigns per item (`EBallestSurfaceAssignment`; console `ballest.editor.surface [none|magnet|ice|grippy]`; the enum's `Grass` and `GrippyCards` are "not included in cooked builds"). Each one draws with a material from the native `UBallestSurfaceMaterialSettings`. Its defaults are compiled into the exe, so `src/materials.ts` (`SURFACES`) lists them: magnet `MI_MagnetMachined_PanelTrim`, ice `MI_Surface_Ice`, grippy `MI_Surface_Grippy`. `run.sh` adds `DefaultGame.ini` to the paint dump, and its `[/Script/Ballest.BallestSurfaceMaterialSettings]` overrides apply; 0.4.1 sets `MagnetMaterial` to `MI_MagnetPearlescentNatural_Prototype`. `materials.json` lists `surfaces: [{ name, material }]` in the game's order (none, magnet, ice, grippy), with `material` as an object path, or null for none. How a map file stores an item's surface is not known yet (see `docs/FORMAT.md`).
 
 **Usmap patches (`Program.cs`):** found by diffing against the 5.8.0-release headers.
 
@@ -342,23 +354,24 @@ The name map matters because soft references (`TSoftClassPtr`, `FSoftObjectPath`
 
 `build-registry.mjs` combines that with a property dump of the content-browser data:
 
-- **`levelEditorItems`:** 201 Blueprint classes whose parent chain reaches `BP_BaseItem`. The native root is `/Script/SKGGizmo.SKGMLEEditorItem`. For each one it gives:
+- **`levelEditorItems`:** 238 Blueprint classes whose parent chain reaches `BP_BaseItem`. The native root is `/Script/SKGGizmo.SKGMLEEditorItem`. For each one it gives:
   - the parent chain
   - `inPalette`
   - `inRecipeRegistry`
   - `seenInSamples`
   - `referencedBy` (other packages, such as cooked maps, that reference it)
 - **`palette`:** what the in-game item browser shows: `UI/Data/ContentBrowser/DT_MapItems`, a DataTable of `S_ItemData {Category, DataAsset}`. Each row points to a `PDA_MapItem` data asset with `Items[] {Name, Thumbnail, Class}`. Both are Blueprint-defined, so they parse fully.
-  - 11 categories, 100 items: Ramps 30, Tracks 32, Pipes 8, Props 5, Scenery 1, Misc 4, Shapes 5, Special 5, Bowls 7, Objectives 2, Decals 1.
+  - 14 categories, 140 items: Ramps 30, Tracks 32, Pipes 8, Props 5, Scenery 1, Misc 4, Shapes 14, Special 8, Bowls 7, Objectives 3, Decals 1, Tubes 19, Lights 7, Hazards 1 (0.4.1 added Tubes, Lights and Hazards, the GlossyRed shapes, and the elevator, spinning cylinder and paddle under Special; it moved the lights, light cards, laser and checkpoint disc into the palette, and replaced `BP_Prim_Sphere` with the GlossyRed spheres).
   - No `PDA_MapItem` asset exists outside the table.
-  - All 91 sampled classes are in the palette except `MP_PlayerStart`, which isn't in the palette (it is required in every map).
-- **`recipeRegistry`:** `/Game/LevelEditor/Playback/DA_UGCPlaybackRecipeRegistry` is a native `BallestUGCPlaybackRecipeRegistry`. Its properties fail with `Missing prop mappings for type BallestUGCPlaybackRecipeRegistry`, so the per-class recipe data can't be read. Its name map still lists the classes it references: 200 of the 201 items. The one it lacks is `ExampleObjects/RandomObjects/BP_TwoCubeTwoColor_2`.
+  - `MP_PlayerStart` isn't in the palette (it is required in every map). The other sampled classes outside it are the probe maps' hidden pieces, `BP_Prim_Sphere` and the removed `MP_PinballPaddle`.
+- **`recipeRegistry`:** `/Game/LevelEditor/Playback/DA_UGCPlaybackRecipeRegistry` is a native `BallestUGCPlaybackRecipeRegistry`. Its properties fail with `Missing prop mappings for type BallestUGCPlaybackRecipeRegistry`, so the per-class recipe data can't be read. Its name map still lists the classes it references: 237 of the 238 items. The one it lacks is `ExampleObjects/RandomObjects/BP_TwoCubeTwoColor_2`. A name map holds an FName's string without its number, so a soft reference to `.../BP_GlossyRed_Tube_Bend_25` is stored as `.../BP_GlossyRed_Tube_Bend` (number 26); `build-registry.mjs` matches such a base name to the numbered package, unless a package of the base name exists too (as `BP_TwoCubeTwoColor` does).
 - **`candidates`:** the classes the coordinator asked about, each with in-registry, in-palette, is-item and parent chain.
 
-**"Hidden" pieces:** 100 item classes are in the recipe registry but not in the palette. Examples:
+**"Hidden" pieces:** 97 item classes are in the recipe registry but not in the palette. Examples:
 
-- the lights: `MP_Raw*Light`, `MP_*LightFixture`, `MP_LightCard_01..04`
-- boosters, pinball parts, `BP_CircularFlexiblePlatform`, `BP_UGCShapeDecal`, `MP_CheckpointStrip`, `MP_ActualCheckpoint_Disc`
+- the light fixtures `MP_*LightFixture` (the raw lights and light cards are in the Lights category since 0.4.1)
+- boosters, `MP_PinballLauncher`, `BP_CircularFlexiblePlatform`, `BP_UGCShapeDecal`, `MP_CheckpointStrip`
+- 0.4.1's `BP_SpinningPaddles`, `BP_Surface_Grippy/Ice/Magnet` (plain cubes), `MP_MoveableKillzone`, `MP_SlipPlatform`, and `BP_Prim_Sphere`
 - `BP_Bowl_Shallow`, `MP_Airvents`
 - several `Bevel_*` pieces
 

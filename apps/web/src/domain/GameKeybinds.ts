@@ -209,6 +209,7 @@ const GAME_ACTIONS: Readonly<Record<string, Resolver>> = {
   cameraspeedfaster: fixed("speedFaster"),
   cameraspeedslower: fixed("speedSlower"),
   camera: mouseButtonOnly("look"), // Mouse2D in game; the browser needs a held button
+  cameramouse: mouseButtonOnly("look"), // 0.4.1 moved the free camera's Mouse2D from IA_Camera to IA_CameraMouse
   look: lookResolver,
   // IA_CenterCamera (C) is left out: the level editor's C switches local / world axes.
   // IMC_Universal

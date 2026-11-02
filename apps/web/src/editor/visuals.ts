@@ -5,6 +5,8 @@
 import { type CatalogIndex, type MeshInfo, slotDefaultsOf, visibleExtras } from "../domain/Catalog"
 import { type Tuple3, type Tuple4, ueToScene } from "../domain/coords"
 import type { Item } from "../domain/MapFile"
+import { sourceMeshOf } from "../domain/mirror"
+import { surfaceMaterialOf, type Surfaces } from "../domain/surface"
 import { assetUrl } from "./assetUrl"
 
 /** URL of a catalog glb (`pieces/...`); undefined when there is none. */
@@ -19,17 +21,25 @@ export interface Visual {
   readonly relative?: { readonly position: Tuple3; readonly quaternion: Tuple4; readonly scale: Tuple3 }
 }
 
-/** An item's own mesh components, plus the class's visible extra meshes. */
-export const visualsOf = (item: Item, index: CatalogIndex | null): ReadonlyArray<Visual> => {
+/**
+ * An item's own mesh components, plus the class's visible extra meshes. A baked mirror mesh
+ * draws as its source (ItemObject applies the mirroring); an item with a surface draws every
+ * slot with the surface's material, like the game.
+ */
+export const visualsOf = (item: Item, index: CatalogIndex | null, surfaces: Surfaces = []): ReadonlyArray<Visual> => {
   const visuals: Array<Visual> = []
+  const surface = surfaceMaterialOf(item, surfaces)
+  const withSurface = (slots: ReadonlyArray<string | undefined>) =>
+    surface === undefined ? slots : Array.from({ length: Math.max(slots.length, 1) }, () => surface)
   item.meshComponents.forEach((mc, i) => {
-    const path = mc.meshAssetPath
-    if (path === undefined || path.length === 0) return
+    const saved = mc.meshAssetPath
+    if (saved === undefined || saved.length === 0) return
+    const path = sourceMeshOf(index, saved)
     const mesh = index?.meshes.get(path) ?? { meshAssetPath: path, glb: undefined, bounds: undefined, slotDefaults: [] }
     // The item's own materials win; slots it doesn't set use the catalog defaults.
     const slotMaterials = [...mesh.slotDefaults]
     for (const m of mc.materials) slotMaterials[m.materialIndex] = m.material
-    visuals.push({ key: `m${i}`, mesh, slotMaterials })
+    visuals.push({ key: `m${i}`, mesh, slotMaterials: withSurface(slotMaterials) })
   })
   visibleExtras(index?.pieceByClass.get(item.actorToSpawn)).forEach((extra, i) => {
     const t = extra.transformRelativeToMain
@@ -48,7 +58,12 @@ export const visualsOf = (item: Item, index: CatalogIndex | null): ReadonlyArray
     // The component's own slot materials: the same engine cube is the vent's air beam and the
     // checkpoint's glow panel, so the mesh-level defaults (first piece to use it) are not enough.
     const own = slotDefaultsOf(extra.materialSlots)
-    visuals.push({ key: `x${i}`, mesh, slotMaterials: own.length > 0 ? own : mesh.slotDefaults, relative: rel })
+    visuals.push({
+      key: `x${i}`,
+      mesh,
+      slotMaterials: withSurface(own.length > 0 ? own : mesh.slotDefaults),
+      relative: rel
+    })
   })
   return visuals
 }

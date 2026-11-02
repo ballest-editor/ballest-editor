@@ -1,16 +1,16 @@
 # tools/compress: the extractor's meshes and textures, ready to serve
 
-`tools/extract/` writes the raw game data to `assets/`. Its small files (catalog, materials, keybinds, strings, registry, thumbs) are committed and the editor serves them itself at `/assets/*`. Its meshes (`assets/pieces/`, 89 MB) and textures (`assets/textures/`, 148 MB) are gitignored. This step compresses those two into `web-assets/` (about 53 MB, also gitignored), and `publish.mjs` publishes that as the **asset pack**: a tarball on a GitHub release, which machines without the game download instead.
+`tools/extract/` writes the raw game data to `assets/`. Its small files (catalog, materials, keybinds, strings, registry, thumbs) are committed and the editor serves them itself at `/assets/*`. Its meshes (`assets/pieces/`, 96 MB) and textures (`assets/textures/`, 173 MB) are gitignored. This step compresses those two into `web-assets/` (about 61 MB, also gitignored), and `publish.mjs` publishes that as the **asset pack**: a tarball on a GitHub release, which machines without the game download instead.
 
 ```sh
 pnpm assets           # compress.mjs assets web-assets, then download.mjs
 pnpm assets:publish   # publish.mjs web-assets tools/compress/web-assets.json  (needs `gh`, logged in)
 ```
 
-| `assets/`         | `web-assets/`                            | size (Oct 2026) |
+| `assets/`         | `web-assets/`                            | size (Nov 2026) |
 | ----------------- | ---------------------------------------- | --------------- |
-| `pieces/**.glb`   | same names, meshopt-compressed, lossless | 89 → 24 MB      |
-| `textures/**.png` | `.avif`, 4:4:4, quality 80               | 148 → 29 MB     |
+| `pieces/**.glb`   | same names, meshopt-compressed, lossless | 96 → 25 MB      |
+| `textures/**.png` | `.avif`, 4:4:4, quality 80               | 173 → 36 MB     |
 
 ## Where the editor reads from
 

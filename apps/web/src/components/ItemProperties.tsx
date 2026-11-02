@@ -13,6 +13,7 @@ import {
   type ColorProperty,
   type ItemProperty,
   optionLabel,
+  type Options,
   propertyLabel,
   type PropertyRow,
   propertyRows
@@ -43,12 +44,12 @@ const scrubStep = (reference: number): number => {
 
 /** An integer with labelled values; a value outside them is listed too, with what it draws. */
 function OptionValue(props: {
-  readonly options: ReadonlyArray<string>
+  readonly options: Options
   readonly value: unknown
   readonly onChange: (value: number) => void
 }) {
   const current = typeof props.value === "number" ? props.value : null
-  const labels = new Map(props.options.map((label, i) => [String(i), label]))
+  const labels = new Map(props.options.flatMap((label, i) => (label === null ? [] : [[String(i), label] as const])))
   if (current !== null && !labels.has(String(current))) labels.set(String(current), optionLabel(props.options, current))
   return (
     <Select
@@ -229,7 +230,10 @@ function PropertyRowView({ row }: { readonly row: PropertyRow }) {
         `${property.name} (${property.type})`,
         hasDefault
           ? `Default: ${describe(property, property.default)}`
-          : "Not a property the catalog lists for this piece"
+          : "Not a property the catalog lists for this piece",
+        ...(property.optional === true
+          ? ["Not yet seen in a game save of this piece: export warns about items that carry it"]
+          : [])
       ]}
       properties={[property]}
       resetTo={describe(property, property.default)}

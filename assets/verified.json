@@ -1,5 +1,5 @@
 {
-  "note": "Hand-maintained results of loading single-piece probe maps in the in-game level editor (build 0.4.0-playtest). Palette pieces are assumed ok. A rejected item makes the game discard the whole map and start a default one.",
+  "note": "Hand-maintained results of loading single-piece probe maps in the in-game level editor (build 0.4.0-playtest), plus entries `via` the 0.4.1 pak where a patch settles a class without a probe. Palette pieces are assumed ok. A rejected item makes the game discard the whole map and start a default one.",
   "results": {
     "MP_RawPointLight": {
       "status": "ok",
@@ -14,9 +14,10 @@
       "date": "2026-10-26"
     },
     "MP_PinballPaddle": {
-      "status": "ok",
-      "date": "2026-10-26",
-      "note": "mesh-less piece; written with meshAssetPath \"\" like the air vent"
+      "status": "rejected",
+      "date": "2026-11-02",
+      "note": "0.4.1 moved its Blueprint out of the cooked game (/Game/Uncooked/PhysicsProps/OLDORREMOVED) and the recipe registry; BP_PhysicsPaddle replaces it",
+      "via": "pak"
     },
     "BP_Track_Curve_Tiny1": {
       "status": "ok",
@@ -475,6 +476,12 @@
       "status": "ok",
       "date": "2026-10-26",
       "via": "tools/probe/run.py"
+    },
+    "BP_Prim_Sphere": {
+      "status": "ok",
+      "date": "2026-11-02",
+      "note": "in the palette up to 0.4.0 (in game-saved samples); 0.4.1 replaced it in the palette with the GlossyRed spheres but keeps it in the recipe registry",
+      "via": "pak"
     }
   }
 }

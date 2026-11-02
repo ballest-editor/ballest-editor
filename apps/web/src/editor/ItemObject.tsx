@@ -2,12 +2,21 @@ import { useGLTF } from "@react-three/drei"
 import { Component, memo, type ReactNode, Suspense, useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import { type Bounds, type CatalogIndex, DEFAULT_BOUNDS, type MeshInfo } from "../domain/Catalog"
-import { type Tuple3, UE_TO_THREE_MATRIX, ueBoundsToScene, ueToScene } from "../domain/coords"
+import {
+  fromTuple3,
+  toTuple3,
+  type Tuple3,
+  UE_TO_THREE_MATRIX,
+  ueBoundsToScene,
+  ueToScene,
+  ueToThreeVector
+} from "../domain/coords"
 import type { Item } from "../domain/MapFile"
+import { mirrorScaleOf } from "../domain/mirror"
 import { applySlotMaterials } from "./materials"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
-import { glbUrl, visualsOf } from "./visuals"
+import { glbUrl, type Visual, visualsOf } from "./visuals"
 import { fixSceneWinding } from "./winding"
 
 const ueToThree = new THREE.Matrix4().set(...UE_TO_THREE_MATRIX)
@@ -120,7 +129,13 @@ export const ItemObject = memo(function ItemObjectView(props: {
   const live = useEditor((s) => s.preview?.get(id))
   const itemTransform = live ?? item.itemTransform
   const transform = useMemo(() => ueToScene(itemTransform), [itemTransform])
-  const visuals = useMemo(() => visualsOf(item, index), [item, index])
+  const surfaces = useEditor((s) => s.surfaces)
+  const visuals = useMemo(() => visualsOf(item, index, surfaces), [item, index, surfaces])
+  // Mirror X / Y: the source mesh scaled by -1 along the item's local axes (UE scale in the scene frame).
+  const mirror = useMemo(() => {
+    const scale = mirrorScaleOf(item, index)
+    return scale === undefined ? undefined : toTuple3(ueToThreeVector(fromTuple3(scale)))
+  }, [item, index])
 
   return (
     <group
@@ -130,6 +145,16 @@ export const ItemObject = memo(function ItemObjectView(props: {
       quaternion={transform.quaternion}
       scale={transform.scale}
     >
+      <group {...(mirror === undefined ? {} : { scale: mirror })}>
+        <ItemVisuals visuals={visuals} />
+      </group>
+    </group>
+  )
+})
+
+function ItemVisuals({ visuals }: { readonly visuals: ReadonlyArray<Visual> }) {
+  return (
+    <>
       {visuals.length === 0 && <BoundsBox bounds={undefined} warn />}
       {visuals.map((v) =>
         v.relative === undefined
@@ -145,6 +170,6 @@ export const ItemObject = memo(function ItemObjectView(props: {
             </group>
           )
       )}
-    </group>
+    </>
   )
-})
+}
