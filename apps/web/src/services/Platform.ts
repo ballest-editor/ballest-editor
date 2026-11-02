@@ -19,6 +19,7 @@ import type {
   PlayResult,
   PlaySessionEnded,
   PluginStatus,
+  ProjectFolder,
   ProjectMap,
   ProjectMapFile,
   ProjectMaps,
@@ -106,8 +107,12 @@ export class Platform extends Context.Service<Platform, {
   readonly chooseProject: Effect.Effect<Option.Option<ProjectState>, PlatformError>
   /** Goes back to a recent project, or the default. */
   readonly switchProject: (path: string) => Effect.Effect<ProjectState, PlatformError>
-  /** Shows the project's maps folder in the file manager. */
-  readonly revealProject: Effect.Effect<void, PlatformError>
+  /** Makes `<projectsFolder>/<name>` a project and uses it. */
+  readonly createProject: (name: string) => Effect.Effect<ProjectState, PlatformError>
+  /** Shows one of the project's folders in the file manager. */
+  readonly revealProject: (which: ProjectFolder) => Effect.Effect<void, PlatformError>
+  /** Renames the project (its file's name; the folder keeps its name). */
+  readonly renameProject: (name: string) => Effect.Effect<ProjectState, PlatformError>
   /** Keeps which map is open in the project (null: one that isn't in it), so the next launch opens it again. */
   readonly rememberOpenMap: (fileName: string | null) => Effect.Effect<void, PlatformError>
   /** The project's maps, most recently changed first; always empty in a browser. */
@@ -289,7 +294,10 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
     projectState: bridgeCall(() => bridge.projectState()),
     chooseProject: bridgeCall(() => bridge.chooseProject()).pipe(Effect.map(Option.fromNullOr)),
     switchProject: (path) => bridgeCall(() => bridge.switchProject(path)),
-    revealProject: bridgeCheck(() => bridge.revealProject(), "The project has no maps folder yet."),
+    createProject: (name) => bridgeCall(() => bridge.createProject(name)),
+    revealProject: (which) =>
+      bridgeCheck(() => bridge.revealProject(which), "The project doesn't have that folder yet."),
+    renameProject: (name) => bridgeCall(() => bridge.renameProject(name)),
     rememberOpenMap: (fileName) => bridgeCall(() => bridge.rememberOpenMap(fileName)),
     listMaps: bridgeCall(() => bridge.listMaps()),
     readMap: (fileName) => bridgeCall(() => bridge.readMap(fileName)),
@@ -383,7 +391,9 @@ const makeBrowser = (): Platform["Service"] => {
     projectState: noProject,
     chooseProject: noProject,
     switchProject: () => noProject,
-    revealProject: noProject,
+    createProject: () => noProject,
+    revealProject: () => noProject,
+    renameProject: () => noProject,
     rememberOpenMap: () => Effect.void,
     listMaps: Effect.succeed([]),
     readMap: () => noProject,

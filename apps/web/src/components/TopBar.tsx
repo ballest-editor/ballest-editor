@@ -3,6 +3,8 @@ import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Kbd } from "@workspace/ui/components/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
+import { cn } from "@workspace/ui/lib/utils"
+import { useEffect } from "react"
 import { formatBinding } from "../domain/Keybinds"
 import { playMap } from "../editor/actions"
 import { useEditor } from "../editor/store"
@@ -41,13 +43,43 @@ const TITLE_BAR_CLASSES = [
   "pr-[calc(100vw_-_env(titlebar-area-width,100vw)_-_env(titlebar-area-x,0px)_+_0.5rem)]"
 ].join(" ")
 
+/**
+ * The window's title: the project in use (desktop), centred like any document window's, its folder on hover. With
+ * none it is Untitled Project, starred because nothing is on disk yet (docs/PROJECTS.md § Shell).
+ */
+function ProjectTitle() {
+  const state = useEditor((s) => s.project)
+  const name = state === null ? null : state.current === null ? "Untitled Project *" : state.current.name
+  // the OS window title too, so the taskbar and alt-tab tell projects apart
+  useEffect(() => {
+    document.title = name === null ? "Ballest Editor" : `${name} – Ballest Editor`
+  }, [name])
+  if (state === null || name === null) return null
+  const project = state.current
+  return (
+    // the strip spans the bar (centring) but lets clicks through to the menus; only the name itself takes the hover
+    <div className="pointer-events-none absolute inset-x-0 flex justify-center">
+      <span
+        className={cn(
+          "pointer-events-auto max-w-[40vw] truncate text-xs text-muted-foreground",
+          project === null && "italic"
+        )}
+        title={project?.path ?? "Not saved anywhere yet: Save the map to name the project."}
+      >
+        {name}
+      </span>
+    </div>
+  )
+}
+
 export function TopBar() {
   const catalog = useEditor((s) => s.catalog)
 
   return (
-    <header className={`flex h-10 shrink-0 items-center gap-1 border-b bg-card ${TITLE_BAR_CLASSES}`}>
+    <header className={`relative flex h-10 shrink-0 items-center gap-1 border-b bg-card ${TITLE_BAR_CLASSES}`}>
       <span className="mr-2 px-1 text-sm font-semibold">Ballest Editor</span>
       <MenuBar />
+      <ProjectTitle />
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <PlayButton />
         {catalog?.warning !== undefined && (

@@ -14,7 +14,7 @@ import { useEditor } from "../editor/store"
 /** Import found a map of the same file name in the project: replace it (it is backed up) or import a renamed copy. */
 export function ImportClashDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   const clash = useEditor((s) => s.importClash)
-  const projectName = useEditor((s) => s.project?.current.name ?? "the project")
+  const projectName = useEditor((s) => s.project?.current?.name ?? "Untitled Project")
   const setImportClash = useEditor((s) => s.setImportClash)
   const cancel = () => {
     setImportClash(null)

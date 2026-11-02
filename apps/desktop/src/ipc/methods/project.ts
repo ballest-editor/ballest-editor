@@ -1,6 +1,7 @@
 import {
   BackupRef,
   ChooseProjectResult,
+  CreateProjectPayload,
   ExportChecks,
   ExportMapPayload,
   ExportMapResult,
@@ -17,6 +18,8 @@ import {
   ProjectPathPayload,
   ProjectState,
   RenameMapPayload,
+  RenameProjectPayload,
+  RevealProjectPayload,
   WriteMapPayload
 } from "@ballest/contracts"
 import { Effect, Option, Path, Schema } from "effect"
@@ -29,6 +32,7 @@ import {
   CHECK_EXPORTS_CHANNEL,
   CHOOSE_PROJECT_CHANNEL,
   CREATE_MAP_CHANNEL,
+  CREATE_PROJECT_CHANNEL,
   EXPORT_MAP_CHANNEL,
   IMPORT_MAP_CHANNEL,
   LIST_BACKUPS_CHANNEL,
@@ -40,6 +44,7 @@ import {
   REIMPORT_MAP_CHANNEL,
   REMEMBER_OPEN_MAP_CHANNEL,
   RENAME_MAP_CHANNEL,
+  RENAME_PROJECT_CHANNEL,
   REVEAL_PROJECT_CHANNEL,
   SAVE_MAP_CHANNEL,
   SWITCH_PROJECT_CHANNEL
@@ -67,11 +72,14 @@ export const chooseProject = makeIpcMethod({
   result: ChooseProjectResult,
   handler: Effect.fn("ipc.chooseProject")(function*(_, event) {
     const projects = yield* Projects
-    const { current } = yield* projects.state
+    const { current, projectsFolder } = yield* projects.state
     const picked = yield* (yield* ElectronDialog).showOpenFolder({
       owner: event.sender.id,
       title: "Choose the project folder",
-      defaultPath: Option.some(current.exists ? current.path : (yield* Path.Path).dirname(current.path)),
+      // the project in use, or where projects are made; a folder that isn't a project yet starts in its parent
+      defaultPath: Option.some(
+        current === null ? projectsFolder : current.exists ? current.path : (yield* Path.Path).dirname(current.path)
+      ),
       filters: []
     })
     if (Option.isNone(picked)) return null
@@ -88,14 +96,34 @@ export const switchProject = makeIpcMethod({
   })
 })
 
+/** New project: `<projectsFolder>/<name>`, made and used. */
+export const createProject = makeIpcMethod({
+  channel: CREATE_PROJECT_CHANNEL,
+  payload: CreateProjectPayload,
+  result: ProjectState,
+  handler: Effect.fn("ipc.createProject")(function*({ name }) {
+    return yield* (yield* Projects).createNew(name)
+  })
+})
+
 export const revealProject = makeIpcMethod({
   channel: REVEAL_PROJECT_CHANNEL,
-  payload: Schema.Undefined,
+  payload: RevealProjectPayload,
   result: Schema.Boolean,
-  handler: Effect.fn("ipc.revealProject")(function*() {
-    const folder = yield* (yield* Projects).mapsFolder
+  handler: Effect.fn("ipc.revealProject")(function*({ which }) {
+    const folder = yield* (yield* Projects).folderOf(which)
     if (Option.isNone(folder)) return false
     return yield* (yield* ElectronShell).openFolder(folder.value)
+  })
+})
+
+/** Project settings › General: the project's name. */
+export const renameProject = makeIpcMethod({
+  channel: RENAME_PROJECT_CHANNEL,
+  payload: RenameProjectPayload,
+  result: ProjectState,
+  handler: Effect.fn("ipc.renameProject")(function*({ name }) {
+    return yield* (yield* Projects).setName(name)
   })
 })
 

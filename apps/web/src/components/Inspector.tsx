@@ -23,6 +23,7 @@ import { type Axis, readField, type TransformField } from "../domain/groupTransf
 import { selectionProperties } from "../domain/itemProperties"
 import { formatBindings, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
 import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/MapFile"
+import { formatCreatedAt } from "../domain/time"
 import {
   deleteSelection,
   duplicateSelection,
@@ -60,9 +61,9 @@ function MapSettings() {
   const facts: ReadonlyArray<readonly [string, string]> = [
     ["Creator", levelData.creatorName || "set in Settings › General"],
     ["Items", String(itemCount)],
-    ["Created", levelData.createdAt || "on export"],
+    ["Created", levelData.createdAt ? formatCreatedAt(levelData.createdAt) : "on export"],
     ["Validated", levelData.bValidated ? "yes" : "no"],
-    ["Source", `${fileName ?? "new map"}${hasEditorState ? "" : " (no editorState)"}`]
+    ["File", fileName === null ? "not saved yet" : `${fileName}${hasEditorState ? "" : " (no editorState)"}`]
   ]
   return (
     <div className="flex flex-col gap-3">
@@ -93,7 +94,12 @@ function MapSettings() {
         {facts.map(([k, v]) => (
           <div key={k} className="contents">
             <dt className="text-muted-foreground">{k}</dt>
-            <dd className="break-all">{v}</dd>
+            <dd
+              className={k === "File" ? "min-w-0 truncate font-mono text-[0.6875rem]" : ""}
+              title={k === "File" ? v : undefined}
+            >
+              {v}
+            </dd>
           </div>
         ))}
       </dl>

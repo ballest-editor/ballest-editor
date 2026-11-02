@@ -10,6 +10,7 @@ import type {
   MapBackups,
   MapLink,
   OpenedMapFile,
+  ProjectFolder,
   ProjectInfo,
   ProjectMap,
   ProjectMapFile,
@@ -39,12 +40,18 @@ export type ProjectFile = typeof ProjectFile.Type
 export const PROJECT_FILE = "ballest-project.json"
 const RECENT_LIMIT = 8
 
+/** A folder name every OS accepts: letters, digits, spaces, `-` and `_`, not starting with a dot or a space. */
+const isProjectName = (name: string): boolean => /^[\p{L}\p{N}_-][\p{L}\p{N} _-]{0,63}$/u.test(name)
+
 export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectError", {
   path: Schema.String,
   reason: Schema.Literals([
     "inGameMaps",
     "fileName",
     "exists",
+    "noProject",
+    "projectExists",
+    "projectName",
     "notFound",
     "notPicked",
     "extension",
@@ -63,6 +70,12 @@ export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectErr
         return `${this.path} isn't a map file name (a .balledit name, no folders).`
       case "exists":
         return `The project already has a map called ${this.path}.`
+      case "noProject":
+        return "There is no project yet: Save the map to name one, or open a project."
+      case "projectExists":
+        return `${this.path} already holds a project. Open it instead, or choose another name.`
+      case "projectName":
+        return `${this.path} can't name a folder: use letters, digits, spaces, - and _.`
       case "notFound":
         return `${this.path} doesn't exist any more.`
       case "notPicked":
@@ -102,9 +115,9 @@ interface MapContents {
 type ProjectEffect<A> = Effect.Effect<A, ProjectError | MapLinkError | BackupError>
 
 /**
- * The project folder and the maps in it (docs/PROJECTS.md). One project is in use at a time: the default
- * (`Documents/Ballest Editor/Maps`) until the user picks another. A project exists on disk from the first New map or
- * Import. Main touches only its `maps/` and `.ballest/` folders, the game's maps folder (Export), the backups of the
+ * The project folder and the maps in it (docs/PROJECTS.md). One project is in use at a time, the most recent one; with
+ * none (the first launch) the window is Untitled Project and nothing is on disk until the first Save names a project
+ * (`createNew`). A project exists on disk from `createNew`, or from the first New map or Import into a chosen folder. Main touches only its `maps/` and `.ballest/` folders, the game's maps folder (Export), the backups of the
  * files Export wrote over there (`<userData>/backups/`), and the files the user picks in the Import dialog (read only).
  * Maps are named by file name, never by path. Every write over a map goes through `Backups.overwrite`.
  */
@@ -112,11 +125,17 @@ export class Projects extends Context.Service<Projects, {
   readonly state: Effect.Effect<ProjectState>
   /** Uses `folder` as the project from now on; refused when it is the game's maps folder or inside it. */
   readonly use: (folder: string) => Effect.Effect<ProjectState, ProjectError>
-  /** Goes back to a recent project, or the default; any other folder is refused. */
+  /** Goes back to a recent project; any other folder is refused. */
   readonly switchTo: (folder: string) => Effect.Effect<ProjectState, ProjectError>
   /** Keeps which map is open in the current project (`ProjectState.lastOpenMap`); null forgets it. */
   readonly rememberOpenMap: (fileName: string | null) => Effect.Effect<void, ProjectError>
   /** The current project's `maps/` folder, when it exists. */
+  /** Makes `<projectsFolder>/<name>` a project (fails when it holds one already) and uses it. */
+  readonly createNew: (name: string) => Effect.Effect<ProjectState, ProjectError>
+  /** Renames the current project in its `ballest-project.json` (made first if it isn't on disk yet). */
+  readonly setName: (name: string) => Effect.Effect<ProjectState, ProjectError>
+  /** One of the current project's folders, when it exists: the project, its `maps/`, its backups. */
+  readonly folderOf: (which: ProjectFolder) => Effect.Effect<Option.Option<string>>
   readonly mapsFolder: Effect.Effect<Option.Option<string>>
   readonly list: Effect.Effect<ProjectMaps, ProjectError>
   readonly read: (fileName: string) => Effect.Effect<ProjectMapFile, ProjectError>
@@ -148,7 +167,7 @@ export class Projects extends Context.Service<Projects, {
 }>()("ballest/desktop/project/Projects") {
   /** `platform` decides how paths compare (Windows: case-insensitively); `exportBackups` keeps what Export wrote over. */
   static readonly make = Effect.fn("Projects.make")(function*(
-    defaultFolder: string,
+    projectsFolder: string,
     platform: NodeJS.Platform,
     exportBackups: string
   ) {
@@ -165,33 +184,44 @@ export class Projects extends Context.Service<Projects, {
       new ProjectError({ path: file, reason, ...(cause === undefined ? {} : { cause }) })
 
     const remembered = settings.get.pipe(Effect.map((s): ProjectSettings => s.project ?? {}))
-    const current = remembered.pipe(Effect.map((s) => s.recent?.[0] ?? defaultFolder))
+    /** The project in use (the most recent), or none while the window is Untitled Project. */
+    const currentOption: Effect.Effect<Option.Option<string>> = remembered.pipe(
+      Effect.map((s) => {
+        const [first] = s.recent ?? []
+        return first === undefined ? Option.none() : Option.some(first)
+      })
+    )
+    /** The project in use; anything that writes into a project fails without one. */
+    const current: Effect.Effect<string, ProjectError> = currentOption.pipe(
+      Effect.flatMap(Effect.fromOption),
+      Effect.mapError(fail("noProject", projectsFolder))
+    )
 
     const info = (folder: string) =>
       fs.readFileString(path.join(folder, PROJECT_FILE)).pipe(
         Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(ProjectFile))),
         Effect.map((file) => ({ name: file.name, exists: true })),
         Effect.orElseSucceed(() => ({ name: path.basename(folder), exists: false })),
-        Effect.map((found): ProjectInfo => ({ path: folder, ...found, isDefault: same(folder, defaultFolder) }))
+        Effect.map((found): ProjectInfo => ({ path: folder, ...found }))
       )
 
     const state = Effect.gen(function*() {
-      const { recent = [] } = yield* remembered
-      const [folder = defaultFolder, ...others] = recent
-      const before = same(folder, defaultFolder) || others.some((p) => same(p, defaultFolder))
-        ? others
-        : [...others, defaultFolder]
-      const lastOpenMap = (yield* remembered).lastOpenMap?.[folder] ?? null
+      const { recent = [], lastOpenMap: kept = {} } = yield* remembered
+      const [folder, ...others] = recent
+      const lastOpenMap = folder === undefined ? null : kept[folder] ?? null
       return {
-        current: yield* info(folder),
-        recent: yield* Effect.forEach(before, info),
-        lastOpenMap: lastOpenMap !== null && isMapFileName(lastOpenMap) ? lastOpenMap : null
+        current: folder === undefined ? null : yield* info(folder),
+        recent: yield* Effect.forEach(others, info),
+        lastOpenMap: lastOpenMap !== null && isMapFileName(lastOpenMap) ? lastOpenMap : null,
+        projectsFolder
       } satisfies ProjectState
     })
 
     const rememberOpenMap = Effect.fn("Projects.rememberOpenMap")(function*(fileName: string | null) {
-      const project = yield* current
       if (fileName !== null && !isMapFileName(fileName)) return yield* fail("fileName", fileName)()
+      const project = Option.getOrNull(yield* currentOption)
+      // nothing to remember it in: Untitled Project has one map and no folder
+      if (project === null) return
       yield* settings.update((s) => {
         const { [project]: _previous, ...others } = s.project?.lastOpenMap ?? {}
         const lastOpenMap = fileName === null ? others : { ...others, [project]: fileName }
@@ -217,15 +247,14 @@ export class Projects extends Context.Service<Projects, {
 
     const switchTo = Effect.fn("Projects.switchTo")(function*(raw: string) {
       const { recent = [] } = yield* remembered
-      if (!same(raw, defaultFolder) && !recent.some((p) => same(p, raw))) return yield* fail("notPicked", raw)()
+      if (!recent.some((p) => same(p, raw))) return yield* fail("notPicked", raw)()
       return yield* use(raw)
     })
 
     const mapsDir = (project: string) => path.join(project, "maps")
 
-    /** The current project, made on disk if it isn't yet: `maps/`, `.ballest/`, `ballest-project.json`, `.gitignore`. */
-    const ensure = Effect.gen(function*() {
-      const project = yield* current
+    /** Makes `project` on disk if it isn't yet: `maps/`, `.ballest/`, `ballest-project.json`, `.gitignore`. */
+    const ensureAt = Effect.fnUntraced(function*(project: string) {
       yield* outsideGame(project)
       const writeIfMissing = (file: string, write: Effect.Effect<void, unknown>) =>
         fs.exists(file).pipe(Effect.flatMap((exists) => exists ? Effect.void : write))
@@ -240,6 +269,46 @@ export class Projects extends Context.Service<Projects, {
         )
       }).pipe(Effect.mapError(fail("write", project)))
       return project
+    })
+
+    /** The current project, made on disk if it isn't yet. */
+    const ensure = current.pipe(Effect.flatMap(ensureAt))
+
+    const setName = Effect.fn("Projects.setName")(function*(name: string) {
+      const trimmed = name.trim()
+      if (trimmed === "" || trimmed.length > 64) return yield* fail("projectName", name)()
+      const project = yield* ensure
+      const file = path.join(project, PROJECT_FILE)
+      const current_ = yield* fs.readFileString(file).pipe(
+        Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(ProjectFile))),
+        Effect.mapError(fail("read", file))
+      )
+      yield* writeJson(fs, file, { ...current_, name: trimmed }).pipe(Effect.mapError(fail("write", file)))
+      return yield* state
+    })
+
+    const folderOf = (which: ProjectFolder) =>
+      currentOption.pipe(
+        Effect.flatMap(Option.match({
+          onNone: () => Effect.succeed(Option.none<string>()),
+          onSome: (project) => {
+            const dir = which === "project" ? project : which === "maps" ? mapsDir(project) : projectBackups(project)
+            return fs.exists(dir).pipe(
+              Effect.map((found) => found ? Option.some(dir) : Option.none()),
+              Effect.orElseSucceed(Option.none)
+            )
+          }
+        }))
+      )
+
+    const createNew = Effect.fn("Projects.createNew")(function*(name: string) {
+      const trimmed = name.trim()
+      if (!isProjectName(trimmed)) return yield* fail("projectName", name)()
+      const folder = path.join(projectsFolder, trimmed)
+      const taken = yield* fs.exists(path.join(folder, PROJECT_FILE)).pipe(Effect.orElseSucceed(() => false))
+      if (taken) return yield* fail("projectExists", folder)()
+      yield* ensureAt(folder)
+      return yield* use(folder)
     })
 
     const target = Effect.fnUntraced(function*(project: string, fileName: string) {
@@ -308,7 +377,9 @@ export class Projects extends Context.Service<Projects, {
     })
 
     const list = Effect.gen(function*() {
-      const project = yield* current
+      // Untitled Project has no folder and nothing listed
+      const project = Option.getOrNull(yield* currentOption)
+      if (project === null) return []
       const dir = mapsDir(project)
       if (!(yield* fs.exists(dir).pipe(Effect.orElseSucceed(() => false)))) return []
       const names = yield* fs.readDirectory(dir).pipe(Effect.mapError(fail("read", dir)))
@@ -469,8 +540,10 @@ export class Projects extends Context.Service<Projects, {
     const checkLock = yield* Semaphore.make(1)
 
     const checkExports = Effect.gen(function*() {
-      const project = yield* current
       const checks = { changed: Array<string>(), missing: Array<string>() }
+      // nothing linked without a project
+      const project = Option.getOrNull(yield* currentOption)
+      if (project === null) return checks
       const gameMaps = yield* presentGameMaps
       if (Option.isNone(gameMaps)) return checks
       for (const [fileName, link] of Object.entries(yield* links.all(project))) {
@@ -514,14 +587,15 @@ export class Projects extends Context.Service<Projects, {
       } satisfies ProjectMapFile
     })
 
-    const mapsFolder = current.pipe(
-      Effect.map(mapsDir),
-      Effect.flatMap((dir) =>
-        fs.exists(dir).pipe(
-          Effect.map((found) => found ? Option.some(dir) : Option.none()),
-          Effect.orElseSucceed(Option.none)
-        )
-      )
+    const mapsFolder = currentOption.pipe(
+      Effect.flatMap(Option.match({
+        onNone: () => Effect.succeed(Option.none<string>()),
+        onSome: (project) =>
+          fs.exists(mapsDir(project)).pipe(
+            Effect.map((found) => found ? Option.some(mapsDir(project)) : Option.none()),
+            Effect.orElseSucceed(Option.none)
+          )
+      }))
     )
 
     const backupOf = (place: BackupRef["place"]) => ({ id, fileName, at }: Backup): MapBackup => ({
@@ -532,8 +606,10 @@ export class Projects extends Context.Service<Projects, {
     })
 
     const backups = Effect.gen(function*() {
-      const project = yield* current
-      const inProject = (yield* backupStore.list(projectBackups(project))).map(backupOf("project"))
+      const project = Option.getOrNull(yield* currentOption)
+      const inProject = project === null
+        ? []
+        : (yield* backupStore.list(projectBackups(project))).map(backupOf("project"))
       const exported = (yield* backupStore.list(exportBackups)).map(backupOf("export"))
       return [...inProject, ...exported].sort((a, b) => b.at.localeCompare(a.at))
     }).pipe(Effect.withSpan("Projects.backups"))
@@ -549,6 +625,9 @@ export class Projects extends Context.Service<Projects, {
       state,
       use,
       switchTo,
+      createNew,
+      setName,
+      folderOf,
       rememberOpenMap,
       mapsFolder,
       list,
@@ -569,8 +648,8 @@ export class Projects extends Context.Service<Projects, {
   static readonly layer = Layer.effect(
     Projects,
     Effect.gen(function*() {
-      const { defaultProjectDir, platform, exportBackupsDir } = yield* DesktopEnvironment
-      return yield* Projects.make(defaultProjectDir, platform, exportBackupsDir)
+      const { projectsDir, platform, exportBackupsDir } = yield* DesktopEnvironment
+      return yield* Projects.make(projectsDir, platform, exportBackupsDir)
     })
   )
 }

@@ -37,9 +37,11 @@ const setup = Effect.gen(function*() {
   const game = { running: false, launches: 0, steamAnswers: true }
   const sent: Array<readonly [string, unknown]> = []
   const settings = path.join(dir, "desktop-settings.json")
+  // the project in use is remembered in the settings; `dir` is where New project would make its siblings
+  yield* fs.writeFileString(settings, JSON.stringify({ project: { recent: [path.join(dir, "project")] } }))
   const base = Layer.mergeAll(
     Layer.effect(GameLink, GameLink.make(bundle)),
-    Layer.effect(Projects, Projects.make(path.join(dir, "project"), "linux", path.join(dir, "userData", "backups")))
+    Layer.effect(Projects, Projects.make(dir, "linux", path.join(dir, "userData", "backups")))
       .pipe(Layer.provide(Layer.mergeAll(MapLinks.layer, Backups.layer)))
   ).pipe(
     Layer.provideMerge(layerFakeGamePaths(steam.host, settings)),

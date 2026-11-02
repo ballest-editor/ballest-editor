@@ -16,8 +16,8 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
   readonly exportBackupsDir: string
   /** `userData/notifications.json`: the bell's last notifications. */
   readonly notificationsPath: string
-  /** `Documents/Ballest Editor/Maps`: the project used until the user picks another (docs/PROJECTS.md). */
-  readonly defaultProjectDir: string
+  /** `Documents/Ballest Editor`: where New project and the first Save make project folders (docs/PROJECTS.md). */
+  readonly projectsDir: string
   readonly preloadPath: string
   /** The window's icon: `icon.png`, rendered from `resources/icon.svg` by the build next to `main.cjs`. */
   readonly iconPath: string
@@ -49,7 +49,7 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
           settingsPath: path.join(metadata.userData, "desktop-settings.json"),
           exportBackupsDir: path.join(metadata.userData, "backups"),
           notificationsPath: path.join(metadata.userData, "notifications.json"),
-          defaultProjectDir: path.join(metadata.documents, "Ballest Editor", "Maps"),
+          projectsDir: path.join(metadata.documents, "Ballest Editor"),
           preloadPath: path.join(dirname, "preload.cjs"),
           iconPath: path.join(dirname, "icon.png"),
           // Unpackaged, `vite build` of apps/web has already copied the assets into dist/assets.

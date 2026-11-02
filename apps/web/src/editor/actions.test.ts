@@ -20,6 +20,7 @@ import {
   projectFile,
   TEST_MAPS_FOLDER,
   TEST_PROJECT,
+  TEST_PROJECTS_FOLDER,
   testBridge,
   type TestDisk,
   testHash
@@ -30,7 +31,6 @@ import {
   checkExportsEffect,
   checkGameLinkEffect,
   chooseGameLinkFolderEffect,
-  closeMapTabEffect,
   createNewMap,
   describeBackupEffect,
   duplicateMapEffect,
@@ -39,6 +39,7 @@ import {
   followOpenMapEffect,
   followPlaySessionsEffect,
   followUpdateState,
+  freshMapEffect,
   holdsUnload,
   importAsCopyEffect,
   importMapFile,
@@ -46,6 +47,7 @@ import {
   keepNotifications,
   launchGameEffect,
   muteNotificationKindEffect,
+  nameProjectEffect,
   openProjectMap,
   openProjectMapFile,
   openStartingMap,
@@ -100,12 +102,14 @@ const edit = () => {
 }
 
 /** A fresh editor for each test: the store outlives the layers. */
-const reset = Effect.sync(() => {
+/** A clean editor over the disk's project, as the app has after its startup load. */
+const reset = Effect.gen(function*() {
   s().loadMap(s().doc.map, null)
   s().setImportClash(null)
   s().setPublishedDraft(null)
   s().setChangedExport(null)
   s().closeDialog()
+  yield* refreshProjectEffect
 })
 
 /** Imports `path` through the dialog. */
@@ -200,6 +204,33 @@ describe("project actions", () => {
 
       yield* openProjectMapFile(renamed)
       assert.strictEqual(s().doc.map.worldSettings.levelData.levelDisplayName, "Hairpin")
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("Untitled Project: nothing on disk until the first Save names the project", () => {
+    const disk = makeTestDisk()
+    disk.project.current = null
+    return Effect.gen(function*() {
+      yield* reset
+      assert.isNull(s().project?.current)
+      // New map stays in memory, and there is nothing to import into
+      yield* createNewMap("Big Loop", "Isaac")
+      assert.isNull(s().file)
+      assert.strictEqual(disk.files.size, 0)
+      const refused = yield* Effect.flip(importMapFile)
+      assert.match(refused.message, /no project to import into/)
+      assert.deepStrictEqual(disk.dialogs, [])
+
+      // The Save dialog's project name makes the folder, then the map is written into it
+      yield* nameProjectEffect("My tracks")
+      const project = `${TEST_PROJECTS_FOLDER}/My tracks`
+      assert.deepInclude(s().project?.current, { path: project, name: "My tracks" })
+      assert.isNull(s().file)
+      yield* saveMapAsEffect
+      const name = "Map_LevelEditorMain&Big Loop_Isaac.balledit"
+      assert.deepStrictEqual(s().file, { name, path: projectFile(name, project) })
+      assert.isTrue(disk.files.has(projectFile(name, project)))
+      assert.deepStrictEqual(s().projectMaps.map((m) => m.fileName), [name])
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
@@ -335,14 +366,16 @@ describe("project actions", () => {
       yield* Effect.promise(() => openProjectMap(name))
       assert.strictEqual(s().file?.name, name)
 
+      // leaving the map for a fresh one (what New map does) asks first
+      const leave = unlessCancelled("newMap", freshMapEffect)
       editTo(9)
       disk.promptAnswers.push("cancel", "save")
-      yield* closeMapTabEffect
+      yield* leave
       assert.include(s(), { dirty: true })
       assert.strictEqual(s().file?.name, name)
-      assert.match(disk.prompts[0]?.message ?? "", /before closing the map\?$/)
+      assert.match(disk.prompts[0]?.message ?? "", /before starting a new map\?$/)
       // Save: written first, then the tab shows a fresh unsaved map
-      yield* closeMapTabEffect
+      yield* leave
       assert.include(s(), { file: null, dirty: false })
       assert.strictEqual(s().doc.map.worldSettings.levelData.levelDisplayName, "Untitled")
       const saved = yield* MapCodec.use((codec) => codec.decode(disk.files.get(projectFile(name))!))
@@ -353,14 +386,14 @@ describe("project actions", () => {
       editTo(2)
       const before = disk.files.get(projectFile(name))
       disk.promptAnswers.push("discard")
-      yield* closeMapTabEffect
+      yield* leave
       assert.include(s(), { file: null, dirty: false })
       assert.strictEqual(disk.files.get(projectFile(name)), before)
 
       // a clean map closes without asking
       yield* openProjectMapFile(name)
       const asked = disk.prompts.length
-      yield* closeMapTabEffect
+      yield* leave
       assert.isNull(s().file)
       assert.strictEqual(disk.prompts.length, asked)
     }).pipe(Effect.provide(layerFor(disk)))
@@ -417,7 +450,7 @@ describe("project actions", () => {
       yield* openProjectMapFile(second)
       yield* Effect.yieldNow
       assert.deepStrictEqual(disk.project.lastOpenMap, { [TEST_PROJECT]: second })
-      yield* closeMapTabEffect
+      yield* freshMapEffect
       yield* Effect.yieldNow
       assert.deepStrictEqual(disk.project.lastOpenMap, {})
       stop()

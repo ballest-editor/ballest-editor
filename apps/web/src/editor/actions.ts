@@ -1,4 +1,5 @@
 /** UI-facing operations that run Effects through the single app runtime. */
+import type { ProjectFolder } from "@ballest/contracts"
 import { Cause, Deferred, Effect, Exit, Fiber, Option, Queue, Stream } from "effect"
 import { toast } from "sonner"
 import type { UeTransform, Vec3 } from "../domain/coords"
@@ -305,7 +306,11 @@ const revealIn = (where: "project" | "game"): NotificationAction => ({
   command: where === "project" ? { _tag: "RevealProject" } : { _tag: "RevealGamePath", which: "mapsFolder" }
 })
 
-const projectName = () => useEditor.getState().project?.current.name ?? "the project"
+/** The project's name; Untitled Project while there is none (docs/PROJECTS.md § Shell). */
+const projectName = () => useEditor.getState().project?.current?.name ?? "Untitled Project"
+
+/** Whether there is a project to write maps into (desktop with one named; a browser has none and keeps maps in memory). */
+const hasProject = () => useEditor.getState().project?.current != null
 
 /** The open map encoded the way the game wants it written, with the document it was made from. */
 const exportOpenMap = Effect.gen(function*() {
@@ -340,7 +345,8 @@ export const createNewMap = Effect.fn("createNewMap")(function*(displayName: str
   const catalog = useEditor.getState().catalog?.catalog
   const playerStartPiece = catalog?.pieces.find((p) => p.classPath === PLAYER_START_CLASS)
   const map = newMapFile({ displayName, creatorName, createdAt, playerStartPiece })
-  if (!platform.capabilities.projects) {
+  // a browser keeps it in memory; so does Untitled Project, until the first Save names a project
+  if (!platform.capabilities.projects || !hasProject()) {
     useEditor.getState().loadMap(map, null)
     return
   }
@@ -445,22 +451,26 @@ export const followOpenMapEffect = Effect.gen(function*() {
  * Closes the map's tab: the tab then shows a fresh unsaved map, as New map would without its dialog; unsaved edits ask
  * first (the shared prompt, `unlessCancelled`).
  */
-export const closeMapTabEffect = Effect.suspend(() => unlessCancelled("closeMap", freshMapEffect))
-
-export const closeMapTab = () => run(closeMapTabEffect)
-
 /**
  * Rename… or Duplicate… for one of the project's maps from the Maps dialog or Project settings: the dialogs name the
  * open map, so the map is opened first (asking about the open map's unsaved edits), then its dialog.
  */
-export const nameProjectMap = (fileName: string, mode: "rename" | "duplicate") =>
+export const nameProjectMap = (fileName: string, mode: "rename" | "duplicate" | "recover") =>
+  withProjectMapOpen(fileName, Effect.sync(() => useEditor.getState().openDialog(mode)))
+
+/**
+ * Runs `then` with the project map `fileName` open: it is opened first when another is (asking about that one's
+ * unsaved edits; a cancel runs nothing). The Project panel's per-map actions go through this, since Export, Play and
+ * the name dialogs act on the open map.
+ */
+const withProjectMapOpen = (fileName: string, then: Effect.Effect<void, unknown, AppServices>) =>
   run(
     Effect.gen(function*() {
       if (useEditor.getState().file?.name !== fileName) {
         yield* unlessCancelled("openMap", openProjectMapFile(fileName))
         if (useEditor.getState().file?.name !== fileName) return
       }
-      useEditor.getState().openDialog(mode)
+      yield* then
     })
   )
 
@@ -552,6 +562,11 @@ const importInto = Effect.fn("importInto")(function*(pending: ImportClash, repla
  */
 export const importMapFile = Effect.gen(function*() {
   const platform = yield* Platform
+  if (platform.capabilities.projects && !hasProject()) {
+    return yield* new PlatformError({
+      message: "There is no project to import into yet. Save the open map to name one, or open a project."
+    })
+  }
   const picked = yield* platform.pickMapFile
   if (Option.isNone(picked)) return
   const { name, path, text } = picked.value
@@ -942,6 +957,12 @@ export const playEffect = (replacePublished: boolean, overwriteChanged = false) 
 
 export const playMap = () => run(playEffect(false))
 
+/** The Project panel's Export to game on a map: opened first, then exported as the open map is. */
+export const exportProjectMapFromPanel = (fileName: string) => withProjectMapOpen(fileName, exportToGameEffect(false))
+
+/** The Project panel's Play on a map: opened first, then played as the open map is. */
+export const playProjectMapFromPanel = (fileName: string) => withProjectMapOpen(fileName, playEffect(false))
+
 /** The newDraft dialog's answer: a copy of the map that was never published, under a new name; then Play races it. */
 export const playAsNewDraft = (displayName: string, creatorName: string, replace = false) =>
   run(duplicateMapEffect(displayName, creatorName, replace, true).pipe(Effect.andThen(playEffect(false))))
@@ -1101,12 +1122,13 @@ const changeProject = (
   run(unlessCancelled(
     "switchProject",
     Effect.gen(function*() {
-      const before = useEditor.getState().project?.current.path
+      const before = useEditor.getState().project?.current?.path ?? null
       const next = yield* change(yield* Platform)
       if (Option.isNone(next)) return
-      if (next.value.current.path !== before) useEditor.getState().detachFile()
+      const after = next.value.current
+      if (after === null || after.path !== before) useEditor.getState().detachFile()
       yield* refreshProject
-      useEditor.getState().notify("info", `Using the project ${next.value.current.name}`, {
+      useEditor.getState().notify("info", `Using the project ${after?.name ?? "Untitled Project"}`, {
         kind: "projectChanged",
         actions: [revealIn("project")]
       })
@@ -1118,14 +1140,38 @@ export const chooseProject = () => changeProject((platform) => platform.choosePr
 
 /** Goes back to a recent project; the one in use already is left alone. */
 export const switchProject = (path: string) =>
-  path === useEditor.getState().project?.current.path
+  path === useEditor.getState().project?.current?.path
     ? Promise.resolve(undefined)
     : changeProject((platform) => Effect.asSome(platform.switchProject(path)))
 
-export const revealProject = () =>
+/** New project…: `<projectsFolder>/<name>` is made and becomes the project. */
+export const createProject = (name: string) => changeProject((platform) => Effect.asSome(platform.createProject(name)))
+
+/**
+ * The first Save's project name (docs/PROJECTS.md § Shell): Untitled Project becomes `<projectsFolder>/<name>` and
+ * the open map stays open, unsaved, for the save that follows. No unsaved-changes prompt: nothing is left behind.
+ */
+export const nameProjectEffect = Effect.fn("nameProjectEffect")(function*(name: string) {
+  yield* (yield* Platform).createProject(name)
+  yield* refreshProject
+})
+
+export const nameProject = (name: string) => run(nameProjectEffect(name))
+
+/** Shows one of the project's folders in the file manager: its `maps/` unless asked otherwise. */
+export const revealProject = (which: ProjectFolder = "maps") =>
   run(
     Effect.gen(function*() {
-      yield* (yield* Platform).revealProject
+      yield* (yield* Platform).revealProject(which)
+    })
+  )
+
+/** Project settings › General: the project's name, in its file; the folder keeps its name. */
+export const renameProject = (name: string) =>
+  run(
+    Effect.gen(function*() {
+      yield* (yield* Platform).renameProject(name)
+      yield* refreshProject
     })
   )
 
