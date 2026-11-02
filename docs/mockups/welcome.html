@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Welcome window, project home, project settings</title>
+<style>
+  :root { --ink: #ccc; --dim: #777; --line: #555; --fill: #2a2a2a; --fill2: #333; --acc: #6ea8ff; --ok: #6c6; --warn: #db5; }
+  body { font: 13px/1.4 ui-monospace, monospace; color: var(--ink); margin: 0; }
+  h2 { font: 600 15px/1.3 system-ui, sans-serif; margin: 28px 0 4px; }
+  h2 small { font-weight: 400; color: var(--dim); margin-left: 8px; }
+  p.note { font: 12px/1.5 system-ui, sans-serif; color: var(--dim); margin: 0 0 10px; max-width: 70ch; }
+  p.note b { color: var(--ink); font-weight: 500; }
+  .win { border: 1px solid var(--line); border-radius: 6px; background: #1b1b1b; overflow: hidden; width: 100%; aspect-ratio: 16 / 9.4; display: flex; flex-direction: column; position: relative; }
+  .win.small { aspect-ratio: 16 / 11; max-width: 560px; }
+  .bar { height: 28px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 14px; padding: 0 10px; color: var(--dim); flex: none; }
+  .bar b { color: var(--ink); font-weight: 600; }
+  .bar .r { margin-left: auto; }
+  .status { height: 22px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 14px; padding: 0 10px; color: var(--dim); flex: none; }
+  .status .r { margin-left: auto; }
+  .body { flex: 1; min-height: 0; display: flex; position: relative; }
+  .pane { flex: 1; min-width: 0; padding: 18px 28px; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row .sp { flex: 1; }
+  .h { font: 600 14px system-ui, sans-serif; color: var(--ink); }
+  .sub { color: var(--dim); font-size: 11px; }
+  .btn { border: 1px solid var(--line); border-radius: 4px; padding: 3px 9px; color: var(--ink); white-space: nowrap; }
+  .btn.p { background: var(--acc); border-color: var(--acc); color: #000; }
+  .box { border: 1px solid var(--line); border-radius: 6px; }
+  .list { display: flex; flex-direction: column; }
+  .li { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 14px; padding: 7px 10px; border-bottom: 1px solid #2c2c2c; }
+  .li:last-child { border-bottom: 0; }
+  .li.on { background: var(--fill); }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .dim { color: var(--dim); }
+  .strip { display: flex; gap: 16px; padding: 7px 10px; }
+  .thumb { width: 64px; height: 40px; background: var(--fill2); border-radius: 3px; background-image: linear-gradient(135deg, #3a3a3a 0 30%, transparent 30%); }
+  .thumb.big { width: 100%; height: 72px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .card { background: var(--fill); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .card.dash { background: none; border: 1px dashed var(--line); align-items: center; justify-content: center; min-height: 120px; }
+  .side { width: 190px; flex: none; border-right: 1px solid var(--line); padding: 12px 0; display: flex; flex-direction: column; }
+  .nav { padding: 6px 16px; color: var(--dim); }
+  .nav.on { color: var(--ink); background: var(--fill); }
+  .nav.sub2 { padding-left: 32px; }
+  .dimmer { position: absolute; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; }
+  .dlg { background: #222; border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-width: 330px; }
+  .dlg .h { font-size: 13px; }
+  .form { display: grid; grid-template-columns: 9rem 1fr; gap: 10px 14px; align-items: center; }
+  .in { border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; color: var(--ink); background: #181818; }
+  .in.dim { color: var(--dim); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
+  .cap { font: 11px system-ui, sans-serif; color: var(--dim); margin-top: 6px; }
+  .tabs { height: 26px; border-bottom: 1px solid var(--line); display: flex; align-items: stretch; flex: none; }
+  .tab { padding: 0 10px; display: flex; align-items: center; gap: 6px; border-right: 1px solid var(--line); color: var(--dim); }
+  .tab.on { background: #1b1b1b; color: var(--ink); }
+  .panel { width: 110px; flex: none; background: #171717; }
+  .panel.l { border-right: 1px solid var(--line); } .panel.r { border-left: 1px solid var(--line); }
+  .vp { flex: 1; background: repeating-linear-gradient(45deg, #202020 0 10px, #1d1d1d 10px 20px); }
+</style>
+</head>
+<body>
+
+<h2>1 · Welcome window<small>app level: pick a project</small></h2>
+<p class="note">Shown from the second launch on, and whenever the last project window closes. Each project card is its last-edited map's thumbnail. <b>New project</b> and <b>Open…</b> are the only other actions; Game link lives in the project window, not here. Settings (the app's) is reachable from the gear.</p>
+<div class="win small">
+  <div class="bar"><b>Ballest Editor</b><span class="r dim">⚙</span></div>
+  <div class="body"><div class="pane">
+    <div class="row"><span class="h">Projects</span><span class="sp"></span><span class="btn">Open…</span><span class="btn p">+ New project</span></div>
+    <div class="box list">
+      <div class="li"><div class="thumb"></div><div><div>Season 3 tracks</div><div class="sub">~/Documents/Ballest Editor/Season 3 tracks</div></div><span class="dim">4 maps</span><span class="dim">today</span></div>
+      <div class="li"><div class="thumb"></div><div>Golf <span class="dim">· open in another window</span><div class="sub">~/Documents/Ballest Editor/Golf</div></div><span class="dim">1 map</span><span class="dim">yesterday</span></div>
+      <div class="li"><div class="thumb"></div><div>Scratch<div class="sub">~/Desktop/scratch</div></div><span class="dim">7 maps</span><span class="dim">3 w ago</span></div>
+    </div>
+    <div class="sub" style="margin-top:auto">Right-click a project: Open in new window · Reveal · Remove from list</div>
+  </div></div>
+</div>
+
+<h2>2 · Opening a project<small>this window or a new one</small></h2>
+<p class="note">Only asked from inside a project window (File › Open project, or Welcome reached from one). From the bare Welcome window the project just opens there. "Always" is remembered in Settings.</p>
+<div class="win small" style="max-width:560px">
+  <div class="bar"><b>Ballest Editor</b> File Edit View Map Project Game</div>
+  <div class="tabs"><div class="tab">⌂</div><div class="tab on">Big Loop ●</div></div>
+  <div class="body"><div class="panel l"></div><div class="vp"></div><div class="panel r"></div>
+    <div class="dimmer"><div class="dlg">
+      <div class="h">Open "Golf"</div>
+      <div class="sub">Where should it open?</div>
+      <div class="row"><span class="sp"></span><span class="btn">Cancel</span><span class="btn">New window</span><span class="btn p">This window</span></div>
+      <div class="sub">☐ Always do this</div>
+    </div></div>
+  </div>
+  <div class="status">Season 3 tracks</div>
+</div>
+
+<h2>3 · Project home<small>project window, no map open</small></h2>
+<p class="note">Frame 1 from the last set, with thumbnails. Reached on opening a project with nothing to restore, by closing the last map tab, or with ⌂. The heading is the project; its folder and the Project settings gear sit under it. First launch lands here too, as <b>Untitled Project *</b> with one Untitled map already in it.</p>
+<div class="win">
+  <div class="bar"><b>Ballest Editor</b> File Edit View Map Project Game</div>
+  <div class="body"><div class="pane" style="max-width:820px;margin:0 auto;width:100%">
+    <div class="row"><div><div class="h">Season 3 tracks</div><div class="sub">~/Documents/Ballest Editor/Season 3 tracks · <u>Reveal</u> · <u>Project settings…</u></div></div><span class="sp"></span><span class="btn">Import…</span><span class="btn p">+ New map</span></div>
+    <div class="grid">
+      <div class="card"><div class="thumb big"></div><div class="row"><span>Big Loop</span><span class="sp"></span><span class="warn" title="changed in game">⟳</span></div><div class="sub">edited 2 h ago · changed in game</div></div>
+      <div class="card"><div class="thumb big"></div><div class="row"><span>Golf base</span><span class="sp"></span><span class="ok">✓</span></div><div class="sub">yesterday · in sync</div></div>
+      <div class="card"><div class="thumb big"></div><div class="row"><span>Spiral test</span><span class="sp"></span><span class="dim">·</span></div><div class="sub">3 d ago · not exported</div></div>
+      <div class="card"><div class="thumb big"></div><div class="row"><span>Hairpin</span><span class="sp"></span><span class="ok">✓</span></div><div class="sub">1 w ago · published</div></div>
+    </div>
+    <div class="box strip" style="margin-top:auto"><span>▸ Game link</span><span class="ok">✓ game</span><span class="ok">✓ maps folder</span><span class="ok">✓ creator spigipple…</span><span class="dim">○ plugin manager <i>(for Play)</i> · <u>Set up…</u></span></div>
+  </div></div>
+  <div class="status">Season 3 tracks <span class="r">🔔</span></div>
+</div>
+
+<h2>4 · First launch<small>nothing on disk yet</small></h2>
+<div class="two">
+  <div>
+    <div class="win">
+      <div class="bar"><b>Ballest Editor</b> File Edit View Map Project Game</div>
+      <div class="tabs"><div class="tab">⌂</div><div class="tab on">Untitled map ●</div></div>
+      <div class="body"><div class="panel l"></div><div class="vp"></div><div class="panel r"></div>
+        <div class="dimmer" style="background:none;align-items:flex-start;justify-content:flex-end;padding:10px"><div class="dlg" style="min-width:0;padding:10px 12px;gap:6px">
+          <div class="h">Game link</div>
+          <div class="sub"><span class="ok">✓</span> game &nbsp;<span class="ok">✓</span> maps folder &nbsp;<span class="ok">✓</span> creator &nbsp;<span class="dim">○ plugin manager</span></div>
+        </div></div>
+      </div>
+      <div class="status"><i>Untitled Project *</i> <span class="r">🔔 1</span></div>
+    </div>
+    <div class="cap"><b>4a.</b> Straight into the editor, no Welcome: Untitled Project with Untitled map. The Game link checklist arrives as the one first-run notification instead of a page. The asterisk means the project has no folder yet.</div>
+  </div>
+  <div>
+    <div class="win">
+      <div class="bar"><b>Ballest Editor</b> File Edit View Map Project Game</div>
+      <div class="tabs"><div class="tab">⌂</div><div class="tab on">Untitled map ●</div></div>
+      <div class="body"><div class="panel l"></div><div class="vp"></div><div class="panel r"></div>
+        <div class="dimmer"><div class="dlg">
+          <div class="h">Save project</div>
+          <div class="form">
+            <span class="dim">Project name</span><span class="in">My tracks</span>
+            <span class="dim">Folder</span><span class="in dim">~/Documents/Ballest Editor/My tracks &nbsp;▸</span>
+            <span class="dim">Map name</span><span class="in">Big Loop</span>
+          </div>
+          <div class="row"><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Save</span></div>
+        </div></div>
+      </div>
+      <div class="status"><i>Untitled Project *</i></div>
+    </div>
+    <div class="cap"><b>4b.</b> The first Save names both the project and the map and makes the folder. After that the project is on disk, the asterisk goes, and it appears in Welcome next launch.</div>
+  </div>
+</div>
+
+<h2>5 · Project settings<small>one dialog: the project, then each map</small></h2>
+<p class="note">IntelliJ's Project Structure shape. Map › Map settings… opens it on that map's entry; File › Project settings… on the project's. Today's "Project settings" dialog (level data, difficulty, tags, grid height) is what a map entry holds.</p>
+<div class="two">
+  <div>
+    <div class="win" style="aspect-ratio:16/11">
+      <div class="body">
+        <div class="side">
+          <div class="nav on">Project</div>
+          <div class="nav" style="margin-top:8px;color:var(--ink);font-weight:600">Maps</div>
+          <div class="nav sub2">Big Loop</div>
+          <div class="nav sub2">Golf base</div>
+          <div class="nav sub2">Spiral test</div>
+          <div class="nav sub2">Hairpin</div>
+        </div>
+        <div class="pane" style="gap:12px">
+          <div class="h">Project</div>
+          <div class="form">
+            <span class="dim">Name</span><span class="in">Season 3 tracks</span>
+            <span class="dim">Folder</span><span class="in dim">~/Documents/Ballest Editor/Season 3 tracks</span>
+            <span class="dim">Creator</span><span class="in dim">spigipple… (from Steam)</span>
+            <span class="dim">Export to</span><span class="in dim">Game's maps folder ▾</span>
+          </div>
+          <div class="sub" style="margin-top:auto">Later: git remote, branch.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="win" style="aspect-ratio:16/11">
+      <div class="body">
+        <div class="side">
+          <div class="nav">Project</div>
+          <div class="nav" style="margin-top:8px;color:var(--ink);font-weight:600">Maps</div>
+          <div class="nav sub2 on">Big Loop</div>
+          <div class="nav sub2">Golf base</div>
+          <div class="nav sub2">Spiral test</div>
+          <div class="nav sub2">Hairpin</div>
+        </div>
+        <div class="pane" style="gap:12px">
+          <div class="row"><span class="h">Big Loop</span><span class="sp"></span><span class="btn">Rename</span><span class="btn">Duplicate</span></div>
+          <div class="form">
+            <span class="dim">Level</span><span class="in dim">LevelEditorMain ▾</span>
+            <span class="dim">Difficulty</span><span class="in dim">Medium ▾</span>
+            <span class="dim">Tags</span><span class="in dim">loop, speed</span>
+            <span class="dim">Grid height</span><span class="in">100</span>
+            <span class="dim">Export on save</span><span class="dim">☐</span>
+          </div>
+          <div class="sub" style="margin-top:auto">Exported 4 min ago · <span class="warn">changed in game</span> · <u>Re-import</u></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -173,60 +173,50 @@ tool), is reloaded when the open map has no unsaved edits and reported otherwise
 
 ## Shell
 
-Document tabs (one per open map), a Start tab when nothing is open, and a status bar. The status bar
-is where state that used to be a toast lives:
+Decided with the wireframes in [mockups/](mockups/) (rough; the detailed UI comes with the work). The shape, from
+the outside in:
+
+- **Welcome window** (later; [mockups/welcome.html](mockups/welcome.html) § 1). The app's level: recent projects with
+  a thumbnail each, New project, Open…. Shown from the second launch on and when the last project window closes. From a
+  project window, opening another project asks **This window / New window** (IntelliJ), remembered in Settings. One
+  project per window.
+- **Project window.** Always shows a map: every project has at least one, and opening a project opens its last open
+  map, or its first. There is no Start tab and no empty editor. Maps are the document tabs (one at a time today, several
+  in 0.5). The project's maps are reached through **Project › Maps…**, a dialog (or later a drawer) listing them with
+  thumbnail, link state and last edit, with New map, Import…, Open, Rename, Duplicate, Delete. It is a tool, not a
+  home page.
+- **First launch.** Straight into the editor as **Untitled Project \*** with an Untitled map, nothing on disk. The
+  first Save opens a **Save project** modal: project name, folder (default `Documents/Ballest Editor/<name>`), map
+  name. After it the project exists and the asterisk goes. The Game link checklist shows as a modal on first launch
+  (and from Project › Game link…), not as a page; later launches notify only when a result changes.
+- **Menus.** `File` (New project, Open project…, Recent projects, Save, Save project…, Close project, Settings…, Quit),
+  `Edit`, `View`, `Project` (Maps…, New map…, Import map…, Rename map…, Duplicate map…, Recover previous version…,
+  Export to game, Export on save, Re-import from game, Play, Launch game, Game link…, Project settings…). No separate
+  Map or Game menu: a map is only ever the open one, and the game is the project's export target.
+- **Project settings** ([mockups/welcome.html](mockups/welcome.html) § 5): one dialog, IntelliJ's Project Structure
+  shape. Left: _Project_ (name, folder, creator, export target; later git), then _Maps_ with an entry per map holding
+  what today's map settings dialog edits (level, difficulty, tags, grid height, Export on save) plus Rename and
+  Duplicate. Project › Project settings… opens on the project; the open map's settings open on its entry.
+- **Status bar.** Left the project (italic with \* while untitled); centre the open map's link state, click for a
+  popover with the export path, last export time, Export, Play, Re-import, Reveal; right the update pill and the
+  notification bell.
+- **Notifications.** Every toast is also a notification. The bell keeps the last 100 across restarts
+  (`<userData>/notifications.json`), with their actions still live. Persistent ones pin to the top until resolved.
+  "Don't show again" is per notification kind.
+- **Settings** (the app: keybinds, camera, appearance, game folders) stays its own dialog under File.
 
 ```
-┌ BE  File  Edit  View  Map  Game                   Big Loop *            v ^ x ┐
+┌ BE  File  Edit  View  Project                     Big Loop *            v ^ x ┐
 ├───┬───────────┬──────────────────────────────────────────────┬────────────────┤
-│ ▣ │ Pieces    │ [Start] [Big Loop *] [Golf base]             │ Inspector      │
+│ ▣ │ Pieces    │ [Big Loop *] [Golf base]                     │ Inspector      │
 │ ▤ │           │                                              │                │
 │   │           │               viewport                 [cube]│                │
 ├───┴───────────┴──────────────────────────────────────────────┴────────────────┤
-│ Maps · main    ⟳ Exported 4 min ago · changed in game  [Export] [Play] │ 1.2.0 🔔3 │
+│ Season 3 tracks  ⟳ Exported 4 min ago · changed in game  [Export] [Play] │ 1.2.0 🔔3 │
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Left:** the project (later its branch).
-- **Centre:** the open map's link state; click for a popover with the export path, last export time,
-  Export, Play, Re-import, Reveal.
-- **Right:** the update pill (#136) and the notification bell.
-
-**Notifications.** Every toast is also a notification. The toast auto-dismisses; the bell keeps the
-last 100 across restarts (`<userData>/notifications.json`), with their actions still live (Reveal,
-Re-import, Choose folder…). Persistent ones (game not found, plugin manager missing) pin to the top
-until resolved and resolve themselves when the cause goes away. "Don't show again" is per
-notification kind, in `desktop-settings.json`.
-
-**Start tab.** Opens when no map tab is open, and from View. Project-centric, which is what separates
-it from an IDE's welcome page:
-
-```
-┌ Start ─────────────────────────────────────────────────────────────┐
-│ Maps in this project                                 [New map]     │
-│  ┌──────┐ Big Loop        ⟳ changed in game    edited 2 h ago      │
-│  │ thumb│ Golf base       ✓ in sync             edited yesterday   │
-│  └──────┘ Spiral test     · not exported        edited 3 d ago     │
-│                                                                    │
-│ In the game, not imported                            [Import…]     │
-│   Hairpin_Isaac.balledit        published · 412 items              │
-│   Test3_Isaac.balledit          210 items                          │
-│                                                                    │
-│ Game link   ✓ game  ✓ maps  ✓ creator Isaac  ✗ plugin manager ▸    │
-└────────────────────────────────────────────────────────────────────┘
-```
-
-**Game link** replaces the three startup toasts of #133, #134 and #135 with one checklist, inline on
-the Start tab on first run and collapsed to one row afterwards: the install, the maps folder, the
-creator (from Steam, editable), the plugin manager and the `ballest-editor-link` plugin (#118). A
-missing item carries its fix (Choose folder…, Install docs, Install plugin). Nothing toasts on first
-run because this is already in front of the user; later launches notify only when a result changes.
-
-**Settings tiers.** _Settings_ (the app: keybinds, camera, appearance, game folders), _Project
-settings_ (name, folder, default creator, export target; later git), _Map settings_ (what today's
-"Project settings…" edits: level data, difficulty, tags, grid height, Export on save). A **Map** menu
-holds Rename, Duplicate, Recover previous version, Map settings, Export to game and Re-import; **Game** keeps Launch, Play and
-Install plugin.
+Thumbnails are an offscreen render of the map written next to it on save, used by Maps… and Welcome.
 
 ## Phases
 
