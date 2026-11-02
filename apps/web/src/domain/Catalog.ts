@@ -55,12 +55,14 @@ export class ExtraMesh extends Schema.Opaque<ExtraMesh>()(open({
 })) {}
 
 /**
- * A laser's beam, which the game builds in native code along a trace from the terminal's muzzle
- * (Main-relative, UE cm) in the direction `axis`: a thin core inside a wider glow.
+ * A laser's beam, which the game builds in native code from the terminal's muzzle (Main-relative,
+ * UE cm) in the direction `axis`: a thin core inside a wider glow, `length` cm long before the
+ * item's scale.
  */
 export class Beam extends Schema.Opaque<Beam>()(open({
   muzzle: Vec3Tuple,
   axis: Vec3Tuple,
+  length: Schema.Finite,
   coreRadius: Schema.Finite,
   glowRadius: Schema.Finite,
   /** Linear RGB. */

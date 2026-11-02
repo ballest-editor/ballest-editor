@@ -137,9 +137,10 @@ Piece = {
                   transformRelativeToMain: {location, quat, scale}, materialSlots, bounds }]
                        // transformRelativeToMain is the Blueprint's, except where native code replaces it
                        // (NATIVE_TRANSFORMS in build-catalog.mjs: the elevator's Platform is drawn at scale 1)
-  beam?: { muzzle:[x,y,z], axis:[x,y,z], coreRadius, glowRadius, color:[r,g,b] }
-                       // lasers: the beam native code builds along a trace from the muzzle (Main-relative cm),
-                       // radii from the Blueprint, colour from M_LaserBeamCore; its length is the trace's
+  beam?: { muzzle:[x,y,z], axis:[x,y,z], length, coreRadius, glowRadius, color:[r,g,b] }
+                       // lasers: the beam native code builds from the muzzle (Main-relative cm), `length` cm
+                       // at scale 1 (SM_LaserCore's; the item's X scale stretches it), radii from the
+                       // Blueprint, colour from M_LaserBeamCore
   sampleProperties     // "propertyName:type" pairs seen in samples
   properties: [{ name, list, type, ueType, default, hidden, source, optional? }]
                        // the CDO's LevelEditorExposedProperties, in order: list/type are where and how

@@ -1,8 +1,9 @@
 /**
- * A laser's beam (catalog `beam`). The game builds it in native code along a trace from the
- * terminal's muzzle: a thin core inside a wider glow, ending at the first thing in its way.
- * Here the same trace runs against the other items' meshes a few times a second, so the beam
- * follows the map as it is edited. The beam itself takes no clicks and stops no other beam.
+ * A laser's beam (catalog `beam`). The game builds it in native code from the terminal's muzzle:
+ * a thin core inside a wider glow, `length` cm long (stretched by the item's X scale) or shorter
+ * where something is in its way. Here that trace runs against the other items' meshes a few
+ * times a second, so the beam follows the map as it is edited. The beam itself takes no clicks
+ * and stops no other beam.
  */
 import { useFrame } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
@@ -11,9 +12,6 @@ import type { Beam } from "../domain/Catalog"
 import { UE_TO_THREE_MATRIX } from "../domain/coords"
 import { sceneRegistry } from "./sceneRegistry"
 import { isMesh } from "./threeGuards"
-
-/** How far a beam with nothing in its way reaches (cm). The game's sweep limit is native; this is a stand-in. */
-export const BEAM_REACH = 10_000
 
 /** Seconds between traces: often enough to follow a drag, cheap on maps with thousands of items. */
 const TRACE_INTERVAL = 0.25
@@ -97,14 +95,13 @@ export function LaserBeam({ beam, itemId }: { readonly beam: Beam; readonly item
     direction.subVectors(ahead, from)
     const perUnit = direction.length()
     if (perUnit === 0) return
-    const length = traceBeam(root, from, direction.normalize(), itemId, BEAM_REACH) / perUnit
-    span.current.scale.x = length
+    span.current.scale.x = traceBeam(root, from, direction.normalize(), itemId, beam.length * perUnit) / perUnit
   })
 
   return (
     <group ref={frame} matrixAutoUpdate={false} matrix={ueToThree}>
       <group position={beam.muzzle} quaternion={orientation}>
-        <group ref={span} scale={[0, 1, 1]}>
+        <group ref={span} scale={[beam.length, 1, 1]}>
           <mesh geometry={unitBeam} material={core} scale={[1, beam.coreRadius, beam.coreRadius]} raycast={noRaycast} />
           <mesh geometry={unitBeam} material={glow} scale={[1, beam.glowRadius, beam.glowRadius]} raycast={noRaycast} />
         </group>

@@ -186,8 +186,10 @@ const nativeTransform = (className, component, transform) => {
 // A laser's beam: BallestLaserBeamMeshComponents (core and glow) native code builds along the trace from the
 // terminal's muzzle, so there is no mesh to export. Its radii are the Blueprint's (LaserCoreRadius,
 // LaserGlowRadius); the colour is M_LaserBeamCore's LaserColor default. The beam leaves the terminal's front
-// face (the mesh's +X side) along +X.
+// face (the mesh's +X side) along +X. Its length is SM_LaserCore's (a 100 cm unit cylinder): the laser's only
+// scalable axis is X (ScalableAxes), which stretches it, and the game's thumbnail shows a beam about 1 m long.
 const LASER_COLOR = [1, 0.015494804, 0.015494804]
+const LASER_LENGTH = 100
 const beamOf = (cls, mesh) => {
   const variable = (name) => cls?.levelEditorProperties?.variables?.find((v) => v.name === name)?.default
   const coreRadius = variable("LaserCoreRadius"), glowRadius = variable("LaserGlowRadius")
@@ -195,6 +197,7 @@ const beamOf = (cls, mesh) => {
   return {
     muzzle: [mesh?.bounds?.max?.[0] ?? 0, 0, 0],
     axis: [1, 0, 0],
+    length: LASER_LENGTH,
     coreRadius,
     glowRadius,
     color: LASER_COLOR

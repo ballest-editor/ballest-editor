@@ -14334,6 +14334,7 @@
           0,
           0
         ],
+        "length": 100,
         "coreRadius": 2,
         "glowRadius": 12,
         "color": [
@@ -19778,6 +19779,7 @@
           0,
           0
         ],
+        "length": 100,
         "coreRadius": 2,
         "glowRadius": 12,
         "color": [
