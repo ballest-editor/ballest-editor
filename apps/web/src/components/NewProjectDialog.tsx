@@ -10,11 +10,9 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { useState } from "react"
+import { isProjectName } from "../domain/project"
 import { createProject } from "../editor/actions"
 import { useEditor } from "../editor/store"
-
-/** A folder name every OS accepts (main checks the same): letters, digits, spaces, `-` and `_`. */
-const isProjectName = (name: string): boolean => /^[\p{L}\p{N}_-][\p{L}\p{N} _-]{0,63}$/u.test(name)
 
 /**
  * File › New project… (desktop): the folder's name is all it asks. The project is made under `projectsFolder`
@@ -27,7 +25,7 @@ export function NewProjectDialog({ open, onClose }: { readonly open: boolean; re
   const trimmed = name.trim()
   const valid = isProjectName(trimmed)
   const taken = recent !== null &&
-    [recent.current, ...recent.recent].some((p) => p.name.toLowerCase() === trimmed.toLowerCase())
+    [recent.current, ...recent.recent].some((p) => p !== null && p.name.toLowerCase() === trimmed.toLowerCase())
   const submit = async () => {
     await createProject(trimmed)
     setName("")

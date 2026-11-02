@@ -59,7 +59,7 @@ export interface TestDisk {
    */
   gameLink: { last: GameLinkResult | null; muted: Array<string> }
   /** The project in use, the recent ones, and the map last open in each (as `desktop-settings.json` keeps them). */
-  project: { current: string; recent: Array<string>; lastOpenMap: Record<string, string> }
+  project: { current: string | null; recent: Array<string>; lastOpenMap: Record<string, string> }
   /**
    * `creator`: what `findCreator` answers. `plugin`: the editor-link plugin's status; installing it makes it `current`,
    * counted in `pluginInstalls`. `races`: the maps Play asked the plugin to race (its `play.json`s), in order.
@@ -196,38 +196,34 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
   const info = (path: string): ProjectInfo => ({
     path,
     name: nameOf(path),
-    exists: [...disk.files.keys()].some((file) => file.startsWith(`${path}/maps/`)),
-    isDefault: path === TEST_PROJECT
+    exists: [...disk.files.keys()].some((file) => file.startsWith(`${path}/maps/`))
   })
-  const state = () => {
-    const others = disk.project.recent.filter((p) => p !== disk.project.current)
-    const recent = others.includes(TEST_PROJECT) || disk.project.current === TEST_PROJECT
-      ? others
-      : [...others, TEST_PROJECT]
-    return {
-      current: info(disk.project.current),
-      recent: recent.map(info),
-      lastOpenMap: disk.project.lastOpenMap[disk.project.current] ?? null,
-      projectsFolder: TEST_PROJECTS_FOLDER
-    }
-  }
+  /** The project in use; "" while there is none (Untitled Project), so no file is ever under it. */
+  const current = () => disk.project.current ?? ""
+  const NO_PROJECT = "There is no project yet: Save the map to name one, or open a project."
+  const state = () => ({
+    current: disk.project.current === null ? null : info(disk.project.current),
+    recent: disk.project.recent.filter((p) => p !== disk.project.current).map(info),
+    lastOpenMap: disk.project.lastOpenMap[current()] ?? null,
+    projectsFolder: TEST_PROJECTS_FOLDER
+  })
   const select = (path: string) => {
     if (path.startsWith(TEST_MAPS_FOLDER)) return fail(`${path} is the game's maps folder or inside it.`)
     disk.project = { ...disk.project, current: path, recent: [path, ...disk.project.recent.filter((p) => p !== path)] }
     return Promise.resolve(state())
   }
   const mapOf = (fileName: string): ProjectMap => {
-    const text = disk.files.get(projectFile(fileName, disk.project.current)) ?? ""
+    const text = disk.files.get(projectFile(fileName, current())) ?? ""
     return {
       fileName,
-      path: projectFile(fileName, disk.project.current),
+      path: projectFile(fileName, current()),
       modifiedAt: TIME,
       hash: testHash(text),
       publishedFileId: publishedIdOf(text),
-      link: linksOf(disk.project.current).get(fileName) ?? null
+      link: linksOf(current()).get(fileName) ?? null
     }
   }
-  const has = (fileName: string) => disk.files.has(projectFile(fileName, disk.project.current))
+  const has = (fileName: string) => disk.files.has(projectFile(fileName, current()))
   /** Keeps the file at `path` before something else is written there, as main's `Backups` does. */
   const backUp = (place: BackupPlace, path: string, next: string | null) => {
     const old = disk.files.get(path)
@@ -236,7 +232,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     disk.backups.unshift({ place, id: `${disk.backups.length} ${fileName}`, fileName, at: TIME, text: old })
   }
   const write = (fileName: string, text: string) => {
-    const path = projectFile(fileName, disk.project.current)
+    const path = projectFile(fileName, current())
     backUp("project", path, text)
     disk.files.set(path, text)
     return Promise.resolve(mapOf(fileName))
@@ -262,36 +258,40 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       return select(path)
     },
     revealProject: () => {
-      const { current } = disk.project
-      if (!info(current).exists) return Promise.resolve(false)
-      disk.external.push(`${current}/maps`)
+      const project = disk.project.current
+      if (project === null || !info(project).exists) return Promise.resolve(false)
+      disk.external.push(`${project}/maps`)
       return Promise.resolve(true)
     },
     rememberOpenMap: (fileName) => {
-      const { [disk.project.current]: _previous, ...others } = disk.project.lastOpenMap
-      disk.project.lastOpenMap = fileName === null ? others : { ...others, [disk.project.current]: fileName }
+      const project = disk.project.current
+      if (project === null) return Promise.resolve()
+      const { [project]: _previous, ...others } = disk.project.lastOpenMap
+      disk.project.lastOpenMap = fileName === null ? others : { ...others, [project]: fileName }
       return Promise.resolve()
     },
     listMaps: () => {
-      const prefix = `${disk.project.current}/maps/`
+      const prefix = `${current()}/maps/`
       return Promise.resolve(
         [...disk.files.keys()].filter((file) => file.startsWith(prefix)).map((file) => mapOf(nameOf(file)))
       )
     },
     readMap: (fileName) => {
-      const text = disk.files.get(projectFile(fileName, disk.project.current))
+      if (disk.project.current === null) return fail(NO_PROJECT)
+      const text = disk.files.get(projectFile(fileName, current()))
       return text === undefined
-        ? fail(`${projectFile(fileName, disk.project.current)} doesn't exist any more.`)
+        ? fail(`${projectFile(fileName, current())} doesn't exist any more.`)
         : Promise.resolve({ ...mapOf(fileName), text })
     },
     createMap: ({ fileName, text }) => has(fileName) ? exists(fileName) : write(fileName, text),
     saveMap: ({ fileName, text }) => write(fileName, text),
     renameMap: ({ from, to, text }) => {
+      if (disk.project.current === null) return fail(NO_PROJECT)
       if (from === to) return write(to, text)
       if (has(to)) return exists(to)
-      backUp("project", projectFile(from, disk.project.current), null)
-      disk.files.delete(projectFile(from, disk.project.current))
-      const links = linksOf(disk.project.current)
+      backUp("project", projectFile(from, current()), null)
+      disk.files.delete(projectFile(from, current()))
+      const links = linksOf(current())
       const moved = links.get(from)
       links.delete(from)
       if (moved !== undefined) links.set(to, moved)
@@ -305,12 +305,13 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       return Promise.resolve({ path, name: nameOf(path), text } satisfies OpenedMapFile)
     },
     importMap: async ({ source, fileName, text, replace }) => {
+      if (disk.project.current === null) return fail(NO_PROJECT)
       if (has(fileName) && !replace) return { _tag: "Clash", fileName } as const
       const original = disk.files.get(source) ?? ""
       await write(fileName, text)
       const origin = { path: source, hash: testHash(original), at: TIME }
       const fromGame = source === `${TEST_MAPS_FOLDER}/${fileName}`
-      const links = linksOf(disk.project.current)
+      const links = linksOf(current())
       links.set(fileName, {
         ...(links.get(fileName) ?? emptyLink),
         origin,
@@ -321,15 +322,15 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     exportMap: ({ fileName, replacePublished, overwriteChanged }) => {
       const folder = disk.game.paths.mapsFolder.path
       if (folder === null) return Promise.reject(new Error("GamePathError: Couldn't find the game's maps folder."))
-      const text = disk.files.get(projectFile(fileName, disk.project.current))
-      if (text === undefined) return fail(`${projectFile(fileName, disk.project.current)} doesn't exist any more.`)
+      const text = disk.files.get(projectFile(fileName, current()))
+      if (text === undefined) return fail(`${projectFile(fileName, current())} doesn't exist any more.`)
       const path = `${folder}/${fileName}`
       const existing = disk.files.get(path)
       const publishedFileId = existing === undefined ? -1 : publishedIdOf(existing)
       if (!replacePublished && publishedFileId > 0) {
         return Promise.resolve({ _tag: "Published", file: { path, name: fileName }, publishedFileId } as const)
       }
-      const links = linksOf(disk.project.current)
+      const links = linksOf(current())
       const last = links.get(fileName)
       const seen = existing === undefined ? null : testHash(existing)
       if (
@@ -351,7 +352,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       const changed: Array<string> = []
       const missing: Array<string> = []
       const folder = disk.game.paths.mapsFolder.path
-      const links = linksOf(disk.project.current)
+      const links = linksOf(current())
       for (const [fileName, link] of links) {
         if (folder === null || link.export?.path !== `${folder}/${fileName}`) continue
         const text = disk.files.get(link.export.path)
@@ -366,12 +367,13 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       return Promise.resolve({ changed, missing })
     },
     reimportMap: async (fileName) => {
-      const link = linksOf(disk.project.current).get(fileName) ?? emptyLink
+      if (disk.project.current === null) return fail(NO_PROJECT)
+      const link = linksOf(current()).get(fileName) ?? emptyLink
       const text = link.export === null ? undefined : disk.files.get(link.export.path)
       if (link.export === null || text === undefined) return fail(`${fileName} has no export to re-import.`)
       await write(fileName, text)
       const seen = { ...link.export, hash: testHash(text) }
-      linksOf(disk.project.current).set(fileName, { ...link, export: seen, lastSeenHash: seen.hash })
+      linksOf(current()).set(fileName, { ...link, export: seen, lastSeenHash: seen.hash })
       return { ...mapOf(fileName), text }
     },
     listBackups: () => Promise.resolve(disk.backups.map(({ text: _, ...backup }) => backup)),
@@ -430,7 +432,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       return Promise.resolve({ plugin: disk.game.plugin, restartGame: disk.game.running })
     },
     play: async ({ fileName, replacePublished, overwriteChanged }) => {
-      const publishedFileId = publishedIdOf(disk.files.get(projectFile(fileName, disk.project.current)) ?? "")
+      const publishedFileId = publishedIdOf(disk.files.get(projectFile(fileName, current())) ?? "")
       if (publishedFileId >= 0) return { _tag: "PublishedMap", fileName, publishedFileId } as const
       const exported = await bridge.exportMap({ fileName, replacePublished, overwriteChanged })
       if (exported._tag !== "Exported") return exported

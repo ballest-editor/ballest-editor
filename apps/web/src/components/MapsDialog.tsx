@@ -79,7 +79,7 @@ function MapRow(
  */
 export function MapsDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   const maps = useEditor((s) => s.projectMaps)
-  const projectPath = useEditor((s) => s.project?.current.path ?? "")
+  const project = useEditor((s) => s.project?.current ?? null)
   const now = useNow()
   const then = (action: () => Promise<unknown>) => {
     onClose()
@@ -90,12 +90,16 @@ export function MapsDialog({ open, onClose }: { readonly open: boolean; readonly
       <DialogContent className="flex max-h-[min(80vh,720px)] min-h-[24rem] flex-col sm:max-w-3xl">
         <DialogHeader className="flex-row items-center gap-2">
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <DialogTitle>Maps</DialogTitle>
-            <DialogDescription className="truncate font-mono text-[0.6875rem]" title={projectPath}>
-              {projectPath}
-            </DialogDescription>
+            <DialogTitle>{project === null ? "Untitled Project" : "Maps"}</DialogTitle>
+            {project === null
+              ? <DialogDescription>Not saved anywhere yet: Save the open map to name the project.</DialogDescription>
+              : (
+                <DialogDescription className="truncate font-mono text-[0.6875rem]" title={project.path}>
+                  {project.path}
+                </DialogDescription>
+              )}
           </div>
-          <Button variant="outline" onClick={() => then(importMap)}>
+          <Button variant="outline" disabled={project === null} onClick={() => then(importMap)}>
             <IconFileImport data-icon="inline-start" />
             Import…
           </Button>
@@ -107,8 +111,9 @@ export function MapsDialog({ open, onClose }: { readonly open: boolean; readonly
         {maps.length === 0
           ? (
             <p className="px-2 py-6 text-xs text-muted-foreground">
-              No maps saved yet. Save the open map, or New map… starts one here; Import… copies one in from the game's
-              maps folder or anywhere else.
+              {project === null
+                ? "The open map is the project's only one so far. Save it to name the project and keep it on disk."
+                : "No maps saved yet. Save the open map, or New map… starts one here; Import… copies one in from the game's maps folder or anywhere else."}
             </p>
           )
           : (

@@ -1,9 +1,12 @@
+import { Input } from "@workspace/ui/components/input"
+import { Label } from "@workspace/ui/components/label"
 import { useMemo, useState } from "react"
 import { riskyClassesIn } from "../domain/Catalog"
 import { copyNameOf, isValidName, mapFileNameOf } from "../domain/factory"
 import { unconfirmedPropertiesIn } from "../domain/itemProperties"
 import { classNameOf } from "../domain/MapFile"
-import { duplicateMap, playAsNewDraft, renameOpenMap, saveMapAs } from "../editor/actions"
+import { isProjectName } from "../domain/project"
+import { duplicateMap, nameProject, playAsNewDraft, renameOpenMap, saveMapAs } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { type MapCreator, MapNameDialog, useMapCreator } from "./MapNameDialog"
 
@@ -30,7 +33,13 @@ export function NameMapDialog(
   const items = useEditor((s) => s.doc.map.items)
   const catalog = useEditor((s) => s.catalog)
   const projects = useEditor((s) => s.capabilities.projects)
-  const projectName = useEditor((s) => s.project?.current.name ?? "the project")
+  const project = useEditor((s) => s.project?.current ?? null)
+  const projectsFolder = useEditor((s) => s.project?.projectsFolder ?? "")
+  // Saving into Untitled Project names the project first (docs/PROJECTS.md § Shell)
+  const namesProject = projects && mode === "saveAs" && project === null
+  const [projectDraft, setProjectDraft] = useState("")
+  const projectTrimmed = projectDraft.trim()
+  const projectOk = !namesProject || isProjectName(projectTrimmed)
   const projectMaps = useEditor((s) => s.projectMaps)
   const fileName = useEditor((s) => s.file?.name ?? null)
   const takeAfterSave = useEditor((s) => s.takeAfterSave)
@@ -73,6 +82,7 @@ export function NameMapDialog(
     else if (mode === "newDraft") await playAsNewDraft(name, creator.name, replaces)
     else if (mode === "rename") await renameOpenMap(name, creator.name)
     else {
+      if (namesProject) await nameProject(projectTrimmed)
       useEditor.getState().renameLevel(name, creator.name)
       await saveMapAs()
     }
@@ -86,7 +96,9 @@ export function NameMapDialog(
 
   const copy = {
     saveAs: projects
-      ? { title: "Save map", note: `Saves it in ${projectName}.`, submit: "Save" }
+      ? namesProject
+        ? { title: "Save map", note: "Names the project it goes in, and saves it there.", submit: "Save" }
+        : { title: "Save map", note: `Saves it in ${project?.name ?? "the project"}.`, submit: "Save" }
       : {
         title: "Export map",
         note: "Downloads it. Drop it in the game's UserSavedMaps folder; don't rename the file afterwards.",
@@ -137,9 +149,26 @@ export function NameMapDialog(
       }
       submitLabel={replaces ? "Replace" : copy.submit}
       canSubmit={isValidName(name) && isValidName(creator.name) && risky.rejected.length === 0 &&
-        (!clash || replaces)}
+        (!clash || replaces) && projectOk}
       onSubmit={submit}
     >
+      {namesProject && (
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="saveAs-project">Project name</Label>
+          <Input
+            id="saveAs-project"
+            value={projectDraft}
+            placeholder="My tracks"
+            aria-invalid={projectTrimmed !== "" && !projectOk}
+            onChange={(e) => setProjectDraft(e.target.value)}
+          />
+          <span className="text-[0.7rem] text-muted-foreground">
+            {projectTrimmed === "" || !projectOk
+              ? `A folder of maps, made in ${projectsFolder}. Letters, digits, spaces, - and _.`
+              : <code className="break-all">{`${projectsFolder}/${projectTrimmed}`}</code>}
+          </span>
+        </div>
+      )}
       {mode === "newDraft" && (
         <p className="text-xs text-muted-foreground">
           {levelData.levelDisplayName} is the draft of a map published to the Workshop (item{" "}

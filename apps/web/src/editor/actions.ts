@@ -305,7 +305,11 @@ const revealIn = (where: "project" | "game"): NotificationAction => ({
   command: where === "project" ? { _tag: "RevealProject" } : { _tag: "RevealGamePath", which: "mapsFolder" }
 })
 
-const projectName = () => useEditor.getState().project?.current.name ?? "the project"
+/** The project's name; Untitled Project while there is none (docs/PROJECTS.md § Shell). */
+const projectName = () => useEditor.getState().project?.current?.name ?? "Untitled Project"
+
+/** Whether there is a project to write maps into (desktop with one named; a browser has none and keeps maps in memory). */
+const hasProject = () => useEditor.getState().project?.current != null
 
 /** The open map encoded the way the game wants it written, with the document it was made from. */
 const exportOpenMap = Effect.gen(function*() {
@@ -340,7 +344,8 @@ export const createNewMap = Effect.fn("createNewMap")(function*(displayName: str
   const catalog = useEditor.getState().catalog?.catalog
   const playerStartPiece = catalog?.pieces.find((p) => p.classPath === PLAYER_START_CLASS)
   const map = newMapFile({ displayName, creatorName, createdAt, playerStartPiece })
-  if (!platform.capabilities.projects) {
+  // a browser keeps it in memory; so does Untitled Project, until the first Save names a project
+  if (!platform.capabilities.projects || !hasProject()) {
     useEditor.getState().loadMap(map, null)
     return
   }
@@ -552,6 +557,11 @@ const importInto = Effect.fn("importInto")(function*(pending: ImportClash, repla
  */
 export const importMapFile = Effect.gen(function*() {
   const platform = yield* Platform
+  if (platform.capabilities.projects && !hasProject()) {
+    return yield* new PlatformError({
+      message: "There is no project to import into yet. Save the open map to name one, or open a project."
+    })
+  }
   const picked = yield* platform.pickMapFile
   if (Option.isNone(picked)) return
   const { name, path, text } = picked.value
@@ -1101,12 +1111,13 @@ const changeProject = (
   run(unlessCancelled(
     "switchProject",
     Effect.gen(function*() {
-      const before = useEditor.getState().project?.current.path
+      const before = useEditor.getState().project?.current?.path ?? null
       const next = yield* change(yield* Platform)
       if (Option.isNone(next)) return
-      if (next.value.current.path !== before) useEditor.getState().detachFile()
+      const after = next.value.current
+      if (after === null || after.path !== before) useEditor.getState().detachFile()
       yield* refreshProject
-      useEditor.getState().notify("info", `Using the project ${next.value.current.name}`, {
+      useEditor.getState().notify("info", `Using the project ${after?.name ?? "Untitled Project"}`, {
         kind: "projectChanged",
         actions: [revealIn("project")]
       })
@@ -1118,12 +1129,23 @@ export const chooseProject = () => changeProject((platform) => platform.choosePr
 
 /** Goes back to a recent project; the one in use already is left alone. */
 export const switchProject = (path: string) =>
-  path === useEditor.getState().project?.current.path
+  path === useEditor.getState().project?.current?.path
     ? Promise.resolve(undefined)
     : changeProject((platform) => Effect.asSome(platform.switchProject(path)))
 
 /** New project…: `<projectsFolder>/<name>` is made and becomes the project. */
 export const createProject = (name: string) => changeProject((platform) => Effect.asSome(platform.createProject(name)))
+
+/**
+ * The first Save's project name (docs/PROJECTS.md § Shell): Untitled Project becomes `<projectsFolder>/<name>` and
+ * the open map stays open, unsaved, for the save that follows. No unsaved-changes prompt: nothing is left behind.
+ */
+export const nameProjectEffect = Effect.fn("nameProjectEffect")(function*(name: string) {
+  yield* (yield* Platform).createProject(name)
+  yield* refreshProject
+})
+
+export const nameProject = (name: string) => run(nameProjectEffect(name))
 
 export const revealProject = () =>
   run(

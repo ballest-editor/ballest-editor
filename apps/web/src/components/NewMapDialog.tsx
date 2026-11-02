@@ -8,7 +8,7 @@ import { MapNameDialog, useMapCreator } from "./MapNameDialog"
 export function NewMapDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   const creator = useMapCreator()
   const projects = useEditor((s) => s.capabilities.projects)
-  const projectName = useEditor((s) => s.project?.current.name ?? "the project")
+  const project = useEditor((s) => s.project?.current ?? null)
   const [name, setName] = useState("")
   const clash = useEditor((s) =>
     projects && s.projectMaps.some((m) => m.fileName === mapFileNameOf(name.trim(), creator.name))
@@ -27,7 +27,7 @@ export function NewMapDialog({ open, onClose }: { readonly open: boolean; readon
       title="New map"
       fileNameLead="Exports as"
       fileNameNote={`Starts like a new in-game map, with the player start and the goal ring where the game puts them${
-        projects ? `, and is saved in ${projectName} at once` : ""
+        projects && project !== null ? `, and is saved in ${project.name} at once` : ""
       }.`}
       name={name}
       onNameChange={setName}

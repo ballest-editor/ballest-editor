@@ -3,6 +3,7 @@ import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Kbd } from "@workspace/ui/components/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
+import { cn } from "@workspace/ui/lib/utils"
 import { formatBinding } from "../domain/Keybinds"
 import { playMap } from "../editor/actions"
 import { useEditor } from "../editor/store"
@@ -41,16 +42,23 @@ const TITLE_BAR_CLASSES = [
   "pr-[calc(100vw_-_env(titlebar-area-width,100vw)_-_env(titlebar-area-x,0px)_+_0.5rem)]"
 ].join(" ")
 
-/** The window's title: the project in use (desktop), centred like any document window's. Its folder on hover. */
+/**
+ * The window's title: the project in use (desktop), centred like any document window's, its folder on hover. With
+ * none it is Untitled Project, starred because nothing is on disk yet (docs/PROJECTS.md § Shell).
+ */
 function ProjectTitle() {
-  const project = useEditor((s) => s.project?.current ?? null)
-  if (project === null) return null
+  const state = useEditor((s) => s.project)
+  if (state === null) return null
+  const project = state.current
   return (
     <span
-      className="pointer-events-none absolute inset-x-0 mx-auto w-max max-w-[40%] truncate text-center text-xs text-muted-foreground"
-      title={project.path}
+      className={cn(
+        "pointer-events-none absolute inset-x-0 mx-auto w-max max-w-[40%] truncate text-center text-xs text-muted-foreground",
+        project === null && "italic"
+      )}
+      title={project?.path ?? "Not saved anywhere yet: Save the map to name the project."}
     >
-      {project.name}
+      {project === null ? "Untitled Project *" : project.name}
     </span>
   )
 }

@@ -225,14 +225,15 @@ What is built ([DESKTOP.md](DESKTOP.md) § Renderer): the project window as abov
 multi-window, Untitled Project \* and the Save project modal, thumbnails, the drawer and Delete in Maps…. Where this
 first slice stops short of the design:
 
-- **No Welcome, no first-launch project.** On launch the window opens the map open when the app last ran (kept per
-  project in `desktop-settings.json`), else the project's most recently edited map, else a fresh unsaved map named
-  Untitled (an empty project starts there; the first Save names the map into the default project, not into a named
-  Untitled Project). Closing the last tab shows the same fresh map. The window's title shows the project plainly,
-  never italic with \*.
-- **File › New project…** asks a name and makes `Documents/Ballest Editor/<name>` (`Projects.createNew`); a project
-  elsewhere is Open project…, the folder chooser. No Close project yet: without the Welcome window there is nowhere to
-  go.
+- **No Welcome yet.** On launch the window opens the last used project (the first of the recent list in
+  `desktop-settings.json`) on the map open when the app last ran, else the project's most recently edited map, else a
+  fresh unsaved map named Untitled. With no project used yet it is **Untitled Project \*** (italic in the title; main's
+  `ProjectState.current` is null): the fresh map in memory, nothing on disk, `Maps…` showing only that. New map there
+  stays in memory too; Import is refused with the reason. The first Save's dialog asks the project name as well
+  (`isProjectName`, made under `projectsFolder` by `Projects.createNew`), then writes the map into it; Export and
+  Play go through Save, so they ask the same. Closing the last tab shows the fresh map again.
+- **File › New project…** asks a name and makes `Documents/Ballest Editor/<name>`; a project elsewhere is Open
+  project…, the folder chooser. No Close project yet: without the Welcome window there is nowhere to go.
 - **Maps…** has no thumbnails (a square slot per row waits for them) and no Delete. Rename and Duplicate open the map
   first (the name dialogs name the open map); Reveal shows the project's maps folder, not the file.
 - **Project settings:** the name is read-only (the folder's), the export target read-only (the game's maps folder);

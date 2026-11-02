@@ -95,7 +95,7 @@ function RecentProjectsMenu() {
             title={project.path}
             onClick={() => void switchProject(project.path)}
           >
-            <span className="truncate">{project.name}{project.isDefault ? " (default)" : ""}</span>
+            <span className="truncate">{project.name}</span>
           </MenubarItem>
         ))}
       </MenubarSubContent>

@@ -69,11 +69,14 @@ export const chooseProject = makeIpcMethod({
   result: ChooseProjectResult,
   handler: Effect.fn("ipc.chooseProject")(function*(_, event) {
     const projects = yield* Projects
-    const { current } = yield* projects.state
+    const { current, projectsFolder } = yield* projects.state
     const picked = yield* (yield* ElectronDialog).showOpenFolder({
       owner: event.sender.id,
       title: "Choose the project folder",
-      defaultPath: Option.some(current.exists ? current.path : (yield* Path.Path).dirname(current.path)),
+      // the project in use, or where projects are made; a folder that isn't a project yet starts in its parent
+      defaultPath: Option.some(
+        current === null ? projectsFolder : current.exists ? current.path : (yield* Path.Path).dirname(current.path)
+      ),
       filters: []
     })
     if (Option.isNone(picked)) return null

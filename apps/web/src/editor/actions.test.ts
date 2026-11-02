@@ -20,6 +20,7 @@ import {
   projectFile,
   TEST_MAPS_FOLDER,
   TEST_PROJECT,
+  TEST_PROJECTS_FOLDER,
   testBridge,
   type TestDisk,
   testHash
@@ -46,6 +47,7 @@ import {
   keepNotifications,
   launchGameEffect,
   muteNotificationKindEffect,
+  nameProjectEffect,
   openProjectMap,
   openProjectMapFile,
   openStartingMap,
@@ -100,12 +102,14 @@ const edit = () => {
 }
 
 /** A fresh editor for each test: the store outlives the layers. */
-const reset = Effect.sync(() => {
+/** A clean editor over the disk's project, as the app has after its startup load. */
+const reset = Effect.gen(function*() {
   s().loadMap(s().doc.map, null)
   s().setImportClash(null)
   s().setPublishedDraft(null)
   s().setChangedExport(null)
   s().closeDialog()
+  yield* refreshProjectEffect
 })
 
 /** Imports `path` through the dialog. */
@@ -200,6 +204,33 @@ describe("project actions", () => {
 
       yield* openProjectMapFile(renamed)
       assert.strictEqual(s().doc.map.worldSettings.levelData.levelDisplayName, "Hairpin")
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("Untitled Project: nothing on disk until the first Save names the project", () => {
+    const disk = makeTestDisk()
+    disk.project.current = null
+    return Effect.gen(function*() {
+      yield* reset
+      assert.isNull(s().project?.current)
+      // New map stays in memory, and there is nothing to import into
+      yield* createNewMap("Big Loop", "Isaac")
+      assert.isNull(s().file)
+      assert.strictEqual(disk.files.size, 0)
+      const refused = yield* Effect.flip(importMapFile)
+      assert.match(refused.message, /no project to import into/)
+      assert.deepStrictEqual(disk.dialogs, [])
+
+      // The Save dialog's project name makes the folder, then the map is written into it
+      yield* nameProjectEffect("My tracks")
+      const project = `${TEST_PROJECTS_FOLDER}/My tracks`
+      assert.deepInclude(s().project?.current, { path: project, name: "My tracks" })
+      assert.isNull(s().file)
+      yield* saveMapAsEffect
+      const name = "Map_LevelEditorMain&Big Loop_Isaac.balledit"
+      assert.deepStrictEqual(s().file, { name, path: projectFile(name, project) })
+      assert.isTrue(disk.files.has(projectFile(name, project)))
+      assert.deepStrictEqual(s().projectMaps.map((m) => m.fileName), [name])
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
