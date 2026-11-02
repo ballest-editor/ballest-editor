@@ -174,6 +174,33 @@ const withNative = (own, className, chain, sample) => {
   ]
 }
 
+// Component transforms the game's native code replaces at runtime, by class and component. The elevator's
+// Platform template is scaled 17.7 x 17.7 (a 22 m disc over the 3 m base); BallestElevatorComponent drives the
+// platform, and the thumbnail shows it a little narrower than the base, as its mesh is at scale 1.
+const NATIVE_TRANSFORMS = { BP_Elevator: { Platform: { scale: [1, 1, 1] } } }
+const nativeTransform = (className, component, transform) => {
+  const native = NATIVE_TRANSFORMS[className]?.[component]
+  return native ? { ...transform, ...native } : transform
+}
+
+// A laser's beam: BallestLaserBeamMeshComponents (core and glow) native code builds along the trace from the
+// terminal's muzzle, so there is no mesh to export. Its radii are the Blueprint's (LaserCoreRadius,
+// LaserGlowRadius); the colour is M_LaserBeamCore's LaserColor default. The beam leaves the terminal's front
+// face (the mesh's +X side) along +X.
+const LASER_COLOR = [1, 0.015494804, 0.015494804]
+const beamOf = (cls, mesh) => {
+  const variable = (name) => cls?.levelEditorProperties?.variables?.find((v) => v.name === name)?.default
+  const coreRadius = variable("LaserCoreRadius"), glowRadius = variable("LaserGlowRadius")
+  if (typeof coreRadius !== "number" || typeof glowRadius !== "number") return undefined
+  return {
+    muzzle: [mesh?.bounds?.max?.[0] ?? 0, 0, 0],
+    axis: [1, 0, 0],
+    coreRadius,
+    glowRadius,
+    color: LASER_COLOR
+  }
+}
+
 const pieces = []
 const unresolved = []
 const registry = JSON.parse(readFileSync(join(assets, "registry.json"), "utf8"))
@@ -227,10 +254,11 @@ for (const o of pieceOrder(registry)) {
         glb: glbPath(meshes.get(m.staticMesh)),
         visible: m.visible,
         hiddenInGame: m.hiddenInGame,
-        transformRelativeToMain: m.mainSpace,
+        transformRelativeToMain: nativeTransform(s.className.replace(/_C$/, ""), m.name, m.mainSpace),
         materialSlots: slotsFor(m.staticMesh, m.overrideMaterials),
         bounds: meshes.get(m.staticMesh)?.bounds ?? null
       })),
+    ...(beamOf(cls, mesh) ? { beam: beamOf(cls, mesh) } : {}),
     sampleProperties: Object.keys(s.propertyNames).sort(),
     properties: withNative(propertiesOf(cls, s), s.className.replace(/_C$/, ""), chainOf.get(s.objectPath) ?? [], s)
   }

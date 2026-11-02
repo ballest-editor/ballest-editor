@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "notes": ["scalars/vectors/textures/switches are effective values: root UMaterial defaults (from CachedExpressionData) overridden by each instance down the chain.","vectors are linear RGBA as stored by UE. baseColor/emissive in approx are linear; set three.js colors with Color.setRGB(r,g,b, THREE.LinearSRGBColorSpace) (or the default working space).","approx.baseColor/metallic/roughness are the compiled shader evaluated for the material's parameters and a facing view with every texture at its mean colour (approx.evaluated true); otherwise (translucent passes) parameters picked by name (approx.keys says which; null = neutral default). opacity/emissive are always picked by name.","approx.colorLayers are the texture reads the base colour depends on: colour = baseColor + sum of gain * (read - mean); approx.opacityLayers the reads a translucent pass's alpha depends on, the same way on the read's channel (r/g/b/a; gain and mean from the evaluated shader; tiling is repeats per UV unit, or per cm when projected; instanceScale as for the normal map).","approx.reads are the base-pass pixel shader's texture reads, traced through the compiled shader (tools/extract shaders): projection uv = mesh UV0 (scale in repeats per UV unit); object = object-aligned position, pivot at the object origin, rotating with the piece (scale in repeats per cm; instanceScale 1 = u, v also multiply by the piece's x, y scale); world. strength is a normal layer's blend strength. approx.*Texture/tiling/projection/instanceScale are the primary read per role; tiling is [u, v].","Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).","approx.variation is the grey mottle as the base pass applies it: colour *= 1 + gain * product over layers of (texture read at tilings[i] + offsets[i]); gain already includes the instance's parameter (ColorContrast - 1 for the Env masters).","approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).","approx.opacity is the evaluated alpha on the face that shows most (a beam masks its caps with 1 - |world normal z|: its sides); approx.upFade (0..1, null = 1) is the fraction left on a face that looks up. An additive pass renders as its evaluated glow (emissive, black base, opacity 1) faded the same way.","approx.programs is the compiled shader's own output math as GLSL functions f(uv, worldNormal, objectPosition, time) with the instance's parameters folded in: alpha (a translucent pass's alpha, e.g. the vent's streaks for any frame via time), glow (an additive pass's unlit colour) and base (an opaque base colour whose texture reads the layers cannot place, e.g. the rubber block's cells); textures are the samplers the code reads (uTexN).","A few materials cannot be read from the cooked data and are overridden by name (OVERRIDES in tools/extract/src/materials.ts): M_PlasticBase's cell noise samples the engine's placeholder texture, so its base colour is taken as BaseColor_Light, the colour the game shows.","paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap).","surfaces are the level editor's item surfaces (EBallestSurfaceAssignment) in the game's order, each with the material the game draws that physics surface with (object path; null for none): UBallestSurfaceMaterialSettings' defaults from the exe, overridden by DefaultGame.ini."],
+  "notes": ["scalars/vectors/textures/switches are effective values: root UMaterial defaults (from CachedExpressionData) overridden by each instance down the chain.","vectors are linear RGBA as stored by UE. baseColor/emissive in approx are linear; set three.js colors with Color.setRGB(r,g,b, THREE.LinearSRGBColorSpace) (or the default working space).","approx.baseColor/metallic/roughness are the compiled shader evaluated for the material's parameters and a facing view with every texture at its mean colour (approx.evaluated true); otherwise (translucent passes) parameters picked by name (approx.keys says which; null = neutral default). opacity/emissive are always picked by name.","approx.colorLayers are the texture reads the base colour depends on: colour = baseColor + sum of gain * (read - mean); approx.opacityLayers the reads a translucent pass's alpha depends on, the same way on the read's channel (r/g/b/a; gain and mean from the evaluated shader; tiling is repeats per UV unit, or per cm when projected; instanceScale as for the normal map).","approx.reads are the base-pass pixel shader's texture reads, traced through the compiled shader (tools/extract shaders): projection uv = mesh UV0 (scale in repeats per UV unit); object = object-aligned position, pivot at the object origin, rotating with the piece (scale in repeats per cm; instanceScale 1 = u, v also multiply by the piece's x, y scale); world. strength is a normal layer's blend strength. approx.*Texture/tiling/projection/instanceScale are the primary read per role; tiling is [u, v].","Textures are PNG, largest mip <= --tex-max (2048) px. Normal maps had Z rebuilt from BC5 X/Y and keep UE's DirectX convention (green = -Y); in three.js use normalScale (1, -1) or flip G. sRGB flag per texture in `textures` (sRGB false => load with NoColorSpace).","approx.variation is the grey mottle as the base pass applies it: colour *= 1 + gain * product over layers of (texture read at tilings[i] + offsets[i]); gain already includes the instance's parameter (ColorContrast - 1 for the Env masters).","approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).","approx.opacity is the evaluated alpha on the face that shows most (a beam masks its caps with 1 - |world normal z|: its sides); approx.upFade (0..1, null = 1) is the fraction left on a face that looks up. An additive pass renders as its evaluated glow (emissive, black base, opacity 1) faded the same way.","approx.programs is the compiled shader's own output math as GLSL functions f(uv, worldNormal, objectPosition, time) with the instance's parameters folded in: alpha (a translucent pass's alpha, e.g. the vent's streaks for any frame via time), glow (an additive pass's unlit colour) and base (an opaque base colour whose texture reads the layers cannot place: coordinates through a cell function, e.g. the rubber block's cells and the paddle's stripe, or a mask in a texture's alpha, e.g. the spinning cylinder's stripes); textures are the samplers the code reads (uTexN).","A few materials cannot be read from the cooked data and are overridden by name (OVERRIDES in tools/extract/src/materials.ts): M_PlasticBase's cell noise samples the engine's placeholder texture, so its base colour is taken as BaseColor_Light, the colour the game shows.","paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap).","surfaces are the level editor's item surfaces (EBallestSurfaceAssignment) in the game's order, each with the material the game draws that physics surface with (object path; null for none): UBallestSurfaceMaterialSettings' defaults from the exe, overridden by DefaultGame.ini."],
   "materials": [
     {
       "path": "/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial",
@@ -11463,19 +11463,20 @@
         "projection": "uv",
         "instanceScale": 0,
         "opacityLayers": [],
-        "colorLayers": [
-          {
-            "texture": "textures/Art/Decals/Logos/Orbital/Textures/OrbitalLogo_graph_packed.png",
-            "tiling": [1,1],
-            "projection": "uv",
-            "instanceScale": 0,
-            "gain": [0.336716,0.318568,-0.136971],
-            "mean": [0,0,0.5385615330118074]
-          }
-        ],
+        "colorLayers": [],
         "variation": null,
         "outline": null,
-        "programs": {},
+        "programs": {
+          "base": {
+            "code": "vec3 ballestBase(vec2 uv, vec3 nrm, vec3 pos, float time) {\n  vec4 s199 = texture2D(uTex0, vec2(uv.x, uv.y));\n  float t214 = (0.336716 * s199.w);\n  float t217 = (t214 + 0.039546);\n  float t243 = clamp(t217, 0.0, 1.0);\n  float t215 = (0.318568 * s199.w);\n  float t218 = (t215 + 0.078187);\n  float t244 = clamp(t218, 0.0, 1.0);\n  float t216 = (-0.136971 * s199.w);\n  float t219 = (t216 + 0.571125);\n  float t245 = clamp(t219, 0.0, 1.0);\n  return vec3(t243, t244, t245);\n}",
+            "textures": [
+              {
+                "uniform": "uTex0",
+                "texture": "textures/Art/Decals/Logos/Orbital/Textures/OrbitalLogo_graph_packed.png"
+              }
+            ]
+          }
+        },
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -11548,7 +11549,21 @@
         "colorLayers": [],
         "variation": null,
         "outline": null,
-        "programs": {},
+        "programs": {
+          "base": {
+            "code": "vec3 ballestBase(vec2 uv, vec3 nrm, vec3 pos, float time) {\n  float t293 = (uv.y + -0.5874999761581421);\n  float t295 = (t293 * 40.0);\n  float t315 = (1.0 - t295);\n  float t317 = min(t295, t315);\n  float t307 = dFdy(t295);\n  float t309 = abs(t307);\n  float t303 = dFdx(t295);\n  float t305 = abs(t303);\n  float t311 = (t309 + t305);\n  float t313 = max(t311, 0.000009999999747378752);\n  float t319 = (t317 / t313);\n  float t321 = (t319 + 0.5);\n  float t323 = clamp(t321, 0.0, 1.0);\n  float t292 = (uv.x + -0.5335000157356262);\n  float t294 = (t292 * 30.303030014038086);\n  float t314 = (1.0 - t294);\n  float t316 = min(t294, t314);\n  float t306 = dFdy(t294);\n  float t308 = abs(t306);\n  float t302 = dFdx(t294);\n  float t304 = abs(t302);\n  float t310 = (t308 + t304);\n  float t312 = max(t310, 0.000009999999747378752);\n  float t318 = (t316 / t312);\n  float t320 = (t318 + 0.5);\n  float t322 = clamp(t320, 0.0, 1.0);\n  float t324 = (t323 * t322);\n  float t459 = (0.095274 * t324);\n  float t466 = (0.37626213 - t459);\n  vec4 s298 = texture2D(uTex0, vec2(t294, t295));\n  float t325 = (t324 * s298.w);\n  float t469 = (t466 * t325);\n  float t472 = (t469 + t459);\n  float t162 = (uv.x + -0.6660000085830688);\n  float t165 = (0.0 - t162);\n  float t169 = abs(t162);\n  float t171 = fract(t169);\n  float t173 = (0.0 - t171);\n  float t175 = ((t162 >= t165) ? t171 : t173);\n  float t177 = (t175 * 6.0);\n  float t179 = (t177 + -0.25);\n  float t180 = clamp(t179, 0.0, 1.0);\n  float t163 = (uv.y + -0.10000000149011612);\n  float t164 = (t163 * 0.1666666716337204);\n  float t166 = (0.0 - t164);\n  float t170 = abs(t164);\n  float t172 = fract(t170);\n  float t174 = (0.0 - t172);\n  float t176 = ((t164 >= t166) ? t172 : t174);\n  float t178 = (t176 * 6.0);\n  float t181 = clamp(t178, 0.0, 1.0);\n  vec4 s286 = texture2D(uTex1, vec2(t180, t181));\n  float t443 = (-0.128633 * s286.w);\n  float t446 = (t443 + 1.0);\n  float t449 = (t446 * s286.x);\n  float t452 = (t446 - t449);\n  float t475 = (t472 - t452);\n  float t326 = max(t325, t324);\n  float t478 = (t475 * t326);\n  float t481 = (t478 + t452);\n  float t521 = clamp(t481, 0.0, 1.0);\n  float t460 = (0.149879 * t324);\n  float t467 = (0.39675522 - t460);\n  float t470 = (t467 * t325);\n  float t473 = (t470 + t460);\n  float t444 = (-1.0 * s286.w);\n  float t447 = (t444 + 1.0);\n  float t450 = (t447 * s286.x);\n  float t453 = (t447 - t450);\n  float t476 = (t473 - t453);\n  float t479 = (t476 * t326);\n  float t482 = (t479 + t453);\n  float t522 = clamp(t482, 0.0, 1.0);\n  float t461 = (0.913043 * t324);\n  float t468 = (0.43415365 - t461);\n  float t471 = (t468 * t325);\n  float t474 = (t471 + t461);\n  float t445 = (-1.0 * s286.w);\n  float t448 = (t445 + 1.0);\n  float t451 = (t448 * s286.x);\n  float t454 = (t448 - t451);\n  float t477 = (t474 - t454);\n  float t480 = (t477 * t326);\n  float t483 = (t480 + t454);\n  float t523 = clamp(t483, 0.0, 1.0);\n  return vec3(t521, t522, t523);\n}",
+            "textures": [
+              {
+                "uniform": "uTex0",
+                "texture": "textures/Art/Decals/Logos/Orbital/Textures/OrbitalLogo_graph_packed.png"
+              },
+              {
+                "uniform": "uTex1",
+                "texture": "textures/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/Textures/Paddles/PaddleSides_graph_packed.png"
+              }
+            ]
+          }
+        },
         "keys": {
           "baseColor": null,
           "metallic": null,
@@ -12031,19 +12046,20 @@
         "projection": "uv",
         "instanceScale": 0,
         "opacityLayers": [],
-        "colorLayers": [
-          {
-            "texture": "textures/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/Textures/Surfaces/SpinningCylinder/GrippySpinningCylinder_graph_packed.png",
-            "tiling": [1.0004881620407104,1],
-            "projection": "uv",
-            "instanceScale": 0,
-            "gain": [0.8049999999999999,0.131,-0.03],
-            "mean": [0.4883508869369628,0,0.9143206035086334]
-          }
-        ],
+        "colorLayers": [],
         "variation": null,
         "outline": null,
-        "programs": {},
+        "programs": {
+          "base": {
+            "code": "vec3 ballestBase(vec2 uv, vec3 nrm, vec3 pos, float time) {\n  float t150 = (uv.x * 1.0004881620407104);\n  float t154 = (0.5 * uv.y);\n  vec4 s211 = texture2D(uTex0, vec2(t150, t154));\n  float t220 = (0.85 * s211.w);\n  float t227 = (t220 - 0.045);\n  float t230 = (t227 * s211.w);\n  float t233 = (t230 + 0.045);\n  float t257 = clamp(t233, 0.0, 1.0);\n  float t221 = (0.18 * s211.w);\n  float t228 = (t221 - 0.049);\n  float t231 = (t228 * s211.w);\n  float t234 = (t231 + 0.049);\n  float t258 = clamp(t234, 0.0, 1.0);\n  float t222 = (0.025 * s211.w);\n  float t229 = (t222 - 0.055);\n  float t232 = (t229 * s211.w);\n  float t235 = (t232 + 0.055);\n  float t259 = clamp(t235, 0.0, 1.0);\n  return vec3(t257, t258, t259);\n}",
+            "textures": [
+              {
+                "uniform": "uTex0",
+                "texture": "textures/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/Textures/Surfaces/SpinningCylinder/GrippySpinningCylinder_graph_packed.png"
+              }
+            ]
+          }
+        },
         "keys": {
           "baseColor": null,
           "metallic": null,

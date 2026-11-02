@@ -34,6 +34,8 @@ export interface Read {
   readonly mean: readonly [number, number, number] | null
   /** Translucent passes: what the read adds to the alpha going 0 -> 1. */
   readonly alphaGain: number
+  /** What the read's alpha channel alone adds to the base colour; null = nothing (a layer only applies rgb). */
+  readonly fromAlpha: readonly [number, number, number] | null
 }
 
 // ------------------------------------------------------------------ texture reads, from the trace
@@ -157,7 +159,8 @@ export const readsOf = (
       unresolved: [...unresolved].sort(),
       gain: null,
       mean: null,
-      alphaGain: 0
+      alphaGain: 0,
+      fromAlpha: null
     })
   }
   return { reads: out, index }
@@ -324,7 +327,19 @@ export interface Layers {
   readonly colorLayers: ReadonlyArray<Read>
   readonly projection: Projection
   readonly variation: Variation | null
+  /**
+   * The base colour depends on a read the layers cannot place: one whose coordinates are not fully known (a
+   * cell function, an unresolved parameter: the paddle's stripe goes through frac) or whose alpha channel
+   * carries a mask (the spinning cylinder's stripes). The material's base program draws it instead.
+   */
+  readonly unplaced: boolean
 }
+
+/**
+ * A read that moves the colour visibly (by a tenth of full scale): the paddle's stripe (1), the cylinder's (0.8).
+ * Smaller detail the trace cannot place (DefaultMaterial's, the rough paints' faint grain) stays a flat colour.
+ */
+const visible = (rgb: ReadonlyArray<number> | null | undefined) => rgb?.some((x) => Math.abs(x) >= 0.1) ?? false
 
 export const layersOf = (
   sh: MaterialShaders | undefined,
@@ -339,7 +354,9 @@ export const layersOf = (
     : readsOf(sh, merged, textureOf, textureInfo, translucent)
   const reads = traced.reads.map((r, i) => {
     const g = evaluated?.gains[String(traced.index[i])]
-    return g === undefined ? r : { ...r, gain: g.gain, mean: g.mean, alphaGain: g.alpha }
+    return g === undefined
+      ? r
+      : { ...r, gain: g.gain, mean: g.mean, alphaGain: g.alpha, fromAlpha: g.fromAlpha ?? null }
   })
   const variation = sh === undefined ? null : variationOf(sh, merged, reads, traced.index)
   // Only reads whose coordinates are fully known can stand for a role.
@@ -359,7 +376,13 @@ export const layersOf = (
   const opacityRead = primary("opacity")
   const ormRead = primary("orm")
   const projection: Projection = (normalRead ?? colorLayers[0] ?? variationRead ?? opacityRead)?.projection ?? "uv"
-  return { reads, normalRead, variationRead, opacityRead, ormRead, colorLayers, projection, variation }
+  // Reads the trace dropped (no coordinate source it could follow) that still move the colour.
+  const untraced = Object.entries(evaluated?.gains ?? {}).some(([i, g]) =>
+    !traced.index.includes(Number(i)) && (sh?.reads[Number(i)]?.texture ?? -1) >= 0 && visible(g.gain)
+  )
+  const unplaced = reads.some((r) => r.role !== "normal" && (r.unresolved.length > 0 || visible(r.fromAlpha))) ||
+    untraced
+  return { reads, normalRead, variationRead, opacityRead, ormRead, colorLayers, projection, variation, unplaced }
 }
 
 // ------------------------------------------------------------------ 4. output
@@ -389,7 +412,8 @@ export const approxOf = (
 ) => {
   const S = merged.scalars, V = merged.vectors
   const { additive, alphaShown, emissiveColor, translucent, upFade } = translucency
-  const { colorLayers, normalRead, opacityRead, ormRead, projection, reads, variation, variationRead } = layers
+  const { colorLayers, normalRead, opacityRead, ormRead, projection, reads, unplaced, variation, variationRead } =
+    layers
   const bc = picks.baseColor.value
   // M_OutlineEdges: a band of OutlineBase grey along the UV border, `Size` being the un-banded fraction.
   const outlineBase = V["OutlineBase"]
@@ -404,10 +428,7 @@ export const approxOf = (
     Object.entries(evaluated?.programs ?? {})
       // A base program only where the layers cannot place a read, and never for an overridden material: its
       // program runs the same math on the placeholder texture the override exists to work around.
-      .filter(([kind]) =>
-        kind !== "base" ||
-        (override === undefined && reads.some((r) => r.role !== "normal" && r.unresolved.length > 0))
-      )
+      .filter(([kind]) => kind !== "base" || (override === undefined && unplaced))
       .map(([kind, p]) => [kind, {
         code: p.code,
         textures: p.textures.map((t) => ({

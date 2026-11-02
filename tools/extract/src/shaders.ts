@@ -120,15 +120,18 @@ export interface MaterialSurface {
    * (additive: the unlit colour) or `base` (opaque: the GBuffer base colour); textures by material texture index.
    */
   readonly programs: Partial<Record<"alpha" | "glow" | "base", GlslProgramRef>>
-  /** By read index: the colour (and, translucent, alpha) the read adds going 0 -> 1, and the mean it was evaluated at. */
-  readonly gains: Record<
-    string,
-    {
-      readonly gain: readonly [number, number, number]
-      readonly alpha: number
-      readonly mean: readonly [number, number, number]
-    }
-  >
+  /**
+   * By read index: the colour (and, translucent, alpha) the read adds going 0 -> 1, and the mean it was evaluated
+   * at; `fromAlpha`, where the read's alpha alone moves the colour, how much (a mask packed in the alpha).
+   */
+  readonly gains: Record<string, ReadGain>
+}
+
+export interface ReadGain {
+  readonly gain: readonly [number, number, number]
+  readonly alpha: number
+  readonly mean: readonly [number, number, number]
+  readonly fromAlpha?: readonly [number, number, number]
 }
 
 /** A listed material's trace with the surface evaluated for its own parameters: what `materials build` works from. */
@@ -347,15 +350,18 @@ export const shaders = Effect.fn("shaders")(function*(options: {
     if (alphaProgram) programs.alpha = alphaProgram
     if (glowProgram) programs.glow = glowProgram
     if (baseProgram) programs.base = baseProgram
-    const gains: Record<
-      string,
-      { gain: readonly [number, number, number]; alpha: number; mean: readonly [number, number, number] }
-    > = {}
+    const gains: Record<string, ReadGain> = {}
     for (const [v, gain] of Object.entries(surface?.gains ?? {})) {
       const alpha = surface?.alphaGains[v] ?? 0
       if (gain.every((x) => Math.abs(x) < 1e-4) && Math.abs(alpha) < 1e-4) continue
       const m = means.get(v) ?? [0.5, 0.5, 0.5, 1]
-      gains[String(px.sampleValues.indexOf(v))] = { gain, alpha, mean: [m[0], m[1], m[2]] }
+      const fromAlpha = surface?.alphaColorGains[v]
+      gains[String(px.sampleValues.indexOf(v))] = {
+        gain,
+        alpha,
+        mean: [m[0], m[1], m[2]],
+        ...(fromAlpha?.some((x) => Math.abs(x) >= 1e-4) ? { fromAlpha } : {})
+      }
     }
     materials[material] = {
       shader: key,
@@ -380,7 +386,7 @@ export const shaders = Effect.fn("shaders")(function*(options: {
     notes: [
       "`shaders`, per material the C# tool dumped shaders for (the roots and the instances with their own shader map): the base-pass pixel shader's texture reads (`reads`, texture = index into `textures`, -1 = an engine texture) with each coordinate traced to its sources (`leaves`), and the vertex shader's outputs (`interpolants`) traced the same way. `materials`, per listed material (instances included): the trace it runs (`shader`, a key of `shaders`: itself or its first ancestor with one) and its `surface`.",
       "A leaf is one source the coordinate depends on linearly: kind input (vertex attribute ATTRIBUTEn in the vertex shader, interpolant TEXCOORDn / SV_Position in the pixel shader), buffer (vertex fetch: UVs), sceneData (the primitive/instance transform), param (constant buffer), texture, constant. factor = product of the literal constants on the path; params = constant-buffer values on the path; sceneDepth = transform rows multiplied in (1: local->world, 2: ...->object); sceneScale = multiplied (1) / divided (-1) by the instance scale.",
-      "`surface` is the shader evaluated for this material's parameters and a facing view, every texture read at its mean colour: base colour (the GBuffer's for opaque passes, the lit diffuse term for translucent ones), metallic and roughness (opaque), opacity (translucent; opacitySide for a vertical face, alphaRange with every read at 0 / 1, emissiveSide the unlit colour of a vertical face), and per read index the colour / alpha the read adds going 0 -> 1 (gain) around the mean it was evaluated at.",
+      "`surface` is the shader evaluated for this material's parameters and a facing view, every texture read at its mean colour: base colour (the GBuffer's for opaque passes, the lit diffuse term for translucent ones), metallic and roughness (opaque), opacity (translucent; opacitySide for a vertical face, alphaRange with every read at 0 / 1, emissiveSide the unlit colour of a vertical face), and per read index the colour / alpha the read adds going 0 -> 1 (gain) around the mean it was evaluated at (fromAlpha: the colour its alpha channel alone adds, where it adds any).",
       "`mottle` is the grey-mottle chain where the base pass has one: reads (indices) offset by `offsets`, multiplied together, times `gain` (sign * constant * (param + paramAdd)) and added to 1, multiplying the base colour.",
       "`textures[i].index` indexes the root material's ReferencedTextures; `param` names the texture parameter an instance may override. `slots` name the Material constant-buffer floats (`[reg].c`) by parameter (from the preshader bytecode) where the expression is a plain parameter read."
     ],

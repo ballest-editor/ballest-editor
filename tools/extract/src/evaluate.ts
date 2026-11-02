@@ -406,6 +406,11 @@ export interface Surface {
   readonly emissiveSide: readonly [number, number, number]
   /** Per texture sample value: how much r, g, b of the base colour change when the sample goes 0 -> 1. */
   readonly gains: Record<string, readonly [number, number, number]>
+  /**
+   * The same for the sample's alpha alone (the other channels at their means): a mask packed in a texture's
+   * alpha (the spinning cylinder's stripes), which a layer adding `gain * (rgb - mean)` cannot show.
+   */
+  readonly alphaColorGains: Record<string, readonly [number, number, number]>
 }
 
 /** SSA handle -> the constant buffer's type name (`Material`, `View`), or `cbN` for an unnamed one. */
@@ -514,10 +519,15 @@ export const surfaceOf = (
   const base = opaque ? gbuffer : diffuse ?? [undefined, undefined, undefined]
   const alpha = opaque ? undefined : outs.get("0.w")
   const cfg = cfgOf(ir)
-  const at = (overrides: ReadonlyMap<string, number>, normal: readonly [number, number, number]) => {
+  /** `overrides`: a sample's value on every channel; `channel`, the one channel the overrides set (else all). */
+  const at = (
+    overrides: ReadonlyMap<string, number>,
+    normal: readonly [number, number, number],
+    channel?: number
+  ) => {
     const e = new Evaluator(m, {
       cbuf: (ref) => cbuf(ref) ?? ENGINE_DEFAULTS[ref],
-      sample: (v, ch) => overrides.get(v) ?? means(v, ch),
+      sample: (v, ch) => (channel === undefined || ch === channel ? overrides.get(v) : undefined) ?? means(v, ch),
       normal,
       cfg
     })
@@ -538,12 +548,17 @@ export const surfaceOf = (
   const shown = shows(side) > shows(zero) ? SIDE : UP
   const gains: Record<string, readonly [number, number, number]> = {}
   const alphaGains: Record<string, number> = {}
+  const alphaColorGains: Record<string, readonly [number, number, number]> = {}
+  const difference = (hi: typeof zero, lo: typeof zero): readonly [number, number, number] => {
+    const h = rgb(hi.rgb), l = rgb(lo.rgb)
+    return [h[0] - l[0], h[1] - l[1], h[2] - l[2]]
+  }
   if (hasBase) {
     for (const s of colorSamples) {
       const hi = at(new Map([[s, 1]]), shown), lo = at(new Map([[s, 0]]), shown)
-      const h = rgb(hi.rgb), l = rgb(lo.rgb)
-      gains[s] = [h[0] - l[0], h[1] - l[1], h[2] - l[2]]
+      gains[s] = difference(hi, lo)
       if (!opaque) alphaGains[s] = hi.alpha - lo.alpha
+      alphaColorGains[s] = difference(at(new Map([[s, 1]]), shown, 3), at(new Map([[s, 0]]), shown, 3))
     }
   }
   const corner = (value: number) => at(new Map(colorSamples.map((s) => [s, value])), shown).alpha
@@ -557,6 +572,7 @@ export const surfaceOf = (
     emissive: rgb(zero.scene),
     emissiveSide: rgb(side.scene),
     gains,
-    alphaGains
+    alphaGains,
+    alphaColorGains
   }
 }

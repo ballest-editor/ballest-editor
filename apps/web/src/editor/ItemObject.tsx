@@ -13,6 +13,7 @@ import {
 } from "../domain/coords"
 import type { Item } from "../domain/MapFile"
 import { mirrorScaleOf } from "../domain/mirror"
+import { LaserBeam } from "./LaserBeam"
 import { applySlotMaterials } from "./materials"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
@@ -136,6 +137,7 @@ export const ItemObject = memo(function ItemObjectView(props: {
     const scale = mirrorScaleOf(item, index)
     return scale === undefined ? undefined : toTuple3(ueToThreeVector(fromTuple3(scale)))
   }, [item, index])
+  const beam = index?.pieceByClass.get(item.actorToSpawn)?.beam
 
   return (
     <group
@@ -147,6 +149,7 @@ export const ItemObject = memo(function ItemObjectView(props: {
     >
       <group {...(mirror === undefined ? {} : { scale: mirror })}>
         <ItemVisuals visuals={visuals} />
+        {beam !== undefined && <LaserBeam beam={beam} itemId={id} />}
       </group>
     </group>
   )

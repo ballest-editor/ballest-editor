@@ -55,6 +55,19 @@ export class ExtraMesh extends Schema.Opaque<ExtraMesh>()(open({
 })) {}
 
 /**
+ * A laser's beam, which the game builds in native code along a trace from the terminal's muzzle
+ * (Main-relative, UE cm) in the direction `axis`: a thin core inside a wider glow.
+ */
+export class Beam extends Schema.Opaque<Beam>()(open({
+  muzzle: Vec3Tuple,
+  axis: Vec3Tuple,
+  coreRadius: Schema.Finite,
+  glowRadius: Schema.Finite,
+  /** Linear RGB. */
+  color: Vec3Tuple
+})) {}
+
+/**
  * A property the level editor exposes on a class (its CDO's `LevelEditorExposedProperties`),
  * in the game's order. `list`/`type` are where and how the game writes it; null when the
  * extractor couldn't map the Blueprint type. `hidden`: left out of the game's own panel.
@@ -83,6 +96,7 @@ export class CatalogPiece extends Schema.Opaque<CatalogPiece>()(open({
   seenInSamples: Schema.optionalKey(Schema.Int),
   mainRelativeTransform: Schema.optionalKey(Schema.NullOr(MainRelativeTransform)),
   extraMeshes: Schema.optionalKey(Schema.Array(ExtraMesh)),
+  beam: Schema.optionalKey(Beam),
   /** In-game browser category, display name, visibility and thumbnail (newer catalogs). */
   category: Schema.optionalKey(Schema.NullOr(Schema.String)),
   displayName: Schema.optionalKey(Schema.NullOr(Schema.String)),
