@@ -128,6 +128,8 @@ export function MenuBar() {
     s.capabilities
   )
   const exportOnSave = useEditor((s) => s.exportOnSave)
+  // Untitled Project has no folder to import into yet (the Project panel's Import is disabled the same way)
+  const untitled = useEditor((s) => s.project?.current === null)
   // Re-import needs an export to take the map from
   const exportedFile = useOpenProjectMap()?.map
   const reimportable = exportedFile?.link?.export != null ? exportedFile.fileName : null
@@ -255,7 +257,7 @@ export function MenuBar() {
         ? (
           <Menu title="Project">
             <CommandItem action="newMap" inset>New map…</CommandItem>
-            <CommandItem action="openMap" inset>Import map…</CommandItem>
+            <CommandItem action="openMap" inset disabled={untitled}>Import map…</CommandItem>
             {canExport && (
               <>
                 <MenubarSeparator />

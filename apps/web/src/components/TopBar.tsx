@@ -4,6 +4,7 @@ import { Button } from "@workspace/ui/components/button"
 import { Kbd } from "@workspace/ui/components/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
+import { useEffect } from "react"
 import { formatBinding } from "../domain/Keybinds"
 import { playMap } from "../editor/actions"
 import { useEditor } from "../editor/store"
@@ -48,18 +49,26 @@ const TITLE_BAR_CLASSES = [
  */
 function ProjectTitle() {
   const state = useEditor((s) => s.project)
-  if (state === null) return null
+  const name = state === null ? null : state.current === null ? "Untitled Project *" : state.current.name
+  // the OS window title too, so the taskbar and alt-tab tell projects apart
+  useEffect(() => {
+    document.title = name === null ? "Ballest Editor" : `${name} – Ballest Editor`
+  }, [name])
+  if (state === null || name === null) return null
   const project = state.current
   return (
-    <span
-      className={cn(
-        "pointer-events-none absolute inset-x-0 mx-auto w-max max-w-[40%] truncate text-center text-xs text-muted-foreground",
-        project === null && "italic"
-      )}
-      title={project?.path ?? "Not saved anywhere yet: Save the map to name the project."}
-    >
-      {project === null ? "Untitled Project *" : project.name}
-    </span>
+    // the strip spans the bar (centring) but lets clicks through to the menus; only the name itself takes the hover
+    <div className="pointer-events-none absolute inset-x-0 flex justify-center">
+      <span
+        className={cn(
+          "pointer-events-auto max-w-[40vw] truncate text-xs text-muted-foreground",
+          project === null && "italic"
+        )}
+        title={project?.path ?? "Not saved anywhere yet: Save the map to name the project."}
+      >
+        {name}
+      </span>
+    </div>
   )
 }
 
