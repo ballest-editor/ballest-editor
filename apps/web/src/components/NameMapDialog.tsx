@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { riskyClassesIn } from "../domain/Catalog"
 import { copyNameOf, isValidName, mapFileNameOf } from "../domain/factory"
+import { unconfirmedPropertiesIn } from "../domain/itemProperties"
 import { classNameOf } from "../domain/MapFile"
 import { duplicateMap, playAsNewDraft, renameOpenMap, saveMapAs } from "../editor/actions"
 import { useEditor } from "../editor/store"
@@ -33,15 +34,12 @@ export function NameMapDialog(
   const projectMaps = useEditor((s) => s.projectMaps)
   const fileName = useEditor((s) => s.file?.name ?? null)
   const takeAfterSave = useEditor((s) => s.takeAfterSave)
-  const risky = useMemo(
-    () =>
-      riskyClassesIn(
-        items.map((it) => classNameOf(it.actorToSpawn)),
-        catalog?.catalog.pieces ?? [],
-        catalog?.verified ?? {}
-      ),
-    [items, catalog]
-  )
+  const risky = useMemo(() => {
+    const pieces = catalog?.catalog.pieces ?? []
+    const classes = riskyClassesIn(items.map((it) => classNameOf(it.actorToSpawn)), pieces, catalog?.verified ?? {})
+    // a surface or mirror flag on a piece no 0.4.1 save has shown with one
+    return { ...classes, unverified: [...classes.unverified, ...unconfirmedPropertiesIn(items, pieces)] }
+  }, [items, catalog])
   const settingsCreator = useMapCreator()
   const mapCreator = levelData.creatorName.trim()
   const ownCreator = useOwnCreator(mapCreator || settingsCreator.name)

@@ -116,6 +116,12 @@ public static partial class Program
             info["compression"] = tex.CompressionSettings.ToString();
             info["sRGB"] = tex.SRGB;
             info["format"] = tex.Format.ToString();
+            if (tex.Format == EPixelFormat.PF_A32B32G32R32F)
+            {
+                // Float data (M_PanelTrim_Shared's island data holds cm-scale values), not an image: no PNG.
+                info["skipped"] = "float data texture, not an image";
+                return info;
+            }
             var decoded = tex.Decode(texMax) ?? throw new InvalidDataException("decode returned null");
             var pkg = tp.Split('.')[0];
             var rel = flat ? pkg[(pkg.LastIndexOf('/') + 1)..] + ".png"

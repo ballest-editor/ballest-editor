@@ -42,6 +42,16 @@ const refsOf = (pkg) => {
   const v = imports[`Ballest/Content${pkg.slice(5)}`] ?? {}
   return new Set([...(v.namePaths ?? []), ...(v.imports ?? []).map((i) => i.path.split(".")[0])])
 }
+// An FName keeps a trailing `_<n>` (no leading zero) as a number beside its name-map string, so a package
+// `/Game/.../BP_GlossyRed_Tube_Bend_25` appears in a name map as `/Game/.../BP_GlossyRed_Tube_Bend`. When a package
+// of that base name exists too (BP_TwoCubeTwoColor beside BP_TwoCubeTwoColor_2) the entry can't tell them apart,
+// so it counts for the base package only.
+const packages = new Set(Object.keys(imports).map((file) => gamePath(file)))
+const references = (refs, pkg) => {
+  if (refs.has(pkg)) return true
+  const numbered = /^(.*)_(0|[1-9]\d*)$/.exec(pkg)
+  return numbered !== null && !packages.has(numbered[1]) && refs.has(numbered[1])
+}
 
 // Palette: DT_MapItems rows -> PDA_MapItem data assets -> Items[] {Name, Thumbnail, Class}.
 const cb = palette.packages
@@ -87,7 +97,7 @@ for (const [file, v] of Object.entries(imports)) {
   const refs = new Set([...(v.namePaths ?? []), ...(v.imports ?? []).map((i) => i.path.split(".")[0])])
   for (const cp of items) {
     const pkg = cp.split(".")[0]
-    if (refs.has(pkg) && gamePath(file).split(".")[0] !== pkg) {
+    if (references(refs, pkg) && gamePath(file).split(".")[0] !== pkg) {
       ;(referencers.get(cp) ?? referencers.set(cp, []).get(cp)).push(gamePath(file))
     }
   }
@@ -100,7 +110,7 @@ const describe = (cp) => {
     parentChain: chainOf(cp),
     inPalette: paletteClasses.has(cp),
     palette: paletteClasses.get(cp) ?? null,
-    inRecipeRegistry: regRefs.has(pkg),
+    inRecipeRegistry: references(regRefs, pkg),
     seenInSamples: seen.get(cp) ?? 0,
     referencedBy: (referencers.get(cp) ?? []).filter((p) => !p.startsWith(REGISTRY)).sort()
   }
@@ -180,7 +190,7 @@ const out = {
     parseErrors: regEntry.parseErrors ?? [],
     imports: regEntry.imports ?? [],
     referencedPackages: [...(regEntry.namePaths ?? [])],
-    referencedItemClasses: items.filter((cp) => regRefs.has(cp.split(".")[0]))
+    referencedItemClasses: items.filter((cp) => references(regRefs, cp.split(".")[0]))
   },
   levelEditorItems: items.map(describe),
   candidates

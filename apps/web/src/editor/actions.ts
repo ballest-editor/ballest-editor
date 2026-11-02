@@ -164,8 +164,8 @@ export const loadCatalog = () =>
 export const loadMaterials = () =>
   run(
     Effect.gen(function*() {
-      const { table, paint } = yield* MaterialLibrary.use((library) => library.load)
-      useEditor.getState().setMaterials(table, paint)
+      const { paint, surfaces, table } = yield* MaterialLibrary.use((library) => library.load)
+      useEditor.getState().setMaterials(table, paint, surfaces)
     })
   )
 

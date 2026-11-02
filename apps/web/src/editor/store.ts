@@ -34,11 +34,13 @@ import { LIMITS } from "../domain/limits"
 import { type LinkState, linkStateOf } from "../domain/linkState"
 import { isPlayerStart, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
+import { MIRROR_X, MIRROR_Y, withMirrorMesh } from "../domain/mirror"
 import { addNotice, clearNotices, dropNotices, markRead, mergeNotices, resolveNotices } from "../domain/notifications"
 import type { PaintPicker } from "../domain/Paint"
 import { type Pivot, pivotAt } from "../domain/pivot"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type Lighting, lightingOf } from "../domain/sunlight"
+import type { Surfaces } from "../domain/surface"
 import type { LoadedCatalog } from "../services/CatalogLoader"
 import type {
   GamePathKind,
@@ -254,6 +256,8 @@ export interface EditorState {
   readonly materialTable: MaterialTable | null
   /** The game's material picker (finishes x colours); empty until loaded. */
   readonly paint: PaintPicker
+  /** The item surfaces (0.4.1), by saved value, with the material each draws with; empty until loaded. */
+  readonly surfaces: Surfaces
   readonly keybinds: Keybinds
   readonly settings: Settings
   /** The game's defaults (and which actions fell back to editor defaults). */
@@ -379,7 +383,7 @@ export interface EditorState {
   readonly setLightingPreview: (lighting: Lighting | null) => void
   readonly setCatalog: (catalog: LoadedCatalog) => void
   readonly finishBoot: () => void
-  readonly setMaterials: (table: MaterialTable, paint: PaintPicker) => void
+  readonly setMaterials: (table: MaterialTable, paint: PaintPicker, surfaces: Surfaces) => void
   readonly setKeybinds: (keybinds: Keybinds, defaults?: DerivedKeybinds) => void
   readonly setSettings: (settings: Settings) => void
   readonly reportMissingGlb: (url: string) => void
@@ -504,6 +508,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     booting: true,
     materialTable: null,
     paint: [],
+    surfaces: [],
     keybinds: fallbackDefaults.keybinds,
     settings: defaultSettings,
     keybindDefaults: fallbackDefaults,
@@ -588,7 +593,15 @@ export const useEditor = create<EditorState>()((set, get) => {
     setSelectionProperties: (changes) => {
       const s = get()
       const indices = selectedIndices(s)
-      const next = setProperties(s.doc.map, indices, changes)
+      const written = setProperties(s.doc.map, indices, changes)
+      // A mirror flag also swaps the mesh (and some materials) for the game's baked mirror, in the same step.
+      const mirrors = changes.some(({ property }) => property.name === MIRROR_X || property.name === MIRROR_Y)
+      const next = mirrors
+        ? Option.map(written, (map) => ({
+          ...map,
+          items: map.items.map((item, i) => (indices.includes(i) ? withMirrorMesh(item, s.catalogIndex) : item))
+        }))
+        : written
       if (Option.isNone(next)) {
         const names = changes.map((c) => `${JSON.stringify(c.value)} for ${c.property.name}`).join(", ")
         s.notify("error", `Not a valid value: ${names}.`)
@@ -751,7 +764,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setLightingPreview: (lightingPreview) => set({ lightingPreview }),
     setCatalog: (catalog) => set({ catalog, catalogIndex: indexCatalog(catalog.catalog) }),
     finishBoot: () => set({ booting: false }),
-    setMaterials: (materialTable, paint) => set({ materialTable, paint }),
+    setMaterials: (materialTable, paint, surfaces) => set({ materialTable, paint, surfaces }),
     setSettings: (settings) => set({ settings }),
     setKeybinds: (keybinds, defaults) => set((s) => ({ keybinds, keybindDefaults: defaults ?? s.keybindDefaults })),
     reportMissingGlb: (url) =>

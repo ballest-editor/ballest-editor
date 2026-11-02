@@ -29,7 +29,8 @@ describe("MapCodec", () => {
         const map = yield* codec.decode(text)
         const out = yield* codec.encode(map)
         assert.deepStrictEqual(JSON.parse(out), JSON.parse(text))
-        assert.strictEqual(map.editorState !== undefined, sample.kind === "balledit")
+        // a published map never has editorState; a 0.4.1 draft with nothing in it (no groups, pivots or camera) omits it
+        if (sample.kind === "ballmap") assert.isUndefined(map.editorState)
       }).pipe(Effect.provide(MapCodec.layer))
   )
 

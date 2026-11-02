@@ -52,3 +52,38 @@ describe("visualsOf", () => {
     )
   })
 })
+
+describe("visualsOf, 0.4.1", () => {
+  const BAKE = "/Game/LevelEditor/Mirror/Meshes/SM_Mirror_1.SM_Mirror_1"
+  const ICE = "/Game/Ice.Ice"
+  const box = Schema.decodeSync(Catalog)({
+    pieces: [{
+      classPath: "/Game/Box.Box_C",
+      className: "Box",
+      meshAssetPath: CUBE,
+      glb: "pieces/_Engine/BasicShapes/Cube.glb",
+      materialSlots: [slot(BEAM), { ...slot(GLOW), index: 1 }]
+    }],
+    mirrors: { meshes: [{ meshAssetPath: CUBE, mirrorMeshAssetPath: BAKE }] }
+  })
+
+  it("draws a baked mirror as its source mesh, and a surface over every slot", () => {
+    const index = indexCatalog(box)
+    const item = itemFromPiece(box.pieces[0]!, identityTransform())
+    const mirrored = { ...item, meshComponents: [{ ...item.meshComponents[0]!, meshAssetPath: BAKE }] }
+    assert.strictEqual(visualsOf(mirrored, index)[0]?.mesh?.meshAssetPath, CUBE)
+    const iced = {
+      ...item,
+      intProperties: [{ currentValue: 2, propertyName: "SurfaceAssignment", propertyType: "Integer" }]
+    }
+    const surfaces = [{ name: "none", material: null }, { name: "magnet", material: null }, {
+      name: "ice",
+      material: ICE
+    }]
+    assert.deepStrictEqual(visualsOf(iced, index, surfaces)[0]?.slotMaterials, [ICE, ICE])
+    assert.deepStrictEqual(visualsOf(item, index, surfaces)[0]?.slotMaterials.map((m) => m?.includes("LandRay")), [
+      true,
+      false
+    ])
+  })
+})

@@ -70,14 +70,20 @@ function verifyMaterials(dir) {
       return false
     }
   }
+  const png = m.textures.filter((t) => t.png)
+  // Not decoded on purpose: textures a master names as a default but the game never cooked (M_PaddleBase's Quixel
+  // Bridge FlatNormal; the game draws without them too) and float data textures (skipped by the extractor).
+  const excused = m.textures.filter((t) => !t.png && (t.skipped || t.error?.includes("There is no game file")))
+  const excusedPaths = new Set(excused.map((t) => `missing:${t.path}`))
   const missing = new Set()
   for (const r of m.materials) {
-    for (const t of Object.values(r.textures)) if (t && (t.startsWith("missing:") || !exists(t))) missing.add(t)
+    for (const t of Object.values(r.textures)) {
+      if (t && !excusedPaths.has(t) && (t.startsWith("missing:") || !exists(t))) missing.add(t)
+    }
     for (const k of ["baseColorTexture", "normalTexture", "ormTexture"]) {
       if (r.approx[k] && !exists(r.approx[k])) missing.add(r.approx[k])
     }
   }
-  const png = m.textures.filter((t) => t.png)
   const bytes = png.reduce((n, t) => n + (t.bytes ?? 0), 0)
   console.log(
     `materials: ${m.materials.length} total, ${m.materials.filter((r) => r.recovered).length} recovered, ` +
@@ -85,9 +91,10 @@ function verifyMaterials(dir) {
         m.materials.filter((r) => r.approx.baseColorTexture || r.approx.normalTexture).length
       } with base/normal textures; ` +
       `textures: ${png.length}/${m.textures.length} decoded, ${(bytes / 1e6).toFixed(1)} MB, ${missing.size} missing` +
-      (missing.size ? `\n  missing: ${[...missing].join(", ")}` : "")
+      (missing.size ? `\n  missing: ${[...missing].join(", ")}` : "") +
+      (excused.length ? `\n  not decoded: ${excused.map((t) => `${t.path} (${t.skipped ?? t.error})`).join(", ")}` : "")
   )
-  return missing.size === 0 && png.length === m.textures.length
+  return missing.size === 0 && png.length + excused.length === m.textures.length
 }
 
 let failed = 0

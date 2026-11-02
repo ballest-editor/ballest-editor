@@ -20,6 +20,7 @@ import {
   PLAYER_START_CLASS,
   SYSTEM_LEVEL_NAME
 } from "./MapFile"
+import { SURFACE_PROPERTY } from "./surface"
 import { rotatorToQuat } from "./ueMath"
 
 /** `YYYY.MM.DD-HH.MM.SS`, the game's `createdAt` format. */
@@ -77,6 +78,12 @@ const emptyProperties = {
   nameProperties: [],
   stringProperties: []
 } as const
+
+/** The player start and goal as 0.4.1 saves them: no properties of their own, the item surface at none. */
+const objectiveProperties = {
+  ...emptyProperties,
+  intProperties: [{ currentValue: 0, propertyName: SURFACE_PROPERTY, propertyType: "Integer" }]
+}
 
 export const meshComponentFor = (meshAssetPath: string, materials: ReadonlyArray<string>): MeshComponent => ({
   meshComponentTag: MESH_COMPONENT_TAG,
@@ -157,7 +164,7 @@ export const playerStartItem = (piece?: CatalogPiece): Item =>
       itemTransform: playerStartTransform(),
       meshComponents: [meshComponentFor(PLAYER_START_MESH, [GOAL_YELLOW])],
       bIsBaseItem: false,
-      ...emptyProperties
+      ...objectiveProperties
     }
 
 const GOAL_MESH = "/Game/Maps/_GENERATED/PC/SM_GoalRing.SM_GoalRing"
@@ -175,7 +182,7 @@ export const goalItem = (): Item => ({
   },
   meshComponents: [meshComponentFor(GOAL_MESH, [GOAL_YELLOW])],
   bIsBaseItem: false,
-  ...emptyProperties
+  ...objectiveProperties
 })
 
 export const defaultEditorState = (): EditorState => ({

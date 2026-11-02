@@ -87,8 +87,8 @@ describe("factory", () => {
   })
 
   it("writes the new map's two items exactly as a fresh in-game draft does", () => {
-    // prefabs 1 is a draft whose goal was never moved; drafts write bIsBaseItem false.
-    const file = listSamples().find((f) => f.name.includes("prefabs 1"))!
+    // new pieces probe is a 0.4.1 draft whose player start and goal were never moved; drafts write bIsBaseItem false.
+    const file = listSamples().find((f) => f.name.includes("new pieces probe"))!
     const codec = Schema.fromJsonString(MapFile)
     const draft = Schema.encodeSync(MapFile)(Schema.decodeSync(codec)(readSample(file)))
     const fresh = Schema.encodeSync(MapFile)(

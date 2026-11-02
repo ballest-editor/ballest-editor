@@ -425,4 +425,42 @@ describe("approxOf", () => {
     assert.deepStrictEqual(overridden.baseColor, [0.9, 0.8, 0.7])
     assert.deepStrictEqual(overridden.programs, {})
   })
+
+  it("runs a base program where the colour comes from a read's alpha or from a read the trace dropped", () => {
+    const program = { base: { code: "vec3 ballestBase() {}", textures: [{ uniform: "uTex0", texture: 1 }] } }
+    // the spinning cylinder: the stripes are a mask in the alpha; the rgb a layer would add is flat
+    const alphaMask: MaterialShaders = {
+      ...SHADERS,
+      surface: {
+        ...SURFACE,
+        programs: program,
+        gains: { "1": { gain: [0.8, 0.1, 0], alpha: 0, mean: [0.5, 0, 0.9], fromAlpha: [0.8, 0.1, 0] } }
+      }
+    }
+    assert.isDefined(build(alphaMask).programs["base"])
+    // the paddle: the stripe's coordinates go through frac, so the trace leaves the read without a source
+    const dropped: MaterialShaders = {
+      ...SHADERS,
+      reads: [...SHADERS.reads, {
+        texture: 1,
+        op: "sample",
+        channels: "xyzw",
+        resultFactor: null,
+        coords: [{ leaves: [] }, { leaves: [] }]
+      }],
+      surface: {
+        ...SURFACE,
+        programs: program,
+        gains: { ...SURFACE.gains, "4": { gain: [-1, -1, -1], alpha: 0, mean: [0.2, 0, 0.8] } }
+      }
+    }
+    assert.isDefined(build(dropped).programs["base"])
+    // a dropped read that leaves the colour alone, or nearly (DefaultMaterial's faint grain), needs no program
+    const faint = (gain: readonly [number, number, number]) => ({
+      ...dropped,
+      surface: { ...SURFACE, programs: program, gains: { "4": { gain, alpha: 0, mean: [0.5, 0.5, 0.5] as const } } }
+    })
+    assert.deepStrictEqual(build(faint([0, 0, 0])).programs, {})
+    assert.deepStrictEqual(build(faint([0.03, 0.03, 0.03])).programs, {})
+  })
 })

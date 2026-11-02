@@ -1,5 +1,5 @@
 // `materials list|build`.
-//   list  WORK ASSETS -> WORK/materials.txt (union of sample, catalog and paint materials)
+//   list  WORK ASSETS -> WORK/materials.txt (union of sample, catalog, paint and surface materials)
 //   build WORK ASSETS -> ASSETS/materials.json from WORK/materials-dump.json (+ paint-dump.json, shaders.json)
 // Parameters come from the cooked assets (instances override their parents down the chain). How textures are
 // read (which UV space, at what scale, how strongly) comes from the compiled shaders (shaders.json), not from
@@ -99,6 +99,51 @@ const loadPaint = Effect.fn("loadPaint")(function*(work: string) {
   })
 })
 
+// ------------------------------------------------------------------ surfaces
+// The level editor's item surface (EBallestSurfaceAssignment; console `ballest.editor.surface [none|magnet|ice|grippy]`;
+// the uncooked Grass and GrippyCards are left out of shipping builds). Each physics surface draws with one material:
+// UBallestSurfaceMaterialSettings' defaults are compiled into the exe (not readable from the pak, so listed here),
+// and DefaultGame.ini's [/Script/Ballest.BallestSurfaceMaterialSettings] may override them.
+const SURFACES_DIR = "/Game/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/Materials/Surfaces"
+const SURFACES: ReadonlyArray<{ readonly name: string; readonly setting?: string; readonly material?: string }> = [
+  { name: "none" },
+  {
+    name: "magnet",
+    setting: "MagnetMaterial",
+    material: `${SURFACES_DIR}/Magnet/MI_MagnetMachined_PanelTrim.MI_MagnetMachined_PanelTrim`
+  },
+  { name: "ice", setting: "IceMaterial", material: `${SURFACES_DIR}/Ice/MI_Surface_Ice.MI_Surface_Ice` },
+  { name: "grippy", setting: "GrippyMaterial", material: `${SURFACES_DIR}/Grippy/MI_Surface_Grippy.MI_Surface_Grippy` }
+]
+const SURFACE_SETTINGS = "[/Script/Ballest.BallestSurfaceMaterialSettings]"
+
+interface Surface {
+  readonly name: string
+  readonly material: string | null
+}
+
+/** The surfaces in the game's order, with DefaultGame.ini (a loose file in the paint dump) applied. */
+const surfacesOf = (dump: unknown): Array<Surface> => {
+  const ini = str(get(dump, "files", "Ballest/Config/DefaultGame.ini")) ?? ""
+  const start = ini.indexOf(SURFACE_SETTINGS)
+  const section = start < 0 ? "" : ini.slice(start + SURFACE_SETTINGS.length).split(/\n\[/)[0] ?? ""
+  const overrides = new Map(
+    section.split(/\r?\n/).flatMap((line) => {
+      const match = /^(\w+)=(\S+)$/.exec(line.trim())
+      return match === null ? [] : [[match[1], match[2]] as const]
+    })
+  )
+  return SURFACES.map(({ material, name, setting }) => ({
+    name,
+    material: (setting === undefined ? undefined : overrides.get(setting)) ?? material ?? null
+  }))
+}
+
+const loadSurfaces = Effect.fn("loadSurfaces")(function*(work: string) {
+  const path = yield* Path
+  return surfacesOf(yield* readJsonIfExists(path.join(work, "paint-dump.json")))
+})
+
 // ------------------------------------------------------------------ list
 export const materialsList = Effect.fn("materialsList")(function*({ assets, work }: { work: string; assets: string }) {
   const fs = yield* FileSystem
@@ -125,7 +170,9 @@ export const materialsList = Effect.fn("materialsList")(function*({ assets, work
     for (const x of arr(get(p, "extraMeshes"))) slots(get(x, "materialSlots"))
   }
   for (const m of arr(get(cat, "meshes"))) slots(get(m, "materialSlots"))
+  for (const m of arr(get(cat, "mirrors", "materials"))) add(get(m, "mirrored"))
   for (const c of (yield* loadPaint(work)) ?? []) for (const { material } of c.colors) add(material.split("'")[1])
+  for (const { material } of yield* loadSurfaces(work)) add(material)
   yield* fs.writeFileString(path.join(work, "materials.txt"), [...set].sort().join("\n") + "\n")
   yield* Effect.logInfo(`[materials] ${set.size} referenced materials`)
 })
@@ -195,6 +242,7 @@ export const materialsBuild = Effect.fn("materialsBuild")(
     const dump = yield* readJson(path.join(work, "materials-dump.json"))
     const shaderMaterials = shaderMaterialsOf(yield* readJsonIfExists(path.join(work, "shaders.json")))
     const paint = yield* loadPaint(work)
+    const surfaces = yield* loadSurfaces(work)
     const texPath = (p: string | null): string | null => {
       const png = p === null ? undefined : str(get(dump, "textures", p, "png"))
       return png === undefined ? null : `textures/${png}`
@@ -266,7 +314,8 @@ export const materialsBuild = Effect.fn("materialsBuild")(
       sRGB: bool(get(t, "sRGB")) ?? null,
       format: str(get(t, "format")) ?? null,
       bytes: num(get(t, "bytes")) ?? null,
-      error: str(get(t, "error")) ?? null
+      error: str(get(t, "error")) ?? null,
+      ...(get(t, "skipped") === undefined ? {} : { skipped: str(get(t, "skipped")) ?? null })
     }))
     const out = {
       version: 2,
@@ -280,12 +329,14 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         "approx.variation is the grey mottle as the base pass applies it: colour *= 1 + gain * product over layers of (texture read at tilings[i] + offsets[i]); gain already includes the instance's parameter (ColorContrast - 1 for the Env masters).",
         "approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).",
         "approx.opacity is the evaluated alpha on the face that shows most (a beam masks its caps with 1 - |world normal z|: its sides); approx.upFade (0..1, null = 1) is the fraction left on a face that looks up. An additive pass renders as its evaluated glow (emissive, black base, opacity 1) faded the same way.",
-        "approx.programs is the compiled shader's own output math as GLSL functions f(uv, worldNormal, objectPosition, time) with the instance's parameters folded in: alpha (a translucent pass's alpha, e.g. the vent's streaks for any frame via time), glow (an additive pass's unlit colour) and base (an opaque base colour whose texture reads the layers cannot place, e.g. the rubber block's cells); textures are the samplers the code reads (uTexN).",
+        "approx.programs is the compiled shader's own output math as GLSL functions f(uv, worldNormal, objectPosition, time) with the instance's parameters folded in: alpha (a translucent pass's alpha, e.g. the vent's streaks for any frame via time), glow (an additive pass's unlit colour) and base (an opaque base colour whose texture reads the layers cannot place: coordinates through a cell function, e.g. the rubber block's cells and the paddle's stripe, or a mask in a texture's alpha, e.g. the spinning cylinder's stripes); textures are the samplers the code reads (uTexN).",
         "A few materials cannot be read from the cooked data and are overridden by name (OVERRIDES in tools/extract/src/materials.ts): M_PlasticBase's cell noise samples the engine's placeholder texture, so its base colour is taken as BaseColor_Light, the colour the game shows.",
-        "paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap)."
+        "paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap).",
+        "surfaces are the level editor's item surfaces (EBallestSurfaceAssignment) in the game's order, each with the material the game draws that physics surface with (object path; null for none): UBallestSurfaceMaterialSettings' defaults from the exe, overridden by DefaultGame.ini."
       ],
       materials: records,
       ...(paint === null ? {} : { paint }),
+      surfaces,
       textures: texList.sort((a, b) => a.path.localeCompare(b.path))
     }
     yield* fs.writeFileString(path.join(assets, "materials.json"), compactJson(out) + "\n")

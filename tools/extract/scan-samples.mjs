@@ -58,8 +58,9 @@ for (const input of inputs) {
           bump(c.propertyNames, `${p.propertyName}:${p.propertyType ?? kind}`)
         }
       }
-      // The properties the game wrote, list by list in its order (the first item that has any).
-      if (!c.properties) {
+      // The properties the game wrote, list by list in its order: the first item that has any, replaced by the
+      // first one a 0.4.1 game saved (every item it saves carries SurfaceAssignment; savedBy041).
+      if (!c.savedBy041) {
         const written = ["bool", "float", "int", "text", "name", "string"].flatMap((kind) =>
           (it[`${kind}Properties`] ?? []).map((p) => ({
             list: `${kind}Properties`,
@@ -67,7 +68,9 @@ for (const input of inputs) {
             type: p.propertyType
           }))
         )
-        if (written.length > 0) c.properties = written
+        const by041 = written.some((p) => p.name === "SurfaceAssignment")
+        if (written.length > 0 && (!c.properties || by041)) c.properties = written
+        if (by041) c.savedBy041 = true
       }
     }
   }

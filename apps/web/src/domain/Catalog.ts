@@ -55,6 +55,21 @@ export class ExtraMesh extends Schema.Opaque<ExtraMesh>()(open({
 })) {}
 
 /**
+ * A laser's beam, which the game builds in native code from the terminal's muzzle (Main-relative,
+ * UE cm) in the direction `axis`: a thin core inside a wider glow, `length` cm long before the
+ * item's scale.
+ */
+export class Beam extends Schema.Opaque<Beam>()(open({
+  muzzle: Vec3Tuple,
+  axis: Vec3Tuple,
+  length: Schema.Finite,
+  coreRadius: Schema.Finite,
+  glowRadius: Schema.Finite,
+  /** Linear RGB. */
+  color: Vec3Tuple
+})) {}
+
+/**
  * A property the level editor exposes on a class (its CDO's `LevelEditorExposedProperties`),
  * in the game's order. `list`/`type` are where and how the game writes it; null when the
  * extractor couldn't map the Blueprint type. `hidden`: left out of the game's own panel.
@@ -64,7 +79,12 @@ export class CatalogProperty extends Schema.Opaque<CatalogProperty>()(open({
   list: Schema.NullOr(PropertyList),
   type: Schema.NullOr(Schema.String),
   default: Schema.Unknown,
-  hidden: Schema.optionalKey(Schema.Boolean)
+  hidden: Schema.optionalKey(Schema.Boolean),
+  /**
+   * A native property (surface, mirror) on a class no 0.4.1 save has shown yet: the game loads
+   * the item without it, so new items leave it out until it's set (see docs/FORMAT.md).
+   */
+  optional: Schema.optionalKey(Schema.Boolean)
 })) {}
 
 export class CatalogPiece extends Schema.Opaque<CatalogPiece>()(open({
@@ -78,6 +98,7 @@ export class CatalogPiece extends Schema.Opaque<CatalogPiece>()(open({
   seenInSamples: Schema.optionalKey(Schema.Int),
   mainRelativeTransform: Schema.optionalKey(Schema.NullOr(MainRelativeTransform)),
   extraMeshes: Schema.optionalKey(Schema.Array(ExtraMesh)),
+  beam: Schema.optionalKey(Beam),
   /** In-game browser category, display name, visibility and thumbnail (newer catalogs). */
   category: Schema.optionalKey(Schema.NullOr(Schema.String)),
   displayName: Schema.optionalKey(Schema.NullOr(Schema.String)),
@@ -95,10 +116,26 @@ export class CatalogMesh extends Schema.Opaque<CatalogMesh>()(open({
   bounds: NullableBounds
 })) {}
 
+/** A mesh and the game's baked mirror of it (0.4.1 Mirror X / Mirror Y). */
+export class MirrorPair extends Schema.Opaque<MirrorPair>()(open({
+  meshAssetPath: Schema.String,
+  mirrorMeshAssetPath: Schema.String
+})) {}
+
+/** A slot material the game swaps for another on a mirrored item (the spinning cylinder's cap). */
+export class MirrorMaterial extends Schema.Opaque<MirrorMaterial>()(open({
+  material: Schema.String,
+  mirrored: Schema.String
+})) {}
+
 export class Catalog extends Schema.Opaque<Catalog>()(open({
   pieces: Schema.Array(CatalogPiece),
   meshes: Schema.optionalKey(Schema.Array(CatalogMesh)),
-  unresolved: Schema.optionalKey(Schema.Array(Schema.Unknown))
+  unresolved: Schema.optionalKey(Schema.Array(Schema.Unknown)),
+  mirrors: Schema.optionalKey(open({
+    meshes: Schema.Array(MirrorPair),
+    materials: Schema.optionalKey(Schema.Array(MirrorMaterial))
+  }))
 })) {}
 
 export const decodeCatalog = Schema.decodeUnknownEffect(Catalog)
@@ -127,6 +164,11 @@ export interface CatalogIndex {
   readonly pieceByClass: ReadonlyMap<string, CatalogPiece>
   /** Class path -> why the extractor couldn't resolve it (`catalog.unresolved`). */
   readonly unresolvedReasons: ReadonlyMap<string, string>
+  /** Baked mirror mesh -> the mesh it mirrors. */
+  readonly mirrorSources: ReadonlyMap<string, string>
+  /** Mesh -> its baked mirror. */
+  readonly mirrorMeshes: ReadonlyMap<string, string>
+  readonly mirrorMaterials: ReadonlyArray<MirrorMaterial>
 }
 
 const orUndefined = <A>(a: A | null | undefined): A | undefined => a ?? undefined
@@ -170,7 +212,20 @@ export const indexCatalog = (catalog: Catalog): CatalogIndex => {
       )
     }
   }
-  return { meshes, pieceByClass, unresolvedReasons }
+  const mirrorSources = new Map<string, string>()
+  const mirrorMeshes = new Map<string, string>()
+  for (const pair of catalog.mirrors?.meshes ?? []) {
+    if (!mirrorSources.has(pair.mirrorMeshAssetPath)) mirrorSources.set(pair.mirrorMeshAssetPath, pair.meshAssetPath)
+    if (!mirrorMeshes.has(pair.meshAssetPath)) mirrorMeshes.set(pair.meshAssetPath, pair.mirrorMeshAssetPath)
+  }
+  return {
+    meshes,
+    pieceByClass,
+    unresolvedReasons,
+    mirrorSources,
+    mirrorMeshes,
+    mirrorMaterials: catalog.mirrors?.materials ?? []
+  }
 }
 
 /**

@@ -61,10 +61,21 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
   it("lists the properties sample items carry, in the order the game writes them", () => {
     const { pieceByClass } = indexCatalog(load())
     const names = (entries: ReadonlyArray<{ readonly propertyName: string }>) => entries.map((p) => p.propertyName)
+    const inOrder = (some: ReadonlyArray<string>, all: ReadonlyArray<string>) => {
+      let at = 0
+      return some.every((name) => (at = all.indexOf(name, at) + 1) > 0)
+    }
     for (const item of sampleItems()) {
       const known = pieceByClass.get(item.actorToSpawn)?.properties ?? []
+      // a 0.4.1 save carries the whole layout; an older one the properties its game knew, in the same order
+      const by041 = item.intProperties.some((p) => p.propertyName === "SurfaceAssignment")
       for (const list of PROPERTY_LISTS) {
-        assert.deepStrictEqual(names(item[list]), known.filter((p) => p.list === list).map((p) => p.name))
+        const listed = known.filter((p) => p.list === list).map((p) => p.name)
+        if (by041) assert.deepStrictEqual(names(item[list]), listed)
+        else {assert.isTrue(
+            inOrder(names(item[list]), listed),
+            `${item.actorToSpawn} ${list}: ${names(item[list]).join(", ")}`
+          )}
         for (const entry of item[list]) {
           assert.strictEqual(entry.propertyType, known.find((p) => p.name === entry.propertyName)?.type)
         }
@@ -93,11 +104,14 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
     )
     expect(unavailable.length).toBe((catalog.unresolved ?? []).length)
     // extras-only pieces stay placeable
-    const extrasOnly = new Set(["MP_OrangeSign", "MP_PinballPaddle", "BP_CircularFlexiblePlatform"])
+    const extrasOnly = new Set(["MP_OrangeSign", "BP_CircularFlexiblePlatform", "MP_MoveableKillzone"])
     for (const piece of catalog.pieces.filter((p) => extrasOnly.has(p.className))) {
       expect(unavailableReasonOf(indexCatalog(catalog), piece)).toBeUndefined()
       expect(visibleExtras(piece).length).toBeGreaterThan(0)
     }
+    // a class the game no longer ships (0.4.1 moved the pinball paddle out of the cooked game) is unavailable
+    const paddle = catalog.pieces.find((p) => p.className === "MP_PinballPaddle")!
+    expect(unavailableReasonOf(indexCatalog(catalog), paddle)).toMatch(/removed from the game/)
   })
 
   // assets/pieces/ is git-ignored extractor output (`nix run .#extract`); absent in CI.

@@ -3,6 +3,7 @@ import { DateTime, Effect, Fiber, Layer, Option } from "effect"
 import { TestClock } from "effect/testing"
 import { creatorOf } from "../domain/creator"
 import { setLevelData, setLevelNames } from "../domain/edits"
+import { defaultEditorState } from "../domain/factory"
 import { allFound, GAME_NOT_FOUND, gameLinkRows, PLUGIN_MANAGER_MISSING, PLUGIN_MISSING } from "../domain/gameLink"
 import { linkStateOf } from "../domain/linkState"
 import type { MapFile } from "../domain/MapFile"
@@ -136,7 +137,14 @@ describe("project actions", () => {
         yield* TestClock.setTime(createdAtTime(s().doc.map.worldSettings.levelData.createdAt))
         yield* saveMapFile
         assert.deepStrictEqual(disk.dialogs.map((d) => d.kind), ["import"])
-        assert.isTrue(disk.files.get(projectFile(name)) === text, "the saved file differs from the game's")
+        // 0.4.1 saves a draft with nothing in its editorState (no groups, pivots or camera) without one; the editor
+        // writes the empty one 0.4.0 always did, and changes nothing else
+        const saved = text.includes("\"editorState\"") ?
+          text :
+          yield* MapCodec.use((codec) =>
+            Effect.flatMap(codec.decode(text), (map) => codec.encode({ ...map, editorState: defaultEditorState() }))
+          )
+        assert.isTrue(disk.files.get(projectFile(name)) === saved, "the saved file differs from the game's")
 
         // the game changed it since: Export asks, and Back up and overwrite writes the project file over it
         disk.files.set(inGame, "changed in the game")
@@ -145,8 +153,8 @@ describe("project actions", () => {
         assert.strictEqual(disk.files.get(inGame), "changed in the game")
         s().setChangedExport(null)
         yield* exportToGameEffect(false, true)
-        assert.isTrue(disk.files.get(inGame) === text, "the export differs from the project file")
-        assert.strictEqual(disk.links.get(TEST_PROJECT)?.get(name)?.export?.hash, testHash(text))
+        assert.isTrue(disk.files.get(inGame) === saved, "the export differs from the project file")
+        assert.strictEqual(disk.links.get(TEST_PROJECT)?.get(name)?.export?.hash, testHash(saved))
       }).pipe(Effect.provide(layerFor(disk)))
     }
   )
