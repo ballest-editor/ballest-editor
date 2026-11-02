@@ -166,7 +166,7 @@ const withHandlers = <A, E>(
     readonly fake: ReturnType<typeof fakeIpcMain>
     readonly dialogs: ReturnType<typeof fakeDialogs>
     readonly dir: string
-    /** The default project: `Documents/Ballest Editor/Maps` in the temp folder. */
+    /** The default project: `Documents/Ballest Editor/My maps` in the temp folder. */
     readonly project: string
     readonly steam: Effect.Success<ReturnType<typeof makeFakeSteam>>
   }) => Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>,
@@ -185,7 +185,7 @@ const withHandlers = <A, E>(
       Layer.provide(SteamLibrary.layer),
       Layer.provide(Layer.succeed(GameHost, GameHost.of(steam.host)))
     )
-    const project = path.join(dir, "Documents", "Ballest Editor", "Maps")
+    const project = path.join(dir, "Documents", "Ballest Editor", "My maps")
     const projects = Layer.effect(Projects, Projects.make(project, "linux", path.join(dir, "userData", "backups")))
       .pipe(
         Layer.provide(Layer.mergeAll(MapLinks.layer, Backups.layer)),
@@ -251,7 +251,7 @@ describe("DesktopIpc", () => {
         const text = "{\r\n\t\"items\": [ \"é\" ]\r\n}"
 
         assert.deepStrictEqual(yield* fake.invoke(channels.PROJECT_STATE_CHANNEL), {
-          current: { path: project, name: "Maps", exists: false, isDefault: true },
+          current: { path: project, name: "My maps", exists: false, isDefault: true },
           recent: [],
           lastOpenMap: null,
           projectsFolder: path.dirname(project)
@@ -281,7 +281,7 @@ describe("DesktopIpc", () => {
         assert.strictEqual(yield* fs.readFileString(path.join(project, "maps", name)), text)
         assert.deepStrictEqual(JSON.parse(yield* fs.readFileString(path.join(project, "ballest-project.json"))), {
           formatVersion: 1,
-          name: "Maps",
+          name: "My maps",
           exportTarget: "game"
         })
         assert.strictEqual(yield* fs.readFileString(path.join(project, ".gitignore")), ".ballest/\n")
@@ -629,7 +629,7 @@ describe("DesktopIpc", () => {
         const chosen = yield* fake.invoke(channels.CHOOSE_PROJECT_CHANNEL)
         assert.deepStrictEqual(chosen, {
           current: { path: other, name: "Elsewhere", exists: false, isDefault: false },
-          recent: [{ path: project, name: "Maps", exists: false, isDefault: true }],
+          recent: [{ path: project, name: "My maps", exists: false, isDefault: true }],
           lastOpenMap: null,
           projectsFolder: path.dirname(project)
         })

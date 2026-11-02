@@ -81,7 +81,7 @@ export const ProjectInfo = Schema.Struct({
   name: Schema.String,
   /** Whether the folder is a project on disk yet (it has `ballest-project.json`). */
   exists: Schema.Boolean,
-  /** `Documents/Ballest Editor/Maps`, the project used until the user picks another. */
+  /** `Documents/Ballest Editor/My maps`, the project used until the user picks another. */
   isDefault: Schema.Boolean
 })
 export type ProjectInfo = typeof ProjectInfo.Type

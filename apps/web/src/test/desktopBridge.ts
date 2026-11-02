@@ -85,7 +85,7 @@ export interface TestDisk {
 
 export const TEST_MAPS_FOLDER = "/game/UserSavedMaps"
 export const TEST_PROJECTS_FOLDER = "/home/me/Documents/Ballest Editor"
-export const TEST_PROJECT = `${TEST_PROJECTS_FOLDER}/Maps`
+export const TEST_PROJECT = `${TEST_PROJECTS_FOLDER}/My maps`
 
 /** Where a project map is: `<project>/maps/<file name>`. */
 export const projectFile = (fileName: string, project = TEST_PROJECT) => `${project}/maps/${fileName}`

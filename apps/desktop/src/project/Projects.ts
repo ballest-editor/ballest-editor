@@ -112,7 +112,7 @@ type ProjectEffect<A> = Effect.Effect<A, ProjectError | MapLinkError | BackupErr
 
 /**
  * The project folder and the maps in it (docs/PROJECTS.md). One project is in use at a time: the default
- * (`Documents/Ballest Editor/Maps`) until the user picks another. A project exists on disk from the first New map or
+ * (`Documents/Ballest Editor/My maps`) until the user picks another. A project exists on disk from the first New map or
  * Import. Main touches only its `maps/` and `.ballest/` folders, the game's maps folder (Export), the backups of the
  * files Export wrote over there (`<userData>/backups/`), and the files the user picks in the Import dialog (read only).
  * Maps are named by file name, never by path. Every write over a map goes through `Backups.overwrite`.
