@@ -10,6 +10,7 @@ import type {
   MapBackups,
   MapLink,
   OpenedMapFile,
+  ProjectFolder,
   ProjectInfo,
   ProjectMap,
   ProjectMapFile,
@@ -131,6 +132,10 @@ export class Projects extends Context.Service<Projects, {
   /** The current project's `maps/` folder, when it exists. */
   /** Makes `<projectsFolder>/<name>` a project (fails when it holds one already) and uses it. */
   readonly createNew: (name: string) => Effect.Effect<ProjectState, ProjectError>
+  /** Renames the current project in its `ballest-project.json` (made first if it isn't on disk yet). */
+  readonly setName: (name: string) => Effect.Effect<ProjectState, ProjectError>
+  /** One of the current project's folders, when it exists: the project, its `maps/`, its backups. */
+  readonly folderOf: (which: ProjectFolder) => Effect.Effect<Option.Option<string>>
   readonly mapsFolder: Effect.Effect<Option.Option<string>>
   readonly list: Effect.Effect<ProjectMaps, ProjectError>
   readonly read: (fileName: string) => Effect.Effect<ProjectMapFile, ProjectError>
@@ -268,6 +273,33 @@ export class Projects extends Context.Service<Projects, {
 
     /** The current project, made on disk if it isn't yet. */
     const ensure = current.pipe(Effect.flatMap(ensureAt))
+
+    const setName = Effect.fn("Projects.setName")(function*(name: string) {
+      const trimmed = name.trim()
+      if (trimmed === "" || trimmed.length > 64) return yield* fail("projectName", name)()
+      const project = yield* ensure
+      const file = path.join(project, PROJECT_FILE)
+      const current_ = yield* fs.readFileString(file).pipe(
+        Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(ProjectFile))),
+        Effect.mapError(fail("read", file))
+      )
+      yield* writeJson(fs, file, { ...current_, name: trimmed }).pipe(Effect.mapError(fail("write", file)))
+      return yield* state
+    })
+
+    const folderOf = (which: ProjectFolder) =>
+      currentOption.pipe(
+        Effect.flatMap(Option.match({
+          onNone: () => Effect.succeed(Option.none<string>()),
+          onSome: (project) => {
+            const dir = which === "project" ? project : which === "maps" ? mapsDir(project) : projectBackups(project)
+            return fs.exists(dir).pipe(
+              Effect.map((found) => found ? Option.some(dir) : Option.none()),
+              Effect.orElseSucceed(Option.none)
+            )
+          }
+        }))
+      )
 
     const createNew = Effect.fn("Projects.createNew")(function*(name: string) {
       const trimmed = name.trim()
@@ -594,6 +626,8 @@ export class Projects extends Context.Service<Projects, {
       use,
       switchTo,
       createNew,
+      setName,
+      folderOf,
       rememberOpenMap,
       mapsFolder,
       list,

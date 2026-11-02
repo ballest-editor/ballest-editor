@@ -273,7 +273,7 @@ describe("DesktopIpc", () => {
               projectsFolder: path.dirname(project)
             })
             assert.deepStrictEqual(yield* fake.invoke(channels.LIST_MAPS_CHANNEL), [])
-            assert.isFalse(yield* fake.invoke(channels.REVEAL_PROJECT_CHANNEL))
+            assert.isFalse(yield* fake.invoke(channels.REVEAL_PROJECT_CHANNEL, { which: "maps" }))
             yield* fake.invoke(channels.REMEMBER_OPEN_MAP_CHANNEL, { fileName: name })
             assert.isNull((yield* fake.invokeAs(ProjectState, channels.PROJECT_STATE_CHANNEL)).lastOpenMap)
             const unnamed = yield* Effect.flip(fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text }))
@@ -287,8 +287,22 @@ describe("DesktopIpc", () => {
               lastOpenMap: null,
               projectsFolder: path.dirname(project)
             })
-            assert.isTrue(yield* fake.invoke(channels.REVEAL_PROJECT_CHANNEL))
+            assert.isTrue(yield* fake.invoke(channels.REVEAL_PROJECT_CHANNEL, { which: "maps" }))
+            assert.isTrue(yield* fake.invoke(channels.REVEAL_PROJECT_CHANNEL, { which: "project" }))
+            // the backups folder is made by the first backup
+            assert.isFalse(yield* fake.invoke(channels.REVEAL_PROJECT_CHANNEL, { which: "backups" }))
             assert.deepStrictEqual(yield* fake.invoke(channels.LIST_MAPS_CHANNEL), [])
+
+            // Project settings › General renames the project in its file; the folder keeps its name
+            const renamedProject = yield* fake.invokeAs(ProjectState, channels.RENAME_PROJECT_CHANNEL, {
+              name: " Season 3 "
+            })
+            assert.deepInclude(renamedProject.current, { path: project, name: "Season 3" })
+            assert.deepInclude(JSON.parse(yield* fs.readFileString(path.join(project, "ballest-project.json"))), {
+              name: "Season 3"
+            })
+            const blank = yield* Effect.flip(fake.invoke(channels.RENAME_PROJECT_CHANNEL, { name: "  " }))
+            assert.match(String(blank.cause), /can't name a folder/)
 
             // the open map is kept per project for the next launch; a name that isn't a map file's is refused
             yield* fake.invoke(channels.REMEMBER_OPEN_MAP_CHANNEL, { fileName: name })
@@ -312,7 +326,7 @@ describe("DesktopIpc", () => {
             assert.strictEqual(yield* fs.readFileString(path.join(project, "maps", name)), text)
             assert.deepStrictEqual(JSON.parse(yield* fs.readFileString(path.join(project, "ballest-project.json"))), {
               formatVersion: 1,
-              name: "My maps",
+              name: "Season 3",
               exportTarget: "game"
             })
             // A second New map of the same name is refused.

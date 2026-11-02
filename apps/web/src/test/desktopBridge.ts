@@ -60,6 +60,8 @@ export interface TestDisk {
   gameLink: { last: GameLinkResult | null; muted: Array<string> }
   /** The project in use, the recent ones, and the map last open in each (as `desktop-settings.json` keeps them). */
   project: { current: string | null; recent: Array<string>; lastOpenMap: Record<string, string> }
+  /** Names set through `renameProject`, by project folder (what its `ballest-project.json` would say). */
+  projectNames: Map<string, string>
   /**
    * `creator`: what `findCreator` answers. `plugin`: the editor-link plugin's status; installing it makes it `current`,
    * counted in `pluginInstalls`. `races`: the maps Play asked the plugin to race (its `play.json`s), in order.
@@ -143,6 +145,7 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   notifications: [],
   gameLink: { last: null, muted: [] },
   project: { current: TEST_PROJECT, recent: [], lastOpenMap: {} },
+  projectNames: new Map(),
   game: {
     paths: testGamePaths,
     running: false,
@@ -195,7 +198,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
   }
   const info = (path: string): ProjectInfo => ({
     path,
-    name: nameOf(path),
+    name: disk.projectNames.get(path) ?? nameOf(path),
     exists: [...disk.files.keys()].some((file) => file.startsWith(`${path}/maps/`))
   })
   /** The project in use; "" while there is none (Untitled Project), so no file is ever under it. */
@@ -257,11 +260,19 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       if (info(path).exists) return fail(`${path} already holds a project.`)
       return select(path)
     },
-    revealProject: () => {
+    revealProject: (which) => {
       const project = disk.project.current
       if (project === null || !info(project).exists) return Promise.resolve(false)
-      disk.external.push(`${project}/maps`)
+      disk.external.push(
+        which === "project" ? project : which === "maps" ? `${project}/maps` : `${project}/.ballest/backups`
+      )
       return Promise.resolve(true)
+    },
+    renameProject: (name) => {
+      const project = disk.project.current
+      if (project === null) return fail(NO_PROJECT)
+      disk.projectNames.set(project, name.trim())
+      return Promise.resolve(state())
     },
     rememberOpenMap: (fileName) => {
       const project = disk.project.current

@@ -108,6 +108,16 @@ export type ProjectPathPayload = typeof ProjectPathPayload.Type
 export const CreateProjectPayload = Schema.Struct({ name: Schema.String })
 export type CreateProjectPayload = typeof CreateProjectPayload.Type
 
+/** Project settings › General: the project's name in `ballest-project.json` (the folder keeps its name). */
+export const RenameProjectPayload = Schema.Struct({ name: Schema.String })
+export type RenameProjectPayload = typeof RenameProjectPayload.Type
+
+/** The project's folders the file manager can be asked to show: the project itself, its `maps/`, its backups. */
+export const ProjectFolder = Schema.Literals(["project", "maps", "backups"])
+export type ProjectFolder = typeof ProjectFolder.Type
+export const RevealProjectPayload = Schema.Struct({ which: ProjectFolder })
+export type RevealProjectPayload = typeof RevealProjectPayload.Type
+
 /**
  * A map in the project: its file in `maps/`, when that last changed, the SHA-256 of its bytes (compared with the last
  * export's to tell whether it was edited since), its `levelPublishedFileId` (-1 when it was never published, or the
@@ -554,8 +564,10 @@ export interface DesktopBridge {
   readonly switchProject: (path: string) => Promise<ProjectState>
   /** Makes `<projectsFolder>/<name>` a project and uses it; refused when that folder already holds one. */
   readonly createProject: (name: string) => Promise<ProjectState>
-  /** Shows the project's `maps/` folder in the file manager; false when it doesn't exist or fails to open. */
-  readonly revealProject: () => Promise<boolean>
+  /** Shows one of the project's folders in the file manager; false when it doesn't exist or fails to open. */
+  readonly revealProject: (which: ProjectFolder) => Promise<boolean>
+  /** Renames the project in `ballest-project.json`; the folder keeps its name. */
+  readonly renameProject: (name: string) => Promise<ProjectState>
   /** Keeps which map is open in the project, so the next launch opens it again (`ProjectState.lastOpenMap`). */
   readonly rememberOpenMap: (fileName: string | null) => Promise<void>
   /** The project's maps, most recently changed first; empty when the project isn't on disk yet. */

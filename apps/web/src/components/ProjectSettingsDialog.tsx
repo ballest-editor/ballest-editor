@@ -1,4 +1,4 @@
-import { IconAlertTriangleFilled, IconCheck, IconFolder, IconMap } from "@tabler/icons-react"
+import { IconAlertTriangleFilled, IconCheck, IconFolder, IconFolderOpen, IconMap } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
@@ -7,7 +7,7 @@ import { Toggle } from "@workspace/ui/components/toggle"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { useEffect, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { usableCreatorName } from "../domain/creator"
 import { setLevelData as setMapLevelData, withLevelNames } from "../domain/edits"
 import { isValidName, mapFileNameOf, mapLabelOf, NAME_RULE } from "../domain/factory"
@@ -32,15 +32,15 @@ import {
   patchProjectMap,
   type ProjectMapSettings,
   readProjectMapSettings,
+  renameProject,
+  revealGamePath,
   revealProject,
   saveProjectMapPrefs,
   setExportOnSave,
   setGridHeight,
-  setLevelData,
-  updateSettings
+  setLevelData
 } from "../editor/actions"
 import { useCreator, useEditor } from "../editor/store"
-import { creatorSettingsRow } from "./CreatorSetting"
 import { NumberField } from "./NumberField"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
@@ -415,6 +415,29 @@ const mapRows = (
   ]
 }
 
+/** The project's name, written to its file when the field is left or Enter pressed; blank keeps the name as it was. */
+function ProjectNameField({ name }: { readonly name: string }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const value = draft ?? name
+  const commit = () => {
+    const trimmed = value.trim()
+    if (trimmed !== "" && trimmed !== name) void renameProject(trimmed)
+    setDraft(null)
+  }
+  return (
+    <Input
+      className="w-56"
+      value={value}
+      aria-label="Project name"
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur()
+      }}
+    />
+  )
+}
+
 /**
  * Project settings (docs/PROJECTS.md § Shell), one dialog in IntelliJ's Project Structure shape: the project (name,
  * folder, creator, export target), then an entry per map holding what Map settings used to edit (name, level, grid
@@ -434,9 +457,8 @@ export function ProjectSettingsDialog(
   const project = useEditor((s) => s.project?.current ?? null)
   const maps = useEditor((s) => s.projectMaps)
   const units = useEditor((s) => s.settings.general.units)
-  const creatorSetting = useEditor((s) => s.settings.general.creatorName)
-  const found = useEditor((s) => s.foundCreator)
   const creator = useCreator()
+  const gameMapsFolder = useEditor((s) => s.gamePaths?.mapsFolder.path ?? null)
   const savedCreator = usableCreatorName(creator)
   const openDialog = useEditor((s) => s.openDialog)
   const openMap = useOpenMapEntry()
@@ -460,7 +482,7 @@ export function ProjectSettingsDialog(
   const mapEntries = maps.map((m) => m.fileName)
   const categories: ReadonlyArray<SettingsCategoryInfo<Category>> = [
     ...(projects && project !== null
-      ? [{ id: "project" as const, label: project.name, icon: IconFolder, section: "Project" }]
+      ? [{ id: "project" as const, label: "General", icon: IconFolder, section: "Project" }]
       : []),
     ...(openMap.fileName === null || !projects
       ? [{ id: openMap.category, label: openMap.label, icon: IconMap, section: "Maps" }]
@@ -481,58 +503,82 @@ export function ProjectSettingsDialog(
     else void nameProjectMap(fileName, mode)
   }
 
+  const folderRow = (
+    id: string,
+    label: string,
+    description: string,
+    path: string | null,
+    reveal: () => void,
+    extra?: ReactNode
+  ): Row => ({
+    id,
+    category: "project",
+    label,
+    description,
+    wide: true,
+    control: (
+      <div className="flex items-center gap-2">
+        <span
+          className="min-w-0 flex-1 truncate font-mono text-[0.6875rem] text-muted-foreground"
+          title={path ?? undefined}
+        >
+          {path ?? "Not found"}
+        </span>
+        <Button variant="outline" size="sm" disabled={path === null} onClick={reveal}>
+          <IconFolderOpen data-icon="inline-start" />
+          Reveal
+        </Button>
+        {extra}
+      </div>
+    )
+  })
+
   const projectRows: ReadonlyArray<Row> = project === null ? [] : [
     {
       id: "projectName",
       category: "project",
       label: "Name",
-      description: "The project folder's name. Renaming a project comes with New project (0.5).",
-      control: <Input className="w-56" value={project.name} readOnly />
+      description: "Shown in the title bar and in Recent projects. The folder keeps its name.",
+      control: <ProjectNameField name={project.name} />
     },
-    {
-      id: "folder",
-      category: "project",
-      label: "Folder",
-      description: "Where the project's maps are. Change… uses another folder as the project from now on.",
-      wide: true,
-      control: (
-        <div className="flex items-center gap-2">
-          <span
-            className="min-w-0 flex-1 truncate font-mono text-[0.6875rem] text-muted-foreground"
-            title={project.path}
-          >
-            {project.path}
-          </span>
-          <Button variant="outline" size="sm" onClick={() => void revealProject()}>Reveal</Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              onClose()
-              void chooseProject()
-            }}
-          >
-            Change…
-          </Button>
-        </div>
-      )
-    },
-    {
-      ...creatorSettingsRow({
-        creator,
-        setting: creatorSetting,
-        found,
-        onChange: (creatorName) => void updateSettings("general", { creatorName })
-      }),
-      category: "project"
-    },
-    {
-      id: "exportTarget",
-      category: "project",
-      label: "Export to",
-      description: "Where Export to game writes the project's maps.",
-      control: <span className="text-xs text-muted-foreground">Game's maps folder</span>
-    }
+    folderRow(
+      "folder",
+      "Project folder",
+      "The project: ballest-project.json, its maps and its backups. Change… uses another folder as the project.",
+      project.path,
+      () => void revealProject("project"),
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => {
+          onClose()
+          void chooseProject()
+        }}
+      >
+        Change…
+      </Button>
+    ),
+    folderRow(
+      "mapsFolder",
+      "Maps",
+      "The project's maps, one .balledit each.",
+      `${project.path}/maps`,
+      () => void revealProject("maps")
+    ),
+    folderRow(
+      "backupsFolder",
+      "Backups",
+      "The versions Save, Rename and Re-import wrote over (Recover previous version… lists them).",
+      `${project.path}/.ballest/backups`,
+      () => void revealProject("backups")
+    ),
+    folderRow(
+      "exportsFolder",
+      "Exports",
+      "The game's maps folder: where Export to game writes, and what the in-game editor lists.",
+      gameMapsFolder,
+      () => void revealGamePath("mapsFolder")
+    )
   ]
 
   // the shown entry's rows (another map's are read from its file when its entry shows), after the project's

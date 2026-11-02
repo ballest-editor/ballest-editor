@@ -18,6 +18,8 @@ import {
   ProjectPathPayload,
   ProjectState,
   RenameMapPayload,
+  RenameProjectPayload,
+  RevealProjectPayload,
   WriteMapPayload
 } from "@ballest/contracts"
 import { Effect, Option, Path, Schema } from "effect"
@@ -42,6 +44,7 @@ import {
   REIMPORT_MAP_CHANNEL,
   REMEMBER_OPEN_MAP_CHANNEL,
   RENAME_MAP_CHANNEL,
+  RENAME_PROJECT_CHANNEL,
   REVEAL_PROJECT_CHANNEL,
   SAVE_MAP_CHANNEL,
   SWITCH_PROJECT_CHANNEL
@@ -105,12 +108,22 @@ export const createProject = makeIpcMethod({
 
 export const revealProject = makeIpcMethod({
   channel: REVEAL_PROJECT_CHANNEL,
-  payload: Schema.Undefined,
+  payload: RevealProjectPayload,
   result: Schema.Boolean,
-  handler: Effect.fn("ipc.revealProject")(function*() {
-    const folder = yield* (yield* Projects).mapsFolder
+  handler: Effect.fn("ipc.revealProject")(function*({ which }) {
+    const folder = yield* (yield* Projects).folderOf(which)
     if (Option.isNone(folder)) return false
     return yield* (yield* ElectronShell).openFolder(folder.value)
+  })
+})
+
+/** Project settings › General: the project's name. */
+export const renameProject = makeIpcMethod({
+  channel: RENAME_PROJECT_CHANNEL,
+  payload: RenameProjectPayload,
+  result: ProjectState,
+  handler: Effect.fn("ipc.renameProject")(function*({ name }) {
+    return yield* (yield* Projects).setName(name)
   })
 })
 

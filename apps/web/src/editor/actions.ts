@@ -1,4 +1,5 @@
 /** UI-facing operations that run Effects through the single app runtime. */
+import type { ProjectFolder } from "@ballest/contracts"
 import { Cause, Deferred, Effect, Exit, Fiber, Option, Queue, Stream } from "effect"
 import { toast } from "sonner"
 import type { UeTransform, Vec3 } from "../domain/coords"
@@ -1157,10 +1158,20 @@ export const nameProjectEffect = Effect.fn("nameProjectEffect")(function*(name: 
 
 export const nameProject = (name: string) => run(nameProjectEffect(name))
 
-export const revealProject = () =>
+/** Shows one of the project's folders in the file manager: its `maps/` unless asked otherwise. */
+export const revealProject = (which: ProjectFolder = "maps") =>
   run(
     Effect.gen(function*() {
-      yield* (yield* Platform).revealProject
+      yield* (yield* Platform).revealProject(which)
+    })
+  )
+
+/** Project settings › General: the project's name, in its file; the folder keeps its name. */
+export const renameProject = (name: string) =>
+  run(
+    Effect.gen(function*() {
+      yield* (yield* Platform).renameProject(name)
+      yield* refreshProject
     })
   )
 

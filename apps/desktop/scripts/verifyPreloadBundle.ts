@@ -14,6 +14,7 @@ const members = {
   switchProject: "function",
   createProject: "function",
   revealProject: "function",
+  renameProject: "function",
   rememberOpenMap: "function",
   listMaps: "function",
   readMap: "function",
