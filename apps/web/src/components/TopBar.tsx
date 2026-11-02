@@ -41,13 +41,28 @@ const TITLE_BAR_CLASSES = [
   "pr-[calc(100vw_-_env(titlebar-area-width,100vw)_-_env(titlebar-area-x,0px)_+_0.5rem)]"
 ].join(" ")
 
+/** The window's title: the project in use (desktop), centred like any document window's. Its folder on hover. */
+function ProjectTitle() {
+  const project = useEditor((s) => s.project?.current ?? null)
+  if (project === null) return null
+  return (
+    <span
+      className="pointer-events-none absolute inset-x-0 mx-auto w-max max-w-[40%] truncate text-center text-xs text-muted-foreground"
+      title={project.path}
+    >
+      {project.name}
+    </span>
+  )
+}
+
 export function TopBar() {
   const catalog = useEditor((s) => s.catalog)
 
   return (
-    <header className={`flex h-10 shrink-0 items-center gap-1 border-b bg-card ${TITLE_BAR_CLASSES}`}>
+    <header className={`relative flex h-10 shrink-0 items-center gap-1 border-b bg-card ${TITLE_BAR_CLASSES}`}>
       <span className="mr-2 px-1 text-sm font-semibold">Ballest Editor</span>
       <MenuBar />
+      <ProjectTitle />
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <PlayButton />
         {catalog?.warning !== undefined && (

@@ -1,6 +1,7 @@
 import {
   BackupRef,
   ChooseProjectResult,
+  CreateProjectPayload,
   ExportChecks,
   ExportMapPayload,
   ExportMapResult,
@@ -29,6 +30,7 @@ import {
   CHECK_EXPORTS_CHANNEL,
   CHOOSE_PROJECT_CHANNEL,
   CREATE_MAP_CHANNEL,
+  CREATE_PROJECT_CHANNEL,
   EXPORT_MAP_CHANNEL,
   IMPORT_MAP_CHANNEL,
   LIST_BACKUPS_CHANNEL,
@@ -85,6 +87,16 @@ export const switchProject = makeIpcMethod({
   result: ProjectState,
   handler: Effect.fn("ipc.switchProject")(function*({ path }) {
     return yield* (yield* Projects).switchTo(path)
+  })
+})
+
+/** New project: `<projectsFolder>/<name>`, made and used. */
+export const createProject = makeIpcMethod({
+  channel: CREATE_PROJECT_CHANNEL,
+  payload: CreateProjectPayload,
+  result: ProjectState,
+  handler: Effect.fn("ipc.createProject")(function*({ name }) {
+    return yield* (yield* Projects).createNew(name)
   })
 })
 

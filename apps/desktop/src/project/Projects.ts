@@ -39,12 +39,17 @@ export type ProjectFile = typeof ProjectFile.Type
 export const PROJECT_FILE = "ballest-project.json"
 const RECENT_LIMIT = 8
 
+/** A folder name every OS accepts: letters, digits, spaces, `-` and `_`, not starting with a dot or a space. */
+const isProjectName = (name: string): boolean => /^[\p{L}\p{N}_-][\p{L}\p{N} _-]{0,63}$/u.test(name)
+
 export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectError", {
   path: Schema.String,
   reason: Schema.Literals([
     "inGameMaps",
     "fileName",
     "exists",
+    "projectExists",
+    "projectName",
     "notFound",
     "notPicked",
     "extension",
@@ -63,6 +68,10 @@ export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectErr
         return `${this.path} isn't a map file name (a .balledit name, no folders).`
       case "exists":
         return `The project already has a map called ${this.path}.`
+      case "projectExists":
+        return `${this.path} already holds a project. Open it instead, or choose another name.`
+      case "projectName":
+        return `${this.path} can't name a folder: use letters, digits, spaces, - and _.`
       case "notFound":
         return `${this.path} doesn't exist any more.`
       case "notPicked":
@@ -117,6 +126,8 @@ export class Projects extends Context.Service<Projects, {
   /** Keeps which map is open in the current project (`ProjectState.lastOpenMap`); null forgets it. */
   readonly rememberOpenMap: (fileName: string | null) => Effect.Effect<void, ProjectError>
   /** The current project's `maps/` folder, when it exists. */
+  /** Makes `<projectsFolder>/<name>` a project (fails when it holds one already) and uses it. */
+  readonly createNew: (name: string) => Effect.Effect<ProjectState, ProjectError>
   readonly mapsFolder: Effect.Effect<Option.Option<string>>
   readonly list: Effect.Effect<ProjectMaps, ProjectError>
   readonly read: (fileName: string) => Effect.Effect<ProjectMapFile, ProjectError>
@@ -164,6 +175,9 @@ export class Projects extends Context.Service<Projects, {
     const fail = (reason: ProjectError["reason"], file: string) => (cause?: unknown) =>
       new ProjectError({ path: file, reason, ...(cause === undefined ? {} : { cause }) })
 
+    // The default project is `<projectsFolder>/Maps`; New project puts its siblings next to it.
+    const projectsFolder = path.dirname(defaultFolder)
+
     const remembered = settings.get.pipe(Effect.map((s): ProjectSettings => s.project ?? {}))
     const current = remembered.pipe(Effect.map((s) => s.recent?.[0] ?? defaultFolder))
 
@@ -185,7 +199,8 @@ export class Projects extends Context.Service<Projects, {
       return {
         current: yield* info(folder),
         recent: yield* Effect.forEach(before, info),
-        lastOpenMap: lastOpenMap !== null && isMapFileName(lastOpenMap) ? lastOpenMap : null
+        lastOpenMap: lastOpenMap !== null && isMapFileName(lastOpenMap) ? lastOpenMap : null,
+        projectsFolder
       } satisfies ProjectState
     })
 
@@ -223,9 +238,8 @@ export class Projects extends Context.Service<Projects, {
 
     const mapsDir = (project: string) => path.join(project, "maps")
 
-    /** The current project, made on disk if it isn't yet: `maps/`, `.ballest/`, `ballest-project.json`, `.gitignore`. */
-    const ensure = Effect.gen(function*() {
-      const project = yield* current
+    /** Makes `project` on disk if it isn't yet: `maps/`, `.ballest/`, `ballest-project.json`, `.gitignore`. */
+    const ensureAt = Effect.fnUntraced(function*(project: string) {
       yield* outsideGame(project)
       const writeIfMissing = (file: string, write: Effect.Effect<void, unknown>) =>
         fs.exists(file).pipe(Effect.flatMap((exists) => exists ? Effect.void : write))
@@ -240,6 +254,19 @@ export class Projects extends Context.Service<Projects, {
         )
       }).pipe(Effect.mapError(fail("write", project)))
       return project
+    })
+
+    /** The current project, made on disk if it isn't yet. */
+    const ensure = current.pipe(Effect.flatMap(ensureAt))
+
+    const createNew = Effect.fn("Projects.createNew")(function*(name: string) {
+      const trimmed = name.trim()
+      if (!isProjectName(trimmed)) return yield* fail("projectName", name)()
+      const folder = path.join(projectsFolder, trimmed)
+      const taken = yield* fs.exists(path.join(folder, PROJECT_FILE)).pipe(Effect.orElseSucceed(() => false))
+      if (taken) return yield* fail("projectExists", folder)()
+      yield* ensureAt(folder)
+      return yield* use(folder)
     })
 
     const target = Effect.fnUntraced(function*(project: string, fileName: string) {
@@ -549,6 +576,7 @@ export class Projects extends Context.Service<Projects, {
       state,
       use,
       switchTo,
+      createNew,
       rememberOpenMap,
       mapsFolder,
       list,

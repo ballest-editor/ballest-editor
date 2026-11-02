@@ -190,11 +190,12 @@ the outside in:
 - **First launch.** Straight into the editor as **Untitled Project \*** with an Untitled map, nothing on disk. The
   first Save opens a **Save project** modal: project name, folder (default `Documents/Ballest Editor/<name>`), map
   name. After it the project exists and the asterisk goes. The Game link checklist shows as a modal on first launch
-  (and from Project › Game link…), not as a page; later launches notify only when a result changes.
-- **Menus.** `File` (New project, Open project…, Recent projects, Save, Save project…, Close project, Settings…, Quit),
-  `Edit`, `View`, `Project` (Maps…, New map…, Import map…, Rename map…, Duplicate map…, Recover previous version…,
-  Export to game, Export on save, Re-import from game, Play, Launch game, Game link…, Project settings…). No separate
-  Map or Game menu: a map is only ever the open one, and the game is the project's export target.
+  (and from File › Game link…), not as a page; later launches notify only when a result changes.
+- **Menus.** `File` (New project…, Open project…, Recent projects, Save, Save project…, Close project, Settings…,
+  Game link…, Quit), `Edit`, `View`, `Project` (Maps…, New map…, Import map…, Export to game, Export on save, Re-import
+  from game, Play, Launch game, Project settings…). No separate Map or Game menu: a map is only ever the open one, and
+  the game is the project's export target. Rename, Duplicate and Recover are per map in Maps…; the Game link is the
+  user's machine, not the project's, so it sits with Settings under File.
 - **Project settings** ([mockups/welcome.html](mockups/welcome.html) § 5): one dialog, IntelliJ's Project Structure
   shape. Left: _Project_ (name, folder, creator, export target; later git), then _Maps_ with an entry per map holding
   what today's map settings dialog edits (level, difficulty, tags, grid height, Export on save) plus Rename and
@@ -227,10 +228,11 @@ first slice stops short of the design:
 - **No Welcome, no first-launch project.** On launch the window opens the map open when the app last ran (kept per
   project in `desktop-settings.json`), else the project's most recently edited map, else a fresh unsaved map named
   Untitled (an empty project starts there; the first Save names the map into the default project, not into a named
-  Untitled Project). Closing the last tab shows the same fresh map. The status bar shows the project plainly, never
-  italic with \*.
-- **File › New project… and Close project** are in the menu, off ("Coming in 0.5"); Open project… is the folder
-  chooser.
+  Untitled Project). Closing the last tab shows the same fresh map. The window's title shows the project plainly,
+  never italic with \*.
+- **File › New project…** asks a name and makes `Documents/Ballest Editor/<name>` (`Projects.createNew`); a project
+  elsewhere is Open project…, the folder chooser. No Close project yet: without the Welcome window there is nowhere to
+  go.
 - **Maps…** has no thumbnails (a square slot per row waits for them) and no Delete. Rename and Duplicate open the map
   first (the name dialogs name the open map); Reveal shows the project's maps folder, not the file.
 - **Project settings:** the name is read-only (the folder's), the export target read-only (the game's maps folder);
@@ -271,7 +273,7 @@ disk (a folder, one JSON file, a hash) and large in how the app reads; that is t
 | #136 restyle the update pill                    | Keep; the pill moves to the status bar.                                                                                                             |
 | #118 install the plugin, #66 Play               | Keep; Play exports first and records the link. Install plugin is a Game link row.                                                                   |
 | #140 status bar, notifications, Start tab       | Done (phase 2); the Start tab has since given way to Project › Maps… (§ Shell).                                                                     |
-| #134 game link checklist                        | Done (phase 2; #135 merged into it): the checklist, now Project › Game link…, and notifications when a result changes between launches.             |
+| #134 game link checklist                        | Done (phase 2; #135 merged into it): the checklist, now File › Game link…, and notifications when a result changes between launches.                |
 | #141 sync detection, Export confirm, Re-import  | Done (phase 3).                                                                                                                                     |
 | #112 sidecar                                    | Move to 0.4; add "re-match on Re-import" to its scope.                                                                                              |
 | #81, #111 hide, lock, layers                    | Move to 0.4.                                                                                                                                        |

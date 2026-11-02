@@ -112,6 +112,7 @@ export type Dialog =
   | "mapSettings"
   | "maps"
   | "gameLink"
+  | "newProject"
   | "replacePublished"
   | "overwriteChanged"
   | "newDraft"

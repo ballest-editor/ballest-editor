@@ -91,7 +91,9 @@ export const ProjectState = Schema.Struct({
   current: ProjectInfo,
   recent: Schema.Array(ProjectInfo),
   /** The map last open in the current project (its file name), for the next launch to open again; null when none was. */
-  lastOpenMap: Schema.NullOr(MapFileName)
+  lastOpenMap: Schema.NullOr(MapFileName),
+  /** Where New project makes its folders: `Documents/Ballest Editor`. */
+  projectsFolder: FilePath
 })
 export type ProjectState = typeof ProjectState.Type
 
@@ -100,6 +102,10 @@ export const ChooseProjectResult = Schema.NullOr(ProjectState)
 
 export const ProjectPathPayload = Schema.Struct({ path: FilePath })
 export type ProjectPathPayload = typeof ProjectPathPayload.Type
+
+/** New project: the folder's name under `ProjectState.projectsFolder`. */
+export const CreateProjectPayload = Schema.Struct({ name: Schema.String })
+export type CreateProjectPayload = typeof CreateProjectPayload.Type
 
 /**
  * A map in the project: its file in `maps/`, when that last changed, the SHA-256 of its bytes (compared with the last
@@ -545,6 +551,8 @@ export interface DesktopBridge {
   readonly chooseProject: () => Promise<ProjectState | null>
   /** Goes back to a recent project (or the default one). */
   readonly switchProject: (path: string) => Promise<ProjectState>
+  /** Makes `<projectsFolder>/<name>` a project and uses it; refused when that folder already holds one. */
+  readonly createProject: (name: string) => Promise<ProjectState>
   /** Shows the project's `maps/` folder in the file manager; false when it doesn't exist or fails to open. */
   readonly revealProject: () => Promise<boolean>
   /** Keeps which map is open in the project, so the next launch opens it again (`ProjectState.lastOpenMap`). */

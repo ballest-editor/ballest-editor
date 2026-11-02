@@ -453,7 +453,7 @@ export const closeMapTab = () => run(closeMapTabEffect)
  * Rename… or Duplicate… for one of the project's maps from the Maps dialog or Project settings: the dialogs name the
  * open map, so the map is opened first (asking about the open map's unsaved edits), then its dialog.
  */
-export const nameProjectMap = (fileName: string, mode: "rename" | "duplicate") =>
+export const nameProjectMap = (fileName: string, mode: "rename" | "duplicate" | "recover") =>
   run(
     Effect.gen(function*() {
       if (useEditor.getState().file?.name !== fileName) {
@@ -1121,6 +1121,9 @@ export const switchProject = (path: string) =>
   path === useEditor.getState().project?.current.path
     ? Promise.resolve(undefined)
     : changeProject((platform) => Effect.asSome(platform.switchProject(path)))
+
+/** New project…: `<projectsFolder>/<name>` is made and becomes the project. */
+export const createProject = (name: string) => changeProject((platform) => Effect.asSome(platform.createProject(name)))
 
 export const revealProject = () =>
   run(

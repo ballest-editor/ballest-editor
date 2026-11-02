@@ -84,7 +84,8 @@ export interface TestDisk {
 }
 
 export const TEST_MAPS_FOLDER = "/game/UserSavedMaps"
-export const TEST_PROJECT = "/home/me/Documents/Ballest Editor/Maps"
+export const TEST_PROJECTS_FOLDER = "/home/me/Documents/Ballest Editor"
+export const TEST_PROJECT = `${TEST_PROJECTS_FOLDER}/Maps`
 
 /** Where a project map is: `<project>/maps/<file name>`. */
 export const projectFile = (fileName: string, project = TEST_PROJECT) => `${project}/maps/${fileName}`
@@ -206,7 +207,8 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     return {
       current: info(disk.project.current),
       recent: recent.map(info),
-      lastOpenMap: disk.project.lastOpenMap[disk.project.current] ?? null
+      lastOpenMap: disk.project.lastOpenMap[disk.project.current] ?? null,
+      projectsFolder: TEST_PROJECTS_FOLDER
     }
   }
   const select = (path: string) => {
@@ -254,6 +256,11 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       return path === null ? Promise.resolve(null) : select(path)
     },
     switchProject: select,
+    createProject: (name) => {
+      const path = `${TEST_PROJECTS_FOLDER}/${name.trim()}`
+      if (info(path).exists) return fail(`${path} already holds a project.`)
+      return select(path)
+    },
     revealProject: () => {
       const { current } = disk.project
       if (!info(current).exists) return Promise.resolve(false)

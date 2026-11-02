@@ -253,7 +253,8 @@ describe("DesktopIpc", () => {
         assert.deepStrictEqual(yield* fake.invoke(channels.PROJECT_STATE_CHANNEL), {
           current: { path: project, name: "Maps", exists: false, isDefault: true },
           recent: [],
-          lastOpenMap: null
+          lastOpenMap: null,
+          projectsFolder: path.dirname(project)
         })
         assert.deepStrictEqual(yield* fake.invoke(channels.LIST_MAPS_CHANNEL), [])
         assert.isFalse(yield* fake.invoke(channels.REVEAL_PROJECT_CHANNEL))
@@ -609,6 +610,7 @@ describe("DesktopIpc", () => {
   it.effect("chooses another project folder, refuses the game's maps folder and switches back", () =>
     withHandlers(({ fake, dialogs, dir, project, steam }) =>
       Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
         const path = yield* Path.Path
         const other = path.join(dir, "Elsewhere")
 
@@ -628,7 +630,8 @@ describe("DesktopIpc", () => {
         assert.deepStrictEqual(chosen, {
           current: { path: other, name: "Elsewhere", exists: false, isDefault: false },
           recent: [{ path: project, name: "Maps", exists: false, isDefault: true }],
-          lastOpenMap: null
+          lastOpenMap: null,
+          projectsFolder: path.dirname(project)
         })
         // Only a recent project or the default can be switched to by path.
         const error = yield* Effect.flip(
@@ -638,6 +641,20 @@ describe("DesktopIpc", () => {
         const back = yield* fake.invokeAs(ProjectState, channels.SWITCH_PROJECT_CHANNEL, { path: project })
         assert.strictEqual(back.current.path, project)
         assert.deepStrictEqual(back.recent.map((p) => p.path), [other])
+
+        // New project makes `<projectsFolder>/<name>` on disk and uses it; a second one of that name is refused.
+        const made = yield* fake.invokeAs(ProjectState, channels.CREATE_PROJECT_CHANNEL, { name: " Season 3 " })
+        const season = path.join(path.dirname(project), "Season 3")
+        assert.deepInclude(made.current, { path: season, name: "Season 3", exists: true, isDefault: false })
+        assert.deepStrictEqual(made.recent.map((p) => p.path), [project, other])
+        assert.isTrue(yield* fs.exists(path.join(season, "maps")))
+        assert.strictEqual(yield* fs.readFileString(path.join(season, ".gitignore")), ".ballest/\n")
+        const again = yield* Effect.flip(fake.invoke(channels.CREATE_PROJECT_CHANNEL, { name: "Season 3" }))
+        assert.match(String(again.cause), /already holds a project/)
+        for (const bad of ["", ".hidden", "a/b", "x".repeat(65)]) {
+          const refused = yield* Effect.flip(fake.invoke(channels.CREATE_PROJECT_CHANNEL, { name: bad }))
+          assert.match(String(refused.cause), /can't name a folder/)
+        }
       })
     ))
 

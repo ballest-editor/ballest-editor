@@ -30,6 +30,7 @@ import { KeybindCheatSheet } from "./KeybindCheatSheet"
 import { MapsDialog } from "./MapsDialog"
 import { NameMapDialog } from "./NameMapDialog"
 import { NewMapDialog } from "./NewMapDialog"
+import { NewProjectDialog } from "./NewProjectDialog"
 import { OverwriteChangedDialog } from "./OverwriteChangedDialog"
 import { Palette } from "./Palette"
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
@@ -178,6 +179,7 @@ export function Editor() {
       />
       <MapsDialog open={dialog === "maps"} onClose={close} />
       <GameLinkDialog open={dialog === "gameLink"} onClose={close} />
+      <NewProjectDialog open={dialog === "newProject"} onClose={close} />
       <ReplacePublishedDialog open={dialog === "replacePublished"} onClose={close} />
       <OverwriteChangedDialog open={dialog === "overwriteChanged"} onClose={close} />
       <ImportClashDialog open={dialog === "importClash"} onClose={close} />

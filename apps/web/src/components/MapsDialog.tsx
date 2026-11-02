@@ -30,31 +30,30 @@ function MapRow(
   const label = mapLabelOf(map.fileName)
   const open = () => {
     onClose()
-    void openProjectMap(map.fileName)
+    if (!isOpen) void openProjectMap(map.fileName)
   }
-  const name = (mode: "rename" | "duplicate") => {
+  const name = (mode: "rename" | "duplicate" | "recover") => {
     onClose()
     void nameProjectMap(map.fileName, mode)
   }
   return (
-    <li
-      className={cn(
-        "grid grid-cols-[auto_minmax(0,1fr)_9rem_7rem_auto_auto] items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted/60",
-        isOpen && "bg-muted/40"
-      )}
-      title={map.path}
-      onDoubleClick={open}
-    >
-      <ThumbnailSlot />
-      <span className="flex min-w-0 items-center gap-1.5">
-        <span className="truncate font-medium">{label}</span>
-        {isOpen && <span className="shrink-0 text-muted-foreground">open</span>}
-      </span>
-      <LinkStateBadge state={linkStateOf(map, { unsaved: isOpen && dirty })} />
-      <span className="text-right text-muted-foreground" title={formatDateTime(map.modifiedAt)}>
-        edited {formatAgo(map.modifiedAt, now)}
-      </span>
-      <Button variant="outline" size="sm" disabled={isOpen} onClick={open}>Open</Button>
+    <li className={cn("flex items-center gap-1 rounded-md pr-1 hover:bg-muted/60", isOpen && "bg-muted/40")}>
+      <button
+        type="button"
+        className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_9rem_7rem] items-center gap-3 rounded-md px-2 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        title={isOpen ? `${map.path}\nThe open map` : `${map.path}\nOpen`}
+        onClick={open}
+      >
+        <ThumbnailSlot />
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate font-medium">{label}</span>
+          {isOpen && <span className="shrink-0 text-muted-foreground">open</span>}
+        </span>
+        <LinkStateBadge state={linkStateOf(map, { unsaved: isOpen && dirty })} />
+        <span className="text-right text-muted-foreground" title={formatDateTime(map.modifiedAt)}>
+          edited {formatAgo(map.modifiedAt, now)}
+        </span>
+      </button>
       <DropdownMenu>
         <DropdownMenuTrigger
           render={<Button variant="ghost" size="icon-sm" aria-label={`More for ${label}`} />}
@@ -64,6 +63,7 @@ function MapRow(
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => name("rename")}>Rename…</DropdownMenuItem>
           <DropdownMenuItem onClick={() => name("duplicate")}>Duplicate…</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => name("recover")}>Recover previous version…</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => void revealProject()}>Reveal</DropdownMenuItem>
         </DropdownMenuContent>
@@ -74,12 +74,12 @@ function MapRow(
 
 /**
  * Project › Maps… (desktop; docs/PROJECTS.md § Shell): the project's maps, most recently changed first, each with its
- * link state and when it was last edited, the open one marked. New map…, Import…; Open (a double click too), and
- * per map Rename…, Duplicate… and Reveal. A tool, not a home page.
+ * link state and when it was last edited, the open one marked. New map…, Import…; a click on a map opens it, and its
+ * menu holds Rename…, Duplicate…, Recover previous version… and Reveal. A tool, not a home page.
  */
 export function MapsDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   const maps = useEditor((s) => s.projectMaps)
-  const projectName = useEditor((s) => s.project?.current.name ?? "this project")
+  const projectPath = useEditor((s) => s.project?.current.path ?? "")
   const now = useNow()
   const then = (action: () => Promise<unknown>) => {
     onClose()
@@ -87,11 +87,13 @@ export function MapsDialog({ open, onClose }: { readonly open: boolean; readonly
   }
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="flex max-h-[min(80vh,720px)] flex-col sm:max-w-3xl">
+      <DialogContent className="flex max-h-[min(80vh,720px)] min-h-[24rem] flex-col sm:max-w-3xl">
         <DialogHeader className="flex-row items-center gap-2">
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <DialogTitle>Maps in {projectName}</DialogTitle>
-            <DialogDescription>The project's maps, most recently changed first.</DialogDescription>
+            <DialogTitle>Maps</DialogTitle>
+            <DialogDescription className="truncate font-mono text-[0.6875rem]" title={projectPath}>
+              {projectPath}
+            </DialogDescription>
           </div>
           <Button variant="outline" onClick={() => then(importMap)}>
             <IconFileImport data-icon="inline-start" />

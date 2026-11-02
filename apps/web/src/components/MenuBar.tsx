@@ -13,7 +13,6 @@ import {
   MenubarSubTrigger,
   MenubarTrigger
 } from "@workspace/ui/components/menubar"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import type { ReactNode } from "react"
 import { formatBinding, type KeybindAction } from "../domain/Keybinds"
 import type { Settings } from "../domain/Settings"
@@ -55,18 +54,6 @@ function CommandItem(
       {children}
       <Shortcut action={action} />
     </MenubarItem>
-  )
-}
-
-/** A menu item that isn't there yet, with the tooltip saying when (the item itself takes no pointer events). */
-function ComingItem({ children, when }: { readonly children: ReactNode; readonly when: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger render={<div />}>
-        <MenubarItem disabled>{children}</MenubarItem>
-      </TooltipTrigger>
-      <TooltipContent side="right">{when}</TooltipContent>
-    </Tooltip>
   )
 }
 
@@ -139,7 +126,6 @@ export function MenuBar() {
   const { projects, exportToGame: canExport, launchGame: canLaunchGame, play: canPlay } = useEditor((s) =>
     s.capabilities
   )
-  const hasFile = useEditor((s) => s.file !== null)
   const exportOnSave = useEditor((s) => s.exportOnSave)
   // Re-import needs an export to take the map from
   const exportedFile = useOpenProjectMap()?.map
@@ -160,14 +146,14 @@ export function MenuBar() {
       {projects
         ? (
           <Menu title="File">
-            <ComingItem when="Coming in 0.5">New project…</ComingItem>
+            <MenubarItem onClick={() => openDialog("newProject")}>New project…</MenubarItem>
             <MenubarItem onClick={() => void chooseProject()}>Open project…</MenubarItem>
             <RecentProjectsMenu />
             <MenubarSeparator />
             <CommandItem action="saveMap">Save</CommandItem>
-            <ComingItem when="Coming in 0.5">Close project</ComingItem>
             <MenubarSeparator />
             <MenubarItem onClick={() => openDialog("settings")}>Settings…</MenubarItem>
+            <MenubarItem onClick={() => openDialog("gameLink")}>Game link…</MenubarItem>
             <MenubarItem onClick={() => void quitApp()}>Quit</MenubarItem>
           </Menu>
         )
@@ -267,10 +253,6 @@ export function MenuBar() {
             <MenubarItem inset onClick={() => openDialog("maps")}>Maps…</MenubarItem>
             <CommandItem action="newMap" inset>New map…</CommandItem>
             <CommandItem action="openMap" inset>Import map…</CommandItem>
-            <MenubarSeparator />
-            <MenubarItem inset onClick={() => openDialog(hasFile ? "rename" : "saveAs")}>Rename map…</MenubarItem>
-            <CommandItem action="saveMapAs" inset>Duplicate map…</CommandItem>
-            <MenubarItem inset onClick={() => openDialog("recover")}>Recover previous version…</MenubarItem>
             {canExport && (
               <>
                 <MenubarSeparator />
@@ -294,7 +276,6 @@ export function MenuBar() {
               </>
             )}
             <MenubarSeparator />
-            <MenubarItem inset onClick={() => openDialog("gameLink")}>Game link…</MenubarItem>
             <MenubarItem inset onClick={() => openDialog("projectSettings")}>Project settings…</MenubarItem>
           </Menu>
         )
