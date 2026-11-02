@@ -5,33 +5,14 @@ import { Kbd } from "@workspace/ui/components/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { formatBinding } from "../domain/Keybinds"
 import { playMap } from "../editor/actions"
-import { useEditor, useOpenMapLabel } from "../editor/store"
+import { useEditor } from "../editor/store"
 import { MenuBar } from "./MenuBar"
-
-/** The open map's name, with a dot while it has unsaved changes; its file's path (desktop) on hover. */
-function FileName() {
-  const file = useEditor((s) => s.file)
-  const dirty = useEditor((s) => s.dirty)
-  const mapOpen = useEditor((s) => s.mapOpen)
-  const label = useOpenMapLabel()
-  if (!mapOpen) return null
-  return (
-    <span
-      className="ml-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
-      title={file?.path ?? undefined}
-    >
-      <span className="truncate">{label}</span>
-      {dirty && <span className="size-1.5 shrink-0 rounded-full bg-foreground/60" aria-label="unsaved changes" />}
-    </span>
-  )
-}
 
 /** Play (desktop): exports the open map and races it in the game. Its tooltip shows the keybind (F5). */
 function PlayButton() {
   const canPlay = useEditor((s) => s.capabilities.play)
-  const mapOpen = useEditor((s) => s.mapOpen)
   const keybinds = useEditor((s) => s.keybinds.playMap)
-  if (!canPlay || !mapOpen) return null
+  if (!canPlay) return null
   return (
     <Tooltip>
       <TooltipTrigger
@@ -67,7 +48,6 @@ export function TopBar() {
     <header className={`flex h-10 shrink-0 items-center gap-1 border-b bg-card ${TITLE_BAR_CLASSES}`}>
       <span className="mr-2 px-1 text-sm font-semibold">Ballest Editor</span>
       <MenuBar />
-      <FileName />
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <PlayButton />
         {catalog?.warning !== undefined && (

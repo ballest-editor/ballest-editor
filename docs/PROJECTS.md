@@ -4,8 +4,10 @@ Status: long-term design, written 2026-10-31. Phase 1 and 2 are milestone 0.2 wo
 sequenced below. Phase 1's project folder, save flow, Import and Export to game are built (#132), and so are the
 unsaved-changes prompt before closing or replacing the open map (#70; [DESKTOP.md](DESKTOP.md) § Window) and backups
 on overwrite with Recover (#137; [DESKTOP.md](DESKTOP.md) § Backups). Of phase 2, the status bar, the notification
-centre, the Start tab (plain list) and the document tabs are built (#140; [DESKTOP.md](DESKTOP.md) § Renderer describes
-them), and so is the Game link checklist with its notifications (#134; [DESKTOP.md](DESKTOP.md) § Renderer). Play
+centre and the document tabs are built (#140; [DESKTOP.md](DESKTOP.md) § Renderer describes them), and so is the Game
+link checklist with its notifications (#134; [DESKTOP.md](DESKTOP.md) § Renderer). The first slice of § Shell is built
+too: map tabs only (no Start tab), Project › Maps…, the Project menu, Project settings and the Game link as a modal; §
+Shell says where it stops short. Play
 is built (#66; [DESKTOP.md](DESKTOP.md) § Play). Phase 3, sync with the in-game editor, is built too (#141; § Sync
 below, [DESKTOP.md](DESKTOP.md) § Sync). [DESKTOP.md](DESKTOP.md) describes the shell this runs in; [FORMAT.md](FORMAT.md) the
 game's file format, which none of this changes.
@@ -115,7 +117,7 @@ imported from `UserSavedMaps` is linked to that file from the start, so Export k
 and sync detection works. Nothing is edited in place outside a project. Importing a file whose name
 clashes with an existing map asks: replace (backing up), or import as a copy.
 
-Later, the Start tab lists the maps in `UserSavedMaps` that aren't in the project yet, with an Import
+Later, Maps… lists the maps in `UserSavedMaps` that aren't in the project yet, with an Import
 button each (#103's first slice).
 
 ### Export and Play
@@ -143,7 +145,7 @@ reported once).
 Later, Re-import gets a diff (#105) and "merge" becomes possible for non-overlapping edits. Not
 before git.
 
-Link states, shown in the status bar and on the Start tab: **Not exported**, **In sync**, **Edited
+Link states, shown in the status bar and in Maps…: **Not exported**, **In sync**, **Edited
 since export**, **Changed in game**, **Both changed**, **Published draft** (the export has a
 `levelPublishedFileId`).
 
@@ -218,6 +220,25 @@ the outside in:
 
 Thumbnails are an offscreen render of the map written next to it on save, used by Maps… and Welcome.
 
+What is built ([DESKTOP.md](DESKTOP.md) § Renderer): the project window as above, without the Welcome window,
+multi-window, Untitled Project \* and the Save project modal, thumbnails, the drawer and Delete in Maps…. Where this
+first slice stops short of the design:
+
+- **No Welcome, no first-launch project.** On launch the window opens the map open when the app last ran (kept per
+  project in `desktop-settings.json`), else the project's most recently edited map, else a fresh unsaved map named
+  Untitled (an empty project starts there; the first Save names the map into the default project, not into a named
+  Untitled Project). Closing the last tab shows the same fresh map. The status bar shows the project plainly, never
+  italic with \*.
+- **File › New project… and Close project** are in the menu, off ("Coming in 0.5"); Open project… is the folder
+  chooser.
+- **Maps…** has no thumbnails (a square slot per row waits for them) and no Delete. Rename and Duplicate open the map
+  first (the name dialogs name the open map); Reveal shows the project's maps folder, not the file.
+- **Project settings:** the name is read-only (the folder's), the export target read-only (the game's maps folder);
+  no git yet. A map entry edits the open map in the editor, any other map on disk through the save path; the open map
+  with unsaved edits is refused.
+- **Game link** opens by itself on the first launch and when a launch finds the game or its maps folder missing; the
+  plugin manager is an optional row, never red, and never opens it.
+
 ## Phases
 
 The order is chosen so that where files live is settled before anyone installs a release: moving
@@ -231,11 +252,11 @@ follow at any time without touching saved projects.
 | 3     | 0.2       | **Sync.** Change detection on launch, focus and after Play; the Export confirm; Re-import; link states in the status bar and Start tab.                                                                                                                                                    |
 | 4     | 0.3       | **Public launch**, as planned. No new flow work; docs describe the three nouns.                                                                                                                                                                                                            |
 | 5     | 0.4 (new) | **Editor-only data.** The sidecar (#112) with stable keys and re-matching on Re-import; hide, lock, layers (#81, #111); Map settings tier.                                                                                                                                                 |
-| 6     | 0.5 (new) | **Projects proper.** Start tab with thumbnails; maps folder and Workshop browser (#103); New and Open project; Project settings tier; git history and diff (#105); multi-map with shared bases (#104).                                                                                     |
+| 6     | 0.5 (new) | **Projects proper.** Thumbnails in Maps… and Welcome; maps folder and Workshop browser (#103); New and Open project; Project settings tier; git history and diff (#105); multi-map with shared bases (#104).                                                                               |
 | 7     | later     | **Derived data.** Generators, derived pieces and splines make the sidecar authoritative for the pieces they own; detached pieces.                                                                                                                                                          |
 
 What stays out of the public launch on purpose: a separate project-manager window (Godot style), git,
-thumbnails on the Start tab, the Workshop browser, multi-map, any merge. Phase 1 to 3 are small on
+thumbnails in Maps…, the Workshop browser, multi-map, any merge. Phase 1 to 3 are small on
 disk (a folder, one JSON file, a hash) and large in how the app reads; that is the trade.
 
 ### Issues to reshape
@@ -249,9 +270,9 @@ disk (a folder, one JSON file, a hash) and large in how the app reads; that is t
 | #142 map settings, #143 new and open project    | New, phases 5 and 6; #21's dialog becomes Map settings.                                                                                             |
 | #136 restyle the update pill                    | Keep; the pill moves to the status bar.                                                                                                             |
 | #118 install the plugin, #66 Play               | Keep; Play exports first and records the link. Install plugin is a Game link row.                                                                   |
-| #140 status bar, notifications, Start tab       | Done (phase 2).                                                                                                                                     |
-| #134 game link checklist                        | Done (phase 2; #135 merged into it): the checklist on the Start tab, and notifications when a result changes between launches.                      |
+| #140 status bar, notifications, Start tab       | Done (phase 2); the Start tab has since given way to Project › Maps… (§ Shell).                                                                     |
+| #134 game link checklist                        | Done (phase 2; #135 merged into it): the checklist, now Project › Game link…, and notifications when a result changes between launches.             |
 | #141 sync detection, Export confirm, Re-import  | Done (phase 3).                                                                                                                                     |
 | #112 sidecar                                    | Move to 0.4; add "re-match on Re-import" to its scope.                                                                                              |
 | #81, #111 hide, lock, layers                    | Move to 0.4.                                                                                                                                        |
-| #103 Workshop browser, #104 multi-map, #105 git | Move to 0.5; #103 gains "the maps folder list on the Start tab" as its first slice.                                                                 |
+| #103 Workshop browser, #104 multi-map, #105 git | Move to 0.5; #103 gains "the maps folder list in Maps…" as its first slice.                                                                         |

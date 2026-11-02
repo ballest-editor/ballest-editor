@@ -96,7 +96,9 @@ export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 export type Tool = "select" | "translate" | "rotate" | "scale"
 /**
  * `saveAs` names a map that has no file yet before it goes into the project (desktop), or before it is downloaded
- * (browser: Export). `rename`, `duplicate` and `recover` are the Map menu's (desktop).
+ * (browser: Export). `rename`, `duplicate` and `recover` are the Project menu's (desktop), and so are `maps` (Project ›
+ * Maps…) and `gameLink`. `projectSettings` opens Project settings on the project's page, `mapSettings` on the open map's
+ * entry in it.
  */
 export type Dialog =
   | "new"
@@ -104,7 +106,10 @@ export type Dialog =
   | "rename"
   | "duplicate"
   | "settings"
+  | "projectSettings"
   | "mapSettings"
+  | "maps"
+  | "gameLink"
   | "replacePublished"
   | "overwriteChanged"
   | "newDraft"
@@ -170,9 +175,6 @@ export interface NotifyOptions {
   readonly actions?: ReadonlyArray<NotificationAction>
 }
 
-/** The document tabs: the Start tab, and the open map's. */
-export type DocumentTab = "start" | "map"
-
 let nextId = 0
 const freshId = () => `item-${++nextId}`
 const freshIds = (n: number) => Array.from({ length: n }, freshId)
@@ -214,10 +216,10 @@ export interface EditorState {
   readonly pluginStatus: PluginStatus | null
   /**
    * The Game link checklist's memory (desktop): whether this is the first launch that looked (the checklist then
-   * starts expanded), and what was last found and kept for the next launch.
+   * opens as a dialog), and what was last found and kept for the next launch.
    */
   readonly gameLink: { readonly firstRun: boolean; readonly last: GameLinkResult | null }
-  /** Why the folder last chosen for `which` on the Start tab was refused (it isn't the game's); null once one is used. */
+  /** Why the folder last chosen for `which` in the Game link was refused (it isn't the game's); null once one is used. */
   readonly gamePathProblem: { readonly which: GamePathKind; readonly message: string } | null
   /** Export found a published map's draft under the map's file name; the replacePublished dialog asks. */
   readonly publishedDraft: PublishedDraft | null
@@ -229,14 +231,6 @@ export interface EditorState {
   readonly notifications: ReadonlyArray<NotificationRecord>
   /** The kinds "Don't show again" muted: `notify` drops them. */
   readonly mutedNotificationKinds: ReadonlySet<string>
-  /**
-   * Whether a map is open in its tab. The document always holds a map; with no tab open it is a blank one nobody sees,
-   * and the map commands are off.
-   */
-  readonly mapOpen: boolean
-  /** Whether the Start tab is in the tab strip; it is whenever no map is open. */
-  readonly startOpen: boolean
-  readonly activeTab: DocumentTab
   readonly selectedIds: Selection
   readonly tool: Tool
   /** Whether the gizmo follows the selected item's axes or the world's. */
@@ -285,8 +279,8 @@ export interface EditorState {
   readonly frameAllRequest: number
 
   /**
-   * Replaces the document and shows it in its tab; `floorHeight` defaults to the map's player start height. `dirty` opens it as unsaved edits
-   * of `file` (a recovered version), so the next Save writes it there.
+   * Replaces the document (the map tab always shows one); `floorHeight` defaults to the map's player start height.
+   * `dirty` opens it as unsaved edits of `file` (a recovered version), so the next Save writes it there.
    */
   readonly loadMap: (
     map: MapFile,
@@ -319,13 +313,6 @@ export interface EditorState {
   readonly setPublishedDraft: (draft: PublishedDraft | null) => void
   readonly setChangedExport: (changed: ChangedExport | null) => void
   readonly setUpdate: (update: UpdateState) => void
-  /** Shows the Start tab, adding it to the strip if it was closed (View › Start). */
-  readonly showStart: () => void
-  /** Takes the Start tab out of the strip; only while a map is open, which then shows. */
-  readonly closeStart: () => void
-  readonly showMapTab: () => void
-  /** Closes the map's tab, discarding unsaved edits (actions asks first); Start shows. */
-  readonly closeMap: () => void
   readonly placePiece: (piece: CatalogPiece, transform: ItemTransform) => void
   /**
    * Replaces the transforms of several items as one undo step; false (with a notice, and
@@ -505,9 +492,6 @@ export const useEditor = create<EditorState>()((set, get) => {
     update: null,
     notifications: [],
     mutedNotificationKinds: new Set(),
-    mapOpen: false,
-    startOpen: true,
-    activeTab: "start",
     selectedIds: [],
     tool: "translate",
     gizmoSpace: "world",
@@ -541,8 +525,8 @@ export const useEditor = create<EditorState>()((set, get) => {
         file,
         exportOnSave: options?.exportOnSave ?? false,
         selectedIds: [],
-        mapOpen: true,
-        activeTab: "map",
+        preview: null,
+        lightingPreview: null,
         frameAllRequest: s.frameAllRequest + 1
       })),
 
@@ -563,27 +547,6 @@ export const useEditor = create<EditorState>()((set, get) => {
     setChangedExport: (changedExport) =>
       set({ changedExport, dialog: changedExport === null ? null : "overwriteChanged" }),
     setUpdate: (update) => set({ update }),
-    showStart: () => set({ startOpen: true, activeTab: "start" }),
-    closeStart: () => set((s) => s.mapOpen ? { startOpen: false, activeTab: "map" } : s),
-    showMapTab: () => set((s) => s.mapOpen ? { activeTab: "map" } : s),
-    closeMap: () => {
-      const blank = initialMap()
-      set({
-        doc: docOf(blank),
-        floorHeight: floorHeightOf(blank),
-        past: [],
-        future: [],
-        dirty: false,
-        file: null,
-        exportOnSave: false,
-        selectedIds: [],
-        preview: null,
-        lightingPreview: null,
-        mapOpen: false,
-        startOpen: true,
-        activeTab: "start"
-      })
-    },
 
     placePiece: (piece, transform) => {
       const item = validateItem(itemFromPiece(piece, transform))
@@ -912,10 +875,10 @@ export const useCreator = (): Creator => {
 
 /**
  * The open map's entry in the project (desktop) and its link state; unsaved edits count as edits since the export.
- * Null with no map open, in a browser, and for a map that isn't in the project yet.
+ * Null in a browser, and for a map that isn't in the project yet.
  */
 export const useOpenProjectMap = (): { readonly map: ProjectMap; readonly state: LinkState } | null => {
-  const fileName = useEditor((s) => s.mapOpen ? s.file?.name ?? null : null)
+  const fileName = useEditor((s) => s.file?.name ?? null)
   const maps = useEditor((s) => s.projectMaps)
   const dirty = useEditor((s) => s.dirty)
   const map = fileName === null ? undefined : maps.find((m) => m.fileName === fileName)

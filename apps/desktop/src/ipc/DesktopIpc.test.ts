@@ -243,7 +243,7 @@ describe("DesktopIpc", () => {
     }))
 
   it.effect("New map makes the default project on disk, and Save, Rename and list keep to its maps folder", () =>
-    withHandlers(({ fake, project }) =>
+    withHandlers(({ dir, fake, project }) =>
       Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
         const path = yield* Path.Path
@@ -252,10 +252,22 @@ describe("DesktopIpc", () => {
 
         assert.deepStrictEqual(yield* fake.invoke(channels.PROJECT_STATE_CHANNEL), {
           current: { path: project, name: "Maps", exists: false, isDefault: true },
-          recent: []
+          recent: [],
+          lastOpenMap: null
         })
         assert.deepStrictEqual(yield* fake.invoke(channels.LIST_MAPS_CHANNEL), [])
         assert.isFalse(yield* fake.invoke(channels.REVEAL_PROJECT_CHANNEL))
+
+        // the open map is kept per project for the next launch; a name that isn't a map file's is refused
+        yield* fake.invoke(channels.REMEMBER_OPEN_MAP_CHANNEL, { fileName: name })
+        assert.strictEqual((yield* fake.invokeAs(ProjectState, channels.PROJECT_STATE_CHANNEL)).lastOpenMap, name)
+        assert.deepInclude((yield* readSettings(fs, dir)).project?.lastOpenMap, { [project]: name })
+        assert.match(
+          String((yield* Effect.flip(fake.invoke(channels.REMEMBER_OPEN_MAP_CHANNEL, { fileName: "../x" }))).cause),
+          /isn't a map file name/
+        )
+        yield* fake.invoke(channels.REMEMBER_OPEN_MAP_CHANNEL, { fileName: null })
+        assert.isNull((yield* fake.invokeAs(ProjectState, channels.PROJECT_STATE_CHANNEL)).lastOpenMap)
 
         const created = yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text })
         assert.deepInclude(created, {
@@ -615,7 +627,8 @@ describe("DesktopIpc", () => {
         const chosen = yield* fake.invoke(channels.CHOOSE_PROJECT_CHANNEL)
         assert.deepStrictEqual(chosen, {
           current: { path: other, name: "Elsewhere", exists: false, isDefault: false },
-          recent: [{ path: project, name: "Maps", exists: false, isDefault: true }]
+          recent: [{ path: project, name: "Maps", exists: false, isDefault: true }],
+          lastOpenMap: null
         })
         // Only a recent project or the default can be switched to by path.
         const error = yield* Effect.flip(

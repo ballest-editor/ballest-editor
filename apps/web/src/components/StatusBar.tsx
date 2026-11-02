@@ -4,15 +4,21 @@ import { LinkStatus } from "./LinkStatus"
 import { NotificationCenter } from "./NotificationCenter"
 import { UpdatePill } from "./UpdatePill"
 
-/** The project in use, its folder on hover (desktop). */
+/** The project in use, its folder on hover (desktop); a click opens Project › Maps…. */
 function ProjectName() {
   const project = useEditor((s) => s.project?.current ?? null)
+  const openDialog = useEditor((s) => s.openDialog)
   if (project === null) return null
   return (
-    <span className="flex min-w-0 items-center gap-1 text-muted-foreground" title={project.path}>
+    <button
+      type="button"
+      className="flex min-w-0 items-center gap-1 rounded-sm px-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+      title={`${project.path}\nThe project's maps`}
+      onClick={() => openDialog("maps")}
+    >
       <IconFolder className="size-3.5 shrink-0" />
       <span className="truncate">{project.name}</span>
-    </span>
+    </button>
   )
 }
 

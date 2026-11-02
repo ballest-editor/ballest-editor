@@ -51,8 +51,3 @@ export const commandFor = (action: KeybindAction): (() => void) | undefined =>
 /** Whether this platform runs the action at all. Play needs the desktop app; in a browser F5 still reloads. */
 export const runsHere = (action: KeybindAction): boolean =>
   action !== "playMap" || useEditor.getState().capabilities.play
-
-const WITHOUT_MAP: ReadonlySet<KeybindAction> = new Set(["newMap", "openMap", "showKeybinds"])
-
-/** Whether the action's keybind works with the Start tab in front; the others act on the map, which it covers. */
-export const worksOnStart = (action: KeybindAction): boolean => WITHOUT_MAP.has(action)

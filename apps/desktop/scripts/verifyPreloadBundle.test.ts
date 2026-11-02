@@ -10,6 +10,7 @@ const valid = `
     chooseProject: () => electron.ipcRenderer.invoke("ballest:project:choose"),
     switchProject: (path) => electron.ipcRenderer.invoke("ballest:project:switch", { path }),
     revealProject: () => electron.ipcRenderer.invoke("ballest:project:reveal"),
+    rememberOpenMap: (fileName) => electron.ipcRenderer.invoke("ballest:project:rememberOpenMap", { fileName }),
     listMaps: () => electron.ipcRenderer.invoke("ballest:project:listMaps"),
     readMap: (fileName) => electron.ipcRenderer.invoke("ballest:project:readMap", { fileName }),
     createMap: (payload) => electron.ipcRenderer.invoke("ballest:project:createMap", payload),

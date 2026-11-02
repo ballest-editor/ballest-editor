@@ -108,6 +108,8 @@ export class Platform extends Context.Service<Platform, {
   readonly switchProject: (path: string) => Effect.Effect<ProjectState, PlatformError>
   /** Shows the project's maps folder in the file manager. */
   readonly revealProject: Effect.Effect<void, PlatformError>
+  /** Keeps which map is open in the project (null: one that isn't in it), so the next launch opens it again. */
+  readonly rememberOpenMap: (fileName: string | null) => Effect.Effect<void, PlatformError>
   /** The project's maps, most recently changed first; always empty in a browser. */
   readonly listMaps: Effect.Effect<ProjectMaps, PlatformError>
   readonly readMap: (fileName: string) => Effect.Effect<ProjectMapFile, PlatformError>
@@ -288,6 +290,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
     chooseProject: bridgeCall(() => bridge.chooseProject()).pipe(Effect.map(Option.fromNullOr)),
     switchProject: (path) => bridgeCall(() => bridge.switchProject(path)),
     revealProject: bridgeCheck(() => bridge.revealProject(), "The project has no maps folder yet."),
+    rememberOpenMap: (fileName) => bridgeCall(() => bridge.rememberOpenMap(fileName)),
     listMaps: bridgeCall(() => bridge.listMaps()),
     readMap: (fileName) => bridgeCall(() => bridge.readMap(fileName)),
     createMap: (file) => bridgeCall(() => bridge.createMap(file)),
@@ -381,6 +384,7 @@ const makeBrowser = (): Platform["Service"] => {
     chooseProject: noProject,
     switchProject: () => noProject,
     revealProject: noProject,
+    rememberOpenMap: () => Effect.void,
     listMaps: Effect.succeed([]),
     readMap: () => noProject,
     createMap: () => noProject,

@@ -245,7 +245,7 @@ export function SettingsShell<C extends string>(props: {
                   data-category={id}
                 >
                   <CategoryIcon />
-                  <span className="flex-1 text-left">{label}</span>
+                  <span className="min-w-0 flex-1 truncate text-left">{label}</span>
                   {searching
                     ? hits > 0 && (
                       <span className="rounded-full bg-primary/15 px-1.5 text-[0.65rem] text-primary tabular-nums">

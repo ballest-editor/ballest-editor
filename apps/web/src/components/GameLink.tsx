@@ -1,10 +1,9 @@
-import { IconChevronRight, IconCircleCheck, IconCircleDashed, IconCircleX, IconRefresh } from "@tabler/icons-react"
+import { IconCircleCheck, IconCircleDashed, IconCircleX, IconRefresh } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/ui/components/collapsible"
 import { cn } from "@workspace/ui/lib/utils"
 import { type ComponentType, useState } from "react"
 import {
-  allFound,
+  anythingMissing,
   type GameLinkFix,
   type GameLinkRow,
   gameLinkRows,
@@ -23,12 +22,14 @@ import { useCreator, useEditor } from "../editor/store"
 const ICONS: Record<GameLinkRowState, ComponentType<{ readonly className?: string }>> = {
   ok: IconCircleCheck,
   missing: IconCircleX,
+  optional: IconCircleDashed,
   waiting: IconCircleDashed
 }
 
 const TONES: Record<GameLinkRowState, string> = {
   ok: "text-emerald-600 dark:text-emerald-400",
   missing: "text-destructive",
+  optional: "text-muted-foreground",
   waiting: "text-muted-foreground"
 }
 
@@ -37,6 +38,7 @@ function StateIcon({ state, className }: { readonly state: GameLinkRowState; rea
   return <Icon className={cn("size-3.5 shrink-0", TONES[state], className)} />
 }
 
+/** A row's fix; the optional plugin manager's is quiet (outline), since nothing is wrong without it. */
 function FixButton({ fix, state }: { readonly fix: GameLinkFix; readonly state: GameLinkRowState }) {
   const openDialog = useEditor((s) => s.openDialog)
   const [busy, setBusy] = useState(false)
@@ -44,7 +46,11 @@ function FixButton({ fix, state }: { readonly fix: GameLinkFix; readonly state: 
     case "ChooseFolder":
       return <Button size="sm" onClick={() => void chooseGameLinkFolder(fix.which)}>Choose folder…</Button>
     case "OpenPluginDocs":
-      return <Button size="sm" onClick={() => void openExternalLink(PLUGIN_MANAGER_URL)}>Install docs</Button>
+      return (
+        <Button variant="outline" size="sm" onClick={() => void openExternalLink(PLUGIN_MANAGER_URL)}>
+          Install docs
+        </Button>
+      )
     case "InstallPlugin":
       return (
         <Button
@@ -79,7 +85,12 @@ function ChecklistRow({ row }: { readonly row: GameLinkRow }) {
       <StateIcon state={problem === null ? row.state : "missing"} className="mt-px" />
       <span className="text-muted-foreground">{row.label}</span>
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className={cn("font-medium", row.state === "waiting" && "font-normal text-muted-foreground")}>
+        <span
+          className={cn(
+            "font-medium",
+            (row.state === "waiting" || row.state === "optional") && "font-normal text-muted-foreground"
+          )}
+        >
           {row.title}
         </span>
         {row.note !== null && <span className="text-muted-foreground">{row.note}</span>}
@@ -105,77 +116,41 @@ function ChecklistRow({ row }: { readonly row: GameLinkRow }) {
   )
 }
 
-/** The collapsed row: one mark per item ("✓ game ✓ maps ✓ creator Isaac ✗ plugin manager"). */
-function Summary({ rows }: { readonly rows: ReadonlyArray<GameLinkRow> }) {
-  return (
-    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-      {rows.map((row) => (
-        <span key={row.id} className="inline-flex items-center gap-1 whitespace-nowrap">
-          <StateIcon state={row.state} />
-          {row.short}
-        </span>
-      ))}
-    </span>
-  )
+/** What the checklist says over its rows: looking, all there, or what is still needed. */
+export function useGameLinkSummary(): string {
+  const paths = useEditor((s) => s.gamePaths)
+  const plugin = useEditor((s) => s.pluginStatus)
+  const creator = useCreator()
+  if (paths === null || plugin === null) return "Looking for the game…"
+  return anythingMissing(gameLinkRows(paths, plugin, creator))
+    ? "Export, Launch game and Play need these."
+    : "Everything Export and Launch game need is here."
 }
 
 /**
- * The Start tab's Game link (docs/PROJECTS.md § Shell, desktop): the game's install, its maps folder, the creator
- * name, the plugin manager and the editor's plugin, each with its path and, when missing, its fix. Expanded on the
- * first launch and while something is missing; once everything is found, one summary row that expands.
+ * The Game link checklist (docs/PROJECTS.md § Shell, desktop): the game's install, its maps folder, the creator name,
+ * the plugin manager and the editor's plugin, each with its path and, when missing, its fix. The plugin manager is
+ * optional: only Play needs it. ⟳ looks everything up again.
  */
-export function GameLink() {
+export function GameLinkChecklist() {
   const paths = useEditor((s) => s.gamePaths)
   const plugin = useEditor((s) => s.pluginStatus)
-  const firstRun = useEditor((s) => s.gameLink.firstRun)
   const creator = useCreator()
   const rows = gameLinkRows(paths, plugin, creator)
-  const looking = paths === null || plugin === null
-  const found = allFound(rows)
-  // The user's expand / collapse holds until the result changes between all found and not.
-  const [choice, setChoice] = useState<{ readonly open: boolean; readonly found: boolean } | null>(null)
-  const open = !looking && (choice?.found === found ? choice.open : firstRun || !found)
-
   return (
-    <Collapsible
-      open={open}
-      onOpenChange={(next) => setChoice({ open: next, found })}
-      render={<section aria-labelledby="start-game-link" className="rounded-lg border" />}
-    >
-      <div className="flex items-center gap-3 px-4 py-3">
-        <CollapsibleTrigger
-          disabled={looking}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <IconChevronRight
-            className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
-          />
-          <h2 id="start-game-link" className="shrink-0 text-sm font-medium">Game link</h2>
-          {looking
-            ? <span className="text-muted-foreground">Looking for the game…</span>
-            : open
-            ? (
-              <span className="text-muted-foreground">
-                {found
-                  ? "Everything Export, Launch game and Play need is here."
-                  : "Export, Launch game and Play need these."}
-              </span>
-            )
-            : <Summary rows={rows} />}
-        </CollapsibleTrigger>
+    <div className="flex flex-col rounded-lg border text-xs">
+      <ul className="flex flex-col py-1">{rows.map((row) => <ChecklistRow key={row.id} row={row} />)}</ul>
+      <div className="flex items-center justify-end border-t px-2 py-1">
         <Button
           variant="ghost"
-          size="icon-sm"
-          aria-label="Check again"
-          title="Check again"
+          size="sm"
+          className="text-muted-foreground"
           onClick={() => void refreshGameLink()}
         >
-          <IconRefresh />
+          <IconRefresh data-icon="inline-start" />
+          Check again
         </Button>
       </div>
-      <CollapsibleContent>
-        <ul className="flex flex-col border-t py-1">{rows.map((row) => <ChecklistRow key={row.id} row={row} />)}</ul>
-      </CollapsibleContent>
-    </Collapsible>
+    </div>
   )
 }

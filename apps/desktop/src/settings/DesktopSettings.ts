@@ -24,7 +24,9 @@ export type GamePathOverrides = typeof GamePathOverrides.Type
 /** The projects used on this machine (project/Projects.ts). */
 export const ProjectSettings = Schema.Struct({
   /** Project folders, the one in use first (at most 8). Empty: the default project. */
-  recent: Schema.optional(Schema.Array(Schema.String))
+  recent: Schema.optional(Schema.Array(Schema.String)),
+  /** The map last open in each project (its file name), by project folder, for the next launch to open again. */
+  lastOpenMap: Schema.optional(Schema.Record(Schema.String, Schema.String))
 })
 export type ProjectSettings = typeof ProjectSettings.Type
 
