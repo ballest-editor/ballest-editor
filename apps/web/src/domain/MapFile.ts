@@ -143,7 +143,7 @@ export class MapFile extends Schema.Opaque<MapFile>()(
 // ---------------------------------------------------------------------------
 // Constants
 
-export const SYSTEM_LEVEL_NAME = "Map_LevelEditorMain"
+export { SYSTEM_LEVEL_NAME } from "@ballest/contracts"
 export const MESH_COMPONENT_TAG = "SKGMapEditor"
 export const PLAYER_START_CLASS =
   "/Script/Engine.BlueprintGeneratedClass'/Game/MapItems/PlayerStart/MP_PlayerStart.MP_PlayerStart_C'"
