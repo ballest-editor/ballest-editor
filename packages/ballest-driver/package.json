@@ -1,0 +1,10 @@
+{
+  "name": "@ballest/driver-plugin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The ballest-driver plugin for the Ballest plugin manager (AngelScript): places pieces and sets the camera in a test copy for tools/driver",
+  "scripts": {
+    "build": "node ../ballest-editor-link/scripts/stage.ts ."
+  }
+}
