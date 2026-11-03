@@ -13,6 +13,7 @@ export const GAME_EXE = "Ballest-Win64-Shipping.exe"
  * - `BALLEST_COMPATDATA`: the game's Proton prefix folder (`compatdata/3339810`; copied into every slot).
  * - `BALLEST_PROTON`: the Proton folder to run slots with.
  * - `BALLEST_UMU`: the `umu-run` executable.
+ * - `BALLEST_DRIVER_PLUGIN`: the staged driver plugin folder (default: packages/ballest-driver/dist/ballest-driver).
  */
 export class DriverPaths extends Context.Service<DriverPaths, {
   readonly home: string
@@ -24,6 +25,10 @@ export class DriverPaths extends Context.Service<DriverPaths, {
   readonly compatdata: string
   readonly proton: string
   readonly umu: string
+  /** The game copy's plugins folder, which every slot's own plugins folder is copied from. */
+  readonly gamePlugins: string
+  /** The driver plugin as `pnpm build` stages it (info.toml + main.as). */
+  readonly plugin: string
 }>()("ballest/driver/DriverPaths") {
   static readonly make = Effect.gen(function*() {
     const path = yield* Path.Path
@@ -39,7 +44,10 @@ export class DriverPaths extends Context.Service<DriverPaths, {
       install: env["BALLEST_GAME_DIR"] ?? path.join(steam, "common", "Ballest of Them All"),
       compatdata: env["BALLEST_COMPATDATA"] ?? path.join(steam, "compatdata", APP_ID),
       proton: env["BALLEST_PROTON"] ?? path.join(steam, "common", "Proton - Experimental"),
-      umu: env["BALLEST_UMU"] ?? "umu-run"
+      umu: env["BALLEST_UMU"] ?? "umu-run",
+      gamePlugins: path.join(game, "Ballest", "Binaries", "Win64", "plugins"),
+      plugin: env["BALLEST_DRIVER_PLUGIN"]
+        ?? path.resolve(import.meta.dirname, "..", "..", "..", "packages", "ballest-driver", "dist", "ballest-driver")
     })
   })
 
@@ -65,6 +73,10 @@ export interface SlotPaths {
   readonly launchLog: string
   readonly instance: string
   readonly types: string
+  /** The slot's own plugins (the host runs these instead of the game copy's when the folder exists). */
+  readonly plugins: string
+  /** The driver plugin's command file in that folder. */
+  readonly pluginCommand: string
 }
 
 export const slotPaths = (paths: DriverPaths["Service"], path: Path.Path, slot: number): SlotPaths => {
@@ -85,7 +97,9 @@ export const slotPaths = (paths: DriverPaths["Service"], path: Path.Path, slot: 
     settings: path.join(userDir, "Saved", "Config", "Windows", "GameUserSettings.ini"),
     launchLog: path.join(dir, "launch.log"),
     instance: path.join(dir, "instance.json"),
-    types: path.join(dir, "types")
+    types: path.join(dir, "types"),
+    plugins: path.join(data, "plugins"),
+    pluginCommand: path.join(data, "plugins", "ballest-driver", "command.json")
   }
 }
 

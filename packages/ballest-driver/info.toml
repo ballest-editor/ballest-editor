@@ -1,0 +1,9 @@
+[meta]
+name = "Ballest Driver"
+version = "0.1.0"
+author = "spigelli"
+description = "Lets the Ballest Editor's game driver place and move pieces and set the camera in a test copy. Not for a player's game."
+min_host = "0.32.0"
+
+[script]
+files = ["main.as"]

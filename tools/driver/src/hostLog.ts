@@ -49,3 +49,13 @@ export const tail = (log: string, n: number): Array<string> => {
   if (lines.at(-1) === "") lines.pop()
   return lines.slice(Math.max(0, lines.length - n))
 }
+
+/** The driver plugin's answer to `nonce` (`reply <nonce> <json>` from source ballest-driver), or null while there is none. */
+export const replyTo = (text: string, nonce: string): string | null => {
+  const prefix = `reply ${nonce} `
+  for (const raw of text.split("\n")) {
+    const line = parseLine(raw.replace(/\r$/, ""))
+    if (line?.source === "ballest-driver" && line.text.startsWith(prefix)) return line.text.slice(prefix.length)
+  }
+  return null
+}

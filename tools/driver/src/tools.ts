@@ -1,6 +1,7 @@
 import { Effect, FileSystem, Path, Schema } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { Channel } from "./channel.ts"
+import { Plugin } from "./plugin.ts"
 import { DriverError, fail, io, Slots } from "./slots.ts"
 
 // The MCP tools (docs/DRIVER.md § Tools). Each is a thin wrapper over the host's test channel or the slots; replies
@@ -8,6 +9,7 @@ import { DriverError, fail, io, Slots } from "./slots.ts"
 
 const slotParam = Schema.optional(Schema.Finite).annotate({ description: "the slot, 1-9 (default 1)" })
 const Replies = Schema.Struct({ replies: Schema.Array(Schema.String) })
+const PluginReply = Schema.Struct({ reply: Schema.Unknown })
 const Status = Schema.Struct({
   slot: Schema.Finite,
   running: Schema.Boolean,
@@ -116,15 +118,80 @@ export const DriverToolkit = Toolkit.make(
     "Moves the track editor's camera: to x y z with pitch and yaw, or lookat x y z, or frame <piece id> [distance]. Without arguments, reads it.",
     { slot: slotParam, args: Schema.optional(Schema.String) },
     Replies
+  ),
+  // Through the driver plugin (packages/ballest-driver), the script API's own calls; the editor must be open.
+  tool(
+    "editor_spawn",
+    "Places pieces in the open map the way the editor pastes (one undo step, left selected): classes are class paths as the catalog and map files write them; transforms hold nine numbers per class: x y z, pitch yaw roll (degrees), scale x y z. Returns the new pieces.",
+    {
+      slot: slotParam,
+      classes: Schema.Array(Schema.String),
+      transforms: Schema.Array(Schema.Finite),
+      drop: Schema.optional(Schema.Boolean)
+    },
+    PluginReply
+  ),
+  tool("editor_pieces_json", "Every piece of the open map as JSON: id, class, location, rotation, scale.", {
+    slot: slotParam
+  }, PluginReply),
+  tool(
+    "editor_transform",
+    "Moves a piece to x y z and/or turns it to pitch yaw roll (degrees, absolute). Returns the piece.",
+    {
+      slot: slotParam,
+      id: Schema.Finite,
+      x: Schema.optional(Schema.Finite),
+      y: Schema.optional(Schema.Finite),
+      z: Schema.optional(Schema.Finite),
+      pitch: Schema.optional(Schema.Finite),
+      yaw: Schema.optional(Schema.Finite),
+      roll: Schema.optional(Schema.Finite)
+    },
+    PluginReply
+  ),
+  tool("editor_select", "Selects exactly these pieces, with the editor's gizmo.", {
+    slot: slotParam,
+    ids: Schema.Array(Schema.Finite)
+  }, PluginReply),
+  tool("editor_undo", "The editor's own undo (Ctrl+Z).", { slot: slotParam }, PluginReply),
+  tool(
+    "camera_set",
+    "Takes the camera: at x y z, looking pitch (up/down) and yaw (around), with fov degrees (default 90). camera_release gives it back.",
+    {
+      slot: slotParam,
+      x: Schema.Finite,
+      y: Schema.Finite,
+      z: Schema.Finite,
+      pitch: Schema.Finite,
+      yaw: Schema.Finite,
+      fov: Schema.optional(Schema.Finite)
+    },
+    PluginReply
+  ),
+  tool("camera_release", "Gives the camera back to the game.", { slot: slotParam }, PluginReply),
+  tool("hide_editor", "Hides (or shows again) the track editor's panels, for a clean render of the world.", {
+    slot: slotParam,
+    on: Schema.optional(Schema.Boolean)
+  }, PluginReply),
+  tool(
+    "plugin_call",
+    "Any op of the driver plugin with its JSON arguments (see packages/ballest-driver/main.as): ping, project {x,y,z}, redo, ...",
+    { slot: slotParam, op: Schema.String, args: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)) },
+    PluginReply
   )
 )
 
 const n = (slot: number | undefined) => slot ?? 1
 const quoted = (s: string) => s.replace(/[\r\n]/g, " ")
+/** A class path as SpawnPieces wants it: the catalog and map files wrap it as `/Script/Engine.BlueprintGeneratedClass'<path>'`. */
+const classPath = (s: string) => /'(.+)'$/.exec(s)?.[1] ?? s
 
 export const DriverToolsLayer = DriverToolkit.toLayer(Effect.gen(function*() {
   const slots = yield* Slots
   const channel = yield* Channel
+  const plugin = yield* Plugin
+  const call = (slot: number | undefined, op: string, args?: Record<string, unknown>) =>
+    plugin.call(n(slot), op, args).pipe(Effect.map((reply) => ({ reply })))
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const run = (slot: number | undefined, command: string, timeoutMs?: number) =>
@@ -186,6 +253,17 @@ export const DriverToolsLayer = DriverToolkit.toLayer(Effect.gen(function*() {
     tap: ({ slot, x, y }) => run(slot, `tap ${Math.round(x)} ${Math.round(y)}`),
     gamekey: ({ frames, key, slot }) => run(slot, `gamekey ${quoted(key)} ${frames ?? 2}`),
     editor_pieces: ({ slot }) => run(slot, "editor pieces"),
-    editor_camera: ({ args, slot }) => run(slot, `editorcam${args === undefined ? "" : ` ${quoted(args)}`}`)
+    editor_camera: ({ args, slot }) => run(slot, `editorcam${args === undefined ? "" : ` ${quoted(args)}`}`),
+    editor_spawn: ({ classes, drop, slot, transforms }) =>
+      call(slot, "spawn", { classes: classes.map(classPath), transforms, drop: drop ?? false }),
+    editor_pieces_json: ({ slot }) => call(slot, "pieces"),
+    editor_transform: ({ id, pitch, roll, slot, x, y, yaw, z }) =>
+      call(slot, "transform", { id, x, y, z, pitch, yaw, roll }),
+    editor_select: ({ ids, slot }) => call(slot, "select", { ids }),
+    editor_undo: ({ slot }) => call(slot, "undo"),
+    camera_set: ({ fov, pitch, slot, x, y, yaw, z }) => call(slot, "camera", { x, y, z, pitch, yaw, fov: fov ?? 90 }),
+    camera_release: ({ slot }) => call(slot, "camera_release"),
+    hide_editor: ({ on, slot }) => call(slot, "hide_editor", { on: on ?? true }),
+    plugin_call: ({ args, op, slot }) => call(slot, op, args)
   })
 }))

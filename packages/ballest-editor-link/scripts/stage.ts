@@ -1,11 +1,11 @@
-// Stages the plugin as the desktop app ships it: info.toml and the script files it lists, in
-// dist/ballest-editor-link/ (the folder name is the plugin's id). apps/desktop installs it from there, or from the
-// packaged app's resources/plugins/ballest-editor-link.
+// Stages a plugin as it is installed: info.toml and the script files it lists, in dist/<id>/ (the folder name is
+// the plugin's id). The plugin's folder is this package's, or the one given (packages/ballest-driver runs this too).
+// apps/desktop installs ballest-editor-link from there, or from the packaged app's resources/plugins/.
 import * as fs from "node:fs"
 import * as path from "node:path"
 
-const root = path.resolve(import.meta.dirname, "..")
-const out = path.join(root, "dist", "ballest-editor-link")
+const root = path.resolve(process.argv[2] ?? path.join(import.meta.dirname, ".."))
+const out = path.join(root, "dist", path.basename(root))
 const manifest = fs.readFileSync(path.join(root, "info.toml"), "utf8")
 // The plugin manager's default when [script] has no files.
 const listed = /^\s*files\s*=\s*\[(.*)\]/m.exec(manifest)?.[1] ?? "\"main.as\""

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { hostVersion, isReady, parseLine, replies, sandboxState, tail } from "./hostLog.ts"
+import { hostVersion, isReady, parseLine, replies, replyTo, sandboxState, tail } from "./hostLog.ts"
 
 const log = `[11:51:17.450] [info] [host] Ballest plugin host 0.33.2 starting
 [11:51:17.450] [info] [host] sandbox mode is on for this session: nothing leaves this computer or changes your records
@@ -45,5 +45,15 @@ describe("hostLog", () => {
       "[11:51:58.232] [info] [host] test: pieces: [79949 MP_PlayerStart_C at -3955.0,-1785.0,8615.0]"
     ])
     expect(tail("", 3)).toEqual([])
+  })
+})
+
+describe("replyTo", () => {
+  it("finds the driver plugin's reply for a nonce and nothing else", () => {
+    const text =
+      `[12:00:00.000] [info] [ballest-driver] reply 17-1 {"ok":true}\n[12:00:00.001] [info] [host] test: reply 17-2 x\n`
+    expect(replyTo(text, "17-1")).toBe(`{"ok":true}`)
+    expect(replyTo(text, "17-2")).toBeNull()
+    expect(replyTo(text, "17")).toBeNull()
   })
 })

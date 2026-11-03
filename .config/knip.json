@@ -31,6 +31,7 @@
       "entry": ["src/main.ts", "*.mjs"]
     },
     "tools/release": {},
-    "tools/driver": {}
+    "tools/driver": {},
+    "packages/ballest-driver": {}
   }
 }

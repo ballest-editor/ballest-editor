@@ -1,9 +1,10 @@
 # Game driver: an MCP server that runs and drives the game for agents
 
-Status: written 2026-11-03. The first slice is built: `tools/driver/` ([its README](../tools/driver/README.md)) runs
-slots, the file channel, `render`, `state`, `agent_state`, `open_map`, the map probes, `types_dump` and thin wrappers
-over `tap`, `gamekey`, `editor pieces` and `editorcam`, as an MCP server `.mcp.json` registers. The driver plugin and
-the rendering comparisons (§ Order of work 3 and 6) are not. The spike's files are in
+Status: written 2026-11-03. Built: `tools/driver/` ([its README](../tools/driver/README.md)) runs slots, the file
+channel, `render`, `state`, `agent_state`, `open_map`, the map probes, `types_dump`, thin wrappers over `tap`,
+`gamekey`, `editor pieces` and `editorcam`, and the driver plugin (`packages/ballest-driver`) with its tools:
+`editor_spawn`, `editor_transform`, `editor_select`, `editor_undo`, `camera_set`, `hide_editor`. It is an MCP server
+`.mcp.json` registers. Not built: the rendering comparisons (§ Order of work 6). The spike's files are in
 `~/.cache/ballest-editor/driver-spike/`; the driver's own live in `~/.cache/ballest-editor/driver/`.
 
 ## What it is for

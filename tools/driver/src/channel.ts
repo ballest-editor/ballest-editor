@@ -1,5 +1,6 @@
 import { Context, Effect, FileSystem, Layer, Semaphore } from "effect"
 import { replies } from "./hostLog.ts"
+import { logFrom, logSize } from "./logFile.ts"
 import { type DriverError, fail, Slots } from "./slots.ts"
 
 const READ_TIMEOUT_MS = 8_000
@@ -22,14 +23,6 @@ export class Channel extends Context.Service<Channel, {
     const fs = yield* FileSystem.FileSystem
     const slots = yield* Slots
 
-    const size = (file: string) =>
-      fs.stat(file).pipe(Effect.map((info) => Number(info.size)), Effect.orElseSucceed(() => 0))
-    const readFrom = (file: string, offset: number) =>
-      fs.readFile(file).pipe(
-        Effect.map((bytes) => new TextDecoder().decode(bytes.subarray(offset))),
-        Effect.orElseSucceed(() => "")
-      )
-
     // One command at a time per slot: the host reads one file, and MCP clients call tools concurrently.
     const locks = new Map<number, Semaphore.Semaphore>()
     const lockOf = (n: number) =>
@@ -49,7 +42,7 @@ export class Channel extends Context.Service<Channel, {
       if (line.includes("\n")) {
         return yield* fail("one command at a time (the host's `seq a || b` runs several on one frame)")
       }
-      const before = yield* size(slot.hostLog)
+      const before = yield* logSize(fs, slot.hostLog)
       const temp = `${slot.commandFile}.${process.pid}.${++sequence}.tmp`
       yield* fs.writeFileString(temp, `${line}\n`).pipe(
         Effect.andThen(fs.rename(temp, slot.commandFile)),
@@ -72,11 +65,11 @@ export class Channel extends Context.Service<Channel, {
       let lines: ReadonlyArray<string> = []
       while (Date.now() - sent < timeoutMs) {
         yield* Effect.sleep("100 millis")
-        const now = yield* size(slot.hostLog)
+        const now = yield* logSize(fs, slot.hostLog)
         if (now !== last) {
           last = now
           quietSince = Date.now()
-          lines = replies(yield* readFrom(slot.hostLog, before))
+          lines = replies(yield* logFrom(fs, slot.hostLog, before))
         } else if (lines.length > 0 && Date.now() - quietSince >= QUIET_MS) {
           break
         }

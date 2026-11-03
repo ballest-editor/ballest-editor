@@ -108,6 +108,9 @@ export class Slots extends Context.Service<Slots, {
         yield* io(fs.copyFile(path.join(host, "version.dll"), path.join(win64, "version.dll")), "copying the host")
         yield* rsync(path.join(host, "plugins"), path.join(win64, "plugins"), [])
       }
+      if (yield* io(fs.exists(path.join(driver.plugin, "main.as")), "looking for the driver plugin")) {
+        yield* rsync(driver.plugin, path.join(win64, "plugins", "ballest-driver"), [])
+      }
       if (!(yield* io(fs.exists(path.join(win64, "version.dll")), "looking for the host"))) {
         return yield* fail(`${win64} has no version.dll: install the plugin manager in the game, or pass --host`)
       }
@@ -142,6 +145,8 @@ export class Slots extends Context.Service<Slots, {
           yield* io(fs.makeDirectory(to, { recursive: true }), `creating ${to}`)
         }
       }
+      // The slot's own plugins, fresh from the game copy's on every start: the driver plugin's command file is per slot.
+      yield* rsync(driver.gamePlugins, slot.plugins, ["DISABLED"])
       yield* io(fs.makeDirectory(path.dirname(slot.settings), { recursive: true }), "creating the config folder")
       yield* io(fs.writeFileString(slot.settings, GAME_USER_SETTINGS), "writing the settings")
     })
