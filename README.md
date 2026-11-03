@@ -1,3 +1,5 @@
+<img src="apps/desktop/resources/icon.svg" alt="Ballest Editor logo: a red ball on a blue grid block" width="128" align="right" />
+
 # ballest-editor
 
 A standalone, CAD-style map editor for [Ballest of Them All](https://store.steampowered.com/app/3339810). Reads and writes the game's own `.balledit` / `.ballmap` JSON, so maps made here load in the in-game editor and publish to the Workshop normally.
