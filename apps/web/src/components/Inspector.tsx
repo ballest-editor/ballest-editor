@@ -77,7 +77,7 @@ function MapSettings() {
                 size="icon-sm"
                 className="text-muted-foreground"
                 aria-label="Map settings"
-                onClick={() => openDialog("mapSettings")}
+                onClick={() => openDialog({ id: "mapSettings" })}
               />
             }
           >

@@ -69,7 +69,7 @@ function FixButton({ fix, state }: { readonly fix: GameLinkFix; readonly state: 
         <Button
           variant={state === "ok" ? "outline" : "default"}
           size="sm"
-          onClick={() => openDialog("settings", "general")}
+          onClick={() => openDialog({ id: "settings", category: "general" })}
         >
           {state === "ok" ? "Change…" : "Set name…"}
         </Button>
