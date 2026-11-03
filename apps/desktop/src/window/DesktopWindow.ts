@@ -1,3 +1,4 @@
+import { PushChannels } from "@ballest/contracts"
 import { Context, Effect, Layer, Option } from "effect"
 import type * as Electron from "electron"
 import { DesktopEnvironment } from "../app/DesktopEnvironment"
@@ -8,7 +9,6 @@ import {
   type ElectronWindowCreateError,
   type ElectronWindowLoadError
 } from "../electron/ElectronWindow"
-import { UNLOAD_REQUEST_CHANNEL } from "../ipc/channels"
 import { DesktopSettings, type WindowState } from "../settings/DesktopSettings"
 import { titleBarOverlay, windowBackground, windowShortcutOf } from "./chrome"
 
@@ -91,7 +91,7 @@ export class DesktopWindow extends Context.Service<DesktopWindow, {
         window.webContents.on("will-prevent-unload", () => {
           const kind = closing ? "close" : "reload"
           closing = false
-          window.webContents.send(UNLOAD_REQUEST_CHANNEL, kind)
+          window.webContents.send(PushChannels.onUnloadRequest, kind)
         })
         yield* Effect.addFinalizer(() =>
           Effect.suspend(() => {

@@ -1,8 +1,7 @@
-import { type PlayLaunch, type PlayPayload, type PlayResult, PlaySessionEnded } from "@ballest/contracts"
+import { type PlayLaunch, type PlayPayload, type PlayResult, PlaySessionEnded, PushChannels } from "@ballest/contracts"
 import { Context, DateTime, Effect, Layer, Option, PubSub, Schema, Stream } from "effect"
 import { ElectronShell } from "../electron/ElectronShell"
 import { ElectronWindow } from "../electron/ElectronWindow"
-import { PLAY_SESSION_ENDED_CHANNEL } from "../ipc/channels"
 import type { BackupError } from "../project/Backups"
 import type { MapLinkError } from "../project/MapLinks"
 import { type ProjectError, Projects } from "../project/Projects"
@@ -25,7 +24,8 @@ export type PlayError = ProjectError | MapLinkError | BackupError | GamePathErro
 /**
  * Play (docs/DESKTOP.md § Play): Export to game, then the handoff to the `ballest-editor-link` plugin, then the game
  * if it isn't running. Then it follows the game session the race runs in, and when the game's process exits, says so
- * on `sessionEnds` and to the page (`PLAY_SESSION_ENDED_CHANNEL`): the moment sync detection (#141) checks the exports.
+ * on `sessionEnds` and to the page (`PushChannels.onPlaySessionEnded`): the moment sync detection (#141) checks the
+ * exports.
  */
 export class GamePlay extends Context.Service<GamePlay, {
   readonly play: (payload: PlayPayload) => Effect.Effect<PlayResult, PlayError>
@@ -62,7 +62,7 @@ export class GamePlay extends Context.Service<GamePlay, {
       yield* Effect.logInfo(`The game session racing ${ended.fileName} ended`)
       yield* PubSub.publish(ends, ended)
       yield* encodeEnded(ended).pipe(
-        Effect.flatMap((encoded) => windows.sendAll(PLAY_SESSION_ENDED_CHANNEL, encoded)),
+        Effect.flatMap((encoded) => windows.sendAll(PushChannels.onPlaySessionEnded, encoded)),
         Effect.orDie
       )
     }).pipe(

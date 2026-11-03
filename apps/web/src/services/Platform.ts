@@ -1,6 +1,9 @@
 import type {
   BackupRef,
+  DesktopArgs,
   DesktopBridge,
+  DesktopInvoke,
+  DesktopMethodName,
   ExportChecks,
   ExportMapResult,
   FoundCreator,
@@ -238,6 +241,10 @@ const bridgeErrorMessage = (cause: unknown): string => {
 const bridgeCall = <A>(call: () => Promise<A>) =>
   Effect.tryPromise({ try: call, catch: (cause) => new PlatformError({ message: bridgeErrorMessage(cause) }) })
 
+/** Calls bridge method `name` with its payload (none when it takes none); a rejection fails with main's message. */
+const invoker = (bridge: DesktopInvoke) => <K extends DesktopMethodName>(name: K, ...args: DesktopArgs<K>) =>
+  bridgeCall(() => bridge[name](...args))
+
 const openedMap = (file: OpenedMapFile): OpenedMap => ({
   name: file.name,
   path: Option.some(file.path),
@@ -245,8 +252,8 @@ const openedMap = (file: OpenedMapFile): OpenedMap => ({
 })
 
 /** A bridge call answering whether it worked; false becomes `message`. */
-const bridgeCheck = (call: () => Promise<boolean>, message: string) =>
-  bridgeCall(call).pipe(Effect.filterOrFail((ok) => ok, () => new PlatformError({ message })), Effect.asVoid)
+const bridgeCheck = (call: Effect.Effect<boolean, PlatformError>, message: string) =>
+  call.pipe(Effect.filterOrFail((ok) => ok, () => new PlatformError({ message })), Effect.asVoid)
 
 /**
  * Listens before asking for the current state. A state pushed while the request is out is at least as new as its
@@ -261,7 +268,7 @@ const updateStates = (bridge: DesktopBridge) =>
         Queue.offerUnsafe(queue, state)
       })
       yield* Effect.addFinalizer(() => Effect.sync(unsubscribe))
-      const current = yield* bridgeCall(() => bridge.getUpdateState())
+      const current = yield* invoker(bridge)("getUpdateState")
       if (!seen.pushed) Queue.offerUnsafe(queue, current)
     })
   )
@@ -277,8 +284,9 @@ const pushed = <A>(subscribe: (listener: (value: A) => void) => () => void) =>
 
 const leave = (kind: UnloadKind) => Effect.sync(() => kind === "close" ? window.close() : window.location.reload())
 
-const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
-  Platform.of({
+const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
+  const call = invoker(bridge)
+  return Platform.of({
     capabilities: {
       ...browserCapabilities,
       projects: true,
@@ -287,57 +295,53 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] =>
       play: true,
       updates: true
     },
-    pickMapFile: bridgeCall(() => bridge.pickImport()).pipe(
-      Effect.map((file) => Option.map(Option.fromNullOr(file), openedMap))
-    ),
+    pickMapFile: call("pickImport").pipe(Effect.map((file) => Option.map(Option.fromNullOr(file), openedMap))),
     download: () => Effect.fail(new PlatformError({ message: "The desktop app saves into the project." })),
-    projectState: bridgeCall(() => bridge.projectState()),
-    chooseProject: bridgeCall(() => bridge.chooseProject()).pipe(Effect.map(Option.fromNullOr)),
-    switchProject: (path) => bridgeCall(() => bridge.switchProject(path)),
-    createProject: (name) => bridgeCall(() => bridge.createProject(name)),
+    projectState: call("projectState"),
+    chooseProject: call("chooseProject").pipe(Effect.map(Option.fromNullOr)),
+    switchProject: (path) => call("switchProject", { path }),
+    createProject: (name) => call("createProject", { name }),
     revealProject: (which) =>
-      bridgeCheck(() => bridge.revealProject(which), "The project doesn't have that folder yet."),
-    renameProject: (name) => bridgeCall(() => bridge.renameProject(name)),
-    rememberOpenMap: (fileName) => bridgeCall(() => bridge.rememberOpenMap(fileName)),
-    listMaps: bridgeCall(() => bridge.listMaps()),
-    readMap: (fileName) => bridgeCall(() => bridge.readMap(fileName)),
-    createMap: (file) => bridgeCall(() => bridge.createMap(file)),
-    saveMap: (file) => bridgeCall(() => bridge.saveMap(file)),
-    renameMap: (file) => bridgeCall(() => bridge.renameMap(file)),
-    importMap: (payload) => bridgeCall(() => bridge.importMap(payload)),
-    exportMap: (fileName, options) => bridgeCall(() => bridge.exportMap({ fileName, ...options })),
-    checkExports: bridgeCall(() => bridge.checkExports()),
-    reimportMap: (fileName) => bridgeCall(() => bridge.reimportMap(fileName)),
-    listBackups: bridgeCall(() => bridge.listBackups()),
-    readBackup: ({ place, id }) => bridgeCall(() => bridge.readBackup({ place, id })),
-    setWindowTheme: (dark) => bridgeCall(() => bridge.setWindowTheme(dark)),
-    confirmUnsaved: (action, map) => bridgeCall(() => bridge.confirmUnsaved(unsavedPromptOf(action, map))),
+      bridgeCheck(call("revealProject", { which }), "The project doesn't have that folder yet."),
+    renameProject: (name) => call("renameProject", { name }),
+    rememberOpenMap: (fileName) => call("rememberOpenMap", { fileName }),
+    listMaps: call("listMaps"),
+    readMap: (fileName) => call("readMap", { fileName }),
+    createMap: (file) => call("createMap", file),
+    saveMap: (file) => call("saveMap", file),
+    renameMap: (file) => call("renameMap", file),
+    importMap: (payload) => call("importMap", payload),
+    exportMap: (fileName, options) => call("exportMap", { fileName, ...options }),
+    checkExports: call("checkExports"),
+    reimportMap: (fileName) => call("reimportMap", { fileName }),
+    listBackups: call("listBackups"),
+    readBackup: ({ place, id }) => call("readBackup", { place, id }),
+    setWindowTheme: (dark) => call("setWindowTheme", { dark }),
+    confirmUnsaved: (action, map) => call("confirmUnsaved", unsavedPromptOf(action, map)),
     unloadRequests: pushed((listener) => bridge.onUnloadRequest(listener)),
     leave,
-    openExternal: (url) => bridgeCheck(() => bridge.openExternal(url), `Couldn't open ${url}.`),
-    gamePaths: bridgeCall(() => bridge.gamePaths()),
-    chooseGamePath: (which) => bridgeCall(() => bridge.chooseGamePath(which)).pipe(Effect.map(Option.fromNullOr)),
-    resetGamePath: (which) => bridgeCall(() => bridge.resetGamePath(which)),
-    revealGamePath: (which) => bridgeCheck(() => bridge.revealGamePath(which), "Couldn't show that folder."),
-    launchGame: bridgeCheck(
-      () => bridge.launchGame(),
-      "Couldn't ask Steam to start the game. Is Steam installed?"
-    ),
-    isGameRunning: bridgeCall(() => bridge.isGameRunning()),
-    findCreator: bridgeCall(() => bridge.findCreator()).pipe(Effect.map(Option.fromNullOr)),
-    pluginStatus: bridgeCall(() => bridge.pluginStatus()),
-    installPlugin: bridgeCall(() => bridge.installPlugin()),
-    play: (fileName, options) => bridgeCall(() => bridge.play({ fileName, ...options })),
+    openExternal: (url) => bridgeCheck(call("openExternal", { url }), `Couldn't open ${url}.`),
+    gamePaths: call("gamePaths"),
+    chooseGamePath: (which) => call("chooseGamePath", { which }).pipe(Effect.map(Option.fromNullOr)),
+    resetGamePath: (which) => call("resetGamePath", { which }),
+    revealGamePath: (which) => bridgeCheck(call("revealGamePath", { which }), "Couldn't show that folder."),
+    launchGame: bridgeCheck(call("launchGame"), "Couldn't ask Steam to start the game. Is Steam installed?"),
+    isGameRunning: call("isGameRunning"),
+    findCreator: call("findCreator").pipe(Effect.map(Option.fromNullOr)),
+    pluginStatus: call("pluginStatus"),
+    installPlugin: call("installPlugin"),
+    play: (fileName, options) => call("play", { fileName, ...options }),
     playSessionEnds: pushed((listener) => bridge.onPlaySessionEnded(listener)),
-    loadNotifications: bridgeCall(() => bridge.loadNotifications()),
-    saveNotifications: (records) => bridgeCall(() => bridge.saveNotifications(records)),
-    muteNotifications: (kind) => bridgeCall(() => bridge.muteNotifications(kind)),
-    gameLinkMemory: bridgeCall(() => bridge.gameLinkMemory()),
-    rememberGameLink: (result) => bridgeCall(() => bridge.rememberGameLink(result)),
+    loadNotifications: call("loadNotifications"),
+    saveNotifications: (records) => call("saveNotifications", { records }),
+    muteNotifications: (kind) => call("muteNotifications", { kind }),
+    gameLinkMemory: call("gameLinkMemory"),
+    rememberGameLink: (result) => call("rememberGameLink", result),
     updates: updateStates(bridge),
-    downloadUpdate: bridgeCall(() => bridge.downloadUpdate()),
-    installUpdate: bridgeCall(() => bridge.installUpdate())
+    downloadUpdate: call("downloadUpdate"),
+    installUpdate: call("installUpdate")
   })
+}
 
 /** A one-shot `<input type=file>`: resolves with the picked file, or none when the picker is dismissed. */
 const pickFile = (accept: string) =>

@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import type { InvokeChannels, PushChannels } from "./channels"
 
 /** Runtime versions of the desktop app, for bug reports and the about dialog. */
 export const DesktopVersions = Schema.Struct({
@@ -542,124 +543,169 @@ export const UpdateState = Schema.Struct({
 })
 export type UpdateState = typeof UpdateState.Type
 
+/** What a bridge method takes and gives: its payload's schema and its result's, neither needing services. */
+interface DesktopMethodSchemas {
+  readonly payload: Schema.ConstraintCodec<unknown>
+  readonly result: Schema.ConstraintCodec<unknown>
+}
+
+const noPayload = Schema.Undefined
+
 /**
- * What the desktop preload exposes to the renderer as `window.ballest`. The renderer only sees this interface, so
- * everything crossing it is plain data (structured-clone safe). Main decodes every payload and encodes every result
- * with the schemas above; a payload that fails to decode rejects the returned promise.
+ * Every method on `window.ballest`, by name: what the page sends and what main answers, as `ipcRenderer.invoke` on
+ * `InvokeChannels[name]`. Main decodes every payload and encodes every result with these schemas; a payload that fails
+ * to decode rejects the page's promise. Adding an entry here and its channel to `InvokeChannels` is the whole contract
+ * side: `DesktopBridge` and the preload follow, and main fails typecheck until it has a handler.
  *
  * Main reads and writes map files only in the current project's `maps/` folder (named by file name, never by path) and
  * in the game's maps folder (Export to game, Play), and reads only the files the user picked in its Import dialog. The
  * files it writes over are kept in its own backups folders, which the page reaches by backup name only. In the game's
  * install it writes only inside `<plugins>/ballest-editor-link/` (Install plugin, Play's `play.json`).
  */
-export interface DesktopBridge {
-  readonly versions: DesktopVersions
+export const DesktopMethods = {
   /** Echoes `message` back from the main process. */
-  readonly ping: (message: string) => Promise<PingResult>
+  ping: { payload: PingPayload, result: PingResult },
   /** The project in use and the recent ones. */
-  readonly projectState: () => Promise<ProjectState>
+  projectState: { payload: noPayload, result: ProjectState },
   /** A folder dialog, then uses the chosen folder as the project; null when cancelled. The game's maps folder is refused. */
-  readonly chooseProject: () => Promise<ProjectState | null>
+  chooseProject: { payload: noPayload, result: ChooseProjectResult },
   /** Goes back to a recent project. */
-  readonly switchProject: (path: string) => Promise<ProjectState>
+  switchProject: { payload: ProjectPathPayload, result: ProjectState },
   /** Makes `<projectsFolder>/<name>` a project and uses it; refused when that folder already holds one. */
-  readonly createProject: (name: string) => Promise<ProjectState>
+  createProject: { payload: CreateProjectPayload, result: ProjectState },
   /** Shows one of the project's folders in the file manager; false when it doesn't exist or fails to open. */
-  readonly revealProject: (which: ProjectFolder) => Promise<boolean>
+  revealProject: { payload: RevealProjectPayload, result: Schema.Boolean },
   /** Renames the project in `ballest-project.json`; the folder keeps its name. */
-  readonly renameProject: (name: string) => Promise<ProjectState>
+  renameProject: { payload: RenameProjectPayload, result: ProjectState },
   /** Keeps which map is open in the project, so the next launch opens it again (`ProjectState.lastOpenMap`). */
-  readonly rememberOpenMap: (fileName: string | null) => Promise<void>
+  rememberOpenMap: { payload: OpenMapPayload, result: Schema.Void },
   /** The project's maps, most recently changed first; empty when the project isn't on disk yet. */
-  readonly listMaps: () => Promise<ProjectMaps>
+  listMaps: { payload: noPayload, result: ProjectMaps },
   /** Reads a project map. */
-  readonly readMap: (fileName: string) => Promise<ProjectMapFile>
+  readMap: { payload: MapFileNamePayload, result: ProjectMapFile },
   /** Writes a new map into the project, making the project first if needed; fails when one of that name exists. */
-  readonly createMap: (payload: WriteMapPayload) => Promise<ProjectMap>
+  createMap: { payload: WriteMapPayload, result: ProjectMap },
   /**
    * Writes over a project map (Save), or writes it if it has gone. The text is written as is: same bytes, no BOM.
    * Atomic, like every write. The file it replaces goes to the project's backups first; the same text writes nothing.
    */
-  readonly saveMap: (payload: WriteMapPayload) => Promise<ProjectMap>
+  saveMap: { payload: WriteMapPayload, result: ProjectMap },
   /** Writes the map under its new file name and moves the old file to the project's backups; its link moves with it. */
-  readonly renameMap: (payload: RenameMapPayload) => Promise<ProjectMap>
+  renameMap: { payload: RenameMapPayload, result: ProjectMap },
   /** The native open dialog for a map file anywhere; null when cancelled. The file may then be imported. */
-  readonly pickImport: () => Promise<OpenedMapFile | null>
+  pickImport: { payload: noPayload, result: PickImportResult },
   /** Copies a picked file into the project and records where it came from (a map it replaces goes to backups). */
-  readonly importMap: (payload: ImportMapPayload) => Promise<ImportMapResult>
+  importMap: { payload: ImportMapPayload, result: ImportMapResult },
   /**
    * Copies a project map byte for byte into the game's maps folder and records the export in its link. The file it
    * replaces there goes to `<userData>/backups/` first.
    */
-  readonly exportMap: (payload: ExportMapPayload) => Promise<ExportMapResult>
+  exportMap: { payload: ExportMapPayload, result: ExportMapResult },
   /**
    * Sync detection: hashes every linked map's export in the game's maps folder and compares it with the last export
    * and the last seen hash, keeping what it saw in the link. A changed export is reported once; a missing one has its
    * export dropped from the link. Nothing is checked while the maps folder isn't there.
    */
-  readonly checkExports: () => Promise<ExportChecks>
+  checkExports: { payload: noPayload, result: ExportChecks },
   /**
    * Re-import: replaces a project map with its export in the game's maps folder, byte for byte (the project's file goes
    * to the project's backups first), and records the export as in sync. Fails for a map that has no export.
    */
-  readonly reimportMap: (fileName: string) => Promise<ProjectMapFile>
+  reimportMap: { payload: MapFileNamePayload, result: ProjectMapFile },
   /** The current project's backups and the exports' (docs/PROJECTS.md § The files), newest first. */
-  readonly listBackups: () => Promise<MapBackups>
+  listBackups: { payload: noPayload, result: MapBackups },
   /** Reads a backup `listBackups` named. */
-  readonly readBackup: (ref: BackupRef) => Promise<MapBackupFile>
+  readBackup: { payload: BackupRef, result: MapBackupFile },
   /** The page's resolved theme: the window controls drawn over its top bar, and the window background, follow it. */
-  readonly setWindowTheme: (dark: boolean) => Promise<void>
+  setWindowTheme: { payload: WindowThemePayload, result: Schema.Void },
   /** The native Save / Don't save / Cancel box, modal to the window. */
-  readonly confirmUnsaved: (prompt: UnsavedPrompt) => Promise<UnsavedChoice>
-  /** Calls `listener` each time the page held a close or a reload with unsaved edits, until the returned function is called. */
-  readonly onUnloadRequest: (listener: (kind: UnloadKind) => void) => () => void
+  confirmUnsaved: { payload: UnsavedPrompt, result: UnsavedChoice },
   /** Opens an http(s) URL in the default browser; false when it is refused or fails to open. */
-  readonly openExternal: (url: string) => Promise<boolean>
+  openExternal: { payload: OpenExternalPayload, result: Schema.Boolean },
   /** Where the game, its maps folder and the plugins folder are, and how each was found. */
-  readonly gamePaths: () => Promise<GamePaths>
+  gamePaths: { payload: noPayload, result: GamePaths },
   /** A folder dialog, then `which` uses the chosen folder instead of the one found; null when cancelled. */
-  readonly chooseGamePath: (which: GamePathKind) => Promise<GamePaths | null>
+  chooseGamePath: { payload: GamePathPayload, result: ChooseGamePathResult },
   /** Goes back to the folder found through Steam. */
-  readonly resetGamePath: (which: GamePathKind) => Promise<GamePaths>
+  resetGamePath: { payload: GamePathPayload, result: GamePaths },
   /** Shows the folder in the file manager; false when it doesn't exist or fails to open. */
-  readonly revealGamePath: (which: GamePathKind) => Promise<boolean>
+  revealGamePath: { payload: GamePathPayload, result: Schema.Boolean },
   /** Starts the game through Steam (`steam://rungameid/3339810`); false when Steam couldn't be asked. */
-  readonly launchGame: () => Promise<boolean>
+  launchGame: { payload: noPayload, result: Schema.Boolean },
   /** Whether the game (`Ballest-Win64-Shipping.exe`) is running. */
-  readonly isGameRunning: () => Promise<boolean>
+  isGameRunning: { payload: noPayload, result: Schema.Boolean },
   /** The creator name the game would write (the Steam persona name), and where it was found; null when none was. */
-  readonly findCreator: () => Promise<FoundCreator | null>
+  findCreator: { payload: noPayload, result: FindCreatorResult },
   /** Whether the `ballest-editor-link` plugin is installed, and as new as the app's copy. */
-  readonly pluginStatus: () => Promise<PluginStatus>
+  pluginStatus: { payload: noPayload, result: PluginStatus },
   /**
    * Copies the app's `ballest-editor-link` into the plugins folder, over an older copy (its `play.json` is kept).
    * Rejects when the plugin manager isn't installed. Only ever writes inside `<plugins>/ballest-editor-link`.
    */
-  readonly installPlugin: () => Promise<InstallPluginResult>
+  installPlugin: { payload: noPayload, result: InstallPluginResult },
   /**
    * Play: exports a project map like `exportMap` (backups, link record, the published-draft question), writes
    * `<plugins>/ballest-editor-link/play.json` for the plugin to race it, and starts the game if it isn't running.
    * Without the plugin it still exports and starts the game; `play.json` is only written into an installed plugin.
    */
-  readonly play: (payload: PlayPayload) => Promise<PlayResult>
-  /** Calls `listener` each time the game session a Play started or joined ends, until the returned function is called. */
-  readonly onPlaySessionEnded: (listener: (ended: PlaySessionEnded) => void) => () => void
+  play: { payload: PlayPayload, result: PlayResult },
   /** The notifications kept in `<userData>/notifications.json`, newest first; empty when there are none yet. */
-  readonly loadNotifications: () => Promise<NotificationRecords>
+  loadNotifications: { payload: noPayload, result: NotificationRecords },
   /** Replaces the kept notifications (at most `NOTIFICATION_LIMIT`). */
-  readonly saveNotifications: (records: NotificationRecords) => Promise<void>
+  saveNotifications: { payload: Schema.Struct({ records: NotificationRecords }), result: Schema.Void },
   /** "Don't show again": mutes a notification kind from now on, across restarts; the kinds muted afterwards. */
-  readonly muteNotifications: (kind: string) => Promise<MutedNotificationKinds>
+  muteNotifications: { payload: NotificationKindPayload, result: MutedNotificationKinds },
   /** What the Game link found last time (null on the first launch), and the muted notification kinds. */
-  readonly gameLinkMemory: () => Promise<GameLinkMemory>
+  gameLinkMemory: { payload: noPayload, result: GameLinkMemory },
   /** Keeps what the Game link found, for the next launch to compare with. */
-  readonly rememberGameLink: (result: GameLinkResult) => Promise<void>
+  rememberGameLink: { payload: GameLinkResult, result: Schema.Void },
   /** The updater's state now. */
-  readonly getUpdateState: () => Promise<UpdateState>
+  getUpdateState: { payload: noPayload, result: UpdateState },
   /** Starts downloading the release on offer (`available`); progress and the outcome arrive through `onUpdateState`. */
-  readonly downloadUpdate: () => Promise<void>
+  downloadUpdate: { payload: noPayload, result: Schema.Void },
   /** Quits, installs the downloaded release (`ready`) and starts it. Unsaved edits are lost. */
-  readonly installUpdate: () => Promise<void>
-  /** Calls `listener` with every later state, until the returned function is called. */
-  readonly onUpdateState: (listener: (state: UpdateState) => void) => () => void
+  installUpdate: { payload: noPayload, result: Schema.Void }
+} as const satisfies { readonly [K in keyof typeof InvokeChannels]: DesktopMethodSchemas }
+
+/** What main pushes to the page (`webContents.send` on `PushChannels[name]`), by the bridge member that listens. */
+const DesktopPushes = {
+  /** Calls `listener` each time the page held a close or a reload with unsaved edits, until the returned function is called. */
+  onUnloadRequest: UnloadKind,
+  /** Calls `listener` each time the game session a Play started or joined ends, until the returned function is called. */
+  onPlaySessionEnded: PlaySessionEnded,
+  /** Calls `listener` with every later update state, until the returned function is called. */
+  onUpdateState: UpdateState
+} as const satisfies {
+  readonly [K in keyof typeof PushChannels]: Schema.ConstraintCodec<unknown>
+}
+
+export type DesktopMethodName = keyof typeof DesktopMethods
+
+/** What the page passes to a bridge method: its payload as encoded, or nothing for a method that takes none. */
+export type DesktopArgs<K extends DesktopMethodName> = [(typeof DesktopMethods)[K]["payload"]["Encoded"]] extends
+  [undefined] ? []
+  : [payload: (typeof DesktopMethods)[K]["payload"]["Encoded"]]
+
+/** What a bridge method's promise resolves with: its result as main encoded it. */
+export type DesktopResult<K extends DesktopMethodName> = (typeof DesktopMethods)[K]["result"]["Encoded"]
+
+/** The bridge's methods, one per `DesktopMethods` entry. */
+export type DesktopInvoke = {
+  readonly [K in keyof typeof DesktopMethods]: (...args: DesktopArgs<K>) => Promise<DesktopResult<K>>
+}
+
+/** The bridge's subscriptions, one per `DesktopPushes` entry: each returns the function that unsubscribes. */
+export type DesktopSubscriptions = {
+  readonly [K in keyof typeof DesktopPushes]: (
+    listener: (value: (typeof DesktopPushes)[K]["Encoded"]) => void
+  ) => () => void
+}
+
+/**
+ * What the desktop preload exposes to the renderer as `window.ballest`: the runtime versions, then one member per entry
+ * in `DesktopMethods` and `DesktopPushes`. The renderer only sees this interface, so everything crossing it is plain
+ * data (structured-clone safe).
+ */
+export interface DesktopBridge extends DesktopInvoke, DesktopSubscriptions {
+  readonly versions: DesktopVersions
 }
