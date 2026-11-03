@@ -95,27 +95,6 @@ export interface Snapshot {
 export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
 export type Tool = "select" | "translate" | "rotate" | "scale"
-/**
- * `saveAs` names a map that has no file yet before it goes into the project (desktop), or before it is downloaded
- * (browser: Export). `rename`, `duplicate` and `recover` are the Project panel's per-map items (desktop); `gameLink`
- * is File › Game link…. `projectSettings` opens Project settings on the project's page, `mapSettings` on the open
- * map's entry in it.
- */
-export type Dialog =
-  | "new"
-  | "saveAs"
-  | "rename"
-  | "duplicate"
-  | "settings"
-  | "projectSettings"
-  | "mapSettings"
-  | "gameLink"
-  | "newProject"
-  | "replacePublished"
-  | "overwriteChanged"
-  | "newDraft"
-  | "importClash"
-  | "recover"
 export type LeftTab = "pieces" | "project"
 export type SettingsCategory = "general" | "editor" | "camera" | "keybinds" | "appearance" | "lighting" | "game"
 
@@ -162,6 +141,39 @@ export interface ImportClash {
   readonly map: MapFile
 }
 
+/**
+ * A modal dialog: which one (`id`) and what it is about.
+ *
+ * - `saveAs` names a map that has no file yet before it goes into the project (desktop), or before it is downloaded
+ *   (browser: Export). `afterSave` is what the unsaved-changes prompt's Save (or Export, Play) goes on to do once the
+ *   map is saved: the dialog takes it before it closes itself to save, its Cancel drops it, and so does any other
+ *   dialog opening in its place.
+ * - `rename`, `duplicate` and `recover` are the Project panel's per-map items (desktop); `gameLink` is File › Game
+ *   link….
+ * - `settings` opens on `category`, or on the page it last showed (`settingsCategory`).
+ * - `projectSettings` opens Project settings on the project's page, `mapSettings` on the open map's entry in it.
+ * - `replacePublished`, `overwriteChanged` and `importClash` ask about what Export, Play or Import found.
+ */
+export type DialogState =
+  | {
+    readonly id:
+      | "new"
+      | "rename"
+      | "duplicate"
+      | "projectSettings"
+      | "mapSettings"
+      | "gameLink"
+      | "newProject"
+      | "newDraft"
+      | "recover"
+  }
+  | { readonly id: "saveAs"; readonly afterSave?: Effect.Effect<void, unknown> }
+  | { readonly id: "settings"; readonly category?: SettingsCategory }
+  | { readonly id: "replacePublished" } & PublishedDraft
+  | { readonly id: "overwriteChanged" } & ChangedExport
+  | { readonly id: "importClash" } & ImportClash
+export type Dialog = DialogState["id"]
+
 /** What `notify` records besides the level and title (docs/PROJECTS.md § Shell). */
 export interface NotifyOptions {
   /** What it is about (`mapSaved`, `gameNotFound`, ...); the level (`info`, `error`) when not given. */
@@ -206,8 +218,6 @@ export interface EditorState {
   readonly projectMaps: ReadonlyArray<ProjectMap>
   /** The open map's "Export on save" (desktop, off by default; kept with the map's prefs). */
   readonly exportOnSave: boolean
-  /** An import waiting on the clash dialog. */
-  readonly importClash: ImportClash | null
   /** What the platform (browser or desktop app) offers; the browser's until the startup load says otherwise. */
   readonly capabilities: PlatformCapabilities
   /** The game's folders as last looked up (desktop; null until the startup check or the Game link asks). */
@@ -223,10 +233,6 @@ export interface EditorState {
   readonly gameLink: { readonly firstRun: boolean; readonly last: GameLinkResult | null }
   /** Why the folder last chosen for `which` in the Game link was refused (it isn't the game's); null once one is used. */
   readonly gamePathProblem: { readonly which: GamePathKind; readonly message: string } | null
-  /** Export found a published map's draft under the map's file name; the replacePublished dialog asks. */
-  readonly publishedDraft: PublishedDraft | null
-  /** Export found the game changed the export since the last one; the overwriteChanged dialog asks. */
-  readonly changedExport: ChangedExport | null
   /** The desktop updater's state, once main has sent it; null in a browser. */
   readonly update: UpdateState | null
   /** Every notification (each toast is one), newest first, at most `NOTIFICATION_LIMIT`. */
@@ -240,12 +246,8 @@ export interface EditorState {
   /** The left dock's tab: the piece palette, or the project's maps (docs/PROJECTS.md § Shell). */
   readonly leftTab: LeftTab
   /** The open modal dialog; editor keybinds are suspended while one is open. */
-  readonly dialog: Dialog | null
-  /**
-   * What the unsaved-changes prompt's Save goes on to do (close, start a new map...) when the map had to be named
-   * first: runs once the `saveAs` dialog has saved it, and is dropped when that dialog is cancelled or another opens.
-   */
-  readonly afterSave: Effect.Effect<void, unknown> | null
+  readonly dialog: DialogState | null
+  /** The Settings dialog's page, kept between openings. */
   readonly settingsCategory: SettingsCategory
   /** The keybind cheat sheet: shown while its binding is held. */
   readonly cheatSheet: boolean
@@ -307,17 +309,12 @@ export interface EditorState {
    */
   readonly detachFile: () => void
   readonly setExportOnSave: (exportOnSave: boolean) => void
-  /** Asks how to import a file whose name the project has (null forgets it). */
-  readonly setImportClash: (clash: ImportClash | null) => void
   readonly setCapabilities: (capabilities: PlatformCapabilities) => void
   readonly setGamePaths: (gamePaths: GamePaths) => void
   readonly setFoundCreator: (foundCreator: Option.Option<FoundCreator>) => void
   readonly setPluginStatus: (pluginStatus: PluginStatus) => void
   readonly setGameLink: (gameLink: Partial<EditorState["gameLink"]>) => void
   readonly setGamePathProblem: (problem: EditorState["gamePathProblem"]) => void
-  /** Asks whether to replace a published map's draft in the maps folder (null forgets it). */
-  readonly setPublishedDraft: (draft: PublishedDraft | null) => void
-  readonly setChangedExport: (changed: ChangedExport | null) => void
   readonly setUpdate: (update: UpdateState) => void
   readonly placePiece: (piece: CatalogPiece, transform: ItemTransform) => void
   /**
@@ -374,12 +371,9 @@ export interface EditorState {
   readonly setTool: (tool: Tool) => void
   readonly toggleGizmoSpace: () => void
   readonly setLeftTab: (tab: LeftTab) => void
-  readonly openDialog: (dialog: Dialog, category?: SettingsCategory) => void
+  /** Opens `dialog` in place of the open one (and its payload). */
+  readonly openDialog: (dialog: DialogState) => void
   readonly closeDialog: () => void
-  /** Opens the `saveAs` dialog to name the map, with what to do once it is saved. */
-  readonly nameThen: (afterSave: Effect.Effect<void, unknown>) => void
-  /** `afterSave`, cleared: the `saveAs` dialog takes it before saving. */
-  readonly takeAfterSave: () => Effect.Effect<void, unknown> | null
   readonly setCheatSheet: (cheatSheet: boolean) => void
   readonly setSettingsCategory: (category: SettingsCategory) => void
   readonly setPreview: (preview: EditorState["preview"]) => void
@@ -487,15 +481,12 @@ export const useEditor = create<EditorState>()((set, get) => {
     project: null,
     projectMaps: [],
     exportOnSave: false,
-    importClash: null,
     capabilities: { projects: false, exportToGame: false, launchGame: false, play: false, updates: false },
     gamePaths: null,
     foundCreator: Option.none(),
     pluginStatus: null,
     gameLink: { firstRun: true, last: null },
     gamePathProblem: null,
-    publishedDraft: null,
-    changedExport: null,
     update: null,
     notifications: [],
     mutedNotificationKinds: new Set(),
@@ -504,7 +495,6 @@ export const useEditor = create<EditorState>()((set, get) => {
     gizmoSpace: "world",
     leftTab: "pieces",
     dialog: null,
-    afterSave: null,
     settingsCategory: "general",
     cheatSheet: false,
     catalog: null,
@@ -544,17 +534,12 @@ export const useEditor = create<EditorState>()((set, get) => {
     setProject: (project, projectMaps) => set({ project, projectMaps }),
     detachFile: () => set((s) => s.file === null ? s : { file: null, dirty: true }),
     setExportOnSave: (exportOnSave) => set({ exportOnSave }),
-    setImportClash: (importClash) => set({ importClash, dialog: importClash === null ? null : "importClash" }),
     setCapabilities: (capabilities) => set({ capabilities }),
     setGamePaths: (gamePaths) => set({ gamePaths }),
     setFoundCreator: (foundCreator) => set({ foundCreator }),
     setPluginStatus: (pluginStatus) => set({ pluginStatus }),
     setGameLink: (gameLink) => set((s) => ({ gameLink: { ...s.gameLink, ...gameLink } })),
     setGamePathProblem: (gamePathProblem) => set({ gamePathProblem }),
-    setPublishedDraft: (publishedDraft) =>
-      set({ publishedDraft, dialog: publishedDraft === null ? null : "replacePublished" }),
-    setChangedExport: (changedExport) =>
-      set({ changedExport, dialog: changedExport === null ? null : "overwriteChanged" }),
     setUpdate: (update) => set({ update }),
 
     placePiece: (piece, transform) => {
@@ -749,20 +734,13 @@ export const useEditor = create<EditorState>()((set, get) => {
     setTool: (tool) => set({ tool }),
     toggleGizmoSpace: () => set((s) => ({ gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
     setLeftTab: (leftTab) => set({ leftTab }),
-    openDialog: (dialog, category) =>
+    openDialog: (dialog) =>
       set((s) => ({
         dialog,
-        settingsCategory: category ?? s.settingsCategory,
-        afterSave: dialog === "saveAs" ? s.afterSave : null
+        settingsCategory: dialog.id === "settings" ? dialog.category ?? s.settingsCategory : s.settingsCategory
       })),
-    // The saveAs dialog closes itself before it saves, so this keeps `afterSave`; its Cancel drops it.
+    // Drops the payload with the dialog: the saveAs dialog takes its `afterSave` before it closes itself to save.
     closeDialog: () => set({ dialog: null }),
-    nameThen: (afterSave) => set({ dialog: "saveAs", afterSave }),
-    takeAfterSave: () => {
-      const { afterSave } = get()
-      set({ afterSave: null })
-      return afterSave
-    },
     setCheatSheet: (cheatSheet) => set({ cheatSheet }),
     setSettingsCategory: (settingsCategory) => set({ settingsCategory }),
     setPreview: (preview) => set({ preview }),

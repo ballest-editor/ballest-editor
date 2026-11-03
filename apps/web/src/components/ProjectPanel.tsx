@@ -260,7 +260,7 @@ export function ProjectPanel() {
           <IconFileImport />
         </HeaderButton>
         {projects && (
-          <HeaderButton label="Project settings…" onClick={() => openDialog("projectSettings")}>
+          <HeaderButton label="Project settings…" onClick={() => openDialog({ id: "projectSettings" })}>
             <IconSettings />
           </HeaderButton>
         )}

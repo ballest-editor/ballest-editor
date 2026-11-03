@@ -60,8 +60,8 @@ file the user picked to import; the page names maps by file name, never by path.
   Duplicate over it, Import replacing it, Re-import) and the old file after a Rename. The game's copy before an
   Export (or Play) wrote over it goes to `<userData>/backups/` under the same naming, since it belongs to this machine,
   not the project. Both go through one step, `Backups.overwrite`; unchanged bytes keep nothing; each folder keeps 20
-  versions per file for 30 days (`desktop-settings.json` › `backups`). Map › Recover previous version… opens one as
-  unsaved edits ([DESKTOP.md](DESKTOP.md) § Backups).
+  versions per file for 30 days (`desktop-settings.json` › `backups`). Recover previous version… (a map's menu in the
+  Project panel) opens one as unsaved edits ([DESKTOP.md](DESKTOP.md) § Backups).
 
 The project in use and the recent ones (at most 8) are in `desktop-settings.json` under `project.recent`, the one in
 use first; an empty list means the default project.
@@ -166,7 +166,7 @@ What is built (#141; [DESKTOP.md](DESKTOP.md) § Sync):
   (and marks the version seen, so the next focus doesn't report it again). Back up and overwrite exports after all,
   through the same backup step; Re-import first re-imports and exports nothing. A game file that already holds the
   bytes being exported doesn't ask.
-- **Re-import** (the notification, the status bar popover, Map › Re-import from game) asks about the open map's unsaved
+- **Re-import** (the notification, the status bar popover, Project › Re-import from game) asks about the open map's unsaved
   edits first when it is the one re-imported, then copies the game's file into the project byte for byte through
   `Backups.overwrite`, records it as the export and reloads the open map.
 
@@ -222,11 +222,11 @@ the outside in:
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Thumbnails are an offscreen render of the map written next to it on save, used by Maps… and Welcome.
+Thumbnails are an offscreen render of the map written next to it on save, used by the Project panel and Welcome.
 
 What is built ([DESKTOP.md](DESKTOP.md) § Renderer): the project window as above, without the Welcome window,
-multi-window, Untitled Project \* and the Save project modal, thumbnails, the drawer and Delete in Maps…. Where this
-first slice stops short of the design:
+multi-window, the Save project modal, and thumbnails and Delete in the Project panel. Where this first slice stops
+short of the design:
 
 - **No Welcome yet.** On launch the window opens the last used project (the first of the recent list in
   `desktop-settings.json`) on the map open when the app last ran, else the project's most recently edited map, else a
@@ -254,31 +254,31 @@ follow at any time without touching saved projects.
 | Phase | Milestone | Scope                                                                                                                                                                                                                                                                                      |
 | ----- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1     | 0.2       | **Project folder and the save flow.** Default project created lazily; New map saves at once; Rename and Duplicate replace Save as; Import replaces Open; Export to game replaces Save to game; `link.json`; backups on overwrite; close prompt. Menus and dialog copy use the three nouns. |
-| 2     | 0.2       | **Game link and notifications.** Status bar; notification centre; Start tab as a plain list (no thumbnails); Game link checklist; creator from Steam; game not found; plugin manager and plugin install; Play.                                                                             |
-| 3     | 0.2       | **Sync.** Change detection on launch, focus and after Play; the Export confirm; Re-import; link states in the status bar and Start tab.                                                                                                                                                    |
+| 2     | 0.2       | **Game link and notifications.** Status bar; notification centre; Start tab as a plain list (no thumbnails; since replaced by the Project panel); Game link checklist; creator from Steam; game not found; plugin manager and plugin install; Play.                                        |
+| 3     | 0.2       | **Sync.** Change detection on launch, focus and after Play; the Export confirm; Re-import; link states in the status bar and Start tab (now the Project panel).                                                                                                                            |
 | 4     | 0.3       | **Public launch**, as planned. No new flow work; docs describe the three nouns.                                                                                                                                                                                                            |
 | 5     | 0.4 (new) | **Editor-only data.** The sidecar (#112) with stable keys and re-matching on Re-import; hide, lock, layers (#81, #111); Map settings tier.                                                                                                                                                 |
-| 6     | 0.5 (new) | **Projects proper.** Thumbnails in Maps… and Welcome; maps folder and Workshop browser (#103); New and Open project; Project settings tier; git history and diff (#105); multi-map with shared bases (#104).                                                                               |
+| 6     | 0.5 (new) | **Projects proper.** Thumbnails in the Project panel and Welcome; maps folder and Workshop browser (#103); New and Open project; Project settings tier; git history and diff (#105); multi-map with shared bases (#104).                                                                   |
 | 7     | later     | **Derived data.** Generators, derived pieces and splines make the sidecar authoritative for the pieces they own; detached pieces.                                                                                                                                                          |
 
 What stays out of the public launch on purpose: a separate project-manager window (Godot style), git,
-thumbnails in Maps…, the Workshop browser, multi-map, any merge. Phase 1 to 3 are small on
+thumbnails in the Project panel, the Workshop browser, multi-map, any merge. Phase 1 to 3 are small on
 disk (a folder, one JSON file, a hash) and large in how the app reads; that is the trade.
 
 ### Issues to reshape
 
-| Issue                                           | Change                                                                                                                                              |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #132 save to a default folder                   | Rewrite as phase 1: the project folder, New saves at once, Rename and Duplicate, Import, Export to game. Its "decide first" list is answered above. |
-| #137 back up before overwriting                 | Keep; backups go under `<project>/.ballest/backups/` for project files and `<userData>/backups/` for exports. Recover lives in the Map menu.        |
-| #70 close prompt                                | Keep as is.                                                                                                                                         |
-| #133 creator from Steam                         | Keep the discovery; the UI is a Game link row, not a Settings-only field. Done: `useCreator()` is what the row shows (DESKTOP.md § Game paths).     |
-| #142 map settings, #143 new and open project    | New, phases 5 and 6; #21's dialog becomes Map settings.                                                                                             |
-| #136 restyle the update pill                    | Keep; the pill moves to the status bar.                                                                                                             |
-| #118 install the plugin, #66 Play               | Keep; Play exports first and records the link. Install plugin is a Game link row.                                                                   |
-| #140 status bar, notifications, Start tab       | Done (phase 2); the Start tab has since given way to the Project panel (§ Shell).                                                                   |
-| #134 game link checklist                        | Done (phase 2; #135 merged into it): the checklist, now File › Game link…, and notifications when a result changes between launches.                |
-| #141 sync detection, Export confirm, Re-import  | Done (phase 3).                                                                                                                                     |
-| #112 sidecar                                    | Move to 0.4; add "re-match on Re-import" to its scope.                                                                                              |
-| #81, #111 hide, lock, layers                    | Move to 0.4.                                                                                                                                        |
-| #103 Workshop browser, #104 multi-map, #105 git | Move to 0.5; #103 gains "the maps folder list in Maps…" as its first slice.                                                                         |
+| Issue                                           | Change                                                                                                                                                                               |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| #132 save to a default folder                   | Rewrite as phase 1: the project folder, New saves at once, Rename and Duplicate, Import, Export to game. Its "decide first" list is answered above.                                  |
+| #137 back up before overwriting                 | Keep; backups go under `<project>/.ballest/backups/` for project files and `<userData>/backups/` for exports. Recover lives in the Project panel (a map's menu; first the Map menu). |
+| #70 close prompt                                | Keep as is.                                                                                                                                                                          |
+| #133 creator from Steam                         | Keep the discovery; the UI is a Game link row, not a Settings-only field. Done: `useCreator()` is what the row shows (DESKTOP.md § Game paths).                                      |
+| #142 map settings, #143 new and open project    | New, phases 5 and 6; #21's dialog becomes Map settings.                                                                                                                              |
+| #136 restyle the update pill                    | Keep; the pill moves to the status bar.                                                                                                                                              |
+| #118 install the plugin, #66 Play               | Keep; Play exports first and records the link. Install plugin is a Game link row.                                                                                                    |
+| #140 status bar, notifications, Start tab       | Done (phase 2); the Start tab has since given way to the Project panel (§ Shell).                                                                                                    |
+| #134 game link checklist                        | Done (phase 2; #135 merged into it): the checklist, now File › Game link…, and notifications when a result changes between launches.                                                 |
+| #141 sync detection, Export confirm, Re-import  | Done (phase 3).                                                                                                                                                                      |
+| #112 sidecar                                    | Move to 0.4; add "re-match on Re-import" to its scope.                                                                                                                               |
+| #81, #111 hide, lock, layers                    | Move to 0.4.                                                                                                                                                                         |
+| #103 Workshop browser, #104 multi-map, #105 git | Move to 0.5; #103 gains "the maps folder list in the Project panel" as its first slice.                                                                                              |

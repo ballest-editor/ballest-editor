@@ -29,11 +29,11 @@ describe("commands", () => {
     commandFor("toggleGizmoSpace")?.()
     assert.strictEqual(s().gizmoSpace, "local")
     commandFor("saveMapAs")?.()
-    assert.strictEqual(s().dialog, "saveAs")
+    assert.strictEqual(s().dialog?.id, "saveAs")
     s().closeDialog()
     // a map that was never saved has no file to write over: Save asks like Save as
     commandFor("saveMap")?.()
-    assert.strictEqual(s().dialog, "saveAs")
+    assert.strictEqual(s().dialog?.id, "saveAs")
     s().closeDialog()
     s().select([s().doc.ids[0]!])
     commandFor("deselect")?.()

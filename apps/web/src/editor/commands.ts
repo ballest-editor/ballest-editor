@@ -34,7 +34,7 @@ export const actionCommands = {
   /** Duplicate… on desktop (Save as is gone: the location is the project), Export… (a download) in a browser. */
   saveMapAs: () => {
     const { capabilities, openDialog } = useEditor.getState()
-    openDialog(capabilities.projects ? "duplicate" : "saveAs")
+    openDialog({ id: capabilities.projects ? "duplicate" : "saveAs" })
   },
   playMap: () => void playMap(),
   showKeybinds: () => useEditor.getState().setCheatSheet(true)

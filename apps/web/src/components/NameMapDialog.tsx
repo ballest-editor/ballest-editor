@@ -42,7 +42,9 @@ export function NameMapDialog(
   const projectOk = !namesProject || isProjectName(projectTrimmed)
   const projectMaps = useEditor((s) => s.projectMaps)
   const fileName = useEditor((s) => s.file?.name ?? null)
-  const takeAfterSave = useEditor((s) => s.takeAfterSave)
+  // What the unsaved-changes prompt's Save (or Export, Play) goes on to do once the map is saved (close, a new map...):
+  // Submit holds on to it as it closes the dialog, then saves; Cancel drops it with the dialog.
+  const afterSave = useEditor((s) => s.dialog?.id === "saveAs" ? s.dialog.afterSave : undefined)
   const risky = useMemo(() => {
     const pieces = catalog?.catalog.pieces ?? []
     const classes = riskyClassesIn(items.map((it) => classNameOf(it.actorToSpawn)), pieces, catalog?.verified ?? {})
@@ -84,14 +86,8 @@ export function NameMapDialog(
     else {
       if (namesProject) await nameProject(projectTrimmed)
       useEditor.getState().renameLevel(name, creator.name)
-      await saveMapAs()
+      await saveMapAs(afterSave)
     }
-  }
-
-  // Cancelled: what the unsaved-changes prompt's Save was going to do next (close, a new map...) doesn't happen.
-  const cancel = () => {
-    takeAfterSave()
-    onClose()
   }
 
   const copy = {
@@ -126,7 +122,7 @@ export function NameMapDialog(
   return (
     <MapNameDialog
       open={open}
-      onClose={cancel}
+      onClose={onClose}
       id={mode}
       title={copy.title}
       fileNameLead="Exports as"
@@ -141,7 +137,7 @@ export function NameMapDialog(
           <button
             type="button"
             className="underline underline-offset-2 hover:text-foreground"
-            onClick={() => openDialog("settings", "general")}
+            onClick={() => openDialog({ id: "settings", category: "general" })}
           >
             change
           </button>
