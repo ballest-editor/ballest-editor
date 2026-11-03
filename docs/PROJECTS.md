@@ -191,7 +191,7 @@ the outside in:
 - **First launch.** Straight into the editor as **Untitled Project \*** with an Untitled map, nothing on disk. The
   first Save opens a **Save project** modal: project name, folder (default `Documents/Ballest Editor/<name>`), map
   name. After it the project exists and the asterisk goes. The Game link checklist shows as a modal on first launch
-  (and from File › Game link…), not as a page; later launches notify only when a result changes.
+  (and from File › Game link…), not as a tab; later launches notify only when a result changes.
 - **Menus.** `File` (New project…, Open project…, Recent projects, Save, Save project…, Close project, Settings…,
   Game link…, Quit), `Edit`, `View` (Pieces, Project, …), `Project` (New map…, Import map…, Export to game, Export on save,
   Re-import from game, Play, Launch game, Project settings…). No separate Map or Game menu: a map is only ever the open
@@ -207,7 +207,9 @@ the outside in:
 - **Notifications.** Every toast is also a notification. The bell keeps the last 100 across restarts
   (`<userData>/notifications.json`), with their actions still live. Persistent ones pin to the top until resolved.
   "Don't show again" is per notification kind.
-- **Settings** (the app: keybinds, camera, appearance, game folders) stays its own dialog under File.
+- **Settings** (the app: keybinds, camera, appearance, and the Game link checklist as its Game page, the game's
+  folders and the editor's plugin) stays its own dialog under File. File › Game link… and Settings › Game are the
+  same checklist in two frames; there is no second description of the folders.
 
 ```
 ┌ BE  File  Edit  View  Project                     Big Loop *            v ^ x ┐

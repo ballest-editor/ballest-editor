@@ -20,6 +20,7 @@ import { Struct } from "effect"
 import { useEffect, useState } from "react"
 import { movementLookModes } from "../domain/flyKeys"
 import { namedActions } from "../domain/GameKeybinds"
+import { overriddenFolders } from "../domain/gameLink"
 import {
   type Bindings,
   chordOf,
@@ -37,18 +38,11 @@ import {
   wheelChordOf
 } from "../domain/Keybinds"
 import { CUSTOM_FOV_PRESET, defaultSettings, gridColorsOf, type Settings } from "../domain/Settings"
-import {
-  findCreator,
-  loadGamePaths,
-  resetGamePaths,
-  resetKeybinds,
-  saveKeybinds,
-  saveSettings
-} from "../editor/actions"
+import { refreshGameLink, resetGamePaths, resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
 import { type SettingsCategory, useCreator, useEditor } from "../editor/store"
 import { useDarkTheme } from "../editor/theme"
 import { creatorSettingsRow } from "./CreatorSetting"
-import { GAME_PATH_KINDS, gameSettingsRows } from "./GameSettings"
+import { CheckAgainButton, GameLinkRows, useGameLinkSummary } from "./GameLink"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
 const movementLookItems = {
@@ -73,7 +67,7 @@ const CATEGORIES: ReadonlyArray<SettingsCategoryInfo<SettingsCategory>> = [
   { id: "lighting", label: "Lighting", icon: IconSun }
 ]
 
-/** Desktop only: the game's folders. */
+/** Desktop only: the Game link checklist, File › Game link…'s rows without its box. */
 const GAME_CATEGORY: SettingsCategoryInfo<SettingsCategory> = { id: "game", label: "Game", icon: IconDeviceGamepad2 }
 
 type Row = SettingsRow<SettingsCategory>
@@ -215,15 +209,15 @@ export function SettingsDialog(props: {
   const defaults = useEditor((s) => s.keybindDefaults)
   const [listening, setListening] = useState<Listening | null>(null)
   const hasGame = useEditor((s) => s.capabilities.exportToGame)
-  const gamePaths = useEditor((s) => s.gamePaths)
+  const overridden = overriddenFolders(useEditor((s) => s.gamePaths))
+  const gameLinkSummary = useGameLinkSummary()
   const creator = useCreator()
   const foundCreator = useEditor((s) => s.foundCreator)
-  const pluginStatus = useEditor((s) => s.pluginStatus)
 
   // The game or the plugin manager may have been installed, run or moved since, and Steam logged in as someone else:
   // look the folders, the plugin and the creator name up each time the dialog opens.
   useEffect(() => {
-    if (props.open && hasGame) void Promise.all([loadGamePaths(), findCreator()])
+    if (props.open && hasGame) void refreshGameLink()
   }, [props.open, hasGame])
 
   const update = <K extends keyof Settings>(section: K, patch: Partial<Settings[K]>) =>
@@ -666,15 +660,30 @@ export function SettingsDialog(props: {
         description: "The game's sky with the map's sun in it. Off: the theme's background.",
         control: <Switch checked={l.skyVisible} onCheckedChange={(v) => update("lighting", { skyVisible: v })} />
       },
-      ...(hasGame ? gameSettingsRows(gamePaths, pluginStatus) : [])
+      ...(hasGame
+        ? [
+          {
+            id: "gameLink",
+            category: "game",
+            label: "Game link",
+            description: gameLinkSummary,
+            keywords:
+              "steam proton install folder path UserSavedMaps maps plugins plugin manager ballest-editor-link editor plugin play update version",
+            wide: true,
+            changes: { modified: overridden.length > 0, reset: () => void resetGamePaths(overridden) },
+            // Check again where the reset goes: each chosen folder has its own reset, and so does the footer.
+            action: <CheckAgainButton size="xs" />,
+            control: <GameLinkRows framed={false} />
+          } satisfies Row
+        ]
+        : [])
     ]
   })()
 
   const resetCategory = (category: SettingsCategory) => {
     if (category === "keybinds") void resetKeybinds()
-    else if (category === "game") {
-      void resetGamePaths(GAME_PATH_KINDS.filter((which) => gamePaths?.[which].status === "overridden"))
-    } else void saveSettings({ ...settings, [category]: defaultSettings[category] })
+    else if (category === "game") void resetGamePaths(overridden)
+    else void saveSettings({ ...settings, [category]: defaultSettings[category] })
   }
   return (
     <SettingsShell

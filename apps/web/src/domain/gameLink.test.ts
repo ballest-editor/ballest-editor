@@ -12,6 +12,7 @@ import {
   type GameLinkRow,
   gameLinkRows,
   MUTABLE_KINDS,
+  overriddenFolders,
   playWithoutPluginNotice,
   PLUGIN_MANAGER_FOUND,
   PLUGIN_MANAGER_MISSING,
@@ -49,15 +50,30 @@ const byId = (rows: ReadonlyArray<GameLinkRow>) => {
 }
 
 describe("Game link checklist", () => {
-  it("finds everything: each row has its path and Reveal, and the summary names the creator", () => {
+  it("finds everything: each row has its path, Reveal and Change…, and the summary names the creator", () => {
     const rows = gameLinkRows(everything, plugin("current", "0.2.0"), isaac)
     assert.isTrue(allFound(rows))
     assert.deepStrictEqual(rows.map((row) => row.short), ["game", "maps", "creator Isaac", "plugin manager", "plugin"])
     const { install, mapsFolder, pluginManager, plugin: editorPlugin } = byId(rows)
-    assert.deepInclude(install, { path: "/game", reveal: "install", fix: null })
-    assert.deepInclude(mapsFolder, { path: "/pfx/UserSavedMaps", reveal: "mapsFolder" })
-    assert.deepInclude(pluginManager, { path: PLUGINS, reveal: "pluginsFolder" })
-    assert.deepInclude(editorPlugin, { title: "ballest-editor-link 0.2.0", fix: null })
+    assert.deepInclude(install, {
+      note: "Found through Steam.",
+      path: "/game",
+      reveal: "install",
+      reset: null,
+      fixes: [{ _tag: "ChooseFolder", which: "install" }]
+    })
+    assert.deepInclude(mapsFolder, {
+      path: "/pfx/UserSavedMaps",
+      reveal: "mapsFolder",
+      fixes: [{ _tag: "ChooseFolder", which: "mapsFolder" }]
+    })
+    assert.deepInclude(pluginManager, {
+      path: PLUGINS,
+      reveal: "pluginsFolder",
+      fixes: [{ _tag: "ChooseFolder", which: "pluginsFolder" }]
+    })
+    assert.deepInclude(editorPlugin, { title: "ballest-editor-link 0.2.0", fixes: [] })
+    assert.deepStrictEqual(overriddenFolders(everything), [])
   })
 
   it("is looking until the lookups are in", () => {
@@ -78,11 +94,11 @@ describe("Game link checklist", () => {
     assert.deepInclude(install, {
       state: "missing",
       title: "Couldn't find Ballest of Them All",
-      fix: { _tag: "ChooseFolder", which: "install" }
+      fixes: [{ _tag: "ChooseFolder", which: "install" }]
     })
-    assert.deepInclude(mapsFolder, { state: "waiting", fix: null })
-    assert.deepInclude(pluginManager, { state: "waiting", fix: null })
-    assert.deepInclude(editorPlugin, { state: "waiting", fix: null })
+    assert.deepInclude(mapsFolder, { state: "waiting", fixes: [] })
+    assert.deepInclude(pluginManager, { state: "waiting", fixes: [] })
+    assert.deepInclude(editorPlugin, { state: "waiting", fixes: [] })
   })
 
   it("with the game but no maps folder yet says to run the game once", () => {
@@ -91,34 +107,63 @@ describe("Game link checklist", () => {
       state: "missing",
       title: "Run the game once to create its maps folder",
       reveal: null,
-      fix: { _tag: "ChooseFolder", which: "mapsFolder" }
+      fixes: [{ _tag: "ChooseFolder", which: "mapsFolder" }]
     })
   })
 
-  it("without the plugin manager links to its install docs; the plugin waits for it", () => {
+  it("says which folders were chosen here, and offers to reset each to the one Steam knows about", () => {
+    const paths: GameFolders = {
+      install: { status: "overridden", path: "/elsewhere" },
+      mapsFolder: { status: "found", path: "/pfx/UserSavedMaps" },
+      pluginsFolder: { status: "overridden", path: "/elsewhere/plugins" }
+    }
+    const { install, mapsFolder, pluginManager } = byId(gameLinkRows(paths, plugin("current", "0.2.0"), isaac))
+    assert.deepInclude(install, {
+      state: "ok",
+      note: "Chosen here instead of the one Steam knows about.",
+      path: "/elsewhere",
+      reset: "install"
+    })
+    assert.deepInclude(mapsFolder, { note: "Found next to the game. Export to game writes here.", reset: null })
+    assert.deepInclude(pluginManager, { path: "/elsewhere/plugins", reset: "pluginsFolder" })
+    assert.deepStrictEqual(overriddenFolders(paths), ["install", "pluginsFolder"])
+    assert.deepStrictEqual(overriddenFolders(null), [])
+  })
+
+  it("without the plugin manager links to its install docs and lets its plugins folder be chosen; the plugin waits", () => {
     const paths: GameFolders = { ...everything, pluginsFolder: { status: "missing", path: PLUGINS } }
     const { pluginManager, plugin: editorPlugin } = byId(gameLinkRows(paths, plugin("noPluginManager"), isaac))
     // optional: only Play needs it, so nothing is wrong, but the row still carries the fix
     assert.deepInclude(pluginManager, {
       state: "optional",
       title: "Not installed (optional, for Play)",
-      fix: { _tag: "OpenPluginDocs" }
+      fixes: [{ _tag: "OpenPluginDocs" }, { _tag: "ChooseFolder", which: "pluginsFolder" }]
     })
     assert.isFalse(anythingMissing(gameLinkRows(paths, plugin("noPluginManager"), isaac)))
     assert.isFalse(allFound(gameLinkRows(paths, plugin("noPluginManager"), isaac)))
-    assert.deepInclude(editorPlugin, { state: "waiting", fix: null })
+    assert.deepInclude(editorPlugin, { state: "waiting", fixes: [] })
+  })
+
+  it("without the plugin manager in a plugins folder chosen here offers to reset it", () => {
+    const paths: GameFolders = { ...everything, pluginsFolder: { status: "overridden", path: "/elsewhere" } }
+    assert.deepInclude(byId(gameLinkRows(paths, plugin("noPluginManager"), isaac)).pluginManager, {
+      state: "optional",
+      path: "/elsewhere",
+      reset: "pluginsFolder",
+      fixes: [{ _tag: "OpenPluginDocs" }]
+    })
   })
 
   it("offers Install for a missing plugin and Update for an older one", () => {
     assert.deepInclude(byId(gameLinkRows(everything, plugin("missing"), isaac)).plugin, {
       state: "missing",
       title: "Not installed",
-      fix: { _tag: "InstallPlugin", update: false }
+      fixes: [{ _tag: "InstallPlugin", update: false }]
     })
     assert.deepInclude(byId(gameLinkRows(everything, plugin("outdated", "0.1.0"), isaac)).plugin, {
       state: "missing",
       title: "Version 0.1.0 is installed",
-      fix: { _tag: "InstallPlugin", update: true }
+      fixes: [{ _tag: "InstallPlugin", update: true }]
     })
   })
 
@@ -129,7 +174,7 @@ describe("Game link checklist", () => {
     assert.deepInclude(rows(creatorOf(null, Option.none())).creator, {
       state: "missing",
       title: "No creator name",
-      fix: { _tag: "EditCreator" }
+      fixes: [{ _tag: "EditCreator" }]
     })
     const odd = rows(creatorOf(null, Option.some({ name: "x_y ★", source: "steam" }))).creator
     assert.strictEqual(odd.state, "missing")
