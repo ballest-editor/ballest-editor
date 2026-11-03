@@ -261,8 +261,10 @@ export function FlyCamera() {
     camera.position.copy(sphere.center).addScaledVector(forward, -Math.max(sphere.radius * 2.5, 300))
   }, [focusRequest, camera])
 
-  // Frame the whole map on load and on request. Uses item translations so it works before meshes load.
+  // Frame the whole map on load and on request. Uses item translations so it works before meshes load. Each tab keeps
+  // its view: leaving a tab remembers it, coming back restores it (a tab not seen yet is framed).
   useEffect(() => {
+    const views = new Map<string, { position: THREE.Vector3; quaternion: THREE.Quaternion; target: THREE.Vector3 }>()
     const frameAll = () => {
       const { items } = useEditor.getState().doc.map
       const box = new THREE.Box3()
@@ -282,7 +284,22 @@ export function FlyCamera() {
     }
     frameAll()
     return useEditor.subscribe((s, prev) => {
-      if (s.frameAllRequest !== prev.frameAllRequest) frameAll()
+      if (s.tabId !== prev.tabId) {
+        views.set(prev.tabId, {
+          position: camera.position.clone(),
+          quaternion: camera.quaternion.clone(),
+          target: target.current.clone()
+        })
+        for (const id of views.keys()) if (!s.tabIds.includes(id)) views.delete(id)
+        const view = views.get(s.tabId)
+        if (view === undefined) {
+          frameAll()
+          return
+        }
+        camera.position.copy(view.position)
+        camera.quaternion.copy(view.quaternion)
+        target.current.copy(view.target)
+      } else if (s.frameAllRequest !== prev.frameAllRequest) frameAll()
     })
   }, [camera])
 

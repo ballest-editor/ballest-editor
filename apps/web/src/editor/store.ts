@@ -194,9 +194,16 @@ const freshId = () => `item-${++nextId}`
 const freshIds = (n: number) => Array.from({ length: n }, freshId)
 const docOf = (map: MapFile): Doc => ({ map, ids: freshIds(map.items.length) })
 
+let nextTabId = 0
+const freshTabId = () => `tab-${++nextTabId}`
+
 export const initialMap = () => newMapFile({ displayName: "Untitled", creatorName: "", createdAt: "" })
 
-export interface EditorState {
+/**
+ * What each document tab keeps of its own (docs/PROJECTS.md § Shell): its map, history, file and selection. The active
+ * tab's is the top of `EditorState`, where every edit works; the others wait in `parkedTabs` as they were left.
+ */
+export interface TabState {
   readonly doc: Doc
   /**
    * The height (UE cm) the grid is drawn at and palette pieces land on: by default the player
@@ -212,12 +219,30 @@ export interface EditorState {
   readonly dirty: boolean
   /** Null for a map that was never opened or saved. */
   readonly file: OpenFile | null
+  /** The map's "Export on save" (desktop, off by default; kept with the map's prefs). */
+  readonly exportOnSave: boolean
+  readonly selectedIds: Selection
+  /** Opened as the fresh map the app starts on (or closing the last tab leaves): see `isBlankTab`. */
+  readonly fresh: boolean
+}
+
+/**
+ * Where `loadMap` puts a map: over the active tab's, over another tab's (`tabId`), or in a new tab after the active
+ * one (`newTab`), which takes the active tab's place instead while that is blank (`isBlankTab`).
+ */
+export type TabTarget = "active" | "newTab" | { readonly tabId: string }
+
+export interface EditorState extends TabState {
+  /** The document tabs, in order. */
+  readonly tabIds: ReadonlyArray<string>
+  /** The active tab, whose state is the `TabState` fields here. */
+  readonly tabId: string
+  /** Every other tab's state, as it was left. */
+  readonly parkedTabs: ReadonlyMap<string, TabState>
   /** The project in use and the recent ones (desktop; null until the startup load, and in a browser). */
   readonly project: ProjectState | null
   /** The project's maps, most recently changed first (desktop). */
   readonly projectMaps: ReadonlyArray<ProjectMap>
-  /** The open map's "Export on save" (desktop, off by default; kept with the map's prefs). */
-  readonly exportOnSave: boolean
   /** What the platform (browser or desktop app) offers; the browser's until the startup load says otherwise. */
   readonly capabilities: PlatformCapabilities
   /** The game's folders as last looked up (desktop; null until the startup check or the Game link asks). */
@@ -239,7 +264,6 @@ export interface EditorState {
   readonly notifications: ReadonlyArray<NotificationRecord>
   /** The kinds "Don't show again" muted: `notify` drops them. */
   readonly mutedNotificationKinds: ReadonlySet<string>
-  readonly selectedIds: Selection
   readonly tool: Tool
   /** Whether the gizmo follows the selected item's axes or the world's. */
   readonly gizmoSpace: GizmoSpace
@@ -287,27 +311,49 @@ export interface EditorState {
   readonly frameAllRequest: number
 
   /**
-   * Replaces the document (the map tab always shows one); `floorHeight` defaults to the map's player start height.
-   * `dirty` opens it as unsaved edits of `file` (a recovered version), so the next Save writes it there.
+   * Shows `map` in a tab (`into`, the active one by default) with a fresh history; a new tab becomes the active one.
+   * `floorHeight` defaults to the map's player start height. `dirty` opens it as unsaved edits of `file` (a recovered
+   * version), so the next Save writes it there.
    */
   readonly loadMap: (
     map: MapFile,
     file: OpenFile | null,
     floorHeight?: number,
-    options?: { readonly exportOnSave?: boolean; readonly dirty?: boolean }
+    options?: {
+      readonly exportOnSave?: boolean
+      readonly dirty?: boolean
+      readonly fresh?: boolean
+      readonly into?: TabTarget
+    }
   ) => void
+  /** Makes `tabId` the active tab; nothing while a drag or scrub is under way. */
+  readonly activateTab: (tabId: string) => void
+  /** Moves tab `tabId` to position `index` in the strip (clamped). */
+  readonly moveTab: (tabId: string, index: number) => void
   /**
-   * The map was saved as `map` (the export-time level fields applied to `from`) into `file`. When the document is
-   * still `from`, `map` replaces it without an undo step and the document is clean; when it was edited meanwhile, only
-   * the file is remembered.
+   * Edits tab `tabId`'s map as one undo step of that tab (Project settings changing a map open in another tab);
+   * nothing when `patch` returns the same map.
    */
-  readonly markSaved: (from: Doc, map: MapFile, file: OpenFile) => void
+  readonly editTabMap: (tabId: string, patch: (map: MapFile) => MapFile) => void
+  readonly setTabFloorHeight: (tabId: string, floorHeight: number) => void
+  readonly setTabExportOnSave: (tabId: string, exportOnSave: boolean) => void
+  /**
+   * Closes `tabId` without asking (editor/actions asks about its unsaved edits first); the tab after it, else the one
+   * before, becomes active in its place. The last tab stays: there is always a map.
+   */
+  readonly closeTab: (tabId: string) => void
+  /**
+   * Tab `tabId`'s map was saved as `map` (the export-time level fields applied to `from`) into `file`. When its
+   * document is still `from`, `map` replaces it without an undo step and the tab is clean; when it was edited
+   * meanwhile, only the file is remembered.
+   */
+  readonly markSaved: (tabId: string, from: Doc, map: MapFile, file: OpenFile) => void
   readonly setProject: (project: ProjectState, maps: ReadonlyArray<ProjectMap>) => void
   /**
-   * The open map no longer has a file: it stays open with its edits as unsaved, and the next Save names it into the
-   * project in use (after switching to another project).
+   * The open maps no longer have files: they stay open with their edits as unsaved, and the next Save names each into
+   * the project in use (after switching to another project).
    */
-  readonly detachFile: () => void
+  readonly detachFiles: () => void
   readonly setExportOnSave: (exportOnSave: boolean) => void
   readonly setCapabilities: (capabilities: PlatformCapabilities) => void
   readonly setGamePaths: (gamePaths: GamePaths) => void
@@ -401,6 +447,37 @@ export interface EditorState {
   readonly requestFrameAll: () => void
 }
 
+/** A tab's state for `map`, opened with no history and nothing selected. */
+const freshTabState = (
+  map: MapFile,
+  file: OpenFile | null,
+  floorHeight?: number,
+  options?: { readonly exportOnSave?: boolean; readonly dirty?: boolean; readonly fresh?: boolean }
+): TabState => ({
+  doc: docOf(map),
+  floorHeight: floorHeight ?? floorHeightOf(map),
+  past: [],
+  future: [],
+  dirty: options?.dirty ?? false,
+  file,
+  exportOnSave: options?.exportOnSave ?? false,
+  selectedIds: [],
+  fresh: options?.fresh ?? false
+})
+
+/** The active tab's state, out of the store. */
+const activeTabOf = (s: EditorState): TabState => ({
+  doc: s.doc,
+  floorHeight: s.floorHeight,
+  past: s.past,
+  future: s.future,
+  dirty: s.dirty,
+  file: s.file,
+  exportOnSave: s.exportOnSave,
+  selectedIds: s.selectedIds,
+  fresh: s.fresh
+})
+
 export const useEditor = create<EditorState>()((set, get) => {
   /**
    * Push `before` (by default the current doc and selection) onto the undo stack and replace
@@ -469,18 +546,30 @@ export const useEditor = create<EditorState>()((set, get) => {
 
   const fallbackDefaults = deriveKeybinds(undefined)
 
-  const startingMap = initialMap()
+  /**
+   * Applies `update` to tab `tabId`'s state, wherever it is (the top of the store for the active tab); nothing when no
+   * tab has that id.
+   */
+  const updateTab = (tabId: string, update: (tab: TabState) => Partial<TabState>) =>
+    set((s) => {
+      if (tabId === s.tabId) return update(s)
+      const parked = s.parkedTabs.get(tabId)
+      if (parked === undefined) return s
+      return { parkedTabs: new Map(s.parkedTabs).set(tabId, { ...parked, ...update(parked) }) }
+    })
+
+  /** Interaction state that belongs to the active tab and doesn't survive leaving it. */
+  const leftBehind = { preview: null, lightingPreview: null } as const
+
+  const firstTabId = freshTabId()
 
   return {
-    doc: docOf(startingMap),
-    floorHeight: floorHeightOf(startingMap),
-    past: [],
-    future: [],
-    dirty: false,
-    file: null,
+    ...freshTabState(initialMap(), null, undefined, { fresh: true }),
+    tabIds: [firstTabId],
+    tabId: firstTabId,
+    parkedTabs: new Map(),
     project: null,
     projectMaps: [],
-    exportOnSave: false,
     capabilities: { projects: false, exportToGame: false, launchGame: false, play: false, updates: false },
     gamePaths: null,
     foundCreator: Option.none(),
@@ -490,7 +579,6 @@ export const useEditor = create<EditorState>()((set, get) => {
     update: null,
     notifications: [],
     mutedNotificationKinds: new Set(),
-    selectedIds: [],
     tool: "translate",
     gizmoSpace: "world",
     leftTab: "pieces",
@@ -514,25 +602,91 @@ export const useEditor = create<EditorState>()((set, get) => {
     focusRequest: 0,
     frameAllRequest: 0,
 
-    loadMap: (map, file, floorHeight, options) =>
-      set((s) => ({
-        doc: docOf(map),
-        floorHeight: floorHeight ?? floorHeightOf(map),
-        past: [],
-        future: [],
-        dirty: options?.dirty ?? false,
-        file,
-        exportOnSave: options?.exportOnSave ?? false,
-        selectedIds: [],
-        preview: null,
-        lightingPreview: null,
-        frameAllRequest: s.frameAllRequest + 1
-      })),
+    loadMap: (map, file, floorHeight, options) => {
+      const tab = freshTabState(map, file, floorHeight, options)
+      const into = options?.into ?? "active"
+      if (typeof into === "object" && into.tabId !== get().tabId) {
+        updateTab(into.tabId, () => tab)
+        return
+      }
+      set((s) => {
+        const replace = into !== "newTab" || isBlankTab(s)
+        if (replace) return { ...tab, ...leftBehind, frameAllRequest: s.frameAllRequest + 1 }
+        const tabId = freshTabId()
+        const at = s.tabIds.indexOf(s.tabId) + 1
+        return {
+          ...tab,
+          ...leftBehind,
+          tabId,
+          tabIds: [...s.tabIds.slice(0, at), tabId, ...s.tabIds.slice(at)],
+          parkedTabs: new Map(s.parkedTabs).set(s.tabId, activeTabOf(s)),
+          frameAllRequest: s.frameAllRequest + 1
+        }
+      })
+    },
 
-    markSaved: (from, map, file) =>
-      set((s) => s.doc === from ? { doc: { ...s.doc, map }, dirty: false, file } : { file }),
+    activateTab: (tabId) =>
+      set((s) => {
+        const next = s.parkedTabs.get(tabId)
+        if (next === undefined || interacting(s) || duplicateDragBase !== null) return s
+        const parkedTabs = new Map(s.parkedTabs).set(s.tabId, activeTabOf(s))
+        parkedTabs.delete(tabId)
+        return { ...next, ...leftBehind, tabId, parkedTabs }
+      }),
+
+    moveTab: (tabId, index) =>
+      set((s) => {
+        const from = s.tabIds.indexOf(tabId)
+        if (from < 0) return s
+        const rest = s.tabIds.filter((id) => id !== tabId)
+        const at = Math.max(0, Math.min(index, rest.length))
+        return { tabIds: [...rest.slice(0, at), tabId, ...rest.slice(at)] }
+      }),
+
+    editTabMap: (tabId, patch) =>
+      updateTab(tabId, (tab) => {
+        const map = patch(tab.doc.map)
+        if (map === tab.doc.map) return {}
+        return {
+          doc: { map, ids: tab.doc.ids },
+          past: [...tab.past, {
+            doc: tab.doc,
+            selectedIds: tab.selectedIds,
+            otherSelectedIds: tab.selectedIds,
+            selectionOnly: false
+          }].slice(-HISTORY_LIMIT),
+          future: [],
+          dirty: true
+        }
+      }),
+    setTabFloorHeight: (tabId, floorHeight) => updateTab(tabId, () => ({ floorHeight })),
+    setTabExportOnSave: (tabId, exportOnSave) => updateTab(tabId, () => ({ exportOnSave })),
+
+    closeTab: (tabId) => {
+      const { tabIds, tabId: active } = get()
+      const index = tabIds.indexOf(tabId)
+      if (index < 0 || tabIds.length === 1) return
+      if (tabId === active) get().activateTab(tabIds[index + 1] ?? tabIds[index - 1] ?? tabId)
+      set((s) => {
+        // a drag kept the closing tab active
+        if (s.tabId === tabId) return s
+        const parkedTabs = new Map(s.parkedTabs)
+        parkedTabs.delete(tabId)
+        return { tabIds: s.tabIds.filter((id) => id !== tabId), parkedTabs }
+      })
+    },
+
+    markSaved: (tabId, from, map, file) =>
+      updateTab(tabId, (tab) => tab.doc === from ? { doc: { ...tab.doc, map }, dirty: false, file } : { file }),
     setProject: (project, projectMaps) => set({ project, projectMaps }),
-    detachFile: () => set((s) => s.file === null ? s : { file: null, dirty: true }),
+    detachFiles: () =>
+      set((s) => {
+        const detach = (tab: TabState): TabState => tab.file === null ? tab : { ...tab, file: null, dirty: true }
+        return {
+          ...detach(activeTabOf(s)),
+          parkedTabs: new Map([...s.parkedTabs].map(([id, tab]) => [id, detach(tab)]))
+        }
+      }),
     setExportOnSave: (exportOnSave) => set({ exportOnSave }),
     setCapabilities: (capabilities) => set({ capabilities }),
     setGamePaths: (gamePaths) => set({ gamePaths }),
@@ -793,6 +947,30 @@ export const useEditor = create<EditorState>()((set, get) => {
   }
 })
 
+/** Tab `tabId`'s state, wherever it is; undefined when no tab has that id. */
+export const tabStateOf = (s: EditorState, tabId: string): TabState | undefined =>
+  tabId === s.tabId ? activeTabOf(s) : s.parkedTabs.get(tabId)
+
+/** The tab that has the project map `fileName` open, if one does. */
+export const tabWithFile = (s: EditorState, fileName: string): string | undefined =>
+  s.tabIds.find((id) => tabStateOf(s, id)?.file?.name === fileName)
+
+/** The tabs with unsaved edits, in tab order. */
+export const dirtyTabs = (s: EditorState): ReadonlyArray<string> => s.tabIds.filter((id) => tabStateOf(s, id)?.dirty)
+
+/**
+ * A tab nobody has used: the fresh map the app starts on (or closing the last tab leaves), never saved, with no edits
+ * and no history. A map opened into a new tab takes its place.
+ */
+export const isBlankTab = (tab: TabState): boolean =>
+  tab.fresh && tab.file === null && !tab.dirty && tab.past.length === 0
+
+/** A map's name as its tab and the title bar show it: its file's, else the name inside it. */
+export const tabLabelOf = (tab: TabState): string =>
+  tab.file === null
+    ? tab.doc.map.worldSettings.levelData.levelDisplayName.trim() || "Untitled"
+    : mapLabelOf(tab.file.name)
+
 /** A document and the selection that goes with it. */
 interface DocState {
   readonly doc: Doc
@@ -882,8 +1060,26 @@ export const useOpenProjectMap = (): { readonly map: ProjectMap; readonly state:
 }
 
 /** The open map's name as its tab and the title bar show it. */
-export const useOpenMapLabel = (): string => {
-  const fileName = useEditor((s) => s.file?.name ?? null)
-  const displayName = useEditor((s) => s.doc.map.worldSettings.levelData.levelDisplayName)
-  return fileName === null ? displayName.trim() || "Untitled" : mapLabelOf(fileName)
+export const useOpenMapLabel = (): string => useEditor((s) => tabLabelOf(s))
+
+/** Tab `tabId`'s name, whether it has unsaved edits (or was never saved) and its file (name and path), for its tab. */
+export const useTabSummary = (tabId: string) => {
+  const label = useEditor((s) => {
+    const tab = tabStateOf(s, tabId)
+    return tab === undefined ? "" : tabLabelOf(tab)
+  })
+  const unsaved = useEditor((s) => {
+    const tab = tabStateOf(s, tabId)
+    return tab !== undefined && (tab.dirty || tab.file === null)
+  })
+  const path = useEditor((s) => tabStateOf(s, tabId)?.file?.path ?? null)
+  const fileName = useEditor((s) => tabStateOf(s, tabId)?.file?.name ?? null)
+  return { label, unsaved, path, fileName }
 }
+
+/** Whether the project map `fileName` is open in a tab with unsaved edits. */
+export const useHasUnsavedEdits = (fileName: string): boolean =>
+  useEditor((s) => {
+    const tabId = tabWithFile(s, fileName)
+    return tabId !== undefined && tabStateOf(s, tabId)?.dirty === true
+  })

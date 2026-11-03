@@ -105,9 +105,8 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
         <DialogHeader>
           <DialogTitle>Recover a previous version</DialogTitle>
           <DialogDescription>
-            Before writing over a map file the editor keeps a copy of it: the project's on Save, Rename and Import, the
-            game's on Export. A version opens as unsaved edits; Save writes it over the map, backing up the current file
-            first.
+            Copies kept before a map file was written over: the project's on Save, Rename and Import, the game's on
+            Export. A version opens as unsaved edits; Save writes it over the map and backs up the current file first.
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center justify-between gap-2">

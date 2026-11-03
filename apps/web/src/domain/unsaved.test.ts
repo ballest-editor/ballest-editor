@@ -8,8 +8,8 @@ describe("unsavedPromptOf", () => {
       detail: "If you don't save, the changes are lost."
     })
     assert.strictEqual(
-      unsavedPromptOf("newMap", "Big Loop").message,
-      "Save the changes to Big Loop before starting a new map?"
+      unsavedPromptOf("closeTab", "Big Loop").message,
+      "Save the changes to Big Loop before closing it?"
     )
   })
 
@@ -21,8 +21,8 @@ describe("unsavedPromptOf", () => {
 describe("discardQuestionOf", () => {
   it("asks whether to go on without saving", () => {
     assert.strictEqual(
-      discardQuestionOf("openMap", "Big Loop"),
-      "Big Loop has unsaved changes. Discard them and open another map?"
+      discardQuestionOf("recover", "Big Loop"),
+      "Big Loop has unsaved changes. Discard them and open a previous version?"
     )
   })
 })

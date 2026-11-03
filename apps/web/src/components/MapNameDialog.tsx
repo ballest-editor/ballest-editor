@@ -1,3 +1,4 @@
+import { IconFile } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -11,9 +12,10 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { type ReactNode, useState } from "react"
 import { usableCreatorName } from "../domain/creator"
-import { isValidName, mapFileNameOf, NAME_RULE } from "../domain/factory"
+import { isValidName, mapFileNameOf, NAME_RULE_SENTENCE } from "../domain/factory"
 import { updateSettings } from "../editor/actions"
 import { useCreator } from "../editor/store"
+import { PathField } from "./PathText"
 
 export interface MapCreator {
   /**
@@ -66,6 +68,7 @@ export function MapNameDialog(props: {
   readonly onSubmit: () => Promise<void>
 }) {
   const { creator } = props
+  const fileName = mapFileNameOf(props.name || "name", creator.name || "creator")
   return (
     <Dialog open={props.open} onOpenChange={(next) => !next && props.onClose()}>
       <DialogContent>
@@ -78,12 +81,12 @@ export function MapNameDialog(props: {
         >
           <DialogHeader>
             <DialogTitle>{props.title}</DialogTitle>
-            <DialogDescription>
-              {props.fileNameLead}{" "}
-              <code className="break-all">{mapFileNameOf(props.name || "name", creator.name || "creator")}</code>.{" "}
-              {props.fileNameNote}
-            </DialogDescription>
+            <DialogDescription>{props.fileNameNote}</DialogDescription>
           </DialogHeader>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-muted-foreground">{props.fileNameLead}</span>
+            <PathField path={fileName} icon={IconFile} />
+          </div>
           <div className="flex flex-col gap-1">
             <Label htmlFor={`${props.id}-name`}>Map name</Label>
             <Input
@@ -93,7 +96,7 @@ export function MapNameDialog(props: {
               onChange={(e) => props.onNameChange(e.target.value)}
               aria-invalid={props.name !== "" && !isValidName(props.name)}
             />
-            <span className="text-[0.7rem] text-muted-foreground">{NAME_RULE}</span>
+            <span className="text-[0.7rem] text-muted-foreground">{NAME_RULE_SENTENCE}.</span>
           </div>
           {creator.saved === ""
             ? (

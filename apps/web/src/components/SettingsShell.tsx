@@ -20,7 +20,8 @@ export interface SettingsRow<C extends string> {
   readonly category: C
   readonly group?: string
   readonly label: string
-  readonly description?: string
+  /** Under the label; a string is searched too, a node (a path on its own line) needs `keywords` for that. */
+  readonly description?: ReactNode
   /** Description shown as a hover tooltip on the label instead of under it. */
   readonly tooltip?: boolean
   /** More text the search matches (e.g. the choices inside the control). */
@@ -102,7 +103,11 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
   )
   const trailing = row.action ?? (row.changes && <ResetButton {...row.changes} />)
   return (
-    <div className="group/row relative flex min-h-9 flex-col gap-2 py-1 pl-3">
+    // The same padding above and below every row, so the dividers sit evenly between them; a wide control (a field, the
+    // tag chips) has an edge of its own, so it gets a little more room before the divider than text does.
+    <div
+      className={cn("group/row relative flex flex-col gap-2.5 py-3 pl-3", row.wide && row.control != null && "pb-4")}
+    >
       {isModified(row) && (
         <Tooltip>
           <TooltipTrigger
@@ -110,7 +115,7 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
               <span
                 className={cn(
                   "absolute left-0 size-1.5 -translate-y-1/2 rounded-full bg-primary",
-                  row.wide ? "top-4" : "top-1/2"
+                  row.wide ? "top-[1.3rem]" : "top-1/2"
                 )}
                 aria-label="Changed from default"
               />
@@ -127,11 +132,13 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
               {trailing}
             </div>
             {/* Clear of the reset button's column; a row-specific action takes its place instead. */}
-            <div className={cn("pb-1", row.changes && row.action === undefined && "pr-8")}>{row.control}</div>
+            {row.control != null && (
+              <div className={cn(row.changes && row.action === undefined && "pr-8")}>{row.control}</div>
+            )}
           </>
         )
         : (
-          <div className="flex min-h-7 items-center gap-4">
+          <div className="flex min-h-7 items-center gap-6">
             {text}
             <div className="flex shrink-0 items-center gap-2">
               {row.control}
@@ -172,7 +179,9 @@ export function SettingsShell<C extends string>(props: {
   const searching = terms.length > 0
   const matches = (r: SettingsRow<C>) =>
     terms.every((t) =>
-      `${r.label} ${r.description ?? ""} ${r.group ?? ""} ${r.keywords ?? ""} ${labelOf(r.category)}`
+      `${r.label} ${typeof r.description === "string" ? r.description : ""} ${r.group ?? ""} ${r.keywords ?? ""} ${
+        labelOf(r.category)
+      }`
         .toLowerCase()
         .includes(t)
     )
@@ -199,7 +208,10 @@ export function SettingsShell<C extends string>(props: {
 
   return (
     <Dialog open={props.open} onOpenChange={(next) => !next && props.busy !== true && props.onClose()}>
-      <DialogContent className="flex h-[min(80vh,720px)] w-full gap-0 overflow-hidden p-0 sm:max-w-4xl" showCloseButton>
+      <DialogContent
+        className="flex h-[min(80vh,720px)] w-full gap-0 overflow-hidden p-0 sm:max-w-4xl"
+        showCloseButton
+      >
         <nav className="flex w-56 shrink-0 flex-col gap-1 border-r bg-muted/30 p-3">
           <div className="relative mb-2">
             <IconSearch className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
