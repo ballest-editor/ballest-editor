@@ -1,4 +1,4 @@
-/** Times as the status bar, the Start tab and the notification centre show them, in the user's local time zone. */
+/** Times as the status bar, the Project panel and the notification centre show them, in the user's local time zone. */
 
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
