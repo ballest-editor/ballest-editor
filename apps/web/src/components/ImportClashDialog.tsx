@@ -13,15 +13,10 @@ import { useEditor } from "../editor/store"
 
 /** Import found a map of the same file name in the project: replace it (it is backed up) or import a renamed copy. */
 export function ImportClashDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
-  const clash = useEditor((s) => s.importClash)
+  const clash = useEditor((s) => s.dialog?.id === "importClash" ? s.dialog : null)
   const projectName = useEditor((s) => s.project?.current?.name ?? "Untitled Project")
-  const setImportClash = useEditor((s) => s.setImportClash)
-  const cancel = () => {
-    setImportClash(null)
-    onClose()
-  }
   return (
-    <Dialog open={open && clash !== null} onOpenChange={(next) => !next && cancel()}>
+    <Dialog open={open && clash !== null} onOpenChange={(next) => !next && onClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Replace the map in the project?</DialogTitle>
@@ -32,7 +27,7 @@ export function ImportClashDialog({ open, onClose }: { readonly open: boolean; r
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={cancel}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button variant="outline" onClick={() => void importAsCopy()}>Import as copy</Button>
           <Button variant="destructive" onClick={() => void replaceOnImport()}>Replace</Button>
         </DialogFooter>

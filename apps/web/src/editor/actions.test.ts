@@ -64,7 +64,7 @@ import {
   startNewMapEffect,
   unlessCancelled
 } from "./actions"
-import { useEditor } from "./store"
+import { type DialogState, useEditor } from "./store"
 
 const s = () => useEditor.getState()
 
@@ -101,13 +101,13 @@ const edit = () => {
   s().setLighting({ ...lighting, timeOfDay: (lighting.timeOfDay + 1) % 24 })
 }
 
+/** What the open `saveAs` dialog goes on to do once it has saved, as its Submit takes it. */
+const afterSaveOf = (dialog: DialogState | null) => dialog?.id === "saveAs" ? dialog.afterSave : undefined
+
 /** A fresh editor for each test: the store outlives the layers. */
 /** A clean editor over the disk's project, as the app has after its startup load. */
 const reset = Effect.gen(function*() {
   s().loadMap(s().doc.map, null)
-  s().setImportClash(null)
-  s().setPublishedDraft(null)
-  s().setChangedExport(null)
   s().closeDialog()
   yield* refreshProjectEffect
 })
@@ -153,9 +153,9 @@ describe("project actions", () => {
         // the game changed it since: Export asks, and Back up and overwrite writes the project file over it
         disk.files.set(inGame, "changed in the game")
         yield* exportToGameEffect(false)
-        assert.strictEqual(s().dialog, "overwriteChanged")
+        assert.strictEqual(s().dialog?.id, "overwriteChanged")
         assert.strictEqual(disk.files.get(inGame), "changed in the game")
-        s().setChangedExport(null)
+        s().closeDialog()
         yield* exportToGameEffect(false, true)
         assert.isTrue(disk.files.get(inGame) === saved, "the export differs from the project file")
         assert.strictEqual(disk.links.get(TEST_PROJECT)?.get(name)?.export?.hash, testHash(saved))
@@ -183,7 +183,7 @@ describe("project actions", () => {
 
       // Rename: the file moves to the new name; the old one is gone from the project.
       s().renameLevel("Hairpin", "Isaac")
-      yield* saveMapAsEffect
+      yield* saveMapAsEffect()
       const renamed = "Map_LevelEditorMain&Hairpin_Isaac.balledit"
       assert.deepStrictEqual(s().file, { name: renamed, path: projectFile(renamed) })
       assert.isFalse(disk.files.has(projectFile(first)))
@@ -226,7 +226,7 @@ describe("project actions", () => {
       const project = `${TEST_PROJECTS_FOLDER}/My tracks`
       assert.deepInclude(s().project?.current, { path: project, name: "My tracks" })
       assert.isNull(s().file)
-      yield* saveMapAsEffect
+      yield* saveMapAsEffect()
       const name = "Map_LevelEditorMain&Big Loop_Isaac.balledit"
       assert.deepStrictEqual(s().file, { name, path: projectFile(name, project) })
       assert.isTrue(disk.files.has(projectFile(name, project)))
@@ -239,12 +239,12 @@ describe("project actions", () => {
     return Effect.gen(function*() {
       yield* reset
       yield* saveMapFile
-      assert.strictEqual(s().dialog, "saveAs")
+      assert.strictEqual(s().dialog?.id, "saveAs")
       assert.strictEqual(disk.files.size, 0)
       s().closeDialog()
 
       s().renameLevel("Fresh", "Isaac")
-      yield* saveMapAsEffect
+      yield* saveMapAsEffect()
       const name = "Map_LevelEditorMain&Fresh_Isaac.balledit"
       assert.deepStrictEqual(s().file, { name, path: projectFile(name) })
       assert.isTrue(disk.files.has(projectFile(name)))
@@ -259,8 +259,8 @@ describe("project actions", () => {
     return Effect.gen(function*() {
       yield* reset
       yield* importFrom(disk, download)
-      assert.strictEqual(s().dialog, "importClash")
-      assert.strictEqual(s().importClash?.fileName, name)
+      const clash = s().dialog
+      assert.strictEqual(clash?.id === "importClash" && clash.fileName, name)
       assert.strictEqual(disk.files.get(projectFile(name)), "{}")
 
       yield* importAsCopyEffect
@@ -274,7 +274,7 @@ describe("project actions", () => {
       assert.strictEqual(disk.links.get(TEST_PROJECT)?.get(copy)?.origin?.path, download)
 
       yield* importFrom(disk, download)
-      assert.strictEqual(s().dialog, "importClash")
+      assert.strictEqual(s().dialog?.id, "importClash")
       yield* replaceOnImportEffect
       assert.isTrue(disk.files.get(projectFile(name)) === readSample(sample))
       assert.strictEqual(s().file?.name, name)
@@ -310,11 +310,10 @@ describe("project actions", () => {
       s().setLighting({ ...lightingOf(s().doc.map.worldSettings), timeOfDay: 5 })
       yield* exportToGameEffect(false)
       assert.isFalse(s().dirty)
-      assert.deepStrictEqual(s().publishedDraft, { name, publishedFileId: 3561234567, from: "export" })
-      assert.strictEqual(s().dialog, "replacePublished")
+      assert.deepStrictEqual(s().dialog, { id: "replacePublished", name, publishedFileId: 3561234567, from: "export" })
       assert.strictEqual(disk.files.get(inGame), published)
 
-      s().setPublishedDraft(null)
+      s().closeDialog()
       yield* exportToGameEffect(true)
       assert.strictEqual(disk.files.get(inGame), disk.files.get(projectFile(name)))
       const exported = yield* MapCodec.use((codec) => codec.decode(disk.files.get(inGame)!))
@@ -752,7 +751,7 @@ describe("game link actions", () => {
       assert.deepStrictEqual(kinds(), [])
       assert.deepStrictEqual(disk.gameLink.last, found)
       // the checklist opens as a dialog on the first launch only, while everything Export needs is there
-      assert.strictEqual(s().dialog, "gameLink")
+      assert.strictEqual(s().dialog?.id, "gameLink")
       s().closeDialog()
 
       yield* restart
@@ -950,12 +949,11 @@ describe("Play", () => {
       yield* reset
       yield* openProjectMapFile(name)
       yield* playEffect(false)
-      assert.deepStrictEqual(s().publishedDraft, { name, publishedFileId: 3561234567, from: "play" })
-      assert.strictEqual(s().dialog, "replacePublished")
+      assert.deepStrictEqual(s().dialog, { id: "replacePublished", name, publishedFileId: 3561234567, from: "play" })
       assert.strictEqual(disk.files.get(inGame), draft)
       assert.deepStrictEqual(disk.game.races, [])
 
-      s().setPublishedDraft(null)
+      s().closeDialog()
       yield* playEffect(true)
       assert.strictEqual(disk.files.get(inGame), text)
       assert.deepStrictEqual(disk.game.races, [name])
@@ -969,7 +967,7 @@ describe("Play", () => {
       yield* reset
       yield* openProjectMapFile(name)
       yield* playEffect(false)
-      assert.strictEqual(s().dialog, "newDraft")
+      assert.strictEqual(s().dialog?.id, "newDraft")
       assert.isFalse(disk.files.has(`${TEST_MAPS_FOLDER}/${name}`))
       s().closeDialog()
 
@@ -990,8 +988,7 @@ describe("Play", () => {
     return Effect.gen(function*() {
       yield* reset
       yield* playEffect(false)
-      assert.strictEqual(s().dialog, "saveAs")
-      assert.isNotNull(s().afterSave)
+      assert.isDefined(afterSaveOf(s().dialog))
       assert.deepStrictEqual(disk.game.races, [])
     }).pipe(Effect.provide(layerFor(disk)))
   })
@@ -1074,15 +1071,14 @@ describe("sync", () => {
       const saved = savedInGame(text, 4)
       disk.files.set(inGame, saved)
       yield* exportToGameEffect(false)
-      assert.strictEqual(s().dialog, "overwriteChanged")
-      assert.deepStrictEqual(s().changedExport, { name, from: "export", replacePublished: false })
+      assert.deepStrictEqual(s().dialog, { id: "overwriteChanged", name, from: "export", replacePublished: false })
       assert.strictEqual(disk.files.get(inGame), saved)
       // the dialog showed the change: the next focus doesn't report it again
       yield* checkExportsEffect
       assert.lengthOf(reported(), 0)
 
       yield* overwriteChangedEffect
-      assert.isNull(s().changedExport)
+      assert.isNull(s().dialog)
       assert.strictEqual(disk.files.get(inGame), text)
       assert.deepInclude(disk.backups[0], { place: "export", fileName: name, text: saved })
       assert.strictEqual(stateNow(), "inSync")
@@ -1104,7 +1100,7 @@ describe("sync", () => {
       yield* exported(disk)
       disk.files.set(inGame, savedInGame(text, 6))
       yield* playEffect(false)
-      assert.deepStrictEqual(s().changedExport, { name, from: "play", replacePublished: false })
+      assert.deepStrictEqual(s().dialog, { id: "overwriteChanged", name, from: "play", replacePublished: false })
       assert.deepStrictEqual(disk.game.races, [])
       yield* overwriteChangedEffect
       assert.deepStrictEqual(disk.game.races, [name])
@@ -1177,7 +1173,7 @@ describe("unsaved changes", () => {
     return Effect.gen(function*() {
       yield* reset
       yield* startNewMapEffect
-      assert.strictEqual(s().dialog, "new")
+      assert.strictEqual(s().dialog?.id, "new")
       assert.deepStrictEqual(disk.prompts, [])
       s().closeDialog()
 
@@ -1191,7 +1187,7 @@ describe("unsaved changes", () => {
         detail: "If you don't save, the changes are lost."
       })
       yield* startNewMapEffect
-      assert.strictEqual(s().dialog, "new")
+      assert.strictEqual(s().dialog?.id, "new")
       assert.isTrue(s().dirty)
       assert.strictEqual(disk.files.size, 0)
     }).pipe(Effect.provide(layerFor(disk)))
@@ -1221,27 +1217,28 @@ describe("unsaved changes", () => {
       edit()
       disk.promptAnswers.push("save", "save")
       yield* startNewMapEffect
-      assert.strictEqual(s().dialog, "saveAs")
+      assert.strictEqual(s().dialog?.id, "saveAs")
       // the saveAs dialog's Cancel: a later save doesn't go on to the New map dialog
-      s().takeAfterSave()
       s().closeDialog()
       yield* saveMapFile
+      const later = afterSaveOf(s().dialog)
       s().closeDialog()
       s().renameLevel("Fresh", "Isaac")
-      yield* saveMapAsEffect
+      yield* saveMapAsEffect(later)
       assert.isNull(s().dialog)
       assert.isFalse(s().dirty)
 
       yield* reset
       edit()
       yield* startNewMapEffect
-      assert.strictEqual(s().dialog, "saveAs")
-      // the dialog closes itself, then saves
+      // the dialog takes what comes next and closes itself, then saves
+      const next = afterSaveOf(s().dialog)
+      assert.isDefined(next)
       s().closeDialog()
       s().renameLevel("Fresh 2", "Isaac")
-      yield* saveMapAsEffect
+      yield* saveMapAsEffect(next)
       assert.isTrue(disk.files.has(projectFile("Map_LevelEditorMain&Fresh 2_Isaac.balledit")))
-      assert.strictEqual(s().dialog, "new")
+      assert.strictEqual(s().dialog?.id, "new")
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
@@ -1252,8 +1249,9 @@ describe("unsaved changes", () => {
       edit()
       disk.promptAnswers.push("save")
       yield* startNewMapEffect
-      s().openDialog("settings", "general")
-      assert.isNull(s().afterSave)
+      assert.isDefined(afterSaveOf(s().dialog))
+      s().openDialog({ id: "settings", category: "general" })
+      assert.isUndefined(afterSaveOf(s().dialog))
     }).pipe(Effect.provide(layerFor(disk)))
   })
 

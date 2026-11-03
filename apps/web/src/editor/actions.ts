@@ -453,7 +453,7 @@ export const followOpenMapEffect = Effect.gen(function*() {
  * then its dialog.
  */
 export const nameProjectMap = (fileName: string, mode: "rename" | "duplicate" | "recover") =>
-  withProjectMapOpen(fileName, Effect.sync(() => useEditor.getState().openDialog(mode)))
+  withProjectMapOpen(fileName, Effect.sync(() => useEditor.getState().openDialog({ id: mode })))
 
 /**
  * Runs `then` with the project map `fileName` open: it is opened first when another is (asking about that one's
@@ -539,7 +539,7 @@ const importInto = Effect.fn("importInto")(function*(pending: ImportClash, repla
   const { source, fileName, text, map } = pending
   const result = yield* platform.importMap({ source, fileName, text, replace })
   if (result._tag === "Clash") {
-    useEditor.getState().setImportClash(pending)
+    useEditor.getState().openDialog({ id: "importClash", ...pending })
     return
   }
   yield* showMap(map, fileOf(result.map))
@@ -586,9 +586,9 @@ export const importMap = () => run(unlessCancelled("openMap", importMapFile))
 
 /** The clash dialog's Replace: the project's map of that name goes to backups. */
 export const replaceOnImportEffect = Effect.gen(function*() {
-  const { importClash, setImportClash } = useEditor.getState()
-  if (importClash === null) return
-  setImportClash(null)
+  const { dialog: importClash, closeDialog } = useEditor.getState()
+  if (importClash?.id !== "importClash") return
+  closeDialog()
   yield* importInto(importClash, true)
 })
 
@@ -596,9 +596,9 @@ export const replaceOnImport = () => run(replaceOnImportEffect)
 
 /** The clash dialog's Import as copy: the imported map is renamed `<name> 2` (or the next free number). */
 export const importAsCopyEffect = Effect.gen(function*() {
-  const { importClash, setImportClash, projectMaps } = useEditor.getState()
-  if (importClash === null) return
-  setImportClash(null)
+  const { dialog: importClash, closeDialog, projectMaps } = useEditor.getState()
+  if (importClash?.id !== "importClash") return
+  closeDialog()
   const { levelDisplayName, creatorName } = importClash.map.worldSettings.levelData
   const creator = creatorName.trim()
   const taken = new Set(projectMaps.map((m) => m.fileName))
@@ -675,10 +675,10 @@ const downloadOpenMap = Effect.gen(function*() {
 const saveOpenMapThen = <E, R>(then: Effect.Effect<void, E, R>) =>
   Effect.gen(function*() {
     const platform = yield* Platform
-    const { doc, file, nameThen } = useEditor.getState()
+    const { doc, file, openDialog } = useEditor.getState()
     // It may run later, from the dialog: it takes its services along.
     const nameFirst = Effect.gen(function*() {
-      nameThen(Effect.provideContext(then, yield* Effect.context<R>()))
+      openDialog({ id: "saveAs", afterSave: Effect.provideContext(then, yield* Effect.context<R>()) })
     })
     if (platform.capabilities.projects) {
       if (file === null) return yield* nameFirst
@@ -695,17 +695,20 @@ export const saveMapFile = saveOpenMapThen(Effect.void)
 
 export const saveMap = () => run(saveMapFile)
 
-/** The `saveAs` dialog's last step, once the name is confirmed: into the project (desktop) or a download (browser). */
-export const saveMapAsEffect = Effect.gen(function*() {
-  const platform = yield* Platform
-  const { file, takeAfterSave } = useEditor.getState()
-  const then = takeAfterSave()
-  if (!platform.capabilities.projects) yield* downloadOpenMap
-  else yield* file === null ? createFromOpenMap : writeOpenMap(file, { exportAfter: true }).pipe(Effect.asVoid)
-  if (then !== null) yield* then
-})
+/**
+ * The `saveAs` dialog's last step, once the name is confirmed: into the project (desktop) or a download (browser), then
+ * the dialog's `afterSave`.
+ */
+export const saveMapAsEffect = (afterSave: Effect.Effect<void, unknown> = Effect.void) =>
+  Effect.gen(function*() {
+    const platform = yield* Platform
+    const { file } = useEditor.getState()
+    if (!platform.capabilities.projects) yield* downloadOpenMap
+    else yield* file === null ? createFromOpenMap : writeOpenMap(file, { exportAfter: true }).pipe(Effect.asVoid)
+    yield* afterSave
+  })
 
-export const saveMapAs = () => run(saveMapAsEffect)
+export const saveMapAs = (afterSave?: Effect.Effect<void, unknown>) => run(saveMapAsEffect(afterSave))
 
 // --- unsaved changes: one prompt before anything that would lose them ------------------------
 
@@ -754,7 +757,7 @@ export const followUnloadRequests = (): () => void => {
 /** New map: asks about unsaved edits first, then the New map dialog (name and creator). */
 export const startNewMapEffect = unlessCancelled(
   "newMap",
-  Effect.sync(() => useEditor.getState().openDialog("new"))
+  Effect.sync(() => useEditor.getState().openDialog({ id: "new" }))
 )
 
 export const startNewMap = () => run(startNewMapEffect)
@@ -799,7 +802,8 @@ const ASK_FIRST: ExportOptions = { replacePublished: false, overwriteChanged: fa
 const exportProjectMap = Effect.fn("exportProjectMap")(function*(fileName: string, options: ExportOptions) {
   const exported = yield* (yield* Platform).exportMap(fileName, options)
   if (exported._tag === "Published") {
-    useEditor.getState().setPublishedDraft({
+    useEditor.getState().openDialog({
+      id: "replacePublished",
       name: exported.file.name,
       publishedFileId: exported.publishedFileId,
       from: "export"
@@ -807,7 +811,8 @@ const exportProjectMap = Effect.fn("exportProjectMap")(function*(fileName: strin
     return
   }
   if (exported._tag === "ChangedInGame") {
-    useEditor.getState().setChangedExport({
+    useEditor.getState().openDialog({
+      id: "overwriteChanged",
       name: exported.file.name,
       from: "export",
       replacePublished: options.replacePublished
@@ -827,14 +832,14 @@ const exportProjectMap = Effect.fn("exportProjectMap")(function*(fileName: strin
  */
 const withSavedOpenMap = <E, R>(then: (fileName: string) => Effect.Effect<void, E, R>) =>
   Effect.gen(function*() {
-    const { doc, file, dirty, nameThen } = useEditor.getState()
+    const { doc, file, dirty, openDialog } = useEditor.getState()
     if (file === null) {
       const named = Effect.suspend(() => {
         const saved = useEditor.getState().file
         return saved === null ? Effect.void : then(saved.name)
       })
       // It runs later, from the dialog: it takes its services along.
-      nameThen(Effect.provideContext(named, yield* Effect.context<R>()))
+      openDialog({ id: "saveAs", afterSave: Effect.provideContext(named, yield* Effect.context<R>()) })
       return
     }
     const { levelDisplayName, creatorName } = doc.map.worldSettings.levelData
@@ -857,8 +862,9 @@ export const exportToGame = () => run(exportToGameEffect(false))
 
 /** The replacePublished dialog's answer: replace the published map's draft after all, and go on with Export or Play. */
 export const replacePublishedDraft = () => {
-  const from = useEditor.getState().publishedDraft?.from ?? "export"
-  useEditor.getState().setPublishedDraft(null)
+  const { dialog, closeDialog } = useEditor.getState()
+  const from = dialog?.id === "replacePublished" ? dialog.from : "export"
+  closeDialog()
   return run(from === "play" ? playEffect(true) : exportToGameEffect(true))
 }
 
@@ -867,9 +873,9 @@ export const replacePublishedDraft = () => {
  * that copy goes to the backups, as everything Export writes over does.
  */
 export const overwriteChangedEffect = Effect.suspend(() => {
-  const changed = useEditor.getState().changedExport
-  useEditor.getState().setChangedExport(null)
-  if (changed === null) return Effect.void
+  const { dialog: changed, closeDialog } = useEditor.getState()
+  closeDialog()
+  if (changed?.id !== "overwriteChanged") return Effect.void
   const { from, replacePublished } = changed
   return from === "play" ? playEffect(replacePublished, true) : exportToGameEffect(replacePublished, true)
 })
@@ -878,9 +884,9 @@ export const overwriteChangedExport = () => run(overwriteChangedEffect)
 
 /** The overwriteChanged dialog's Re-import first: the game's version replaces the project's; nothing is exported. */
 export const reimportFirstEffect = Effect.suspend(() => {
-  const changed = useEditor.getState().changedExport
-  useEditor.getState().setChangedExport(null)
-  return changed === null ? Effect.void : reimportMapEffect(changed.name)
+  const { dialog: changed, closeDialog } = useEditor.getState()
+  closeDialog()
+  return changed?.id === "overwriteChanged" ? reimportMapEffect(changed.name) : Effect.void
 })
 
 export const reimportFirst = () => run(reimportFirstEffect)
@@ -918,21 +924,23 @@ const playProjectMap = Effect.fn("playProjectMap")(function*(fileName: string, o
   const result = yield* (yield* Platform).play(fileName, options)
   switch (result._tag) {
     case "Published":
-      useEditor.getState().setPublishedDraft({
+      useEditor.getState().openDialog({
+        id: "replacePublished",
         name: result.file.name,
         publishedFileId: result.publishedFileId,
         from: "play"
       })
       return
     case "ChangedInGame":
-      useEditor.getState().setChangedExport({
+      useEditor.getState().openDialog({
+        id: "overwriteChanged",
         name: result.file.name,
         from: "play",
         replacePublished: options.replacePublished
       })
       return
     case "PublishedMap":
-      useEditor.getState().openDialog("newDraft")
+      useEditor.getState().openDialog({ id: "newDraft" })
       return
     case "Played":
       yield* refreshProject
@@ -949,7 +957,7 @@ export const playEffect = (replacePublished: boolean, overwriteChanged = false) 
   Effect.suspend(() =>
     isNeverPublished(useEditor.getState().doc.map.worldSettings.levelData.levelPublishedFileId)
       ? withSavedOpenMap((fileName) => playProjectMap(fileName, { replacePublished, overwriteChanged }))
-      : Effect.sync(() => useEditor.getState().openDialog("newDraft"))
+      : Effect.sync(() => useEditor.getState().openDialog({ id: "newDraft" }))
   )
 
 export const playMap = () => run(playEffect(false))
@@ -1243,7 +1251,7 @@ export const checkGameLinkEffect = Effect.gen(function*() {
   const current = gameLinkResultOf(paths, plugin)
   reportGameLink(memory.last, current)
   yield* rememberGameLink(current)
-  if (memory.last === null || !exportReady(paths)) useEditor.getState().openDialog("gameLink")
+  if (memory.last === null || !exportReady(paths)) useEditor.getState().openDialog({ id: "gameLink" })
 }).pipe(Effect.catch((error) => Effect.logWarning("Couldn't check the Game link", error)))
 
 /** Runs a lookup that may return the game's folders (none: the user cancelled) and shows them, and the plugin. */

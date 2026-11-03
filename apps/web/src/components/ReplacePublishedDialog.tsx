@@ -15,14 +15,9 @@ import { useEditor } from "../editor/store"
  * loses the draft's link to its Workshop item, so this asks first.
  */
 export function ReplacePublishedDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
-  const draft = useEditor((s) => s.publishedDraft)
-  const setPublishedDraft = useEditor((s) => s.setPublishedDraft)
-  const cancel = () => {
-    setPublishedDraft(null)
-    onClose()
-  }
+  const draft = useEditor((s) => s.dialog?.id === "replacePublished" ? s.dialog : null)
   return (
-    <Dialog open={open && draft !== null} onOpenChange={(next) => !next && cancel()}>
+    <Dialog open={open && draft !== null} onOpenChange={(next) => !next && onClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Replace a published map's draft?</DialogTitle>
@@ -35,7 +30,7 @@ export function ReplacePublishedDialog({ open, onClose }: { readonly open: boole
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={cancel}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button variant="destructive" onClick={() => void replacePublishedDraft()}>Replace</Button>
         </DialogFooter>
       </DialogContent>
