@@ -38,7 +38,6 @@ export type {
   FoundCreator,
   GameLinkMemory,
   GameLinkResult,
-  GamePath,
   GamePathKind,
   GamePaths,
   InstallPluginResult,

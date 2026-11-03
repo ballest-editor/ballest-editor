@@ -126,7 +126,8 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
               {text}
               {trailing}
             </div>
-            <div className={cn("pb-1", row.changes && "pr-8")}>{row.control}</div>
+            {/* Clear of the reset button's column; a row-specific action takes its place instead. */}
+            <div className={cn("pb-1", row.changes && row.action === undefined && "pr-8")}>{row.control}</div>
           </>
         )
         : (

@@ -57,18 +57,17 @@ function ProjectTitle() {
   if (state === null || name === null) return null
   const project = state.current
   return (
-    // the strip spans the bar (centring) but lets clicks through to the menus; only the name itself takes the hover
-    <div className="pointer-events-none absolute inset-x-0 flex justify-center">
-      <span
-        className={cn(
-          "pointer-events-auto max-w-[40vw] truncate text-xs text-muted-foreground",
-          project === null && "italic"
-        )}
-        title={project?.path ?? "Not saved anywhere yet: Save the map to name the project."}
-      >
-        {name}
-      </span>
-    </div>
+    // Centred in the bar at the name's own width. A box spanning the bar would inherit the bar's drag region and,
+    // coming after the menus, cover their no-drag middle (pointer-events doesn't apply to drag regions).
+    <span
+      className={cn(
+        "absolute inset-x-0 mx-auto w-fit max-w-[40vw] truncate text-xs text-muted-foreground",
+        project === null && "italic"
+      )}
+      title={project?.path ?? "Not saved anywhere yet: Save the map to name the project."}
+    >
+      {name}
+    </span>
   )
 }
 

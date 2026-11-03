@@ -1,7 +1,8 @@
+import { isMapFileName } from "@ballest/contracts"
 import { Context, DateTime, Effect, FileSystem, Layer, Option, Path, Schema, Semaphore } from "effect"
 import { Buffer } from "node:buffer"
 import { DesktopSettings } from "../settings/DesktopSettings"
-import { isMapFileName, writeAtomic } from "./files"
+import { writeAtomic } from "./files"
 
 /** How long backups are kept unless `desktop-settings.json` says otherwise (`backups.keep`, `backups.maxAgeDays`). */
 export const BACKUP_RETENTION = { keep: 20, maxAgeDays: 30 } as const

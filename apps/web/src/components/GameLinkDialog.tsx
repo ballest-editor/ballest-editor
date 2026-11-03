@@ -10,8 +10,8 @@ import {
 import { GameLinkChecklist, useGameLinkSummary } from "./GameLink"
 
 /**
- * Project › Game link… (desktop): the checklist as a modal. It also opens by itself on the first launch, and when a
- * launch finds a folder Export needs missing (docs/PROJECTS.md § Shell).
+ * File › Game link… (desktop): the checklist as a modal; Settings › Game shows the same checklist as a page. It also
+ * opens by itself on the first launch, and when a launch finds a folder Export needs missing (docs/PROJECTS.md § Shell).
  */
 export function GameLinkDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   const summary = useGameLinkSummary()

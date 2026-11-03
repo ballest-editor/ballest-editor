@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import type { InvokeChannels, PushChannels } from "./channels"
+import { isMapFileName } from "./names"
 
 /** Runtime versions of the desktop app, for bug reports and the about dialog. */
 export const DesktopVersions = Schema.Struct({
@@ -46,9 +47,13 @@ export const PickImportResult = Schema.NullOr(OpenedMapFile)
 
 /**
  * A map's file name in a project's `maps/` folder, which is also its name in the game's maps folder
- * (`Map_LevelEditorMain&<name>_<creator>.balledit`). Never a path: main joins it to the folder after checking it.
+ * (`Map_LevelEditorMain&<name>_<creator>.balledit`). Never a path: decoding a payload refuses anything `isMapFileName`
+ * doesn't accept, before a handler sees it, and main checks it again before joining it to a folder.
  */
-export const MapFileName = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255))
+export const MapFileName = Schema.String.check(
+  Schema.isMaxLength(255),
+  Schema.makeFilter((name: string) => isMapFileName(name) || "isn't a map file name (a .balledit name, no folders)")
+)
 
 /** An instant as ISO 8601 UTC text (`2026-10-31T12:00:00.000Z`). */
 export const IsoTime = Schema.String.check(Schema.isMaxLength(64))

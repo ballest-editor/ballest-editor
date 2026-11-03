@@ -149,14 +149,14 @@ export function MenuBar() {
       {projects
         ? (
           <Menu title="File">
-            <MenubarItem onClick={() => openDialog("newProject")}>New project…</MenubarItem>
+            <MenubarItem onClick={() => openDialog({ id: "newProject" })}>New project…</MenubarItem>
             <MenubarItem onClick={() => void chooseProject()}>Open project…</MenubarItem>
             <RecentProjectsMenu />
             <MenubarSeparator />
             <CommandItem action="saveMap">Save</CommandItem>
             <MenubarSeparator />
-            <MenubarItem onClick={() => openDialog("settings")}>Settings…</MenubarItem>
-            <MenubarItem onClick={() => openDialog("gameLink")}>Game link…</MenubarItem>
+            <MenubarItem onClick={() => openDialog({ id: "settings" })}>Settings…</MenubarItem>
+            <MenubarItem onClick={() => openDialog({ id: "gameLink" })}>Game link…</MenubarItem>
             <MenubarItem onClick={() => void quitApp()}>Quit</MenubarItem>
           </Menu>
         )
@@ -168,7 +168,7 @@ export function MenuBar() {
             <CommandItem action="saveMap">Save</CommandItem>
             <CommandItem action="saveMapAs">Export…</CommandItem>
             <MenubarSeparator />
-            <MenubarItem onClick={() => openDialog("settings")}>Settings…</MenubarItem>
+            <MenubarItem onClick={() => openDialog({ id: "settings" })}>Settings…</MenubarItem>
           </Menu>
         )}
       <Menu title="Edit">
@@ -281,12 +281,12 @@ export function MenuBar() {
               </>
             )}
             <MenubarSeparator />
-            <MenubarItem inset onClick={() => openDialog("projectSettings")}>Project settings…</MenubarItem>
+            <MenubarItem inset onClick={() => openDialog({ id: "projectSettings" })}>Project settings…</MenubarItem>
           </Menu>
         )
         : (
           <Menu title="Project">
-            <MenubarItem onClick={() => openDialog("mapSettings")}>Project settings…</MenubarItem>
+            <MenubarItem onClick={() => openDialog({ id: "mapSettings" })}>Project settings…</MenubarItem>
           </Menu>
         )}
     </Menubar>

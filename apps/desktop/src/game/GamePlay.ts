@@ -1,10 +1,19 @@
-import { type PlayLaunch, type PlayPayload, type PlayResult, PlaySessionEnded, PushChannels } from "@ballest/contracts"
+import {
+  isNeverPublished,
+  type PlayLaunch,
+  type PlayPayload,
+  type PlayResult,
+  PlaySessionEnded,
+  PushChannels
+} from "@ballest/contracts"
 import { Context, DateTime, Effect, Layer, Option, PubSub, Schema, Stream } from "effect"
 import { ElectronShell } from "../electron/ElectronShell"
 import { ElectronWindow } from "../electron/ElectronWindow"
 import type { BackupError } from "../project/Backups"
+import { MapExports } from "../project/MapExports"
+import { MapFiles } from "../project/MapFiles"
 import type { MapLinkError } from "../project/MapLinks"
-import { type ProjectError, Projects } from "../project/Projects"
+import type { ProjectError } from "../project/Projects"
 import { GameLink, type GameLinkError } from "./GameLink"
 import type { GamePathError } from "./GamePaths"
 import { GameProcess } from "./GameProcess"
@@ -13,9 +22,6 @@ import { GameProcess } from "./GameProcess"
 export const SESSION_POLL = "5 seconds"
 /** How long a game Play started may take to show up; one that never does (Steam updating it, a closed prompt) is dropped. */
 export const SESSION_START_TIMEOUT = "5 minutes"
-
-/** The plugin manager races only maps never published: `levelPublishedFileId` -1 (docs/DESKTOP.md § Play). */
-export const isNeverPublished = (publishedFileId: number): boolean => publishedFileId < 0
 
 const encodeEnded = Schema.encodeEffect(PlaySessionEnded)
 
@@ -33,7 +39,8 @@ export class GamePlay extends Context.Service<GamePlay, {
   readonly sessionEnds: Stream.Stream<PlaySessionEnded>
 }>()("ballest/desktop/game/GamePlay") {
   static readonly make = Effect.gen(function*() {
-    const projects = yield* Projects
+    const files = yield* MapFiles
+    const exports = yield* MapExports
     const link = yield* GameLink
     const game = yield* GameProcess
     const shell = yield* ElectronShell
@@ -80,10 +87,10 @@ export class GamePlay extends Context.Service<GamePlay, {
 
     const play = Effect.fn("GamePlay.play")(function*(payload: PlayPayload) {
       const { fileName } = payload
-      const { publishedFileId } = yield* projects.read(fileName)
+      const { publishedFileId } = yield* files.read(fileName)
       if (!isNeverPublished(publishedFileId)) return { _tag: "PublishedMap", fileName, publishedFileId } as const
 
-      const exported = yield* projects.exportMap(payload)
+      const exported = yield* exports.exportMap(payload)
       if (exported._tag !== "Exported") return exported
 
       const { plugin, sent } = yield* link.requestRace(fileName)

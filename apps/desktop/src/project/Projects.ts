@@ -1,30 +1,15 @@
-import type {
-  BackupRef,
-  ExportChecks,
-  ExportMapPayload,
-  ExportMapResult,
-  ImportMapPayload,
-  ImportMapResult,
-  MapBackup,
-  MapBackupFile,
-  MapBackups,
-  MapLink,
-  OpenedMapFile,
-  ProjectFolder,
-  ProjectInfo,
-  ProjectMap,
-  ProjectMapFile,
-  ProjectMaps,
-  ProjectState
+import {
+  isMapFileName,
+  isProjectName,
+  MAP_EXTENSIONS,
+  type ProjectFolder,
+  type ProjectInfo,
+  type ProjectState
 } from "@ballest/contracts"
-import { Context, DateTime, Effect, FileSystem, Layer, Option, Path, Schema, Semaphore } from "effect"
-import { DesktopEnvironment } from "../app/DesktopEnvironment"
-import { type GamePathError, GamePaths } from "../game/GamePaths"
+import { Context, Effect, FileSystem, Option, Path, Schema } from "effect"
+import { GamePaths } from "../game/GamePaths"
 import { DesktopSettings, type ProjectSettings } from "../settings/DesktopSettings"
-import { type Backup, type BackupError, Backups, parseBackupId } from "./Backups"
-import { isMapFileName, isWithin, MAP_EXTENSIONS, MAX_MAP_BYTES, sha256, writeAtomic, writeJson } from "./files"
-import { emptyLink, type MapLinkError, MapLinks } from "./MapLinks"
-import { type ExportReport, seeExport } from "./sync"
+import { isSamePath, isWithin, writeJson } from "./files"
 
 /** `ballest-project.json`, at the project's root: what is shared with the project (docs/PROJECTS.md). */
 export const ProjectFile = Schema.Struct({
@@ -40,9 +25,7 @@ export type ProjectFile = typeof ProjectFile.Type
 export const PROJECT_FILE = "ballest-project.json"
 const RECENT_LIMIT = 8
 
-/** A folder name every OS accepts: letters, digits, spaces, `-` and `_`, not starting with a dot or a space. */
-const isProjectName = (name: string): boolean => /^[\p{L}\p{N}_-][\p{L}\p{N} _-]{0,63}$/u.test(name)
-
+/** The error of every project operation: `Projects`, `MapFiles` and `MapExports` alike. */
 export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectError", {
   path: Schema.String,
   reason: Schema.Literals([
@@ -94,32 +77,22 @@ export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectErr
   }
 }
 
-/** Only the field Export looks at in the file it would replace; everything else is ignored. */
-const PublishedId = Schema.fromJsonString(Schema.Struct({
-  worldSettings: Schema.Struct({ levelData: Schema.Struct({ levelPublishedFileId: Schema.Finite }) })
-}))
+/** A `ProjectError` about `file`, from the failure's cause (if any): `Effect.mapError(projectError("read", file))`. */
+export const projectError = (reason: ProjectError["reason"], file: string) => (cause?: unknown) =>
+  new ProjectError({ path: file, reason, ...(cause === undefined ? {} : { cause }) })
 
-/** A map file's `levelPublishedFileId`; -1 (never published) when it has none or doesn't decode. */
-const publishedIdOf = (text: string): number =>
-  Schema.decodeOption(PublishedId)(text).pipe(
-    Option.map((map) => map.worldSettings.levelData.levelPublishedFileId),
-    Option.getOrElse(() => -1)
-  )
+/** A project's `maps/` folder. */
+export const mapsFolderIn = (path: Path.Path, project: string) => path.join(project, "maps")
 
-/** What `listMaps` reports of a map's bytes. */
-interface MapContents {
-  readonly hash: string
-  readonly publishedFileId: number
-}
-
-type ProjectEffect<A> = Effect.Effect<A, ProjectError | MapLinkError | BackupError>
+/** A project's backups folder, `.ballest/backups/`. */
+export const backupsFolderIn = (path: Path.Path, project: string) => path.join(project, ".ballest", "backups")
 
 /**
- * The project folder and the maps in it (docs/PROJECTS.md). One project is in use at a time, the most recent one; with
- * none (the first launch) the window is Untitled Project and nothing is on disk until the first Save names a project
- * (`createNew`). A project exists on disk from `createNew`, or from the first New map or Import into a chosen folder. Main touches only its `maps/` and `.ballest/` folders, the game's maps folder (Export), the backups of the
- * files Export wrote over there (`<userData>/backups/`), and the files the user picks in the Import dialog (read only).
- * Maps are named by file name, never by path. Every write over a map goes through `Backups.overwrite`.
+ * Which project is in use (docs/PROJECTS.md). One project is in use at a time, the most recent one; with none (the
+ * first launch) the window is Untitled Project and nothing is on disk until the first Save names a project
+ * (`createNew`). A project exists on disk from `createNew`, or from the first New map or Import into a chosen folder
+ * (`ensure`). A project is never the game's maps folder or inside it. Its maps are `MapFiles`', their exports
+ * `MapExports`'.
  */
 export class Projects extends Context.Service<Projects, {
   readonly state: Effect.Effect<ProjectState>
@@ -129,72 +102,38 @@ export class Projects extends Context.Service<Projects, {
   readonly switchTo: (folder: string) => Effect.Effect<ProjectState, ProjectError>
   /** Keeps which map is open in the current project (`ProjectState.lastOpenMap`); null forgets it. */
   readonly rememberOpenMap: (fileName: string | null) => Effect.Effect<void, ProjectError>
-  /** The current project's `maps/` folder, when it exists. */
   /** Makes `<projectsFolder>/<name>` a project (fails when it holds one already) and uses it. */
   readonly createNew: (name: string) => Effect.Effect<ProjectState, ProjectError>
   /** Renames the current project in its `ballest-project.json` (made first if it isn't on disk yet). */
   readonly setName: (name: string) => Effect.Effect<ProjectState, ProjectError>
   /** One of the current project's folders, when it exists: the project, its `maps/`, its backups. */
   readonly folderOf: (which: ProjectFolder) => Effect.Effect<Option.Option<string>>
-  readonly mapsFolder: Effect.Effect<Option.Option<string>>
-  readonly list: Effect.Effect<ProjectMaps, ProjectError>
-  readonly read: (fileName: string) => Effect.Effect<ProjectMapFile, ProjectError>
-  /** Writes a new map; fails when the project has one of that name. Makes the project first when needed. */
-  readonly create: (fileName: string, text: string) => ProjectEffect<ProjectMap>
-  /** Writes over a map (or writes it, if it has gone); the old file goes to the project's backups. */
-  readonly save: (fileName: string, text: string) => ProjectEffect<ProjectMap>
-  /** Writes `to`, moves `from` to the backups and its link to `to`. Fails when `to` exists. */
-  readonly rename: (from: string, to: string, text: string) => ProjectEffect<ProjectMap>
-  /** Reads a file the user picked in the Import dialog; it may be imported from now on. */
-  readonly pick: (file: string) => Effect.Effect<OpenedMapFile, ProjectError>
-  readonly importMap: (payload: ImportMapPayload) => ProjectEffect<ImportMapResult>
-  /** Copies a map byte for byte into the game's maps folder and records the export in its link. */
-  readonly exportMap: (
-    payload: ExportMapPayload
-  ) => Effect.Effect<ExportMapResult, ProjectError | MapLinkError | BackupError | GamePathError>
-  /**
-   * Sync detection (docs/PROJECTS.md § Sync): looks at every linked map's export in the game's maps folder, keeps what
-   * it saw in the link, and reports what changed since the last look. One check at a time, so a change seen by one is
-   * never reported again by another running beside it.
-   */
-  readonly checkExports: Effect.Effect<ExportChecks, MapLinkError>
-  /** Replaces a project map with its export (the project's file goes to backups) and records the export as in sync. */
-  readonly reimportMap: (fileName: string) => ProjectEffect<ProjectMapFile>
-  /** The current project's backups and the exports', newest first. */
-  readonly backups: Effect.Effect<MapBackups>
-  /** Reads a backup `backups` listed; any other name is refused. */
-  readonly readBackup: (ref: BackupRef) => Effect.Effect<MapBackupFile, ProjectError>
+  /** The project in use, or none while the window is Untitled Project. */
+  readonly current: Effect.Effect<Option.Option<string>>
+  /** The project in use; fails (`noProject`) without one. */
+  readonly inUse: Effect.Effect<string, ProjectError>
+  /** The project in use, made on disk if it isn't yet; fails without one. Anything that writes into a project. */
+  readonly ensure: Effect.Effect<string, ProjectError>
 }>()("ballest/desktop/project/Projects") {
-  /** `platform` decides how paths compare (Windows: case-insensitively); `exportBackups` keeps what Export wrote over. */
-  static readonly make = Effect.fn("Projects.make")(function*(
-    projectsFolder: string,
-    platform: NodeJS.Platform,
-    exportBackups: string
-  ) {
+  /** `platform` decides how paths compare (Windows: case-insensitively). */
+  static readonly make = Effect.fn("Projects.make")(function*(projectsFolder: string, platform: NodeJS.Platform) {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const settings = yield* DesktopSettings
-    const links = yield* MapLinks
     const game = yield* GamePaths
-    const backupStore = yield* Backups
 
-    const picked = new Set<string>()
-    const same = (a: string, b: string) => isWithin(path, a, b, platform) && isWithin(path, b, a, platform)
-    const fail = (reason: ProjectError["reason"], file: string) => (cause?: unknown) =>
-      new ProjectError({ path: file, reason, ...(cause === undefined ? {} : { cause }) })
+    const same = (a: string, b: string) => isSamePath(path, a, b, platform)
 
     const remembered = settings.get.pipe(Effect.map((s): ProjectSettings => s.project ?? {}))
-    /** The project in use (the most recent), or none while the window is Untitled Project. */
-    const currentOption: Effect.Effect<Option.Option<string>> = remembered.pipe(
+    const current: Effect.Effect<Option.Option<string>> = remembered.pipe(
       Effect.map((s) => {
         const [first] = s.recent ?? []
         return first === undefined ? Option.none() : Option.some(first)
       })
     )
-    /** The project in use; anything that writes into a project fails without one. */
-    const current: Effect.Effect<string, ProjectError> = currentOption.pipe(
+    const inUse: Effect.Effect<string, ProjectError> = current.pipe(
       Effect.flatMap(Effect.fromOption),
-      Effect.mapError(fail("noProject", projectsFolder))
+      Effect.mapError(projectError("noProject", projectsFolder))
     )
 
     const info = (folder: string) =>
@@ -218,21 +157,21 @@ export class Projects extends Context.Service<Projects, {
     })
 
     const rememberOpenMap = Effect.fn("Projects.rememberOpenMap")(function*(fileName: string | null) {
-      if (fileName !== null && !isMapFileName(fileName)) return yield* fail("fileName", fileName)()
-      const project = Option.getOrNull(yield* currentOption)
+      if (fileName !== null && !isMapFileName(fileName)) return yield* projectError("fileName", fileName)()
+      const project = Option.getOrNull(yield* current)
       // nothing to remember it in: Untitled Project has one map and no folder
       if (project === null) return
       yield* settings.update((s) => {
         const { [project]: _previous, ...others } = s.project?.lastOpenMap ?? {}
         const lastOpenMap = fileName === null ? others : { ...others, [project]: fileName }
         return { ...s, project: { ...s.project, lastOpenMap } }
-      }).pipe(Effect.mapError(fail("write", project)))
+      }).pipe(Effect.mapError(projectError("write", project)))
     })
 
     /** Refuses the game's maps folder and anything inside it (wherever it is now, found or not). */
     const outsideGame = Effect.fnUntraced(function*(folder: string) {
       const maps = (yield* game.get).mapsFolder.path
-      if (maps !== null && isWithin(path, maps, folder, platform)) return yield* fail("inGameMaps", folder)()
+      if (maps !== null && isWithin(path, maps, folder, platform)) return yield* projectError("inGameMaps", folder)()
     })
 
     const use = Effect.fn("Projects.use")(function*(raw: string) {
@@ -241,17 +180,15 @@ export class Projects extends Context.Service<Projects, {
       yield* settings.update((s) => {
         const others = (s.project?.recent ?? []).filter((p) => !same(p, folder))
         return { ...s, project: { ...s.project, recent: [folder, ...others].slice(0, RECENT_LIMIT) } }
-      }).pipe(Effect.mapError(fail("write", raw)))
+      }).pipe(Effect.mapError(projectError("write", raw)))
       return yield* state
     })
 
     const switchTo = Effect.fn("Projects.switchTo")(function*(raw: string) {
       const { recent = [] } = yield* remembered
-      if (!recent.some((p) => same(p, raw))) return yield* fail("notPicked", raw)()
+      if (!recent.some((p) => same(p, raw))) return yield* projectError("notPicked", raw)()
       return yield* use(raw)
     })
-
-    const mapsDir = (project: string) => path.join(project, "maps")
 
     /** Makes `project` on disk if it isn't yet: `maps/`, `.ballest/`, `ballest-project.json`, `.gitignore`. */
     const ensureAt = Effect.fnUntraced(function*(project: string) {
@@ -259,7 +196,7 @@ export class Projects extends Context.Service<Projects, {
       const writeIfMissing = (file: string, write: Effect.Effect<void, unknown>) =>
         fs.exists(file).pipe(Effect.flatMap((exists) => exists ? Effect.void : write))
       yield* Effect.gen(function*() {
-        yield* fs.makeDirectory(mapsDir(project), { recursive: true })
+        yield* fs.makeDirectory(mapsFolderIn(path, project), { recursive: true })
         yield* fs.makeDirectory(path.join(project, ".ballest"), { recursive: true })
         const file: ProjectFile = { formatVersion: 1, name: path.basename(project), exportTarget: "game" }
         yield* writeIfMissing(path.join(project, PROJECT_FILE), writeJson(fs, path.join(project, PROJECT_FILE), file))
@@ -267,32 +204,35 @@ export class Projects extends Context.Service<Projects, {
           path.join(project, ".gitignore"),
           fs.writeFileString(path.join(project, ".gitignore"), ".ballest/\n")
         )
-      }).pipe(Effect.mapError(fail("write", project)))
+      }).pipe(Effect.mapError(projectError("write", project)))
       return project
     })
 
-    /** The current project, made on disk if it isn't yet. */
-    const ensure = current.pipe(Effect.flatMap(ensureAt))
+    const ensure = inUse.pipe(Effect.flatMap(ensureAt))
 
     const setName = Effect.fn("Projects.setName")(function*(name: string) {
       const trimmed = name.trim()
-      if (trimmed === "" || trimmed.length > 64) return yield* fail("projectName", name)()
+      if (trimmed === "" || trimmed.length > 64) return yield* projectError("projectName", name)()
       const project = yield* ensure
       const file = path.join(project, PROJECT_FILE)
       const current_ = yield* fs.readFileString(file).pipe(
         Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(ProjectFile))),
-        Effect.mapError(fail("read", file))
+        Effect.mapError(projectError("read", file))
       )
-      yield* writeJson(fs, file, { ...current_, name: trimmed }).pipe(Effect.mapError(fail("write", file)))
+      yield* writeJson(fs, file, { ...current_, name: trimmed }).pipe(Effect.mapError(projectError("write", file)))
       return yield* state
     })
 
     const folderOf = (which: ProjectFolder) =>
-      currentOption.pipe(
+      current.pipe(
         Effect.flatMap(Option.match({
           onNone: () => Effect.succeed(Option.none<string>()),
           onSome: (project) => {
-            const dir = which === "project" ? project : which === "maps" ? mapsDir(project) : projectBackups(project)
+            const dir = which === "project"
+              ? project
+              : which === "maps"
+              ? mapsFolderIn(path, project)
+              : backupsFolderIn(path, project)
             return fs.exists(dir).pipe(
               Effect.map((found) => found ? Option.some(dir) : Option.none()),
               Effect.orElseSucceed(Option.none)
@@ -303,353 +243,25 @@ export class Projects extends Context.Service<Projects, {
 
     const createNew = Effect.fn("Projects.createNew")(function*(name: string) {
       const trimmed = name.trim()
-      if (!isProjectName(trimmed)) return yield* fail("projectName", name)()
+      if (!isProjectName(trimmed)) return yield* projectError("projectName", name)()
       const folder = path.join(projectsFolder, trimmed)
       const taken = yield* fs.exists(path.join(folder, PROJECT_FILE)).pipe(Effect.orElseSucceed(() => false))
-      if (taken) return yield* fail("projectExists", folder)()
+      if (taken) return yield* projectError("projectExists", folder)()
       yield* ensureAt(folder)
       return yield* use(folder)
-    })
-
-    const target = Effect.fnUntraced(function*(project: string, fileName: string) {
-      if (!isMapFileName(fileName)) return yield* fail("fileName", fileName)()
-      return path.join(mapsDir(project), fileName)
-    })
-
-    /** What a map's bytes say, by path; a file read again only once its time or size changes. */
-    const contents = new Map<string, MapContents & { readonly stamp: string }>()
-    const contentsOf = Effect.fnUntraced(function*(file: string, stamp: string) {
-      const known = contents.get(file)
-      if (known?.stamp === stamp) return known
-      const bytes = yield* fs.readFile(file).pipe(Effect.mapError(fail("read", file)))
-      const read = { stamp, hash: sha256(bytes), publishedFileId: publishedIdOf(new TextDecoder().decode(bytes)) }
-      contents.set(file, read)
-      return read
-    })
-
-    const stampOf = (stat: FileSystem.File.Info) =>
-      `${Option.getOrElse(stat.mtime, () => new Date(0)).toISOString()} ${stat.size} ${
-        Option.getOrElse(stat.ino, () => 0n)
-      }`
-
-    /** The hash of a file in the game's maps folder: null when it is gone, none when it can't be read just now. */
-    const gameHashOf = (file: string): Effect.Effect<Option.Option<string | null>> =>
-      fs.stat(file).pipe(
-        Effect.flatMap((stat) => contentsOf(file, stampOf(stat))),
-        Effect.map((read) => Option.some(read.hash)),
-        Effect.catch((error) =>
-          error._tag === "PlatformError" && error.reason._tag === "NotFound"
-            ? Effect.succeedSome(null)
-            : Effect.logWarning(`Couldn't read ${file}`, error).pipe(Effect.as(Option.none()))
-        )
-      )
-
-    /**
-     * The file a link's export is, when it is `fileName` in the game's maps folder `gameMaps`. An export elsewhere (the
-     * maps folder moved since) isn't looked at.
-     */
-    const exportIn = (gameMaps: string, fileName: string, link: MapLink | undefined): Option.Option<string> => {
-      const file = path.join(gameMaps, fileName)
-      const exported = link?.export ?? null
-      return exported !== null && same(exported.path, file) ? Option.some(file) : Option.none()
-    }
-
-    /** The game's maps folder, when it is there: an unmounted drive or an uninstalled game drops no links. */
-    const presentGameMaps = Effect.gen(function*() {
-      const folder = (yield* game.get).mapsFolder.path
-      if (folder === null) return Option.none<string>()
-      return (yield* fs.exists(folder).pipe(Effect.orElseSucceed(() => false))) ? Option.some(folder) : Option.none()
-    })
-
-    const mapInfo = Effect.fnUntraced(function*(project: string, fileName: string, link?: MapLink | null) {
-      const file = path.join(mapsDir(project), fileName)
-      const stat = yield* fs.stat(file).pipe(Effect.mapError(fail("read", file)))
-      const modifiedAt = Option.getOrElse(stat.mtime, () => new Date(0)).toISOString()
-      const { hash, publishedFileId } = yield* contentsOf(file, stampOf(stat))
-      return {
-        fileName,
-        path: file,
-        modifiedAt,
-        hash,
-        publishedFileId,
-        link: link === undefined ? (yield* links.all(project))[fileName] ?? null : link
-      } satisfies ProjectMap
-    })
-
-    const list = Effect.gen(function*() {
-      // Untitled Project has no folder and nothing listed
-      const project = Option.getOrNull(yield* currentOption)
-      if (project === null) return []
-      const dir = mapsDir(project)
-      if (!(yield* fs.exists(dir).pipe(Effect.orElseSucceed(() => false)))) return []
-      const names = yield* fs.readDirectory(dir).pipe(Effect.mapError(fail("read", dir)))
-      const all = yield* links.all(project)
-      const maps = yield* Effect.forEach(
-        names.filter(isMapFileName),
-        (name) => mapInfo(project, name, all[name] ?? null).pipe(Effect.option)
-      )
-      return maps.flatMap(Option.toArray).sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt))
-    }).pipe(Effect.withSpan("Projects.list"))
-
-    /** Reads a file with `read`, unless it is too large to be a map. */
-    const readMapFile = <A>(
-      file: string,
-      read: Effect.Effect<A, Effect.Error<ReturnType<FileSystem.FileSystem["readFile"]>>>
-    ) =>
-      fs.stat(file).pipe(
-        Effect.filterOrFail((stat) => Number(stat.size) <= MAX_MAP_BYTES, () => fail("tooLarge", file)()),
-        Effect.andThen(read),
-        Effect.catchTag(
-          "PlatformError",
-          (cause) => Effect.fail(fail(cause.reason._tag === "NotFound" ? "notFound" : "read", file)(cause))
-        )
-      )
-
-    const readBytes = (file: string) => readMapFile(file, fs.readFile(file))
-    const readText = (file: string) => readMapFile(file, fs.readFileString(file))
-
-    const read = Effect.fn("Projects.read")(function*(fileName: string) {
-      const project = yield* current
-      const text = yield* readText(yield* target(project, fileName))
-      return { ...(yield* mapInfo(project, fileName)), text } satisfies ProjectMapFile
-    })
-
-    const write = (file: string, data: string | Uint8Array) =>
-      writeAtomic(fs, file, data).pipe(Effect.mapError(fail("write", file)))
-
-    const exists = (file: string) => fs.exists(file).pipe(Effect.mapError(fail("read", file)))
-
-    const projectBackups = (project: string) => path.join(project, ".ballest", "backups")
-    const backupsIn = (place: BackupRef["place"], project: string) =>
-      place === "project" ? projectBackups(project) : exportBackups
-
-    const create = Effect.fn("Projects.create")(function*(fileName: string, text: string) {
-      const project = yield* ensure
-      const file = yield* target(project, fileName)
-      if (yield* exists(file)) return yield* fail("exists", fileName)()
-      yield* write(file, text)
-      return yield* mapInfo(project, fileName)
-    })
-
-    const save = Effect.fn("Projects.save")(function*(fileName: string, text: string) {
-      const project = yield* ensure
-      yield* backupStore.overwrite(projectBackups(project), yield* target(project, fileName), text)
-      return yield* mapInfo(project, fileName)
-    })
-
-    const rename = Effect.fn("Projects.rename")(function*(from: string, to: string, text: string) {
-      if (from === to) return yield* save(to, text)
-      const project = yield* ensure
-      const old = yield* target(project, from)
-      const next = yield* target(project, to)
-      if (yield* exists(next)) return yield* fail("exists", to)()
-      yield* write(next, text)
-      yield* backupStore.retire(projectBackups(project), old)
-      yield* links.rename(project, from, to)
-      return yield* mapInfo(project, to)
-    })
-
-    const pick = Effect.fn("Projects.pick")(function*(raw: string) {
-      const file = path.resolve(raw)
-      if (!MAP_EXTENSIONS.some((ext) => file.toLowerCase().endsWith(ext))) return yield* fail("extension", file)()
-      const text = yield* readText(file)
-      picked.add(file)
-      return { path: file, name: path.basename(file), text } satisfies OpenedMapFile
-    })
-
-    const importMap = Effect.fn("Projects.importMap")(
-      function*({ source: raw, fileName, text, replace }: ImportMapPayload) {
-        const source = path.resolve(raw)
-        if (!picked.has(source)) return yield* fail("notPicked", source)()
-        const project = yield* ensure
-        const file = yield* target(project, fileName)
-        // Importing a file of this very project changes nothing.
-        if (same(source, file)) return { _tag: "Imported", map: yield* mapInfo(project, fileName) } as const
-        if (!replace && (yield* exists(file))) return { _tag: "Clash", fileName } as const
-        const bytes = yield* fs.readFile(source).pipe(Effect.mapError(fail("read", source)))
-        yield* backupStore.overwrite(projectBackups(project), file, text)
-
-        const origin = { path: source, hash: sha256(bytes), at: DateTime.formatIso(yield* DateTime.now) }
-        // A map imported from the game's maps folder under its own name is that file's export from the start.
-        const gameMaps = (yield* game.get).mapsFolder.path
-        const fromGame = gameMaps !== null && same(path.dirname(source), gameMaps) && path.basename(source) === fileName
-        const link = yield* links.modify(project, fileName, (previous) => ({
-          ...(previous ?? emptyLink),
-          origin,
-          ...(fromGame && { export: origin, lastSeenHash: origin.hash })
-        }))
-        return { _tag: "Imported", map: yield* mapInfo(project, fileName, link) } as const
-      }
-    )
-
-    const exportMap = Effect.fn("Projects.exportMap")(function*(
-      { fileName, replacePublished, overwriteChanged }: ExportMapPayload
-    ) {
-      const project = yield* current
-      const source = yield* target(project, fileName)
-      const bytes = yield* fs.readFile(source).pipe(
-        Effect.mapError((cause) => fail(cause.reason._tag === "NotFound" ? "notFound" : "read", source)(cause))
-      )
-      const file = path.join(yield* game.mapsFolderForWrite, fileName)
-
-      if (!replacePublished) {
-        const publishedFileId = yield* fs.readFileString(file).pipe(
-          Effect.flatMap(Schema.decodeEffect(PublishedId)),
-          Effect.map((map) => map.worldSettings.levelData.levelPublishedFileId),
-          Effect.option
-        )
-        if (Option.isSome(publishedFileId) && publishedFileId.value > 0) {
-          return {
-            _tag: "Published",
-            file: { path: file, name: fileName },
-            publishedFileId: publishedFileId.value
-          } as const
-        }
-      }
-
-      if (!overwriteChanged) {
-        const changed = yield* changedSinceExport(project, file, fileName, sha256(bytes))
-        if (changed) return { _tag: "ChangedInGame", file: { path: file, name: fileName } } as const
-      }
-
-      yield* backupStore.overwrite(exportBackups, file, bytes)
-      const exported = { path: file, hash: sha256(bytes), at: DateTime.formatIso(yield* DateTime.now) }
-      const link = yield* links.modify(project, fileName, (previous) => ({
-        ...(previous ?? emptyLink),
-        export: exported,
-        lastSeenHash: exported.hash
-      }))
-      return { _tag: "Exported", file: { path: file, name: fileName }, link: link ?? emptyLink } as const
-    })
-
-    /**
-     * Whether Export would write over a version of `file` the game made since the last export (one that isn't the
-     * bytes about to be written either, which lose nothing). The version is seen, so the next check doesn't report it.
-     */
-    const changedSinceExport = Effect.fnUntraced(
-      function*(project: string, file: string, fileName: string, writing: string) {
-        const exported = (yield* links.all(project))[fileName]?.export ?? null
-        if (exported === null || !same(exported.path, file)) return false
-        const now = Option.getOrNull(yield* gameHashOf(file))
-        if (now === null || now === exported.hash || now === writing) return false
-        yield* links.modify(project, fileName, (link) => link === null ? null : seeExport(link, now).link)
-        return true
-      }
-    )
-
-    const checkLock = yield* Semaphore.make(1)
-
-    const checkExports = Effect.gen(function*() {
-      const checks = { changed: Array<string>(), missing: Array<string>() }
-      // nothing linked without a project
-      const project = Option.getOrNull(yield* currentOption)
-      if (project === null) return checks
-      const gameMaps = yield* presentGameMaps
-      if (Option.isNone(gameMaps)) return checks
-      for (const [fileName, link] of Object.entries(yield* links.all(project))) {
-        const file = exportIn(gameMaps.value, fileName, link)
-        if (Option.isNone(file)) continue
-        const hash = yield* gameHashOf(file.value)
-        if (Option.isNone(hash)) continue
-        // seen against the link as it is when written, should an Export have changed it since
-        const seen: { report: ExportReport | null } = { report: null }
-        yield* links.modify(project, fileName, (latest) => {
-          if (latest === null) return null
-          const next = seeExport(latest, hash.value)
-          seen.report = next.report
-          return next.link
-        })
-        if (seen.report !== null) checks[seen.report].push(fileName)
-      }
-      return checks satisfies ExportChecks
-    }).pipe(checkLock.withPermits(1), Effect.withSpan("Projects.checkExports"))
-
-    const reimportMap = Effect.fn("Projects.reimportMap")(function*(fileName: string) {
-      const project = yield* current
-      const file = yield* target(project, fileName)
-      const gameMaps = (yield* game.get).mapsFolder.path
-      const source = gameMaps === null
-        ? Option.none<string>()
-        : exportIn(gameMaps, fileName, (yield* links.all(project))[fileName])
-      if (Option.isNone(source)) return yield* fail("notExported", fileName)()
-      const bytes = yield* readBytes(source.value)
-      yield* backupStore.overwrite(projectBackups(project), file, bytes)
-      const seen = { path: source.value, hash: sha256(bytes), at: DateTime.formatIso(yield* DateTime.now) }
-      const link = yield* links.modify(project, fileName, (previous) => ({
-        ...(previous ?? emptyLink),
-        export: seen,
-        lastSeenHash: seen.hash
-      }))
-      return {
-        ...(yield* mapInfo(project, fileName, link)),
-        // the game's bytes as they are: a BOM is kept, like everything else
-        text: new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes)
-      } satisfies ProjectMapFile
-    })
-
-    const mapsFolder = currentOption.pipe(
-      Effect.flatMap(Option.match({
-        onNone: () => Effect.succeed(Option.none<string>()),
-        onSome: (project) =>
-          fs.exists(mapsDir(project)).pipe(
-            Effect.map((found) => found ? Option.some(mapsDir(project)) : Option.none()),
-            Effect.orElseSucceed(Option.none)
-          )
-      }))
-    )
-
-    const backupOf = (place: BackupRef["place"]) => ({ id, fileName, at }: Backup): MapBackup => ({
-      place,
-      id,
-      fileName,
-      at
-    })
-
-    const backups = Effect.gen(function*() {
-      const project = Option.getOrNull(yield* currentOption)
-      const inProject = project === null
-        ? []
-        : (yield* backupStore.list(projectBackups(project))).map(backupOf("project"))
-      const exported = (yield* backupStore.list(exportBackups)).map(backupOf("export"))
-      return [...inProject, ...exported].sort((a, b) => b.at.localeCompare(a.at))
-    }).pipe(Effect.withSpan("Projects.backups"))
-
-    const readBackup = Effect.fn("Projects.readBackup")(function*({ place, id }: BackupRef) {
-      const file = path.join(backupsIn(place, yield* current), id)
-      const backup = parseBackupId(id)
-      if (Option.isNone(backup)) return yield* fail("notFound", file)()
-      return { ...backupOf(place)(backup.value), text: yield* readText(file) } satisfies MapBackupFile
     })
 
     return Projects.of({
       state,
       use,
       switchTo,
+      rememberOpenMap,
       createNew,
       setName,
       folderOf,
-      rememberOpenMap,
-      mapsFolder,
-      list,
-      read,
-      create,
-      save,
-      rename,
-      pick,
-      importMap,
-      exportMap,
-      checkExports,
-      reimportMap,
-      backups,
-      readBackup
+      current,
+      inUse,
+      ensure
     })
   })
-
-  static readonly layer = Layer.effect(
-    Projects,
-    Effect.gen(function*() {
-      const { projectsDir, platform, exportBackupsDir } = yield* DesktopEnvironment
-      return yield* Projects.make(projectsDir, platform, exportBackupsDir)
-    })
-  )
 }

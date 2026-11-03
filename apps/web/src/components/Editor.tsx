@@ -18,7 +18,7 @@ import {
 } from "../editor/actions"
 import { warmCatalog } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
-import { useEditor, useOpenMapLabel } from "../editor/store"
+import { type Dialog, useEditor, useOpenMapLabel } from "../editor/store"
 import { watchResolvedTheme } from "../editor/theme"
 import { useActionKeys } from "../editor/useActionKeys"
 import { Viewport } from "../editor/Viewport"
@@ -110,7 +110,7 @@ const useCheckExportsOnFocus = () =>
   }, [])
 
 export function Editor() {
-  const dialog = useEditor((s) => s.dialog)
+  const dialog = useEditor((s): Dialog | null => s.dialog?.id ?? null)
   const settingsCategory = useEditor((s) => s.settingsCategory)
   const setSettingsCategory = useEditor((s) => s.setSettingsCategory)
   const close = useEditor((s) => s.closeDialog)
