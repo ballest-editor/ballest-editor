@@ -229,8 +229,7 @@ export const setLevelData = (map: MapFile, levelData: LevelData): MapFile => ({
 export const setLevelNames = (map: MapFile, displayName: string, creatorName: string): MapFile =>
   setLevelData(map, withLevelNames(map.worldSettings.levelData, displayName, creatorName))
 
-/** Whether a map was never published (`levelPublishedFileId` -1): the plugin manager races no other kind. */
-export const isNeverPublished = (publishedFileId: number): boolean => publishedFileId < 0
+export { isNeverPublished } from "@ballest/contracts"
 
 /**
  * The map as a draft that was never published (`levelPublishedFileId` -1), the only kind the plugin manager races: Play's

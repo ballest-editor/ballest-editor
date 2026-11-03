@@ -6,10 +6,9 @@ import { vi } from "vitest"
 import { ElectronShell } from "../electron/ElectronShell"
 import { ElectronWindow } from "../electron/ElectronWindow"
 import { PLAY_SESSION_ENDED_CHANNEL } from "../ipc/channels"
-import { Backups } from "../project/Backups"
 import { sha256 } from "../project/files"
-import { MapLinks } from "../project/MapLinks"
-import { Projects } from "../project/Projects"
+import { layerProjectsAt } from "../project/layers"
+import { MapFiles } from "../project/MapFiles"
 import { DesktopSettings } from "../settings/DesktopSettings"
 import { layerFakeGamePaths, makeFakePluginBundle, makeFakeSteam, runScoped } from "./fakeSteam"
 import { GameLink, PlayFile } from "./GameLink"
@@ -41,8 +40,7 @@ const setup = Effect.gen(function*() {
   yield* fs.writeFileString(settings, JSON.stringify({ project: { recent: [path.join(dir, "project")] } }))
   const base = Layer.mergeAll(
     Layer.effect(GameLink, GameLink.make(bundle)),
-    Layer.effect(Projects, Projects.make(dir, "linux", path.join(dir, "userData", "backups")))
-      .pipe(Layer.provide(Layer.mergeAll(MapLinks.layer, Backups.layer)))
+    layerProjectsAt(dir, "linux", path.join(dir, "userData", "backups"))
   ).pipe(
     Layer.provideMerge(layerFakeGamePaths(steam.host, settings)),
     Layer.provideMerge(Layer.effect(DesktopSettings, DesktopSettings.make(settings)))
@@ -67,9 +65,9 @@ const setup = Effect.gen(function*() {
     Layer.effect(GamePlay, GamePlay.make).pipe(Layer.provide(fakes), Layer.provideMerge(base))
   )
   const play = yield* GamePlay.pipe(Effect.provide(services))
-  const projects = yield* Projects.pipe(Effect.provide(services))
+  const files = yield* MapFiles.pipe(Effect.provide(services))
   const link = yield* GameLink.pipe(Effect.provide(services))
-  yield* projects.create(name, mapText(-1))
+  yield* files.create(name, mapText(-1))
   return {
     fs,
     path,
@@ -77,7 +75,7 @@ const setup = Effect.gen(function*() {
     steam,
     game,
     sent,
-    projects,
+    files,
     link,
     play,
     playJson: path.join(steam.plugins, "ballest-editor-link", "play.json")
@@ -147,9 +145,9 @@ describe("GamePlay.play", () => {
 
   it.effect("refuses a published map, which the plugin manager won't race, and writes nothing", () =>
     runScoped(Effect.gen(function*() {
-      const { fs, path, steam, game, projects, link, play, playJson } = yield* setup
+      const { fs, path, steam, game, files, link, play, playJson } = yield* setup
       yield* link.installPlugin
-      yield* projects.save(name, mapText(3561234567))
+      yield* files.save(name, mapText(3561234567))
       assert.deepStrictEqual(yield* play.play({ fileName: name, replacePublished: false, overwriteChanged: false }), {
         _tag: "PublishedMap",
         fileName: name,
@@ -183,9 +181,9 @@ describe("GamePlay.play", () => {
 describe("GamePlay.sessionEnds", () => {
   it.effect("says when the game a Play started has closed, once, with the last map raced", () =>
     runScoped(Effect.gen(function*() {
-      const { projects, game, sent, play } = yield* setup
+      const { files, game, sent, play } = yield* setup
       const other = "Map_LevelEditorMain&Other_me.balledit"
-      yield* projects.create(other, mapText(-1))
+      yield* files.create(other, mapText(-1))
       const ends = yield* Stream.runCollect(Stream.take(play.sessionEnds, 1)).pipe(Effect.forkChild)
       yield* settle
 

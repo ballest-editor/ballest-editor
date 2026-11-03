@@ -19,9 +19,7 @@ import { GameProcess } from "./game/GameProcess"
 import { SteamLibrary } from "./game/SteamLibrary"
 import { DesktopIpc } from "./ipc/DesktopIpc"
 import { NotificationLog } from "./notifications/NotificationLog"
-import { Backups } from "./project/Backups"
-import { MapLinks } from "./project/MapLinks"
-import { Projects } from "./project/Projects"
+import { layerProjects } from "./project/layers"
 import { DesktopSettings } from "./settings/DesktopSettings"
 import { DesktopUpdates } from "./updates/DesktopUpdates"
 import { DesktopWindow } from "./window/DesktopWindow"
@@ -52,16 +50,13 @@ const layerGame = Layer.mergeAll(GameCreator.layer, GameLink.layer).pipe(
   Layer.provideMerge(GameHost.layer)
 )
 
-const layerProjects = Projects.layer.pipe(
-  Layer.provide(Layer.mergeAll(MapLinks.layer, Backups.layer)),
-  Layer.provideMerge(layerGame)
-)
+const layerProjectsAndGame = layerProjects.pipe(Layer.provideMerge(layerGame))
 
 const layerDesktopRuntime = Layer.mergeAll(
   DesktopWindow.layer,
   DesktopUpdates.layer,
   NotificationLog.layer,
-  GamePlay.layer.pipe(Layer.provideMerge(layerProjects))
+  GamePlay.layer.pipe(Layer.provideMerge(layerProjectsAndGame))
 ).pipe(
   Layer.provideMerge(DesktopSettings.layer),
   Layer.provideMerge(DesktopEnvironment.layer(__dirname)),

@@ -1,17 +1,8 @@
 import { Effect, type FileSystem, type Path } from "effect"
 import { createHash } from "node:crypto"
 
-/** What may be imported at all; only `.balledit` files live in a project or the game's maps folder. */
-export const MAP_EXTENSIONS = [".balledit", ".ballmap", ".json"] as const
-
 /** The game's largest maps are a few MB; anything this size isn't a map. */
 export const MAX_MAP_BYTES = 64 * 1024 * 1024
-
-/** A file name for a project's `maps/` or the game's maps folder: a `.balledit` name that can't leave the folder or upset Windows. */
-export const isMapFileName = (name: string): boolean =>
-  name.toLowerCase().endsWith(".balledit") && name.length > ".balledit".length &&
-  // oxlint-disable-next-line eslint/no-control-regex -- control characters are exactly what is refused here
-  !/[<>:"/\\|?*\u0000-\u001f]/.test(name) && !name.startsWith(".") && !name.endsWith(" ")
 
 /** The SHA-256 of `bytes` as lowercase hex: what a link record keeps of a file. */
 export const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
@@ -39,3 +30,7 @@ export const isWithin = (path: Path.Path, parent: string, child: string, platfor
   const relative = path.relative(fold(parent), fold(child))
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))
 }
+
+/** Whether `a` and `b` are the same folder or file. Windows paths compare case-insensitively. */
+export const isSamePath = (path: Path.Path, a: string, b: string, platform: NodeJS.Platform): boolean =>
+  isWithin(path, a, b, platform) && isWithin(path, b, a, platform)
