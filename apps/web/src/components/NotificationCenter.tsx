@@ -1,6 +1,7 @@
 import { IconAlertCircle, IconBell, IconInfoCircle, IconPin } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@workspace/ui/components/popover"
+import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { cn } from "@workspace/ui/lib/utils"
 import { MUTABLE_KINDS } from "../domain/gameLink"
 import { panelSections, unreadCount } from "../domain/notifications"
@@ -13,7 +14,7 @@ function NotificationItem({ notice }: { readonly notice: NotificationRecord }) {
   const Icon = notice.level === "error" ? IconAlertCircle : IconInfoCircle
   const mutable = MUTABLE_KINDS.has(notice.kind)
   return (
-    <li className={cn("flex gap-2 rounded-md px-2 py-1.5", !notice.read && "bg-muted/60")}>
+    <li className={cn("flex gap-2.5 rounded-md px-3 py-2", !notice.read && "bg-muted/60")}>
       <Icon
         className={cn(
           "mt-0.5 size-3.5 shrink-0",
@@ -64,12 +65,12 @@ function Section(
   }
 ) {
   return (
-    <section className="flex flex-col gap-0.5">
-      <h3 className="flex items-center gap-1 px-2 pt-1 text-[0.6875rem] font-medium text-muted-foreground uppercase">
+    <section className="flex flex-col gap-1">
+      <h3 className="flex items-center gap-1 px-3 pt-1 text-[0.6875rem] font-medium text-muted-foreground uppercase">
         {pinned && <IconPin className="size-3" />}
         {title}
       </h3>
-      <ul className="flex flex-col gap-0.5">
+      <ul className="flex flex-col gap-1">
         {notices.map((notice) => <NotificationItem key={notice.id} notice={notice} />)}
       </ul>
     </section>
@@ -104,8 +105,8 @@ export function NotificationCenter() {
         <IconBell className="size-3.5" />
         {unread > 0 && <span className="tabular-nums">{unread}</span>}
       </PopoverTrigger>
-      <PopoverContent side="top" align="end" className="w-96 gap-2 p-1.5">
-        <div className="flex items-center gap-1 px-1 pt-1">
+      <PopoverContent side="top" align="end" className="w-[26rem] gap-1 p-2">
+        <div className="flex items-center gap-1 px-2 pt-1 pb-1">
           <PopoverTitle className="flex-1">Notifications</PopoverTitle>
           <Button variant="ghost" size="xs" disabled={unread === 0} onClick={() => markRead()}>Mark all read</Button>
           <Button
@@ -117,15 +118,18 @@ export function NotificationCenter() {
             Clear
           </Button>
         </div>
-        <div className="flex max-h-[min(60vh,32rem)] flex-col gap-2 overflow-y-auto">
-          {notifications.length === 0 && (
-            <p className="px-2 py-6 text-center text-muted-foreground">
-              No notifications
-            </p>
-          )}
-          {pinned.length > 0 && <Section title="Pinned" pinned notices={pinned} />}
-          {days.map(({ day, notices }) => <Section key={day} title={day} notices={notices} />)}
-        </div>
+        {/* the cap goes on the viewport: it is what scrolls */}
+        <ScrollArea className="[&_[data-slot=scroll-area-viewport]]:max-h-[min(60vh,32rem)]">
+          <div className="flex flex-col gap-3 py-1 pr-3 pl-1">
+            {notifications.length === 0 && (
+              <p className="px-2 py-6 text-center text-muted-foreground">
+                No notifications
+              </p>
+            )}
+            {pinned.length > 0 && <Section title="Pinned" pinned notices={pinned} />}
+            {days.map(({ day, notices }) => <Section key={day} title={day} notices={notices} />)}
+          </div>
+        </ScrollArea>
       </PopoverContent>
     </Popover>
   )

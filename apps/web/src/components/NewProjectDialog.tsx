@@ -13,6 +13,7 @@ import { useState } from "react"
 import { isProjectName } from "../domain/project"
 import { createProject } from "../editor/actions"
 import { useEditor } from "../editor/store"
+import { PathText } from "./PathText"
 
 /**
  * File › New project… (desktop): the folder's name is all it asks. The project is made under `projectsFolder`
@@ -55,15 +56,13 @@ export function NewProjectDialog({ open, onClose }: { readonly open: boolean; re
               aria-invalid={trimmed !== "" && (!valid || taken)}
               onChange={(e) => setName(e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">
-              {trimmed === ""
-                ? `Made in ${projectsFolder}`
-                : taken
-                ? "A project with that name is in the recent list already."
-                : valid
-                ? <span className="font-mono text-[0.6875rem]">{`${projectsFolder}/${trimmed}`}</span>
-                : "Letters, digits, spaces, - and _ only."}
-            </p>
+            <div className="text-xs text-muted-foreground">
+              {taken
+                ? "A recent project has that name already."
+                : trimmed !== "" && !valid
+                ? "Letters, digits, spaces, - and _ only."
+                : <PathText block>{trimmed === "" ? projectsFolder : `${projectsFolder}/${trimmed}`}</PathText>}
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>

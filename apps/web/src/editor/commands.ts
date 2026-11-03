@@ -3,7 +3,16 @@
  * the same action, so the two can't drift apart.
  */
 import type { KeybindAction } from "../domain/Keybinds"
-import { deleteSelection, duplicateSelection, importMap, playMap, saveMap, startNewMap } from "./actions"
+import {
+  closeActiveTab,
+  cycleTab,
+  deleteSelection,
+  duplicateSelection,
+  importMap,
+  playMap,
+  saveMap,
+  startNewMap
+} from "./actions"
 import { useEditor } from "./store"
 
 /**
@@ -27,7 +36,7 @@ export const actionCommands = {
   toggleGizmoSpace: () => useEditor.getState().toggleGizmoSpace(),
   speedFaster: () => useEditor.getState().changeSpeed(1),
   speedSlower: () => useEditor.getState().changeSpeed(-1),
-  newMap: () => void startNewMap(),
+  newMap: startNewMap,
   /** Import… on desktop, Open… in a browser. */
   openMap: () => void importMap(),
   saveMap: () => void saveMap(),
@@ -36,6 +45,9 @@ export const actionCommands = {
     const { capabilities, openDialog } = useEditor.getState()
     openDialog({ id: capabilities.projects ? "duplicate" : "saveAs" })
   },
+  closeTab: () => void closeActiveTab(),
+  nextTab: () => cycleTab(1),
+  previousTab: () => cycleTab(-1),
   playMap: () => void playMap(),
   showKeybinds: () => useEditor.getState().setCheatSheet(true)
 } satisfies Partial<Record<KeybindAction, () => void>>

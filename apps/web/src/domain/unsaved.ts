@@ -1,9 +1,16 @@
 /**
- * What the unsaved-changes prompt says. One prompt guards everything that would lose the open map's edits: closing the
- * window, reloading the page, New map, opening or importing another map, switching projects, and re-importing the open
- * map from the game.
+ * What the unsaved-changes prompt says. One prompt per map guards everything that would lose its edits: closing the
+ * window, reloading the page or closing its tab, switching projects, and replacing it (re-importing it from the game,
+ * recovering a previous version, importing a file over it).
  */
-export type UnsavedAction = "close" | "reload" | "newMap" | "openMap" | "switchProject" | "reimport"
+export type UnsavedAction =
+  | "close"
+  | "reload"
+  | "closeTab"
+  | "switchProject"
+  | "reimport"
+  | "recover"
+  | "replaceOnImport"
 
 export interface UnsavedPrompt {
   /** The question, answered with Save, Don't save or Cancel. */
@@ -14,19 +21,21 @@ export interface UnsavedPrompt {
 const doing: Record<UnsavedAction, string> = {
   close: "closing",
   reload: "reloading",
-  newMap: "starting a new map",
-  openMap: "opening another map",
+  closeTab: "closing it",
   switchProject: "switching projects",
-  reimport: "re-importing it from the game"
+  reimport: "re-importing it from the game",
+  recover: "opening a previous version",
+  replaceOnImport: "replacing it with the imported map"
 }
 
 const verb: Record<UnsavedAction, string> = {
   close: "close the editor",
   reload: "reload",
-  newMap: "start a new map",
-  openMap: "open another map",
+  closeTab: "close it",
   switchProject: "switch projects",
-  reimport: "re-import it from the game"
+  reimport: "re-import it from the game",
+  recover: "open a previous version",
+  replaceOnImport: "replace it with the imported map"
 }
 
 /** The desktop prompt: Save, Don't save, Cancel. `map` is the map's name, as the title bar shows it. */

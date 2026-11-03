@@ -183,10 +183,10 @@ the outside in:
   project window, opening another project asks **This window / New window** (IntelliJ), remembered in Settings. One
   project per window.
 - **Project window.** Always shows a map: every project has at least one, and opening a project opens its last open
-  map, or its first. There is no Start tab and no empty editor. Maps are the document tabs (one at a time today, several
-  in 0.5). The project's maps live in the **Project panel**, a tab beside Pieces in the left dock: a tree of the
+  map, or its first. There is no Start tab and no empty editor. Maps are the document tabs, several at a
+  time. The project's maps live in the **Project panel**, a tab beside Pieces in the left dock: a tree of the
   project's maps (later folders, sub-assemblies and the rest), each with its link state and a dot while it is open
-  with unsaved edits, like an editor's file explorer. A click opens a map; its menu holds Rename, Duplicate, Recover,
+  in a tab with unsaved edits, like an editor's file explorer. A click opens a map; its menu holds Rename, Duplicate, Recover,
   Export, Play, Reveal; the header New map, Import and Project settings.
 - **First launch.** Straight into the editor as **Untitled Project \*** with an Untitled map, nothing on disk. The
   first Save opens a **Save project** modal: project name, folder (default `Documents/Ballest Editor/<name>`), map
@@ -207,8 +207,8 @@ the outside in:
 - **Notifications.** Every toast is also a notification. The bell keeps the last 100 across restarts
   (`<userData>/notifications.json`), with their actions still live. Persistent ones pin to the top until resolved.
   "Don't show again" is per notification kind.
-- **Settings** (the app: keybinds, camera, appearance, and the Game link checklist as its Game page, the game's
-  folders and the editor's plugin) stays its own dialog under File. File › Game link… and Settings › Game are the
+- **Settings** (the app: keybinds, camera, appearance (theme, animation speed), and the Game link checklist as its
+  Game page, the game's folders and the editor's plugin) stays its own dialog under File. File › Game link… and Settings › Game are the
   same checklist in two frames; there is no second description of the folders.
 
 ```
@@ -240,8 +240,7 @@ short of the design:
 - **The Project panel** has no thumbnails and no Delete. Rename, Duplicate, Export and Play open the map first (they
   act on the open map); Reveal shows the project's maps folder, not the file.
 - **Project settings:** the name is read-only (the folder's), the export target read-only (the game's maps folder);
-  no git yet. A map entry edits the open map in the editor, any other map on disk through the save path; the open map
-  with unsaved edits is refused.
+  no git yet. A map entry edits a map open in a tab in that tab, any other map on disk through the save path.
 - **Game link** opens by itself on the first launch and when a launch finds the game or its maps folder missing; the
   plugin manager is an optional row, never red, and never opens it.
 

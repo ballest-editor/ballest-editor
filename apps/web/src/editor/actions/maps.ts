@@ -1,21 +1,22 @@
 /**
  * The project's maps in the editor (docs/PROJECTS.md): New map, reading and showing a map, the map the app starts on,
- * Project settings' per-map edits and prefs, and the project's own name and folders. What asks about unsaved edits
- * first (opening another map, Import, switching projects) is in `project`.
+ * Project settings' per-map edits and prefs, and the project's own name and folders. Opening, Import and switching
+ * projects are in `project`.
  */
 import type { ProjectFolder } from "@ballest/contracts"
 import { Effect } from "effect"
 import { creatorOf, usableCreatorName } from "../../domain/creator"
+import { setLevelData as setMapLevelData } from "../../domain/edits"
 import { currentCreatedAt, mapLabelOf, newMapFile } from "../../domain/factory"
 import { type LevelData, type MapFile, PLAYER_START_CLASS } from "../../domain/MapFile"
 import { type MapPrefs, mapPrefsKeyOf } from "../../domain/MapPrefs"
 import { MapCodec } from "../../services/MapCodec"
 import { MapExporter } from "../../services/MapExporter"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
-import { Platform, PlatformError } from "../../services/Platform"
-import { useEditor } from "../store"
+import { Platform } from "../../services/Platform"
+import { type TabTarget, tabWithFile, useEditor } from "../store"
 import { notifyFailure, run } from "./run"
-import { fileOf, hasProject, projectName, refreshProject, revealIn, saveMapPrefs, showMap } from "./shared"
+import { fileOf, hasProject, projectName, refreshProject, revealIn, saveTabPrefs, showMap } from "./shared"
 
 /**
  * New map: starts it the way the in-game editor does and, on desktop, saves it into the project at once (making the
@@ -29,12 +30,12 @@ export const createNewMap = Effect.fn("createNewMap")(function*(displayName: str
   const map = newMapFile({ displayName, creatorName, createdAt, playerStartPiece })
   // a browser keeps it in memory; so does Untitled Project, until the first Save names a project
   if (!platform.capabilities.projects || !hasProject()) {
-    useEditor.getState().loadMap(map, null)
+    useEditor.getState().loadMap(map, null, undefined, { into: "newTab" })
     return
   }
   const result = yield* (yield* MapExporter).prepare(map)
   const created = yield* platform.createMap({ fileName: result.filename, text: result.text })
-  yield* showMap(result.map, fileOf(created))
+  yield* showMap(result.map, fileOf(created), { into: "newTab" })
   yield* refreshProject
   useEditor.getState().notify("info", `Created ${mapLabelOf(created.fileName)} in ${projectName()}`, {
     kind: "mapCreated",
@@ -44,20 +45,21 @@ export const createNewMap = Effect.fn("createNewMap")(function*(displayName: str
 
 export const newMap = (displayName: string, creatorName: string) => run(createNewMap(displayName, creatorName))
 
-/** Reads one of the project's maps into the editor, quietly. */
-const readProjectMapIntoEditor = Effect.fn("readProjectMapIntoEditor")(function*(fileName: string) {
+/** Reads one of the project's maps into the editor, in the tab `into` says. */
+const readProjectMapIntoEditor = Effect.fn("readProjectMapIntoEditor")(function*(fileName: string, into: TabTarget) {
   const file = yield* (yield* Platform).readMap(fileName)
   const map = yield* MapCodec.use((codec) => codec.decode(file.text))
-  yield* showMap(map, fileOf(file))
-  return { file, map }
+  yield* showMap(map, fileOf(file), { into })
 })
 
-/** Opens one of the project's maps. */
+/**
+ * Opens one of the project's maps: the tab that has it open becomes the active one, else it opens in a new tab (in
+ * place of the fresh map the app starts on, while that is untouched). Nothing is asked: no map is replaced.
+ */
 export const openProjectMapFile = Effect.fn("openProjectMapFile")(function*(fileName: string) {
-  const { file, map } = yield* readProjectMapIntoEditor(fileName)
-  useEditor.getState().notify("info", `Opened ${mapLabelOf(file.fileName)} (${map.items.length} items)`, {
-    kind: "mapOpened"
-  })
+  const open = tabWithFile(useEditor.getState(), fileName)
+  if (open === undefined) yield* readProjectMapIntoEditor(fileName, "newTab")
+  else useEditor.getState().activateTab(open)
 })
 
 /**
@@ -70,7 +72,8 @@ export const freshMapEffect = Effect.gen(function*() {
   const playerStartPiece = catalog?.catalog.pieces.find((p) => p.classPath === PLAYER_START_CLASS)
   const creatorName = usableCreatorName(creatorOf(settings.general.creatorName, foundCreator))
   const createdAt = yield* currentCreatedAt
-  useEditor.getState().loadMap(newMapFile({ displayName: "Untitled", creatorName, createdAt, playerStartPiece }), null)
+  const map = newMapFile({ displayName: "Untitled", creatorName, createdAt, playerStartPiece })
+  useEditor.getState().loadMap(map, null, undefined, { fresh: true })
 })
 
 /**
@@ -86,7 +89,7 @@ export const openStartingMap = Effect.gen(function*() {
     ...projectMaps.filter((m) => m.fileName !== last).map((m) => m.fileName)
   ]
   for (const fileName of candidates) {
-    const opened = yield* readProjectMapIntoEditor(fileName).pipe(
+    const opened = yield* readProjectMapIntoEditor(fileName, "active").pipe(
       Effect.as(true),
       Effect.catchCause((cause) => Effect.sync(() => notifyFailure(cause)).pipe(Effect.as(false)))
     )
@@ -138,21 +141,20 @@ export const readProjectMapSettings = (fileName: string) =>
   )
 
 /**
- * Project settings editing a map that isn't the open one: the file is read, `patch` applied and the result written
- * through the same path as Save (its name may change, moving the file; the old one goes to the backups). The open map
- * with unsaved edits is refused: Save it first. A clean open map is reloaded from the write.
+ * Project settings editing a map that isn't in the active tab. A map open in another tab is edited there, as an undo
+ * step of that tab, and saved when that tab is (its prefs are kept under its new name). Otherwise the file is read,
+ * `patch` applied and the result written through the same path as Save (its name may change, moving the file; the
+ * old one goes to the backups).
  */
 export const patchProjectMapEffect = Effect.fn("patchProjectMapEffect")(
   function*(fileName: string, patch: (map: MapFile) => MapFile) {
     const platform = yield* Platform
-    const { file: openFile, dirty } = useEditor.getState()
-    const isOpen = openFile?.name === fileName
-    if (isOpen && dirty) {
-      return yield* new PlatformError({
-        message: `${
-          mapLabelOf(fileName)
-        } is open with unsaved edits. Save it first, or change its settings in the editor.`
-      })
+    const s = useEditor.getState()
+    const tabId = tabWithFile(s, fileName)
+    if (tabId !== undefined) {
+      s.editTabMap(tabId, patch)
+      yield* saveTabPrefs(tabId)
+      return undefined
     }
     const read = yield* platform.readMap(fileName)
     const map = yield* MapCodec.use((codec) => codec.decode(read.text))
@@ -160,7 +162,6 @@ export const patchProjectMapEffect = Effect.fn("patchProjectMapEffect")(
     const saved = result.filename === fileName
       ? yield* platform.saveMap({ fileName, text: result.text })
       : yield* platform.renameMap({ from: fileName, to: result.filename, text: result.text })
-    if (isOpen) yield* showMap(result.map, fileOf(saved))
     yield* refreshProject
     return saved
   }
@@ -177,25 +178,27 @@ export const saveProjectMapPrefs = (key: string, prefs: MapPrefs) =>
     })
   )
 
-/** Export on save for the open map, kept with its prefs. */
-export const setExportOnSave = (exportOnSave: boolean) => {
-  useEditor.getState().setExportOnSave(exportOnSave)
-  return run(saveMapPrefs)
+/** Export on save for a tab's map (the active tab's by default), kept with its prefs. */
+export const setExportOnSave = (exportOnSave: boolean, tabId = useEditor.getState().tabId) => {
+  useEditor.getState().setTabExportOnSave(tabId, exportOnSave)
+  return run(saveTabPrefs(tabId))
 }
 
 /**
- * Changes the map's level fields (one undo step). Its prefs are saved again under its
- * (possibly new) name.
+ * Changes a tab's map's level fields (one undo step of that tab; the active tab's by default). Its prefs are saved
+ * again under its (possibly new) name.
  */
-export const setLevelData = (levelData: LevelData) => {
-  useEditor.getState().setLevelData(levelData)
-  return run(saveMapPrefs)
+export const setLevelData = (levelData: LevelData, tabId = useEditor.getState().tabId) => {
+  const s = useEditor.getState()
+  if (tabId === s.tabId) s.setLevelData(levelData)
+  else s.editTabMap(tabId, (map) => setMapLevelData(map, levelData))
+  return run(saveTabPrefs(tabId))
 }
 
-/** Moves the grid (and where pieces land); saved with the map's prefs, not in its history. */
-export const setGridHeight = (gridHeight: number) => {
-  useEditor.getState().setFloorHeight(gridHeight)
-  return run(saveMapPrefs)
+/** Moves a tab's grid (and where pieces land; the active tab's by default); saved with the map's prefs, not in its history. */
+export const setGridHeight = (gridHeight: number, tabId = useEditor.getState().tabId) => {
+  useEditor.getState().setTabFloorHeight(tabId, gridHeight)
+  return run(saveTabPrefs(tabId))
 }
 
 /**

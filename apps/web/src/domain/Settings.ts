@@ -20,7 +20,9 @@ export const GeneralSettings = Schema.Struct({
    */
   creatorName: Schema.NullOr(Schema.String),
   /** Whether Alt+dragging a translate handle moves a copy and leaves the selection in place, like the game. */
-  altDragDuplicates: Schema.Boolean
+  altDragDuplicates: Schema.Boolean,
+  /** Whether every Save also exports the map to the game (desktop), whatever the map's own Export on save says. */
+  exportOnSave: Schema.Boolean
 })
 
 export const EditorSettings = Schema.Struct({
@@ -50,6 +52,11 @@ export const CameraSettings = Schema.Struct({
   movementNeedsLook: Schema.Literals(movementLookModes)
 })
 
+/** The animation speeds, as Settings › Appearance offers them, and the factor each applies to every duration. */
+export const motionSpeeds = ["off", "fast", "normal", "slow"] as const
+export type MotionSpeed = (typeof motionSpeeds)[number]
+export const MOTION_SCALE: Record<MotionSpeed, number> = { off: 0, fast: 0.5, normal: 1, slow: 2 }
+
 const HexColor = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/))
 
 export const AppearanceSettings = Schema.Struct({
@@ -59,7 +66,9 @@ export const AppearanceSettings = Schema.Struct({
   gridCellColor: Schema.NullOr(HexColor),
   gridSectionColor: Schema.NullOr(HexColor),
   /** Whether the level's water (see domain/level) is drawn. */
-  waterVisible: Schema.Boolean
+  waterVisible: Schema.Boolean,
+  /** How fast the interface animates (panels opening, menus, tabs); "off" skips every animation. */
+  motion: Schema.Literals(motionSpeeds)
 })
 
 export const LightingSettings = Schema.Struct({
@@ -92,7 +101,7 @@ export const Settings = Schema.Struct({
 export type Settings = typeof Settings.Type
 
 export const defaultSettings: Settings = {
-  general: { units: "cm", creatorName: null, altDragDuplicates: true },
+  general: { units: "cm", creatorName: null, altDragDuplicates: true, exportOnSave: false },
   editor: { placeDistance: PLACE_DISTANCE, undoSelection: false },
   camera: {
     flySpeed: 2000,
@@ -109,7 +118,8 @@ export const defaultSettings: Settings = {
     gridVisible: true,
     gridCellColor: null,
     gridSectionColor: null,
-    waterVisible: true
+    waterVisible: true,
+    motion: "normal"
   },
   lighting: { mapLighting: true, skyVisible: true },
   snapping: {

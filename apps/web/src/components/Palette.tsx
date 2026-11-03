@@ -1,4 +1,4 @@
-import { IconChevronRight } from "@tabler/icons-react"
+import { IconChevronRight, IconFoldDown, IconFoldUp } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/ui/components/collapsible"
 import { Input } from "@workspace/ui/components/input"
@@ -105,6 +105,7 @@ export function Palette() {
   const placePiece = useEditor((s) => s.placePiece)
   const [query, setQuery] = useState("")
   const [open, setOpen] = useState<Readonly<Record<string, boolean>>>({})
+  const [allCollapsed, setAllCollapsed] = useState(false)
 
   const index = useEditor((s) => s.catalogIndex)
   const terms = useMemo(() => query.toLowerCase().split(/\s+/).filter((t) => t.length > 0), [query])
@@ -131,9 +132,35 @@ export function Palette() {
     focusViewport()
   }
 
+  // Collapse all / Expand all, like an editor's file explorer: one click folds every group, the next opens them.
+  const toggleAll = () => {
+    const next = !allCollapsed
+    setAllCollapsed(next)
+    setOpen(Object.fromEntries(sections.map((section) => [section.name, !next])))
+  }
+
   return (
     <aside className="flex h-full min-w-0 flex-col gap-2 bg-card p-2">
-      <Input type="search" placeholder="Search pieces…" value={query} onChange={(e) => setQuery(e.target.value)} />
+      <div className="flex items-center gap-1">
+        <Input
+          type="search"
+          placeholder="Search pieces…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="min-w-0 flex-1"
+        />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0 text-muted-foreground"
+          aria-label={allCollapsed ? "Expand all groups" : "Collapse all groups"}
+          title={allCollapsed ? "Expand all groups" : "Collapse all groups"}
+          disabled={terms.length > 0}
+          onClick={toggleAll}
+        >
+          {allCollapsed ? <IconFoldDown className="size-4" /> : <IconFoldUp className="size-4" />}
+        </Button>
+      </div>
       {catalog === null && !booting && (
         <div className="px-1 text-xs text-muted-foreground">The piece catalog couldn't be loaded.</div>
       )}
@@ -150,15 +177,15 @@ export function Palette() {
                   onOpenChange={(next) => setOpen((o) => ({ ...o, [section.name]: next }))}
                 >
                   <CollapsibleTrigger
-                    className="group flex w-full items-center gap-1 rounded-sm px-1 py-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase hover:text-foreground"
+                    className="group flex h-8 w-full items-center gap-1.5 rounded-sm px-1.5 text-[0.7rem] font-semibold tracking-wider text-muted-foreground uppercase hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60 focus-visible:outline-none"
                     onMouseDown={(e) => e.preventDefault()}
                   >
-                    <IconChevronRight className="size-3 transition-transform group-data-[panel-open]:rotate-90" />
+                    <IconChevronRight className="size-3.5 transition-transform duration-200 group-data-[panel-open]:rotate-90" />
                     <span className="truncate">{section.name}</span>
                     <span className="ml-auto font-normal tabular-nums">{section.pieces.length}</span>
                   </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <ul className="flex flex-col gap-0.5">
+                  <CollapsibleContent className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-200 ease-out data-[ending-style]:h-0 data-[starting-style]:h-0">
+                    <ul className="flex flex-col gap-0.5 pb-1">
                       {section.pieces.map((piece) => {
                         const unavailable = unavailableReason(piece)
                         return (

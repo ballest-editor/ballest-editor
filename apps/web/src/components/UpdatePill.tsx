@@ -13,7 +13,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { useRef } from "react"
 import { formatDate } from "../domain/time"
 import { downloadUpdate, installUpdate, openExternalLink } from "../editor/actions"
-import { useEditor, useUpdateState } from "../editor/store"
+import { dirtyTabs, useEditor, useUpdateState } from "../editor/store"
 import { ReleaseNotes } from "./ReleaseNotes"
 
 /** The states the pill shows; the others (no newer release, or updates off) show nothing. */
@@ -171,7 +171,7 @@ function Actions({ state, dirty }: { readonly state: UpdateState; readonly dirty
  */
 export function UpdatePill() {
   const state = useUpdateState()
-  const dirty = useEditor((s) => s.dirty)
+  const dirty = useEditor((s) => dirtyTabs(s).length > 0)
   const offer = state === null ? null : offerOf(state)
   if (state === null || offer === null) return null
 

@@ -367,7 +367,7 @@ export function SettingsDialog(props: {
         ...setting("general", "altDragDuplicates"),
         label: "Alt+drag duplicates",
         description:
-          "Holding Alt while dragging a translate handle moves a copy of the selection and leaves the original in place, like the game. Turn off to make Alt+drag a plain move.",
+          "Alt+drag on a translate handle moves a copy and leaves the original in place, like the game. Off: Alt+drag is a plain move.",
         control: (
           <Switch
             checked={settings.general.altDragDuplicates}
@@ -375,6 +375,23 @@ export function SettingsDialog(props: {
           />
         )
       },
+      ...(hasGame
+        ? [
+          {
+            id: "exportOnSaveAll",
+            ...setting("general", "exportOnSave"),
+            label: "Export every save",
+            description:
+              "Every Save also exports the map to the game. Off: only maps with their own Export on save are exported.",
+            control: (
+              <Switch
+                checked={settings.general.exportOnSave}
+                onCheckedChange={(v) => update("general", { exportOnSave: v })}
+              />
+            )
+          } satisfies Row
+        ]
+        : []),
       {
         id: "autosave",
         category: "general",
@@ -389,7 +406,7 @@ export function SettingsDialog(props: {
         ...setting("editor", "placeDistance"),
         label: "Placement distance",
         description:
-          "How far from the camera a new piece lands when the floor is further away or out of sight. Pieces too wide to fit at this distance go further out.",
+          "How far from the camera a new piece lands when the floor is out of reach. Wider pieces go further.",
         control: (
           <>
             <Slider
@@ -604,6 +621,29 @@ export function SettingsDialog(props: {
         )
       },
       {
+        id: "motion",
+        ...setting("appearance", "motion"),
+        label: "Animation speed",
+        description: "How fast panels, menus and tabs animate. Off skips every animation.",
+        control: (
+          <Select
+            value={a.motion}
+            items={{ off: "Off", fast: "Fast", normal: "Normal", slow: "Slow" }}
+            onValueChange={(v) => v !== null && update("appearance", { motion: v })}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="off">Off</SelectItem>
+              <SelectItem value="fast">Fast</SelectItem>
+              <SelectItem value="normal">Normal</SelectItem>
+              <SelectItem value="slow">Slow</SelectItem>
+            </SelectContent>
+          </Select>
+        )
+      },
+      {
         id: "gridVisible",
         ...setting("appearance", "gridVisible"),
         label: "Show grid",
@@ -650,7 +690,7 @@ export function SettingsDialog(props: {
         ...setting("lighting", "mapLighting"),
         label: "Map lighting",
         description:
-          "Light the viewport with the map's sun and sky, as set in the inspector's Lighting section. Off: fixed studio lights.",
+          "Light the viewport with the map's sun and sky (the inspector's Lighting section). Off: fixed studio lights.",
         control: <Switch checked={l.mapLighting} onCheckedChange={(v) => update("lighting", { mapLighting: v })} />
       },
       {

@@ -1,6 +1,13 @@
-import { IconCircleCheck, IconCircleDashed, IconCircleX, IconRefresh, IconRestore } from "@tabler/icons-react"
+import {
+  IconCircleCheck,
+  IconCircleDashed,
+  IconCircleX,
+  IconFolderOpen,
+  IconFolderSearch,
+  IconRefresh,
+  IconRestore
+} from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { type ComponentType, useState } from "react"
 import {
@@ -21,6 +28,7 @@ import {
   revealGamePath
 } from "../editor/actions"
 import { useCreator, useEditor } from "../editor/store"
+import { PathAction, PathField } from "./PathText"
 
 const ICONS: Record<GameLinkRowState, ComponentType<{ readonly className?: string }>> = {
   ok: IconCircleCheck,
@@ -91,71 +99,82 @@ function FixButton({ fix, state }: { readonly fix: GameLinkFix; readonly state: 
   }
 }
 
-/** Back to the folder found through Steam, for one chosen here instead (Settings' reset). */
-function ResetButton({ which }: { readonly which: GameFolderKind }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="text-muted-foreground"
-            onClick={() => void resetGamePaths([which])}
-            aria-label="Use the folder Steam knows about"
-          />
-        }
-      >
-        <IconRestore />
-      </TooltipTrigger>
-      <TooltipContent>Use the folder Steam knows about</TooltipContent>
-    </Tooltip>
-  )
-}
-
 /** The folder a row's Choose folder… or Change… picks, whose refusal shows on that row. */
 const chosenFolder = (row: GameLinkRow): GameFolderKind | null => {
   for (const fix of row.fixes) if (fix._tag === "ChooseFolder") return fix.which
   return null
 }
 
+/**
+ * One row, in the settings rows' shape: the state icon, the row's name with what was found (or what is wrong) under
+ * it, and its fix as a button at the right. A folder that is there shows as a `PathField` under that, with Reveal,
+ * Change and (for one chosen here) reset as the field's icon actions, so the folder rows line up with Project
+ * settings' Locations.
+ */
 function ChecklistRow({ row, framed }: { readonly row: GameLinkRow; readonly framed: boolean }) {
   const folder = chosenFolder(row)
   const problem = useEditor((s) => s.gamePathProblem?.which === folder ? s.gamePathProblem.message : null)
   const { reveal, reset } = row
+  const quiet = row.state === "waiting" || row.state === "optional"
+  // a folder that is there is changed from its field; its fix button only shows while it is missing
+  const inField = row.state === "ok" && row.path !== null ? folder : null
+  const buttons = row.fixes.filter((fix) => !(inField !== null && fix._tag === "ChooseFolder"))
   return (
-    <li className={cn("grid grid-cols-[auto_7rem_minmax(0,1fr)_auto] items-start gap-x-3 py-2", framed && "px-4")}>
-      <StateIcon state={problem === null ? row.state : "missing"} className="mt-px" />
-      <span className="text-muted-foreground">{row.label}</span>
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <span
-          className={cn(
-            "font-medium",
-            (row.state === "waiting" || row.state === "optional") && "font-normal text-muted-foreground"
-          )}
-        >
-          {row.title}
-        </span>
-        {row.note !== null && <span className="text-muted-foreground">{row.note}</span>}
-        {row.path !== null && (
-          <span
-            className="truncate text-left font-mono text-[0.6875rem] text-muted-foreground"
-            dir="rtl"
-            title={row.path}
-          >
-            {/* rtl so a long path is cut at its start: the folder itself is at the end */}
-            <bdi>{row.path}</bdi>
+    <li
+      className={cn(
+        "flex flex-col gap-2.5 py-3",
+        framed ? "px-4" : "first:pt-0 last:pb-0",
+        row.path !== null && "pb-4 last:pb-1"
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <StateIcon state={problem === null ? row.state : "missing"} className="mt-0.5" />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className="font-medium">{row.label}</span>
+          <span className={cn("text-[0.7rem] text-muted-foreground", quiet && "opacity-80")}>
+            <span className={cn(!quiet && "text-foreground/80")}>{row.title}</span>
+            {row.note !== null && `. ${row.note}`}
           </span>
+          {problem !== null && <span className="text-[0.7rem] text-destructive">{problem}</span>}
+        </div>
+        {buttons.length > 0 && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            {buttons.map((fix) => <FixButton key={fix._tag} fix={fix} state={row.state} />)}
+          </div>
         )}
-        {problem !== null && <span className="text-destructive">{problem}</span>}
       </div>
-      <div className="flex items-center gap-1.5">
-        {reveal !== null && (
-          <Button variant="outline" size="sm" onClick={() => void revealGamePath(reveal)}>Reveal</Button>
-        )}
-        {row.fixes.map((fix) => <FixButton key={fix._tag} fix={fix} state={row.state} />)}
-        {reset !== null && <ResetButton which={reset} />}
-      </div>
+      {row.path !== null && (
+        <div className="pl-[1.625rem]">
+          <PathField
+            path={row.path}
+            actions={reveal === null && inField === null && reset === null ? undefined : (
+              <>
+                {reveal !== null && (
+                  <PathAction
+                    label="Reveal in file manager"
+                    icon={IconFolderOpen}
+                    onClick={() => void revealGamePath(reveal)}
+                  />
+                )}
+                {inField !== null && (
+                  <PathAction
+                    label="Choose another folder…"
+                    icon={IconFolderSearch}
+                    onClick={() => void chooseGameLinkFolder(inField)}
+                  />
+                )}
+                {reset !== null && (
+                  <PathAction
+                    label="Use the folder Steam knows about"
+                    icon={IconRestore}
+                    onClick={() => void resetGamePaths([reset])}
+                  />
+                )}
+              </>
+            )}
+          />
+        </div>
+      )}
     </li>
   )
 }
@@ -184,7 +203,7 @@ export function GameLinkRows({ framed }: { readonly framed: boolean }) {
   const creator = useCreator()
   const rows = gameLinkRows(paths, plugin, creator)
   return (
-    <ul className={cn("flex flex-col text-xs", framed ? "py-1" : "divide-y divide-border/50")}>
+    <ul className={cn("flex flex-col divide-y divide-border/50 text-xs", framed && "py-1")}>
       {rows.map((row) => <ChecklistRow key={row.id} row={row} framed={framed} />)}
     </ul>
   )

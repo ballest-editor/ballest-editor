@@ -9,7 +9,7 @@ import { Platform } from "../../services/Platform"
 import { useEditor } from "../store"
 import { notifyFailure, run, runUntilCleanup } from "./run"
 import { fileOf, refreshProject, showMap } from "./shared"
-import { unlessCancelled } from "./unsaved"
+import { unlessCancelledFor } from "./unsaved"
 
 /** Tells that the game changed a map's export, with Re-import and Ignore. */
 const notifyChangedInGame = (fileName: string) =>
@@ -59,14 +59,13 @@ export const checkExports = () => run(checkExportsEffect)
 
 /**
  * Re-import: the game's version of a map replaces the project's (which goes to the project's backups), and the link
- * records it as in sync. The open map is reloaded from it, after asking about its unsaved edits.
+ * records it as in sync. A tab that has the map open is made active and reloaded from it, after asking about its
+ * unsaved edits.
  */
 export const reimportMapEffect = (fileName: string) =>
-  Effect.suspend(() => {
-    const isOpen = () => useEditor.getState().file?.name === fileName
-    const reimport = Effect.gen(function*() {
+  unlessCancelledFor(fileName, "reimport", (open) =>
+    Effect.gen(function*() {
       const file = yield* (yield* Platform).reimportMap(fileName)
-      const open = isOpen()
       if (open) yield* showMap(yield* MapCodec.use((codec) => codec.decode(file.text)), fileOf(file))
       yield* refreshProject
       useEditor.getState().notify("info", `Re-imported ${mapLabelOf(fileName)} from the game`, {
@@ -74,9 +73,7 @@ export const reimportMapEffect = (fileName: string) =>
         body: "The project's previous version is in the backups (Project › Recover previous version…).",
         actions: open ? [] : [{ label: "Open", command: { _tag: "OpenMap", fileName } }]
       })
-    })
-    return isOpen() ? unlessCancelled("reimport", reimport) : reimport
-  })
+    }))
 
 export const reimportMap = (fileName: string) => run(reimportMapEffect(fileName))
 

@@ -26,8 +26,8 @@ export function NewMapDialog({ open, onClose }: { readonly open: boolean; readon
       id="new"
       title="New map"
       fileNameLead="Exports as"
-      fileNameNote={`Starts like a new in-game map, with the player start and the goal ring where the game puts them${
-        projects && project !== null ? `, and is saved in ${project.name} at once` : ""
+      fileNameNote={`A player start and a goal ring where the game puts them${
+        projects && project !== null ? `, saved in ${project.name} right away` : ""
       }.`}
       name={name}
       onNameChange={setName}
@@ -38,8 +38,7 @@ export function NewMapDialog({ open, onClose }: { readonly open: boolean; readon
     >
       {clash && (
         <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          The project already has a map called {name.trim()} by{" "}
-          {creator.name}. Open it from the Project panel, or pick another name.
+          The project already has {name.trim()} by {creator.name}. Open it from the Project panel, or pick another name.
         </p>
       )}
     </MapNameDialog>
