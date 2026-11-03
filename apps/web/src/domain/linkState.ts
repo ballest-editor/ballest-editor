@@ -1,6 +1,6 @@
 /**
  * How a project map stands against its export in the game's maps folder (docs/PROJECTS.md § Sync), shown in the status
- * bar and on the Start tab.
+ * bar and in the Project panel.
  */
 
 /** The file a link record points at (`LinkedFile` in @ballest/contracts): its path, its bytes' hash, and when. */

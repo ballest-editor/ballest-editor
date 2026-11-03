@@ -448,12 +448,9 @@ export const followOpenMapEffect = Effect.gen(function*() {
 })
 
 /**
- * Closes the map's tab: the tab then shows a fresh unsaved map, as New map would without its dialog; unsaved edits ask
- * first (the shared prompt, `unlessCancelled`).
- */
-/**
- * Rename… or Duplicate… for one of the project's maps from the Maps dialog or Project settings: the dialogs name the
- * open map, so the map is opened first (asking about the open map's unsaved edits), then its dialog.
+ * Rename…, Duplicate… or Recover previous version… for one of the project's maps from the Project panel or Project
+ * settings: the dialogs act on the open map, so the map is opened first (asking about the open map's unsaved edits),
+ * then its dialog.
  */
 export const nameProjectMap = (fileName: string, mode: "rename" | "duplicate" | "recover") =>
   withProjectMapOpen(fileName, Effect.sync(() => useEditor.getState().openDialog(mode)))
@@ -989,7 +986,7 @@ const notifyChangedInGame = (fileName: string) =>
 /**
  * One look at the exports (desktop): main hashes each linked map's export and reports what the game changed since the
  * last look, each change once; a map whose export is gone shows Not exported from then on. The maps are listed again,
- * so the status bar and the Maps dialog show the states. A failure is only logged: the next focus looks again.
+ * so the status bar and the Project panel show the states. A failure is only logged: the next focus looks again.
  */
 const checkExportsOnce = Effect.gen(function*() {
   const platform = yield* Platform
