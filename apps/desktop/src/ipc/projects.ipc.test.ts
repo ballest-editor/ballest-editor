@@ -1,8 +1,7 @@
-import { ProjectState } from "@ballest/contracts"
+import { InvokeChannels, ProjectState } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, FileSystem, Option, Path } from "effect"
 import { vi } from "vitest"
-import * as channels from "./channels"
 import { readSettings, withHandlers } from "./handlersHarness"
 
 // The services' layers call Electron; these tests replace them, so only the module import needs a stand-in
@@ -23,54 +22,54 @@ describe("Projects over IPC", () => {
 
             // No project yet: Untitled Project. Nothing is listed or revealed, remembering an open map is a no-op, and
             // writing a map is refused until a project is named.
-            assert.deepStrictEqual(yield* fake.invoke(channels.PROJECT_STATE_CHANNEL), {
+            assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.projectState), {
               current: null,
               recent: [],
               lastOpenMap: null,
               projectsFolder: path.dirname(project)
             })
-            assert.deepStrictEqual(yield* fake.invoke(channels.LIST_MAPS_CHANNEL), [])
-            assert.isFalse(yield* fake.invoke(channels.REVEAL_PROJECT_CHANNEL, { which: "maps" }))
-            yield* fake.invoke(channels.REMEMBER_OPEN_MAP_CHANNEL, { fileName: name })
-            assert.isNull((yield* fake.invokeAs(ProjectState, channels.PROJECT_STATE_CHANNEL)).lastOpenMap)
-            const unnamed = yield* Effect.flip(fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text }))
+            assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.listMaps), [])
+            assert.isFalse(yield* fake.invoke(InvokeChannels.revealProject, { which: "maps" }))
+            yield* fake.invoke(InvokeChannels.rememberOpenMap, { fileName: name })
+            assert.isNull((yield* fake.invokeAs(ProjectState, InvokeChannels.projectState)).lastOpenMap)
+            const unnamed = yield* Effect.flip(fake.invoke(InvokeChannels.createMap, { fileName: name, text }))
             assert.match(String(unnamed.cause), /no project yet/)
 
             // The first Save names the project; it is on disk from then on.
-            const named = yield* fake.invokeAs(ProjectState, channels.CREATE_PROJECT_CHANNEL, { name: "My maps" })
+            const named = yield* fake.invokeAs(ProjectState, InvokeChannels.createProject, { name: "My maps" })
             assert.deepStrictEqual(named, {
               current: { path: project, name: "My maps", exists: true },
               recent: [],
               lastOpenMap: null,
               projectsFolder: path.dirname(project)
             })
-            assert.isTrue(yield* fake.invoke(channels.REVEAL_PROJECT_CHANNEL, { which: "maps" }))
-            assert.isTrue(yield* fake.invoke(channels.REVEAL_PROJECT_CHANNEL, { which: "project" }))
+            assert.isTrue(yield* fake.invoke(InvokeChannels.revealProject, { which: "maps" }))
+            assert.isTrue(yield* fake.invoke(InvokeChannels.revealProject, { which: "project" }))
             // the backups folder is made by the first backup
-            assert.isFalse(yield* fake.invoke(channels.REVEAL_PROJECT_CHANNEL, { which: "backups" }))
-            assert.deepStrictEqual(yield* fake.invoke(channels.LIST_MAPS_CHANNEL), [])
+            assert.isFalse(yield* fake.invoke(InvokeChannels.revealProject, { which: "backups" }))
+            assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.listMaps), [])
 
             // Project settings › General renames the project in its file; the folder keeps its name
-            const renamedProject = yield* fake.invokeAs(ProjectState, channels.RENAME_PROJECT_CHANNEL, {
+            const renamedProject = yield* fake.invokeAs(ProjectState, InvokeChannels.renameProject, {
               name: " Season 3 "
             })
             assert.deepInclude(renamedProject.current, { path: project, name: "Season 3" })
             assert.deepInclude(JSON.parse(yield* fs.readFileString(path.join(project, "ballest-project.json"))), {
               name: "Season 3"
             })
-            const blank = yield* Effect.flip(fake.invoke(channels.RENAME_PROJECT_CHANNEL, { name: "  " }))
+            const blank = yield* Effect.flip(fake.invoke(InvokeChannels.renameProject, { name: "  " }))
             assert.match(String(blank.cause), /can't name a folder/)
 
             // the open map is kept per project for the next launch; a name that isn't a map file's is refused
-            yield* fake.invoke(channels.REMEMBER_OPEN_MAP_CHANNEL, { fileName: name })
-            assert.strictEqual((yield* fake.invokeAs(ProjectState, channels.PROJECT_STATE_CHANNEL)).lastOpenMap, name)
+            yield* fake.invoke(InvokeChannels.rememberOpenMap, { fileName: name })
+            assert.strictEqual((yield* fake.invokeAs(ProjectState, InvokeChannels.projectState)).lastOpenMap, name)
             assert.deepInclude((yield* readSettings(fs, dir)).project?.lastOpenMap, { [project]: name })
             assert.match(
-              String((yield* Effect.flip(fake.invoke(channels.REMEMBER_OPEN_MAP_CHANNEL, { fileName: "../x" }))).cause),
+              String((yield* Effect.flip(fake.invoke(InvokeChannels.rememberOpenMap, { fileName: "../x" }))).cause),
               /isn't a map file name/
             )
-            yield* fake.invoke(channels.REMEMBER_OPEN_MAP_CHANNEL, { fileName: null })
-            assert.isNull((yield* fake.invokeAs(ProjectState, channels.PROJECT_STATE_CHANNEL)).lastOpenMap)
+            yield* fake.invoke(InvokeChannels.rememberOpenMap, { fileName: null })
+            assert.isNull((yield* fake.invokeAs(ProjectState, InvokeChannels.projectState)).lastOpenMap)
           }),
         undefined,
         "none"
@@ -88,19 +87,19 @@ describe("Projects over IPC", () => {
             const other = path.join(dir, "Elsewhere")
 
             dialogs.answers.push(null)
-            assert.isNull(yield* fake.invoke(channels.CHOOSE_PROJECT_CHANNEL))
+            assert.isNull(yield* fake.invoke(InvokeChannels.chooseProject))
             // No project yet, so the dialog starts where projects are made.
             assert.strictEqual(Option.getOrNull(dialogs.asked[0]!.defaultPath), path.dirname(project))
-            yield* fake.invoke(channels.CREATE_PROJECT_CHANNEL, { name: "My maps" })
+            yield* fake.invoke(InvokeChannels.createProject, { name: "My maps" })
 
             for (const refused of [steam.maps, path.join(steam.maps, "sub")]) {
               dialogs.answers.push(refused)
-              const error = yield* Effect.flip(fake.invoke(channels.CHOOSE_PROJECT_CHANNEL))
+              const error = yield* Effect.flip(fake.invoke(InvokeChannels.chooseProject))
               assert.match(String(error.cause), /game's maps folder or inside it/)
             }
 
             dialogs.answers.push(other)
-            const chosen = yield* fake.invoke(channels.CHOOSE_PROJECT_CHANNEL)
+            const chosen = yield* fake.invoke(InvokeChannels.chooseProject)
             assert.deepStrictEqual(chosen, {
               current: { path: other, name: "Elsewhere", exists: false },
               recent: [{ path: project, name: "My maps", exists: true }],
@@ -109,24 +108,24 @@ describe("Projects over IPC", () => {
             })
             // Only a recent project can be switched to by path.
             const error = yield* Effect.flip(
-              fake.invoke(channels.SWITCH_PROJECT_CHANNEL, { path: path.join(dir, "Random") })
+              fake.invoke(InvokeChannels.switchProject, { path: path.join(dir, "Random") })
             )
             assert.match(String(error.cause), /picked/)
-            const back = yield* fake.invokeAs(ProjectState, channels.SWITCH_PROJECT_CHANNEL, { path: project })
+            const back = yield* fake.invokeAs(ProjectState, InvokeChannels.switchProject, { path: project })
             assert.strictEqual(back.current?.path, project)
             assert.deepStrictEqual(back.recent.map((p) => p.path), [other])
 
             // New project makes `<projectsFolder>/<name>` on disk and uses it; a second one of that name is refused.
-            const made = yield* fake.invokeAs(ProjectState, channels.CREATE_PROJECT_CHANNEL, { name: " Season 3 " })
+            const made = yield* fake.invokeAs(ProjectState, InvokeChannels.createProject, { name: " Season 3 " })
             const season = path.join(path.dirname(project), "Season 3")
             assert.deepInclude(made.current, { path: season, name: "Season 3", exists: true })
             assert.deepStrictEqual(made.recent.map((p) => p.path), [project, other])
             assert.isTrue(yield* fs.exists(path.join(season, "maps")))
             assert.strictEqual(yield* fs.readFileString(path.join(season, ".gitignore")), ".ballest/\n")
-            const again = yield* Effect.flip(fake.invoke(channels.CREATE_PROJECT_CHANNEL, { name: "Season 3" }))
+            const again = yield* Effect.flip(fake.invoke(InvokeChannels.createProject, { name: "Season 3" }))
             assert.match(String(again.cause), /already holds a project/)
             for (const bad of ["", ".hidden", "a/b", "x".repeat(65)]) {
-              const refused = yield* Effect.flip(fake.invoke(channels.CREATE_PROJECT_CHANNEL, { name: bad }))
+              const refused = yield* Effect.flip(fake.invoke(InvokeChannels.createProject, { name: bad }))
               assert.match(String(refused.cause), /can't name a folder/)
             }
           }),

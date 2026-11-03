@@ -1,58 +1,6 @@
-import type { DesktopBridge } from "@ballest/contracts"
+import { InvokeChannels, PushChannels } from "@ballest/contracts/channels"
 import { parse } from "acorn"
 import * as vm from "node:vm"
-
-/**
- * What `window.ballest` must hold, by `typeof`. Typed against the interface so a new bridge member that isn't listed
- * here (or a stale one that is) fails typecheck.
- */
-const members = {
-  versions: "object",
-  ping: "function",
-  projectState: "function",
-  chooseProject: "function",
-  switchProject: "function",
-  createProject: "function",
-  revealProject: "function",
-  renameProject: "function",
-  rememberOpenMap: "function",
-  listMaps: "function",
-  readMap: "function",
-  createMap: "function",
-  saveMap: "function",
-  renameMap: "function",
-  pickImport: "function",
-  importMap: "function",
-  exportMap: "function",
-  checkExports: "function",
-  reimportMap: "function",
-  listBackups: "function",
-  readBackup: "function",
-  setWindowTheme: "function",
-  confirmUnsaved: "function",
-  onUnloadRequest: "function",
-  openExternal: "function",
-  gamePaths: "function",
-  chooseGamePath: "function",
-  resetGamePath: "function",
-  revealGamePath: "function",
-  launchGame: "function",
-  isGameRunning: "function",
-  findCreator: "function",
-  pluginStatus: "function",
-  installPlugin: "function",
-  play: "function",
-  onPlaySessionEnded: "function",
-  loadNotifications: "function",
-  saveNotifications: "function",
-  muteNotifications: "function",
-  gameLinkMemory: "function",
-  rememberGameLink: "function",
-  getUpdateState: "function",
-  downloadUpdate: "function",
-  installUpdate: "function",
-  onUpdateState: "function"
-} as const satisfies Record<keyof DesktopBridge, "object" | "function">
 
 /** A sandboxed preload can require these and nothing else. */
 const sandboxModules = new Set(["electron", "electron/common", "electron/renderer", "events", "timers", "url"])
@@ -88,9 +36,56 @@ const requiredModules = (source: string): ReadonlyArray<string> => {
   return found
 }
 
+/** What the stub `ipcRenderer` was asked: invokes with their channel and payload, listeners added and removed. */
+interface IpcCalls {
+  readonly invoked: Array<readonly [string, unknown]>
+  readonly listening: Array<string>
+}
+
+const stubElectron = (exposed: Map<string, unknown>, calls: IpcCalls) => ({
+  contextBridge: { exposeInMainWorld: (name: string, api: unknown) => exposed.set(name, api) },
+  ipcRenderer: {
+    invoke: (channel: string, payload: unknown) => {
+      calls.invoked.push([channel, payload])
+      return Promise.resolve(undefined)
+    },
+    on: (channel: string) => void calls.listening.push(channel),
+    removeListener: (channel: string) => {
+      const index = calls.listening.indexOf(channel)
+      if (index !== -1) calls.listening.splice(index, 1)
+    }
+  }
+})
+
+/** What is wrong with `bridge`'s `name`, a function that should invoke `channel` with its payload as is. */
+const checkMethod = (bridge: object, calls: IpcCalls, name: string, channel: string): ReadonlyArray<string> => {
+  const method: unknown = Reflect.get(bridge, name)
+  if (typeof method !== "function") return [`${name} (function)`]
+  const payload = { probe: name }
+  calls.invoked.length = 0
+  Reflect.apply(method, bridge, [payload])
+  const [call] = calls.invoked
+  return calls.invoked.length === 1 && call?.[0] === channel && call[1] === payload
+    ? []
+    : [`${name} (invoke ${channel} with its payload)`]
+}
+
+/** What is wrong with `bridge`'s `name`, a subscription to `channel` that returns its unsubscribe. */
+const checkSubscription = (bridge: object, calls: IpcCalls, name: string, channel: string): ReadonlyArray<string> => {
+  const subscribe: unknown = Reflect.get(bridge, name)
+  if (typeof subscribe !== "function") return [`${name} (function)`]
+  const unsubscribe: unknown = Reflect.apply(subscribe, bridge, [() => undefined])
+  const listened = calls.listening.includes(channel)
+  if (typeof unsubscribe === "function") Reflect.apply(unsubscribe, undefined, [])
+  return listened && typeof unsubscribe === "function" && !calls.listening.includes(channel)
+    ? []
+    : [`${name} (listen on ${channel} until unsubscribed)`]
+}
+
 /**
  * Checks a built preload: it requires only what a sandboxed preload can, and running it (against a stub `electron`)
- * exposes `window.ballest` with every `DesktopBridge` member. Throws with what is wrong.
+ * exposes `window.ballest` with the versions, every method in `InvokeChannels` invoking its channel with the payload as
+ * is, and every subscription in `PushChannels` listening on its channel. Throws with what is wrong.
  */
 export const verifyPreloadBundle = (source: string): void => {
   const unsupported = [...new Set(requiredModules(source).map((name) => name.replace(/^node:/, "")))]
@@ -100,10 +95,8 @@ export const verifyPreloadBundle = (source: string): void => {
   }
 
   const exposed = new Map<string, unknown>()
-  const electron = {
-    contextBridge: { exposeInMainWorld: (name: string, api: unknown) => exposed.set(name, api) },
-    ipcRenderer: { invoke: () => Promise.resolve(undefined), on: () => undefined, removeListener: () => undefined }
-  }
+  const calls: IpcCalls = { invoked: [], listening: [] }
+  const electron = stubElectron(exposed, calls)
   vm.runInNewContext(source, {
     require: (name: string) => name.startsWith("electron") ? electron : {},
     process: { versions: { electron: "0", chrome: "0", node: "0" }, contextIsolated: true },
@@ -113,8 +106,10 @@ export const verifyPreloadBundle = (source: string): void => {
 
   const bridge = exposed.get("ballest")
   if (typeof bridge !== "object" || bridge === null) throw new Error("the preload doesn't expose window.ballest")
-  const missing = Object.entries(members)
-    .filter(([name, type]) => typeof Reflect.get(bridge, name) !== type)
-    .map(([name, type]) => `${name} (${type})`)
+  const missing = [
+    ...typeof Reflect.get(bridge, "versions") === "object" ? [] : ["versions (object)"],
+    ...Object.entries(InvokeChannels).flatMap(([name, channel]) => checkMethod(bridge, calls, name, channel)),
+    ...Object.entries(PushChannels).flatMap(([name, channel]) => checkSubscription(bridge, calls, name, channel))
+  ]
   if (missing.length > 0) throw new Error(`window.ballest is missing ${missing.join(", ")}`)
 }

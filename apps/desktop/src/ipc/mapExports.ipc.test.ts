@@ -2,6 +2,7 @@ import {
   ExportChecks,
   ExportMapResult,
   ImportMapResult,
+  InvokeChannels,
   MapBackupFile,
   MapBackups,
   ProjectMapFile,
@@ -12,7 +13,6 @@ import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import { vi } from "vitest"
 import { sha256 } from "../project/files"
 import { LinkFile } from "../project/MapLinks"
-import * as channels from "./channels"
 import { expectTag, withHandlers } from "./handlersHarness"
 
 // The services' layers call Electron; these tests replace them, so only the module import needs a stand-in
@@ -33,16 +33,16 @@ describe("MapExports over IPC", () => {
 
         // Not picked: the page can't name a file to import.
         const unpicked = { source: inGame, fileName: name, text: original, replace: false }
-        assert.match(String((yield* Effect.flip(fake.invoke(channels.IMPORT_MAP_CHANNEL, unpicked))).cause), /picked/)
+        assert.match(String((yield* Effect.flip(fake.invoke(InvokeChannels.importMap, unpicked))).cause), /picked/)
 
         dialogs.answers.push(null)
-        assert.isNull(yield* fake.invoke(channels.PICK_IMPORT_CHANNEL))
+        assert.isNull(yield* fake.invoke(InvokeChannels.pickImport))
         dialogs.answers.push(inGame)
-        assert.deepStrictEqual(yield* fake.invoke(channels.PICK_IMPORT_CHANNEL), { path: inGame, name, text: original })
+        assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.pickImport), { path: inGame, name, text: original })
         assert.strictEqual(Option.getOrNull(dialogs.asked[0]!.defaultPath), steam.maps)
 
         const imported = expectTag(
-          yield* fake.invokeAs(ImportMapResult, channels.IMPORT_MAP_CHANNEL, unpicked),
+          yield* fake.invokeAs(ImportMapResult, InvokeChannels.importMap, unpicked),
           "Imported"
         )
         const hash = sha256(new TextEncoder().encode(original))
@@ -57,11 +57,11 @@ describe("MapExports over IPC", () => {
 
         // The same name again: reported, then replaced on request with the old copy in backups.
         const again = { ...unpicked, text: "{\"v\":2}" }
-        assert.deepStrictEqual(yield* fake.invoke(channels.IMPORT_MAP_CHANNEL, again), {
+        assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.importMap, again), {
           _tag: "Clash",
           fileName: name
         })
-        yield* fake.invoke(channels.IMPORT_MAP_CHANNEL, { ...again, replace: true })
+        yield* fake.invoke(InvokeChannels.importMap, { ...again, replace: true })
         assert.strictEqual(yield* fs.readFileString(path.join(project, "maps", name)), "{\"v\":2}")
         assert.lengthOf(yield* fs.readDirectory(path.join(project, ".ballest", "backups")), 1)
 
@@ -70,9 +70,9 @@ describe("MapExports over IPC", () => {
         yield* fs.makeDirectory(path.dirname(download), { recursive: true })
         yield* fs.writeFileString(download, "{}")
         dialogs.answers.push(download)
-        yield* fake.invoke(channels.PICK_IMPORT_CHANNEL)
+        yield* fake.invoke(InvokeChannels.pickImport)
         const other = expectTag(
-          yield* fake.invokeAs(ImportMapResult, channels.IMPORT_MAP_CHANNEL, {
+          yield* fake.invokeAs(ImportMapResult, InvokeChannels.importMap, {
             source: download,
             fileName: path.basename(download),
             text: "{}",
@@ -83,7 +83,7 @@ describe("MapExports over IPC", () => {
         assert.deepInclude(other.map.link, { export: null, lastSeenHash: null })
 
         const exported = expectTag(
-          yield* fake.invokeAs(ExportMapResult, channels.EXPORT_MAP_CHANNEL, {
+          yield* fake.invokeAs(ExportMapResult, InvokeChannels.exportMap, {
             fileName: name,
             replacePublished: false,
             overwriteChanged: false
@@ -112,10 +112,10 @@ describe("MapExports over IPC", () => {
         })
         yield* fs.makeDirectory(steam.maps, { recursive: true })
         yield* fs.writeFileString(target, published)
-        yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text: "{}" })
+        yield* fake.invoke(InvokeChannels.createMap, { fileName: name, text: "{}" })
 
         assert.deepStrictEqual(
-          yield* fake.invoke(channels.EXPORT_MAP_CHANNEL, {
+          yield* fake.invoke(InvokeChannels.exportMap, {
             fileName: name,
             replacePublished: false,
             overwriteChanged: false
@@ -123,7 +123,7 @@ describe("MapExports over IPC", () => {
           { _tag: "Published", file: { path: target, name }, publishedFileId: 3561234567 }
         )
         assert.strictEqual(yield* fs.readFileString(target), published)
-        const replaced = yield* fake.invokeAs(ExportMapResult, channels.EXPORT_MAP_CHANNEL, {
+        const replaced = yield* fake.invokeAs(ExportMapResult, InvokeChannels.exportMap, {
           fileName: name,
           replacePublished: true,
           overwriteChanged: false
@@ -137,7 +137,7 @@ describe("MapExports over IPC", () => {
           target,
           JSON.stringify({ worldSettings: { levelData: { levelPublishedFileId: -1 } } })
         )
-        const again = yield* fake.invokeAs(ExportMapResult, channels.EXPORT_MAP_CHANNEL, {
+        const again = yield* fake.invokeAs(ExportMapResult, InvokeChannels.exportMap, {
           fileName: name,
           replacePublished: false,
           overwriteChanged: true
@@ -155,18 +155,18 @@ describe("MapExports over IPC", () => {
         const inGame = path.join(steam.maps, name)
         const inProject = path.join(project, "maps", name)
         const hashOf = (text: string) => sha256(new TextEncoder().encode(text))
-        const check = fake.invokeAs(ExportChecks, channels.CHECK_EXPORTS_CHANNEL)
+        const check = fake.invokeAs(ExportChecks, InvokeChannels.checkExports)
         const exportIt = (overwriteChanged: boolean) =>
-          fake.invokeAs(ExportMapResult, channels.EXPORT_MAP_CHANNEL, {
+          fake.invokeAs(ExportMapResult, InvokeChannels.exportMap, {
             fileName: name,
             replacePublished: false,
             overwriteChanged
           })
         const linkOf = Effect.gen(function*() {
-          const maps = yield* fake.invokeAs(ProjectMaps, channels.LIST_MAPS_CHANNEL)
+          const maps = yield* fake.invokeAs(ProjectMaps, InvokeChannels.listMaps)
           return maps.find((m) => m.fileName === name)?.link
         })
-        yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text: "{\"v\":1}" })
+        yield* fake.invoke(InvokeChannels.createMap, { fileName: name, text: "{\"v\":1}" })
         expectTag(yield* exportIt(false), "Exported")
         assert.deepStrictEqual(yield* check, { changed: [], missing: [] })
 
@@ -184,10 +184,10 @@ describe("MapExports over IPC", () => {
         assert.strictEqual(yield* fs.readFileString(inGame), saved)
         expectTag(yield* exportIt(true), "Exported")
         assert.strictEqual(yield* fs.readFileString(inGame), "{\"v\":1}")
-        const backups = yield* fake.invokeAs(MapBackups, channels.LIST_BACKUPS_CHANNEL)
+        const backups = yield* fake.invokeAs(MapBackups, InvokeChannels.listBackups)
         const [kept] = backups
         assert.deepInclude(kept, { place: "export", fileName: name })
-        assert.strictEqual((yield* fake.invokeAs(MapBackupFile, channels.READ_BACKUP_CHANNEL, kept)).text, saved)
+        assert.strictEqual((yield* fake.invokeAs(MapBackupFile, InvokeChannels.readBackup, kept)).text, saved)
 
         // Saved in the game again, and seen by an Export first: the check doesn't report it again.
         const again = "{\"v\":1,\"editorState\":{\"again\":1}}"
@@ -196,16 +196,16 @@ describe("MapExports over IPC", () => {
         assert.deepStrictEqual(yield* check, { changed: [], missing: [] })
 
         // Re-import: the game's version replaces the project's, which goes to the project's backups.
-        const reimported = yield* fake.invokeAs(ProjectMapFile, channels.REIMPORT_MAP_CHANNEL, { fileName: name })
+        const reimported = yield* fake.invokeAs(ProjectMapFile, InvokeChannels.reimportMap, { fileName: name })
         assert.strictEqual(reimported.text, again)
         assert.strictEqual(yield* fs.readFileString(inProject), again)
         assert.deepInclude(reimported.link?.export, { path: inGame, hash: hashOf(again) })
         assert.strictEqual(reimported.link?.lastSeenHash, hashOf(again))
-        const projectBackup = (yield* fake.invokeAs(MapBackups, channels.LIST_BACKUPS_CHANNEL)).find((b) =>
+        const projectBackup = (yield* fake.invokeAs(MapBackups, InvokeChannels.listBackups)).find((b) =>
           b.place === "project"
         )
         assert.strictEqual(
-          (yield* fake.invokeAs(MapBackupFile, channels.READ_BACKUP_CHANNEL, projectBackup)).text,
+          (yield* fake.invokeAs(MapBackupFile, InvokeChannels.readBackup, projectBackup)).text,
           "{\"v\":1}"
         )
         expectTag(yield* exportIt(false), "Exported")
@@ -215,7 +215,7 @@ describe("MapExports over IPC", () => {
         assert.deepStrictEqual(yield* check, { changed: [], missing: [name] })
         assert.deepInclude(yield* linkOf, { export: null, lastSeenHash: null })
         assert.deepStrictEqual(yield* check, { changed: [], missing: [] })
-        const refused = yield* Effect.flip(fake.invoke(channels.REIMPORT_MAP_CHANNEL, { fileName: name }))
+        const refused = yield* Effect.flip(fake.invoke(InvokeChannels.reimportMap, { fileName: name }))
         assert.match(String(refused.cause), /no export/)
       })
     ))
@@ -225,18 +225,18 @@ describe("MapExports over IPC", () => {
       Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
         const name = "Map_LevelEditorMain&Away_me.balledit"
-        yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text: "{}" })
-        yield* fake.invoke(channels.EXPORT_MAP_CHANNEL, {
+        yield* fake.invoke(InvokeChannels.createMap, { fileName: name, text: "{}" })
+        yield* fake.invoke(InvokeChannels.exportMap, {
           fileName: name,
           replacePublished: false,
           overwriteChanged: false
         })
         yield* fs.remove(steam.maps, { recursive: true })
-        assert.deepStrictEqual(yield* fake.invokeAs(ExportChecks, channels.CHECK_EXPORTS_CHANNEL), {
+        assert.deepStrictEqual(yield* fake.invokeAs(ExportChecks, InvokeChannels.checkExports), {
           changed: [],
           missing: []
         })
-        const [map] = yield* fake.invokeAs(ProjectMaps, channels.LIST_MAPS_CHANNEL)
+        const [map] = yield* fake.invokeAs(ProjectMaps, InvokeChannels.listMaps)
         assert.isNotNull(map?.link?.export)
       })
     ))
@@ -249,9 +249,9 @@ describe("MapExports over IPC", () => {
         const name = "Map_LevelEditorMain&Track_me.balledit"
         yield* fs.makeDirectory(steam.maps, { recursive: true })
         yield* fs.writeFileString(path.join(steam.maps, name), "{\"edited\":\"in game\"}")
-        yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text: "{\"v\":1}" })
+        yield* fake.invoke(InvokeChannels.createMap, { fileName: name, text: "{\"v\":1}" })
 
-        const exportIt = fake.invoke(channels.EXPORT_MAP_CHANNEL, {
+        const exportIt = fake.invoke(InvokeChannels.exportMap, {
           fileName: name,
           replacePublished: false,
           overwriteChanged: false
@@ -259,20 +259,20 @@ describe("MapExports over IPC", () => {
         yield* exportIt
         // The same bytes again: nothing to keep.
         yield* exportIt
-        const backups = yield* fake.invokeAs(MapBackups, channels.LIST_BACKUPS_CHANNEL)
+        const backups = yield* fake.invokeAs(MapBackups, InvokeChannels.listBackups)
         assert.deepStrictEqual(backups.map((b) => [b.place, b.fileName]), [["export", name]])
         const [backup] = backups
-        const read = yield* fake.invokeAs(MapBackupFile, channels.READ_BACKUP_CHANNEL, backup)
+        const read = yield* fake.invokeAs(MapBackupFile, InvokeChannels.readBackup, backup)
         assert.strictEqual(read.text, "{\"edited\":\"in game\"}")
         assert.lengthOf(yield* fs.readDirectory(path.join(dir, "userData", "backups")), 1)
 
         // Only names main wrote in its own folders.
         for (const id of ["../desktop-settings.json", `../../${name}`, name, "notes.txt"]) {
-          const error = yield* Effect.flip(fake.invoke(channels.READ_BACKUP_CHANNEL, { place: "export", id }))
+          const error = yield* Effect.flip(fake.invoke(InvokeChannels.readBackup, { place: "export", id }))
           assert.match(String(error.cause), /doesn't exist/, id)
         }
         const unknown = { place: "project", id: `2026-10-31T12-00-00-000Z ${name}` }
-        assert.match(String((yield* Effect.flip(fake.invoke(channels.READ_BACKUP_CHANNEL, unknown))).cause), /exist/)
+        assert.match(String((yield* Effect.flip(fake.invoke(InvokeChannels.readBackup, unknown))).cause), /exist/)
       })
     ))
 })

@@ -23,8 +23,9 @@ apps/
   desktop/    Electron main + preload. Effect main process (@effect/platform-node), no React
 packages/
   ui/         shadcn (unchanged)
-  contracts/  Schemas and the DesktopBridge interface shared by preload, main and renderer. Depends on effect only,
-              exports src directly (no build)
+  contracts/  Schemas, the bridge's method table and the DesktopBridge type mapped from it, shared by preload, main
+              and renderer; the channel table (contracts/channels) imports nothing. Depends on effect only, exports src
+              directly (no build)
 tools/
   compress/   + download.mjs: fetches the asset pack when web-assets/ isn't on disk
 ```
@@ -110,12 +111,12 @@ Effect layers, same shape as t3-code:
 - `app/`: `DesktopEnvironment` (paths: `userData`, `resourcesPath`, `isPackaged`, dev server URL from `VITE_DEV_SERVER_URL`), `DesktopApp.program` (whenReady → protocol → IPC handlers → window → updater), fatal errors to `dialog.showErrorBox`.
 - `game/`: `SteamLibrary` (finds the install from `libraryfolders.vdf` + `appmanifest_3339810.acf`, like the plugin manager's `find_game.sh`), `GamePaths` (maps folder, plugins folder; Windows and Proton variants, see below), `GameLink` (the plugin's status and install, and `play.json`), `GamePlay` (Play: the export, the handoff, the launch, and the game session after it).
 - `project/`: `Projects` (which project is in use: recent projects, New project, the project's name and folders, the open map), `MapFiles` (its `maps/`: list, read, write, rename, import, backups), `MapExports` (Export to game, sync detection, Re-import), over `MapLinks` (`link.json`) and `Backups`. All three fail with `ProjectError`. The naming rules main and the page share (`isMapFileName`, `isProjectName`, `mapFileNameOf`, ...) are `@ballest/contracts`' `names.ts`; `MapFileName` applies `isMapFileName`, so a payload naming anything else is refused before its handler runs.
-- `ipc/`: `makeIpcMethod({ channel, payload: Schema, result: Schema, handler })`, decode in, encode out, `ipcMain.handle` inside `acquireRelease`. Main pushes to the renderer with `webContents.send`.
+- `ipc/`: each bridge method is an entry in `@ballest/contracts`' `DesktopMethods` (payload and result schemas) and `InvokeChannels` (its channel); `DesktopBridge` is mapped from them. `methods/<area>.ts` holds a handler per entry, `makeIpcMethod(name, handler)` decodes in, encodes out and `ipcMain.handle`s inside `acquireRelease`, and `DesktopIpcHandlers.ts` registers every entry (a method without a handler fails typecheck). Main pushes to the renderer with `webContents.send` on a `PushChannels` channel. Steps: [apps/desktop/README.md § Adding a method](../apps/desktop/README.md#adding-a-method-the-page-can-call).
 - Entry: `Effect.provide(layerDesktopRuntime)` then `NodeRuntime.runMain`. `registerSchemesAsPrivileged` runs before `whenReady`.
 
 The window loads `ballest://app/` in production and `ballest-dev://app/` in dev. `protocol.handle` serves the renderer build from `app.asar` and `/assets/*` from `process.resourcesPath/assets` (SPA fallback to `index.html`, path-traversal guard, MIME by extension, a CSP header). In dev the handler proxies to the Vite dev server with `net.fetch`; HMR connects straight to the Vite port. The router uses hash history under Electron.
 
-`webPreferences`: `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`. The preload is a self-contained bundle (a sandboxed preload can't resolve imports from inside asar) exposing `window.ballest satisfies DesktopBridge`.
+`webPreferences`: `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`. The preload is a self-contained bundle (a sandboxed preload can't resolve imports from inside asar) exposing `window.ballest`: a loop over `@ballest/contracts/channels` forwarding each method's payload as is, so it never bundles effect. `scripts/verifyPreloadBundle.ts` checks it on every build.
 
 ### Game paths
 

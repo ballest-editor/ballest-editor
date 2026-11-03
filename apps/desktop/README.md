@@ -35,16 +35,16 @@ flowchart LR
     fs[(disk)]
   end
   page -- "fetch, script, mesh<br/>ballest://app/..." --> protocol --> fs
-  page -- "window.ballest.ping()" --> preload -- "ipcRenderer.invoke('ballest:ping')" --> ipc
+  page -- "window.ballest.ping({ message })" --> preload -- "ipcRenderer.invoke('ballest:ping')" --> ipc
 ```
 
 **Loading files.** The page asks for `ballest://app/assets/catalog.json` like any URL. There is no web server and no port. Chromium hands the request to a function in main, `serveStatic`, which reads the file from `apps/web/dist` and returns a `Response`. Page routes like `/editor/settings` match no file and get `index.html`, so the router takes over. A missing `.glb` gets a 404. Paths with `..` in them can't leave the directory. Every response carries a Content-Security-Policy header.
 
 Why not `file://`? There, `fetch("/assets/x")` resolves to the root of the disk, and every local page shares one origin. A localhost server would work too, but it can collide on a port, and any other program on the machine could connect to it.
 
-**Doing things.** Reading a map from the game's folder or launching Steam needs Node, so the page sends main a message and waits for the answer. That is IPC. The page never sees `ipcRenderer`; it sees `window.ballest`, a plain object the preload puts there before any page script runs. `window.ballest.ping("hello")` becomes `ipcRenderer.invoke("ballest:ping", { message: "hello" })`, main checks the payload against a schema, runs the handler and encodes the result. `ping(42)` rejects. The object's shape is the `DesktopBridge` interface in `packages/contracts`, shared by all three sides.
+**Doing things.** Reading a map from the game's folder or launching Steam needs Node, so the page sends main a message and waits for the answer. That is IPC. The page never sees `ipcRenderer`; it sees `window.ballest`, a plain object the preload puts there before any page script runs. `window.ballest.ping({ message: "hello" })` becomes `ipcRenderer.invoke("ballest:ping", { message: "hello" })`, main checks the payload against a schema, runs the handler and encodes the result. `ping({ message: 42 })` rejects. The object's shape is the `DesktopBridge` type, which `packages/contracts` maps from its table of methods (`DesktopMethods`), shared by all three sides.
 
-The preload is the only code that holds `ipcRenderer`, so the page can only send the messages the bridge exposes. That is why it matters that the preload is small and hand-written.
+The preload is the only code that holds `ipcRenderer`, so the page can only send the messages the bridge exposes. That is why the preload is small: a loop that forwards each method's payload, as is, to its channel in `InvokeChannels`, and subscribes to each channel in `PushChannels`.
 
 ## Two schemes
 
@@ -104,21 +104,21 @@ flowchart TB
 
 ## Adding a method the page can call
 
-One IPC method is one `makeIpcMethod`. Adding `exportMap` touches five files:
+A method is declared once, in `packages/contracts`, and handled once, in main. Adding `exportMap` touches three files:
 
-1. `packages/contracts/src/DesktopBridge.ts`. Payload and result schemas, plus a member on the interface.
-2. `src/ipc/channels.ts`. The channel name.
-3. `src/ipc/methods/<area>.ts`. `makeIpcMethod({ channel, payload, result, handler })`. The handler is where the work happens, with whatever services it needs.
-4. `src/ipc/DesktopIpcHandlers.ts`. One `yield* ipc.handle(exportMap)` line.
-5. `src/preload.ts`. One line forwarding to `ipcRenderer.invoke`.
+1. `packages/contracts/src/channels.ts`. Its channel in `InvokeChannels`: `exportMap: "ballest:project:exportMap"`.
+2. `packages/contracts/src/DesktopBridge.ts`. Its payload and result schemas, and its entry in `DesktopMethods`: `exportMap: { payload: ExportMapPayload, result: ExportMapResult }`, under the doc comment the page sees on `window.ballest.exportMap`. A method that takes nothing has `payload: noPayload`.
+3. `src/ipc/methods/<area>.ts`. Its handler in the area's handlers: `exportMap: Effect.fn("ipc.exportMap")(function*(payload) { ... })`. It gets the decoded payload and the sender, returns the result before encoding, and uses whatever services it needs.
 
-The compiler catches a missing bridge member in the preload and in the build check. It doesn't catch a forgotten step 4; the call would reject with "no handler registered".
+The rest follows from the table. `DesktopBridge` gets `exportMap(payload)`, the preload forwards it, `DesktopIpcHandlers.ts` registers `makeIpcMethod(name, handler)` for every entry, and the build check calls it. Typecheck fails when a channel has no schemas or the other way round, and when a method has no handler. The page reaches it through `Platform` (`apps/web/src/services/Platform.ts`), which names each method it offers.
 
-Main pushing to the page goes the other way: `webContents.send` in main (`ElectronWindow.sendAll`), and an `on`/`removeListener` pair in the preload. `onUpdateState` is the one example.
+The channels are a table of their own because the preload bundles them: `@ballest/contracts/channels` imports nothing, while the schemas would bring effect into the preload (7 kB → ~300 kB, run before every page load).
+
+Main pushing to the page goes the other way: `webContents.send` in main (`ElectronWindow.sendAll`) on a channel in `PushChannels`, the value's schema in `DesktopPushes`, and a subscription the preload makes for each (`onUpdateState`, `onUnloadRequest`, `onPlaySessionEnded`).
 
 ## The preload build check
 
-A sandboxed preload can `require("electron")` and nothing else, and it has to be one file. `scripts/verifyPreloadBundle.ts` runs on every `vite build`, parses `preload.cjs`, refuses any other `require` or a dynamic `import()`, then runs the bundle in a Node VM against a stub `electron` and checks that `window.ballest` has every `DesktopBridge` member. Rename `ping` in the preload and the build fails. This is a packaging check, not a security one; anyone who can edit `preload.cjs` on disk can edit `main.cjs` too.
+A sandboxed preload can `require("electron")` and nothing else, and it has to be one file. `scripts/verifyPreloadBundle.ts` runs on every `vite build`, parses `preload.cjs`, refuses any other `require` or a dynamic `import()`, then runs the bundle in a Node VM against a stub `electron` and checks `window.ballest`: the versions, each method in `InvokeChannels` invoking its channel with its payload as is, and each subscription in `PushChannels` listening on its channel until unsubscribed. Send `ping` on the wrong channel and the build fails. This is a packaging check, not a security one; anyone who can edit `preload.cjs` on disk can edit `main.cjs` too.
 
 ## Updates
 
@@ -163,7 +163,8 @@ src/
   electron/   one service per Electron API
   game/       SteamLibrary (Steam's libraries, the game's install), GamePaths (install, maps and plugins folders,
               overrides), GameProcess (is the game running), vdf (Steam's KeyValues format)
-  ipc/        DesktopIpc (handle + makeIpcMethod), channels, methods/
+  ipc/        DesktopIpc (handle + makeIpcMethod), DesktopIpcHandlers (registers every method), methods/ (the
+              handlers, by area)
   notifications/ NotificationLog (notifications.json: the bell's last 100, kept for the page)
   project/    Projects (the project folder: its maps, Import, Export to game, backups), MapLinks (.ballest/link.json),
               files (map file names, atomic writes, hashes)

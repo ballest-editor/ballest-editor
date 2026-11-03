@@ -1,11 +1,10 @@
-import { type PlayResult, PlaySessionEnded } from "@ballest/contracts"
+import { type PlayResult, PlaySessionEnded, PushChannels } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Fiber, FileSystem, Layer, Path, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { vi } from "vitest"
 import { ElectronShell } from "../electron/ElectronShell"
 import { ElectronWindow } from "../electron/ElectronWindow"
-import { PLAY_SESSION_ENDED_CHANNEL } from "../ipc/channels"
 import { sha256 } from "../project/files"
 import { layerProjectsAt } from "../project/layers"
 import { MapFiles } from "../project/MapFiles"
@@ -203,7 +202,7 @@ describe("GamePlay.sessionEnds", () => {
       assert.strictEqual(ended?.fileName, other)
       assert.lengthOf(sent, 1)
       const [channel, payload] = sent[0]!
-      assert.strictEqual(channel, PLAY_SESSION_ENDED_CHANNEL)
+      assert.strictEqual(channel, PushChannels.onPlaySessionEnded)
       const decoded = yield* Schema.decodeUnknownEffect(PlaySessionEnded)(payload)
       assert.strictEqual(decoded.fileName, other)
 

@@ -1,10 +1,9 @@
-import { MapBackupFile, MapBackups, ProjectMaps } from "@ballest/contracts"
+import { InvokeChannels, MapBackupFile, MapBackups, ProjectMaps } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, FileSystem, Path } from "effect"
 import * as Fs from "node:fs"
 import { vi } from "vitest"
 import { sha256 } from "../project/files"
-import * as channels from "./channels"
 import { samplesDir, withHandlers } from "./handlersHarness"
 
 // The services' layers call Electron; these tests replace them, so only the module import needs a stand-in
@@ -22,7 +21,7 @@ describe("MapFiles over IPC", () => {
 
         // The project in use isn't on disk yet: the first New map makes it, named after its folder.
         assert.isFalse(yield* fs.exists(project))
-        const created = yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text })
+        const created = yield* fake.invoke(InvokeChannels.createMap, { fileName: name, text })
         assert.deepInclude(created, {
           fileName: name,
           path: path.join(project, "maps", name),
@@ -37,29 +36,29 @@ describe("MapFiles over IPC", () => {
           exportTarget: "game"
         })
         // A second New map of the same name is refused.
-        const clash = yield* Effect.flip(fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text: "{}" }))
+        const clash = yield* Effect.flip(fake.invoke(InvokeChannels.createMap, { fileName: name, text: "{}" }))
         assert.match(String(clash.cause), /already has a map called/)
 
-        yield* fake.invoke(channels.SAVE_MAP_CHANNEL, { fileName: name, text: `${text}\r\n` })
-        assert.deepInclude(yield* fake.invoke(channels.READ_MAP_CHANNEL, { fileName: name }), {
+        yield* fake.invoke(InvokeChannels.saveMap, { fileName: name, text: `${text}\r\n` })
+        assert.deepInclude(yield* fake.invoke(InvokeChannels.readMap, { fileName: name }), {
           text: `${text}\r\n`
         })
 
         const renamed = "Map_LevelEditorMain&Loop_me.balledit"
-        yield* fake.invoke(channels.RENAME_MAP_CHANNEL, { from: name, to: renamed, text: "{\"renamed\":1}" })
+        yield* fake.invoke(InvokeChannels.renameMap, { from: name, to: renamed, text: "{\"renamed\":1}" })
         assert.deepStrictEqual(
-          (yield* fake.invokeAs(ProjectMaps, channels.LIST_MAPS_CHANNEL)).map((m) => m.fileName),
+          (yield* fake.invokeAs(ProjectMaps, InvokeChannels.listMaps)).map((m) => m.fileName),
           [
             renamed
           ]
         )
         // The Save kept the file it wrote over, the Rename the file it moved away from: newest first.
-        const backups = yield* fake.invokeAs(MapBackups, channels.LIST_BACKUPS_CHANNEL)
+        const backups = yield* fake.invokeAs(MapBackups, InvokeChannels.listBackups)
         assert.deepStrictEqual(backups.map((b) => [b.place, b.fileName]), [["project", name], ["project", name]])
         const texts = yield* Effect.forEach(
           backups,
           ({ place, id }) =>
-            fake.invokeAs(MapBackupFile, channels.READ_BACKUP_CHANNEL, { place, id }).pipe(
+            fake.invokeAs(MapBackupFile, InvokeChannels.readBackup, { place, id }).pipe(
               Effect.map((b) => b.text)
             )
         )
@@ -68,14 +67,14 @@ describe("MapFiles over IPC", () => {
 
         // Names only: nothing reaches outside maps/.
         for (const bad of ["../x.balledit", "a/b.balledit", "x.json", ".balledit", "con:.balledit"]) {
-          const error = yield* Effect.flip(fake.invoke(channels.SAVE_MAP_CHANNEL, { fileName: bad, text }))
+          const error = yield* Effect.flip(fake.invoke(InvokeChannels.saveMap, { fileName: bad, text }))
           assert.match(String(error.cause), /isn't a map file name/, bad)
         }
         assert.isFalse(yield* fs.exists(path.join(project, "x.balledit")))
 
         // The hash follows the bytes, and the published id is read from them.
         const published = "{\"worldSettings\":{\"levelData\":{\"levelPublishedFileId\":3456}}}"
-        assert.deepInclude(yield* fake.invoke(channels.SAVE_MAP_CHANNEL, { fileName: renamed, text: published }), {
+        assert.deepInclude(yield* fake.invoke(InvokeChannels.saveMap, { fileName: renamed, text: published }), {
           hash: sha256(new TextEncoder().encode(published)),
           publishedFileId: 3456
         })
@@ -93,12 +92,12 @@ describe("MapFiles over IPC", () => {
           for (const [i, sample] of samples.entries()) {
             const text = Fs.readFileSync(`${samplesDir}/${sample}`, "utf8")
             const fileName = `Map_LevelEditorMain&Sample ${i}_me.balledit`
-            yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName, text })
-            yield* fake.invoke(channels.SAVE_MAP_CHANNEL, { fileName, text: "{}" })
-            const backups = yield* fake.invokeAs(MapBackups, channels.LIST_BACKUPS_CHANNEL)
+            yield* fake.invoke(InvokeChannels.createMap, { fileName, text })
+            yield* fake.invoke(InvokeChannels.saveMap, { fileName, text: "{}" })
+            const backups = yield* fake.invokeAs(MapBackups, InvokeChannels.listBackups)
             const backup = backups.find((b) => b.fileName === fileName)
             assert.isDefined(backup, sample)
-            const read = yield* fake.invokeAs(MapBackupFile, channels.READ_BACKUP_CHANNEL, backup)
+            const read = yield* fake.invokeAs(MapBackupFile, InvokeChannels.readBackup, backup)
             assert.isTrue(read.text === text, `${sample} differs after the backup`)
           }
         })

@@ -1,78 +1,24 @@
-import {
-  BackupRef,
-  ChooseProjectResult,
-  CreateProjectPayload,
-  ExportChecks,
-  ExportMapPayload,
-  ExportMapResult,
-  ImportMapPayload,
-  ImportMapResult,
-  MAP_EXTENSIONS,
-  MapBackupFile,
-  MapBackups,
-  MapFileNamePayload,
-  OpenMapPayload,
-  PickImportResult,
-  ProjectMap,
-  ProjectMapFile,
-  ProjectMaps,
-  ProjectPathPayload,
-  ProjectState,
-  RenameMapPayload,
-  RenameProjectPayload,
-  RevealProjectPayload,
-  WriteMapPayload
-} from "@ballest/contracts"
-import { Effect, Option, Path, Schema } from "effect"
+import { MAP_EXTENSIONS } from "@ballest/contracts"
+import { Effect, Option, Path } from "effect"
 import { ElectronDialog } from "../../electron/ElectronDialog"
 import { ElectronShell } from "../../electron/ElectronShell"
 import { GamePaths } from "../../game/GamePaths"
 import { MapExports } from "../../project/MapExports"
 import { MapFiles } from "../../project/MapFiles"
 import { Projects } from "../../project/Projects"
-import {
-  CHECK_EXPORTS_CHANNEL,
-  CHOOSE_PROJECT_CHANNEL,
-  CREATE_MAP_CHANNEL,
-  CREATE_PROJECT_CHANNEL,
-  EXPORT_MAP_CHANNEL,
-  IMPORT_MAP_CHANNEL,
-  LIST_BACKUPS_CHANNEL,
-  LIST_MAPS_CHANNEL,
-  PICK_IMPORT_CHANNEL,
-  PROJECT_STATE_CHANNEL,
-  READ_BACKUP_CHANNEL,
-  READ_MAP_CHANNEL,
-  REIMPORT_MAP_CHANNEL,
-  REMEMBER_OPEN_MAP_CHANNEL,
-  RENAME_MAP_CHANNEL,
-  RENAME_PROJECT_CHANNEL,
-  REVEAL_PROJECT_CHANNEL,
-  SAVE_MAP_CHANNEL,
-  SWITCH_PROJECT_CHANNEL
-} from "../channels"
-import { makeIpcMethod } from "../DesktopIpc"
+import type { DesktopIpcHandlers } from "../DesktopIpc"
 
 const IMPORT_FILTERS = [
   { name: "Ballest maps", extensions: MAP_EXTENSIONS.map((ext) => ext.slice(1)) },
   { name: "All files", extensions: ["*"] }
 ]
 
-export const projectState = makeIpcMethod({
-  channel: PROJECT_STATE_CHANNEL,
-  payload: Schema.Undefined,
-  result: ProjectState,
-  handler: Effect.fn("ipc.projectState")(function*() {
+export const projectHandlers = {
+  projectState: Effect.fn("ipc.projectState")(function*() {
     return yield* (yield* Projects).state
-  })
-})
-
-/** A folder dialog starting at the project in use; the chosen folder becomes the project. */
-export const chooseProject = makeIpcMethod({
-  channel: CHOOSE_PROJECT_CHANNEL,
-  payload: Schema.Undefined,
-  result: ChooseProjectResult,
-  handler: Effect.fn("ipc.chooseProject")(function*(_, event) {
+  }),
+  /** A folder dialog starting at the project in use; the chosen folder becomes the project. */
+  chooseProject: Effect.fn("ipc.chooseProject")(function*(_, event) {
     const projects = yield* Projects
     const { current, projectsFolder } = yield* projects.state
     const picked = yield* (yield* ElectronDialog).showOpenFolder({
@@ -86,110 +32,44 @@ export const chooseProject = makeIpcMethod({
     })
     if (Option.isNone(picked)) return null
     return yield* projects.use(picked.value)
-  })
-})
-
-export const switchProject = makeIpcMethod({
-  channel: SWITCH_PROJECT_CHANNEL,
-  payload: ProjectPathPayload,
-  result: ProjectState,
-  handler: Effect.fn("ipc.switchProject")(function*({ path }) {
+  }),
+  switchProject: Effect.fn("ipc.switchProject")(function*({ path }) {
     return yield* (yield* Projects).switchTo(path)
-  })
-})
-
-/** New project: `<projectsFolder>/<name>`, made and used. */
-export const createProject = makeIpcMethod({
-  channel: CREATE_PROJECT_CHANNEL,
-  payload: CreateProjectPayload,
-  result: ProjectState,
-  handler: Effect.fn("ipc.createProject")(function*({ name }) {
+  }),
+  /** New project: `<projectsFolder>/<name>`, made and used. */
+  createProject: Effect.fn("ipc.createProject")(function*({ name }) {
     return yield* (yield* Projects).createNew(name)
-  })
-})
-
-export const revealProject = makeIpcMethod({
-  channel: REVEAL_PROJECT_CHANNEL,
-  payload: RevealProjectPayload,
-  result: Schema.Boolean,
-  handler: Effect.fn("ipc.revealProject")(function*({ which }) {
+  }),
+  revealProject: Effect.fn("ipc.revealProject")(function*({ which }) {
     const folder = yield* (yield* Projects).folderOf(which)
     if (Option.isNone(folder)) return false
     return yield* (yield* ElectronShell).openFolder(folder.value)
-  })
-})
-
-/** Project settings › General: the project's name. */
-export const renameProject = makeIpcMethod({
-  channel: RENAME_PROJECT_CHANNEL,
-  payload: RenameProjectPayload,
-  result: ProjectState,
-  handler: Effect.fn("ipc.renameProject")(function*({ name }) {
+  }),
+  /** Project settings › General: the project's name. */
+  renameProject: Effect.fn("ipc.renameProject")(function*({ name }) {
     return yield* (yield* Projects).setName(name)
-  })
-})
-
-/** Keeps which map is open in the project, so the next launch opens it again. */
-export const rememberOpenMap = makeIpcMethod({
-  channel: REMEMBER_OPEN_MAP_CHANNEL,
-  payload: OpenMapPayload,
-  result: Schema.Void,
-  handler: Effect.fn("ipc.rememberOpenMap")(function*({ fileName }) {
+  }),
+  /** Keeps which map is open in the project, so the next launch opens it again. */
+  rememberOpenMap: Effect.fn("ipc.rememberOpenMap")(function*({ fileName }) {
     yield* (yield* Projects).rememberOpenMap(fileName)
-  })
-})
-
-export const listMaps = makeIpcMethod({
-  channel: LIST_MAPS_CHANNEL,
-  payload: Schema.Undefined,
-  result: ProjectMaps,
-  handler: Effect.fn("ipc.listMaps")(function*() {
+  }),
+  listMaps: Effect.fn("ipc.listMaps")(function*() {
     return yield* (yield* MapFiles).list
-  })
-})
-
-export const readMap = makeIpcMethod({
-  channel: READ_MAP_CHANNEL,
-  payload: MapFileNamePayload,
-  result: ProjectMapFile,
-  handler: Effect.fn("ipc.readMap")(function*({ fileName }) {
+  }),
+  readMap: Effect.fn("ipc.readMap")(function*({ fileName }) {
     return yield* (yield* MapFiles).read(fileName)
-  })
-})
-
-export const createMap = makeIpcMethod({
-  channel: CREATE_MAP_CHANNEL,
-  payload: WriteMapPayload,
-  result: ProjectMap,
-  handler: Effect.fn("ipc.createMap")(function*({ fileName, text }) {
+  }),
+  createMap: Effect.fn("ipc.createMap")(function*({ fileName, text }) {
     return yield* (yield* MapFiles).create(fileName, text)
-  })
-})
-
-export const saveMap = makeIpcMethod({
-  channel: SAVE_MAP_CHANNEL,
-  payload: WriteMapPayload,
-  result: ProjectMap,
-  handler: Effect.fn("ipc.saveMap")(function*({ fileName, text }) {
+  }),
+  saveMap: Effect.fn("ipc.saveMap")(function*({ fileName, text }) {
     return yield* (yield* MapFiles).save(fileName, text)
-  })
-})
-
-export const renameMap = makeIpcMethod({
-  channel: RENAME_MAP_CHANNEL,
-  payload: RenameMapPayload,
-  result: ProjectMap,
-  handler: Effect.fn("ipc.renameMap")(function*({ from, to, text }) {
+  }),
+  renameMap: Effect.fn("ipc.renameMap")(function*({ from, to, text }) {
     return yield* (yield* MapFiles).rename(from, to, text)
-  })
-})
-
-/** The open dialog, starting in the game's maps folder when it is found. */
-export const pickImport = makeIpcMethod({
-  channel: PICK_IMPORT_CHANNEL,
-  payload: Schema.Undefined,
-  result: PickImportResult,
-  handler: Effect.fn("ipc.pickImport")(function*(_, event) {
+  }),
+  /** The open dialog, starting in the game's maps folder when it is found. */
+  pickImport: Effect.fn("ipc.pickImport")(function*(_, event) {
     const { mapsFolder } = yield* (yield* GamePaths).get
     const picked = yield* (yield* ElectronDialog).showOpenFile({
       owner: event.sender.id,
@@ -199,60 +79,24 @@ export const pickImport = makeIpcMethod({
     })
     if (Option.isNone(picked)) return null
     return yield* (yield* MapFiles).pick(picked.value)
-  })
-})
-
-export const importMap = makeIpcMethod({
-  channel: IMPORT_MAP_CHANNEL,
-  payload: ImportMapPayload,
-  result: ImportMapResult,
-  handler: Effect.fn("ipc.importMap")(function*(payload) {
+  }),
+  importMap: Effect.fn("ipc.importMap")(function*(payload) {
     return yield* (yield* MapFiles).importMap(payload)
-  })
-})
-
-export const exportMap = makeIpcMethod({
-  channel: EXPORT_MAP_CHANNEL,
-  payload: ExportMapPayload,
-  result: ExportMapResult,
-  handler: Effect.fn("ipc.exportMap")(function*(payload) {
+  }),
+  exportMap: Effect.fn("ipc.exportMap")(function*(payload) {
     return yield* (yield* MapExports).exportMap(payload)
-  })
-})
-
-/** Sync detection: the exports the game changed since the last look, and the ones gone (docs/PROJECTS.md § Sync). */
-export const checkExports = makeIpcMethod({
-  channel: CHECK_EXPORTS_CHANNEL,
-  payload: Schema.Undefined,
-  result: ExportChecks,
-  handler: Effect.fn("ipc.checkExports")(function*() {
+  }),
+  /** Sync detection: the exports the game changed since the last look, and the ones gone (docs/PROJECTS.md § Sync). */
+  checkExports: Effect.fn("ipc.checkExports")(function*() {
     return yield* (yield* MapExports).checkExports
-  })
-})
-
-export const reimportMap = makeIpcMethod({
-  channel: REIMPORT_MAP_CHANNEL,
-  payload: MapFileNamePayload,
-  result: ProjectMapFile,
-  handler: Effect.fn("ipc.reimportMap")(function*({ fileName }) {
+  }),
+  reimportMap: Effect.fn("ipc.reimportMap")(function*({ fileName }) {
     return yield* (yield* MapExports).reimportMap(fileName)
-  })
-})
-
-export const listBackups = makeIpcMethod({
-  channel: LIST_BACKUPS_CHANNEL,
-  payload: Schema.Undefined,
-  result: MapBackups,
-  handler: Effect.fn("ipc.listBackups")(function*() {
+  }),
+  listBackups: Effect.fn("ipc.listBackups")(function*() {
     return yield* (yield* MapFiles).backups
-  })
-})
-
-export const readBackup = makeIpcMethod({
-  channel: READ_BACKUP_CHANNEL,
-  payload: BackupRef,
-  result: MapBackupFile,
-  handler: Effect.fn("ipc.readBackup")(function*(ref) {
+  }),
+  readBackup: Effect.fn("ipc.readBackup")(function*(ref) {
     return yield* (yield* MapFiles).readBackup(ref)
   })
-})
+} satisfies Partial<DesktopIpcHandlers>

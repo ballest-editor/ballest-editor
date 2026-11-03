@@ -1,10 +1,15 @@
-import { ChooseGamePathResult, GamePaths as GamePathsSchema, PlayResult, PluginStatus } from "@ballest/contracts"
+import {
+  ChooseGamePathResult,
+  GamePaths as GamePathsSchema,
+  InvokeChannels,
+  PlayResult,
+  PluginStatus
+} from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import { vi } from "vitest"
 import { PlayFile } from "../game/GameLink"
 import { sha256 } from "../project/files"
-import * as channels from "./channels"
 import { expectTag, opened, readSettings, withHandlers } from "./handlersHarness"
 
 // The services' layers call Electron; these tests replace them, so only the module import needs a stand-in
@@ -20,12 +25,12 @@ describe("the game over IPC", () => {
           mapsFolder: { status: "found", path: steam.maps },
           pluginsFolder: { status: "missing", path: `${steam.install}/Ballest/Binaries/Win64/plugins` }
         }
-        assert.deepStrictEqual(yield* fake.invoke(channels.GAME_PATHS_CHANNEL), found)
+        assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.gamePaths), found)
 
         dialogs.answers.push(null)
-        assert.isNull(yield* fake.invoke(channels.CHOOSE_GAME_PATH_CHANNEL, { which: "mapsFolder" }))
+        assert.isNull(yield* fake.invoke(InvokeChannels.chooseGamePath, { which: "mapsFolder" }))
         dialogs.answers.push(dir)
-        assert.deepStrictEqual(yield* fake.invoke(channels.CHOOSE_GAME_PATH_CHANNEL, { which: "mapsFolder" }), {
+        assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.chooseGamePath, { which: "mapsFolder" }), {
           ...found,
           mapsFolder: { status: "overridden", path: dir }
         })
@@ -35,15 +40,15 @@ describe("the game over IPC", () => {
         ])
         // Not the game: refused, and the install stays as found.
         dialogs.answers.push(dir)
-        const error = yield* Effect.flip(fake.invoke(channels.CHOOSE_GAME_PATH_CHANNEL, { which: "install" }))
+        const error = yield* Effect.flip(fake.invoke(InvokeChannels.chooseGamePath, { which: "install" }))
         assert.match(String(error.cause), /isn't Ballest of Them All's folder/)
-        assert.deepStrictEqual(yield* fake.invoke(channels.RESET_GAME_PATH_CHANNEL, { which: "mapsFolder" }), found)
+        assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.resetGamePath, { which: "mapsFolder" }), found)
 
         opened.length = 0
-        assert.isTrue(yield* fake.invoke(channels.REVEAL_GAME_PATH_CHANNEL, { which: "mapsFolder" }))
-        assert.isFalse(yield* fake.invoke(channels.REVEAL_GAME_PATH_CHANNEL, { which: "pluginsFolder" }))
+        assert.isTrue(yield* fake.invoke(InvokeChannels.revealGamePath, { which: "mapsFolder" }))
+        assert.isFalse(yield* fake.invoke(InvokeChannels.revealGamePath, { which: "pluginsFolder" }))
         assert.match(
-          String((yield* Effect.flip(fake.invoke(channels.REVEAL_GAME_PATH_CHANNEL, { which: "/etc" }))).cause),
+          String((yield* Effect.flip(fake.invoke(InvokeChannels.revealGamePath, { which: "/etc" }))).cause),
           /Expected/
         )
         assert.deepStrictEqual(opened, [steam.maps])
@@ -54,8 +59,8 @@ describe("the game over IPC", () => {
     withHandlers(({ fake }) =>
       Effect.gen(function*() {
         opened.length = 0
-        assert.isFalse(yield* fake.invoke(channels.IS_GAME_RUNNING_CHANNEL))
-        assert.isTrue(yield* fake.invoke(channels.LAUNCH_GAME_CHANNEL))
+        assert.isFalse(yield* fake.invoke(InvokeChannels.isGameRunning))
+        assert.isTrue(yield* fake.invoke(InvokeChannels.launchGame))
         assert.deepStrictEqual(opened, ["steam://rungameid/3339810"])
       })
     ))
@@ -65,14 +70,14 @@ describe("the game over IPC", () => {
       Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
         const path = yield* Path.Path
-        assert.isNull(yield* fake.invoke(channels.FIND_CREATOR_CHANNEL))
+        assert.isNull(yield* fake.invoke(InvokeChannels.findCreator))
         const config = path.join(steam.steam, "config")
         yield* fs.makeDirectory(config)
         yield* fs.writeFileString(
           path.join(config, "loginusers.vdf"),
           `"users"\n{\n\t"76561198000000001"\n\t{\n\t\t"PersonaName"\t\t"Marble"\n\t\t"MostRecent"\t\t"1"\n\t}\n}\n`
         )
-        assert.deepStrictEqual(yield* fake.invoke(channels.FIND_CREATOR_CHANNEL), { name: "Marble", source: "steam" })
+        assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.findCreator), { name: "Marble", source: "steam" })
       })
     ))
 
@@ -82,26 +87,26 @@ describe("the game over IPC", () => {
         const fs = yield* FileSystem.FileSystem
         const path = yield* Path.Path
         const folder = path.join(steam.plugins, "ballest-editor-link")
-        assert.deepStrictEqual(yield* fake.invoke(channels.PLUGIN_STATUS_CHANNEL), {
+        assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.pluginStatus), {
           status: "noPluginManager",
           bundledVersion: "0.2.0",
           installedVersion: null,
           folder
         })
         assert.match(
-          String((yield* Effect.flip(fake.invoke(channels.INSTALL_PLUGIN_CHANNEL))).cause),
+          String((yield* Effect.flip(fake.invoke(InvokeChannels.installPlugin))).cause),
           /plugin manager isn't installed/
         )
 
         yield* fs.makeDirectory(steam.plugins)
         yield* fs.writeFileString(path.join(path.dirname(steam.plugins), "version.dll"), "")
-        assert.deepInclude(yield* fake.invoke(channels.PLUGIN_STATUS_CHANNEL), { status: "missing" })
-        assert.deepStrictEqual(yield* fake.invoke(channels.INSTALL_PLUGIN_CHANNEL), {
+        assert.deepInclude(yield* fake.invoke(InvokeChannels.pluginStatus), { status: "missing" })
+        assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.installPlugin), {
           plugin: { status: "current", bundledVersion: "0.2.0", installedVersion: "0.2.0", folder },
           restartGame: false
         })
         assert.match(
-          String((yield* Effect.flip(fake.invoke(channels.PLUGIN_STATUS_CHANNEL, { folder: "/etc" }))).cause),
+          String((yield* Effect.flip(fake.invoke(InvokeChannels.pluginStatus, { folder: "/etc" }))).cause),
           /undefined/
         )
       })
@@ -115,13 +120,13 @@ describe("the game over IPC", () => {
         opened.length = 0
         const name = "Map_LevelEditorMain&Track_me.balledit"
         const text = JSON.stringify({ worldSettings: { levelData: { levelPublishedFileId: -1 } }, items: [] })
-        yield* fake.invoke(channels.CREATE_MAP_CHANNEL, { fileName: name, text })
+        yield* fake.invoke(InvokeChannels.createMap, { fileName: name, text })
         yield* fs.makeDirectory(steam.plugins)
         yield* fs.writeFileString(path.join(path.dirname(steam.plugins), "version.dll"), "")
-        yield* fake.invoke(channels.INSTALL_PLUGIN_CHANNEL)
+        yield* fake.invoke(InvokeChannels.installPlugin)
 
         const result = expectTag(
-          yield* fake.invokeAs(PlayResult, channels.PLAY_CHANNEL, {
+          yield* fake.invokeAs(PlayResult, InvokeChannels.play, {
             fileName: name,
             replacePublished: false,
             overwriteChanged: false
@@ -139,7 +144,7 @@ describe("the game over IPC", () => {
         assert.deepStrictEqual(opened, ["steam://rungameid/3339810"])
         // Only a project map's file name.
         const bad = yield* Effect.flip(
-          fake.invoke(channels.PLAY_CHANNEL, {
+          fake.invoke(InvokeChannels.play, {
             fileName: "../x.balledit",
             replacePublished: false,
             overwriteChanged: false
@@ -153,12 +158,12 @@ describe("the game over IPC", () => {
     withHandlers(({ fake, dialogs, dir, steam }) =>
       Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
-        const paths = yield* fake.invokeAs(GamePathsSchema, channels.GAME_PATHS_CHANNEL)
+        const paths = yield* fake.invokeAs(GamePathsSchema, InvokeChannels.gamePaths)
         assert.deepStrictEqual(paths.install, { status: "missing", path: null })
-        assert.strictEqual((yield* fake.invokeAs(PluginStatus, channels.PLUGIN_STATUS_CHANNEL)).status, "noGame")
+        assert.strictEqual((yield* fake.invokeAs(PluginStatus, InvokeChannels.pluginStatus)).status, "noGame")
 
         dialogs.answers.push(dir)
-        const error = yield* Effect.flip(fake.invoke(channels.CHOOSE_GAME_PATH_CHANNEL, { which: "install" }))
+        const error = yield* Effect.flip(fake.invoke(InvokeChannels.chooseGamePath, { which: "install" }))
         assert.match(String(error.cause), /isn't Ballest of Them All's folder/)
         assert.isUndefined((yield* readSettings(fs, dir)).game)
 
@@ -167,7 +172,7 @@ describe("the game over IPC", () => {
         yield* fs.makeDirectory(exe.slice(0, exe.lastIndexOf("/")), { recursive: true })
         yield* fs.writeFileString(exe, "")
         dialogs.answers.push(steam.install)
-        const chosen = yield* fake.invokeAs(ChooseGamePathResult, channels.CHOOSE_GAME_PATH_CHANNEL, {
+        const chosen = yield* fake.invokeAs(ChooseGamePathResult, InvokeChannels.chooseGamePath, {
           which: "install"
         })
         assert.deepStrictEqual(chosen?.install, { status: "overridden", path: steam.install })

@@ -1,3 +1,4 @@
+import { type DesktopMethodName, DesktopMethods, InvokeChannels } from "@ballest/contracts"
 import { Context, Effect, Layer, Schema, type Scope } from "effect"
 
 /** The part of an invoke event the handlers may look at. */
@@ -60,25 +61,49 @@ export class DesktopIpc extends Context.Service<DesktopIpc, {
   static readonly layer = (ipcMain: DesktopIpcMain) => Layer.succeed(DesktopIpc, DesktopIpc.make(ipcMain))
 }
 
+/** A bridge method's payload as its handler gets it: decoded. */
+type HandlerPayload<K extends DesktopMethodName> = (typeof DesktopMethods)[K]["payload"]["Type"]
+
+/** A bridge method's result as its handler gives it: before encoding. */
+type HandlerResult<K extends DesktopMethodName> = (typeof DesktopMethods)[K]["result"]["Type"]
+
+/** The work behind bridge method `K`: its decoded payload and the sender in, its result out. */
+export type DesktopIpcHandler<K extends DesktopMethodName, E = unknown, R = unknown> = (
+  payload: HandlerPayload<K>,
+  event: DesktopIpcInvokeEvent
+) => Effect.Effect<HandlerResult<K>, E, R>
+
 /**
- * An IPC method whose payload is decoded and whose result is encoded with Schema, so the handler only ever sees
- * valid input and the renderer only ever gets the contract's encoded shape.
+ * A handler for every method in `DesktopMethods`. Each file in `methods/` holds an area's (`satisfies
+ * Partial<DesktopIpcHandlers>`); `DesktopIpcHandlers.ts` puts them together and fails typecheck when one is missing.
  */
-export const makeIpcMethod = <Payload, EncodedPayload, Result, EncodedResult, E, R>(method: {
-  readonly channel: string
-  readonly payload: Schema.Codec<Payload, EncodedPayload>
-  readonly result: Schema.Codec<Result, EncodedResult>
-  readonly handler: (payload: Payload, event: DesktopIpcInvokeEvent) => Effect.Effect<Result, E, R>
-}): DesktopIpcMethod<E | Schema.SchemaError, R> => {
-  const decode = Schema.decodeUnknownEffect(method.payload)
-  const encode = Schema.encodeEffect(method.result)
+export type DesktopIpcHandlers<E = unknown, R = unknown> = {
+  readonly [K in DesktopMethodName]: DesktopIpcHandler<K, E, R>
+}
+
+/**
+ * Bridge method `name` on its channel (`InvokeChannels`), its payload decoded and its result encoded with its schemas
+ * (`DesktopMethods`), so the handler only ever sees valid input and the renderer only ever gets the contract's encoded
+ * shape.
+ */
+export const makeIpcMethod = <K extends DesktopMethodName, E, R>(
+  name: K,
+  handler: DesktopIpcHandler<K, E, R>
+): DesktopIpcMethod<E | Schema.SchemaError, R> => {
+  const channel = InvokeChannels[name]
+  const schemas: {
+    readonly payload: Schema.ConstraintCodec<HandlerPayload<K>, unknown>
+    readonly result: Schema.ConstraintCodec<HandlerResult<K>, unknown>
+  } = DesktopMethods[name]
+  const decode = Schema.decodeUnknownEffect(schemas.payload)
+  const encode = Schema.encodeEffect(schemas.result)
   return {
-    channel: method.channel,
+    channel,
     handler: (raw, event) =>
       decode(raw).pipe(
-        Effect.flatMap((payload) => method.handler(payload, event)),
+        Effect.flatMap((payload) => handler(payload, event)),
         Effect.flatMap(encode),
-        Effect.withSpan("DesktopIpc.method", { attributes: { channel: method.channel } })
+        Effect.withSpan("DesktopIpc.method", { attributes: { channel } })
       )
   }
 }

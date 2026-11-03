@@ -1,9 +1,8 @@
-import { UpdateState } from "@ballest/contracts"
+import { PushChannels, UpdateState } from "@ballest/contracts"
 import { Config, Context, Effect, Layer, Option, Ref, Schema, type Scope, Semaphore } from "effect"
 import { DesktopEnvironment } from "../app/DesktopEnvironment"
 import { ElectronUpdater } from "../electron/ElectronUpdater"
 import { ElectronWindow } from "../electron/ElectronWindow"
-import { UPDATE_STATE_CHANNEL } from "../ipc/channels"
 import * as Machine from "./updateMachine"
 
 const STARTUP_DELAY = "15 seconds"
@@ -25,7 +24,7 @@ const encodeState = Schema.encodeEffect(UpdateState)
 
 /**
  * The in-app updater (docs/DESKTOP.md § Packaging and release): checks GitHub Releases, downloads when the user asks
- * and installs on their restart. Every state change is pushed to the page on `UPDATE_STATE_CHANNEL`.
+ * and installs on their restart. Every state change is pushed to the page on `PushChannels.onUpdateState`.
  */
 export class DesktopUpdates extends Context.Service<DesktopUpdates, {
   readonly state: Effect.Effect<UpdateState>
@@ -61,7 +60,7 @@ export class DesktopUpdates extends Context.Service<DesktopUpdates, {
       const apply = (f: (state: UpdateState) => UpdateState) =>
         Ref.updateAndGet(ref, f).pipe(
           Effect.flatMap(encodeState),
-          Effect.flatMap((encoded) => windows.sendAll(UPDATE_STATE_CHANNEL, encoded)),
+          Effect.flatMap((encoded) => windows.sendAll(PushChannels.onUpdateState, encoded)),
           Effect.orDie
         )
       const update = (f: (state: UpdateState) => UpdateState) => lock.withPermits(1)(apply(f))

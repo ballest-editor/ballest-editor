@@ -1,57 +1,25 @@
+import { InvokeChannels, PushChannels } from "@ballest/contracts/channels"
 import { describe, expect, it } from "vitest"
 import { verifyPreloadBundle } from "./verifyPreloadBundle"
 
+/** A hand-written preload exposing the whole bridge, as the built one would. */
 const valid = `
   const electron = require("electron")
   electron.contextBridge.exposeInMainWorld("ballest", {
     versions: { electron: process.versions.electron },
-    ping: (message) => electron.ipcRenderer.invoke("ballest:ping", { message }),
-    projectState: () => electron.ipcRenderer.invoke("ballest:project:state"),
-    chooseProject: () => electron.ipcRenderer.invoke("ballest:project:choose"),
-    switchProject: (path) => electron.ipcRenderer.invoke("ballest:project:switch", { path }),
-    createProject: (name) => electron.ipcRenderer.invoke("ballest:project:create", { name }),
-    revealProject: (which) => electron.ipcRenderer.invoke("ballest:project:reveal", { which }),
-    renameProject: (name) => electron.ipcRenderer.invoke("ballest:project:rename", { name }),
-    rememberOpenMap: (fileName) => electron.ipcRenderer.invoke("ballest:project:rememberOpenMap", { fileName }),
-    listMaps: () => electron.ipcRenderer.invoke("ballest:project:listMaps"),
-    readMap: (fileName) => electron.ipcRenderer.invoke("ballest:project:readMap", { fileName }),
-    createMap: (payload) => electron.ipcRenderer.invoke("ballest:project:createMap", payload),
-    saveMap: (payload) => electron.ipcRenderer.invoke("ballest:project:saveMap", payload),
-    renameMap: (payload) => electron.ipcRenderer.invoke("ballest:project:renameMap", payload),
-    pickImport: () => electron.ipcRenderer.invoke("ballest:project:pickImport"),
-    importMap: (payload) => electron.ipcRenderer.invoke("ballest:project:importMap", payload),
-    exportMap: (payload) => electron.ipcRenderer.invoke("ballest:project:exportMap", payload),
-    checkExports: () => electron.ipcRenderer.invoke("ballest:project:checkExports"),
-    reimportMap: (fileName) => electron.ipcRenderer.invoke("ballest:project:reimportMap", { fileName }),
-    listBackups: () => electron.ipcRenderer.invoke("ballest:project:listBackups"),
-    readBackup: (ref) => electron.ipcRenderer.invoke("ballest:project:readBackup", ref),
-    setWindowTheme: (dark) => electron.ipcRenderer.invoke("ballest:window:setTheme", { dark }),
-    confirmUnsaved: (prompt) => electron.ipcRenderer.invoke("ballest:window:confirmUnsaved", prompt),
-    onUnloadRequest: () => () => {},
-    openExternal: (url) => electron.ipcRenderer.invoke("ballest:shell:openExternal", { url }),
-    gamePaths: () => electron.ipcRenderer.invoke("ballest:game:paths"),
-    chooseGamePath: (which) => electron.ipcRenderer.invoke("ballest:game:choosePath", { which }),
-    resetGamePath: (which) => electron.ipcRenderer.invoke("ballest:game:resetPath", { which }),
-    revealGamePath: (which) => electron.ipcRenderer.invoke("ballest:game:revealPath", { which }),
-    launchGame: () => electron.ipcRenderer.invoke("ballest:game:launch"),
-    isGameRunning: () => electron.ipcRenderer.invoke("ballest:game:isRunning"),
-    findCreator: () => electron.ipcRenderer.invoke("ballest:game:findCreator"),
-    pluginStatus: () => electron.ipcRenderer.invoke("ballest:game:pluginStatus"),
-    installPlugin: () => electron.ipcRenderer.invoke("ballest:game:installPlugin"),
-    play: (payload) => electron.ipcRenderer.invoke("ballest:game:play", payload),
-    onPlaySessionEnded: () => () => {},
-    loadNotifications: () => electron.ipcRenderer.invoke("ballest:notifications:load"),
-    saveNotifications: (records) => electron.ipcRenderer.invoke("ballest:notifications:save", { records }),
-    muteNotifications: (kind) => electron.ipcRenderer.invoke("ballest:notifications:mute", { kind }),
-    gameLinkMemory: () => electron.ipcRenderer.invoke("ballest:gameLink:memory"),
-    rememberGameLink: (result) => electron.ipcRenderer.invoke("ballest:gameLink:remember", result),
-    getUpdateState: () => electron.ipcRenderer.invoke("ballest:update:get"),
-    downloadUpdate: () => electron.ipcRenderer.invoke("ballest:update:download"),
-    installUpdate: () => electron.ipcRenderer.invoke("ballest:update:install"),
-    onUpdateState: (listener) => {
-      electron.ipcRenderer.on("ballest:update:state", listener)
-      return () => electron.ipcRenderer.removeListener("ballest:update:state", listener)
-    }
+${
+  Object.entries(InvokeChannels).map(([name, channel]) =>
+    `    ${name}: (payload) => electron.ipcRenderer.invoke("${channel}", payload),`
+  ).join("\n")
+}
+${
+  Object.entries(PushChannels).map(([name, channel]) =>
+    `    ${name}: (listener) => {
+      electron.ipcRenderer.on("${channel}", listener)
+      return () => electron.ipcRenderer.removeListener("${channel}", listener)
+    },`
+  ).join("\n")
+}
   })
 `
 
@@ -64,7 +32,33 @@ describe("verifyPreloadBundle", () => {
 
   it("rejects a missing or mistyped member", () => {
     expect(() => verifyPreloadBundle(valid.replace("ping:", "pong:"))).toThrow(/missing ping \(function\)/)
+    expect(() => verifyPreloadBundle(valid.replace("onUpdateState:", "onUpdate:"))).toThrow(
+      /missing onUpdateState \(function\)/
+    )
     expect(() => verifyPreloadBundle(`"ballest versions ping"; require("electron")`)).toThrow(/doesn't expose/)
+  })
+
+  it("rejects a method on the wrong channel, or one that doesn't pass its payload as is", () => {
+    expect(() => verifyPreloadBundle(valid.replace(`"ballest:project:readMap"`, `"ballest:project:saveMap"`)))
+      .toThrow(/readMap \(invoke ballest:project:readMap with its payload\)/)
+    expect(() =>
+      verifyPreloadBundle(valid.replace(
+        `ping: (payload) => electron.ipcRenderer.invoke("ballest:ping", payload)`,
+        `ping: (message) => electron.ipcRenderer.invoke("ballest:ping", { message })`
+      ))
+    ).toThrow(/ping \(invoke ballest:ping with its payload\)/)
+  })
+
+  it("rejects a subscription that keeps listening after it is unsubscribed", () => {
+    expect(() =>
+      verifyPreloadBundle(
+        valid.replace(
+          `return () => electron.ipcRenderer.removeListener("ballest:update:state", listener)`,
+          "return () => {}"
+        )
+      )
+    )
+      .toThrow(/onUpdateState \(listen on ballest:update:state until unsubscribed\)/)
   })
 
   it("rejects dynamic imports and requires", () => {

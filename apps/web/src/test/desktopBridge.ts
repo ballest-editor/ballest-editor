@@ -187,7 +187,7 @@ const nameOf = (path: string) => path.split(/[\\/]/).pop() ?? path
 const fail = (message: string) =>
   Promise.reject(new Error(`Error invoking remote method 'x': ProjectError: ${message}`))
 
-/** The preload bridge over a `TestDisk`, answering the way main does. */
+/** The preload bridge over a `TestDisk`, answering the way main does. `DesktopBridge` makes it list every method. */
 export const testBridge = (disk: TestDisk): DesktopBridge => {
   const linksOf = (project: string) => {
     const existing = disk.links.get(project)
@@ -248,19 +248,19 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
 
   const bridge: DesktopBridge = {
     versions: { electron: "test", chrome: "test", node: "test" },
-    ping: (message) => Promise.resolve({ message }),
+    ping: ({ message }) => Promise.resolve({ message }),
     projectState: () => Promise.resolve(state()),
     chooseProject: () => {
       const path = ask("project")
       return path === null ? Promise.resolve(null) : select(path)
     },
-    switchProject: select,
-    createProject: (name) => {
+    switchProject: ({ path }) => select(path),
+    createProject: ({ name }) => {
       const path = `${TEST_PROJECTS_FOLDER}/${name.trim()}`
       if (info(path).exists) return fail(`${path} already holds a project.`)
       return select(path)
     },
-    revealProject: (which) => {
+    revealProject: ({ which }) => {
       const project = disk.project.current
       if (project === null || !info(project).exists) return Promise.resolve(false)
       disk.external.push(
@@ -268,13 +268,13 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       )
       return Promise.resolve(true)
     },
-    renameProject: (name) => {
+    renameProject: ({ name }) => {
       const project = disk.project.current
       if (project === null) return fail(NO_PROJECT)
       disk.projectNames.set(project, name.trim())
       return Promise.resolve(state())
     },
-    rememberOpenMap: (fileName) => {
+    rememberOpenMap: ({ fileName }) => {
       const project = disk.project.current
       if (project === null) return Promise.resolve()
       const { [project]: _previous, ...others } = disk.project.lastOpenMap
@@ -287,7 +287,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
         [...disk.files.keys()].filter((file) => file.startsWith(prefix)).map((file) => mapOf(nameOf(file)))
       )
     },
-    readMap: (fileName) => {
+    readMap: ({ fileName }) => {
       if (disk.project.current === null) return fail(NO_PROJECT)
       const text = disk.files.get(projectFile(fileName, current()))
       return text === undefined
@@ -377,7 +377,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       }
       return Promise.resolve({ changed, missing })
     },
-    reimportMap: async (fileName) => {
+    reimportMap: async ({ fileName }) => {
       if (disk.project.current === null) return fail(NO_PROJECT)
       const link = linksOf(current()).get(fileName) ?? emptyLink
       const text = link.export === null ? undefined : disk.files.get(link.export.path)
@@ -401,12 +401,12 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       disk.unload.listeners.add(listener)
       return () => void disk.unload.listeners.delete(listener)
     },
-    openExternal: (url) => {
+    openExternal: ({ url }) => {
       disk.external.push(url)
       return Promise.resolve(true)
     },
     gamePaths: () => Promise.resolve(disk.game.paths),
-    chooseGamePath: (which) => {
+    chooseGamePath: ({ which }) => {
       const path = ask("folder")
       if (path === null) return Promise.resolve(null)
       if (which === "install" && !disk.files.has(`${path}/${GAME_EXE}`)) {
@@ -417,11 +417,11 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       disk.game.paths = { ...disk.game.paths, [which]: { status: "overridden", path } }
       return Promise.resolve(disk.game.paths)
     },
-    resetGamePath: (which) => {
+    resetGamePath: ({ which }) => {
       disk.game.paths = { ...disk.game.paths, [which]: testGamePaths[which] }
       return Promise.resolve(disk.game.paths)
     },
-    revealGamePath: (which) => {
+    revealGamePath: ({ which }) => {
       const { status, path } = disk.game.paths[which]
       if (status !== "missing" && path !== null) disk.external.push(path)
       return Promise.resolve(status !== "missing")
@@ -459,11 +459,11 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       return () => void disk.playSessions.listeners.delete(listener)
     },
     loadNotifications: () => Promise.resolve(disk.notifications),
-    saveNotifications: (records) => {
+    saveNotifications: ({ records }) => {
       disk.notifications = records
       return Promise.resolve()
     },
-    muteNotifications: (kind) => {
+    muteNotifications: ({ kind }) => {
       if (!disk.gameLink.muted.includes(kind)) disk.gameLink.muted.push(kind)
       return Promise.resolve([...disk.gameLink.muted])
     },
