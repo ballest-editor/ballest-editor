@@ -9,7 +9,7 @@ import type { MapFile } from "../../domain/MapFile"
 import { type MapPrefs, mapPrefsKeyOf } from "../../domain/MapPrefs"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { type NotificationAction, Platform, type ProjectMap } from "../../services/Platform"
-import { type OpenFile, useEditor } from "../store"
+import { type OpenFile, tabStateOf, type TabTarget, useEditor } from "../store"
 
 /** The project in use, the recent ones and its maps into the store (desktop). */
 export const refreshProject = Effect.gen(function*() {
@@ -32,11 +32,14 @@ export const projectName = () => useEditor.getState().project?.current?.name ?? 
 /** Whether there is a project to write maps into (desktop with one named; a browser has none and keeps maps in memory). */
 export const hasProject = () => useEditor.getState().project?.current != null
 
-/** Puts a map into the editor, with the prefs saved for it; `dirty` opens it as unsaved edits of `file`. */
+/**
+ * Puts a map into the editor, with the prefs saved for it, in the tab `into` says (the active one by default); `dirty`
+ * opens it as unsaved edits of `file`.
+ */
 export const showMap = Effect.fn("showMap")(function*(
   map: MapFile,
   file: OpenFile | null,
-  options?: { readonly dirty: boolean }
+  options?: { readonly dirty?: boolean; readonly into?: TabTarget }
 ) {
   // unreadable prefs only cost the saved grid height and Export on save
   const prefs = yield* MapPrefsStore.use((store) => store.load(mapPrefsKeyOf(map))).pipe(
@@ -44,16 +47,20 @@ export const showMap = Effect.fn("showMap")(function*(
   )
   useEditor.getState().loadMap(map, file, prefs.gridHeight, {
     exportOnSave: prefs.exportOnSave === true,
-    dirty: options?.dirty === true
+    dirty: options?.dirty === true,
+    ...(options?.into !== undefined && { into: options.into })
   })
 })
 
 /**
- * The open map's prefs, under its current name: the grid height when it isn't the player
+ * A tab's map prefs (the active tab's by default), under its current name: the grid height when it isn't the player
  * start's (what a load would pick anyway), and Export on save when it is on.
  */
-export const saveMapPrefs = Effect.gen(function*() {
-  const { doc, floorHeight, exportOnSave } = useEditor.getState()
+export const saveTabPrefs = Effect.fn("saveTabPrefs")(function*(tabId?: string) {
+  const s = useEditor.getState()
+  const tab = tabStateOf(s, tabId ?? s.tabId)
+  if (tab === undefined) return
+  const { doc, floorHeight, exportOnSave } = tab
   const prefs: MapPrefs = {
     ...(floorHeight !== floorHeightOf(doc.map) && { gridHeight: floorHeight }),
     ...(exportOnSave && { exportOnSave })

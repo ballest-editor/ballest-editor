@@ -8,36 +8,41 @@ import { asNewDraft, setLevelNames } from "../../domain/edits"
 import { mapFileNameOf, mapLabelOf } from "../../domain/factory"
 import { type ExportedMap, MapExporter } from "../../services/MapExporter"
 import { Platform } from "../../services/Platform"
-import { type Doc, type OpenFile, useEditor } from "../store"
+import { type Doc, type OpenFile, tabStateOf, useEditor } from "../store"
 import { ASK_FIRST, writeToGame } from "./gameWrite"
 import { run } from "./run"
-import { fileOf, projectName, refreshProject, revealIn, saveMapPrefs } from "./shared"
+import { fileOf, projectName, refreshProject, revealIn, saveTabPrefs } from "./shared"
 
-/** The open map encoded the way the game wants it written, with the document it was made from. */
+/**
+ * The open map encoded the way the game wants it written, with the document it was made from and its tab (the save
+ * lands there even when another tab is active by then).
+ */
 const exportOpenMap = Effect.gen(function*() {
-  const { doc } = useEditor.getState()
+  const { doc, tabId } = useEditor.getState()
   const result = yield* (yield* MapExporter).prepare(doc.map)
-  return { doc, result }
+  return { doc, tabId, result }
 })
 
 /**
- * Writes `result` (made from `doc`) into the project as a new map, which the editor then has open. `replace` writes
+ * Writes `result` (made from `doc`) into the project as a new map, which tab `tabId` then has open. `replace` writes
  * over a map of that name instead (it goes to the project's backups).
  */
-const createAsOpenMap = Effect.fn("createAsOpenMap")(function*(doc: Doc, result: ExportedMap, replace = false) {
+const createAsOpenMap = Effect.fn("createAsOpenMap")(function*(
+  { doc, tabId, result }: { readonly doc: Doc; readonly tabId: string; readonly result: ExportedMap },
+  replace = false
+) {
   const platform = yield* Platform
   const file = { fileName: result.filename, text: result.text }
   const created = yield* replace ? platform.saveMap(file) : platform.createMap(file)
-  useEditor.getState().markSaved(doc, result.map, fileOf(created))
-  yield* saveMapPrefs
+  useEditor.getState().markSaved(tabId, doc, result.map, fileOf(created))
+  yield* saveTabPrefs(tabId)
   yield* refreshProject
   return created
 })
 
 /** A new project map from the open one (it had no file yet): the `saveAs` dialog's last step on desktop. */
 const createFromOpenMap = Effect.gen(function*() {
-  const { doc, result } = yield* exportOpenMap
-  const created = yield* createAsOpenMap(doc, result)
+  const created = yield* createAsOpenMap(yield* exportOpenMap)
   useEditor.getState().notify("info", `Saved ${mapLabelOf(created.fileName)} in ${projectName()}`, {
     kind: "mapSaved",
     actions: [revealIn("project")]
@@ -51,13 +56,13 @@ const createFromOpenMap = Effect.gen(function*() {
  */
 const writeOpenMap = Effect.fn("writeOpenMap")(function*(file: OpenFile, options: { readonly exportAfter: boolean }) {
   const platform = yield* Platform
-  const { doc, result } = yield* exportOpenMap
+  const { doc, tabId, result } = yield* exportOpenMap
   const saved = result.filename === file.name
     ? yield* platform.saveMap({ fileName: file.name, text: result.text })
     : yield* platform.renameMap({ from: file.name, to: result.filename, text: result.text })
-  useEditor.getState().markSaved(doc, result.map, fileOf(saved))
+  useEditor.getState().markSaved(tabId, doc, result.map, fileOf(saved))
   // a rename moves the prefs to the new name
-  yield* saveMapPrefs
+  yield* saveTabPrefs(tabId)
   yield* refreshProject
   const label = mapLabelOf(saved.fileName)
   useEditor.getState().notify(
@@ -65,16 +70,19 @@ const writeOpenMap = Effect.fn("writeOpenMap")(function*(file: OpenFile, options
     saved.fileName === file.name ? `Saved ${label}` : `Renamed ${mapLabelOf(file.name)} to ${label}`,
     { kind: saved.fileName === file.name ? "mapSaved" : "mapRenamed", actions: [revealIn("project")] }
   )
-  if (options.exportAfter && useEditor.getState().exportOnSave) yield* writeToGame("export", saved.fileName, ASK_FIRST)
+  // the map's own Export on save, or Settings › General's for every map
+  const state = useEditor.getState()
+  const exportOnSave = state.settings.general.exportOnSave || tabStateOf(state, tabId)?.exportOnSave === true
+  if (options.exportAfter && exportOnSave) yield* writeToGame("export", saved.fileName, ASK_FIRST)
   return saved
 })
 
 /** A browser's Save and Export: the open map as a download, named the way the game wants it. */
 const downloadOpenMap = Effect.gen(function*() {
-  const { doc, result } = yield* exportOpenMap
+  const { doc, tabId, result } = yield* exportOpenMap
   yield* (yield* Platform).download({ name: result.filename, text: result.text })
-  useEditor.getState().markSaved(doc, result.map, { name: result.filename, path: null })
-  yield* saveMapPrefs
+  useEditor.getState().markSaved(tabId, doc, result.map, { name: result.filename, path: null })
+  yield* saveTabPrefs(tabId)
   useEditor.getState().notify("info", `Downloaded ${result.filename}`, { kind: "mapDownloaded" })
 })
 
@@ -123,10 +131,10 @@ export const saveOpenMapThen = <E, R>(then: Effect.Effect<void, E, R>, options =
  */
 export const withSavedOpenMap = <E, R>(then: (fileName: string) => Effect.Effect<void, E, R>) =>
   Effect.gen(function*() {
-    const { doc, file, dirty } = useEditor.getState()
+    const { doc, file, dirty, tabId } = useEditor.getState()
     if (file !== null && !dirty && file.name === gameFileNameOf(doc)) return yield* then(file.name)
     const withSaved = Effect.suspend(() => {
-      const saved = useEditor.getState().file
+      const saved = tabStateOf(useEditor.getState(), tabId)?.file ?? null
       return saved === null ? Effect.void : then(saved.name)
     })
     yield* saveOpenMapThen(withSaved, { exportAfter: false })
@@ -164,10 +172,10 @@ export const renameOpenMap = (displayName: string, creatorName: string) => {
  */
 export const duplicateMapEffect = Effect.fn("duplicateMapEffect")(
   function*(displayName: string, creatorName: string, replace = false, newDraft = false) {
-    const { doc, file } = useEditor.getState()
+    const { doc, file, tabId } = useEditor.getState()
     const named = setLevelNames(doc.map, displayName, creatorName)
     const result = yield* (yield* MapExporter).prepare(newDraft ? asNewDraft(named) : named)
-    const created = yield* createAsOpenMap(doc, result, replace)
+    const created = yield* createAsOpenMap({ doc, tabId, result }, replace)
     const from = file === null ? "" : ` from ${mapLabelOf(file.name)}`
     const over = replace ? " (the map it replaced went to the backups)" : ""
     useEditor.getState().notify(

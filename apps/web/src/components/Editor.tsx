@@ -1,6 +1,7 @@
 import { Toaster } from "@workspace/ui/components/sonner"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
 import { useEffect } from "react"
+import { MOTION_SCALE } from "../domain/Settings"
 import {
   checkExports,
   followNotifications,
@@ -72,6 +73,14 @@ const useTheme = () => {
     }), [theme])
 }
 
+/** The animation speed setting onto <html>: `--motion` scales every transition and animation (globals.css). */
+const useMotion = () => {
+  const motion = useEditor((s) => s.settings.appearance.motion)
+  useEffect(() => {
+    document.documentElement.style.setProperty("--motion", String(MOTION_SCALE[motion]))
+  }, [motion])
+}
+
 /** The window title: the open map, marked while it has unsaved changes. */
 const useDocumentTitle = () => {
   const label = useOpenMapLabel()
@@ -119,6 +128,7 @@ export function Editor() {
   useDocumentTitle()
   useUnsavedGuard()
   useTheme()
+  useMotion()
   useBlurButtonsAfterClick()
 
   // Background-warm the glb cache for every palette piece once the catalog is in.

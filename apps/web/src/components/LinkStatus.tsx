@@ -13,6 +13,7 @@ import { exportToGame, playMap, reimportMap, revealGamePath } from "../editor/ac
 import { useEditor, useOpenProjectMap } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { LINK_STATE_HELP, LinkStateBadge } from "./LinkStateBadge"
+import { PathText } from "./PathText"
 
 /**
  * The open map's link to its export (docs/PROJECTS.md § Sync), in the middle of the status bar: the state and when it
@@ -46,7 +47,9 @@ export function LinkStatus() {
         {exported !== null && (
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
             <dt className="text-muted-foreground">Export</dt>
-            <dd className="break-all font-mono text-[0.6875rem]">{exported.path}</dd>
+            <dd className="min-w-0">
+              <PathText block>{exported.path}</PathText>
+            </dd>
             <dt className="text-muted-foreground">Last export</dt>
             <dd>
               {formatDateTime(exported.at)} ({formatAgo(exported.at, now)})

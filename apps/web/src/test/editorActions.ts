@@ -1,5 +1,6 @@
 /** What the editor actions' tests share: the layers over a test disk, the store, samples and edits. */
 import { DateTime, Effect, Layer } from "effect"
+import { mapLabelOf } from "../domain/factory"
 import { lightingOf } from "../domain/sunlight"
 import { refreshProject } from "../editor/actions/shared"
 import { type DialogState, useEditor } from "../editor/store"
@@ -32,9 +33,10 @@ export const edit = () => {
   s().setLighting({ ...lighting, timeOfDay: (lighting.timeOfDay + 1) % 24 })
 }
 
-/** A clean editor over the disk's project, as the app has after its startup load. */
+/** A clean editor over the disk's project, as the app has after its startup load: one tab, with a fresh map. */
 export const reset = Effect.gen(function*() {
-  s().loadMap(s().doc.map, null)
+  useEditor.setState({ tabIds: [s().tabId], parkedTabs: new Map() })
+  s().loadMap(s().doc.map, null, undefined, { fresh: true })
   s().closeDialog()
   yield* refreshProject
 })
@@ -59,7 +61,7 @@ export const playSample = (published = false) => {
   const text = readSample(sample)
   return {
     name,
-    label: name.replace(/^Map_LevelEditorMain&/, "").replace(/\.balledit$/, ""),
+    label: mapLabelOf(name),
     text: published ? text.replace("\"levelPublishedFileId\": -1", "\"levelPublishedFileId\": 3561234567") : text
   }
 }

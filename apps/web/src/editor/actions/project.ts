@@ -1,6 +1,6 @@
 /**
  * Opening, importing and switching (docs/PROJECTS.md § Import): another of the project's maps, a map file from
- * anywhere, another project. Each asks about the open map's unsaved edits first.
+ * anywhere, another project. Maps open in tabs of their own; what would replace a map's edits asks about them first.
  */
 import { Effect, Option } from "effect"
 import { setLevelNames } from "../../domain/edits"
@@ -13,45 +13,39 @@ import { type ImportClash, useEditor } from "../store"
 import { openProjectMapFile } from "./maps"
 import { run } from "./run"
 import { fileOf, hasProject, projectName, refreshProject, revealIn, showMap } from "./shared"
-import { unlessCancelled } from "./unsaved"
+import { unlessAnyCancelled, unlessCancelledFor } from "./unsaved"
 
-/**
- * Opens one of the project's maps in the map tab (there is one), asking about the open map's unsaved edits first;
- * the open map itself is left alone.
- */
+/** Opens one of the project's maps (`openProjectMapFile`): its tab if it has one, else a new tab. */
 export const openProjectMap = (fileName: string) =>
-  useEditor.getState().file?.name === fileName
-    ? Promise.resolve(undefined)
-    : run(
-      unlessCancelled("openMap", openProjectMapFile(fileName)).pipe(Effect.ensuring(Effect.ignore(refreshProject)))
-    )
+  run(openProjectMapFile(fileName).pipe(Effect.ensuring(Effect.ignore(refreshProject))))
 
 /**
  * Rename…, Duplicate… or Recover previous version… for one of the project's maps from the Project panel or Project
- * settings: the dialogs act on the open map, so the map is opened first (asking about the open map's unsaved edits),
- * then its dialog.
+ * settings: the dialogs act on the open map, so the map is opened first, then its dialog.
  */
 export const nameProjectMap = (fileName: string, mode: "rename" | "duplicate" | "recover") =>
   withProjectMapOpen(fileName, Effect.sync(() => useEditor.getState().openDialog({ id: mode })))
 
 /**
- * Runs `then` with the project map `fileName` open: it is opened first when another is (asking about that one's
- * unsaved edits; a cancel runs nothing). The Project panel's per-map actions go through this, since Export, Play and
- * the name dialogs act on the open map.
+ * Runs `then` with the project map `fileName` open in the active tab (`openProjectMap` first when it isn't). The
+ * Project panel's per-map actions go through this, since Export, Play and the name dialogs act on the open map.
  */
 export const withProjectMapOpen = (fileName: string, then: Effect.Effect<void, unknown, AppServices>) =>
   run(
     Effect.gen(function*() {
       if (useEditor.getState().file?.name !== fileName) {
-        yield* unlessCancelled("openMap", openProjectMapFile(fileName))
+        yield* openProjectMapFile(fileName)
         if (useEditor.getState().file?.name !== fileName) return
       }
       yield* then
     })
   )
 
-/** Copies a picked file into the project (or reports the clash) and opens the copy. */
-const importInto = Effect.fn("importInto")(function*(pending: ImportClash, replace: boolean) {
+/**
+ * Copies a picked file into the project (or reports the clash) and opens the copy in a new tab; `replace` writes over
+ * the project's map of that name, which is shown in its own tab when one has it open (`open`).
+ */
+const importInto = Effect.fn("importInto")(function*(pending: ImportClash, replace: boolean, open = false) {
   const platform = yield* Platform
   const { source, fileName, text, map } = pending
   const result = yield* platform.importMap({ source, fileName, text, replace })
@@ -59,7 +53,7 @@ const importInto = Effect.fn("importInto")(function*(pending: ImportClash, repla
     useEditor.getState().openDialog({ id: "importClash", ...pending })
     return
   }
-  yield* showMap(map, fileOf(result.map))
+  yield* showMap(map, fileOf(result.map), { into: open ? "active" : "newTab" })
   yield* refreshProject
   useEditor.getState().notify(
     "info",
@@ -86,8 +80,7 @@ export const importMapFile = Effect.gen(function*() {
   const { name, path, text } = picked.value
   const map = yield* MapCodec.use((codec) => codec.decode(text))
   if (Option.isNone(path)) {
-    yield* showMap(map, { name, path: null })
-    useEditor.getState().notify("info", `Opened ${name} (${map.items.length} items)`, { kind: "mapOpened" })
+    yield* showMap(map, { name, path: null }, { into: "newTab" })
     return
   }
   const { levelDisplayName, creatorName } = map.worldSettings.levelData
@@ -99,14 +92,17 @@ export const importMapFile = Effect.gen(function*() {
   yield* importInto({ source: path.value, ...pending }, false)
 })
 
-export const importMap = () => run(unlessCancelled("openMap", importMapFile))
+export const importMap = () => run(importMapFile)
 
-/** The clash dialog's Replace: the project's map of that name goes to backups. */
+/**
+ * The clash dialog's Replace: the project's map of that name goes to backups. When a tab has it open, that tab is asked
+ * about its unsaved edits first and shows the import.
+ */
 export const replaceOnImportEffect = Effect.gen(function*() {
   const { dialog: importClash, closeDialog } = useEditor.getState()
   if (importClash?.id !== "importClash") return
   closeDialog()
-  yield* importInto(importClash, true)
+  yield* unlessCancelledFor(importClash.fileName, "replaceOnImport", (open) => importInto(importClash, true, open))
 })
 
 export const replaceOnImport = () => run(replaceOnImportEffect)
@@ -127,20 +123,20 @@ export const importAsCopyEffect = Effect.gen(function*() {
 export const importAsCopy = () => run(importAsCopyEffect)
 
 /**
- * Uses another project from now on, asking about unsaved edits first (Save writes them into the project being left).
- * The open map stays open; it belonged to the old project, so it is unsaved here.
+ * Uses another project from now on, asking about each tab's unsaved edits first (Save writes them into the project
+ * being left). The open maps stay open; they belonged to the old project, so they are unsaved here.
  */
 const changeProject = (
   change: (platform: Platform["Service"]) => Effect.Effect<Option.Option<ProjectState>, PlatformError>
 ) =>
-  run(unlessCancelled(
+  run(unlessAnyCancelled(
     "switchProject",
     Effect.gen(function*() {
       const before = useEditor.getState().project?.current?.path ?? null
       const next = yield* change(yield* Platform)
       if (Option.isNone(next)) return
       const after = next.value.current
-      if (after === null || after.path !== before) useEditor.getState().detachFile()
+      if (after === null || after.path !== before) useEditor.getState().detachFiles()
       yield* refreshProject
       useEditor.getState().notify("info", `Using the project ${after?.name ?? "Untitled Project"}`, {
         kind: "projectChanged",

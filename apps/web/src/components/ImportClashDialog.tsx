@@ -22,8 +22,8 @@ export function ImportClashDialog({ open, onClose }: { readonly open: boolean; r
           <DialogTitle>Replace the map in the project?</DialogTitle>
           <DialogDescription>
             {projectName} already has{" "}
-            <span className="text-foreground">{mapLabelOf(clash?.fileName ?? "")}</span>. Replace it with the imported
-            file (the project's copy goes to its backups), or import the file as a copy under the next free name.
+            <span className="text-foreground">{mapLabelOf(clash?.fileName ?? "")}</span>. Replace it (the current copy
+            goes to the backups), or import as a copy under the next free name.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

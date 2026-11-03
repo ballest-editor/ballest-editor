@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/manrope";
 @import "@fontsource-variable/montserrat";
+@import "@fontsource-variable/geist-mono";
 
 @custom-variant dark (&:is(.dark *));
 @source "../../../apps/**/*.{ts,tsx}";
@@ -119,6 +120,8 @@
     --color-sidebar-ring: var(--sidebar-ring);
     --font-sans: 'Manrope Variable', sans-serif;
     --font-heading: 'Montserrat Variable', sans-serif;
+    /* Bundled, so paths and numbers sit the same on every machine (system mono fonts differ in their vertical metrics). */
+    --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 @layer base {
@@ -128,4 +131,28 @@
   body {
     @apply bg-background text-foreground;
     }
+}
+/*
+ * Animation speed (the editor's Settings › Appearance): `--motion` on <html> scales every duration, 0 turns animation
+ * off. It goes into the theme's default transition duration, the `duration-*` utilities (so a `duration-300` is 300ms
+ * at Normal) and the fallback of tw-animate's enter and exit animations; nothing is forced on elements that set their
+ * own.
+ */
+:root {
+  --motion: 1;
+}
+
+@theme inline {
+  --default-transition-duration: calc(150ms * var(--motion));
+  --animate-in: enter var(--tw-animation-duration, var(--tw-duration, calc(0.15s * var(--motion)))) var(--tw-ease, ease)
+    var(--tw-animation-delay, 0s) var(--tw-animation-iteration-count, 1) var(--tw-animation-direction, normal)
+    var(--tw-animation-fill-mode, none);
+  --animate-out: exit var(--tw-animation-duration, var(--tw-duration, calc(0.15s * var(--motion)))) var(--tw-ease, ease)
+    var(--tw-animation-delay, 0s) var(--tw-animation-iteration-count, 1) var(--tw-animation-direction, normal)
+    var(--tw-animation-fill-mode, none);
+}
+
+@utility duration-* {
+  --tw-duration: calc(--value(integer) * 1ms * var(--motion));
+  transition-duration: calc(--value(integer) * 1ms * var(--motion));
 }

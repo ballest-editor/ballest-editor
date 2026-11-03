@@ -1,12 +1,13 @@
 /**
- * Unsaved changes (docs/DESKTOP.md § Window): one prompt before anything that would lose them, and the window's held
- * closes and reloads.
+ * Unsaved changes (docs/DESKTOP.md § Window): one prompt per map before anything that would lose its edits, and the
+ * window's held closes and reloads, which ask about every tab with unsaved edits.
  */
 import { Effect, Fiber, Stream } from "effect"
 import type { UnsavedAction } from "../../domain/unsaved"
 import { Platform, type UnloadKind } from "../../services/Platform"
 import { runtime } from "../../services/runtime"
-import { useEditor } from "../store"
+import { dirtyTabs, tabWithFile, useEditor } from "../store"
+import { freshMapEffect } from "./maps"
 import { notifyFailure, run } from "./run"
 import { saveOpenMapThen } from "./save"
 
@@ -27,8 +28,9 @@ export const leavingFor = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
 const openMapName = () => useEditor.getState().doc.map.worldSettings.levelData.levelDisplayName.trim() || "Untitled"
 
 /**
- * Runs `next` unless the open map has unsaved edits and the user cancels. With unsaved edits the platform asks first
- * (Save, Don't save, Cancel): Save saves the map, naming it first if it has to, then goes on; Don't save goes on.
+ * Runs `next` unless the open map (the active tab's) has unsaved edits and the user cancels. With unsaved edits the
+ * platform asks first (Save, Don't save, Cancel): Save saves the map, naming it first if it has to, then goes on; Don't
+ * save goes on.
  */
 export const unlessCancelled = <E, R>(action: UnsavedAction, next: Effect.Effect<void, E, R>) =>
   Effect.gen(function*() {
@@ -38,12 +40,47 @@ export const unlessCancelled = <E, R>(action: UnsavedAction, next: Effect.Effect
     else if (choice === "discard") yield* next
   })
 
-/** Whether the page holds a close or a reload (its `beforeunload` cancels it) so the prompt can ask first. */
-export const holdsUnload = () => useEditor.getState().dirty && !leaving
+/** What `unlessCancelled` makes of an Effect that fails with `E` and needs `R`. */
+type Asked<E, R> = ReturnType<typeof unlessCancelled<E, R>>
 
-/** The desktop window held a close or a reload: asks, then closes or reloads unless the user cancelled. */
+/**
+ * Runs `next` unless the user cancels for one of the tabs with unsaved edits: each is made the active tab in turn and
+ * asked about (`unlessCancelled`), and the first Cancel stops there.
+ */
+export const unlessAnyCancelled = <E, R>(
+  action: UnsavedAction,
+  next: Effect.Effect<void, E, R>,
+  asked: ReadonlySet<string> = new Set()
+): Asked<E, R> =>
+  Effect.suspend(() => {
+    const tabId = dirtyTabs(useEditor.getState()).find((id) => !asked.has(id))
+    if (tabId === undefined) return next
+    useEditor.getState().activateTab(tabId)
+    return unlessCancelled(action, unlessAnyCancelled(action, next, new Set([...asked, tabId])))
+  })
+
+/**
+ * Runs `next` for the project map `fileName`, which is about to be replaced: when a tab has it open, that tab is made
+ * active and asked about first (`unlessCancelled`), and `next` hears `true`; otherwise it runs at once with `false`.
+ */
+export const unlessCancelledFor = <E, R>(
+  fileName: string,
+  action: UnsavedAction,
+  next: (open: boolean) => Effect.Effect<void, E, R>
+) =>
+  Effect.suspend(() => {
+    const tabId = tabWithFile(useEditor.getState(), fileName)
+    if (tabId === undefined) return next(false)
+    useEditor.getState().activateTab(tabId)
+    return unlessCancelled(action, next(true))
+  })
+
+/** Whether the page holds a close or a reload (its `beforeunload` cancels it) so the prompt can ask first. */
+export const holdsUnload = () => dirtyTabs(useEditor.getState()).length > 0 && !leaving
+
+/** The desktop window held a close or a reload: asks about each map with unsaved edits, then closes or reloads. */
 export const answerUnloadRequest = (kind: UnloadKind) =>
-  unlessCancelled(
+  unlessAnyCancelled(
     kind,
     Effect.gen(function*() {
       leaving = true
@@ -65,13 +102,67 @@ export const followUnloadRequests = (): () => void => {
   return () => void runtime.runFork(Fiber.interrupt(fiber))
 }
 
-/** New map: asks about unsaved edits first, then the New map dialog (name and creator). */
-export const startNewMapEffect = unlessCancelled(
-  "newMap",
-  Effect.sync(() => useEditor.getState().openDialog({ id: "new" }))
-)
+/** New map: the New map dialog (name and creator); the map opens in a tab of its own. */
+export const startNewMap = () => useEditor.getState().openDialog({ id: "new" })
 
-export const startNewMap = () => run(startNewMapEffect)
+/**
+ * Closes a tab, asking about its unsaved edits first (it is made the active tab to ask). Closing the last tab shows a
+ * fresh, unsaved map in its place: there is always a map.
+ */
+export const closeTabEffect = (tabId: string) =>
+  Effect.suspend(() => {
+    const { tabIds, activateTab } = useEditor.getState()
+    if (!tabIds.includes(tabId)) return Effect.void
+    activateTab(tabId)
+    return unlessCancelled(
+      "closeTab",
+      Effect.suspend(() => {
+        const s = useEditor.getState()
+        if (s.tabIds.length > 1) return Effect.sync(() => s.closeTab(tabId))
+        return freshMapEffect
+      })
+    )
+  })
+
+export const closeTab = (tabId: string) => run(closeTabEffect(tabId))
+
+/** Closes the active tab (`closeTab`). */
+export const closeActiveTab = () => closeTab(useEditor.getState().tabId)
+
+/** Closes `tabIds` one after the other (`closeTabEffect` each); a Cancel stops there. */
+const closeTabsEffect = (tabIds: ReadonlyArray<string>) =>
+  Effect.gen(function*() {
+    for (const id of tabIds) {
+      const before = useEditor.getState().tabIds.length
+      yield* closeTabEffect(id)
+      if (useEditor.getState().tabIds.length === before) return
+    }
+  })
+
+/** Closes every tab but `tabId`, asking about each one's unsaved edits in turn; `tabId` is left active. */
+export const closeOtherTabs = (tabId: string) =>
+  run(
+    closeTabsEffect(useEditor.getState().tabIds.filter((id) => id !== tabId)).pipe(
+      Effect.ensuring(Effect.sync(() => useEditor.getState().activateTab(tabId)))
+    )
+  )
+
+/** Closes the tabs after `tabId`, asking about each one's unsaved edits in turn; `tabId` is left active. */
+export const closeTabsToRight = (tabId: string) => {
+  const { tabIds } = useEditor.getState()
+  return run(
+    closeTabsEffect(tabIds.slice(tabIds.indexOf(tabId) + 1)).pipe(
+      Effect.ensuring(Effect.sync(() => useEditor.getState().activateTab(tabId)))
+    )
+  )
+}
+
+/** Makes the next tab active (`step` 1) or the previous one (-1), wrapping around. */
+export const cycleTab = (step: 1 | -1) => {
+  const { tabIds, tabId, activateTab } = useEditor.getState()
+  const next = tabIds[(tabIds.indexOf(tabId) + step + tabIds.length) % tabIds.length]
+  if (next !== undefined) activateTab(next)
+}
 
 /** File › Quit: the same as closing the window, so unsaved edits ask first (docs/DESKTOP.md § Window). */
 export const quitApp = () => run(answerUnloadRequest("close"))

@@ -3,7 +3,7 @@
  * Everything here returns plain values typed by the MapFile schemas; the round-trip and
  * factory tests decode them again to prove they satisfy the schema.
  */
-import { mapFileNameOf, SYSTEM_LEVEL_NAME, userLevelNameOf } from "@ballest/contracts"
+import { mapFileNameOf, NAME_RULE, SYSTEM_LEVEL_NAME, userLevelNameOf } from "@ballest/contracts"
 import { DateTime, Effect } from "effect"
 import type { CatalogPiece } from "./Catalog"
 import type { Vec3 } from "./coords"
@@ -38,10 +38,24 @@ export const currentCreatedAt: Effect.Effect<string, never, DateTime.CurrentTime
 /** Map and creator names and the file name they make: the same rules main applies (`@ballest/contracts`). */
 export { isValidName, mapFileNameOf, NAME_RULE, userLevelNameOf } from "@ballest/contracts"
 
-/** A map file name without the game's prefix and extension (`Big Loop_Isaac`), for lists. */
-export const mapLabelOf = (fileName: string): string => {
+/** `NAME_RULE` starting a sentence. */
+export const NAME_RULE_SENTENCE = `${NAME_RULE[0]?.toUpperCase() ?? ""}${NAME_RULE.slice(1)}`
+
+/** A map file name without the game's prefix and extension (`Big Loop_Isaac`): the name and creator inside it. */
+export const userLevelNameOfFile = (fileName: string): string => {
   const prefix = `${SYSTEM_LEVEL_NAME}&`
   return (fileName.startsWith(prefix) ? fileName.slice(prefix.length) : fileName).replace(/\.balledit$/i, "")
+}
+
+/**
+ * The map's name from its file name (`Big Loop` from `Map_LevelEditorMain&Big Loop_Isaac.balledit`), for tabs, lists
+ * and notifications: the creator is the file's, not something to repeat everywhere. Names hold no `_` (`NAME_RULE`),
+ * so the last one is the separator; a file without one is shown whole.
+ */
+export const mapLabelOf = (fileName: string): string => {
+  const full = userLevelNameOfFile(fileName)
+  const at = full.lastIndexOf("_")
+  return at > 0 ? full.slice(0, at) : full
 }
 
 /** The first of `<name> 2`, `<name> 3`, ... whose file name isn't `taken`: the name a copy gets. */

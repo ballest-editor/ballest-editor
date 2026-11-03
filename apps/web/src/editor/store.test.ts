@@ -3,7 +3,7 @@ import { Schema } from "effect"
 import fixture from "../domain/bundledCatalog.json"
 import { Catalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
-import { withLevelNames } from "../domain/edits"
+import { setLevelNames, withLevelNames } from "../domain/edits"
 import { placementTransform } from "../domain/factory"
 import { isPlayerStart } from "../domain/MapFile"
 import { withDifficulty } from "../domain/mapTags"
@@ -595,5 +595,93 @@ describe("editor store", () => {
     s().markNotificationsRead()
     s().clearNotifications()
     assert.deepStrictEqual(s().notifications, [])
+  })
+})
+
+describe("document tabs", () => {
+  /** One tab, with a fresh map in it. */
+  const oneTab = () => {
+    useEditor.setState({ tabIds: [state().tabId], parkedTabs: new Map() })
+    state().loadMap(startOnlyMap(), null, undefined, { fresh: true })
+  }
+  const named = (name: string) => setLevelNames(startOnlyMap(), name, "me")
+  const fileOf = (name: string) => ({ name: `${name}.balledit`, path: null })
+
+  it("opens a map in a new tab after the active one; an untouched fresh map is replaced instead", () => {
+    oneTab()
+    const first = state().tabId
+    state().loadMap(named("A"), { name: "a.balledit", path: null }, undefined, { into: "newTab" })
+    assert.deepStrictEqual(state().tabIds, [first])
+
+    state().loadMap(named("B"), { name: "b.balledit", path: null }, undefined, { into: "newTab" })
+    const second = state().tabId
+    state().activateTab(first)
+    state().loadMap(named("C"), { name: "c.balledit", path: null }, undefined, { into: "newTab" })
+    assert.deepStrictEqual(state().tabIds, [first, state().tabId, second])
+    assert.strictEqual(state().file?.name, "c.balledit")
+  })
+
+  it("keeps each tab's document, history, selection and file while another is active", () => {
+    oneTab()
+    const first = state().tabId
+    state().placePiece(cube, placementTransform(cube, { x: 10, y: 0, z: 0 }))
+    const placed = state().selectedIds
+    state().loadMap(named("B"), { name: "b.balledit", path: null }, undefined, { into: "newTab" })
+    assert.strictEqual(state().doc.map.items.length, 1)
+    assert.deepStrictEqual(state().selectedIds, [])
+    assert.isFalse(state().dirty)
+
+    state().activateTab(first)
+    assert.deepStrictEqual(state().selectedIds, placed)
+    assert.isTrue(state().dirty)
+    assert.strictEqual(state().doc.map.items.length, 2)
+    state().undo()
+    assert.strictEqual(state().doc.map.items.length, 1)
+  })
+
+  it("closes a tab: the one after it becomes active, else the one before; the last tab stays", () => {
+    oneTab()
+    const first = state().tabId
+    state().placePiece(cube, placementTransform(cube, { x: 0, y: 0, z: 0 }))
+    state().loadMap(named("B"), fileOf("b"), undefined, { into: "newTab" })
+    const second = state().tabId
+    state().loadMap(named("C"), fileOf("c"), undefined, { into: "newTab" })
+    const third = state().tabId
+
+    state().activateTab(second)
+    state().closeTab(second)
+    assert.deepStrictEqual(state().tabIds, [first, third])
+    assert.strictEqual(state().tabId, third)
+    state().closeTab(third)
+    assert.strictEqual(state().tabId, first)
+    assert.strictEqual(state().doc.map.items.length, 2)
+    assert.strictEqual(state().parkedTabs.size, 0)
+    state().closeTab(first)
+    assert.deepStrictEqual(state().tabIds, [first])
+  })
+
+  it("marks the tab a save started from as saved, even when another is active by then", () => {
+    oneTab()
+    const first = state().tabId
+    state().placePiece(cube, placementTransform(cube, { x: 0, y: 0, z: 0 }))
+    const { doc } = state()
+    state().loadMap(named("B"), fileOf("b"), undefined, { into: "newTab" })
+    state().markSaved(first, doc, doc.map, fileOf("a"))
+    assert.strictEqual(state().file?.name, "b.balledit")
+    assert.include(state().parkedTabs.get(first), { dirty: false })
+    assert.deepStrictEqual(state().parkedTabs.get(first)?.file, { name: "a.balledit", path: null })
+  })
+
+  it("doesn't switch tabs mid-drag", () => {
+    oneTab()
+    state().loadMap(named("A"), fileOf("a"), undefined, { into: "newTab" })
+    const first = state().tabId
+    state().loadMap(named("B"), fileOf("b"), undefined, { into: "newTab" })
+    state().setLightingPreview(shownLighting(state()))
+    state().activateTab(first)
+    assert.notStrictEqual(state().tabId, first)
+    state().setLightingPreview(null)
+    state().activateTab(first)
+    assert.strictEqual(state().tabId, first)
   })
 })

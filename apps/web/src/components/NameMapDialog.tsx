@@ -9,6 +9,7 @@ import { isProjectName } from "../domain/project"
 import { duplicateMap, nameProject, playAsNewDraft, renameOpenMap, saveMapAs } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { type MapCreator, MapNameDialog, useMapCreator } from "./MapNameDialog"
+import { PathText } from "./PathText"
 
 /**
  * Names the open map before it is written: `saveAs` for a map that has no file yet (desktop: into the project) or for
@@ -93,28 +94,26 @@ export function NameMapDialog(
   const copy = {
     saveAs: projects
       ? namesProject
-        ? { title: "Save map", note: "Names the project it goes in, and saves it there.", submit: "Save" }
+        ? { title: "Save map", note: "Names the project it goes in and saves it there.", submit: "Save" }
         : { title: "Save map", note: `Saves it in ${project?.name ?? "the project"}.`, submit: "Save" }
       : {
         title: "Export map",
-        note: "Downloads it. Drop it in the game's UserSavedMaps folder; don't rename the file afterwards.",
+        note: "Downloads it. Put it in the game's UserSavedMaps folder; don't rename the file.",
         submit: "Download"
       },
     rename: {
       title: "Rename map",
-      note: "The map's file in the project moves to the new name; the old one goes to the project's backups.",
+      note: "The file moves to the new name; the old one goes to the backups.",
       submit: "Rename"
     },
     duplicate: {
       title: "Duplicate map",
-      note:
-        "Saves a copy of the map as it is now in the project, and goes on editing the copy. The original keeps its last save.",
+      note: "Saves a copy of the map as it is now and goes on editing the copy. The original keeps its last save.",
       submit: "Duplicate"
     },
     newDraft: {
       title: "Play a new draft",
-      note:
-        "Saves a copy of the map as a new draft in the project, goes on editing the copy and races it. The published map's draft keeps its last save.",
+      note: "Saves a copy as a new draft, goes on editing it and races it. The published draft keeps its last save.",
       submit: "Save and play"
     }
   }[mode]
@@ -158,41 +157,45 @@ export function NameMapDialog(
             aria-invalid={projectTrimmed !== "" && !projectOk}
             onChange={(e) => setProjectDraft(e.target.value)}
           />
-          <span className="text-[0.7rem] text-muted-foreground">
-            {projectTrimmed === "" || !projectOk
-              ? `A folder of maps, made in ${projectsFolder}. Letters, digits, spaces, - and _.`
-              : <code className="break-all">{`${projectsFolder}/${projectTrimmed}`}</code>}
-          </span>
+          <div className="text-[0.7rem] text-muted-foreground">
+            {projectTrimmed !== "" && !projectOk
+              ? "Letters, digits, spaces, - and _ only."
+              : (
+                <PathText block>
+                  {projectTrimmed === "" ? projectsFolder : `${projectsFolder}/${projectTrimmed}`}
+                </PathText>
+              )}
+          </div>
         </div>
       )}
       {mode === "newDraft" && (
         <p className="text-xs text-muted-foreground">
-          {levelData.levelDisplayName} is the draft of a map published to the Workshop (item{" "}
-          {levelData.levelPublishedFileId}). The plugin manager only races maps that were never published, so Play races
-          a new draft of it instead: a copy under another name, not linked to the Workshop item.
+          {levelData.levelDisplayName} is the draft of a Workshop map (item{" "}
+          {levelData.levelPublishedFileId}). The plugin manager races only maps never published, so Play races a copy
+          under another name, not linked to the Workshop item.
         </p>
       )}
       {replaces && (
         <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-          The project already has a map called {name.trim()} by {creator.name}.{" "}
-          {mode === "newDraft" ? "Save and play" : "Duplicate"}{" "}
-          replaces it, and its file goes to the project's backups (Project › Recover previous version…).
+          The project already has {name.trim()} by {creator.name}. {mode === "newDraft" ? "Save and play" : "Duplicate"}
+          {" "}
+          replaces it; the current file goes to the backups.
         </p>
       )}
       {clash && !replaces && (
         <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          The project already has a map called {name.trim()} by {creator.name}.
+          The project already has {name.trim()} by {creator.name}.
         </p>
       )}
       {risky.rejected.length > 0 && (
         <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          The in-game editor rejects {risky.rejected.join(", ")} and will discard the whole map. Remove them first.
+          The game rejects {risky.rejected.join(", ")} and would discard the whole map. Remove them first.
         </p>
       )}
       {risky.unverified.length > 0 && (
         <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
           Not yet confirmed to load in-game:{" "}
-          {risky.unverified.join(", ")}. If the game rejects one, it discards the whole map — test with a copy.
+          {risky.unverified.join(", ")}. If the game rejects one, it discards the whole map. Test with a copy.
         </p>
       )}
     </MapNameDialog>

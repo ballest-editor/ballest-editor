@@ -39,6 +39,7 @@ import { LightingSettings } from "./LightingSettings"
 import { ShiftClick } from "./MouseButtonIcon"
 import { NumberField } from "./NumberField"
 import { PaintSection } from "./PaintSection"
+import { PathText } from "./PathText"
 import { PivotSection } from "./PivotSection"
 import { SectionTitle } from "./SectionTitle"
 
@@ -94,12 +95,7 @@ function MapSettings() {
         {facts.map(([k, v]) => (
           <div key={k} className="contents">
             <dt className="text-muted-foreground">{k}</dt>
-            <dd
-              className={k === "File" ? "min-w-0 truncate font-mono text-[0.6875rem]" : ""}
-              title={k === "File" ? v : undefined}
-            >
-              {v}
-            </dd>
+            <dd className="min-w-0">{k === "File" ? <PathText block>{v}</PathText> : v}</dd>
           </div>
         ))}
       </dl>

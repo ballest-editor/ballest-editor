@@ -25,11 +25,10 @@ export function OverwriteChangedDialog({ open, onClose }: { readonly open: boole
         <DialogHeader>
           <DialogTitle>{label} was changed in the game</DialogTitle>
           <DialogDescription>
-            The game's copy of {label} has changed since it was last exported, most likely saved in the in-game editor.
-            {" "}
-            {changed?.from === "play" ? "Play exports" : "Exporting writes"}{" "}
-            this map over it. Back up and overwrite keeps the game's version in the backups; Re-import first replaces
-            the map here with the game's version instead, and exports nothing.
+            The game's copy of {label} changed since the last export, probably saved in the in-game editor.{" "}
+            {changed?.from === "play" ? "Play" : "Export"}{" "}
+            would write over it. Back up and overwrite keeps the game's version in the backups. Re-import first takes
+            the game's version into the project instead, and exports nothing.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

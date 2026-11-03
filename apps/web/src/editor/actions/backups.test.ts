@@ -9,7 +9,7 @@ import { describeBackupEffect, recoverBackupEffect } from "./backups"
 import { exportToGameEffect } from "./exportPlay"
 import { createNewMap } from "./maps"
 import { duplicateMapEffect, saveMapFile } from "./save"
-import { unlessCancelled } from "./unsaved"
+import { unlessCancelledFor } from "./unsaved"
 
 describe("backup actions", () => {
   it.effect("Save keeps the file it writes over; Recover opens it as unsaved edits and Save writes it back", () => {
@@ -58,7 +58,7 @@ describe("backup actions", () => {
       const saved = disk.files.get(projectFile(name))
 
       // Cancel: nothing written, nothing recovered.
-      yield* unlessCancelled("openMap", recoverBackupEffect(first!))
+      yield* unlessCancelledFor(name, "recover", (open) => recoverBackupEffect(first!, open))
       assert.strictEqual(disk.prompts.length, 1)
       assert.strictEqual(disk.files.get(projectFile(name)), saved)
       assert.strictEqual(disk.backups.length, 1)
@@ -66,7 +66,7 @@ describe("backup actions", () => {
 
       // Save: the edits are written over the file, which goes to the backups, then the version opens.
       disk.promptAnswers.push("save")
-      yield* unlessCancelled("openMap", recoverBackupEffect(first!))
+      yield* unlessCancelledFor(name, "recover", (open) => recoverBackupEffect(first!, open))
       assert.deepStrictEqual(disk.backups.map((b) => [b.place, b.fileName, b.text]).slice(0, 1), [[
         "project",
         name,

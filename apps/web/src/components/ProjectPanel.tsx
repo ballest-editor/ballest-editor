@@ -35,8 +35,9 @@ import {
   revealProject,
   startNewMap
 } from "../editor/actions"
-import { type ProjectMap, useEditor, useOpenMapLabel } from "../editor/store"
+import { type ProjectMap, useEditor, useHasUnsavedEdits, useOpenMapLabel } from "../editor/store"
 import { useNow } from "../editor/useNow"
+import { PathText } from "./PathText"
 
 const STATE_ICONS: Record<LinkState, ComponentType<{ readonly className?: string }>> = {
   notExported: IconCircleDashed,
@@ -87,7 +88,7 @@ function RowDetails(
   return (
     <div className="flex max-w-xs flex-col gap-0.5">
       <span className="font-medium">{name}</span>
-      {path !== null && <span className="font-mono text-[0.65rem] break-all opacity-80">{path}</span>}
+      {path !== null && <PathText block className="opacity-80">{path}</PathText>}
       {unsaved && <span className="opacity-80">{path === null ? "Not saved yet" : "Unsaved edits"}</span>}
       {edited !== null && <span className="opacity-80">edited {edited}</span>}
     </div>
@@ -97,18 +98,20 @@ function RowDetails(
 const ROW_CLASSES =
   "group flex h-7 min-w-0 items-center gap-1.5 rounded-sm pr-1 pl-2 text-xs hover:bg-muted/60 has-[button:focus-visible]:bg-muted/60"
 
+/** The map in the active tab: tinted, with a bar at its left, so it reads at a glance. */
+const ACTIVE_ROW_CLASSES = "bg-primary/15 text-foreground shadow-[inset_2px_0_0_0] shadow-primary hover:bg-primary/20"
+
 /**
  * One of the project's maps: a click opens it, its menu (also on right-click) holds what used to be the Project menu's
  * per-map items. The open map is highlighted and carries a dot while it has unsaved edits.
  */
 function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }) {
   const isOpen = useEditor((s) => s.file?.name === map.fileName)
-  const dirty = useEditor((s) => s.dirty)
+  const unsaved = useHasUnsavedEdits(map.fileName)
   const canExport = useEditor((s) => s.capabilities.exportToGame)
   const canPlay = useEditor((s) => s.capabilities.play)
   const menuButton = useRef<HTMLButtonElement>(null)
   const label = mapLabelOf(map.fileName)
-  const unsaved = isOpen && dirty
   const state = linkStateOf(map, { unsaved })
   // right-click opens the same menu the ⋮ button does
   const onContextMenu = (e: MouseEvent) => {
@@ -116,7 +119,7 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
     menuButton.current?.click()
   }
   return (
-    <li className={cn(ROW_CLASSES, isOpen && "bg-muted/40")} onContextMenu={onContextMenu}>
+    <li className={cn(ROW_CLASSES, isOpen && ACTIVE_ROW_CLASSES)} onContextMenu={onContextMenu}>
       <Tooltip>
         <TooltipTrigger
           render={
@@ -186,7 +189,7 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
 function UnsavedRow() {
   const label = useOpenMapLabel()
   return (
-    <li className={cn(ROW_CLASSES, "bg-muted/40")}>
+    <li className={cn(ROW_CLASSES, ACTIVE_ROW_CLASSES)}>
       <Tooltip>
         <TooltipTrigger render={<span className="flex min-w-0 flex-1 items-center gap-1.5" />}>
           <IconMap className="size-3.5 shrink-0 text-muted-foreground" />
@@ -253,7 +256,7 @@ export function ProjectPanel() {
         >
           {projects ? project?.name ?? "Untitled Project *" : "This browser"}
         </span>
-        <HeaderButton label="New map…" onClick={() => void startNewMap()}>
+        <HeaderButton label="New map…" onClick={startNewMap}>
           <IconPlus />
         </HeaderButton>
         <HeaderButton label={projects ? "Import map…" : "Open…"} disabled={untitled} onClick={() => void importMap()}>

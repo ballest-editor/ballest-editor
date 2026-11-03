@@ -1,4 +1,14 @@
-import { IconAlertTriangleFilled, IconCheck, IconFolder, IconFolderOpen, IconMap } from "@tabler/icons-react"
+import {
+  IconAlertTriangleFilled,
+  IconCheck,
+  IconCopy,
+  IconFile,
+  IconFolder,
+  IconFolderOpen,
+  IconFolderSearch,
+  IconMap,
+  IconPencil
+} from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
@@ -10,7 +20,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { type ReactNode, useEffect, useState } from "react"
 import { usableCreatorName } from "../domain/creator"
 import { setLevelData as setMapLevelData, withLevelNames } from "../domain/edits"
-import { isValidName, mapFileNameOf, mapLabelOf, NAME_RULE } from "../domain/factory"
+import { isValidName, mapFileNameOf, mapLabelOf, NAME_RULE_SENTENCE } from "../domain/factory"
 import { floorHeightOf } from "../domain/level"
 import { type LevelData, SYSTEM_LEVEL_NAME } from "../domain/MapFile"
 import type { MapPrefs } from "../domain/MapPrefs"
@@ -42,8 +52,9 @@ import {
   setGridHeight,
   setLevelData
 } from "../editor/actions"
-import { useCreator, useEditor } from "../editor/store"
+import { tabStateOf, tabWithFile, useCreator, useEditor } from "../editor/store"
 import { NumberField } from "./NumberField"
+import { PathAction, PathField, PathText } from "./PathText"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
 /**
@@ -216,6 +227,26 @@ const useOpenMapEntry = (): MapEntry => {
   }
 }
 
+/** A map open in a tab that isn't the active one: edited in that tab (undo steps there, its prefs), like the open map. */
+const useTabMapEntry = (tabId: string | null): MapEntry | null => {
+  const tab = useEditor((s) => tabId === null ? undefined : tabStateOf(s, tabId))
+  const file = tab?.file ?? null
+  if (tabId === null || tab === undefined || file === null) return null
+  return {
+    category: entryOf(file.name),
+    label: mapLabelOf(file.name),
+    fileName: file.name,
+    levelData: tab.doc.map.worldSettings.levelData,
+    floorHeight: tab.floorHeight,
+    startHeight: floorHeightOf(tab.doc.map),
+    exportOnSave: tab.exportOnSave,
+    renameInline: true,
+    setLevelData: (next) => void setLevelData(next, tabId),
+    setGridHeight: (height) => void setGridHeight(height, tabId),
+    setExportOnSave: (on) => void setExportOnSave(on, tabId)
+  }
+}
+
 /**
  * A map that isn't open, read from its file when its entry shows (and again after each write); null until read. Edits
  * go through the save path, so the file moves when the name changes and the old one goes to the backups.
@@ -285,7 +316,7 @@ const mapRows = (
       category,
       group: "General",
       label: "Name",
-      description: `Exports as ${fileName} (${NAME_RULE}).`,
+      description: `${NAME_RULE_SENTENCE}. The file is named after it.`,
       control: entry.renameInline
         ? (
           <NameInput
@@ -302,12 +333,20 @@ const mapRows = (
       label: "File",
       description: entry.fileName === null
         ? "Not saved in the project yet. Save names it."
-        : `${entry.fileName}. Rename moves the file; Duplicate saves a copy and goes on editing it.`,
-      control: (
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => name("rename")}>Rename…</Button>
-          <Button variant="outline" size="sm" onClick={() => name("duplicate")}>Duplicate…</Button>
-        </div>
+        : "Rename moves the file. Duplicate saves a copy and goes on editing it.",
+      wide: true,
+      // no file yet: the description says so, and Save is the way to one
+      control: entry.fileName === null ? null : (
+        <PathField
+          path={fileName}
+          icon={IconFile}
+          actions={
+            <>
+              <PathAction label="Rename…" icon={IconPencil} onClick={() => name("rename")} />
+              <PathAction label="Duplicate…" icon={IconCopy} onClick={() => name("duplicate")} />
+            </>
+          }
+        />
       )
     },
     {
@@ -323,8 +362,7 @@ const mapRows = (
       category,
       group: "General",
       label: `Grid height (${units})`,
-      description:
-        "Where the grid is drawn and new pieces land. Starts at the player start's height. Kept in this editor, not in the map file.",
+      description: "Where the grid sits and new pieces land. Starts at the player start's height.",
       action: (
         <Button
           variant="outline"
@@ -353,8 +391,7 @@ const mapRows = (
           category,
           group: "General",
           label: "Export on save",
-          description:
-            "Save also exports the map to the game's maps folder, for going back and forth with the in-game editor. Kept in this editor, not in the map file.",
+          description: "Every Save of this map also exports it to the game.",
           control: <Switch checked={entry.exportOnSave} onCheckedChange={(on) => entry.setExportOnSave(on)} />
         } satisfies Row
       ]
@@ -488,8 +525,13 @@ export function ProjectSettingsDialog(
   const shownFile = category.startsWith("map:") && category !== openMap.category && category !== OPEN_UNSAVED
     ? category.slice("map:".length)
     : null
-  const diskMap = useDiskMapEntry(shownFile, maps.find((m) => m.fileName === shownFile)?.modifiedAt)
-  const entry = shownFile === null ? openMap : diskMap
+  const shownTab = useEditor((s) => shownFile === null ? undefined : tabWithFile(s, shownFile)) ?? null
+  const tabMap = useTabMapEntry(shownTab)
+  const diskMap = useDiskMapEntry(
+    shownTab === null ? shownFile : null,
+    maps.find((m) => m.fileName === shownFile)?.modifiedAt
+  )
+  const entry = shownFile === null ? openMap : tabMap ?? diskMap
 
   const mapEntries = maps.map((m) => m.fileName)
   const categories: ReadonlyArray<SettingsCategoryInfo<Category>> = [
@@ -527,20 +569,23 @@ export function ProjectSettingsDialog(
     label,
     description,
     wide: true,
+    group: "Locations",
     control: (
-      <div className="flex items-center gap-2">
-        <span
-          className="min-w-0 flex-1 truncate font-mono text-[0.6875rem] text-muted-foreground"
-          title={path ?? undefined}
-        >
-          {path ?? missing}
-        </span>
-        <Button variant="outline" size="sm" disabled={path === null} onClick={reveal}>
-          <IconFolderOpen data-icon="inline-start" />
-          Reveal
-        </Button>
-        {extra}
-      </div>
+      <PathField
+        path={path}
+        missing={missing}
+        actions={
+          <>
+            <PathAction
+              label="Reveal in file manager"
+              icon={IconFolderOpen}
+              disabled={path === null}
+              onClick={reveal}
+            />
+            {extra}
+          </>
+        }
+      />
     )
   })
 
@@ -550,28 +595,32 @@ export function ProjectSettingsDialog(
     {
       id: "projectName",
       category: "project",
+      group: "General",
       label: "Name",
       description: project === null
-        ? `Naming the project makes its folder in ${projectsFolder}; the map is saved there from then on.`
+        ? (
+          <>
+            Naming the project makes its folder in <PathText block>{projectsFolder}</PathText>
+            The map is saved there from then on.
+          </>
+        )
         : "Shown in the title bar and in Recent projects. The folder keeps its name.",
       control: <ProjectNameField name={project?.name ?? null} />
     },
     folderRow(
       "folder",
       "Project folder",
-      "The project: ballest-project.json, its maps and its backups. Change… uses another folder as the project.",
+      "Holds ballest-project.json, the maps and the backups.",
       project?.path ?? null,
       () => void revealProject("project"),
-      <Button
-        variant="outline"
-        size="sm"
+      <PathAction
+        label="Open another project…"
+        icon={IconFolderSearch}
         onClick={() => {
           onClose()
           void chooseProject()
         }}
-      >
-        Change…
-      </Button>,
+      />,
       unnamed
     ),
     folderRow(
@@ -586,7 +635,7 @@ export function ProjectSettingsDialog(
     folderRow(
       "backupsFolder",
       "Backups",
-      "The versions Save, Rename and Re-import wrote over (Recover previous version… lists them).",
+      "Previous versions of the maps, from before Save, Rename or Re-import wrote over them.",
       project === null ? null : `${project.path}/.ballest/backups`,
       () => void revealProject("backups"),
       undefined,
@@ -595,7 +644,7 @@ export function ProjectSettingsDialog(
     folderRow(
       "exportsFolder",
       "Exports",
-      "The game's maps folder: where Export to game writes, and what the in-game editor lists.",
+      "The game's maps folder: Export writes here, and the in-game editor lists it.",
       gameMapsFolder,
       () => void revealGamePath("mapsFolder")
     )

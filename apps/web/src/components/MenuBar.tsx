@@ -154,6 +154,7 @@ export function MenuBar() {
             <RecentProjectsMenu />
             <MenubarSeparator />
             <CommandItem action="saveMap">Save</CommandItem>
+            <CommandItem action="closeTab">Close tab</CommandItem>
             <MenubarSeparator />
             <MenubarItem onClick={() => openDialog({ id: "settings" })}>Settings…</MenubarItem>
             <MenubarItem onClick={() => openDialog({ id: "gameLink" })}>Game link…</MenubarItem>
@@ -167,6 +168,7 @@ export function MenuBar() {
             <MenubarSeparator />
             <CommandItem action="saveMap">Save</CommandItem>
             <CommandItem action="saveMapAs">Export…</CommandItem>
+            <CommandItem action="closeTab">Close tab</CommandItem>
             <MenubarSeparator />
             <MenubarItem onClick={() => openDialog({ id: "settings" })}>Settings…</MenubarItem>
           </Menu>

@@ -7,8 +7,10 @@ import {
   DialogHeader,
   DialogTitle
 } from "@workspace/ui/components/dialog"
+import { mapLabelOf } from "../domain/factory"
 import { replacePublishedDraft } from "../editor/actions"
 import { useEditor } from "../editor/store"
+import { PathText } from "./PathText"
 
 /**
  * Export to game (or Play, which exports first) found a file of the same name in the maps folder that is the draft of a published map. Replacing it
@@ -22,11 +24,12 @@ export function ReplacePublishedDialog({ open, onClose }: { readonly open: boole
         <DialogHeader>
           <DialogTitle>Replace a published map's draft?</DialogTitle>
           <DialogDescription>
-            The game's maps folder already has{" "}
-            <code className="break-all">{draft?.name}</code>, the draft of a map published to the Workshop (item{" "}
-            {draft?.publishedFileId}). {draft?.from === "play" ? "Play exports" : "Exporting writes"}{" "}
-            this map over that draft, and the game no longer treats it as the published one. The draft is kept in the
-            backups.
+            The game's maps folder has the draft of{" "}
+            {draft === null ? "" : mapLabelOf(draft.name)}, a map published to the Workshop (item{" "}
+            {draft?.publishedFileId}):
+            <PathText block>{draft?.name ?? ""}</PathText>
+            {draft?.from === "play" ? "Play" : "Export"}{" "}
+            writes this map over it, and the game stops treating it as the published one. The draft goes to the backups.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
