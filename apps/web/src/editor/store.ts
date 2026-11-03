@@ -57,7 +57,6 @@ import type { GizmoSpace } from "./gizmo/handles"
 
 /** The game folder types, for components (which reach services only through editor/). */
 export type {
-  GamePath,
   GamePathKind,
   GamePaths,
   NotificationAction,
@@ -221,7 +220,7 @@ export interface EditorState {
   readonly exportOnSave: boolean
   /** What the platform (browser or desktop app) offers; the browser's until the startup load says otherwise. */
   readonly capabilities: PlatformCapabilities
-  /** The game's folders as last looked up (desktop; null until Settings › Game asks). */
+  /** The game's folders as last looked up (desktop; null until the startup check or the Game link asks). */
   readonly gamePaths: GamePaths | null
   /** The creator name found on this machine (desktop: the Steam persona name), as last looked up; none until then. */
   readonly foundCreator: Option.Option<FoundCreator>

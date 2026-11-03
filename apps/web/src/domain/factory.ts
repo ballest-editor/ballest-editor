@@ -3,6 +3,7 @@
  * Everything here returns plain values typed by the MapFile schemas; the round-trip and
  * factory tests decode them again to prove they satisfy the schema.
  */
+import { mapFileNameOf, SYSTEM_LEVEL_NAME, userLevelNameOf } from "@ballest/contracts"
 import { DateTime, Effect } from "effect"
 import type { CatalogPiece } from "./Catalog"
 import type { Vec3 } from "./coords"
@@ -17,8 +18,7 @@ import {
   MESH_COMPONENT_TAG,
   type MeshComponent,
   objectPathOf,
-  PLAYER_START_CLASS,
-  SYSTEM_LEVEL_NAME
+  PLAYER_START_CLASS
 } from "./MapFile"
 import { SURFACE_PROPERTY } from "./surface"
 import { rotatorToQuat } from "./ueMath"
@@ -35,19 +35,8 @@ export const currentCreatedAt: Effect.Effect<string, never, DateTime.CurrentTime
   (now) => formatCreatedAt(DateTime.toParts(now))
 )
 
-/**
- * Map and creator names: letters, digits and spaces only. The game joins them with `_`
- * into `userLevelName` and the file name, so `_` (and anything Windows rejects in a file
- * name) is out.
- */
-export const NAME_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N} ]*$/u
-export const isValidName = (name: string): boolean => NAME_PATTERN.test(name) && name.trim() === name
-export const NAME_RULE = "letters, digits and spaces only"
-
-export const userLevelNameOf = (displayName: string, creatorName: string): string => `${displayName}_${creatorName}`
-
-export const mapFileNameOf = (displayName: string, creatorName: string): string =>
-  `${SYSTEM_LEVEL_NAME}&${userLevelNameOf(displayName, creatorName)}.balledit`
+/** Map and creator names and the file name they make: the same rules main applies (`@ballest/contracts`). */
+export { isValidName, mapFileNameOf, NAME_RULE, userLevelNameOf } from "@ballest/contracts"
 
 /** A map file name without the game's prefix and extension (`Big Loop_Isaac`), for lists. */
 export const mapLabelOf = (fileName: string): string => {

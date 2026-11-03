@@ -9,9 +9,9 @@ It needs plugin manager 0.26.0 or later. It doesn't use the network or the conso
 
 ## Install
 
-The Ballest Editor desktop app ships this plugin and installs it for you: **Settings › Game › Editor plugin ›
-Install** (or **Update** when the app has a newer one). It needs the plugin manager installed first. To install it by
-hand instead, copy `info.toml` and `main.as` from this folder into
+The Ballest Editor desktop app ships this plugin and installs it for you: **File › Game link… › Editor plugin ›
+Install** (or **Update** when the app has a newer one; Settings › Game shows the same checklist). It needs the plugin
+manager installed first. To install it by hand instead, copy `info.toml` and `main.as` from this folder into
 `<game>/Ballest/Binaries/Win64/plugins/ballest-editor-link/` and start the game. The folder name matters: it's the
 plugin's id, and the editor writes into that folder. The plugin manager picks up a folder copied in by hand the next
 time the game starts.

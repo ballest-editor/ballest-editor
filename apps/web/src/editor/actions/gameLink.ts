@@ -115,7 +115,7 @@ const showGamePaths = <E>(
   lookup: (platform: Platform["Service"]) => Effect.Effect<Option.Option<GamePaths>, E, AppServices>
 ) => run(gamePathsShown(lookup))
 
-/** Looks the game's folders up again, for Settings › Game. */
+/** Looks the game's folders up again, and the plugin with them. */
 export const loadGamePaths = () => showGamePaths((platform) => Effect.asSome(platform.gamePaths))
 
 /** A folder dialog; the chosen folder replaces the one found for `which`. */
@@ -148,7 +148,7 @@ export const resetGamePaths = (kinds: ReadonlyArray<GamePathKind>) =>
   )
 
 /**
- * Install / Update in Settings › Game: copies the app's editor-link plugin into the game's plugins folder. Only ever
+ * Install / Update on the Game link: copies the app's editor-link plugin into the game's plugins folder. Only ever
  * run when the user asks. The plugin manager loads a plugin copied in by hand when the game starts, hence the restart.
  */
 export const installPluginEffect = Effect.gen(function*() {

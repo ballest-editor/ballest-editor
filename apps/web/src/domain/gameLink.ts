@@ -1,7 +1,8 @@
 /**
- * The Game link checklist (docs/PROJECTS.md § Shell; a dialog on desktop): the game's install, its maps folder, the
- * creator name, the plugin manager and the editor's plugin, each found or not, with the fix for a missing one. And
- * what changed since the last launch, which is what the notification centre is told about.
+ * The Game link checklist (docs/PROJECTS.md § Shell; on desktop, File › Game link… and the Settings › Game page): the
+ * game's install, its maps folder, the creator name, the plugin manager and the editor's plugin, each found or not,
+ * with the fix for a missing one and, for a folder, Change… and reset. And what changed since the last launch, which
+ * is what the notification centre is told about.
  */
 import { Option } from "effect"
 import { type Creator, creatorProblem, foundCreatorLabel } from "./creator"
@@ -16,6 +17,12 @@ export interface GameFolder {
 }
 
 export type GameFolders = Readonly<Record<GameFolderKind, GameFolder>>
+
+export const GAME_FOLDER_KINDS: ReadonlyArray<GameFolderKind> = ["install", "mapsFolder", "pluginsFolder"]
+
+/** The folders chosen instead of the ones found: what Settings › Game's "Reset game to defaults" puts back. */
+export const overriddenFolders = (paths: GameFolders | null): ReadonlyArray<GameFolderKind> =>
+  paths === null ? [] : GAME_FOLDER_KINDS.filter((which) => paths[which].status === "overridden")
 
 /** The editor's plugin, compared with the app's copy (`PluginStatus` in @ballest/contracts). */
 export interface PluginLookup {
@@ -42,9 +49,9 @@ export const sameGameLinkResult = (a: GameLinkResult | null, b: GameLinkResult):
 /** The plugin manager's site, which has its install steps. */
 export const PLUGIN_MANAGER_URL = "https://anythinggoes-ballest.github.io/ballest-plugin-manager/"
 
-/** What a checklist row's button does. */
+/** What a checklist row's button does. ChooseFolder on a row that is fine picks another folder (Change…). */
 export type GameLinkFix =
-  | { readonly _tag: "ChooseFolder"; readonly which: "install" | "mapsFolder" }
+  | { readonly _tag: "ChooseFolder"; readonly which: GameFolderKind }
   | { readonly _tag: "OpenPluginDocs" }
   | { readonly _tag: "InstallPlugin"; readonly update: boolean }
   | { readonly _tag: "EditCreator" }
@@ -70,7 +77,10 @@ export interface GameLinkRow {
   readonly path: string | null
   /** The game folder Reveal shows; none when there is nothing to show. */
   readonly reveal: GameFolderKind | null
-  readonly fix: GameLinkFix | null
+  /** The folder chosen instead of the one found, which reset looks up again. */
+  readonly reset: GameFolderKind | null
+  /** Its buttons, the main one first. */
+  readonly fixes: ReadonlyArray<GameLinkFix>
 }
 
 const LOOKING = "Looking…"
@@ -86,14 +96,25 @@ const row = (
   note: null,
   path: null,
   reveal: null,
-  fix: null,
+  reset: null,
+  fixes: [],
   ...fields
 })
 
-const folderFound = (folder: GameFolder, which: GameFolderKind) =>
-  folder.status === "overridden" ? "Chosen instead of the one Steam lists." : which === "install"
-    ? "Found through Steam."
-    : "Found next to the game."
+const choose = (which: GameFolderKind): GameLinkFix => ({ _tag: "ChooseFolder", which })
+
+/** A folder that is there: its path, Reveal, Change…, and reset when it was chosen here. */
+const folderThere = (paths: GameFolders, which: GameFolderKind, found: string) => {
+  const folder = paths[which]
+  const overridden = folder.status === "overridden"
+  return {
+    note: overridden ? "Chosen here instead of the one Steam knows about." : found,
+    path: folder.path,
+    reveal: which,
+    reset: overridden ? which : null,
+    fixes: [choose(which)]
+  }
+}
 
 const installRow = (paths: GameFolders | null): GameLinkRow => {
   if (paths === null) return row("install", "Game", { state: "waiting", title: LOOKING })
@@ -102,9 +123,7 @@ const installRow = (paths: GameFolders | null): GameLinkRow => {
     return row("install", "Game", {
       state: "ok",
       title: "Ballest of Them All",
-      note: folderFound(install, "install"),
-      path: install.path,
-      reveal: "install"
+      ...folderThere(paths, "install", "Found through Steam.")
     })
   }
   return row("install", "Game", {
@@ -112,7 +131,7 @@ const installRow = (paths: GameFolders | null): GameLinkRow => {
     title: "Couldn't find Ballest of Them All",
     note:
       "Steam doesn't list it in any of its libraries. Choose the folder that holds Ballest/Binaries/Win64/Ballest-Win64-Shipping.exe.",
-    fix: { _tag: "ChooseFolder", which: "install" }
+    fixes: [choose("install")]
   })
 }
 
@@ -122,13 +141,8 @@ const mapsRow = (paths: GameFolders | null): GameLinkRow => {
   const { install, mapsFolder } = paths
   const fields = ((): Parameters<typeof row>[2] => {
     if (mapsFolder.status !== "missing") {
-      return {
-        state: "ok",
-        title: "UserSavedMaps",
-        note: `${folderFound(mapsFolder, "mapsFolder")} Export to game writes here.`,
-        path: mapsFolder.path,
-        reveal: "mapsFolder"
-      }
+      const there = folderThere(paths, "mapsFolder", "Found next to the game.")
+      return { state: "ok", title: "UserSavedMaps", ...there, note: `${there.note} Export to game writes here.` }
     }
     if (install.status === "missing") return { state: "waiting", title: "Looked for once the game is found" }
     return mapsFolder.path === null
@@ -136,14 +150,14 @@ const mapsRow = (paths: GameFolders | null): GameLinkRow => {
         state: "missing",
         title: "Couldn't work out where the game keeps its maps",
         note: "Choose its UserSavedMaps folder.",
-        fix: { _tag: "ChooseFolder", which: "mapsFolder" }
+        fixes: [choose("mapsFolder")]
       }
       : {
         state: "missing",
         title: "Run the game once to create its maps folder",
         note: "Or choose the folder, if it keeps its maps somewhere else.",
         path: mapsFolder.path,
-        fix: { _tag: "ChooseFolder", which: "mapsFolder" }
+        fixes: [choose("mapsFolder")]
       }
   })()
   return { ...row("mapsFolder", label, fields), short: "maps" }
@@ -161,7 +175,7 @@ const creatorRow = (creator: Creator): GameLinkRow => {
         state: "ok",
         title: creator.name,
         note: `${from} Written into every exported map and its file name.`,
-        fix: edit
+        fixes: [edit]
       }),
       short: `creator ${creator.name}`
     }
@@ -173,30 +187,48 @@ const creatorRow = (creator: Creator): GameLinkRow => {
       creatorProblem(creator),
       () => "Neither Steam nor the maps folder names one. New map asks for it; or set it in Settings › General."
     ),
-    fix: edit
+    fixes: [edit]
   })
 }
 
+/**
+ * The plugin manager, and the plugins folder it is found by. The folder can be chosen, for a plugin manager whose
+ * plugins aren't next to the game's exe.
+ */
 const pluginManagerRow = (paths: GameFolders | null, plugin: PluginLookup | null): GameLinkRow => {
   const label = "Plugin manager"
-  if (plugin === null) return row("pluginManager", label, { state: "waiting", title: LOOKING })
+  if (paths === null || plugin === null) return row("pluginManager", label, { state: "waiting", title: LOOKING })
+  const { pluginsFolder } = paths
   switch (plugin.status) {
     case "noGame":
       return row("pluginManager", label, { state: "waiting", title: "Looked for once the game is found" })
-    case "noPluginManager":
+    case "noPluginManager": {
+      const docs: GameLinkFix = { _tag: "OpenPluginDocs" }
+      const why = "Play races the open map through it; Export doesn't need it."
       return row("pluginManager", label, {
         state: "optional",
         title: "Not installed (optional, for Play)",
-        note: "Play races the open map through it. Export doesn't need it. Its site has the install steps.",
-        fix: { _tag: "OpenPluginDocs" }
+        ...(pluginsFolder.status === "missing"
+          ? {
+            note: `${why} Installed somewhere else? Choose its plugins folder.`,
+            fixes: [docs, choose("pluginsFolder")]
+          }
+          : pluginsFolder.status === "overridden"
+          ? {
+            note: `${why} Not found with the plugins folder chosen here.`,
+            path: pluginsFolder.path,
+            reset: "pluginsFolder",
+            fixes: [docs]
+          }
+          : { note: why, fixes: [docs] })
       })
+    }
     default:
       return row("pluginManager", label, {
         state: "ok",
         title: "Ballest plugin manager",
-        note: "Installed next to the game's exe.",
-        path: paths?.pluginsFolder.path ?? null,
-        reveal: paths === null || paths.pluginsFolder.status === "missing" ? null : "pluginsFolder"
+        // Found means its plugins folder is there too.
+        ...folderThere(paths, "pluginsFolder", "Installed next to the game's exe.")
       })
   }
 }
@@ -215,7 +247,7 @@ const pluginRow = (plugin: PluginLookup | null): GameLinkRow => {
           title: plugin.installedVersion === null ? "Not installed" : "Some of its files are missing",
           note: "Play races the open map in the game through it.",
           path: plugin.folder,
-          fix: { _tag: "InstallPlugin", update: false }
+          fixes: [{ _tag: "InstallPlugin", update: false }]
         }
       case "outdated":
         return {
@@ -223,7 +255,7 @@ const pluginRow = (plugin: PluginLookup | null): GameLinkRow => {
           title: `Version ${plugin.installedVersion} is installed`,
           note: `This app comes with ${plugin.bundledVersion}.`,
           path: plugin.folder,
-          fix: { _tag: "InstallPlugin", update: true }
+          fixes: [{ _tag: "InstallPlugin", update: true }]
         }
       case "current":
         return {
