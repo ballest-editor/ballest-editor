@@ -42,7 +42,7 @@ import { refreshGameLink, resetGamePaths, resetKeybinds, saveKeybinds, saveSetti
 import { type SettingsCategory, useCreator, useEditor } from "../editor/store"
 import { useDarkTheme } from "../editor/theme"
 import { creatorSettingsRow } from "./CreatorSetting"
-import { GameLinkChecklist, useGameLinkSummary } from "./GameLink"
+import { CheckAgainButton, GameLinkRows, useGameLinkSummary } from "./GameLink"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
 const movementLookItems = {
@@ -67,7 +67,7 @@ const CATEGORIES: ReadonlyArray<SettingsCategoryInfo<SettingsCategory>> = [
   { id: "lighting", label: "Lighting", icon: IconSun }
 ]
 
-/** Desktop only: the Game link checklist, as File › Game link… shows it. */
+/** Desktop only: the Game link checklist, File › Game link…'s rows without its box. */
 const GAME_CATEGORY: SettingsCategoryInfo<SettingsCategory> = { id: "game", label: "Game", icon: IconDeviceGamepad2 }
 
 type Row = SettingsRow<SettingsCategory>
@@ -671,7 +671,9 @@ export function SettingsDialog(props: {
               "steam proton install folder path UserSavedMaps maps plugins plugin manager ballest-editor-link editor plugin play update version",
             wide: true,
             changes: { modified: overridden.length > 0, reset: () => void resetGamePaths(overridden) },
-            control: <GameLinkChecklist />
+            // Check again where the reset goes: each chosen folder has its own reset, and so does the footer.
+            action: <CheckAgainButton size="xs" />,
+            control: <GameLinkRows framed={false} />
           } satisfies Row
         ]
         : [])

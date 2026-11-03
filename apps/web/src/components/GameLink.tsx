@@ -119,12 +119,12 @@ const chosenFolder = (row: GameLinkRow): GameFolderKind | null => {
   return null
 }
 
-function ChecklistRow({ row }: { readonly row: GameLinkRow }) {
+function ChecklistRow({ row, framed }: { readonly row: GameLinkRow; readonly framed: boolean }) {
   const folder = chosenFolder(row)
   const problem = useEditor((s) => s.gamePathProblem?.which === folder ? s.gamePathProblem.message : null)
   const { reveal, reset } = row
   return (
-    <li className="grid grid-cols-[auto_7rem_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-2">
+    <li className={cn("grid grid-cols-[auto_7rem_minmax(0,1fr)_auto] items-start gap-x-3 py-2", framed && "px-4")}>
       <StateIcon state={problem === null ? row.state : "missing"} className="mt-px" />
       <span className="text-muted-foreground">{row.label}</span>
       <div className="flex min-w-0 flex-col gap-0.5">
@@ -172,29 +172,41 @@ export function useGameLinkSummary(): string {
 }
 
 /**
- * The Game link checklist (docs/PROJECTS.md § Shell, desktop; File › Game link… and the Settings › Game page): the
- * game's install, its maps folder, the creator name, the plugin manager and the editor's plugin, each with its path
- * and, when missing, its fix. A folder can be changed, and one chosen here reset to the one Steam knows about. The
- * plugin manager is optional: only Play needs it. Check again looks everything up again.
+ * The Game link checklist's rows (docs/PROJECTS.md § Shell, desktop): the game's install, its maps folder, the creator
+ * name, the plugin manager and the editor's plugin, each with its path and, when missing, its fix. A folder can be
+ * changed, and one chosen here reset to the one Steam knows about. The plugin manager is optional: only Play needs it.
+ * Framed, they are padded for `GameLinkChecklist`'s box; unframed (Settings › Game), they sit flush between dividers
+ * like the other settings.
  */
-export function GameLinkChecklist() {
+export function GameLinkRows({ framed }: { readonly framed: boolean }) {
   const paths = useEditor((s) => s.gamePaths)
   const plugin = useEditor((s) => s.pluginStatus)
   const creator = useCreator()
   const rows = gameLinkRows(paths, plugin, creator)
   return (
-    <div className="flex flex-col rounded-lg border text-xs">
-      <ul className="flex flex-col py-1">{rows.map((row) => <ChecklistRow key={row.id} row={row} />)}</ul>
+    <ul className={cn("flex flex-col text-xs", framed ? "py-1" : "divide-y divide-border/50")}>
+      {rows.map((row) => <ChecklistRow key={row.id} row={row} framed={framed} />)}
+    </ul>
+  )
+}
+
+/** Looks the folders, the plugin and the creator up again. */
+export function CheckAgainButton({ size = "sm" }: { readonly size?: "xs" | "sm" }) {
+  return (
+    <Button variant="ghost" size={size} className="text-muted-foreground" onClick={() => void refreshGameLink()}>
+      <IconRefresh data-icon="inline-start" />
+      Check again
+    </Button>
+  )
+}
+
+/** The checklist in its own box with Check again under it, as File › Game link… shows it. */
+export function GameLinkChecklist() {
+  return (
+    <div className="flex flex-col rounded-lg border">
+      <GameLinkRows framed />
       <div className="flex items-center justify-end border-t px-2 py-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground"
-          onClick={() => void refreshGameLink()}
-        >
-          <IconRefresh data-icon="inline-start" />
-          Check again
-        </Button>
+        <CheckAgainButton />
       </div>
     </div>
   )
