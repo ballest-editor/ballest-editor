@@ -114,7 +114,7 @@ describe("game link actions", () => {
       assert.deepStrictEqual(kinds(), [])
       assert.deepStrictEqual(disk.gameLink.last, found)
       // the checklist opens as a dialog on the first launch only, while everything Export needs is there
-      assert.strictEqual(s().dialog, "gameLink")
+      assert.strictEqual(s().dialog?.id, "gameLink")
       s().closeDialog()
 
       yield* restart

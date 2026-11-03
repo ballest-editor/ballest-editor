@@ -17,7 +17,7 @@ import { duplicateMapEffect, withSavedOpenMap } from "./save"
 const writeOpenMapToGame = (intent: ExportIntent) =>
   Effect.suspend(() =>
     intent === "play" && !isNeverPublished(useEditor.getState().doc.map.worldSettings.levelData.levelPublishedFileId)
-      ? Effect.sync(() => useEditor.getState().openDialog("newDraft"))
+      ? Effect.sync(() => useEditor.getState().openDialog({ id: "newDraft" }))
       : withSavedOpenMap((fileName) => writeToGame(intent, fileName, ASK_FIRST))
   )
 

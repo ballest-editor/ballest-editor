@@ -67,7 +67,7 @@ describe("import actions", () => {
         // the game changed it since: Export asks, and Back up and overwrite writes the project file over it
         disk.files.set(inGame, "changed in the game")
         yield* exportToGameEffect
-        assert.strictEqual(s().dialog, "overwriteChanged")
+        assert.strictEqual(s().dialog?.id, "overwriteChanged")
         assert.strictEqual(disk.files.get(inGame), "changed in the game")
         yield* overwriteChangedEffect
         assert.isTrue(disk.files.get(inGame) === saved, "the export differs from the project file")
@@ -84,8 +84,8 @@ describe("import actions", () => {
     return Effect.gen(function*() {
       yield* reset
       yield* importFrom(disk, download)
-      assert.strictEqual(s().dialog, "importClash")
-      assert.strictEqual(s().importClash?.fileName, name)
+      const clash = s().dialog
+      assert.strictEqual(clash?.id === "importClash" && clash.fileName, name)
       assert.strictEqual(disk.files.get(projectFile(name)), "{}")
 
       yield* importAsCopyEffect
@@ -99,7 +99,7 @@ describe("import actions", () => {
       assert.strictEqual(disk.links.get(TEST_PROJECT)?.get(copy)?.origin?.path, download)
 
       yield* importFrom(disk, download)
-      assert.strictEqual(s().dialog, "importClash")
+      assert.strictEqual(s().dialog?.id, "importClash")
       yield* replaceOnImportEffect
       assert.isTrue(disk.files.get(projectFile(name)) === readSample(sample))
       assert.strictEqual(s().file?.name, name)

@@ -68,7 +68,7 @@ export const followUnloadRequests = (): () => void => {
 /** New map: asks about unsaved edits first, then the New map dialog (name and creator). */
 export const startNewMapEffect = unlessCancelled(
   "newMap",
-  Effect.sync(() => useEditor.getState().openDialog("new"))
+  Effect.sync(() => useEditor.getState().openDialog({ id: "new" }))
 )
 
 export const startNewMap = () => run(startNewMapEffect)

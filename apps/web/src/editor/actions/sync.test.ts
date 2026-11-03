@@ -77,15 +77,14 @@ describe("sync", () => {
       const saved = savedInGame(text, 4)
       disk.files.set(inGame, saved)
       yield* exportToGameEffect
-      assert.strictEqual(s().dialog, "overwriteChanged")
-      assert.deepStrictEqual(s().changedExport, { name, from: "export", replacePublished: false })
+      assert.deepStrictEqual(s().dialog, { id: "overwriteChanged", name, from: "export", replacePublished: false })
       assert.strictEqual(disk.files.get(inGame), saved)
       // the dialog showed the change: the next focus doesn't report it again
       yield* checkExportsEffect
       assert.lengthOf(reported(), 0)
 
       yield* overwriteChangedEffect
-      assert.isNull(s().changedExport)
+      assert.isNull(s().dialog)
       assert.strictEqual(disk.files.get(inGame), text)
       assert.deepInclude(disk.backups[0], { place: "export", fileName: name, text: saved })
       assert.strictEqual(stateNow(), "inSync")
@@ -107,7 +106,7 @@ describe("sync", () => {
       yield* exported(disk)
       disk.files.set(inGame, savedInGame(text, 6))
       yield* playEffect
-      assert.deepStrictEqual(s().changedExport, { name, from: "play", replacePublished: false })
+      assert.deepStrictEqual(s().dialog, { id: "overwriteChanged", name, from: "play", replacePublished: false })
       assert.deepStrictEqual(disk.game.races, [])
       yield* overwriteChangedEffect
       assert.deepStrictEqual(disk.game.races, [name])

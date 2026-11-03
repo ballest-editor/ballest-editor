@@ -95,7 +95,7 @@ export const checkGameLinkEffect = Effect.gen(function*() {
   const current = gameLinkResultOf(paths, plugin)
   reportGameLink(memory.last, current)
   yield* rememberGameLink(current)
-  if (memory.last === null || !exportReady(paths)) useEditor.getState().openDialog("gameLink")
+  if (memory.last === null || !exportReady(paths)) useEditor.getState().openDialog({ id: "gameLink" })
 }).pipe(Effect.catch((error) => Effect.logWarning("Couldn't check the Game link", error)))
 
 /** Runs a lookup that may return the game's folders (none: the user cancelled) and shows them, and the plugin. */

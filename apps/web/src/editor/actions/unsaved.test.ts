@@ -4,7 +4,7 @@ import { lightingOf } from "../../domain/sunlight"
 import { MapCodec } from "../../services/MapCodec"
 import { Platform } from "../../services/Platform"
 import { makeTestDisk, projectFile, type TestDisk } from "../../test/desktopBridge"
-import { edit, layerFor, reset, s } from "../../test/editorActions"
+import { afterSaveOf, edit, layerFor, reset, s } from "../../test/editorActions"
 import { createNewMap } from "./maps"
 import { saveMapAsEffect, saveMapFile } from "./save"
 import { answerUnloadRequest, holdsUnload, startNewMapEffect, unlessCancelled } from "./unsaved"
@@ -25,7 +25,7 @@ describe("unsaved changes", () => {
     return Effect.gen(function*() {
       yield* reset
       yield* startNewMapEffect
-      assert.strictEqual(s().dialog, "new")
+      assert.strictEqual(s().dialog?.id, "new")
       assert.deepStrictEqual(disk.prompts, [])
       s().closeDialog()
 
@@ -39,7 +39,7 @@ describe("unsaved changes", () => {
         detail: "If you don't save, the changes are lost."
       })
       yield* startNewMapEffect
-      assert.strictEqual(s().dialog, "new")
+      assert.strictEqual(s().dialog?.id, "new")
       assert.isTrue(s().dirty)
       assert.strictEqual(disk.files.size, 0)
     }).pipe(Effect.provide(layerFor(disk)))
@@ -69,27 +69,28 @@ describe("unsaved changes", () => {
       edit()
       disk.promptAnswers.push("save", "save")
       yield* startNewMapEffect
-      assert.strictEqual(s().dialog, "saveAs")
+      assert.strictEqual(s().dialog?.id, "saveAs")
       // the saveAs dialog's Cancel: a later save doesn't go on to the New map dialog
-      s().takeAfterSave()
       s().closeDialog()
       yield* saveMapFile
+      const later = afterSaveOf(s().dialog)
       s().closeDialog()
       s().renameLevel("Fresh", "Isaac")
-      yield* saveMapAsEffect
+      yield* saveMapAsEffect(later)
       assert.isNull(s().dialog)
       assert.isFalse(s().dirty)
 
       yield* reset
       edit()
       yield* startNewMapEffect
-      assert.strictEqual(s().dialog, "saveAs")
-      // the dialog closes itself, then saves
+      // the dialog takes what comes next and closes itself, then saves
+      const next = afterSaveOf(s().dialog)
+      assert.isDefined(next)
       s().closeDialog()
       s().renameLevel("Fresh 2", "Isaac")
-      yield* saveMapAsEffect
+      yield* saveMapAsEffect(next)
       assert.isTrue(disk.files.has(projectFile("Map_LevelEditorMain&Fresh 2_Isaac.balledit")))
-      assert.strictEqual(s().dialog, "new")
+      assert.strictEqual(s().dialog?.id, "new")
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
@@ -100,8 +101,9 @@ describe("unsaved changes", () => {
       edit()
       disk.promptAnswers.push("save")
       yield* startNewMapEffect
-      s().openDialog("settings", "general")
-      assert.isNull(s().afterSave)
+      assert.isDefined(afterSaveOf(s().dialog))
+      s().openDialog({ id: "settings", category: "general" })
+      assert.isUndefined(afterSaveOf(s().dialog))
     }).pipe(Effect.provide(layerFor(disk)))
   })
 

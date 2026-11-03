@@ -7,6 +7,7 @@ import { useEditor } from "../../editor/store"
 import { MapCodec } from "../../services/MapCodec"
 import { makeTestDisk, projectFile, TEST_MAPS_FOLDER, testHash } from "../../test/desktopBridge"
 import {
+  afterSaveOf,
   balledits,
   diskWithPlugin,
   edit,
@@ -37,12 +38,11 @@ describe("Export to game", () => {
       s().setLighting({ ...lightingOf(s().doc.map.worldSettings), timeOfDay: 5 })
       yield* exportToGameEffect
       assert.isFalse(s().dirty)
-      assert.deepStrictEqual(s().publishedDraft, { name, publishedFileId: 3561234567, from: "export" })
-      assert.strictEqual(s().dialog, "replacePublished")
+      assert.deepStrictEqual(s().dialog, { id: "replacePublished", name, publishedFileId: 3561234567, from: "export" })
       assert.strictEqual(disk.files.get(inGame), published)
 
       yield* replacePublishedDraftEffect
-      assert.isNull(s().publishedDraft)
+      assert.isNull(s().dialog)
       assert.strictEqual(disk.files.get(inGame), disk.files.get(projectFile(name)))
       const exported = yield* MapCodec.use((codec) => codec.decode(disk.files.get(inGame)!))
       assert.strictEqual(exported.worldSettings.directionalLight.timeOfDay, 5)
@@ -167,13 +167,12 @@ describe("Play", () => {
       yield* reset
       yield* openProjectMapFile(name)
       yield* playEffect
-      assert.deepStrictEqual(s().publishedDraft, { name, publishedFileId: 3561234567, from: "play" })
-      assert.strictEqual(s().dialog, "replacePublished")
+      assert.deepStrictEqual(s().dialog, { id: "replacePublished", name, publishedFileId: 3561234567, from: "play" })
       assert.strictEqual(disk.files.get(inGame), draft)
       assert.deepStrictEqual(disk.game.races, [])
 
       yield* replacePublishedDraftEffect
-      assert.isNull(s().publishedDraft)
+      assert.isNull(s().dialog)
       assert.strictEqual(disk.files.get(inGame), text)
       assert.deepStrictEqual(disk.game.races, [name])
     }).pipe(Effect.provide(layerFor(disk)))
@@ -186,7 +185,7 @@ describe("Play", () => {
       yield* reset
       yield* openProjectMapFile(name)
       yield* playEffect
-      assert.strictEqual(s().dialog, "newDraft")
+      assert.strictEqual(s().dialog?.id, "newDraft")
       assert.isFalse(disk.files.has(`${TEST_MAPS_FOLDER}/${name}`))
       s().closeDialog()
 
@@ -207,17 +206,17 @@ describe("Play", () => {
     return Effect.gen(function*() {
       yield* reset
       yield* playEffect
-      assert.strictEqual(s().dialog, "saveAs")
-      assert.isNotNull(s().afterSave)
+      const afterSave = afterSaveOf(s().dialog)
+      assert.isDefined(afterSave)
       assert.deepStrictEqual(disk.game.races, [])
 
-      // the Save map dialog closes itself, then saves; Play goes on with the file it wrote
+      // the Save map dialog takes what comes next and closes itself, then saves; Play goes on with the file it wrote
       s().closeDialog()
-      yield* saveMapAsEffect
+      yield* saveMapAsEffect(afterSave)
       const saved = s().file?.name ?? ""
       assert.isTrue(disk.files.has(projectFile(saved)))
       assert.deepStrictEqual(disk.game.races, [saved])
-      assert.isNull(s().afterSave)
+      assert.isNull(s().dialog)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
@@ -226,9 +225,10 @@ describe("Play", () => {
     return Effect.gen(function*() {
       yield* reset
       yield* exportToGameEffect
-      assert.strictEqual(s().dialog, "saveAs")
+      const afterSave = afterSaveOf(s().dialog)
+      assert.isDefined(afterSave)
       s().closeDialog()
-      yield* saveMapAsEffect
+      yield* saveMapAsEffect(afterSave)
       const saved = s().file?.name ?? ""
       assert.isTrue(disk.files.has(projectFile(saved)))
       assert.strictEqual(disk.files.get(`${TEST_MAPS_FOLDER}/${saved}`), disk.files.get(projectFile(saved)))

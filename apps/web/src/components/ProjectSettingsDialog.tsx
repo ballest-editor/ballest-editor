@@ -509,7 +509,7 @@ export function ProjectSettingsDialog(
 
   const name = (fileName: string | null, mode: "rename" | "duplicate") => {
     onClose()
-    if (fileName === null || fileName === openMap.fileName) openDialog(mode)
+    if (fileName === null || fileName === openMap.fileName) openDialog({ id: mode })
     else void nameProjectMap(fileName, mode)
   }
 

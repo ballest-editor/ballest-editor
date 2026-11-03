@@ -46,9 +46,10 @@ const notifyPlayed = (fileName: string, played: Extract<PlayResult, { readonly _
 const askFirst = (intent: ExportIntent, refusal: ExportRefusal, options: ExportOptions) =>
   ExportRefusal.match(refusal, {
     Published: ({ file, publishedFileId }) =>
-      useEditor.getState().setPublishedDraft({ name: file.name, publishedFileId, from: intent }),
+      useEditor.getState().openDialog({ id: "replacePublished", name: file.name, publishedFileId, from: intent }),
     ChangedInGame: ({ file }) =>
-      useEditor.getState().setChangedExport({
+      useEditor.getState().openDialog({
+        id: "overwriteChanged",
         name: file.name,
         from: intent,
         replacePublished: options.replacePublished
@@ -73,7 +74,7 @@ export const writeToGame = Effect.fn("writeToGame")(
         askFirst(intent, result, options)
         return
       case "PublishedMap":
-        useEditor.getState().openDialog("newDraft")
+        useEditor.getState().openDialog({ id: "newDraft" })
         return
       case "Exported":
         yield* refreshProject
@@ -91,9 +92,11 @@ export const writeToGame = Effect.fn("writeToGame")(
 
 /** The replacePublished dialog's answer: replace the published map's draft after all, and go on with Export or Play. */
 export const replacePublishedDraftEffect = Effect.suspend(() => {
-  const draft = useEditor.getState().publishedDraft
-  useEditor.getState().setPublishedDraft(null)
-  return draft === null ? Effect.void : writeToGame(draft.from, draft.name, { ...ASK_FIRST, replacePublished: true })
+  const { dialog: draft, closeDialog } = useEditor.getState()
+  closeDialog()
+  return draft?.id === "replacePublished"
+    ? writeToGame(draft.from, draft.name, { ...ASK_FIRST, replacePublished: true })
+    : Effect.void
 })
 
 export const replacePublishedDraft = () => run(replacePublishedDraftEffect)
@@ -103,9 +106,9 @@ export const replacePublishedDraft = () => run(replacePublishedDraftEffect)
  * that copy goes to the backups, as everything Export writes over does.
  */
 export const overwriteChangedEffect = Effect.suspend(() => {
-  const changed = useEditor.getState().changedExport
-  useEditor.getState().setChangedExport(null)
-  if (changed === null) return Effect.void
+  const { dialog: changed, closeDialog } = useEditor.getState()
+  closeDialog()
+  if (changed?.id !== "overwriteChanged") return Effect.void
   const { from, name, replacePublished } = changed
   return writeToGame(from, name, { replacePublished, overwriteChanged: true })
 })

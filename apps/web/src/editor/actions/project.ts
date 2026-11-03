@@ -27,11 +27,12 @@ export const openProjectMap = (fileName: string) =>
     )
 
 /**
- * Rename… or Duplicate… for one of the project's maps from the Maps dialog or Project settings: the dialogs name the
- * open map, so the map is opened first (asking about the open map's unsaved edits), then its dialog.
+ * Rename…, Duplicate… or Recover previous version… for one of the project's maps from the Project panel or Project
+ * settings: the dialogs act on the open map, so the map is opened first (asking about the open map's unsaved edits),
+ * then its dialog.
  */
 export const nameProjectMap = (fileName: string, mode: "rename" | "duplicate" | "recover") =>
-  withProjectMapOpen(fileName, Effect.sync(() => useEditor.getState().openDialog(mode)))
+  withProjectMapOpen(fileName, Effect.sync(() => useEditor.getState().openDialog({ id: mode })))
 
 /**
  * Runs `then` with the project map `fileName` open: it is opened first when another is (asking about that one's
@@ -55,7 +56,7 @@ const importInto = Effect.fn("importInto")(function*(pending: ImportClash, repla
   const { source, fileName, text, map } = pending
   const result = yield* platform.importMap({ source, fileName, text, replace })
   if (result._tag === "Clash") {
-    useEditor.getState().setImportClash(pending)
+    useEditor.getState().openDialog({ id: "importClash", ...pending })
     return
   }
   yield* showMap(map, fileOf(result.map))
@@ -102,9 +103,9 @@ export const importMap = () => run(unlessCancelled("openMap", importMapFile))
 
 /** The clash dialog's Replace: the project's map of that name goes to backups. */
 export const replaceOnImportEffect = Effect.gen(function*() {
-  const { importClash, setImportClash } = useEditor.getState()
-  if (importClash === null) return
-  setImportClash(null)
+  const { dialog: importClash, closeDialog } = useEditor.getState()
+  if (importClash?.id !== "importClash") return
+  closeDialog()
   yield* importInto(importClash, true)
 })
 
@@ -112,9 +113,9 @@ export const replaceOnImport = () => run(replaceOnImportEffect)
 
 /** The clash dialog's Import as copy: the imported map is renamed `<name> 2` (or the next free number). */
 export const importAsCopyEffect = Effect.gen(function*() {
-  const { importClash, setImportClash, projectMaps } = useEditor.getState()
-  if (importClash === null) return
-  setImportClash(null)
+  const { dialog: importClash, closeDialog, projectMaps } = useEditor.getState()
+  if (importClash?.id !== "importClash") return
+  closeDialog()
   const { levelDisplayName, creatorName } = importClash.map.worldSettings.levelData
   const creator = creatorName.trim()
   const taken = new Set(projectMaps.map((m) => m.fileName))

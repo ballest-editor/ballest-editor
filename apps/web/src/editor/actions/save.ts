@@ -91,7 +91,10 @@ const gameFileNameOf = (doc: Doc) => {
 const nameFirst = <E, R>(then: Effect.Effect<void, E, R>) =>
   Effect.gen(function*() {
     // It runs later, from the dialog: it takes its services along.
-    useEditor.getState().nameThen(Effect.provideContext(then, yield* Effect.context<R>()))
+    useEditor.getState().openDialog({
+      id: "saveAs",
+      afterSave: Effect.provideContext(then, yield* Effect.context<R>())
+    })
   })
 
 /**
@@ -133,17 +136,20 @@ export const saveMapFile = saveOpenMapThen(Effect.void)
 
 export const saveMap = () => run(saveMapFile)
 
-/** The `saveAs` dialog's last step, once the name is confirmed: into the project (desktop) or a download (browser). */
-export const saveMapAsEffect = Effect.gen(function*() {
-  const platform = yield* Platform
-  const { file, takeAfterSave } = useEditor.getState()
-  const then = takeAfterSave()
-  if (!platform.capabilities.projects) yield* downloadOpenMap
-  else yield* file === null ? createFromOpenMap : writeOpenMap(file, { exportAfter: true }).pipe(Effect.asVoid)
-  if (then !== null) yield* then
-})
+/**
+ * The `saveAs` dialog's last step, once the name is confirmed: into the project (desktop) or a download (browser), then
+ * the dialog's `afterSave`.
+ */
+export const saveMapAsEffect = (afterSave: Effect.Effect<void, unknown> = Effect.void) =>
+  Effect.gen(function*() {
+    const platform = yield* Platform
+    const { file } = useEditor.getState()
+    if (!platform.capabilities.projects) yield* downloadOpenMap
+    else yield* file === null ? createFromOpenMap : writeOpenMap(file, { exportAfter: true }).pipe(Effect.asVoid)
+    yield* afterSave
+  })
 
-export const saveMapAs = () => run(saveMapAsEffect)
+export const saveMapAs = (afterSave?: Effect.Effect<void, unknown>) => run(saveMapAsEffect(afterSave))
 
 /** Rename: new name and creator, then the file moves to match (the old one goes to backups). */
 export const renameOpenMap = (displayName: string, creatorName: string) => {

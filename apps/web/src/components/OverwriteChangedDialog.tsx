@@ -17,15 +17,10 @@ import { useEditor } from "../editor/store"
  * first, so this asks: back the game's version up and overwrite it, re-import it into the project, or cancel.
  */
 export function OverwriteChangedDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
-  const changed = useEditor((s) => s.changedExport)
-  const setChangedExport = useEditor((s) => s.setChangedExport)
-  const cancel = () => {
-    setChangedExport(null)
-    onClose()
-  }
+  const changed = useEditor((s) => s.dialog?.id === "overwriteChanged" ? s.dialog : null)
   const label = changed === null ? "" : mapLabelOf(changed.name)
   return (
-    <Dialog open={open && changed !== null} onOpenChange={(next) => !next && cancel()}>
+    <Dialog open={open && changed !== null} onOpenChange={(next) => !next && onClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{label} was changed in the game</DialogTitle>
@@ -38,7 +33,7 @@ export function OverwriteChangedDialog({ open, onClose }: { readonly open: boole
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={cancel}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button variant="outline" onClick={() => void reimportFirst()}>Re-import first</Button>
           <Button variant="destructive" onClick={() => void overwriteChangedExport()}>Back up and overwrite</Button>
         </DialogFooter>

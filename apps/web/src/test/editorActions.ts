@@ -2,7 +2,7 @@
 import { DateTime, Effect, Layer } from "effect"
 import { lightingOf } from "../domain/sunlight"
 import { refreshProject } from "../editor/actions/shared"
-import { useEditor } from "../editor/store"
+import { type DialogState, useEditor } from "../editor/store"
 import { MapCodec } from "../services/MapCodec"
 import { MapExporter } from "../services/MapExporter"
 import { MapPrefsStore } from "../services/MapPrefsStore"
@@ -11,6 +11,9 @@ import { makeTestDisk, testBridge, type TestDisk } from "../test/desktopBridge"
 import { listSamples, readSample } from "../test/samples"
 
 export const s = () => useEditor.getState()
+
+/** What the open `saveAs` dialog goes on to do once it has saved, as its Submit takes it. */
+export const afterSaveOf = (dialog: DialogState | null) => dialog?.id === "saveAs" ? dialog.afterSave : undefined
 
 export const layerFor = (disk: TestDisk) =>
   Layer.mergeAll(
@@ -32,9 +35,6 @@ export const edit = () => {
 /** A clean editor over the disk's project, as the app has after its startup load. */
 export const reset = Effect.gen(function*() {
   s().loadMap(s().doc.map, null)
-  s().setImportClash(null)
-  s().setPublishedDraft(null)
-  s().setChangedExport(null)
   s().closeDialog()
   yield* refreshProject
 })

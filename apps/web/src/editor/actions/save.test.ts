@@ -29,7 +29,7 @@ describe("save actions", () => {
 
       // Rename: the file moves to the new name; the old one is gone from the project.
       s().renameLevel("Hairpin", "Isaac")
-      yield* saveMapAsEffect
+      yield* saveMapAsEffect()
       const renamed = "Map_LevelEditorMain&Hairpin_Isaac.balledit"
       assert.deepStrictEqual(s().file, { name: renamed, path: projectFile(renamed) })
       assert.isFalse(disk.files.has(projectFile(first)))
@@ -72,7 +72,7 @@ describe("save actions", () => {
       const project = `${TEST_PROJECTS_FOLDER}/My tracks`
       assert.deepInclude(s().project?.current, { path: project, name: "My tracks" })
       assert.isNull(s().file)
-      yield* saveMapAsEffect
+      yield* saveMapAsEffect()
       const name = "Map_LevelEditorMain&Big Loop_Isaac.balledit"
       assert.deepStrictEqual(s().file, { name, path: projectFile(name, project) })
       assert.isTrue(disk.files.has(projectFile(name, project)))
@@ -85,12 +85,12 @@ describe("save actions", () => {
     return Effect.gen(function*() {
       yield* reset
       yield* saveMapFile
-      assert.strictEqual(s().dialog, "saveAs")
+      assert.strictEqual(s().dialog?.id, "saveAs")
       assert.strictEqual(disk.files.size, 0)
       s().closeDialog()
 
       s().renameLevel("Fresh", "Isaac")
-      yield* saveMapAsEffect
+      yield* saveMapAsEffect()
       const name = "Map_LevelEditorMain&Fresh_Isaac.balledit"
       assert.deepStrictEqual(s().file, { name, path: projectFile(name) })
       assert.isTrue(disk.files.has(projectFile(name)))

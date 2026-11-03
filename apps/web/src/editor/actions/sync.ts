@@ -25,7 +25,7 @@ const notifyChangedInGame = (fileName: string) =>
 /**
  * One look at the exports (desktop): main hashes each linked map's export and reports what the game changed since the
  * last look, each change once; a map whose export is gone shows Not exported from then on. The maps are listed again,
- * so the status bar and the Maps dialog show the states. A failure is only logged: the next focus looks again.
+ * so the status bar and the Project panel show the states. A failure is only logged: the next focus looks again.
  */
 const checkExportsOnce = Effect.gen(function*() {
   const platform = yield* Platform
@@ -82,9 +82,9 @@ export const reimportMap = (fileName: string) => run(reimportMapEffect(fileName)
 
 /** The overwriteChanged dialog's Re-import first: the game's version replaces the project's; nothing is exported. */
 export const reimportFirstEffect = Effect.suspend(() => {
-  const changed = useEditor.getState().changedExport
-  useEditor.getState().setChangedExport(null)
-  return changed === null ? Effect.void : reimportMapEffect(changed.name)
+  const { dialog: changed, closeDialog } = useEditor.getState()
+  closeDialog()
+  return changed?.id === "overwriteChanged" ? reimportMapEffect(changed.name) : Effect.void
 })
 
 export const reimportFirst = () => run(reimportFirstEffect)
