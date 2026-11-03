@@ -1,9 +1,11 @@
-import { IconCircleCheck, IconCircleDashed, IconCircleX, IconRefresh } from "@tabler/icons-react"
+import { IconCircleCheck, IconCircleDashed, IconCircleX, IconRefresh, IconRestore } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { type ComponentType, useState } from "react"
 import {
   anythingMissing,
+  type GameFolderKind,
   type GameLinkFix,
   type GameLinkRow,
   gameLinkRows,
@@ -15,6 +17,7 @@ import {
   installPlugin,
   openExternalLink,
   refreshGameLink,
+  resetGamePaths,
   revealGamePath
 } from "../editor/actions"
 import { useCreator, useEditor } from "../editor/store"
@@ -38,13 +41,24 @@ function StateIcon({ state, className }: { readonly state: GameLinkRowState; rea
   return <Icon className={cn("size-3.5 shrink-0", TONES[state], className)} />
 }
 
-/** A row's fix; the optional plugin manager's is quiet (outline), since nothing is wrong without it. */
+/**
+ * A row's fix. Only a missing row's is filled: on a row that is fine it changes what was found (Change…), and the
+ * optional plugin manager's is quiet, since nothing is wrong without it.
+ */
 function FixButton({ fix, state }: { readonly fix: GameLinkFix; readonly state: GameLinkRowState }) {
   const openDialog = useEditor((s) => s.openDialog)
   const [busy, setBusy] = useState(false)
   switch (fix._tag) {
     case "ChooseFolder":
-      return <Button size="sm" onClick={() => void chooseGameLinkFolder(fix.which)}>Choose folder…</Button>
+      return (
+        <Button
+          variant={state === "missing" ? "default" : "outline"}
+          size="sm"
+          onClick={() => void chooseGameLinkFolder(fix.which)}
+        >
+          {state === "ok" ? "Change…" : "Choose folder…"}
+        </Button>
+      )
     case "OpenPluginDocs":
       return (
         <Button variant="outline" size="sm" onClick={() => void openExternalLink(PLUGIN_MANAGER_URL)}>
@@ -77,9 +91,38 @@ function FixButton({ fix, state }: { readonly fix: GameLinkFix; readonly state: 
   }
 }
 
+/** Back to the folder found through Steam, for one chosen here instead (Settings' reset). */
+function ResetButton({ which }: { readonly which: GameFolderKind }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground"
+            onClick={() => void resetGamePaths([which])}
+            aria-label="Use the folder Steam knows about"
+          />
+        }
+      >
+        <IconRestore />
+      </TooltipTrigger>
+      <TooltipContent>Use the folder Steam knows about</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** The folder a row's Choose folder… or Change… picks, whose refusal shows on that row. */
+const chosenFolder = (row: GameLinkRow): GameFolderKind | null => {
+  for (const fix of row.fixes) if (fix._tag === "ChooseFolder") return fix.which
+  return null
+}
+
 function ChecklistRow({ row }: { readonly row: GameLinkRow }) {
-  const problem = useEditor((s) => s.gamePathProblem?.which === row.id ? s.gamePathProblem.message : null)
-  const { reveal } = row
+  const folder = chosenFolder(row)
+  const problem = useEditor((s) => s.gamePathProblem?.which === folder ? s.gamePathProblem.message : null)
+  const { reveal, reset } = row
   return (
     <li className="grid grid-cols-[auto_7rem_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-2">
       <StateIcon state={problem === null ? row.state : "missing"} className="mt-px" />
@@ -110,7 +153,8 @@ function ChecklistRow({ row }: { readonly row: GameLinkRow }) {
         {reveal !== null && (
           <Button variant="outline" size="sm" onClick={() => void revealGamePath(reveal)}>Reveal</Button>
         )}
-        {row.fix !== null && <FixButton fix={row.fix} state={row.state} />}
+        {row.fixes.map((fix) => <FixButton key={fix._tag} fix={fix} state={row.state} />)}
+        {reset !== null && <ResetButton which={reset} />}
       </div>
     </li>
   )
@@ -128,9 +172,10 @@ export function useGameLinkSummary(): string {
 }
 
 /**
- * The Game link checklist (docs/PROJECTS.md § Shell, desktop): the game's install, its maps folder, the creator name,
- * the plugin manager and the editor's plugin, each with its path and, when missing, its fix. The plugin manager is
- * optional: only Play needs it. ⟳ looks everything up again.
+ * The Game link checklist (docs/PROJECTS.md § Shell, desktop; File › Game link… and the Settings › Game page): the
+ * game's install, its maps folder, the creator name, the plugin manager and the editor's plugin, each with its path
+ * and, when missing, its fix. A folder can be changed, and one chosen here reset to the one Steam knows about. The
+ * plugin manager is optional: only Play needs it. Check again looks everything up again.
  */
 export function GameLinkChecklist() {
   const paths = useEditor((s) => s.gamePaths)
