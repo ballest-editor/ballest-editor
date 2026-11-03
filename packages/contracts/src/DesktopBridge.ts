@@ -188,16 +188,24 @@ export const ExportMapPayload = Schema.Struct({
 })
 export type ExportMapPayload = typeof ExportMapPayload.Type
 
-/**
- * `exportMap`'s result: `Exported` with the file written and the map's new link record. Nothing is written when the
- * file in the maps folder is the draft of a published map and `replacePublished` wasn't set (`Published`), or when the
- * game changed it since the last export (the in-game editor saved it) and `overwriteChanged` wasn't set
- * (`ChangedInGame`).
- */
-export const ExportMapResult = Schema.TaggedUnion({
-  Exported: { file: MapFileRef, link: MapLink },
+/** The cases of `ExportRefusal`, spread into `ExportMapResult` and `PlayResult` so both answer the same shapes. */
+const exportRefusals = {
   Published: { file: MapFileRef, publishedFileId: Schema.Finite },
   ChangedInGame: { file: MapFileRef }
+}
+
+/**
+ * Why an export (Export to game, or Play's) wrote nothing, so the page can ask: the file in the maps folder is the draft
+ * of a published map and `replacePublished` wasn't set (`Published`), or the game changed it since the last export (the
+ * in-game editor saved it) and `overwriteChanged` wasn't set (`ChangedInGame`).
+ */
+export const ExportRefusal = Schema.TaggedUnion(exportRefusals)
+export type ExportRefusal = typeof ExportRefusal.Type
+
+/** `exportMap`'s result: `Exported` with the file written and the map's new link record, or an `ExportRefusal`. */
+export const ExportMapResult = Schema.TaggedUnion({
+  Exported: { file: MapFileRef, link: MapLink },
+  ...exportRefusals
 })
 export type ExportMapResult = typeof ExportMapResult.Type
 
@@ -443,15 +451,13 @@ export type PlayLaunch = typeof PlayLaunch.Type
  * `play`'s result (docs/DESKTOP.md § Play):
  * - `Played`: exported (`file`, the map's new `link`), then `sent` the race to the plugin through its `play.json` when
  *   the plugin is installed (`plugin` says how it stands otherwise), and started the game unless it was running.
- * - `Published`: nothing written: the file in the maps folder is a published map's draft, as Export reports it.
- * - `ChangedInGame`: nothing written: the game changed the export since the last export, as Export reports it.
+ * - `Published`, `ChangedInGame`: nothing written, an `ExportRefusal` as Export reports it.
  * - `PublishedMap`: nothing written: the project map itself is a published map's (`levelPublishedFileId` above -1),
  *   which the plugin manager won't race. A copy saved as a new draft can be.
  */
 export const PlayResult = Schema.TaggedUnion({
   Played: { file: MapFileRef, link: MapLink, plugin: PluginStatus, sent: Schema.Boolean, launch: PlayLaunch },
-  Published: { file: MapFileRef, publishedFileId: Schema.Finite },
-  ChangedInGame: { file: MapFileRef },
+  ...exportRefusals,
   PublishedMap: { fileName: MapFileName, publishedFileId: Schema.Finite }
 })
 export type PlayResult = typeof PlayResult.Type
