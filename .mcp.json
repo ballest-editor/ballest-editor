@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ballest-driver": {
+      "command": "node",
+      "args": ["tools/driver/src/main.ts", "serve"]
+    }
+  }
+}

@@ -4,6 +4,7 @@ packages:
   - "tools/extract"
   - "tools/dev"
   - "tools/release"
+  - "tools/driver"
 
 allowBuilds:
   esbuild: true

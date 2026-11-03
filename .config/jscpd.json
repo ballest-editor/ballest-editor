@@ -7,7 +7,8 @@
     "../tools/extract",
     "../tools/compress",
     "../tools/dev/src",
-    "../tools/release/src"
+    "../tools/release/src",
+    "../tools/driver/src"
   ],
   "format": ["typescript", "tsx", "javascript"],
   "ignore": ["**/routeTree.gen.ts", "../packages/ui/src/components/**"],

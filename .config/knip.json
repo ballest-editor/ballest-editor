@@ -30,6 +30,7 @@
     "tools/extract": {
       "entry": ["src/main.ts", "*.mjs"]
     },
-    "tools/release": {}
+    "tools/release": {},
+    "tools/driver": {}
   }
 }

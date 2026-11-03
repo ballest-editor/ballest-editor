@@ -102,6 +102,7 @@
         "tools/compress/**",
         "tools/dev/**",
         "tools/release/**",
+        "tools/driver/**",
         "!**/node_modules/**",
         "!**/dist/**",
         "!**/dist-electron/**"
@@ -117,7 +118,8 @@
         "tools/extract/**",
         "tools/compress/**",
         "tools/dev/src/**",
-        "tools/release/src/**"
+        "tools/release/src/**",
+        "tools/driver/src/**"
       ]
     },
     "//#format:check": {
