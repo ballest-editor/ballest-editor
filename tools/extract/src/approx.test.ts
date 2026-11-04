@@ -30,6 +30,8 @@ const SURFACE: Surface = {
   baseColor: [0.2, 0.3, 1.4],
   metallic: 0,
   roughness: 0.4,
+  customData: null,
+  customDataBare: null,
   opacity: null,
   opacitySide: null,
   alphaRange: null,
@@ -308,13 +310,42 @@ describe("layersOf", () => {
 })
 
 describe("approxOf", () => {
-  const build = (sh: MaterialShaders | undefined, merged = MERGED, blendMode = "BLEND_Opaque") => {
+  const build = (
+    sh: MaterialShaders | undefined,
+    merged = MERGED,
+    blendMode = "BLEND_Opaque",
+    shadingModel = "MSM_DefaultLit"
+  ) => {
     const evaluated = sh?.surface ?? null
     const picks = picksOf(merged, null)
     const translucency = translucencyOf(blendMode, evaluated, picks.pickedEmissive)
     const layers = layersOf(sh, merged, textureOf, textureInfo, translucency.translucent)
-    return approxOf({ merged, evaluated, picks, translucency, layers, texPath, textureOf })
+    return approxOf({ merged, shadingModel, evaluated, picks, translucency, layers, texPath, textureOf })
   }
+
+  it("decodes the subsurface colour of MSM_Subsurface alone: GBuffer D means something else to the other models", () => {
+    const sh = { ...SHADERS, surface: { ...SURFACE, customData: [0.5, 0.25, 1, 0.3] as const } }
+    const subsurface = build(sh, MERGED, "BLEND_Opaque", "MSM_Subsurface")
+    assert.deepStrictEqual(subsurface.subsurface, [0.25, 0.0625, 1])
+    assert.strictEqual(subsurface.subsurfaceOpacity, 0.3)
+    assert.isUndefined(subsurface.frost) // no noise read
+    assert.isUndefined(build(sh, MERGED, "BLEND_Opaque", "MSM_ClearCoat").subsurface)
+    assert.isUndefined(build(SHADERS, MERGED, "BLEND_Opaque", "MSM_Subsurface").subsurface)
+  })
+
+  it("reads the frost clouds from the bare colour and the material's scale", () => {
+    const surface = {
+      ...SURFACE,
+      customData: [0.5, 0.5, 1, 0.3] as const,
+      customDataBare: [0.25, 0.5, 0.5, 0.3] as const
+    }
+    const merged = {
+      ...MERGED,
+      scalars: { ...MERGED.scalars, PatternScale: 0.2 }
+    }
+    const a = build({ ...SHADERS, surface }, merged, "BLEND_Opaque", "MSM_Subsurface")
+    assert.deepStrictEqual(a.frost, { bare: [0.0625, 0.25, 0.25], scale: 0.001 })
+  })
 
   it("takes the evaluated surface for an opaque pass, with its layers, mottle and outline band", () => {
     const a = build(SHADERS)

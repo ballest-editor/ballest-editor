@@ -83,6 +83,11 @@ const Program = open({
 
 export const MaterialApprox = open({
   baseColor: Schema.optionalKey(Schema.NullOr(Rgb)),
+  /** The subsurface colour of an MSM_Subsurface material (the ice), linear, and how opaque it is (0..1). */
+  subsurface: Schema.optionalKey(Schema.NullOr(Rgb)),
+  subsurfaceOpacity: Num,
+  /** The frost clouds: the subsurface colour falls towards `bare`; `scale` is their noise's, per cm. */
+  frost: Schema.optionalKey(Schema.NullOr(open({ bare: Rgb, scale: Schema.Finite }))),
   metallic: Num,
   roughness: Num,
   opacity: Num,
@@ -200,6 +205,15 @@ export interface MaterialSpec {
   readonly normalTexture: string | undefined
   /** What the shader leaves of the normal map, 1 = full strength. */
   readonly normalStrength: number
+  /** MSM_Subsurface: what the light scatters through, linear (the ice's colour: its base colour is black). */
+  readonly subsurface:
+    | {
+      readonly color: readonly [number, number, number]
+      readonly opacity: number
+      /** The colour where the frost is bare, and the clouds' noise scale (per cm). */
+      readonly frost: { readonly bare: readonly [number, number, number]; readonly scale: number } | undefined
+    }
+    | undefined
   /** Occlusion/roughness/metallic in R/G/B (glTF convention). */
   readonly ormTexture: string | undefined
   readonly emissiveTexture: string | undefined
@@ -277,6 +291,7 @@ export const NEUTRAL: Omit<MaterialSpec, "path"> = {
   baseColorTexture: undefined,
   normalTexture: undefined,
   normalStrength: 1,
+  subsurface: undefined,
   ormTexture: undefined,
   emissiveTexture: undefined,
   variationTexture: undefined,
@@ -367,6 +382,13 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
     baseColorTexture: orUndefined(a.baseColorTexture),
     normalTexture,
     normalStrength: clamp01(a.normalStrength ?? NEUTRAL.normalStrength),
+    subsurface: a.subsurface == null
+      ? undefined
+      : {
+        color: rgb(a.subsurface, [0, 0, 0]),
+        opacity: clamp01(a.subsurfaceOpacity ?? 1),
+        frost: a.frost == null ? undefined : { ...a.frost, bare: rgb(a.frost.bare, [0, 0, 0]) }
+      },
     ormTexture: orm === normalTexture ? undefined : orm,
     emissiveTexture: orUndefined(a.emissiveTexture),
     variationTexture: orUndefined(a.variationTexture),

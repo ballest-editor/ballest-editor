@@ -74,18 +74,22 @@ ${body}${targets}
 !47 = !{i32 0}
 !54 = !{!55}
 !55 = !{i32 0, !"SV_Target", i8 9, i8 16, !56, i8 0, i32 4, i8 4, i32 0, i8 0, null}
-!56 = !{i32 0, i32 1, i32 2, i32 3}
+!56 = !{i32 0, i32 1, i32 2, i32 3, i32 4}
 `
 const store = (target: number, channel: number, value: string) =>
   `  call void @dx.op.storeOutput.f32(i32 5, i32 0, i32 ${target}, i8 ${channel}, float ${value})\n`
-const OPAQUE = common(
-  `  %40 = fmul fast float %21, %31
+const opaque = (gbufferD = "") =>
+  common(
+    `  %40 = fmul fast float %21, %31
   %41 = fmul fast float %21, 5.000000e-01
 `,
-  store(0, 0, "0.000000e+00") + store(0, 1, "0.000000e+00") + store(0, 2, "0.000000e+00") +
-    store(2, 0, "0.000000e+00") + store(2, 2, "%41") +
-    store(3, 0, "%40") + store(3, 1, "%22") + store(3, 2, "%23")
-)
+    store(0, 0, "0.000000e+00") + store(0, 1, "0.000000e+00") + store(0, 2, "0.000000e+00") +
+      store(2, 0, "0.000000e+00") + store(2, 2, "%41") +
+      store(3, 0, "%40") + store(3, 1, "%22") + store(3, 2, "%23") + gbufferD
+  )
+const OPAQUE = opaque()
+// The same pass with GBuffer D written: the shading model's custom data.
+const CUSTOM = opaque(store(4, 0, "%21") + store(4, 1, "%22") + store(4, 2, "%23") + store(4, 3, "%41"))
 const TRANSLUCENT = common(
   `  %50 = call %dx.types.CBufRet.f32 @dx.op.cbufferLoadLegacy.f32(i32 59, %dx.types.Handle %3, i32 161)
   %51 = extractvalue %dx.types.CBufRet.f32 %50, 0
@@ -117,6 +121,12 @@ describe("surfaceOf", () => {
     assert.deepStrictEqual(s?.emissive, [0, 0, 0])
   })
 
+  it("reads GBuffer D as stored, and null for a pass that doesn't write it", () => {
+    const s = surfaceOf(parseModule(CUSTOM), CUSTOM, cbuf, means, ["%20"])
+    assert.deepStrictEqual(s?.customData, [0.25, 0.5, 0.75, 0.125])
+    assert.isNull(surfaceOf(parseModule(OPAQUE), OPAQUE, cbuf, means, ["%20"])?.customData)
+  })
+
   it("reads a translucent pass off the diffuse override term and the scene alpha", () => {
     const s = surfaceOf(parseModule(TRANSLUCENT), TRANSLUCENT, cbuf, means, ["%20"])
     assert.deepStrictEqual(s?.baseColor, [0.25, 0.5, 0.75])
@@ -142,6 +152,32 @@ describe("Evaluator", () => {
     assert.strictEqual(side.value("%33"), 4) // a vertical face: shown
     assert.strictEqual(new Evaluator(m, env).value("%33"), 0) // facing up by default
   })
+  it("reads a dot with a texture read that comes to the zero vector as 0, inputs or not", () => {
+    const NOISE = `
+define void @MainPS() {
+  %1 = call float @dx.op.loadInput.f32(i32 4, i32 1, i32 0, i8 0, i32 undef)
+  %2 = call float @dx.op.loadInput.f32(i32 4, i32 1, i32 0, i8 1, i32 undef)
+  %3 = call %dx.types.ResRet.f32 @dx.op.sampleLevel.f32(i32 62, %dx.types.Handle %9, %dx.types.Handle %9, float %1, float %2, float %1, float undef, i32 0, i32 0, i32 0, float 0.000000e+00)
+  %4 = extractvalue %dx.types.ResRet.f32 %3, 0
+  %5 = fmul fast float %4, 2.000000e+00
+  %6 = fadd fast float %5, -1.000000e+00
+  %7 = call float @dx.op.dot2.f32(i32 54, float %1, float %2, float %6, float %6)
+  ret void
+}
+!dx.resources = !{!4}
+!dx.entryPoints = !{!38}
+!4 = !{null, null, null, null}
+!38 = !{void ()* @MainPS, !"MainPS", !39, !4, null}
+!39 = !{!40, null, null}
+!40 = !{!46}
+!46 = !{i32 1, !"TEXCOORD", i8 9, i8 0, !47, i8 2, i32 1, i8 4, i32 1, i8 0, null}
+!47 = !{i32 0}
+`
+    const m = parseModule(NOISE)
+    assert.strictEqual(new Evaluator(m, { ...env, sample: () => 0.5 }).value("%7"), 0)
+    assert.strictEqual(new Evaluator(m, { ...env, sample: () => 1 }).value("%7"), 1) // reads facing, as before
+  })
+
   it("computes a dot of known values and reads other input dots as facing", () => {
     const m = parseModule(PS)
     const e = new Evaluator(m, { ...env, normal: SIDE })

@@ -107,6 +107,10 @@ export interface MaterialSurface {
   readonly metallic: number | null
   readonly roughness: number | null
   /** Translucent passes: the alpha written for a surface facing up; null for opaque. */
+  /** GBuffer D as stored (rgba): the shading model's custom data; null when the pass writes none. */
+  readonly customData: readonly [number, number, number, number] | null
+  /** GBuffer D with the Perlin noise at its extreme instead of its mean; null without a noise read. */
+  readonly customDataBare: readonly [number, number, number, number] | null
   readonly opacity: number | null
   /** Translucent passes: the alpha for a vertical surface (a beam masks its caps with 1 - |world normal z|). */
   readonly opacitySide: number | null
@@ -230,6 +234,7 @@ export const shaders = Effect.fn("shaders")(function*(options: {
       module: Module
       ir: string
       sampleValues: ReadonlyArray<string>
+      perlin: ReadonlyArray<string>
       mottle: ReadonlyArray<string>
       registers: ReadonlyArray<number>
     }
@@ -303,6 +308,7 @@ export const shaders = Effect.fn("shaders")(function*(options: {
         module: pixel.module,
         ir: pixel.ir,
         sampleValues: pixelSamples.map((s) => s.value),
+        perlin: pixelSamples.filter((s) => s.perlin).map((s) => s.value),
         mottle: mottle?.samples ?? [],
         registers
       })
@@ -374,10 +380,16 @@ export const shaders = Effect.fn("shaders")(function*(options: {
     }
     // Engine textures read 1: custom stencil / depth lookups that gate the level editor's ghost modes (the plain,
     // placed state), the fog's transmittance, and the translucency lighting volumes (an additive glow is lit: its
-    // colour is its base colour under that ambient). Material textures without a decodable mean read mid-grey.
+    // colour is its base colour under that ambient). The Perlin volume reads its mean instead: it stores gradients and
+    // a bias around 127/255, so that is noise 0 (at 1 the noise sits at an extreme, and the ice's frost reads as bare).
+    // Material textures without a decodable mean read mid-grey.
     const engine = new Set(px.sampleValues.filter((_, i) => (base.reads[i]?.texture ?? -1) < 0))
-    const sampleMean = (v: string, ch: number) => means.get(v)?.[ch] ?? (engine.has(v) ? 1 : 0.5)
+    const perlin = new Set(px.perlin)
+    const sampleMean = (v: string, ch: number) =>
+      means.get(v)?.[ch] ?? (perlin.has(v) ? 127 / 255 : engine.has(v) ? 1 : 0.5)
     const surface = surfaceOf(px.module, px.ir, cbuf, sampleMean, colour)
+    const bareMean = (v: string, ch: number) => (perlin.has(v) ? 1 : sampleMean(v, ch))
+    const bare = perlin.size === 0 ? null : surfaceOf(px.module, px.ir, cbuf, bareMean, colour)
     // The output chains as GLSL: what the renderer runs where the linearised layers fall short.
     const { registers } = px
     const bc5 = new Set<number>()
@@ -448,6 +460,8 @@ export const shaders = Effect.fn("shaders")(function*(options: {
         baseColor: surface.baseColor ?? [0, 0, 0],
         metallic: surface.metallic,
         roughness: surface.roughness,
+        customData: surface.customData,
+        customDataBare: bare?.customData ?? null,
         opacity: surface.opacity,
         opacitySide: surface.opacitySide,
         alphaRange: surface.alphaRange,

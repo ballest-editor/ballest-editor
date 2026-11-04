@@ -112,8 +112,9 @@ const ACTIONS = {
   pivot_front: "ChooseFront",
   surface_default: "ChooseSurface | u8:0",
   surface_magnet: "ChooseSurface | u8:1",
-  surface_grippy: "ChooseSurface | u8:2",
-  surface_ice: "ChooseSurface | u8:3"
+  // EBallestSurfaceAssignment's values, not the panel's order (Magnet, Grippy, Ice).
+  surface_grippy: "ChooseSurface | u8:3",
+  surface_ice: "ChooseSurface | u8:2"
 } as const
 const ACTION_NAMES = [
   "flip_x",

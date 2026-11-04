@@ -31,7 +31,7 @@ describe("three materials", () => {
     uniforms: {},
     vertexShader: "#include <common>\n#include <project_vertex>",
     fragmentShader:
-      "#include <common>\n#include <normalmap_pars_fragment>\n#include <map_fragment>\n#include <alphamap_fragment>\n#include <emissivemap_fragment>\n#include <normal_fragment_maps>\n#include <opaque_fragment>"
+      "#include <common>\n#include <normalmap_pars_fragment>\n#include <map_fragment>\n#include <alphamap_fragment>\n#include <emissivemap_fragment>\n#include <normal_fragment_maps>\n#include <lights_fragment_end>\n#include <opaque_fragment>"
   })
 
   it("builds cached three materials: blue is blue, glass is translucent, unknown is neutral", () => {
@@ -87,6 +87,37 @@ describe("three materials", () => {
     assert.include(shader.fragmentShader, "texture2D( map, ballestUv( uBaseColorTiling ) )")
     assert.notInclude(shader.fragmentShader, "#include <map_fragment>")
     assert.include(shader.vertexShader, "vBallestScale")
+    assert.include(shader.vertexShader, "transpose( inverse( mat3( modelMatrix ) ) ) * objectNormal")
+  })
+
+  it("takes a subsurface material's normal strength and light from its spec, and leaves the others on the defaults", () => {
+    const table = parseMaterialsFile({
+      materials: [{
+        path: "/Game/Ice.Ice",
+        approx: {
+          normalTexture: "textures/n.png",
+          normalStrength: 0.5,
+          subsurface: [0.1, 0.5, 0.9],
+          subsurfaceOpacity: 0.3,
+          frost: { bare: [0.05, 0.3, 0.5], scale: 0.001 }
+        }
+      }, { path: "/Game/Plain.Plain", approx: { normalTexture: "textures/n.png" } }]
+    })
+    const ice = materialFor(table, "/Game/Ice.Ice")
+    assert.deepStrictEqual(ice.normalScale, new THREE.Vector2(0.8, 0.8))
+    const shader = program()
+    const patch = shaderPatchOf(ice)
+    assert.isDefined(patch)
+    applyShaderPatch(shader, patch)
+    assert.strictEqual(patch.defines["BALLEST_SUBSURFACE"], 1)
+    assert.deepStrictEqual(shader.uniforms["uSubsurface"]?.value, new THREE.Vector4(0.1, 0.5, 0.9, 0.3))
+    assert.strictEqual(patch.defines["BALLEST_FROST"], 1)
+    assert.deepStrictEqual(shader.uniforms["uSubsurfaceBare"]?.value, new THREE.Vector3(0.05, 0.3, 0.5))
+    assert.strictEqual(shader.uniforms["uFrostScale"]?.value, 0.001)
+    assert.include(shader.fragmentShader, "ballestFrost( vBallestPos )")
+    const plain = materialFor(table, "/Game/Plain.Plain")
+    assert.deepStrictEqual(plain.normalScale, new THREE.Vector2(1.6, 1.6))
+    assert.isUndefined(shaderPatchOf(plain)?.defines["BALLEST_SUBSURFACE"])
   })
 
   it("projects object-aligned materials through the face's dominant axis, scaled like the piece", () => {

@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { evalCurve, SKY_GAIN, skyIrradiance, skyOf, skyRadiance } from "./sky"
+import { ARENA_RIM, evalCurve, SKY_GAIN, skyIrradiance, skyOf, skyRadiance } from "./sky"
 import { sunOf } from "./sunlight"
 
 const EPSILON = 1e-4
@@ -52,5 +52,10 @@ describe("sky", () => {
     assert.closeTo(skyIrradiance(even, { x: 1, y: 0, z: 0 }, radiance), radiance, 1e-3)
     // no ground: an upright face sees half as much
     assert.closeTo(skyIrradiance(even, { x: 1, y: 0, z: 0 }, 0), radiance / 2, 2e-2)
+    // the arena takes the low sky too: a side face loses more of it than an up-facing one
+    const side = skyIrradiance(even, { x: 1, y: 0, z: 0 }, 0, ARENA_RIM)
+    const up = skyIrradiance(even, UP, 0, ARENA_RIM)
+    assert.isBelow(side, radiance / 2)
+    assert.isBelow(side / (radiance / 2), up / radiance)
   })
 })

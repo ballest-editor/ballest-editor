@@ -403,6 +403,8 @@ export const layersOf = (
 // ------------------------------------------------------------------ 4. output
 export interface ApproxInput {
   readonly merged: Merged
+  /** The chain's shading model (`MSM_Subsurface`). */
+  readonly shadingModel: string
   readonly evaluated: Surface | null
   readonly picks: Picks
   readonly translucency: Translucency
@@ -418,9 +420,15 @@ const MIN_NORMAL_STRENGTH = 0.02
 /** A program that compares a UV directly: a band of colour with no texture behind it. */
 const UV_BAND = /\(uv\.[xy] [<>]/
 
+/** The strength `normalStrength` is a fraction of (NORMAL_STRENGTH in apps/web/src/editor/materials.ts). */
+const RENDERER_NORMAL_STRENGTH = 1.6
+
+/** M_IceCube's noise coordinates: world position (cm) times this times its `PatternScale`, read off the shader. */
+const FROST_NOISE_SCALE = 0.005
+
 /** `approx`: what the renderer draws for the material. */
 export const approxOf = (
-  { evaluated, layers, merged, picks, texPath, textureOf, translucency }: ApproxInput
+  { evaluated, layers, merged, picks, shadingModel, texPath, textureOf, translucency }: ApproxInput
 ) => {
   const S = merged.scalars, V = merged.vectors
   const { additive, alphaShown, emissiveColor, refracts, translucent, upFade } = translucency
@@ -434,6 +442,23 @@ export const approxOf = (
     ? { inset: [(1 - sizeX) / 2, (1 - sizeY) / 2], color: outlineBase.slice(0, 3) }
     : null
   const tex = (r: Read | undefined) => (r === undefined ? null : texPath(r.texture))
+  // MSM_Subsurface keeps its subsurface colour in GBuffer D's rgb, stored as a square root (UE's
+  // EncodeSubsurfaceColor), and its opacity in a. Other shading models keep unrelated data there (clear coat, cloth).
+  const custom = shadingModel === "MSM_Subsurface" ? evaluated?.customData ?? null : null
+  const subsurface = custom === null ? null : custom.slice(0, 3).map((x) => x * x)
+  const subsurfaceOpacity = custom?.[3] ?? null
+  // The frost (M_IceCube) moves it between that colour and the bare one, in clouds at this scale.
+  const bare = custom === null ? null : evaluated?.customDataBare ?? null
+  const pattern = S["PatternScale"]
+  const frost = bare === null || pattern == null
+    ? null
+    : { bare: bare.slice(0, 3).map((x) => x * x), scale: pattern * FROST_NOISE_SCALE }
+  // The shader's normal strength isn't measured for a projected map. M_IceCube blends one map twice: flattened past
+  // flat (1 - Normal Strength) and reoriented by its detail layer, so the slopes add up to this.
+  const normalScale = S["Normal Strength"], detailScale = S["DetailNormalIntensity"]
+  const blendedNormal = frost === null || normalScale == null || detailScale == null
+    ? null
+    : (1 - normalScale + detailScale) / RENDERER_NORMAL_STRENGTH
   // The shader's own math as GLSL (alpha of a translucent pass, an additive glow, or an opaque base colour
   // whose reads the layers above could not place): what the renderer runs instead of the linearised look.
   const programs = Object.fromEntries(
@@ -462,6 +487,8 @@ export const approxOf = (
       : (bc ?? [0.8, 0.8, 0.8, 1]).slice(0, 3),
     metallic: evaluated?.metallic != null ? clamp01(evaluated.metallic) : picks.metallic.value ?? 0,
     roughness: evaluated?.roughness != null ? clamp01(evaluated.roughness) : picks.roughness.value ?? 0.6,
+    ...(subsurface === null ? {} : { subsurface, subsurfaceOpacity }),
+    ...(frost === null ? {} : { frost }),
     evaluated: evaluated !== null,
     // An additive pass is all glow (its alpha is 0): drawn at full strength, faded by upFade. A translucent
     // pass whose alpha vanishes on every face (a view-angle effect) keeps the parameter's opacity.
@@ -476,7 +503,7 @@ export const approxOf = (
     baseColorTexture: null,
     // A map that barely moves the normal is not drawn at all.
     normalTexture: (normalRead?.strength ?? 0) >= MIN_NORMAL_STRENGTH ? tex(normalRead) : null,
-    normalStrength: normalRead?.strength ?? 1,
+    normalStrength: blendedNormal ?? normalRead?.strength ?? 1,
     ormTexture: tex(ormRead),
     variationTexture: tex(variationRead),
     opacityTexture: tex(opacityRead),

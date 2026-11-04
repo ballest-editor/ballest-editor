@@ -72,6 +72,8 @@ export interface Sample {
    * `* 2 - 1` reads 2; a layer blended at strength s reads 2s.
    */
   readonly resultFactor: number | null
+  /** A read of the engine's Perlin noise volume (FastGradientPerlinNoise3D_TEX). */
+  readonly perlin: boolean
 }
 
 export interface Output {
@@ -546,6 +548,14 @@ const dedupe = (leaves: ReadonlyArray<Leaf>): Array<Leaf> => {
 // The smallest literal the sample's first channel is multiplied by. A normal map is unpacked with `* 2 - 1`;
 // a layer blended at strength s is also scaled by 2s somewhere, and the smaller factor is the one that
 // tells the layers apart.
+/** FastGradientPerlinNoise3D_TEX decodes the volume's gradients as `read * 255/127 - 1`: the float, as dxc prints it. */
+const PERLIN_SCALE = "0x4000102040000000"
+
+const isPerlin = (m: Module, sample: string): boolean => {
+  const read = [...m.defs].find(([, d]) => d === `extractvalue %dx.types.ResRet.f32 ${sample}, 0`)?.[0]
+  return read !== undefined && [...m.defs.values()].some((d) => d === `fmul fast float ${read}, ${PERLIN_SCALE}`)
+}
+
 const resultFactorOf = (m: Module, sample: string): number | null => {
   const escaped = sample.replace(".", "\\.")
   let best: number | null = null
@@ -581,7 +591,15 @@ export const samples = (m: Module): Array<Sample> => {
       .map((x) => num(x[1]))
     const channels = [...new Set(used)].sort((x, y) => x - y).map((c) => XYZW[c]).join("")
     const coords = [g(s, 3), g(s, 4), g(s, 5)].slice(0, coordCount).map((c) => dedupe(tracer.trace(c, ROOT)))
-    out.push({ value: v, op: g(s, 1), register, channels, coords, resultFactor: resultFactorOf(m, v) })
+    out.push({
+      value: v,
+      op: g(s, 1),
+      register,
+      channels,
+      coords,
+      resultFactor: resultFactorOf(m, v),
+      perlin: isPerlin(m, v)
+    })
   }
   return out
 }

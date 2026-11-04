@@ -73,6 +73,19 @@ describe("materials", () => {
     assert.strictEqual(parseMaterialsFile("nope").materials.size, 0)
   })
 
+  it("keeps a subsurface colour and its opacity apart from the base colour", () => {
+    const table = parseMaterialsFile({
+      materials: [{
+        path: "/Game/Ice.Ice",
+        approx: { baseColor: [0.01, 0.02, 0.5], subsurface: [0.1, 0.4, 0.9], subsurfaceOpacity: 0.3 }
+      }]
+    })
+    const ice = lookupMaterial(table, "/Game/Ice.Ice")!
+    assert.deepStrictEqual(ice.baseColor, [0.01, 0.02, 0.5])
+    assert.deepStrictEqual(ice.subsurface, { color: [0.1, 0.4, 0.9], opacity: 0.3, frost: undefined })
+    assert.isUndefined(lookupMaterial(table, BLUE)?.subsurface)
+  })
+
   const real = path.join(repoRoot, "assets", "materials.json")
   it.skipIf(!fs.existsSync(real))("decodes assets/materials.json", () => {
     const table = parseMaterialsFile(JSON.parse(fs.readFileSync(real, "utf8")))

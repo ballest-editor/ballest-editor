@@ -2,12 +2,12 @@
  * The game's sky as a three.js material (see domain/sky for where each term comes from).
  * One material draws the visible dome, with the sun disc and stars, fading out just above the
  * grid (`uClipY`) so the theme's background shows under it; a second, `capture`,
- * draws the same sky without the sun and with a dim ground, for the environment map the
- * scene is lit by (the game's sky light is a real-time capture of this sky).
+ * draws the same sky without the sun, and with the arena below `ARENA_RIM`, for the environment
+ * map the scene is lit by (the game's sky light is a real-time capture of this sky).
  */
 import * as THREE from "three"
-import { ueToThreeVector } from "../domain/coords"
-import { type Sky, SKY_GAIN, SUN_RADIUS } from "../domain/sky"
+import { type Tuple3, ueToThreeVector } from "../domain/coords"
+import { ARENA_RIM, type Sky, SKY_GAIN, SUN_RADIUS } from "../domain/sky"
 
 /**
  * The visible dome's radius (cm), which is also where the floor grid finishes fading out:
@@ -39,7 +39,6 @@ uniform vec3 uSun;
 uniform float uStars;
 uniform float uGain;
 uniform vec3 uGround;
-uniform vec3 uTint;
 uniform float uClipY;
 varying vec3 vDir;
 
@@ -63,8 +62,8 @@ void main() {
   vec3 color = mix( uZenith + uStars * 0.5 * ballestStars( d ), uHorizon, f );
   float alpha = 1.0;
   #ifdef BALLEST_CAPTURE
-    // The capture keeps the sky's shape and takes its colour from the light the game shows (viewLightOf).
-    color = dot( d.y < 0.0 ? uGround : color, vec3( 0.2126, 0.7152, 0.0722 ) ) * uTint;
+    // The stands' top edge isn't a line in the distance: a soft step, and the normal maps don't break it into specks.
+    color = mix( uGround, color, smoothstep( ${(ARENA_RIM * 0.8).toFixed(4)}, ${(ARENA_RIM * 1.2).toFixed(4)}, d.y ) );
   #else
     // How far above the grid's height this direction meets the dome (from the exact
     // direction, not the faceted mesh); the sky fades in over SKY_FADE_HEIGHT from there.
@@ -96,7 +95,6 @@ const skyUniforms = (capture: boolean) => ({
   uStars: { value: 0 },
   uGain: { value: capture ? SKY_GAIN : SKY_GAIN * SKY_EXPOSURE },
   uGround: { value: new THREE.Color() },
-  uTint: { value: new THREE.Color(1, 1, 1) },
   /** World height (scene units) where the visible dome has faded out. */
   uClipY: { value: -Infinity }
 })
@@ -134,15 +132,9 @@ export class SkyMaterial extends THREE.ShaderMaterial {
   }
 }
 
-/** Puts `sky` into a sky material; `ground` is the capture's lower hemisphere, `tint` the capture's colour (linear RGB). */
-export const setSky = (
-  material: SkyMaterial,
-  sky: Sky,
-  ground: number,
-  tint: readonly [number, number, number] = [1, 1, 1]
-): void => {
+/** Puts `sky` into a sky material; `ground` is the capture's arena (linear RGB) below `ARENA_RIM`. */
+export const setSky = (material: SkyMaterial, sky: Sky, ground: Tuple3): void => {
   const u = material.sky
-  u.uTint.value.setRGB(...tint, THREE.LinearSRGBColorSpace)
   u.uZenith.value.setRGB(...sky.zenith, THREE.LinearSRGBColorSpace)
   u.uHorizon.value.setRGB(...sky.horizon, THREE.LinearSRGBColorSpace)
   u.uFalloff.value = sky.horizonFalloff
@@ -150,5 +142,5 @@ export const setSky = (
   u.uToSun.value.set(toSun.x, toSun.y, toSun.z).normalize()
   u.uSun.value.setRGB(sky.sunBrightness, sky.sunBrightness, sky.sunBrightness, THREE.LinearSRGBColorSpace)
   u.uStars.value = sky.stars
-  u.uGround.value.setRGB(ground * 0.8, ground * 0.9, ground, THREE.LinearSRGBColorSpace)
+  u.uGround.value.setRGB(...ground, THREE.LinearSRGBColorSpace)
 }
