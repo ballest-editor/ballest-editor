@@ -223,6 +223,13 @@ const paintableOf = (cls, className, inPalette) => {
   return inPalette && variable !== undefined && variable.default !== false && !PAINT_LOCKED_PAST_NATIVE.has(className)
 }
 
+// Slots of the pieces above that a map file can paint anyway. Only playing the map shows which: the game overwrites
+// some slots and never draws others, so the table is measured (docs/qa/materials.md).
+const offPanelPaint = new Map(
+  JSON.parse(readFileSync(join(import.meta.dirname, "paint-measured.json"), "utf8")).pieces
+    .flatMap((p) => (p.offPanel === undefined ? [] : [[p.classPath, p.offPanel]]))
+)
+
 const pieces = []
 const unresolved = []
 const registry = JSON.parse(readFileSync(join(assets, "registry.json"), "utf8"))
@@ -264,6 +271,7 @@ for (const o of pieceOrder(registry)) {
     glb: glbPath(mesh),
     materialSlots: meshAssetPath ? slotsFor(meshAssetPath, main?.overrideMaterials) : [],
     paintable: paintableOf(cls, s.className.replace(/_C$/, ""), !!o.category),
+    ...(offPanelPaint.has(s.objectPath) ? { offPanelPaint: offPanelPaint.get(s.objectPath) } : {}),
     bounds: mesh?.bounds ?? null,
     seenInSamples: s.seenInSamples,
     meshSource: main ? "pak" : sampleMesh ? "samples" : null,

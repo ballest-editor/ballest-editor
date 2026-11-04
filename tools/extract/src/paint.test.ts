@@ -9,13 +9,18 @@ const read = <S extends Schema.Decoder<unknown>>(schema: S, ...parts: ReadonlyAr
   Schema.decodeUnknownSync(schema)(JSON.parse(fs.readFileSync(path.join(repo, ...parts), "utf8")))
 
 const Measured = Schema.Struct({
-  pieces: Schema.Array(Schema.Struct({ classPath: Schema.String, slots: Schema.Finite }))
+  pieces: Schema.Array(Schema.Struct({
+    classPath: Schema.String,
+    slots: Schema.Finite,
+    offPanel: Schema.optionalKey(Schema.Array(Schema.Finite))
+  }))
 })
 const CatalogFile = Schema.Struct({
   pieces: Schema.Array(Schema.Struct({
     objectPath: Schema.String,
     inPalette: Schema.Boolean,
     paintable: Schema.Boolean,
+    offPanelPaint: Schema.optionalKey(Schema.Array(Schema.Finite)),
     materialSlots: Schema.Array(Schema.Unknown)
   }))
 })
@@ -106,6 +111,16 @@ describe("the catalog against the game", () => {
       const ours = p.paintable ? p.materialSlots.length : 0
       return ours === game.slots ? [] : [{ piece: p.objectPath, ours, game: game.slots }]
     })
+    expect(wrong).toEqual([])
+  })
+
+  it("carries the measured off-panel slots, on locked pieces, within their slots", () => {
+    const wrong = pieces.filter((p) => {
+      const slots = p.offPanelPaint ?? []
+      return String(slots) !== String(byPath.get(p.objectPath)?.offPanel ?? [])
+        || (slots.length > 0 && p.paintable)
+        || slots.some((slot) => slot >= p.materialSlots.length)
+    }).map((p) => p.objectPath)
     expect(wrong).toEqual([])
   })
 

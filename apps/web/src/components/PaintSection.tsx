@@ -1,3 +1,4 @@
+import { Badge } from "@workspace/ui/components/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { cn } from "@workspace/ui/lib/utils"
 import { useState } from "react"
@@ -7,6 +8,7 @@ import {
   choiceOf,
   colorForFinish,
   cssColor,
+  offPanelSlotsOf,
   type PaintColor,
   type PaintFinish,
   paintGroups,
@@ -27,11 +29,16 @@ interface SlotTarget {
   readonly slot: number
 }
 
-const slotsOf = (members: ReadonlyArray<SelectedItem>): ReadonlyArray<SlotTarget> => {
+const slotsOf = (
+  members: ReadonlyArray<SelectedItem>,
+  only: ReadonlySet<number> | undefined
+): ReadonlyArray<SlotTarget> => {
   const seen = new Map<string, SlotTarget>()
   for (const { item } of members) {
     item.meshComponents.forEach((mesh, component) => {
-      for (const { materialIndex: slot } of mesh.materials) seen.set(`${component}:${slot}`, { component, slot })
+      for (const { materialIndex: slot } of mesh.materials) {
+        if (only === undefined || only.has(slot)) seen.set(`${component}:${slot}`, { component, slot })
+      }
     })
   }
   return [...seen.values()].sort((a, b) => a.component - b.component || a.slot - b.slot)
@@ -72,7 +79,11 @@ function Swatch(
  * otherwise it only shows that finish's colours until one is picked.
  */
 function SlotPaintRow(
-  { members, target }: { readonly members: ReadonlyArray<SelectedItem>; readonly target: SlotTarget }
+  { members, offPanel, target }: {
+    readonly members: ReadonlyArray<SelectedItem>
+    readonly offPanel: boolean
+    readonly target: SlotTarget
+  }
 ) {
   const paint = useEditor((s) => s.paint)
   // A finish browsed without picking a colour yet; otherwise the slot's own finish shows.
@@ -111,7 +122,10 @@ function SlotPaintRow(
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs">{slotName}</span>
+        <span className="flex items-center gap-1.5 text-xs">
+          {slotName}
+          {offPanel && <Badge variant="outline" title={OFF_PANEL_HINT}>Off-panel</Badge>}
+        </span>
         <Select
           value={finish?.name ?? null}
           items={Object.fromEntries(paint.map((f) => [f.name, f.name]))}
@@ -145,6 +159,9 @@ function SlotPaintRow(
   )
 }
 
+const OFF_PANEL_HINT =
+  "The game's paint panel doesn't offer this slot, but it draws and keeps paint set here, and the map still validates."
+
 function Note({ children }: { readonly children: string }) {
   return <div className="text-xs text-muted-foreground">{children}</div>
 }
@@ -157,6 +174,7 @@ function PaintGroup(
   if (first === undefined) return null
   const name = catalogIndex?.pieceByClass.get(first.item.actorToSpawn)?.displayName ??
     classNameOf(first.item.actorToSpawn)
+  const offPanel = offPanelSlotsOf(first.item, catalogIndex)
   return (
     <div className="flex flex-col gap-3">
       {showName && (
@@ -165,11 +183,12 @@ function PaintGroup(
           <span className="ml-1 font-normal text-muted-foreground">× {members.length}</span>
         </div>
       )}
-      {slotsOf(members).map((target) => (
+      {slotsOf(members, offPanel).map((target) => (
         <SlotPaintRow
           // a different set of items starts with no finish being browsed
           key={`${members.map((m) => m.id).join(",")}:${target.component}:${target.slot}`}
           members={members}
+          offPanel={offPanel !== undefined}
           target={target}
         />
       ))}

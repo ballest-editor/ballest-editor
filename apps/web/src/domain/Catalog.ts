@@ -96,6 +96,8 @@ export class CatalogPiece extends Schema.Opaque<CatalogPiece>()(open({
   materialSlots: Schema.Array(CatalogMaterialSlot),
   /** Whether the game's Paint panel lists the piece (`bCanChangeMaterial`); older catalogs leave it out. */
   paintable: Schema.optionalKey(Schema.Boolean),
+  /** Slots the game's panel doesn't offer that a map file can still paint: the game draws and keeps them. */
+  offPanelPaint: Schema.optionalKey(Schema.Array(Schema.Int)),
   bounds: NullableBounds,
   seenInSamples: Schema.optionalKey(Schema.Int),
   mainRelativeTransform: Schema.optionalKey(Schema.NullOr(MainRelativeTransform)),

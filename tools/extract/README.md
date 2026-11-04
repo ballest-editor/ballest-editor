@@ -133,6 +133,9 @@ Piece = {
                        // materials.json. The Fortnite usmap can't read the light cards' CDOs, so build-catalog.mjs
                        // lists those four by name.
                        // src/paint.test.ts checks this against paint-measured.json (the game's panel, per piece)
+  offPanelPaint?       // on pieces that aren't paintable: slots a map file can paint anyway (the game draws and keeps
+                       // them and the map validates). From paint-measured.json `offPanel`, since nothing in the pak
+                       // says which slots survive; docs/qa/materials.md § Off-panel paint
   bounds: { min:[x,y,z], max:[x,y,z] }   // mesh-local, UE cm, from LOD0 vertices
   seenInSamples        // item count across samples/ (0 for classes never sampled)
   meshSource           // "pak" (resolved from the Blueprint) | "samples" (fallback)

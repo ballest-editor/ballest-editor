@@ -44,13 +44,23 @@ interface HasItem {
 export interface PaintTargets<T extends HasItem> {
   /** A selected item has a surface: the game lists no slots at all, for any of the selection. */
   readonly surfaceLocked: boolean
-  /** The items the panel lists. A piece the catalog doesn't know keeps its paint editable. */
+  /** The items with slots to paint. A piece the catalog doesn't know keeps its paint editable. */
   readonly items: ReadonlyArray<T>
 }
 
 /**
- * What the game's Paint panel lists for a selection: nothing while a selected item has a
- * surface (`AreSelectionMaterialSlotsEditable`), else the items whose piece allows paint.
+ * An item's off-panel slots: the ones its piece's panel doesn't offer, which a map file can still paint and the game
+ * then draws (docs/qa/materials.md). Undefined when the panel offers the piece's slots itself.
+ */
+export const offPanelSlotsOf = (item: Item, index: CatalogIndex | null): ReadonlySet<number> | undefined => {
+  const piece = index?.pieceByClass.get(item.actorToSpawn)
+  return piece?.paintable === false ? new Set(piece.offPanelPaint) : undefined
+}
+
+/**
+ * What can be painted in a selection: nothing while a selected item has a surface, as the game's panel lists nothing
+ * then (`AreSelectionMaterialSlotsEditable`) and draws the surface over the paint anyway. Otherwise the items whose
+ * piece allows paint, or has off-panel slots.
  */
 export const paintTargets = <T extends HasItem>(
   selected: ReadonlyArray<T>,
@@ -60,7 +70,10 @@ export const paintTargets = <T extends HasItem>(
     ? { surfaceLocked: true, items: [] }
     : {
       surfaceLocked: false,
-      items: selected.filter(({ item }) => index?.pieceByClass.get(item.actorToSpawn)?.paintable !== false)
+      items: selected.filter(({ item }) => {
+        const offPanel = offPanelSlotsOf(item, index)
+        return offPanel === undefined || offPanel.size > 0
+      })
     }
 
 /** Items the panel edits together: the same class, whatever their meshes (a mirrored one saves a baked mesh). */
