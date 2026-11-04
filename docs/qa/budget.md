@@ -52,7 +52,7 @@ A piece's properties don't change its cost on 0.4.1, and that includes lights th
 
 Shadows do matter to the game in another way: `BallestUGCLightComponent` has `bDisableShadowsOnNewPlacement`, and a Point, Spot or Rect Light placed from the palette starts with shadows off. That looks like a rendering decision. It doesn't touch the budget number.
 
-It is also a difference from the app. `catalog.json` gives the Spot and Rect Lights `bLightCastsShadows` true, their Blueprint default, so a new one in the app casts shadows and the game's doesn't. That isn't fixed here.
+This was also a difference from the app: `catalog.json` gives the Spot and Rect Lights `bLightCastsShadows` true, their Blueprint default, so a new one in the app cast shadows and the game's didn't. The app's placement now writes false for every light (docs/FORMAT.md § 0.4.1).
 
 ### Publishing
 
