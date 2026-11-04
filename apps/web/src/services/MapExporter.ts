@@ -59,6 +59,8 @@ export class MapExporter extends Context.Service<MapExporter, {
               createdAt
             }
           },
+          // Only a published .ballmap flags its items: the editor leaves such an item out of its list of pieces.
+          items: map.items.map((item) => item.bIsBaseItem ? { ...item, bIsBaseItem: false } : item),
           // .ballmap files have no editorState, and neither do 0.4.1's saves, but the game loads a draft that has one.
           editorState: map.editorState ?? defaultEditorState()
         }

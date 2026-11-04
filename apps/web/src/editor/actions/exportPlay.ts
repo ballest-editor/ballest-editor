@@ -4,6 +4,8 @@
  */
 import { Effect } from "effect"
 import { isNeverPublished } from "../../domain/edits"
+import { gameLoadProblems } from "../../domain/limits"
+import { ExportValidationError } from "../../services/errors"
 import { useEditor } from "../store"
 import { ASK_FIRST, type ExportIntent, writeToGame } from "./gameWrite"
 import { withProjectMapOpen } from "./project"
@@ -12,14 +14,19 @@ import { duplicateMapEffect, withSavedOpenMap } from "./save"
 
 /**
  * Export to game or Play on the open map. The plugin manager only races maps never published, so Play of a published
- * map's draft offers to save a new draft of it instead (the `newDraft` dialog).
+ * map's draft offers to save a new draft of it instead (the `newDraft` dialog). The file is checked here as well as
+ * on Save: an imported `.balledit` is copied byte for byte, and a map with no edits goes to the game as it is, so
+ * neither passes through `MapExporter`, and the game opens a blank map for a file it refuses.
  */
 const writeOpenMapToGame = (intent: ExportIntent) =>
-  Effect.suspend(() =>
-    intent === "play" && !isNeverPublished(useEditor.getState().doc.map.worldSettings.levelData.levelPublishedFileId)
-      ? Effect.sync(() => useEditor.getState().openDialog({ id: "newDraft" }))
+  Effect.suspend(() => {
+    const { catalogIndex, doc, openDialog } = useEditor.getState()
+    const problems = gameLoadProblems(doc.map, catalogIndex)
+    if (problems.length > 0) return Effect.fail(new ExportValidationError({ message: problems.slice(0, 3).join(" ") }))
+    return intent === "play" && !isNeverPublished(doc.map.worldSettings.levelData.levelPublishedFileId)
+      ? Effect.sync(() => openDialog({ id: "newDraft" }))
       : withSavedOpenMap((fileName) => writeToGame(intent, fileName, ASK_FIRST))
-  )
+  })
 
 /**
  * Export to game: writes the map into the game's UserSavedMaps folder under the game's file name, where the in-game

@@ -42,7 +42,9 @@ const withSlots = (meshAssetPath: string, slots: ReadonlyArray<number>): Item =>
 
 describe("game load rules", () => {
   it("rejects a material past the mesh's last slot, when the catalog knows the mesh", () => {
-    const load = (item: Item, index: CatalogIndex | null = catalog) => gameLoadProblems(addItem(fresh(), item), index)
+    // This catalog has no pieces, so the class and mesh rules in gameRules.ts refuse everything: only slots are at issue.
+    const load = (item: Item, index: CatalogIndex | null = catalog) =>
+      gameLoadProblems(addItem(fresh(), item), index).filter((problem) => problem.includes("material slot"))
     assert.deepStrictEqual(load(withSlots(MESH, [0, 1])), [])
     assert.deepStrictEqual(load(withSlots(MESH, [0, 1, 2])), ["Item 2 sets material slot 3, but its mesh has 2."])
     assert.deepStrictEqual(load(withSlots(BAKE, [2])), ["Item 2 sets material slot 3, but its mesh has 2."])
@@ -70,13 +72,16 @@ describe("game load rules", () => {
     const base = plain()
     const tooManyMeshes: Item = {
       ...base,
-      meshComponents: Array.from({ length: LIMITS.meshComponentsPerItem + 1 }, () => base.meshComponents[0]!)
+      meshComponents: Array.from(
+        { length: LIMITS.meshComponentsPerItem + 1 },
+        (_, i) => ({ ...base.meshComponents[0]!, meshComponentTag: `Tag${i}` })
+      )
     }
     const tooManyProps: Item = {
       ...base,
       boolProperties: Array.from(
         { length: LIMITS.propertiesPerList + 1 },
-        () => ({ propertyName: "b", propertyType: "Bool", currentValue: true })
+        (_, i) => ({ propertyName: `b${i}`, propertyType: "Bool", currentValue: true })
       )
     }
     const problems = gameLoadProblems(addItem(addItem(fresh(), tooManyMeshes), tooManyProps))
