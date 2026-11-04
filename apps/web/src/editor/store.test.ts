@@ -9,7 +9,7 @@ import { isPlayerStart } from "../domain/MapFile"
 import { withDifficulty } from "../domain/mapTags"
 import { mirrorFlagsOf } from "../domain/mirror"
 import { defaultSettings } from "../domain/Settings"
-import { initialMap, nextSelection, pivotOf, shownLighting, useEditor } from "./store"
+import { initialMap, nextSelection, pivotOf, shownLighting, shownTransform, useEditor } from "./store"
 
 const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!
 
@@ -367,6 +367,27 @@ describe("editor store", () => {
       const bad = new Map(moved).set(ids[2]!, { ...transformOf(ids[2]!), rotation: { x: 0, y: 0, z: 0, w: 0 } })
       assert.isFalse(s().transformItems(bad))
       assert.deepStrictEqual(ids.map((id) => transformOf(id).translation.x), [0, 100, 200])
+    })
+
+    it("resizes a decal as one undo step, though its transform in the file doesn't change", () => {
+      const { steps } = setup()
+      const name = "BP_UGCCircuitDecal"
+      const classPath = `/Script/Engine.BlueprintGeneratedClass'/Game/MapItems/Decals/${name}.${name}_C'`
+      s().placePiece({ ...cube, classPath }, placementTransform(cube, { x: 0, y: 0, z: 0 }))
+      const id = s().doc.ids.at(-1)!
+      const size = () =>
+        s().doc.map.items[s().doc.ids.indexOf(id)]!.floatProperties.find((p) => p.propertyName === "DecalHeight")
+      const before = shownTransform(s(), id)!
+      assert.deepStrictEqual(before.scale3D, { x: 200, y: 200, z: 100 })
+
+      assert.isTrue(s().transformItems(new Map([[id, { ...before, scale3D: { ...before.scale3D, x: 500 } }]])))
+      assert.strictEqual(s().past.length, steps + 2) // the placing and the resizing
+      assert.strictEqual(size()?.currentValue, 500)
+      assert.deepStrictEqual(transformOf(id).scale3D, { x: 1, y: 1, z: 1 })
+      assert.strictEqual(shownTransform(s(), id)!.scale3D.x, 500)
+
+      s().undo()
+      assert.strictEqual(shownTransform(s(), id)!.scale3D.x, 200)
     })
 
     it("deletes the whole selection as one step and restores it on undo", () => {

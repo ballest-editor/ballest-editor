@@ -1,12 +1,14 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 import fs from "node:fs"
 import path from "node:path"
 import { listSamples, readSample, repoRoot } from "../test/samples"
 import { decodeCatalog, indexCatalog } from "./Catalog"
-import { addItem } from "./edits"
-import { defaultEditorState, newMapFile, playerStartItem } from "./factory"
+import { addItem, setTransforms } from "./edits"
+import { editTransform } from "./editTransform"
+import { defaultEditorState, identityTransform, itemFromPiece, newMapFile, playerStartItem } from "./factory"
 import { gameRuleProblems } from "./gameRules"
+import { selectionProperties } from "./itemProperties"
 import { gameLoadProblems } from "./limits"
 import { type Item, MapFile } from "./MapFile"
 
@@ -193,6 +195,22 @@ describe("the game's rules", () => {
   it("the class in a problem is the file's item", () => {
     const map = addItem(fresh(), cube({ actorToSpawn: "/Game/N/BP_N.BP_N_C" }))
     assert.match(gameLoadProblems(map, catalog).join(" "), new RegExp(`Item ${map.items.length - 1} is a BP_N`))
+  })
+
+  it.each(["BP_UGCCircuitDecal", "BP_UGCShapeDecal"])("takes a %s's size from the Scale row alone", (className) => {
+    const piece = catalog.pieceByClass.get(pathOf(className))!
+    const placed = itemFromPiece(piece, identityTransform({ x: 0, y: 0, z: 0 }))
+    const isSize = (name: string) => ["DecalHeight", "DecalWidth", "DecalDepth"].includes(name)
+    const unsized = { ...placed, floatProperties: placed.floatProperties.filter((p) => !isSize(p.propertyName)) }
+    for (const item of [placed, unsized]) {
+      const map = addItem(fresh(), item)
+      const scale3D = { x: 500, y: 300, z: 60 }
+      const resized = setTransforms(map, [[map.items.length - 1, { ...editTransform(item), scale3D }]])
+      const next = Option.getOrThrow(resized)
+      assert.deepStrictEqual(editTransform(next.items.at(-1)!).scale3D, scale3D)
+      assert.deepStrictEqual(gameLoadProblems(next, catalog), [])
+    }
+    assert.isFalse(selectionProperties([{ item: placed, piece }]).some((p) => isSize(p.name)))
   })
 
   // A false alarm here would stop a player saving a map the game loads. The props probe is from 0.4.0: it has the

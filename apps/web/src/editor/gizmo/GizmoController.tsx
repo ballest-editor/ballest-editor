@@ -8,7 +8,7 @@ import { localToWorld } from "../../domain/pivot"
 import { transformSelection } from "../actions"
 import { AXIS_COLORS } from "../axisColors"
 import { sceneRegistry } from "../sceneRegistry"
-import { activeId, pivotOf, shownTransform, useEditor } from "../store"
+import { activeId, fitTransforms, pivotOf, shownTransform, useEditor } from "../store"
 import { dragAxisWorld, dragDelta, type DragStart, type PointerSample } from "./drag"
 import { GizmoObject, toolHandles } from "./handles"
 import { worldPerPixel } from "./math"
@@ -238,10 +238,13 @@ export function GizmoController() {
           active.localPivots = byCopy(copies, active.localPivots)
         }
       }
-      const next = new Map(
-        [...active.startTransforms].map((
-          [id, t]
-        ) => [id, applyGroupDelta(t, active.pivot, delta, active.localPivots.get(id))])
+      const next = fitTransforms(
+        useEditor.getState(),
+        new Map(
+          [...active.startTransforms].map((
+            [id, t]
+          ) => [id, applyGroupDelta(t, active.pivot, delta, active.localPivots.get(id))])
+        )
       )
       active.last = next
       applyToObjects(next)

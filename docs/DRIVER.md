@@ -129,7 +129,7 @@ so it could be listed in the registry if that is ever useful; it is not needed f
 
 ### Pivots and the gizmo
 
-The game gives each piece a default gizmo position, and the app copies it (docs/FORMAT.md § Pivots), so where the
+The default gizmo position is the piece's origin, wherever that falls on its mesh, and the app copies the game's pivots (docs/FORMAT.md § Pivots), so where the
 gizmo sits is a thing to check as much as how the piece looks. Measured on this build: the editor pawn's handler
 (`SKGMLEHandlerComponent`, reached with the test channel's `callx` on the instance under `PersistentLevel`) has
 `GetSelectionPivotChoice`, `SetSelectionPivot` (the inspector's buttons: `ESKGMLEEditorPivot` Default 0, Center 1,

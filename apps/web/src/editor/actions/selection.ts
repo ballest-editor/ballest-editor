@@ -1,5 +1,6 @@
 /** Selection edits: each is one undo step, however many items it touches. */
 import type { UeTransform, Vec3 } from "../../domain/coords"
+import { editTransform } from "../../domain/editTransform"
 import {
   type Axis,
   type AxisEdit,
@@ -10,7 +11,7 @@ import {
 import type { PropertyChange } from "../../domain/itemProperties"
 import type { FlipAxis } from "../../domain/mirror"
 import { localToWorld, type PivotChoice, pivotFor } from "../../domain/pivot"
-import { pivotOf, type SlotPaint, useEditor } from "../store"
+import { fitTransforms, pivotOf, type SlotPaint, useEditor } from "../store"
 
 export const transformSelection = (transforms: ReadonlyMap<string, UeTransform>): boolean =>
   useEditor.getState().transformItems(transforms)
@@ -29,10 +30,11 @@ export const deleteSelection = () => useEditor.getState().deleteSelection()
 
 export const duplicateSelection = () => useEditor.getState().duplicateSelection()
 
-/** An item's document transform: never the live preview. */
+/** An item's edit transform in the document: never the live preview. */
 const docTransform = (id: string): UeTransform | undefined => {
   const { doc } = useEditor.getState()
-  return doc.map.items[doc.ids.indexOf(id)]?.itemTransform
+  const item = doc.map.items[doc.ids.indexOf(id)]
+  return item === undefined ? undefined : editTransform(item)
 }
 
 /** An item's own pivot, local and unscaled. */
@@ -42,11 +44,14 @@ const localPivotOf = (id: string): Vec3 => pivotOf(useEditor.getState(), id).loc
 const withSelectionEdit = (
   edit: (t: UeTransform, localPivot: Vec3) => UeTransform
 ): ReadonlyMap<string, UeTransform> =>
-  new Map(
-    useEditor.getState().selectedIds.flatMap((id) => {
-      const t = docTransform(id)
-      return t === undefined ? [] : [[id, edit(t, localPivotOf(id))] as const]
-    })
+  fitTransforms(
+    useEditor.getState(),
+    new Map(
+      useEditor.getState().selectedIds.flatMap((id) => {
+        const t = docTransform(id)
+        return t === undefined ? [] : [[id, edit(t, localPivotOf(id))] as const]
+      })
+    )
   )
 
 /** An axis edit made from the document transforms, about the active item's pivot like the gizmo. */

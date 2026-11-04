@@ -19,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/component
 import { useState } from "react"
 import { useShallow } from "zustand/react/shallow"
 import type { UeTransform, Vec3 } from "../domain/coords"
+import { editTransform, isDecal } from "../domain/editTransform"
 import { type Axis, readField, type TransformField } from "../domain/groupTransform"
 import { selectionProperties } from "../domain/itemProperties"
 import { formatBindings, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
@@ -146,6 +147,16 @@ const transformRows = (units: "cm" | "m"): ReadonlyArray<TransformRowSpec> => [
     digits: 2
   }
 ]
+
+/** A decal's scale is its size (domain/editTransform.ts): cm, so a factor's step would crawl. */
+const DECAL_SIZE_ROW: TransformRowSpec = {
+  field: "scale3D",
+  title: "Size (cm: height, width, depth)",
+  icon: IconArrowsMaximize,
+  labels: { x: "X", y: "Y", z: "Z" },
+  step: 1,
+  digits: 1
+}
 
 const rowName = (
   field: TransformField
@@ -421,9 +432,9 @@ export function Inspector() {
             {transformRows(units).map((row) => (
               <TransformRow
                 key={row.field}
-                row={row}
+                row={row.field === "scale3D" && items.every(isDecal) ? DECAL_SIZE_ROW : row}
                 shown={transforms}
-                active={active.itemTransform}
+                active={editTransform(active)}
                 perUnit={row.field === "translation" ? perUnit : 1}
               />
             ))}
