@@ -1,0 +1,3466 @@
+{
+	"worldSettings":
+	{
+		"directionalLight":
+		{
+			"timeOfDay": 7.3000001907348633,
+			"brightness": 12
+		},
+		"metaData": [],
+		"levelData":
+		{
+			"systemLevelName": "Map_LevelEditorMain",
+			"userLevelName": "hidden probe 2_spigipplespigipplespigipple",
+			"levelDifficulty": "Beginner",
+			"levelDescription": "",
+			"uploaderOnlyLevelPreviewImagePath": "",
+			"bValidated": false,
+			"mapTags":
+			{
+				"gameplayTags": [
+					{
+						"tagName": "UGCTypes.Map"
+					},
+					{
+						"tagName": "MapTags.UGCTags.Mood.sunrise"
+					},
+					{
+						"tagName": "MapTags.UGCTags.Props.vents"
+					},
+					{
+						"tagName": "MapTags.UGCTags.Mood.day"
+					}
+				]
+			},
+			"medalTimesByIndex": [],
+			"createdAt": "2026.11.04-22.05.33",
+			"creatorName": "spigipplespigipplespigipple",
+			"levelDisplayName": "hidden probe 2",
+			"levelPublishedFileId": -1
+		},
+		"skylightIntensity": 1,
+		"directionalLightAngle": 159.39999389648438
+	},
+	"items": [
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/MapItems/PlayerStart/MP_PlayerStart.MP_PlayerStart_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -3000,
+					"y": -3000,
+					"z": 0
+				},
+				"scale3D":
+				{
+					"x": 0.27653800000000001,
+					"y": 0.27653800000000001,
+					"z": 0.27653800000000001
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_GoalYellow.MI_GoalYellow'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_Start_Fixed.SM_Start_Fixed",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_GoalYellow.MI_GoalYellow"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_HalfRingKicker.BP_Bevel_Full_HalfRingKicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -24000,
+					"y": -24000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_HalfRingKicker.Bevel_Full_HalfRingKicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_Kicker.BP_Bevel_Full_Kicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -18000,
+					"y": -24000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Kicker.Bevel_Full_Kicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_MediumScoop.BP_Bevel_Full_MediumScoop_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -12000,
+					"y": -24000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_MediumScoop.Bevel_Full_MediumScoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_Ring.BP_Bevel_Full_Ring_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -6000,
+					"y": -24000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_Ring.Bevel_Full_Ring",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_RingScoop.BP_Bevel_Full_RingScoop_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 0,
+					"y": -24000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_RingScoop.Bevel_Full_RingScoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_ShallowKicker.BP_Bevel_Full_ShallowKicker_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 6000,
+					"y": -24000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_ShallowScoop.BP_Bevel_Full_ShallowScoop_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 12000,
+					"y": -24000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2'",
+							"materialIndex": 2
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite'",
+							"materialIndex": 3
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Bevel/Normal/FullDepth/Bevel_Full_ShallowScoop.Bevel_Full_ShallowScoop",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum",
+						"/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2",
+						"/Game/Art/Stadium/Arena/MI_ArenaWhite.MI_ArenaWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Bowl_Shallow.BP_Bowl_Shallow_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 18000,
+					"y": -24000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/willc/Shallowbowl.Shallowbowl",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_Bump.BP_Bump_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 24000,
+					"y": -24000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/Bump_StaticMesh.Bump_StaticMesh",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Cinematics/PatchTeaser/BP_CinematicLaserTerminal.BP_CinematicLaserTerminal_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -24000,
+					"y": -18000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Iron.MI_Env_Iron'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Art/VFX/Lasers/SM_LaserTerminal.SM_LaserTerminal",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Iron.MI_Env_Iron"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Physics/Actors/BP_CircularFlexiblePlatform.BP_CircularFlexiblePlatform_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -18000,
+					"y": -18000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [],
+					"meshAssetPath": "",
+					"materialAssetPaths": []
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_Cube.BP_Cube_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -12000,
+					"y": -18000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/1M_Cube.1M_Cube",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_CubePrePlac.BP_CubePrePlac_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -6000,
+					"y": -18000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/M_ExampleObjectsMASTER.M_ExampleObjectsMASTER'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/1M_Cube.1M_Cube",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/M_ExampleObjectsMASTER.M_ExampleObjectsMASTER"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Structures/BP_Floor.BP_Floor_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 0,
+					"y": -18000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/TemplateFloor.TemplateFloor",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_LeftArm.BP_LeftArm_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 6000,
+					"y": -18000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/LeftArm_StaticMesh.LeftArm_StaticMesh",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_OneCubeTwoColor.BP_OneCubeTwoColor_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 12000,
+					"y": -18000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsBlue.MI_ExampleObjectsBlue'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsRed.MI_ExampleObjectsRed'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/1M_CubeMultiMaterial.1M_CubeMultiMaterial",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsBlue.MI_ExampleObjectsBlue",
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsRed.MI_ExampleObjectsRed"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Physics/Actors/BP_PhysicsPropBase.BP_PhysicsPropBase_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 18000,
+					"y": -18000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [],
+					"meshAssetPath": "",
+					"materialAssetPaths": []
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_PieceTest.BP_PieceTest_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 24000,
+					"y": -18000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000_45.SM_1000_45",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Sphere.BP_Prim_Sphere_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -24000,
+					"y": -12000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_Sphere.SM_Sphere",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_Ramp.BP_Ramp_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -18000,
+					"y": -12000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/Ramp_StaticMesh.Ramp_StaticMesh",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_RightArm.BP_RightArm_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -12000,
+					"y": -12000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/RightArm_StaticMesh.RightArm_StaticMesh",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/BP_SpinningPaddles.BP_SpinningPaddles_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -6000,
+					"y": -12000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Engine/EngineMaterials/WorldGridMaterial.WorldGridMaterial'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/Meshes/SM_ProvisionalSpinningPaddles_1.SM_ProvisionalSpinningPaddles_1",
+					"materialAssetPaths": [
+						"/Engine/EngineMaterials/WorldGridMaterial.WorldGridMaterial"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 1,
+					"propertyName": "PhysicsVariantCount",
+					"propertyType": "Integer"
+				},
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_Stairs.BP_Stairs_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 0,
+					"y": -12000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/Linear_Stair_StaticMesh.Linear_Stair_StaticMesh",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/BP_Surface_Grippy.BP_Surface_Grippy_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 6000,
+					"y": -12000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Engine/BasicShapes/Cube.Cube",
+					"materialAssetPaths": [
+						"/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 3,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/BP_Surface_Ice.BP_Surface_Ice_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 12000,
+					"y": -12000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Engine/BasicShapes/Cube.Cube",
+					"materialAssetPaths": [
+						"/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 2,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/BP_Surface_Magnet.BP_Surface_Magnet_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 18000,
+					"y": -12000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Engine/BasicShapes/Cube.Cube",
+					"materialAssetPaths": [
+						"/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 1,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_TwoCubeOneColor.BP_TwoCubeOneColor_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 24000,
+					"y": -12000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsRed.MI_ExampleObjectsRed'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/1M_Cube.1M_Cube",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsRed.MI_ExampleObjectsRed"
+					]
+				},
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsRed.MI_ExampleObjectsRed'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/1M_Cube.1M_Cube",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsRed.MI_ExampleObjectsRed"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_TwoCubeTwoColor.BP_TwoCubeTwoColor_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -24000,
+					"y": -6000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsBlue.MI_ExampleObjectsBlue'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsRed.MI_ExampleObjectsRed'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/1M_CubeMultiMaterial.1M_CubeMultiMaterial",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsBlue.MI_ExampleObjectsBlue",
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsRed.MI_ExampleObjectsRed"
+					]
+				},
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsBlue.MI_ExampleObjectsBlue'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsRed.MI_ExampleObjectsRed'",
+							"materialIndex": 1
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/1M_CubeMultiMaterial.1M_CubeMultiMaterial",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsBlue.MI_ExampleObjectsBlue",
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsRed.MI_ExampleObjectsRed"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/MapItems/Decals/BP_UGCShapeDecal.BP_UGCShapeDecal_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -18000,
+					"y": -6000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Engine/EngineMaterials/DefaultMaterial.DefaultMaterial'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Engine/BasicShapes/Sphere.Sphere",
+					"materialAssetPaths": [
+						"/Engine/EngineMaterials/DefaultMaterial.DefaultMaterial"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": true,
+					"propertyName": "bDecalEnabled",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bDecalUseEmissive",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [
+				{
+					"currentValue": 200,
+					"propertyName": "DecalWidth",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 200,
+					"propertyName": "DecalHeight",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 100,
+					"propertyName": "DecalDepth",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 1,
+					"propertyName": "DecalRed",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 1,
+					"propertyName": "DecalGreen",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 1,
+					"propertyName": "DecalBlue",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 0,
+					"propertyName": "DecalTileSpacing",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 1,
+					"propertyName": "DecalSDFSize",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 0,
+					"propertyName": "DecalFillEdgeSoftness",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 0,
+					"propertyName": "DecalEmissiveIntensity",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 1,
+					"propertyName": "DecalRoughness",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 0,
+					"propertyName": "DecalSpecular",
+					"propertyType": "Float"
+				}
+			],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "DecalShapeType",
+					"propertyType": "Integer"
+				},
+				{
+					"currentValue": 0,
+					"propertyName": "DecalFillType",
+					"propertyType": "Integer"
+				},
+				{
+					"currentValue": 1,
+					"propertyName": "DecalTileCount",
+					"propertyType": "Integer"
+				},
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Structures/BP_Wall.BP_Wall_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -12000,
+					"y": -6000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/Wall.Wall",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/MI_ExampleObjectsWhite.MI_ExampleObjectsWhite"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Cylinder_3071E2C2_MI_ArenaYellow.Cylinder_3071E2C2_MI_ArenaYellow_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -6000,
+					"y": -6000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Cylinder_3071E2C2.Cylinder_3071E2C2",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Cylinder_3071E2C2_MI_Pipes.Cylinder_3071E2C2_MI_Pipes_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 0,
+					"y": -6000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/MI_Pipes.MI_Pipes'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Cylinder_3071E2C2.Cylinder_3071E2C2",
+					"materialAssetPaths": [
+						"/Game/Art/MI_Pipes.MI_Pipes"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Cylinder_4B40C9CF_MI_ArenaBlue.Cylinder_4B40C9CF_MI_ArenaBlue_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 6000,
+					"y": -6000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaBlue.MI_ArenaBlue'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Cylinder_4B40C9CF.Cylinder_4B40C9CF",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_ArenaBlue.MI_ArenaBlue"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Cylinder_4B40C9CF_MI_ArenaYellow.Cylinder_4B40C9CF_MI_ArenaYellow_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 12000,
+					"y": -6000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Cylinder_4B40C9CF.Cylinder_4B40C9CF",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Merge_C6C6700A_MI_ArenaYellow.Merge_C6C6700A_MI_ArenaYellow_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 18000,
+					"y": -6000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Merge_C6C6700A.Merge_C6C6700A",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_ArenaYellow.MI_ArenaYellow"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Mirror_E8D8C4F0_MI_ArenaAluminum.Mirror_E8D8C4F0_MI_ArenaAluminum_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 24000,
+					"y": -6000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Mirror_E8D8C4F0.Mirror_E8D8C4F0",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Arena/MI_ArenaAluminum.MI_ArenaAluminum"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_Airvents.MP_Airvents_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -24000,
+					"y": 0,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/M_ExampleObjectsMASTER.M_ExampleObjectsMASTER'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Geometry/1M_Cube.1M_Cube",
+					"materialAssetPaths": [
+						"/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Materials/M_ExampleObjectsMASTER.M_ExampleObjectsMASTER"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Gameplay/Props/BP_AirVent.BP_AirVent_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -24000,
+					"y": 0,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [],
+					"meshAssetPath": "",
+					"materialAssetPaths": []
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Physics/Actors/Boosters/MP_BoostPlatform.MP_BoostPlatform_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -18000,
+					"y": 0,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Stadium/Misc/Blimp/MatsOld/White.White'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Core/Physics/Actors/Boosters/Meshes/SM_BostPlatform.SM_BostPlatform",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Misc/Blimp/MatsOld/White.White"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Physics/Actors/Boosters/MP_BoostRing.MP_BoostRing_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -12000,
+					"y": 0,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 0
+						},
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 1
+						},
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal'",
+							"materialIndex": 2
+						}
+					],
+					"meshAssetPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/Meshes/SM_Hole.SM_Hole",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal",
+						"/Game/Art/Materials/Environment/Materials/M_BaseSurface_Metal.M_BaseSurface_Metal"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Physics/Actors/Boosters/MP_BoostVolume.MP_BoostVolume_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -6000,
+					"y": 0,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Engine/EngineMaterials/DefaultMaterial.DefaultMaterial'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Engine/EngineMeshes/Cube.Cube",
+					"materialAssetPaths": [
+						"/Engine/EngineMaterials/DefaultMaterial.DefaultMaterial"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/MP_CheckpointStrip.MP_CheckpointStrip_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [],
+					"meshAssetPath": "",
+					"materialAssetPaths": []
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Physics/Actors/MP_MoveableKillzone.MP_MoveableKillzone_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 6000,
+					"y": 0,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [],
+					"meshAssetPath": "",
+					"materialAssetPaths": []
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Signage/MP_OrangeSign.MP_OrangeSign_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 12000,
+					"y": 0,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [],
+					"meshAssetPath": "",
+					"materialAssetPaths": []
+				},
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.MaterialInstanceConstant'/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Orange_Smooth.MI_Env_Orange_Smooth'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Maps/_GENERATED/PC/SM_1000_45.SM_1000_45",
+					"materialAssetPaths": [
+						"/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Orange_Smooth.MI_Env_Orange_Smooth"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Physics/Actors/Projectors/PinballLauncher/MP_PinballLauncher.MP_PinballLauncher_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 18000,
+					"y": 0,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Engine/EngineMaterials/WorldGridMaterial.WorldGridMaterial'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Core/Physics/Actors/Projectors/PinballLauncher/Meshes/SM_PinballProjector.SM_PinballProjector",
+					"materialAssetPaths": [
+						"/Engine/EngineMaterials/WorldGridMaterial.WorldGridMaterial"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/MP_PointLightFixture.MP_PointLightFixture_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": 24000,
+					"y": 0,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Engine/EngineMaterials/DefaultMaterial.DefaultMaterial'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Engine/BasicShapes/Sphere.Sphere",
+					"materialAssetPaths": [
+						"/Engine/EngineMaterials/DefaultMaterial.DefaultMaterial"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": true,
+					"propertyName": "bLightCastsShadows",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [
+				{
+					"currentValue": 1000,
+					"propertyName": "LightBrightness",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 1000,
+					"propertyName": "LightAttenuationRadius",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 1,
+					"propertyName": "LightRed",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 1,
+					"propertyName": "LightGreen",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 1,
+					"propertyName": "LightBlue",
+					"propertyType": "Float"
+				}
+			],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/Core/Physics/Actors/Boosters/MP_SlipPlatform.MP_SlipPlatform_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -24000,
+					"y": 6000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Game/Art/Stadium/Misc/Blimp/MatsOld/White.White'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Game/Core/Physics/Actors/Boosters/Meshes/SM_BostPlatform.SM_BostPlatform",
+					"materialAssetPaths": [
+						"/Game/Art/Stadium/Misc/Blimp/MatsOld/White.White"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		},
+		{
+			"actorToSpawn": "/Script/Engine.BlueprintGeneratedClass'/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/MP_SpotLightFixture.MP_SpotLightFixture_C'",
+			"itemTransform":
+			{
+				"rotation":
+				{
+					"x": 0,
+					"y": 0,
+					"z": 0,
+					"w": 1
+				},
+				"translation":
+				{
+					"x": -18000,
+					"y": 6000,
+					"z": 5000
+				},
+				"scale3D":
+				{
+					"x": 1,
+					"y": 1,
+					"z": 1
+				}
+			},
+			"meshComponents": [
+				{
+					"meshComponentTag": "SKGMapEditor",
+					"materials": [
+						{
+							"material": "/Script/Engine.Material'/Engine/EngineMaterials/DefaultMaterial.DefaultMaterial'",
+							"materialIndex": 0
+						}
+					],
+					"meshAssetPath": "/Engine/BasicShapes/Sphere.Sphere",
+					"materialAssetPaths": [
+						"/Engine/EngineMaterials/DefaultMaterial.DefaultMaterial"
+					]
+				}
+			],
+			"bIsBaseItem": false,
+			"boolProperties": [
+				{
+					"currentValue": true,
+					"propertyName": "bLightCastsShadows",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirror",
+					"propertyType": "Bool"
+				},
+				{
+					"currentValue": false,
+					"propertyName": "bMirrorX",
+					"propertyType": "Bool"
+				}
+			],
+			"floatProperties": [
+				{
+					"currentValue": 1000,
+					"propertyName": "LightBrightness",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 1000,
+					"propertyName": "LightAttenuationRadius",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 1,
+					"propertyName": "LightRed",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 1,
+					"propertyName": "LightGreen",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 1,
+					"propertyName": "LightBlue",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 20,
+					"propertyName": "LightInnerConeAngle",
+					"propertyType": "Float"
+				},
+				{
+					"currentValue": 45,
+					"propertyName": "LightOuterConeAngle",
+					"propertyType": "Float"
+				}
+			],
+			"intProperties": [
+				{
+					"currentValue": 0,
+					"propertyName": "SurfaceAssignment",
+					"propertyType": "Integer"
+				}
+			],
+			"textProperties": [],
+			"nameProperties": [],
+			"stringProperties": []
+		}
+	]
+}

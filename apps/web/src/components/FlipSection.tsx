@@ -13,9 +13,8 @@ const FLIPS: ReadonlyArray<{ readonly axis: FlipAxis; readonly label: string; re
 /**
  * The selection's flips, side by side under the transform like the game's inspector. A click
  * flips each selected item from its own state, so a mixed selection stays mixed. Unlike the
- * game, which shows no state and leaves the buttons live on pieces they do nothing to, these
- * show what's flipped, Flip Y is off for a physics prop, and a selection that can't flip at all
- * has no row (the game hides it for the player start only).
+ * game, which shows no state, these show what's flipped. A selection that can't flip at all (the
+ * player start, the goal, the checkpoints) has no row, as in the game.
  */
 export function FlipSection({ items }: { readonly items: ReadonlyArray<PlacedItem> }) {
   const flips = FLIPS.map((flip) => ({ ...flip, state: selectionFlip(items, flip.axis) }))

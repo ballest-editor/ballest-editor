@@ -15,6 +15,11 @@ import { type Item, MESH_COMPONENT_TAG, objectPathOf } from "./MapFile"
 
 export const MIRROR_X = "bMirrorX"
 export const MIRROR_Y = "bMirror"
+/** Flip Y on the spinning cylinder and paddle, which have no `bMirror` (measured: docs/qa/exposed-properties.md). */
+export const PHYSICS_FLIP = "PhysicsFlip"
+
+/** Whether a property is one of the flags that change how an item is mirrored. */
+export const isMirrorFlag = (name: string): boolean => name === MIRROR_X || name === MIRROR_Y || name === PHYSICS_FLIP
 
 export interface MirrorFlags {
   readonly x: boolean
@@ -23,13 +28,13 @@ export interface MirrorFlags {
 
 export type FlipAxis = keyof MirrorFlags
 
-/** The bool property behind each axis's flip. */
-export const MIRROR_PROPERTIES: Readonly<Record<FlipAxis, string>> = { x: MIRROR_X, y: MIRROR_Y }
-
 const flag = (item: Item, name: string): boolean =>
   item.boolProperties.some((p) => p.propertyName === name && p.currentValue)
 
-export const mirrorFlagsOf = (item: Item): MirrorFlags => ({ x: flag(item, MIRROR_X), y: flag(item, MIRROR_Y) })
+export const mirrorFlagsOf = (item: Item): MirrorFlags => ({
+  x: flag(item, MIRROR_X),
+  y: flag(item, MIRROR_Y) || flag(item, PHYSICS_FLIP)
+})
 
 /** The mesh a saved mesh path draws: a baked mirror's source, else the path itself. */
 export const sourceMeshOf = (index: CatalogIndex | null, meshAssetPath: string): string =>

@@ -134,8 +134,20 @@ const NATIVE = {
   bMirrorX: { list: "boolProperties", type: "Bool", default: false }
 }
 const CHECKPOINT_BASE = "/Game/Core/Gameplay/MapTriggers/BP_ActualCheckpointBase.BP_ActualCheckpointBase_C"
-// Defaults native code sets over the Blueprint's (the probe's untouched point light: shadows off, 10 m reach).
-const DEFAULT_OVERRIDES = { MP_RawPointLight: { bLightCastsShadows: false, LightAttenuationRadius: 1000 } }
+// Defaults native code sets over the Blueprint's. The point light's shadows are off when it's placed from the palette
+// (the "new pieces probe", placed by hand; BallestUGCLightComponent's bDisableShadowsOnNewPlacement), though one a map
+// loads or a paste makes saves them on. The rest are what the palette and hidden probes saved for an untouched item.
+const REACH = { LightAttenuationRadius: 1000 }
+const DEFAULT_OVERRIDES = {
+  MP_RawPointLight: { bLightCastsShadows: false, ...REACH },
+  MP_RawSpotLight: REACH,
+  MP_RawRectLight: REACH,
+  MP_PointLightFixture: REACH,
+  MP_SpotLightFixture: REACH,
+  BP_Surface_Magnet: { SurfaceAssignment: 1 },
+  BP_Surface_Ice: { SurfaceAssignment: 2 },
+  BP_Surface_Grippy: { SurfaceAssignment: 3 }
+}
 
 const nativeEntry = (name, optional) => ({
   name,
@@ -172,6 +184,46 @@ const withNative = (own, className, chain, sample) => {
     ...own.map((p) => (p.name in overrides ? { ...p, default: overrides[p.name] } : p)),
     ...[...mirror, "SurfaceAssignment"].map((name) => nativeEntry(name, true))
   ]
+}
+
+// What the game's details panel offers on a class, measured in game (panel.json; docs/qa/exposed-properties.md). Native
+// code decides this at runtime (BallestUGCPropertyDisplayLibrary), so the pak can't show it. A property with no row is
+// saved but not offered: hidden. Flip Y is PhysicsFlip on a class that has it, bMirror on the rest.
+const panel = JSON.parse(readFileSync(join(import.meta.dirname, "panel.json"), "utf8"))
+const SURFACE_OPTIONS = [
+  { value: 0, label: "Default" },
+  { value: 1, label: "Magnet" },
+  { value: 3, label: "Grippy" },
+  { value: 2, label: "Ice" }
+]
+const FIRST_ROW = 3
+const panelControls = (entry) => ({
+  bMirrorX: entry.flip === false ? null : { label: "Flip X", control: "toggle", row: 0 },
+  bMirror: entry.flip === false ? null : { label: "Flip Y", control: "toggle", row: 1 },
+  PhysicsFlip: entry.flip === false ? null : { label: "Flip Y", control: "toggle", row: 1 },
+  SurfaceAssignment: entry.surface === false
+    ? null
+    : { label: "Surfaces", control: "dropdown", row: 2, options: SURFACE_OPTIONS }
+})
+
+const withPanel = (properties, className) => {
+  const entry = panel.pieces[className]
+  // MP_PinballPaddle: 0.4.1 removed it, so there's no panel to measure.
+  if (entry === undefined) return properties
+  const rows = new Map(
+    (panel.rowSets[entry.rows] ?? []).flatMap(({ name, names, ...row }, i) =>
+      (names ?? [name]).map((n) => [n, { ...row, row: FIRST_ROW + i }])
+    )
+  )
+  const controls = panelControls(entry)
+  const listed = new Set(properties.map((p) => p.name))
+  for (const name of rows.keys()) {
+    if (!listed.has(name)) throw new Error(`panel.json: ${className} has no property ${name}`)
+  }
+  return properties.map((p) => {
+    const shown = rows.get(p.name) ?? controls[p.name]
+    return shown ? { ...p, ...shown, hidden: false } : { ...p, hidden: true }
+  })
 }
 
 // Components native code places at runtime: BallestElevatorComponent drives the platform, so the cooked templates say
@@ -291,7 +343,10 @@ for (const o of pieceOrder(registry)) {
       })),
     ...(beamOf(cls, mesh) ? { beam: beamOf(cls, mesh) } : {}),
     sampleProperties: Object.keys(s.propertyNames).sort(),
-    properties: withNative(propertiesOf(cls, s), s.className.replace(/_C$/, ""), chainOf.get(s.objectPath) ?? [], s)
+    properties: withPanel(
+      withNative(propertiesOf(cls, s), s.className.replace(/_C$/, ""), chainOf.get(s.objectPath) ?? [], s),
+      s.className.replace(/_C$/, "")
+    )
   }
   if (cls?.error) piece.classError = cls.error
   if (!meshAssetPath) {

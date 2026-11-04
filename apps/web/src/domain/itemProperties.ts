@@ -1,14 +1,25 @@
 /**
  * Item properties: the typed `*Properties` lists on an item (air vent strength, decal size,
- * ...). The catalog says which properties a class exposes, in the game's order and with
- * the class defaults; an item may also carry properties the catalog doesn't know, which
- * are shown and edited as they are.
+ * ...). The catalog says which properties a class saves, with their defaults, and which of
+ * them the game's panel offers and how; an item may also carry properties the catalog doesn't
+ * know, which are shown and edited as they are.
  */
 import { Option, Predicate } from "effect"
-import type { CatalogPiece } from "./Catalog"
+import type { CatalogPiece, CatalogProperty } from "./Catalog"
 import type { Item, PropertyList } from "./MapFile"
-import { type FlipAxis, MIRROR_PROPERTIES, MIRROR_X, MIRROR_Y, mirrorFlagsOf } from "./mirror"
-import { SURFACE_PROPERTY } from "./surface"
+import { type FlipAxis, isMirrorFlag, MIRROR_X, MIRROR_Y, mirrorFlagsOf, PHYSICS_FLIP } from "./mirror"
+
+/** A dropdown's choices in the game's order, by saved value. */
+export type Options = ReadonlyArray<{ readonly value: number; readonly label: string }>
+
+/** How the game's panel edits a number: a slider's range, and where a typed value stops. */
+export interface PropertyRange {
+  readonly min: number
+  readonly max: number
+  readonly step: number
+  /** The highest value that can be typed: the slider's maximum unless the game allows more. */
+  readonly typedMax: number
+}
 
 /** A property as the inspector shows it, across one or more items. */
 export interface ItemProperty {
@@ -20,52 +31,25 @@ export interface ItemProperty {
   readonly values: ReadonlyArray<unknown>
   /** The class default; undefined when the catalog doesn't list the property. */
   readonly default: unknown
-  /** Left out of the game's own property panel (the decal's size follows its scale there). */
-  readonly hidden: boolean
-  /** Labels by value for an integer the game edits as a dropdown (null: not a choice); undefined for a plain number. */
+  /** Labels by value for what the game edits as a dropdown; undefined for a plain value. */
   readonly options: Options | undefined
+  /** The game's label for it, when the catalog has one. */
+  readonly label?: string | undefined
+  /** The slider the game gives it; undefined for a value it doesn't edit as a number. */
+  readonly range?: PropertyRange | undefined
   /** A native property the game loads the item without (catalog `optional`): new items leave it out. */
   readonly optional?: boolean
 }
 
-/** Dropdown labels by value; null where a value isn't one of the game's choices. */
-export type Options = ReadonlyArray<string | null>
-
-/**
- * Dropdown labels for integer properties, by class and property name. None of them are in the
- * game data, so they come from in-game probe maps: the decal style names (0.4.0-playtest) are
- * the game's own dropdown labels; the shape decal's shape and fill are sliders in game, named
- * here after what each value draws; the elevator's speeds (0.4.1) are its dropdown's labels for
- * the values it saved. Larger values draw the last option.
- */
-const PROPERTY_OPTIONS: Readonly<Record<string, Readonly<Record<string, Options>>>> = {
-  BP_UGCCircuitDecal: { DecalStyle: ["Arrow", "Scratch Marks", "Stripes"] },
-  BP_UGCShapeDecal: {
-    DecalShapeType: ["Square", "Circle", "Hexagon", "Parallelogram", "Triangle"],
-    DecalFillType: ["Filled", "Outline"]
-  },
-  BP_Elevator: { PhysicsElevatorSpeedTier: [null, "Slow", "Normal", "Fast"] }
-}
-
-/** Dropdowns every class shares: the item surface (0.4.1; values from the probe, names from materials.json). */
-const SHARED_OPTIONS: Readonly<Record<string, Options>> = {
-  [SURFACE_PROPERTY]: ["None", "Magnet", "Ice", "Grippy"]
-}
-
-/** The label for an option value: the game draws values past the end as the last option. */
+/** The label for a saved value. A value outside the choices is what the game moves it to on load. */
 export const optionLabel = (options: Options, value: number): string => {
-  const label = options[value]
-  if (typeof label === "string") return label
-  const last = options.at(-1)
-  return label === undefined && value > 0 && typeof last === "string"
-    ? `${value} (draws as ${last})`
-    : `${value} (unknown)`
+  const found = options.find((o) => o.value === value)
+  if (found !== undefined) return found.label
+  const values = options.map((o) => o.value)
+  const nearest = value < Math.min(...values) ? Math.min(...values) : Math.max(...values)
+  const label = options.find((o) => o.value === nearest)?.label
+  return label === undefined ? String(value) : `${value} (the game loads this as ${label})`
 }
-
-const optionsOf = (piece: CatalogPiece | undefined, list: PropertyList, name: string) =>
-  list !== "intProperties"
-    ? undefined
-    : (piece === undefined ? undefined : PROPERTY_OPTIONS[piece.className]?.[name]) ?? SHARED_OPTIONS[name]
 
 export const PROPERTY_LISTS: ReadonlyArray<PropertyList> = [
   "boolProperties",
@@ -93,6 +77,11 @@ export const validPropertyValue = (list: PropertyList, value: unknown): boolean 
   }
 }
 
+const rangeOf = (p: CatalogProperty): PropertyRange | undefined =>
+  p.control === "slider" && p.min !== undefined && p.max !== undefined
+    ? { min: p.min, max: p.max, step: p.step ?? 1, typedMax: p.typedMax ?? p.max }
+    : undefined
+
 /** The catalog's properties for a piece that the editor can write (known list, valid default). */
 const knownProperties = (piece: CatalogPiece | undefined) =>
   (piece?.properties ?? []).flatMap((p) =>
@@ -103,7 +92,10 @@ const knownProperties = (piece: CatalogPiece | undefined) =>
         type: p.type,
         default: p.default,
         hidden: p.hidden === true,
-        options: optionsOf(piece, p.list, p.name),
+        row: p.row,
+        label: p.label,
+        range: rangeOf(p),
+        options: p.options,
         optional: p.optional === true
       }]
       : []
@@ -134,14 +126,16 @@ export const defaultProperties = (piece: CatalogPiece): Pick<Item, PropertyList>
 const stored = (item: Item, list: PropertyList, name: string) => item[list].find((p) => p.propertyName === name)
 
 /**
- * The properties of an item: the class's exposed ones in the game's order (stored value,
- * else the default), then any others the item carries.
+ * The properties of an item the inspector offers: the ones the game's panel has, in its order
+ * (stored value, else the default), then any the catalog doesn't know, which the game would
+ * refuse and so stay editable to put right. A hidden one is saved but never offered.
  */
 const propertiesOfItem = (item: Item, piece: CatalogPiece | undefined): ReadonlyArray<ItemProperty> => {
   const known = knownProperties(piece)
   const isKnown = (list: PropertyList, name: string) => known.some((p) => p.list === list && p.name === name)
+  const offered = known.filter((p) => !p.hidden).sort((a, b) => (a.row ?? Infinity) - (b.row ?? Infinity))
   return [
-    ...known.map((p) => {
+    ...offered.map(({ hidden: _hidden, row: _row, ...p }) => {
       const entry = stored(item, p.list, p.name)
       return {
         ...p,
@@ -156,8 +150,7 @@ const propertiesOfItem = (item: Item, piece: CatalogPiece | undefined): Readonly
         type: p.propertyType,
         values: [p.currentValue],
         default: undefined,
-        hidden: false,
-        options: optionsOf(piece, list, p.propertyName)
+        options: undefined
       }))
     )
   ]
@@ -169,8 +162,6 @@ export interface PlacedItem {
   readonly piece: CatalogPiece | undefined
 }
 
-const isMirrorFlag = (property: ItemProperty) => property.name === MIRROR_X || property.name === MIRROR_Y
-
 /**
  * The properties every selected item has (same list, name and type), with each item's value.
  * The mirror flags aren't among them: the inspector edits those with its flip buttons.
@@ -178,7 +169,7 @@ const isMirrorFlag = (property: ItemProperty) => property.name === MIRROR_X || p
 export const selectionProperties = (items: ReadonlyArray<PlacedItem>): ReadonlyArray<ItemProperty> => {
   const [first, ...rest] = items.map(({ item, piece }) => propertiesOfItem(item, piece))
   if (first === undefined) return []
-  return first.filter((property) => !isMirrorFlag(property)).flatMap((property) => {
+  return first.filter((property) => !isMirrorFlag(property.name)).flatMap((property) => {
     const values = [...property.values]
     for (const other of rest) {
       const match = other.find((p) => p.list === property.list && p.name === property.name && p.type === property.type)
@@ -207,20 +198,27 @@ export const withProperty = (
   return Option.some({ ...item, [property.list]: next })
 }
 
-/** Whether an item flips on an axis: its class has the flag (not all do), or the item carries it. */
-const flipsOn = ({ item, piece }: PlacedItem, axis: FlipAxis): boolean => {
-  const name = MIRROR_PROPERTIES[axis]
-  return stored(item, "boolProperties", name) !== undefined || (piece?.properties ?? []).some((p) => p.name === name)
-}
+/**
+ * The flag an item flips with on an axis: Flip Y is `PhysicsFlip` on a class that has it. None
+ * where the game offers no flip (the catalog lists the flag hidden), or an unknown class doesn't
+ * carry one.
+ */
+const flipFlagOf = ({ item, piece }: PlacedItem, axis: FlipAxis): string | undefined =>
+  (axis === "x" ? [MIRROR_X] : [PHYSICS_FLIP, MIRROR_Y]).find((name) => {
+    const listed = piece?.properties?.find((p) => p.name === name)
+    return listed === undefined ? stored(item, "boolProperties", name) !== undefined : listed.hidden !== true
+  })
 
 /**
- * An axis's flip across a selection, counting only the items that flip on it. Every piece has
- * x and y except the physics props (x only), and the player start and checkpoints (neither).
+ * An axis's flip across a selection, counting only the items that flip on it. Every piece flips
+ * on both except the player start, the goal and the checkpoints, which flip on neither.
  */
 export type FlipState = "unavailable" | "off" | "on" | "mixed"
 
 export const selectionFlip = (items: ReadonlyArray<PlacedItem>, axis: FlipAxis): FlipState => {
-  const flipped = items.filter((placed) => flipsOn(placed, axis)).map(({ item }) => mirrorFlagsOf(item)[axis])
+  const flipped = items.filter((placed) => flipFlagOf(placed, axis) !== undefined).map(({ item }) =>
+    mirrorFlagsOf(item)[axis]
+  )
   if (flipped.length === 0) return "unavailable"
   return flipped.every(Boolean) ? "on" : flipped.some(Boolean) ? "mixed" : "off"
 }
@@ -228,8 +226,9 @@ export const selectionFlip = (items: ReadonlyArray<PlacedItem>, axis: FlipAxis):
 /** The item flipped on an axis, as the game's flip buttons do; itself when it doesn't flip on that axis. */
 export const withFlip = (placed: PlacedItem, axis: FlipAxis): Item => {
   const { item } = placed
-  if (!flipsOn(placed, axis)) return item
-  const property = { list: "boolProperties", name: MIRROR_PROPERTIES[axis], type: "Bool" } as const
+  const name = flipFlagOf(placed, axis)
+  if (name === undefined) return item
+  const property = { list: "boolProperties", name, type: "Bool" } as const
   return Option.getOrElse(withProperty(item, property, !mirrorFlagsOf(item)[axis]), () => item)
 }
 
@@ -271,7 +270,7 @@ const colorAt = (properties: ReadonlyArray<ItemProperty>, red: ItemProperty): Co
     const green = channel(g)
     const blue = channel(b)
     if (green === undefined || blue === undefined) continue
-    const label = propertyLabel(prefixEnd === "" ? `${prefix}Color` : prefix)
+    const label = red.label ?? labelFromName(prefixEnd === "" ? `${prefix}Color` : prefix)
     return { label, channels: [red, green, blue] }
   }
   return undefined
@@ -288,21 +287,60 @@ export const propertyRows = (properties: ReadonlyArray<ItemProperty>): ReadonlyA
   })
 }
 
-/** The game's own labels where a name doesn't read as one (its property panel, 0.4.1). */
-const PROPERTY_LABELS: Readonly<Record<string, string>> = {
-  [SURFACE_PROPERTY]: "Surface",
-  [MIRROR_X]: "Flip X",
-  [MIRROR_Y]: "Flip Y",
-  PhysicsElevatorExtensionLength: "Travel Height",
-  PhysicsElevatorSpeedTier: "Speed",
-  PhysicsCylinderSpinSpeed: "Spin Speed",
-  PhysicsPaddleSpeedMultiplier: "Paddle Speed",
-  PhysicsVariantCount: "Paddles / Doors"
+/** A readable label for a name the catalog gives none for: `bFacingOnly` -> `Facing Only`. */
+const labelFromName = (name: string): string => name.replace(/^b(?=[A-Z])/, "").replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+
+/** The label a property shows: the game's, else one made from its name. */
+export const propertyLabel = (property: Pick<ItemProperty, "name" | "label">): string =>
+  property.label ?? labelFromName(property.name)
+
+/** A value as the game's panel takes it: a typed number stops at the range's ends. */
+export const clampToRange = (property: Pick<ItemProperty, "range">, value: number): number => {
+  const { range } = property
+  return range === undefined ? value : Math.min(Math.max(value, range.min), range.typedMax)
 }
 
-/** A readable label for a property name: `bFacingOnly` -> `Facing Only`, `DecalWidth` -> `Decal Width`. */
-export const propertyLabel = (name: string): string =>
-  PROPERTY_LABELS[name] ?? name.replace(/^b(?=[A-Z])/, "").replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+/**
+ * The step a dragged slider moves by. The game reports 0.01 for every float, but that's its
+ * keyboard step; dragging is continuous, and Density's whole range is 0 to 0.01.
+ */
+export const sliderStep = ({ min, max, step }: PropertyRange): number =>
+  step >= 1 ? step : Math.min(step, (max - min) / 1000)
+
+const INNER_CONE = "LightInnerConeAngle"
+const OUTER_CONE = "LightOuterConeAngle"
+const EMISSIVE = "DecalEmissiveIntensity"
+const USE_EMISSIVE = "bDecalUseEmissive"
+
+const floatOf = (item: Item, name: string): number | undefined => {
+  const value = stored(item, "floatProperties", name)?.currentValue
+  return typeof value === "number" ? value : undefined
+}
+
+/**
+ * The changes one edit makes on an item besides its own, as the game's panel makes them: a
+ * spot light's inner cone never passes its outer, whichever is edited; a decal's emissive
+ * strength turns emissive on.
+ */
+export const linkedChanges = (item: Item, change: PropertyChange): ReadonlyArray<PropertyChange> => {
+  const { property, value } = change
+  if (typeof value !== "number") return []
+  if (property.name === EMISSIVE && value > 0) {
+    return [{ property: { list: "boolProperties", name: USE_EMISSIVE, type: "Bool" }, value: true }]
+  }
+  const cone = { list: property.list, type: property.type }
+  if (property.name === OUTER_CONE && value < (floatOf(item, INNER_CONE) ?? -Infinity)) {
+    return [{ property: { ...cone, name: INNER_CONE }, value }]
+  }
+  return []
+}
+
+/** An edit as the game applies it: an inner cone wider than the outer stops at the outer. */
+export const appliedValue = (item: Item, change: PropertyChange): unknown => {
+  const { property, value } = change
+  if (property.name !== INNER_CONE || typeof value !== "number") return value
+  return Math.min(value, floatOf(item, OUTER_CONE) ?? Infinity)
+}
 
 /**
  * Pieces in a map carrying a native property no game save of their class has shown yet
@@ -320,7 +358,7 @@ export const unconfirmedPropertiesIn = (
     const optional = (piece?.properties ?? []).filter((p) => p.optional === true)
     for (const p of optional) {
       if (p.list !== null && item[p.list].some((entry) => entry.propertyName === p.name)) {
-        out.add(`${piece?.className} (${propertyLabel(p.name)})`)
+        out.add(`${piece?.className} (${propertyLabel(p)})`)
       }
     }
   }

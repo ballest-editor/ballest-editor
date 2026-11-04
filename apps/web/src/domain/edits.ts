@@ -5,7 +5,7 @@
  */
 import { Option, Schema } from "effect"
 import { defaultEditorState, qualifyMaterialPath, userLevelNameOf } from "./factory"
-import { type PropertyChange, withProperty } from "./itemProperties"
+import { appliedValue, linkedChanges, type PropertyChange, withProperty } from "./itemProperties"
 import {
   Item,
   type ItemPivot,
@@ -101,10 +101,14 @@ export const setProperties = (
   const items = map.items.slice()
   for (const index of indices) {
     let item = items[index]
-    for (const { property, value } of changes) {
-      const next = item === undefined ? Option.none() : withProperty(item, property, value)
-      if (Option.isNone(next)) return Option.none()
-      item = next.value
+    for (const change of changes) {
+      if (item === undefined) return Option.none()
+      const applied = { property: change.property, value: appliedValue(item, change) }
+      for (const { property, value } of [applied, ...linkedChanges(item, applied)]) {
+        const next = withProperty(item, property, value)
+        if (Option.isNone(next)) return Option.none()
+        item = next.value
+      }
     }
     if (item === undefined) return Option.none()
     items[index] = item
