@@ -31,7 +31,7 @@ const tool = <const Name extends string, P extends Schema.Struct.Fields, S exten
 export const DriverToolkit = Toolkit.make(
   tool(
     "slot_start",
-    "Starts a sandboxed copy of the game in its own Proton prefix and waits for its main menu (about 25 s). headless: no window at all; window: a 720p window.",
+    "Starts a sandboxed copy of the game in its own Proton prefix and waits for its main menu (about 25 s). headless: no window at all; window: a 720p window. Needs the Steam client running: if it isn't, never start Steam yourself; ask the user to start it and to confirm when it is running.",
     { slot: slotParam, mode: Schema.optional(Schema.Literals(["headless", "window"])) },
     Status
   ),
@@ -43,7 +43,7 @@ export const DriverToolkit = Toolkit.make(
   ),
   tool(
     "slot_status",
-    "Whether Steam is running (no slot starts without it), whether a slot runs, is at its menu, and its sandbox state, with the host log's last lines.",
+    "Whether Steam is running (no slot starts without it; if false, ask the user to start Steam, never start it yourself), whether a slot runs, is at its menu, and its sandbox state, with the host log's last lines.",
     {
       slot: slotParam
     },

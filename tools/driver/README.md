@@ -6,9 +6,10 @@ is how to run it.
 
 ## Needs
 
-- Linux with Steam running (`slot_start` refuses to start a copy while it is closed, and never starts Steam itself:
-  a copy that did would leave Steam with the copy's environment), the game installed and started once (its Proton prefix exists), Proton Experimental,
-  and `umu-run` (the [umu launcher](https://github.com/Open-Wine-Components/umu-launcher)).
+- Linux with Steam running. `slot_start` refuses to start a copy while Steam is closed, and an agent must not start
+  Steam either (the tools say so): it asks the user to start it and to confirm when it is running. A copy that started
+  Steam would leave Steam with the copy's environment.
+- The game installed and started once (its Proton prefix exists), Proton Experimental, and `umu-run` (the [umu launcher](https://github.com/Open-Wine-Components/umu-launcher)).
 - The [plugin manager](https://github.com/AnythingGoes-ballest/ballest-plugin-manager) host in the game, with the
   Wine override that makes it load (`WINEDLLOVERRIDES="version=n,b"` in the launch options, or
   `"version"="native,builtin"` in the prefix's `user.reg`). Until upstream carries

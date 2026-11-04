@@ -23,4 +23,5 @@ export const steamRunning = (fs: FileSystem.FileSystem): Effect.Effect<boolean> 
     return isSteamProcess(yield* fs.readFileString(`/proc/${pid}/cmdline`))
   }).pipe(Effect.orElseSucceed(() => false))
 
-export const STEAM_NOT_RUNNING = "Steam isn't running: start it, then try again (the driver never starts it itself)"
+export const STEAM_NOT_RUNNING =
+  "Steam isn't running. Don't start it yourself: ask the user to start Steam and to say when it is running, then try again."
