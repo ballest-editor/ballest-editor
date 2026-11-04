@@ -25,8 +25,8 @@
       "note": "palette piece used as the control"
     },
     "MP_OrangeSign": {
-      "status": "ok",
-      "note": "0.4.1 loads it only with meshComponents: [], which is what the app writes; gameRules.ts refuses any component",
+      "status": "rejected",
+      "note": "it loads with no mesh components, but saving it in the game leaves a map that opens blank",
       "date": "2026-11-04",
       "via": "tools/driver"
     },
@@ -366,14 +366,14 @@
       "via": "tools/probe/run.py"
     },
     "BP_TwoCubeOneColor": {
-      "status": "ok",
-      "note": "0.4.1 loads it only with meshComponents: [], which is what the app writes; gameRules.ts refuses any component",
+      "status": "rejected",
+      "note": "it loads with no mesh components, but saving it in the game leaves a map that opens blank",
       "date": "2026-11-04",
       "via": "tools/driver"
     },
     "BP_TwoCubeTwoColor": {
-      "status": "ok",
-      "note": "0.4.1 loads it only with meshComponents: [], which is what the app writes; gameRules.ts refuses any component",
+      "status": "rejected",
+      "note": "it loads with no mesh components, but saving it in the game leaves a map that opens blank",
       "date": "2026-11-04",
       "via": "tools/driver"
     },

@@ -155,7 +155,7 @@ const refusedInSamples: ReadonlyArray<readonly [string, ReadonlyArray<string>]> 
   [
     "hidden probe 2",
     [[27, "BP_TwoCubeOneColor"], [28, "BP_TwoCubeTwoColor"], [44, "MP_OrangeSign"]].map(([item, className]) =>
-      `Item ${item} is a ${className} with mesh components, which makes the game discard the whole map. Delete it and place it again.`
+      `Item ${item} is a ${className} with mesh components, which makes the game discard the whole map. Delete it.`
     )
   ]
 ]

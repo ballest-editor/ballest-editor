@@ -137,7 +137,7 @@ const meshProblems = (
     return [
       `Item ${index} is a ${
         classNameOf(item.actorToSpawn)
-      } with mesh components, which makes the game discard the whole map. Delete it and place it again.`
+      } with mesh components, which makes the game discard the whole map. Delete it.`
     ]
   }
   const out = item.meshComponents.flatMap((mesh) => materialProblems(mesh, index))

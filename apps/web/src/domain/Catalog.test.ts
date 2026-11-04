@@ -73,7 +73,7 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
     assert.deepStrictEqual(placementTransform(checkpoint, { x: 0, y: 0, z: 0 }).scale3D, { x: 1.5, y: 1.5, z: 1.5 })
   })
 
-  it("places the classes the game only reloads without mesh components, and a map of them passes the rules", () => {
+  it("keeps the classes the game only reloads without mesh components out of placement, and writes them with none", () => {
     const catalog = load()
     const index = indexCatalog(catalog)
     const { results } = Schema.decodeSync(Schema.fromJsonString(VerificationFile))(
@@ -90,7 +90,7 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
       newMapFile({ displayName: "A", creatorName: "B", createdAt: "" })
     )
     assert.deepStrictEqual(gameLoadProblems(map, index), [])
-    assert.deepStrictEqual(pieces.map((p) => unavailableReasonOf(index, p, results)), [undefined, undefined, undefined])
+    assert.isTrue(pieces.every((p) => unavailableReasonOf(index, p, results)?.includes("opens blank")))
     // the game's panel doesn't paint them, and with no component there is nothing to save paint in
     assert.deepStrictEqual(paintTargets(items, index).items, [])
   })
