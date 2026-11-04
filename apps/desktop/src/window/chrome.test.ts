@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { titleBarOverlay, windowShortcutOf } from "./chrome"
+import { devMenuTemplate, titleBarOverlay, windowShortcutOf } from "./chrome"
 
 const key = (code: string, modifiers: Partial<Record<"control" | "shift" | "alt" | "meta", boolean>> = {}) => ({
   type: "keyDown",
@@ -25,6 +25,14 @@ describe("window chrome", () => {
     expect(windowShortcutOf(key("F11", { alt: true }))).toBeUndefined()
     expect(windowShortcutOf({ ...key("F11"), type: "keyUp" })).toBeUndefined()
     expect(windowShortcutOf({ ...key("F11"), isAutoRepeat: true })).toBeUndefined()
+  })
+
+  it("leaves Ctrl+W to the page: the dev menu only reloads and opens DevTools", () => {
+    const items = devMenuTemplate.flatMap(({ submenu }) => Array.isArray(submenu) ? submenu : [])
+    // An exact list, since the roles that group others (`windowMenu`, `fileMenu`) bring `close` with them.
+    expect(items.map(({ role }) => role)).toEqual(["reload", "forceReload", "toggleDevTools"])
+    expect(items.filter(({ accelerator }) => accelerator !== undefined)).toEqual([])
+    expect(devMenuTemplate.filter(({ role }) => role !== undefined)).toEqual([])
   })
 
   it("draws the window controls in the page theme's foreground", () => {
