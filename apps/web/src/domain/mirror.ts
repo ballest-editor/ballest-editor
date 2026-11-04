@@ -1,6 +1,6 @@
 /**
- * Mirroring (0.4.1): Mirror X and Mirror Y flip an item's geometry along its local x and y
- * axes. The map file keeps the item's transform as it was and stores the flags as the bool
+ * Mirroring (0.4.1): the game's Flip X and Flip Y flip an item's geometry along its local x and
+ * y axes. The map file keeps the item's transform as it was and stores the flags as the bool
  * properties `bMirrorX` and `bMirror`. An item mirrored on one axis saves its mesh as the
  * game's baked mirror of it (catalog `mirrors`); on both, which is a half turn about local z,
  * the original. Some pieces also swap a slot material (the spinning cylinder's cap). From the
@@ -20,6 +20,11 @@ export interface MirrorFlags {
   readonly x: boolean
   readonly y: boolean
 }
+
+export type FlipAxis = keyof MirrorFlags
+
+/** The bool property behind each axis's flip. */
+export const MIRROR_PROPERTIES: Readonly<Record<FlipAxis, string>> = { x: MIRROR_X, y: MIRROR_Y }
 
 const flag = (item: Item, name: string): boolean =>
   item.boolProperties.some((p) => p.propertyName === name && p.currentValue)

@@ -34,6 +34,7 @@ import {
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import { selectedIndices, shownTransform, useEditor } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
+import { FlipSection } from "./FlipSection"
 import { ItemProperties } from "./ItemProperties"
 import { LightingSettings } from "./LightingSettings"
 import { ShiftClick } from "./MouseButtonIcon"
@@ -405,6 +406,7 @@ export function Inspector() {
   // Display units only; the map always stores centimetres (rotation and scale don't convert).
   const perUnit = units === "m" ? 100 : 1
   const active = items.at(-1) ?? first
+  const placed = items.map((item) => ({ item, piece: catalogIndex?.pieceByClass.get(item.actorToSpawn) }))
 
   return (
     <ScrollArea className="h-full bg-card">
@@ -414,16 +416,19 @@ export function Inspector() {
 
         <Separator />
         <SectionTitle>Transform</SectionTitle>
-        <div className="grid grid-cols-[auto_1fr_1fr_1fr] items-center gap-x-1.5 gap-y-1.5">
-          {transformRows(units).map((row) => (
-            <TransformRow
-              key={row.field}
-              row={row}
-              shown={transforms}
-              active={active.itemTransform}
-              perUnit={row.field === "translation" ? perUnit : 1}
-            />
-          ))}
+        <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-[auto_1fr_1fr_1fr] items-center gap-x-1.5 gap-y-1.5">
+            {transformRows(units).map((row) => (
+              <TransformRow
+                key={row.field}
+                row={row}
+                shown={transforms}
+                active={active.itemTransform}
+                perUnit={row.field === "translation" ? perUnit : 1}
+              />
+            ))}
+          </div>
+          <FlipSection items={placed} />
         </div>
 
         <Separator />
@@ -432,11 +437,7 @@ export function Inspector() {
         <Separator />
         <SectionTitle>Paint</SectionTitle>
         <PaintSection selected={items.map((item, i) => ({ item, id: ids[i] ?? "" }))} />
-        <ItemProperties
-          properties={selectionProperties(
-            items.map((item) => ({ item, piece: catalogIndex?.pieceByClass.get(item.actorToSpawn) }))
-          )}
-        />
+        <ItemProperties properties={selectionProperties(placed)} />
 
         {items.length === 1 && (
           <>

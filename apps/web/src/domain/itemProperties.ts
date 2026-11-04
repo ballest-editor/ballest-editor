@@ -7,7 +7,7 @@
 import { Option, Predicate } from "effect"
 import type { CatalogPiece } from "./Catalog"
 import type { Item, PropertyList } from "./MapFile"
-import { MIRROR_X, MIRROR_Y } from "./mirror"
+import { type FlipAxis, MIRROR_PROPERTIES, MIRROR_X, MIRROR_Y, mirrorFlagsOf } from "./mirror"
 import { SURFACE_PROPERTY } from "./surface"
 
 /** A property as the inspector shows it, across one or more items. */
@@ -163,13 +163,22 @@ const propertiesOfItem = (item: Item, piece: CatalogPiece | undefined): Readonly
   ]
 }
 
-/** The properties every selected item has (same list, name and type), with each item's value. */
-export const selectionProperties = (
-  items: ReadonlyArray<{ readonly item: Item; readonly piece: CatalogPiece | undefined }>
-): ReadonlyArray<ItemProperty> => {
+/** An item with its catalog piece, when the catalog knows the class. */
+export interface PlacedItem {
+  readonly item: Item
+  readonly piece: CatalogPiece | undefined
+}
+
+const isMirrorFlag = (property: ItemProperty) => property.name === MIRROR_X || property.name === MIRROR_Y
+
+/**
+ * The properties every selected item has (same list, name and type), with each item's value.
+ * The mirror flags aren't among them: the inspector edits those with its flip buttons.
+ */
+export const selectionProperties = (items: ReadonlyArray<PlacedItem>): ReadonlyArray<ItemProperty> => {
   const [first, ...rest] = items.map(({ item, piece }) => propertiesOfItem(item, piece))
   if (first === undefined) return []
-  return first.flatMap((property) => {
+  return first.filter((property) => !isMirrorFlag(property)).flatMap((property) => {
     const values = [...property.values]
     for (const other of rest) {
       const match = other.find((p) => p.list === property.list && p.name === property.name && p.type === property.type)
@@ -196,6 +205,32 @@ export const withProperty = (
     ? [...entries, { currentValue: value, propertyName: property.name, propertyType: property.type }]
     : entries.map((p, i) => (i === index ? { ...p, currentValue: value } : p))
   return Option.some({ ...item, [property.list]: next })
+}
+
+/** Whether an item flips on an axis: its class has the flag (not all do), or the item carries it. */
+const flipsOn = ({ item, piece }: PlacedItem, axis: FlipAxis): boolean => {
+  const name = MIRROR_PROPERTIES[axis]
+  return stored(item, "boolProperties", name) !== undefined || (piece?.properties ?? []).some((p) => p.name === name)
+}
+
+/**
+ * An axis's flip across a selection, counting only the items that flip on it. Every piece has
+ * x and y except the physics props (x only), and the player start and checkpoints (neither).
+ */
+export type FlipState = "unavailable" | "off" | "on" | "mixed"
+
+export const selectionFlip = (items: ReadonlyArray<PlacedItem>, axis: FlipAxis): FlipState => {
+  const flipped = items.filter((placed) => flipsOn(placed, axis)).map(({ item }) => mirrorFlagsOf(item)[axis])
+  if (flipped.length === 0) return "unavailable"
+  return flipped.every(Boolean) ? "on" : flipped.some(Boolean) ? "mixed" : "off"
+}
+
+/** The item flipped on an axis, as the game's flip buttons do; itself when it doesn't flip on that axis. */
+export const withFlip = (placed: PlacedItem, axis: FlipAxis): Item => {
+  const { item } = placed
+  if (!flipsOn(placed, axis)) return item
+  const property = { list: "boolProperties", name: MIRROR_PROPERTIES[axis], type: "Bool" } as const
+  return Option.getOrElse(withProperty(item, property, !mirrorFlagsOf(item)[axis]), () => item)
 }
 
 /** A value to set on one property; several are set together as one edit. */
@@ -256,8 +291,8 @@ export const propertyRows = (properties: ReadonlyArray<ItemProperty>): ReadonlyA
 /** The game's own labels where a name doesn't read as one (its property panel, 0.4.1). */
 const PROPERTY_LABELS: Readonly<Record<string, string>> = {
   [SURFACE_PROPERTY]: "Surface",
-  [MIRROR_X]: "Mirror X",
-  [MIRROR_Y]: "Mirror Y",
+  [MIRROR_X]: "Flip X",
+  [MIRROR_Y]: "Flip Y",
   PhysicsElevatorExtensionLength: "Travel Height",
   PhysicsElevatorSpeedTier: "Speed",
   PhysicsCylinderSpinSpeed: "Spin Speed",

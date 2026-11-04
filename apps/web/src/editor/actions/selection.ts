@@ -8,6 +8,7 @@ import {
   writeFieldAbout
 } from "../../domain/groupTransform"
 import type { PropertyChange } from "../../domain/itemProperties"
+import type { FlipAxis } from "../../domain/mirror"
 import { localToWorld, type PivotChoice, pivotFor } from "../../domain/pivot"
 import { pivotOf, type SlotPaint, useEditor } from "../store"
 
@@ -20,6 +21,9 @@ export const paintSlots = (edits: ReadonlyArray<SlotPaint>): boolean => useEdito
 /** Sets item properties on every selected item. */
 export const setSelectionProperties = (changes: ReadonlyArray<PropertyChange>): boolean =>
   useEditor.getState().setSelectionProperties(changes)
+
+/** Flips the selected items on one axis (one undo step); see `EditorState.flipSelection`. */
+export const flipSelection = (axis: FlipAxis) => useEditor.getState().flipSelection(axis)
 
 export const deleteSelection = () => useEditor.getState().deleteSelection()
 

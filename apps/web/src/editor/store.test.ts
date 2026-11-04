@@ -7,6 +7,7 @@ import { setLevelNames, withLevelNames } from "../domain/edits"
 import { placementTransform } from "../domain/factory"
 import { isPlayerStart } from "../domain/MapFile"
 import { withDifficulty } from "../domain/mapTags"
+import { mirrorFlagsOf } from "../domain/mirror"
 import { defaultSettings } from "../domain/Settings"
 import { initialMap, nextSelection, pivotOf, shownLighting, useEditor } from "./store"
 
@@ -555,6 +556,29 @@ describe("editor store", () => {
     assert.strictEqual(s().past.length, before + 1)
     s().undo()
     assert.deepStrictEqual(s().doc.map.items.map((i) => i.floatProperties.length), [0, 0, 0])
+  })
+
+  it("flips each selected item from its own state as one undo step, skipping what can't flip", () => {
+    const s = () => useEditor.getState()
+    const flag = { list: "boolProperties", type: "Bool", default: false } as const
+    const mirrorable = { ...cube, properties: [{ ...flag, name: "bMirror" }, { ...flag, name: "bMirrorX" }] }
+    s().loadMap(startOnlyMap(), null)
+    for (const x of [0, 100]) s().placePiece(mirrorable, placementTransform(mirrorable, { x, y: 0, z: 0 }))
+    const [start, a, b] = s().doc.ids
+    const flipped = () => s().doc.map.items.map((item) => mirrorFlagsOf(item).x)
+    s().select([a!])
+    s().flipSelection("x")
+    assert.deepStrictEqual(flipped(), [false, true, false])
+    s().select([start!, a!, b!])
+    const before = s().past.length
+    s().flipSelection("x")
+    assert.deepStrictEqual(flipped(), [false, false, true])
+    assert.strictEqual(s().past.length, before + 1)
+    s().select([start!])
+    s().flipSelection("x") // the player start doesn't flip: no step
+    assert.strictEqual(s().past.length, before + 1)
+    s().undo()
+    assert.deepStrictEqual(flipped(), [false, true, false])
   })
 
   it("loading a map replaces the document, its history and any live interaction", () => {
