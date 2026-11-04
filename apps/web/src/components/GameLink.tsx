@@ -8,6 +8,7 @@ import {
   IconRestore
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
+import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { cn } from "@workspace/ui/lib/utils"
 import { type ComponentType, useState } from "react"
 import {
@@ -222,9 +223,12 @@ export function CheckAgainButton({ size = "sm" }: { readonly size?: "xs" | "sm" 
 /** The checklist in its own box with Check again under it, as File › Game link… shows it. */
 export function GameLinkChecklist() {
   return (
-    <div className="flex flex-col rounded-lg border">
-      <GameLinkRows framed />
-      <div className="flex items-center justify-end border-t px-2 py-1">
+    <div className="flex min-h-0 flex-col rounded-lg border">
+      {/* a column, so its viewport can shrink: the dialog has only a max height, which `size-full` can't resolve */}
+      <ScrollArea className="flex min-h-0 flex-1 flex-col">
+        <GameLinkRows framed />
+      </ScrollArea>
+      <div className="flex shrink-0 items-center justify-end border-t px-2 py-1">
         <CheckAgainButton />
       </div>
     </div>
