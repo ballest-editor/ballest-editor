@@ -5,6 +5,7 @@ import { ElectronMenu } from "../electron/ElectronMenu"
 import { type DesktopProtocolSource, ElectronProtocol } from "../electron/ElectronProtocol"
 import { installDesktopIpcHandlers } from "../ipc/DesktopIpcHandlers"
 import { DesktopUpdates } from "../updates/DesktopUpdates"
+import { devMenuTemplate } from "../window/chrome"
 import { DesktopWindow } from "../window/DesktopWindow"
 import { DesktopEnvironment } from "./DesktopEnvironment"
 
@@ -33,9 +34,11 @@ const run = Effect.gen(function*() {
   yield* app.on("will-quit", (event) => event.preventDefault())
 
   yield* app.whenReady
-  // Installed builds have no application menu: the page's menu bar is the UI, and Electron's default one would
-  // reload or close the window behind the editor's back. DesktopWindow handles F11 and Ctrl+Q instead.
-  if (environment.isPackaged) yield* (yield* ElectronMenu).remove
+  // The page's menu bar is the UI, and Electron's default menu would reload or close the window behind the editor's
+  // back: its Ctrl+W is the fly keys held together. Installed builds have no application menu, unpackaged ones only
+  // reload and DevTools. DesktopWindow handles F11 and Ctrl+Q in both.
+  const menu = yield* ElectronMenu
+  yield* environment.isPackaged ? menu.remove : menu.set(devMenuTemplate)
   yield* (yield* ElectronProtocol).register(protocolSource(environment))
   yield* installDesktopIpcHandlers()
   // The first check waits a while, so the page is up to show what it finds.

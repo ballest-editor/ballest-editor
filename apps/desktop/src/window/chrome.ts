@@ -17,7 +17,15 @@ export const titleBarOverlay = (dark: boolean): Electron.TitleBarOverlayOptions 
 export const windowBackground = (dark: boolean): string => dark ? "#09090b" : "#ffffff"
 
 /**
- * The window shortcuts an application menu would have given. Installed builds have no menu (nothing to reload or
+ * The application menu of unpackaged builds, for its reload and DevTools keys. Nothing here may close the window:
+ * Ctrl+W is Ctrl (fly down) and W (fly forward) held together.
+ */
+export const devMenuTemplate: Array<Electron.MenuItemConstructorOptions> = [
+  { label: "Develop", submenu: [{ role: "reload" }, { role: "forceReload" }, { role: "toggleDevTools" }] }
+]
+
+/**
+ * The window shortcuts an application menu would have given. Neither build's menu has them (nothing may reload or
  * close the window behind the editor's back), so main handles these before the page sees the key.
  */
 export type WindowShortcut = "quit" | "toggleFullScreen"

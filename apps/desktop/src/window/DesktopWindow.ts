@@ -103,7 +103,7 @@ export class DesktopWindow extends Context.Service<DesktopWindow, {
           )
         )
 
-        // A menu bar never shows. Unpackaged builds keep Electron's default menu for its reload and DevTools keys.
+        // A menu bar never shows. Unpackaged builds keep a menu only for its reload and DevTools keys (devMenuTemplate).
         window.setMenuBarVisibility(false)
         window.webContents.on("before-input-event", (event, input) => {
           const shortcut = windowShortcutOf(input)
