@@ -281,6 +281,7 @@ export const materialsBuild = Effect.fn("materialsBuild")(
       const layers = layersOf(sh, merged, textureOf, textureInfo, translucency.translucent)
       const approx = approxOf({
         merged,
+        shadingModel,
         evaluated,
         picks,
         translucency,
@@ -332,6 +333,7 @@ export const materialsBuild = Effect.fn("materialsBuild")(
       notes: [
         "scalars/vectors/textures/switches are effective values: root UMaterial defaults (from CachedExpressionData) overridden by each instance down the chain.",
         "vectors are linear RGBA as stored by UE. baseColor/emissive in approx are linear; set three.js colors with Color.setRGB(r,g,b, THREE.LinearSRGBColorSpace) (or the default working space).",
+        "approx.subsurface (MSM_Subsurface only) is the evaluated subsurface colour, linear, and approx.subsurfaceOpacity its opacity; approx.frost (the ice) is the clouds that move it towards frost.bare (the colour with the noise at its extreme), at frost.scale per cm of world position. UE adds the colour to the diffuse colour for indirect light and scatters the sun through it, so a black base colour (the ice) still shows it.",
         "approx.baseColor/metallic/roughness are the compiled shader evaluated for the material's parameters and a facing view with every texture at its mean colour (approx.evaluated true); otherwise (translucent passes) parameters picked by name (approx.keys says which; null = neutral default). opacity/emissive are always picked by name.",
         "approx.colorLayers are the texture reads the base colour depends on: colour = baseColor + sum of gain * (read - mean); approx.opacityLayers the reads a translucent pass's alpha depends on, the same way on the read's channel (r/g/b/a; gain and mean from the evaluated shader; tiling is repeats per UV unit, or per cm when projected; instanceScale as for the normal map).",
         "approx.reads are the base-pass pixel shader's texture reads, traced through the compiled shader (tools/extract shaders): projection uv = mesh UV0 (scale in repeats per UV unit); object = object-aligned position, pivot at the object origin, rotating with the piece (scale in repeats per cm; instanceScale 1 = u, v also multiply by the piece's x, y scale); world. strength is a normal layer's blend strength. approx.*Texture/tiling/projection/instanceScale are the primary read per role; tiling is [u, v].",

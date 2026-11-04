@@ -189,9 +189,11 @@ export class Evaluator {
         // A dot over the vertex normal (N·V, N·L, a fixed light direction) is an orientation: the normal
         // against a transform row is a world normal component, anything else reads facing (1). Two
         // input-derived vectors read facing too. Anything else (a luminance weighting of texture reads, a
-        // channel pick) is computed.
-        const both = i.operands.slice(0, i.n).some((o) => this.#inputDependent(o)) &&
-          i.operands.slice(i.n).some((o) => this.#inputDependent(o))
+        // channel pick) is computed. A texture read that comes to the zero vector is 0 against anything: the
+        // Perlin volume's gradient at its mean.
+        const left = i.operands.slice(0, i.n), right = i.operands.slice(i.n)
+        if ([left, right].some((side) => side.every((o) => this.#zeroRead(o)))) return 0
+        const both = left.some((o) => this.#inputDependent(o)) && right.some((o) => this.#inputDependent(o))
         if (both || i.operands.some((o) => this.#reaches(o, 4, this.#isNormalInput))) {
           return this.#worldNormalComponent(i.operands) ?? 1
         }
@@ -279,6 +281,13 @@ export class Evaluator {
   readonly #isNormalInput = (v: string): boolean => {
     const i = instructionOf(this.#m, v)
     return i?.kind === "input" && (this.#m.inputs.find((x) => x.id === i.id)?.name.startsWith("TEXCOORD11") ?? false)
+  }
+
+  readonly #isRead = (v: string): boolean => instructionOf(this.#m, v)?.kind === "sample"
+
+  /** A value decoded from a texture read that evaluates to 0 (`read * 255/127 - 1` at 127/255). */
+  #zeroRead(v: string): boolean {
+    return Math.abs(this.value(v)) < 1e-6 && this.#reaches(v, 3, this.#isRead)
   }
 
   /** Whether `pred` holds for `v` or a value it reaches within `depth` operand steps. */
@@ -388,6 +397,8 @@ export interface Surface {
   readonly baseColor: readonly [number, number, number] | null
   readonly metallic: number | null
   readonly roughness: number | null
+  /** Opaque passes: GBuffer D, the shading model's custom data as stored (rgba); null when the pass writes none. */
+  readonly customData: readonly [number, number, number, number] | null
   /** Translucent passes: the alpha the pass writes (scene colour .a) for a surface facing up; null for opaque. */
   readonly opacity: number | null
   /** Translucent passes: the alpha for a vertical surface (the sides of a beam whose caps are masked). */
@@ -523,6 +534,7 @@ export const surfaceOf = (
   const diffuse = opaque ? null : diffuseOf(m)
   const base = opaque ? gbuffer : diffuse ?? [undefined, undefined, undefined]
   const alpha = opaque ? undefined : outs.get("0.w")
+  const custom = ["4.x", "4.y", "4.z", "4.w"].map((k) => outs.get(k))
   const cfg = cfgOf(ir)
   /** `overrides`: a sample's value on every channel; `channel`, the one channel the overrides set (else all). */
   const at = (
@@ -542,7 +554,8 @@ export const surfaceOf = (
       metallic: metallic === undefined ? 0 : e.value(metallic),
       roughness: roughness === undefined ? 0 : e.value(roughness),
       alpha: alpha === undefined ? 1 : e.value(alpha),
-      normal: normalOut.map((n) => n === undefined ? 0.5 : e.value(n))
+      normal: normalOut.map((n) => n === undefined ? 0.5 : e.value(n)),
+      custom: custom.map((c) => (c === undefined ? 0 : e.value(c)))
     }
   }
   const hasBase = base.every((b) => b !== undefined)
@@ -579,6 +592,9 @@ export const surfaceOf = (
     baseColor: hasBase ? rgb(zero.rgb) : null,
     metallic: opaque ? zero.metallic : null,
     roughness: opaque ? zero.roughness : null,
+    customData: opaque && custom.every((c) => c !== undefined)
+      ? [zero.custom[0] ?? 0, zero.custom[1] ?? 0, zero.custom[2] ?? 0, zero.custom[3] ?? 0]
+      : null,
     opacity: opaque ? null : zero.alpha,
     opacitySide: opaque ? null : side.alpha,
     alphaRange: opaque || !hasBase ? null : [corner(0), corner(1)],

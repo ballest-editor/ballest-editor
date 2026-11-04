@@ -104,6 +104,10 @@ export interface Patch {
     /** gain, mean */
     readonly uAlphaShape: THREE.IUniform<THREE.Vector2>
     readonly uUpFade: THREE.IUniform<number>
+    readonly uSubsurface: THREE.IUniform<THREE.Vector4>
+    readonly uSubsurfaceBare: THREE.IUniform<THREE.Vector3>
+    /** The frost clouds' noise scale, per cm. */
+    readonly uFrostScale: THREE.IUniform<number>
     /** Game time in seconds for the programs that move (the vent's streaks); shared, see `gameTime`. */
     readonly uBallestTime: THREE.IUniform<number>
     /** The mesh's local bounds (the programs' "bounding box 0-1" coordinates); see `materialForMesh`. */
@@ -172,6 +176,8 @@ const patchOf = (
   if (spec.outline !== undefined) defines["BALLEST_OUTLINE"] = 1
   for (const program of programs) defines[`BALLEST_PROGRAM_${program.kind.toUpperCase()}`] = 1
   if (spec.additive) defines["BALLEST_UNLIT"] = 1
+  if (spec.subsurface !== undefined) defines["BALLEST_SUBSURFACE"] = 1
+  if (spec.subsurface?.frost !== undefined) defines["BALLEST_FROST"] = 1
   if (Object.keys(defines).length === 0) return undefined
   const outline = spec.outline
   const vt = spec.variation?.tilings ?? []
@@ -216,6 +222,11 @@ const patchOf = (
       uAlphaTiling: { value: vec2(spec.opacityLayer?.tiling ?? [1, 1]) },
       uAlphaShape: { value: new THREE.Vector2(spec.opacityLayer?.gain ?? 0, spec.opacityLayer?.mean ?? 0.5) },
       uUpFade: { value: spec.upFade },
+      uSubsurface: {
+        value: new THREE.Vector4(...(spec.subsurface?.color ?? [0, 0, 0]), spec.subsurface?.opacity ?? 1)
+      },
+      uSubsurfaceBare: { value: new THREE.Vector3(...(spec.subsurface?.frost?.bare ?? [0, 0, 0])) },
+      uFrostScale: { value: spec.subsurface?.frost?.scale ?? 0 },
       uNormal2Tiling: { value: vec2(spec.normalLayer?.tiling ?? [1, 1]) },
       uNormal2Strength: { value: spec.normalLayer?.strength ?? 0 },
       uOutlineInset: { value: new THREE.Vector2(outline?.inset[0] ?? 0, outline?.inset[1] ?? 0) },
@@ -241,9 +252,12 @@ varying vec3 vBallestLocal;
 `
 const VERTEX_BODY = /* glsl */ `
 vBallestScale = vec3( length( modelMatrix[ 0 ].xyz ), length( modelMatrix[ 1 ].xyz ), length( modelMatrix[ 2 ].xyz ) );
+// Normals take the inverse transpose: the model matrix itself would tilt them on a piece scaled unevenly, the meshes'
+// quantised normals by as much as 30 times their error on a thin slab.
+vec3 ballestWorldNormal = normalize( transpose( inverse( mat3( modelMatrix ) ) ) * objectNormal ).xzy;
 #ifdef BALLEST_WORLD
   vBallestPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xzy;
-  vBallestNormal = normalize( mat3( modelMatrix ) * objectNormal ).xzy;
+  vBallestNormal = ballestWorldNormal;
 #else
   vBallestPos = transformed * vBallestScale;
   vBallestNormal = objectNormal;
@@ -251,7 +265,7 @@ vBallestScale = vec3( length( modelMatrix[ 0 ].xyz ), length( modelMatrix[ 1 ].x
 vBallestUv = uv;
 vBallestNormalMatrix = normalMatrix;
 // The world normal in UE's frame (three's y is UE's z); the beams fade their end caps by its z.
-vBallestWorldNormal = normalize( mat3( modelMatrix ) * objectNormal ).xzy;
+vBallestWorldNormal = ballestWorldNormal;
 vBallestUp = abs( vBallestWorldNormal.z );
 // The object-space position in cm with the piece's own scale: what the game's shaders see for a piece at the origin.
 vBallestLocal = transformed * vBallestScale;
@@ -289,10 +303,44 @@ uniform sampler2D uAlphaMap;
 uniform vec2 uAlphaTiling;
 uniform vec2 uAlphaShape;
 uniform float uUpFade;
+uniform vec4 uSubsurface;
+uniform vec3 uSubsurfaceBare;
+uniform float uFrostScale;
 uniform vec2 uNormal2Tiling;
 uniform float uNormal2Strength;
 uniform vec2 uOutlineInset;
 uniform vec3 uOutlineColor;
+#ifdef BALLEST_FROST
+vec3 ballestGradient( vec3 c ) {
+  vec3 h = fract( sin( vec3( dot( c, vec3( 127.1, 311.7, 74.7 ) ), dot( c, vec3( 269.5, 183.3, 246.1 ) ), dot( c, vec3( 113.5, 271.9, 124.6 ) ) ) ) * 43758.5453 );
+  return h * 2.0 - 1.0;
+}
+// Gradient noise standing in for the engine's Perlin volume: the same kind of noise, not the game's own pattern.
+float ballestNoise( vec3 p ) {
+  vec3 i = floor( p ), f = fract( p ), u = f * f * f * ( f * ( f * 6.0 - 15.0 ) + 10.0 );
+  return mix(
+    mix(
+      mix( dot( ballestGradient( i ), f ), dot( ballestGradient( i + vec3( 1, 0, 0 ) ), f - vec3( 1, 0, 0 ) ), u.x ),
+      mix( dot( ballestGradient( i + vec3( 0, 1, 0 ) ), f - vec3( 0, 1, 0 ) ), dot( ballestGradient( i + vec3( 1, 1, 0 ) ), f - vec3( 1, 1, 0 ) ), u.x ),
+      u.y
+    ),
+    mix(
+      mix( dot( ballestGradient( i + vec3( 0, 0, 1 ) ), f - vec3( 0, 0, 1 ) ), dot( ballestGradient( i + vec3( 1, 0, 1 ) ), f - vec3( 1, 0, 1 ) ), u.x ),
+      mix( dot( ballestGradient( i + vec3( 0, 1, 1 ) ), f - vec3( 0, 1, 1 ) ), dot( ballestGradient( i + vec3( 1, 1, 1 ) ), f - vec3( 1, 1, 1 ) ), u.x ),
+      u.y
+    ),
+    u.z
+  );
+}
+// M_IceCube's frost, 0 (bare) to 1: soft clouds at the material's own scale. Its mask also fades with the camera's
+// distance, through terms that fold away in the cooked shader, so the mean and the spread are measured off the game's
+// ice instead: a floor sits about three quarters of the way from bare to frosted, and moves about a third either way.
+float ballestFrost( vec3 position ) {
+  vec3 p = position * uFrostScale;
+  float noise = ballestNoise( p ) + ballestNoise( p * 3.0 ) / 3.0;
+  return saturate( 0.75 + 1.1 * noise );
+}
+#endif
 // The face's dominant axis in the projection frame: 0 = x, 1 = y, 2 = z.
 int ballestAxis() {
   vec3 n = abs( vBallestNormal );
@@ -370,6 +418,32 @@ totalEmissiveRadiance = ballestGlow( vBallestUv, vBallestWorldNormal, vBallestLo
   float ballestShown = min( 1.0, diffuseColor.a * max( ballestPeak, 1.0 ) );
   totalEmissiveRadiance *= diffuseColor.a / max( ballestShown, 1e-4 );
   diffuseColor.a = ballestShown;
+#endif
+`
+// UE's subsurface shading (MSM_Subsurface): the colour joins the diffuse colour for indirect light, and the sun
+// scatters through it (SubsurfaceBxDF): back scatter that barely depends on the normal, plus in-scatter when looking
+// towards the light. A face turned from the sun gets none: the piece's own shadow stops the transmission.
+const SUBSURFACE_LIGHT = /* glsl */ `
+#ifdef BALLEST_SUBSURFACE
+  #ifdef BALLEST_FROST
+    vec3 ballestColor = mix( uSubsurfaceBare, uSubsurface.rgb, ballestFrost( vBallestPos ) );
+  #else
+    vec3 ballestColor = uSubsurface.rgb;
+  #endif
+  reflectedLight.indirectDiffuse += ballestColor * ( irradiance + iblIrradiance ) * RECIPROCAL_PI;
+  #if NUM_DIR_LIGHTS > 0
+  {
+    vec3 ballestL = directionalLights[ 0 ].direction;
+    vec3 ballestV = normalize( vViewPosition );
+    float ballestOpacity = uSubsurface.a;
+    float ballestNoH = saturate( dot( normal, normalize( ballestL + ballestV ) ) );
+    float ballestBack = saturate( ballestNoH * ballestOpacity + 1.0 - ballestOpacity ) / ( 2.0 * PI );
+    float ballestIn = pow( saturate( dot( ballestL, -ballestV ) ), 12.0 ) * mix( 3.0, 0.1, ballestOpacity );
+    float ballestLit = smoothstep( -0.3, 0.0, dot( normal, ballestL ) );
+    reflectedLight.directDiffuse += directionalLights[ 0 ].color * ballestColor
+      * mix( ballestBack, 1.0, ballestIn ) * ballestLit;
+  }
+  #endif
 #endif
 `
 // The tangent-space perturbation from the normal map(s): the second layer adds at its strength.
@@ -471,6 +545,7 @@ export const applyShaderPatch = (shader: ShaderProgram, patch: Patch): void => {
         ? PROJECTED_NORMAL
         : tiled("normal_fragment_maps", "texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0", "ballestMapN()")
     )
+    .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>\n${SUBSURFACE_LIGHT}`)
 }
 
 const patches = new WeakMap<THREE.Material, Patch>()

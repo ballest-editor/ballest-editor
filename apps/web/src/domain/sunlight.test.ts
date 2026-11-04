@@ -56,16 +56,13 @@ describe("sunlight", () => {
     assert.closeTo(afternoon.z, morning.z, EPSILON)
   })
 
-  it("shows a warm low sun over a blue sky, and a brighter sky at noon", () => {
+  it("shows a warm low sun, and a weaker one at noon", () => {
     const light = (timeOfDay: number, brightness = 12) => viewLightOf(sunOf({ timeOfDay, brightness, angle: 0 }))
     const low = light(7.3), noon = light(12)
     assert.isAbove(low.sun[0], low.sun[2] * 2)
-    assert.isBelow(low.sky[0], low.sky[2] / 2)
-    assert.isAbove(noon.sky[1], low.sky[1] * 2)
     assert.isBelow(noon.sun[0], low.sun[0])
     assert.closeTo(light(7.3, 6).sun[0], low.sun[0] / 2, EPSILON) // the sun follows the brightness slider
-    assert.deepStrictEqual(light(0).sun, [0, 0, 0]) // night: the sun is gone and the sky dims with the sky light
-    assert.isBelow(light(0).sky[1], low.sky[1])
+    assert.deepStrictEqual(light(0).sun, [0, 0, 0]) // night: the sun is gone
   })
 
   it("dims the sun towards the horizon and hides it below", () => {

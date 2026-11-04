@@ -162,6 +162,16 @@ export const skyOf = (sun: Sun, timeOfDay: number): Sky => {
   }
 }
 
+/**
+ * What the sky light can't see past. The game's capture holds the sky alone, but its global illumination and
+ * reflections stop at the stadium: seen from the arena the stands reach about 15 degrees above the horizon, and they
+ * and the water are blue-green with almost no red (measured in the game's renders). So the renderer's capture ends at
+ * `ARENA_RIM`, the sine of that elevation, and holds the arena's colour below it.
+ */
+export const ARENA_RIM = 0.26
+/** The arena's colour, linear RGB, as a fraction of the light on an up-facing surface. */
+export const ARENA_COLOR: Tuple3 = [0.06, 0.27, 0.33]
+
 /** The sky's colour (without stars or the sun) in direction `d` (game frame, unit). */
 export const skyRadiance = (sky: Sky, d: Vec3): Tuple3 => {
   const f = Math.min(1, Math.pow(1 - Math.min(1, Math.max(0, d.z)), sky.horizonFalloff))
@@ -170,12 +180,12 @@ export const skyRadiance = (sky: Sky, d: Vec3): Tuple3 => {
 }
 
 /**
- * Light (as a luminance) reaching a surface facing `normal` from the sky above the horizon
- * and an even `ground` below it: the cosine-weighted mean radiance over the sphere. Sets the
- * sky light's strength, so that the brightest-lit faces get the game's sky-light intensity
- * whatever the sky's own colours.
+ * Light (as a luminance) reaching a surface facing `normal` from the sky above `rim` (the
+ * sine of an elevation) and an even `ground` below it: the cosine-weighted mean radiance over
+ * the sphere. Sets the sky light's strength, so that the brightest-lit faces get the game's
+ * sky-light intensity whatever the sky's own colours.
  */
-export const skyIrradiance = (sky: Sky, normal: Vec3, ground: number): number => {
+export const skyIrradiance = (sky: Sky, normal: Vec3, ground: number, rim = 0): number => {
   const rings = 24
   const segments = 32
   let sum = 0
@@ -190,7 +200,7 @@ export const skyIrradiance = (sky: Sky, normal: Vec3, ground: number): number =>
       const facing = d.x * normal.x + d.y * normal.y + d.z * normal.z
       if (facing <= 0) continue
       const w = facing * r // cos(angle to the normal) * solid-angle element
-      const radiance = z < 0 ? ground : luminance(skyRadiance(sky, d))
+      const radiance = z < rim ? ground : luminance(skyRadiance(sky, d))
       sum += w * radiance
       weight += w
     }
@@ -198,4 +208,4 @@ export const skyIrradiance = (sky: Sky, normal: Vec3, ground: number): number =>
   return weight > 0 ? sum / weight : 0
 }
 
-const luminance = ([r, g, b]: Tuple3): number => 0.2126 * r + 0.7152 * g + 0.0722 * b
+export const luminance = ([r, g, b]: Tuple3): number => 0.2126 * r + 0.7152 * g + 0.0722 * b

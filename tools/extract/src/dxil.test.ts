@@ -103,6 +103,21 @@ define void @MainPS() {
 `
 
 describe("dxil", () => {
+  it("recognises a Perlin volume read by its decode, and only that", () => {
+    const read = (scale: string) => `
+define void @MainPS() {
+  %1 = call %dx.types.ResRet.f32 @dx.op.sampleLevel.f32(i32 62, %dx.types.Handle %9, %dx.types.Handle %9, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float undef, i32 0, i32 0, i32 0, float 0.000000e+00)
+  %2 = extractvalue %dx.types.ResRet.f32 %1, 0
+  %3 = fmul fast float %2, ${scale}
+  ret void
+}
+!dx.entryPoints = !{!38}
+!38 = !{void ()* @MainPS, !"MainPS", null, null, null}
+`
+    assert.isTrue(samples(parseModule(read("0x4000102040000000")))[0]?.perlin)
+    assert.isFalse(samples(parseModule(read("2.000000e+00")))[0]?.perlin)
+  })
+
   it("reads LLVM's hex doubles", () => {
     assert.strictEqual(parseFloat("0x3FF0000000000000"), 1)
     assert.closeTo(parseFloat("0x3FD99999A0000000")!, 0.4, 1e-6)
