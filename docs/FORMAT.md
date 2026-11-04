@@ -116,7 +116,16 @@ Not every class lists them in its CDO. The probe map `samples/UserSavedMaps/...p
 
 ## Materials (the in-game Paint panel)
 
-Each `meshComponents[].materials[]` entry is one UE material slot (`materialIndex`, contiguous from 0, in index order), and `materialAssetPaths` repeats the same materials as bare object paths in the same order. Every slot can be repainted independently, including outline strips such as `M_OutlineEdges`. The in-game Paint panel offers 7 finishes (smooth, rough, glossy, concrete, tiled, emissive, special) × colours, which come to 66 material instances, listed in `assets/materials.json` under `paint` (see `tools/extract/README.md`). A physics surface (0.4.1) is separate from the paint: see "0.4.1: surfaces, mirroring, physics props". Maps also carry materials outside that list: catalog defaults (`MI_ArenaOrange2`, `M_BaseSurface_Metal`, …) and older instances (`MI_Env_Smooth_Lime_OLD`).
+Each `meshComponents[].materials[]` entry is one UE material slot (`materialIndex`, contiguous from 0, in index order), and `materialAssetPaths` repeats the same materials as bare object paths in the same order. Every slot of a paintable piece can be repainted independently, including outline strips such as `M_OutlineEdges`. The in-game Paint panel offers 7 finishes (smooth, rough, glossy, concrete, tiled, emissive, special) × colours, which come to 65 material instances, listed in `assets/materials.json` under `paint` (see `tools/extract/README.md`). Maps also carry materials outside that list: catalog defaults (`MI_ArenaOrange2`, `M_BaseSurface_Metal`, …) and older instances (`MI_Env_Smooth_Lime_OLD`). The game keeps them on load and save.
+
+What the panel lists, measured on 0.4.1 for every palette piece ([docs/qa/materials.md](qa/materials.md)):
+
+- **Slots:** one row per slot of the item's one mesh component, numbered from 1, each offering the whole library. No piece narrows the choices (`SetMaterialListFiltered` is empty). Items of the same class are listed and painted together.
+- **Pieces that take no paint** (`catalog.json` `paintable` false): the 20 palette pieces whose class sets `bCanChangeMaterial` false (rubber, air vent, glass, the three physics props, objectives, decal, lights, light cards and laser), and every piece outside the palette, since the panel builds no row for a class it can't name from `DT_MapItems`. The panel drops them and keeps the rest of the selection. It is the panel's rule, not the loader's: the map files tested could paint six of the seven locked pieces tried, and the game kept that on load and save.
+- **Surfaces:** a selection with any item on a surface lists no slots at all. A material painted before the surface was set stays saved, and shows again when the surface is cleared.
+- **Picking a finish** swaps the slot to the new finish's version of its colour, when there is one, and otherwise paints nothing. A slot not on a picker choice counts as Grey, so `special` paints it `MI_Pipes` and the other finishes leave it.
+
+A material entry at or past the mesh's slot count makes the game discard the whole map, one past the end included, and open an empty one. An empty `materials` list is fine: the game fills in the defaults. The app refuses to save a map with such an entry when the catalog knows the mesh. A physics surface (0.4.1) is separate from the paint: see "0.4.1: surfaces, mirroring, physics props".
 
 ## Hard limits (constants recovered from the shipping exe, build 0.4.0-playtest)
 
@@ -172,7 +181,7 @@ On load the game does not move items below the water: the `asdf new not loaded` 
 
 - transform must be finite, rotation normalized
 - unknown property name / wrong type → item rejected
-- per-mesh material slot safety limit
+- per-mesh material slot safety limit: a `materialIndex` at or past the mesh's slot count (measured, see Materials)
 - `Serialized level JSON contains an invalid or oversized object`
 - `levelName and username must be strings`; display-name text limit 4096
 - editor metadata (groups, pivots) validated separately. Any of these discards the whole map and opens a blank one with no message: a pivot or group member past the last item, an empty group, an item in two groups, a group with no `frame`. A group of one and a group with no `name` load (measured, docs/qa/save-roundtrip.md)

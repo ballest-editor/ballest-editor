@@ -1,4 +1,5 @@
 import { Context, DateTime, Effect, Layer } from "effect"
+import type { CatalogIndex } from "../domain/Catalog"
 import {
   currentCreatedAt,
   defaultEditorState,
@@ -21,7 +22,10 @@ export interface ExportedMap {
 
 export class MapExporter extends Context.Service<MapExporter, {
   /** Applies the level-name fields the game expects, checks the game's load rules (domain/limits), and encodes to a `.balledit`. */
-  prepare(map: MapFile): Effect.Effect<ExportedMap, ExportValidationError | MapEncodeError>
+  prepare(
+    map: MapFile,
+    catalog?: CatalogIndex | null
+  ): Effect.Effect<ExportedMap, ExportValidationError | MapEncodeError>
 }>()("ballest/services/MapExporter") {
   static readonly layerNoDeps = Layer.effect(
     MapExporter,
@@ -29,7 +33,7 @@ export class MapExporter extends Context.Service<MapExporter, {
       const codec = yield* MapCodec
       const timeZone = yield* DateTime.CurrentTimeZone
 
-      const prepare = Effect.fn("MapExporter.prepare")(function*(map: MapFile) {
+      const prepare = Effect.fn("MapExporter.prepare")(function*(map: MapFile, catalog: CatalogIndex | null = null) {
         const levelData = map.worldSettings.levelData
         const displayName = levelData.levelDisplayName.trim()
         const creatorName = levelData.creatorName.trim()
@@ -41,7 +45,7 @@ export class MapExporter extends Context.Service<MapExporter, {
             message: `Map name and creator: ${NAME_RULE} (they become the file name).`
           })
         }
-        const problems = gameLoadProblems(map)
+        const problems = gameLoadProblems(map, catalog)
         if (problems.length > 0) {
           return yield* new ExportValidationError({ message: problems.slice(0, 3).join(" ") })
         }

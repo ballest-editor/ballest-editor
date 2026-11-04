@@ -1,0 +1,954 @@
+{
+  "note": "What the game's details panel listed for each piece, read from a slot of tools/driver on 0.4.1: slots is its paint rows. tools/extract/src/paint.test.ts holds assets/catalog.json to it. docs/qa/materials.md has how it was measured.",
+  "game": "0.4.1",
+  "pieces": [
+    {
+      "classPath": "/Game/Cinematics/PatchTeaser/BP_CinematicLaserTerminal.BP_CinematicLaserTerminal_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Core/Gameplay/MapTriggers/BP_ActualCheckpointBase.BP_ActualCheckpointBase_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Core/Gameplay/MapTriggers/BP_Checkpoint.BP_Checkpoint_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Core/Gameplay/MapTriggers/MP_ActualCheckpoint_Disc.MP_ActualCheckpoint_Disc_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Core/Gameplay/MapTriggers/MP_ActualCheckpoint_Strip.MP_ActualCheckpoint_Strip_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Core/Gameplay/Props/BP_AirVent.BP_AirVent_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Core/Gameplay/Props/MP_AirVent.MP_AirVent_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Core/Physics/Actors/BP_CircularFlexiblePlatform.BP_CircularFlexiblePlatform_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Core/Physics/Actors/BP_PhysicsPropBase.BP_PhysicsPropBase_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Core/Physics/Actors/Boosters/MP_BoostPlatform.MP_BoostPlatform_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Core/Physics/Actors/Boosters/MP_BoostRing.MP_BoostRing_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Core/Physics/Actors/Boosters/MP_BoostVolume.MP_BoostVolume_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Core/Physics/Actors/Boosters/MP_SlipPlatform.MP_SlipPlatform_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Core/Physics/Actors/MP_MoveableKillzone.MP_MoveableKillzone_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Core/Physics/Actors/Projectors/PinballLauncher/MP_PinballLauncher.MP_PinballLauncher_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Branch.Bevel_Full_Branch_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Cap.Bevel_Full_Cap_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_HalfRing.Bevel_Full_HalfRing_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_HalfRingKicker.Bevel_Full_HalfRingKicker_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Kicker.Bevel_Full_Kicker_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_MediumScoop.Bevel_Full_MediumScoop_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Ring.Bevel_Full_Ring_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_RingScoop.Bevel_Full_RingScoop_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowKicker.Bevel_Full_ShallowKicker_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowScoop.Bevel_Full_ShallowScoop_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowShortScoop.Bevel_Full_ShallowShortScoop_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowSideKicker_L.Bevel_Full_ShallowSideKicker_L_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShallowSideKicker_R.Bevel_Full_ShallowSideKicker_R_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShortScoop.Bevel_Full_ShortScoop_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShortUScoop_L.Bevel_Full_ShortUScoop_L_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_ShortUScoop_R.Bevel_Full_ShortUScoop_R_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Straight.Bevel_Full_Straight_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_StubKicker.Bevel_Full_StubKicker_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/FullDepth/Bevel_Full_Turn.Bevel_Full_Turn_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_Cap.Bevel_Half_Cap_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_ConcaveCornerCurveFlat.Bevel_Half_ConcaveCornerCurveFlat_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_ConvexCornerCurveFlat.Bevel_Half_ConvexCornerCurveFlat_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_CornerStraight.Bevel_Half_CornerStraight_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_DeepCornerScoop.Bevel_Half_DeepCornerScoop_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_DeepScoop.Bevel_Half_DeepScoop_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_MediumRamp.Bevel_Half_MediumRamp_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_Platform.Bevel_Half_Platform_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_SSurveL.Bevel_Half_SSurveL_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_SSurveR.Bevel_Half_SSurveR_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_ShallowCornerHump.Bevel_Half_ShallowCornerHump_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_ShallowCornerScoop.Bevel_Half_ShallowCornerScoop_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_ShallowRamp.Bevel_Half_ShallowRamp_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_SteepCornerHump.Bevel_Half_SteepCornerHump_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_Straight.Bevel_Half_Straight_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_TightConcaveCornerCurveFlat.Bevel_Half_TightConcaveCornerCurveFlat_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Normal/HalfDepth/Bevel_Half_Turn.Bevel_Half_Turn_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Bumper.Bevel_Bumper_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_BumperLongDouble.Bevel_BumperLongDouble_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_BumperLongSingle.Bevel_BumperLongSingle_C",
+      "slots": 2
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Props/Bevel_Rail.Bevel_Rail_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Scenery/Bevel_Arch.Bevel_Arch_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_Branch.Bevel_Tall_Branch_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_Cap.Bevel_Tall_Cap_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_CornerConcave.Bevel_Tall_CornerConcave_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_CornerStraight.Bevel_Tall_CornerStraight_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_Podium.Bevel_Tall_Podium_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_Ring.Bevel_Tall_Ring_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_SheerStraight.Bevel_Tall_SheerStraight_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_StraightPlatform.Bevel_Tall_StraightPlatform_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Bevel/Tall/Bevel_Tall_StraightWall.Bevel_Tall_StraightWall_C",
+      "slots": 4
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_Capsule.BP_GlossyRed_Capsule_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_Capsule_FlatBottom.BP_GlossyRed_Capsule_FlatBottom_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_EighthSphere.BP_GlossyRed_EighthSphere_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_HalfCapsule.BP_GlossyRed_HalfCapsule_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_HalfCapsule_FlatBottom.BP_GlossyRed_HalfCapsule_FlatBottom_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_HalfSphere.BP_GlossyRed_HalfSphere_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_Half_TubeLong_Bend_45.BP_GlossyRed_Half_TubeLong_Bend_45_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_Half_TubeLong_Bend_90.BP_GlossyRed_Half_TubeLong_Bend_90_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_Half_TubeLong_Curve_25.BP_GlossyRed_Half_TubeLong_Curve_25_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_Half_TubeLong_Curve_45.BP_GlossyRed_Half_TubeLong_Curve_45_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_Half_TubeLong_Curve_90.BP_GlossyRed_Half_TubeLong_Curve_90_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_Half_TubeLong_Straight.BP_GlossyRed_Half_TubeLong_Straight_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_Half_TubeLong_Straight_Bend_25.BP_GlossyRed_Half_TubeLong_Straight_Bend_25_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_QuarterCapsule.BP_GlossyRed_QuarterCapsule_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_QuarterCapsule_FlatBottom.BP_GlossyRed_QuarterCapsule_FlatBottom_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_QuarterSphere.BP_GlossyRed_QuarterSphere_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_TubeLong_Bend_25.BP_GlossyRed_TubeLong_Bend_25_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_TubeLong_Bend_45.BP_GlossyRed_TubeLong_Bend_45_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_TubeLong_Bend_90.BP_GlossyRed_TubeLong_Bend_90_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_TubeLong_Curve_25.BP_GlossyRed_TubeLong_Curve_25_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_TubeLong_Curve_90.BP_GlossyRed_TubeLong_Curve_90_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_TubeLong_Straight.BP_GlossyRed_TubeLong_Straight_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_TubeLong_Straight_Curve_45.BP_GlossyRed_TubeLong_Straight_Curve_45_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_Tube_Bend_25.BP_GlossyRed_Tube_Bend_25_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_Tube_Bend_45.BP_GlossyRed_Tube_Bend_45_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_Tube_Bend_90.BP_GlossyRed_Tube_Bend_90_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_Tube_Funnel.BP_GlossyRed_Tube_Funnel_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_Tube_Straight.BP_GlossyRed_Tube_Straight_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/GlossyRed/BP_GlossyRed_WholeSphere.BP_GlossyRed_WholeSphere_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lasers/MP_LaserTerminal.MP_LaserTerminal_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/LightCards/MP_LightCard_01.MP_LightCard_01_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/LightCards/MP_LightCard_02.MP_LightCard_02_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/LightCards/MP_LightCard_03.MP_LightCard_03_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/LightCards/MP_LightCard_04.MP_LightCard_04_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/MP_PointLightFixture.MP_PointLightFixture_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/MP_RawPointLight.MP_RawPointLight_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/MP_RawRectLight.MP_RawRectLight_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/MP_RawSpotLight.MP_RawSpotLight_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Lights/MP_SpotLightFixture.MP_SpotLightFixture_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/MP_CheckpointStrip.MP_CheckpointStrip_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/MP_Cone.MP_Cone_C",
+      "slots": 2
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/MP_Pyramid.MP_Pyramid_C",
+      "slots": 2
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/MP_ShallowBowlV2.MP_ShallowBowlV2_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MapPieces/Signage/MP_OrangeSign.MP_OrangeSign_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_Airvents.MP_Airvents_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_FlatGlassPlane.MP_FlatGlassPlane_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_FlatRing.MP_FlatRing_C",
+      "slots": 2
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_RoundedBumper.MP_RoundedBumper_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_RoundedGlassPlane1.MP_RoundedGlassPlane1_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_RoundedTorus.MP_RoundedTorus_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_SM_ConeBowl.MP_SM_ConeBowl_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_SM_CornerScoop.MP_SM_CornerScoop_C",
+      "slots": 2
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_SM_FullMediumBowl.MP_SM_FullMediumBowl_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_SM_HalfShallowHoleBowl.MP_SM_HalfShallowHoleBowl_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_SM_Hole.MP_SM_Hole_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_SM_QuarterMediumBowl.MP_SM_QuarterMediumBowl_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_SM_QuarterShallowHoleBowl.MP_SM_QuarterShallowHoleBowl_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/MaterialUpdatePieces/MP_TunnelHalf.MP_TunnelHalf_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/BP_Elevator.BP_Elevator_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/BP_PhysicsPaddle.BP_PhysicsPaddle_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/BP_SpinningCylinder.BP_SpinningCylinder_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/BP_SpinningPaddles.BP_SpinningPaddles_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/BP_Surface_Grippy.BP_Surface_Grippy_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/BP_Surface_Ice.BP_Surface_Ice_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/PhysicsProps/BP_Surface_Magnet.BP_Surface_Magnet_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/SpecialPieces/RubberBlock2_M_PlasticBase.RubberBlock2_M_PlasticBase_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/BallestAssets/SpecialPieces/RubberCylinder.RubberCylinder_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_500_kicker1_M_ClearCoat_M_OutlineEdges.AJ_500_kicker1_M_ClearCoat_M_OutlineEdges_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_Bowl00_MI_ArenaWhite.AJ_Bowl00_MI_ArenaWhite_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_Bowl00_M_TechSubtle.AJ_Bowl00_M_TechSubtle_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_Prop_Box2_MI_ArenaYellow.AJ_Prop_Box2_MI_ArenaYellow_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_Ramp_00_M_TechSubtle.AJ_Ramp_00_M_TechSubtle_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_Ramp_00_WorldGridMaterial.AJ_Ramp_00_WorldGridMaterial_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_Ringscoop_00_MI_ArenaWhite.AJ_Ringscoop_00_MI_ArenaWhite_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/AJ_Sausage_01_MI_ArenaOrange.AJ_Sausage_01_MI_ArenaOrange_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/BaseSplineActor2.BaseSplineActor2_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_04A2A514_MI_ArenaOrange.Boolean_04A2A514_MI_ArenaOrange_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_04A2A514_MI_ArenaWhite.Boolean_04A2A514_MI_ArenaWhite_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_1459EA0F_MI_ArenaWhite.Boolean_1459EA0F_MI_ArenaWhite_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_52A10C51_MI_ArenaWhite.Boolean_52A10C51_MI_ArenaWhite_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_53D127A7_WorldGridMaterial_MI_ArenaOrange.Boolean_53D127A7_WorldGridMaterial_MI_ArenaOrange_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_631C696A_WorldGridMaterial_MI_ArenaWhite.Boolean_631C696A_WorldGridMaterial_MI_ArenaWhite_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_7DFF2134_MI_ArenaOrange.Boolean_7DFF2134_MI_ArenaOrange_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_B6FBEE07_MI_ArenaOrange.Boolean_B6FBEE07_MI_ArenaOrange_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_D12E18D1_MI_ArenaWhite.Boolean_D12E18D1_MI_ArenaWhite_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_Merge_2B91702A_MI_ArenaOrange.Boolean_Merge_2B91702A_MI_ArenaOrange_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_Merge_2B91702A_MI_ArenaYellow.Boolean_Merge_2B91702A_MI_ArenaYellow_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Boolean_Merge_2B91702A_MI_InteriorLight2.Boolean_Merge_2B91702A_MI_InteriorLight2_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Box_005FE104_WorldGridMaterial.Box_005FE104_WorldGridMaterial_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Box_9379DB4B_MI_ArenaAluminum.Box_9379DB4B_MI_ArenaAluminum_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Box_9379DB4B_M_TechSubtle.Box_9379DB4B_M_TechSubtle_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Box_9379DB4B_WorldGridMaterial.Box_9379DB4B_WorldGridMaterial_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Merge_C6C6700A_MI_ArenaYellow.Merge_C6C6700A_MI_ArenaYellow_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ13/Mirror_E8D8C4F0_MI_ArenaAluminum.Mirror_E8D8C4F0_MI_ArenaAluminum_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ_Ramp_00_M_BaseSurface_Metal.AJ_Ramp_00_M_BaseSurface_Metal_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/AJ_Ramp_00_Merge_FDB4E64F_M_BaseSurface_Metal.AJ_Ramp_00_Merge_FDB4E64F_M_BaseSurface_Metal_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Boolean_1C6BD50B_MI_Pipes.Boolean_1C6BD50B_MI_Pipes_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Boolean_3024C8A1_MI_ArenaWhite.Boolean_3024C8A1_MI_ArenaWhite_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Boolean_3024C8A1_MI_ArenaYellow.Boolean_3024C8A1_MI_ArenaYellow_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Boolean_84A9059E_MI_ArenaGreen_MI_ArenaGreen.Boolean_84A9059E_MI_ArenaGreen_MI_ArenaGreen_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Boolean_84A9059E_MI_ArenaRed_MI_ArenaRed.Boolean_84A9059E_MI_ArenaRed_MI_ArenaRed_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Boolean_84A9059E_MI_ArenaWhite_MI_ArenaWhite.Boolean_84A9059E_MI_ArenaWhite_MI_ArenaWhite_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Boolean_84A9059E_MI_ArenaYellow_MI_ArenaYellow.Boolean_84A9059E_MI_ArenaYellow_MI_ArenaYellow_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Box_A3F21BC8.Box_A3F21BC8_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Box_AA156F14_MI_ArenaAluminum.Box_AA156F14_MI_ArenaAluminum_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Box_AA156F14_MI_ArenaOrange.Box_AA156F14_MI_ArenaOrange_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Box_AA156F14_M_BaseSurface_Metal.Box_AA156F14_M_BaseSurface_Metal_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Box_AA156F14_WorldGridMaterial.Box_AA156F14_WorldGridMaterial_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Cylinder_3071E2C2_MI_ArenaYellow.Cylinder_3071E2C2_MI_ArenaYellow_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Cylinder_3071E2C2_MI_Pipes.Cylinder_3071E2C2_MI_Pipes_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Cylinder_4B40C9CF_MI_ArenaBlue.Cylinder_4B40C9CF_MI_ArenaBlue_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/AutoGeneratedBallestPieces/Cylinder_4B40C9CF_MI_ArenaYellow.Cylinder_4B40C9CF_MI_ArenaYellow_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Bowl_RingScoop.BP_Bowl_RingScoop_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Bowl_Shallow.BP_Bowl_Shallow_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Misc_Pinched1.BP_Misc_Pinched1_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_PieceTest.BP_PieceTest_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Half1.BP_Pipe_Half1_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Half_Large1.BP_Pipe_Half_Large1_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Half_Tiny1.BP_Pipe_Half_Tiny1_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Quarter_Large.BP_Pipe_Quarter_Large_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Quarter_Small.BP_Pipe_Quarter_Small_C",
+      "slots": 2
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Quarter_Straight.BP_Pipe_Quarter_Straight_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Pipe_Tube1.BP_Pipe_Tube1_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cylinder.BP_Prim_Cylinder_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Sphere.BP_Prim_Sphere_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve1.BP_Ramp_Curve1_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve2.BP_Ramp_Curve2_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve_Long1.BP_Ramp_Curve_Long1_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve_Long2.BP_Ramp_Curve_Long2_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve_Short1.BP_Ramp_Curve_Short1_C",
+      "slots": 2
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Curve_Short2.BP_Ramp_Curve_Short2_C",
+      "slots": 2
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Kicker1.BP_Ramp_Kicker1_C",
+      "slots": 2
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Kicker1_Short.BP_Ramp_Kicker1_Short_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Kicker2.BP_Ramp_Kicker2_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Kicker2_Short.BP_Ramp_Kicker2_Short_C",
+      "slots": 2
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveDown.BP_Ramp_Round_CurveDown_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Ramp_Round_CurveUp.BP_Ramp_Round_CurveUp_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Curve1.BP_Track_Curve1_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Curve_Large1.BP_Track_Curve_Large1_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Curve_Tiny1.BP_Track_Curve_Tiny1_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Long1.BP_Track_Long1_C",
+      "slots": 2
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Mid1.BP_Track_Mid1_C",
+      "slots": 2
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Round_Curve.BP_Track_Round_Curve_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Round_Straight.BP_Track_Round_Straight_C",
+      "slots": 1
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Track_Short1.BP_Track_Short1_C",
+      "slots": 2
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_Branch.BP_Bevel_Full_Branch_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_Cap.BP_Bevel_Full_Cap_C",
+      "slots": 3
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_HalfRing.BP_Bevel_Full_HalfRing_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_HalfRingKicker.BP_Bevel_Full_HalfRingKicker_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_Kicker.BP_Bevel_Full_Kicker_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_MediumScoop.BP_Bevel_Full_MediumScoop_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_Ring.BP_Bevel_Full_Ring_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_RingScoop.BP_Bevel_Full_RingScoop_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_ShallowKicker.BP_Bevel_Full_ShallowKicker_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/Bevel/BP_Bevel_Full_ShallowScoop.BP_Bevel_Full_ShallowScoop_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_Bump.BP_Bump_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_Cube.BP_Cube_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_CubePrePlac.BP_CubePrePlac_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_LeftArm.BP_LeftArm_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_OneCubeTwoColor.BP_OneCubeTwoColor_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_Ramp.BP_Ramp_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_RightArm.BP_RightArm_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_Stairs.BP_Stairs_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_TwoCubeOneColor.BP_TwoCubeOneColor_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/RandomObjects/BP_TwoCubeTwoColor.BP_TwoCubeTwoColor_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Structures/BP_Floor.BP_Floor_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/Structures/BP_Wall.BP_Wall_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/MapItems/Decals/BP_UGCCircuitDecal.BP_UGCCircuitDecal_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/MapItems/Decals/BP_UGCShapeDecal.BP_UGCShapeDecal_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/MapItems/PlayerStart/MP_PlayerStart.MP_PlayerStart_C",
+      "slots": 0
+    },
+    {
+      "classPath": "/Game/Maps/JacksonMaps/_GENERATED/jack/Special/BaseSplineActor.BaseSplineActor_C",
+      "slots": 0
+    }
+  ]
+}

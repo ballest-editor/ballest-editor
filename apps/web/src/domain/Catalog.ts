@@ -94,6 +94,8 @@ export class CatalogPiece extends Schema.Opaque<CatalogPiece>()(open({
   meshAssetPath: Schema.NullOr(Schema.String),
   glb: NullableString,
   materialSlots: Schema.Array(CatalogMaterialSlot),
+  /** Whether the game's Paint panel lists the piece (`bCanChangeMaterial`); older catalogs leave it out. */
+  paintable: Schema.optionalKey(Schema.Boolean),
   bounds: NullableBounds,
   seenInSamples: Schema.optionalKey(Schema.Int),
   mainRelativeTransform: Schema.optionalKey(Schema.NullOr(MainRelativeTransform)),

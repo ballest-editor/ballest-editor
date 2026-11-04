@@ -18,8 +18,8 @@ import { fileOf, projectName, refreshProject, revealIn, saveTabPrefs } from "./s
  * lands there even when another tab is active by then).
  */
 const exportOpenMap = Effect.gen(function*() {
-  const { doc, tabId } = useEditor.getState()
-  const result = yield* (yield* MapExporter).prepare(doc.map)
+  const { catalogIndex, doc, tabId } = useEditor.getState()
+  const result = yield* (yield* MapExporter).prepare(doc.map, catalogIndex)
   return { doc, tabId, result }
 })
 
@@ -172,9 +172,9 @@ export const renameOpenMap = (displayName: string, creatorName: string) => {
  */
 export const duplicateMapEffect = Effect.fn("duplicateMapEffect")(
   function*(displayName: string, creatorName: string, replace = false, newDraft = false) {
-    const { doc, file, tabId } = useEditor.getState()
+    const { catalogIndex, doc, file, tabId } = useEditor.getState()
     const named = setLevelNames(doc.map, displayName, creatorName)
-    const result = yield* (yield* MapExporter).prepare(newDraft ? asNewDraft(named) : named)
+    const result = yield* (yield* MapExporter).prepare(newDraft ? asNewDraft(named) : named, catalogIndex)
     const created = yield* createAsOpenMap({ doc, tabId, result }, replace)
     const from = file === null ? "" : ` from ${mapLabelOf(file.name)}`
     const over = replace ? " (the map it replaced went to the backups)" : ""

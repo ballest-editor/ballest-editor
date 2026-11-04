@@ -1,4 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
+import { Schema } from "effect"
+import { Catalog, type CatalogIndex, indexCatalog } from "./Catalog"
 import { addItem } from "./edits"
 import { defaultEditorState, identityTransform, newMapFile, playerStartItem } from "./factory"
 import { gameLoadProblems, isNormalizedRotation, LIMITS } from "./limits"
@@ -14,7 +16,40 @@ const withRotation = (item: Item, rotation: Item["itemTransform"]["rotation"]): 
   itemTransform: { ...identityTransform(), rotation }
 })
 
+const MESH = "/Game/X/SM_X.SM_X"
+const BAKE = "/Game/LevelEditor/Mirror/Meshes/SM_Mirror_1.SM_Mirror_1"
+const catalog: CatalogIndex = {
+  ...indexCatalog(
+    Schema.decodeSync(Catalog)({
+      pieces: [],
+      meshes: [{
+        meshAssetPath: MESH,
+        materialSlots: [{ index: 0, defaultMaterial: "/Game/A.A" }, { index: 1, defaultMaterial: "/Game/B.B" }]
+      }]
+    })
+  ),
+  mirrorSources: new Map([[BAKE, MESH]])
+}
+const withSlots = (meshAssetPath: string, slots: ReadonlyArray<number>): Item => ({
+  ...plain(),
+  meshComponents: [{
+    meshComponentTag: "SKGMapEditor",
+    meshAssetPath,
+    materials: slots.map((materialIndex) => ({ material: "/Game/A.A", materialIndex })),
+    materialAssetPaths: []
+  }]
+})
+
 describe("game load rules", () => {
+  it("rejects a material past the mesh's last slot, when the catalog knows the mesh", () => {
+    const load = (item: Item, index: CatalogIndex | null = catalog) => gameLoadProblems(addItem(fresh(), item), index)
+    assert.deepStrictEqual(load(withSlots(MESH, [0, 1])), [])
+    assert.deepStrictEqual(load(withSlots(MESH, [0, 1, 2])), ["Item 2 sets material slot 3, but its mesh has 2."])
+    assert.deepStrictEqual(load(withSlots(BAKE, [2])), ["Item 2 sets material slot 3, but its mesh has 2."])
+    assert.deepStrictEqual(load(withSlots("/Game/Y/SM_Y.SM_Y", [7])), [])
+    assert.deepStrictEqual(load(withSlots(MESH, [7]), null), [])
+  })
+
   it("accepts a fresh map", () => {
     assert.deepStrictEqual(gameLoadProblems(fresh()), [])
   })
