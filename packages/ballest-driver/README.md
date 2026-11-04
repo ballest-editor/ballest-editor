@@ -3,7 +3,7 @@
 A plugin for the [Ballest plugin manager](https://anythinggoes-ballest.github.io/ballest-plugin-manager/) that
 `tools/driver` installs into its sandboxed copies of the game, never into a player's game. It does what the host's
 test channel has no command for, through the script API: `Editor::SpawnPieces`, `SetLocation`, `SetRotation`,
-`Select`, `Undo`, `Redo`, `Camera::Set`, `Camera::Project`, `Hud::HideEditor`.
+`Select`, `Selection`, `Undo`, `Redo`, `Camera::Set`, `Camera::Project`, `Hud::HideEditor`.
 
 The driver writes `command.json` into the plugin's folder (each slot has a plugins folder of its own, so a command
 reaches one copy):

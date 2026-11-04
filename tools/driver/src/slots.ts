@@ -1,9 +1,12 @@
 import { Context, Effect, FileSystem, Layer, Path, Schema } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { spawn } from "node:child_process"
+import { openSync } from "node:fs"
 import { hostVersion, isReady, type SandboxState, sandboxState, tail } from "./hostLog.ts"
-import { DriverPaths, savedIn, type SlotPaths, slotPaths } from "./paths.ts"
+import { APP_ID, DriverPaths, savedIn, type SlotPaths, slotPaths } from "./paths.ts"
 import { environMarker, GAME_USER_SETTINGS, gameArgs, launchEnv, type SlotMode, withVersionOverride } from "./prefix.ts"
+import { PROBE_FILE, probeMap } from "./probe.ts"
+import { STEAM_NOT_RUNNING, steamRunning } from "./steam.ts"
 
 export class DriverError extends Schema.TaggedError<DriverError>()("DriverError", {
   message: Schema.String
@@ -17,6 +20,8 @@ export const io = <A>(effect: Effect.Effect<A, unknown>, what: string) =>
 
 export interface SlotStatus {
   readonly slot: number
+  /** Whether the Steam client is running; no slot starts without it. */
+  readonly steam: boolean
   readonly running: boolean
   readonly ready: boolean
   readonly sandbox: SandboxState
@@ -88,6 +93,7 @@ export class Slots extends Context.Service<Slots, {
       const running = (yield* processes(slot)).length > 0
       return {
         slot: n,
+        steam: yield* steamRunning(fs),
         running,
         ready: running && isReady(log),
         sandbox: sandboxState(log),
@@ -149,6 +155,9 @@ export class Slots extends Context.Service<Slots, {
       yield* rsync(driver.gamePlugins, slot.plugins, ["DISABLED"])
       yield* io(fs.makeDirectory(path.dirname(slot.settings), { recursive: true }), "creating the config folder")
       yield* io(fs.writeFileString(slot.settings, GAME_USER_SETTINGS), "writing the settings")
+      // The probe map, empty: the game lists maps at launch, so it has to exist now for probes to open it later.
+      yield* io(fs.makeDirectory(slot.maps, { recursive: true }), "creating the maps folder")
+      yield* io(fs.writeFileString(path.join(slot.maps, PROBE_FILE), probeMap([])), "writing the probe map")
     })
 
     const start = Effect.fn("Slots.start")(function*(n: number, mode: SlotMode) {
@@ -157,6 +166,8 @@ export class Slots extends Context.Service<Slots, {
         return yield* fail(`no game copy at ${driver.game}: run setup first`)
       }
       if ((yield* processes(slot)).length > 0) return yield* fail(`slot ${n} is already running (stop it first)`)
+      // Checked before anything is touched: the launcher only forwards a steam://run request when Steam is closed.
+      if (!(yield* steamRunning(fs))) return yield* fail(STEAM_NOT_RUNNING)
       yield* prepare(slot)
       yield* io(fs.remove(slot.hostLog, { force: true }), "clearing the old log")
       const launcher = path.join(driver.game, "Ballest.exe")
@@ -168,10 +179,12 @@ export class Slots extends Context.Service<Slots, {
       }
       const pid = yield* Effect.try({
         try: () => {
+          // umu's and Proton's own output; the game's log is in the prefix (steam-<app id>.log).
+          const launchLog = openSync(slot.launchLog, "w")
           const child = spawn(driver.umu, [launcher, ...gameArgs(mode)], {
             env,
             detached: true,
-            stdio: ["ignore", "ignore", "ignore"],
+            stdio: ["ignore", launchLog, launchLog],
             cwd: driver.game
           })
           child.unref()
@@ -193,7 +206,9 @@ export class Slots extends Context.Service<Slots, {
         const log = yield* readLog(slot)
         if (isReady(log)) break
         if ((yield* processes(slot)).length === 0 && Date.now() - started > 20_000) {
-          return yield* fail(`slot ${n} exited before the menu; see ${slot.launchLog} and ${slot.hostLog}`)
+          return yield* fail(
+            `slot ${n} exited before the menu; see ${slot.launchLog}, ${slot.dir}/steam-${APP_ID}.log and ${slot.hostLog}`
+          )
         }
       }
       yield* Effect.sleep("3 seconds")

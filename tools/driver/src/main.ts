@@ -6,13 +6,15 @@ import { Console, Effect, Layer, Option } from "effect"
 import { McpProtocol, McpServer } from "effect/ai"
 import { Argument, Command, Flag } from "effect/cli"
 import { Channel } from "./channel.ts"
+import { Handler } from "./handler.ts"
 import { Plugin } from "./plugin.ts"
+import { Probe } from "./probeMap.ts"
 import { Slots } from "./slots.ts"
 import { DriverToolkit, DriverToolsLayer } from "./tools.ts"
 
 const VERSION = "0.1.0"
 
-const services = Layer.mergeAll(Channel.layer, Plugin.layer, Slots.layer)
+const services = Layer.mergeAll(Channel.layer, Plugin.layer, Handler.layer, Probe.layer, Slots.layer)
 
 const serve = Command.make("serve", {}, () =>
   Layer.launch(
@@ -23,7 +25,7 @@ const serve = Command.make("serve", {}, () =>
         name: "ballest-driver",
         version: VERSION,
         instructions:
-          "Runs sandboxed copies of Ballest of Them All headless under Proton and drives them through the plugin manager's test channel. Start with slot_start, look with render and state, drive the editor with open_map, tap, gamekey and command, read the game's types with types_dump, and probe the map format with map_write, open_map and map_read.",
+          "Runs sandboxed copies of Ballest of Them All headless under Proton and drives them through the plugin manager's test channel. Slots need the Steam client running: when slot_status says steam is false or slot_start says Steam isn't running, never start Steam yourself; ask the user to start it and to say when it is running. Start with slot_start, look with render and state, drive the editor with open_map, tap, gamekey and command, read the game's types with types_dump, and probe the map format with map_write, open_map and map_read.",
         protocols: [McpProtocol.v2025_06_18, McpProtocol.v2025_03_26, McpProtocol.v2024_11_05]
       }))
     )

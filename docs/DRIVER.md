@@ -124,6 +124,64 @@ answers with `Log::Info` lines the driver reads from `host.log`, the same way it
 calls work in any game, sandboxed or not, because the script API is what plugins are for. It uses no `Console::Run`,
 so it could be listed in the registry if that is ever useful; it is not needed for the editor's users.
 
+### Pivots and the gizmo
+
+The game gives each piece a default gizmo position, and the app copies it (docs/FORMAT.md § Pivots), so where the
+gizmo sits is a thing to check as much as how the piece looks. Measured on this build: the editor pawn's handler
+(`SKGMLEHandlerComponent`, reached with the test channel's `callx` on the instance under `PersistentLevel`) has
+`GetSelectionPivotChoice`, `SetSelectionPivot` (the inspector's buttons: `ESKGMLEEditorPivot` Default 0, Center 1,
+Bottom 2, Top 3, Left 4, Right 5, Back 6, Front 7, WorldOrigin 8) and `GetSelectionTransform`, the gizmo's transform
+as a 96-byte FTransform of which the host reports the first 64 bytes (quaternion and translation, not the scale).
+The gizmo and the selection outline render whenever a piece is selected, with the editor's panels hidden too, so a
+render with the gizmo is a render with the piece selected, and a clean one has nothing selected.
+
+That gives a measurement for free: the Center, Bottom, Top, Left, Right, Back and Front pivots put the gizmo at the
+centre of the piece's mesh bounds and the centres of its six faces, in the world. On the ramp `BP_Ramp_Curve_Short1`
+they matched the catalog's bounds to the millimetre. For a piece that isn't turned, the box around those points is
+its mesh bounds; `editor_measure` reports the points and the box and puts the piece's own pivot choice and the
+selection back, since the choice stays with the piece (it is what the map saves in `editorState.pivots`).
+
+`piece_views` is the piece evaluation flow for a piece of the open map, and `piece_turntable` the same from nothing
+but a class path (§ Probe maps): measure, select the piece (or nothing, for a clean render),
+set the pivot to show (the piece's own by default, since that is the game's choice for it; Center standardises it),
+hide the panels, frame the camera from the measured bounds for each standard view (front, back, left and right as elevations level
+with the piece, so heights read off them; top and bottom as plans; front-left and back-right raised: fixed names
+and directions, so renders of two pieces or two game versions line up),
+render each, then release the camera, show the panels and put the pivot and the selection back. It returns the
+measurement, the gizmo's transform and the PNGs; what the pictures show is the agent's to judge.
+
+### Probe maps
+
+Every slot has one probe map, `Map_LevelEditorMain&driver probe_driver.balledit` in its `UserSavedMaps`, written
+empty (the start alone) at every start: the game lists maps at launch, but reads a map's file when it is opened
+from the Create page, so the file can be overwritten with any pieces and opened again without a restart. Measured:
+`levelData.userLevelName` has to match the file's name, or the game opens whichever map has that name. From inside
+the editor the route is `open Map_MainMenu`, then `openmap driver probe` once the Create page's entries exist
+(about 10 s in all). `probe_map` does that for a list of pieces; `piece_turntable` opens the map with one piece at
+(0, 0, 5000), well above the arena's water at z 0, measures it, builds a studio and a ruler if asked (six primitive
+cubes at scale 30 around the piece, so every view has a plain tiled wall behind it instead of the arena, and a
+100 cm cube at its near corner for texture scale), takes the views, and writes the empty probe back. Nothing is
+saved unless the editor saves; the next probe overwrites the file anyway.
+
+### The UI as data
+
+The host's `state` lists only its own UI, so two test commands were added to the host (the fork's `ui-dump` branch,
+on top of PR #28): `widgets <Class> [filter] [depth]` walks a user widget's tree and writes one line a widget (class,
+name, visibility, enabled, a text block's or box's text, a check box's state, a combo's choice, a palette tile's
+piece class), and `palette` reads the content browser as the game builds it: `W_Categories_C` holds one
+`W_CategoryItems_C` per category in panel order, each with its FName, its header and the data asset behind it,
+`PDA_MapItem_C`, whose `Items` are `S_Item` structs of name, thumbnail and class. Those fourteen data assets under
+`/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/UI/Data/ContentBrowser/` are the game's catalog; they are in
+the paks, so `tools/extract` could read them offline too.
+
+`palette_dump` returns that, and `palette_diff` compares it with `assets/catalog.json` by class path: measured on
+0.4.1, the two match exactly, 140 pieces in 14 categories. `ui_widgets` returns a widget tree (`W_Details_C` for the
+details panel, `W_MapEditor_C` for the whole editor). `editor_action` runs one of the details panel's own functions
+on the selection (`FlipSelectionX`, `ChooseCenter`, `SetSelectionMirrored`, `ChooseSurface`: what its buttons call)
+with a snapshot before and after: the selected pieces, the pivot and gizmo, the first selected piece's mirror and
+surface flags, and the panel's controls. Measured: Flip X toggles the piece's `bMirrorX` and leaves its transform
+alone, which is what the app's mirror handling assumes (docs/FORMAT.md § Mirrors).
+
 ### What the headless modes do and do not give
 
 - `-RenderOffscreen` (measured): no window, real frames through `render`, the host's `tap` and `gamekey` for input.

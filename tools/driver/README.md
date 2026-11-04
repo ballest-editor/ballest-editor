@@ -6,14 +6,17 @@ is how to run it.
 
 ## Needs
 
-- Linux with Steam running, the game installed and started once (its Proton prefix exists), Proton Experimental,
-  and `umu-run` (the [umu launcher](https://github.com/Open-Wine-Components/umu-launcher)).
+- Linux with Steam running. `slot_start` refuses to start a copy while Steam is closed, and an agent must not start
+  Steam either (the tools say so): it asks the user to start it and to confirm when it is running. A copy that started
+  Steam would leave Steam with the copy's environment.
+- The game installed and started once (its Proton prefix exists), Proton Experimental, and `umu-run` (the [umu launcher](https://github.com/Open-Wine-Components/umu-launcher)).
 - The [plugin manager](https://github.com/AnythingGoes-ballest/ballest-plugin-manager) host in the game, with the
   Wine override that makes it load (`WINEDLLOVERRIDES="version=n,b"` in the launch options, or
   `"version"="native,builtin"` in the prefix's `user.reg`). Until upstream carries
-  [PR #28](https://github.com/AnythingGoes-ballest/ballest-plugin-manager/pull/28), the host has to be built from that
-  branch: without it a sandboxed copy deadlocks at start, and without its interface fix the sandbox stays incomplete
-  and refuses every command that changes the game.
+  [PR #28](https://github.com/AnythingGoes-ballest/ballest-plugin-manager/pull/28), the host has to be built from the
+  fork's `ui-dump` branch (PR #28's fixes plus the `widgets` and `palette` test commands the UI tools use): without
+  the fixes a sandboxed copy deadlocks at start, and without the interface fix the sandbox stays incomplete and
+  refuses every command that changes the game.
 - `rsync`.
 
 ## Running it
@@ -46,7 +49,7 @@ Each prefix has its own wineserver, so copies run beside each other and beside t
 | Tool                                                                                     | Does                                                                                                                                                                                                                                            |
 | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `slot_start {slot, mode}`                                                                | Starts a slot (`headless`, the default, or `window`) and waits for its menu. Returns its status.                                                                                                                                                |
-| `slot_stop`, `slot_status`, `slot_log`                                                   | What they say. Status includes whether the sandbox is `complete` (commands that change the game need that).                                                                                                                                     |
+| `slot_stop`, `slot_status`, `slot_log`                                                   | What they say. Status includes whether Steam is running (`steam`) and whether the sandbox is `complete` (commands that change the game need that).                                                                                              |
 | `command {slot, command}`                                                                | Any test channel command (`src/host/testchannel.hpp` upstream lists them); its reply lines.                                                                                                                                                     |
 | `state`, `agent_state`                                                                   | What is on screen as the host lists it; the game's state as JSON.                                                                                                                                                                               |
 | `render {name}`                                                                          | A 1280x720 PNG of the frame, headless too. Returns the path; read the file to look.                                                                                                                                                             |
@@ -56,6 +59,9 @@ Each prefix has its own wineserver, so copies run beside each other and beside t
 | `tap`, `gamekey`, `editor_pieces`, `editor_camera`                                       | Thin wrappers over the test commands of the same names (`editorcam` for the camera).                                                                                                                                                            |
 | `editor_spawn`, `editor_pieces_json`, `editor_transform`, `editor_select`, `editor_undo` | Through the driver plugin ([packages/ballest-driver](../../packages/ballest-driver)): pieces placed as the editor pastes them (class paths as the catalog writes them), the map's pieces as JSON, a piece moved or turned, the selection, undo. |
 | `camera_set`, `camera_release`, `hide_editor`, `plugin_call`                             | The plugin's camera (position, pitch, yaw, fov), the editor's panels hidden for a clean render, and any op of the plugin by name.                                                                                                               |
+| `editor_selection`, `editor_pivot {choice?}`                                             | The selected pieces as JSON; the selection's pivot choice and the gizmo's transform (the game's default gizmo position differs by piece), with `choice` setting it first (Default, Center, Bottom, Top, Left, Right, Back, Front, WorldOrigin). |
+| `editor_measure {id}`                                                                    | A piece's origin, bounds centre and six face centres in the world through the pivot choices, and the box around them; the piece's pivot and the selection are put back.                                                                         |
+| `piece_views {id, gizmo?, pivot?, views?, prefix?}`                                      | The evaluation flow in one call (docs/DRIVER.md § Pivots and the gizmo): measures, renders the standard views framed from the bounds with the panels hidden, with the gizmo at the piece's own pivot or the given one, or nothing selected.     |
 
 Replies are the host's own lines. The channel is the file one (a command costs about half a second); the host's
 named pipe isn't reachable from Linux yet (docs/DRIVER.md § Transport).
