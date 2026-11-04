@@ -6,7 +6,8 @@ is how to run it.
 
 ## Needs
 
-- Linux with Steam running, the game installed and started once (its Proton prefix exists), Proton Experimental,
+- Linux with Steam running (`slot_start` refuses to start a copy while it is closed, and never starts Steam itself:
+  a copy that did would leave Steam with the copy's environment), the game installed and started once (its Proton prefix exists), Proton Experimental,
   and `umu-run` (the [umu launcher](https://github.com/Open-Wine-Components/umu-launcher)).
 - The [plugin manager](https://github.com/AnythingGoes-ballest/ballest-plugin-manager) host in the game, with the
   Wine override that makes it load (`WINEDLLOVERRIDES="version=n,b"` in the launch options, or
@@ -46,7 +47,7 @@ Each prefix has its own wineserver, so copies run beside each other and beside t
 | Tool                                                                                     | Does                                                                                                                                                                                                                                            |
 | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `slot_start {slot, mode}`                                                                | Starts a slot (`headless`, the default, or `window`) and waits for its menu. Returns its status.                                                                                                                                                |
-| `slot_stop`, `slot_status`, `slot_log`                                                   | What they say. Status includes whether the sandbox is `complete` (commands that change the game need that).                                                                                                                                     |
+| `slot_stop`, `slot_status`, `slot_log`                                                   | What they say. Status includes whether Steam is running (`steam`) and whether the sandbox is `complete` (commands that change the game need that).                                                                                              |
 | `command {slot, command}`                                                                | Any test channel command (`src/host/testchannel.hpp` upstream lists them); its reply lines.                                                                                                                                                     |
 | `state`, `agent_state`                                                                   | What is on screen as the host lists it; the game's state as JSON.                                                                                                                                                                               |
 | `render {name}`                                                                          | A 1280x720 PNG of the frame, headless too. Returns the path; read the file to look.                                                                                                                                                             |

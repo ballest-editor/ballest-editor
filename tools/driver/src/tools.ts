@@ -12,6 +12,7 @@ const Replies = Schema.Struct({ replies: Schema.Array(Schema.String) })
 const PluginReply = Schema.Struct({ reply: Schema.Unknown })
 const Status = Schema.Struct({
   slot: Schema.Finite,
+  steam: Schema.Boolean,
   running: Schema.Boolean,
   ready: Schema.Boolean,
   sandbox: Schema.Literals(["off", "starting", "incomplete", "complete"]),
@@ -40,9 +41,14 @@ export const DriverToolkit = Toolkit.make(
     { slot: slotParam },
     Schema.Struct({ killed: Schema.Finite })
   ),
-  tool("slot_status", "Whether a slot runs, is at its menu, and its sandbox state, with the host log's last lines.", {
-    slot: slotParam
-  }, Status),
+  tool(
+    "slot_status",
+    "Whether Steam is running (no slot starts without it), whether a slot runs, is at its menu, and its sandbox state, with the host log's last lines.",
+    {
+      slot: slotParam
+    },
+    Status
+  ),
   tool("slot_log", "The last lines of a slot's host.log (the host's and the plugins' log, where test replies go).", {
     slot: slotParam,
     lines: Schema.optional(Schema.Finite)
