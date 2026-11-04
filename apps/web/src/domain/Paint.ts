@@ -3,12 +3,15 @@
  * `assets/materials.json` (tools/extract): finishes (smooth, rough, glossy, ...) in the game's
  * order, each listing its colours and the class-qualified material a map file stores for
  * that choice. A slot's material is one of these, or anything else a map or catalog default
- * carries (which the picker can't show as a choice).
+ * carries (which the picker can't show as a choice). Every paintable piece offers the same
+ * picker on every slot; docs/qa/materials.md has what was measured.
  */
 import { Option, Schema } from "effect"
-import { objectPathOf } from "./MapFile"
+import type { CatalogIndex } from "./Catalog"
+import { type Item, objectPathOf } from "./MapFile"
 import { assetNameOf, type MaterialSpec, NEUTRAL } from "./Materials"
 import { open } from "./schema"
+import { surfaceOf } from "./surface"
 
 const Rgb = Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite])
 
@@ -33,6 +36,57 @@ export const parsePaint = (json: unknown): PaintPicker => {
   return Array.isArray(list) ? list.flatMap((value) => Option.toArray(decodeFinish(value))) : []
 }
 
+/** A selected item, with whatever the caller needs to keep beside it. */
+interface HasItem {
+  readonly item: Item
+}
+
+export interface PaintTargets<T extends HasItem> {
+  /** A selected item has a surface: the game lists no slots at all, for any of the selection. */
+  readonly surfaceLocked: boolean
+  /** The items with slots to paint. A piece the catalog doesn't know keeps its paint editable. */
+  readonly items: ReadonlyArray<T>
+}
+
+/**
+ * An item's off-panel slots: the ones its piece's panel doesn't offer, which a map file can still paint and the game
+ * then draws (docs/qa/materials.md). Undefined when the panel offers the piece's slots itself.
+ */
+export const offPanelSlotsOf = (item: Item, index: CatalogIndex | null): ReadonlySet<number> | undefined => {
+  const piece = index?.pieceByClass.get(item.actorToSpawn)
+  return piece?.paintable === false ? new Set(piece.offPanelPaint) : undefined
+}
+
+/**
+ * What can be painted in a selection: nothing while a selected item has a surface, as the game's panel lists nothing
+ * then (`AreSelectionMaterialSlotsEditable`) and draws the surface over the paint anyway. Otherwise the items whose
+ * piece allows paint, or has off-panel slots.
+ */
+export const paintTargets = <T extends HasItem>(
+  selected: ReadonlyArray<T>,
+  index: CatalogIndex | null
+): PaintTargets<T> =>
+  selected.some(({ item }) => surfaceOf(item) !== 0)
+    ? { surfaceLocked: true, items: [] }
+    : {
+      surfaceLocked: false,
+      items: selected.filter(({ item }) => {
+        const offPanel = offPanelSlotsOf(item, index)
+        return offPanel === undefined || offPanel.size > 0
+      })
+    }
+
+/** Items the panel edits together: the same class, whatever their meshes (a mirrored one saves a baked mesh). */
+export const paintGroups = <T extends HasItem>(items: ReadonlyArray<T>): ReadonlyArray<ReadonlyArray<T>> => {
+  const groups = new Map<string, Array<T>>()
+  for (const entry of items) {
+    const group = groups.get(entry.item.actorToSpawn)
+    if (group === undefined) groups.set(entry.item.actorToSpawn, [entry])
+    else group.push(entry)
+  }
+  return [...groups.values()]
+}
+
 export interface PaintChoice {
   readonly finish: PaintFinish
   readonly color: PaintColor
@@ -50,6 +104,16 @@ export const choiceOf = (picker: PaintPicker, material: string | undefined): Pai
   return all.find(({ color }) => objectPathOf(color.material) === path) ??
     all.find(({ color }) => assetNameOf(color.material) === name)
 }
+
+/** The panel's colour for a slot that isn't on a picker choice: EBallestMaterialColors' first value. */
+const UNSET_COLOR = "Grey"
+
+/**
+ * The colour a change of finish paints: the slot's colour, when the new finish has it. An unpainted slot counts as
+ * Grey, so `special` paints it, and every other finish paints nothing until a colour is picked.
+ */
+export const colorForFinish = (finish: PaintFinish, choice: PaintChoice | undefined): PaintColor | undefined =>
+  finish.colors.find((c) => c.color === (choice?.color.color ?? UNSET_COLOR))
 
 type Linear = readonly [number, number, number]
 

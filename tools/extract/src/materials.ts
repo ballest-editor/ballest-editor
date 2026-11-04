@@ -31,8 +31,16 @@ const readJsonIfExists = Effect.fn("readJsonIfExists")(function*(file: string) {
 // ------------------------------------------------------------------ paint (in-game picker)
 // The level editor's "Paint" panel: MaterialCategories_Library lists PDA_MaterialCategory assets (smooth,
 // rough, ...); each maps EBallestMaterialColors to one material. Category and colour names come from the
-// enums' display names; the map order is the order the game lists them.
+// enums' display names; the map order is the order the game lists them, except as SWATCH_ORDER says.
 const PAINT_LIBRARY = "MaterialCategories_Library"
+// A category asset only saves what differs from the class, so the ordinary finishes get their swatch colours from
+// here; `special` overrides them (docs/qa/materials.md).
+const CATEGORY_DEFAULTS = "Default__PDA_MaterialCategory_C"
+// Measured in game on 0.4.1: `special` lists its swatches in this order, the reverse of its cooked ColorMaterialMap,
+// though GetAvailableColors is a plain Map_Keys. The six other finishes keep the cooked order.
+const SWATCH_ORDER: Readonly<Record<string, ReadonlyArray<string>>> = {
+  special: ["Grey", "Concrete", "Iron", "Copper", "Aluminum"]
+}
 
 interface PaintColor {
   readonly color: string | undefined
@@ -44,7 +52,7 @@ interface PaintCategory {
   readonly colors: ReadonlyArray<PaintColor>
 }
 
-const paintOf = (dump: unknown): Array<PaintCategory> => {
+export const paintOf = (dump: unknown): Array<PaintCategory> => {
   const exports = Object.values(obj(get(dump, "packages")) ?? {}).flatMap(arr)
   const byName = new Map(exports.map((e) => [str(get(e, "Name")), e] as const))
   const enumNames = (name: string) =>
@@ -58,6 +66,18 @@ const paintOf = (dump: unknown): Array<PaintCategory> => {
   const enumKey = (v: unknown) => str(v)?.split("::").pop()
   const library = byName.get(PAINT_LIBRARY)
   if (library === undefined) throw new MaterialsError({ message: `paint: ${PAINT_LIBRARY} not in the dump` })
+  const displayColors = (owner: unknown) =>
+    arr(get(owner, "Properties", "ColorColorMap")).map((kv) => [str(get(kv, "Key")), get(kv, "Value")] as const)
+  const classColors = displayColors(byName.get(CATEGORY_DEFAULTS))
+  const inGameOrder = (name: string | undefined, colors: ReadonlyArray<PaintColor>): ReadonlyArray<PaintColor> => {
+    const order = name === undefined ? undefined : SWATCH_ORDER[name]
+    if (order === undefined) return colors
+    const rank = (c: PaintColor) => (c.color === undefined ? -1 : order.indexOf(c.color))
+    if (colors.some((c) => rank(c) < 0)) {
+      throw new MaterialsError({ message: `paint: ${name} has a colour SWATCH_ORDER doesn't list` })
+    }
+    return [...colors].sort((a, b) => rank(a) - rank(b))
+  }
   return arr(get(library, "Properties", "BallestMaterialCategories")).map((ref) => {
     const asset = byName.get(str(get(ref, "ObjectName"))?.split("'")[1])
     if (asset === undefined) {
@@ -66,25 +86,28 @@ const paintOf = (dump: unknown): Array<PaintCategory> => {
     const p = get(asset, "Properties")
     // An unset byte enum is its first enumerator (MaterialCategory_Smooth stores none).
     const name = categoryNames.get(enumKey(get(p, "MaterialCategory")) ?? "NewEnumerator0")
-    const display = new Map(arr(get(p, "ColorColorMap")).map((kv) => [str(get(kv, "Key")), get(kv, "Value")] as const))
+    const display = new Map([...classColors, ...displayColors(asset)])
     return {
       name,
-      colors: arr(get(p, "ColorMaterialMap")).map((kv) => {
-        const value = get(kv, "Value")
-        const cls = str(get(value, "ObjectName"))?.split("'")[0] ?? ""
-        const shown = display.get(str(get(kv, "Key")))
-        const r = num(get(shown, "R")), gg = num(get(shown, "G")), b = num(get(shown, "B"))
-        const displayColor: [number, number, number] | undefined =
-          r !== undefined && gg !== undefined && b !== undefined
-            ? [r, gg, b]
-            : undefined
-        return {
-          color: colorNames.get(enumKey(get(kv, "Key"))),
-          // class-qualified, as map files store it
-          material: `/Script/Engine.${cls}'${refPath(value)}'`,
-          ...(displayColor === undefined ? {} : { displayColor })
-        }
-      })
+      colors: inGameOrder(
+        name,
+        arr(get(p, "ColorMaterialMap")).map((kv) => {
+          const value = get(kv, "Value")
+          const cls = str(get(value, "ObjectName"))?.split("'")[0] ?? ""
+          const shown = display.get(str(get(kv, "Key")))
+          const r = num(get(shown, "R")), gg = num(get(shown, "G")), b = num(get(shown, "B"))
+          const displayColor: [number, number, number] | undefined =
+            r !== undefined && gg !== undefined && b !== undefined
+              ? [r, gg, b]
+              : undefined
+          return {
+            color: colorNames.get(enumKey(get(kv, "Key"))),
+            // class-qualified, as map files store it
+            material: `/Script/Engine.${cls}'${refPath(value)}'`,
+            ...(displayColor === undefined ? {} : { displayColor })
+          }
+        })
+      )
     }
   })
 }
@@ -317,7 +340,7 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         "approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).",
         "approx.opacity is the evaluated alpha on the face that shows most (a beam masks its caps with 1 - |world normal z|: its sides); approx.upFade (0..1, null = 1) is the fraction left on a face that looks up. An additive pass renders as its evaluated glow (emissive, black base, opacity 1) faded the same way.",
         "approx.programs is the compiled shader's own output math as GLSL functions f(uv, worldNormal, objectPosition, time) with the instance's parameters folded in: alpha (a translucent pass's alpha, e.g. the vent's streaks for any frame via time), glow (the unlit colour of an additive or translucent pass, run beside its alpha; samplers uGlowTexN) and base (an opaque base colour whose texture reads the layers cannot place: coordinates through a cell function, e.g. the rubber block's cells and the paddle's stripe, or a mask in a texture's alpha, e.g. the spinning cylinder's stripes); textures are the samplers the code reads (uTexN).",
-        "paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap).",
+        "paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour the game shows (ColorColorMap: the category's own, else the category class default's).",
         "surfaces are the level editor's item surfaces (EBallestSurfaceAssignment) in the game's order, each with the material the game draws that physics surface with (object path; null for none): UBallestSurfaceMaterialSettings' defaults from the exe, overridden by DefaultGame.ini."
       ],
       materials: records,

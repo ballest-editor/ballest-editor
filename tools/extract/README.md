@@ -128,6 +128,14 @@ Piece = {
   glb                  // path relative to assets/, e.g. "pieces/Maps/_GENERATED/PC/SM_500.glb"
   materialSlots: [{ index, slotName, defaultMaterial, meshMaterial }]
                        // defaultMaterial = component OverrideMaterials[i] ?? mesh slot material
+  paintable            // whether the game's Paint panel lists the piece (in the palette, with bCanChangeMaterial):
+                       // then every one of materialSlots is a row offering the whole `paint` picker of
+                       // materials.json. The Fortnite usmap can't read the light cards' CDOs, so build-catalog.mjs
+                       // lists those four by name.
+                       // src/paint.test.ts checks this against paint-measured.json (the game's panel, per piece)
+  offPanelPaint?       // on pieces that aren't paintable: slots a map file can paint anyway (the game draws and keeps
+                       // them and the map validates). From paint-measured.json `offPanel`, since nothing in the pak
+                       // says which slots survive; docs/qa/materials.md § Off-panel paint
   bounds: { min:[x,y,z], max:[x,y,z] }   // mesh-local, UE cm, from LOD0 vertices
   seenInSamples        // item count across samples/ (0 for classes never sampled)
   meshSource           // "pak" (resolved from the Blueprint) | "samples" (fallback)
@@ -328,10 +336,11 @@ If the root's BaseColor pin isn't connected but EmissiveColor is (`M_Emissive_Li
 **The Paint picker (`paint`).** The level editor's Paint panel (`UI/Details/Material/WBP_CustomizeMaterial`, one row per mesh slot) offers a finish dropdown and a row of colour swatches. Its data:
 
 - `UI/Data/MaterialSelection/MaterialCategories_Library` (a `PDA_MaterialCategories`) lists the finishes in order. Each one is a `PDA_MaterialCategory` under `/Game/Art/DataAssets/BallestMaterials/`.
-- Each category's `ColorMaterialMap` maps an `EBallestMaterialColors` value to a material. `MaterialCategory` is an `EBallestMaterialCategories` value; `MaterialCategory_Smooth` leaves it unset, so it takes the first enumerator, `smooth`. `ColorColorMap` sets an explicit swatch colour, and only `special` uses it.
-- Category and colour names are the enums' display names. The `*_Dark` materials are listed as "Black". `MaterialName` says "emmissive", so the extractor uses the enum's name instead.
+- Each category's `ColorMaterialMap` maps an `EBallestMaterialColors` value to a material. `MaterialCategory` is an `EBallestMaterialCategories` value; `MaterialCategory_Smooth` leaves it unset, so it takes the first enumerator, `smooth`. `ColorColorMap` is the swatch colour: the ordinary finishes inherit it from `Default__PDA_MaterialCategory_C`, and `special` saves its own.
+- The swatches follow `ColorMaterialMap`'s order, except `special`, which the game lists in reverse (`SWATCH_ORDER` in `src/materials.ts`, measured).
+- Category and colour names are the enums' display names. The `*_Dark` materials are listed as "Black". `MaterialName` says "emmissive", and the game's dropdown shows that, so the extractor uses the enum's name instead.
 
-`run.sh` dumps both directories to `paint-dump.json`. `build-materials.mjs` adds the picker's materials to the list and writes `paint: [{ name, colors: [{ color, material, displayColor? }] }]`, with `material` class-qualified the way map files store it. That's 7 finishes and 66 materials: smooth, rough, glossy, concrete, tiled and emissive in 10 colours each (White, Black, Red, Orange, Yellow, Lime, Blue, SkyBlue, Purple, Wine), and special in 5 (Aluminum, Copper, Iron, Concrete, Grey = `MI_Pipes`). The swatches' preview textures (`ColorPreviewTextureMap`) are empty in the cooked assets.
+`run.sh` dumps both directories to `paint-dump.json`. `build-materials.mjs` adds the picker's materials to the list and writes `paint: [{ name, colors: [{ color, material, displayColor? }] }]`, with `material` class-qualified the way map files store it. That's 7 finishes and 65 materials: smooth, rough, glossy, concrete, tiled and emissive in 10 colours each (White, Black, Red, Orange, Yellow, Lime, Blue, SkyBlue, Purple, Wine), and special in 5 (Grey = `MI_Pipes`, Concrete, Iron, Copper, Aluminum). The swatches' preview textures (`ColorPreviewTextureMap`) are empty in the cooked assets.
 
 **Item surfaces (`surfaces`).** 0.4.1 added physics surfaces that the level editor assigns per item (`EBallestSurfaceAssignment`; console `ballest.editor.surface [none|magnet|ice|grippy]`; the enum's `Grass` and `GrippyCards` are "not included in cooked builds"). Each one draws with a material from the native `UBallestSurfaceMaterialSettings`. Its defaults are compiled into the exe, so `src/materials.ts` (`SURFACES`) lists them: magnet `MI_MagnetMachined_PanelTrim`, ice `MI_Surface_Ice`, grippy `MI_Surface_Grippy`. `run.sh` adds `DefaultGame.ini` to the paint dump, and its `[/Script/Ballest.BallestSurfaceMaterialSettings]` overrides apply; 0.4.1 sets `MagnetMaterial` to `MI_MagnetPearlescentNatural_Prototype`. `materials.json` lists `surfaces: [{ name, material }]` in the game's order (none, magnet, ice, grippy), with `material` as an object path, or null for none. How a map file stores an item's surface is not known yet (see `docs/FORMAT.md`).
 

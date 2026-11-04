@@ -210,6 +210,26 @@ const beamOf = (cls, mesh) => {
   }
 }
 
+// Whether the level editor's Paint panel lists a piece. W_ItemsDatas.CreateItemList takes a selected BP_BaseItem only
+// if its bCanChangeMaterial is set, and W_MeshMaterialData.SetMaterialSlots builds no row for a class it can't name
+// from DT_MapItems: the palette. BP_BaseItem's CDO sets the flag, so the classes that lock their paint are the ones
+// whose CDO saves it false; a null default means the class left it alone. Without the variable it isn't a BP_BaseItem.
+// The light cards save it false too, but past LightCardVisualContract, a native struct the Fortnite usmap doesn't
+// have, so their CDOs stop reading before it; the game's own usmap (tools/driver types_dump) shows it. Those four are
+// the only classes the two usmaps disagree on.
+const PAINT_LOCKED_PAST_NATIVE = new Set(["MP_LightCard_01", "MP_LightCard_02", "MP_LightCard_03", "MP_LightCard_04"])
+const paintableOf = (cls, className, inPalette) => {
+  const variable = cls?.levelEditorProperties?.variables?.find((v) => v.name === "bCanChangeMaterial")
+  return inPalette && variable !== undefined && variable.default !== false && !PAINT_LOCKED_PAST_NATIVE.has(className)
+}
+
+// Slots of the pieces above that a map file can paint anyway. Only playing the map shows which: the game overwrites
+// some slots and never draws others, so the table is measured (docs/qa/materials.md).
+const offPanelPaint = new Map(
+  JSON.parse(readFileSync(join(import.meta.dirname, "paint-measured.json"), "utf8")).pieces
+    .flatMap((p) => (p.offPanel === undefined ? [] : [[p.classPath, p.offPanel]]))
+)
+
 const pieces = []
 const unresolved = []
 const registry = JSON.parse(readFileSync(join(assets, "registry.json"), "utf8"))
@@ -250,6 +270,8 @@ for (const o of pieceOrder(registry)) {
     meshAssetPath,
     glb: glbPath(mesh),
     materialSlots: meshAssetPath ? slotsFor(meshAssetPath, main?.overrideMaterials) : [],
+    paintable: paintableOf(cls, s.className.replace(/_C$/, ""), !!o.category),
+    ...(offPanelPaint.has(s.objectPath) ? { offPanelPaint: offPanelPaint.get(s.objectPath) } : {}),
     bounds: mesh?.bounds ?? null,
     seenInSamples: s.seenInSamples,
     meshSource: main ? "pak" : sampleMesh ? "samples" : null,

@@ -2,7 +2,9 @@
  * What the game's loader rejects (docs/FORMAT.md, "Hard limits" and "Load-time validation").
  * One bad item makes the game discard the whole map, so exports are checked up front.
  */
+import type { CatalogIndex } from "./Catalog"
 import { isPlayerStart, type Item, type MapFile } from "./MapFile"
+import { sourceMeshOf } from "./mirror"
 
 /** Constants recovered from the shipping exe (build 0.4.0-playtest). */
 export const LIMITS = {
@@ -27,8 +29,24 @@ export const isNormalizedRotation = (
   q: { readonly x: number; readonly y: number; readonly z: number; readonly w: number }
 ): boolean => Math.abs(1 - (q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w)) < QUAT_NORMALIZED_THRESHOLD
 
-const itemProblems = (item: Item, index: number): Array<string> => {
-  const out: Array<string> = []
+/**
+ * A material entry past its mesh's last slot makes the game discard the map (measured on 0.4.1: one past the end is
+ * enough). Meshes the catalog doesn't know aren't checked.
+ */
+const slotProblems = (item: Item, index: number, catalog: CatalogIndex | null): Array<string> =>
+  item.meshComponents.flatMap(({ materials, meshAssetPath }) => {
+    const known = meshAssetPath === undefined
+      ? undefined
+      : catalog?.meshes.get(sourceMeshOf(catalog, meshAssetPath))?.slotDefaults.length
+    if (known === undefined || known === 0) return []
+    const past = materials.find((m) => m.materialIndex >= known)
+    return past === undefined
+      ? []
+      : [`Item ${index} sets material slot ${past.materialIndex + 1}, but its mesh has ${known}.`]
+  })
+
+const itemProblems = (item: Item, index: number, catalog: CatalogIndex | null): Array<string> => {
+  const out: Array<string> = slotProblems(item, index, catalog)
   if (!isNormalizedRotation(item.itemTransform.rotation)) out.push(`Item ${index} has a non-normalized rotation.`)
   if (item.meshComponents.length > LIMITS.meshComponentsPerItem) {
     out.push(
@@ -69,9 +87,10 @@ const editorStateProblems = (map: MapFile): Array<string> => {
 
 /**
  * Everything that would make the game reject `map`, as user-facing sentences; empty when
- * the map is loadable. Finite transforms are already guaranteed by the schema.
+ * the map is loadable. Finite transforms are already guaranteed by the schema. Material slots
+ * are only checked with a catalog.
  */
-export const gameLoadProblems = (map: MapFile): ReadonlyArray<string> => {
+export const gameLoadProblems = (map: MapFile, catalog: CatalogIndex | null = null): ReadonlyArray<string> => {
   const out: Array<string> = []
   const playerStarts = map.items.filter(isPlayerStart).length
   if (playerStarts !== 1) out.push(`The game needs exactly one MP_PlayerStart; this map has ${playerStarts}.`)
@@ -79,6 +98,6 @@ export const gameLoadProblems = (map: MapFile): ReadonlyArray<string> => {
   if (map.items.length > LIMITS.itemsPerLevel) {
     out.push(`The map has ${map.items.length} items (maximum ${LIMITS.itemsPerLevel}).`)
   }
-  map.items.forEach((item, index) => out.push(...itemProblems(item, index)))
+  map.items.forEach((item, index) => out.push(...itemProblems(item, index, catalog)))
   return out
 }
