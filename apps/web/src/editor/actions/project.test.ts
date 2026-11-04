@@ -87,7 +87,7 @@ describe("import actions", () => {
       yield* reset
       yield* importFrom(disk, inGame)
       const error = yield* Effect.flip(saveMapFile)
-      assert.match(error.message, /same mesh component twice/)
+      assert.match(error.message, /BP_TwoCubeOneColor with mesh components/)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 

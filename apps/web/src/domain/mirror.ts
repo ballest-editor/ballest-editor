@@ -63,6 +63,9 @@ const swapsMaterials = (item: Item, index: CatalogIndex): boolean =>
 export const mirrorScaleOf = (item: Item, index: CatalogIndex | null): Tuple3 | undefined => {
   const { x, y } = mirrorFlagsOf(item)
   if (!x && !y) return undefined
+  // Nothing saved to bake: the game flips the actor it built from the class (measured on the two-cube classes and the
+  // orange sign, which only load this way).
+  if (item.meshComponents.length === 0) return [x ? -1 : 1, y ? -1 : 1, 1]
   const path = mainComponent(item)?.meshAssetPath
   if (path === undefined || index === null || swapsMaterials(item, index)) return undefined
   const source = sourceMeshOf(index, path)

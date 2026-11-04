@@ -7,6 +7,7 @@ import { mapFileNameOf, NAME_RULE, SYSTEM_LEVEL_NAME, userLevelNameOf } from "@b
 import { DateTime, Effect } from "effect"
 import type { CatalogPiece } from "./Catalog"
 import type { Vec3 } from "./coords"
+import { refusesMeshComponents } from "./gameRules"
 import { defaultProperties } from "./itemProperties"
 import { DEFAULT_GOAL, DEFAULT_PLAYER_START } from "./level"
 import {
@@ -129,12 +130,13 @@ const placedProperties = (piece: CatalogPiece): Pick<Item, PropertyList> => {
 /**
  * An item exactly as the in-game editor writes a freshly placed piece. Pieces whose Main
  * component has no mesh (air vent, checkpoint strip) get the empty mesh component the
- * game writes for them, and every exposed property is written at its placement default.
+ * game writes for them, and every exposed property is written at its placement default. The classes the game only
+ * reloads without components get none, unlike its own saves: it draws them from the class.
  */
 export const itemFromPiece = (piece: CatalogPiece, transform: ItemTransform): Item => ({
   actorToSpawn: piece.classPath,
   itemTransform: transform,
-  meshComponents: [
+  meshComponents: refusesMeshComponents(piece.classPath) ? [] : [
     piece.meshAssetPath === null
       ? meshComponentFor("", [])
       : meshComponentFor(

@@ -33,6 +33,13 @@ const catalog = Schema.decodeUnknownSync(Catalog)({
       meshAssetPath: null,
       materialSlots: [],
       extraMeshes: [extra("Aura", GLOW)]
+    },
+    {
+      classPath: "/Game/TwoCubes.TwoCubes_C",
+      className: "TwoCubes",
+      meshAssetPath: CUBE,
+      materialSlots: [slot(GLOW)],
+      extraMeshes: [extra("Second", BEAM)]
     }
   ]
 })
@@ -50,6 +57,21 @@ describe("visualsOf", () => {
         GLOW
       ]]
     )
+  })
+
+  it("draws the class's Main mesh for an item with no mesh components, as the game does", () => {
+    const index = indexCatalog(catalog)
+    const [vent, , twoCubes] = catalog.pieces
+    const bare = (piece: typeof twoCubes) => ({ ...itemFromPiece(piece!, identityTransform()), meshComponents: [] })
+    assert.deepStrictEqual(
+      visualsOf(bare(twoCubes), index).map((v) => [v.key, v.mesh?.meshAssetPath, v.slotMaterials]),
+      [
+        ["main", CUBE, [GLOW]],
+        ["x0", CUBE, [BEAM]]
+      ]
+    )
+    // a class with no Main mesh is its extras
+    assert.deepStrictEqual(visualsOf(bare(vent), index).map((v) => v.key), ["x0"])
   })
 })
 

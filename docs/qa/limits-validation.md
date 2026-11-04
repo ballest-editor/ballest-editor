@@ -35,7 +35,7 @@ This is why a file the game refuses is worse than an error. Blocking those files
 - **`domain/gameRules.ts` holds the new rules**, each measured below: classes the catalog lacks or the game no longer ships, unknown, misplaced, repeated and nameless properties, extra mesh components, uncooked meshes, negative and repeated material slots, too many materials or paths, unknown difficulties, `editorState.version`, repeated pivots, unknown pivot choices, group names and frames, and the parser's limits on strings, field names, containers and nesting.
 - **Writing a `.balledit` clears `bIsBaseItem`**, see below.
 
-The rules ran over all 30 samples and 10,017 items. They flag four items, and each is correct. One is the `MP_PinballPaddle` in the 0.4.0 props probe: the class is gone from 0.4.1 and a map with one opens blank. The other three are in `hidden probe 2`, a `BP_TwoCubeOneColor`, a `BP_TwoCubeTwoColor` and an `MP_OrangeSign`. The game saved each with two components under one tag and won't reopen them (`docs/qa/exposed-properties.md`), and the rule against a repeated component catches them. `gameRules.test.ts` keeps this check, plus a case the game accepts for each kind of rule, so a rule that goes too far fails a test.
+The rules ran over all 30 samples and 10,017 items. They flag four items, and each is correct. One is the `MP_PinballPaddle` in the 0.4.0 props probe: the class is gone from 0.4.1 and a map with one opens blank. The other three are in `hidden probe 2`, a `BP_TwoCubeOneColor`, a `BP_TwoCubeTwoColor` and an `MP_OrangeSign`. The game saved each with two components under one tag and won't reopen them (`docs/qa/exposed-properties.md`), and the rule against any component on those classes catches them. `gameRules.test.ts` keeps this check, plus a case the game accepts for each kind of rule, so a rule that goes too far fails a test.
 
 ## Limits
 
@@ -255,7 +255,7 @@ These are files we still let through.
 
 - **A material that isn't cooked** opens a blank map and we export it. The known list (`materials.json` plus the catalog) covers all 13,759 material references in the samples, but it isn't the game's full set, so a blocking rule could stop a valid Workshop map from saving. It needs the full list from the pak. The app can't produce such a path, so this takes a hand-edited file.
 - **No goal** exports, and Play in the game then does nothing. The map isn't lost, so I didn't block Save, which would stop a player saving mid-edit. A warning at Play would suit it better.
-- **`verified.json`'s other rejected classes** (`MP_OrangeSign`, `BP_TwoCubeOneColor`, `BP_TwoCubeTwoColor`) are only caught at Export when an item has two components under one tag, as the game's own saves do. The app places them with one component, which passes these rules; only the Save dialog refuses that. #184 measured on 0.4.1 that any mesh component on these classes discards the map, and `meshComponents: []` loads, so what the app should write for them is an open decision.
+- **A game save of `MP_OrangeSign`, `BP_TwoCubeOneColor` or `BP_TwoCubeTwoColor`.** The app writes these with `meshComponents: []` and `gameRules.ts` refuses any component, so the app's own file loads. Measured on 0.4.1 from a map the factory wrote: all three opened and drew, alone and together, flipped on either axis, with a surface, scaled and turned. Saving that map in the game wrote two components back on each, and the saved file then opened blank. The app refuses such a file at Save, Export and Play, but it can't stop the game saving one, so `verified.json` keeps these classes `rejected` and players can't place them.
 
 ## What I could not verify
 
@@ -264,7 +264,7 @@ These are files we still let through.
 - **The limits marked "No" above.** Those constants come from the exe alone.
 - **Whether a player can click a base item.** `tap` only reaches UI widgets. My test of it failed on an ordinary cube too, so it says nothing about base items. I know they're missing from `Editor::Pieces`, not that they can't be selected.
 - **Any route but the editor.** Every case opened through the Create page. Racing a `.balledit` through our plugin, the published `.ballmap` loader and the Workshop path were not tested, so Play in the tables is the editor's Play button. They may be stricter or looser.
-- **The extra-component rule on multi-mesh pieces.** A second component was refused on a cube, and the rule allows one per mesh the catalog lists for the piece. The only samples with two components are the three classes above, which the game refuses, so no case shows that allowance is right.
+- **The extra-component rule on multi-mesh pieces.** A second component was refused on a cube, and the rule allows one per mesh the catalog lists for the piece. The only samples with two components are the three classes that take none, so no case shows that allowance is right.
 - **A message after no-goal Play.** The render 6 s later shows none, but a short toast could have come and gone.
 
 ## Method
