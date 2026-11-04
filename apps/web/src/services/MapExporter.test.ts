@@ -1,7 +1,9 @@
 import { assert, describe, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Schema } from "effect"
 import { TestClock } from "effect/testing"
+import { Catalog, indexCatalog } from "../domain/Catalog"
 import { newMapFile } from "../domain/factory"
+import { jsonValueCount, LIMITS } from "../domain/limits"
 import { isPlayerStart, MapFile } from "../domain/MapFile"
 import { objectAt, parseJson } from "../test/json"
 import { listSamples, readSample } from "../test/samples"
@@ -17,6 +19,78 @@ const TestLayer = MapExporter.layerNoDeps.pipe(
 const fresh = () => newMapFile({ displayName: "My Track", creatorName: "spig", createdAt: "2000.01.01-00.00.00" })
 
 describe("MapExporter", () => {
+  it.effect("counts JSON values the way the written file does, for every sample", () =>
+    Effect.gen(function*() {
+      const codec = yield* MapCodec
+      for (const sample of listSamples()) {
+        const text = readSample(sample)
+        const written = yield* codec.encode(yield* codec.decode(text))
+        assert.strictEqual(jsonValueCount(yield* codec.decode(text)), jsonValueCount(parseJson(written)), sample.name)
+      }
+    }).pipe(Effect.provide(TestLayer)))
+
+  it.effect("checks the map as written: the editorState it adds counts toward the limit", () =>
+    Effect.gen(function*() {
+      const exporter = yield* MapExporter
+      const { items, worldSettings } = fresh()
+      const filler = items[0]!
+      const room = LIMITS.jsonValuesPerFile - jsonValueCount({ items, worldSettings })
+      const count = Math.floor(room / jsonValueCount(filler))
+      // A medal time is one value, so these fill the map to exactly the limit, without editorState.
+      const medalTimesByIndex = [
+        ...worldSettings.levelData.medalTimesByIndex,
+        ...Array.from({ length: room - count * jsonValueCount(filler) }, () => 0)
+      ]
+      const full: MapFile = {
+        worldSettings: { ...worldSettings, levelData: { ...worldSettings.levelData, medalTimesByIndex } },
+        items: [...items, ...Array.from({ length: count }, () => filler)]
+      }
+      assert.strictEqual(jsonValueCount(full), LIMITS.jsonValuesPerFile)
+      const error = yield* Effect.flip(exporter.prepare(full))
+      assert.match(error.message, /JSON values/)
+    }).pipe(Effect.provide(TestLayer)))
+
+  it.effect("passes the catalog on, so the material slot check still runs", () =>
+    Effect.gen(function*() {
+      const exporter = yield* MapExporter
+      const meshAssetPath = "/Game/X/SM_X.SM_X"
+      const catalog = indexCatalog(
+        yield* Schema.decodeEffect(Catalog)({
+          pieces: [],
+          meshes: [{ meshAssetPath, materialSlots: [{ index: 0, defaultMaterial: "/Game/A.A" }] }]
+        })
+      )
+      const map = fresh()
+      const item = map.items[0]!
+      const pastTheEnd = {
+        ...item,
+        actorToSpawn: "/Game/X/BP_X.BP_X_C",
+        meshComponents: [{
+          meshComponentTag: "SKGMapEditor",
+          meshAssetPath,
+          materials: [{ material: "/Game/A.A", materialIndex: 1 }],
+          materialAssetPaths: []
+        }]
+      }
+      const error = yield* Effect.flip(exporter.prepare({ ...map, items: [...map.items, pastTheEnd] }, catalog))
+      assert.match(error.message, /material slot 2/)
+    }).pipe(Effect.provide(TestLayer)))
+
+  it.effect("checks the text it writes: the game's layout counts toward the character limit", () =>
+    Effect.gen(function*() {
+      const exporter = yield* MapExporter
+      const map = fresh()
+      const { worldSettings } = map
+      // Fits as a bare string; the file around it doesn't.
+      const levelDescription = "x".repeat(LIMITS.charactersPerFile)
+      const full: MapFile = {
+        ...map,
+        worldSettings: { ...worldSettings, levelData: { ...worldSettings.levelData, levelDescription } }
+      }
+      const error = yield* Effect.flip(exporter.prepare(full))
+      assert.match(error.message, /characters \(maximum 67108864\)/)
+    }).pipe(Effect.provide(TestLayer)))
+
   it.effect("names the file and stamps the level fields the game expects", () =>
     Effect.gen(function*() {
       yield* TestClock.setTime(NOW)
