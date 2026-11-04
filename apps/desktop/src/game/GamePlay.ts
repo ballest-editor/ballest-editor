@@ -10,10 +10,10 @@ import { Context, DateTime, Effect, Layer, Option, PubSub, Schema, Stream } from
 import { ElectronShell } from "../electron/ElectronShell"
 import { ElectronWindow } from "../electron/ElectronWindow"
 import type { BackupError } from "../project/Backups"
-import { MapExports } from "../project/MapExports"
+import { MapExports, type MapRefusedError } from "../project/MapExports"
 import { MapFiles } from "../project/MapFiles"
 import type { MapLinkError } from "../project/MapLinks"
-import type { ProjectError } from "../project/Projects"
+import { type ProjectError, Projects } from "../project/Projects"
 import { GameLink, type GameLinkError } from "./GameLink"
 import type { GamePathError } from "./GamePaths"
 import { GameProcess } from "./GameProcess"
@@ -25,7 +25,7 @@ export const SESSION_START_TIMEOUT = "5 minutes"
 
 const encodeEnded = Schema.encodeEffect(PlaySessionEnded)
 
-export type PlayError = ProjectError | MapLinkError | BackupError | GamePathError | GameLinkError
+export type PlayError = MapRefusedError | ProjectError | MapLinkError | BackupError | GamePathError | GameLinkError
 
 /**
  * Play (docs/DESKTOP.md § Play): Export to game, then the handoff to the `ballest-editor-link` plugin, then the game
@@ -39,6 +39,7 @@ export class GamePlay extends Context.Service<GamePlay, {
   readonly sessionEnds: Stream.Stream<PlaySessionEnded>
 }>()("ballest/desktop/game/GamePlay") {
   static readonly make = Effect.gen(function*() {
+    const projects = yield* Projects
     const files = yield* MapFiles
     const exports = yield* MapExports
     const link = yield* GameLink
@@ -87,7 +88,8 @@ export class GamePlay extends Context.Service<GamePlay, {
 
     const play = Effect.fn("GamePlay.play")(function*(payload: PlayPayload) {
       const { fileName } = payload
-      const { publishedFileId } = yield* files.read(fileName)
+      // not `read`, which stops at its size cap: a file too long for the game is Export's to refuse, with the reason
+      const { publishedFileId } = yield* files.info(yield* projects.inUse, fileName)
       if (!isNeverPublished(publishedFileId)) return { _tag: "PublishedMap", fileName, publishedFileId } as const
 
       const exported = yield* exports.exportMap(payload)

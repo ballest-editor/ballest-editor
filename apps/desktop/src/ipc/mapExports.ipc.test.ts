@@ -1,4 +1,5 @@
 import {
+  CHARACTERS_PER_FILE,
   ExportChecks,
   ExportMapResult,
   ImportMapResult,
@@ -217,6 +218,60 @@ describe("MapExports over IPC", () => {
         assert.deepStrictEqual(yield* check, { changed: [], missing: [] })
         const refused = yield* Effect.flip(fake.invoke(InvokeChannels.reimportMap, { fileName: name }))
         assert.match(String(refused.cause), /no export/)
+      })
+    ))
+
+  // `truncate` grows a file with holes, so these write nothing to disk until Export copies one.
+  it.effect("refuses a file past the game's character limit, as the file is now, and writes nothing", () =>
+    withHandlers(({ fake, project, steam }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const name = "Map_LevelEditorMain&Long_me.balledit"
+        const inGame = path.join(steam.maps, name)
+        const exportIt = fake.invoke(InvokeChannels.exportMap, {
+          fileName: name,
+          // nothing it could ask about gets it past this
+          replacePublished: true,
+          overwriteChanged: true
+        })
+        const linkOf = fake.invokeAs(ProjectMaps, InvokeChannels.listMaps).pipe(
+          Effect.map((maps) => maps.find((m) => m.fileName === name)?.link)
+        )
+        yield* fake.invoke(InvokeChannels.createMap, { fileName: name, text: "{}" })
+        yield* exportIt
+        const linked = yield* linkOf
+
+        // Grown by hand after the app read it: the open tab still shows a clean map, so nothing goes through Save.
+        yield* fs.truncate(path.join(project, "maps", name), CHARACTERS_PER_FILE + 1)
+        const refused = yield* Effect.flip(exportIt)
+        assert.match(
+          String(refused.cause),
+          /^MapRefusedError: The map's file has 67108865 characters \(maximum 67108864\)/
+        )
+        assert.strictEqual(yield* fs.readFileString(inGame), "{}")
+        assert.deepStrictEqual((yield* linkOf)?.export, linked?.export)
+        // Nor could it be opened again: only a tab from before it grew gets as far as Export.
+        const unread = yield* Effect.flip(fake.invoke(InvokeChannels.readMap, { fileName: name }))
+        assert.match(String(unread.cause), /too large to be a map/)
+      })
+    ))
+
+  it.effect("counts characters, not bytes: a file at the limit in characters but past it in bytes exports", () =>
+    withHandlers(({ fake, project, steam }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const name = "Map_LevelEditorMain&Wide_me.balledit"
+        yield* fake.invoke(InvokeChannels.createMap, { fileName: name, text: "é" })
+        yield* fs.truncate(path.join(project, "maps", name), CHARACTERS_PER_FILE + 1)
+        yield* fake.invoke(InvokeChannels.exportMap, {
+          fileName: name,
+          replacePublished: false,
+          overwriteChanged: false
+        })
+        const { size } = yield* fs.stat(path.join(steam.maps, name))
+        assert.strictEqual(Number(size), CHARACTERS_PER_FILE + 1)
       })
     ))
 

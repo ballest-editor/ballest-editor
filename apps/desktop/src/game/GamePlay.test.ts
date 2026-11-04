@@ -1,4 +1,4 @@
-import { type PlayResult, PlaySessionEnded, PushChannels } from "@ballest/contracts"
+import { CHARACTERS_PER_FILE, type PlayResult, PlaySessionEnded, PushChannels } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Fiber, FileSystem, Layer, Path, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
@@ -155,6 +155,20 @@ describe("GamePlay.play", () => {
       assert.isFalse(yield* fs.exists(path.join(steam.maps, name)))
       assert.isFalse(yield* fs.exists(playJson))
       assert.strictEqual(game.launches, 0)
+    })))
+
+  it.effect("refuses a file past the game's character limit with the reason, and writes nothing", () =>
+    runScoped(Effect.gen(function*() {
+      const { fs, path, dir, steam, game, link, play, playJson } = yield* setup
+      yield* link.installPlugin
+      // a hole, so the file costs nothing to make
+      yield* fs.truncate(path.join(dir, "project", "maps", name), CHARACTERS_PER_FILE + 1)
+      const refused = yield* Effect.flip(
+        play.play({ fileName: name, replacePublished: true, overwriteChanged: true })
+      )
+      assert.match(refused.message, /^The map's file has 67108865 characters/)
+      const written = yield* Effect.forEach([path.join(steam.maps, name), playJson], (file) => fs.exists(file))
+      assert.deepStrictEqual({ written, launches: game.launches }, { written: [false, false], launches: 0 })
     })))
 
   it.effect("asks before writing over a published map's draft in the maps folder, as Export does", () =>

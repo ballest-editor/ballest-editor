@@ -2,6 +2,7 @@
  * What the game's loader rejects (docs/FORMAT.md, "Hard limits" and "Load-time validation").
  * One bad item makes the game discard the whole map, so exports are checked up front.
  */
+import { CHARACTERS_PER_FILE } from "@ballest/contracts"
 import type { CatalogIndex } from "./Catalog"
 import { gameRuleProblems, isNormalizedRotation } from "./gameRules"
 import { isPlayerStart, type Item, type MapFile } from "./MapFile"
@@ -16,7 +17,7 @@ export const LIMITS = {
   meshComponentsPerItem: 64,
   propertiesPerList: 4096,
   jsonValuesPerFile: 2_000_000,
-  charactersPerFile: 67_108_864
+  charactersPerFile: CHARACTERS_PER_FILE
 } as const
 
 const PROPERTY_LISTS = [
@@ -28,6 +29,7 @@ const PROPERTY_LISTS = [
   "stringProperties"
 ] as const
 
+export { fileTextProblems } from "@ballest/contracts"
 export { isNormalizedRotation } from "./gameRules"
 
 /** Every value in a JSON document, objects and arrays included. */
@@ -70,14 +72,6 @@ const itemProblems = (item: Item, index: number, catalog: CatalogIndex | null): 
   }
   return out
 }
-
-/** What the game rejects in the file as text: whitespace counts, and so does the game's layout of it. */
-export const fileTextProblems = (text: string): ReadonlyArray<string> =>
-  text.length > LIMITS.charactersPerFile
-    ? [
-      `The map's file has ${text.length} characters (maximum ${LIMITS.charactersPerFile}): past that the game opens a blank map instead.`
-    ]
-    : []
 
 /**
  * What the game checks in `editorState`. Any of these makes it discard the whole map and open a blank one, without a
