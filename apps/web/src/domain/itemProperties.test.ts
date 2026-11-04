@@ -9,12 +9,15 @@ import {
   optionLabel,
   propertyLabel,
   propertyRows,
+  selectionFlip,
   selectionProperties,
   unconfirmedPropertiesIn,
   validPropertyValue,
+  withFlip,
   withProperty
 } from "./itemProperties"
 import { Item, type MapFile } from "./MapFile"
+import { mirrorFlagsOf } from "./mirror"
 
 const decal = Schema.decodeSync(CatalogPiece)({
   classPath: "/Script/Engine.BlueprintGeneratedClass'/Game/MapItems/Decals/BP_UGCCircuitDecal.BP_UGCCircuitDecal_C'",
@@ -255,7 +258,53 @@ describe("0.4.1 native properties", () => {
     assert.strictEqual(optionLabel(speed.options!, 4), "4 (draws as Fast)")
     assert.deepStrictEqual(
       ["bMirror", "bMirrorX", "SurfaceAssignment", "PhysicsElevatorExtensionLength"].map(propertyLabel),
-      ["Mirror Y", "Mirror X", "Surface", "Travel Height"]
+      ["Flip Y", "Flip X", "Surface", "Travel Height"]
     )
+  })
+})
+
+describe("flips", () => {
+  const pieceWith = (className: string, flags: ReadonlyArray<string>) =>
+    Schema.decodeSync(CatalogPiece)({
+      classPath: `/Script/Engine.BlueprintGeneratedClass'/Game/X/${className}.${className}_C'`,
+      className,
+      meshAssetPath: null,
+      materialSlots: [],
+      bounds: null,
+      properties: flags.map((name) => ({ name, list: "boolProperties", type: "Bool", default: false, optional: true }))
+    })
+  const bevel = pieceWith("Bevel", ["bMirror", "bMirrorX"])
+  const paddle = pieceWith("BP_PhysicsPaddle", ["bMirrorX"])
+  const checkpoint = pieceWith("BP_Checkpoint", [])
+  const plain = (piece: CatalogPiece) => ({ item: itemFromPiece(piece, identityTransform()), piece })
+  const flipped = (piece: CatalogPiece) => ({ ...plain(piece), item: withFlip(plain(piece), "x") })
+
+  it("toggles an item from its own state, writing the flag on a class that left it out", () => {
+    const once = flipped(bevel)
+    assert.deepStrictEqual(mirrorFlagsOf(once.item), { x: true, y: false })
+    assert.deepStrictEqual(mirrorFlagsOf(withFlip(once, "x")), { x: false, y: false })
+    assert.deepStrictEqual(mirrorFlagsOf(withFlip(once, "y")), { x: true, y: true })
+  })
+
+  it("leaves an item alone on an axis its class doesn't flip on, as the game's button does", () => {
+    const start = plain(paddle)
+    assert.strictEqual(withFlip(start, "y"), start.item)
+    const unknown = { item: start.item, piece: undefined }
+    assert.strictEqual(withFlip(unknown, "x"), start.item)
+    // a class the catalog doesn't know still flips on a flag the item carries
+    assert.isFalse(mirrorFlagsOf(withFlip({ item: flipped(paddle).item, piece: undefined }, "x")).x)
+  })
+
+  it("reads an axis across a selection, counting only the items that flip on it", () => {
+    assert.strictEqual(selectionFlip([plain(bevel)], "x"), "off")
+    assert.strictEqual(selectionFlip([flipped(bevel), flipped(paddle)], "x"), "on")
+    assert.strictEqual(selectionFlip([flipped(bevel), plain(paddle)], "x"), "mixed")
+    assert.strictEqual(selectionFlip([flipped(bevel), plain(checkpoint)], "x"), "on")
+    assert.strictEqual(selectionFlip([plain(paddle)], "y"), "unavailable")
+    assert.strictEqual(selectionFlip([plain(checkpoint)], "x"), "unavailable")
+  })
+
+  it("keeps the flags out of the listed properties: the flip buttons edit them", () => {
+    assert.deepStrictEqual(selectionProperties([plain(bevel)]), [])
   })
 })

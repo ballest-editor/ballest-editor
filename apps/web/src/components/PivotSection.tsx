@@ -17,6 +17,10 @@ const span: Record<PivotChoice, string> = {
   Front: "col-span-3"
 }
 
+/** A toggle's look when it's on (pressed), or on for only part of a mixed selection (`data-in-use`). */
+export const TOGGLE_STATE_CLASSES =
+  "data-[in-use]:border-primary data-[in-use]:bg-primary/15 data-[pressed]:border-primary data-[pressed]:bg-primary data-[pressed]:text-primary-foreground"
+
 /**
  * The selection's pivot, like the game's inspector. A click sets the choice on every selected
  * item. When their pivots differ, nothing is pressed and the choices in use are outlined.
@@ -59,9 +63,7 @@ export function PivotSection() {
               disabled={disabled}
               title={disabled ? "This piece's bounds are unknown, so only Default is available." : undefined}
               data-in-use={mixed && used.has(choice) ? "" : undefined}
-              className={`${
-                span[choice]
-              } data-[in-use]:border-primary data-[in-use]:bg-primary/15 data-[pressed]:border-primary data-[pressed]:bg-primary data-[pressed]:text-primary-foreground`}
+              className={`${span[choice]} ${TOGGLE_STATE_CLASSES}`}
             >
               {choice}
             </ToggleGroupItem>

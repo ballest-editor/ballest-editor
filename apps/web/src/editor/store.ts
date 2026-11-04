@@ -27,14 +27,14 @@ import {
 import { itemFromPiece, mapLabelOf, newMapFile } from "../domain/factory"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
 import type { GameLinkResult } from "../domain/gameLink"
-import type { PropertyChange } from "../domain/itemProperties"
+import { type PropertyChange, withFlip } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
 import { LIMITS } from "../domain/limits"
 import { type LinkState, linkStateOf } from "../domain/linkState"
 import { isPlayerStart, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
-import { MIRROR_X, MIRROR_Y, withMirrorMesh } from "../domain/mirror"
+import { type FlipAxis, withMirrorMesh } from "../domain/mirror"
 import { addNotice, clearNotices, dropNotices, markRead, mergeNotices, resolveNotices } from "../domain/notifications"
 import type { PaintPicker } from "../domain/Paint"
 import { type Pivot, pivotAt } from "../domain/pivot"
@@ -378,6 +378,8 @@ export interface EditorState extends TabState {
    * one edit); false (with a notice, and nothing changed) when a value doesn't fit its property.
    */
   readonly setSelectionProperties: (changes: ReadonlyArray<PropertyChange>) => boolean
+  /** Flips each selected item that can flip on the axis, from its own state: one undo step. */
+  readonly flipSelection: (axis: FlipAxis) => void
   /** Sets the pivots of several items as one undo step (nothing when none changes). */
   readonly setItemPivots: (pivots: ReadonlyMap<string, Pivot>) => void
   readonly deleteSelection: () => void
@@ -736,15 +738,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setSelectionProperties: (changes) => {
       const s = get()
       const indices = selectedIndices(s)
-      const written = setProperties(s.doc.map, indices, changes)
-      // A mirror flag also swaps the mesh (and some materials) for the game's baked mirror, in the same step.
-      const mirrors = changes.some(({ property }) => property.name === MIRROR_X || property.name === MIRROR_Y)
-      const next = mirrors
-        ? Option.map(written, (map) => ({
-          ...map,
-          items: map.items.map((item, i) => (indices.includes(i) ? withMirrorMesh(item, s.catalogIndex) : item))
-        }))
-        : written
+      const next = setProperties(s.doc.map, indices, changes)
       if (Option.isNone(next)) {
         const names = changes.map((c) => `${JSON.stringify(c.value)} for ${c.property.name}`).join(", ")
         s.notify("error", `Not a valid value: ${names}.`)
@@ -757,6 +751,19 @@ export const useEditor = create<EditorState>()((set, get) => {
       )
       if (!unchanged) commit({ map: next.value, ids: s.doc.ids })
       return true
+    },
+
+    flipSelection: (axis) => {
+      const s = get()
+      const { map, ids } = s.doc
+      const selected = new Set(selectedIndices(s))
+      const items = map.items.map((item, i) => {
+        if (!selected.has(i)) return item
+        const flipped = withFlip({ item, piece: s.catalogIndex?.pieceByClass.get(item.actorToSpawn) }, axis)
+        // A flip also swaps the mesh (and some materials) for the game's baked mirror, in the same step.
+        return flipped === item ? item : withMirrorMesh(flipped, s.catalogIndex)
+      })
+      if (items.some((item, i) => item !== map.items[i])) commit({ map: { ...map, items }, ids })
     },
 
     setItemPivots: (pivots) => {
