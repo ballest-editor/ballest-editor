@@ -26,6 +26,9 @@ const createdAtTime = (createdAt: string) => {
 
 const ballmaps = listSamples().filter((sample) => sample.kind === "ballmap")
 
+/** The game saved this one but won't reopen it, so the app doesn't write it (docs/qa/exposed-properties.md). */
+const isRefused = (sample: { readonly name: string }) => sample.name.includes("hidden probe 2")
+
 /** Imports `path` through the dialog. */
 const importFrom = (disk: TestDisk, path: string) =>
   Effect.gen(function*() {
@@ -34,7 +37,7 @@ const importFrom = (disk: TestDisk, path: string) =>
   })
 
 describe("import actions", () => {
-  it.effect.each(balledits.map((sample) => [sample.name, sample] as const))(
+  it.effect.each(balledits.filter((sample) => !isRefused(sample)).map((sample) => [sample.name, sample] as const))(
     "imports %s from the game linked to it, saves it and exports it back, byte for byte",
     ([, sample]) => {
       const name = fileNameOf(sample)
@@ -75,6 +78,18 @@ describe("import actions", () => {
       }).pipe(Effect.provide(layerFor(disk)))
     }
   )
+
+  it.effect("imports a map the game won't reopen, and refuses to save it", () => {
+    const sample = balledits.find(isRefused)!
+    const inGame = `${TEST_MAPS_FOLDER}/${fileNameOf(sample)}`
+    const disk = makeTestDisk({ [inGame]: readSample(sample) })
+    return Effect.gen(function*() {
+      yield* reset
+      yield* importFrom(disk, inGame)
+      const error = yield* Effect.flip(saveMapFile)
+      assert.match(error.message, /same mesh component twice/)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
 
   it.effect("a name clash on import asks; Import as copy renames the map, Replace keeps the name", () => {
     const sample = balledits[0]!

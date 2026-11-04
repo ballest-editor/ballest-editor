@@ -26,6 +26,25 @@ import { openProjectMapFile } from "./maps"
 import { duplicateMapEffect, saveMapAsEffect, saveMapFile } from "./save"
 
 describe("Export to game", () => {
+  it.effect("won't send the game an imported file it would refuse, though nothing went through Save", () => {
+    const sample = balledits[0]!
+    const name = fileNameOf(sample)
+    const text = readSample(sample).replace(/"w": 1\b/, "\"w\": 2")
+    assert.notStrictEqual(text, readSample(sample))
+    const disk = makeTestDisk({ [projectFile(name)]: text })
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(name)
+      assert.isFalse(s().dirty)
+      const failed = yield* Effect.flip(exportToGameEffect)
+      assert.match(String(failed), /non-normalized rotation/)
+      assert.isFalse(disk.files.has(`${TEST_MAPS_FOLDER}/${name}`))
+      const played = yield* Effect.flip(playEffect)
+      assert.match(String(played), /non-normalized rotation/)
+      assert.isFalse(disk.files.has(`${TEST_MAPS_FOLDER}/${name}`))
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
   it.effect("Export saves unsaved edits first, and asks before replacing a published map's draft", () => {
     const sample = balledits[0]!
     const name = fileNameOf(sample)

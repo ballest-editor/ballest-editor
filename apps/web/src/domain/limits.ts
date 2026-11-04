@@ -3,6 +3,7 @@
  * One bad item makes the game discard the whole map, so exports are checked up front.
  */
 import type { CatalogIndex } from "./Catalog"
+import { gameRuleProblems, isNormalizedRotation } from "./gameRules"
 import { isPlayerStart, type Item, type MapFile } from "./MapFile"
 import { sourceMeshOf } from "./mirror"
 
@@ -18,9 +19,6 @@ export const LIMITS = {
   charactersPerFile: 67_108_864
 } as const
 
-/** UE's THRESH_QUAT_NORMALIZED: |1 - |q|^2| must be below this. */
-const QUAT_NORMALIZED_THRESHOLD = 0.01
-
 const PROPERTY_LISTS = [
   "boolProperties",
   "floatProperties",
@@ -30,9 +28,7 @@ const PROPERTY_LISTS = [
   "stringProperties"
 ] as const
 
-export const isNormalizedRotation = (
-  q: { readonly x: number; readonly y: number; readonly z: number; readonly w: number }
-): boolean => Math.abs(1 - (q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w)) < QUAT_NORMALIZED_THRESHOLD
+export { isNormalizedRotation } from "./gameRules"
 
 /** Every value in a JSON document, objects and arrays included. */
 export const jsonValueCount = (value: unknown): number => {
@@ -109,8 +105,8 @@ const editorStateProblems = (map: MapFile): Array<string> => {
 
 /**
  * Everything that would make the game reject `map`, as user-facing sentences; empty when
- * the map is loadable. Finite transforms are already guaranteed by the schema. Material slots
- * are only checked with a catalog.
+ * the map is loadable. Finite transforms are already guaranteed by the schema. Rules about classes, properties,
+ * meshes and material slots need a catalog.
  */
 export const gameLoadProblems = (map: MapFile, catalog: CatalogIndex | null = null): ReadonlyArray<string> => {
   const out: Array<string> = []
@@ -127,5 +123,6 @@ export const gameLoadProblems = (map: MapFile, catalog: CatalogIndex | null = nu
     )
   }
   map.items.forEach((item, index) => out.push(...itemProblems(item, index, catalog)))
+  out.push(...gameRuleProblems(map, catalog))
   return out
 }

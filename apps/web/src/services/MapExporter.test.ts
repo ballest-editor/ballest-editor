@@ -81,11 +81,16 @@ describe("MapExporter", () => {
       const exporter = yield* MapExporter
       const map = fresh()
       const { worldSettings } = map
-      // Fits as a bare string; the file around it doesn't.
-      const levelDescription = "x".repeat(LIMITS.charactersPerFile)
+      // Each is the longest string the game reads. Together they fit as bare strings; the file around them doesn't.
+      const tagName = "x".repeat(1_048_576)
+      const gameplayTags = Array.from({ length: LIMITS.charactersPerFile / tagName.length }, () => ({ tagName }))
+      const { levelData } = worldSettings
       const full: MapFile = {
         ...map,
-        worldSettings: { ...worldSettings, levelData: { ...worldSettings.levelData, levelDescription } }
+        worldSettings: {
+          ...worldSettings,
+          levelData: { ...levelData, mapTags: { ...levelData.mapTags, gameplayTags } }
+        }
       }
       const error = yield* Effect.flip(exporter.prepare(full))
       assert.match(error.message, /characters \(maximum 67108864\)/)
@@ -109,7 +114,7 @@ describe("MapExporter", () => {
       assert.isDefined(decoded.editorState)
     }).pipe(Effect.provide(TestLayer)))
 
-  it.effect("adds editorState when exporting an imported .ballmap, keeping everything else", () =>
+  it.effect("adds editorState when exporting an imported .ballmap, keeping all but the published flag", () =>
     Effect.gen(function*() {
       const codec = yield* MapCodec
       const exporter = yield* MapExporter
@@ -117,12 +122,23 @@ describe("MapExporter", () => {
       const original = parseJson(readSample(sample))
       const result = yield* exporter.prepare(yield* codec.decode(readSample(sample)))
       const json = parseJson(result.text)
-      assert.deepStrictEqual(objectAt(json)["items"], objectAt(original)["items"])
+      const asDraft = parseJson(readSample(sample).replaceAll(/"bIsBaseItem": true/g, "\"bIsBaseItem\": false"))
+      assert.deepStrictEqual(objectAt(json)["items"], objectAt(asDraft)["items"])
       assert.deepStrictEqual(objectAt(json, "editorState")["pivots"], [])
       assert.strictEqual(
         objectAt(json, "worldSettings", "levelData")["levelDisplayName"],
         objectAt(original, "worldSettings", "levelData")["levelDisplayName"]
       )
+    }).pipe(Effect.provide(TestLayer)))
+
+  it.effect("writes a published map's items as a draft's, which the editor lists", () =>
+    Effect.gen(function*() {
+      const sample = listSamples().find((s) => s.kind === "ballmap")!
+      const published = yield* MapCodec.use((codec) => codec.decode(readSample(sample)))
+      assert.isTrue(published.items.every((item) => item.bIsBaseItem))
+      const { map } = yield* MapExporter.use((exporter) => exporter.prepare(published))
+      assert.isTrue(map.items.every((item) => !item.bIsBaseItem))
+      assert.strictEqual(map.items.length, published.items.length)
     }).pipe(Effect.provide(TestLayer)))
 
   it.effect("refuses maps without exactly one player start, or without a name", () =>

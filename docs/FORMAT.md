@@ -17,7 +17,7 @@ The exe has `ListUserSavedMapSubfolders`, so subfolders under `UserSavedMaps` ar
 
 ## File format
 
-Plain UTF-8 JSON, tab-indented, CRLF line endings, no BOM. `.balledit` and `.ballmap` are the same schema; `.ballmap` lacks `editorState`.
+Plain UTF-8 JSON, tab-indented, CRLF line endings, no BOM. `.balledit` and `.ballmap` are the same schema; `.ballmap` lacks `editorState` and has `bIsBaseItem` true on every item.
 
 ```
 {
@@ -54,7 +54,7 @@ Item = {
   actorToSpawn: "/Script/Engine.BlueprintGeneratedClass'/Game/.../BP_X.BP_X_C'",
   itemTransform: { rotation: {x,y,z,w} (unit quat), translation: {x,y,z} (cm), scale3D: {x,y,z} },
   meshComponents: [ { meshComponentTag: "SKGMapEditor", meshAssetPath, materials: [ { material, materialIndex } ], materialAssetPaths: [] } ],
-  bIsBaseItem: false,
+  bIsBaseItem: false,                                // true on every item of a .ballmap; see "Load-time validation"
   boolProperties / floatProperties / intProperties / textProperties / nameProperties / stringProperties:
       [ { propertyName, propertyType, currentValue } ]
 }
@@ -99,7 +99,7 @@ The game's publish screen sets a difficulty and Workshop tags. Both end up in `l
 
 ## Catalog (from 22 sample maps, 9.9k items)
 
-91 distinct `actorToSpawn` classes so far — families: `BP_Prim_*` (cube/cylinder/sphere), `BP_Track_*`, `BP_Ramp_*`, `BP_Pipe_*`, `Bevel_*` (~40 pieces), `MP_*` (glass planes, bowls, air vent, cone, torus…), `BP_Checkpoint`, `MP_ActualCheckpoint_Strip`, `MP_PlayerStart` (required, forbidden in prefabs), `BP_UGCCircuitDecal`.
+91 distinct `actorToSpawn` classes so far — families: `BP_Prim_*` (cube/cylinder/sphere), `BP_Track_*`, `BP_Ramp_*`, `BP_Pipe_*`, `Bevel_*` (~40 pieces), `MP_*` (glass planes, bowls, air vent, cone, torus…), `BP_Checkpoint`, `MP_ActualCheckpoint_Strip`, `MP_PlayerStart` (needed to race, forbidden in prefabs), `BP_UGCCircuitDecal`.
 Mesh assets referenced from `/Game/Maps/_GENERATED/PC/*` (79 in the pak), materials from `/Game/Art/Materials/*` (`MI_Env_*`, `M_GlassV2`, …).
 Exposed item properties seen: `Field Magnitude`, `EntryAssistMinSpeed`, `QualifiedAirflowTargetSpeed`, `UpperAirflowMultiplier` (air vent), `DecalWidth/Height/Depth`, `DecalStyle`, `bFacingOnly` (decal).
 A class's exposed properties are its CDO's `LevelEditorExposedProperties` (Blueprint variables, so readable from the pak; `catalog.json` `properties`). The game saves every one of them on every item of that class, in that order, split by type into the typed lists (Blueprint `Double`/`Float` → `floatProperties` `"Float"`, `Int` → `intProperties` `"Integer"`, `Bool` → `boolProperties` `"Bool"`). Defaults: air vent 750000 / 800 / 0.25 / 2000; decal 200 × 200 × 100, style 0, `bFacingOnly` true. `LevelEditorHiddenProperties` (the decal's width/height/depth, a rect light's source size) are still saved, just left out of the in-game panel.
@@ -134,17 +134,21 @@ A material entry at or past the mesh's slot count makes the game discard the who
 
 Found by locating the `lea` that references each error string and reading the adjacent `cmp` immediate (`/tmp/ballest-re`, objdump).
 
-| Limit                     | Value                                     | Error string                                            | Code addr   |
-| ------------------------- | ----------------------------------------- | ------------------------------------------------------- | ----------- |
-| JSON values per file      | **2,000,000** (0.4.1, measured)           | `...exceeds the maximum value count of %lld.`           | —           |
-| Characters per file       | **67,108,864** (0.4.1, measured)          | `...exceeds the %d-character safety limit.`             | —           |
-| Items per level           | **100,000** (0x186A0)                     | `Serialized level contains more than %d items.`         | 0x1447EEB9D |
-| Any JSON array length     | 100,000                                   | `...array with more than %d entries.`                   | 0x1447EE993 |
-| Mesh components per item  | 64                                        | `Item %d contains more than %d saved mesh components.`  | 0x1447EFAFB |
-| Properties per typed list | 4,096                                     | `Item %d contains more than %d saved %s properties.`    | 0x1447B665B |
-| JSON field-name length    | 4,096                                     | `...oversized field name.`                              | 0x1447EE8C2 |
-| Prefab items              | 2–4,096                                   | string                                                  | —           |
-| Workshop `.ballmap` bytes | not recovered (64-bit constant elsewhere) | `...oversized root .ballmap (%lld bytes; maximum %lld)` | 0x144ECBD1C |
+| Limit                     | Value                                     | Error string                                                  | Code addr   |
+| ------------------------- | ----------------------------------------- | ------------------------------------------------------------- | ----------- |
+| JSON values per file      | **2,000,000** (0.4.1, measured)           | `...exceeds the maximum value count of %lld.`                 | —           |
+| Characters per file       | **67,108,864** (0.4.1, measured)          | `...exceeds the %d-character safety limit.`                   | —           |
+| Items per level           | **100,000** (0x186A0)                     | `Serialized level contains more than %d items.`               | 0x1447EEB9D |
+| Any JSON array or object  | 100,000 entries (0.4.1, measured)         | `...array with more than %d entries.`                         | 0x1447EE993 |
+| JSON string length        | 1,048,576 (0.4.1, measured)               | `...a string longer than %d characters.`                      | 0x144FE1462 |
+| JSON nesting              | 64, root at 0 (0.4.1, measured)           | `...exceeds the maximum nesting depth of %d.`                 | 0x144FE0F50 |
+| Materials per mesh        | 256 (0.4.1, exe only)                     | `Item %d mesh %d exceeds the %d-entry material safety limit.` | 0x144FE2768 |
+| Mesh or material path     | 4,096 (0.4.1, exe only)                   | `Item %d mesh %d asset path is longer than %d characters.`    | 0x144FE22E3 |
+| Mesh components per item  | 64                                        | `Item %d contains more than %d saved mesh components.`        | 0x1447EFAFB |
+| Properties per typed list | 4,096                                     | `Item %d contains more than %d saved %s properties.`          | 0x1447B665B |
+| JSON field-name length    | 4,096                                     | `...oversized field name.`                                    | 0x1447EE8C2 |
+| Prefab items              | 2–4,096                                   | string                                                        | —           |
+| Workshop `.ballmap` bytes | not recovered (64-bit constant elsewhere) | `...oversized root .ballmap (%lld bytes; maximum %lld)`       | 0x144ECBD1C |
 
 The value and character limits are the ones a big map meets (`docs/qa/budget.md` § The real limits). Every object, array and scalar counts as a value, and every character of the file counts, whitespace and the game's layout included. A real map stops near 46,600 items on characters, and no map gets past 83,331 items on values, so the 100,000-item limit is never the one that binds. Past either, the game drops the map without a message and opens the default new map.
 
@@ -186,15 +190,18 @@ There is no floor near the start: the player start floats about 85 m above the w
 
 On load the game does not move items below the water: the `asdf new not loaded` → `asdf loaded and saved` drafts (an in-game load and save, in the game's `UserSavedMaps`, not in `samples/`) kept all 25 transforms unchanged, down to z = −1213. The `props probe` draft (written with everything near z = 0) came back from the game with its non-floor items 170–400 cm higher. Every offset is a multiple of 10 cm, which looks more like moves with the in-game editor's 10 cm snap than physics settling, but that is unconfirmed.
 
-## Load-time validation (from exe strings)
+## Load-time validation
 
-- transform must be finite, rotation normalized
-- unknown property name / wrong type → item rejected
-- per-mesh material slot safety limit: a `materialIndex` at or past the mesh's slot count (measured, see Materials)
-- `Serialized level JSON contains an invalid or oversized object`
-- `levelName and username must be strings`; display-name text limit 4096
-- editor metadata (groups, pivots) validated separately. Any of these discards the whole map and opens a blank one with no message: a pivot or group member past the last item, an empty group, an item in two groups, a group with no `frame`. A group of one and a group with no `name` load (measured, docs/qa/save-roundtrip.md)
-- prefab: 2–4096 items, no `MP_PlayerStart`
+Measured on 0.4.1, case by case, in [docs/qa/limits-validation.md](qa/limits-validation.md). A file the game refuses opens a blank map (the level's start and goal under the map's name) with no message, and pressing Save there and accepting the overwrite prompt replaces the file with that blank map. A file it can't list is missing from the Create page.
+
+- Blank map: a rotation outside `abs(1 - abs(q)^2) < 0.01`; a non-finite transform, light value (time, brightness, angle), float property, camera or pivot position; a class that doesn't exist, isn't an actor or is gone from the build; a property its class lacks, in the wrong list, set twice or with no name; a second mesh component on a piece with one; any mesh component on `BP_TwoCubeOneColor`, `BP_TwoCubeTwoColor` or `MP_OrangeSign`, including the two the game saves for each ([docs/qa/exposed-properties.md](qa/exposed-properties.md)); a mesh or material that isn't cooked; a material slot that is negative, repeated or at or past the mesh's slot count (see Materials), or more material paths than slots; `editorState` without `version` 1; a pivot repeated, past the items or with an unknown choice; a group with no members, a member past the items or in two groups, no frame, a non-normalised frame or a name that isn't empty or 1 to 64 letters and digits; any limit above.
+- Off the Create page: invalid JSON, no `worldSettings`, or a `levelDifficulty` that isn't one of the five names (any case, `EBallgameDifficulty::` allowed; a missing one loads).
+- Lost on the next save: an actor class that isn't an editor item (`BP_KillZone`, `StaticMeshActor`). The game spawns it, the editor doesn't list it, and Save leaves it out.
+- Loads: a missing field takes its default, including `meshComponents`, property lists, `editorState` and every `worldSettings` field except `levelData.userLevelName`, without which the Create entry opens another map. Unknown keys load and Save drops them. Scale, position, `SurfaceAssignment` and `propertyType` aren't checked, and nothing is clamped to the placement bounds. A group of one and a group with no `name` load ([docs/qa/save-roundtrip.md](qa/save-roundtrip.md)).
+- Start and goal: the editor loads a map with any number of either. On its Play button no start gives a timed run with no ball, two starts use the later one, no goal does nothing, and two goals work.
+- `bIsBaseItem`: true on every item of a `.ballmap`, false in every draft. A flagged item in a draft is in the world and survives Save, but the editor's piece list leaves it out, so the editor writes false.
+- `levelName and username must be strings` is from the exe, about leaderboards or ghosts by its neighbours, and wasn't reached by any probe.
+- Prefab: 2–4096 items, no `MP_PlayerStart`.
 
 ## Game assets
 
