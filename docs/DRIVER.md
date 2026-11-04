@@ -124,6 +124,30 @@ answers with `Log::Info` lines the driver reads from `host.log`, the same way it
 calls work in any game, sandboxed or not, because the script API is what plugins are for. It uses no `Console::Run`,
 so it could be listed in the registry if that is ever useful; it is not needed for the editor's users.
 
+### Pivots and the gizmo
+
+The game gives each piece a default gizmo position, and the app copies it (docs/FORMAT.md § Pivots), so where the
+gizmo sits is a thing to check as much as how the piece looks. Measured on this build: the editor pawn's handler
+(`SKGMLEHandlerComponent`, reached with the test channel's `callx` on the instance under `PersistentLevel`) has
+`GetSelectionPivotChoice`, `SetSelectionPivot` (the inspector's buttons: `ESKGMLEEditorPivot` Default 0, Center 1,
+Bottom 2, Top 3, Left 4, Right 5, Back 6, Front 7, WorldOrigin 8) and `GetSelectionTransform`, the gizmo's transform
+as a 96-byte FTransform of which the host reports the first 64 bytes (quaternion and translation, not the scale).
+The gizmo and the selection outline render whenever a piece is selected, with the editor's panels hidden too, so a
+render with the gizmo is a render with the piece selected, and a clean one has nothing selected.
+
+That gives a measurement for free: the Center, Bottom, Top, Left, Right, Back and Front pivots put the gizmo at the
+centre of the piece's mesh bounds and the centres of its six faces, in the world. On the ramp `BP_Ramp_Curve_Short1`
+they matched the catalog's bounds to the millimetre. For a piece that isn't turned, the box around those points is
+its mesh bounds; `editor_measure` reports the points and the box and puts the piece's own pivot choice and the
+selection back, since the choice stays with the piece (it is what the map saves in `editorState.pivots`).
+
+`piece_views` is the piece evaluation flow in one call: measure, select the piece (or nothing, for a clean render),
+set the pivot to show (the piece's own by default, since that is the game's choice for it; Center standardises it),
+hide the panels, frame the camera from the measured bounds for each standard view (front, back, left, right, top,
+bottom, front-left, back-right: fixed names and directions, so renders of two pieces or two game versions line up),
+render each, then release the camera, show the panels and put the pivot and the selection back. It returns the
+measurement, the gizmo's transform and the PNGs; what the pictures show is the agent's to judge.
+
 ### What the headless modes do and do not give
 
 - `-RenderOffscreen` (measured): no window, real frames through `render`, the host's `tap` and `gamekey` for input.

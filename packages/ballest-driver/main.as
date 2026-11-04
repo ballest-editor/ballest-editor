@@ -3,7 +3,7 @@
 //     { "nonce": "<unique>", "op": "spawn", ... }
 // A nonce not seen before is run once, and answered with one log line the driver reads from host.log:
 //     reply <nonce> <json>
-// Ops: spawn {classes[], transforms[9 per piece], drop}, pieces, select {ids[]}, transform {id, x, y, z, pitch, yaw,
+// Ops: spawn {classes[], transforms[9 per piece], drop}, pieces, selection, select {ids[]}, transform {id, x, y, z, pitch, yaw,
 // roll}, camera {x, y, z, pitch, yaw, fov}, camera_release, hide_editor {on}, undo, redo, project {x, y, z}, ping.
 
 [Setting name="Check every" min=0.05 max=5 description="Seconds between looks at command.json"]
@@ -77,6 +77,8 @@ string Run(const string &in c)
         return Error("the track editor isn't open");
     if (op == "pieces")
         return Pieces(Editor::Pieces());
+    if (op == "selection")
+        return Pieces(Editor::Selection());
     if (op == "undo")
         return Ok(Editor::Undo());
     if (op == "redo")

@@ -6,13 +6,14 @@ import { Console, Effect, Layer, Option } from "effect"
 import { McpProtocol, McpServer } from "effect/ai"
 import { Argument, Command, Flag } from "effect/cli"
 import { Channel } from "./channel.ts"
+import { Handler } from "./handler.ts"
 import { Plugin } from "./plugin.ts"
 import { Slots } from "./slots.ts"
 import { DriverToolkit, DriverToolsLayer } from "./tools.ts"
 
 const VERSION = "0.1.0"
 
-const services = Layer.mergeAll(Channel.layer, Plugin.layer, Slots.layer)
+const services = Layer.mergeAll(Channel.layer, Plugin.layer, Handler.layer, Slots.layer)
 
 const serve = Command.make("serve", {}, () =>
   Layer.launch(

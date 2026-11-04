@@ -1,8 +1,10 @@
 import { Effect, FileSystem, Path, Schema } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { Channel } from "./channel.ts"
+import { decodePieces, Handler, PIVOT_CHOICES } from "./handler.ts"
 import { Plugin } from "./plugin.ts"
 import { DriverError, fail, io, Slots } from "./slots.ts"
+import { frame, STANDARD_VIEWS } from "./views.ts"
 
 // The MCP tools (docs/DRIVER.md § Tools). Each is a thin wrapper over the host's test channel or the slots; replies
 // come back as the host wrote them. Pictures and dumps stay on disk and come back as paths.
@@ -20,6 +22,33 @@ const Status = Schema.Struct({
   dir: Schema.String,
   log: Schema.Array(Schema.String)
 })
+
+const Vec3 = Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite])
+const Transform = Schema.Struct({
+  rotation: Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite, Schema.Finite]),
+  location: Vec3
+})
+const Pivot = Schema.Literals(PIVOT_CHOICES)
+const PivotState = Schema.Struct({ choice: Pivot, gizmo: Transform })
+const Measurement = Schema.Struct({
+  id: Schema.Finite,
+  class: Schema.String,
+  pivot: Pivot,
+  gizmo: Transform,
+  origin: Vec3,
+  center: Vec3,
+  faces: Schema.Struct({ bottom: Vec3, top: Vec3, left: Vec3, right: Vec3, back: Vec3, front: Vec3 }),
+  bounds: Schema.Struct({ min: Vec3, max: Vec3 })
+})
+const Camera = Schema.Struct({
+  x: Schema.Finite,
+  y: Schema.Finite,
+  z: Schema.Finite,
+  pitch: Schema.Finite,
+  yaw: Schema.Finite,
+  fov: Schema.Finite
+})
+const VIEW_NAMES = STANDARD_VIEWS.map((v) => v.name).join(", ")
 
 const tool = <const Name extends string, P extends Schema.Struct.Fields, S extends Schema.Top>(
   name: Name,
@@ -159,7 +188,43 @@ export const DriverToolkit = Toolkit.make(
     slot: slotParam,
     ids: Schema.Array(Schema.Finite)
   }, PluginReply),
+  tool("editor_selection", "The selected pieces as JSON: id, class, location, rotation, scale.", {
+    slot: slotParam
+  }, PluginReply),
   tool("editor_undo", "The editor's own undo (Ctrl+Z).", { slot: slotParam }, PluginReply),
+  // Through the editor's handler (callx): the selection's pivot and gizmo (docs/DRIVER.md § Pivots and the gizmo).
+  tool(
+    "editor_pivot",
+    `The selection's pivot choice and the gizmo's transform (where the editor puts the gizmo for the selected piece: its default differs by piece, and our app copies that). With choice, sets the pivot first, as the inspector's buttons do (it stays with the piece): ${
+      PIVOT_CHOICES.join(", ")
+    }.`,
+    { slot: slotParam, choice: Schema.optional(Pivot) },
+    PivotState
+  ),
+  tool(
+    "editor_measure",
+    "Measures a piece through the editor's pivot choices: its origin, the centre of its mesh bounds and the centres of the six faces, in the world, plus a world-aligned box around them (the mesh bounds for a piece that isn't turned), with the gizmo's transform for the piece's own pivot. Leaves the piece's pivot and the selection as they were.",
+    { slot: slotParam, id: Schema.Finite },
+    Measurement
+  ),
+  tool(
+    "piece_views",
+    `Renders a piece from the standard views (${VIEW_NAMES}), framed from its measured bounds with the editor's panels hidden; returns the measurement and one PNG per view (<prefix>-<view>.png; read the files to look). gizmo: the piece stays selected, so the editor's gizmo and selection outline show (off: nothing selected). pivot: the pivot to show the gizmo at (default: the piece's own, which is what the game picks for it; Center standardises it); put back afterwards. views: a subset of the names.`,
+    {
+      slot: slotParam,
+      id: Schema.Finite,
+      prefix: Schema.optional(Schema.String),
+      gizmo: Schema.optional(Schema.Boolean),
+      pivot: Schema.optional(Pivot),
+      views: Schema.optional(Schema.Array(Schema.String)),
+      fov: Schema.optional(Schema.Finite)
+    },
+    Schema.Struct({
+      measurement: Measurement,
+      pivot: Schema.NullOr(PivotState),
+      views: Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String, camera: Camera }))
+    })
+  ),
   tool(
     "camera_set",
     "Takes the camera: at x y z, looking pitch (up/down) and yaw (around), with fov degrees (default 90). camera_release gives it back.",
@@ -196,12 +261,21 @@ export const DriverToolsLayer = DriverToolkit.toLayer(Effect.gen(function*() {
   const slots = yield* Slots
   const channel = yield* Channel
   const plugin = yield* Plugin
+  const handler = yield* Handler
   const call = (slot: number | undefined, op: string, args?: Record<string, unknown>) =>
     plugin.call(n(slot), op, args).pipe(Effect.map((reply) => ({ reply })))
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const run = (slot: number | undefined, command: string, timeoutMs?: number) =>
     channel.send(n(slot), command, timeoutMs).pipe(Effect.map((replies) => ({ replies })))
+  const render = (slot: number, name: string) =>
+    Effect.gen(function*() {
+      const safe = name.replace(/[^A-Za-z0-9_-]/g, "_")
+      const replies = yield* channel.send(slot, `render ${safe}`, 20_000)
+      const done = replies.find((r) => r.startsWith("render -> "))
+      if (done === undefined || done.includes("failed")) return yield* fail(`render: ${replies.join(" | ")}`)
+      return path.join(slots.paths(slot).data, `${safe}.png`)
+    })
 
   return DriverToolkit.of({
     slot_start: ({ mode, slot }) => slots.start(n(slot), mode ?? "headless"),
@@ -217,14 +291,7 @@ export const DriverToolsLayer = DriverToolkit.toLayer(Effect.gen(function*() {
         if (line === undefined) return yield* fail(`no state in the reply: ${replies.join(" | ")}`)
         return { state: JSON.parse(line.slice("agentstate ".length)) as unknown }
       }),
-    render: ({ name, slot }) =>
-      Effect.gen(function*() {
-        const safe = (name ?? "render").replace(/[^A-Za-z0-9_-]/g, "_")
-        const replies = yield* channel.send(n(slot), `render ${safe}`, 20_000)
-        const done = replies.find((r) => r.startsWith("render -> "))
-        if (done === undefined || done.includes("failed")) return yield* fail(`render: ${replies.join(" | ")}`)
-        return { path: path.join(slots.paths(n(slot)).data, `${safe}.png`) }
-      }),
+    render: ({ name, slot }) => render(n(slot), name ?? "render").pipe(Effect.map((file) => ({ path: file }))),
     open_map: ({ fragment, slot }) => run(slot, `openmap ${quoted(fragment)}`, 30_000),
     map_list: ({ slot }) =>
       io(fs.readDirectory(slots.paths(n(slot)).maps), "listing the maps").pipe(
@@ -266,7 +333,49 @@ export const DriverToolsLayer = DriverToolkit.toLayer(Effect.gen(function*() {
     editor_transform: ({ id, pitch, roll, slot, x, y, yaw, z }) =>
       call(slot, "transform", { id, x, y, z, pitch, yaw, roll }),
     editor_select: ({ ids, slot }) => call(slot, "select", { ids }),
+    editor_selection: ({ slot }) => call(slot, "selection"),
     editor_undo: ({ slot }) => call(slot, "undo"),
+    editor_pivot: ({ choice, slot }) =>
+      choice === undefined ? handler.pivot(n(slot)) : handler.setPivot(n(slot), choice),
+    editor_measure: ({ id, slot }) => handler.measure(n(slot), id),
+    piece_views: ({ fov, gizmo, id, pivot, prefix, slot, views }) =>
+      Effect.gen(function*() {
+        const s = n(slot)
+        const wanted = views === undefined
+          ? STANDARD_VIEWS
+          : views.map((name) => {
+            const view = STANDARD_VIEWS.find((v) => v.name === name)
+            return view ?? fail(`no view ${name}; the views are ${VIEW_NAMES}`)
+          })
+        const chosen = yield* Effect.forEach(
+          wanted,
+          (v) => v instanceof DriverError ? Effect.fail(v) : Effect.succeed(v)
+        )
+        const measurement = yield* handler.measure(s, id)
+        const before = (yield* decodePieces(yield* plugin.call(s, "selection"))).pieces.map((p) => p.id)
+        const restore = Effect.gen(function*() {
+          yield* plugin.call(s, "camera_release")
+          yield* plugin.call(s, "hide_editor", { on: false })
+          if (gizmo === true && pivot !== undefined) yield* handler.setPivot(s, measurement.pivot)
+          yield* plugin.call(s, "select", { ids: before })
+        }).pipe(Effect.ignore)
+        const shoot = Effect.gen(function*() {
+          yield* plugin.call(s, "select", { ids: gizmo === true ? [id] : [] })
+          let state = null
+          if (gizmo === true) state = pivot === undefined ? yield* handler.pivot(s) : yield* handler.setPivot(s, pivot)
+          yield* plugin.call(s, "hide_editor", { on: true })
+          const shots: Array<{ name: string; path: string; camera: ReturnType<typeof frame> }> = []
+          for (const view of chosen) {
+            const camera = frame(measurement.bounds, view, fov ?? 60)
+            yield* plugin.call(s, "camera", { ...camera })
+            yield* Effect.sleep("250 millis")
+            const file = yield* render(s, `${prefix ?? `piece-${id}`}-${view.name}`)
+            shots.push({ name: view.name, path: file, camera })
+          }
+          return { measurement, pivot: state, views: shots }
+        })
+        return yield* shoot.pipe(Effect.ensuring(restore))
+      }),
     camera_set: ({ fov, pitch, slot, x, y, yaw, z }) => call(slot, "camera", { x, y, z, pitch, yaw, fov: fov ?? 90 }),
     camera_release: ({ slot }) => call(slot, "camera_release"),
     hide_editor: ({ on, slot }) => call(slot, "hide_editor", { on: on ?? true }),
