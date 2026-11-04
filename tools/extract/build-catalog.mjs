@@ -134,12 +134,12 @@ const NATIVE = {
   bMirrorX: { list: "boolProperties", type: "Bool", default: false }
 }
 const CHECKPOINT_BASE = "/Game/Core/Gameplay/MapTriggers/BP_ActualCheckpointBase.BP_ActualCheckpointBase_C"
-// Defaults native code sets over the Blueprint's. The point light's shadows are off when it's placed from the palette
-// (the "new pieces probe", placed by hand; BallestUGCLightComponent's bDisableShadowsOnNewPlacement), though one a map
-// loads or a paste makes saves them on. The rest are what the palette and hidden probes saved for an untouched item.
+// Defaults native code sets over the Blueprint's: what the palette and hidden probes saved for an untouched item. A
+// light's shadows aren't here. The class default stays the Blueprint's true, which a light a map loads or a paste makes
+// has; only a new placement starts with them off (apps/web/src/domain/factory.ts).
 const REACH = { LightAttenuationRadius: 1000 }
 const DEFAULT_OVERRIDES = {
-  MP_RawPointLight: { bLightCastsShadows: false, ...REACH },
+  MP_RawPointLight: REACH,
   MP_RawSpotLight: REACH,
   MP_RawRectLight: REACH,
   MP_PointLightFixture: REACH,

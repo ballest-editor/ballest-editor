@@ -18,10 +18,14 @@ import {
   MESH_COMPONENT_TAG,
   type MeshComponent,
   objectPathOf,
-  PLAYER_START_CLASS
+  PLAYER_START_CLASS,
+  type PropertyList
 } from "./MapFile"
 import { SURFACE_PROPERTY } from "./surface"
 import { rotatorToQuat } from "./ueMath"
+
+/** Whether a light casts shadows: the one property a new placement doesn't start at its class default. */
+const LIGHT_SHADOWS = "bLightCastsShadows"
 
 /** `YYYY.MM.DD-HH.MM.SS`, the game's `createdAt` format. */
 export const formatCreatedAt = (parts: DateTime.DateTime.Parts): string => {
@@ -108,9 +112,24 @@ export const qualifyMaterialPath = (path: string): string => {
 }
 
 /**
+ * The properties of a new placement: the class defaults, with a light's shadows off. The game's light component
+ * (`bDisableShadowsOnNewPlacement`, set on every class with this property) does that when a light is placed. It's no
+ * class default: a light that is pasted, or loaded from a file without the property, has them on.
+ */
+const placedProperties = (piece: CatalogPiece): Pick<Item, PropertyList> => {
+  const properties = defaultProperties(piece)
+  return {
+    ...properties,
+    boolProperties: properties.boolProperties.map((p) =>
+      p.propertyName === LIGHT_SHADOWS ? { ...p, currentValue: false } : p
+    )
+  }
+}
+
+/**
  * An item exactly as the in-game editor writes a freshly placed piece. Pieces whose Main
  * component has no mesh (air vent, checkpoint strip) get the empty mesh component the
- * game writes for them, and every exposed property is written at its class default.
+ * game writes for them, and every exposed property is written at its placement default.
  */
 export const itemFromPiece = (piece: CatalogPiece, transform: ItemTransform): Item => ({
   actorToSpawn: piece.classPath,
@@ -126,7 +145,7 @@ export const itemFromPiece = (piece: CatalogPiece, transform: ItemTransform): It
       )
   ],
   bIsBaseItem: false,
-  ...defaultProperties(piece)
+  ...placedProperties(piece)
 })
 
 /**

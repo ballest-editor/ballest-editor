@@ -16705,7 +16705,7 @@
           "list": "boolProperties",
           "type": "Bool",
           "ueType": "BoolProperty",
-          "default": false,
+          "default": true,
           "hidden": false,
           "source": "cdo",
           "label": "Casts Shadows",

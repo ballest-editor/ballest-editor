@@ -11,7 +11,7 @@ import { listSamples, readSample, repoRoot } from "../test/samples"
 import { Catalog, HIDDEN_SECTION, indexCatalog, paletteSections, unavailableReasonOf, visibleExtras } from "./Catalog"
 import { itemFromPiece, placementTransform, qualifyMaterialPath } from "./factory"
 import { defaultProperties, PROPERTY_LISTS } from "./itemProperties"
-import { Item, MapFile, objectPathOf } from "./MapFile"
+import { Item, MapFile, objectPathOf, type PropertyList } from "./MapFile"
 
 const catalogPath = path.join(repoRoot, "assets", "catalog.json")
 const hasCatalog = fs.existsSync(catalogPath)
@@ -64,10 +64,6 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
 
   it("places every class with the property lists the game saves for it untouched", () => {
     const { pieceByClass } = indexCatalog(load())
-    // The one default that differs by how an item appears: placed from the palette, a point light's shadows are off
-    // (the "new pieces probe"); loaded or pasted, as these probes' are, they're on.
-    const placedOff = (item: Item, name: string) =>
-      item.actorToSpawn.includes("MP_RawPointLight") && name === "bLightCastsShadows"
     const entries = probeItems()
     assert.isAbove(entries.length, 230)
     for (const saved of entries) {
@@ -77,10 +73,48 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
       for (const list of PROPERTY_LISTS) {
         const shape = (
           entry: { readonly propertyName: string; readonly currentValue: unknown }
-        ) => [entry.propertyName, placedOff(saved, entry.propertyName) ? "either" : entry.currentValue]
+        ) => [entry.propertyName, entry.currentValue]
         assert.deepStrictEqual(fresh[list].map(shape), saved[list].map(shape), `${piece.className} ${list}`)
       }
     }
+  })
+
+  it("starts every new light with shadows off, in the layout the game saves, and nothing else differs", () => {
+    const catalog = load()
+    const shadows = (properties: Pick<Item, "boolProperties">) =>
+      properties.boolProperties.find((p) => p.propertyName === "bLightCastsShadows")?.currentValue
+    const lights = catalog.pieces.filter((piece) => shadows(defaultProperties(piece)) !== undefined)
+    assert.deepStrictEqual(lights.map((p) => p.className).sort(), [
+      "MP_PointLightFixture",
+      "MP_RawPointLight",
+      "MP_RawRectLight",
+      "MP_RawSpotLight",
+      "MP_SpotLightFixture"
+    ])
+    for (const piece of catalog.pieces) {
+      const classDefaults = defaultProperties(piece)
+      const placed = itemFromPiece(piece, placementTransform(piece, { x: 0, y: 0, z: 0 }))
+      if (lights.includes(piece)) {
+        assert.isTrue(shadows(classDefaults), piece.className)
+        assert.isFalse(shadows(placed), piece.className)
+      }
+      const rest = (properties: Pick<Item, PropertyList>, list: PropertyList) =>
+        properties[list].map((p) =>
+          p.propertyName === "bLightCastsShadows"
+            ? [p.propertyName, p.propertyType]
+            : [p.propertyName, p.propertyType, p.currentValue]
+        )
+      for (const list of PROPERTY_LISTS) {
+        assert.deepStrictEqual(rest(placed, list), rest(classDefaults, list), `${piece.className} ${list}`)
+      }
+    }
+    // the one light in the samples that was placed by hand, not loaded or pasted
+    const handPlaced = listSamples().filter((s) => s.name.includes("new pieces probe"))
+      .flatMap((s) => decodeSample(readSample(s)).items)
+      .find((item) => item.actorToSpawn.includes("MP_RawPointLight"))!
+    const piece = indexCatalog(catalog).pieceByClass.get(handPlaced.actorToSpawn)!
+    const placed = itemFromPiece(piece, placementTransform(piece, { x: 0, y: 0, z: 0 }))
+    assert.deepStrictEqual(placed.boolProperties, handPlaced.boolProperties)
   })
 
   it("leaves no property of a class the game can load unconfirmed", () => {

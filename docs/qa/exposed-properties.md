@@ -63,7 +63,7 @@ None are in the palette. The app can still place them from its Hidden section, a
 ## Not verified
 
 - Colour channels. The picker is native and the driver can't operate it, so no save proves which property each channel writes. The names come from the catalog, and the samples show them saved. The "Color" label was read on the spot light and the shape decal only. The light cards use the same row class.
-- A point light's default shadows when placed from the palette. The driver can't place from the palette. Loaded or pasted, it saves shadows on. The catalog keeps off, from the piece placed by hand in the "new pieces probe" of 2026-11-02, and `bDisableShadowsOnNewPlacement` agrees.
+- A point light's default shadows when placed from the palette. This report couldn't reach the palette. It has since been measured through the tiles' own handlers (docs/DRIVER.md § The UI as data): placed, it saves shadows off; loaded or pasted, on. The catalog now keeps the class's on, and the app's placement writes off (docs/FORMAT.md § 0.4.1).
 - The text box's own validation. I called the commit handler directly because `tap` lands on the panel's deselect guard, so what the box does with something that isn't a number is unknown.
 - Emissive back at 0. I only saw it turn `bDecalUseEmissive` on, so the app only turns it on.
 - Load behaviour on the lights. Only the rows named above were tried past their ends in a file.

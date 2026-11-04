@@ -200,6 +200,8 @@ with a snapshot before and after: the selected pieces, the pivot and gizmo, the 
 surface flags, and the panel's controls. Measured: Flip X toggles the piece's `bMirrorX` and leaves its transform
 alone, which is what the app's mirror handling assumes (docs/FORMAT.md § Mirrors).
 
+Placing from the palette has no tool, but a tile's click handler can be called directly. `instances W_MapItem_C` lists the tiles, `widgets W_MapItem_C <tile> 1` shows each one's class, and `callx W_MapItem_C BndEvt__W_MapItem_B_Item_K2Node_ComponentBoundEvent_0_OnButtonClickedEvent__DelegateSignature <tile>` places the piece, leaving a second instance of the class that `editor pieces` doesn't list. A class outside the palette goes through the handler component: `callx SKGMLEHandlerComponent SpawnActorLocalPrePlace PersistentLevel | o:BlueprintGeneratedClass,<Class>_C`, then `callx SKGMLEHandlerComponent PlacePrePlacedActor PersistentLevel`. `callx` can't pass the transform, so that piece sits at the origin with a zero transform, and it wasn't in the map when the editor saved: read it live with `props <Class> <instance>`.
+
 ### Reading objects
 
 Traps from the budget QA (docs/qa/budget.md):
