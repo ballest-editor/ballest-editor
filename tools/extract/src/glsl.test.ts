@@ -60,7 +60,60 @@ define void @MainPS() {
 !47 = !{i32 0}
 `
 
+// "Bounding Box Based 0-1 UVW": the object position (here the world position input) over the primitive data's
+// LocalObjectBoundsMin and Max, rows 26 and 27.
+const BOUNDS_PS = `
+define void @MainPS() {
+  %1 = call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 11, i32 11, i32 0, i8 0 }, i32 11, i1 false)
+  %2 = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %1, %dx.types.ResourceProperties { i32 12, i32 16 })
+  %10 = call float @dx.op.loadInput.f32(i32 4, i32 2, i32 0, i8 0, i32 undef)
+  %20 = call %dx.types.ResRet.f32 @dx.op.rawBufferLoad.f32(i32 139, %dx.types.Handle %2, i32 26, i32 0, i8 15, i32 4)
+  %21 = extractvalue %dx.types.ResRet.f32 %20, 0
+  %22 = call %dx.types.ResRet.f32 @dx.op.rawBufferLoad.f32(i32 139, %dx.types.Handle %2, i32 27, i32 0, i8 15, i32 4)
+  %23 = extractvalue %dx.types.ResRet.f32 %22, 0
+  %24 = fsub fast float %10, %21
+  %25 = fsub fast float %23, %21
+  %26 = fdiv fast float %24, %25
+  ret void
+}
+!dx.resources = !{!4}
+!dx.entryPoints = !{!38}
+!4 = !{!5, null, null, null}
+!5 = !{!20}
+!20 = !{i32 0, %"class.StructuredBuffer<vector<float, 4> >"* undef, !"", i32 0, i32 11, i32 1, i32 12, i32 0, !19}
+!38 = !{void ()* @MainPS, !"MainPS", !39, !4, null}
+!39 = !{!40, null, null}
+!40 = !{!48}
+!48 = !{i32 2, !"TEXCOORD", i8 9, i8 0, !47, i8 2, i32 1, i8 4, i32 2, i8 0, null}
+!47 = !{i32 0}
+`
+
 describe("emitProgram", () => {
+  it("leaves the mesh's bounds live, in the piece's scale like the position", () => {
+    const m = parseModule(BOUNDS_PS)
+    const evaluator = new Evaluator(m, { cbuf: () => undefined, sample: () => 0.5 })
+    const env = { evaluator, materialTextures: new Set<number>(), bc5: new Set<number>(), isTime: () => false }
+    const { code } = emitProgram(m, env, "ballestAlpha", ["%26"])
+    assert.include(code, "(uBallestBoundsMin.x * vBallestScale.x)")
+    assert.include(code, "(uBallestBoundsMax.x * vBallestScale.x)")
+    assert.notInclude(code, "/ 0.0")
+  })
+
+  it("names its samplers by the prefix it is given, so two programs of a material can run together", () => {
+    const m = parseModule(PS)
+    const evaluator = new Evaluator(m, { cbuf: () => undefined, sample: () => 0.5 })
+    const env = {
+      evaluator,
+      materialTextures: new Set([16]),
+      bc5: new Set<number>(),
+      isTime: () => false,
+      samplerPrefix: "uGlowTex"
+    }
+    assert.deepStrictEqual(emitProgram(m, env, "ballestGlow", ["%61"]).textures, [
+      { uniform: "uGlowTex0", register: 16 }
+    ])
+  })
+
   it("emits the fragment-dependent chain and folds the rest", () => {
     const m = parseModule(PS)
     const evaluator = new Evaluator(m, { cbuf: () => undefined, sample: () => 0.5 })

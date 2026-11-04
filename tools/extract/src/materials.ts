@@ -7,8 +7,8 @@
 import { Effect, Schema } from "effect"
 import { FileSystem } from "effect/FileSystem"
 import { Path } from "effect/Path"
-import { approxOf, layersOf, type Override, picksOf, type TextureInfo, translucencyOf } from "./approx.ts"
-import { arr, bool, get, type JsonObject, nameOf, num, obj, refPath, str } from "./json.ts"
+import { approxOf, layersOf, picksOf, type TextureInfo, translucencyOf } from "./approx.ts"
+import { arr, bool, get, type JsonObject, num, obj, refPath, str } from "./json.ts"
 import { chainOf, slotTexture } from "./params.ts"
 import type { MaterialShaders, MaterialSurface, ShaderTrace } from "./shaders.ts"
 
@@ -224,17 +224,6 @@ const isShaderTrace = (v: unknown): v is ShaderTrace =>
 const isSurface = (v: unknown): v is MaterialSurface =>
   Array.isArray(get(v, "baseColor")) && obj(get(v, "gains")) !== undefined
 
-/**
- * Materials the cooked data cannot describe, by asset name, each a function of the instance's vectors.
- * M_PlasticBase mixes BaseColor_Dark and BaseColor_Light per 45/30/22.5 cm cell by a noise lookup whose
- * texture slot holds the engine's placeholder DefaultWhiteGrid in the cooked asset (the blueprint binds the
- * real one at runtime, so its GLSL program reads near-white and lands on the dark colour); the game shows
- * the light colour with faint darker cells.
- */
-const OVERRIDES: Record<string, Override> = {
-  M_PlasticBase: { baseColor: (V) => V["BaseColor_Light"]?.slice(0, 3) }
-}
-
 export const materialsBuild = Effect.fn("materialsBuild")(
   function*({ assets, work }: { work: string; assets: string }) {
     const fs = yield* FileSystem
@@ -259,14 +248,13 @@ export const materialsBuild = Effect.fn("materialsBuild")(
       const recovered = self.error === undefined &&
         Object.keys(merged.scalars).length + Object.keys(merged.vectors).length + Object.keys(merged.textures).length >
           0
-      const name = nameOf(materialPath)
       // The compiled shader's trace, evaluated for this instance's parameters (shaders.json).
       const sh = shaderMaterials[materialPath]
       if (sh !== undefined) withShaders++
       const evaluated = sh?.surface ?? null
       const textureOf = (slot: number): string | null => slotTexture({ merged, root }, sh?.textures[slot])
       const picks = picksOf(merged, root.connectedOutputs ?? null)
-      const translucency = translucencyOf(blendMode, evaluated, picks.pickedEmissive)
+      const translucency = translucencyOf(blendMode, evaluated, picks.pickedEmissive, root.connectedOutputs ?? null)
       const layers = layersOf(sh, merged, textureOf, textureInfo, translucency.translucent)
       const approx = approxOf({
         merged,
@@ -274,7 +262,6 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         picks,
         translucency,
         layers,
-        override: OVERRIDES[name],
         texPath,
         textureOf
       })
@@ -329,8 +316,7 @@ export const materialsBuild = Effect.fn("materialsBuild")(
         "approx.variation is the grey mottle as the base pass applies it: colour *= 1 + gain * product over layers of (texture read at tilings[i] + offsets[i]); gain already includes the instance's parameter (ColorContrast - 1 for the Env masters).",
         "approx.outline is M_OutlineEdges' grey band along the UV border ({inset: [u, v] fraction, color}).",
         "approx.opacity is the evaluated alpha on the face that shows most (a beam masks its caps with 1 - |world normal z|: its sides); approx.upFade (0..1, null = 1) is the fraction left on a face that looks up. An additive pass renders as its evaluated glow (emissive, black base, opacity 1) faded the same way.",
-        "approx.programs is the compiled shader's own output math as GLSL functions f(uv, worldNormal, objectPosition, time) with the instance's parameters folded in: alpha (a translucent pass's alpha, e.g. the vent's streaks for any frame via time), glow (an additive pass's unlit colour) and base (an opaque base colour whose texture reads the layers cannot place: coordinates through a cell function, e.g. the rubber block's cells and the paddle's stripe, or a mask in a texture's alpha, e.g. the spinning cylinder's stripes); textures are the samplers the code reads (uTexN).",
-        "A few materials cannot be read from the cooked data and are overridden by name (OVERRIDES in tools/extract/src/materials.ts): M_PlasticBase's cell noise samples the engine's placeholder texture, so its base colour is taken as BaseColor_Light, the colour the game shows.",
+        "approx.programs is the compiled shader's own output math as GLSL functions f(uv, worldNormal, objectPosition, time) with the instance's parameters folded in: alpha (a translucent pass's alpha, e.g. the vent's streaks for any frame via time), glow (the unlit colour of an additive or translucent pass, run beside its alpha; samplers uGlowTexN) and base (an opaque base colour whose texture reads the layers cannot place: coordinates through a cell function, e.g. the rubber block's cells and the paddle's stripe, or a mask in a texture's alpha, e.g. the spinning cylinder's stripes); textures are the samplers the code reads (uTexN).",
         "paint is the in-game editor's material picker (MaterialCategories_Library): categories in the game's order, each with its colours and the class-qualified material a map file stores for that choice. displayColor (linear RGB) is the swatch colour where the game sets one explicitly (ColorColorMap).",
         "surfaces are the level editor's item surfaces (EBallestSurfaceAssignment) in the game's order, each with the material the game draws that physics surface with (object path; null for none): UBallestSurfaceMaterialSettings' defaults from the exe, overridden by DefaultGame.ini."
       ],

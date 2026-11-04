@@ -1,7 +1,20 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
 import { parseMaterialsFile } from "../domain/Materials"
-import { BLUE, GLASS, GLOW, materialsFile, OUTLINE, PIPE, primitive, TILES, WIND } from "../test/materials"
+import {
+  BLUE,
+  CELLS,
+  FADED,
+  GLASS,
+  GLOW,
+  materialsFile,
+  OUTLINE,
+  PANEL,
+  PIPE,
+  primitive,
+  TILES,
+  WIND
+} from "../test/materials"
 import {
   applyShaderPatch,
   applySlotMaterials,
@@ -18,7 +31,7 @@ describe("three materials", () => {
     uniforms: {},
     vertexShader: "#include <common>\n#include <project_vertex>",
     fragmentShader:
-      "#include <common>\n#include <normalmap_pars_fragment>\n#include <map_fragment>\n#include <alphamap_fragment>\n#include <emissivemap_fragment>\n#include <normal_fragment_maps>"
+      "#include <common>\n#include <normalmap_pars_fragment>\n#include <map_fragment>\n#include <alphamap_fragment>\n#include <emissivemap_fragment>\n#include <normal_fragment_maps>\n#include <opaque_fragment>"
   })
 
   it("builds cached three materials: blue is blue, glass is translucent, unknown is neutral", () => {
@@ -145,7 +158,7 @@ describe("three materials", () => {
     assert.deepStrictEqual(shaderPatchOf(wind)?.uniforms.uAlphaShape.value, new THREE.Vector2(0.6, 0.3))
     assert.isDefined(shaderPatchOf(wind)?.uniforms["uTex0"])
     assert.isFalse(shaderPatchOf(wind)?.uniforms.uAlphaMap.value?.flipY) // same rows as the program's read
-    assert.strictEqual(shaderPatchOf(wind)?.uniforms.uBallestTime.value, 0)
+    assert.isAbove(shaderPatchOf(wind)?.uniforms.uBallestTime.value ?? 0, 0) // past a checkpoint's activation flash
     assert.strictEqual(wind.defines?.["STANDARD"], "") // three's own define survives the patch
     const shader = program()
     applyShaderPatch(shader, shaderPatchOf(wind)!)
@@ -168,7 +181,7 @@ describe("three materials", () => {
     assert.strictEqual(glow.blending, THREE.AdditiveBlending)
     assert.strictEqual(glow.opacity, 1)
     assert.deepStrictEqual(glow.emissive.toArray().map((c) => +c.toFixed(2)), [0.63, 0.03, 0.04])
-    assert.deepStrictEqual(shaderPatchOf(glow)?.defines, { BALLEST_PROGRAM_GLOW: 1 })
+    assert.deepStrictEqual(shaderPatchOf(glow)?.defines, { BALLEST_PROGRAM_GLOW: 1, BALLEST_UNLIT: 1 })
     const shader = program()
     applyShaderPatch(shader, shaderPatchOf(glow)!)
     assert.include(
@@ -176,6 +189,51 @@ describe("three materials", () => {
       "totalEmissiveRadiance = ballestGlow( vBallestUv, vBallestWorldNormal, vBallestLocal, uBallestTime );"
     )
     assert.notInclude(shader.fragmentShader, "#include <emissivemap_fragment>")
+    // the sky must not reflect in a glow, and it skips the tone mapping the framebuffer already has
+    assert.include(shader.fragmentShader, "outgoingLight = pow( max( totalEmissiveRadiance, 0.0 )")
+    assert.isFalse(glow.toneMapped)
+  })
+
+  it("runs a translucent pass's alpha and glow side by side, with an HDR glow moved into the alpha", () => {
+    const table = parseMaterialsFile(materialsFile)
+    const panel = materialFor(table, PANEL)
+    assert.isFalse(panel.blending === THREE.AdditiveBlending)
+    assert.deepStrictEqual(shaderPatchOf(panel)?.defines, { BALLEST_PROGRAM_ALPHA: 1, BALLEST_PROGRAM_GLOW: 1 })
+    assert.isDefined(shaderPatchOf(panel)?.uniforms["uTex0"])
+    assert.isDefined(shaderPatchOf(panel)?.uniforms["uGlowTex0"])
+    const shader = program()
+    applyShaderPatch(shader, shaderPatchOf(panel)!)
+    assert.include(shader.fragmentShader, "float ballestAlpha(")
+    assert.include(shader.fragmentShader, "vec3 ballestGlow(")
+    assert.include(shader.fragmentShader, "diffuseColor.a = ballestShown;")
+  })
+
+  it("builds a program that reads its mesh's bounds once per mesh size", () => {
+    const table = parseMaterialsFile(materialsFile)
+    const sized = (size: number): THREE.Material => {
+      const root = new THREE.Group()
+      const mesh: THREE.Mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(size, size, size),
+        new THREE.MeshBasicMaterial({ name: "0:Cells" })
+      )
+      root.add(mesh)
+      applySlotMaterials(root, table, [CELLS])
+      return mesh.material instanceof THREE.Material ? mesh.material : neutralMaterial()
+    }
+    const small = sized(2)
+    const large = sized(10)
+    assert.notStrictEqual(small, large)
+    assert.strictEqual(sized(2), small)
+    assert.strictEqual(shaderPatchOf(large)?.uniforms.uBallestBoundsMax.value.x, 5)
+    assert.strictEqual(shaderPatchOf(small)?.uniforms.uBallestBoundsMin.value.x, -1)
+    // the same compiled program: only the uniforms differ
+    assert.strictEqual(small.customProgramCacheKey(), large.customProgramCacheKey())
+  })
+
+  it("scales a normal map by what the shader leaves of it", () => {
+    const table = parseMaterialsFile(materialsFile)
+    assert.closeTo(materialFor(table, TILES).normalScale.x, 1.6, 1e-6)
+    assert.closeTo(materialFor(table, FADED).normalScale.x, 0.64, 1e-6)
   })
 
   it("assigns materials per primitive by UE slot index", () => {

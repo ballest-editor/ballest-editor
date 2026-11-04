@@ -39,6 +39,7 @@ uniform vec3 uSun;
 uniform float uStars;
 uniform float uGain;
 uniform vec3 uGround;
+uniform vec3 uTint;
 uniform float uClipY;
 varying vec3 vDir;
 
@@ -62,7 +63,8 @@ void main() {
   vec3 color = mix( uZenith + uStars * 0.5 * ballestStars( d ), uHorizon, f );
   float alpha = 1.0;
   #ifdef BALLEST_CAPTURE
-    color = d.y < 0.0 ? uGround : color;
+    // The capture keeps the sky's shape and takes its colour from the light the game shows (viewLightOf).
+    color = dot( d.y < 0.0 ? uGround : color, vec3( 0.2126, 0.7152, 0.0722 ) ) * uTint;
   #else
     // How far above the grid's height this direction meets the dome (from the exact
     // direction, not the faceted mesh); the sky fades in over SKY_FADE_HEIGHT from there.
@@ -94,6 +96,7 @@ const skyUniforms = (capture: boolean) => ({
   uStars: { value: 0 },
   uGain: { value: capture ? SKY_GAIN : SKY_GAIN * SKY_EXPOSURE },
   uGround: { value: new THREE.Color() },
+  uTint: { value: new THREE.Color(1, 1, 1) },
   /** World height (scene units) where the visible dome has faded out. */
   uClipY: { value: -Infinity }
 })
@@ -131,9 +134,15 @@ export class SkyMaterial extends THREE.ShaderMaterial {
   }
 }
 
-/** Puts `sky` into a sky material; `ground` is the capture's lower hemisphere (linear RGB). */
-export const setSky = (material: SkyMaterial, sky: Sky, ground: number): void => {
+/** Puts `sky` into a sky material; `ground` is the capture's lower hemisphere, `tint` the capture's colour (linear RGB). */
+export const setSky = (
+  material: SkyMaterial,
+  sky: Sky,
+  ground: number,
+  tint: readonly [number, number, number] = [1, 1, 1]
+): void => {
   const u = material.sky
+  u.uTint.value.setRGB(...tint, THREE.LinearSRGBColorSpace)
   u.uZenith.value.setRGB(...sky.zenith, THREE.LinearSRGBColorSpace)
   u.uHorizon.value.setRGB(...sky.horizon, THREE.LinearSRGBColorSpace)
   u.uFalloff.value = sky.horizonFalloff

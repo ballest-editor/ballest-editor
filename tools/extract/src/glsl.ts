@@ -19,7 +19,7 @@ import { bufferNames, type Evaluator } from "./evaluate.ts"
 export interface GlslProgram {
   /** A GLSL function `<returnType> <name>(vec2 uv, vec3 nrm, vec3 pos, float time)`. */
   readonly code: string
-  /** The material texture registers the code samples, as `uTexN` samplers. */
+  /** The material texture registers the code samples, as numbered samplers (`uTexN`, see `samplerPrefix`). */
   readonly textures: ReadonlyArray<{ readonly uniform: string; readonly register: number }>
   /** How many instructions the emitter had to fold because it does not understand them, and which. */
   readonly unsupported: number
@@ -34,9 +34,17 @@ export interface GlslEnv {
   readonly bc5: ReadonlySet<number>
   /** A constant-buffer reference (`View[167].z`) that is the game time. */
   readonly isTime: (ref: string) => boolean
+  /** The samplers' name, numbered per program: two programs of one material must not share a sampler name. */
+  readonly samplerPrefix?: string
 }
 
 const XYZW = ["x", "y", "z", "w"] as const
+
+/**
+ * The primitive data rows the renderer provides (`LocalObjectBoundsMin` and `Max`), as uniforms in the mesh's own
+ * frame. `pos` carries the piece's scale, so these do too: "Bounding Box Based 0-1 UVW" stays 0 to 1.
+ */
+const BOUNDS_ROWS: Record<number, string> = { 26: "uBallestBoundsMin", 27: "uBallestBoundsMax" }
 
 /** A finite float as a GLSL literal (`1.0`, `2.5e-7`). */
 export const glslFloat = (n: number): string => {
@@ -70,6 +78,16 @@ class Emitter {
   }
 
   /** The GLSL for a fragment input, or undefined for one the renderer does not provide (folded). */
+  #boundsExpr(v: string): string | undefined {
+    const i = this.#at(v)
+    if (i?.kind !== "extract" || i.channel > 2) return undefined
+    const load = this.#at(i.aggregate)
+    if (load?.kind !== "rawLoad") return undefined
+    const uniform = BOUNDS_ROWS[this.#env.evaluator.int(load.index)]
+    const c = XYZW[i.channel] ?? "x"
+    return uniform === undefined ? undefined : `(${uniform}.${c} * vBallestScale.${c})`
+  }
+
   #inputExpr(i: Input): string | undefined {
     const sig = this.#m.inputs.find((x) => x.id === i.id)
     if (sig === undefined) return undefined
@@ -123,6 +141,7 @@ class Emitter {
       } else if (i.kind === "extract") {
         const agg = this.#at(i.aggregate)
         if (agg?.kind === "cbuffer" && this.#env.isTime(this.#cbufRef(agg, i.channel))) mark(v)
+        if (this.#boundsExpr(v) !== undefined) mark(v)
       }
     }
     // Buffer and constant loads are static whatever indexes them (the instance id, an engine stencil read).
@@ -229,7 +248,10 @@ class Emitter {
           if (this.#env.bc5.has(register) && i.channel >= 2) return i.channel === 2 ? "0.0" : "1.0"
           return `${this.#sample(i.aggregate, agg, register)}.${XYZW[i.channel] ?? "x"}`
         }
-        // Scene data and the other constant buffers fold (a piece at the origin); only the game time is live.
+        // Scene data and the other constant buffers fold (a piece at the origin); the game time and the mesh's
+        // bounds are live.
+        const bounds = this.#boundsExpr(v)
+        if (bounds !== undefined) return bounds
         return agg?.kind === "cbuffer" && this.#env.isTime(this.#cbufRef(agg, i.channel)) ? "time" : this.#fold(v)
       }
       case "float": {
@@ -293,7 +315,7 @@ class Emitter {
     const u = this.expr(s.coords[0]), w = this.expr(s.coords[1])
     let uniform = this.textures.get(register)
     if (uniform === undefined) {
-      uniform = `uTex${this.textures.size}`
+      uniform = `${this.#env.samplerPrefix ?? "uTex"}${this.textures.size}`
       this.textures.set(register, uniform)
     }
     const name = `s${v.slice(1).replace(".", "_")}`

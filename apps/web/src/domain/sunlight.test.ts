@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { Option } from "effect"
 import { setLighting } from "./edits"
 import { newMapFile } from "./factory"
-import { DEFAULT_LIGHT_ANGLE, lightingOf, skyLightIntensity, sunOf, sunPitch } from "./sunlight"
+import { DEFAULT_LIGHT_ANGLE, lightingOf, skyLightIntensity, sunOf, sunPitch, viewLightOf } from "./sunlight"
 
 const EPSILON = 1e-4
 
@@ -34,6 +34,18 @@ describe("sunlight", () => {
     assert.closeTo(morning.x, 0, EPSILON)
     assert.closeTo(morning.y, -Math.SQRT1_2, EPSILON) // yaw 90 points the light along +Y; the morning sun is behind it
     assert.closeTo(evening.y, Math.SQRT1_2, EPSILON)
+  })
+
+  it("shows a warm low sun over a blue sky, and a brighter sky at noon", () => {
+    const light = (timeOfDay: number, brightness = 12) => viewLightOf(sunOf({ timeOfDay, brightness, angle: 0 }))
+    const low = light(7.3), noon = light(12)
+    assert.isAbove(low.sun[0], low.sun[2] * 2)
+    assert.isBelow(low.sky[0], low.sky[2] / 2)
+    assert.isAbove(noon.sky[1], low.sky[1] * 2)
+    assert.isBelow(noon.sun[0], low.sun[0])
+    assert.closeTo(light(7.3, 6).sun[0], low.sun[0] / 2, EPSILON) // the sun follows the brightness slider
+    assert.deepStrictEqual(light(0).sun, [0, 0, 0]) // night: the sun is gone and the sky dims with the sky light
+    assert.isBelow(light(0).sky[1], low.sky[1])
   })
 
   it("dims the sun towards the horizon and hides it below", () => {

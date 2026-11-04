@@ -281,6 +281,8 @@ export const picksOf = (merged: Merged, connectedOutputs: ReadonlyArray<string> 
 export interface Translucency {
   readonly translucent: boolean
   readonly additive: boolean
+  /** The pass refracts and has no glow of its own: its scene colour is what is behind it. */
+  readonly refracts: boolean
   /** The evaluated alpha on the face that shows most; null without an evaluation. */
   readonly alphaShown: number | null
   /** 0..1: how much of the opacity (additive: the glow) is left on a face that looks up; null = all of it. */
@@ -294,7 +296,8 @@ export interface Translucency {
 export const translucencyOf = (
   blendMode: string,
   evaluated: Surface | null,
-  pickedEmissive: ReadonlyArray<number> | null
+  pickedEmissive: ReadonlyArray<number> | null,
+  connectedOutputs: ReadonlyArray<string> | null = null
 ): Translucency => {
   const translucent = /Translucent|Additive|Modulate/.test(blendMode)
   const additive = blendMode.includes("Additive")
@@ -304,15 +307,18 @@ export const translucencyOf = (
   const glowUp = Math.max(...(evaluated?.emissive ?? [0]))
   const glowSide = Math.max(...(evaluated?.emissiveSide ?? [0]))
   const glowShown = Math.max(glowUp, glowSide)
-  // An additive pass adds its unlit scene colour: that is the glow, evaluated on the face that shows it.
-  const glow = additive && evaluated !== null && glowShown > 0 ? evaluated : null
+  // A pass's unlit scene colour is its glow, evaluated on the face that shows it: all an additive pass adds, and
+  // the emissive a translucent one draws over its lit base colour. A refracting pass (glass, water) draws the scene
+  // behind it there, no glow: evaluated, that is mid-grey at most, where a real one (the checkpoint's panel) is HDR.
+  const refracts = (connectedOutputs?.includes("Refraction") ?? false) && glowShown < 1
+  const glow = translucent && !refracts && evaluated !== null && glowShown > 0 ? evaluated : null
   const emissiveColor = glow !== null ? glowSide > glowUp ? glow.emissiveSide : glow.emissive : pickedEmissive
   const upFade = additive && glowShown > 0
     ? Math.min(1, glowUp / glowShown)
     : alphaSide !== null && alphaSide > (alphaUp ?? 0)
     ? Math.min(1, (alphaUp ?? 0) / alphaSide)
     : null
-  return { translucent, additive, alphaShown, upFade, emissiveColor, glowEvaluated: glow !== null }
+  return { translucent, additive, refracts, alphaShown, upFade, emissiveColor, glowEvaluated: glow !== null }
 }
 
 // ------------------------------------------------------------------ 3. layers
@@ -352,17 +358,26 @@ export const layersOf = (
   const traced: { reads: Array<Read>; index: Array<number> } = sh === undefined
     ? { reads: [], index: [] }
     : readsOf(sh, merged, textureOf, textureInfo, translucent)
+  // A normal map's strength is what the shader does with it: the unpack constant says how it is decoded, but a
+  // master can fade it by a parameter (M_ArenaColorBase, to nothing at ConcreteValue 0) or by another read (the air
+  // vent's map shows only at the peak of its slats). An opaque evaluation measures that for a map on the mesh's UVs,
+  // where no response means no map; a projected map's axes depend on the face, which the facing surface cannot show.
+  const measured = evaluated?.metallic != null
   const reads = traced.reads.map((r, i) => {
     const g = evaluated?.gains[String(traced.index[i])]
+    const strength = measured && r.role === "normal" && r.projection === "uv"
+      ? Math.min(r.strength, Math.abs(g?.normal ?? 0))
+      : r.strength
     return g === undefined
-      ? r
-      : { ...r, gain: g.gain, mean: g.mean, alphaGain: g.alpha, fromAlpha: g.fromAlpha ?? null }
+      ? { ...r, strength }
+      : { ...r, strength, gain: g.gain, mean: g.mean, alphaGain: g.alpha, fromAlpha: g.fromAlpha ?? null }
   })
   const variation = sh === undefined ? null : variationOf(sh, merged, reads, traced.index)
   // Only reads whose coordinates are fully known can stand for a role.
   const byRole = (role: Role) => reads.filter((r) => r.role === role && r.unresolved.length === 0)
-  // The main normal layer: strongest, then the coarsest (the Env masters add a fine x12 layer at full strength).
-  const normals = byRole("normal").sort((a, b) => b.strength - a.strength || a.scale[0] - b.scale[0])
+  // The main normal layer: decoded strongest, then the coarsest (the Env masters add a fine x12 layer at full strength).
+  const decoded = (r: Read) => traced.reads[reads.indexOf(r)]?.strength ?? r.strength
+  const normals = byRole("normal").sort((a, b) => decoded(b) - decoded(a) || a.scale[0] - b.scale[0])
   const primary = (role: Role) => byRole(role)[0]
   // Colour layers: reads the evaluated surface says add to the base colour (gain != 0). Without an
   // evaluation (translucent passes) no colour texture is applied: the parameters alone are safer.
@@ -386,18 +401,12 @@ export const layersOf = (
 }
 
 // ------------------------------------------------------------------ 4. output
-/** A material the cooked data cannot describe, overridden by asset name as a function of the instance's vectors. */
-export interface Override {
-  readonly baseColor?: (vectors: Merged["vectors"]) => ReadonlyArray<number> | undefined
-}
-
 export interface ApproxInput {
   readonly merged: Merged
   readonly evaluated: Surface | null
   readonly picks: Picks
   readonly translucency: Translucency
   readonly layers: Layers
-  readonly override: Override | undefined
   /** A texture object path -> its PNG under assets, or null when it was not decoded. */
   readonly texPath: (texture: string | null) => string | null
   /** A material texture slot -> the texture it holds for this instance. */
@@ -405,13 +414,16 @@ export interface ApproxInput {
 }
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
+const MIN_NORMAL_STRENGTH = 0.02
+/** A program that compares a UV directly: a band of colour with no texture behind it. */
+const UV_BAND = /\(uv\.[xy] [<>]/
 
 /** `approx`: what the renderer draws for the material. */
 export const approxOf = (
-  { evaluated, layers, merged, override, picks, texPath, textureOf, translucency }: ApproxInput
+  { evaluated, layers, merged, picks, texPath, textureOf, translucency }: ApproxInput
 ) => {
   const S = merged.scalars, V = merged.vectors
-  const { additive, alphaShown, emissiveColor, translucent, upFade } = translucency
+  const { additive, alphaShown, emissiveColor, refracts, translucent, upFade } = translucency
   const { colorLayers, normalRead, opacityRead, ormRead, projection, reads, unplaced, variation, variationRead } =
     layers
   const bc = picks.baseColor.value
@@ -426,9 +438,10 @@ export const approxOf = (
   // whose reads the layers above could not place): what the renderer runs instead of the linearised look.
   const programs = Object.fromEntries(
     Object.entries(evaluated?.programs ?? {})
-      // A base program only where the layers cannot place a read, and never for an overridden material: its
-      // program runs the same math on the placeholder texture the override exists to work around.
-      .filter(([kind]) => kind !== "base" || (override === undefined && unplaced))
+      // A base program only where the layers cannot place a read or the colour is drawn from the UVs with no
+      // texture at all (the paddle's top stripe).
+      .filter(([kind, p]) => kind !== "base" || unplaced || UV_BAND.test(p.code))
+      .filter(([kind]) => kind !== "glow" || !refracts)
       .map(([kind, p]) => [kind, {
         code: p.code,
         textures: p.textures.map((t) => ({
@@ -437,20 +450,22 @@ export const approxOf = (
         }))
       }])
   )
+  // An additive pass is all glow, also when the glow only shows through its texture masks (zero at their means).
+  const allGlow = additive && (emissiveColor !== null || programs["glow"] !== undefined)
   return {
     // The evaluated shader where there is one (opaque); else parameters picked by name. Emissive-only
     // masters (BaseColor pin unconnected) render black + emissive in UE.
-    baseColor: override?.baseColor?.(V) ?? (evaluated !== null && !(additive && emissiveColor)
+    baseColor: evaluated !== null && !allGlow
       ? evaluated.baseColor.map(clamp01)
-      : (picks.emissiveOnly || additive) && emissiveColor
+      : (picks.emissiveOnly && emissiveColor) || allGlow
       ? [0, 0, 0]
-      : (bc ?? [0.8, 0.8, 0.8, 1]).slice(0, 3)),
+      : (bc ?? [0.8, 0.8, 0.8, 1]).slice(0, 3),
     metallic: evaluated?.metallic != null ? clamp01(evaluated.metallic) : picks.metallic.value ?? 0,
     roughness: evaluated?.roughness != null ? clamp01(evaluated.roughness) : picks.roughness.value ?? 0.6,
     evaluated: evaluated !== null,
     // An additive pass is all glow (its alpha is 0): drawn at full strength, faded by upFade. A translucent
     // pass whose alpha vanishes on every face (a view-angle effect) keeps the parameter's opacity.
-    opacity: additive && emissiveColor
+    opacity: allGlow
       ? 1
       : alphaShown !== null && alphaShown >= 0.02
       ? clamp01(alphaShown)
@@ -459,7 +474,9 @@ export const approxOf = (
     upFade,
     emissive: emissiveColor,
     baseColorTexture: null,
-    normalTexture: tex(normalRead),
+    // A map that barely moves the normal is not drawn at all.
+    normalTexture: (normalRead?.strength ?? 0) >= MIN_NORMAL_STRENGTH ? tex(normalRead) : null,
+    normalStrength: normalRead?.strength ?? 1,
     ormTexture: tex(ormRead),
     variationTexture: tex(variationRead),
     opacityTexture: tex(opacityRead),

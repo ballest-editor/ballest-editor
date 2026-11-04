@@ -21,6 +21,7 @@ import { gridColorsOf } from "../domain/Settings"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { ItemObject } from "./ItemObject"
+import { advanceGameTime } from "./materials"
 import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
@@ -273,6 +274,12 @@ function Water() {
   )
 }
 
+/** Runs the clock of the materials that move (the vent's air, the checkpoints' glow). */
+function GameClock() {
+  useFrame((_, seconds) => advanceGameTime(seconds))
+  return null
+}
+
 /** Outline along a selected item's mesh edges (see selectionOutline.ts); the active item draws lighter. */
 function SelectedOutline({ id, active }: { readonly id: string; readonly active: boolean }) {
   const outline = useMemo(() => new SelectionOutline(), [])
@@ -333,6 +340,7 @@ export function Viewport(
       >
         <ViewportBackground />
         <SmoothResize />
+        <GameClock />
         <SceneLights />
         <ViewportGrid />
         <Water />

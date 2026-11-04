@@ -117,7 +117,7 @@ export interface MaterialSurface {
   readonly emissiveSide: readonly [number, number, number]
   /**
    * The shader's own math as GLSL, with this instance's parameters folded in: `alpha` (translucent), `glow`
-   * (additive: the unlit colour) or `base` (opaque: the GBuffer base colour); textures by material texture index.
+   * (the unlit colour of a translucent or additive pass) or `base` (opaque: the GBuffer base colour); textures by material texture index.
    */
   readonly programs: Partial<Record<"alpha" | "glow" | "base", GlslProgramRef>>
   /**
@@ -132,6 +132,8 @@ export interface ReadGain {
   readonly alpha: number
   readonly mean: readonly [number, number, number]
   readonly fromAlpha?: readonly [number, number, number]
+  /** How far the read turns the surface's normal, 1 = a full-strength normal map (opaque passes). */
+  readonly normal?: number
 }
 
 /** A listed material's trace with the surface evaluated for its own parameters: what `materials build` works from. */
@@ -162,9 +164,47 @@ export interface ShadersFile {
 
 const isAnalysed = (e: ShaderTrace | { readonly error: string }): e is ShaderTrace => !Object.hasOwn(e, "error")
 
-/** Material textures are the highest-numbered Texture2D SRVs: UE binds the Material uniform buffer last. */
-const materialTextureRegisters = (m: Module, count: number): Array<number> =>
-  m.srvs.filter((s) => s.kind === "Texture2D").map((s) => s.register).sort((a, b) => a - b).slice(-count)
+/** A texture read as `materialTextureRegisters` needs it: the register, and whether it is decoded as a normal map. */
+interface RegisterRead {
+  readonly register: number
+  readonly normal: boolean
+}
+
+/** The ways to pick `size` of the slots 0..count-1, the first slots first (so the last ones are left out first). */
+const subsets = (count: number, size: number, from = 0): ReadonlyArray<ReadonlyArray<number>> =>
+  size === 0
+    ? [[]]
+    : Array.from({ length: count - from }, (_, i) => from + i)
+      .flatMap((first) => subsets(count, size - 1, first + 1).map((rest) => [first, ...rest]))
+
+/**
+ * The register of each material texture slot, -1 for one the compiler left out. Material textures are the
+ * highest-numbered Texture2D SRVs (UE binds the Material uniform buffer last), but only those this pixel shader uses
+ * are bound: a parameter it does not read leaves no register, and the registers close up. The shader says which were
+ * dropped only through its reads, so a slot's register is the one that fits: a read decoded as a normal map (`* 2 - 1`)
+ * lands on a normal map, and among equal fits the last slots are the ones left out.
+ */
+export const materialTextureRegisters = (
+  m: Pick<Module, "srvs">,
+  count: number,
+  reads: ReadonlyArray<RegisterRead>,
+  slotIsNormal: (slot: number) => boolean
+): ReadonlyArray<number> => {
+  if (count === 0) return []
+  const top = m.srvs.filter((s) => s.kind === "Texture2D").map((s) => s.register).sort((a, b) => a - b).slice(-count)
+  const read = new Set(reads.map((r) => r.register))
+  const firstRead = top.findIndex((r) => read.has(r))
+  const bound = firstRead < 0 ? top : top.slice(firstRead)
+  if (bound.length === count) return top
+  const normal = new Set(reads.filter((r) => r.normal).map((r) => r.register))
+  const fit = (slots: ReadonlyArray<number>) =>
+    bound.filter((register, i) => normal.has(register) === slotIsNormal(slots[i] ?? -1)).length
+  const best = subsets(count, bound.length).reduce((a, b) => (fit(b) > fit(a) ? b : a))
+  return Array.from({ length: count }, (_, slot) => {
+    const i = best.indexOf(slot)
+    return i < 0 ? -1 : bound[i] ?? -1
+  })
+}
 
 export const shaders = Effect.fn("shaders")(function*(options: {
   readonly dump: string
@@ -186,7 +226,13 @@ export const shaders = Effect.fn("shaders")(function*(options: {
   /** the analysed pixel shader of each material entry, kept for the per-instance evaluation */
   const pixels = new Map<
     string,
-    { module: Module; ir: string; sampleValues: ReadonlyArray<string>; mottle: ReadonlyArray<string> }
+    {
+      module: Module
+      ir: string
+      sampleValues: ReadonlyArray<string>
+      mottle: ReadonlyArray<string>
+      registers: ReadonlyArray<number>
+    }
   >()
   const disassemble = Effect.fn("disassemble")(function*(file: string) {
     const full = path.join(options.dump, `${file}.dxil`)
@@ -222,9 +268,26 @@ export const shaders = Effect.fn("shaders")(function*(options: {
         .map((m) => ({ ...m, outputs: outputsOf(m.ir, m.module) }))
         .sort((a, b) => b.outputs.length - a.outputs.length)[0]
       const textureParams = ues.UniformTextureParameters[0] ?? []
-      const registers = materialTextureRegisters(pixel.module, textureParams.length)
-      const materialCb = pixel.module.cbuffers.find((c) => c.type === "Material")
       const pixelSamples = samples(pixel.module)
+      const root = chainOf(dump, material)
+      const registers = materialTextureRegisters(
+        pixel.module,
+        textureParams.length,
+        // Level reads are the engine's (lighting volumes, fog), also where one lands among the top registers.
+        pixelSamples.filter((s) => s.op !== "sampleLevel").map((s) => ({
+          register: s.register,
+          normal: s.resultFactor === 2
+        })),
+        (slot) => {
+          const param = textureParams[slot]
+          const texture = param === undefined ? null : slotTexture(root, {
+            index: param.TextureIndex,
+            param: param.ParameterInfo.Name === "None" ? null : param.ParameterInfo.Name
+          })
+          return texture !== null && str(get(dump, "textures", texture, "compression")) === "TC_Normalmap"
+        }
+      )
+      const materialCb = pixel.module.cbuffers.find((c) => c.type === "Material")
       const mottle = mottleOf(pixel.module)
       const reads: Array<TextureRead> = pixelSamples.map((s) => ({
         texture: registers.indexOf(s.register),
@@ -240,7 +303,8 @@ export const shaders = Effect.fn("shaders")(function*(options: {
         module: pixel.module,
         ir: pixel.ir,
         sampleValues: pixelSamples.map((s) => s.value),
-        mottle: mottle?.samples ?? []
+        mottle: mottle?.samples ?? [],
+        registers
       })
       traces[material] = {
         pixel: pixel.shader.file,
@@ -308,13 +372,14 @@ export const shaders = Effect.fn("shaders")(function*(options: {
       const mean = texture === null ? null : yield* meanOf(texture)
       if (mean !== null) means.set(v, mean)
     }
-    // Engine textures (custom stencil / depth lookups that gate the level editor's ghost modes) read 1: the
-    // plain, placed state. Material textures without a decodable mean read mid-grey.
+    // Engine textures read 1: custom stencil / depth lookups that gate the level editor's ghost modes (the plain,
+    // placed state), the fog's transmittance, and the translucency lighting volumes (an additive glow is lit: its
+    // colour is its base colour under that ambient). Material textures without a decodable mean read mid-grey.
     const engine = new Set(px.sampleValues.filter((_, i) => (base.reads[i]?.texture ?? -1) < 0))
     const sampleMean = (v: string, ch: number) => means.get(v)?.[ch] ?? (engine.has(v) ? 1 : 0.5)
     const surface = surfaceOf(px.module, px.ir, cbuf, sampleMean, colour)
     // The output chains as GLSL: what the renderer runs where the linearised layers fall short.
-    const registers = materialTextureRegisters(px.module, base.textures.length)
+    const { registers } = px
     const bc5 = new Set<number>()
     for (const [i, register] of registers.entries()) {
       const texture = slotTexture(chain, base.textures[i])
@@ -328,14 +393,21 @@ export const shaders = Effect.fn("shaders")(function*(options: {
         sample: sampleMean,
         cfg: cfgOf(px.ir)
       }),
-      materialTextures: new Set(registers),
+      materialTextures: new Set(registers.filter((r) => r >= 0)),
       bc5,
       isTime: (ref) => ref === "View[167].z"
     }
-    const program = (name: string, roots: ReadonlyArray<string | undefined>): GlslProgramRef | undefined => {
+    const program = (
+      name: string,
+      roots: ReadonlyArray<string | undefined>,
+      samplerPrefix?: string
+    ): GlslProgramRef | undefined => {
       if (roots.some((r) => r === undefined)) return undefined
-      const p = emitProgram(px.module, glslEnv, name, roots.map((r) => r ?? "0.0"))
+      const env = samplerPrefix === undefined ? glslEnv : { ...glslEnv, samplerPrefix }
+      const p = emitProgram(px.module, env, name, roots.map((r) => r ?? "0.0"))
       if (p.textures.length === 0) return undefined
+      // A division by a folded zero: the math needs something only a frame has (the light beams' scene depth).
+      if (p.code.includes("/ 0.0)")) return undefined
       return {
         code: p.code,
         textures: p.textures.map((t) => ({ uniform: t.uniform, texture: registers.indexOf(t.register) }))
@@ -345,7 +417,11 @@ export const shaders = Effect.fn("shaders")(function*(options: {
     const additive = chain.blendMode.includes("Additive")
     const programs: Partial<Record<"alpha" | "glow" | "base", GlslProgramRef>> = {}
     const alphaProgram = !opaque && !additive ? program("ballestAlpha", [outs.get("0.w")]) : undefined
-    const glowProgram = additive ? program("ballestGlow", ["0.x", "0.y", "0.z"].map((k) => outs.get(k))) : undefined
+    // The scene colour with no lights: all an additive pass draws, and what a translucent one's emissive adds to
+    // its lit base colour (the vent's air, the checkpoint's bars). It runs beside the alpha, so its own samplers.
+    const glowProgram = opaque
+      ? undefined
+      : program("ballestGlow", ["0.x", "0.y", "0.z"].map((k) => outs.get(k)), "uGlowTex")
     const baseProgram = opaque ? program("ballestBase", ["3.x", "3.y", "3.z"].map((k) => outs.get(k))) : undefined
     if (alphaProgram) programs.alpha = alphaProgram
     if (glowProgram) programs.glow = glowProgram
@@ -353,20 +429,23 @@ export const shaders = Effect.fn("shaders")(function*(options: {
     const gains: Record<string, ReadGain> = {}
     for (const [v, gain] of Object.entries(surface?.gains ?? {})) {
       const alpha = surface?.alphaGains[v] ?? 0
-      if (gain.every((x) => Math.abs(x) < 1e-4) && Math.abs(alpha) < 1e-4) continue
+      const normal = surface?.normalGains[v] ?? 0
+      if (gain.every((x) => Math.abs(x) < 1e-4) && Math.abs(alpha) < 1e-4 && Math.abs(normal) < 1e-4) continue
       const m = means.get(v) ?? [0.5, 0.5, 0.5, 1]
       const fromAlpha = surface?.alphaColorGains[v]
       gains[String(px.sampleValues.indexOf(v))] = {
         gain,
         alpha,
         mean: [m[0], m[1], m[2]],
-        ...(fromAlpha?.some((x) => Math.abs(x) >= 1e-4) ? { fromAlpha } : {})
+        ...(fromAlpha?.some((x) => Math.abs(x) >= 1e-4) ? { fromAlpha } : {}),
+        ...(Math.abs(normal) >= 1e-4 ? { normal } : {})
       }
     }
     materials[material] = {
       shader: key,
-      surface: surface?.baseColor == null ? null : {
-        baseColor: surface.baseColor,
+      // A translucent pass with no lit diffuse term is all emissive: its base colour is black.
+      surface: surface === null || (opaque && surface.baseColor === null) ? null : {
+        baseColor: surface.baseColor ?? [0, 0, 0],
         metallic: surface.metallic,
         roughness: surface.roughness,
         opacity: surface.opacity,

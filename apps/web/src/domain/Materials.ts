@@ -91,6 +91,8 @@ export const MaterialApprox = open({
   emissive: Schema.optionalKey(Schema.NullOr(Schema.Union([Rgb, Schema.Finite]))),
   baseColorTexture: Str,
   normalTexture: Str,
+  /** What the shader leaves of the normal map, 1 = full strength. */
+  normalStrength: Num,
   ormTexture: Str,
   metallicRoughnessTexture: Str,
   emissiveTexture: Str,
@@ -116,7 +118,7 @@ export const MaterialApprox = open({
   outline: Schema.optionalKey(Schema.NullOr(Outline)),
   /**
    * The shader's own math where the fields above cannot say it: a translucent pass's `alpha` (the vent's
-   * streaks, for any frame via time), an additive pass's `glow`, an opaque `base` colour (the rubber block's cells).
+   * streaks, for any frame via time), the unlit `glow` of an additive or translucent pass, an opaque `base` colour.
    */
   programs: Schema.optionalKey(Schema.NullOr(open({
     alpha: Schema.optionalKey(Schema.NullOr(Program)),
@@ -196,6 +198,8 @@ export interface MaterialSpec {
   readonly emissive: readonly [number, number, number]
   readonly baseColorTexture: string | undefined
   readonly normalTexture: string | undefined
+  /** What the shader leaves of the normal map, 1 = full strength. */
+  readonly normalStrength: number
   /** Occlusion/roughness/metallic in R/G/B (glTF convention). */
   readonly ormTexture: string | undefined
   readonly emissiveTexture: string | undefined
@@ -223,7 +227,10 @@ export interface MaterialSpec {
   readonly outline:
     | { readonly inset: readonly [number, number]; readonly color: readonly [number, number, number] }
     | undefined
-  /** The shader's own math, run by the renderer: `alpha` (translucent), `glow` (additive) or `base` (opaque). */
+  /**
+   * The shader's own math, run by the renderer: `alpha` and `glow` (translucent; additive has `glow` alone) or
+   * `base` (opaque).
+   */
   readonly programs: {
     readonly alpha?: MaterialProgram
     readonly glow?: MaterialProgram
@@ -269,6 +276,7 @@ export const NEUTRAL: Omit<MaterialSpec, "path"> = {
   emissive: [0, 0, 0],
   baseColorTexture: undefined,
   normalTexture: undefined,
+  normalStrength: 1,
   ormTexture: undefined,
   emissiveTexture: undefined,
   variationTexture: undefined,
@@ -358,6 +366,7 @@ export const toSpec = (path: string, entry: typeof MaterialEntry.Type): Material
     emissive,
     baseColorTexture: orUndefined(a.baseColorTexture),
     normalTexture,
+    normalStrength: clamp01(a.normalStrength ?? NEUTRAL.normalStrength),
     ormTexture: orm === normalTexture ? undefined : orm,
     emissiveTexture: orUndefined(a.emissiveTexture),
     variationTexture: orUndefined(a.variationTexture),

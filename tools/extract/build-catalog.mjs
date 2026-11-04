@@ -174,10 +174,16 @@ const withNative = (own, className, chain, sample) => {
   ]
 }
 
-// Component transforms the game's native code replaces at runtime, by class and component. The elevator's
-// Platform template is scaled 17.7 x 17.7 (a 22 m disc over the 3 m base); BallestElevatorComponent drives the
-// platform, and the thumbnail shows it a little narrower than the base, as its mesh is at scale 1.
-const NATIVE_TRANSFORMS = { BP_Elevator: { Platform: { scale: [1, 1, 1] } } }
+// Components native code places at runtime: BallestElevatorComponent drives the platform, so the cooked templates say
+// nothing about where it sits (the Platform template is scaled 17.7 x 17.7, a 22 m disc over the 3 m base). These are
+// the components' RelativeLocation and RelativeScale3D in a placed elevator, read from the running game with the game
+// driver: the platform's mesh, whose skirt reaches 65 cm down at scale 1, is squashed into the base.
+const NATIVE_TRANSFORMS = {
+  BP_Elevator: {
+    Platform: { location: [0, 0, 6.9114], scale: [0.9786, 0.9786, 0.216] },
+    StretchExtension: { location: [0, 0, -7.0898], scale: [0.6, 0.6, 0.001] }
+  }
+}
 const nativeTransform = (className, component, transform) => {
   const native = NATIVE_TRANSFORMS[className]?.[component]
   return native ? { ...transform, ...native } : transform
