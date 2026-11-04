@@ -24,9 +24,9 @@ const decodeTransform = Schema.decodeUnknownOption(ItemTransform)
 export const addItem = (map: MapFile, item: Item): MapFile => ({ ...map, items: [...map.items, item] })
 
 /**
- * Removes items and keeps `editorState.pivots` consistent: pivots of removed items are
- * dropped and later indices shift down (the game rejects maps with invalid editor
- * metadata). `groups` has no known non-empty sample, so it is left untouched.
+ * Removes items and keeps `editorState` consistent: pivots and group members of removed
+ * items are dropped and later indices shift down, and a group left empty goes too. A stale
+ * index or an empty group makes the game discard the whole map (`gameLoadProblems`).
  */
 export const removeItems = (map: MapFile, indices: ReadonlyArray<number>): MapFile => {
   const removed = new Set(indices)
@@ -49,7 +49,11 @@ export const removeItems = (map: MapFile, indices: ReadonlyArray<number>): MapFi
         .map((p) => {
           const itemIndex = shift(p.itemIndex)
           return itemIndex === p.itemIndex ? p : { ...p, itemIndex }
-        })
+        }),
+      groups: map.editorState.groups.flatMap((group) => {
+        const members = group.members.filter((member) => !removed.has(member)).map(shift)
+        return members.length === 0 ? [] : [{ ...group, members }]
+      })
     }
   }
 }

@@ -166,6 +166,19 @@ cubes at scale 30 around the piece, so every view has a plain tiled wall behind 
 100 cm cube at its near corner for texture scale), takes the views, and writes the empty probe back. Nothing is
 saved unless the editor saves; the next probe overwrites the file anyway.
 
+### Saving from the editor
+
+`gamekey` has no Ctrl+S and the host's `click` doesn't reach game buttons. Either of these saves, with the same result:
+
+- `callx W_SaveLoad_C ManuallySaveNoCallback Transient | b:1`, which overwrites without asking.
+- `callx W_MapEditor_C BndEvt__W_MapEditor_WBP_SaveButton_K2Node_ComponentBoundEvent_11_ButtonPressed__DelegateSignature Transient`, the save button, then `tap 590 415` on the popup's yes.
+
+The game writes `<name>_<player>`, not the file it opened, so a save of the probe map leaves `driver probe_<player>` beside it. Check the file's mtime: `ok` only says the call ran.
+
+`openmap` matches the first word of its argument, in the first entry that contains it, so give it one distinctive word and check the pieces that come up. A map the game rejects opens as a blank one, and its start is called `MP_PlayerStart_00_C_0`.
+
+To race a map, copy `packages/ballest-editor-link` into the slot's `plugins` folder before a restart and write its `play.json`; `callx W_SaveLoad_C BeginTrackValidation` starts a stock track instead. Races run in `Map_TrackUGCPlayback`, whose light is not the editor's: docs/qa/save-roundtrip.md has what differs.
+
 ### The UI as data
 
 The host's `state` lists only its own UI, so two test commands were added to the host (the fork's `ui-dump` branch,

@@ -2,7 +2,7 @@ import { Context, Effect, FileSystem, Layer, Path } from "effect"
 import { Channel } from "./channel.ts"
 import { decodePieces } from "./handler.ts"
 import { Plugin } from "./plugin.ts"
-import { PROBE_FILE, PROBE_NAME, type ProbeItem, probeMap } from "./probe.ts"
+import { PROBE_FILE, PROBE_FRAGMENT, type ProbeItem, probeMap } from "./probe.ts"
 import { type DriverError, fail, io, Slots } from "./slots.ts"
 
 const OPEN_TIMEOUT_MS = 45_000
@@ -45,7 +45,7 @@ export class Probe extends Context.Service<Probe, {
       // The Create page's entries take a moment to exist after the menu is up.
       let opened = false
       while (!opened && Date.now() - started < OPEN_TIMEOUT_MS) {
-        const replies = yield* channel.send(slot, `openmap ${PROBE_NAME}`, 30_000)
+        const replies = yield* channel.send(slot, `openmap ${PROBE_FRAGMENT}`, 30_000)
         opened = replies.some((r) => r.endsWith("-> ok"))
         if (!opened) yield* Effect.sleep("1 second")
       }

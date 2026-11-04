@@ -3,9 +3,14 @@
 // the file when the map is opened from the Create page, so the content can change between opens without a restart.
 // `levelData.userLevelName` has to match the file's name: the game opens the map by that name, not by the file.
 
-export const PROBE_NAME = "driver probe"
+const PROBE_NAME = "driver probe"
 export const PROBE_CREATOR = "driver"
 export const PROBE_FILE = `Map_LevelEditorMain&${PROBE_NAME}_${PROBE_CREATOR}.balledit`
+/**
+ * What `openmap` looks for to open the probe. The host matches only the first word of its argument, and `driver probe`
+ * would match `driver`, which also finds the `driver probe_<player>` copy an editor save leaves beside the probe.
+ */
+export const PROBE_FRAGMENT = `probe_${PROBE_CREATOR}`
 
 export interface ProbeItem {
   /** A class path as the catalog and map files write them (with or without the BlueprintGeneratedClass wrapper). */

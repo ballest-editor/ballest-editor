@@ -7,7 +7,9 @@
  *
  * - time of day (hours) sets the light's pitch, -(t - 6) * 15 degrees: sunrise at 6:00,
  *   overhead at 12:00, sunset at 18:00, straight below at midnight. The editor map's light
- *   sits at exactly that pitch for the default time (7.2997 h -> -19.4956 degrees).
+ *   sits at exactly that pitch for the default time (7.2997 h -> -19.4956 degrees). Past
+ *   noon the sun doesn't cross overhead: in a race it comes back down the side it rose on,
+ *   so 13:00 lights a map exactly as 11:00 does (measured, docs/qa/save-roundtrip.md).
  * - light rotation is the light's yaw in degrees (`directionalLightAngle`).
  * - sunlight is the light's intensity (`brightness`; the editor map's light is 12, which is
  *   also what new maps save, though the slider only spans 1.25-7).
@@ -89,10 +91,12 @@ export interface Sun {
 export const sunOf = (lighting: Lighting): Sun => {
   const pitch = rad(sunPitch(lighting.timeOfDay))
   const yaw = rad(lighting.angle)
-  // UE's FRotator forward vector; a directional light shines along it, so the sun is behind it.
+  // A directional light shines along its forward vector, so the sun is behind it. The horizontal part is always on the
+  // yaw's side: the game's light never goes over the top, as a plain FRotator forward vector would past pitch -90.
+  const horizontal = Math.abs(Math.cos(pitch))
   const toSun: Vec3 = {
-    x: -Math.cos(pitch) * Math.cos(yaw),
-    y: -Math.cos(pitch) * Math.sin(yaw),
+    x: -horizontal * Math.cos(yaw),
+    y: -horizontal * Math.sin(yaw),
     z: -Math.sin(pitch)
   }
   const elevation = deg(Math.asin(clamp(toSun.z, -1, 1)))

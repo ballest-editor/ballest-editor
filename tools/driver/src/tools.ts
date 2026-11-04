@@ -216,7 +216,7 @@ export const DriverToolkit = Toolkit.make(
   ),
   tool(
     "open_map",
-    "Opens one of the slot's saved maps in the track editor through the Create page (openmap). fragment: part of the map's file name.",
+    "Opens one of the slot's saved maps in the track editor through the Create page (openmap). fragment: one word of the map's file name; the host matches only the first word and takes the first entry containing it, so check the pieces shown: `-> ok` doesn't mean it was the map you meant.",
     { slot: slotParam, fragment: Schema.String },
     Replies
   ),
@@ -279,7 +279,7 @@ export const DriverToolkit = Toolkit.make(
   }, PluginReply),
   tool(
     "editor_transform",
-    "Moves a piece to x y z and/or turns it to pitch yaw roll (degrees, absolute). Returns the piece.",
+    "Moves a piece to x y z and/or turns it to pitch yaw roll (degrees, absolute). Each triple goes together: give all three, because a missing one is written as 0. Returns the piece.",
     {
       slot: slotParam,
       id: Schema.Finite,

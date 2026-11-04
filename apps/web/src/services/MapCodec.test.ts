@@ -3,6 +3,7 @@ import { Effect, Option } from "effect"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { setLevelData, setSlotMaterials, type SlotMaterial, withLevelNames } from "../domain/edits"
+import { defaultEditorState } from "../domain/factory"
 import { objectPathOf } from "../domain/MapFile"
 import { hasTag, TAG_GROUPS, tagNameOf, unknownTags, withDifficulty, withTag } from "../domain/mapTags"
 import { parsePaint } from "../domain/Paint"
@@ -29,10 +30,28 @@ describe("MapCodec", () => {
         const map = yield* codec.decode(text)
         const out = yield* codec.encode(map)
         assert.deepStrictEqual(JSON.parse(out), JSON.parse(text))
-        // a published map never has editorState; a 0.4.1 draft with nothing in it (no groups, pivots or camera) omits it
+        // a published map never has editorState, and neither does a draft 0.4.1 saved
         if (sample.kind === "ballmap") assert.isUndefined(map.editorState)
       }).pipe(Effect.provide(MapCodec.layer))
   )
+
+  // No sample has a group (0.4.1 doesn't save them), so this one is the shape the game loads, with a field it might add.
+  it.effect("keeps a group, and what it doesn't model, through decode and encode", () =>
+    Effect.gen(function*() {
+      const codec = yield* MapCodec
+      const frame = {
+        rotation: { x: 0, y: 0, z: 0, w: 1 },
+        translation: { x: 1, y: 2, z: 3 },
+        scale3D: { x: 1, y: 1, z: 1 }
+      }
+      const source = parseJson(readSample(samples.find((s) => s.kind === "balledit")!))
+      const group = { members: [0, 1], name: "a", frame, extra: true }
+      const editorState = { ...defaultEditorState(), groups: [group] }
+      const text = JSON.stringify({ ...objectAt(source), editorState })
+      const map = yield* codec.decode(text)
+      assert.deepStrictEqual(map.editorState?.groups, [group])
+      assert.deepStrictEqual(objectAt(parseJson(yield* codec.encode(map)))["editorState"], editorState)
+    }).pipe(Effect.provide(MapCodec.layer)))
 
   // Current in-game saves are reproduced byte for byte (older Workshop files write short
   // number arrays inline, which the current game no longer does).
