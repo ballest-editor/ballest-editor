@@ -40,6 +40,13 @@ describe("builderConfig", () => {
     assert.isDefined(linux.linux)
     assert.isUndefined(linux.win)
   })
+
+  it("names the AppImage without a version, so an update overwrites it, and the Windows installer with one", () => {
+    const win = builderConfig({ ...options, platform: "win" })
+    const linux = builderConfig({ ...options, platform: "linux" })
+    assert.strictEqual(linux.linux?.artifactName, "Ballest-Editor-${arch}.${ext}")
+    assert.strictEqual(win.artifactName, "Ballest-Editor-${version}-${arch}.${ext}")
+  })
 })
 
 describe("releaseFiles", () => {
@@ -49,7 +56,8 @@ describe("releaseFiles", () => {
       "Ballest-Editor-1.0.0-x64.exe.blockmap",
       "latest.yml"
     ])
-    assert.deepStrictEqual(releaseFiles("linux", "1.0.0"), ["Ballest-Editor-1.0.0-x86_64.AppImage", "latest-linux.yml"])
+    assert.deepStrictEqual(releaseFiles("linux", "1.0.0"), ["Ballest-Editor-x86_64.AppImage", "latest-linux.yml"])
     assert.strictEqual(installerName("linux", "1.0.0"), releaseFiles("linux", "1.0.0")[0])
+    assert.strictEqual(installerName("linux", "1.0.0"), installerName("linux", "2.0.0"))
   })
 })

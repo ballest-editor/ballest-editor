@@ -32,9 +32,12 @@ const MOCK_RELEASE_NOTES = [
 
 export const mockFeed = (port: number): UpdateFeed => ({ _tag: "Mock", url: `http://127.0.0.1:${port}/` })
 
-/** The installer or AppImage a platform's build must produce, named by `artifactName` (AppImage says x86_64). */
+/**
+ * The installer or AppImage a platform's build must produce, named by `artifactName` (AppImage says x86_64). The
+ * AppImage has the same name in every release: see `linux.artifactName` in `builderConfig`.
+ */
 export const installerName = (platform: Platform, version: string) =>
-  platform === "win" ? `Ballest-Editor-${version}-x64.exe` : `Ballest-Editor-${version}-x86_64.AppImage`
+  platform === "win" ? `Ballest-Editor-${version}-x64.exe` : "Ballest-Editor-x86_64.AppImage"
 
 /**
  * Every file a platform's build uploads: the installer, its blockmap for differential updates (the AppImage embeds
@@ -102,6 +105,9 @@ export const builderConfig = (options: {
       toolsets: { appimage: "1.0.3" },
       linux: {
         target: [{ target: "AppImage", arch: ["x64"] }],
+        // No version: electron-updater only overwrites an AppImage in place if the name has none or doesn't change.
+        // Otherwise the update lands under the new name, and launchers pointing at the old path break.
+        artifactName: "Ballest-Editor-${arch}.${ext}",
         category: "Game",
         executableName: "ballest-editor",
         // Names the .desktop file after package.json's desktopName, which Electron reports as the window's class.

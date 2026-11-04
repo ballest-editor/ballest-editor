@@ -6,7 +6,7 @@ import { CHECKSUMS, parseUpdateManifest, releaseProblems, verifyRelease } from "
 
 const VERSION = "9.9.9-smoke.0"
 const EXE = `Ballest-Editor-${VERSION}-x64.exe`
-const APPIMAGE = `Ballest-Editor-${VERSION}-x86_64.AppImage`
+const APPIMAGE = "Ballest-Editor-x86_64.AppImage"
 
 // What electron-builder 26 writes, quoting and all.
 const manifest = (version: string, file: string) =>
@@ -81,6 +81,18 @@ describe("verifyRelease", () => {
       const error = yield* Effect.flip(verifyRelease(dir, VERSION, ["win", "linux"]))
       assert.strictEqual(error._tag, "ReleaseAssetsInvalid")
       assert.isFalse(yield* fs.exists(path.join(dir, CHECKSUMS)))
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)))
+
+  it.effect("refuses an AppImage with the version in its name, which updates would rename", () =>
+    Effect.gen(function*() {
+      const { dir, fs, path } = yield* release
+      const versioned = `Ballest-Editor-${VERSION}-x86_64.AppImage`
+      yield* fs.rename(path.join(dir, APPIMAGE), path.join(dir, versioned))
+      yield* fs.writeFileString(path.join(dir, "latest-linux.yml"), manifest(VERSION, versioned))
+      assert.deepStrictEqual(yield* releaseProblems(dir, VERSION, ["linux"]), [
+        `${APPIMAGE} is missing`,
+        `latest-linux.yml doesn't list ${APPIMAGE}`
+      ])
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)))
 
   it.effect("checks only the platforms asked for", () =>
