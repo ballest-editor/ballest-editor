@@ -141,12 +141,27 @@ they matched the catalog's bounds to the millimetre. For a piece that isn't turn
 its mesh bounds; `editor_measure` reports the points and the box and puts the piece's own pivot choice and the
 selection back, since the choice stays with the piece (it is what the map saves in `editorState.pivots`).
 
-`piece_views` is the piece evaluation flow in one call: measure, select the piece (or nothing, for a clean render),
+`piece_views` is the piece evaluation flow for a piece of the open map, and `piece_turntable` the same from nothing
+but a class path (§ Probe maps): measure, select the piece (or nothing, for a clean render),
 set the pivot to show (the piece's own by default, since that is the game's choice for it; Center standardises it),
-hide the panels, frame the camera from the measured bounds for each standard view (front, back, left, right, top,
-bottom, front-left, back-right: fixed names and directions, so renders of two pieces or two game versions line up),
+hide the panels, frame the camera from the measured bounds for each standard view (front, back, left and right as elevations level
+with the piece, so heights read off them; top and bottom as plans; front-left and back-right raised: fixed names
+and directions, so renders of two pieces or two game versions line up),
 render each, then release the camera, show the panels and put the pivot and the selection back. It returns the
 measurement, the gizmo's transform and the PNGs; what the pictures show is the agent's to judge.
+
+### Probe maps
+
+Every slot has one probe map, `Map_LevelEditorMain&driver probe_driver.balledit` in its `UserSavedMaps`, written
+empty (the start alone) at every start: the game lists maps at launch, but reads a map's file when it is opened
+from the Create page, so the file can be overwritten with any pieces and opened again without a restart. Measured:
+`levelData.userLevelName` has to match the file's name, or the game opens whichever map has that name. From inside
+the editor the route is `open Map_MainMenu`, then `openmap driver probe` once the Create page's entries exist
+(about 10 s in all). `probe_map` does that for a list of pieces; `piece_turntable` opens the map with one piece at
+(0, 0, 5000), well above the arena's water at z 0, measures it, builds a studio and a ruler if asked (six primitive
+cubes at scale 30 around the piece, so every view has a plain tiled wall behind it instead of the arena, and a
+100 cm cube at its near corner for texture scale), takes the views, and writes the empty probe back. Nothing is
+saved unless the editor saves; the next probe overwrites the file anyway.
 
 ### What the headless modes do and do not give
 

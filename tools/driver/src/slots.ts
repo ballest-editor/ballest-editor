@@ -5,6 +5,7 @@ import { openSync } from "node:fs"
 import { hostVersion, isReady, type SandboxState, sandboxState, tail } from "./hostLog.ts"
 import { APP_ID, DriverPaths, savedIn, type SlotPaths, slotPaths } from "./paths.ts"
 import { environMarker, GAME_USER_SETTINGS, gameArgs, launchEnv, type SlotMode, withVersionOverride } from "./prefix.ts"
+import { PROBE_FILE, probeMap } from "./probe.ts"
 import { STEAM_NOT_RUNNING, steamRunning } from "./steam.ts"
 
 export class DriverError extends Schema.TaggedError<DriverError>()("DriverError", {
@@ -154,6 +155,9 @@ export class Slots extends Context.Service<Slots, {
       yield* rsync(driver.gamePlugins, slot.plugins, ["DISABLED"])
       yield* io(fs.makeDirectory(path.dirname(slot.settings), { recursive: true }), "creating the config folder")
       yield* io(fs.writeFileString(slot.settings, GAME_USER_SETTINGS), "writing the settings")
+      // The probe map, empty: the game lists maps at launch, so it has to exist now for probes to open it later.
+      yield* io(fs.makeDirectory(slot.maps, { recursive: true }), "creating the maps folder")
+      yield* io(fs.writeFileString(path.join(slot.maps, PROBE_FILE), probeMap([])), "writing the probe map")
     })
 
     const start = Effect.fn("Slots.start")(function*(n: number, mode: SlotMode) {

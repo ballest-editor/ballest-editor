@@ -1,10 +1,12 @@
 import { Effect, FileSystem, Path, Schema } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { Channel } from "./channel.ts"
-import { decodePieces, Handler, PIVOT_CHOICES } from "./handler.ts"
+import { decodePieces, Handler, type Measurement as Measured, PIVOT_CHOICES, type PivotChoice } from "./handler.ts"
 import { Plugin } from "./plugin.ts"
+import { type ProbeItem, quaternion } from "./probe.ts"
+import { Probe } from "./probeMap.ts"
 import { DriverError, fail, io, Slots } from "./slots.ts"
-import { frame, STANDARD_VIEWS } from "./views.ts"
+import { frame, type Placement, ruler, STANDARD_VIEWS, studio } from "./views.ts"
 
 // The MCP tools (docs/DRIVER.md § Tools). Each is a thin wrapper over the host's test channel or the slots; replies
 // come back as the host wrote them. Pictures and dumps stay on disk and come back as paths.
@@ -49,6 +51,31 @@ const Camera = Schema.Struct({
   fov: Schema.Finite
 })
 const VIEW_NAMES = STANDARD_VIEWS.map((v) => v.name).join(", ")
+const Shot = Schema.Struct({ name: Schema.String, path: Schema.String, camera: Camera })
+const Views = Schema.Struct({
+  measurement: Measurement,
+  pivot: Schema.NullOr(PivotState),
+  views: Schema.Array(Shot)
+})
+const viewParams = {
+  prefix: Schema.optional(Schema.String),
+  gizmo: Schema.optional(Schema.Boolean),
+  pivot: Schema.optional(Pivot),
+  views: Schema.optional(Schema.Array(Schema.String)),
+  fov: Schema.optional(Schema.Finite)
+}
+const ProbePiece = Schema.Struct({
+  classPath: Schema.String,
+  location: Schema.optional(Vec3),
+  rotation: Schema.optional(Vec3).annotate({ description: "pitch, yaw, roll in degrees" }),
+  scale: Schema.optional(Vec3)
+})
+const Opened = Schema.Struct({
+  file: Schema.String,
+  pieces: Schema.Array(Schema.Struct({ id: Schema.Finite, class: Schema.String }))
+})
+/** Where a probe's piece goes: well above the arena's water (at z 0) and clear of the start. */
+const PROBE_AT = [0, 0, 5000] as const
 
 const tool = <const Name extends string, P extends Schema.Struct.Fields, S extends Schema.Top>(
   name: Name,
@@ -202,28 +229,37 @@ export const DriverToolkit = Toolkit.make(
     PivotState
   ),
   tool(
-    "editor_measure",
+    "piece_measure",
     "Measures a piece through the editor's pivot choices: its origin, the centre of its mesh bounds and the centres of the six faces, in the world, plus a world-aligned box around them (the mesh bounds for a piece that isn't turned), with the gizmo's transform for the piece's own pivot. Leaves the piece's pivot and the selection as they were.",
     { slot: slotParam, id: Schema.Finite },
     Measurement
   ),
   tool(
     "piece_views",
-    `Renders a piece from the standard views (${VIEW_NAMES}), framed from its measured bounds with the editor's panels hidden; returns the measurement and one PNG per view (<prefix>-<view>.png; read the files to look). gizmo: the piece stays selected, so the editor's gizmo and selection outline show (off: nothing selected). pivot: the pivot to show the gizmo at (default: the piece's own, which is what the game picks for it; Center standardises it); put back afterwards. views: a subset of the names.`,
+    `Renders a piece of the open map from the standard views (${VIEW_NAMES}: elevations level with the piece, plans, and two raised three-quarter views), framed from its measured bounds with the editor's panels hidden; returns the measurement and one PNG per view (<prefix>-<view>.png; read the files to look). gizmo: the piece stays selected, so the editor's gizmo and selection outline show (off: nothing selected). pivot: the pivot to show the gizmo at (default: the piece's own, which is what the game picks for it; Center standardises it); put back afterwards. views: a subset of the names.`,
+    { slot: slotParam, id: Schema.Finite, ...viewParams },
+    Views
+  ),
+  // Probes: the slot's own probe map, written and opened (docs/DRIVER.md § Probe maps).
+  tool(
+    "probe_map",
+    "Writes the slot's probe map with just these pieces (class paths as the catalog writes them; location default 0 0 5000, above the arena's water at z 0; rotation pitch yaw roll; scale) and opens it in the editor by way of the main menu (about 10 s). Returns the pieces as the editor shows them, with their ids. The file is overwritten by the next probe and reset by piece_turntable; nothing is saved unless the editor saves.",
+    { slot: slotParam, pieces: Schema.Array(ProbePiece) },
+    Opened
+  ),
+  tool(
+    "piece_turntable",
+    `Evaluates one piece by class from nothing: opens the probe map with it alone (at 0 0 5000; rotation and scale optional), measures it, puts up a studio around it (six large cubes, so every view has a plain wall behind the piece instead of the arena; off: the arena shows), optionally a 100 cm cube beside it as a ruler for gauging texture scale, then renders the standard views as piece_views does (gizmo, pivot, views, fov as there), and resets the probe map file. Returns the measurement, the gizmo transform and the PNGs. About 30 s.`,
     {
       slot: slotParam,
-      id: Schema.Finite,
-      prefix: Schema.optional(Schema.String),
-      gizmo: Schema.optional(Schema.Boolean),
-      pivot: Schema.optional(Pivot),
-      views: Schema.optional(Schema.Array(Schema.String)),
-      fov: Schema.optional(Schema.Finite)
+      classPath: Schema.String,
+      rotation: Schema.optional(Vec3).annotate({ description: "pitch, yaw, roll in degrees" }),
+      scale: Schema.optional(Vec3),
+      studio: Schema.optional(Schema.Boolean),
+      ruler: Schema.optional(Schema.Boolean),
+      ...viewParams
     },
-    Schema.Struct({
-      measurement: Measurement,
-      pivot: Schema.NullOr(PivotState),
-      views: Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String, camera: Camera }))
-    })
+    Schema.Struct({ ...Views.fields, id: Schema.Finite, probe: Schema.String })
   ),
   tool(
     "camera_set",
@@ -262,6 +298,7 @@ export const DriverToolsLayer = DriverToolkit.toLayer(Effect.gen(function*() {
   const channel = yield* Channel
   const plugin = yield* Plugin
   const handler = yield* Handler
+  const probe = yield* Probe
   const call = (slot: number | undefined, op: string, args?: Record<string, unknown>) =>
     plugin.call(n(slot), op, args).pipe(Effect.map((reply) => ({ reply })))
   const fs = yield* FileSystem.FileSystem
@@ -275,6 +312,65 @@ export const DriverToolsLayer = DriverToolkit.toLayer(Effect.gen(function*() {
       const done = replies.find((r) => r.startsWith("render -> "))
       if (done === undefined || done.includes("failed")) return yield* fail(`render: ${replies.join(" | ")}`)
       return path.join(slots.paths(slot).data, `${safe}.png`)
+    })
+
+  const probeItem = (p: {
+    readonly classPath: string
+    readonly location?: readonly [number, number, number] | undefined
+    readonly rotation?: readonly [number, number, number] | undefined
+    readonly scale?: readonly [number, number, number] | undefined
+  }): ProbeItem => ({
+    classPath: classPath(p.classPath),
+    ...(p.location === undefined ? {} : { location: p.location }),
+    ...(p.rotation === undefined ? {} : { rotation: quaternion(p.rotation[0], p.rotation[1], p.rotation[2]) }),
+    ...(p.scale === undefined ? {} : { scale: p.scale })
+  })
+
+  /** The standard views of a measured piece: the selection, pivot, panels and camera set up and put back around them. */
+  const shoot = (
+    s: number,
+    id: number,
+    measurement: Measured,
+    o: {
+      readonly fov?: number | undefined
+      readonly gizmo?: boolean | undefined
+      readonly pivot?: PivotChoice | undefined
+      readonly prefix?: string | undefined
+      readonly views?: ReadonlyArray<string> | undefined
+    }
+  ) =>
+    Effect.gen(function*() {
+      const chosen = yield* Effect.forEach(o.views ?? STANDARD_VIEWS.map((v) => v.name), (name) => {
+        const view = STANDARD_VIEWS.find((v) => v.name === name)
+        return view === undefined ? fail(`no view ${name}; the views are ${VIEW_NAMES}`) : Effect.succeed(view)
+      })
+      const before = (yield* decodePieces(yield* plugin.call(s, "selection"))).pieces.map((p) => p.id)
+      const restore = Effect.gen(function*() {
+        yield* plugin.call(s, "camera_release")
+        yield* plugin.call(s, "hide_editor", { on: false })
+        if (o.gizmo === true && o.pivot !== undefined) yield* handler.setPivot(s, measurement.pivot)
+        yield* plugin.call(s, "select", { ids: before })
+      }).pipe(Effect.ignore)
+      const take = Effect.gen(function*() {
+        yield* plugin.call(s, "select", { ids: o.gizmo === true ? [id] : [] })
+        let state = null
+        if (o.gizmo === true) {
+          state = o.pivot === undefined
+            ? yield* handler.pivot(s)
+            : yield* handler.setPivot(s, o.pivot)
+        }
+        yield* plugin.call(s, "hide_editor", { on: true })
+        const shots: Array<{ name: string; path: string; camera: ReturnType<typeof frame> }> = []
+        for (const view of chosen) {
+          const camera = frame(measurement.bounds, view, o.fov ?? 60)
+          yield* plugin.call(s, "camera", { ...camera })
+          yield* Effect.sleep("250 millis")
+          const file = yield* render(s, `${o.prefix ?? `piece-${id}`}-${view.name}`)
+          shots.push({ name: view.name, path: file, camera })
+        }
+        return { measurement, pivot: state, views: shots }
+      })
+      return yield* take.pipe(Effect.ensuring(restore))
     })
 
   return DriverToolkit.of({
@@ -337,44 +433,45 @@ export const DriverToolsLayer = DriverToolkit.toLayer(Effect.gen(function*() {
     editor_undo: ({ slot }) => call(slot, "undo"),
     editor_pivot: ({ choice, slot }) =>
       choice === undefined ? handler.pivot(n(slot)) : handler.setPivot(n(slot), choice),
-    editor_measure: ({ id, slot }) => handler.measure(n(slot), id),
+    piece_measure: ({ id, slot }) => handler.measure(n(slot), id),
     piece_views: ({ fov, gizmo, id, pivot, prefix, slot, views }) =>
       Effect.gen(function*() {
         const s = n(slot)
-        const wanted = views === undefined
-          ? STANDARD_VIEWS
-          : views.map((name) => {
-            const view = STANDARD_VIEWS.find((v) => v.name === name)
-            return view ?? fail(`no view ${name}; the views are ${VIEW_NAMES}`)
-          })
-        const chosen = yield* Effect.forEach(
-          wanted,
-          (v) => v instanceof DriverError ? Effect.fail(v) : Effect.succeed(v)
-        )
         const measurement = yield* handler.measure(s, id)
-        const before = (yield* decodePieces(yield* plugin.call(s, "selection"))).pieces.map((p) => p.id)
-        const restore = Effect.gen(function*() {
-          yield* plugin.call(s, "camera_release")
-          yield* plugin.call(s, "hide_editor", { on: false })
-          if (gizmo === true && pivot !== undefined) yield* handler.setPivot(s, measurement.pivot)
-          yield* plugin.call(s, "select", { ids: before })
-        }).pipe(Effect.ignore)
-        const shoot = Effect.gen(function*() {
-          yield* plugin.call(s, "select", { ids: gizmo === true ? [id] : [] })
-          let state = null
-          if (gizmo === true) state = pivot === undefined ? yield* handler.pivot(s) : yield* handler.setPivot(s, pivot)
-          yield* plugin.call(s, "hide_editor", { on: true })
-          const shots: Array<{ name: string; path: string; camera: ReturnType<typeof frame> }> = []
-          for (const view of chosen) {
-            const camera = frame(measurement.bounds, view, fov ?? 60)
-            yield* plugin.call(s, "camera", { ...camera })
-            yield* Effect.sleep("250 millis")
-            const file = yield* render(s, `${prefix ?? `piece-${id}`}-${view.name}`)
-            shots.push({ name: view.name, path: file, camera })
-          }
-          return { measurement, pivot: state, views: shots }
-        })
-        return yield* shoot.pipe(Effect.ensuring(restore))
+        return yield* shoot(s, id, measurement, { fov, gizmo, pivot, prefix, views })
+      }),
+    probe_map: ({ pieces, slot }) => probe.open(n(slot), pieces.map(probeItem)),
+    piece_turntable: (
+      { classPath: cls, fov, gizmo, pivot, prefix, rotation, ruler: withRuler, scale, slot, studio: withStudio, views }
+    ) =>
+      Effect.gen(function*() {
+        const s = n(slot)
+        const opened = yield* probe.open(s, [probeItem({ classPath: cls, location: PROBE_AT, rotation, scale })])
+        const subject = opened.pieces.find((p) => !p.class.includes("PlayerStart"))
+        if (subject === undefined) {
+          return yield* fail(`the probe map opened without the piece: ${JSON.stringify(opened.pieces)}`)
+        }
+        const measurement = yield* handler.measure(s, subject.id)
+        const props: Array<Placement> = withStudio === false ? [] : [...studio(measurement.bounds)]
+        if (withRuler === true) props.push(ruler(measurement.bounds))
+        if (props.length > 0) {
+          yield* plugin.call(s, "spawn", {
+            classes: props.map((p) => p.classPath),
+            transforms: props.flatMap((p) => [...p.location, ...p.rotation, ...p.scale]),
+            drop: false
+          })
+          yield* plugin.call(s, "select", { ids: [] })
+        }
+        const shots = yield* shoot(s, subject.id, measurement, {
+          fov,
+          gizmo,
+          pivot,
+          prefix: prefix ?? `turntable-${subject.class}`,
+          views
+        }).pipe(
+          Effect.ensuring(probe.reset(s).pipe(Effect.ignore))
+        )
+        return { ...shots, id: subject.id, probe: opened.file }
       }),
     camera_set: ({ fov, pitch, slot, x, y, yaw, z }) => call(slot, "camera", { x, y, z, pitch, yaw, fov: fov ?? 90 }),
     camera_release: ({ slot }) => call(slot, "camera_release"),
