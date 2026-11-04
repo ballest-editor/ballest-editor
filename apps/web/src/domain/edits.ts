@@ -4,6 +4,7 @@
  * schemas before they reach the document.
  */
 import { Option, Schema } from "effect"
+import { withEditTransform } from "./editTransform"
 import { defaultEditorState, qualifyMaterialPath, userLevelNameOf } from "./factory"
 import { appliedValue, linkedChanges, type PropertyChange, withProperty } from "./itemProperties"
 import {
@@ -15,7 +16,7 @@ import {
   type MeshComponent,
   objectPathOf
 } from "./MapFile"
-import type { Pivot } from "./pivot"
+import { type Pivot, pivotAt } from "./pivot"
 import { DEFAULT_LIGHT_ANGLE, type Lighting } from "./sunlight"
 
 const decodeItem = Schema.decodeUnknownOption(Item)
@@ -72,8 +73,8 @@ const validTransform = (transform: unknown): Option.Option<ItemTransform> =>
   })
 
 /**
- * Replaces the transforms (rotation, translation, scale) of several items at once, all or
- * nothing: None when any index is out of range or any transform is invalid.
+ * Replaces the edit transforms (rotation, translation, scale; see editTransform.ts) of several items
+ * at once, all or nothing: None when any index is out of range or any transform is invalid.
  */
 export const setTransforms = (
   map: MapFile,
@@ -84,7 +85,7 @@ export const setTransforms = (
     const item = items[index]
     const t = validTransform(transform)
     if (item === undefined || Option.isNone(t)) return Option.none()
-    items[index] = { ...item, itemTransform: { ...item.itemTransform, ...t.value } }
+    items[index] = withEditTransform(item, t.value, pivotAt(map, index).localPosition)
   }
   return Option.some({ ...map, items })
 }

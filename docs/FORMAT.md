@@ -213,4 +213,42 @@ In-game console (`ballest.editor.*`): `saveprefab`, `spawnprefab`, `listprefabs`
 
 ## Pivots (`editorState.pivots`)
 
-The in-game inspector sets a per-item pivot: Default, Center, Bottom, Top, Left, Right, Back or Front. The gizmo sits on it and rotates and scales the item about it. `localPosition` is that point in the item's local frame (the Main component, unscaled cm): the centre of the Main mesh's local bounds, or the centre of one face of them. Back is +X, Front −X, Right +Y, Left −Y, Top +Z, Bottom −Z. Every pivot in `samples/` matches the catalog's bounds this way (`apps/web/src/domain/pivot.test.ts`). Items without an entry use Default (the origin), and no sample has a Default entry, so the editor drops the entry when a pivot goes back to Default. Entries are sorted by `itemIndex`. A map without `editorState` (an imported `.ballmap`) gets one when a pivot is set or pasted.
+The in-game inspector sets a per-item pivot: Default, Center, Bottom, Top, Left, Right, Back or Front. The gizmo sits on it and rotates and scales the item about it. `localPosition` is that point in the item's local frame (the Main component, unscaled cm): the centre of the item's local bounds, or the centre of one face of them. Back is +X, Front −X, Right +Y, Left −Y, Top +Z, Bottom −Z. Every pivot in `samples/` matches the catalog's bounds this way (`apps/web/src/domain/pivot.test.ts`). Items without an entry use Default (the origin), and no sample has a Default entry, so the editor drops the entry when a pivot goes back to Default. Entries are sorted by `itemIndex`. A map without `editorState` (an imported `.ballmap`) gets one when a pivot is set or pasted.
+
+Default is the item's origin on every piece: on all 140 palette pieces (0.4.1), loaded or newly placed, the game's gizmo sits on `itemTransform.translation` and turns with the item. Where that origin falls on the mesh varies by piece, but the mesh carries it, so nothing per piece is needed.
+
+The bounds are the Main mesh's, measured through the game's own gizmo, with these exceptions (`MEASURED_BOUNDS` in `pivot.ts`):
+
+| Pieces                                                   | Bounds the game uses                                                                                                                                                               |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No Main mesh (air vent, checkpoint disc and strip)       | The box around the visible components. A sample's air vent saves Top at z 372.375, the top of its `WindCube`.                                                                      |
+| `MP_RawPointLight`, `MP_RawSpotLight`, `MP_RawRectLight` | None: every pivot is the origin.                                                                                                                                                   |
+| `BP_UGCCircuitDecal`, `BP_UGCShapeDecal`                 | A unit box, ±0.5, scaled by the decal's size (§ Decals), so a pivot of 50 lands 50 m away.                                                                                         |
+| `MP_LaserTerminal`                                       | X −4.6541 to 113, reaching along the beam, whatever blocks it. Measured at scale 1: at other scales the game's box doesn't follow the item's scale (scale 2: Back 213, Top 18.71). |
+| `BP_Elevator`                                            | Z −8.9917 to 8.9602, taller than the Main mesh, whatever its travel height.                                                                                                        |
+| `BP_Checkpoint`                                          | Moves as the goal animates (Center drifts about 20 cm in X), so no value is exact; the editor keeps the ring's box.                                                                |
+
+The game accepts a file's `localPosition` for all of these and puts the gizmo there.
+
+## Decals
+
+A decal (`BP_UGCCircuitDecal`, `BP_UGCShapeDecal`) has no scale of its own. Its `scale3D` stays 1, and the game ignores any other value in a file. Its size is three float properties, in cm, and the game's inspector and gizmo show and change them as the Scale:
+
+| Scale axis | Property      | Default | Limits  |
+| ---------- | ------------- | ------- | ------- |
+| X          | `DecalHeight` | 200     | 10–2000 |
+| Y          | `DecalWidth`  | 200     | 10–2000 |
+| Z          | `DecalDepth`  | 100     | 10–1000 |
+
+An edit outside the limits stops at them, and a negative one at 10. Resizing keeps the pivot in place and moves the item, as scaling any item does: with a Top pivot, a depth of 60 made 160 moves the item 50 cm down. The editor works the same way (`apps/web/src/domain/editTransform.ts`): its gizmo and inspector use the size as the scale, and `setTransforms` writes it back to the properties.
+
+## Elevators
+
+`BP_Elevator`'s scale is the platform's size and nothing else: it doesn't touch `PhysicsElevatorExtensionLength`. The game holds it to these rules, on load and on every edit, and the editor does the same (`apps/web/src/domain/editTransform.ts`):
+
+- X and Y are one size. The edited axis sets it; if both changed, or on load, X does. So (2, 3, 1) from (2, 2, 1) gives (3, 3, 1), and a file's (1, 3, 1) loads as (1, 1, 1).
+- Each axis keeps its sign: (−3, 1, 1) gives (−3, 3, 1).
+- Z is always 1.
+- The size stops at 0.01 and has no upper limit (10⁶ works).
+
+The game keeps the pivot in place for the scale asked for, after the 0.01 limit, and links the axes afterwards without moving the item. So the pivot slides whenever Y follows X, X follows Y or a Z is dropped: with a Right pivot, X 1 to 3 leaves the item where it is and takes the pivot from 150 to 450, and with a Top pivot a Z of 3 moves the item down 17.92 cm though Z stays 1. The editor copies this too. A decal is different: its limits apply before the pivot is kept, so its pivot never slides.

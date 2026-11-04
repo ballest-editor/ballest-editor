@@ -3,12 +3,14 @@
  * point it names in the item's local frame, in unscaled cm. The gizmo sits on the pivot and
  * turns and scales the item about it.
  *
- * The game writes `localPosition` as the matching point on the Main mesh's local bounds:
- * the centre of the box, or the centre of one face. Back is +X, Front -X, Right +Y, Left -Y,
- * Top +Z, Bottom -Z. Every pivot in `samples/` matches this against the catalog's bounds
- * (pivot.test.ts). Default is the item's origin, and items with no entry are Default.
+ * The game writes `localPosition` as the matching point on the item's local bounds: the
+ * centre of the box, or the centre of one face. Back is +X, Front -X, Right +Y, Left -Y,
+ * Top +Z, Bottom -Z. Those bounds are the Main mesh's, or the visible components' for a piece
+ * with no Main mesh; a few pieces differ (MEASURED_BOUNDS). Every pivot in `samples/` matches
+ * this against the catalog (pivot.test.ts). Default is the item's origin, and items with no
+ * entry are Default.
  */
-import type { Bounds, CatalogIndex } from "./Catalog"
+import { type Bounds, type CatalogIndex, type CatalogPiece, visibleExtras } from "./Catalog"
 import type { UeTransform, Vec3 } from "./coords"
 import type { Item, ItemPivot, MapFile } from "./MapFile"
 import { rotateVec } from "./ueMath"
@@ -50,10 +52,59 @@ export const pivotPointOnBounds = (bounds: Bounds, choice: PivotChoice): Vec3 =>
   }
 }
 
-/** The local bounds a pivot is measured on: the class's Main mesh, else the item's first mesh. */
+const NO_SIZE: Bounds = { min: [0, 0, 0], max: [0, 0, 0] }
+
+/** A decal's frame: a unit box, which its size scales (see editTransform.ts). */
+const DECAL_BOX: Bounds = { min: [-0.5, -0.5, -0.5], max: [0.5, 0.5, 0.5] }
+
+/**
+ * Pieces whose pivots the catalog can't give, by class name, as the game's editor measured
+ * them on 0.4.1 (docs/FORMAT.md, "Pivots"): every pivot of a raw light is its origin, the
+ * laser's box reaches along its beam (exact at scale 1 only: the game's box doesn't follow
+ * the item's scale), and the elevator's is taller than its Main mesh. BP_Checkpoint isn't
+ * here: its box moves as the goal animates.
+ */
+const MEASURED_BOUNDS: Readonly<Record<string, Bounds>> = {
+  MP_RawPointLight: NO_SIZE,
+  MP_RawSpotLight: NO_SIZE,
+  MP_RawRectLight: NO_SIZE,
+  BP_UGCCircuitDecal: DECAL_BOX,
+  BP_UGCShapeDecal: DECAL_BOX,
+  MP_LaserTerminal: { min: [-4.6541, -18.7124, -18.7124], max: [113, 18.7124, 18.7124] },
+  BP_Elevator: { min: [-150, -150, -8.9917], max: [150, 150, 8.9602] }
+}
+
+/** The box around the bounds of `piece`'s visible components, in its local frame. */
+const visibleExtrasBounds = (piece: CatalogPiece, index: CatalogIndex): Bounds | undefined => {
+  const corners = visibleExtras(piece).flatMap((extra) => {
+    const bounds = extra.bounds ?? index.meshes.get(extra.meshAssetPath ?? "")?.bounds
+    if (bounds === undefined) return []
+    const { location: [lx, ly, lz], quat: [qx, qy, qz, qw], scale: [sx, sy, sz] } = extra.transformRelativeToMain
+    const t: UeTransform = {
+      translation: { x: lx, y: ly, z: lz },
+      rotation: { x: qx, y: qy, z: qz, w: qw },
+      scale3D: { x: sx, y: sy, z: sz }
+    }
+    const [x0, y0, z0] = bounds.min
+    const [x1, y1, z1] = bounds.max
+    return [x0, x1].flatMap((x) => [y0, y1].flatMap((y) => [z0, z1].map((z) => localToWorld(t, { x, y, z }))))
+  })
+  if (corners.length === 0) return undefined
+  const along = (pick: (...v: Array<number>) => number) =>
+    [pick(...corners.map((c) => c.x)), pick(...corners.map((c) => c.y)), pick(...corners.map((c) => c.z))] as const
+  return { min: along(Math.min), max: along(Math.max) }
+}
+
+/**
+ * The local bounds a pivot is measured on: the measured box, else the class's Main mesh, else
+ * its visible components, else the item's first mesh.
+ */
 export const pivotBoundsOf = (item: Item, index: CatalogIndex | null): Bounds | undefined => {
   const piece = index?.pieceByClass.get(item.actorToSpawn)
-  if (piece?.bounds !== undefined && piece.bounds !== null) return piece.bounds
+  if (piece !== undefined && index !== null) {
+    const bounds = MEASURED_BOUNDS[piece.className] ?? piece.bounds ?? visibleExtrasBounds(piece, index)
+    if (bounds !== undefined) return bounds
+  }
   const path = item.meshComponents[0]?.meshAssetPath
   return path === undefined ? undefined : index?.meshes.get(path)?.bounds
 }

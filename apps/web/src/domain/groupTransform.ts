@@ -31,7 +31,7 @@ const ORIGIN: Vec3 = { x: 0, y: 0, z: 0 }
  * `after`, moved so the item's local point `local` (unscaled cm) is where it was in `before`:
  * how a turn or scale about an item's own pivot comes out.
  */
-const keepPoint = (before: UeTransform, after: UeTransform, local: Vec3): UeTransform => ({
+export const keepPoint = <T extends UeTransform>(before: UeTransform, after: T, local: Vec3): T => ({
   ...after,
   translation: add(after.translation, sub(localToWorld(before, local), localToWorld(after, local)))
 })

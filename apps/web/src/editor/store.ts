@@ -24,6 +24,7 @@ import {
   type SlotMaterial,
   validateItem
 } from "../domain/edits"
+import { editTransform, fitEditTransform } from "../domain/editTransform"
 import { itemFromPiece, mapLabelOf, newMapFile } from "../domain/factory"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
 import type { GameLinkResult } from "../domain/gameLink"
@@ -998,9 +999,11 @@ const samePivot = (a: Pivot, b: Pivot) => a.choice === b.choice && sameVec(a.loc
 
 /** True when item `index` has the same transform in both maps (an edit that changed nothing). */
 const sameItemTransform = (before: MapFile, after: MapFile, index: number): boolean => {
-  const a = before.items[index]?.itemTransform
-  const b = after.items[index]?.itemTransform
-  if (a === undefined || b === undefined) return false
+  const itemBefore = before.items[index]
+  const itemAfter = after.items[index]
+  if (itemBefore === undefined || itemAfter === undefined) return false
+  const a = editTransform(itemBefore)
+  const b = editTransform(itemAfter)
   const qa = a.rotation
   const qb = b.rotation
   return sameVec(a.translation, b.translation) && sameVec(a.scale3D, b.scale3D) &&
@@ -1040,9 +1043,23 @@ export const shownLighting = (s: EditorState): Lighting => s.lightingPreview ?? 
 /** An item's pivot (Default when it has none, or isn't in the document). */
 export const pivotOf = (s: EditorState, id: string): Pivot => pivotAt(s.doc.map, s.doc.ids.indexOf(id))
 
-/** An item's transform as shown: the live preview, else the document. */
-export const shownTransform = (s: EditorState, id: string): UeTransform | undefined =>
-  s.preview?.get(id) ?? s.doc.map.items[s.doc.ids.indexOf(id)]?.itemTransform
+/** An item's edit transform (see domain/editTransform.ts) as shown: the live preview, else the document. */
+export const shownTransform = (s: EditorState, id: string): UeTransform | undefined => {
+  const preview = s.preview?.get(id)
+  if (preview !== undefined) return preview
+  const item = s.doc.map.items[s.doc.ids.indexOf(id)]
+  return item === undefined ? undefined : editTransform(item)
+}
+
+/** Edit transforms as the game would take them, so a drag stops at a decal's limits as it happens. */
+export const fitTransforms = (
+  s: EditorState,
+  transforms: ReadonlyMap<string, UeTransform>
+): ReadonlyMap<string, UeTransform> =>
+  new Map([...transforms].map(([id, t]) => {
+    const item = s.doc.map.items[s.doc.ids.indexOf(id)]
+    return [id, item === undefined ? t : fitEditTransform(item, t, pivotOf(s, id).localPosition)] as const
+  }))
 
 /** The desktop updater's state; null in a browser, and until main has answered. */
 export const useUpdateState = () => useEditor((s) => s.update)

@@ -303,7 +303,7 @@ export const DriverToolkit = Toolkit.make(
   // Through the editor's handler (callx): the selection's pivot and gizmo (docs/DRIVER.md § Pivots and the gizmo).
   tool(
     "editor_pivot",
-    `The selection's pivot choice and the gizmo's transform (where the editor puts the gizmo for the selected piece: its default differs by piece, and our app copies that). With choice, sets the pivot first, as the inspector's buttons do (it stays with the piece): ${
+    `The selection's pivot choice and the gizmo's transform (where the editor puts the gizmo for the selected piece: by default its origin, wherever that falls on the mesh, and our app copies that). With choice, sets the pivot first, as the inspector's buttons do (it stays with the piece): ${
       PIVOT_CHOICES.join(", ")
     }.`,
     { slot: slotParam, choice: Schema.optional(Pivot) },

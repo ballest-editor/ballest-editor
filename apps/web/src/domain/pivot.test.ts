@@ -99,8 +99,42 @@ describe("setPivots", () => {
 const catalogPath = path.join(repoRoot, "assets", "catalog.json")
 
 describe.skipIf(!fs.existsSync(catalogPath))("pivots in samples/", () => {
-  const index = indexCatalog(Schema.decodeSync(Schema.fromJsonString(Catalog))(fs.readFileSync(catalogPath, "utf8")))
+  const catalog = Schema.decodeSync(Schema.fromJsonString(Catalog))(fs.readFileSync(catalogPath, "utf8"))
+  const index = indexCatalog(catalog)
   const decode = Schema.decodeSync(Schema.fromJsonString(MapFile))
+
+  const measured = (className: string, choice: PivotChoice) => {
+    const piece = catalog.pieces.find((p) => p.className === className)!
+    const item = { ...playerStartItem(), actorToSpawn: piece.classPath, meshComponents: [] }
+    return pivotFor(item, index, choice)?.localPosition
+  }
+
+  // The game's own answers, read from its gizmo through each pivot button on 0.4.1.
+  it("matches the game on the pieces the Main mesh doesn't describe", () => {
+    const cases: ReadonlyArray<readonly [string, PivotChoice, readonly [number, number, number]]> = [
+      ["MP_AirVent", "Center", [0, 0, 186.1875]],
+      ["MP_AirVent", "Right", [0, 85.265, 186.1875]],
+      ["MP_ActualCheckpoint_Disc", "Top", [0, 0, 286.3]],
+      ["MP_ActualCheckpoint_Disc", "Back", [145, 0, 135.62]],
+      ["MP_ActualCheckpoint_Strip", "Center", [0, 0, 87.89]],
+      ["MP_ActualCheckpoint_Strip", "Right", [0, 253.5, 87.89]],
+      ["BP_UGCCircuitDecal", "Back", [0.5, 0, 0]],
+      ["BP_UGCCircuitDecal", "Top", [0, 0, 0.5]],
+      ["BP_UGCShapeDecal", "Right", [0, 0.5, 0]],
+      ["MP_LaserTerminal", "Center", [54.1729, 0, 0]],
+      ["BP_Elevator", "Center", [0, 0, -0.0157]],
+      ["BP_Elevator", "Top", [0, 0, 8.9602]]
+    ]
+    for (const [className, choice, [x, y, z]] of cases) {
+      expectVec(measured(className, choice)!, { x, y, z }, 1)
+    }
+  })
+
+  it("keeps every pivot of a raw light on its origin", () => {
+    for (const className of ["MP_RawPointLight", "MP_RawSpotLight", "MP_RawRectLight"]) {
+      for (const choice of PIVOT_CHOICES) expectVec(measured(className, choice)!, { x: 0, y: 0, z: 0 })
+    }
+  })
 
   it("match the choice's point on the piece's bounds, as the game computes it", () => {
     let checked = 0

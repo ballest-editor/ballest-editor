@@ -11,6 +11,7 @@ import {
   ueToScene,
   ueToThreeVector
 } from "../domain/coords"
+import { DECAL_VISUAL_SCALE, editTransform, isDecal } from "../domain/editTransform"
 import type { Item } from "../domain/MapFile"
 import { mirrorScaleOf } from "../domain/mirror"
 import { LaserBeam } from "./LaserBeam"
@@ -128,7 +129,7 @@ export const ItemObject = memo(function ItemObjectView(props: {
 
   // A continuous interaction (gizmo drag, inspector scrub) shows here before it commits.
   const live = useEditor((s) => s.preview?.get(id))
-  const itemTransform = live ?? item.itemTransform
+  const itemTransform = live ?? editTransform(item)
   const transform = useMemo(() => ueToScene(itemTransform), [itemTransform])
   const surfaces = useEditor((s) => s.surfaces)
   const visuals = useMemo(() => visualsOf(item, index, surfaces), [item, index, surfaces])
@@ -137,6 +138,12 @@ export const ItemObject = memo(function ItemObjectView(props: {
     const scale = mirrorScaleOf(item, index)
     return scale === undefined ? undefined : toTuple3(ueToThreeVector(fromTuple3(scale)))
   }, [item, index])
+  // A decal's scale is its size in cm, so its mesh is drawn as a unit.
+  const visualScale = useMemo(() => {
+    if (!isDecal(item)) return mirror
+    const [x, y, z] = mirror ?? [1, 1, 1]
+    return [x * DECAL_VISUAL_SCALE, y * DECAL_VISUAL_SCALE, z * DECAL_VISUAL_SCALE] as const
+  }, [item, mirror])
   const beam = index?.pieceByClass.get(item.actorToSpawn)?.beam
 
   return (
@@ -147,7 +154,7 @@ export const ItemObject = memo(function ItemObjectView(props: {
       quaternion={transform.quaternion}
       scale={transform.scale}
     >
-      <group {...(mirror === undefined ? {} : { scale: mirror })}>
+      <group {...(visualScale === undefined ? {} : { scale: visualScale })}>
         <ItemVisuals visuals={visuals} />
         {beam !== undefined && <LaserBeam beam={beam} itemId={id} />}
       </group>
