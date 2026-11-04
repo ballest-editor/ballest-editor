@@ -31,6 +31,7 @@ This is why a file the game refuses is worse than an error. Blocking those files
 ## What changed in the app
 
 - **Export and Play check the map first.** A map with no edits skipped `MapExporter`, and an imported `.balledit` is copied byte for byte, so neither passed any rule, including the ones we already had. `writeOpenMapToGame` now runs `gameLoadProblems` before anything is written. The test for it fails without the change.
+- **Main checks the character limit on the file it copies.** `MapExports.exportMap` runs `fileTextProblems` on the bytes it is about to write, before it asks about anything. The map the page decoded can't show this limit, since whitespace counts, and an open tab can be older than the file. Play goes through the same export. A file this long can't be imported or opened, because it is over `MAX_MAP_BYTES`, so what got through was a file that grew on disk while its tab sat open with no edits.
 - **`domain/gameRules.ts` holds the new rules**, each measured below: classes the catalog lacks or the game no longer ships, unknown, misplaced, repeated and nameless properties, extra mesh components, uncooked meshes, negative and repeated material slots, too many materials or paths, unknown difficulties, `editorState.version`, repeated pivots, unknown pivot choices, group names and frames, and the parser's limits on strings, field names, containers and nesting.
 - **Writing a `.balledit` clears `bIsBaseItem`**, see below.
 
@@ -203,23 +204,23 @@ The first two decide how big a map can be, and they land far below 100,000 items
 
 ### Parser limits, each at the limit and one past it
 
-| Case                                                        | Game      | Ours                                       |
-| ----------------------------------------------------------- | --------- | ------------------------------------------ |
-| String of 1,048,576 characters                              | Loads     | Exports                                    |
-| String of 1,048,577, modelled field or not                  | Blank map | Blocks it                                  |
-| Field name of 4,095 or 4,096                                | Loads     | Exports                                    |
-| Field name of 4,097                                         | Blank map | Blocks it                                  |
-| Array or object of 100,000 entries                          | Loads     | Exports                                    |
-| Array or object of 100,001                                  | Blank map | Blocks it                                  |
-| 62 or 63 arrays nested under the root                       | Loads     | Exports                                    |
-| 64 or 65                                                    | Blank map | Blocks it                                  |
-| 2,000,000 JSON values or fewer                              | Loads     | Exports                                    |
-| 2,000,001 or more                                           | Blank map | Blocks it                                  |
-| 67,108,864 characters or fewer                              | Loads     | Exports                                    |
-| 67,108,865                                                  | Blank map | Blocks it once edited. Open gap, see below |
-| 40 million `é`: 80 MB as UTF-8, under the cap in characters | Loads     | Exports                                    |
-| 100,000 bare items (2.4 million values)                     | Blank map | Blocks it                                  |
-| 100,001 bare items                                          | Blank map | Blocks it                                  |
+| Case                                                        | Game      | Ours      |
+| ----------------------------------------------------------- | --------- | --------- |
+| String of 1,048,576 characters                              | Loads     | Exports   |
+| String of 1,048,577, modelled field or not                  | Blank map | Blocks it |
+| Field name of 4,095 or 4,096                                | Loads     | Exports   |
+| Field name of 4,097                                         | Blank map | Blocks it |
+| Array or object of 100,000 entries                          | Loads     | Exports   |
+| Array or object of 100,001                                  | Blank map | Blocks it |
+| 62 or 63 arrays nested under the root                       | Loads     | Exports   |
+| 64 or 65                                                    | Blank map | Blocks it |
+| 2,000,000 JSON values or fewer                              | Loads     | Exports   |
+| 2,000,001 or more                                           | Blank map | Blocks it |
+| 67,108,864 characters or fewer                              | Loads     | Exports   |
+| 67,108,865                                                  | Blank map | Blocks it |
+| 40 million `é`: 80 MB as UTF-8, under the cap in characters | Loads     | Exports   |
+| 100,000 bare items (2.4 million values)                     | Blank map | Blocks it |
+| 100,001 bare items                                          | Blank map | Blocks it |
 
 ### JSON syntax
 
@@ -255,7 +256,6 @@ These are files we still let through.
 - **A material that isn't cooked** opens a blank map and we export it. The known list (`materials.json` plus the catalog) covers all 13,759 material references in the samples, but it isn't the game's full set, so a blocking rule could stop a valid Workshop map from saving. It needs the full list from the pak. The app can't produce such a path, so this takes a hand-edited file.
 - **No goal** exports, and Play in the game then does nothing. The map isn't lost, so I didn't block Save, which would stop a player saving mid-edit. A warning at Play would suit it better.
 - **`verified.json`'s other rejected classes** (`MP_OrangeSign`, `BP_TwoCubeOneColor`, `BP_TwoCubeTwoColor`) are only caught at Export when an item has two components under one tag, as the game's own saves do. The app places them with one component, which passes these rules; only the Save dialog refuses that. #184 measured on 0.4.1 that any mesh component on these classes discards the map, and `meshComponents: []` loads, so what the app should write for them is an open decision.
-- **The character limit on an unedited file.** `fileTextProblems` runs in `prepare`, on the text it encodes, so an imported `.balledit` past 67,108,864 characters goes to the game until it's edited. The value limit is checked before Export and Play, so this takes a file with few values and long strings, which means a hand-edited one.
 
 ## What I could not verify
 

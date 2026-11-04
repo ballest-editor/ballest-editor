@@ -16,7 +16,8 @@ import { duplicateMapEffect, withSavedOpenMap } from "./save"
  * Export to game or Play on the open map. The plugin manager only races maps never published, so Play of a published
  * map's draft offers to save a new draft of it instead (the `newDraft` dialog). The file is checked here as well as
  * on Save: an imported `.balledit` is copied byte for byte, and a map with no edits goes to the game as it is, so
- * neither passes through `MapExporter`, and the game opens a blank map for a file it refuses.
+ * neither passes through `MapExporter`, and the game opens a blank map for a file it refuses. The character limit is
+ * about the file's own text, which this decoded map isn't, so main checks that on the bytes it copies (`MapExports`).
  */
 const writeOpenMapToGame = (intent: ExportIntent) =>
   Effect.suspend(() => {

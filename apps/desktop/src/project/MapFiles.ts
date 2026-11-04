@@ -108,8 +108,10 @@ export class MapFiles extends Context.Service<MapFiles, {
     const contentsOf = (file: string) => fs.stat(file).pipe(Effect.flatMap((stat) => cached(file, stampOf(stat))))
 
     const info = Effect.fnUntraced(function*(project: string, fileName: string, link?: MapLink | null) {
-      const file = path.join(mapsFolderIn(path, project), fileName)
-      const stat = yield* fs.stat(file).pipe(Effect.mapError(projectError("read", file)))
+      const file = yield* fileOf(project, fileName)
+      const stat = yield* fs.stat(file).pipe(
+        Effect.mapError((cause) => projectError(cause.reason._tag === "NotFound" ? "notFound" : "read", file)(cause))
+      )
       const modifiedAt = Option.getOrElse(stat.mtime, () => new Date(0)).toISOString()
       const { hash, publishedFileId } = yield* cached(file, stampOf(stat))
       return {

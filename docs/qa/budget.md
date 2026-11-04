@@ -99,7 +99,7 @@ The character limit is the one a real map meets first, because it counts whitesp
 
 The largest sample, Ballest Of The Mall, has 5,640,696 characters and 133,226 values, 8.4 % and 7 % of the limits. No map is close, but a generated one could be, and the failure is silent. The hard-limits QA also found that saving over the file from that blank map replaces the real one, so a player who doesn't notice loses the map.
 
-Before this change the app only counted items, so the app would write such a map without complaint. Now it refuses, and every write goes through `MapExporter.prepare`. That runs the value check on the map as written, with the `editorState` it adds, and the character check on the encoded text.
+Before this change the app only counted items, so the app would write such a map without complaint. Now it refuses. Every Save goes through `MapExporter.prepare`, which runs the value check on the map as written, with the `editorState` it adds, and the character check on the encoded text. Export and Play can copy a file that skipped Save, so main runs the character check again on the bytes it copies (`MapExports.exportMap`).
 
 ## The app against the game
 

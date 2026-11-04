@@ -609,7 +609,8 @@ export const DesktopMethods = {
   importMap: { payload: ImportMapPayload, result: ImportMapResult },
   /**
    * Copies a project map byte for byte into the game's maps folder and records the export in its link. The file it
-   * replaces there goes to `<userData>/backups/` first.
+   * replaces there goes to `<userData>/backups/` first. Fails, writing nothing, on a file past the game's character
+   * limit (`fileTextProblems`).
    */
   exportMap: { payload: ExportMapPayload, result: ExportMapResult },
   /**

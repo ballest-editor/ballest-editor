@@ -2,6 +2,7 @@ import {
   type ExportChecks,
   type ExportMapPayload,
   type ExportMapResult,
+  fileTextProblems,
   isMapFileName,
   type MapLink,
   type ProjectMapFile
@@ -15,16 +16,25 @@ import { emptyLink, type MapLinkError, MapLinks } from "./MapLinks"
 import { backupsFolderIn, type ProjectError, projectError, Projects } from "./Projects"
 import { type ExportReport, seeExport } from "./sync"
 
+/** A project file the game would discard, so nothing was exported. `message` says why. */
+export class MapRefusedError extends Schema.TaggedError<MapRefusedError>()("MapRefusedError", {
+  message: Schema.String
+}) {}
+
 /**
  * Export to game and sync (docs/PROJECTS.md § Sync): copies a project map into the game's maps folder, keeping the
  * game's old copy in `<userData>/backups/` (`exportBackups`), records each export in the map's link, and looks at the
  * exports again to tell what the game changed since. Main writes into the game's maps folder only here.
  */
 export class MapExports extends Context.Service<MapExports, {
-  /** Copies a map byte for byte into the game's maps folder and records the export in its link. */
+  /**
+   * Copies a map byte for byte into the game's maps folder and records the export in its link. Refused
+   * (`MapRefusedError`) past the game's character limit, measured on those bytes: the page's checks see the map it
+   * decoded, which isn't the file's text, and may be older than the file.
+   */
   readonly exportMap: (
     payload: ExportMapPayload
-  ) => Effect.Effect<ExportMapResult, ProjectError | MapLinkError | BackupError | GamePathError>
+  ) => Effect.Effect<ExportMapResult, MapRefusedError | ProjectError | MapLinkError | BackupError | GamePathError>
   /**
    * Sync detection (docs/PROJECTS.md § Sync): looks at every linked map's export in the game's maps folder, keeps what
    * it saw in the link, and reports what changed since the last look. One check at a time, so a change seen by one is
@@ -97,6 +107,8 @@ export class MapExports extends Context.Service<MapExports, {
       const bytes = yield* fs.readFile(source).pipe(
         Effect.mapError((cause) => projectError(cause.reason._tag === "NotFound" ? "notFound" : "read", source)(cause))
       )
+      const problems = fileTextProblems(new TextDecoder().decode(bytes))
+      if (problems.length > 0) return yield* new MapRefusedError({ message: problems.join(" ") })
       const file = path.join(yield* game.mapsFolderForWrite, fileName)
 
       if (!replacePublished) {
