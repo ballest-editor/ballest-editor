@@ -79,6 +79,15 @@ describe.skipIf(!hasCatalog)("mirroring", () => {
     assert.isUndefined(mirrorScaleOf(cylinder, idx))
     assert.match(cylinder.meshComponents[0]!.materials[1]!.material, /Cap_Flipped/)
   })
+
+  it("flips an item with no mesh components whole, and leaves it with none", () => {
+    const idx = index()
+    const bare = { ...probe().find((i) => className(i) === "Bevel_Full_ShortUScoop_L")!, meshComponents: [] }
+    assert.isUndefined(mirrorScaleOf(bare, idx))
+    const flipped = setFlag(bare, MIRROR_X, true)
+    assert.deepStrictEqual(mirrorScaleOf(flipped, idx), [-1, 1, 1])
+    assert.deepStrictEqual(withMirrorMesh(flipped, idx).meshComponents, [])
+  })
 })
 
 // Measured on 0.4.1 (docs/qa/exposed-properties.md): Flip Y sets PhysicsFlip on these two, which have no bMirror. One

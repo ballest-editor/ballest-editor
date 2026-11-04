@@ -25,10 +25,10 @@
       "note": "palette piece used as the control"
     },
     "MP_OrangeSign": {
-      "status": "rejected",
-      "note": "game saved ['MP_PlayerStart', 'BP_Checkpoint'] instead",
-      "date": "2026-10-26",
-      "via": "tools/probe/run.py"
+      "status": "ok",
+      "note": "0.4.1 loads it only with meshComponents: [], which is what the app writes; gameRules.ts refuses any component",
+      "date": "2026-11-04",
+      "via": "tools/driver"
     },
     "MP_LightCard_01": {
       "status": "ok",
@@ -366,16 +366,16 @@
       "via": "tools/probe/run.py"
     },
     "BP_TwoCubeOneColor": {
-      "status": "rejected",
-      "note": "game saved ['MP_PlayerStart', 'BP_Checkpoint'] instead",
-      "date": "2026-10-26",
-      "via": "tools/probe/run.py"
+      "status": "ok",
+      "note": "0.4.1 loads it only with meshComponents: [], which is what the app writes; gameRules.ts refuses any component",
+      "date": "2026-11-04",
+      "via": "tools/driver"
     },
     "BP_TwoCubeTwoColor": {
-      "status": "rejected",
-      "note": "game saved ['MP_PlayerStart', 'BP_Checkpoint'] instead",
-      "date": "2026-10-26",
-      "via": "tools/probe/run.py"
+      "status": "ok",
+      "note": "0.4.1 loads it only with meshComponents: [], which is what the app writes; gameRules.ts refuses any component",
+      "date": "2026-11-04",
+      "via": "tools/driver"
     },
     "BP_UGCShapeDecal": {
       "status": "ok",

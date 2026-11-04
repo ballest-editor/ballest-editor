@@ -22,15 +22,21 @@ export interface Visual {
 }
 
 /**
- * An item's own mesh components, plus the class's visible extra meshes. A baked mirror mesh
- * draws as its source (ItemObject applies the mirroring); an item with a surface draws every
- * slot with the surface's material, like the game.
+ * An item's own mesh components, plus the class's visible extra meshes. An item with no
+ * components has the class's Main mesh, as the game draws it. A baked mirror mesh draws as its
+ * source (ItemObject applies the mirroring); an item with a surface draws every slot with the
+ * surface's material, like the game.
  */
 export const visualsOf = (item: Item, index: CatalogIndex | null, surfaces: Surfaces = []): ReadonlyArray<Visual> => {
   const visuals: Array<Visual> = []
   const surface = surfaceMaterialOf(item, surfaces)
   const withSurface = (slots: ReadonlyArray<string | undefined>) =>
     surface === undefined ? slots : Array.from({ length: Math.max(slots.length, 1) }, () => surface)
+  const piece = index?.pieceByClass.get(item.actorToSpawn)
+  if (item.meshComponents.length === 0 && typeof piece?.meshAssetPath === "string") {
+    const mesh = index?.meshes.get(piece.meshAssetPath)
+    visuals.push({ key: "main", mesh, slotMaterials: withSurface(slotDefaultsOf(piece.materialSlots)) })
+  }
   item.meshComponents.forEach((mc, i) => {
     const saved = mc.meshAssetPath
     if (saved === undefined || saved.length === 0) return
@@ -41,7 +47,7 @@ export const visualsOf = (item: Item, index: CatalogIndex | null, surfaces: Surf
     for (const m of mc.materials) slotMaterials[m.materialIndex] = m.material
     visuals.push({ key: `m${i}`, mesh, slotMaterials: withSurface(slotMaterials) })
   })
-  visibleExtras(index?.pieceByClass.get(item.actorToSpawn)).forEach((extra, i) => {
+  visibleExtras(piece).forEach((extra, i) => {
     const t = extra.transformRelativeToMain
     const rel = ueToScene({
       translation: { x: t.location[0], y: t.location[1], z: t.location[2] },

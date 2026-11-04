@@ -8,10 +8,21 @@ import { Schema } from "effect"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { listSamples, readSample, repoRoot } from "../test/samples"
-import { Catalog, HIDDEN_SECTION, indexCatalog, paletteSections, unavailableReasonOf, visibleExtras } from "./Catalog"
-import { itemFromPiece, placementTransform, qualifyMaterialPath } from "./factory"
+import {
+  Catalog,
+  HIDDEN_SECTION,
+  indexCatalog,
+  paletteSections,
+  unavailableReasonOf,
+  VerificationFile,
+  visibleExtras
+} from "./Catalog"
+import { addItem } from "./edits"
+import { itemFromPiece, newMapFile, placementTransform, qualifyMaterialPath } from "./factory"
 import { defaultProperties, PROPERTY_LISTS } from "./itemProperties"
+import { gameLoadProblems } from "./limits"
 import { Item, MapFile, objectPathOf, type PropertyList } from "./MapFile"
+import { paintTargets } from "./Paint"
 
 const catalogPath = path.join(repoRoot, "assets", "catalog.json")
 const hasCatalog = fs.existsSync(catalogPath)
@@ -60,6 +71,28 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
     assert.isAbove(visibleExtras(vent).length, 0)
     const checkpoint = byName("BP_Checkpoint")
     assert.deepStrictEqual(placementTransform(checkpoint, { x: 0, y: 0, z: 0 }).scale3D, { x: 1.5, y: 1.5, z: 1.5 })
+  })
+
+  it("places the classes the game only reloads without mesh components, and a map of them passes the rules", () => {
+    const catalog = load()
+    const index = indexCatalog(catalog)
+    const { results } = Schema.decodeSync(Schema.fromJsonString(VerificationFile))(
+      fs.readFileSync(path.join(repoRoot, "assets", "verified.json"), "utf8")
+    )
+    const pieces = catalog.pieces.filter((p) => /^(BP_TwoCube(One|Two)Color|MP_OrangeSign)$/.test(p.className))
+    assert.strictEqual(pieces.length, 3)
+    const items = pieces.map((piece) => ({
+      item: itemFromPiece(piece, placementTransform(piece, { x: 0, y: 0, z: 0 }))
+    }))
+    assert.deepStrictEqual(items.map(({ item }) => item.meshComponents), [[], [], []])
+    const map = items.reduce(
+      (out, { item }) => addItem(out, item),
+      newMapFile({ displayName: "A", creatorName: "B", createdAt: "" })
+    )
+    assert.deepStrictEqual(gameLoadProblems(map, index), [])
+    assert.deepStrictEqual(pieces.map((p) => unavailableReasonOf(index, p, results)), [undefined, undefined, undefined])
+    // the game's panel doesn't paint them, and with no component there is nothing to save paint in
+    assert.deepStrictEqual(paintTargets(items, index).items, [])
   })
 
   it("places every class with the property lists the game saves for it untouched", () => {

@@ -50,6 +50,16 @@ const GROUP_NAME = /^[A-Za-z0-9]{1,64}$/
 /** Baked mirror meshes: the catalog pairs most of them, not all, and they are the game's own. */
 const MIRROR_MESHES = "/Game/LevelEditor/Mirror/"
 
+/**
+ * Classes the game reloads only with `meshComponents: []`: any component on one, even those it saved itself, makes it
+ * discard the whole map and open a blank one (docs/qa/exposed-properties.md). They are the only classes that save two
+ * components, but that isn't shown to be the cause, so the rule goes by class.
+ */
+const NO_MESH_COMPONENT_CLASSES = new Set(["BP_TwoCubeOneColor", "BP_TwoCubeTwoColor", "MP_OrangeSign"])
+
+export const refusesMeshComponents = (actorToSpawn: string): boolean =>
+  NO_MESH_COMPONENT_CLASSES.has(classNameOf(actorToSpawn))
+
 const jsonProblem = (value: unknown, depth: number): string | undefined => {
   if (typeof value === "string") {
     return value.length > JSON_LIMITS.stringLength
@@ -123,6 +133,13 @@ const meshProblems = (
   piece: CatalogPiece | undefined,
   catalog: CatalogIndex | null
 ): Array<string> => {
+  if (item.meshComponents.length > 0 && refusesMeshComponents(item.actorToSpawn)) {
+    return [
+      `Item ${index} is a ${
+        classNameOf(item.actorToSpawn)
+      } with mesh components, which makes the game discard the whole map. Delete it and place it again.`
+    ]
+  }
   const out = item.meshComponents.flatMap((mesh) => materialProblems(mesh, index))
   const tags = item.meshComponents.map((mesh) => mesh.meshComponentTag)
   if (new Set(tags).size < tags.length) out.push(`Item ${index} saves the same mesh component twice.`)

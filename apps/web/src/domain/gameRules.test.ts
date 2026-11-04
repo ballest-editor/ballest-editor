@@ -65,6 +65,9 @@ const frame = (w = 1) => ({
 })
 const group = (name: string, w = 1) => ({ members: [0, 1], name, frame: frame(w) })
 
+/** The classes the game reloads only with `meshComponents: []`. */
+const NO_MESH_CLASSES = ["BP_TwoCubeOneColor", "BP_TwoCubeTwoColor", "MP_OrangeSign"]
+
 // Each of these opened a blank map in the game, or left the map off the Create page (docs/qa/limits-validation.md).
 const refused: ReadonlyArray<readonly [string, MapFile, RegExp]> = [
   [
@@ -127,14 +130,34 @@ const refused: ReadonlyArray<readonly [string, MapFile, RegExp]> = [
   ["an unknown pivot choice", editorState({ pivots: [pivot(1, "Sideways")] }), /Sideways/],
   ["a group name of 65 characters", editorState({ groups: [group("A".repeat(65))] }), /1 to 64/],
   ["a group name with a space", editorState({ groups: [group("A B")] }), /1 to 64/],
-  ["a group frame that isn't normalized", editorState({ groups: [group("G", 2)] }), /non-normalized/]
+  ["a group frame that isn't normalized", editorState({ groups: [group("G", 2)] }), /non-normalized/],
+  ...NO_MESH_CLASSES.map((className) =>
+    [
+      `one mesh component on a ${className}`,
+      withCube({ actorToSpawn: pathOf(className), meshComponents: [mesh] }),
+      /mesh components, which makes the game discard the whole map/
+    ] as const
+  ),
+  [
+    "an empty mesh component on a MP_OrangeSign",
+    withCube({
+      actorToSpawn: pathOf("MP_OrangeSign"),
+      meshComponents: [{ ...mesh, meshAssetPath: "", materials: [], materialAssetPaths: [] }]
+    }),
+    /MP_OrangeSign with mesh components/
+  ]
 ]
 
 // The samples the game won't open. `hidden probe 2` holds the three classes it saves but won't reload: BP_TwoCubeOneColor,
 // BP_TwoCubeTwoColor and MP_OrangeSign (docs/qa/exposed-properties.md).
 const refusedInSamples: ReadonlyArray<readonly [string, ReadonlyArray<string>]> = [
   ["props probe", ["Item 15 is a MP_PinballPaddle, which isn't a map piece in this game version."]],
-  ["hidden probe 2", [27, 28, 44].map((item) => `Item ${item} saves the same mesh component twice.`)]
+  [
+    "hidden probe 2",
+    [[27, "BP_TwoCubeOneColor"], [28, "BP_TwoCubeTwoColor"], [44, "MP_OrangeSign"]].map(([item, className]) =>
+      `Item ${item} is a ${className} with mesh components, which makes the game discard the whole map. Delete it and place it again.`
+    )
+  ]
 ]
 
 // Each of these loaded in the game.
@@ -162,7 +185,13 @@ const accepted: ReadonlyArray<readonly [string, MapFile]> = [
   ["the WorldOrigin pivot", editorState({ pivots: [pivot(1, "WorldOrigin")] })],
   ["pivots out of order", editorState({ pivots: [pivot(1), pivot(0)] })],
   ["a group name of 64 characters", editorState({ groups: [group("A".repeat(64))] })],
-  ["a group with no name", editorState({ groups: [group("")] })]
+  ["a group with no name", editorState({ groups: [group("")] })],
+  ...NO_MESH_CLASSES.map((className) =>
+    [
+      `a ${className} with no mesh components`,
+      withCube({ actorToSpawn: pathOf(className), meshComponents: [] })
+    ] as const
+  )
 ]
 
 describe("the game's rules", () => {
@@ -172,6 +201,11 @@ describe("the game's rules", () => {
 
   it.each(accepted)("accepts %s", (_, map) => {
     assert.deepStrictEqual(gameRuleProblems(map, catalog), [])
+  })
+
+  it("refuses a mesh component on the classes that load without one, with no catalog to go by", () => {
+    const map = withCube({ actorToSpawn: pathOf("BP_TwoCubeOneColor"), meshComponents: [mesh] })
+    assert.match(gameRuleProblems(map, null).join(" "), /discard the whole map/)
   })
 
   it("keeps to the parser's limits on any JSON value", () => {
