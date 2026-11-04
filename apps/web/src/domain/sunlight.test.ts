@@ -28,12 +28,32 @@ describe("sunlight", () => {
     assert.closeTo(elevation(21), -45, EPSILON)
   })
 
-  it("crosses the sky along the light's yaw", () => {
+  // The light's forward vector in a race (Map_TrackUGCPlayback, GetActorForwardVector) for maps at yaw 37, read through
+  // the driver: docs/qa/save-roundtrip.md. The sun is behind it.
+  it.each([
+    [3, 0.565, 0.426, Math.SQRT1_2],
+    [5, 0.771, 0.581, 0.259],
+    [8, 0.692, 0.521, -0.5],
+    [11, 0.207, 0.156, -0.966],
+    [13, 0.207, 0.156, -0.966],
+    [15, 0.565, 0.426, -Math.SQRT1_2],
+    [17, 0.771, 0.581, -0.259],
+    [19, 0.771, 0.581, 0.259],
+    [22, 0.399, 0.301, 0.866]
+  ])("puts the sun where a race has it at %d:00", (timeOfDay, x, y, z) => {
+    const { toSun } = sunOf({ timeOfDay, brightness: 12, angle: 37 })
+    assert.closeTo(-toSun.x, x, 1e-3)
+    assert.closeTo(-toSun.y, y, 1e-3)
+    assert.closeTo(-toSun.z, z, 1e-3)
+  })
+
+  it("stays on the side it rose on: the afternoon mirrors the morning", () => {
     const morning = sunOf({ timeOfDay: 9, brightness: 12, angle: 90 }).toSun
-    const evening = sunOf({ timeOfDay: 15, brightness: 12, angle: 90 }).toSun
+    const afternoon = sunOf({ timeOfDay: 15, brightness: 12, angle: 90 }).toSun
     assert.closeTo(morning.x, 0, EPSILON)
-    assert.closeTo(morning.y, -Math.SQRT1_2, EPSILON) // yaw 90 points the light along +Y; the morning sun is behind it
-    assert.closeTo(evening.y, Math.SQRT1_2, EPSILON)
+    assert.closeTo(morning.y, -Math.SQRT1_2, EPSILON) // yaw 90 points the light along +Y; the sun is behind it
+    assert.closeTo(afternoon.y, morning.y, EPSILON)
+    assert.closeTo(afternoon.z, morning.z, EPSILON)
   })
 
   it("shows a warm low sun over a blue sky, and a brighter sky at noon", () => {

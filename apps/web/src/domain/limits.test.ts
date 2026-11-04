@@ -1,8 +1,8 @@
 import { assert, describe, it } from "@effect/vitest"
 import { addItem } from "./edits"
-import { identityTransform, newMapFile, playerStartItem } from "./factory"
+import { defaultEditorState, identityTransform, newMapFile, playerStartItem } from "./factory"
 import { gameLoadProblems, isNormalizedRotation, LIMITS } from "./limits"
-import type { Item, MapFile } from "./MapFile"
+import type { EditorState, Item, MapFile } from "./MapFile"
 
 const fresh = (): MapFile => newMapFile({ displayName: "A", creatorName: "B", createdAt: "" })
 const plain = (): Item => ({
@@ -54,5 +54,41 @@ describe("game load rules", () => {
     const items = Array.from({ length: LIMITS.itemsPerLevel + 1 }, () => plain())
     const map: MapFile = { ...fresh(), items: [playerStartItem(), ...items] }
     assert.match(gameLoadProblems(map)[0]!, /100002 items/)
+  })
+})
+
+const withEditorState = (state: Partial<EditorState>): MapFile => {
+  const map = addItem(addItem(fresh(), plain()), plain())
+  return { ...map, editorState: { ...defaultEditorState(), ...state } }
+}
+const frame = {}
+
+describe("game load rules for editorState", () => {
+  // Each of these was opened in the game on 0.4.1, which opened a blank map instead (docs/qa/save-roundtrip.md).
+  it.each([
+    ["a group member past the last item", { groups: [{ members: [2, 99], frame }] }, /Group 0 .* item 99/],
+    ["an empty group", { groups: [{ members: [], frame }] }, /Group 0 is empty/],
+    [
+      "an item in two groups",
+      { groups: [{ members: [2, 3], frame }, { members: [3], frame }] },
+      /Item 3 is in two groups/
+    ],
+    ["a group without a frame", { groups: [{ members: [2, 3] }] }, /Group 0 has no frame/],
+    [
+      "a pivot past the last item",
+      { pivots: [{ itemIndex: 99, pivot: { choice: "Center", localPosition: { x: 0, y: 0, z: 0 } } }] },
+      /pivot .* item 99/
+    ]
+  ])("refuses %s", (_, state, message) => {
+    assert.match(gameLoadProblems(withEditorState(state)).join(" "), message)
+  })
+
+  // And each of these opened.
+  it.each([
+    ["a named group of two", { groups: [{ members: [2, 3], name: "a", frame }] }],
+    ["a group of one", { groups: [{ members: [2], frame }] }],
+    ["a group without a name", { groups: [{ members: [2, 3], frame }] }]
+  ])("accepts %s", (_, state) => {
+    assert.deepStrictEqual(gameLoadProblems(withEditorState(state)), [])
   })
 })

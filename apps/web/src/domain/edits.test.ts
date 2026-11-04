@@ -13,8 +13,8 @@ import {
   setTransforms,
   validateItem
 } from "./edits"
-import { identityTransform, newMapFile, playerStartItem } from "./factory"
-import type { MapFile } from "./MapFile"
+import { defaultEditorState, identityTransform, newMapFile, playerStartItem } from "./factory"
+import type { EditorGroup, MapFile } from "./MapFile"
 
 const withItems = (n: number): MapFile => {
   // item i sits at x = i
@@ -34,7 +34,23 @@ const withItems = (n: number): MapFile => {
   }
 }
 
+const grouped = (groups: ReadonlyArray<EditorGroup>): MapFile => {
+  const map = withItems(6)
+  return { ...map, editorState: { ...defaultEditorState(), groups } }
+}
+
 describe("edits", () => {
+  // A stale member, or a group left empty, makes the game discard the whole map (docs/qa/save-roundtrip.md).
+  it("removing items takes them out of groups and shifts the later members down", () => {
+    const map = removeItems(grouped([{ members: [2, 3, 5], name: "a", frame: {} }]), [1, 3])
+    assert.deepStrictEqual(map.editorState?.groups, [{ members: [1, 3], name: "a", frame: {} }])
+  })
+
+  it("removing every member of a group removes the group", () => {
+    const map = removeItems(grouped([{ members: [2, 3], frame: {} }, { members: [4, 5], frame: {} }]), [2, 3])
+    assert.deepStrictEqual(map.editorState?.groups, [{ members: [2, 3], frame: {} }])
+  })
+
   it("removes items and remaps editorState pivots", () => {
     const map = removeItems(withItems(5), [1, 2])
     assert.deepStrictEqual(map.items.map((i) => i.itemTransform.translation.x), [0, 3, 4])

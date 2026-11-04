@@ -59,7 +59,7 @@ export class MapExporter extends Context.Service<MapExporter, {
               createdAt
             }
           },
-          // .ballmap files have no editorState; every .balledit the game writes does.
+          // .ballmap files have no editorState, and neither do 0.4.1's saves, but the game loads a draft that has one.
           editorState: map.editorState ?? defaultEditorState()
         }
         const text = yield* codec.encode(out)

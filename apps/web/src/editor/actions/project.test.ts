@@ -55,8 +55,8 @@ describe("import actions", () => {
         yield* TestClock.setTime(createdAtTime(s().doc.map.worldSettings.levelData.createdAt))
         yield* saveMapFile
         assert.deepStrictEqual(disk.dialogs.map((d) => d.kind), ["import"])
-        // 0.4.1 saves a draft with nothing in its editorState (no groups, pivots or camera) without one; the editor
-        // writes the empty one 0.4.0 always did, and changes nothing else
+        // 0.4.1's saves have no editorState (docs/qa/save-roundtrip.md); the editor writes the empty one 0.4.0 did, and
+        // changes nothing else
         const saved = text.includes("\"editorState\"") ?
           text :
           yield* MapCodec.use((codec) =>

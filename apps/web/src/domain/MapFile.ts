@@ -118,10 +118,22 @@ export class ItemPivot extends Schema.Opaque<ItemPivot>()(
   })
 ) {}
 
+/**
+ * A group, as `SKGMLEEditorGroupSave` holds it: item indices, a name and a frame. Nothing in `samples/` has one and 0.4.1
+ * doesn't save them, so `frame` stays untyped: a hand-written `{ rotation, translation, scale3D }` loads, but only that
+ * it's there is known to matter (see `gameLoadProblems`).
+ */
+export const EditorGroup = open({
+  members: Schema.Array(Schema.Int),
+  name: Schema.optionalKey(Schema.String),
+  frame: Schema.optionalKey(Schema.Unknown)
+})
+export type EditorGroup = typeof EditorGroup.Type
+
 export class EditorState extends Schema.Opaque<EditorState>()(
   open({
     version: Schema.Int,
-    groups: Schema.Array(Schema.Unknown),
+    groups: Schema.Array(EditorGroup),
     pivots: Schema.Array(ItemPivot),
     bHasCamera: Schema.Boolean,
     cameraLocation: Vector3,

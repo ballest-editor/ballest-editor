@@ -33,7 +33,7 @@ Plain UTF-8 JSON, tab-indented, CRLF line endings, no BOM. `.balledit` and `.bal
       bValidated: bool,                              // true once a validation run has been completed in-game
       mapTags: { gameplayTags: [ { tagName: "UGCTypes.Map" | "MapTags.UGCTags.*" } ] },
       medalTimesByIndex: [ float x4 ] | [0],         // set by validation run
-      createdAt: "YYYY.MM.DD-HH.MM.SS",
+      createdAt: "YYYY.MM.DD-HH.MM.SS",              // UTC; 0.4.1 sets it to the time the map was opened
       creatorName: string,
       levelDisplayName: string,
       levelPublishedFileId: -1 | int
@@ -44,7 +44,7 @@ Plain UTF-8 JSON, tab-indented, CRLF line endings, no BOM. `.balledit` and `.bal
   items: [ Item ],
   editorState: {                                     // draft-only
     version: 1,
-    groups: [...],
+    groups: [ { members: [ itemIndex ], name, frame: { rotation, translation, scale3D } } ],  // the shape the game loads; no sample has one
     pivots: [ { itemIndex, pivot: { choice: Default|Center|Bottom|Top|Left|Right|Back|Front, localPosition: {x,y,z} } } ],
     bHasCamera, cameraLocation: {x,y,z}, cameraRotation: {pitch,yaw,roll}
   }
@@ -72,7 +72,9 @@ Recovered from the pak's Blueprint bytecode (`W_WorldSettings`, `BP_Sky_Sphere_S
 | sunlight               | `directionalLight.brightness`  | 1.25–7       | The light's intensity. New maps save 12, the editor map's light intensity               |
 | light rotation         | `directionalLightAngle` (opt.) | −360–360     | The light's yaw in degrees (default −20.6474552154541)                                  |
 
-The pitch formula is the native `SetWorldTimeOfDay`, which we can't read; it is confirmed by the editor map's light, which sits at pitch −19.495638 for the default time 7.2997093 (and yaw −20.647455, the default angle). The light is 6000 K. The number fields accept values outside the slider ranges, and samples contain brightness 0, 2, 8 and 12.
+The pitch formula is the native `SetWorldTimeOfDay`, which we can't read; it is confirmed by the editor map's light, which sits at pitch −19.495638 for the default time 7.2997093 (and yaw −20.647455, the default angle). The light is 6000 K.
+
+In a race the sun doesn't cross overhead: the light's forward vector keeps its horizontal part on the yaw's side at every hour measured, so 13:00 lights a map as 11:00 does. The game's editor differs: loading a map there sets the yaw to the file's value plus 180, and a save writes that live yaw back, normalised. Before noon each open and save in the game moves `directionalLightAngle` by 180, which is where the `159.3525390625` in some samples comes from; a race reads the file's value as it is, so the race's sun moves too. The slider is direct (set 100, saves 100). Measurements are in [docs/qa/save-roundtrip.md](qa/save-roundtrip.md). The number fields accept values outside the slider ranges, and samples contain brightness 0, 2, 8 and 12.
 
 The sky light is not a control. On load and on every time change the game sets it from the time of day alone: `clamp(t < 12 ? lerp(MinimumFillLight, 3, t/12) : t ≥ 24 ? MinimumFillLight : lerp(3, MinimumFillLight, (t − 12)/12), 1, 3)`. `MinimumFillLight` is a game-instance default we couldn't read. `skylightIntensity` (always 1 in samples) isn't used for this. The stylized sky sphere switches to a night look before 4:00 and after 20:00.
 
@@ -142,12 +144,12 @@ The 0.4.1 patch ("Fixed-Step Physics & New Track Editor Features", 2026-10-31, p
 
 - **Item surface:** saved as an item property, `intProperties` `SurfaceAssignment` (`Integer`): 0 none, 1 magnet, 2 ice, 3 grippy (`EBallestSurfaceAssignment`; its Grass and GrippyCards values aren't in cooked builds). Every item a 0.4.1 game saves carries it, the player start and goal included, after the class's own ints; setting a surface back to none writes 0. A surface doesn't change the item's saved materials (the red cube set to ice still saves `MI_Env_Glossy_Red`); the game draws it with the surface's material (`materials.json` `surfaces`), and so does the editor.
 - **Mirroring:** Mirror X and Mirror Y flip an item's geometry along its local x (red) and y (green) axes. They're saved as `boolProperties` `bMirrorX` and `bMirror` (in that list's order: `bMirror`, then `bMirrorX`, after the class's own bools), and the item's transform is saved unchanged. The game bakes mirrored geometry: an item mirrored on one axis saves its `meshAssetPath` as a baked copy under `/Game/LevelEditor/Mirror/Meshes/SM_Mirror_<hash>`, the same copy for Mirror X and Mirror Y; mirrored on both (a half turn about local z) it saves the original mesh. `DA_ItemMirrorCatalog`, which maps meshes to bakes, is a native class the extractor can't read, so `catalog.json` `mirrors` pairs them by geometry (186 of the 193 bakes; most negate local y). Physics props with their own `PhysicsFlip` carry only `bMirrorX`; the probe's mirrored paddle saved a bake with `PhysicsFlip` still false, while the spinning cylinder kept its mesh and swapped its cap to `MI_SpinningCylinderCap_Flipped`. The player start and goal carry neither flag. In the game's panel the two are buttons, Flip X and Flip Y, under the transform: each click toggles every selected item from its own state and shows no state itself. Measured with the driver: Flip Y does nothing to a physics prop, and a checkpoint (`bSupportsMirror` false) keeps the buttons but neither does anything; the player start has no buttons.
-- **Draft without `editorState`:** the probe, which has no groups, pivots or saved camera, has no `editorState` key at all; 0.4.0 wrote an empty one. The editor still writes the empty one when it saves such a draft.
+- **Draft without `editorState`:** 0.4.0 wrote an empty one. In the game driver's slots 0.4.1 writes none at all, even with pivots set or a group made in that session, so an in-game save deletes them (docs/qa/save-roundtrip.md; not confirmed outside a sandboxed copy). The game still loads and uses an `editorState`, and the editor writes one.
 - **Physics props** (Special category), each with CDO-exposed properties (`catalog.json`): Elevator `PhysicsElevatorExtensionLength` (float, 400, "Travel height") and `PhysicsElevatorSpeedTier` (int: 1 Slow (the default), 2 Normal, 3 Fast); Spinning Cylinder `PhysicsFlip` (bool; not shown in the game's panel) and `PhysicsCylinderSpinSpeed` (float, 90, "Spin speed"); Paddle `PhysicsPaddleSpeedMultiplier` (float, 1, "Paddle speed", a slider up to 5) and `PhysicsFlip`. The hidden `BP_SpinningPaddles` has `PhysicsVariantCount` (int, 1, "Paddles / doors"). `BP_PhysicsPaddle` replaces `MP_PinballPaddle`, which the game no longer ships.
 - **Lasers** (Hazards): `MP_LaserTerminal`, now drawn with `SM_LaserTerminal_Orbital`, saved with no laser properties of its own.
 - **Lights:** the point light now also saves `LightAttenuationRadius` (1000, after `LightBrightness`), and an untouched one saves `bLightCastsShadows` false; its Blueprint still says true. The spot and rect lights haven't been probed in 0.4.1, so the catalog keeps their 0.4.0 layout.
 
-**Which classes carry the native properties.** A class a 0.4.1 save shows keeps exactly the layout the game wrote (`tools/extract/build-catalog.mjs`). On every other class the catalog lists `SurfaceAssignment`, and the mirror flags by the rule above, as `optional`: the game rejects an item with a property its class doesn't have ("Item %d has an invalid transform, unknown property, or incorrect property value type"), and then discards the whole map, while every 0.4.0 map shows it loads items without them. So the editor leaves optional properties out of new items, writes one only when it's set, and Export warns about items that carry one. A probe with one of each remaining palette kind (checkpoint disc, air vent, decals, spot and rect lights, light cards, a track, ramp, pipe and bowl) would confirm the rule for the rest of the palette.
+**Which classes carry the native properties.** A class a 0.4.1 save shows keeps exactly the layout the game wrote (`tools/extract/build-catalog.mjs`). On every other class the catalog lists `SurfaceAssignment`, and the mirror flags by the rule above, as `optional`: the game rejects an item with a property its class doesn't have ("Item %d has an invalid transform, unknown property, or incorrect property value type"), and then discards the whole map, while every 0.4.0 map shows it loads items without them. So the editor leaves optional properties out of new items, writes one only when it's set, and Export warns about items that carry one. Saves through the game driver confirmed the rule for a ramp, the air vent and the circuit decal. A probe with one of each remaining palette kind (checkpoint disc, shape decal, spot and rect lights, light cards, a track, pipe and bowl) would confirm it for the rest of the palette.
 
 ## The level (`Map_LevelEditorMain`)
 
@@ -173,7 +175,7 @@ On load the game does not move items below the water: the `asdf new not loaded` 
 - per-mesh material slot safety limit
 - `Serialized level JSON contains an invalid or oversized object`
 - `levelName and username must be strings`; display-name text limit 4096
-- editor metadata (groups, pivots) validated separately; invalid → rejected
+- editor metadata (groups, pivots) validated separately. Any of these discards the whole map and opens a blank one with no message: a pivot or group member past the last item, an empty group, an item in two groups, a group with no `frame`. A group of one and a group with no `name` load (measured, docs/qa/save-roundtrip.md)
 - prefab: 2–4096 items, no `MP_PlayerStart`
 
 ## Game assets
