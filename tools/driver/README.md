@@ -13,9 +13,10 @@ is how to run it.
 - The [plugin manager](https://github.com/AnythingGoes-ballest/ballest-plugin-manager) host in the game, with the
   Wine override that makes it load (`WINEDLLOVERRIDES="version=n,b"` in the launch options, or
   `"version"="native,builtin"` in the prefix's `user.reg`). Until upstream carries
-  [PR #28](https://github.com/AnythingGoes-ballest/ballest-plugin-manager/pull/28), the host has to be built from that
-  branch: without it a sandboxed copy deadlocks at start, and without its interface fix the sandbox stays incomplete
-  and refuses every command that changes the game.
+  [PR #28](https://github.com/AnythingGoes-ballest/ballest-plugin-manager/pull/28), the host has to be built from the
+  fork's `ui-dump` branch (PR #28's fixes plus the `widgets` and `palette` test commands the UI tools use): without
+  the fixes a sandboxed copy deadlocks at start, and without the interface fix the sandbox stays incomplete and
+  refuses every command that changes the game.
 - `rsync`.
 
 ## Running it

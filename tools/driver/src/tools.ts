@@ -6,6 +6,7 @@ import { Plugin } from "./plugin.ts"
 import { type ProbeItem, quaternion } from "./probe.ts"
 import { Probe } from "./probeMap.ts"
 import { DriverError, fail, io, Slots } from "./slots.ts"
+import { diffPalette, parsePalette, parseWidgets } from "./ui.ts"
 import { frame, type Placement, ruler, STANDARD_VIEWS, studio } from "./views.ts"
 
 // The MCP tools (docs/DRIVER.md § Tools). Each is a thin wrapper over the host's test channel or the slots; replies
@@ -74,6 +75,86 @@ const Opened = Schema.Struct({
   file: Schema.String,
   pieces: Schema.Array(Schema.Struct({ id: Schema.Finite, class: Schema.String }))
 })
+const PaletteItem = Schema.Struct({ name: Schema.String, classPath: Schema.String })
+const PaletteCategory = Schema.Struct({
+  index: Schema.Finite,
+  name: Schema.String,
+  header: Schema.String,
+  tiles: Schema.Finite,
+  asset: Schema.String,
+  items: Schema.Array(PaletteItem)
+})
+const Widget = Schema.Struct({
+  depth: Schema.Finite,
+  class: Schema.String,
+  name: Schema.String,
+  visibility: Schema.String,
+  enabled: Schema.Boolean,
+  text: Schema.optional(Schema.String),
+  checked: Schema.optional(Schema.Boolean),
+  classPath: Schema.optional(Schema.String)
+})
+/** The details panel's own functions, by what the agent means (W_Details_C, measured with `functions`). */
+const ACTIONS = {
+  flip_x: "FlipSelectionX",
+  flip_y: "FlipSelectionY",
+  mirror_on: "SetSelectionMirrored | b:1",
+  mirror_off: "SetSelectionMirrored | b:0",
+  mirror_x_on: "SetSelectionMirroredX | b:1",
+  mirror_x_off: "SetSelectionMirroredX | b:0",
+  pivot_default: "ChooseDefault",
+  pivot_center: "ChooseCenter",
+  pivot_bottom: "ChooseBottom",
+  pivot_top: "ChooseTop",
+  pivot_left: "ChooseLeft",
+  pivot_right: "ChooseRight",
+  pivot_back: "ChooseBack",
+  pivot_front: "ChooseFront",
+  surface_default: "ChooseSurface | u8:0",
+  surface_magnet: "ChooseSurface | u8:1",
+  surface_grippy: "ChooseSurface | u8:2",
+  surface_ice: "ChooseSurface | u8:3"
+} as const
+const ACTION_NAMES = [
+  "flip_x",
+  "flip_y",
+  "mirror_on",
+  "mirror_off",
+  "mirror_x_on",
+  "mirror_x_off",
+  "pivot_default",
+  "pivot_center",
+  "pivot_bottom",
+  "pivot_top",
+  "pivot_left",
+  "pivot_right",
+  "pivot_back",
+  "pivot_front",
+  "surface_default",
+  "surface_magnet",
+  "surface_grippy",
+  "surface_ice"
+] as const satisfies ReadonlyArray<keyof typeof ACTIONS>
+const ActionName = Schema.Literals(ACTION_NAMES)
+/** Which of a piece's flags the details panel's actions change (BP_BaseItem, read with `props`). */
+const FLAGS = new Set(["bMirror", "bMirrorX", "bSupportsMirror", "SurfaceAssignment"])
+const Snapshot = Schema.Struct({
+  selection: Schema.Unknown,
+  pivot: Schema.NullOr(PivotState),
+  flags: Schema.Record(Schema.String, Schema.String),
+  panel: Schema.Array(Widget)
+})
+
+/** As much of assets/catalog.json as the palette diff reads. */
+const Catalog = Schema.Struct({
+  pieces: Schema.Array(Schema.Struct({
+    objectPath: Schema.String,
+    displayName: Schema.optional(Schema.NullOr(Schema.String)),
+    category: Schema.optional(Schema.NullOr(Schema.String)),
+    inPalette: Schema.optional(Schema.Boolean)
+  }))
+})
+
 /** Where a probe's piece goes: well above the arena's water (at z 0) and clear of the start. */
 const PROBE_AT = [0, 0, 5000] as const
 
@@ -240,6 +321,54 @@ export const DriverToolkit = Toolkit.make(
     { slot: slotParam, id: Schema.Finite, ...viewParams },
     Views
   ),
+  // The game's UI as data (docs/DRIVER.md § The UI as data): the host fork's `palette` and `widgets` commands.
+  tool(
+    "palette_dump",
+    "The editor's content browser as the game builds it: every category in panel order with its header, the data asset behind it, how many tiles it shows, and its items (display name, class path). The game's own catalog, for checking ours.",
+    { slot: slotParam },
+    Schema.Struct({ categories: Schema.Array(PaletteCategory) })
+  ),
+  tool(
+    "palette_diff",
+    "palette_dump against assets/catalog.json, by class path: pieces the game shows that the catalog lacks or doesn't mark in the palette, pieces the catalog marks that the game no longer shows, names or categories that differ, and categories whose tiles don't match their items. Empty lists mean the catalog matches the game.",
+    { slot: slotParam },
+    Schema.Struct({
+      missingFromCatalog: Schema.Array(
+        Schema.Struct({ name: Schema.String, classPath: Schema.String, category: Schema.String })
+      ),
+      notMarkedInPalette: Schema.Array(Schema.String),
+      goneFromPalette: Schema.Array(Schema.String),
+      renamed: Schema.Array(Schema.Struct({
+        classPath: Schema.String,
+        catalog: Schema.Struct({ displayName: Schema.String, category: Schema.String }),
+        game: Schema.Struct({ displayName: Schema.String, category: Schema.String })
+      })),
+      tileMismatch: Schema.Array(
+        Schema.Struct({ category: Schema.String, tiles: Schema.Finite, items: Schema.Finite })
+      ),
+      palette: Schema.Finite,
+      catalog: Schema.Finite
+    })
+  ),
+  tool(
+    "ui_widgets",
+    "A game widget's tree as data: every widget under the first instance of className (W_Details_C: the details panel with its pivot, flip and surface controls; W_MapEditor_C: the whole editor; W_Categories_C: the palette, tiles with their class paths) with its class, name, visibility, enabled state, text, check state. filter narrows the instance by path fragment (default Transient); depth caps the tree (default 12). At most 400 widgets.",
+    {
+      slot: slotParam,
+      className: Schema.String,
+      filter: Schema.optional(Schema.String),
+      depth: Schema.optional(Schema.Finite)
+    },
+    Schema.Struct({ widgets: Schema.Array(Widget) })
+  ),
+  tool(
+    "editor_action",
+    `One of the details panel's actions on the selection, through the panel's own function (as its button would), with a snapshot before and after: the selected pieces, the pivot and gizmo, the first selected piece's mirror and surface flags, and the panel's controls. Actions: ${
+      ACTION_NAMES.join(", ")
+    }. Select the piece first (editor_select).`,
+    { slot: slotParam, action: ActionName },
+    Schema.Struct({ action: Schema.String, call: Schema.String, before: Snapshot, after: Snapshot })
+  ),
   // Probes: the slot's own probe map, written and opened (docs/DRIVER.md § Probe maps).
   tool(
     "probe_map",
@@ -373,6 +502,54 @@ export const DriverToolsLayer = DriverToolkit.toLayer(Effect.gen(function*() {
       return yield* take.pipe(Effect.ensuring(restore))
     })
 
+  const paletteDump = (s: number) =>
+    Effect.gen(function*() {
+      const replies = yield* channel.send(s, "palette", 30_000)
+      if (!replies.some((r) => r.startsWith("palette -> ") && r.includes("categories"))) {
+        return yield* fail(
+          `palette: ${replies.join(" | ")} (the host needs the fork's palette command; see tools/driver/README.md)`
+        )
+      }
+      return parsePalette(replies)
+    })
+
+  const widgets = (s: number, className: string, filter: string, depth: number) =>
+    Effect.gen(function*() {
+      const replies = yield* channel.send(
+        s,
+        `widgets ${quoted(className)} ${quoted(filter)} ${Math.round(depth)}`,
+        30_000
+      )
+      if (!replies.some((r) => r.startsWith("widgets ") && r.includes(" -> /"))) {
+        return yield* fail(
+          `widgets: ${replies.join(" | ")} (the host needs the fork's widgets command; see tools/driver/README.md)`
+        )
+      }
+      return parseWidgets(replies)
+    })
+
+  /** What the details panel's actions can change, read before and after one. */
+  const snapshot = (s: number) =>
+    Effect.gen(function*() {
+      const selection = yield* plugin.call(s, "selection")
+      const selected = (yield* decodePieces(selection)).pieces
+      const pivot = selected.length === 0 ? null : yield* handler.pivot(s)
+      const flags: Record<string, string> = {}
+      const first = selected[0]
+      if (first !== undefined) {
+        // `props` reports the first live instance of the class: exact for one selected piece of its class.
+        const lines = yield* channel.send(s, `props ${first.class} PersistentLevel`)
+        for (const line of lines) {
+          const m = /^ {2}(\S+) \((\w+)\) @\S+ size \d+ = ([0-9a-f]+)$/.exec(line)
+          if (m !== null && FLAGS.has(m[1] ?? "")) flags[m[1] ?? ""] = m[3] ?? ""
+        }
+      }
+      const panel = (yield* widgets(s, "W_Details_C", "Transient", 8)).filter((w) =>
+        /^(Flip|Pivot|Surface|GroupName|Mirror)/.test(w.name)
+      )
+      return { selection, pivot, flags, panel }
+    })
+
   return DriverToolkit.of({
     slot_start: ({ mode, slot }) => slots.start(n(slot), mode ?? "headless"),
     slot_stop: ({ slot }) => slots.stop(n(slot)).pipe(Effect.map((killed) => ({ killed }))),
@@ -439,6 +616,36 @@ export const DriverToolsLayer = DriverToolkit.toLayer(Effect.gen(function*() {
         const s = n(slot)
         const measurement = yield* handler.measure(s, id)
         return yield* shoot(s, id, measurement, { fov, gizmo, pivot, prefix, views })
+      }),
+    palette_dump: ({ slot }) => paletteDump(n(slot)).pipe(Effect.map((categories) => ({ categories }))),
+    palette_diff: ({ slot }) =>
+      Effect.gen(function*() {
+        const palette = yield* paletteDump(n(slot))
+        const file = path.resolve(import.meta.dirname, "..", "..", "..", "assets", "catalog.json")
+        const text = yield* io(fs.readFileString(file), "reading the catalog")
+        const catalog = yield* Schema.decodeUnknownEffect(Catalog)(JSON.parse(text)).pipe(
+          Effect.mapError((e) => fail(`assets/catalog.json isn't the shape the diff expects: ${String(e)}`))
+        )
+        return {
+          ...diffPalette(palette, catalog.pieces),
+          palette: palette.reduce((sum, c) => sum + c.items.length, 0),
+          catalog: catalog.pieces.filter((p) => p.inPalette === true).length
+        }
+      }),
+    ui_widgets: ({ className, depth, filter, slot }) =>
+      widgets(n(slot), className, filter ?? "Transient", depth ?? 12).pipe(Effect.map((w) => ({ widgets: w }))),
+    editor_action: ({ action, slot }) =>
+      Effect.gen(function*() {
+        const s = n(slot)
+        const before = yield* snapshot(s)
+        const [fn, args] = ACTIONS[action].split(" | ")
+        const command = `callx W_Details_C ${fn} Transient${args === undefined ? "" : ` | ${args}`}`
+        const replies = yield* channel.send(s, command)
+        if (!replies.some((r) => r.startsWith("callx ") && r.includes(" ok"))) {
+          return yield* fail(`${action}: ${replies.join(" | ")}`)
+        }
+        yield* Effect.sleep("300 millis")
+        return { action, call: command, before, after: yield* snapshot(s) }
       }),
     probe_map: ({ pieces, slot }) => probe.open(n(slot), pieces.map(probeItem)),
     piece_turntable: (

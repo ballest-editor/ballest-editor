@@ -163,6 +163,25 @@ cubes at scale 30 around the piece, so every view has a plain tiled wall behind 
 100 cm cube at its near corner for texture scale), takes the views, and writes the empty probe back. Nothing is
 saved unless the editor saves; the next probe overwrites the file anyway.
 
+### The UI as data
+
+The host's `state` lists only its own UI, so two test commands were added to the host (the fork's `ui-dump` branch,
+on top of PR #28): `widgets <Class> [filter] [depth]` walks a user widget's tree and writes one line a widget (class,
+name, visibility, enabled, a text block's or box's text, a check box's state, a combo's choice, a palette tile's
+piece class), and `palette` reads the content browser as the game builds it: `W_Categories_C` holds one
+`W_CategoryItems_C` per category in panel order, each with its FName, its header and the data asset behind it,
+`PDA_MapItem_C`, whose `Items` are `S_Item` structs of name, thumbnail and class. Those fourteen data assets under
+`/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/UI/Data/ContentBrowser/` are the game's catalog; they are in
+the paks, so `tools/extract` could read them offline too.
+
+`palette_dump` returns that, and `palette_diff` compares it with `assets/catalog.json` by class path: measured on
+0.4.1, the two match exactly, 140 pieces in 14 categories. `ui_widgets` returns a widget tree (`W_Details_C` for the
+details panel, `W_MapEditor_C` for the whole editor). `editor_action` runs one of the details panel's own functions
+on the selection (`FlipSelectionX`, `ChooseCenter`, `SetSelectionMirrored`, `ChooseSurface`: what its buttons call)
+with a snapshot before and after: the selected pieces, the pivot and gizmo, the first selected piece's mirror and
+surface flags, and the panel's controls. Measured: Flip X toggles the piece's `bMirrorX` and leaves its transform
+alone, which is what the app's mirror handling assumes (docs/FORMAT.md § Mirrors).
+
 ### What the headless modes do and do not give
 
 - `-RenderOffscreen` (measured): no window, real frames through `render`, the host's `tap` and `gamekey` for input.
