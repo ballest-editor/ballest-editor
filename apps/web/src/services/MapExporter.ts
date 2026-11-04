@@ -8,7 +8,7 @@ import {
   NAME_RULE,
   userLevelNameOf
 } from "../domain/factory"
-import { gameLoadProblems } from "../domain/limits"
+import { fileTextProblems, gameLoadProblems } from "../domain/limits"
 import { type MapFile, SYSTEM_LEVEL_NAME } from "../domain/MapFile"
 import { ExportValidationError, type MapEncodeError } from "./errors"
 import { MapCodec } from "./MapCodec"
@@ -45,10 +45,6 @@ export class MapExporter extends Context.Service<MapExporter, {
             message: `Map name and creator: ${NAME_RULE} (they become the file name).`
           })
         }
-        const problems = gameLoadProblems(map, catalog)
-        if (problems.length > 0) {
-          return yield* new ExportValidationError({ message: problems.slice(0, 3).join(" ") })
-        }
         const createdAt = yield* currentCreatedAt.pipe(Effect.provideService(DateTime.CurrentTimeZone, timeZone))
         const out: MapFile = {
           ...map,
@@ -66,7 +62,15 @@ export class MapExporter extends Context.Service<MapExporter, {
           // .ballmap files have no editorState, and neither do 0.4.1's saves, but the game loads a draft that has one.
           editorState: map.editorState ?? defaultEditorState()
         }
+        const problems = gameLoadProblems(out, catalog)
+        if (problems.length > 0) {
+          return yield* new ExportValidationError({ message: problems.slice(0, 3).join(" ") })
+        }
         const text = yield* codec.encode(out)
+        const textProblems = fileTextProblems(text)
+        if (textProblems.length > 0) {
+          return yield* new ExportValidationError({ message: textProblems.join(" ") })
+        }
         return {
           filename: mapFileNameOf(displayName, creatorName),
           text,

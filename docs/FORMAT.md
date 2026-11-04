@@ -133,6 +133,8 @@ Found by locating the `lea` that references each error string and reading the ad
 
 | Limit                     | Value                                     | Error string                                            | Code addr   |
 | ------------------------- | ----------------------------------------- | ------------------------------------------------------- | ----------- |
+| JSON values per file      | **2,000,000** (0.4.1, measured)           | `...exceeds the maximum value count of %lld.`           | —           |
+| Characters per file       | **67,108,864** (0.4.1, measured)          | `...exceeds the %d-character safety limit.`             | —           |
 | Items per level           | **100,000** (0x186A0)                     | `Serialized level contains more than %d items.`         | 0x1447EEB9D |
 | Any JSON array length     | 100,000                                   | `...array with more than %d entries.`                   | 0x1447EE993 |
 | Mesh components per item  | 64                                        | `Item %d contains more than %d saved mesh components.`  | 0x1447EFAFB |
@@ -140,6 +142,10 @@ Found by locating the `lea` that references each error string and reading the ad
 | JSON field-name length    | 4,096                                     | `...oversized field name.`                              | 0x1447EE8C2 |
 | Prefab items              | 2–4,096                                   | string                                                  | —           |
 | Workshop `.ballmap` bytes | not recovered (64-bit constant elsewhere) | `...oversized root .ballmap (%lld bytes; maximum %lld)` | 0x144ECBD1C |
+
+The value and character limits are the ones a big map meets (`docs/qa/budget.md` § The real limits). Every object, array and scalar counts as a value, and every character of the file counts, whitespace and the game's layout included. A real map stops near 46,600 items on characters, and no map gets past 83,331 items on values, so the 100,000-item limit is never the one that binds. Past either, the game drops the map without a message and opens the default new map.
+
+There is no piece budget. Items still carry a `BudgetCost` and `MaximumMapBudget` is still 300, but on 0.4.1 nothing counts the cost or enforces the limit, and the header's bar stays empty (`docs/qa/budget.md`, which has every cost).
 
 Practical ceiling is performance, not the parser: largest Workshop map seen is 3,750 items; the game spawns one actor per item (`Ballest.UGC.Playback.ForceFullActors`, spatial bucketing cvars suggest instancing for big maps).
 

@@ -6,11 +6,16 @@ import type { CatalogIndex } from "./Catalog"
 import { isPlayerStart, type Item, type MapFile } from "./MapFile"
 import { sourceMeshOf } from "./mirror"
 
-/** Constants recovered from the shipping exe (build 0.4.0-playtest). */
+/**
+ * Recovered from the shipping exe. The first three are from build 0.4.0-playtest; the last two from 0.4.1, and
+ * measured there at their boundaries (docs/qa/budget.md). Those two are the ones a big map meets.
+ */
 export const LIMITS = {
   itemsPerLevel: 100_000,
   meshComponentsPerItem: 64,
-  propertiesPerList: 4096
+  propertiesPerList: 4096,
+  jsonValuesPerFile: 2_000_000,
+  charactersPerFile: 67_108_864
 } as const
 
 /** UE's THRESH_QUAT_NORMALIZED: |1 - |q|^2| must be below this. */
@@ -28,6 +33,15 @@ const PROPERTY_LISTS = [
 export const isNormalizedRotation = (
   q: { readonly x: number; readonly y: number; readonly z: number; readonly w: number }
 ): boolean => Math.abs(1 - (q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w)) < QUAT_NORMALIZED_THRESHOLD
+
+/** Every value in a JSON document, objects and arrays included. */
+export const jsonValueCount = (value: unknown): number => {
+  if (value === undefined) return 0
+  if (typeof value !== "object" || value === null) return 1
+  let count = 1
+  for (const child of Object.values(value)) count += jsonValueCount(child)
+  return count
+}
 
 /**
  * A material entry past its mesh's last slot makes the game discard the map (measured on 0.4.1: one past the end is
@@ -60,6 +74,14 @@ const itemProblems = (item: Item, index: number, catalog: CatalogIndex | null): 
   }
   return out
 }
+
+/** What the game rejects in the file as text: whitespace counts, and so does the game's layout of it. */
+export const fileTextProblems = (text: string): ReadonlyArray<string> =>
+  text.length > LIMITS.charactersPerFile
+    ? [
+      `The map's file has ${text.length} characters (maximum ${LIMITS.charactersPerFile}): past that the game opens a blank map instead.`
+    ]
+    : []
 
 /**
  * What the game checks in `editorState`. Any of these makes it discard the whole map and open a blank one, without a
@@ -97,6 +119,12 @@ export const gameLoadProblems = (map: MapFile, catalog: CatalogIndex | null = nu
   out.push(...editorStateProblems(map))
   if (map.items.length > LIMITS.itemsPerLevel) {
     out.push(`The map has ${map.items.length} items (maximum ${LIMITS.itemsPerLevel}).`)
+  }
+  const values = jsonValueCount(map)
+  if (values > LIMITS.jsonValuesPerFile) {
+    out.push(
+      `The map has ${values} JSON values (maximum ${LIMITS.jsonValuesPerFile}): past that the game opens a blank map instead.`
+    )
   }
   map.items.forEach((item, index) => out.push(...itemProblems(item, index, catalog)))
   return out

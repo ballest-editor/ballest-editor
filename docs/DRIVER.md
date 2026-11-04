@@ -198,6 +198,17 @@ with a snapshot before and after: the selected pieces, the pivot and gizmo, the 
 surface flags, and the panel's controls. Measured: Flip X toggles the piece's `bMirrorX` and leaves its transform
 alone, which is what the app's mirror handling assumes (docs/FORMAT.md § Mirrors).
 
+### Reading objects
+
+Traps from the budget QA (docs/qa/budget.md):
+
+- `props <Class> PersistentLevel` reads the first instance whose class matches, and subclasses match. Pass the instance's own name as the filter and check the reply's first line.
+- `props` with no `Transient` filter on a widget class reads the Blueprint's archetype, not the live widget.
+- `probe_map` waits for at least the pieces it wrote, so a map that didn't reload can pass if the open one has as many. It can't wait for an exact count: a piece with a child actor, like `MP_Airvents`, shows as two.
+- From a heavy map (tens of thousands of pieces) the game can stall on `open Map_MainMenu`. Restart the slot.
+- The save button writes `<name>_<player>.balledit`, under the player's name, not the probe's file. A second save asks to overwrite in a dialog that waits for a tap.
+- `membytes` returns at most 512 bytes a call.
+
 ### What the headless modes do and do not give
 
 - `-RenderOffscreen` (measured): no window, real frames through `render`, the host's `tap` and `gamekey` for input.

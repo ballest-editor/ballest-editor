@@ -3,7 +3,7 @@ import { Schema } from "effect"
 import { Catalog, type CatalogIndex, indexCatalog } from "./Catalog"
 import { addItem } from "./edits"
 import { defaultEditorState, identityTransform, newMapFile, playerStartItem } from "./factory"
-import { gameLoadProblems, isNormalizedRotation, LIMITS } from "./limits"
+import { fileTextProblems, gameLoadProblems, isNormalizedRotation, jsonValueCount, LIMITS } from "./limits"
 import type { EditorState, Item, MapFile } from "./MapFile"
 
 const fresh = (): MapFile => newMapFile({ displayName: "A", creatorName: "B", createdAt: "" })
@@ -89,6 +89,37 @@ describe("game load rules", () => {
     const items = Array.from({ length: LIMITS.itemsPerLevel + 1 }, () => plain())
     const map: MapFile = { ...fresh(), items: [playerStartItem(), ...items] }
     assert.match(gameLoadProblems(map)[0]!, /100002 items/)
+  })
+
+  it("counts every JSON value, containers included", () => {
+    assert.strictEqual(jsonValueCount(null), 1)
+    assert.strictEqual(jsonValueCount([]), 1)
+    assert.strictEqual(jsonValueCount({ a: 1, b: [true, "x"], c: {} }), 6)
+    // a field the encoder leaves out isn't in the file
+    assert.strictEqual(jsonValueCount({ a: 1, b: undefined }), 2)
+  })
+
+  it("stops at the game's character limit, counting every character of the file", () => {
+    assert.deepStrictEqual(fileTextProblems(" ".repeat(LIMITS.charactersPerFile)), [])
+    assert.match(
+      fileTextProblems(" ".repeat(LIMITS.charactersPerFile + 1))[0]!,
+      /67108865 characters \(maximum 67108864\).*blank map/
+    )
+  })
+
+  it("stops at the game's JSON value limit, long before its item limit", () => {
+    const base = fresh()
+    const filler = plain()
+    const perItem = jsonValueCount(filler)
+    const room = LIMITS.jsonValuesPerFile - jsonValueCount(base)
+    const fits = Math.floor(room / perItem)
+    const withFiller = (count: number): MapFile => ({
+      ...base,
+      items: [...base.items, ...Array.from({ length: count }, () => filler)]
+    })
+    assert.isBelow(base.items.length + fits + 1, LIMITS.itemsPerLevel)
+    assert.deepStrictEqual(gameLoadProblems(withFiller(fits)), [])
+    assert.match(gameLoadProblems(withFiller(fits + 1))[0]!, /JSON values \(maximum 2000000\).*blank map/)
   })
 })
 
