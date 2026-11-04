@@ -142,6 +142,8 @@ Every change goes to the page on `ballest:update:state`; the page asks for the c
 | `BALLEST_MOCK_UPDATES=1`          | checks `http://127.0.0.1:4848/` (`pnpm release:mock-server`) instead |
 | `BALLEST_MOCK_UPDATE_SERVER_PORT` | that port                                                            |
 
+On Linux, `electron-updater` deletes the running AppImage and moves the update to the same path only when the file's name has no version (or already matches the download); otherwise the update lands beside it under the download's name, and anything pointing at the old path stops working. So every release's AppImage is `Ballest-Editor-x86_64.AppImage`, and an update replaces it in place, under whatever name the user gave it, as long as that name has no version. A copy saved with a versioned name (0.1.0-rc.1, rc.2) is renamed once more, to `Ballest-Editor-x86_64.AppImage`, on its next update; after that it stays put.
+
 Trying it without a release is [tools/release](../../tools/release/README.md#trying-updates)'s job.
 
 ## Security settings
