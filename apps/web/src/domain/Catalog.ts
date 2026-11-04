@@ -69,10 +69,18 @@ export class Beam extends Schema.Opaque<Beam>()(open({
   color: Vec3Tuple
 })) {}
 
+/** A choice of a dropdown row: the saved value and the game's label for it. */
+export class CatalogPropertyOption extends Schema.Opaque<CatalogPropertyOption>()(open({
+  value: Schema.Int,
+  label: Schema.String
+})) {}
+
 /**
- * A property the level editor exposes on a class (its CDO's `LevelEditorExposedProperties`),
- * in the game's order. `list`/`type` are where and how the game writes it; null when the
- * extractor couldn't map the Blueprint type. `hidden`: left out of the game's own panel.
+ * A property the level editor saves on a class, in the game's order. `list`/`type` are where and
+ * how the game writes it; null when the extractor couldn't map the Blueprint type. `hidden`:
+ * saved, but the game's details panel offers no control for it. The rest describe that control,
+ * measured in game (tools/extract/panel.json): its label, kind and position, and for a number the
+ * slider's range and step. `typedMax` is where a typed value stops when that's past the slider.
  */
 export class CatalogProperty extends Schema.Opaque<CatalogProperty>()(open({
   name: Schema.String,
@@ -80,6 +88,14 @@ export class CatalogProperty extends Schema.Opaque<CatalogProperty>()(open({
   type: Schema.NullOr(Schema.String),
   default: Schema.Unknown,
   hidden: Schema.optionalKey(Schema.Boolean),
+  label: Schema.optionalKey(Schema.String),
+  control: Schema.optionalKey(Schema.Literals(["slider", "dropdown", "toggle", "color"])),
+  row: Schema.optionalKey(Schema.Int),
+  min: Schema.optionalKey(Schema.Finite),
+  max: Schema.optionalKey(Schema.Finite),
+  step: Schema.optionalKey(Schema.Finite),
+  typedMax: Schema.optionalKey(Schema.Finite),
+  options: Schema.optionalKey(Schema.Array(CatalogPropertyOption)),
   /**
    * A native property (surface, mirror) on a class no 0.4.1 save has shown yet: the game loads
    * the item without it, so new items leave it out until it's set (see docs/FORMAT.md).

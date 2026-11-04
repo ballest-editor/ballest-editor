@@ -190,6 +190,8 @@ piece class), and `palette` reads the content browser as the game builds it: `W_
 `/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/UI/Data/ContentBrowser/` are the game's catalog; they are in
 the paks, so `tools/extract` could read them offline too.
 
+Two traps when reading a piece's properties. `ui_widgets W_ItemPropertyData_C` takes the first instance, and old ones stay around, so it can return another piece's rows: read `W_ItemsDatas_C`, which holds the live one, and check `TB_Actor` names the selected piece. And `openmap` matches only its first word against the file name, so `openmap palette probe 1` opens the first map containing `palette`; the game's own save of the probe map also writes a second `driver probe_<creator>` file that the same word matches.
+
 `palette_dump` returns that, and `palette_diff` compares it with `assets/catalog.json` by class path: measured on
 0.4.1, the two match exactly, 140 pieces in 14 categories. `ui_widgets` returns a widget tree (`W_Details_C` for the
 details panel, `W_MapEditor_C` for the whole editor). `editor_action` runs one of the details panel's own functions

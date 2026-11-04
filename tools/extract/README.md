@@ -150,12 +150,13 @@ Piece = {
                        // at scale 1 (SM_LaserCore's; the item's X scale stretches it), radii from the
                        // Blueprint, colour from M_LaserBeamCore
   sampleProperties     // "propertyName:type" pairs seen in samples
-  properties: [{ name, list, type, ueType, default, hidden, source, optional? }]
+  properties: [{ name, list, type, ueType, default, hidden, source, optional?,
+                 label?, control?, row?, min?, max?, step?, typedMax?, options? }]
                        // the CDO's LevelEditorExposedProperties, in order: list/type are where and how
                        // map files store it ("floatProperties"/"Float", "intProperties"/"Integer",
                        // "boolProperties"/"Bool"; null for other Blueprint types), default is the CDO
-                       // value (0/false when unversioned serialization omitted it), hidden = listed in
-                       // LevelEditorHiddenProperties (left out of the in-game property panel); then the
+                       // value (0/false when unversioned serialization omitted it), hidden = saved, but
+                       // the in-game panel has no control for it (panel.json); then the
                        // native ones 0.4.1 adds (source "native": SurfaceAssignment, bMirror, bMirrorX),
                        // optional where no 0.4.1 save of the class has shown them
 }
@@ -164,6 +165,8 @@ Piece = {
 **`properties`:** where the CDO lists `LevelEditorExposedProperties` (the air vent, the circuit decal, five light classes, and 0.4.1's elevator, spinning cylinder, paddle and spinning paddles) they come from there (`source: "cdo"`). Some classes expose properties from native code instead (the shape decal, the light cards): for those the names, lists and order are the ones the game wrote into the samples, and the defaults are the Blueprint variables' CDO values (`source: "samples"`; the class's `variables` in `classes.json`). Every sample item's properties match these names, lists and order, and unedited sample items carry exactly these defaults.
 
 **Native properties (0.4.1).** The game saves an item surface (`SurfaceAssignment`) on every item and the Mirror Y / X flags (`bMirror`, `bMirrorX`) on most, from native code (docs/FORMAT.md, "0.4.1"). `scan-samples.mjs` records each class's property layout from a 0.4.1 save when the samples have one (`savedBy041`: the item carries `SurfaceAssignment`), and `build-catalog.mjs` (`withNative`) keeps that layout exactly. Every other class gets the native properties by rule, marked `optional`. `DEFAULT_OVERRIDES` holds defaults the native code sets over the Blueprint's (the point light's shadows off and its 1000 cm attenuation radius).
+
+**The details panel (`panel.json`).** What the game offers on a class comes from native code at runtime, so the pak can't show it. `panel.json` is checked in, measured on 0.4.1 ([docs/qa/exposed-properties.md](../../docs/qa/exposed-properties.md)): `rowSets` are the panel's rows (label, control, slider range and step, `typedMax` where a typed value goes past the slider, a dropdown's options), and `pieces` lists all 237 classes the game can load, with the rows they use and `flip: false` or `surface: false` where the panel leaves those out. `withPanel` in `build-catalog.mjs` merges it into `properties`: a property with a row gets its control and `row` (its place in the panel), and one without is `hidden`. `src/panel.test.ts` fails if a palette piece is missing from it. After a game patch, measure again: the method is in that doc.
 
 **Mirrors (`mirrors`).** `run.sh` also exports `/Game/LevelEditor/Mirror/Meshes` (the game's 193 baked mirror meshes). `mirrors.mjs` pairs each with its source by geometry: the same triangle count, bounds mirrored in local x or y, and the same distinct vertex positions with that axis negated (allowing 0.5%, since the bake welds a little differently); where several sources share a shape, the one whose vertex count and slot names also match the bake wins. That pairs 186 one to one; the 7 left mirror meshes nothing exports (`SM_Paddle_Flipped`, for one). The bakes are then dropped from `assets/pieces/`: the editor draws a mirrored item as its source scaled by -1, and only needs the pairs to write the path the game saves. `materials` is the one slot swap the probe showed (the spinning cylinder's cap).
 

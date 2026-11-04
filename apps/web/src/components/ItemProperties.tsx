@@ -5,18 +5,21 @@ import { Label } from "@workspace/ui/components/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Separator } from "@workspace/ui/components/separator"
+import { Slider } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
 import { Option } from "effect"
 import { type ReactNode, useId, useState } from "react"
 import { hexToLinear, linearToHex, type Rgb } from "../domain/color"
 import {
+  clampToRange,
   type ColorProperty,
   type ItemProperty,
   optionLabel,
   type Options,
   propertyLabel,
   type PropertyRow,
-  propertyRows
+  propertyRows,
+  sliderStep
 } from "../domain/itemProperties"
 import { setSelectionProperties } from "../editor/actions"
 import { NumberField } from "./NumberField"
@@ -42,14 +45,17 @@ const scrubStep = (reference: number): number => {
   return magnitude === 0 ? 0.01 : Math.max(0.001, 10 ** (Math.floor(Math.log10(magnitude)) - 2))
 }
 
-/** An integer with labelled values; a value outside them is listed too, with what it draws. */
+const sliderValue = (value: number | ReadonlyArray<number>): number | undefined =>
+  typeof value === "number" ? value : value[0]
+
+/** A saved value with labelled choices; one outside them is listed too, with what the game makes of it. */
 function OptionValue(props: {
   readonly options: Options
   readonly value: unknown
   readonly onChange: (value: number) => void
 }) {
   const current = typeof props.value === "number" ? props.value : null
-  const labels = new Map(props.options.flatMap((label, i) => (label === null ? [] : [[String(i), label] as const])))
+  const labels = new Map(props.options.map((o) => [String(o.value), o.label] as const))
   if (current !== null && !labels.has(String(current))) labels.set(String(current), optionLabel(props.options, current))
   return (
     <Select
@@ -90,8 +96,8 @@ function PropertyValue({ property, id, handleClassName }: {
       const integer = property.list === "intProperties"
       const shown = typeof value === "number" ? value : null
       const reference = typeof property.default === "number" ? property.default : shown ?? 0
-      const commit = (v: number) => set(integer ? Math.round(v) : v)
-      return (
+      const commit = (v: number) => set(clampToRange(property, integer ? Math.round(v) : v))
+      const field = (
         <NumberField
           label={property.name}
           value={scrub ?? shown}
@@ -102,6 +108,28 @@ function PropertyValue({ property, id, handleClassName }: {
           digits={integer ? 0 : 3}
           {...(handleClassName === undefined ? {} : { handleClassName })}
         />
+      )
+      const { range } = property
+      if (range === undefined) return field
+      // The slider stays inside its range; the field shows a value past it, as the game's text box does.
+      const position = Math.min(Math.max(scrub ?? shown ?? range.min, range.min), range.max)
+      return (
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-1.5">
+          <Slider
+            aria-label={propertyLabel(property)}
+            min={range.min}
+            max={range.max}
+            step={sliderStep(range)}
+            value={position}
+            onValueChange={(v) => setScrub(sliderValue(v) ?? null)}
+            onValueCommitted={(v) => {
+              const next = sliderValue(v)
+              setScrub(null)
+              if (next !== undefined) commit(next)
+            }}
+          />
+          {field}
+        </div>
       )
     }
     default:
@@ -172,15 +200,16 @@ function Row(props: {
   readonly children: (id: string) => ReactNode
 }) {
   const id = useId()
-  const hidden = props.properties.some((p) => p.hidden)
   const resettable = props.properties.filter((p) => p.default !== undefined)
   const atDefault = resettable.every((p) => p.values.every((v) => v === p.default))
-  const details = [...props.details, ...(hidden ? ["Hidden in the game's own property panel"] : [])].join("\n")
   return (
     <div className="contents">
-      <Label htmlFor={id} title={details} className="min-w-0 text-xs leading-tight break-words text-muted-foreground">
+      <Label
+        htmlFor={id}
+        title={props.details.join("\n")}
+        className="min-w-0 text-xs leading-tight break-words text-muted-foreground"
+      >
         {props.label}
-        {hidden && "*"}
       </Label>
       {props.children(id)}
       {resettable.length > 0 && !atDefault
@@ -225,12 +254,13 @@ function PropertyRowView({ row }: { readonly row: PropertyRow }) {
   const hasDefault = property.default !== undefined
   return (
     <Row
-      label={propertyLabel(property.name)}
+      label={propertyLabel(property)}
       details={[
         `${property.name} (${property.type})`,
         hasDefault
           ? `Default: ${describe(property, property.default)}`
           : "Not a property the catalog lists for this piece",
+        ...(property.range === undefined ? [] : [`Range: ${property.range.min} to ${property.range.typedMax}`]),
         ...(property.optional === true
           ? ["Not yet seen in a game save of this piece: export warns about items that carry it"]
           : [])
@@ -259,11 +289,6 @@ export function ItemProperties({ properties }: { readonly properties: ReadonlyAr
           return <PropertyRowView key={`${first.list}/${first.name}`} row={row} />
         })}
       </div>
-      {properties.some((p) => p.hidden) && (
-        <p className="text-xs text-muted-foreground">
-          * Hidden in the game's own property panel.
-        </p>
-      )}
     </>
   )
 }

@@ -11,7 +11,16 @@ import { listSamples, readSample, repoRoot } from "../test/samples"
 import { Catalog, type CatalogIndex, indexCatalog } from "./Catalog"
 import { withProperty } from "./itemProperties"
 import { type Item, MapFile } from "./MapFile"
-import { MIRROR_X, MIRROR_Y, mirrorFlagsOf, mirrorScaleOf, sourceMeshOf, withMirrorMesh } from "./mirror"
+import {
+  isMirrorFlag,
+  MIRROR_X,
+  MIRROR_Y,
+  mirrorFlagsOf,
+  mirrorScaleOf,
+  PHYSICS_FLIP,
+  sourceMeshOf,
+  withMirrorMesh
+} from "./mirror"
 
 const catalogPath = path.join(repoRoot, "assets", "catalog.json")
 const hasCatalog = fs.existsSync(catalogPath)
@@ -69,5 +78,45 @@ describe.skipIf(!hasCatalog)("mirroring", () => {
     assert.isTrue(mirrorFlagsOf(cylinder).x)
     assert.isUndefined(mirrorScaleOf(cylinder, idx))
     assert.match(cylinder.meshComponents[0]!.materials[1]!.material, /Cap_Flipped/)
+  })
+})
+
+// Measured on 0.4.1 (docs/qa/exposed-properties.md): Flip Y sets PhysicsFlip on these two, which have no bMirror. One
+// axis saves the paddle's bake and the cylinder's flipped cap; both axes save the paddle's own mesh and the normal cap.
+describe.skipIf(!hasCatalog)("Flip Y on the physics props", () => {
+  const index = () => indexCatalog(Schema.decodeUnknownSync(Catalog)(JSON.parse(fs.readFileSync(catalogPath, "utf8"))))
+  const palette = () =>
+    listSamples()
+      .filter((f) => f.name.includes("palette probe"))
+      .flatMap((f) => Schema.decodeSync(Schema.fromJsonString(MapFile))(readSample(f)).items)
+  const named = (name: string) => palette().find((item) => className(item) === name)!
+  const flipped = (item: Item, x: boolean, y: boolean) =>
+    withMirrorMesh(setFlag(setFlag(item, MIRROR_X, x), PHYSICS_FLIP, y), index())
+  const cap = (item: Item) => item.meshComponents[0]?.materials.at(-1)?.material ?? ""
+
+  it("reads PhysicsFlip as the y flag", () => {
+    const flag = (propertyName: string): Item => ({
+      ...named("BP_PhysicsPaddle"),
+      boolProperties: [{ currentValue: true, propertyName, propertyType: "Bool" }]
+    })
+    assert.deepStrictEqual(mirrorFlagsOf(flag(PHYSICS_FLIP)), { x: false, y: true })
+    assert.deepStrictEqual(mirrorFlagsOf(flag(MIRROR_Y)), { x: false, y: true })
+    assert.isTrue(isMirrorFlag(PHYSICS_FLIP))
+    assert.isFalse(isMirrorFlag("bFacingOnly"))
+  })
+
+  it("saves the paddle's bake on one axis and its own mesh on both", () => {
+    const paddle = named("BP_PhysicsPaddle")
+    assert.include(mainMesh(flipped(paddle, false, true)), "SM_Mirror_a1c6e610f778cbb47635")
+    assert.include(mainMesh(flipped(paddle, true, false)), "SM_Mirror_a1c6e610f778cbb47635")
+    assert.strictEqual(mainMesh(flipped(paddle, true, true)), mainMesh(paddle))
+  })
+
+  it("keeps the cylinder's mesh and swaps its cap on one axis, not on both", () => {
+    const cylinder = named("BP_SpinningCylinder")
+    const yOnly = flipped(cylinder, false, true)
+    assert.strictEqual(mainMesh(yOnly), mainMesh(cylinder))
+    assert.include(cap(yOnly), "MI_SpinningCylinderCap_Flipped")
+    assert.include(cap(flipped(cylinder, true, true)), "MI_SpinningCylinderCap_Normal")
   })
 })

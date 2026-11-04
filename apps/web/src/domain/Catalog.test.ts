@@ -10,7 +10,7 @@ import * as path from "node:path"
 import { listSamples, readSample, repoRoot } from "../test/samples"
 import { Catalog, HIDDEN_SECTION, indexCatalog, paletteSections, unavailableReasonOf, visibleExtras } from "./Catalog"
 import { itemFromPiece, placementTransform, qualifyMaterialPath } from "./factory"
-import { PROPERTY_LISTS } from "./itemProperties"
+import { defaultProperties, PROPERTY_LISTS } from "./itemProperties"
 import { Item, MapFile, objectPathOf } from "./MapFile"
 
 const catalogPath = path.join(repoRoot, "assets", "catalog.json")
@@ -19,6 +19,9 @@ const load = () => Schema.decodeSync(Schema.fromJsonString(Catalog))(fs.readFile
 
 const decodeSample = Schema.decodeSync(Schema.fromJsonString(MapFile))
 const sampleItems = () => listSamples().flatMap((s) => decodeSample(readSample(s)).items)
+/** Untouched items of every class the game can load, as a 0.4.1 game saves them (docs/qa/exposed-properties.md). */
+const probeItems = () =>
+  listSamples().filter((s) => /(palette|hidden) probe/.test(s.name)).flatMap((s) => decodeSample(readSample(s)).items)
 
 describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
   it("decodes and keeps unknown keys", () => {
@@ -49,13 +52,56 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
     const vent = byName("MP_AirVent")
     const ventItem = itemFromPiece(vent, placementTransform(vent, { x: 0, y: 0, z: 0 }))
     const sampleVent = sampleItems().find((i) => i.actorToSpawn === vent.classPath)!
+    const savedVent = probeItems().find((i) => i.actorToSpawn === vent.classPath)!
     assert.deepStrictEqual(ventItem.meshComponents, sampleVent.meshComponents)
     assert.deepStrictEqual(ventItem.itemTransform.scale3D, sampleVent.itemTransform.scale3D)
     // the sample vent is unedited: the extracted defaults are exactly what the game saves
-    for (const list of PROPERTY_LISTS) assert.deepStrictEqual(ventItem[list], sampleVent[list])
+    for (const list of PROPERTY_LISTS) assert.deepStrictEqual(ventItem[list], savedVent[list])
     assert.isAbove(visibleExtras(vent).length, 0)
     const checkpoint = byName("BP_Checkpoint")
     assert.deepStrictEqual(placementTransform(checkpoint, { x: 0, y: 0, z: 0 }).scale3D, { x: 1.5, y: 1.5, z: 1.5 })
+  })
+
+  it("places every class with the property lists the game saves for it untouched", () => {
+    const { pieceByClass } = indexCatalog(load())
+    // The one default that differs by how an item appears: placed from the palette, a point light's shadows are off
+    // (the "new pieces probe"); loaded or pasted, as these probes' are, they're on.
+    const placedOff = (item: Item, name: string) =>
+      item.actorToSpawn.includes("MP_RawPointLight") && name === "bLightCastsShadows"
+    const entries = probeItems()
+    assert.isAbove(entries.length, 230)
+    for (const saved of entries) {
+      const piece = pieceByClass.get(saved.actorToSpawn)
+      if (piece === undefined) continue
+      const fresh = defaultProperties(piece)
+      for (const list of PROPERTY_LISTS) {
+        const shape = (
+          entry: { readonly propertyName: string; readonly currentValue: unknown }
+        ) => [entry.propertyName, placedOff(saved, entry.propertyName) ? "either" : entry.currentValue]
+        assert.deepStrictEqual(fresh[list].map(shape), saved[list].map(shape), `${piece.className} ${list}`)
+      }
+    }
+  })
+
+  it("leaves no property of a class the game can load unconfirmed", () => {
+    const unconfirmed = load().pieces.filter((p) =>
+      p.className !== "MP_PinballPaddle" && (p.properties ?? []).some((q) => q.optional === true)
+    )
+    assert.deepStrictEqual(unconfirmed.map((p) => p.className), [])
+  })
+
+  it("carries the game's labels and ranges for the panel's rows", () => {
+    const catalog = load()
+    const property = (className: string, name: string) =>
+      catalog.pieces.find((p) => p.className === className)?.properties?.find((q) => q.name === name)
+    assert.strictEqual(property("MP_AirVent", "EntryAssistMinSpeed")?.label, "Entry Boost Speed")
+    assert.strictEqual(property("MP_AirVent", "Field Magnitude")?.max, 2250000)
+    assert.strictEqual(property("BP_Elevator", "PhysicsElevatorExtensionLength")?.typedMax, 10000)
+    assert.isTrue(property("MP_RawPointLight", "LightAttenuationRadius")?.hidden)
+    assert.isTrue(property("MP_AirVent", "SurfaceAssignment")?.hidden)
+    assert.isFalse(property("BP_Prim_Cube", "SurfaceAssignment")?.hidden)
+    assert.strictEqual(property("BP_SpinningCylinder", "PhysicsFlip")?.label, "Flip Y")
+    assert.isTrue(property("BP_Checkpoint", "SurfaceAssignment")?.hidden)
   })
 
   it("lists the properties sample items carry, in the order the game writes them", () => {
