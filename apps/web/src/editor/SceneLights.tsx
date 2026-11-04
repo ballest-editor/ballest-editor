@@ -2,9 +2,9 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import { useShallow } from "zustand/react/shallow"
-import { toTuple3, ueToThreeVector } from "../domain/coords"
+import { toTuple3, type Tuple3, ueToThreeVector } from "../domain/coords"
 import { type Sky, skyIrradiance, skyOf } from "../domain/sky"
-import { sunOf } from "../domain/sunlight"
+import { sunOf, viewLightOf } from "../domain/sunlight"
 import { setSky, SKY_DOME_RADIUS, SkyMaterial } from "./sky"
 import { shownLighting, useEditor } from "./store"
 import { setWaterLight } from "./water"
@@ -18,8 +18,6 @@ const STUDIO_SUN: readonly [number, number, number] = [3000, 8000, 2000]
 const STUDIO_SUN_INTENSITY = 1.6
 /** Light the studio fills send onto an up-facing surface (the sky colour's luminance is about 0.8). */
 const STUDIO_FILL = AMBIENT + HEMISPHERE * 0.8
-/** three.js intensity per unit of the game's sun brightness: the map's sun at the default 12 matches the studio sun. */
-const SUN_PER_BRIGHTNESS = STUDIO_SUN_INTENSITY / 12
 /** How far out the sun sits (cm); a directional light only uses the direction. */
 const SUN_DISTANCE = 10_000
 /**
@@ -30,6 +28,8 @@ const SUN_DISTANCE = 10_000
 const GROUND_BOUNCE = 0.35
 
 const UP = { x: 0, y: 0, z: 1 }
+
+const luminanceOf = ([r, g, b]: readonly [number, number, number]) => 0.2126 * r + 0.7152 * g + 0.0722 * b
 
 /** Light reaching an up-facing surface: the fill, plus the sun by how high it stands. */
 const upwardLight = (fill: number, sunIntensity: number, sunHeight: number) =>
@@ -85,20 +85,19 @@ function StudioLights() {
 
 function MapLights() {
   const { sun, sky } = useMapSun()
-  const sunIntensity = sun.intensity * SUN_PER_BRIGHTNESS
+  const light = useMemo(() => viewLightOf(sun), [sun])
   const { x, y, z } = sun.toSun
   const position = toTuple3(ueToThreeVector({ x: x * SUN_DISTANCE, y: y * SUN_DISTANCE, z: z * SUN_DISTANCE }))
-  const color = useMemo(() => new THREE.Color().setRGB(...sun.color, THREE.LinearSRGBColorSpace), [sun])
-  // The game's sky light (1-3 by the time of day), at the studio fill's strength at noon.
-  const fill = (STUDIO_FILL * sun.skyIntensity) / 3
-  useEffect(
-    () => setWaterLight(Math.min(1, upwardLight(fill, sunIntensity, z) / STUDIO_UPWARD_LIGHT)),
-    [fill, sunIntensity, z]
-  )
+  const color = useMemo(() => new THREE.Color().setRGB(...light.sun, THREE.LinearSRGBColorSpace), [light])
+  useEffect(() => {
+    // The same terms as the studio's: radiance times pi is what the studio's fill lights add.
+    const upward = upwardLight(Math.PI * luminanceOf(light.sky), luminanceOf(light.sun), z)
+    setWaterLight(Math.min(1, upward / STUDIO_UPWARD_LIGHT))
+  }, [light, z])
   return (
     <>
-      <SkyLight sky={sky} fill={fill} />
-      <directionalLight position={position} color={color} intensity={sunIntensity} />
+      <SkyLight sky={sky} tint={light.sky} />
+      <directionalLight position={position} color={color} intensity={1} />
     </>
   )
 }
@@ -126,9 +125,9 @@ function SkyDome({ sky, clipBelow }: { readonly sky: Sky; readonly clipBelow: nu
 
 /**
  * The sky light: the sky (without the sun, which is the directional light) captured into a
- * prefiltered environment map, at `fill` on an up-facing surface whatever the sky's own colours.
+ * prefiltered environment map, seen by an up-facing surface as the radiance `tint`.
  */
-function SkyLight({ sky, fill }: { readonly sky: Sky; readonly fill: number }) {
+function SkyLight({ sky, tint }: { readonly sky: Sky; readonly tint: Tuple3 }) {
   const gl = useThree((s) => s.gl)
   const scene = useThree((s) => s.scene)
   const capture = useMemo(() => {
@@ -147,24 +146,23 @@ function SkyLight({ sky, fill }: { readonly sky: Sky; readonly fill: number }) {
   // again when the canvas is resized: a capture taken at the canvas's initial size (before the
   // viewport has measured itself) leaves the scene drawing wrongly once it is resized.
   const captured = useRef<
-    { readonly sky: Sky; readonly fill: number; readonly width: number; readonly height: number } | null
+    { readonly sky: Sky; readonly tint: Tuple3; readonly width: number; readonly height: number } | null
   >(null)
   const target = useRef<THREE.WebGLRenderTarget | null>(null)
   useFrame(() => {
     const width = gl.domElement.width
     const height = gl.domElement.height
     const last = captured.current
-    if (last?.sky === sky && last.fill === fill && last.width === width && last.height === height) return
-    captured.current = { sky, fill, width, height }
+    if (last?.sky === sky && last.tint === tint && last.width === width && last.height === height) return
+    captured.current = { sky, tint, width, height }
     const ground = skyIrradiance(sky, UP, 0) * GROUND_BOUNCE
     const irradiance = skyIrradiance(sky, UP, ground)
-    setSky(capture.material, sky, ground)
+    setSky(capture.material, sky, ground, tint)
     target.current?.dispose()
     target.current = capture.pmrem.fromScene(capture.scene, 0, 0.1, 100)
     scene.environment = target.current.texture
-    // three shades ambient and hemisphere light through BRDF_Lambert (albedo / pi) but an
-    // environment of radiance L at L * albedo, hence the pi.
-    scene.environmentIntensity = irradiance > 0 ? fill / Math.PI / irradiance : 0
+    // The capture's mean radiance on an up-facing surface is `tint` times its irradiance here.
+    scene.environmentIntensity = irradiance > 0 ? 1 / irradiance : 0
   })
   useEffect(() => () => {
     scene.environment = null

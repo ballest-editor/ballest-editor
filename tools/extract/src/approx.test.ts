@@ -36,7 +36,10 @@ const SURFACE: Surface = {
   emissive: [0, 0, 0],
   emissiveSide: [0, 0, 0],
   programs: {},
-  gains: { "1": { gain: [0.5, 0.1, 0], alpha: 0, mean: [0.4, 0.4, 0.4] } }
+  gains: {
+    "0": { gain: [0, 0, 0], alpha: 0, mean: [0.5, 0.5, 0], normal: 1 },
+    "1": { gain: [0.5, 0.1, 0], alpha: 0, mean: [0.4, 0.4, 0.4] }
+  }
 }
 
 // An opaque master in the shape shaders.json gives: a normal map on the mesh UVs tiled 12 x `UV Tile`, a colour
@@ -243,6 +246,27 @@ describe("translucencyOf", () => {
     assert.strictEqual(t.alphaShown, 0)
   })
 
+  it("takes a translucent pass's scene colour as its glow, unless it is what a refraction sees", () => {
+    const surface = (emissive: readonly [number, number, number]): Surface => ({
+      ...SURFACE,
+      metallic: null,
+      roughness: null,
+      opacity: 0.2,
+      opacitySide: 0.2,
+      emissive,
+      emissiveSide: emissive
+    })
+    const translucent = "BLEND_TranslucentGreyTransmittance"
+    assert.deepStrictEqual(translucencyOf(translucent, surface([1.2, 1.2, 1.2]), null).emissiveColor, [1.2, 1.2, 1.2])
+    const glass = translucencyOf(translucent, surface([0.5, 0.5, 0.5]), null, ["Opacity", "Refraction"])
+    assert.isNull(glass.emissiveColor)
+    assert.isTrue(glass.refracts)
+    // the checkpoint's panel refracts too, but its glow is real: HDR
+    const panel = translucencyOf(translucent, surface([6, 1, 1.2]), null, ["EmissiveColor", "Refraction"])
+    assert.deepStrictEqual(panel.emissiveColor, [6, 1, 1.2])
+    assert.isFalse(panel.refracts)
+  })
+
   it("keeps the picked emissive without an evaluation, and an opaque pass has no alpha", () => {
     const t = translucencyOf("BLEND_Opaque", null, [1, 2, 3])
     assert.deepStrictEqual([t.translucent, t.additive, t.alphaShown, t.upFade, t.emissiveColor], [
@@ -284,14 +308,12 @@ describe("layersOf", () => {
 })
 
 describe("approxOf", () => {
-  const build = (sh: MaterialShaders | undefined, merged = MERGED, blendMode = "BLEND_Opaque", override?: {
-    baseColor: () => ReadonlyArray<number>
-  }) => {
+  const build = (sh: MaterialShaders | undefined, merged = MERGED, blendMode = "BLEND_Opaque") => {
     const evaluated = sh?.surface ?? null
     const picks = picksOf(merged, null)
     const translucency = translucencyOf(blendMode, evaluated, picks.pickedEmissive)
     const layers = layersOf(sh, merged, textureOf, textureInfo, translucency.translucent)
-    return approxOf({ merged, evaluated, picks, translucency, layers, override, texPath, textureOf })
+    return approxOf({ merged, evaluated, picks, translucency, layers, texPath, textureOf })
   }
 
   it("takes the evaluated surface for an opaque pass, with its layers, mottle and outline band", () => {
@@ -400,7 +422,7 @@ describe("approxOf", () => {
     assert.isNull(a.keys.emissive) // the glow is evaluated, not the pick
   })
 
-  it("runs a base program only where a read is unplaced, and never for an overridden material", () => {
+  it("runs a base program only where a read is unplaced", () => {
     const unplaced: MaterialShaders = {
       ...SHADERS,
       reads: [...SHADERS.reads, {
@@ -421,9 +443,52 @@ describe("approxOf", () => {
     assert.isNull(a.variation)
     // placed reads only: the layers suffice
     assert.deepStrictEqual(build({ ...unplaced, reads: SHADERS.reads }).programs, {})
-    const overridden = build(unplaced, MERGED, "BLEND_Opaque", { baseColor: () => [0.9, 0.8, 0.7] })
-    assert.deepStrictEqual(overridden.baseColor, [0.9, 0.8, 0.7])
-    assert.deepStrictEqual(overridden.programs, {})
+  })
+
+  it("runs a base program for a band of colour cut from the UVs, with no texture behind it", () => {
+    const stripe = (code: string): MaterialShaders => ({
+      ...SHADERS,
+      surface: { ...SURFACE, programs: { base: { code, textures: [] } } }
+    })
+    assert.property(build(stripe("float t = ((uv.y < 0.8) ? 0.0 : 1.0);")).programs, "base") // the paddle's end stripe
+    assert.deepStrictEqual(build(stripe("float t = (uv.y * 2.0);")).programs, {})
+  })
+
+  it("draws a normal map as strongly as the shader leaves it, and not at all without a response", () => {
+    const withNormal = (normal: number | undefined): MaterialShaders => ({
+      ...SHADERS,
+      surface: {
+        ...SURFACE,
+        gains: {
+          "1": { gain: [0.5, 0.1, 0], alpha: 0, mean: [0.4, 0.4, 0.4] },
+          ...(normal === undefined ? {} : { "0": { gain: [0, 0, 0], alpha: 0, mean: [0.5, 0.5, 0], normal } })
+        }
+      }
+    })
+    assert.strictEqual(build(withNormal(1)).normalStrength, 1)
+    assert.strictEqual(build(withNormal(0.4)).normalStrength, 0.4) // M_ArenaColorBase with ConcreteValue set
+    const none = build(withNormal(undefined)) // ConcreteValue 0, or the vent's map behind its slats
+    assert.strictEqual(none.normalStrength, 0)
+    assert.isNull(none.normalTexture)
+  })
+
+  it("treats an additive pass with a glow program as all glow, even when its masks are 0 at their means", () => {
+    const masked: MaterialShaders = {
+      ...SHADERS,
+      surface: {
+        ...SURFACE,
+        baseColor: [1, 0.14, 0.17],
+        metallic: null,
+        roughness: null,
+        opacity: 0,
+        opacitySide: 0,
+        programs: { glow: { code: "vec3 ballestGlow() {}", textures: [{ uniform: "uGlowTex0", texture: 1 }] } }
+      }
+    }
+    const a = build(masked, MERGED, "BLEND_Additive")
+    assert.deepStrictEqual(a.baseColor, [0, 0, 0])
+    assert.strictEqual(a.opacity, 1)
+    assert.property(a.programs, "glow")
   })
 
   it("runs a base program where the colour comes from a read's alpha or from a read the trace dropped", () => {

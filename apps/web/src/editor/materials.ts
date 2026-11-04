@@ -17,7 +17,10 @@
  *   shader gives it (the pipes' grid lines, the air vent's slats);
  * - the grey mottle (T_MacroVariation) exactly as the game's shader forms it: a product of offset reads at
  *   three scales, times a gain, added to 1 and multiplied into the base colour;
- * - M_OutlineEdges' grey band along the UV border of a face.
+ * - M_OutlineEdges' grey band along the UV border of a face;
+ * - the game shader's own output chains (`approx.programs`): alpha and glow side by side for a translucent pass, glow
+ *   alone (unlit) for an additive one, a base colour for what the layers can't say. They run on a shared clock, and
+ *   read their mesh's bounds where the shader does.
  */
 import * as THREE from "three"
 import { lookupMaterial, type MaterialSpec, type MaterialTable, NEUTRAL, type Pair } from "../domain/Materials"
@@ -26,6 +29,8 @@ import { isMesh } from "./threeGuards"
 
 /** Normal-map strength: the game's concrete grooves read crisper than a unit normal map gives. */
 const NORMAL_STRENGTH = 1.6
+/** The exponent that makes an additive glow's sum on the display-encoded framebuffer read like the game's HDR one. */
+const ADDITIVE_CURVE = 1.75
 
 const textureLoader = new THREE.TextureLoader()
 const textures = new Map<string, THREE.Texture>()
@@ -99,8 +104,11 @@ export interface Patch {
     /** gain, mean */
     readonly uAlphaShape: THREE.IUniform<THREE.Vector2>
     readonly uUpFade: THREE.IUniform<number>
-    /** Game time in seconds for the programs that scroll (the vent's streaks); a fixed frame. */
+    /** Game time in seconds for the programs that move (the vent's streaks); shared, see `gameTime`. */
     readonly uBallestTime: THREE.IUniform<number>
+    /** The mesh's local bounds (the programs' "bounding box 0-1" coordinates); see `materialForMesh`. */
+    readonly uBallestBoundsMin: THREE.IUniform<THREE.Vector3>
+    readonly uBallestBoundsMax: THREE.IUniform<THREE.Vector3>
     readonly uNormal2Tiling: THREE.IUniform<THREE.Vector2>
     readonly uNormal2Strength: THREE.IUniform<number>
     readonly uOutlineInset: THREE.IUniform<THREE.Vector2>
@@ -108,7 +116,26 @@ export interface Patch {
   }
 }
 
+/**
+ * The game time the programs read. It starts well past 0 because a checkpoint's shaders count from its activation
+ * (`time - ActivationTime`, 0 until the ball reaches it): at 0 they would draw the flash of the moment it is reached.
+ */
+const GAME_TIME_START = 600
+const gameTime: THREE.IUniform<number> = { value: GAME_TIME_START }
+
+/** Moves the programs' clock on by `seconds`: the air and the glows scroll as they do in the game. */
+export const advanceGameTime = (seconds: number): void => {
+  gameTime.value += seconds
+}
+
 type ProgramKind = "alpha" | "glow" | "base"
+
+/** One of the game shader's output chains: its GLSL and the samplers it reads, as `[uniform, texture]`. */
+interface Program {
+  readonly kind: ProgramKind
+  readonly code: string
+  readonly maps: ReadonlyArray<[string, THREE.Texture]>
+}
 
 const vec2 = (p: Pair) => new THREE.Vector2(p[0], p[1])
 const isOne = (p: Pair) => p[0] === 1 && p[1] === 1
@@ -119,9 +146,7 @@ const patchOf = (
   normal2: THREE.Texture | null,
   colorMaps: ReadonlyArray<THREE.Texture>,
   alphaMap: THREE.Texture | null,
-  program:
-    | { readonly kind: ProgramKind; readonly code: string; readonly maps: ReadonlyArray<[string, THREE.Texture]> }
-    | null
+  programs: ReadonlyArray<Program>
 ): Patch | undefined => {
   const defines: Record<string, number | string> = {}
   const { tiling } = spec
@@ -143,22 +168,25 @@ const patchOf = (
     defines["BALLEST_ALPHA_CHANNEL"] = spec.opacityLayer?.channel ?? "r"
   }
   // A program carries the game's own cap mask; the up fade stands in only without one.
-  if (spec.translucent && spec.upFade < 1 && program === null) defines["BALLEST_UP_FADE"] = 1
+  if (spec.translucent && spec.upFade < 1 && programs.length === 0) defines["BALLEST_UP_FADE"] = 1
   if (spec.outline !== undefined) defines["BALLEST_OUTLINE"] = 1
-  if (program !== null) defines[`BALLEST_PROGRAM_${program.kind.toUpperCase()}`] = 1
+  for (const program of programs) defines[`BALLEST_PROGRAM_${program.kind.toUpperCase()}`] = 1
+  if (spec.additive) defines["BALLEST_UNLIT"] = 1
   if (Object.keys(defines).length === 0) return undefined
   const outline = spec.outline
   const vt = spec.variation?.tilings ?? []
   const vo = spec.variation?.offsets ?? []
-  const glsl = program === null
-    ? ""
-    : `${program.maps.map(([uniform]) => `uniform sampler2D ${uniform};`).join("\n")}\n${program.code}\n`
+  const glsl = programs
+    .map((p) => `${p.maps.map(([uniform]) => `uniform sampler2D ${uniform};`).join("\n")}\n${p.code}\n`)
+    .join("")
   return {
     defines,
     glsl,
     uniforms: {
-      ...Object.fromEntries((program?.maps ?? []).map(([uniform, map]) => [uniform, { value: map }])),
-      uBallestTime: { value: 0 },
+      ...Object.fromEntries(programs.flatMap((p) => p.maps).map(([uniform, map]) => [uniform, { value: map }])),
+      uBallestTime: gameTime,
+      uBallestBoundsMin: { value: new THREE.Vector3() },
+      uBallestBoundsMax: { value: new THREE.Vector3(1, 1, 1) },
       uBaseColorTiling: { value: vec2(tiling.baseColor) },
       uNormalTiling: { value: vec2(tiling.normal) },
       uOpacityTiling: { value: vec2(tiling.opacity) },
@@ -238,6 +266,8 @@ varying float vBallestUp;
 varying vec3 vBallestWorldNormal;
 varying vec3 vBallestLocal;
 uniform float uBallestTime;
+uniform vec3 uBallestBoundsMin;
+uniform vec3 uBallestBoundsMax;
 uniform vec2 uBaseColorTiling;
 uniform vec2 uNormalTiling;
 uniform vec2 uOpacityTiling;
@@ -330,6 +360,18 @@ const COLOR_EXTRAS = /* glsl */ `
   diffuseColor.rgb = mix( diffuseColor.rgb, uOutlineColor, ballestBand );
 #endif
 `
+// The game blends a translucent pass in HDR, so a little of a bright glow still saturates the pixel; here it is
+// tone-mapped first and blended after, where the same alpha leaves a dull mix. An emissive above 1 moves its energy
+// into the alpha, and the colour drops by as much, which keeps the product the game blends.
+const GLOW_FRAGMENT = /* glsl */ `
+totalEmissiveRadiance = ballestGlow( vBallestUv, vBallestWorldNormal, vBallestLocal, uBallestTime );
+#ifdef BALLEST_PROGRAM_ALPHA
+  float ballestPeak = max( max( totalEmissiveRadiance.r, totalEmissiveRadiance.g ), totalEmissiveRadiance.b );
+  float ballestShown = min( 1.0, diffuseColor.a * max( ballestPeak, 1.0 ) );
+  totalEmissiveRadiance *= diffuseColor.a / max( ballestShown, 1e-4 );
+  diffuseColor.a = ballestShown;
+#endif
+`
 // The tangent-space perturbation from the normal map(s): the second layer adds at its strength.
 const NORMAL_LAYERS = /* glsl */ `
 #ifdef USE_NORMALMAP
@@ -396,11 +438,19 @@ export const applyShaderPatch = (shader: ShaderProgram, patch: Patch): void => {
     .replace("#include <common>", `#include <common>\n${FRAGMENT_DECLS}\n${patch.glsl}`)
     .replace(
       "#include <emissivemap_fragment>",
-      "BALLEST_PROGRAM_GLOW" in patch.defines
-        ? "totalEmissiveRadiance = ballestGlow( vBallestUv, vBallestWorldNormal, vBallestLocal, uBallestTime );"
-        : "#include <emissivemap_fragment>"
+      "BALLEST_PROGRAM_GLOW" in patch.defines ? GLOW_FRAGMENT : "#include <emissivemap_fragment>"
     )
     .replace("#include <normalmap_pars_fragment>", `#include <normalmap_pars_fragment>\n${NORMAL_LAYERS}`)
+    // An additive pass adds its unlit colour alone: the sky must not reflect in a glow. The game adds it to the HDR
+    // scene before tone mapping; here the framebuffer is already display-encoded, where the same sum comes out far
+    // too strong in the dim channels, so the colour goes through a curve and skips the tone mapping (`build`).
+    .replace(
+      "#include <opaque_fragment>",
+      `#ifdef BALLEST_UNLIT
+  outgoingLight = pow( max( totalEmissiveRadiance, 0.0 ), vec3( ${ADDITIVE_CURVE.toFixed(2)} ) );
+#endif
+#include <opaque_fragment>`
+    )
     .replace(
       "#include <map_fragment>",
       `${
@@ -461,7 +511,10 @@ const build = (
     material.transparent = true
     material.opacity = spec.opacity
     material.depthWrite = false
-    if (spec.additive) material.blending = THREE.AdditiveBlending
+    if (spec.additive) {
+      material.blending = THREE.AdditiveBlending
+      material.toneMapped = false
+    }
   }
   const drop =
     (slot: "map" | "normalMap" | "roughnessMap" | "metalnessMap" | "aoMap" | "emissiveMap" | "alphaMap") => () => {
@@ -479,7 +532,7 @@ const build = (
     material.normalMap = loadTexture(spec.normalTexture, THREE.NoColorSpace, drop("normalMap"))
     // UE normal maps use DirectX green (+Y = down the image); with the rows unflipped that is +v, three's
     // bitangent, so no sign flip (three's default flip would need (1, -1)).
-    material.normalScale.set(NORMAL_STRENGTH, NORMAL_STRENGTH)
+    material.normalScale.setScalar(NORMAL_STRENGTH * spec.normalStrength)
   }
   if (spec.ormTexture !== undefined) {
     const orm = loadTexture(spec.ormTexture, THREE.NoColorSpace, () => {
@@ -520,30 +573,24 @@ const build = (
   const colorMaps = spec.colorLayers.map((layer) =>
     loadTexture(layer.texture, colorSpaceOf(layer.texture, THREE.SRGBColorSpace), dropDefine("BALLEST_COLOR"))
   )
-  // The shader's own math where there is some (one kind per material: alpha, glow or base).
-  const programKind: ProgramKind | undefined = spec.programs.alpha
-    ? "alpha"
-    : spec.programs.glow
-    ? "glow"
-    : spec.programs.base
-    ? "base"
-    : undefined
-  const programSpec = programKind === undefined ? undefined : spec.programs[programKind]
-  const program = programKind === undefined || programSpec === undefined
-    ? null
-    : {
-      kind: programKind,
-      code: programSpec.code,
-      maps: programSpec.textures.map((t): [string, THREE.Texture] => [
+  // The shader's own math where there is some: a translucent pass runs its alpha and its glow side by side.
+  const programs = (["alpha", "glow", "base"] as const).flatMap((kind): ReadonlyArray<Program> => {
+    const program = spec.programs[kind]
+    if (program === undefined) return []
+    return [{
+      kind,
+      code: program.code,
+      maps: program.textures.map((t): [string, THREE.Texture] => [
         t.uniform,
         loadTexture(
           t.texture,
           colorSpaceOf(t.texture, THREE.SRGBColorSpace),
-          dropDefine(`BALLEST_PROGRAM_${programKind.toUpperCase()}`)
+          dropDefine(`BALLEST_PROGRAM_${kind.toUpperCase()}`)
         )
       ])
-    }
-  const patch = patchOf(spec, variation, normal2, colorMaps, alphaMap, program)
+    }]
+  })
+  const patch = patchOf(spec, variation, normal2, colorMaps, alphaMap, programs)
   if (patch !== undefined) patchShader(material, patch)
   return material
 }
@@ -573,6 +620,33 @@ export const slotIndexOf = (mesh: THREE.Mesh): number => {
   return match ? Number(match[1]) : 0
 }
 
+/**
+ * The material for `mesh`. A program that reads its mesh's bounds (the rubber's cells, the checkpoints' glow) sizes its
+ * pattern from them, so those materials are built once per mesh size; the rest are shared.
+ */
+const materialForMesh = (
+  table: MaterialTable | null,
+  path: string | undefined,
+  mesh: THREE.Mesh
+): THREE.MeshStandardMaterial => {
+  const shared = materialFor(table, path)
+  const patch = patches.get(shared)
+  const spec = lookupMaterial(table, path)
+  if (patch?.glsl.includes("uBallestBounds") !== true || spec === undefined) return shared
+  mesh.geometry.computeBoundingBox()
+  const box = mesh.geometry.boundingBox
+  if (box === null) return shared
+  const key = `${spec.path}|${box.min.toArray().join()}|${box.max.toArray().join()}`
+  const cached = materials.get(key)
+  if (cached !== undefined) return cached
+  const material = build(spec, table)
+  const own = patches.get(material)
+  own?.uniforms.uBallestBoundsMin.value.copy(box.min)
+  own?.uniforms.uBallestBoundsMax.value.copy(box.max)
+  materials.set(key, material)
+  return material
+}
+
 /** Assigns game materials to every primitive under `root` by UE slot index. */
 export const applySlotMaterials = (
   root: THREE.Object3D,
@@ -580,5 +654,5 @@ export const applySlotMaterials = (
   slotMaterials: ReadonlyArray<string | undefined>
 ): void =>
   root.traverse((object) => {
-    if (isMesh(object)) object.material = materialFor(table, slotMaterials[slotIndexOf(object)])
+    if (isMesh(object)) object.material = materialForMesh(table, slotMaterials[slotIndexOf(object)], object)
   })

@@ -15,9 +15,12 @@ Two jobs, both of which so far cost a long session of hand work each time:
    editor, by hand, step by step from a written list, so the agent could learn how surfaces and mirroring are saved.
    Before that it grepped the exe for property names and still could not learn the elevator's speed labels. With a
    driver, an agent builds the probe itself, saves it, and reads the file.
-2. **Rendering checks.** The editor's approximations of the vent air, the checkpoint glow and the laser mesh are off by
-   amounts nobody has measured. A driver places one piece in the game, frames it with the game's camera, takes a
-   picture, and the editor renders the same piece the same way for a side-by-side.
+2. **Rendering checks.** A driver places one piece in the game, frames it with the game's camera, takes a picture,
+   and the editor renders the same piece the same way for a side-by-side. It also answers what no picture can: the
+   live components' transforms and visibility (`callx`, `objprop`), a dynamic material's parameters, the light's
+   forward vector. The first pass with it found the elevator's platform placement and most of what the materials
+   got wrong (tools/extract/README.md). The editor and a race are different levels with different light actors, so
+   the sun of a morning map is on the other side in editor pictures.
 
 Both need: start a copy of the game, get into its editor, place pieces, read what is on screen, take pictures, save
 maps and read them back. Headless, several at once, without touching the user's own game or settings.

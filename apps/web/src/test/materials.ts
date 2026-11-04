@@ -17,6 +17,12 @@ export const GLOW = "/Game/Art/Materials/VFX/M_CheckpointPreGlow.M_CheckpointPre
 /** A base colour with a grid texture added on top, like MI_Pipes. */
 export const PIPE = "/Game/Art/Materials/Instances/MI_Pipes.MI_Pipes"
 /** Object-aligned tiles that scale with the piece, like MI_Env_Blue_Tiles. */
+/** A translucent pass with an alpha and a glow program (the checkpoint strip's panel). */
+export const PANEL = "/Game/Art/Materials/Masters/M_CheckpointLight.M_CheckpointLight"
+/** A base program that reads its mesh's bounds (the rubber's cells). */
+export const CELLS = "/Game/Art/Materials/Masters/M_PlasticBase.M_PlasticBase"
+/** A normal map the shader fades (M_ArenaColorBase with ConcreteValue set). */
+export const FADED = "/Game/Art/Stadium/Arena/MI_ArenaBlue.MI_ArenaBlue"
 export const TILES = "/Game/Art/Materials/Environment/Materials/Instances_2/MI_Env_Blue_Tiles.MI_Env_Blue_Tiles"
 export const materialsFile = {
   version: 1,
@@ -103,6 +109,48 @@ export const materialsFile = {
           }
         }
       },
+      recovered: true
+    },
+    {
+      path: PANEL,
+      blendMode: "BLEND_TranslucentGreyTransmittance",
+      approx: {
+        baseColor: [1, 0.1, 0.15],
+        emissive: [6, 1, 1.2],
+        opacity: 0.2,
+        programs: {
+          alpha: {
+            code: "float ballestAlpha(vec2 uv, vec3 nrm, vec3 pos, float time) {\n  return texture2D(uTex0, uv).x;\n}",
+            textures: [{ uniform: "uTex0", texture: "textures/mask.png" }]
+          },
+          glow: {
+            code:
+              "vec3 ballestGlow(vec2 uv, vec3 nrm, vec3 pos, float time) {\n  return vec3(6.0, 1.0, 1.2) * texture2D(uGlowTex0, uv).x;\n}",
+            textures: [{ uniform: "uGlowTex0", texture: "textures/glow.png" }]
+          }
+        }
+      },
+      recovered: true
+    },
+    {
+      path: CELLS,
+      blendMode: "BLEND_Opaque",
+      approx: {
+        baseColor: [0.02, 0.2, 0.07],
+        programs: {
+          base: {
+            code:
+              "vec3 ballestBase(vec2 uv, vec3 nrm, vec3 pos, float time) {\n  return texture2D(uTex0, pos.xy / (uBallestBoundsMax.xy * vBallestScale.xy)).xyz;\n}",
+            textures: [{ uniform: "uTex0", texture: "textures/cells.png" }]
+          }
+        }
+      },
+      recovered: true
+    },
+    {
+      path: FADED,
+      blendMode: "BLEND_Opaque",
+      approx: { baseColor: [1, 0.5, 0], normalTexture: "textures/tiles_n.png", normalStrength: 0.4 },
       recovered: true
     },
     {

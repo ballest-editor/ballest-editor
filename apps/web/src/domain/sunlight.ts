@@ -107,6 +107,44 @@ export const sunOf = (lighting: Lighting): Sun => {
   }
 }
 
+/**
+ * The light the game's camera shows, for the viewport: linear RGB. `sun` is a directional light's colour, `sky` the
+ * radiance an up-facing surface sees from the sky.
+ */
+export interface ViewLight {
+  readonly sun: Tuple3
+  readonly sky: Tuple3
+}
+
+/**
+ * Fitted through the viewport's tone mapping to a cube's faces and white pieces as the game's editor renders them at
+ * the default brightness, with the sun low and overhead. The fit is of colours, each face taken at its own angle to
+ * the sun, so it does not depend on which side the sun is on (the editor turns a morning sun around from a race's).
+ * Those pictures include the game's auto exposure, which is why the noon sun looks weaker than the morning's: this is
+ * what shows on screen, not physical light. The low sun is warm and the sky gives almost no red, so a face turned from
+ * the sun is a deep blue.
+ */
+const LOW_SUN_LIGHT: ViewLight = { sun: [4.6, 3, 2.2], sky: [0.06, 0.135, 0.175] }
+const HIGH_SUN_LIGHT: ViewLight = { sun: [0.79, 0.43, 0.45], sky: [0.012, 0.47, 0.55] }
+/** The sun's height (sine of its elevation) in the low fit: the default time of day. */
+const LOW_SUN_HEIGHT = 0.334
+/** The brightness and the sky light the fits were made at. */
+const FIT_BRIGHTNESS = 12
+const FIT_SKY_LIGHT = 2.2
+
+export const viewLightOf = (sun: Sun): ViewLight => {
+  const height = clamp((sun.toSun.z - LOW_SUN_HEIGHT) / (1 - LOW_SUN_HEIGHT), 0, 1)
+  const mixed = (
+    a: Tuple3,
+    b: Tuple3
+  ): Tuple3 => [lerp(a[0], b[0], height), lerp(a[1], b[1], height), lerp(a[2], b[2], height)]
+  const scaled = ([r, g, b]: Tuple3, by: number): Tuple3 => [r * by, g * by, b * by]
+  return {
+    sun: scaled(mixed(LOW_SUN_LIGHT.sun, HIGH_SUN_LIGHT.sun), sun.intensity / FIT_BRIGHTNESS),
+    sky: scaled(mixed(LOW_SUN_LIGHT.sky, HIGH_SUN_LIGHT.sky), Math.min(1, sun.skyIntensity / FIT_SKY_LIGHT))
+  }
+}
+
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x))
 const smoothstep = (edge0: number, edge1: number, x: number) => {

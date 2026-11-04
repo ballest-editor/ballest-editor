@@ -16,7 +16,11 @@ import { isMesh } from "./threeGuards"
 /** Seconds between traces: often enough to follow a drag, cheap on maps with thousands of items. */
 const TRACE_INTERVAL = 0.25
 
-const GLOW_OPACITY = 0.25
+/** How far the core goes from the beam's colour towards white: the game's beam burns white at its centre. */
+const CORE_HEAT = 0.85
+/** The glow's strength where the view meets it head-on, and how fast it falls off towards its silhouette. */
+const GLOW_STRENGTH = 0.55
+const GLOW_FALLOFF = 2.5
 
 const ueToThree = new THREE.Matrix4().set(...UE_TO_THREE_MATRIX)
 
@@ -24,6 +28,45 @@ const ueToThree = new THREE.Matrix4().set(...UE_TO_THREE_MATRIX)
 const unitBeam = new THREE.CylinderGeometry(1, 1, 1, 16, 1, true).rotateZ(-Math.PI / 2).translate(0.5, 0, 0)
 
 const noRaycast = () => {}
+
+/** The halo around the core: bright along the middle of the tube and gone at its edge, with no hard outline. */
+const glowMaterial = (color: THREE.Color): THREE.ShaderMaterial =>
+  new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: color } },
+    // The log depth chunks: the viewport's depth buffer is logarithmic, and a plain depth fails against it.
+    vertexShader: /* glsl */ `
+      #include <common>
+      #include <logdepthbuf_pars_vertex>
+      varying vec3 vNormal;
+      varying vec3 vView;
+      void main() {
+        vec4 position4 = modelViewMatrix * vec4( position, 1.0 );
+        vNormal = normalMatrix * normal;
+        vView = -position4.xyz;
+        gl_Position = projectionMatrix * position4;
+        #include <logdepthbuf_vertex>
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      #include <common>
+      #include <logdepthbuf_pars_fragment>
+      uniform vec3 uColor;
+      varying vec3 vNormal;
+      varying vec3 vView;
+      void main() {
+        #include <logdepthbuf_fragment>
+        float facing = abs( dot( normalize( vNormal ), normalize( vView ) ) );
+        gl_FragColor = vec4( uColor, ${GLOW_STRENGTH.toFixed(2)} * pow( facing, ${GLOW_FALLOFF.toFixed(2)} ) );
+        #include <colorspace_fragment>
+      }
+    `,
+    // Both walls of the tube: the UE frame the beam sits in turns the winding over.
+    side: THREE.DoubleSide,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    toneMapped: false
+  })
 
 /** The item id an object belongs to (its nearest ancestor that carries one). */
 const itemIdOf = (object: THREE.Object3D): unknown => {
@@ -62,16 +105,8 @@ export function LaserBeam({ beam, itemId }: { readonly beam: Beam; readonly item
   const elapsed = useRef(TRACE_INTERVAL)
   const [core, glow] = useMemo(() => {
     const color = new THREE.Color().setRGB(...beam.color, THREE.LinearSRGBColorSpace)
-    return [
-      new THREE.MeshBasicMaterial({ color, toneMapped: false }),
-      new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity: GLOW_OPACITY,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
-      })
-    ]
+    const hot = color.clone().lerp(new THREE.Color(1, 1, 1), CORE_HEAT)
+    return [new THREE.MeshBasicMaterial({ color: hot, toneMapped: false }), glowMaterial(color)]
   }, [beam.color])
   useEffect(() => () => {
     core.dispose()

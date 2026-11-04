@@ -411,6 +411,8 @@ export interface Surface {
    * alpha (the spinning cylinder's stripes), which a layer adding `gain * (rgb - mean)` cannot show.
    */
   readonly alphaColorGains: Record<string, readonly [number, number, number]>
+  /** Per colour read: how far it turns the normal, 1 = a full-strength normal map (opaque passes). */
+  readonly normalGains: Record<string, number>
 }
 
 /** SSA handle -> the constant buffer's type name (`Material`, `View`), or `cbN` for an unnamed one. */
@@ -431,9 +433,10 @@ export const ENGINE_DEFAULTS: Record<string, number> = {
   // View.PreExposure and View.OneOverPreExposure
   "View[160].z": 1,
   "View[160].w": 1,
-  // View.DiffuseOverrideParameter / SpecularOverrideParameter: (0, 0, 0, 1) = no override
+  // View.DiffuseOverrideParameter / SpecularOverrideParameter / NormalOverrideParameter: (0, 0, 0, 1) = no override
   "View[161].w": 1,
   "View[162].w": 1,
+  "View[163].w": 1,
   // The translucent passes clamp their scene colour to this maximum: effectively none.
   "View[358].z": 1e6,
   // View.SVPositionToTranslatedWorld (rows 44..47) = identity and View.PreViewTranslation (128) = 0: the
@@ -512,6 +515,8 @@ export const surfaceOf = (
   const scene = ["0.x", "0.y", "0.z"].map((k) => outs.get(k))
   const metallic = outs.get("2.x")
   const roughness = outs.get("2.z")
+  // GBuffer A, the world normal as n * 0.5 + 0.5.
+  const normalOut = ["1.x", "1.y", "1.z"].map((k) => outs.get(k))
   if (scene.some((b) => b === undefined)) return null
   const gbuffer = ["3.x", "3.y", "3.z"].map((k) => outs.get(k))
   const opaque = gbuffer.every((b) => b !== undefined) && metallic !== undefined && roughness !== undefined
@@ -536,7 +541,8 @@ export const surfaceOf = (
       scene: scene.map((b) => (b === undefined ? 0 : e.value(b))),
       metallic: metallic === undefined ? 0 : e.value(metallic),
       roughness: roughness === undefined ? 0 : e.value(roughness),
-      alpha: alpha === undefined ? 1 : e.value(alpha)
+      alpha: alpha === undefined ? 1 : e.value(alpha),
+      normal: normalOut.map((n) => n === undefined ? 0.5 : e.value(n))
     }
   }
   const hasBase = base.every((b) => b !== undefined)
@@ -549,6 +555,7 @@ export const surfaceOf = (
   const gains: Record<string, readonly [number, number, number]> = {}
   const alphaGains: Record<string, number> = {}
   const alphaColorGains: Record<string, readonly [number, number, number]> = {}
+  const normalGains: Record<string, number> = {}
   const difference = (hi: typeof zero, lo: typeof zero): readonly [number, number, number] => {
     const h = rgb(hi.rgb), l = rgb(lo.rgb)
     return [h[0] - l[0], h[1] - l[1], h[2] - l[2]]
@@ -559,6 +566,12 @@ export const surfaceOf = (
       gains[s] = difference(hi, lo)
       if (!opaque) alphaGains[s] = hi.alpha - lo.alpha
       alphaColorGains[s] = difference(at(new Map([[s, 1]]), shown, 3), at(new Map([[s, 0]]), shown, 3))
+      // A read's x from flat (0.5) to its extreme (1) moves n by 1 at full strength, in the encoded output by half.
+      if (opaque) {
+        const flat = at(new Map([[s, 0.5]]), shown, 0).normal
+        const turned = at(new Map([[s, 1]]), shown, 0).normal
+        normalGains[s] = 2 * Math.hypot(...turned.map((n, i) => n - (flat[i] ?? 0)))
+      }
     }
   }
   const corner = (value: number) => at(new Map(colorSamples.map((s) => [s, value])), shown).alpha
@@ -573,6 +586,7 @@ export const surfaceOf = (
     emissiveSide: rgb(side.scene),
     gains,
     alphaGains,
-    alphaColorGains
+    alphaColorGains,
+    normalGains
   }
 }
