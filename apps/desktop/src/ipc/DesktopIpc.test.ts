@@ -57,6 +57,7 @@ describe("DesktopIpc", () => {
         yield* fake.invoke(InvokeChannels.setWindowTheme, { dark: false })
         assert.deepStrictEqual(recoloured, [[1, {
           overlay: { color: "#01000000", symbolColor: "#09090b", height: 40 },
+          popoutOverlay: { color: "#01000000", symbolColor: "#09090b", height: 32 },
           background: "#ffffff"
         }]])
         assert.match(
