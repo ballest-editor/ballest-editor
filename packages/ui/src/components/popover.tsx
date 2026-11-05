@@ -1,4 +1,5 @@
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover"
+import { usePortalContainer } from "@workspace/ui/lib/portal-container"
 import { cn } from "cn"
 import * as React from "react"
 
@@ -25,7 +26,7 @@ function PopoverContent({
   >)
 {
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={usePortalContainer()}>
       <PopoverPrimitive.Positioner
         align={align}
         alignOffset={alignOffset}
