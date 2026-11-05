@@ -288,7 +288,9 @@ export class MapFiles extends Context.Service<MapFiles, {
         : (yield* backupStore.list(backupsFolderIn(path, project)))
           .filter((backup) => isMapFileName(backup.fileName))
           .map(backupOf("project"))
-      const exported = (yield* backupStore.list(exportBackups)).map(backupOf("export"))
+      const exported = (yield* backupStore.list(exportBackups))
+        .filter((backup) => isMapFileName(backup.fileName))
+        .map(backupOf("export"))
       return [...inProject, ...exported].sort((a, b) => b.at.localeCompare(a.at))
     }).pipe(Effect.withSpan("MapFiles.backups"))
 

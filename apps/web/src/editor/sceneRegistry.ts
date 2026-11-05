@@ -4,6 +4,7 @@
  */
 import type { Camera, Object3D } from "three"
 import type { Vec3 } from "../domain/coords"
+import type { ViewRay } from "../domain/prefab"
 import type { ViewProjection } from "../domain/viewLayout"
 
 export const sceneRegistry = {
@@ -26,6 +27,8 @@ export const sceneRegistry = {
   flyKeysActive: () => false,
   /** where a palette click should place a new piece with this footprint (cm), in UE cm */
   placementPoint: (_footprint: number): Vec3 => ({ x: 0, y: 0, z: 0 }),
+  /** where the active pane looks from and along, in UE cm: what a prefab spawns in front of */
+  viewRay: (): ViewRay => ({ origin: { x: 0, y: 0, z: 0 }, direction: { x: 1, y: 0, z: 0 } }),
   /** what the orthographic / perspective toggle turns the active pane to (the menu's chunk can't reach the cameras) */
   toggledProjection: (): ViewProjection => "perspective"
 }

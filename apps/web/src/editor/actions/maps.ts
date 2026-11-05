@@ -123,7 +123,8 @@ export const followOpenMapEffect = Effect.gen(function*() {
   let known = useEditor.getState().file?.name ?? null
   return useEditor.subscribe((s) => {
     const fileName = s.file?.name ?? null
-    if (fileName === known) return
+    // a definition's tab isn't a map to come back to
+    if (fileName === known || s.document.kind === "prefab") return
     known = fileName
     runFork(
       platform.rememberOpenMap(fileName).pipe(

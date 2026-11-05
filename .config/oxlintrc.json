@@ -17,6 +17,11 @@
       "allow": [
         {
           "from": "file",
+          "path": "src/domain/PrefabFile.ts",
+          "name": ["PrefabItem", "PrefabFile", "PrefabGroup"]
+        },
+        {
+          "from": "file",
           "path": "src/domain/MapFile.ts",
           "name": [
             "Vector3",

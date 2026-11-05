@@ -10,6 +10,8 @@ import type {
   OpenedMapFile,
   PlaySessionEnded,
   PluginStatus,
+  PrefabInfo,
+  PrefabTier,
   ProjectInfo,
   ProjectMap,
   ProjectTarget,
@@ -18,7 +20,13 @@ import type {
   UnsavedPrompt,
   UpdateState
 } from "@ballest/contracts"
-import { isMapFileName, sidecarFileNameOf } from "@ballest/contracts"
+import {
+  isMapFileName,
+  prefabFileNameOf,
+  prefabNameOfFile,
+  prefabSummaryOf,
+  sidecarFileNameOf
+} from "@ballest/contracts"
 import { Option, Schema } from "effect"
 
 /**
@@ -51,6 +59,8 @@ export interface TestDisk {
    * the game's maps folder's (Export). Like main, nothing is kept when the bytes don't change.
    */
   readonly backups: Array<MapBackupFile>
+  /** What main kept of the prefabs it wrote over, renamed or deleted, oldest first. */
+  readonly prefabBackups: Array<{ readonly name: string; readonly text: string }>
   /** How many times the page asked main to check the exports (`checkExports`). */
   exportChecks: number
   /** What `notifications.json` holds. */
@@ -101,6 +111,7 @@ export interface TestDisk {
 }
 
 export const TEST_MAPS_FOLDER = "/game/UserSavedMaps"
+export const TEST_PREFABS_FOLDER = "/game/SaveGames/Prefabs"
 export const TEST_PROJECTS_FOLDER = "/home/me/Documents/Ballest Editor"
 export const TEST_PROJECT = `${TEST_PROJECTS_FOLDER}/My maps`
 
@@ -110,6 +121,13 @@ export const projectFile = (fileName: string, project = TEST_PROJECT) => `${proj
 /** Where a project map's sidecar is. */
 export const sidecarFile = (fileName: string, project = TEST_PROJECT) =>
   projectFile(sidecarFileNameOf(fileName), project)
+
+/** Where a project prefab is: `<project>/prefabs/<name>.json`. */
+export const projectPrefabFile = (name: string, project = TEST_PROJECT) =>
+  `${project}/prefabs/${prefabFileNameOf(name)}`
+
+/** Where a user prefab is: the game's own prefabs folder. */
+export const userPrefabFile = (name: string) => `${TEST_PREFABS_FOLDER}/${prefabFileNameOf(name)}`
 
 /** What an install folder must hold for `chooseGamePath` to take it, as main checks. */
 export const GAME_EXE = "Ballest/Binaries/Win64/Ballest-Win64-Shipping.exe"
@@ -161,6 +179,7 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   playSessions: makeTestPush<PlaySessionEnded>(),
   links: new Map(),
   backups: [],
+  prefabBackups: [],
   exportChecks: 0,
   notifications: [],
   gameLink: { last: null, muted: [] },
@@ -305,6 +324,30 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     return disk.answers.shift() ?? null
   }
   const exists = (fileName: string) => fail(`The project already has a map called ${fileName}.`)
+  const prefabFolder = (tier: PrefabTier) =>
+    tier === "user" ? TEST_PREFABS_FOLDER : disk.project.current === null ? null : `${disk.project.current}/prefabs`
+  const prefabPath = (tier: PrefabTier, name: string) => {
+    const folder = prefabFolder(tier)
+    return folder === null ? null : `${folder}/${prefabFileNameOf(name)}`
+  }
+  const prefabInfo = (tier: PrefabTier, name: string, path: string, text: string): PrefabInfo => ({
+    tier,
+    name,
+    path,
+    modifiedAt: TIME,
+    hash: testHash(text),
+    ...prefabSummaryOf(text)
+  })
+  const prefabText = (tier: PrefabTier, name: string) => {
+    const path = prefabPath(tier, name)
+    const text = path === null ? undefined : disk.files.get(path)
+    return path === null || text === undefined ? undefined : { path, text }
+  }
+  /** What is written over goes to the backups, like main. */
+  const keepPrefab = (name: string, path: string) => {
+    const text = disk.files.get(path)
+    if (text !== undefined) disk.prefabBackups.push({ name, text })
+  }
 
   const bridge: DesktopBridge = {
     versions: { electron: "test", chrome: "test", node: "test" },
@@ -386,6 +429,54 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     writeSidecar: ({ fileName, text }) => {
       disk.files.set(sidecarFile(fileName, current()), text)
       return Promise.resolve()
+    },
+    listPrefabs: ({ tier }) => {
+      const folder = prefabFolder(tier)
+      const entries = [...disk.files].flatMap(([path, text]) => {
+        const name = folder !== null && path.startsWith(`${folder}/`)
+          ? prefabNameOfFile(path.slice(folder.length + 1))
+          : undefined
+        return name === undefined ? [] : [prefabInfo(tier, name, path, text)]
+      })
+      return Promise.resolve(entries.sort((a, b) => a.name.localeCompare(b.name)))
+    },
+    readPrefab: ({ name, tier }) => {
+      const file = prefabText(tier, name)
+      return file === undefined
+        ? fail(`${name} doesn't exist any more.`)
+        : Promise.resolve({ ...prefabInfo(tier, name, file.path, file.text), text: file.text })
+    },
+    writePrefab: ({ name, replace, text, tier }) => {
+      const path = prefabPath(tier, name)
+      if (path === null) return fail(NO_PROJECT)
+      if (!replace && disk.files.has(path)) return fail(`There is already a prefab called ${name}.`)
+      if (disk.files.get(path) !== text) keepPrefab(name, path)
+      disk.files.set(path, text)
+      return Promise.resolve(prefabInfo(tier, name, path, text))
+    },
+    deletePrefab: ({ name, tier }) => {
+      const path = prefabPath(tier, name)
+      if (path !== null) {
+        keepPrefab(name, path)
+        disk.files.delete(path)
+      }
+      return Promise.resolve()
+    },
+    renamePrefab: ({ from, tier, to }) => {
+      const file = prefabText(tier, from)
+      const next = prefabPath(tier, to)
+      if (file === undefined || next === null) return fail(`${from} doesn't exist any more.`)
+      if (disk.files.has(next)) return fail(`There is already a prefab called ${to}.`)
+      keepPrefab(from, file.path)
+      disk.files.delete(file.path)
+      disk.files.set(next, file.text)
+      return Promise.resolve(prefabInfo(tier, to, next, file.text))
+    },
+    revealPrefabs: ({ tier }) => {
+      const folder = prefabFolder(tier)
+      if (folder === null) return Promise.resolve(false)
+      disk.external.push(folder)
+      return Promise.resolve(true)
     },
     pickImport: () => {
       const path = ask("import")

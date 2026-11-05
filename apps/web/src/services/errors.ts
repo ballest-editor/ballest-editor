@@ -12,6 +12,20 @@ export class SidecarDecodeError extends Schema.TaggedError<SidecarDecodeError>()
   message: Schema.String
 }) {}
 
+/** A file that isn't the shape of a prefab, in the game's words with what was wrong after them. */
+export class PrefabDecodeError extends Schema.TaggedError<PrefabDecodeError>()("PrefabDecodeError", {
+  message: Schema.String
+}) {}
+
+/** A prefab of the right shape that the game wouldn't spawn. */
+export class PrefabRefusedError extends Schema.TaggedError<PrefabRefusedError>()("PrefabRefusedError", {
+  problems: Schema.Array(Schema.String)
+}) {
+  override get message(): string {
+    return this.problems.join(" ")
+  }
+}
+
 export class CatalogLoadError extends Schema.TaggedError<CatalogLoadError>()("CatalogLoadError", {
   url: Schema.String,
   message: Schema.String

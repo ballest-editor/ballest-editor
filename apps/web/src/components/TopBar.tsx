@@ -7,14 +7,26 @@ import { cn } from "@workspace/ui/lib/utils"
 import { useEffect } from "react"
 import { formatBinding } from "../domain/Keybinds"
 import { playMap } from "../editor/actions"
-import { useEditor } from "../editor/store"
+import { PREFAB_TAB_STAYS_HERE, useEditor, useOpenPrefab } from "../editor/store"
 import { MenuBar } from "./MenuBar"
 
 /** Play (desktop): exports the open map and races it in the game. Its tooltip shows the keybind (F5). */
 function PlayButton() {
   const canPlay = useEditor((s) => s.capabilities.play)
   const keybinds = useEditor((s) => s.keybinds.playMap)
+  const prefab = useOpenPrefab()
   if (!canPlay) return null
+  if (prefab !== null) {
+    return (
+      // a disabled button gets no pointer events, so the tooltip lives on a wrapper
+      <span className="cursor-not-allowed" title={PREFAB_TAB_STAYS_HERE}>
+        <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2" disabled>
+          <IconPlayerPlayFilled className="size-3.5" />
+          Play
+        </Button>
+      </span>
+    )
+  }
   return (
     <Tooltip>
       <TooltipTrigger

@@ -19,6 +19,7 @@ import { groupBoxTargets } from "../domain/groupSelection"
 import { isBound, mouseChordOf } from "../domain/Keybinds"
 import { WATER } from "../domain/level"
 import { gridColorsOf } from "../domain/Settings"
+import { placePrefab } from "./actions"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { GroupBox } from "./groupBox"
@@ -27,6 +28,7 @@ import { advanceGameTime } from "./materials"
 import { OrthoGrid } from "./OrthoGrid"
 import { panePointer, perspectiveOnly } from "./paneCameras"
 import { drawEveryPane, PaneRenderer, useBeforePaneDraw } from "./PaneRenderer"
+import { droppedPrefab, isPrefabDrag } from "./prefabDrag"
 import { GROUP_BOX_COLORS, SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
@@ -379,6 +381,18 @@ export function Viewport(
       tabIndex={-1}
       data-viewport
       onPointerDown={(e) => e.currentTarget.focus({ preventScroll: true })}
+      onDragOver={(e) => {
+        if (!isPrefabDrag(e.dataTransfer)) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = "copy"
+      }}
+      onDrop={(e) => {
+        const prefab = droppedPrefab(e.dataTransfer)
+        if (prefab === undefined) return
+        e.preventDefault()
+        e.currentTarget.focus({ preventScroll: true })
+        void placePrefab(prefab)
+      }}
     >
       <Canvas
         // Hidden until the first scene is ready, then a quick fade up from translucent.

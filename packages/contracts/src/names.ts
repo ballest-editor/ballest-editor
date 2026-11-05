@@ -47,5 +47,20 @@ export const mapFileNameOf = (displayName: string, creatorName: string): string 
  */
 export const isProjectName = (name: string): boolean => /^[\p{L}\p{N}_-][\p{L}\p{N} _-]{0,63}$/u.test(name)
 
+/** A prefab's name, as `saveprefab` takes it: its file is `<name>.json`. */
+export const isPrefabName = (name: string): boolean => /^[A-Za-z0-9_-]{1,64}$/.test(name)
+export const PREFAB_NAME_RULE = "1 to 64 letters, digits, _ and -"
+
+/** The file of the prefab `name`, in a prefabs folder. */
+export const prefabFileNameOf = (name: string): string => `${name}.json`
+
+const PREFAB_EXTENSION = ".json"
+
+/** The prefab a file in a prefabs folder holds; undefined for a file that isn't one's. */
+export const prefabNameOfFile = (fileName: string): string | undefined => {
+  const name = fileName.slice(0, -PREFAB_EXTENSION.length)
+  return fileName.endsWith(PREFAB_EXTENSION) && isPrefabName(name) ? name : undefined
+}
+
 /** Whether a map was never published (`levelPublishedFileId` -1): the plugin manager races no other kind. */
 export const isNeverPublished = (publishedFileId: number): boolean => publishedFileId < 0

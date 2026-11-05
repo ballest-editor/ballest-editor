@@ -515,6 +515,7 @@ export function ProjectSettingsDialog(
   const savedCreator = usableCreatorName(creator)
   const openDialog = useEditor((s) => s.openDialog)
   const openMap = useOpenMapEntry()
+  const inPrefab = useEditor((s) => s.document.kind === "prefab")
 
   const [category, setCategory] = useState<Category>(openMap.category)
   // Each time the dialog opens, or is opened again for the other page, start on the page it was opened for.
@@ -551,7 +552,7 @@ export function ProjectSettingsDialog(
   ))
   const categories: ReadonlyArray<SettingsCategoryInfo<Category>> = [
     ...(projects ? [{ id: "project" as const, label: "General", icon: IconFolder, section: "Project" }] : []),
-    ...(openMap.fileName === null || !projects
+    ...(!inPrefab && (openMap.fileName === null || !projects)
       ? [{ id: openMap.category, label: openMap.label, icon: IconMap, section: "Maps" }]
       : []),
     ...otherUnsaved.map((tabId, index) => ({

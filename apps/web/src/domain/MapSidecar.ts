@@ -2,7 +2,7 @@
  * Schema of a map's sidecar, `maps/<file name>.editor.json`: what the game's format can't hold. The game never reads it.
  * docs/PROJECTS.md § The files has the shape and its rules.
  */
-import { FileHash } from "@ballest/contracts"
+import { FileHash, PrefabName, PrefabTier } from "@ballest/contracts"
 import { Schema } from "effect"
 
 /** An item's stable key or a group's id: random and URL-safe. The two share one space, so a tree node has one id. */
@@ -21,6 +21,20 @@ export class SidecarItem extends Schema.Opaque<SidecarItem>()(
   })
 ) {}
 
+/**
+ * What makes a group a prefab instance: the definition it was placed from. `items` is what each of those items was, in
+ * the definition's frame and document order (`signatureOf`), which is how an instance is told from an edited one once
+ * the definition has moved on.
+ */
+export const PrefabLink = Schema.Struct({
+  tier: PrefabTier,
+  name: PrefabName,
+  /** The SHA-256 of the definition's file when this was placed or last updated. */
+  hash: FileHash,
+  items: Schema.Array(Schema.String)
+})
+export type PrefabLink = typeof PrefabLink.Type
+
 export interface ItemNode {
   readonly kind: "item"
   readonly key: string
@@ -32,6 +46,7 @@ export interface GroupNode {
   readonly name: string
   readonly tags: ReadonlyArray<string>
   readonly children: ReadonlyArray<TreeNode>
+  readonly prefab?: PrefabLink
 }
 
 export type TreeNode = ItemNode | GroupNode
@@ -43,7 +58,8 @@ const GroupNodeSchema = Schema.Struct({
   id: NodeId,
   name: Schema.String,
   tags: Tags,
-  children: Schema.Array(Schema.suspend((): Schema.Codec<TreeNode> => TreeNode))
+  children: Schema.Array(Schema.suspend((): Schema.Codec<TreeNode> => TreeNode)),
+  prefab: Schema.optionalKey(PrefabLink)
 })
 
 const TreeNode: Schema.Codec<TreeNode> = Schema.Union([ItemNodeSchema, GroupNodeSchema])

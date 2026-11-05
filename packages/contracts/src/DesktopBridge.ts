@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import type { InvokeChannels, PushChannels } from "./channels"
-import { isMapFileName } from "./names"
+import { isMapFileName, isPrefabName } from "./names"
 
 /** Runtime versions of the desktop app, for bug reports and the about dialog. */
 export const DesktopVersions = Schema.Struct({
@@ -82,6 +82,74 @@ export const MapLink = Schema.Struct({
   lastSeenHash: Schema.NullOr(FileHash)
 })
 export type MapLink = typeof MapLink.Type
+
+/**
+ * The two places prefabs live (docs/DESKTOP.md § Prefabs): `user` is the game's own prefabs folder, so the in-game editor
+ * lists them too, and `project` is `<project>/prefabs/`.
+ */
+export const PrefabTier = Schema.Literals(["user", "project"])
+export type PrefabTier = typeof PrefabTier.Type
+
+/** A prefab's name, which is its file's less `.json`. Never a path: anything `isPrefabName` refuses stops at decoding. */
+export const PrefabName = Schema.String.check(
+  Schema.makeFilter((name: string) => isPrefabName(name) || "isn't a prefab name (1 to 64 letters, digits, _ and -)")
+)
+
+/** A prefab's text: the game's JSON. The page encodes and decodes it, main only moves it. */
+export const PrefabText = Schema.String.check(Schema.isMaxLength(64 * 1024 * 1024))
+
+/** A prefab as a tier lists it. */
+export const PrefabInfo = Schema.Struct({
+  tier: PrefabTier,
+  name: PrefabName,
+  /** Where its file is; null in the web review build, which keeps prefabs in memory. */
+  path: Schema.NullOr(FilePath),
+  modifiedAt: IsoTime,
+  hash: FileHash,
+  /** How many items the file holds, and the first one's class; null for a file that doesn't read as a prefab. */
+  itemCount: Schema.NullOr(Schema.Int),
+  firstClass: Schema.NullOr(Schema.String)
+})
+export type PrefabInfo = typeof PrefabInfo.Type
+
+/** Only what a tier's list shows of a file; the page decodes the rest. */
+const PrefabSummary = Schema.fromJsonString(Schema.Struct({
+  format: Schema.Literal("BallestPrefab"),
+  items: Schema.Array(Schema.Struct({ class: Schema.String }))
+}))
+
+/** What a tier's list says of a prefab's text. */
+export const prefabSummaryOf = (text: string): Pick<PrefabInfo, "itemCount" | "firstClass"> => {
+  const decoded = Schema.decodeOption(PrefabSummary)(text.replace(/^\uFEFF/, ""))
+  return decoded._tag === "Some"
+    ? { itemCount: decoded.value.items.length, firstClass: decoded.value.items[0]?.class ?? null }
+    : { itemCount: null, firstClass: null }
+}
+
+export const PrefabInfos = Schema.Array(PrefabInfo)
+export type PrefabInfos = typeof PrefabInfos.Type
+
+export const PrefabRead = Schema.Struct({ ...PrefabInfo.fields, text: PrefabText })
+export type PrefabRead = typeof PrefabRead.Type
+
+export const PrefabTierPayload = Schema.Struct({ tier: PrefabTier })
+export type PrefabTierPayload = typeof PrefabTierPayload.Type
+
+export const PrefabRef = Schema.Struct({ tier: PrefabTier, name: PrefabName })
+export type PrefabRef = typeof PrefabRef.Type
+
+/** `writePrefab`: `replace` writes over a prefab of that name (it goes to the backups), and without it that fails. */
+export const WritePrefabPayload = Schema.Struct({
+  tier: PrefabTier,
+  name: PrefabName,
+  text: PrefabText,
+  replace: Schema.Boolean
+})
+export type WritePrefabPayload = typeof WritePrefabPayload.Type
+
+/** `renamePrefab`: moves it within its tier; fails when `to` is taken. */
+export const RenamePrefabPayload = Schema.Struct({ tier: PrefabTier, from: PrefabName, to: PrefabName })
+export type RenamePrefabPayload = typeof RenamePrefabPayload.Type
 
 /** The folder the user works in (docs/PROJECTS.md). It is made on disk by the first New map or Import. */
 export const ProjectInfo = Schema.Struct({
@@ -353,6 +421,10 @@ export const NotificationCommand = Schema.TaggedUnion({
   OpenMap: { fileName: MapFileName },
   /** Replaces a project map with its export as the game changed it (Re-import). */
   ReimportMap: { fileName: MapFileName },
+  /** Replaces the edited instances of a prefab in the open maps with its definition. */
+  UpdatePrefabInstances: { tier: PrefabTier, name: PrefabName },
+  /** Makes the edited instances of a prefab in the open maps plain groups. */
+  DetachPrefabInstances: { tier: PrefabTier, name: PrefabName },
   /** Nothing besides marking the notification read (Ignore). */
   Dismiss: {},
   /** Opens a web page in the default browser (the plugin manager's install steps). */
@@ -650,6 +722,16 @@ export const DesktopMethods = {
   renameMap: { payload: RenameMapPayload, result: ProjectMap },
   /** Writes a map's sidecar beside it, after the map itself. The old sidecar goes to the project's backups. */
   writeSidecar: { payload: WriteSidecarPayload, result: Schema.Void },
+  /** A tier's prefabs by name; a tier with no folder yet has none. */
+  listPrefabs: { payload: PrefabTierPayload, result: PrefabInfos },
+  readPrefab: { payload: PrefabRef, result: PrefabRead },
+  /** Writes a prefab atomically, keeping what it replaces in the backups. */
+  writePrefab: { payload: WritePrefabPayload, result: PrefabInfo },
+  /** Moves a prefab to the backups. */
+  deletePrefab: { payload: PrefabRef, result: Schema.Void },
+  renamePrefab: { payload: RenamePrefabPayload, result: PrefabInfo },
+  /** Shows a tier's folder in the file manager; false when it has none yet. */
+  revealPrefabs: { payload: PrefabTierPayload, result: Schema.Boolean },
   /** The native open dialog for a map file anywhere; null when cancelled. The file may then be imported. */
   pickImport: { payload: noPayload, result: PickImportResult },
   /** Copies a picked file into the project and records where it came from (a map it replaces goes to backups). */

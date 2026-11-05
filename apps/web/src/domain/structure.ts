@@ -5,7 +5,7 @@
  */
 import { type CatalogIndex, humanizedClass, pieceLabelOf } from "./Catalog"
 import { classNameOf, type MapFile } from "./MapFile"
-import type { GroupNode, ItemNode, TreeNode } from "./MapSidecar"
+import type { GroupNode, ItemNode, PrefabLink, TreeNode } from "./MapSidecar"
 
 /** What an item has beyond the game's data. An item with neither has no entry. */
 export interface ItemMeta {
@@ -124,6 +124,17 @@ export const withGroupName = (structure: Structure, id: string, name: string): S
   const group = findGroup(structure.tree, id)
   if (group === undefined || trimmed.length === 0 || trimmed === group.name) return undefined
   return withGroupNode(structure, id, (node) => ({ ...node, name: trimmed }))
+}
+
+/** Makes group `id` an instance of a prefab, or a plain group (undefined). */
+export const withPrefabLink = (
+  structure: Structure,
+  id: string,
+  link: PrefabLink | undefined
+): Structure | undefined => {
+  const group = findGroup(structure.tree, id)
+  if (group === undefined || group.prefab === link) return undefined
+  return withGroupNode(structure, id, ({ prefab: _, ...node }) => link === undefined ? node : { ...node, prefab: link })
 }
 
 const sameTags = (a: ReadonlyArray<string>, b: ReadonlyArray<string>) =>

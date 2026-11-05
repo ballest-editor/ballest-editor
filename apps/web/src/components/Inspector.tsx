@@ -34,7 +34,7 @@ import {
   setSelectionField
 } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
-import { selectedIndices, useEditor } from "../editor/store"
+import { type PrefabDocument, selectedIndices, useEditor, useOpenPrefab } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { FlipSection } from "./FlipSection"
 import { ItemProperties } from "./ItemProperties"
@@ -45,9 +45,39 @@ import { PaintSection } from "./PaintSection"
 import { PathText } from "./PathText"
 import { PivotSection } from "./PivotSection"
 import { SectionTitle } from "./SectionTitle"
-import { GroupSection, ItemTags } from "./StructureSection"
+import { GroupSection, InstanceSection, ItemTags } from "./StructureSection"
 
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
+
+function Facts({ facts }: { readonly facts: ReadonlyArray<readonly [string, string]> }) {
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+      {facts.map(([k, v]) => (
+        <div key={k} className="contents">
+          <dt className="text-muted-foreground">{k}</dt>
+          <dd className="min-w-0">{k === "File" ? <PathText block>{v}</PathText> : v}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+/** A definition's tab with nothing selected: what it is. Its name and tier change in the Prefabs panel. */
+function PrefabSettings({ prefab }: { readonly prefab: PrefabDocument }) {
+  const itemCount = useEditor((s) => s.doc.map.items.length)
+  const path = useEditor((s) => s.file?.path ?? null)
+  const facts: ReadonlyArray<readonly [string, string]> = [
+    ["Tier", prefab.tier],
+    ["Items", String(itemCount)],
+    ["File", path ?? `${prefab.name}.json`]
+  ]
+  return (
+    <div className="flex flex-col gap-3">
+      <SectionTitle>Prefab {prefab.name}</SectionTitle>
+      <Facts facts={facts} />
+    </div>
+  )
+}
 
 function MapSettings() {
   const levelData = useEditor((s) => s.doc.map.worldSettings.levelData)
@@ -95,14 +125,7 @@ function MapSettings() {
         <Label htmlFor="map-name" className="text-muted-foreground">Name</Label>
         <Input id="map-name" value={name} onChange={(e) => setDraft(e.target.value)} onBlur={commit} />
       </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-        {facts.map(([k, v]) => (
-          <div key={k} className="contents">
-            <dt className="text-muted-foreground">{k}</dt>
-            <dd className="min-w-0">{k === "File" ? <PathText block>{v}</PathText> : v}</dd>
-          </div>
-        ))}
-      </dl>
+      <Facts facts={facts} />
     </div>
   )
 }
@@ -415,15 +438,22 @@ export function Inspector() {
     [tree, selectedIds, enteredGroupId]
   )
 
+  const prefab = useOpenPrefab()
   const first = items[0]
   if (first === undefined) {
     return (
       <ScrollArea className="h-full bg-card">
         <div className="flex flex-col gap-3 p-3">
-          <MapSettings />
-          <Separator />
-          <SectionTitle>Lighting</SectionTitle>
-          <LightingSettings />
+          {prefab === null
+            ? (
+              <>
+                <MapSettings />
+                <Separator />
+                <SectionTitle>Lighting</SectionTitle>
+                <LightingSettings />
+              </>
+            )
+            : <PrefabSettings prefab={prefab} />}
         </div>
       </ScrollArea>
     )
@@ -439,6 +469,7 @@ export function Inspector() {
       <div className="flex flex-col gap-3 p-3">
         {group !== undefined && (
           <>
+            {group.prefab !== undefined && <InstanceSection group={group} link={group.prefab} />}
             <GroupSection key={group.id} group={group} />
             <Separator />
           </>

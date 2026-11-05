@@ -29,6 +29,8 @@ export interface OutlineRow {
   readonly itemCount: number
   /** A group whose children aren't shown. */
   readonly collapsed: boolean
+  /** A group that is a prefab instance. */
+  readonly instance: boolean
 }
 
 /** Each item's `actorToSpawn`, by key. */
@@ -76,7 +78,8 @@ export const outlineRows = (
           tags: structure.items.get(node.key)?.tags ?? [],
           childCount: 0,
           itemCount: 0,
-          collapsed: false
+          collapsed: false,
+          instance: false
         }
         if (!filtering || rowMatches(row, terms)) rows.push(row)
         continue
@@ -92,7 +95,8 @@ export const outlineRows = (
         tags: node.tags,
         childCount: node.children.length,
         itemCount: treeKeys([node]).length,
-        collapsed
+        collapsed,
+        instance: node.prefab !== undefined
       }
       const at = rows.length
       rows.push(row)

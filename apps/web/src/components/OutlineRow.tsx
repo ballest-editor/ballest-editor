@@ -1,4 +1,4 @@
-import { IconBox, IconChevronRight, IconFolder, IconFolderOpen } from "@tabler/icons-react"
+import { IconBox, IconBoxMultiple, IconChevronRight, IconFolder, IconFolderOpen } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Input } from "@workspace/ui/components/input"
 import { cn } from "@workspace/ui/lib/utils"
@@ -103,7 +103,7 @@ export const OutlineRowView = memo(function OutlineRowView({
 }) {
   const setGroupCollapsed = useEditor((s) => s.setGroupCollapsed)
   const isGroup = row.kind === "group"
-  const FolderIcon = row.collapsed ? IconFolder : IconFolderOpen
+  const FolderIcon = row.instance ? IconBoxMultiple : row.collapsed ? IconFolder : IconFolderOpen
   return (
     <div
       role="treeitem"

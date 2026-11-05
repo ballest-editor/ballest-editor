@@ -65,6 +65,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - A tab shows the map's name without the creator (`mapLabelOf`), its tooltip is the file's path or "Not saved yet", and tabs can be dragged into another order.
 - A tab's ×, a middle click or Ctrl+F4 closes it after the unsaved-changes prompt (§ Window). Closing the last one shows a fresh map the same way.
 - A right-click opens the tab's menu: Close, Close others, Close to the right, and on desktop Rename…, Duplicate… and Reveal.
+- A tab can hold a prefab's definition instead of a map (§ Prefabs). `TabState.document` says which, and it is one tab model: Save, the prompts and the menus ask it.
 - Ctrl+Tab and Ctrl+Shift+Tab, or Ctrl+PageDown and PageUp, cycle the tabs.
 
 ### Dock
@@ -75,7 +76,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 
 **Panels** are entries in `components/dock/panels.tsx`: an id, a title, a component and a default location (`left`, `right`, `bottom`). That entry is all a panel needs for a tab, a View menu item, a place in the default layout, and a place in layouts saved before it existed. `dockControl.ts` is what the rest of the app calls (`togglePanel`, `resetDockLayout`). It's in the page's first chunk, because the menu bar is, so the registry reaches it from `Dock.tsx` and keeps the panels, and WebGL, out of that chunk.
 
-- **Pieces** and **Project** start stacked on the left, with Pieces in front, and **Inspector** on the right. A panel `always` rendered (Pieces) stays in the page behind another tab, so a long list keeps its scroll position.
+- **Pieces**, **Prefabs** and **Project** start stacked on the left, with Pieces in front, and **Inspector** on the right. A panel `always` rendered (Pieces) stays in the page behind another tab, so a long list keeps its scroll position.
 - View lists every panel, checked while it's open, and Reset layout. Reset closes everything around the centre group and lays out the default again, and the viewport stays mounted.
 - **Each group's "…"** (`GroupMenu.tsx`), at the end of its strip, holds View's panel checks, then Pop out, Collapse and Reset layout.
 - **Collapse** folds a group: a column by the viewport to a rail, a group in a stack to its header. A group can't fold if its neighbours have nothing left to give, so Collapse is off there. A panel arriving unfolds it, and so does a click on a tab, with that panel in front.
@@ -135,7 +136,7 @@ Changing projection keeps the point the pane looks at and its size on screen. Nu
 `components/MenuBar.tsx` holds the menus. Every item calls the entry point its keybind or button uses.
 
 - **File:** New project… (`components/NewProjectDialog.tsx`, a name that becomes `Documents/Ballest Editor/<name>` through `createProject`), Open project…, Recent projects, Save, Close tab, Settings… (`components/SettingsDialog.tsx`, a modal in `SettingsShell`'s shape that looks the game up again each time it opens, and is meant to become a window of its own later), Game link…, and Quit, which closes the window the way its × does, so unsaved edits ask.
-- **Edit:** Undo, Redo, Cut, Copy, Paste, Duplicate, Delete, Deselect, Group and Ungroup.
+- **Edit:** Undo, Redo, Cut, Copy, Paste, Duplicate, Delete, Deselect, Group, Ungroup and Save selection as prefab….
 - **View:** Focus selection, Frame all, the view's panes and the active pane's projection (§ View panes), the dock's panels and Reset layout (§ Dock), and the display toggles (the grid, sky, water and theme).
 - **Project:** New map…, Import map…; Export to game, Export on save, Re-import from game, Play, Launch game; Project settings….
 - **Web review build:** File (New map…, Open…, Save, Export…, Close tab, Settings…), Edit, View, and Project (Project settings…, the one map's).
@@ -165,7 +166,7 @@ There is no Map or Game menu: the menus act on the active tab's map, and the gam
 - A selection made anywhere else scrolls its active row into view once, as far as it takes, and opens the groups around it.
 - Double-click or F2 renames in place: Enter commits, Escape cancels, and an empty name puts an item back on its default name. A group always has a name, so an empty one changes nothing.
 - A drag moves the selection, or just the row when it isn't selected, as one undo step. A line shows a drop before or after a row, and the row lights up for a drop into a group. A group's top and bottom quarters drop beside it, and the gap under an open group is its first child's. Below the last row is the end of the root.
-- Right-click selects the row if it isn't selected, then offers Group, Ungroup, Rename, Duplicate, Delete, Focus and Edit tags….
+- Right-click selects the row if it isn't selected, then offers Group, Ungroup, Save selection as prefab…, Rename, Duplicate, Delete, Focus and Edit tags…, with Update from prefab and Detach from prefab on an instance. An instance's row has an icon of its own.
 - The filter matches names, classes and tags, needing every word. It shows matching rows with the groups around them, whatever is collapsed. A group's items show only if they match too.
 - Which groups are collapsed is kept per tab in the store, outside the sidecar and the history, so undo leaves it alone.
 
@@ -180,6 +181,30 @@ The groups are the sidecar's ([PROJECTS.md § The files](PROJECTS.md#the-files))
 - **The box.** Each group whole in the selection has a dashed box around its items in the viewport, in a colour of its own (`editor/groupBox.ts`, `GROUP_BOX_COLORS`), as well as its items' outlines. The entered group keeps a thinner, fainter box while something inside it is selected. The box is drawn over everything, and a laser's beam doesn't count towards it.
 - **The Inspector** shows the group's name and tags above the item properties when the selection is exactly one group, and a single selected item's tags under its actions. Tags are free strings: Enter or a comma adds one, Backspace in the empty field removes the last.
 - **Delete** removes the group's items, and the group goes with them. **Duplicate** copies a whole group as a new group of the same name and shape.
+
+### Prefabs
+
+A prefab is a reusable assembly, kept as a file in the game's format ([FORMAT.md § Prefab file](FORMAT.md#prefab-file)). The file is its **definition**, and each placed copy is an **instance**: a group with a link to the definition in the sidecar ([PROJECTS.md § The files](PROJECTS.md#the-files)). `domain/prefab.ts` holds the conversions, `domain/prefabInstance.ts` the instances, `editor/actions/prefabs.ts` and `prefabFollow.ts` the flows, and `project/Prefabs.ts` the files in main.
+
+**Tiers.** User prefabs are the game's own `Saved/SaveGames/Prefabs/`, beside its maps folder, so the in-game editor's `listprefabs` and `spawnprefab` see them and the other way round. Project prefabs are `<project>/prefabs/`. Main writes atomically and only in those two folders. A write over a prefab, a Rename and a Delete keep the old file: the project's in `.ballest/backups/`, the game's in `<userData>/backups/` (§ Backups). Untitled Project has no project tier. The web review build has one tier, "This session", kept in memory until the page closes.
+
+**The panel** (`components/PrefabsPanel.tsx`) lists each tier with a filter box. A row shows the name, the item count and the first piece's thumbnail, or a glyph. A click, or a drag onto the viewport, places the prefab. Its menu (⋮, or a right-click) holds Place, Open, Rename…, Duplicate, Copy to project or Copy to user, Delete… and, on desktop, Reveal, which shows the tier's folder. A file that doesn't read as a prefab is listed, and can only be renamed, copied, deleted or revealed.
+
+**Placing** does what `spawnprefab` does (`spawnFrameOf`): the frame goes on the line through the active pane's camera, far enough along that the items' box starts 500 cm ahead. An orthographic pane has no distance, so the line starts at the middle of its view. The items land selected, as one group named after the prefab, in one undo step. A prefab the game would refuse is refused here with the game's words (`prefabProblems`).
+
+**Save selection as prefab…** (Edit menu, the Outline's menu) asks a name and a tier and writes the selected items in selection order, measured from the centre of their turned bounds with no turn or scale, as the game's frame. A selection that is exactly one group gives the file that group's name. It changes nothing in the map, and a name the tier already has turns Save into Replace.
+
+**Instances.** The Outline marks one, and the Inspector shows "Instance of <name>" with how it stands, Update, Detach and Open definition. An instance is **unmodified** while its items match what was placed, allowing for its own placement (`checkInstance`): moving, turning or scaling the whole group, by the editor's scale or the game's, doesn't count. Renaming the group, tagging it and reordering its rows don't either. Changing an item's own transform, properties or materials, or adding or removing one, does. Double-clicking into an instance to edit it is allowed, and makes it modified.
+
+**Following.** Whenever a definition's file changes, every open map follows it: the tab that saved it, or the game, or anything else writing the file. Files are looked at on launch, on focus, after a Play session and after the app's own writes, not by watching the folders (`checkPrefabs`). A map that opens later catches up then.
+
+- An unmodified instance updates in place, as one undo step of its tab, and the tab has unsaved edits. Undoing that isn't taken back by the next look, since only a file that changed sets it off. Items of the same class keep their keys, so names and tags survive.
+- A modified instance stays as it is and goes in the notification centre, once per change, with Update, which replaces it where most of its items stand, and Detach, which keeps the group and drops the link. The Inspector offers the same.
+- Rename moves the links in open maps. A map opened later finds the definition by its hash, if the file hasn't changed since. A definition that is gone leaves its instances standing, and they say so.
+
+**Definitions open in a tab** (Open, Open definition), with the same viewport, Outline and Inspector. The tab holds a map-like document of the prefab's items, around the default start so it sits above the water, and shows the name and tier. Save writes the file, and instances follow. Unsaved edits ask like a map's. Export and Play are off, with a tooltip. The file has no place for structure, so groups made in the tab aren't saved, and a prefab placed in the tab is a plain group. Untouched items are written back as they came, and an edited item keeps its `paint` until its materials change. A file that changes behind a tab with no edits is read again; with edits, the tab says so and Save writes over it.
+
+**Export.** An instance reaches the game as its items and one group named after the prefab ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)). Nothing about prefabs goes in the map's file.
 
 ### Game link
 
@@ -224,7 +249,7 @@ The link states are Not exported, In sync, Edited since export, Changed in game,
 
 The store's `notify(level, title, { kind, body, persistent, actions })` records a `NotificationRecord` (`@ballest/contracts`), and `showToasts` toasts each new one, with its first action as the toast's button.
 
-- Actions are data (`NotificationCommand`: `RevealProject`, `RevealGamePath`, `ChooseGamePath`, `OpenMap`, `OpenExternal`, `InstallPlugin`, `ReimportMap`, `Dismiss`), so they still work after a restart. `runNotificationCommand` runs them.
+- Actions are data (`NotificationCommand`: `RevealProject`, `RevealGamePath`, `ChooseGamePath`, `OpenMap`, `OpenExternal`, `InstallPlugin`, `ReimportMap`, `UpdatePrefabInstances`, `DetachPrefabInstances`, `Dismiss`), so they still work after a restart. `runNotificationCommand` runs them.
 - The bell lists them newest first, grouped by day, the unread ones counted. A `persistent` one is pinned to the top until `resolveNotifications(kind)`, and a newer one of its kind replaces it. Mark all read; Clear keeps only the pinned.
 - The last 100 are kept in `<userData>/notifications.json` (`NotificationLog` in main, `loadNotifications` / `saveNotifications` over IPC). One entry that doesn't decode is dropped, not the file. A browser keeps them in memory.
 
@@ -238,6 +263,7 @@ Every write over an existing map file or sidecar goes through one step, `Backups
 
 - **Where.** The project's own files go to `<project>/.ballest/backups/`. The files Export writes over in the game's maps folder go to `<userData>/backups/`, which is the app's: a project can be shared, but the game's copy of a map is this machine's. Both folders are flat: `<time> <file name>`, the time in ISO 8601 UTC with `-` for `:` and `.` (`2026-10-31T12-00-00-000Z Map_LevelEditorMain&Big Loop_Isaac.balledit`). Two backups of a file in the same millisecond get consecutive times, so names never collide and their order holds.
 - **Skipped** when the new bytes are the old ones (nothing is written either), or when the newest backup of that file already holds the old bytes. A backup that fails stops the write, so the old file is never lost to a failed copy.
+- **Prefabs** are kept the same way, the project's in its backups and the game's in `<userData>/backups/`. A Rename and a Delete move the old file there. Recover doesn't list them: for now a version comes back by hand.
 - **Sidecars** are kept beside the maps in `<project>/.ballest/backups/` under their own file names, and Recover lists only the maps. Reading a project backup also gives the sidecar kept for it, which is the oldest one kept since, because a Save backs up the map first and its sidecar right after. A version with no such sidecar, and any of the game's copies, gets the map's sidecar as it is now. The page re-matches a sidecar that wasn't written for those bytes, as on any open.
 - **Retention.** After each write the folder keeps the newest 20 versions of each file and drops any older than 30 days. `desktop-settings.json` can change both: `{ "backups": { "keep": 20, "maxAgeDays": 30 } }` (no UI yet). Git history (#105) is the long-term version history; this is the safety net.
 - **Recover** (the Project panel › a map's menu › Recover previous version…) shows the open map's versions, newest first, and All backed-up maps for the others, including maps no longer in the project. Main lists both folders (`listBackups`) and reads a backup by its place and name (`readBackup`), refusing any name it didn't write, so paths stay in main. Each version shows its time, whose copy it is (Project or Game) and, decoded through `MapFile` as Open would, its item count and map name.

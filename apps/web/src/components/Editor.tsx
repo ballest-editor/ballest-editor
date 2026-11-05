@@ -4,7 +4,9 @@ import { useEffect } from "react"
 import { MOTION_SCALE } from "../domain/Settings"
 import {
   checkExports,
+  checkPrefabsNow,
   followNotifications,
+  followOpenTabs,
   followPlaySessions,
   followUnloadRequests,
   followUpdates,
@@ -32,6 +34,7 @@ import { NameMapDialog } from "./NameMapDialog"
 import { NewMapDialog } from "./NewMapDialog"
 import { NewProjectDialog } from "./NewProjectDialog"
 import { OverwriteChangedDialog } from "./OverwriteChangedDialog"
+import { DeletePrefabDialog, RenamePrefabDialog, SavePrefabDialog } from "./PrefabDialogs"
 import { ProjectChooser } from "./ProjectChooser"
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
 import { RecoverDialog } from "./RecoverDialog"
@@ -94,12 +97,15 @@ const useUnsavedGuard = () =>
   }, [])
 
 /**
- * Back from the game (or anywhere) the window gets the focus: the in-game editor may have saved a map meanwhile, so the
- * exports are checked (docs/PROJECTS.md § Sync). A browser has none to check.
+ * Back from the game (or anywhere) the window gets the focus: the in-game editor may have saved a map or a prefab
+ * meanwhile, so the exports (docs/PROJECTS.md § Sync) and the prefabs are checked. A browser has only its own to check.
  */
 const useCheckExportsOnFocus = () =>
   useEffect(() => {
-    const check = () => void checkExports()
+    const check = () => {
+      void checkExports()
+      void checkPrefabsNow()
+    }
     window.addEventListener("focus", check)
     return () => window.removeEventListener("focus", check)
   }, [])
@@ -130,9 +136,12 @@ export function Editor() {
   useEffect(() => followNotifications(), [])
   useEffect(() => {
     // The viewport holds its first reveal until these have settled (see Viewport.tsx).
-    void Promise.all([loadCatalog(), loadMaterials(), loadSettings()]).then(() => useEditor.getState().finishBoot())
+    const booted = Promise.all([loadCatalog(), loadMaterials(), loadSettings()]).then(() =>
+      useEditor.getState().finishBoot()
+    )
     void loadKeybinds()
-    void loadPlatform()
+    // instances wait for the catalog as well as the map, which either may bring last
+    void Promise.all([booted, loadPlatform()]).then(followOpenTabs)
   }, [])
   useEffect(() => followUpdates(), [])
   useEffect(() => followViewLayouts(), [])
@@ -170,6 +179,9 @@ export function Editor() {
         onCategoryChange={setSettingsCategory}
         onClose={close}
       />
+      <SavePrefabDialog open={dialog === "savePrefab"} onClose={close} />
+      <RenamePrefabDialog open={dialog === "renamePrefab"} onClose={close} />
+      <DeletePrefabDialog open={dialog === "deletePrefab"} onClose={close} />
       <KeybindCheatSheet />
       {/* clear of the status bar */}
       <Toaster position="bottom-right" offset={{ bottom: 40 }} />

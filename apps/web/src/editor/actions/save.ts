@@ -11,6 +11,7 @@ import { Platform } from "../../services/Platform"
 import { type Doc, gameMapOf, type OpenFile, tabStateOf, useEditor } from "../store"
 import { ASK_FIRST, writeToGame } from "./gameWrite"
 import { nameProjectEffect } from "./maps"
+import { savePrefabTab } from "./prefabs"
 import { run } from "./run"
 import { fileOf, projectName, refreshProject, revealIn, saveTabPrefs, writeSidecarOf } from "./shared"
 
@@ -116,7 +117,11 @@ const nameFirst = <E, R>(then: Effect.Effect<void, E, R>) =>
 export const saveOpenMapThen = <E, R>(then: Effect.Effect<void, E, R>, options = { exportAfter: true }) =>
   Effect.gen(function*() {
     const platform = yield* Platform
-    const { doc, file } = useEditor.getState()
+    const { doc, document, file } = useEditor.getState()
+    if (document.kind === "prefab") {
+      yield* savePrefabTab
+      return yield* then
+    }
     if (platform.capabilities.projects) {
       if (file === null) return yield* nameFirst(then)
       yield* writeOpenMap(file, options)

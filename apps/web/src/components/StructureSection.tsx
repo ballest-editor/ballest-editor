@@ -1,8 +1,11 @@
+import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import { useState } from "react"
-import type { GroupNode } from "../domain/MapSidecar"
+import { useMemo, useState } from "react"
+import type { GroupNode, PrefabLink } from "../domain/MapSidecar"
+import { checkInstance } from "../domain/prefabInstance"
 import { treeKeys } from "../domain/structure"
+import { detachInstance, openPrefab, updateInstance } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { SectionTitle } from "./SectionTitle"
 import { TagInput } from "./TagInput"
@@ -37,6 +40,47 @@ export function GroupSection({ group }: { readonly group: GroupNode }) {
       <div className="flex flex-col gap-1">
         <Label htmlFor="group-tags" className="text-muted-foreground">Tags</Label>
         <TagInput id="group-tags" tags={group.tags} onChange={(tags) => setTags(group.id, tags)} />
+      </div>
+    </div>
+  )
+}
+
+/** How an instance stands against its definition. */
+const instanceStatusOf = (found: boolean, current: boolean, unmodified: boolean) => {
+  if (!found) return "Its definition has gone. It keeps its items."
+  if (current) return unmodified ? "It follows its definition." : "Edited here, so it no longer follows its definition."
+  return unmodified ? "Its definition has changed." : "Edited here, and its definition has changed."
+}
+
+/** A selection that is exactly one prefab instance: what it is an instance of, and what can be done about it. */
+export function InstanceSection({ group, link }: { readonly group: GroupNode; readonly link: PrefabLink }) {
+  const doc = useEditor((s) => s.doc)
+  const definition = useEditor((s) => s.prefabs.find((p) => p.tier === link.tier && p.name === link.name))
+  const { unmodified } = useMemo(() => checkInstance(doc, group, link), [doc, group, link])
+  const found = definition !== undefined
+  const current = definition?.hash === link.hash
+  return (
+    <div className="flex flex-col gap-2">
+      <SectionTitle>Instance of {link.name}</SectionTitle>
+      <p className="text-xs text-muted-foreground">{instanceStatusOf(found, current, unmodified)}</p>
+      <div className="flex flex-wrap gap-1">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!found || (current && unmodified)}
+          onClick={() => void updateInstance(group.id, link)}
+        >
+          Update
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => detachInstance(group.id)}>Detach</Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!found}
+          onClick={() => void openPrefab({ tier: link.tier, name: link.name })}
+        >
+          Open definition
+        </Button>
       </div>
     </div>
   )

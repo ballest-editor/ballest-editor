@@ -3,7 +3,13 @@
  * item's one identity: React keys, selection, the sidecar) and the map's structure (domain/structure). All edits go
  * through domain/edits and domain/structure.
  */
-import { NOTIFICATION_LIMIT, type UpdateState } from "@ballest/contracts"
+import {
+  NOTIFICATION_LIMIT,
+  type PrefabInfos,
+  type PrefabRef,
+  type PrefabTier,
+  type UpdateState
+} from "@ballest/contracts"
 import { type Effect, Option } from "effect"
 import { create } from "zustand"
 import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Catalog"
@@ -44,12 +50,16 @@ import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
 import { LIMITS } from "../domain/limits"
 import { type LinkState, linkStateOf } from "../domain/linkState"
-import { isPlayerStart, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
+import { isPlayerStart, type Item, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
+import type { PrefabLink } from "../domain/MapSidecar"
 import type { MaterialTable } from "../domain/Materials"
 import { type FlipAxis, withMirrorMesh } from "../domain/mirror"
 import { addNotice, clearNotices, dropNotices, markRead, mergeNotices, resolveNotices } from "../domain/notifications"
 import type { PaintPicker } from "../domain/Paint"
 import { type Pivot, pivotAt } from "../domain/pivot"
+import type { PrefabSource } from "../domain/prefab"
+import type { PrefabFile } from "../domain/PrefabFile"
+import { type PrefabDefinition, withUpdatedInstance } from "../domain/prefabInstance"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
 import {
@@ -72,6 +82,7 @@ import {
   withoutGroups,
   withoutKeys,
   withPasted,
+  withPrefabLink,
   withTags
 } from "../domain/structure"
 import { type Lighting, lightingOf } from "../domain/sunlight"
@@ -166,6 +177,26 @@ export interface OpenFile {
 }
 
 /**
+ * A definition open in a tab (docs/DESKTOP.md § Prefabs): which prefab, and the file as it was last read or saved, which
+ * Save writes the tab's items back into.
+ */
+export interface PrefabDocument extends PrefabRef {
+  readonly kind: "prefab"
+  readonly file: PrefabFile
+  readonly hash: string
+  /** What each item, by stable key, was in that file. */
+  readonly sources: ReadonlyMap<string, PrefabSource>
+}
+
+/** What a tab holds: a map, or a prefab's definition in a map-like document. Save, Export and Play ask this first. */
+export type TabDocument = { readonly kind: "map" } | PrefabDocument
+
+const MAP_DOCUMENT: TabDocument = { kind: "map" }
+
+/** Why a definition's tab can't Export or Play. */
+export const PREFAB_TAB_STAYS_HERE = "A prefab isn't a map: place it in one to export or play it."
+
+/**
  * A file in the game's maps folder that is the draft of a published map (`levelPublishedFileId` > 0), found by Export
  * or by Play's export (`from`): replacing it goes on with the one that found it.
  */
@@ -209,6 +240,7 @@ export interface ImportClash {
  * - `projectSettings` opens Project settings on the project's page, `mapSettings` on the open map's entry in it.
  * - `replacePublished`, `overwriteChanged` and `importClash` ask about what Export, Play or Import found.
  * - `whereToOpen` asks whether `target` (shown as `name`) takes over this window or opens in a new one.
+ * - `savePrefab` names a prefab made from the selection; `renamePrefab` and `deletePrefab` are the Prefabs panel's.
  */
 export type DialogState =
   | {
@@ -229,6 +261,8 @@ export type DialogState =
   | { readonly id: "overwriteChanged" } & ChangedExport
   | { readonly id: "importClash" } & ImportClash
   | { readonly id: "whereToOpen"; readonly target: ProjectTarget; readonly name: string }
+  | { readonly id: "savePrefab" }
+  | { readonly id: "renamePrefab" | "deletePrefab"; readonly prefab: PrefabRef }
 export type Dialog = DialogState["id"]
 
 /** What `notify` records besides the level and title (docs/PROJECTS.md § Shell). */
@@ -263,6 +297,8 @@ export const initialMap = () => newMapFile({ displayName: "Untitled", creatorNam
  */
 export interface TabState {
   readonly doc: Doc
+  /** What `doc` is the document of. */
+  readonly document: TabDocument
   /**
    * The height (UE cm) the grid is drawn at and palette pieces land on: by default the player
    * start's, taken when the map loads so it stays put while the start is moved. Project settings
@@ -309,6 +345,8 @@ export interface EditorState extends TabState {
   readonly project: ProjectState | null
   /** The project's maps, most recently changed first (desktop). */
   readonly projectMaps: ReadonlyArray<ProjectMap>
+  /** Every prefab of both tiers, as last listed. */
+  readonly prefabs: PrefabInfos
   /** What the platform (browser or desktop app) offers; the browser's until the startup load says otherwise. */
   readonly capabilities: PlatformCapabilities
   /** The game's folders as last looked up (desktop; null until the startup check or the Game link asks). */
@@ -396,6 +434,7 @@ export interface EditorState extends TabState {
       readonly into?: TabTarget
       readonly loaded?: DocStructure
       readonly viewLayout?: ViewLayout | undefined
+      readonly document?: TabDocument
     }
   ) => void
   /** Makes `tabId` the active tab; nothing while a drag or scrub is under way. */
@@ -407,6 +446,8 @@ export interface EditorState extends TabState {
    * nothing when `patch` returns the same map.
    */
   readonly editTabMap: (tabId: string, patch: (map: MapFile) => MapFile) => void
+  /** Edits tab `tabId`'s document as one undo step of that tab; nothing when `edit` answers undefined. */
+  readonly editTabDoc: (tabId: string, edit: (doc: Doc) => Doc | undefined) => void
   readonly setTabFloorHeight: (tabId: string, floorHeight: number) => void
   readonly setTabExportOnSave: (tabId: string, exportOnSave: boolean) => void
   /**
@@ -420,6 +461,11 @@ export interface EditorState extends TabState {
    * meanwhile, only the file is remembered.
    */
   readonly markSaved: (tabId: string, from: Doc, map: MapFile, file: OpenFile) => void
+  /** Tab `tabId`'s definition was saved from `from`, as `document`: the tab is clean while its document is still `from`. */
+  readonly markPrefabSaved: (tabId: string, from: Doc, document: PrefabDocument, file: OpenFile) => void
+  /** Moves a definition's tab to `document` (a Rename, a Delete) without touching what it holds. */
+  readonly setTabDocument: (tabId: string, document: TabDocument, file: OpenFile | null) => void
+  readonly setPrefabs: (prefabs: PrefabInfos) => void
   readonly setProject: (project: ProjectState, maps: ReadonlyArray<ProjectMap>) => void
   /**
    * The open maps no longer have files: they stay open with their edits as unsaved, and the next Save names each into
@@ -436,6 +482,15 @@ export interface EditorState extends TabState {
   readonly setUpdate: (update: UpdateState) => void
   readonly setUpdateChecked: (updateChecked: boolean) => void
   readonly placePiece: (piece: CatalogPiece, transform: ItemTransform) => void
+  /**
+   * Adds `items` as one new group called `name`, selected, as one undo step: a prefab placed, as an instance when `link`
+   * says of what. Answers the group's id; undefined (with a notice) when the map has no room for them.
+   */
+  readonly placeGroup: (items: ReadonlyArray<Item>, name: string, link?: PrefabLink) => string | undefined
+  /** Replaces the instances `groupIds` of tab `tabId` with `definition`, where they stand, as one undo step. */
+  readonly updateInstances: (tabId: string, groupIds: ReadonlyArray<string>, definition: PrefabDefinition) => void
+  /** Makes the instances `groupIds` of tab `tabId` plain groups, as one undo step. */
+  readonly detachInstances: (tabId: string, groupIds: ReadonlyArray<string>) => void
   /**
    * Replaces the transforms of several items as one undo step; false (with a notice, and
    * nothing changed) when the game would reject any of them.
@@ -578,9 +633,11 @@ const freshTabState = (
     readonly fresh?: boolean
     readonly loaded?: DocStructure
     readonly viewLayout?: ViewLayout | undefined
+    readonly document?: TabDocument
   }
 ): TabState => ({
   doc: docOf(map, options?.loaded),
+  document: options?.document ?? MAP_DOCUMENT,
   floorHeight: floorHeight ?? floorHeightOf(map),
   past: [],
   future: [],
@@ -598,6 +655,7 @@ const freshTabState = (
 /** The active tab's state, out of the store. */
 const activeTabOf = (s: EditorState): TabState => ({
   doc: s.doc,
+  document: s.document,
   floorHeight: s.floorHeight,
   past: s.past,
   future: s.future,
@@ -720,6 +778,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     parkedTabs: new Map(),
     project: null,
     projectMaps: [],
+    prefabs: [],
     capabilities: { projects: false, exportToGame: false, launchGame: false, play: false, updates: false },
     gamePaths: null,
     foundCreator: Option.none(),
@@ -795,15 +854,24 @@ export const useEditor = create<EditorState>()((set, get) => {
       }),
 
     editTabMap: (tabId, patch) =>
+      get().editTabDoc(tabId, (doc) => {
+        const map = patch(doc.map)
+        return map === doc.map ? undefined : { ...doc, map }
+      }),
+    editTabDoc: (tabId, edit) =>
       updateTab(tabId, (tab) => {
-        const map = patch(tab.doc.map)
-        if (map === tab.doc.map) return {}
+        const doc = edit(tab.doc)
+        if (doc === undefined) return {}
+        const kept = new Set(doc.ids)
+        const selectedIds = tab.selectedIds.filter((id) => kept.has(id))
         return {
-          doc: { ...tab.doc, map },
+          doc,
+          selectedIds,
+          enteredGroupId: keptEnteredGroup(doc, tab.enteredGroupId),
           past: [...tab.past, {
             doc: tab.doc,
             selectedIds: tab.selectedIds,
-            otherSelectedIds: tab.selectedIds,
+            otherSelectedIds: selectedIds,
             selectionOnly: false
           }].slice(-HISTORY_LIMIT),
           future: [],
@@ -829,10 +897,18 @@ export const useEditor = create<EditorState>()((set, get) => {
 
     markSaved: (tabId, from, map, file) =>
       updateTab(tabId, (tab) => tab.doc === from ? { doc: { ...tab.doc, map }, dirty: false, file } : { file }),
+    markPrefabSaved: (tabId, from, document, file) =>
+      updateTab(tabId, (tab) => tab.doc === from ? { document, dirty: false, file } : { document, file }),
+    setTabDocument: (tabId, document, file) => updateTab(tabId, () => ({ document, file })),
+    setPrefabs: (prefabs) => set({ prefabs }),
     setProject: (project, projectMaps) => set({ project, projectMaps }),
     detachFiles: () =>
       set((s) => {
-        const detach = (tab: TabState): TabState => tab.file === null ? tab : { ...tab, file: null, dirty: true }
+        // a user prefab belongs to the game, whichever project is in use
+        const detach = (tab: TabState): TabState =>
+          tab.file === null || (tab.document.kind === "prefab" && tab.document.tier === "user")
+            ? tab
+            : { ...tab, file: null, dirty: true }
         return {
           ...detach(activeTabOf(s)),
           parkedTabs: new Map([...s.parkedTabs].map(([id, tab]) => [id, detach(tab)]))
@@ -862,6 +938,39 @@ export const useEditor = create<EditorState>()((set, get) => {
         structure: withNewItems(doc.structure, [id])
       }, { selectedIds: [id] })
     },
+
+    placeGroup: (items, name, link) => {
+      const { doc, notify } = get()
+      if (doc.map.items.length + items.length > LIMITS.itemsPerLevel) {
+        notify("error", `The game allows at most ${LIMITS.itemsPerLevel.toLocaleString()} items in a map.`)
+        return undefined
+      }
+      const keys = freshKeys(items.length)
+      const id = freshKey()
+      const grouped = withGroup(withNewItems(doc.structure, keys), keys, id, name)
+      if (grouped === undefined) return undefined
+      commit({
+        map: { ...doc.map, items: [...doc.map.items, ...items] },
+        ids: [...doc.ids, ...keys],
+        structure: withPrefabLink(grouped, id, link) ?? grouped
+      }, { selectedIds: keys })
+      return id
+    },
+
+    updateInstances: (tabId, groupIds, definition) =>
+      get().editTabDoc(tabId, (doc) => {
+        const next = groupIds.reduce<Doc>((current, id) => withUpdatedInstance(current, id, definition) ?? current, doc)
+        return next === doc ? undefined : next
+      }),
+
+    detachInstances: (tabId, groupIds) =>
+      get().editTabDoc(tabId, (doc) => {
+        const structure = groupIds.reduce<Structure>(
+          (current, id) => withPrefabLink(current, id, undefined) ?? current,
+          doc.structure
+        )
+        return structure === doc.structure ? undefined : { ...doc, structure }
+      }),
 
     transformItems: (transforms) => {
       const { doc } = get()
@@ -1218,7 +1327,10 @@ export const dirtyTabs = (s: EditorState): ReadonlyArray<string> => s.tabIds.fil
  * projects left open. The project's file list can't show them, so the Project panel gives each a row of its own.
  */
 export const tabsWithoutFile = (s: EditorState): ReadonlyArray<string> =>
-  s.tabIds.filter((id) => tabStateOf(s, id)?.file === null)
+  s.tabIds.filter((id) => {
+    const tab = tabStateOf(s, id)
+    return tab?.file === null && tab.document.kind === "map"
+  })
 
 /**
  * A tab nobody has used: the fresh map the app starts on (or closing the last tab leaves), never saved, with no edits
@@ -1242,10 +1354,19 @@ export const hasWindowToTakeOver = (s: EditorState): boolean =>
   !isChooserRequired(s) && (s.project?.current != null || s.tabIds.length > 1 || !isBlankTab(s))
 
 /** A map's name as its tab and the title bar show it: its file's, else the name inside it. */
-export const tabLabelOf = (tab: TabState): string =>
-  tab.file === null
+export const tabLabelOf = (tab: TabState): string => {
+  if (tab.document.kind === "prefab") return tab.document.name
+  return tab.file === null
     ? tab.doc.map.worldSettings.levelData.levelDisplayName.trim() || "Untitled"
     : mapLabelOf(tab.file.name)
+}
+
+/** The tab that has the definition `ref` open, if one does. */
+export const tabWithPrefab = (s: EditorState, { name, tier }: PrefabRef): string | undefined =>
+  s.tabIds.find((id) => {
+    const document = tabStateOf(s, id)?.document
+    return document?.kind === "prefab" && document.tier === tier && document.name === name
+  })
 
 /** A document and the selection that goes with it. */
 interface DocState {
@@ -1408,9 +1529,21 @@ export const useTabSummary = (tabId: string) => {
     return tab !== undefined && (tab.dirty || tab.file === null)
   })
   const path = useEditor((s) => tabStateOf(s, tabId)?.file?.path ?? null)
-  const fileName = useEditor((s) => tabStateOf(s, tabId)?.file?.name ?? null)
-  return { label, unsaved, path, fileName }
+  // the name of a map's file, which the tab's menu acts on; a definition's is the Prefabs panel's
+  const fileName = useEditor((s) => {
+    const tab = tabStateOf(s, tabId)
+    return tab?.document.kind === "map" ? tab.file?.name ?? null : null
+  })
+  const prefabTier = useEditor((s): PrefabTier | null => {
+    const document = tabStateOf(s, tabId)?.document
+    return document?.kind === "prefab" ? document.tier : null
+  })
+  return { label, unsaved, path, fileName, prefabTier }
 }
+
+/** The definition in the active tab, if that's what it holds: what Export and Play are off for. */
+export const useOpenPrefab = (): PrefabDocument | null =>
+  useEditor((s) => s.document.kind === "prefab" ? s.document : null)
 
 /** Whether the project map `fileName` is open in a tab with unsaved edits. */
 export const useHasUnsavedEdits = (fileName: string): boolean =>
