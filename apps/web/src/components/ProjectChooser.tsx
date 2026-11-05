@@ -40,7 +40,9 @@ export function ProjectChooser() {
         <DialogHeader>
           <DialogTitle>{naming || newOnly ? "Start a new project" : "Choose a project"}</DialogTitle>
           <DialogDescription>
-            This window has no project yet. Pick the one it works on. A project can be open in one window at a time.
+            {naming || newOnly
+              ? "This window has no project yet. Name a new one to work in."
+              : "This window has no project yet. Pick the one it works on. A project can be open in one window at a time."}
           </DialogDescription>
         </DialogHeader>
         {naming || newOnly
