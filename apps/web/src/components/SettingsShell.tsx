@@ -287,8 +287,8 @@ export function SettingsShell<C extends string>(props: {
                     <BreadcrumbSeparator />
                   </>
                 )}
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="font-medium">
+                <BreadcrumbItem className="min-w-0">
+                  <BreadcrumbPage className="truncate font-medium">
                     {searching ? `“${query.trim()}”` : labelOf(props.category)}
                   </BreadcrumbPage>
                 </BreadcrumbItem>
