@@ -22,6 +22,9 @@ import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { ItemObject } from "./ItemObject"
 import { advanceGameTime } from "./materials"
+import { OrthoGrid } from "./OrthoGrid"
+import { panePointer, perspectiveOnly } from "./paneCameras"
+import { drawEveryPane, PaneRenderer, useBeforePaneDraw } from "./PaneRenderer"
 import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
@@ -45,7 +48,7 @@ function MapItems() {
     sceneRegistry.itemsRoot = root.current
   }, [])
   return (
-    <group ref={root}>
+    <group ref={root} matrixAutoUpdate={false}>
       {(index !== null || !booting) &&
         doc.map.items.map((item, i) => {
           const id = doc.ids[i]
@@ -129,36 +132,33 @@ const selectModeOf = (e: MouseEvent): SelectMode | null => {
  * double-click on the same spot enters a group.
  */
 function ClickSelect() {
-  const camera = useThree((s) => s.camera)
   const gl = useThree((s) => s.gl)
   useEffect(() => {
     const el = gl.domElement
     const raycaster = new THREE.Raycaster()
-    let down: { x: number; y: number; mode: SelectMode } | null = null
+    let down: { x: number; y: number; mode: SelectMode; slot: number } | null = null
     let clicked = false
-    const itemAt = (e: MouseEvent): string | null => {
-      const rect = el.getBoundingClientRect()
-      const ndc = new THREE.Vector2(
-        ((e.clientX - rect.left) / rect.width) * 2 - 1,
-        -((e.clientY - rect.top) / rect.height) * 2 + 1
-      )
-      raycaster.setFromCamera(ndc, camera)
+    const itemAt = (e: MouseEvent, slot?: number): string | null => {
+      const { ndc, pane } = panePointer(el, e, slot)
+      raycaster.setFromCamera(ndc, pane.camera)
       const root = sceneRegistry.itemsRoot
       return hitItemId(root === null ? [] : raycaster.intersectObject(root, true))
     }
     const onDown = (e: PointerEvent) => {
       const mode = selectModeOf(e)
-      down = mode !== null && !sceneRegistry.gizmoActive() ? { x: e.clientX, y: e.clientY, mode } : null
+      down = mode !== null && !sceneRegistry.gizmoActive()
+        ? { x: e.clientX, y: e.clientY, mode, slot: panePointer(el, e).slot }
+        : null
       clicked = false
     }
     const onUp = (e: PointerEvent) => {
       if (down === null || e.button !== 0) return
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y)
-      const { mode } = down
+      const { mode, slot } = down
       down = null
       if (moved > CLICK_SLOP_PX || sceneRegistry.gizmoActive()) return
       clicked = mode === "replace"
-      useEditor.getState().clickItem(itemAt(e), mode)
+      useEditor.getState().clickItem(itemAt(e, slot), mode)
     }
     const onDoubleClick = (e: MouseEvent) => {
       if (!clicked) return
@@ -173,7 +173,7 @@ function ClickSelect() {
       el.removeEventListener("pointerup", onUp)
       el.removeEventListener("dblclick", onDoubleClick)
     }
-  }, [camera, gl])
+  }, [gl])
   return null
 }
 
@@ -215,7 +215,7 @@ function SmoothResize() {
     // Whoever changes the size (us or R3F's own measuring), redraw at once: a resized
     // canvas is blank until the next render.
     const unsubscribe = store.subscribe((state, prev) => {
-      if (state.size !== prev.size) state.gl.render(state.scene, state.camera)
+      if (state.size !== prev.size) drawEveryPane(state)
     })
     return () => {
       observer.disconnect()
@@ -254,9 +254,20 @@ function ViewportGrid() {
   const floorHeight = useEditor((s) => s.floorHeight)
   const dark = useDarkTheme(appearance.theme)
   const colors = gridColorsOf(appearance, dark)
+  const grid = useRef<THREE.Mesh>(null)
+  // drei fades the grid from R3F's camera, and each pane has its own.
+  useBeforePaneDraw(({ perspective: { position } }) => {
+    const material = grid.current?.material
+    if (!(material instanceof THREE.ShaderMaterial)) return
+    const fadeFrom: unknown = material.uniforms["worldCamProjPosition"]?.value
+    if (fadeFrom instanceof THREE.Vector3) fadeFrom.set(position.x, floorHeight, position.z)
+    material.uniformsNeedUpdate = true
+  })
   if (!appearance.gridVisible) return null
   return (
     <Grid
+      ref={grid}
+      layers={perspectiveOnly}
       position={[0, floorHeight, 0]}
       side={THREE.DoubleSide} // drei's default (BackSide) hides it from below
       infiniteGrid
@@ -318,7 +329,7 @@ function Overlay() {
   const missing = useEditor((s) => s.missingGlbs)
   const speed = useEditor((s) => s.cameraSpeed)
   return (
-    <div className="pointer-events-none absolute inset-2 flex flex-col items-start gap-1.5">
+    <div className="pointer-events-none absolute inset-x-2 top-10 bottom-2 flex flex-col items-start gap-1.5">
       {missing.size > 0 && (
         <Badge variant="destructive" className="pointer-events-auto" title={[...missing].join("\n")}>
           {missing.size} mesh file{missing.size === 1 ? "" : "s"} failed to load
@@ -347,20 +358,22 @@ export function Viewport(
       <Canvas
         // Hidden until the first scene is ready, then a quick fade up from translucent.
         className={revealed ? "animate-in fade-in-30 duration-300 ease-out" : "opacity-0"}
-        camera={{ fov: 60, near: 5, far: 2_000_000, position: [1500, 1200, 1500] }}
-        gl={{ antialias: true, logarithmicDepthBuffer: true }}
+        // A pane that isn't drawn this frame keeps its pixels (see PaneRenderer).
+        gl={{ antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: true }}
       >
         <ViewportBackground />
         <SmoothResize />
         <GameClock />
         <SceneLights />
         <ViewportGrid />
+        <OrthoGrid />
         <Water />
         <MapItems />
         <SelectedOutlines />
         <GizmoController />
         <ClickSelect />
         <FlyCamera />
+        <PaneRenderer />
         {!revealed && <InitialMeshes onSettled={reveal} />}
       </Canvas>
       <Overlay />

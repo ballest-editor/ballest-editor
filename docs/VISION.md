@@ -23,6 +23,7 @@ Numbers are issues. The [milestones](https://github.com/ballest-editor/ballest-e
 ### Built
 
 - **Camera.** Free-fly and orbit with configurable keybinds, focus on the selection, a 1 m floor grid with 10 m sections at the map's floor height.
+- **Split views.** One, two or four panes on a map, each perspective or an orthographic top, bottom, front, back, left or right view with a world grid in cm that matches the snapping grid (#80, [DESKTOP.md](DESKTOP.md#view-panes)).
 - **Gizmos.** Separate translate, rotate and scale gizmos in the Blender style, with per-handle hover highlight and axes coloured in game coordinates (X red, Y green, Z blue = up). Local or world axes.
 - **Placement and transform.** A piece palette using the exact meshes the in-game editor uses, numeric entry for position, rotation and scale, uniform scale, the game's pivot choices (`editorState.pivots`).
 - **Selection.** Shift or Ctrl+click multi-select. Copy, cut, paste, duplicate, and Alt+drag to duplicate.
@@ -48,7 +49,6 @@ Roughly in the order we expect to tackle them.
 Navigation and view:
 
 - View cube in the Fusion 360 style, top right, to snap to orthographic faces, edges and corners and reorient the perspective (#79).
-- Orthographic views with a world grid in cm, matching the game (#80).
 - Hide, isolate and lock pieces (#81).
 
 Gizmos and transform:

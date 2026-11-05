@@ -105,6 +105,8 @@ describe("keybind table", () => {
     expect(formatBinding("Ctrl+KeyZ")).toBe("Ctrl + Z")
     expect(formatBinding("Alt+Mouse0")).toBe("Alt + LMB")
     expect(formatBinding("Mouse3")).toBe("Mouse 4")
+    expect(formatBinding("Numpad7")).toBe("Num 7")
+    expect(formatBinding("Ctrl+Numpad1")).toBe("Ctrl + Num 1")
     expect(formatBinding("ArrowLeft")).toBe("←")
     expect(formatBindings(["KeyF", "KeyC"])).toBe("F / C")
     expect(formatBindings([])).toBe("Unbound")

@@ -8,6 +8,7 @@ import {
   followPlaySessions,
   followUnloadRequests,
   followUpdates,
+  followViewLayouts,
   holdsUnload,
   loadCatalog,
   loadKeybinds,
@@ -131,6 +132,7 @@ export function Editor() {
     void loadPlatform()
   }, [])
   useEffect(() => followUpdates(), [])
+  useEffect(() => followViewLayouts(), [])
   useEffect(() => followPlaySessions(), [])
   useCheckExportsOnFocus()
 

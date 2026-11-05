@@ -231,6 +231,32 @@ export const orientHandle = (handle: Handle, frame: GizmoFrame): void => {
   }
 }
 
+/** An axis handle this close to pointing at the camera (cos of about 3.6°) has nothing left to grab. */
+const END_ON = 0.998
+/** A plane handle or ring this close to edge-on (cos of about 87°) shows as a line. */
+const EDGE_ON = 0.05
+
+/**
+ * Whether a handle can be used from this view, the way Blender decides: an axis pointing at the camera can't be dragged
+ * along, and a plane or ring seen edge-on can't be dragged in, so an orthographic view drops those. The rest keep working.
+ */
+export const handleFacesCamera = (spec: HandleSpec, frame: GizmoFrame): boolean => {
+  const dir = handleWorldDir(spec, frame.gameRotation, frame.space)
+  if (dir === undefined) return true
+  const facing = Math.abs(dir.dot(frame.toCamera))
+  switch (spec.kind) {
+    case "translateAxis":
+    case "scaleAxis":
+      return facing < END_ON
+    case "translatePlane":
+    case "rotateAxis":
+      return facing > EDGE_ON
+    case "rotateView":
+    case "scaleUniform":
+      return true
+  }
+}
+
 export type HandleState = "idle" | "hover" | "active" | "dimmed"
 
 export const styleHandle = (handle: Handle, state: HandleState): void => {
@@ -275,8 +301,9 @@ export class GizmoObject extends THREE.Group {
     this.add(this.guide)
   }
 
-  get hitMeshes(): ReadonlyArray<THREE.Mesh> {
-    return this.handles.flatMap((h) => h.hits)
+  /** What a pointer can grab in the pane last placed for: a raycast doesn't care about `visible`. */
+  get pickableMeshes(): ReadonlyArray<THREE.Mesh> {
+    return this.handles.flatMap((h) => h.root.visible ? h.hits : [])
   }
 
   handle(id: string | null): Handle | undefined {
@@ -288,6 +315,7 @@ export class GizmoObject extends THREE.Group {
     this.body.scale.setScalar(frame.worldPerPixel)
     for (const h of this.handles) {
       orientHandle(h, frame)
+      h.root.visible = h.spec.id === active || handleFacesCamera(h.spec, frame)
       const state: HandleState = active !== null
         ? (h.spec.id === active ? "active" : "dimmed")
         : h.spec.id === hovered

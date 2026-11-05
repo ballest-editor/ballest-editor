@@ -20,6 +20,14 @@ import type { Settings } from "../domain/Settings"
 import { formatGridSize, GRID_SIZES, type GridSize } from "../domain/snap"
 import { canCheckForUpdates } from "../domain/updates"
 import {
+  type ViewLayoutKind,
+  viewLayoutKinds,
+  viewLayoutLabels,
+  type ViewProjection,
+  viewProjectionLabels,
+  viewProjections
+} from "../domain/viewLayout"
+import {
   checkForUpdates,
   chooseProject,
   exportToGame,
@@ -124,6 +132,55 @@ function PanelItem({ id, title }: { readonly id: string; readonly title: string 
   )
 }
 
+/** The keybind that puts the active pane on each view; Perspective has only the toggle. */
+const PROJECTION_ACTIONS: Readonly<Record<ViewProjection, KeybindAction>> = {
+  perspective: "toggleOrthographic",
+  top: "viewTop",
+  bottom: "viewBottom",
+  front: "viewFront",
+  back: "viewBack",
+  left: "viewLeft",
+  right: "viewRight"
+}
+
+/** How the view divides into panes, and what the active pane looks along (docs/DESKTOP.md § View panes). */
+function PaneMenus() {
+  const kind = useEditor((s) => s.viewLayout.kind)
+  const projection = useEditor((s) => s.viewLayout.projections[s.activePane] ?? "perspective")
+  const setViewLayoutKind = useEditor((s) => s.setViewLayoutKind)
+  const lookAlong = (next: ViewProjection) => {
+    const { activePane, setPaneProjection } = useEditor.getState()
+    setPaneProjection(activePane, next)
+  }
+  return (
+    <>
+      <MenubarSub>
+        <MenubarSubTrigger inset>Panes</MenubarSubTrigger>
+        <MenubarSubContent>
+          <MenubarRadioGroup value={kind} onValueChange={(next: ViewLayoutKind) => setViewLayoutKind(next)}>
+            {viewLayoutKinds.map((layout) => (
+              <MenubarRadioItem closeOnClick key={layout} value={layout}>{viewLayoutLabels[layout]}</MenubarRadioItem>
+            ))}
+          </MenubarRadioGroup>
+        </MenubarSubContent>
+      </MenubarSub>
+      <MenubarSub>
+        <MenubarSubTrigger inset>Active pane</MenubarSubTrigger>
+        <MenubarSubContent className="w-max">
+          <MenubarRadioGroup value={projection} onValueChange={lookAlong}>
+            {viewProjections.map((view) => (
+              <MenubarRadioItem closeOnClick key={view} value={view}>
+                {viewProjectionLabels[view]}
+                <Shortcut action={PROJECTION_ACTIONS[view]} />
+              </MenubarRadioItem>
+            ))}
+          </MenubarRadioGroup>
+        </MenubarSubContent>
+      </MenubarSub>
+    </>
+  )
+}
+
 const THEMES: ReadonlyArray<{ readonly theme: Settings["appearance"]["theme"]; readonly label: string }> = [
   { theme: "dark", label: "Dark" },
   { theme: "light", label: "Light" },
@@ -216,6 +273,8 @@ export function MenuBar() {
       </Menu>
       <Menu title="View">
         <CommandItem action="focusSelection" disabled={!hasSelection} inset>Focus selection</CommandItem>
+        <CommandItem action="frameAll" inset>Frame all</CommandItem>
+        <PaneMenus />
         <MenubarSeparator />
         {viewMenuPanels.map(({ id, title }) => <PanelItem key={id} id={id} title={title} />)}
         <MenubarItem inset onClick={resetDockLayout}>Reset layout</MenubarItem>

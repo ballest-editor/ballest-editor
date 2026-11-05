@@ -71,7 +71,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 
 `components/dock/` is everything between the top bar and the status bar, built on [dockview](https://dockview.dev/) (`dockview-react`): the **centre group** with the panels around it, each of which can be dragged to any side of the centre, stacked as tabs, split, resized, collapsed, closed or popped out.
 
-**The centre group** holds the map tabs and the one viewport. Its only permanent panel is `documents`, whose dockview tab is hidden: `DocumentTabs` stands in for it, in the group's header ahead of any other tab. It can't be closed, dragged or popped out. The viewport keeps its own `renderer: "onlyWhenVisible"`, so it sits in the page's flow and resizes in the same frame as the window. A panel can be dropped on the centre's sides, but only one whose home is the centre can join it as a tab. Dropped there, a panel takes its side's usual size, not dockview's half of the viewport.
+**The centre group** holds the map tabs and the one viewport, which divides into panes of its own (§ View panes). Its only permanent panel is `documents`, whose dockview tab is hidden: `DocumentTabs` stands in for it, in the group's header ahead of any other tab. It can't be closed, dragged or popped out. The viewport keeps its own `renderer: "onlyWhenVisible"`, so it sits in the page's flow and resizes in the same frame as the window. A panel can be dropped on the centre's sides, but only one whose home is the centre can join it as a tab. Dropped there, a panel takes its side's usual size, not dockview's half of the viewport.
 
 **Panels** are entries in `components/dock/panels.tsx`: an id, a title, a component and a default location (`left`, `right`, `bottom`, `centre`). That entry is all a panel needs for a tab, a View menu item, a place in the default layout, and a place in layouts saved before it existed. `dockControl.ts` is what the rest of the app calls (`showPanel`, `togglePanel`, `openSettings`, `resetDockLayout`). It's in the page's first chunk, because the menu bar is, so the registry reaches it from `Dock.tsx` and keeps the panels, and WebGL, out of that chunk.
 
@@ -100,13 +100,42 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 
 Dockview is themed in `components/dock/dock.css` with the tokens from `packages/ui`, so it follows light and dark and `--motion`. Its strips are `h-8`, like the document tabs.
 
+### View panes
+
+The viewport is one canvas divided into **panes**, each its own camera on the same map. Selection and the document are shared; only cameras differ. The dock knows nothing of this: to it the viewport is still one panel in the centre group, under the map tabs.
+
+**Layouts.** One pane, two side by side, two stacked, or four, picked from the control at the viewport's top right or View › Panes. `domain/viewLayout.ts` holds a layout: its kind, where the dividers sit, and what each of the four slots looks along. A slot keeps its view while a smaller layout hides it. A divider drags, stays a tenth of the viewport from the edge, and goes back to the middle on a double click.
+
+A layout is per tab (`TabState.viewLayout`), and remembered per map in `MapPrefs` in `localStorage`, not the sidecar: it's how this machine looks at the map, not part of the map. `followViewLayouts` writes it a moment after a change. Cameras aren't remembered: a map opens framed.
+
+**Projections.** Each pane is Perspective, Top, Bottom, Front, Back, Left or Right, from the menu on its label, View › Active pane or the numpad keys. `domain/orthoView.ts` defines them in game space: Front stands on the +X side (the game's forward) looking back at the map, Right on the +Y side, and Top keeps X up the screen and Y to the right. `coords.ts` takes that to the renderer's frame. The label shows the name and scale, `Top · 1 px = 2 cm`, and an orthographic pane has its axes in a corner.
+
+Changing projection keeps the point the pane looks at and its size on screen. Numpad 5 goes to the orthographic view nearest where the pane looks, or back to perspective from the same direction.
+
+**The active pane** is the last one hovered or clicked, outlined when there are several. It is what the fly keys, Focus selection, Frame all and the numpad keys act on, and where a palette piece lands. A pointer drag or the wheel acts on the pane under the pointer, and a drag stays with the pane it started in. Camera speed is global.
+
+**Navigation in an orthographic pane.** The view has one way to look, so look, orbit and pan drags all pan, one to one with the pointer. The wheel zooms to the pointer, whatever it is bound to in perspective. The left, right, up and down keys slide the view, forward and reverse zoom it, and the arrow keys do nothing. Resizing a pane shows more or less of the map at the same zoom.
+
+**The world grid** (`editor/OrthoGrid.tsx`) is a shader over each orthographic pane, drawn over the map at a low opacity so it can be read against a floor that fills the view. It has lines on multiples of their size from the world's origin, which is where snapping puts things: 1 m lines and 10 m sections like the perspective floor grid, fading in 10 cm and 1 cm lines closer in and leaving only the coarser ones further out (`gridLevels`). With snapping on, a step that isn't a power of ten (25 cm) gets lines of its own. The X, Y and Z axes through the origin are in the game's colours. Show grid hides both grids. An orthographic pane has no sky or floor grid: they sit on a layer only perspective cameras see.
+
+**Editing** works the same in every pane: clicks, the gizmos and Alt+drag all sort the pointer by pane and measure it against that pane's camera. The gizmo is placed for each pane just before it draws, so it keeps its size and faces each camera. An axis handle pointing at the camera, and a plane handle or ring seen edge-on, are hidden and can't be grabbed (`handleFacesCamera`), as in Blender. Hover shows only in the pane under the pointer.
+
+**One scene, one context.** `editor/PaneRenderer.tsx` takes over R3F's render and draws each pane into the one `WebGLRenderer` with a viewport and scissor. `editor/paneCameras.ts` holds the cameras, per tab and slot, outside React because they change on every pointer move. The store says what a pane looks along and the cameras follow. Anything that has to face the camera hooks in with `useBeforePaneDraw`.
+
+**Frame cost.** On a large map the CPU's draw calls set the frame time, and four panes drawn every frame would cost four times that. So they aren't:
+
+- The active pane does. The others keep their pixels (`preserveDrawingBuffer`) and take turns, one at a time and at most every 80 ms (`panesToDraw`), which also keeps moving materials moving. During a gizmo drag the other panes follow at that rate.
+- Every pane draws when its pixels are gone or in the wrong place: a resize, a moved divider, a changed layout or projection, another tab. Dragging a divider on a large map is therefore the slow case.
+- Nothing draws while another tab hides the map.
+- `scene.updateMatrixWorld` runs once a frame, not once a pane, and skips the items: an item's objects work out their matrices when they change (`FixedGroup` in `ItemObject.tsx`). An object that updates its own matrix forces everything under it to update too, so the scene and the items' root keep theirs fixed as well. Code that moves an item outside React has to call `updateMatrix`, as the gizmo does.
+
 ### Menus
 
 `components/MenuBar.tsx` holds the menus. Every item calls the entry point its keybind or button uses.
 
 - **File:** New project… (`components/NewProjectDialog.tsx`, a name that becomes `Documents/Ballest Editor/<name>` through `createProject`), Open project…, Recent projects, Save, Close tab, Settings…, Game link…, and Quit, which closes the window the way its × does, so unsaved edits ask.
 - **Edit:** Undo, Redo, Cut, Copy, Paste, Duplicate, Delete, Deselect, Group and Ungroup.
-- **View:** Focus selection, the dock's panels and Reset layout (§ Dock), and the display toggles (the grid, sky, water and theme).
+- **View:** Focus selection, Frame all, the view's panes and the active pane's projection (§ View panes), the dock's panels and Reset layout (§ Dock), and the display toggles (the grid, sky, water and theme).
 - **Project:** New map…, Import map…; Export to game, Export on save, Re-import from game, Play, Launch game; Project settings….
 - **Web review build:** File (New map…, Open…, Save, Export…, Close tab, Settings…), Edit, View, and Project (Project settings…, the one map's).
 

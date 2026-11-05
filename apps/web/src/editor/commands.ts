@@ -3,6 +3,7 @@
  * the same action, so the two can't drift apart.
  */
 import type { KeybindAction } from "../domain/Keybinds"
+import type { ViewProjection } from "../domain/viewLayout"
 import {
   closeActiveTab,
   cycleTab,
@@ -13,7 +14,13 @@ import {
   saveMap,
   startNewMap
 } from "./actions"
+import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
+
+const lookAlong = (projection: ViewProjection) => {
+  const { activePane, setPaneProjection } = useEditor.getState()
+  setPaneProjection(activePane, projection)
+}
 
 /**
  * The command for each one-shot action. Held keys and mouse drags aren't here (FlyCamera
@@ -38,6 +45,14 @@ export const actionCommands = {
   toggleGizmoSpace: () => useEditor.getState().toggleGizmoSpace(),
   speedFaster: () => useEditor.getState().changeSpeed(1),
   speedSlower: () => useEditor.getState().changeSpeed(-1),
+  viewTop: () => lookAlong("top"),
+  viewBottom: () => lookAlong("bottom"),
+  viewFront: () => lookAlong("front"),
+  viewBack: () => lookAlong("back"),
+  viewRight: () => lookAlong("right"),
+  viewLeft: () => lookAlong("left"),
+  toggleOrthographic: () => lookAlong(sceneRegistry.toggledProjection()),
+  frameAll: () => useEditor.getState().requestFrameAll(),
   newMap: startNewMap,
   /** Import… on desktop, Open… in a browser. */
   openMap: () => void importMap(),

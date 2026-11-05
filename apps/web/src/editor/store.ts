@@ -73,6 +73,14 @@ import {
 } from "../domain/structure"
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import type { Surfaces } from "../domain/surface"
+import {
+  clampSplit,
+  defaultViewLayout,
+  paneCountOf,
+  type ViewLayout,
+  type ViewLayoutKind,
+  type ViewProjection
+} from "../domain/viewLayout"
 import type { LoadedCatalog } from "../services/CatalogLoader"
 import type {
   GamePathKind,
@@ -273,6 +281,10 @@ export interface TabState {
   readonly enteredGroupId: string | null
   /** The groups the Outline shows closed. Outside the document and its history, so undo doesn't touch them. */
   readonly collapsedGroups: ReadonlySet<string>
+  /** How the tab divides its view into panes; kept per map in MapPrefsStore. */
+  readonly viewLayout: ViewLayout
+  /** The slot of the active pane: what the fly keys, Focus selection and Frame all act on. */
+  readonly activePane: number
 }
 
 /**
@@ -361,8 +373,12 @@ export interface EditorState extends TabState {
   /** Multiplier on the fly speed, changed by speedFaster/speedSlower. */
   readonly cameraSpeed: number
   /** Bumped to ask the camera to frame the selection / the whole map. */
+  /** Bumped to frame the selection in the active pane. */
   readonly focusRequest: number
+  /** Bumped to frame the whole map in the active pane. */
   readonly frameAllRequest: number
+  /** Bumped when a map is put into the active tab: every pane of the tab frames it. */
+  readonly mapShownRequest: number
 
   /**
    * Shows `map` in a tab (`into`, the active one by default) with a fresh history; a new tab becomes the active one.
@@ -379,6 +395,7 @@ export interface EditorState extends TabState {
       readonly fresh?: boolean
       readonly into?: TabTarget
       readonly loaded?: DocStructure
+      readonly viewLayout?: ViewLayout | undefined
     }
   ) => void
   /** Makes `tabId` the active tab; nothing while a drag or scrub is under way. */
@@ -542,6 +559,13 @@ export interface EditorState extends TabState {
   readonly changeSpeed: (direction: 1 | -1) => void
   readonly requestFocus: () => void
   readonly requestFrameAll: () => void
+  /** Divides the active tab's view; the active pane stays when the new layout still shows it. */
+  readonly setViewLayoutKind: (kind: ViewLayoutKind) => void
+  /** Moves the dividers, as shares of the viewport; each is held off the edges (`clampSplit`). */
+  readonly setPaneSplit: (split: { readonly x?: number; readonly y?: number }) => void
+  /** What the pane in `slot` looks along. */
+  readonly setPaneProjection: (slot: number, projection: ViewProjection) => void
+  readonly setActivePane: (slot: number) => void
 }
 
 /** A tab's state for `map`, opened with no history and nothing selected. */
@@ -554,6 +578,7 @@ const freshTabState = (
     readonly dirty?: boolean
     readonly fresh?: boolean
     readonly loaded?: DocStructure
+    readonly viewLayout?: ViewLayout | undefined
   }
 ): TabState => ({
   doc: docOf(map, options?.loaded),
@@ -566,7 +591,9 @@ const freshTabState = (
   selectedIds: [],
   fresh: options?.fresh ?? false,
   enteredGroupId: null,
-  collapsedGroups: new Set()
+  collapsedGroups: new Set(),
+  viewLayout: options?.viewLayout ?? defaultViewLayout,
+  activePane: 0
 })
 
 /** The active tab's state, out of the store. */
@@ -581,7 +608,9 @@ const activeTabOf = (s: EditorState): TabState => ({
   selectedIds: s.selectedIds,
   fresh: s.fresh,
   enteredGroupId: s.enteredGroupId,
-  collapsedGroups: s.collapsedGroups
+  collapsedGroups: s.collapsedGroups,
+  viewLayout: s.viewLayout,
+  activePane: s.activePane
 })
 
 export const useEditor = create<EditorState>()((set, get) => {
@@ -724,6 +753,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     cameraSpeed: 1,
     focusRequest: 0,
     frameAllRequest: 0,
+    mapShownRequest: 0,
 
     loadMap: (map, file, floorHeight, options) => {
       const tab = freshTabState(map, file, floorHeight, options)
@@ -734,7 +764,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       }
       set((s) => {
         const replace = into !== "newTab" || isBlankTab(s)
-        if (replace) return { ...tab, ...leftBehind, frameAllRequest: s.frameAllRequest + 1 }
+        if (replace) return { ...tab, ...leftBehind, mapShownRequest: s.mapShownRequest + 1 }
         const tabId = freshTabId()
         const at = s.tabIds.indexOf(s.tabId) + 1
         return {
@@ -743,7 +773,7 @@ export const useEditor = create<EditorState>()((set, get) => {
           tabId,
           tabIds: [...s.tabIds.slice(0, at), tabId, ...s.tabIds.slice(at)],
           parkedTabs: new Map(s.parkedTabs).set(s.tabId, activeTabOf(s)),
-          frameAllRequest: s.frameAllRequest + 1
+          mapShownRequest: s.mapShownRequest + 1
         }
       })
     },
@@ -1140,7 +1170,32 @@ export const useEditor = create<EditorState>()((set, get) => {
         return { cameraSpeed: next ?? s.cameraSpeed }
       }),
     requestFocus: () => set((s) => ({ focusRequest: s.focusRequest + 1 })),
-    requestFrameAll: () => set((s) => ({ frameAllRequest: s.frameAllRequest + 1 }))
+    requestFrameAll: () => set((s) => ({ frameAllRequest: s.frameAllRequest + 1 })),
+    setViewLayoutKind: (kind) =>
+      set((s) => ({
+        viewLayout: { ...s.viewLayout, kind },
+        activePane: Math.min(s.activePane, paneCountOf(kind) - 1)
+      })),
+    setPaneSplit: ({ x, y }) =>
+      set((s) => ({
+        viewLayout: {
+          ...s.viewLayout,
+          splitX: x === undefined ? s.viewLayout.splitX : clampSplit(x),
+          splitY: y === undefined ? s.viewLayout.splitY : clampSplit(y)
+        }
+      })),
+    setPaneProjection: (slot, projection) =>
+      set((s) => {
+        const [a, b, c, d] = s.viewLayout.projections
+        const next = [
+          slot === 0 ? projection : a,
+          slot === 1 ? projection : b,
+          slot === 2 ? projection : c,
+          slot === 3 ? projection : d
+        ] as const
+        return { viewLayout: { ...s.viewLayout, projections: next } }
+      }),
+    setActivePane: (slot) => set((s) => s.activePane === slot ? s : { activePane: slot })
   }
 })
 

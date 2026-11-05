@@ -11,6 +11,7 @@ import { mirrorFlagsOf } from "../domain/mirror"
 import { defaultSettings } from "../domain/Settings"
 import { loadStructure, sidecarOf, structureOfMap } from "../domain/sidecar"
 import { treeKeys } from "../domain/structure"
+import { defaultViewLayout } from "../domain/viewLayout"
 import {
   gameMapOf,
   initialMap,
@@ -1155,5 +1156,94 @@ describe("groups and the selection", () => {
     state().clickItem(c, "replace")
     state().deleteSelection()
     assert.strictEqual(groups(), 0)
+  })
+})
+
+describe("view panes", () => {
+  const twoTabs = () => {
+    const first = useEditor.getState().tabId
+    useEditor.getState().loadMap(initialMap(), null, undefined, { into: "newTab" })
+    return { first, second: useEditor.getState().tabId }
+  }
+  /** One tab on a map of its own, whatever came before. */
+  const resetStore = () => {
+    useEditor.setState({ tabIds: [state().tabId], parkedTabs: new Map() })
+    state().loadMap(initialMap(), null)
+  }
+
+  it("keeps each tab's layout and active pane as it was left", () => {
+    resetStore()
+    const { first, second } = twoTabs()
+    state().setViewLayoutKind("quad")
+    state().setActivePane(3)
+    state().setPaneProjection(3, "bottom")
+    state().activateTab(first)
+    assert.strictEqual(state().viewLayout.kind, "single")
+    assert.strictEqual(state().activePane, 0)
+    state().activateTab(second)
+    assert.strictEqual(state().viewLayout.kind, "quad")
+    assert.strictEqual(state().activePane, 3)
+    assert.strictEqual(state().viewLayout.projections[3], "bottom")
+  })
+
+  it("opens a map on the layout remembered for it, or the default", () => {
+    resetStore()
+    const viewLayout = { ...defaultViewLayout, kind: "rows" as const }
+    state().loadMap(initialMap(), null, undefined, { viewLayout })
+    assert.deepStrictEqual(state().viewLayout, viewLayout)
+    state().loadMap(initialMap(), null)
+    assert.deepStrictEqual(state().viewLayout, defaultViewLayout)
+  })
+
+  it("moves the active pane when a smaller layout no longer shows it", () => {
+    resetStore()
+    state().setViewLayoutKind("quad")
+    state().setActivePane(3)
+    state().setViewLayoutKind("columns")
+    assert.strictEqual(state().activePane, 1)
+    state().setViewLayoutKind("single")
+    assert.strictEqual(state().activePane, 0)
+  })
+
+  it("keeps what a hidden slot looks along", () => {
+    resetStore()
+    state().setViewLayoutKind("quad")
+    state().setPaneProjection(2, "back")
+    state().setViewLayoutKind("single")
+    state().setViewLayoutKind("quad")
+    assert.deepStrictEqual(state().viewLayout.projections, ["perspective", "top", "back", "right"])
+  })
+
+  it("holds the dividers off the edges and moves them one at a time", () => {
+    resetStore()
+    state().setPaneSplit({ x: 0.01 })
+    assert.strictEqual(state().viewLayout.splitX, 0.1)
+    assert.strictEqual(state().viewLayout.splitY, 0.5)
+    state().setPaneSplit({ y: 2 })
+    assert.strictEqual(state().viewLayout.splitX, 0.1)
+    assert.strictEqual(state().viewLayout.splitY, 0.9)
+  })
+
+  it("doesn't touch the map, its history or the dirty flag", () => {
+    resetStore()
+    const { doc, past } = state()
+    state().setViewLayoutKind("quad")
+    state().setPaneProjection(0, "top")
+    state().setPaneSplit({ x: 0.3 })
+    state().setActivePane(1)
+    assert.strictEqual(state().doc, doc)
+    assert.strictEqual(state().past, past)
+    assert.isFalse(state().dirty)
+  })
+
+  it("frames the whole map in every pane when one is loaded, and only the active pane on request", () => {
+    resetStore()
+    const { frameAllRequest, mapShownRequest } = state()
+    state().requestFrameAll()
+    assert.strictEqual(state().frameAllRequest, frameAllRequest + 1)
+    assert.strictEqual(state().mapShownRequest, mapShownRequest)
+    state().loadMap(initialMap(), null)
+    assert.strictEqual(state().frameAllRequest, frameAllRequest + 1)
+    assert.strictEqual(state().mapShownRequest, mapShownRequest + 1)
   })
 })

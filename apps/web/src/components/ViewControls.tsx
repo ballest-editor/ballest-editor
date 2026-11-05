@@ -3,37 +3,20 @@ import { Kbd } from "@workspace/ui/components/kbd"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Toggle } from "@workspace/ui/components/toggle"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import type { KeyboardEvent, MouseEvent, ReactNode } from "react"
+import type { ReactNode } from "react"
 import { formatBinding } from "../domain/Keybinds"
 import type { Settings } from "../domain/Settings"
 import { formatGridSize, formatRotationStep, GRID_SIZES, ROTATION_STEPS } from "../domain/snap"
 import { updateSettings } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { ToolBar } from "./ToolBar"
-
-/** One frosted button group; each control gets its own, like the game's. */
-const GROUP =
-  "pointer-events-auto flex items-center gap-1 rounded-full border border-border/60 bg-background/60 p-1 shadow-lg backdrop-blur-md"
+import { GROUP, noFocus, POPUP_OFFSET } from "./viewControlStyle"
+import { ViewLayoutControl, ViewPanes } from "./ViewPanes"
 
 /**
- * Popups open from a control's edge; these offsets clear the group's padding and border
- * (plus the usual 4px gap): `button` for the 32px buttons, `size` for the 24px size picker.
- */
-const POPUP_OFFSET = { button: 9, size: 13 } as const
-
-/** Keeps keyboard focus with the viewport: no focus on mousedown, no Space/Enter activation. */
-const noFocus = {
-  tabIndex: -1,
-  onMouseDown: (e: MouseEvent) => e.preventDefault(),
-  onKeyDown: (e: KeyboardEvent) => {
-    if (e.key === " " || e.key === "Enter") e.preventDefault()
-  }
-}
-
-/**
- * Floating view controls, top-right of the viewport, like the game's: the gizmo's local
- * (cube) or world (globe) axes, then grid and rotation snapping, each in its own group. Icons are named
- * in their tooltips.
+ * Floating view controls, top-right of the viewport, like the game's: how the view divides into panes, the
+ * gizmo's local (cube) or world (globe) axes, then grid and rotation snapping, each in its own group. Icons are
+ * named in their tooltips.
  * Pointer-only like the tool bar, so keybinds stay with the viewport.
  */
 export function ViewControls({ disabled = false }: { readonly disabled?: boolean }) {
@@ -45,6 +28,7 @@ export function ViewControls({ disabled = false }: { readonly disabled?: boolean
 
   return (
     <div className="pointer-events-none absolute top-3 right-3 flex justify-end gap-2">
+      <ViewLayoutControl disabled={disabled} />
       <div className={GROUP}>
         <Tooltip>
           <TooltipTrigger
@@ -195,10 +179,11 @@ function SnapGroup<V extends number>(props: {
   )
 }
 
-/** Everything floating over the viewport: the view controls (top right) and the tool bar (bottom). */
+/** Everything floating over the viewport: its panes' frames, the view controls (top right) and the tool bar (bottom). */
 export function ViewportControls({ disabled = false }: { readonly disabled?: boolean }) {
   return (
     <>
+      <ViewPanes disabled={disabled} />
       <ViewControls disabled={disabled} />
       <ToolBar disabled={disabled} />
     </>
