@@ -17,8 +17,14 @@ const structure: Structure = {
   tree: [group("g", group("h", item("a")), item("b")), item("c"), group("e")],
   items: new Map([["b", { tags: ["start", "ramp"] }]])
 }
-const names = new Map([["a", "Cube 1"], ["b", "Left ramp"], ["c", "Cube 2"]])
-const classes = new Map([["a", "BP_Prim_Cube"], ["b", "BP_Ramp"], ["c", "BP_Prim_Cube"]])
+const names = new Map([
+  ["a", { name: "Cube", ordinal: 1 }],
+  ["b", { name: "Left ramp", ordinal: undefined }],
+  ["c", { name: "Cube", ordinal: 2 }],
+  ["g", { name: "Group g", ordinal: undefined }]
+])
+const classOf = (name: string) => `/Script/Engine.BlueprintGeneratedClass'/Game/Pieces/${name}.${name}_C'`
+const classes = new Map([["a", classOf("BP_Prim_Cube")], ["b", classOf("BP_Ramp")], ["c", classOf("BP_Prim_Cube")]])
 const rowsOf = (collapsed: ReadonlyArray<string> = [], query = "") =>
   outlineRows(structure, names, classes, new Set(collapsed), query)
 const ids = (rows: ReturnType<typeof rowsOf>) => rows.map((row) => row.id)
@@ -40,7 +46,15 @@ describe("outlineRows", () => {
     assert.deepStrictEqual(g?.tags, ["bridge"])
     assert.strictEqual(b?.name, "Left ramp")
     assert.strictEqual(b?.className, "BP_Ramp")
+    assert.strictEqual(b?.actorClass, classOf("BP_Ramp"))
     assert.deepStrictEqual(b?.tags, ["start", "ramp"])
+  })
+
+  it("keeps the ordinal apart from the name", () => {
+    const [, , a, b] = rowsOf()
+    assert.strictEqual(a?.name, "Cube")
+    assert.strictEqual(a?.ordinal, 1)
+    assert.isUndefined(b?.ordinal)
   })
 
   it("hides what a collapsed group holds, and still counts it", () => {

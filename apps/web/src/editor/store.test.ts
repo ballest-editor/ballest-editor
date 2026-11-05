@@ -804,7 +804,7 @@ describe("document structure", () => {
     assertUndoable(() => {
       id = state().groupItems([b, c])
     })
-    assert.deepStrictEqual(shape(), [start, a, ["Group 1", [b, c]]])
+    assert.deepStrictEqual(shape(), [start, a, ["Group", [b, c]]])
     const group = tree().find((node) => node.kind === "group")
     assert.strictEqual(group?.kind === "group" ? group.id : undefined, id)
     assert.isUndefined(state().groupItems(["gone"]))

@@ -34,7 +34,7 @@ import {
   type DropTarget,
   dropTargetAt,
   indexOnceLeft,
-  itemClassNames,
+  itemClasses,
   type OutlineRow,
   outlineRows,
   rowKeys,
@@ -42,9 +42,9 @@ import {
   scrollToShow,
   visibleRange
 } from "../domain/outline"
-import { findNode } from "../domain/structure"
+import { findNode, numberedNameText } from "../domain/structure"
 import { actionCommands, type CommandAction } from "../editor/commands"
-import { itemDisplayNamesOf, nextSelection, useEditor } from "../editor/store"
+import { nextSelection, nodeNamesOf, useEditor } from "../editor/store"
 import { OUTLINE_INDENT, OUTLINE_ROW_HEIGHT, OutlineRowView } from "./OutlineRow"
 import { TagInput } from "./TagInput"
 
@@ -148,11 +148,11 @@ export function Outline() {
 
   const [query, setQuery] = useState("")
   const filtering = query.trim().length > 0
-  const names = useMemo(() => itemDisplayNamesOf({ doc, catalogIndex }), [doc, catalogIndex])
-  const classNames = useMemo(() => itemClassNames(map, ids), [map, ids])
+  const names = useMemo(() => nodeNamesOf({ doc, catalogIndex }), [doc, catalogIndex])
+  const classes = useMemo(() => itemClasses(map, ids), [map, ids])
   const rows = useMemo(
-    () => outlineRows(structure, names, classNames, collapsedGroups, query),
-    [structure, names, classNames, collapsedGroups, query]
+    () => outlineRows(structure, names, classes, collapsedGroups, query),
+    [structure, names, classes, collapsedGroups, query]
   )
   const selected = useMemo(() => new Set(selectedIds), [selectedIds])
   const groupStates = useMemo(() => groupSelectionStates(tree, selected), [tree, selected])
@@ -438,7 +438,7 @@ export function Outline() {
               const el = list.current?.querySelector(`[data-row-index="${rows.indexOf(menuRow)}"]`)
               if (el === undefined || el === null) return
               keepFocus.current = true
-              setTagsTarget({ id: menuRow.id, name: menuRow.name, anchor: el.getBoundingClientRect() })
+              setTagsTarget({ id: menuRow.id, name: numberedNameText(menuRow), anchor: el.getBoundingClientRect() })
             }}
           >
             Edit tags…

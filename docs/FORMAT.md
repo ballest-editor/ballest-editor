@@ -253,7 +253,7 @@ A game group is flat: item indices, a name and a frame. The load-time rules are 
 - `name` is the group's name reduced to letters and digits, at most 64 of them, or empty when none are left.
 - `frame` has identity rotation and scale, with its translation at the centre of the box around the members' `itemTransform.translation`. That a frame is there matters to the game; what the game does with its values isn't measured yet.
 
-Going the other way, a map with no sidecar gets one tree group per game group, where its first member is. An unnamed one is called `Group N`, and a member the game would refuse is left out.
+Going the other way, a map with no sidecar gets one tree group per game group, where its first member is. An unnamed one is called `Group`, and a member the game would refuse is left out.
 
 ## Decals
 

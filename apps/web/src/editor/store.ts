@@ -57,7 +57,10 @@ import {
   findGroup,
   freshKey,
   freshKeys,
+  groupNames,
   itemDisplayNames,
+  itemNames,
+  type NumberedName,
   type Structure,
   withGroup,
   withGroupName,
@@ -1276,9 +1279,16 @@ const indexOfKey = (ids: ReadonlyArray<string>, key: string): number => keyIndic
 export const selectedIndices = (s: EditorState): Array<number> =>
   s.selectedIds.map((id) => indexOfKey(s.doc.ids, id)).filter((i) => i >= 0)
 
-/** Every item's display name, by key: the user's, else its piece's and an ordinal ("Cube 3"). */
+/** Every item's display name as text, by key: the user's, else its piece's, numbered if it isn't alone ("Cube 3"). */
 export const itemDisplayNamesOf = (s: Pick<EditorState, "doc" | "catalogIndex">): ReadonlyMap<string, string> =>
   itemDisplayNames(s.doc.map, s.doc.ids, s.doc.structure.items, s.catalogIndex)
+
+/** The names of the map's items and groups, by key and id, with their ordinals apart so they can be styled. */
+export const nodeNamesOf = (s: Pick<EditorState, "doc" | "catalogIndex">): ReadonlyMap<string, NumberedName> =>
+  new Map([
+    ...itemNames(s.doc.map, s.doc.ids, s.doc.structure.items, s.catalogIndex),
+    ...groupNames(s.doc.structure.tree)
+  ])
 
 /** The active (last selected) item's id, if any. */
 export const activeId = (s: EditorState): string | undefined => s.selectedIds.at(-1)

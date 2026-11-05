@@ -127,7 +127,10 @@ There is no Map or Game menu: the menus act on the active tab's map, and the gam
 
 `components/Outline.tsx` is the map's tree of groups and items, a dock panel that starts on the left (View › Outline, § Dock). It fills whatever it is mounted in and scrolls by itself. `domain/outline.ts` holds its rows, filter, drop targets and scroll window.
 
-- A row shows the name, an item's class, tag chips, and a group's child count (its tooltip gives the items under it). Only the rows in view are drawn.
+- A row shows its icon, the name, tag chips and, at its right edge, a group's child count (its tooltip gives the items under it). Only the rows in view are drawn.
+- An item's icon is what the Pieces panel shows for its piece, else a generic glyph, and a tooltip on its name gives the class.
+- An item's name is the user's, else its piece's: the catalog's display name, or the class written out where the catalog has none (`MP_PlayerStart` is Player Start; the game places it itself and has no name for it).
+- A name used more than once gets an ordinal, muted, right after it: items among themselves in document order, groups in tree order. A name nothing else has shows none. The ordinal isn't part of the name, so renaming starts from the name alone. The status bar shows a group the same way.
 - A click selects, as `toggleSelection`'s chord toggles and `addToSelection`'s chord selects the range from the last row clicked. A group row stands for every item under it, and it lights up when all of them are selected. A click on empty space clears the selection.
 - A selection made anywhere else scrolls its active row into view once, as far as it takes, and opens the groups around it.
 - Double-click or F2 renames in place: Enter commits, Escape cancels, and an empty name puts an item back on its default name. A group always has a name, so an empty one changes nothing.
@@ -140,7 +143,7 @@ There is no Map or Game menu: the menus act on the active tab's map, and the gam
 
 The groups are the sidecar's ([PROJECTS.md § The files](PROJECTS.md#the-files)), and the game gets what it can hold of them ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)). `domain/groupSelection.ts` holds the rules below. The selection stays a list of item keys, so the gizmo, the Inspector, Copy and the rest act on a group's items with no group logic of their own. The item clicked is the active one, so the gizmo sits where the click was.
 
-- **Group** (Ctrl+G) puts the selected items in a new group where the first one was, and a group whole in the selection goes in whole, nested. **Ungroup** (Shift+G) dissolves every group whole in the selection, and the items stay selected. Both are in the Edit menu, the Outline's menu and the keybind settings.
+- **Group** (Ctrl+G) puts the selected items in a new group called Group where the first one was, and a group whole in the selection goes in whole, nested. **Ungroup** (Shift+G) dissolves every group whole in the selection, and the items stay selected. Both are in the Edit menu, the Outline's menu and the keybind settings.
 - **A click** on a grouped item in the viewport selects its outermost group, as the game does. The add and toggle chords add or take away that whole group.
 - **A double-click** enters the group, and the next click level is its children, an item or a nested group. Another double-click goes one deeper. The status bar names the entered group, with × to leave it, and the Outline marks its row and dims what is outside it. The entered group is kept per tab in the store.
 - **Leaving:** Escape steps out one level and selects the group it left. A click on empty space leaves altogether. A click outside the group lands in the nearest parent group that holds what was clicked, or at the root.
