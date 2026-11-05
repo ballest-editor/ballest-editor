@@ -4,6 +4,7 @@ import { ElectronDialog } from "../electron/ElectronDialog"
 import { ElectronMenu } from "../electron/ElectronMenu"
 import { type DesktopProtocolSource, ElectronProtocol } from "../electron/ElectronProtocol"
 import { installDesktopIpcHandlers } from "../ipc/DesktopIpcHandlers"
+import { WindowRegistry } from "../project/WindowRegistry"
 import { DesktopUpdates } from "../updates/DesktopUpdates"
 import { devMenuTemplate } from "../window/chrome"
 import { DesktopWindow } from "../window/DesktopWindow"
@@ -32,6 +33,8 @@ const run = Effect.gen(function*() {
   // until this scope has closed (window bounds saved, handlers removed); the program quits itself below.
   yield* app.on("window-all-closed", () => {})
   yield* app.on("will-quit", (event) => event.preventDefault())
+  // Here, not in the registry's layer: the app quits as this scope ends, before any layer would be released.
+  yield* Effect.addFinalizer(() => WindowRegistry.use((windows) => windows.leave))
 
   yield* app.whenReady
   // The page's menu bar is the UI, and Electron's default menu would reload or close the window behind the editor's

@@ -95,6 +95,8 @@ export const loadPlatform = () =>
       const { capabilities } = yield* Platform
       useEditor.getState().setCapabilities(capabilities)
       yield* refreshProject
+      const startRefused = useEditor.getState().project?.startRefused ?? null
+      if (startRefused !== null) useEditor.getState().notify("error", startRefused, { kind: "projectRefused" })
       yield* findCreatorEffect
       if (capabilities.projects) {
         yield* openStartingMap

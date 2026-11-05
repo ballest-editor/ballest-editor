@@ -4,12 +4,15 @@ import {
   MAP_EXTENSIONS,
   type ProjectFolder,
   type ProjectInfo,
-  type ProjectState
+  type ProjectState,
+  type ProjectTarget
 } from "@ballest/contracts"
 import { Context, Effect, FileSystem, Option, Path, Ref, Schema } from "effect"
 import { GamePaths } from "../game/GamePaths"
 import { DesktopSettings, type ProjectSettings } from "../settings/DesktopSettings"
 import { isSamePath, isWithin, writeJson } from "./files"
+import { type WindowEntry, WindowRegistry } from "./WindowRegistry"
+import { decideStart } from "./windowStart"
 
 /** `ballest-project.json`, at the project's root: what is shared with the project (docs/PROJECTS.md). */
 export const ProjectFile = Schema.Struct({
@@ -41,7 +44,9 @@ export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectErr
     "tooLarge",
     "read",
     "write",
-    "notExported"
+    "notExported",
+    "openElsewhere",
+    "notFolder"
   ]),
   cause: Schema.optional(Schema.Defect())
 }) {
@@ -73,6 +78,10 @@ export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectErr
         return `Couldn't write ${this.path}.`
       case "notExported":
         return `${this.path} has no export in the game's maps folder to re-import.`
+      case "openElsewhere":
+        return `${this.path} is open in another window. A project opens in one window at a time: close it there first, or choose another project.`
+      case "notFolder":
+        return `${this.path} isn't a folder on this machine, so it can't be opened as a project.`
     }
   }
 }
@@ -88,18 +97,28 @@ export const mapsFolderIn = (path: Path.Path, project: string) => path.join(proj
 export const backupsFolderIn = (path: Path.Path, project: string) => path.join(project, ".ballest", "backups")
 
 /**
- * Which project is in use (docs/PROJECTS.md). A window has one project: it starts on the most recent one and keeps it
- * whatever another running copy does; with none (the first launch) the window is Untitled Project and nothing is on disk until the first Save names a project
- * (`createNew`). A project exists on disk from `createNew`, or from the first New map or Import into a chosen folder
- * (`ensure`). A project is never the game's maps folder or inside it. Its maps are `MapFiles`', their exports
- * `MapExports`'.
+ * Which project is in use (docs/PROJECTS.md). A window has one project, and a project one window: it starts where
+ * `decideStart` says and keeps its project whatever another running copy does; with none the window is Untitled Project
+ * and nothing is on disk until the first Save names a project (`createNew`), or it must choose one
+ * (`ProjectState.chooserRequired`). A project exists on disk from `createNew`, or from the first New map or Import into
+ * a chosen folder (`ensure`). A project is never the game's maps folder or inside it, nor one another window has open.
+ * Its maps are `MapFiles`', their exports `MapExports`'.
  */
 export class Projects extends Context.Service<Projects, {
   readonly state: Effect.Effect<ProjectState>
-  /** Uses `folder` as the project from now on; refused when it is the game's maps folder or inside it. */
+  /**
+   * Uses `folder` as the project from now on; refused when it is the game's maps folder or inside it, or another window
+   * has it open.
+   */
   readonly use: (folder: string) => Effect.Effect<ProjectState, ProjectError>
-  /** Goes back to a recent project; any other folder is refused. */
+  /** Takes a folder the user picked in a dialog, for `switchTo` and `prepareWindow`, refused as `use` refuses it. */
+  readonly pick: (folder: string) => Effect.Effect<ProjectInfo, ProjectError>
+  /** Uses a recent project or a picked folder; any other folder is refused. */
   readonly switchTo: (folder: string) => Effect.Effect<ProjectState, ProjectError>
+  /** Refuses `target` as opening it would, changing nothing. */
+  readonly check: (target: ProjectTarget) => Effect.Effect<void, ProjectError>
+  /** `target`'s folder for a new window to start on, made on disk when it is a new project. This window doesn't use it. */
+  readonly prepareWindow: (target: ProjectTarget) => Effect.Effect<string, ProjectError>
   /** Keeps which map is open in the current project (`ProjectState.lastOpenMap`); null forgets it. */
   readonly rememberOpenMap: (fileName: string | null) => Effect.Effect<void, ProjectError>
   /** Makes `<projectsFolder>/<name>` a project (fails when it holds one already) and uses it. */
@@ -115,19 +134,85 @@ export class Projects extends Context.Service<Projects, {
   /** The project in use, made on disk if it isn't yet; fails without one. Anything that writes into a project. */
   readonly ensure: Effect.Effect<string, ProjectError>
 }>()("ballest/desktop/project/Projects") {
-  /** `platform` decides how paths compare (Windows: case-insensitively). */
-  static readonly make = Effect.fn("Projects.make")(function*(projectsFolder: string, platform: NodeJS.Platform) {
+  /**
+   * `platform` decides how paths compare (Windows: case-insensitively). `launchProject` is the `--project` this window
+   * was started with: it goes straight there, unless the folder is refused or open in another window.
+   */
+  static readonly make = Effect.fn("Projects.make")(function*(
+    projectsFolder: string,
+    platform: NodeJS.Platform,
+    launchProject: Option.Option<string> = Option.none()
+  ) {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const settings = yield* DesktopSettings
     const game = yield* GamePaths
+    const windows = yield* WindowRegistry
 
     const same = (a: string, b: string) => isSamePath(path, a, b, platform)
+    const isOpenIn = (open: ReadonlyArray<WindowEntry>, folder: string) =>
+      open.some((window) => window.project !== null && same(window.project, folder))
 
     const remembered = settings.get.pipe(Effect.map((s): ProjectSettings => s.project ?? {}))
-    // This window's project, for as long as it runs. A window has one project: it starts on the most recent, and only
-    // this window's own choices move it. Settings are shared with any other running copy, so they can't be what says.
-    const inWindow = yield* Ref.make(Option.fromNullishOr((yield* remembered).recent?.[0]))
+
+    /** Refuses the game's maps folder and anything inside it (wherever it is now, found or not). */
+    const outsideGame = Effect.fnUntraced(function*(folder: string) {
+      const maps = (yield* game.get).mapsFolder.path
+      if (maps !== null && isWithin(path, maps, folder, platform)) return yield* projectError("inGameMaps", folder)()
+    })
+
+    /** Refuses a folder another window has open. */
+    const free = Effect.fnUntraced(function*(folder: string) {
+      if (isOpenIn(yield* windows.others, folder)) return yield* projectError("openElsewhere", folder)()
+    })
+
+    const remember = (folder: string) =>
+      settings.update((s) => {
+        const others = (s.project?.recent ?? []).filter((p) => !same(p, folder))
+        return { ...s, project: { ...s.project, recent: [folder, ...others].slice(0, RECENT_LIMIT) } }
+      })
+
+    /** The `--project` folder, absolute and there; anything else on the command line is refused here. */
+    const launchFolder = Effect.fnUntraced(function*(raw: string) {
+      if (!path.isAbsolute(raw)) return yield* projectError("notFolder", raw)()
+      const folder = path.resolve(raw)
+      const found = yield* fs.stat(folder).pipe(Effect.mapError(projectError("notFolder", raw)))
+      if (found.type !== "Directory") return yield* projectError("notFolder", raw)()
+      yield* outsideGame(folder)
+      return folder
+    })
+
+    const launch = yield* Option.match(launchProject, {
+      onNone: () => Effect.succeed({ requested: null, refused: null }),
+      onSome: (raw) =>
+        launchFolder(raw).pipe(
+          Effect.map((requested) => ({ requested, refused: null })),
+          Effect.catch((error) => Effect.succeed({ requested: null, refused: error.message }))
+        )
+    })
+
+    const lastUsed = (yield* remembered).recent?.[0] ?? null
+    const startWith = (others: ReadonlyArray<WindowEntry>) =>
+      decideStart({ requested: launch.requested, lastUsed, others, same })
+    const looked = startWith(yield* windows.others)
+    yield* windows.announce({ project: looked.project, choosing: looked.chooser })
+    // A copy starting at this very moment may have looked before this one announced, and this one before it. Each sees
+    // the other by now, so the lower pid keeps what they both took and the other shows the chooser.
+    const settled = startWith((yield* windows.others).filter((window) => window.pid < windows.pid))
+    const start = looked.chooser ? looked : settled
+    if (start.chooser && !looked.chooser) yield* windows.announce({ project: null, choosing: true })
+    if (start.project !== null && start.project === launch.requested) {
+      yield* remember(start.project).pipe(
+        Effect.catchTag("DesktopSettingsWriteError", (error) => Effect.logWarning(error.message, error.cause))
+      )
+    }
+
+    // This window's project, for as long as it runs: only this window's own choices move it. Settings are shared with
+    // any other running copy, so they can't be what says.
+    const inWindow = yield* Ref.make(Option.fromNullOr(start.project))
+    const chooserRequired = yield* Ref.make(start.chooser)
+    // Folders the user picked in a dialog this run: with the recent ones, all a page may name by path.
+    const picked = yield* Ref.make<ReadonlyArray<string>>([])
     const current: Effect.Effect<Option.Option<string>> = Ref.get(inWindow)
     const inUse: Effect.Effect<string, ProjectError> = current.pipe(
       Effect.flatMap(Effect.fromOption),
@@ -147,11 +232,15 @@ export class Projects extends Context.Service<Projects, {
       const folder = Option.getOrUndefined(yield* current)
       const others = folder === undefined ? recent : recent.filter((p) => !same(p, folder))
       const lastOpenMap = folder === undefined ? null : kept[folder] ?? null
+      const open = yield* windows.others
       return {
         current: folder === undefined ? null : yield* info(folder),
         recent: yield* Effect.forEach(others, info),
         lastOpenMap: lastOpenMap !== null && isMapFileName(lastOpenMap) ? lastOpenMap : null,
-        projectsFolder
+        projectsFolder,
+        chooserRequired: yield* Ref.get(chooserRequired),
+        openElsewhere: others.filter((p) => isOpenIn(open, p)),
+        startRefused: launch.refused
       } satisfies ProjectState
     })
 
@@ -167,26 +256,35 @@ export class Projects extends Context.Service<Projects, {
       }).pipe(Effect.mapError(projectError("write", project)))
     })
 
-    /** Refuses the game's maps folder and anything inside it (wherever it is now, found or not). */
-    const outsideGame = Effect.fnUntraced(function*(folder: string) {
-      const maps = (yield* game.get).mapsFolder.path
-      if (maps !== null && isWithin(path, maps, folder, platform)) return yield* projectError("inGameMaps", folder)()
-    })
-
     const use = Effect.fn("Projects.use")(function*(raw: string) {
       const folder = path.resolve(raw)
       yield* outsideGame(folder)
-      yield* settings.update((s) => {
-        const others = (s.project?.recent ?? []).filter((p) => !same(p, folder))
-        return { ...s, project: { ...s.project, recent: [folder, ...others].slice(0, RECENT_LIMIT) } }
-      }).pipe(Effect.mapError(projectError("write", raw)))
+      yield* free(folder)
+      yield* remember(folder).pipe(Effect.mapError(projectError("write", raw)))
       yield* Ref.set(inWindow, Option.some(folder))
+      yield* Ref.set(chooserRequired, false)
+      yield* windows.announce({ project: folder, choosing: false })
       return yield* state
     })
 
-    const switchTo = Effect.fn("Projects.switchTo")(function*(raw: string) {
+    const pick = Effect.fn("Projects.pick")(function*(raw: string) {
+      const folder = path.resolve(raw)
+      yield* outsideGame(folder)
+      yield* free(folder)
+      yield* Ref.update(picked, (folders) => [...folders, folder])
+      return yield* info(folder)
+    })
+
+    /** Refuses a folder that is neither a recent project nor one picked in a dialog: the page can't name any other. */
+    const known = Effect.fnUntraced(function*(raw: string) {
       const { recent = [] } = yield* remembered
-      if (!recent.some((p) => same(p, raw))) return yield* projectError("notPicked", raw)()
+      if (![...recent, ...yield* Ref.get(picked)].some((p) => same(p, raw))) {
+        return yield* projectError("notPicked", raw)()
+      }
+    })
+
+    const switchTo = Effect.fn("Projects.switchTo")(function*(raw: string) {
+      yield* known(raw)
       return yield* use(raw)
     })
 
@@ -241,20 +339,49 @@ export class Projects extends Context.Service<Projects, {
         }))
       )
 
-    const createNew = Effect.fn("Projects.createNew")(function*(name: string) {
+    /** The folder New project would make for `name`, refused when it can't; nothing is written. */
+    const newFolder = Effect.fnUntraced(function*(name: string) {
       const trimmed = name.trim()
       if (!isProjectName(trimmed)) return yield* projectError("projectName", name)()
       const folder = path.join(projectsFolder, trimmed)
       const taken = yield* fs.exists(path.join(folder, PROJECT_FILE)).pipe(Effect.orElseSucceed(() => false))
       if (taken) return yield* projectError("projectExists", folder)()
+      yield* outsideGame(folder)
+      yield* free(folder)
+      return folder
+    })
+
+    const createNew = Effect.fn("Projects.createNew")(function*(name: string) {
+      const folder = yield* newFolder(name)
       yield* ensureAt(folder)
       return yield* use(folder)
+    })
+
+    /** `target`'s folder, refused as opening it would be. */
+    const folderOfTarget = Effect.fnUntraced(function*(target: ProjectTarget) {
+      if (target._tag === "New") return yield* newFolder(target.name)
+      yield* known(target.path)
+      yield* outsideGame(target.path)
+      yield* free(target.path)
+      return target.path
+    })
+
+    const check = Effect.fn("Projects.check")(function*(target: ProjectTarget) {
+      yield* folderOfTarget(target)
+    })
+
+    const prepareWindow = Effect.fn("Projects.prepareWindow")(function*(target: ProjectTarget) {
+      const folder = yield* folderOfTarget(target)
+      return target._tag === "New" ? yield* ensureAt(folder) : folder
     })
 
     return Projects.of({
       state,
       use,
+      pick,
       switchTo,
+      check,
+      prepareWindow,
       rememberOpenMap,
       createNew,
       setName,

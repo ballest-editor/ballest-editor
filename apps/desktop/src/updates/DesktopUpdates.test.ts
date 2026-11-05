@@ -22,6 +22,8 @@ const installedBuild = {
   settingsPath: "/user/desktop-settings.json",
   exportBackupsDir: "/user/backups",
   notificationsPath: "/user/notifications.json",
+  windowsDir: "/tmp/windows",
+  launchProject: Option.none(),
   projectsDir: "/home/me/Documents/Ballest Editor",
   preloadPath: "/app/preload.cjs",
   iconPath: "/app/icon.png",

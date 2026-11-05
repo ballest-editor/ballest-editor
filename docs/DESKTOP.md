@@ -39,7 +39,7 @@ The web review build has no project. Its maps live in tabs in memory: Open is th
 
 ### Projects and maps
 
-On desktop the maps live in a project folder ([PROJECTS.md](PROJECTS.md)). File › New project… or the first Save makes one at `Documents/Ballest Editor/<name>` (`Projects.createNew`, IPC `ballest:project:create`). File › Open project… chooses any folder, and the recent ones are under File › Recent projects.
+On desktop the maps live in a project folder ([PROJECTS.md](PROJECTS.md)). File › New project… or the first Save makes one at `Documents/Ballest Editor/<name>` (`Projects.createNew`, IPC `ballest:project:create`). File › Open project… chooses any folder, and the recent ones are under File › Recent projects. All three ask where the project opens first (§ Other windows). The first Save doesn't: it names this window's project.
 
 Until one is used, the window is **Untitled Project \***: `ProjectState.current` is null, nothing is on disk, main refuses to write a map (`noProject`), and the Save dialog asks the project's name first. The game's maps folder, or a folder inside it, is refused with the reason: the game scans its subfolders and rewrites what it finds.
 
@@ -52,7 +52,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - **Launch game** (Project menu) opens `steam://rungameid/3339810`, or says the game is already running.
 - **Backups.** Every write over a map file keeps the old one first (§ Backups). Recover previous version… in a map's menu in the Project panel lists them.
 - **Toasts** name the project or the maps folder and offer Reveal.
-- **Unsaved changes** are asked about before anything would lose them: closing the window, reloading, quitting, closing a map's tab, replacing a map open in a tab (Re-import, Recover, Import's Replace), and switching projects (New project…, Open project…, Recent projects). Untitled Project doesn't ask when it becomes a project: its maps stay open and Save puts them in that project. New map, opening a map and Import open a tab of their own and ask nothing. See § Window.
+- **Unsaved changes** are asked about before anything would lose them: closing the window, reloading, quitting, closing a map's tab, replacing a map open in a tab (Re-import, Recover, Import's Replace), and switching projects (New project…, Open project… or Recent projects, answered This window). Untitled Project doesn't ask when it becomes a project: its maps stay open and Save puts them in that project. New map, opening a map and Import open a tab of their own and ask nothing. See § Window.
 
 ### Document tabs
 
@@ -60,7 +60,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 
 - Opening a map (the Project panel, a notification's Open) makes its tab active, or opens it in a new tab after the active one. New map, Import and Recover of a map that isn't open do the same. The fresh map the app starts on gives way to the first map opened while it is untouched. Opening a map shows no toast.
 - The store keeps the active tab's state where every edit works and parks the others (`TabState`, `parkedTabs`). A save lands in the tab it started from.
-- There is always a map, never a Start tab or an empty editor. On launch the app opens the map that was open when it last ran, else the project's most recently edited map, else a fresh unsaved map (what New map starts, named Untitled, nothing written; its first Save names it into the project).
+- There is always a map, never a Start tab or an empty editor, even behind the required chooser (§ Other windows). On launch the app opens the map that was open when it last ran, else the project's most recently edited map, else a fresh unsaved map (what New map starts, named Untitled, nothing written; its first Save names it into the project).
 - The active tab's map is kept per project in `desktop-settings.json` (`project.lastOpenMap`, by project folder; `ProjectState.lastOpenMap`, IPC `ballest:project:rememberOpenMap`), written whenever the active tab's file changes after the startup load. The other tabs aren't reopened yet.
 - A tab shows the map's name without the creator (`mapLabelOf`), its tooltip is the file's path or "Not saved yet", and tabs can be dragged into another order.
 - A tab's ×, a middle click or Ctrl+F4 closes it after the unsaved-changes prompt (§ Window). Closing the last one shows a fresh map the same way.
@@ -180,6 +180,54 @@ The window and taskbar icon is `dist-electron/icon.png`, which apps/desktop's bu
 Closing and reloading go through the page's `beforeunload`, which cancels the unload while any tab has unsaved edits. A browser then shows its own leave-page dialog. In the desktop app the window stays open: main sees `will-prevent-unload` and sends `ballest:window:unloadRequest` with `"close"` (when the window's `close` event came first: the close button, Alt+F4, Ctrl+Q, quitting) or `"reload"` (Ctrl+R in an unpackaged build, a Vite full reload in dev). The page asks, and unless the user cancels it stops holding the unload and closes (`window.close()`) or reloads itself. Restarting from the update pill doesn't ask again: the pill already says unsaved changes are lost.
 
 Installed builds have no application menu (`Menu.setApplicationMenu(null)`): the page's menu bar is the UI, and Electron's default menu would reload or close the window behind the editor's back. Its Close Window is on Ctrl+W, which is two fly keys held together, and a hidden menu's accelerators still fire. Main handles the two window shortcuts it would have given, F11 (fullscreen) and Ctrl+Q (quit), in `before-input-event`. Unpackaged builds replace the default menu with a hidden one that has only Reload, Force Reload and Toggle DevTools (`devMenuTemplate`). Ctrl+W reaches the page in both: `before-input-event` must not `preventDefault` it, or the page loses the keydown and the camera stops flying. Alt+F4 and window snapping come from the OS, not the menu.
+
+### Other windows
+
+Each window is a running copy of the app, a process of its own. There is no single-instance lock and no second window inside a process, because `Projects` and the other services hold one window's state. The rule is one project per window, and one window per project.
+
+**The registry.** `WindowRegistry` (`apps/desktop/src/project/WindowRegistry.ts`) keeps a file per running copy, `<userData>/windows/<pid>.json`: `{ "pid", "project", "choosing" }`. `project` is the folder, or null for Untitled Project. `choosing` is true while the required chooser is up, which holds no project and isn't Untitled Project. A copy writes its file at start and on every project change, and removes it on quit.
+
+A copy that crashed leaves its file behind. Whoever reads the folder next tests the pid (`process.kill(pid, 0)`, which also works on Windows) and removes the file of a pid that's gone, along with anything that doesn't decode. EPERM counts as running: that's another account's process, such as an elevated copy, and a project held by mistake does less harm than two windows writing the same files. A reused pid reads as a live window until that process ends, and the project stays refused until then. A registry write that fails is only logged.
+
+**Where a window starts** (`decideStart`, `project/windowStart.ts`).
+
+| The window has | And                                      | It starts on                          |
+| -------------- | ---------------------------------------- | ------------------------------------- |
+| a `--project`  | no other window has that project         | that project, with no chooser         |
+| a `--project`  | another window has that project          | the chooser                           |
+| no `--project` | another window is on Untitled Project    | the chooser                           |
+| no `--project` | another window has the last project used | the chooser                           |
+| no `--project` | neither                                  | the last project, or Untitled Project |
+
+A refused `--project` (§ New window) counts as none, and the page shows the reason (`ProjectState.startRefused`).
+
+Two copies started in the same moment can each look before the other has written its file. So a copy looks, writes its file, then looks again at the lower pids only: the lower pid keeps what they both took, and the higher one shows the chooser.
+
+**The chooser** (`components/ProjectChooser.tsx`) is up while `ProjectState.chooserRequired` is true, from main's decision until a project is in use. It follows [mockups/welcome.html](mockups/welcome.html) § 1 without the thumbnails: the recent projects, New project and Open project…. A project open in another window says so and can't be picked. With no recent projects it opens on the name prompt. A pick always goes to this window and then opens the project's map as a launch would.
+
+It has no close button, and Escape and a click outside do nothing. Quit this window is the way out, and the window's own close button works as usual. `ProjectState.current` stays null meanwhile, so main refuses to write a map. Behind it is the fresh map every window has. The store opens no other dialog while it's up, so a Game link check that would open one does nothing, and the editor's keys are off (`isModalOpen`). The list updates whenever the window gets the focus (§ Sync's check lists the project again).
+
+**Opening a project.** New project… (once it has a name), Open project… (once a folder is picked) and a recent project go through `openProjectEffect` in `editor/actions`:
+
+1. Main checks the project first (`Projects.check`, IPC `ballest:project:check`) and nothing is written. A project open in another window is refused with `openElsewhere`, which says to close it there first. `Projects.use` refuses it again, so the check can't be got round. The game's maps folder and a name already taken are refused here too. A refusal lists the project again, so a stale row updates. Recent projects marks a project open elsewhere, and picking it shows the refusal.
+2. When this window has something to take over (`hasWindowToTakeOver`), the whereToOpen dialog asks: This window, New window, Cancel. A named project always has. Untitled Project has unless its only map is the untouched fresh one, and then it becomes the project at once. The required chooser never asks.
+3. **This window** is `changeProject`: the unsaved-changes prompt in a named project (§ Window), then the switch. In Untitled Project the maps stay open and Save puts them in the project. **Cancel** does nothing.
+
+A new project's folder is made only after This window or New window, and after the unsaved-changes prompt, so Cancel at any of those leaves nothing on disk.
+
+**New window** (`WindowLauncher`, `apps/desktop/src/window/WindowLauncher.ts`; IPC `ballest:project:openWindow`). Main makes a new project's folder, then starts a detached copy with `--project=<path>`, and this window stays exactly as it is. The new copy adds the project to the recent ones when it starts.
+
+| The app runs as                                     | The new copy is                                                                             |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Windows, installed                                  | `process.execPath`                                                                          |
+| Linux AppImage                                      | `APPIMAGE`, the AppImage's own file. The mount it runs from goes when the first copy exits. |
+| Unpackaged (`pnpm dev:desktop`, the `start` script) | Electron with the app's folder. The dev runner doesn't follow it, so it outlives Ctrl+C.    |
+
+A new copy keeps the flags this one was started with, since some Linux desktops need `--no-sandbox` to run an AppImage, except `--remote-debugging-port`, which only one process can hold. A copy that can't be started is `WindowLaunchError`, shown as an error. That covers failing to start at all: a copy that starts and dies at once isn't noticed.
+
+NixOS runs an AppImage through `appimage-run`, whose `bwrap` has `--die-with-parent`. There the new copy's sandbox is a child of the first copy, so closing the first copy kills the new one, unsaved edits included. Only that wrapper does this.
+
+`--project` works from a terminal too. Main takes it only if it's an absolute path to a folder that exists, outside the game's maps folder.
 
 ## Main process
 

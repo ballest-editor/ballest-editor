@@ -20,9 +20,11 @@ import { SteamLibrary } from "./game/SteamLibrary"
 import { DesktopIpc } from "./ipc/DesktopIpc"
 import { NotificationLog } from "./notifications/NotificationLog"
 import { layerProjects } from "./project/layers"
+import { WindowRegistry } from "./project/WindowRegistry"
 import { DesktopSettings } from "./settings/DesktopSettings"
 import { DesktopUpdates } from "./updates/DesktopUpdates"
 import { DesktopWindow } from "./window/DesktopWindow"
+import { WindowLauncher } from "./window/WindowLauncher"
 
 // The Electron main process (docs/DESKTOP.md § Main process). Electron only grants scheme privileges before
 // `ready`, so this runs synchronously at load, before the runtime starts.
@@ -50,11 +52,15 @@ const layerGame = Layer.mergeAll(GameCreator.layer, GameLink.layer).pipe(
   Layer.provideMerge(GameHost.layer)
 )
 
-const layerProjectsAndGame = layerProjects.pipe(Layer.provideMerge(layerGame))
+const layerProjectsAndGame = layerProjects.pipe(
+  Layer.provideMerge(layerGame),
+  Layer.provideMerge(WindowRegistry.layer)
+)
 
 const layerDesktopRuntime = Layer.mergeAll(
   DesktopWindow.layer,
   DesktopUpdates.layer,
+  WindowLauncher.layer,
   NotificationLog.layer,
   GamePlay.layer.pipe(Layer.provideMerge(layerProjectsAndGame))
 ).pipe(

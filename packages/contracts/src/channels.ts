@@ -8,6 +8,8 @@ export const InvokeChannels = {
   ping: "ballest:ping",
   projectState: "ballest:project:state",
   chooseProject: "ballest:project:choose",
+  checkProject: "ballest:project:check",
+  openProjectWindow: "ballest:project:openWindow",
   switchProject: "ballest:project:switch",
   createProject: "ballest:project:create",
   revealProject: "ballest:project:reveal",

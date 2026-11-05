@@ -23,10 +23,12 @@ import type {
   PlaySessionEnded,
   PluginStatus,
   ProjectFolder,
+  ProjectInfo,
   ProjectMap,
   ProjectMapFile,
   ProjectMaps,
   ProjectState,
+  ProjectTarget,
   UnloadKind,
   UnsavedChoice,
   UpdateState
@@ -51,6 +53,7 @@ export type {
   ProjectMap,
   ProjectMapFile,
   ProjectState,
+  ProjectTarget,
   UnloadKind,
   UnsavedChoice
 } from "@ballest/contracts"
@@ -105,9 +108,13 @@ export class Platform extends Context.Service<Platform, {
   readonly download: (file: { readonly name: string; readonly text: string }) => Effect.Effect<void, PlatformError>
   /** The project in use and the recent ones (desktop). */
   readonly projectState: Effect.Effect<ProjectState, PlatformError>
-  /** Asks for a folder to use as the project; none when the user cancels. */
-  readonly chooseProject: Effect.Effect<Option.Option<ProjectState>, PlatformError>
-  /** Goes back to a recent project, or the default. */
+  /** Asks for a folder to open as a project, which nothing uses yet; none when the user cancels. */
+  readonly chooseProject: Effect.Effect<Option.Option<ProjectInfo>, PlatformError>
+  /** Fails as opening `target` would (open in another window, a name that's taken), changing nothing. */
+  readonly checkProject: (target: ProjectTarget) => Effect.Effect<void, PlatformError>
+  /** Starts another running copy of the app on `target`; this window stays as it is. */
+  readonly openProjectWindow: (target: ProjectTarget) => Effect.Effect<void, PlatformError>
+  /** Uses a recent project, or the folder `chooseProject` gave. */
   readonly switchProject: (path: string) => Effect.Effect<ProjectState, PlatformError>
   /** Makes `<projectsFolder>/<name>` a project and uses it. */
   readonly createProject: (name: string) => Effect.Effect<ProjectState, PlatformError>
@@ -300,6 +307,8 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     download: () => Effect.fail(new PlatformError({ message: "The desktop app saves into the project." })),
     projectState: call("projectState"),
     chooseProject: call("chooseProject").pipe(Effect.map(Option.fromNullOr)),
+    checkProject: (target) => call("checkProject", target),
+    openProjectWindow: (target) => call("openProjectWindow", target),
     switchProject: (path) => call("switchProject", { path }),
     createProject: (name) => call("createProject", { name }),
     revealProject: (which) =>
@@ -396,6 +405,8 @@ const makeBrowser = (): Platform["Service"] => {
     download: ({ name, text }) => download(name, text),
     projectState: noProject,
     chooseProject: noProject,
+    checkProject: () => noProject,
+    openProjectWindow: () => noProject,
     switchProject: () => noProject,
     createProject: () => noProject,
     revealProject: () => noProject,

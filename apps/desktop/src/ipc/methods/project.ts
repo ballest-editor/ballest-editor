@@ -6,6 +6,7 @@ import { GamePaths } from "../../game/GamePaths"
 import { MapExports } from "../../project/MapExports"
 import { MapFiles } from "../../project/MapFiles"
 import { Projects } from "../../project/Projects"
+import { WindowLauncher } from "../../window/WindowLauncher"
 import type { DesktopIpcHandlers } from "../DesktopIpc"
 
 const IMPORT_FILTERS = [
@@ -17,7 +18,7 @@ export const projectHandlers = {
   projectState: Effect.fn("ipc.projectState")(function*() {
     return yield* (yield* Projects).state
   }),
-  /** A folder dialog starting at the project in use; the chosen folder becomes the project. */
+  /** A folder dialog starting at the project in use; the page then says where the folder opens. */
   chooseProject: Effect.fn("ipc.chooseProject")(function*(_, event) {
     const projects = yield* Projects
     const { current, projectsFolder } = yield* projects.state
@@ -31,7 +32,14 @@ export const projectHandlers = {
       filters: []
     })
     if (Option.isNone(picked)) return null
-    return yield* projects.use(picked.value)
+    return yield* projects.pick(picked.value)
+  }),
+  checkProject: Effect.fn("ipc.checkProject")(function*(target) {
+    yield* (yield* Projects).check(target)
+  }),
+  /** New window: this window keeps its project; the new copy takes `target` (a new project is made here first). */
+  openProjectWindow: Effect.fn("ipc.openProjectWindow")(function*(target) {
+    yield* (yield* WindowLauncher).open(yield* (yield* Projects).prepareWindow(target))
   }),
   switchProject: Effect.fn("ipc.switchProject")(function*({ path }) {
     return yield* (yield* Projects).switchTo(path)

@@ -11,7 +11,7 @@ import { balledits, edit, fileNameOf, layerFor, noticesWhile, reset, s } from ".
 import { readSample } from "../../test/samples"
 import { dirtyTabs, tabLabelOf, tabStateOf, tabsWithoutFile } from "../store"
 import { createNewMap } from "./maps"
-import { chooseProjectEffect, createProjectEffect, importMapFile } from "./project"
+import { chooseProjectEffect, createProjectEffect, importMapFile, openInThisWindowEffect } from "./project"
 import { duplicateMapEffect, saveMapAsEffect, saveMapFile, saveMapInNewProjectEffect } from "./save"
 
 const fileName = (name: string) => `Map_LevelEditorMain&${name}_Isaac.balledit`
@@ -132,7 +132,7 @@ describe("maps made in Untitled Project", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("Open project… takes them along without asking too", () => {
+  it.effect("Open project… asks where it opens, and This window takes them along without asking about edits", () => {
     const disk = untitledDisk()
     return Effect.gen(function*() {
       yield* reset
@@ -141,6 +141,8 @@ describe("maps made in Untitled Project", () => {
 
       disk.answers.push(project)
       yield* chooseProjectEffect
+      assert.strictEqual(s().dialog?.id, "whereToOpen")
+      yield* openInThisWindowEffect
       assert.deepStrictEqual(disk.prompts, [])
       assert.deepInclude(s().project?.current, { path: project })
       assert.deepStrictEqual(unsavedRows(), ["Big Loop"])

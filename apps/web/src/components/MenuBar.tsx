@@ -84,9 +84,14 @@ function Menu({ title, children }: { readonly title: string; readonly children: 
   )
 }
 
-/** Desktop only: the projects used before, by name (the folder is the tooltip). */
+/**
+ * Desktop only: the projects used before, by name (the folder is the tooltip). One open in another window says so, and
+ * picking it still gets main's refusal, which says what to do.
+ */
 function RecentProjectsMenu() {
-  const recent = useEditor((s) => s.project?.recent ?? [])
+  const state = useEditor((s) => s.project)
+  const recent = state?.recent ?? []
+  const openElsewhere = state?.openElsewhere ?? []
   return (
     <MenubarSub>
       <MenubarSubTrigger disabled={recent.length === 0}>Recent projects</MenubarSubTrigger>
@@ -98,6 +103,9 @@ function RecentProjectsMenu() {
             onClick={() => void switchProject(project.path)}
           >
             <span className="truncate">{project.name}</span>
+            {openElsewhere.includes(project.path) && (
+              <span className="shrink-0 pl-4 text-muted-foreground">Open in another window</span>
+            )}
           </MenubarItem>
         ))}
       </MenubarSubContent>

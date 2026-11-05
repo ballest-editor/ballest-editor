@@ -12,6 +12,7 @@ import type {
   PluginStatus,
   ProjectInfo,
   ProjectMap,
+  ProjectTarget,
   UnloadKind,
   UnsavedChoice,
   UnsavedPrompt,
@@ -58,8 +59,20 @@ export interface TestDisk {
    * muted notification kinds.
    */
   gameLink: { last: GameLinkResult | null; muted: Array<string> }
-  /** The project in use, the recent ones, and the map last open in each (as `desktop-settings.json` keeps them). */
-  project: { current: string | null; recent: Array<string>; lastOpenMap: Record<string, string> }
+  /**
+   * The project in use, the recent ones, and the map last open in each (as `desktop-settings.json` keeps them).
+   * `chooserRequired`: this window must pick a project, as main decides at start; `openElsewhere`: the folders other
+   * windows have open. `windows`: the projects `openProjectWindow` started a window on, and what it fails with next.
+   */
+  project: {
+    current: string | null
+    recent: Array<string>
+    lastOpenMap: Record<string, string>
+    chooserRequired: boolean
+    openElsewhere: Array<string>
+    windows: Array<string>
+    windowFailure: string | null
+  }
   /** Names set through `renameProject`, by project folder (what its `ballest-project.json` would say). */
   projectNames: Map<string, string>
   /**
@@ -146,7 +159,15 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   exportChecks: 0,
   notifications: [],
   gameLink: { last: null, muted: [] },
-  project: { current: TEST_PROJECT, recent: [], lastOpenMap: {} },
+  project: {
+    current: TEST_PROJECT,
+    recent: [],
+    lastOpenMap: {},
+    chooserRequired: false,
+    openElsewhere: [],
+    windows: [],
+    windowFailure: null
+  },
   projectNames: new Map(),
   game: {
     paths: testGamePaths,
@@ -210,12 +231,35 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     current: disk.project.current === null ? null : info(disk.project.current),
     recent: disk.project.recent.filter((p) => p !== disk.project.current).map(info),
     lastOpenMap: disk.project.lastOpenMap[current()] ?? null,
-    projectsFolder: TEST_PROJECTS_FOLDER
+    projectsFolder: TEST_PROJECTS_FOLDER,
+    chooserRequired: disk.project.chooserRequired,
+    openElsewhere: disk.project.recent.filter((p) => disk.project.openElsewhere.includes(p)),
+    startRefused: null
   })
+  /** Why `path` can't be opened, as main says; null when it can. */
+  const refusalOf = (path: string) =>
+    path.startsWith(TEST_MAPS_FOLDER)
+      ? `${path} is the game's maps folder or inside it.`
+      : disk.project.openElsewhere.includes(path)
+      ? `${path} is open in another window.`
+      : null
   const select = (path: string) => {
-    if (path.startsWith(TEST_MAPS_FOLDER)) return fail(`${path} is the game's maps folder or inside it.`)
-    disk.project = { ...disk.project, current: path, recent: [path, ...disk.project.recent.filter((p) => p !== path)] }
+    const refusal = refusalOf(path)
+    if (refusal !== null) return fail(refusal)
+    disk.project = {
+      ...disk.project,
+      current: path,
+      recent: [path, ...disk.project.recent.filter((p) => p !== path)],
+      chooserRequired: false
+    }
     return Promise.resolve(state())
+  }
+  const newProjectPath = (name: string) => `${TEST_PROJECTS_FOLDER}/${name.trim()}`
+  /** Refuses `target` as main does; the folder it means otherwise. */
+  const folderOf = (target: ProjectTarget) => {
+    const path = target._tag === "New" ? newProjectPath(target.name) : target.path
+    const refusal = target._tag === "New" && info(path).exists ? `${path} already holds a project.` : refusalOf(path)
+    return refusal === null ? Promise.resolve(path) : fail(refusal)
   }
   const mapOf = (fileName: string): ProjectMap => {
     const text = disk.files.get(projectFile(fileName, current())) ?? ""
@@ -254,14 +298,20 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     projectState: () => Promise.resolve(state()),
     chooseProject: () => {
       const path = ask("project")
-      return path === null ? Promise.resolve(null) : select(path)
+      if (path === null) return Promise.resolve(null)
+      const refusal = refusalOf(path)
+      return refusal === null ? Promise.resolve(info(path)) : fail(refusal)
+    },
+    checkProject: async (target) => {
+      await folderOf(target)
+    },
+    openProjectWindow: async (target) => {
+      const path = await folderOf(target)
+      if (disk.project.windowFailure !== null) return fail(disk.project.windowFailure)
+      disk.project.windows.push(path)
     },
     switchProject: ({ path }) => select(path),
-    createProject: ({ name }) => {
-      const path = `${TEST_PROJECTS_FOLDER}/${name.trim()}`
-      if (info(path).exists) return fail(`${path} already holds a project.`)
-      return select(path)
-    },
+    createProject: async ({ name }) => select(await folderOf({ _tag: "New", name })),
     revealProject: ({ which }) => {
       const project = disk.project.current
       if (project === null || !info(project).exists) return Promise.resolve(false)

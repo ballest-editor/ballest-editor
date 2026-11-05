@@ -42,7 +42,7 @@ The code is in `apps/desktop/src/project/`. Main reads and writes only these, th
   The `MapLinks` service owns the file: one update at a time, atomic writes, and a file that doesn't decode reads as empty.
 - **`.ballest/backups/<time> <file name>`** holds the project's copy of a map before anything wrote over it, and the old file after a Rename. The game's copy before an export wrote over it goes to `<userData>/backups/` instead, since it belongs to this machine and not to the project. [DESKTOP.md § Backups](DESKTOP.md#backups) has the rules.
 
-`desktop-settings.json` keeps the recent projects under `project.recent`, at most 8, the last one used first. An empty list means Untitled Project. A window has one project: it starts on the first of that list and keeps its project in memory, so another running copy changing the list doesn't move it.
+`desktop-settings.json` keeps the recent projects under `project.recent`, at most 8, the last one used first. An empty list means Untitled Project. A window has one project, kept in memory, so another running copy changing the list doesn't move it. A project opens in one window at a time. [DESKTOP.md § Other windows](DESKTOP.md#other-windows) has where a window starts and how windows know about each other.
 
 A project is never the game's maps folder. The game loads only from `UserSavedMaps`, so a map must be exported to be played, and a project inside that folder would let the game edit project files behind the editor's back. Picking the maps folder, or a folder under it, as a project is refused with that explanation.
 
@@ -97,7 +97,7 @@ The wireframes in [mockups/](mockups/) are rough. Use [mockups/welcome.html](moc
 
 The rest of the design is still to come:
 
-- **Welcome window** ([mockups/welcome.html](mockups/welcome.html) § 1). The app's level: recent projects with a thumbnail each, New project, Open…. It shows from the second launch on and when the last project window closes. Opening another project from a project window asks **This window / New window** (as IntelliJ does), remembered in Settings. One project per window.
+- **Welcome window** ([mockups/welcome.html](mockups/welcome.html) § 1). The app's level: recent projects with a thumbnail each, New project, Open…. It shows from the second launch on and when the last project window closes. The required chooser ([DESKTOP.md § Other windows](DESKTOP.md#other-windows)) has its list and its buttons, but only a window that can't start on a project of its own shows it. **This window / New window** ([mockups/welcome.html](mockups/welcome.html) § 2) is built, without the mockup's Always do this.
 - **Close project** and **Save project…** in the File menu. Close project needs the Welcome window to go back to.
 - **A Save project modal** with a folder choice, for the first Save. Today the Save map dialog asks the project's name and shows the folder it will make, read-only.
 - **Project settings** ([mockups/welcome.html](mockups/welcome.html) § 5), IntelliJ's Project Structure shape, gains a creator, a choice of export target, and git.

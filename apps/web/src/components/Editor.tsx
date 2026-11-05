@@ -33,6 +33,7 @@ import { NameMapDialog } from "./NameMapDialog"
 import { NewMapDialog } from "./NewMapDialog"
 import { NewProjectDialog } from "./NewProjectDialog"
 import { OverwriteChangedDialog } from "./OverwriteChangedDialog"
+import { ProjectChooser } from "./ProjectChooser"
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
 import { RecoverDialog } from "./RecoverDialog"
 import { ReplacePublishedDialog } from "./ReplacePublishedDialog"
@@ -41,6 +42,7 @@ import { SidePanel } from "./SidePanel"
 import { StatusBar } from "./StatusBar"
 import { TopBar } from "./TopBar"
 import { ViewportControls } from "./ViewControls"
+import { WhereToOpenDialog } from "./WhereToOpenDialog"
 
 if (import.meta.env.DEV) {
   // Dev-only handle for poking at the scene from the console / browser automation.
@@ -186,6 +188,8 @@ export function Editor() {
       />
       <GameLinkDialog open={dialog === "gameLink"} onClose={close} />
       <NewProjectDialog open={dialog === "newProject"} onClose={close} />
+      <WhereToOpenDialog open={dialog === "whereToOpen"} onClose={close} />
+      <ProjectChooser />
       <ReplacePublishedDialog open={dialog === "replacePublished"} onClose={close} />
       <OverwriteChangedDialog open={dialog === "overwriteChanged"} onClose={close} />
       <ImportClashDialog open={dialog === "importClash"} onClose={close} />
