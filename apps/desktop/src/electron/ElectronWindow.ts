@@ -29,10 +29,17 @@ export class ElectronWindow extends Context.Service<ElectronWindow, {
   readonly closed: (window: Electron.BrowserWindow) => Effect.Effect<void>
   /** Each display's work area, for checking that saved bounds are still on screen. */
   readonly workAreas: Effect.Effect<ReadonlyArray<Electron.Rectangle>>
-  /** Recolours the window showing `webContentsId`: its title bar overlay and background. Nothing if it has none. */
+  /**
+   * Recolours the window showing `webContentsId` and the windows it popped its panels out into: their title bar overlays
+   * and backgrounds. Nothing if it has none.
+   */
   readonly setColors: (
     webContentsId: number,
-    colors: { readonly overlay: Electron.TitleBarOverlayOptions; readonly background: string }
+    colors: {
+      readonly overlay: Electron.TitleBarOverlayOptions
+      readonly popoutOverlay: Electron.TitleBarOverlayOptions
+      readonly background: string
+    }
   ) => Effect.Effect<void>
   /** Sends `payload` on `channel` to every window's page (main → renderer). */
   readonly sendAll: (channel: string, payload: unknown) => Effect.Effect<void>
@@ -69,13 +76,17 @@ export class ElectronWindow extends Context.Service<ElectronWindow, {
           })
         }),
       workAreas: Effect.sync(() => Electron.screen.getAllDisplays().map((display) => display.workArea)),
-      setColors: (webContentsId, { overlay, background }) =>
+      setColors: (webContentsId, { overlay, popoutOverlay, background }) =>
         Effect.sync(() => {
           const contents = Electron.webContents.fromId(webContentsId)
           const window = contents === undefined ? null : Electron.BrowserWindow.fromWebContents(contents)
           if (window === null || window.isDestroyed()) return
           window.setBackgroundColor(background)
           window.setTitleBarOverlay(overlay)
+          for (const popout of window.getChildWindows()) {
+            popout.setBackgroundColor(background)
+            popout.setTitleBarOverlay(popoutOverlay)
+          }
         }),
       sendAll: (channel, payload) =>
         Effect.sync(() => {

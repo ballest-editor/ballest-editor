@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { devMenuTemplate, titleBarOverlay, windowShortcutOf } from "./chrome"
+import { devMenuTemplate, isPopoutUrl, popoutOverlay, titleBarOverlay, windowShortcutOf } from "./chrome"
 
 const key = (code: string, modifiers: Partial<Record<"control" | "shift" | "alt" | "meta", boolean>> = {}) => ({
   type: "keyDown",
@@ -17,6 +17,20 @@ const key = (code: string, modifiers: Partial<Record<"control" | "shift" | "alt"
 })
 
 describe("window chrome", () => {
+  it("takes only the app's own popout page for a panel's window", () => {
+    const app = new URL("ballest://app/")
+    expect(isPopoutUrl("ballest://app/popout.html", app)).toBe(true)
+    expect(isPopoutUrl("ballest://app/index.html", app)).toBe(false)
+    expect(isPopoutUrl("ballest://other/popout.html", app)).toBe(false)
+    expect(isPopoutUrl("https://app/popout.html", app)).toBe(false)
+    expect(isPopoutUrl("not a url", app)).toBe(false)
+  })
+
+  it("draws a panel's window controls over its tab strip, in the main window's colours", () => {
+    const overlay = titleBarOverlay(false)
+    expect(popoutOverlay(overlay)).toEqual({ ...overlay, height: 32 })
+  })
+
   it("matches only the plain window shortcuts", () => {
     expect(windowShortcutOf(key("F11"))).toBe("toggleFullScreen")
     expect(windowShortcutOf(key("KeyQ", { control: true }))).toBe("quit")

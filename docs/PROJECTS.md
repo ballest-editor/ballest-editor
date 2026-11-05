@@ -108,18 +108,20 @@ Later:
 
 ## Shell
 
-[DESKTOP.md § Renderer](DESKTOP.md#renderer) describes the window as built: map tabs, the Project panel, the menus, Project settings, the Game link, the status bar and notifications. The shape:
+[DESKTOP.md § Renderer](DESKTOP.md#renderer) describes the window as built: map tabs, the dock and its panels, the menus, Project settings, the Game link, the status bar and notifications. The shape, with the default layout:
 
 ```
 ┌ BE  File  Edit  View  Project            Season 3 tracks           Play  v ^ x ┐
-├───┬───────────┬──────────────────────────────────────────────┬─────────────────┤
-│ ▣ │ Pieces    │ [Big Loop *] [Golf base]                     │ Inspector       │
-│ ▤ │           │                                              │                 │
-│   │           │               viewport                       │                 │
-├───┴───────────┴──────────────────────────────────────────────┴─────────────────┤
+├───────────────┬──────────────────────────────────────────────┬─────────────────┤
+│ Project Pieces│ [Big Loop *] [Golf base] [Settings]          │ Inspector       │
+│               │                                              │                 │
+│               │               viewport                       │                 │
+├───────────────┴──────────────────────────────────────────────┴─────────────────┤
 │               Changed in game · Exported 4 min ago              update  bell 3 │
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+Everything between the top bar and the status bar is the dock ([DESKTOP.md § Dock](DESKTOP.md#dock)): the panels can be moved around the map tabs and the viewport, stacked, split, collapsed, closed from View, or popped out into windows of their own, and Settings is a panel beside the maps.
 
 The wireframes in [mockups/](mockups/) are rough. Use [mockups/welcome.html](mockups/welcome.html) for the Welcome window and Project settings below. Its Project home tab and its Map and Game menus were dropped, and so were the Start page and Start tab in `start-page.html` and `start-tab.html`.
 

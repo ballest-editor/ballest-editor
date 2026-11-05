@@ -2,7 +2,7 @@ import { useEffect } from "react"
 import { isMovementChord, sharedKeysFlyFreely } from "../domain/flyKeys"
 import { actionsFor, chordOf, releasesBinding } from "../domain/Keybinds"
 import { commandFor, runsHere } from "./commands"
-import { isEditorKeyEvent } from "./FlyCamera"
+import { isEditorKeyEvent } from "./keyTargets"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
 

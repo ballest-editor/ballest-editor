@@ -2,6 +2,7 @@
 
 import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { IconCheck, IconChevronDown, IconChevronUp, IconSelector } from "@tabler/icons-react"
+import { usePortalContainer } from "@workspace/ui/lib/portal-container"
 import { cn } from "cn"
 import * as React from "react"
 
@@ -70,7 +71,7 @@ function SelectContent({
   >)
 {
   return (
-    <SelectPrimitive.Portal>
+    <SelectPrimitive.Portal container={usePortalContainer()}>
       <SelectPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}

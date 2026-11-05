@@ -249,7 +249,7 @@ function HeaderButton(
 }
 
 /**
- * The left dock's Project tab (docs/PROJECTS.md § Shell): the project and its maps as a tree, the way an editor's
+ * The Project panel (docs/PROJECTS.md § Shell): the project and its maps as a tree, the way an editor's
  * file explorer shows a workspace. A click opens a map; the open one is highlighted, with a dot while it has unsaved
  * edits, and each row shows its link state. Every tab whose map has no file yet is a row too, above them. The header
  * holds New map, Import and Project settings. In a browser, which has no project, only those rows show.

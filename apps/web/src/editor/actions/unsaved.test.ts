@@ -131,7 +131,7 @@ describe("unsaved changes", () => {
       disk.promptAnswers.push("save")
       yield* startNewMapEffect
       assert.isDefined(afterSaveOf(s().dialog))
-      s().openDialog({ id: "settings", category: "general" })
+      s().openDialog({ id: "gameLink" })
       assert.isUndefined(afterSaveOf(s().dialog))
     }).pipe(Effect.provide(layerFor(disk)))
   })

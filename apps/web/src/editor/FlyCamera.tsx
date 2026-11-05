@@ -16,27 +16,15 @@ import {
 } from "../domain/Keybinds"
 import { placeDistanceFor, placementPoint } from "../domain/placement"
 import { editorVerticalFov } from "../domain/Settings"
+import { isEditorKeyEvent } from "./keyTargets"
 import { sceneRegistry } from "./sceneRegistry"
-import { isModalOpen, useEditor } from "./store"
+import { useEditor } from "./store"
 
 const FAST_MULTIPLIER = 4
 const LOOK_SENSITIVITY = 0.0025 // radians per pixel at sensitivity 1
 const KEY_LOOK_SPEED = 1.6 // radians per second for the arrow-key look actions
 const ORBIT_DISTANCE = 1500 // orbit pivot ahead of the camera when the old one is behind it
 const LOCK_SETTLE_MS = 50 // moves dropped after a pointer lock is asked for, taken or lost
-
-export const isTypingTarget = (target: EventTarget | null): boolean =>
-  target instanceof HTMLElement &&
-  (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
-
-/**
- * Keyboard events that belong to a text field, an open dialog or a menu (the menu bar's
- * arrow keys, Escape and type-ahead) never drive the editor.
- */
-export const isEditorKeyEvent = (e: KeyboardEvent): boolean =>
-  !isTypingTarget(e.target) &&
-  !isModalOpen(useEditor.getState()) &&
-  !(e.target instanceof Element && e.target.closest("[role=dialog], [role=menu], [role=menubar]") !== null)
 
 type DragMode = "look" | "orbit" | "pan"
 

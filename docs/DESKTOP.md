@@ -33,7 +33,7 @@ The renderer never imports `electron`. It gets a `Platform` service (`apps/web/s
 | Open external link | `window.open`       | `shell.openExternal`                                         |
 | Updates            | none                | electron-updater state stream                                |
 
-`Platform.layer` is picked at module load: `window.ballest !== undefined` means desktop. The preload runs before any page script, so that test is reliable. Components still reach it through `editor/actions`. Settings, keybinds and map prefs stay in `localStorage`, which Electron persists under `userData`.
+`Platform.layer` is picked at module load: `window.ballest !== undefined` means desktop. The preload runs before any page script, so that test is reliable. Components still reach it through `editor/actions`. Settings, keybinds, map prefs and the dock's layout stay in `localStorage`, which Electron persists under `userData`.
 
 The web review build has no project. Its maps live in tabs in memory, each with its structure and no sidecar file: Open is the file input, and Save and Export download the `.balledit`.
 
@@ -67,12 +67,45 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - A right-click opens the tab's menu: Close, Close others, Close to the right, and on desktop Rename…, Duplicate… and Reveal.
 - Ctrl+Tab and Ctrl+Shift+Tab, or Ctrl+PageDown and PageUp, cycle the tabs.
 
+### Dock
+
+`components/dock/` is everything between the top bar and the status bar, built on [dockview](https://dockview.dev/) (`dockview-react`): the **centre group** with the panels around it, each of which can be dragged to any side of the centre, stacked as tabs, split, resized, collapsed, closed or popped out.
+
+**The centre group** holds the map tabs and the one viewport. Its only permanent panel is `documents`, whose dockview tab is hidden: `DocumentTabs` stands in for it, in the group's header ahead of any other tab. It can't be closed, dragged or popped out. The viewport keeps its own `renderer: "onlyWhenVisible"`, so it sits in the page's flow and resizes in the same frame as the window. A panel can be dropped on the centre's sides, but only one whose home is the centre can join it as a tab. Dropped there, a panel takes its side's usual size, not dockview's half of the viewport.
+
+**Panels** are entries in `components/dock/panels.tsx`: an id, a title, a component and a default location (`left`, `right`, `bottom`, `centre`). That entry is all a panel needs for a tab, a View menu item, a place in the default layout, and a place in layouts saved before it existed. `dockControl.ts` is what the rest of the app calls (`showPanel`, `togglePanel`, `openSettings`, `resetDockLayout`). It's in the page's first chunk, because the menu bar is, so the registry reaches it from `Dock.tsx` and keeps the panels, and WebGL, out of that chunk.
+
+- **Pieces** and **Project** start stacked on the left, with Pieces in front, and **Inspector** on the right. A panel `always` rendered (Pieces) stays in the page behind another tab, so a long list keeps its scroll position.
+- **Settings** (`components/SettingsPanel.tsx`) opens as a tab beside the maps from File › Settings…, or comes forward if it's open. It looks the game up again each time it comes into view.
+- View lists every panel not living in the centre, checked while it's open, and Reset layout. Reset closes everything around the centre group and lays out the default again, and the viewport stays mounted.
+- **Collapse** (a group's − button) folds it to its tab strip: a column by the viewport to a vertical strip, a group in a stack to its header. A group can't fold if its neighbours have nothing left to give, a click on a tab or a panel arriving unfolds it, and so does the + button.
+
+**Sizes.** A window resize goes to the viewport and the panels keep theirs, like closing a group: dockview would even out the group's neighbours. Neither has an option in dockview, so `dockControl.ts` sets the centre group's `priority` and wraps `gridview.remove`. A dockview upgrade should be checked for these.
+
+**The layout** is saved in `localStorage` under `ballest-editor.dock.v1`, a moment after each change and when the page goes away: dockview's `toJSON`, the panel ids it was saved with (`known`), the room around the centre (`hint`) and the collapsed groups' sizes. `domain/dockLayout.ts` holds the rules for reading it back.
+
+- A panel in `known` but not in the layout was closed by the user, and stays closed. One not in `known` is new and gets its default place.
+- A layout that doesn't decode, has a size that isn't a number, has no centre or that `fromJSON` refuses is dropped for the default.
+- The first paint is the saved layout: index.html sets `hint` as `--dock-<side>` on `<html>`, and `EditorSkeleton` lays out to them, first while the editor's chunk loads and then over the dock until its layout is in.
+
+**Popout** (a group's ↗ button) moves the active panel to a window of its own. Closing that window, or the button in its strip, puts it back where it was. Dockview's popout is a `window.open` of `public/popout.html` whose document the main page fills itself, so the panel stays in the same React tree and store. In-window floating groups are turned off.
+
+- **Desktop.** `DesktopWindow` lets the page open that one URL (`isPopoutUrl`) and nothing else, as a same-origin child: sandboxed like the main window, floating over it and closing with it. It has no native title bar: its tab strip is the title bar, as the top bar is for the main window, and main recolours it with the main window (`setColors`). F11 is that window's, and Ctrl+Q closes the main window, where unsaved changes ask.
+- **Web review build.** The same `window.open`. A blocked pop-up leaves the panel where it was, with a notification.
+- **A window doesn't come back on launch.** A browser would block it and dockview would lose the panel. Closing or reloading the main window docks the panels first, and `dockedPopouts` does it for a layout saved popped out, after a crash. An unload that's being held for unsaved changes leaves them alone, in case it's cancelled.
+- **The second window has a realm of its own.** Popups in a panel portal to the panel's window through `PortalContainerContext` (`packages/ui`), or they'd open in the main window. `instanceof Element` doesn't hold for what's in it, hence `elementOf`. Listeners in a panel use the window the panel is in. A panel coming back renders afresh, losing local state such as a search, because its elements belong to a window that's gone. Dialogs open in the main window, which takes the focus.
+- `popoutWindow.ts` adopts each window: the main window's `class` and `style` on `<html>` (theme, `--motion`) are mirrored to it, and it gives keys it doesn't use to the main window, where the keybinds listen.
+
+**Keys.** The rules are `isEditorKeyEvent`'s (`editor/keyTargets.ts`): a text field, a dialog or a menu keeps its keys, and everything else drives the editor, unless another tab in the centre group hides the map (`mapInFront`). Chrome hands focus back after a click (`blurChromeAfterClick`), so the keys work again straight away.
+
+Dockview is themed in `components/dock/dock.css` with the tokens from `packages/ui`, so it follows light and dark and `--motion`. Its strips are `h-8`, like the document tabs.
+
 ### Menus
 
 `components/MenuBar.tsx` holds the menus. Every item calls the entry point its keybind or button uses.
 
 - **File:** New project… (`components/NewProjectDialog.tsx`, a name that becomes `Documents/Ballest Editor/<name>` through `createProject`), Open project…, Recent projects, Save, Close tab, Settings…, Game link…, and Quit, which closes the window the way its × does, so unsaved edits ask.
-- **Edit** and **View.**
+- **Edit**, and **View** (the dock's panels and Reset layout, § Dock; the grid, sky, water and theme).
 - **Project:** New map…, Import map…; Export to game, Export on save, Re-import from game, Play, Launch game; Project settings….
 - **Web review build:** File (New map…, Open…, Save, Export…, Close tab, Settings…), Edit, View, and Project (Project settings…, the one map's).
 
@@ -80,7 +113,7 @@ There is no Map or Game menu: the menus act on the active tab's map, and the gam
 
 ### Project panel
 
-`components/ProjectPanel.tsx` is the left dock's Project tab beside Pieces (`components/LeftDock.tsx`; View › Project). It lists the project and its maps, the way an editor's file explorer shows a workspace.
+`components/ProjectPanel.tsx` is the Project panel (§ Dock). It lists the project and its maps, the way an editor's file explorer shows a workspace.
 
 - Each row shows the map, a dot while it is open in a tab with unsaved edits, and its link state as a glyph. Hovering names the state and says when the map was last edited.
 - A click opens the map.
@@ -184,7 +217,7 @@ Installed builds have no application menu (`Menu.setApplicationMenu(null)`): the
 
 ### Other windows
 
-Each window is a running copy of the app, a process of its own. There is no single-instance lock and no second window inside a process, because `Projects` and the other services hold one window's state. The rule is one project per window, and one window per project.
+Each editor window is a running copy of the app, a process of its own. There is no single-instance lock and no second editor window inside a process, because `Projects` and the other services hold one window's state. A panel popped out into a window of its own (§ Dock) is part of its editor window. The rule is one project per window, and one window per project.
 
 **The registry.** `WindowRegistry` (`apps/desktop/src/project/WindowRegistry.ts`) keeps a file per running copy, `<userData>/windows/<pid>.json`: `{ "pid", "project", "choosing" }`. `project` is the folder, or null for Untitled Project. `choosing` is true while the required chooser is up, which holds no project and isn't Untitled Project. A copy writes its file at start and on every project change, and removes it on quit.
 
