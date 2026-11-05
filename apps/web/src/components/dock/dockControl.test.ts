@@ -2,7 +2,7 @@ import { assert, beforeEach, describe, it, vi } from "@effect/vitest"
 import type { DockviewApi } from "dockview-react"
 import { DOCK_STORAGE_KEY, DOCUMENTS_PANEL } from "../../domain/dockLayout"
 import { useEditor } from "../../editor/store"
-import { attachDock, openSettings, resetDockLayout, showPanel, togglePanel } from "./dockControl"
+import { attachDock, expandGroup, openSettings, resetDockLayout, showPanel, togglePanel } from "./dockControl"
 import type { DockPanel } from "./panels"
 
 const panel = (id: string, location: DockPanel["location"], rest: Partial<DockPanel> = {}): DockPanel => ({
@@ -35,7 +35,11 @@ const fakeDock = ({ failLoad = false, loaded = [DOCUMENTS_PANEL] as ReadonlyArra
     get activePanel() {
       return [...open.values()].at(-1)
     },
-    element: { closest: () => undefined, getBoundingClientRect: () => ({ left: 0, right: 800, bottom: 600 }) },
+    element: {
+      dataset: {},
+      closest: () => undefined,
+      getBoundingClientRect: () => ({ left: 0, right: 800, bottom: 600 })
+    },
     api: {
       onDidActivePanelChange: quiet,
       setActive: () => calls.push("group active"),
@@ -107,8 +111,8 @@ const savedLayout = {
   grid: { root: { type: "branch", data: [], size: 600 }, orientation: "HORIZONTAL", width: 1280, height: 720 },
   panels: {}
 }
-const saved = (known: ReadonlyArray<string>) =>
-  JSON.stringify({ layout: savedLayout, known, hint: { left: 0, right: 0, bottom: 0 }, collapsed: {} })
+const saved = (known: ReadonlyArray<string>, collapsed = {}) =>
+  JSON.stringify({ layout: savedLayout, known, hint: { left: 0, right: 0, bottom: 0 }, collapsed })
 
 describe("the dock's layout on launch", () => {
   const storage = new Map<string, string>()
@@ -143,6 +147,16 @@ describe("the dock's layout on launch", () => {
     const { api, calls } = fakeDock()
     attachDock(api, panels)
     assert.deepStrictEqual(calls, ["fromJSON", "add inspector right"])
+  })
+
+  it("folds a column saved as a rail again, and a click on a tab undoes it", () => {
+    storage.set(DOCK_STORAGE_KEY, saved(["project"], { "1": { axis: "width", size: 260 } }))
+    const { api } = fakeDock()
+    attachDock(api, panels)
+    const [group] = api.groups
+    assert.strictEqual(group?.element.dataset["dockRail"], "")
+    if (group !== undefined) expandGroup(group)
+    assert.isUndefined(group?.element.dataset["dockRail"])
   })
 
   it("falls back to the default when dockview refuses the layout", () => {

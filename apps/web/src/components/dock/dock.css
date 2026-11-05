@@ -78,7 +78,7 @@
   min-width: 0;
   align-items: center;
   gap: 0.25rem;
-  padding-inline: 0.5rem 0.25rem;
+  padding-inline: 0.625rem;
   font-size: 0.65rem;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -147,6 +147,48 @@
 
 .dv-groupview:has([data-dock-hidden-tab]) .dv-scrollable {
   flex: none;
+}
+
+/* A column folded by the viewport: the titles down a slim strip, each one bringing the group back with that panel. */
+.dockview-theme-ballest .dv-groupview[data-dock-rail] {
+  --dv-tabs-and-actions-container-height: 100%;
+}
+
+.dv-groupview[data-dock-rail] > .dv-content-container {
+  display: none;
+}
+
+.dockview-theme-ballest .dv-groupview[data-dock-rail] > .dv-tabs-and-actions-container {
+  box-shadow: none;
+}
+
+/* Physical sides from here: a vertical strip's writing mode turns the logical ones. */
+.dv-groupview[data-dock-rail] .dv-tabs-container {
+  gap: 0.25rem;
+  padding: 0.25rem 0;
+}
+
+.dockview-theme-ballest .dv-groupview[data-dock-rail] .dv-tabs-container .dv-tab {
+  padding: 0.625rem 0;
+  color: var(--muted-foreground);
+  box-shadow: inset 2px 0 transparent;
+  transition: background-color calc(100ms * var(--motion)), color calc(100ms * var(--motion));
+}
+
+.dockview-theme-ballest .dv-groupview[data-dock-rail] .dv-tabs-container .dv-tab:hover {
+  background-color: var(--muted);
+  color: var(--foreground);
+}
+
+.dockview-theme-ballest .dv-groupview[data-dock-rail] .dv-tabs-container .dv-tab.dv-active-tab {
+  color: var(--foreground);
+  box-shadow: inset 2px 0 var(--primary);
+}
+
+.dv-groupview[data-dock-rail] .dock-tab {
+  width: 100%;
+  justify-content: center;
+  padding: 0;
 }
 
 .dock-actions {

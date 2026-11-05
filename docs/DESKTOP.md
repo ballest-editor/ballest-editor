@@ -78,7 +78,9 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - **Pieces** and **Project** start stacked on the left, with Pieces in front, and **Inspector** on the right. A panel `always` rendered (Pieces) stays in the page behind another tab, so a long list keeps its scroll position.
 - **Settings** (`components/SettingsPanel.tsx`) opens as a tab beside the maps from File › Settings…, or comes forward if it's open. It looks the game up again each time it comes into view.
 - View lists every panel not living in the centre, checked while it's open, and Reset layout. Reset closes everything around the centre group and lays out the default again, and the viewport stays mounted.
-- **Collapse** (a group's − button) folds it to its tab strip: a column by the viewport to a vertical strip, a group in a stack to its header. A group can't fold if its neighbours have nothing left to give, a click on a tab or a panel arriving unfolds it, and so does the + button.
+- **Each group's "…"** (`GroupMenu.tsx`), at the end of its strip, holds View's panel checks, then Pop out, Collapse and Reset layout. Only a panel whose home is the centre (Settings) has a × on its tab, since no menu closes it.
+- **Collapse** folds a group: a column by the viewport to a rail, a group in a stack to its header. A group can't fold if its neighbours have nothing left to give, so Collapse is off there. A panel arriving unfolds it, and so does a click on a tab, with that panel in front.
+- **The rail** is 28 px of the panels' titles, read downwards, and nothing else. It's the group's own strip with its header turned to the side, marked `data-dock-rail` and drawn by `dock.css`.
 
 **Sizes.** A window resize goes to the viewport and the panels keep theirs, like closing a group: dockview would even out the group's neighbours. Neither has an option in dockview, so `dockControl.ts` sets the centre group's `priority` and wraps `gridview.remove`. A dockview upgrade should be checked for these.
 
@@ -88,7 +90,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - A layout that doesn't decode, has a size that isn't a number, has no centre or that `fromJSON` refuses is dropped for the default.
 - The first paint is the saved layout: index.html sets `hint` as `--dock-<side>` on `<html>`, and `EditorSkeleton` lays out to them, first while the editor's chunk loads and then over the dock until its layout is in.
 
-**Popout** (a group's ↗ button) moves the active panel to a window of its own. Closing that window, or the button in its strip, puts it back where it was. Dockview's popout is a `window.open` of `public/popout.html` whose document the main page fills itself, so the panel stays in the same React tree and store. In-window floating groups are turned off.
+**Popout** (Pop out in a group's "…") moves the active panel to a window of its own. Closing that window, or the button in its strip, puts it back where it was. Dockview's popout is a `window.open` of `public/popout.html` whose document the main page fills itself, so the panel stays in the same React tree and store. In-window floating groups are turned off.
 
 - **Desktop.** `DesktopWindow` lets the page open that one URL (`isPopoutUrl`) and nothing else, as a same-origin child: sandboxed like the main window, floating over it and closing with it. It has no native title bar: its tab strip is the title bar, as the top bar is for the main window, and main recolours it with the main window (`setColors`). F11 is that window's, and Ctrl+Q closes the main window, where unsaved changes ask.
 - **Web review build.** The same `window.open`. A blocked pop-up leaves the panel where it was, with a notification.

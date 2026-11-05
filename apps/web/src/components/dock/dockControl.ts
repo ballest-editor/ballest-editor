@@ -18,8 +18,10 @@ import { type SettingsCategory, useEditor } from "../../editor/store"
 import type { DockPanel } from "./panels"
 import { adoptPopoutWindow } from "./popoutWindow"
 
-/** A group's tab strip across, `h-8` like the document tabs: what a collapsed group folds down to. */
-const COLLAPSED_SIZE = 32
+/** What a group in a stack folds down to: its tab strip, `h-8` like the document tabs. */
+const COLLAPSED_HEIGHT = 32
+/** What a column by the viewport folds down to: the rail of its panels' titles. dock.css draws it. */
+const RAIL_WIDTH = 28
 const SIDE_SIZES: Record<Exclude<DockLocation, "centre">, number> = { left: 260, right: 300, bottom: 240 }
 /** The viewport never gets narrower or shorter than this when a panel is dragged wider. */
 const MIN_VIEWPORT = { width: 320, height: 200 }
@@ -174,13 +176,15 @@ const notifyOpenPanels = (api: DockviewApi) => {
 const fold = (group: DockviewGroupPanel, axis: CollapsedGroup["axis"]) => {
   collapsed.set(group.id, { axis, size: axis === "width" ? group.width : group.height })
   if (axis === "width") {
+    group.element.dataset["dockRail"] = ""
     group.api.setHeaderPosition("left")
-    group.api.setConstraints({ minimumWidth: COLLAPSED_SIZE, maximumWidth: COLLAPSED_SIZE })
-    group.api.setSize({ width: COLLAPSED_SIZE })
+    group.api.setConstraints({ minimumWidth: RAIL_WIDTH, maximumWidth: RAIL_WIDTH })
+    group.api.setSize({ width: RAIL_WIDTH })
   } else {
-    group.api.setConstraints({ minimumHeight: COLLAPSED_SIZE, maximumHeight: COLLAPSED_SIZE })
-    group.api.setSize({ height: COLLAPSED_SIZE })
+    group.api.setConstraints({ minimumHeight: COLLAPSED_HEIGHT, maximumHeight: COLLAPSED_HEIGHT })
+    group.api.setSize({ height: COLLAPSED_HEIGHT })
   }
+  notifyCollapsed()
 }
 
 /**
@@ -367,16 +371,21 @@ export const popOutPanel = (panel: IDockviewPanel): void => {
   })
 }
 
+const collapseAxisOf = (group: DockviewGroupPanel): CollapsedGroup["axis"] | null =>
+  dock === null || isCentreGroup(group) || collapsed.has(group.id)
+    ? null
+    : collapseAxis(gridOf(dock), group.id, new Set(collapsed.keys()))
+
+/** Whether `group` can fold: there's somewhere for its space to go. */
+export const canCollapseGroup = (group: DockviewGroupPanel): boolean => collapseAxisOf(group) !== null
+
 /**
- * Folds `group` down to its tab strip: a column by the viewport to a vertical strip, a group in a stack to its header.
- * Does nothing when there's nowhere for the space to go.
+ * Folds `group` down: a column by the viewport to a rail of its panels' titles, a group in a stack to its header. Does
+ * nothing when there's nowhere for the space to go.
  */
 export const collapseGroup = (group: DockviewGroupPanel): void => {
-  if (dock === null || collapsed.has(group.id)) return
-  const axis = collapseAxis(gridOf(dock), group.id, new Set(collapsed.keys()))
-  if (axis === null) return
-  fold(group, axis)
-  notifyCollapsed()
+  const axis = collapseAxisOf(group)
+  if (axis !== null) fold(group, axis)
 }
 
 /** Gives a collapsed `group` its size back. Dockview can't drop a constraint, so its usual ones are set in its place. */
@@ -386,6 +395,7 @@ export const expandGroup = (group: DockviewGroupPanel): void => {
   collapsed.delete(group.id)
   const widest = Number.MAX_SAFE_INTEGER
   if (folded.axis === "width") {
+    delete group.element.dataset["dockRail"]
     group.api.setHeaderPosition("top")
     group.api.setConstraints({ minimumWidth: MIN_GROUP.width, maximumWidth: widest })
     group.api.setSize({ width: folded.size })
@@ -397,18 +407,18 @@ export const expandGroup = (group: DockviewGroupPanel): void => {
 }
 
 const collapsedListeners = new Set<() => void>()
-const notifyCollapsed = () => {
+function notifyCollapsed() {
   for (const listener of collapsedListeners) listener()
 }
 
-/** Whether `group` is collapsed, following it. */
-export const useGroupCollapsed = (group: DockviewGroupPanel): boolean =>
+/** The way `group` is folded, if it is, following it. */
+export const useGroupFold = (group: DockviewGroupPanel): CollapsedGroup["axis"] | undefined =>
   useSyncExternalStore(
     (listener) => {
       collapsedListeners.add(listener)
       return () => collapsedListeners.delete(listener)
     },
-    () => collapsed.has(group.id)
+    () => collapsed.get(group.id)?.axis
   )
 
 const followDockChanges = (listener: () => void) => {
@@ -416,9 +426,13 @@ const followDockChanges = (listener: () => void) => {
   return () => dockListeners.delete(listener)
 }
 
-/** Whether panel `id` is open anywhere in the dock, for the View menu's checks. */
-export const usePanelOpen = (id: string): boolean => useSyncExternalStore(followDockChanges, () => openPanels.has(id))
+/** A checkbox menu item for panel `id`: checked while it's open anywhere in the dock, and toggling it. */
+export const usePanelCheck = (id: string) => ({
+  closeOnClick: true,
+  checked: useSyncExternalStore(followDockChanges, () => openPanels.has(id)),
+  onCheckedChange: () => togglePanel(id)
+})
 
-/** The panels the View menu closes and reopens. What lives in the centre has its own way in (File › Settings…). */
+/** The panels the menus close and reopen. What lives in the centre has its own way in (File › Settings…). */
 export const useViewMenuPanels = (): ReadonlyArray<DockPanel> =>
   useSyncExternalStore(followDockChanges, () => dockPanels).filter((panel) => panel.location !== "centre")

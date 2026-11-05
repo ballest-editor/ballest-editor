@@ -1,4 +1,4 @@
-import { IconArrowsMinimize, IconExternalLink, IconMinus, IconPlus, IconX } from "@tabler/icons-react"
+import { IconArrowsMinimize, IconX } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { PortalContainerContext } from "@workspace/ui/lib/portal-container"
 import {
@@ -16,8 +16,9 @@ import { DocumentTabs } from "../DocumentTabs"
 import { EditorSkeletonPanels } from "../EditorSkeleton"
 import { ViewportControls } from "../ViewControls"
 import "./dock.css"
-import { attachDock, collapseGroup, expandGroup, isCentreGroup, popOutPanel, useGroupCollapsed } from "./dockControl"
+import { attachDock, expandGroup, isCentreGroup, useGroupFold } from "./dockControl"
 import { followDockDrags } from "./dragImage"
+import { GroupMenu } from "./GroupMenu"
 import { dockPanels } from "./panels"
 
 const dockTheme: DockviewTheme = { name: "ballest", className: "dockview-theme-ballest" }
@@ -65,7 +66,12 @@ const dockComponents = {
   ...Object.fromEntries(dockPanels.map((panel) => [panel.id, inFrame(panel.component)]))
 }
 
+/**
+ * A panel's tab. Only what lives in the centre has a ×: the rest open and close from the View menu and a group's "…",
+ * and Settings is in neither, wherever it was dragged.
+ */
 function DockTab({ api, containerApi }: IDockviewPanelHeaderProps) {
+  const closable = dockPanels.find((panel) => panel.id === api.id)?.location === "centre"
   const expand = () => {
     const group = containerApi.getPanel(api.id)?.group
     if (group !== undefined) expandGroup(group)
@@ -81,18 +87,20 @@ function DockTab({ api, containerApi }: IDockviewPanelHeaderProps) {
       onMouseDown={(e) => e.button === 1 && e.preventDefault()}
     >
       <span className="truncate">{api.title}</span>
-      <button
-        type="button"
-        aria-label={`Close ${api.title}`}
-        className="dock-tab-close"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation()
-          api.close()
-        }}
-      >
-        <IconX className="size-3" />
-      </button>
+      {closable && (
+        <button
+          type="button"
+          aria-label={`Close ${api.title}`}
+          className="dock-tab-close"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            api.close()
+          }}
+        >
+          <IconX className="size-3" />
+        </button>
+      )}
     </div>
   )
 }
@@ -107,52 +115,30 @@ function CentreTabs({ group }: IDockviewHeaderActionsProps) {
   return isCentreGroup(group) ? <DocumentTabs /> : null
 }
 
-function ActionButton(
-  { label, onClick, children }: { readonly label: string; readonly onClick: () => void; readonly children: ReactNode }
-) {
-  return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      className="size-6 text-muted-foreground"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-    >
-      {children}
-    </Button>
-  )
-}
-
-/** What a group's header holds at its end: fold it away, pop its panel out, or send it back to the main window. */
+/**
+ * What a group's strip holds at its end: its "…", or in a popped-out window the way back. A rail is only its panels'
+ * titles.
+ */
 function GroupActions({ group, activePanel, location }: IDockviewHeaderActionsProps) {
-  const collapsed = useGroupCollapsed(group)
-  if (location?.type === "popout") {
-    return (
-      <div className="dock-actions">
-        <ActionButton label="Back to the main window" onClick={() => group.api.getWindow().close()}>
-          <IconArrowsMinimize className="size-3.5" />
-        </ActionButton>
-      </div>
-    )
-  }
-  const centre = isCentreGroup(group)
-  if (activePanel === undefined || activePanel.id === DOCUMENTS_PANEL) return null
+  const fold = useGroupFold(group)
+  if (fold === "width") return null
+  const back = "Back to the main window"
   return (
     <div className="dock-actions">
-      {!centre && (
-        <ActionButton
-          label={collapsed ? "Expand" : "Collapse"}
-          onClick={() => collapsed ? expandGroup(group) : collapseGroup(group)}
-        >
-          {collapsed ? <IconPlus className="size-3.5" /> : <IconMinus className="size-3.5" />}
-        </ActionButton>
-      )}
-      {!collapsed && (
-        <ActionButton label="Pop out into a window" onClick={() => popOutPanel(activePanel)}>
-          <IconExternalLink className="size-3.5" />
-        </ActionButton>
-      )}
+      {location?.type === "popout"
+        ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="size-6 text-muted-foreground"
+            aria-label={back}
+            title={back}
+            onClick={() => group.api.getWindow().close()}
+          >
+            <IconArrowsMinimize className="size-3.5" />
+          </Button>
+        )
+        : <GroupMenu group={group} activePanel={activePanel} />}
     </div>
   )
 }
