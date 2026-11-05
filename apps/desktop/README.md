@@ -156,7 +156,7 @@ A sandboxed preload can `require` only `electron` and a few built-ins (`electron
 
 ## Updates
 
-An installed app updates itself from this repository's GitHub Releases. `DesktopUpdates` (`src/updates/`) checks 15 s after start and every 4 minutes until it finds a newer release, then waits for the user: the page's status bar offers it, downloads it on Download and installs it on Restart. `electron-updater` does the work through `ElectronUpdater`; electron-builder wrote the feed into `resources/app-update.yml`.
+An installed app updates itself from this repository's GitHub Releases. `DesktopUpdates` (`src/updates/`) checks 15 s after start and every 4 minutes until it finds a newer release, then waits for the user: the page's status bar offers it, downloads it on Download and installs it on Restart. The status bar's left end shows the running version. File › Check for updates and the button in Settings › General run a check now, and both places say what it found; a check nobody asked for only speaks up when it finds a release. `electron-updater` does the work through `ElectronUpdater`; electron-builder wrote the feed into `resources/app-update.yml`.
 
 | State         | When                                            | The page shows                                                                         |
 | ------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |

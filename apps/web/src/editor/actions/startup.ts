@@ -114,10 +114,17 @@ export const followUpdateState = Effect.gen(function*() {
 /** Follows the updater (`followUpdateState`) until the returned function is called: a React effect's cleanup. */
 export const followUpdates = () => runUntilCleanup(followUpdateState, "Stopped following the updater")
 
-const updateStep = (step: "downloadUpdate" | "installUpdate") =>
+const updateStep = (step: "checkForUpdates" | "downloadUpdate" | "installUpdate") =>
   Effect.gen(function*() {
     yield* (yield* Platform)[step]
   })
+
+/** Checks for a newer release now; the store follows what it found, and whether the check ran to its end. */
+export const checkForUpdates = async () => {
+  const { setUpdateChecked } = useEditor.getState()
+  setUpdateChecked(false)
+  setUpdateChecked((await run(updateStep("checkForUpdates").pipe(Effect.as(true)))) === true)
+}
 
 /** Starts downloading the release on offer; the pill follows its progress. */
 export const downloadUpdate = () => run(updateStep("downloadUpdate"))

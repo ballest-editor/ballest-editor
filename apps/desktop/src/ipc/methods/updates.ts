@@ -6,6 +6,9 @@ export const updateHandlers = {
   getUpdateState: Effect.fn("ipc.getUpdateState")(function*() {
     return yield* (yield* DesktopUpdates).state
   }),
+  checkForUpdates: Effect.fn("ipc.checkForUpdates")(function*() {
+    yield* (yield* DesktopUpdates).check
+  }),
   /** Starts the download and returns; the page follows it on `PushChannels.onUpdateState`. */
   downloadUpdate: Effect.fn("ipc.downloadUpdate")(function*() {
     yield* (yield* DesktopUpdates).download

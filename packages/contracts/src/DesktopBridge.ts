@@ -673,6 +673,8 @@ export const DesktopMethods = {
   rememberGameLink: { payload: GameLinkResult, result: Schema.Void },
   /** The updater's state now. */
   getUpdateState: { payload: noPayload, result: UpdateState },
+  /** Checks the feed now and returns when the check is done; the outcome arrives through `onUpdateState`. */
+  checkForUpdates: { payload: noPayload, result: Schema.Void },
   /** Starts downloading the release on offer (`available`); progress and the outcome arrive through `onUpdateState`. */
   downloadUpdate: { payload: noPayload, result: Schema.Void },
   /** Quits, installs the downloaded release (`ready`) and starts it. Unsaved edits are lost. */

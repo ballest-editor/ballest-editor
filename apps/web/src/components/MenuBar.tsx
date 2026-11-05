@@ -17,7 +17,9 @@ import type { ReactNode } from "react"
 import { formatBinding, type KeybindAction } from "../domain/Keybinds"
 import type { Settings } from "../domain/Settings"
 import { formatGridSize, GRID_SIZES, type GridSize } from "../domain/snap"
+import { canCheckForUpdates } from "../domain/updates"
 import {
+  checkForUpdates,
   chooseProject,
   exportToGame,
   launchGame,
@@ -118,6 +120,7 @@ const THEMES: ReadonlyArray<{ readonly theme: Settings["appearance"]["theme"]; r
  */
 export function MenuBar() {
   const canUndo = useEditor((s) => s.past.length > 0 && s.preview === null)
+  const canCheck = useEditor((s) => s.update !== null && canCheckForUpdates(s.update))
   const canRedo = useEditor((s) => s.future.length > 0 && s.preview === null)
   const hasSelection = useEditor((s) => s.selectedIds.length > 0)
   const canPaste = useEditor((s) => s.clipboard !== null)
@@ -158,6 +161,7 @@ export function MenuBar() {
             <MenubarSeparator />
             <MenubarItem onClick={() => openDialog({ id: "settings" })}>Settings…</MenubarItem>
             <MenubarItem onClick={() => openDialog({ id: "gameLink" })}>Game link…</MenubarItem>
+            <MenubarItem disabled={!canCheck} onClick={() => void checkForUpdates()}>Check for updates</MenubarItem>
             <MenubarItem onClick={() => void quitApp()}>Quit</MenubarItem>
           </Menu>
         )
