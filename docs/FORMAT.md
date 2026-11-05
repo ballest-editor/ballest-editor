@@ -239,7 +239,7 @@ The load-time rules are under [Load-time validation](#load-time-validation). The
 
 - One game group per outermost tree group with at least one item anywhere under it. A nested group has no game group of its own.
 - `members` is every item index under it, flattened and sorted.
-- `name` is the group's name reduced to letters and digits, at most 64 of them, or empty when none are left.
+- `name` is the group's name, or the prefab's for a prefab instance, reduced to letters and digits, at most 64 of them, or empty when none are left.
 - `frame` has identity rotation and scale, with its translation at the centre of the box around the members' `itemTransform.translation`. The game's own Ctrl+G centres it on the members' mesh bounds instead (above), so the editor's gizmo for a group made here sits a little off the game's; using the catalog's bounds is a follow-up.
 
 Going the other way, a map with no sidecar gets one tree group per game group, where its first member is. An unnamed one is called `Group N`, and a member the game would refuse is left out.

@@ -83,7 +83,7 @@ A nested group has to flatten to one game group holding every item beneath it. T
 | No `translation`                                | Loads, gizmo at the world origin                         |
 | No `frame` at all, or a non-normalised rotation | Blank map ([limits-validation.md](limits-validation.md)) |
 
-Our rules don't catch the zero scale yet. It is an open gap in [limits-validation.md](limits-validation.md).
+`gameRules.ts` refuses a frame with a 0 on a scale axis.
 
 ## Selecting, ungrouping and the rest
 
