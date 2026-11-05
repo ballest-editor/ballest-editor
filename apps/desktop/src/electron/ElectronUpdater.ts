@@ -1,5 +1,5 @@
-import { Context, Effect, Layer, Option, Schema } from "effect"
-import { autoUpdater } from "electron-updater"
+import { Context, Effect, Layer, Option, Predicate, Schema } from "effect"
+import { autoUpdater, type UpdateCheckResult } from "electron-updater"
 
 /** A release newer than the running app, as the feed describes it. */
 export interface UpdateInfo {
@@ -26,13 +26,64 @@ export class ElectronUpdaterError extends Schema.TaggedError<ElectronUpdaterErro
   }
 }
 
+/** What `findRelease` needs of electron-updater's `autoUpdater`. */
+export interface ReleaseFeed {
+  /** Each check reads it: on, the newest tag of the running prerelease channel; off, GitHub's latest stable release. */
+  allowPrerelease: boolean
+  readonly currentVersion: { readonly prerelease: ReadonlyArray<string | number> }
+  checkForUpdates(): Promise<UpdateCheckResult | null>
+}
+
+const lookUp = (feed: ReleaseFeed, allowPrerelease: boolean) =>
+  Effect.tryPromise({
+    try: () => {
+      feed.allowPrerelease = allowPrerelease
+      return feed.checkForUpdates()
+    },
+    catch: (cause) => new ElectronUpdaterError({ operation: "check", cause })
+  }).pipe(
+    // null: the updater is inactive (no app-update.yml, or Linux outside an AppImage).
+    Effect.map((result): Option.Option<UpdateInfo> =>
+      result?.isUpdateAvailable === true
+        ? Option.some({
+          version: result.updateInfo.version,
+          releaseNotes: result.updateInfo.releaseNotes,
+          releaseDate: result.updateInfo.releaseDate
+        })
+        : Option.none()
+    )
+  )
+
+/** The feed lists a tag as soon as it's pushed, so its release may not have its update manifest yet. */
+const isReleaseUnfinished = (error: ElectronUpdaterError) =>
+  Predicate.hasProperty(error.cause, "code") && error.cause.code === "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND"
+
+/**
+ * The release to offer. A stable install looks at stable releases only. A prerelease install takes a newer stable
+ * release if there is one and otherwise a newer prerelease of its own channel. It looks in that order and stops at the
+ * first find, because a download fetches whatever the last check to find a release found. electron-updater never
+ * reports an older version as an update, so this can't downgrade.
+ *
+ * Until the first stable release is out, the stable lookup fails, and that counts as finding nothing.
+ */
+export const findRelease = (feed: ReleaseFeed): Effect.Effect<Option.Option<UpdateInfo>, ElectronUpdaterError> =>
+  feed.currentVersion.prerelease.length === 0
+    ? lookUp(feed, false)
+    : lookUp(feed, false).pipe(
+      Effect.orElseSucceed(() => Option.none<UpdateInfo>()),
+      Effect.filterOrElse(
+        Option.isSome,
+        () => lookUp(feed, true).pipe(Effect.catchIf(isReleaseUnfinished, () => Effect.succeedNone))
+      )
+    )
+
 export class ElectronUpdater extends Context.Service<ElectronUpdater, {
   /**
    * Nothing happens unless asked: no download after a check, no install on quit. `feed` replaces the one packaged in
    * `app-update.yml` (the mock update server's).
    */
   readonly configure: (options: { readonly feed: Option.Option<URL> }) => Effect.Effect<void>
-  /** The newer release, if the feed has one. */
+  /** The release to offer, if any (`findRelease`). */
   readonly checkForUpdates: Effect.Effect<Option.Option<UpdateInfo>, ElectronUpdaterError>
   /** Downloads the release the last check found, calling `onProgress` with 0 to 100 on the way. */
   readonly downloadUpdate: (onProgress: (percent: number) => void) => Effect.Effect<void, ElectronUpdaterError>
@@ -48,21 +99,7 @@ export class ElectronUpdater extends Context.Service<ElectronUpdater, {
           autoUpdater.autoInstallOnAppQuit = false
           if (Option.isSome(feed)) autoUpdater.setFeedURL({ provider: "generic", url: feed.value.href })
         }),
-      checkForUpdates: Effect.tryPromise({
-        try: () => autoUpdater.checkForUpdates(),
-        catch: (cause) => new ElectronUpdaterError({ operation: "check", cause })
-      }).pipe(
-        // null: the updater is inactive (no app-update.yml, or Linux outside an AppImage).
-        Effect.map((result) =>
-          result?.isUpdateAvailable === true
-            ? Option.some({
-              version: result.updateInfo.version,
-              releaseNotes: result.updateInfo.releaseNotes,
-              releaseDate: result.updateInfo.releaseDate
-            })
-            : Option.none()
-        )
-      ),
+      checkForUpdates: Effect.suspend(() => findRelease(autoUpdater)),
       downloadUpdate: (onProgress) =>
         Effect.acquireUseRelease(
           Effect.sync(() => {
