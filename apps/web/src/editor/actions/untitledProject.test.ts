@@ -1,3 +1,4 @@
+import { isMapFileName } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect } from "effect"
 import {
@@ -103,7 +104,8 @@ describe("maps made in Untitled Project", () => {
       disk.files.delete(inGame)
 
       assert.deepStrictEqual(foldersWithMaps(disk), [project])
-      assert.deepStrictEqual(listed(), [...disk.files.keys()].map((file) => file.split("/maps/")[1]!).sort())
+      const inMaps = [...disk.files.keys()].map((file) => file.split("/maps/")[1]!).filter(isMapFileName)
+      assert.deepStrictEqual(listed(), inMaps.sort())
       assert.lengthOf(listed(), 5)
       assert.isTrue(disk.files.has(projectFile(fileName("Shuttle 2"), project)))
     }).pipe(Effect.provide(layerFor(disk)))

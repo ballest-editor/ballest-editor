@@ -5,7 +5,7 @@ import { MapCodec } from "../../services/MapCodec"
 import { type MapBackup, Platform } from "../../services/Platform"
 import { useEditor } from "../store"
 import { run } from "./run"
-import { fileOf, refreshProject, showMap } from "./shared"
+import { fileOf, loadMapFile, refreshProject, showMap } from "./shared"
 import { unlessCancelledFor } from "./unsaved"
 
 /** The versions main kept of the files it wrote over, newest first, for the Recover dialog (desktop). */
@@ -34,18 +34,20 @@ export const describeBackupEffect = Effect.fn("describeBackupEffect")(function*(
 export const describeBackup = (backup: MapBackup) => run(describeBackupEffect(backup))
 
 /**
- * Recover: opens a backup as unsaved edits of the project map it is a version of, so Save writes it over that map
- * (whose file is backed up first). A map no longer in the project opens as a new one, named on Save. It shows in the
- * map's tab when one has it open (`open`; `recoverBackup` asks about that tab's unsaved edits first), else a new tab.
+ * Recover: opens a backup, with the sidecar kept with it, as unsaved edits of the project map it is a version of, so
+ * Save writes it over that map (whose file is backed up first). A map no longer in the project opens as a new one, named
+ * on Save. It shows in the map's tab when one has it open (`open`; `recoverBackup` asks about that tab's unsaved edits
+ * first), else a new tab.
  */
 export const recoverBackupEffect = Effect.fn("recoverBackupEffect")(function*(backup: MapBackup, open = false) {
   const file = yield* (yield* Platform).readBackup(backup)
-  const map = yield* MapCodec.use((codec) => codec.decode(file.text))
+  const { loaded, map } = yield* loadMapFile(file)
   yield* refreshProject
   const inProject = useEditor.getState().projectMaps.find((m) => m.fileName === backup.fileName)
   yield* showMap(map, inProject === undefined ? null : fileOf(inProject), {
     dirty: true,
-    into: open ? "active" : "newTab"
+    into: open ? "active" : "newTab",
+    loaded
   })
   const label = mapLabelOf(backup.fileName)
   useEditor.getState().notify(

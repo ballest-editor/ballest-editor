@@ -27,6 +27,9 @@ export const FilePath = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLen
 /** A map file's text: the game's JSON, exactly as written to disk. The game's own largest maps are a few MB. */
 export const MapText = Schema.String.check(Schema.isMaxLength(64 * 1024 * 1024))
 
+/** A sidecar's text (docs/PROJECTS.md § The files): the page encodes and decodes it, main only moves it. */
+export const SidecarText = Schema.String.check(Schema.isMaxLength(64 * 1024 * 1024))
+
 /** A map file on disk: where it is and its name (the path's last segment). */
 export const MapFileRef = Schema.Struct({
   path: FilePath,
@@ -158,8 +161,12 @@ export type ProjectMap = typeof ProjectMap.Type
 export const ProjectMaps = Schema.Array(ProjectMap)
 export type ProjectMaps = typeof ProjectMaps.Type
 
-/** A project map that was read, with its text. */
-export const ProjectMapFile = Schema.Struct({ ...ProjectMap.fields, text: MapText })
+/** A project map that was read, with its text and its sidecar's: null when it has none, or that can't be read. */
+export const ProjectMapFile = Schema.Struct({
+  ...ProjectMap.fields,
+  text: MapText,
+  sidecar: Schema.NullOr(SidecarText)
+})
 export type ProjectMapFile = typeof ProjectMapFile.Type
 
 export const MapFileNamePayload = Schema.Struct({ fileName: MapFileName })
@@ -172,6 +179,10 @@ export type OpenMapPayload = typeof OpenMapPayload.Type
 /** `createMap` and `saveMap`: the map's file name in the project and its text. */
 export const WriteMapPayload = Schema.Struct({ fileName: MapFileName, text: MapText })
 export type WriteMapPayload = typeof WriteMapPayload.Type
+
+/** `writeSidecar`: the map the sidecar belongs to, and the sidecar's text. */
+export const WriteSidecarPayload = Schema.Struct({ fileName: MapFileName, text: SidecarText })
+export type WriteSidecarPayload = typeof WriteSidecarPayload.Type
 
 /** `renameMap`: the file the map was in, the one it moves to (named after its new name), and its new text. */
 export const RenameMapPayload = Schema.Struct({ from: MapFileName, to: MapFileName, text: MapText })
@@ -261,8 +272,16 @@ export type MapBackup = typeof MapBackup.Type
 export const MapBackups = Schema.Array(MapBackup)
 export type MapBackups = typeof MapBackups.Type
 
-/** A backup that was read, with its text (the old file's bytes). */
-export const MapBackupFile = Schema.Struct({ ...MapBackup.fields, text: MapText })
+/**
+ * A backup that was read: its text (the old file's bytes), their hash, and the sidecar kept when it was, else the map's
+ * sidecar as it is now (null: the map has none).
+ */
+export const MapBackupFile = Schema.Struct({
+  ...MapBackup.fields,
+  text: MapText,
+  hash: FileHash,
+  sidecar: Schema.NullOr(SidecarText)
+})
 export type MapBackupFile = typeof MapBackupFile.Type
 
 export const WindowThemePayload = Schema.Struct({ dark: Schema.Boolean })
@@ -624,8 +643,13 @@ export const DesktopMethods = {
    * Atomic, like every write. The file it replaces goes to the project's backups first; the same text writes nothing.
    */
   saveMap: { payload: WriteMapPayload, result: ProjectMap },
-  /** Writes the map under its new file name and moves the old file to the project's backups; its link moves with it. */
+  /**
+   * Writes the map under its new file name and moves the old file to the project's backups; its link and its sidecar
+   * move with it.
+   */
   renameMap: { payload: RenameMapPayload, result: ProjectMap },
+  /** Writes a map's sidecar beside it, after the map itself. The old sidecar goes to the project's backups. */
+  writeSidecar: { payload: WriteSidecarPayload, result: Schema.Void },
   /** The native open dialog for a map file anywhere; null when cancelled. The file may then be imported. */
   pickImport: { payload: noPayload, result: PickImportResult },
   /** Copies a picked file into the project and records where it came from (a map it replaces goes to backups). */

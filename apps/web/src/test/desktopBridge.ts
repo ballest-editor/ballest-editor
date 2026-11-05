@@ -18,6 +18,7 @@ import type {
   UnsavedPrompt,
   UpdateState
 } from "@ballest/contracts"
+import { isMapFileName, sidecarFileNameOf } from "@ballest/contracts"
 import { Option, Schema } from "effect"
 
 /**
@@ -105,6 +106,10 @@ export const TEST_PROJECT = `${TEST_PROJECTS_FOLDER}/My maps`
 
 /** Where a project map is: `<project>/maps/<file name>`. */
 export const projectFile = (fileName: string, project = TEST_PROJECT) => `${project}/maps/${fileName}`
+
+/** Where a project map's sidecar is. */
+export const sidecarFile = (fileName: string, project = TEST_PROJECT) =>
+  projectFile(sidecarFileNameOf(fileName), project)
 
 /** What an install folder must hold for `chooseGamePath` to take it, as main checks. */
 export const GAME_EXE = "Ballest/Binaries/Win64/Ballest-Win64-Shipping.exe"
@@ -278,7 +283,15 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     const old = disk.files.get(path)
     if (old === undefined || old === next) return
     const fileName = nameOf(path)
-    disk.backups.unshift({ place, id: `${disk.backups.length} ${fileName}`, fileName, at: TIME, text: old })
+    disk.backups.unshift({
+      place,
+      id: `${disk.backups.length} ${fileName}`,
+      fileName,
+      at: TIME,
+      text: old,
+      hash: testHash(old),
+      sidecar: disk.files.get(sidecarFile(fileName, current())) ?? null
+    })
   }
   const write = (fileName: string, text: string) => {
     const path = projectFile(fileName, current())
@@ -286,6 +299,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     disk.files.set(path, text)
     return Promise.resolve(mapOf(fileName))
   }
+  const sidecarOf = (fileName: string) => disk.files.get(sidecarFile(fileName, current())) ?? null
   const ask = (kind: TestDisk["dialogs"][number]["kind"]) => {
     disk.dialogs.push({ kind })
     return disk.answers.shift() ?? null
@@ -336,7 +350,9 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     listMaps: () => {
       const prefix = `${current()}/maps/`
       return Promise.resolve(
-        [...disk.files.keys()].filter((file) => file.startsWith(prefix)).map((file) => mapOf(nameOf(file)))
+        [...disk.files.keys()]
+          .filter((file) => file.startsWith(prefix) && isMapFileName(nameOf(file)))
+          .map((file) => mapOf(nameOf(file)))
       )
     },
     readMap: ({ fileName }) => {
@@ -344,9 +360,13 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       const text = disk.files.get(projectFile(fileName, current()))
       return text === undefined
         ? fail(`${projectFile(fileName, current())} doesn't exist any more.`)
-        : Promise.resolve({ ...mapOf(fileName), text })
+        : Promise.resolve({ ...mapOf(fileName), text, sidecar: sidecarOf(fileName) })
     },
-    createMap: ({ fileName, text }) => has(fileName) ? exists(fileName) : write(fileName, text),
+    createMap: ({ fileName, text }) => {
+      if (has(fileName)) return exists(fileName)
+      disk.files.delete(sidecarFile(fileName, current()))
+      return write(fileName, text)
+    },
     saveMap: ({ fileName, text }) => write(fileName, text),
     renameMap: ({ from, to, text }) => {
       if (disk.project.current === null) return fail(NO_PROJECT)
@@ -358,7 +378,14 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       const moved = links.get(from)
       links.delete(from)
       if (moved !== undefined) links.set(to, moved)
+      const sidecar = sidecarOf(from)
+      disk.files.delete(sidecarFile(from, current()))
+      if (sidecar !== null) disk.files.set(sidecarFile(to, current()), sidecar)
       return write(to, text)
+    },
+    writeSidecar: ({ fileName, text }) => {
+      disk.files.set(sidecarFile(fileName, current()), text)
+      return Promise.resolve()
     },
     pickImport: () => {
       const path = ask("import")
@@ -369,9 +396,11 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     },
     importMap: async ({ source, fileName, text, replace }) => {
       if (disk.project.current === null) return fail(NO_PROJECT)
+      if (source === projectFile(fileName, current())) return { _tag: "Imported", map: mapOf(fileName) } as const
       if (has(fileName) && !replace) return { _tag: "Clash", fileName } as const
       const original = disk.files.get(source) ?? ""
       await write(fileName, text)
+      disk.files.delete(sidecarFile(fileName, current()))
       const origin = { path: source, hash: testHash(original), at: TIME }
       const fromGame = source === `${TEST_MAPS_FOLDER}/${fileName}`
       const links = linksOf(current())
@@ -437,9 +466,10 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       await write(fileName, text)
       const seen = { ...link.export, hash: testHash(text) }
       linksOf(current()).set(fileName, { ...link, export: seen, lastSeenHash: seen.hash })
-      return { ...mapOf(fileName), text }
+      return { ...mapOf(fileName), text, sidecar: sidecarOf(fileName) }
     },
-    listBackups: () => Promise.resolve(disk.backups.map(({ text: _, ...backup }) => backup)),
+    listBackups: () =>
+      Promise.resolve(disk.backups.map(({ hash: _hash, sidecar: _sidecar, text: _, ...backup }) => backup)),
     readBackup: ({ place, id }) => {
       const backup = disk.backups.find((b) => b.place === place && b.id === id)
       return backup === undefined ? fail(`${id} doesn't exist any more.`) : Promise.resolve(backup)

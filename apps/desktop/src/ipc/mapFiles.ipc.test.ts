@@ -4,11 +4,134 @@ import { Effect, FileSystem, Path } from "effect"
 import * as Fs from "node:fs"
 import { vi } from "vitest"
 import { sha256 } from "../project/files"
-import { samplesDir, withHandlers } from "./handlersHarness"
+import { type fakeIpcMain, samplesDir, withHandlers } from "./handlersHarness"
 
 // The services' layers call Electron; these tests replace them, so only the module import needs a stand-in
 // (requiring the real package from Node would download the binary).
 vi.mock("electron", () => ({}))
+
+const sidecarOf = (hash: string) => JSON.stringify({ mapHash: hash })
+
+describe("sidecars over IPC", () => {
+  const map = "Map_LevelEditorMain&Track_me.balledit"
+  const sidecar = "Map_LevelEditorMain&Track_me.editor.json"
+
+  /** Runs `body` over a project holding `map` and its sidecar `sidecarOf("one")`. */
+  const withSidecar = <A, E>(
+    body: (
+      env: {
+        readonly fake: ReturnType<typeof fakeIpcMain>
+        readonly files: FileSystem.FileSystem
+        readonly maps: string
+        readonly project: string
+      }
+    ) => Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>
+  ) =>
+    withHandlers(({ fake, project }) =>
+      Effect.gen(function*() {
+        const files = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        yield* fake.invoke(InvokeChannels.createMap, { fileName: map, text: "{\"v\":1}" })
+        yield* fake.invoke(InvokeChannels.writeSidecar, { fileName: map, text: sidecarOf("one") })
+        return yield* body({ fake, files, maps: path.join(project, "maps"), project })
+      })
+    )
+
+  it.effect("keeps the sidecar beside the map, reads it with the map and leaves it out of the list", () =>
+    withSidecar(({ fake, files, maps }) =>
+      Effect.gen(function*() {
+        const path = yield* Path.Path
+        assert.strictEqual(yield* files.readFileString(path.join(maps, sidecar)), sidecarOf("one"))
+        assert.deepInclude(yield* fake.invoke(InvokeChannels.readMap, { fileName: map }), {
+          text: "{\"v\":1}",
+          sidecar: sidecarOf("one")
+        })
+        assert.deepStrictEqual(
+          (yield* fake.invokeAs(ProjectMaps, InvokeChannels.listMaps)).map((m) => m.fileName),
+          [map]
+        )
+        const refused = yield* Effect.flip(
+          fake.invoke(InvokeChannels.writeSidecar, { fileName: "../outside.balledit", text: "{}" })
+        )
+        assert.match(String(refused.cause), /map file name/)
+      })
+    ))
+
+  it.effect("reads no sidecar for a map that has none", () =>
+    withHandlers(({ fake }) =>
+      Effect.gen(function*() {
+        yield* fake.invoke(InvokeChannels.createMap, { fileName: map, text: "{}" })
+        assert.deepInclude(yield* fake.invoke(InvokeChannels.readMap, { fileName: map }), { sidecar: null })
+      })
+    ))
+
+  it.effect("Rename moves the sidecar and backs up the old one; a Save keeps the sidecar it writes over", () =>
+    withSidecar(({ fake, files, maps }) =>
+      Effect.gen(function*() {
+        const path = yield* Path.Path
+        const renamed = "Map_LevelEditorMain&Loop_me.balledit"
+        yield* fake.invoke(InvokeChannels.saveMap, { fileName: map, text: "{\"v\":2}" })
+        yield* fake.invoke(InvokeChannels.writeSidecar, { fileName: map, text: sidecarOf("two") })
+        yield* fake.invoke(InvokeChannels.renameMap, { from: map, to: renamed, text: "{\"v\":3}" })
+
+        assert.isFalse(yield* files.exists(path.join(maps, sidecar)))
+        assert.strictEqual(
+          yield* files.readFileString(path.join(maps, "Map_LevelEditorMain&Loop_me.editor.json")),
+          sidecarOf("two")
+        )
+
+        // Recover lists only maps, and each version comes with the sidecar kept when it was
+        const backups = yield* fake.invokeAs(MapBackups, InvokeChannels.listBackups)
+        assert.deepStrictEqual(backups.map((b) => b.fileName), [map, map])
+        const reads = yield* Effect.forEach(
+          backups,
+          ({ id, place }) => fake.invokeAs(MapBackupFile, InvokeChannels.readBackup, { place, id })
+        )
+        assert.deepStrictEqual(reads.map((b) => [b.text, b.sidecar]), [
+          ["{\"v\":2}", sidecarOf("two")],
+          ["{\"v\":1}", sidecarOf("one")]
+        ])
+        assert.strictEqual(reads[0]?.hash, sha256(new TextEncoder().encode("{\"v\":2}")))
+      })
+    ))
+
+  it.effect("gives a version from before the map had a sidecar the sidecar it has now", () =>
+    withHandlers(({ fake }) =>
+      Effect.gen(function*() {
+        yield* fake.invoke(InvokeChannels.createMap, { fileName: map, text: "{\"v\":1}" })
+        yield* fake.invoke(InvokeChannels.saveMap, { fileName: map, text: "{\"v\":2}" })
+        yield* fake.invoke(InvokeChannels.writeSidecar, { fileName: map, text: sidecarOf("now") })
+        const [backup] = yield* fake.invokeAs(MapBackups, InvokeChannels.listBackups)
+        const { id, place } = backup!
+        assert.deepInclude(yield* fake.invokeAs(MapBackupFile, InvokeChannels.readBackup, { place, id }), {
+          text: "{\"v\":1}",
+          sidecar: sidecarOf("now")
+        })
+      })
+    ))
+
+  it.effect("won't read a sidecar's backup as a map's", () =>
+    withSidecar(({ fake, files, project }) =>
+      Effect.gen(function*() {
+        const path = yield* Path.Path
+        yield* fake.invoke(InvokeChannels.writeSidecar, { fileName: map, text: sidecarOf("two") })
+        const [id = ""] = yield* files.readDirectory(path.join(project, ".ballest", "backups"))
+        assert.include(id, sidecar)
+        const refused = yield* Effect.flip(fake.invoke(InvokeChannels.readBackup, { place: "project", id }))
+        assert.match(String(refused.cause), /doesn't exist any more/)
+      })
+    ))
+
+  it.effect("a new map doesn't take over a sidecar left behind", () =>
+    withSidecar(({ fake, files, maps }) =>
+      Effect.gen(function*() {
+        const path = yield* Path.Path
+        yield* files.remove(path.join(maps, map))
+        yield* fake.invoke(InvokeChannels.createMap, { fileName: map, text: "{\"new\":1}" })
+        assert.deepInclude(yield* fake.invoke(InvokeChannels.readMap, { fileName: map }), { sidecar: null })
+      })
+    ))
+})
 
 describe("MapFiles over IPC", () => {
   it.effect("New map makes the project on disk, and New map, Save, Rename and list keep to its maps folder", () =>

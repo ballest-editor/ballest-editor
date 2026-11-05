@@ -145,6 +145,8 @@ describe("parseBackupId", () => {
         millis: Date.UTC(2026, 9, 31, 12, 5, 9, 120)
       })
     )
+    const sidecar = "Map_LevelEditorMain&Big Loop_Isaac.editor.json"
+    assert.deepInclude(Option.getOrNull(parseBackupId(`2026-10-31T12-05-09-120Z ${sidecar}`)), { fileName: sidecar })
     for (
       const bad of [
         MAP,

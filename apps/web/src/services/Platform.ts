@@ -139,6 +139,10 @@ export class Platform extends Context.Service<Platform, {
   readonly renameMap: (
     file: { readonly from: string; readonly to: string; readonly text: string }
   ) => Effect.Effect<ProjectMap, PlatformError>
+  /** Writes a map's sidecar beside it, once the map is written; the old sidecar goes to the project's backups. */
+  readonly writeSidecar: (
+    file: { readonly fileName: string; readonly text: string }
+  ) => Effect.Effect<void, PlatformError>
   /** Copies a picked file into the project. `Clash` (nothing written) when it has a map of that name and not `replace`. */
   readonly importMap: (payload: ImportMapPayload) => Effect.Effect<ImportMapResult, PlatformError>
   /**
@@ -320,6 +324,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     createMap: (file) => call("createMap", file),
     saveMap: (file) => call("saveMap", file),
     renameMap: (file) => call("renameMap", file),
+    writeSidecar: (file) => call("writeSidecar", file),
     importMap: (payload) => call("importMap", payload),
     exportMap: (fileName, options) => call("exportMap", { fileName, ...options }),
     checkExports: call("checkExports"),
@@ -417,6 +422,7 @@ const makeBrowser = (): Platform["Service"] => {
     createMap: () => noProject,
     saveMap: () => noProject,
     renameMap: () => noProject,
+    writeSidecar: () => noProject,
     importMap: () => noProject,
     exportMap: () => desktopOnly,
     checkExports: Effect.succeed({ changed: [], missing: [] }),

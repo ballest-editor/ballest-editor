@@ -8,6 +8,10 @@ export class MapEncodeError extends Schema.TaggedError<MapEncodeError>()("MapEnc
   message: Schema.String
 }) {}
 
+export class SidecarDecodeError extends Schema.TaggedError<SidecarDecodeError>()("SidecarDecodeError", {
+  message: Schema.String
+}) {}
+
 export class CatalogLoadError extends Schema.TaggedError<CatalogLoadError>()("CatalogLoadError", {
   url: Schema.String,
   message: Schema.String

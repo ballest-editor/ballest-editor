@@ -53,6 +53,23 @@ describe("MapCodec", () => {
       assert.deepStrictEqual(objectAt(parseJson(yield* codec.encode(map)))["editorState"], editorState)
     }).pipe(Effect.provide(MapCodec.layer)))
 
+  it.effect("round-trips a sidecar as indented JSON, and fails on one that doesn't decode", () =>
+    Effect.gen(function*() {
+      const codec = yield* MapCodec
+      const sidecar = {
+        formatVersion: 1,
+        mapHash: "c".repeat(64),
+        items: { key: { index: 0, fingerprint: "BP|0,0,0|0,0,0,1|1,1,1", name: "Mine", tags: ["t"] } },
+        tree: [{ kind: "group", id: "g", name: "G", tags: [], children: [{ kind: "item", key: "key" }] }]
+      } as const
+      const text = yield* codec.encodeSidecar(sidecar)
+      assert.isTrue(text.endsWith("}\n"))
+      assert.include(text, "\n  \"formatVersion\": 1,")
+      assert.deepStrictEqual(yield* codec.decodeSidecar(text), sidecar)
+      const broken = yield* Effect.flip(codec.decodeSidecar("{"))
+      assert.strictEqual(broken._tag, "SidecarDecodeError")
+    }).pipe(Effect.provide(MapCodec.layer)))
+
   // Current in-game saves are reproduced byte for byte (older Workshop files write short
   // number arrays inline, which the current game no longer does).
   it.effect.each(samples.filter((s) => s.kind === "balledit").map((s) => [s.name, s] as const))(

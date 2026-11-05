@@ -20,6 +20,7 @@ export const InvokeChannels = {
   createMap: "ballest:project:createMap",
   saveMap: "ballest:project:saveMap",
   renameMap: "ballest:project:renameMap",
+  writeSidecar: "ballest:project:writeSidecar",
   pickImport: "ballest:project:pickImport",
   importMap: "ballest:project:importMap",
   exportMap: "ballest:project:exportMap",

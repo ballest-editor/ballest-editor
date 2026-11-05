@@ -1,6 +1,7 @@
 /**
- * Editor document + UI state. The document is a MapFile (schema-typed) plus a parallel
- * array of stable ids for React keys and selection. All edits go through domain/edits.
+ * Editor document + UI state. The document is a MapFile (schema-typed), a parallel array of each item's stable key (the
+ * item's one identity: React keys, selection, the sidecar) and the map's structure (domain/structure). All edits go
+ * through domain/edits and domain/structure.
  */
 import { NOTIFICATION_LIMIT, type UpdateState } from "@ballest/contracts"
 import { type Effect, Option } from "effect"
@@ -26,6 +27,7 @@ import {
 } from "../domain/edits"
 import { editTransform, fitEditTransform } from "../domain/editTransform"
 import { itemFromPiece, mapLabelOf, newMapFile } from "../domain/factory"
+import { withGameGroups } from "../domain/gameGroups"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
 import type { GameLinkResult } from "../domain/gameLink"
 import { type PropertyChange, withFlip } from "../domain/itemProperties"
@@ -40,6 +42,23 @@ import { addNotice, clearNotices, dropNotices, markRead, mergeNotices, resolveNo
 import type { PaintPicker } from "../domain/Paint"
 import { type Pivot, pivotAt } from "../domain/pivot"
 import { defaultSettings, type Settings } from "../domain/Settings"
+import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
+import {
+  copyStructure,
+  freshKey,
+  freshKeys,
+  itemDisplayNames,
+  type Structure,
+  withGroup,
+  withGroupName,
+  withItemName,
+  withMovedNode,
+  withNewItems,
+  withoutGroup,
+  withoutKeys,
+  withPasted,
+  withTags
+} from "../domain/structure"
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import type { Surfaces } from "../domain/surface"
 import type { LoadedCatalog } from "../services/CatalogLoader"
@@ -68,7 +87,19 @@ export type {
 } from "../services/Platform"
 export interface Doc {
   readonly map: MapFile
+  /** Each item's stable key, in `map.items`' order. The sidecar keeps them across saves and loads. */
   readonly ids: ReadonlyArray<string>
+  /** The groups and each item's name and tags, by those keys (docs/PROJECTS.md § Source of truth). */
+  readonly structure: Structure
+}
+
+/** What a sidecar gives a document on top of its map. */
+type DocStructure = Pick<LoadedStructure, "ids" | "structure">
+
+/** Copied items, and what the document held of them beyond the map: their keys (one per item) and structure. */
+export interface DocClip extends Clip {
+  readonly keys: ReadonlyArray<string>
+  readonly structure: Structure
 }
 
 /**
@@ -193,10 +224,11 @@ export interface NotifyOptions {
   readonly actions?: ReadonlyArray<NotificationAction>
 }
 
-let nextId = 0
-const freshId = () => `item-${++nextId}`
-const freshIds = (n: number) => Array.from({ length: n }, freshId)
-const docOf = (map: MapFile): Doc => ({ map, ids: freshIds(map.items.length) })
+const docOf = (map: MapFile, loaded: DocStructure = structureOfMap(map)): Doc => ({
+  map,
+  ids: loaded.ids,
+  structure: loaded.structure
+})
 
 let nextTabId = 0
 const freshTabId = () => `tab-${++nextTabId}`
@@ -301,7 +333,7 @@ export interface EditorState extends TabState {
    * The last copied items (Ctrl+C), as they were when copied. Not part of the document or
    * its history, so it survives undo and loading another map.
    */
-  readonly clipboard: Clip | null
+  readonly clipboard: DocClip | null
   /**
    * Live transforms of the items under a continuous interaction (gizmo drag, number-field
    * scrub), by id. Not in the document until the interaction commits, as one undo step;
@@ -319,7 +351,7 @@ export interface EditorState extends TabState {
   /**
    * Shows `map` in a tab (`into`, the active one by default) with a fresh history; a new tab becomes the active one.
    * `floorHeight` defaults to the map's player start height. `dirty` opens it as unsaved edits of `file` (a recovered
-   * version), so the next Save writes it there.
+   * version), so the next Save writes it there. `loaded` is what its sidecar gave; without one the map stands alone.
    */
   readonly loadMap: (
     map: MapFile,
@@ -330,6 +362,7 @@ export interface EditorState extends TabState {
       readonly dirty?: boolean
       readonly fresh?: boolean
       readonly into?: TabTarget
+      readonly loaded?: DocStructure
     }
   ) => void
   /** Makes `tabId` the active tab; nothing while a drag or scrub is under way. */
@@ -418,6 +451,24 @@ export interface EditorState extends TabState {
   /** Replaces `worldSettings.levelData` as one undo step (none when nothing changes). */
   readonly setLevelData: (levelData: LevelData) => void
   readonly setFloorHeight: (floorHeight: number) => void
+  /** Sets an item's user name as one undo step; null (or a blank one) clears it. */
+  readonly renameItem: (key: string, name: string | null) => void
+  /** Sets a group's name as one undo step; a blank one changes nothing. */
+  readonly renameGroup: (id: string, name: string) => void
+  /** Sets the tags of an item (by key) or a group (by id) as one undo step. */
+  readonly setTags: (target: string, tags: ReadonlyArray<string>) => void
+  /**
+   * Groups items as one undo step: the new group goes where the first key's node was, and keys in other groups are
+   * pulled out of them. `name` defaults to `Group N`. Answers the group's id, or undefined when no key is an item.
+   */
+  readonly groupItems: (keys: ReadonlyArray<string>, name?: string) => string | undefined
+  /** Dissolves a group as one undo step: its children move to its parent, where it was. */
+  readonly ungroup: (groupId: string) => void
+  /**
+   * Moves an item (by key) or a group (by id) into the group `parentGroupId` (null: the root) at `index` among its
+   * children once it has left them, as one undo step. A group can't go into itself.
+   */
+  readonly moveNode: (nodeId: string, parentGroupId: string | null, index: number) => void
   /** Restores the previous snapshot, including its selection. */
   readonly undo: () => void
   readonly redo: () => void
@@ -461,9 +512,14 @@ const freshTabState = (
   map: MapFile,
   file: OpenFile | null,
   floorHeight?: number,
-  options?: { readonly exportOnSave?: boolean; readonly dirty?: boolean; readonly fresh?: boolean }
+  options?: {
+    readonly exportOnSave?: boolean
+    readonly dirty?: boolean
+    readonly fresh?: boolean
+    readonly loaded?: DocStructure
+  }
 ): TabState => ({
-  doc: docOf(map),
+  doc: docOf(map, options?.loaded),
   floorHeight: floorHeight ?? floorHeightOf(map),
   past: [],
   future: [],
@@ -521,15 +577,29 @@ export const useEditor = create<EditorState>()((set, get) => {
     return indices
   }
 
-  /** The doc with the clip's items added and their fresh ids; undefined (with a notice) when there's no room. */
-  const withClip = (s: EditorState, clip: Clip): (Doc & { readonly added: ReadonlyArray<string> }) | undefined => {
+  /** The doc with the clip's items added and their fresh keys; undefined (with a notice) when there's no room. */
+  const withClip = (s: EditorState, clip: DocClip): (Doc & { readonly added: ReadonlyArray<string> }) | undefined => {
     if (clip.items.length === 0) return undefined
     if (s.doc.map.items.length + clip.items.length > LIMITS.itemsPerLevel) {
       s.notify("error", `The game allows at most ${LIMITS.itemsPerLevel.toLocaleString()} items in a map.`)
       return undefined
     }
-    const added = freshIds(clip.items.length)
-    return { map: pasteItems(s.doc.map, clip), ids: [...s.doc.ids, ...added], added }
+    const added = freshKeys(clip.items.length)
+    const keyOf = new Map(clip.keys.flatMap((key, n) => {
+      const copy = added[n]
+      return copy === undefined ? [] : [[key, copy] as const]
+    }))
+    return {
+      map: pasteItems(s.doc.map, clip),
+      ids: [...s.doc.ids, ...added],
+      structure: withPasted(s.doc.structure, clip.structure, keyOf),
+      added
+    }
+  }
+
+  /** One undo step for a change to the map's structure; nothing when `structure` says nothing changed. */
+  const commitStructure = (structure: Structure | undefined) => {
+    if (structure !== undefined) commit({ ...get().doc, structure })
   }
 
   /** Where an Alt+drag duplicate started, while one is in progress. */
@@ -658,7 +728,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         const map = patch(tab.doc.map)
         if (map === tab.doc.map) return {}
         return {
-          doc: { map, ids: tab.doc.ids },
+          doc: { ...tab.doc, map },
           past: [...tab.past, {
             doc: tab.doc,
             selectedIds: tab.selectedIds,
@@ -714,8 +784,12 @@ export const useEditor = create<EditorState>()((set, get) => {
         return
       }
       const { doc } = get()
-      const id = freshId()
-      commit({ map: addItem(doc.map, item.value), ids: [...doc.ids, id] }, { selectedIds: [id] })
+      const id = freshKey()
+      commit({
+        map: addItem(doc.map, item.value),
+        ids: [...doc.ids, id],
+        structure: withNewItems(doc.structure, [id])
+      }, { selectedIds: [id] })
     },
 
     transformItems: (transforms) => {
@@ -725,7 +799,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       if (Option.isSome(next)) {
         // a drag that ends where it started leaves no step
         if (!entries.every(([index]) => sameItemTransform(doc.map, next.value, index))) {
-          commit({ map: next.value, ids: doc.ids })
+          commit({ ...doc, map: next.value })
         }
         return true
       }
@@ -740,7 +814,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         get().notify("error", "Those items no longer have that material slot.")
         return false
       }
-      if (next.value !== doc.map) commit({ map: next.value, ids: doc.ids })
+      if (next.value !== doc.map) commit({ ...doc, map: next.value })
       return true
     },
 
@@ -758,13 +832,13 @@ export const useEditor = create<EditorState>()((set, get) => {
           s.doc.map.items[i]?.[property.list].some((p) => p.propertyName === property.name && p.currentValue === value)
         )
       )
-      if (!unchanged) commit({ map: next.value, ids: s.doc.ids })
+      if (!unchanged) commit({ ...s.doc, map: next.value })
       return true
     },
 
     flipSelection: (axis) => {
       const s = get()
-      const { map, ids } = s.doc
+      const { map } = s.doc
       const selected = new Set(selectedIndices(s))
       const items = map.items.map((item, i) => {
         if (!selected.has(i)) return item
@@ -772,7 +846,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         // A flip also swaps the mesh (and some materials) for the game's baked mirror, in the same step.
         return flipped === item ? item : withMirrorMesh(flipped, s.catalogIndex)
       })
-      if (items.some((item, i) => item !== map.items[i])) commit({ map: { ...map, items }, ids })
+      if (items.some((item, i) => item !== map.items[i])) commit({ ...s.doc, map: { ...map, items } })
     },
 
     setItemPivots: (pivots) => {
@@ -781,7 +855,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         const index = doc.ids.indexOf(id)
         return index < 0 || samePivot(pivotAt(doc.map, index), pivot) ? [] : [[index, pivot] as const]
       })
-      if (entries.length > 0) commit({ map: setPivots(doc.map, entries), ids: doc.ids })
+      if (entries.length > 0) commit({ ...doc, map: setPivots(doc.map, entries) })
     },
 
     deleteSelection: () => {
@@ -793,13 +867,13 @@ export const useEditor = create<EditorState>()((set, get) => {
 
     duplicateSelection: () => {
       const s = get()
-      const next = withClip(s, copyItems(s.doc.map, copyableIndices(s)))
+      const next = withClip(s, clipOf(s.doc, copyableIndices(s)))
       if (next !== undefined) commit(next, { selectedIds: next.added })
     },
 
     copySelection: () => {
       const s = get()
-      const clip = copyItems(s.doc.map, copyableIndices(s))
+      const clip = clipOf(s.doc, copyableIndices(s))
       if (clip.items.length > 0) set({ clipboard: clip })
     },
 
@@ -808,7 +882,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       // only what was copied goes: cutting never removes the player start
       const indices = copyableIndices(s)
       if (indices.length === 0) return
-      commit(withoutItems(s.doc, indices), { selectedIds: [], clipboard: copyItems(s.doc.map, indices) })
+      commit(withoutItems(s.doc, indices), { selectedIds: [], clipboard: clipOf(s.doc, indices) })
     },
 
     paste: () => {
@@ -821,7 +895,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       const s = get()
       if (duplicateDragBase !== null) return undefined
       const indices = copyableIndices(s)
-      const next = withClip(s, copyItems(s.doc.map, indices))
+      const next = withClip(s, clipOf(s.doc, indices))
       if (next === undefined) return undefined
       duplicateDragBase = { doc: s.doc, selectedIds: s.selectedIds }
       set({ doc: next, selectedIds: next.added })
@@ -846,7 +920,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         if (transforms !== null) get().notify("error", INVALID_TRANSFORM)
         return false
       }
-      commit({ map: next.value, ids: doc.ids }, {}, before)
+      commit({ ...doc, map: next.value }, {}, before)
       return true
     },
 
@@ -854,23 +928,36 @@ export const useEditor = create<EditorState>()((set, get) => {
       const { doc } = get()
       const { levelDisplayName, creatorName: currentCreator } = doc.map.worldSettings.levelData
       if (displayName === levelDisplayName && creatorName === currentCreator) return
-      commit({ map: setLevelNames(doc.map, displayName, creatorName), ids: doc.ids })
+      commit({ ...doc, map: setLevelNames(doc.map, displayName, creatorName) })
     },
 
     setLighting: (lighting) => {
       const { doc } = get()
       const next = setLighting(doc.map, lighting)
       if (Option.isNone(next) || sameLighting(lightingOf(doc.map.worldSettings), lighting)) return
-      commit({ map: next.value, ids: doc.ids })
+      commit({ ...doc, map: next.value })
     },
 
     setLevelData: (levelData) => {
       const { doc } = get()
       if (JSON.stringify(levelData) === JSON.stringify(doc.map.worldSettings.levelData)) return
-      commit({ map: setLevelData(doc.map, levelData), ids: doc.ids })
+      commit({ ...doc, map: setLevelData(doc.map, levelData) })
     },
 
     setFloorHeight: (floorHeight) => set({ floorHeight }),
+
+    renameItem: (key, name) => commitStructure(withItemName(get().doc.structure, key, name)),
+    renameGroup: (id, name) => commitStructure(withGroupName(get().doc.structure, id, name)),
+    setTags: (target, tags) => commitStructure(withTags(get().doc.structure, target, tags)),
+    groupItems: (keys, name) => {
+      const id = freshKey()
+      const next = withGroup(get().doc.structure, keys, id, name)
+      commitStructure(next)
+      return next === undefined ? undefined : id
+    },
+    ungroup: (groupId) => commitStructure(withoutGroup(get().doc.structure, groupId)),
+    moveNode: (nodeId, parentGroupId, index) =>
+      commitStructure(withMovedNode(get().doc.structure, nodeId, parentGroupId, index)),
 
     undo: () =>
       set((s) => {
@@ -1020,8 +1107,21 @@ interface DocState {
 /** The doc without the items at `indices`. */
 const withoutItems = (doc: Doc, indices: ReadonlyArray<number>): Doc => {
   const removed = new Set(indices)
-  return { map: removeItems(doc.map, indices), ids: doc.ids.filter((_, i) => !removed.has(i)) }
+  return {
+    map: removeItems(doc.map, indices),
+    ids: doc.ids.filter((_, i) => !removed.has(i)),
+    structure: withoutKeys(doc.structure, new Set(indices.flatMap((i) => doc.ids[i] ?? [])))
+  }
 }
+
+/** The items at `indices`, in that order, with what the doc holds of them. */
+const clipOf = (doc: Doc, indices: ReadonlyArray<number>): DocClip => {
+  const keys = indices.flatMap((i) => doc.ids[i] ?? [])
+  return { ...copyItems(doc.map, indices), keys, structure: copyStructure(doc.structure, new Set(keys)) }
+}
+
+/** A doc's map as the game gets it: its groups are the projection of the structure (docs/FORMAT.md § Groups). */
+export const gameMapOf = (doc: Doc): MapFile => withGameGroups(doc.map, doc.ids, doc.structure.tree)
 
 const INVALID_TRANSFORM = "That transform isn't valid for the game (non-finite or zero rotation)."
 
@@ -1065,6 +1165,10 @@ export const nextSelection = (current: Selection, id: string | null, mode: Selec
 /** Document indices of the selected items, in selection order. */
 export const selectedIndices = (s: EditorState): Array<number> =>
   s.selectedIds.map((id) => s.doc.ids.indexOf(id)).filter((i) => i >= 0)
+
+/** Every item's display name, by key: the user's, else its piece's and an ordinal ("Cube 3"). */
+export const itemDisplayNamesOf = (s: EditorState): ReadonlyMap<string, string> =>
+  itemDisplayNames(s.doc.map, s.doc.ids, s.doc.structure.items, s.catalogIndex)
 
 /** The active (last selected) item's id, if any. */
 export const activeId = (s: EditorState): string | undefined => s.selectedIds.at(-1)

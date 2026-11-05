@@ -8,11 +8,11 @@ import { asNewDraft, setLevelNames } from "../../domain/edits"
 import { mapFileNameOf, mapLabelOf } from "../../domain/factory"
 import { type ExportedMap, MapExporter } from "../../services/MapExporter"
 import { Platform } from "../../services/Platform"
-import { type Doc, type OpenFile, tabStateOf, useEditor } from "../store"
+import { type Doc, gameMapOf, type OpenFile, tabStateOf, useEditor } from "../store"
 import { ASK_FIRST, writeToGame } from "./gameWrite"
 import { nameProjectEffect } from "./maps"
 import { run } from "./run"
-import { fileOf, projectName, refreshProject, revealIn, saveTabPrefs } from "./shared"
+import { fileOf, projectName, refreshProject, revealIn, saveTabPrefs, writeSidecarOf } from "./shared"
 
 /**
  * The open map encoded the way the game wants it written, with the document it was made from and its tab (the save
@@ -20,7 +20,7 @@ import { fileOf, projectName, refreshProject, revealIn, saveTabPrefs } from "./s
  */
 const exportOpenMap = Effect.gen(function*() {
   const { catalogIndex, doc, tabId } = useEditor.getState()
-  const result = yield* (yield* MapExporter).prepare(doc.map, catalogIndex)
+  const result = yield* (yield* MapExporter).prepare(gameMapOf(doc), catalogIndex)
   return { doc, tabId, result }
 })
 
@@ -36,6 +36,7 @@ const createAsOpenMap = Effect.fn("createAsOpenMap")(function*(
   const file = { fileName: result.filename, text: result.text }
   const created = yield* replace ? platform.saveMap(file) : platform.createMap(file)
   useEditor.getState().markSaved(tabId, doc, result.map, fileOf(created))
+  yield* writeSidecarOf(doc, created.fileName, created.hash)
   yield* saveTabPrefs(tabId)
   yield* refreshProject
   return created
@@ -62,6 +63,7 @@ const writeOpenMap = Effect.fn("writeOpenMap")(function*(file: OpenFile, options
     ? yield* platform.saveMap({ fileName: file.name, text: result.text })
     : yield* platform.renameMap({ from: file.name, to: result.filename, text: result.text })
   useEditor.getState().markSaved(tabId, doc, result.map, fileOf(saved))
+  yield* writeSidecarOf(doc, saved.fileName, saved.hash)
   // a rename moves the prefs to the new name
   yield* saveTabPrefs(tabId)
   yield* refreshProject
@@ -184,7 +186,7 @@ export const renameOpenMap = (displayName: string, creatorName: string) => {
 export const duplicateMapEffect = Effect.fn("duplicateMapEffect")(
   function*(displayName: string, creatorName: string, replace = false, newDraft = false) {
     const { catalogIndex, doc, file, tabId } = useEditor.getState()
-    const named = setLevelNames(doc.map, displayName, creatorName)
+    const named = setLevelNames(gameMapOf(doc), displayName, creatorName)
     const result = yield* (yield* MapExporter).prepare(newDraft ? asNewDraft(named) : named, catalogIndex)
     const created = yield* createAsOpenMap({ doc, tabId, result }, replace)
     const from = file === null ? "" : ` from ${mapLabelOf(file.name)}`
