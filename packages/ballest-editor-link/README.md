@@ -1,16 +1,16 @@
-# Ballest Editor link
+# Editor plugin (`ballest-editor-link`)
 
-A plugin for the [Ballest plugin manager](https://anythinggoes-ballest.github.io/ballest-plugin-manager/). When you press
-**Play** in the Ballest Editor desktop app, it starts a race of the map you're
-editing in _Ballest of Them All_: pre-race menu, countdown, checkpoints and finish, as if it were a published track.
-Press Play again after an edit and the race restarts with the new version.
+A plugin for the [Ballest plugin manager](https://anythinggoes-ballest.github.io/ballest-plugin-manager/), listed there
+as Ballest Editor link. When you press **Play** in Ballest Editor, it starts a race of the map you're editing in
+_Ballest of Them All_: pre-race menu, countdown, checkpoints and finish, as if it were a published track. Press Play
+again after an edit and the race restarts with the new version.
 
 It needs plugin manager 0.26.0 or later. It doesn't use the network or the console.
 
 ## Install
 
-The Ballest Editor desktop app ships this plugin and installs it for you: **File › Game link… › Editor plugin ›
-Install** (or **Update** when the app has a newer one; Settings › Game shows the same checklist). It needs the plugin
+Ballest Editor ships this plugin and installs it for you: **File › Game link… › Editor plugin › Install** (or
+**Update** when the app has a newer one; Settings › Game shows the same checklist). It needs the plugin
 manager installed first. To install it by hand instead, copy `info.toml` and `main.as` from this folder into
 `<game>/Ballest/Binaries/Win64/plugins/ballest-editor-link/` and start the game. The folder name matters: it's the
 plugin's id, and the editor writes into that folder. The plugin manager picks up a folder copied in by hand the next
@@ -18,25 +18,27 @@ time the game starts.
 
 ## How it works
 
-The editor's Play button does three things:
+The editor's Play button does three things ([docs/DESKTOP.md](../../docs/DESKTOP.md#play-the-plugin-handoff) has the
+details):
 
-1. Saves the map into the game's maps folder (`%LOCALAPPDATA%\Ballest\Saved\UserSavedMaps`, or the Proton prefix's copy
-   on Linux). The map must never have been published (`levelPublishedFileId` of -1).
-2. Writes `play.json` into this plugin's folder.
+1. Saves the map into the project and exports it to the game's maps folder. The map must never have been published
+   (`levelPublishedFileId` of -1).
+2. Writes `play.json` into this plugin's folder, if the plugin is installed.
 3. Starts the game through Steam if it isn't running.
 
-The plugin reads `play.json` twice a second (the **Check every** setting changes that). When it sees a nonce it hasn't
+The plugin reads `play.json` from `Update(dt)` twice a second (the **Check every** setting changes that). When it sees a nonce it hasn't
 handled yet, it races the map with `Tracks::OpenLocal`. If the game is still starting up, it waits for the track list,
 then keeps trying every 2 s for 30 s before it gives up and logs the reason.
 
 The last nonce it handled is saved, so a `play.json` left over from your last session doesn't start a race when the
 game starts again.
 
-The editor writes only inside this plugin's folder: `play.json`, and the plugin's own files when you install or update
-it (which keeps `play.json`). It never touches the rest of the game's install.
+The editor writes only in this plugin's folder: `play.json`, and the plugin's own files when you install or update it
+(which keeps `play.json`). An install stages them in a temporary dot folder beside the plugin. It never touches the
+rest of the game's install.
 
-`pnpm build` here stages `info.toml` and the scripts it lists into `dist/ballest-editor-link/`, the copy the desktop
-app ships. Bump `version` in `info.toml` when `main.as` changes, so installed copies show **Update**.
+`pnpm build` here stages `info.toml` and the scripts it lists into `dist/ballest-editor-link/`, the copy the app ships.
+Bump `version` in `info.toml` when `main.as` changes, so installed copies show **Update**.
 
 ## `play.json`
 

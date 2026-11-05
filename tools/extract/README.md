@@ -3,49 +3,49 @@
 This pipeline reads the game's IoStore containers, resolves the level-editor piece Blueprints, and writes:
 
 - `assets/pieces/**.glb`: one file per StaticMesh (LOD0). The path mirrors the UE package path without `/Game/`, so `/Game/Maps/_GENERATED/PC/SM_500.SM_500` becomes `pieces/Maps/_GENERATED/PC/SM_500.glb`, and `/Engine/...` becomes `pieces/_Engine/...`.
-- `assets/catalog.json`: one entry per level-editor item class: the 237 the recipe registry references, plus `MP_PinballPaddle`, which a sample uses but 0.4.1 removed from the game. Together they cover all 102 classes seen in `samples/`. Every exported mesh is listed too.
+- `assets/catalog.json`: one entry per level-editor item class: the 237 the recipe registry references, plus `MP_PinballPaddle`, which a sample uses but 0.4.1 removed from the game. Together they cover all 107 classes seen in `samples/`. Every exported mesh is listed too, apart from the game's baked mirror meshes (see Mirrors below).
 - `assets/thumbs/*.png`: the content-browser icons, at most 256 px and about 3 MB. They are committable.
 - `assets/keybinds.json`: the default Enhanced Input bindings, with in-game labels, settings sections and camera presets.
 - `assets/strings.json`: the English locres strings.
 - `assets/registry.json`: the item class hierarchy, the in-game palette, and recipe-registry references (which pieces exist).
 - `assets/materials.json` + `assets/textures/**.png`: material parameters, plus how each texture is read (UV or object/world projection, scale, layers), traced through the game's compiled shaders, the Paint picker and the item surfaces (the textures are gitignored, about 180 MB).
 
-The current output (game 0.4.1) has 238 pieces and 6 unresolved. 230 meshes were exported with 0 failures. That covers the 192 meshes referenced by the pieces, including their extra components, plus everything else in `/Game/Maps/_GENERATED/PC`. The 0.4.0 export passed the Khronos glTF validator with no errors or warnings; the writer hasn't changed since.
+The current output (game 0.4.1) has 238 pieces and 6 unresolved. 231 meshes were exported with 0 failures. That covers the 192 meshes referenced by the pieces, including their extra components, plus the rest of `/Game/Maps/_GENERATED/PC` and `SM_ProvisionalSpinningPaddles_1`. The 0.4.0 export passed the Khronos glTF validator with no errors or warnings; the writer hasn't changed since.
 
 `assets/pieces/` is about 96 MB, so it is listed in `.gitignore`. Of that, 33 MB is `/Game/Maps/_GENERATED/PC/Box`, a 1.2M-triangle mesh that no piece uses. The glbs referenced by the catalog total about 59 MB.
 
 ## Running it
 
+Run `pnpm install` first: the TypeScript half needs `tools/extract/node_modules`. Then, from the repo root:
+
 ```sh
-nix run .#extract                                   # default Steam path
-nix run .#extract -- "/path/to/Ballest of Them All" --pieces-only --keep-work
-nix develop -c tools/extract/run.sh [GAME_DIR] [options]   # same thing, from the dev shell
+nix develop -c tools/extract/run.sh                                   # default Steam path
+nix develop -c tools/extract/run.sh "/path/to/Ballest of Them All" --pieces-only --keep-work
 ```
 
-Run it from the repo root. By default it reads `./samples` and writes to `./assets`. Use `run.sh --help` to see the options.
+By default it reads `./samples` and writes to `./assets`. `run.sh --help` lists the options. `--usmap FILE` uses that `.usmap` in place of the Fortnite one.
 
-Flakes only see files tracked by git. Until `flake.nix`, `flake.lock` and `tools/` are committed, use `path:.#extract` instead. That copies the whole working tree into the store, which is slow because of `app/node_modules`.
+The flake's `nix run .#extract` app doesn't work: it runs `run.sh` from a store copy of `tools/extract`, which has no `node_modules`, and `run.sh` stops there.
 
 What `run.sh` does:
 
 1. Copies `Ballest/Content/Paks/*.{pak,utoc,ucas}` to `/tmp/ballest-paks` (`--paks-copy`) with `cp -u -p`. The game directory is only read and is never opened for writing.
-2. Downloads data files, each into its own directory under `~/.cache/ballest-editor/downloads/`:
-   - **Oodle.** CUE4Parse's `OodleHelper` downloads `liboodle-data-shared.so` from its pinned `WorkingRobot/OodleUE` release.
-   - **The `.usmap`.** This is Fortnite `++Fortnite+Release-42.40-CL-59086525`, from the URL pinned in `run.sh` (found via `fortnitecentral.genxgames.gg/api/v1/mappings`). The download is checked against a sha256.
+2. Downloads the `.usmap` into `~/.cache/ballest-editor/downloads/usmap/`. This is Fortnite `++Fortnite+Release-42.40-CL-59086525`, from the URL pinned in `run.sh` (found via `fortnitecentral.genxgames.gg/api/v1/mappings`), checked against a sha256. Oodle comes later: on the first `BallestExtract` call, CUE4Parse's `OodleHelper` downloads `liboodle-data-shared.so` from its pinned `WorkingRobot/OodleUE` release into `~/.cache/ballest-editor/downloads/oodle/`.
 3. Builds `cue4/` (the `BallestExtract`, .NET 10 project) against the pinned CUE4Parse source. That source comes from the flake input `cue4parse`, rev `df14b99`. The build copies it into `~/.cache/ballest-editor/extract` because the nix store is read-only and dotnet writes `obj/` next to the sources. NuGet restore needs network access.
 4. Runs the pipeline:
    1. `scan-samples.mjs` lists the classes in the samples.
-   2. `BallestExtract classes` resolves each Blueprint's components.
-   3. `build-catalog.mjs meshes` builds the mesh list.
-   4. `BallestExtract export` writes the glbs.
-   5. `build-catalog.mjs catalog` writes `catalog.json`.
-5. Writes `assets/keybinds.json`, `assets/materials.json` + `assets/textures/`, and `assets/registry.json` (see below).
-   Materials go through `src/` (TypeScript + Effect, run by node directly): `materials list` collects the referenced materials, `BallestExtract materials` dumps them, `materials shader-list` + `BallestExtract shaders` dump every loaded material's cooked vertex/pixel shaders from the IoStore shader library, `shaders` disassembles them with `dxc` and traces each texture read back to its coordinate source, and `materials build` writes `materials.json` from both.
-6. Runs `verify.mjs`, which has no dependencies. It parses the GLB and recomputes bounds and the signed volume (winding) for `SM_500` and `SM_Start_Fixed`.
+   2. `BallestExtract imports` and a dump of the content-browser data feed `build-registry.mjs`, which writes `assets/registry.json` (see below).
+   3. `BallestExtract classes` resolves each Blueprint's components.
+   4. `build-catalog.mjs meshes` builds the mesh list.
+   5. `BallestExtract export` writes the glbs.
+   6. `build-catalog.mjs catalog` writes `catalog.json`.
+5. Writes `assets/keybinds.json`, `assets/strings.json`, `assets/materials.json` and `assets/textures/` (see below). Materials go through `src/` (TypeScript + Effect, run by node directly): `materials list` collects the referenced materials, `BallestExtract materials` dumps them, `materials shader-list` and `BallestExtract shaders` dump every loaded material's cooked vertex and pixel shaders from the IoStore shader library, `shaders` disassembles them with `dxc` and traces each texture read back to its coordinate source, and `materials build` writes `materials.json` from both.
+6. Runs `verify.mjs`, which has no dependencies. It parses the GLB and recomputes bounds and the signed volume (winding) for `SM_500` and `SM_Start_Fixed`. With `--materials` it also fails the run on missing textures.
 
 The extractor also has debugging modes. Run them with `dotnet ~/.cache/ballest-editor/extract/bin/BallestExtract.dll MODE --paks DIR --oodle FILE --usmap FILE ...`:
 
 - `list --filter X` lists files in the pak.
+- `textures`, `classes`, `export`, `materials` and `locres` are the pipeline's own steps.
 - `probe <Ballest/Content/...>` dumps every export of a package as JSON.
 - `dump --prefix DIR --file PATH --out F` does the same for a whole directory, plus loose files, with errors captured.
 - `imports --prefix DIR [--props PKG] --out F` writes header-only dependency data (imports, name-map paths, export classes and supers).
@@ -54,7 +54,21 @@ The extractor also has debugging modes. Run them with `dotnet ~/.cache/ballest-e
 
 ## Shader analysis (`src/shaders.ts`)
 
-A cooked `UMaterial` has no expression graph, so UV tiling, projection and texture wiring can't be read from the asset. The compiled shader is the graph: `src/dxil.ts` parses `dxc -dumpbin` output and, for every `sample` in the base-pass pixel shader, walks the coordinate's SSA chain back to its sources (interpolants, vertex buffers, GPU-scene transforms, constant-buffer parameters, literals), keeping the product of literal factors along each path; the vertex shader's outputs are traced the same way so an interpolant resolves to the mesh UVs or to the object/world position. `src/preshader.ts` decodes the material preshader so constant-buffer slots map back to parameter names (`src/params.ts` resolves a shader's constant-buffer and texture slots against a material's merged parameters), and `src/approx.ts` (the per-material half of `materials build`: name picks, translucency, layers, output) folds the instance's parameter values in. `shaders.json` is the per-instance product `materials build` consumes, not just the per-shader trace: `shaders` holds one trace per compiled base pass (per material the C# tool dumped shaders for), `materials` one entry per listed material, instances included, naming the trace it runs and carrying the surface evaluated for its own parameters. The result per material is `approx.reads`: texture, role, projection (`uv` / `object` / `world`), scale in repeats per UV unit or per cm, whether the piece's instance scale multiplies in, and a normal layer's strength. `src/evaluate.ts` goes one step further and evaluates the pixel shader numerically for the material's own parameter values and a facing view (constant buffers from the preshader slots, texture reads at 0 or their mean, view terms at their engine defaults): the GBuffer outputs then give the base colour, metallic and roughness the game really produces, and how much each colour texture adds (`approx.colorLayers`), so a master that lerps two colours by a fresnel or scales a texture by a parameter is read correctly without naming heuristics. Translucent passes are evaluated twice, for a face looking up and a vertical one: the beam materials (the vent's air, the checkpoint glow) multiply their alpha by `1 - |world normal z|`, so a cube drawn with them shows only its sides; `approx.opacity` is the larger alpha and `approx.upFade` what is left on an up-facing face. An additive pass renders as its evaluated unlit colour. `src/glsl.ts` goes further where the linearised layers cannot: it emits the shader's own output chain as GLSL (`approx.programs`: a translucent pass's alpha, the unlit glow of an additive or translucent pass, an opaque base colour whose reads the layers cannot place: coordinates the trace cannot follow, like the paddle's stripe through `frac`, or a visible mask in a texture's alpha, like the spinning cylinder's stripes, which a layer adding `gain * (rgb - mean)` never sees), folding every parameter, engine constant and scene value for a piece at the origin (SCENE_ROWS / ENGINE_DEFAULTS in `src/evaluate.ts`, phis resolved by walking the control flow) and leaving the UVs, world normal, object position, material texture reads and the game time as inputs; the renderer runs it per fragment, so the vent's streaks are the game's for any frame (`uBallestTime`). A program's `uBallestBoundsMin` and `Max` are the primitive data's `LocalObjectBounds` (rows 26 and 27), which the renderer fills from the mesh: `M_PlasticBase` sizes its cells and the checkpoints' glow their bars from them. A normal map's strength is measured from the shader's normal output for a map on the mesh's UVs (`M_ArenaColorBase` fades it by `ConcreteValue`, the air vent keeps it to the peak of its slats). `materialTextureRegisters` binds a shader's registers to its texture slots: a parameter the compiled shader does not read leaves no register, so the rest close up (`M_CheckpointLight` reads four of its five). The evaluator reads a material's noise at its mean: `FastGradientPerlinNoise3D_TEX`'s volume (recognised by its `* 255/127` decode, `dxil.ts`) reads 127/255, which is noise 0. `MSM_Subsurface` (only the ice) keeps its subsurface colour in GBuffer D, as a square root: `approx.subsurface` with `approx.subsurfaceOpacity`, and `approx.frost`, the clouds between that colour and the one with the noise at its extreme (the renderer's clouds are a stand-in: the engine's noise volume isn't in the cooked data, and the mask's distance fade folds away, so their mean and spread are measured off the game). The renderer shades these as UE does: added to the diffuse colour for indirect light, with the sun scattering through it (the ice's base colour is black). Checked against the game: the Env masters' 200 cm object-aligned tiles (20 across the 10 m cube, 80/40/20 at scale 2,1,1), the metal master's 12 UV repeats (48 tiles).
+A cooked `UMaterial` has no expression graph, so UV tiling, projection and texture wiring can't be read from the asset. The compiled shader is the graph.
+
+- **The trace.** `src/dxil.ts` parses `dxc -dumpbin` output. For every `sample` in the base-pass pixel shader, it walks the coordinate's SSA chain back to its sources (interpolants, vertex buffers, GPU-scene transforms, constant-buffer parameters, literals), keeping the product of literal factors along each path. The vertex shader's outputs are traced the same way, so an interpolant resolves to the mesh UVs or to the object or world position.
+- **Parameters.** `src/preshader.ts` decodes the material preshader, so constant-buffer slots map back to parameter names. `src/params.ts` resolves a shader's constant-buffer and texture slots against a material's merged parameters. `src/approx.ts`, the per-material half of `materials build` (name picks, translucency, layers, output), folds the instance's parameter values in.
+- **`shaders.json`** is the per-instance product `materials build` consumes. `shaders` holds one trace per compiled base pass (per material the C# tool dumped shaders for). `materials` holds one entry per listed material, instances included, naming the trace it runs and carrying the surface evaluated for its own parameters.
+- **What a material gets.** `approx.ts` works from a list of reads: texture, role, projection (`uv`, `object`, `world`), scale in repeats per UV unit or per cm, whether the piece's instance scale multiplies in, and a normal layer's strength. `materials.json` carries the result as `approx.tiling`, `projection`, `instanceScale` and the layers below.
+- **Evaluation.** `src/evaluate.ts` runs the pixel shader numerically for the material's own parameter values and a facing view: constant buffers from the preshader slots, texture reads at 0 or their mean, view terms at their engine defaults. The GBuffer outputs then give the base colour, metallic and roughness the game really produces, and how much each colour texture adds (`approx.colorLayers`). So a master that lerps two colours by a fresnel, or scales a texture by a parameter, is read correctly without naming heuristics. `approx.evaluated` is true on 135 of the 136 materials.
+- **Translucent passes** are evaluated twice, for a face looking up and a vertical one. The beam materials (the vent's air, the checkpoint glow) multiply their alpha by `1 - |world normal z|`, so a cube drawn with them shows only its sides. `approx.opacity` is the larger alpha and `approx.upFade` what is left on an up-facing face. An additive pass renders as its evaluated unlit colour.
+- **Programs.** `src/glsl.ts` goes further where the linearised layers can't: it emits the shader's own output chain as GLSL (`approx.programs`). That covers a translucent pass's alpha, the unlit glow of an additive or translucent pass, and an opaque base colour whose reads the layers can't place: coordinates the trace can't follow, like the paddle's stripe through `frac`, or a visible mask in a texture's alpha, like the spinning cylinder's stripes, which a layer adding `gain * (rgb - mean)` never sees. It folds every parameter, engine constant and scene value for a piece at the origin (SCENE_ROWS and ENGINE_DEFAULTS in `src/evaluate.ts`, phis resolved by walking the control flow) and leaves the UVs, world normal, object position, material texture reads and the game time as inputs. The renderer runs it per fragment, so the vent's streaks are the game's for any frame (`uBallestTime`). A program's `uBallestBoundsMin` and `Max` are the primitive data's `LocalObjectBounds` (rows 26 and 27), which the renderer fills from the mesh: `M_PlasticBase` sizes its cells and the checkpoints' glow their bars from them.
+- **Normal strength.** A normal map's strength is measured from the shader's normal output for a map on the mesh's UVs. `M_ArenaColorBase` fades it by `ConcreteValue`, and the air vent keeps it to the peak of its slats.
+- **Texture registers.** `materialTextureRegisters` binds a shader's registers to its texture slots. A parameter the compiled shader doesn't read leaves no register, so the rest close up (`M_CheckpointLight` reads four of its five).
+- **Noise.** The evaluator reads a material's noise at its mean. `FastGradientPerlinNoise3D_TEX`'s volume (recognised by its `* 255/127` decode, `dxil.ts`) reads 127/255, which is noise 0.
+- **Subsurface.** `MSM_Subsurface` (only the ice) keeps its subsurface colour in GBuffer D, as a square root: `approx.subsurface` with `approx.subsurfaceOpacity`, and `approx.frost`, the clouds between that colour and the one with the noise at its extreme. The renderer's clouds are a stand-in: the engine's noise volume isn't in the cooked data, and the mask's distance fade folds away, so their mean and spread are measured off the game. The renderer shades these as UE does: added to the diffuse colour for indirect light, with the sun scattering through it (the ice's base colour is black).
+
+Checked against the game: the Env masters' 200 cm object-aligned tiles (20 across the 10 m cube, 80/40/20 at scale 2,1,1), the metal master's 12 UV repeats (48 tiles).
 
 ## Coordinate convention (glb files)
 
@@ -78,29 +92,18 @@ In the cooked UE index buffers, outward faces are **clockwise** when the stored 
 
 glTF, and three.js, define the front face as **CCW in the mesh's local coordinates**. three.js keeps that true under a negative-determinant world matrix: it sees `det < 0` and switches `gl.frontFace` to CW, which compensates for the mirror. So under the mapping M (negative determinant), three.js flips frontFace, and faces are outward only if the stored winding is CCW-outward. With UE's original order they weren't, which is why rings and tori showed their inside faces. Mirroring the root does not change which faces three.js treats as front.
 
-**Fix applied in `cue4/Glb.cs`:** each triangle is written as `(i0, i2, i1)`. The glbs are now CCW-outward in their stored coordinates, which is glTF-conformant. They still pass the Khronos validator with no errors or warnings. `verify.mjs` prints the signed volume as a check.
+**Fix applied in `cue4/Glb.cs`.** Each triangle is written as `(i0, i2, i1)`. The glbs are now CCW-outward in their stored coordinates, which is glTF-conformant. They still pass the Khronos validator with no errors or warnings. `verify.mjs` prints the signed volume as a check.
 
 Opened in a plain glTF viewer, a glb now has correct faces, but it looks mirrored (left/right swapped) and Z-up, because the data is still left-handed.
 
-### What the web app must do
+### Using the glbs
 
-1. Put all UE content under one root `Object3D` with this fixed matrix (determinant -1):
+[apps/web/README.md](../../apps/web/README.md#coordinates-and-winding) describes what the editor does, and `apps/web/src/domain/coords.ts` is the code. What any consumer needs:
 
-   ```js
-   // three.x = ue.y (right), three.y = ue.z (up), three.z = -ue.x (UE forward = three -Z)
-   root.matrixAutoUpdate = false
-   root.matrix.set(0, 1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0, 0, 0, 1)
-   ```
-
-   The mirror undoes UE's left-handedness, so the map isn't shown mirrored. three.js handles the CW/CCW switch itself.
-2. Use **`material.side = THREE.FrontSide`**, which is the default. Don't use `BackSide`, and don't use `DoubleSide` as a workaround.
-3. Under the root, use item transforms from the map file unchanged:
-   - `translation` goes to `position`
-   - `rotation` {x,y,z,w} goes to `quaternion`
-   - `scale3D` goes to `scale`
-
-   Quaternion rotation `q v q*` doesn't depend on handedness. If you ever convert a quaternion outside the root, use `v' = det(M) * M * v` on its vector part and keep `w`. For `M` above that gives `(-qy, -qz, qx, w)`.
-4. FRotator values (`relative.rotation`) must go through UE's `FRotator::Quaternion` formula. `actorSpace`/`transformRelativeToMain` already give quaternions.
+1. Wrap the glb in a group with a fixed matrix of determinant -1. The editor's is `three(x, y, z) = UE(x, z, y)`. Any such mapping keeps the world unmirrored: the mirror undoes UE's left-handedness, and they differ only in which way UE +X faces. three.js handles the CW/CCW switch itself.
+2. Use `THREE.FrontSide`, the default, except for materials the game marks `twoSided`. Don't use `BackSide`, and don't use `DoubleSide` as a workaround.
+3. Convert an item's transform from the map file with the same mapping. Quaternion rotation `q v q*` doesn't depend on handedness, so to convert a quaternion use `v' = det(M) * M * v` on its vector part and keep `w`. For the editor's `M` that gives `(-qx, -qz, -qy, w)`.
+4. FRotator values (`relative.rotation` in `classes.json`) must go through UE's `FRotator::Quaternion` formula. `actorSpace` (also in `classes.json`) and `transformRelativeToMain` already give quaternions.
 5. Normals are transformed correctly by three's `normalMatrix`, including under the mirror.
 
 ## catalog.json
@@ -138,7 +141,7 @@ Piece = {
                        // says which slots survive; docs/qa/materials.md § Off-panel paint
   bounds: { min:[x,y,z], max:[x,y,z] }   // mesh-local, UE cm, from LOD0 vertices
   seenInSamples        // item count across samples/ (0 for classes never sampled)
-  meshSource           // "pak" (resolved from the Blueprint) | "samples" (fallback)
+  meshSource           // "pak" (resolved from the Blueprint) | "samples" (fallback, unused at present) | null
   sampleMeshAssetPath  // most common meshAssetPath the game wrote for this class
   mainRelativeTransform// Main's RelativeLocation/Rotation/Scale3D in the BP (informational)
   extraMeshes: [{ name, meshAssetPath, glb, visible, hiddenInGame,
@@ -159,20 +162,21 @@ Piece = {
                        // the in-game panel has no control for it (panel.json); then the
                        // native ones 0.4.1 adds (source "native": SurfaceAssignment, bMirror, bMirrorX),
                        // optional where no 0.4.1 save of the class has shown them
+  note?, classError?   // why a piece is unusual, on the 15 that have one
 }
 ```
 
-**`properties`:** where the CDO lists `LevelEditorExposedProperties` (the air vent, the circuit decal, five light classes, and 0.4.1's elevator, spinning cylinder, paddle and spinning paddles) they come from there (`source: "cdo"`). Some classes expose properties from native code instead (the shape decal, the light cards): for those the names, lists and order are the ones the game wrote into the samples, and the defaults are the Blueprint variables' CDO values (`source: "samples"`; the class's `variables` in `classes.json`). Every sample item's properties match these names, lists and order, and unedited sample items carry exactly these defaults.
+**`properties`.** Where the CDO lists `LevelEditorExposedProperties` (the air vent, the circuit decal, five light classes, and 0.4.1's elevator, spinning cylinder, paddle and spinning paddles) they come from there (`source: "cdo"`). Some classes expose properties from native code instead (the shape decal, the light cards): for those the names, lists and order are the ones the game wrote into the samples, and the defaults are the Blueprint variables' CDO values (`source: "samples"`; the class's `variables` in `classes.json`). Every sample item's properties match these names, lists and order, leaving out the native ones below, and unedited sample items carry exactly these defaults.
 
-**Native properties (0.4.1).** The game saves an item surface (`SurfaceAssignment`) on every item and the Mirror Y / X flags (`bMirror`, `bMirrorX`) on most, from native code (docs/FORMAT.md, "0.4.1"). `scan-samples.mjs` records each class's property layout from a 0.4.1 save when the samples have one (`savedBy041`: the item carries `SurfaceAssignment`), and `build-catalog.mjs` (`withNative`) keeps that layout exactly. Every other class gets the native properties by rule, marked `optional`. `DEFAULT_OVERRIDES` holds defaults the native code sets over the Blueprint's (the point light's shadows off and its 1000 cm attenuation radius).
+**Native properties (0.4.1).** The game saves an item surface (`SurfaceAssignment`) on every item and the Mirror Y / X flags (`bMirror`, `bMirrorX`) on most, from native code (docs/FORMAT.md, "0.4.1"). `scan-samples.mjs` records each class's property layout from a 0.4.1 save when the samples have one (`savedBy041`: the item carries `SurfaceAssignment`), and `build-catalog.mjs` (`withNative`) keeps that layout exactly. Every other class gets the native properties by rule, marked `optional`. `DEFAULT_OVERRIDES` holds defaults the native code sets over the Blueprint's (a light's 1000 cm attenuation radius, a surface cube's `SurfaceAssignment`); a light's shadows aren't among them, since only a new placement starts with them off.
 
 **The details panel (`panel.json`).** What the game offers on a class comes from native code at runtime, so the pak can't show it. `panel.json` is checked in, measured on 0.4.1 ([docs/qa/exposed-properties.md](../../docs/qa/exposed-properties.md)): `rowSets` are the panel's rows (label, control, slider range and step, `typedMax` where a typed value goes past the slider, a dropdown's options), and `pieces` lists all 237 classes the game can load, with the rows they use and `flip: false` or `surface: false` where the panel leaves those out. `withPanel` in `build-catalog.mjs` merges it into `properties`: a property with a row gets its control and `row` (its place in the panel), and one without is `hidden`. `src/panel.test.ts` fails if a palette piece is missing from it. After a game patch, measure again: the method is in that doc.
 
 **Mirrors (`mirrors`).** `run.sh` also exports `/Game/LevelEditor/Mirror/Meshes` (the game's 193 baked mirror meshes). `mirrors.mjs` pairs each with its source by geometry: the same triangle count, bounds mirrored in local x or y, and the same distinct vertex positions with that axis negated (allowing 0.5%, since the bake welds a little differently); where several sources share a shape, the one whose vertex count and slot names also match the bake wins. That pairs 186 one to one; the 7 left mirror meshes nothing exports (`SM_Paddle_Flipped`, for one). The bakes are then dropped from `assets/pieces/`: the editor draws a mirrored item as its source scaled by -1, and only needs the pairs to write the path the game saves. `materials` is the one slot swap the probe showed (the spinning cylinder's cap).
 
-**Piece order:** palette order first, category by category, following `DT_MapItems` rows and the items within each. Then the 97 registry-only ("hidden") items, alphabetically, then sampled classes that are in neither (`MP_PinballPaddle`).
+**Piece order.** Palette order first, category by category, following `DT_MapItems` rows and the items within each. Then the 97 registry-only ("hidden") items, alphabetically, then sampled classes that are in neither (`MP_PinballPaddle`).
 
-The pieces are the classes referenced by `DA_UGCPlaybackRecipeRegistry`. Every one of them descends from `BP_BaseItem`. The one item class missing from the registry, `BP_TwoCubeTwoColor_2`, is left out, and so are non-item classes such as `BP_KillZone`. (Its name-map entry, `.../BP_TwoCubeTwoColor`, is also the real `BP_TwoCubeTwoColor`'s, so whether the registry means `_2` too can't be told; see registry.json.)
+The pieces are the classes referenced by `DA_UGCPlaybackRecipeRegistry`. Every one of them descends from `BP_BaseItem`. The one item class missing from the registry, `BP_TwoCubeTwoColor_2`, is left out, and so are non-item classes such as `BP_KillZone`. Its name-map entry, `.../BP_TwoCubeTwoColor`, is also the real `BP_TwoCubeTwoColor`'s, so whether the registry means `_2` too can't be told (see `registry.json`).
 
 **`unresolved` (6):** classes with no mesh in any StaticMeshComponent, or no class at all:
 
@@ -183,14 +187,16 @@ The pieces are the classes referenced by `DA_UGCPlaybackRecipeRegistry`. Every o
 
 All six are hidden (not in the palette).
 
-Nine pieces have a meshless `Main` and are drawn only from `extraMeshes`:
+Fifteen pieces have a meshless `Main`: those six, and nine that are drawn only from `extraMeshes`:
 
-- `MP_AirVent`, `BP_AirVent`
-- `MP_ActualCheckpoint_Strip`, `MP_ActualCheckpoint_Disc`
-- `BP_UGCCircuitDecal`, `BP_UGCShapeDecal`
+- `MP_AirVent` (`SM_AirVent` plus a wind cube), `BP_AirVent`
+- `MP_ActualCheckpoint_Strip` (`SM_ActualCheckpoint_Strip`, light rods, aura cube), `MP_ActualCheckpoint_Disc`
+- `BP_UGCCircuitDecal` (an editor-only marker sphere, `hiddenInGame`), `BP_UGCShapeDecal`
 - `BP_CircularFlexiblePlatform`, `MP_OrangeSign`, `MP_MoveableKillzone`
 
-In each glb, `materials[i]` is UE material slot `i`. The material is named `"<i>:<slotName>"` and carries `extras.ueMaterial`. Each section is one primitive with `material` set to the UE section's material index, also stored in `extras.ueMaterialIndex`. The materials themselves are flat placeholders, because no textures or material graphs are extracted.
+The decal itself is a game-native component and isn't readable (see Limits).
+
+In each glb, `materials[i]` is UE material slot `i`. The material is named `"<i>:<slotName>"` and carries `extras.ueMaterial`. Each section is one primitive with `material` set to the UE section's material index, also stored in `extras.ueMaterialIndex`. The glb's materials are flat placeholders; the real ones are in `materials.json`.
 
 ### How to place a piece (finding)
 
@@ -198,22 +204,14 @@ In each glb, `materials[i]` is UE material slot `i`. The material is named `"<i>
 
 - In every sample, items whose `Main` template has a non-identity scale were saved with that same scale:
   - `MP_AirVent`: Main scale (0.75, 0.75, 1); 211/211 items have scale3D (0.75, 0.75, 1)
-  - `BP_Checkpoint`: 1.5; 68/69 items
-  - `MP_PlayerStart`: 0.2765; 21/22 items
+  - `BP_Checkpoint`: 1.5; 69/70 items
+  - `MP_PlayerStart`: 0.2765; 23/24 items
 - The map JSON stores `meshComponents[]` only for the component tagged `SKGMapEditor`, which is `Main`.
 
 So to place a piece:
 
 1. Render `glb` with `itemTransform` applied directly.
 2. Render each visible `extraMeshes[]` entry with `itemTransform * transformRelativeToMain`.
-
-Three classes have a meshless `Main` and are drawn only through `extraMeshes`:
-
-- `MP_AirVent` (`SM_AirVent` plus a wind cube)
-- `MP_ActualCheckpoint_Strip` (`SM_ActualCheckpoint_Strip`, light rods, aura cube)
-- `BP_UGCCircuitDecal` (an editor-only marker sphere, `hiddenInGame`)
-
-The decal itself is a game-native component and isn't readable (see Limits).
 
 ## keybinds.json
 
@@ -239,19 +237,19 @@ Output shape:
 - `priority` is not stored in the asset, so it is always null.
 - **Usmap patch:** UE 5.8's `FEnhancedActionKeyMapping` has `bShouldBeIgnored` after `Key`, which Fortnite's mapping lacks. `Program.cs` (`OnlyInUe58`) inserts it. Without that, `IMC_Play` fails with `EnhancedActionKeyMapping: Unknown property with value 7. Can't proceed with serialization (Serialized 5 properties until now)`.
 - The game-native modifiers can't be parsed. These are `BallestInputModifierLookSensitivity`, `...StickDeadzone`, `...CaptureMove` and `...LatestMove`, which fail with `Missing prop mappings for type ...`. They appear with `settings: null` and are listed under `errors`. All 16 errors are of this kind.
-- **The level editor's own shortcuts are not data.** In the cooked game:
+- **The in-game editor's own shortcuts are not data.** In the cooked game:
   - `IMC_LevelEditor`, `IMC_ModeEditor`, `IMC_MainMenu`, `IMC_ModeRace` and `IMC_Paused` are empty. Each is a 10-byte export with no properties.
   - `IA_Translate`, `IA_Rotate`, `IA_Scale` and `IA_Coordinates` exist but are mapped by no context.
   - There are no legacy Action/Axis mappings in `DefaultInput.ini`.
 
   The editor hotkeys live in the native SKGMultiplayerLevelEditor code. The exe has `USKGMLEGizmoDeveloperSettings`, with properties such as `ToggleGizmoVisibilityKey`, and its `[...SKGMLEDeveloperSettings]` ini section is empty, so the defaults compiled into the exe apply. Getting them would mean disassembling the exe, or reading the settings CDO with a game usmap.
 
-  In the level editor, the camera uses `IMC_FreeCam`:
+  In the in-game editor, the camera uses `IMC_FreeCam`:
   - WASD: `IA_Pan`
   - SpaceBar / LeftControl: `IA_Height`, up / down
-  - Mouse2D: `IA_Camera`, look
+  - Mouse2D: `IA_CameraMouse`, look
   - MouseWheelAxis: `IA_CamSpeedModifier`
-  - Gamepad equivalents for all of the above
+  - Gamepad equivalents for all of the above except the wheel (`IA_Camera` is the gamepad's look)
 
   `IMC_Universal` maps Escape to `IA_Pause`.
 
@@ -270,7 +268,7 @@ Output shape:
   Those category literals appear in the widget's bytecode.
 - **`sections[]`** gives the sections in UI order with their actions. Membership is exact. Row order within a section is assigned at runtime and isn't stored in the asset, so it's listed in IMC order. Each section has 9 or 11 design-time row slots (`rowSlots`).
 - **`cameraPresets`** comes from `Core/SaveSystem/Settings/CameraSettings/DT_CameraSettingsPresets`: Default 90/350/65, Wide Angle 110/310/75, Over the Shoulder 90/150/60, Orbital 110/600/200 (fov/distance/height; pitch 0 for all). The dropdown also offers Custom.
-- **`assets/strings.json`** holds all 1404 English strings from `Localization/Game/en/Game.locres`, as `{namespace: {key: text}}`. It is written by the new `BallestExtract locres` mode.
+- **`assets/strings.json`** holds all 1454 English strings from `Localization/Game/en/Game.locres`, as `{namespace: {key: text}}`. The `BallestExtract locres` mode writes it.
 - **Usmap patch:** reading the widget instances needed one more: `BlueprintGeneratedClass` drops `bIsNativePropertyInitFastPathDisabled`. That property isn't in the 5.8 header, and without the patch every BP class failed with `Failed to read ... BoolProperty bIsNativePropertyInitFastPathDisabled`.
 
 ## materials.json and textures
@@ -282,7 +280,7 @@ Output shape:
 - every material the in-game Paint picker offers (see below)
 - every item surface's material (see below)
 
-That gives 135 paths. `BallestExtract materials` follows each one's `Parent` chain up to the root `UMaterial` and dumps every asset in the chain. It also decodes every texture those assets reference: 83 of 85, written as PNG to `assets/textures/` mirroring the UE path. Each PNG is the largest mip at or below `--tex-max`, which defaults to 2048 px. Textures with no mip that small (single-mip UI textures, for example) are resized with ImageSharp. The two left out are not failures, and `verify.mjs` accepts them: `M_PaddleBase` names a Quixel Bridge `FlatNormal` default the game never cooked, and `M_PanelTrim_Shared`'s `T_SharedIslandData` is float data (`PF_A32B32G32R32F`, values −4638 to 323503), not an image, so it is recorded as `skipped`.
+That gives 136 paths. `BallestExtract materials` follows each one's `Parent` chain up to the root `UMaterial` and dumps every asset in the chain. It also decodes every texture those assets reference: 83 of 85, written as PNG to `assets/textures/` mirroring the UE path. Each PNG is the largest mip at or below `--tex-max`, which defaults to 2048 px. Textures with no mip that small (single-mip UI textures, for example) are resized with ImageSharp. The two left out are not failures, and `verify.mjs` accepts them: `M_PaddleBase` names a Quixel Bridge `FlatNormal` default the game never cooked, and `M_PanelTrim_Shared`'s `T_SharedIslandData` is float data (`PF_A32B32G32R32F`, values −4638 to 323503), not an image, so it is recorded as `skipped`.
 
 The textures total about 180 MB, so `assets/textures/` is gitignored.
 
@@ -290,12 +288,11 @@ Decoding uses CUE4Parse-Conversion's managed AssetRipper BCn decoder (`TextureDe
 
 Normal maps (BC5) get their Z channel rebuilt, and they keep UE's DirectX green channel. The editor loads every texture with `flipY` off (the glb UVs are UE's, origin top-left, and the projected reads and the GLSL programs use the game's orientation), where DirectX green already points along +v: `normalScale (1, 1)`. With three's default flip it would be `(1, -1)`.
 
-`build-materials.mjs` merges each chain from the root down: instances store only their overrides. That produces:
+`materials build` (`src/materials.ts`) merges each chain from the root down: instances store only their overrides. That produces:
 
 - `scalars`, `vectors` (linear RGBA), `textures` (PNG paths) and `switches`
 - `blendMode`, `shadingModel`, `twoSided`
 - `connectedOutputs`, taken from the root's `CachedExpressionData.PropertyConnectedMask` and mapped to UE 5.8 `EMaterialProperty` names
-- `referencedTextures`
 - `approx`
 
 **Where the values come from:**
@@ -309,7 +306,7 @@ Normal maps (BC5) get their Z channel rebuilt, and they keep UE's DirectX green 
   - Default values are in `ScalarValues`, `VectorValues`, `TextureValues` and `StaticSwitchValues`, in the same order.
   - `BlendMode`, `ShadingModel`, `TwoSided` and `OpacityMaskClipValue` are ordinary properties.
 
-**Parameter names `approx` keys on.** `approx.keys` records which parameter was used for each field. First match wins:
+**Parameter names `approx` keys on.** Where the shader evaluation has no answer (7 of the 136 materials, and opacity and emissive on any material), `approx` falls back to parameter names. `approx.keys` records which parameter was used for each field. First match wins:
 
 - **baseColor (vector):** `BaseColor`/`Base Color`, `Albedo`/`Diffuse`, `Color`, `Tint`, `*Glass Color*`. Names containing emissive, fresnel, edge, outline, light, grunge, highlight, angle, secondary, direction, noise or blend are skipped.
 - **metallic:** `Metallic`, `Metal`.
@@ -320,34 +317,33 @@ Normal maps (BC5) get their Z channel rebuilt, and they keep UE's DirectX green 
 - **textures:**
   - base colour: `Base Color`/`Albedo`/`Diffuse`
   - normal: `Normal`/`Normal Map`
-  - ORM: only a parameter whose name has a whole-word token `ORM`, `RMA`, `MRA`, `ARM` or `OcclusionRoughnessMetallic`, and never one with "normal" in it. Otherwise it's null. None of the masters uses these names, so `ormTexture` is null everywhere. An earlier substring match picked up "N**orm**al" by mistake.
+  - ORM: only a parameter whose name has a whole-word token `ORM`, `RMA`, `MRA`, `ARM` or `OcclusionRoughnessMetallic`, and never one with "normal" in it. None of the masters uses these names, so `ormTexture` comes from the shader trace when it's set at all (`MI_Surface_Grippy`'s `T_Grippy_RMAH`). An earlier substring match picked up "N**orm**al" by mistake.
 
 If the root's BaseColor pin isn't connected but EmissiveColor is (`M_Emissive_Light`), `approx.baseColor` is black and the colour goes into `approx.emissive`. Anything not found falls back to grey 0.8, roughness 0.6, metallic 0 and opacity 1, or 0.5 for translucent blend modes.
 
 **Results:**
 
-- 135 materials, 129 recovered, 81 with a base colour or normal texture.
+- 136 materials, 130 recovered, 82 with a base colour or normal texture.
 - Every instance chain resolves.
 - Old map files reference `/Game/Art/Materials/Masters/M_BaseSurface_Metal`, which no longer exists. The extractor applies `DefaultEngine.ini`'s `+PackageRedirects` and reports the new path as `redirectedTo`.
-- **Not recovered (5):**
-  - `/Engine/EngineMaterials/DefaultMaterial`, `/Engine/EngineMaterials/WorldGridMaterial`
+- **Not recovered (6):**
+  - `/Engine/EngineMaterials/DefaultMaterial`, `/Engine/EngineMaterials/WorldGridMaterial`, `/Engine/EditorMeshes/ColorCalibrator/M_ClearCoat`
   - `M_AirventBlock`, `M_AJ_LandRay`, `M_Metal_Steel`
 
-  These are root materials with zero parameters; their look is built from constants inside the graph, which isn't cooked. Each still has `referencedTextures`, and `recovered: false`.
-- `approx` ignores UV tiling and world-aligned or triplanar mapping. Masters such as `M_Env_Material_Default` and `M_SmartMat` use world-space UVs, so textures on mesh UVs won't line up with the game. Flat colour is the reliable part.
+  These are root materials with zero parameters; their look is built from constants inside the graph, which isn't cooked. Each has `recovered: false`.
 
-**The Paint picker (`paint`).** The level editor's Paint panel (`UI/Details/Material/WBP_CustomizeMaterial`, one row per mesh slot) offers a finish dropdown and a row of colour swatches. Its data:
+**The Paint picker (`paint`).** The in-game editor's Paint panel (`UI/Details/Material/WBP_CustomizeMaterial`, one row per mesh slot) offers a finish dropdown and a row of colour swatches. Its data:
 
 - `UI/Data/MaterialSelection/MaterialCategories_Library` (a `PDA_MaterialCategories`) lists the finishes in order. Each one is a `PDA_MaterialCategory` under `/Game/Art/DataAssets/BallestMaterials/`.
 - Each category's `ColorMaterialMap` maps an `EBallestMaterialColors` value to a material. `MaterialCategory` is an `EBallestMaterialCategories` value; `MaterialCategory_Smooth` leaves it unset, so it takes the first enumerator, `smooth`. `ColorColorMap` is the swatch colour: the ordinary finishes inherit it from `Default__PDA_MaterialCategory_C`, and `special` saves its own.
 - The swatches follow `ColorMaterialMap`'s order, except `special`, which the game lists in reverse (`SWATCH_ORDER` in `src/materials.ts`, measured).
 - Category and colour names are the enums' display names. The `*_Dark` materials are listed as "Black". `MaterialName` says "emmissive", and the game's dropdown shows that, so the extractor uses the enum's name instead.
 
-`run.sh` dumps both directories to `paint-dump.json`. `build-materials.mjs` adds the picker's materials to the list and writes `paint: [{ name, colors: [{ color, material, displayColor? }] }]`, with `material` class-qualified the way map files store it. That's 7 finishes and 65 materials: smooth, rough, glossy, concrete, tiled and emissive in 10 colours each (White, Black, Red, Orange, Yellow, Lime, Blue, SkyBlue, Purple, Wine), and special in 5 (Grey = `MI_Pipes`, Concrete, Iron, Copper, Aluminum). The swatches' preview textures (`ColorPreviewTextureMap`) are empty in the cooked assets.
+`run.sh` dumps both directories to `paint-dump.json`. `materials build` adds the picker's materials to the list and writes `paint: [{ name, colors: [{ color, material, displayColor? }] }]`, with `material` class-qualified the way map files store it. That's 7 finishes and 65 materials: smooth, rough, glossy, concrete, tiled and emissive in 10 colours each (White, Black, Red, Orange, Yellow, Lime, Blue, SkyBlue, Purple, Wine), and special in 5 (Grey = `MI_Pipes`, Concrete, Iron, Copper, Aluminum). The swatches' preview textures (`ColorPreviewTextureMap`) are empty in the cooked assets.
 
-**Item surfaces (`surfaces`).** 0.4.1 added physics surfaces that the level editor assigns per item (`EBallestSurfaceAssignment`; console `ballest.editor.surface [none|magnet|ice|grippy]`; the enum's `Grass` and `GrippyCards` are "not included in cooked builds"). Each one draws with a material from the native `UBallestSurfaceMaterialSettings`. Its defaults are compiled into the exe, so `src/materials.ts` (`SURFACES`) lists them: magnet `MI_MagnetMachined_PanelTrim`, ice `MI_Surface_Ice`, grippy `MI_Surface_Grippy`. `run.sh` adds `DefaultGame.ini` to the paint dump, and its `[/Script/Ballest.BallestSurfaceMaterialSettings]` overrides apply; 0.4.1 sets `MagnetMaterial` to `MI_MagnetPearlescentNatural_Prototype`. `materials.json` lists `surfaces: [{ name, material }]` in the game's order (none, magnet, ice, grippy), with `material` as an object path, or null for none. How a map file stores an item's surface is not known yet (see `docs/FORMAT.md`).
+**Item surfaces (`surfaces`).** 0.4.1 added physics surfaces that the in-game editor assigns per item (`EBallestSurfaceAssignment`; console `ballest.editor.surface [none|magnet|ice|grippy]`; the enum's `Grass` and `GrippyCards` are "not included in cooked builds"). Each one draws with a material from the native `UBallestSurfaceMaterialSettings`. Its defaults are compiled into the exe, so `src/materials.ts` (`SURFACES`) lists them: magnet `MI_MagnetMachined_PanelTrim`, ice `MI_Surface_Ice`, grippy `MI_Surface_Grippy`. `run.sh` adds `DefaultGame.ini` to the paint dump, and its `[/Script/Ballest.BallestSurfaceMaterialSettings]` overrides apply; 0.4.1 sets `MagnetMaterial` to `MI_MagnetPearlescentNatural_Prototype`. `materials.json` lists `surfaces: [{ name, material }]` in the game's order (none, magnet, ice, grippy), with `material` as an object path, or null for none. [docs/FORMAT.md](../../docs/FORMAT.md#041-surfaces-mirroring-physics-props) has how a map file stores an item's surface.
 
-**Usmap patches (`Program.cs`):** found by diffing against the 5.8.0-release headers.
+**Usmap patches (`Program.cs`).** Found by diffing against the 5.8.0-release headers.
 
 - `MaterialInstance`: drop `ToonProfileParameterValues`.
 - `Material`: drop `bEnableNewHLSLGeneratorOverridden`, `bMaterialTranslatorProfileOverridden` and `MaterialTranslatorProfile`.
@@ -383,9 +379,9 @@ The name map matters because soft references (`TSoftClassPtr`, `FSoftObjectPath`
   - No `PDA_MapItem` asset exists outside the table.
   - `MP_PlayerStart` isn't in the palette (it is required in every map). The other sampled classes outside it are the probe maps' hidden pieces, `BP_Prim_Sphere` and the removed `MP_PinballPaddle`.
 - **`recipeRegistry`:** `/Game/LevelEditor/Playback/DA_UGCPlaybackRecipeRegistry` is a native `BallestUGCPlaybackRecipeRegistry`. Its properties fail with `Missing prop mappings for type BallestUGCPlaybackRecipeRegistry`, so the per-class recipe data can't be read. Its name map still lists the classes it references: 237 of the 238 items. The one it lacks is `ExampleObjects/RandomObjects/BP_TwoCubeTwoColor_2`. A name map holds an FName's string without its number, so a soft reference to `.../BP_GlossyRed_Tube_Bend_25` is stored as `.../BP_GlossyRed_Tube_Bend` (number 26); `build-registry.mjs` matches such a base name to the numbered package, unless a package of the base name exists too (as `BP_TwoCubeTwoColor` does).
-- **`candidates`:** the classes the coordinator asked about, each with in-registry, in-palette, is-item and parent chain.
+- **`candidates`:** a fixed list of classes of interest (`CANDIDATES` in `build-registry.mjs`), each with in-registry, in-palette, is-item and parent chain. Nothing reads it; it's for looking things up by hand.
 
-**"Hidden" pieces:** 97 item classes are in the recipe registry but not in the palette. Examples:
+**"Hidden" pieces.** 97 item classes are in the recipe registry but not in the palette. Examples:
 
 - the light fixtures `MP_*LightFixture` (the raw lights and light cards are in the Lights category since 0.4.1)
 - boosters, `MP_PinballLauncher`, `BP_CircularFlexiblePlatform`, `BP_UGCShapeDecal`, `MP_CheckpointStrip`
@@ -399,26 +395,22 @@ They are real level-editor items the game can spawn from a map file, but the bro
 
 **Route 2: CUE4Parse.** It opens the copied IoStore containers directly with `EGame.GAME_UE5_8`, which exists in CUE4Parse at the pinned rev. It handles TOC v8 / `ReplaceIoChunkHashWithIoHash`, the container header version `SoftPackageReferencesOffset`, and Oodle. `BallestExtract` writes the GLB itself (`cue4/Glb.cs`) instead of using CUE4Parse-Conversion's glTF writer, because that writer converts to Y-up metres (`SwapYZ`, `* 0.01`). None of the meshes is Nanite-only: they all have LOD0 render data.
 
-**Class resolution.** The extractor walks the BP parent chain through `UObject.Super`, which comes from the export map. It collects the `SCS_Node` exports of each package and applies `InheritableComponentHandler` overrides. For property lookups it follows each component template's archetype (`Template`) chain. For all 87 classes whose `Main` has a mesh, the resolved mesh matches the `meshAssetPath` the game wrote into the sample maps.
+**Class resolution.** The extractor walks the BP parent chain through `UObject.Super`, which comes from the export map. It collects the `SCS_Node` exports of each package and applies `InheritableComponentHandler` overrides. For property lookups it follows each component template's archetype (`Template`) chain. For all 102 sampled classes whose `Main` has a mesh, the resolved mesh matches the `meshAssetPath` the game wrote into the sample maps.
 
 ## What didn't work, and the limits
 
 - **Packages use unversioned properties** (`PKG_Cooked | PKG_UnversionedProperties | PKG_FilterEditorOnly`). Even StaticMesh needs a `.usmap`, because the StaticMesh UPROPERTYs come before the render data. Without one, CUE4Parse refuses to load anything:
   `CUE4Parse.UE4.Exceptions.MappingException: Package has unversioned properties but mapping file is missing, can't serialize`.
-  No usmap exists for this game. Making one needs Dumper-7 or UE4SS on Windows. Instead we use Fortnite's, which is an engine superset.
+  We use Fortnite's, which is an engine superset, by default. The plugin manager's `dumptypes` writes one for this build ([docs/DRIVER.md](../../docs/DRIVER.md) § The decompile question), and `run.sh --usmap` would take it, but the pipeline hasn't been moved over.
 - **Fortnite's usmap is not exactly UE 5.8.** We diffed it against the `5.8.0-release` headers for these types, using the tag `5.8.0-release` on EpicGames/UnrealEngine:
   - `ActorComponent`, `SceneComponent`, `PrimitiveComponent`, `MeshComponent`, `SCS_Node`, `ComponentKey`, `ComponentOverrideRecord`: match.
   - `StaticMeshComponent`: Fortnite has two extra properties, `bOverrideNavAreaClass` and `NavAreaClass`. `Program.cs` (`NotInUe58`) drops them at load time.
 
   Without that patch, every StaticMeshComponent template fails with `StreamingTextureBuildInfo: Unknown property with value 117. Can't proceed with serialization`. Worse, the inherited SceneComponent values are read 2 slots off without any error: `RelativeScale3D` comes out as `RelativeLocation`. Any new mismatch would show up the same way, so check `usmap-dump` against the headers if you switch to a different usmap.
 - **`BlueprintGeneratedClass`/`Class` layouts differ from Fortnite's.** CUE4Parse fails with `Failed to read FPropertyTagType ArrayProperty<ObjectProperty> ComponentTemplates ---> ArrayProperty element count 50331648 is larger than the remaining archive size` (and similar errors on `FieldNotifies`). That means class-level properties such as `SimpleConstructionScript`/`InheritableComponentHandler` can't be read. The pipeline avoids them by finding SCS nodes and ICH records through the package export list. These errors are expected noise in `classes.log`.
-- **CDOs and game-native components need the game's own usmap.** This covers:
-  - CDO (`Default__*_C`) properties
-  - game-native component classes such as `BallVentPhysicsComponent`, `BallGoalCrossingComponent` and `BallestUGCCircuitDecalComponent`, which fail with `Missing prop mappings for type BallVentPhysicsComponent`
-
-  So piece-specific gameplay defaults (vent strength, decal size) are not in the catalog, and the decal piece has no real visual. Native C++ components that aren't overridden in a BP would also be missed. None of the sampled pieces has one.
+- **Game-native components need the game's own usmap.** Classes such as `BallVentPhysicsComponent`, `BallGoalCrossingComponent` and `BallestUGCCircuitDecalComponent` fail with `Missing prop mappings for type BallVentPhysicsComponent`. So the decal piece has no real visual. Native C++ components that aren't overridden in a BP would also be missed; none of the sampled pieces has one. CDOs load, which is how the catalog gets its `properties` defaults (vent strength, decal size).
 - **retoc (route 1)** was built from source (rev `885a8da`). The host's rustup has no default toolchain (`error: command failed: 'cargo': No such file or directory`), so it was built with `nix shell nixpkgs#cargo nixpkgs#rustc`. Results:
   - `retoc info` parses the container. Note it reports `container_flags: Compressed | Signed | Indexed`, and there is a `Ballest-Windows.sig`.
   - `retoc to-legacy -f SM_500 /tmp/ballest-paks OUT` converted 14 assets with 0 failures, auto-detecting the version (`--version` only goes up to `UE5_7`).
   - The legacy `.uasset/.uexp` it produces are still unversioned, so a parser and a usmap would still be needed. It isn't part of the pipeline.
-- **Materials** are reported as paths only. No textures or material parameters are extracted, and `M_OutlineEdges` sections (for example slot 1 of `SM_500`) are real geometry that the game renders with an edge shader.
+- `M_OutlineEdges` sections (for example slot 1 of `SM_500`) are real geometry that the game renders with an edge shader.
