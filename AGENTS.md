@@ -25,6 +25,8 @@ Use one name per thing, in code comments and docs alike.
 | in-game editor     | The game's own map editor (not "track editor" or "level editor").                                                                                          |
 | game's maps folder | `UserSavedMaps`.                                                                                                                                           |
 | piece, item        | A piece is a kind of thing in the catalog; an item is one placed in a map.                                                                                 |
+| sidecar            | `maps/<file name>.editor.json`, what a map holds that the game's format can't.                                                                             |
+| stable key         | An item's one identity in the editor: `Doc.ids` in the store, the keys in the sidecar.                                                                     |
 
 ## Layout
 

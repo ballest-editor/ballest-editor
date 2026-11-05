@@ -1,13 +1,13 @@
 # Projects, maps and exports
 
-This page holds the project model: what the three nouns are, the files on disk, why the `.balledit` stays the source of truth, and the design still to come. Phases 1 to 3 below are built. [DESKTOP.md](DESKTOP.md) describes how the app behaves today, and [FORMAT.md](FORMAT.md) describes the game's file format, which none of this changes.
+This page holds the project model: what the three nouns are, the files on disk, which file is the source of truth for what, and the design still to come. Phases 1 to 3 below are built. [DESKTOP.md](DESKTOP.md) describes how the app behaves today, and [FORMAT.md](FORMAT.md) describes the game's file format, which none of this changes.
 
 ## The three nouns
 
 | Noun    | What it is                                                                                                              | Where                                                                                                         |
 | ------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | Project | A folder the user works in, holding any number of maps. Later a git repository.                                         | `Documents/Ballest Editor/<name>/` when the app makes it, or any folder the user opens.                       |
-| Map     | A document in a project: the game's map. Later, editor-only data too.                                                   | `<project>/maps/<file name>.balledit`. Later a sidecar beside it (#112).                                      |
+| Map     | A document in a project: the game's map and the editor-only data beside it.                                             | `<project>/maps/<file name>.balledit`, and its sidecar `<project>/maps/<file name>.editor.json`.              |
 | Export  | The `.balledit` the game reads, a byte-for-byte copy of a map. Play is an export plus the handoff to the editor plugin. | The game's maps folder, the only target so far. A folder the user chooses is a later option (`exportTarget`). |
 
 The link between a map and its export is specific to this machine and is never shared. It lives in `<project>/.ballest/`, which the project's `.gitignore` leaves out.
@@ -17,7 +17,7 @@ The link between a map and its export is specific to this machine and is never s
   ballest-project.json         name, format version, export target
   maps/
     Map_LevelEditorMain&Big Loop_Isaac.balledit
-    Map_LevelEditorMain&Big Loop_Isaac.editor.json    sidecar (#112), later, only once something needs it
+    Map_LevelEditorMain&Big Loop_Isaac.editor.json    its sidecar: what the game's format can't hold
   .ballest/
     link.json                  per map: origin, last export (path, hash, time), last seen game hash
     backups/                   previous versions of overwritten files (#137)
@@ -30,6 +30,34 @@ The code is in `apps/desktop/src/project/`. Main reads and writes only these, th
 
 - **`ballest-project.json`** is indented JSON: `{ "formatVersion": 1, "name": "<folder name>", "exportTarget": "game" }`. Project settings can change `name` (`renameProject`), and the folder keeps its own name. `defaultCreator` is in the schema, but nothing writes or reads it. New maps take the creator from Settings › General, Steam, or the maps already in the game's maps folder (`domain/creator.ts`).
 - **Making a project.** File › New project…, the first Save in Untitled Project, and naming the project in Project settings all call `Projects.createNew`, which makes the folder, `maps/`, `.ballest/`, `ballest-project.json` and a `.gitignore` of `.ballest/`. A folder chosen with Open project… gets whatever it lacks of these on the first write (`Projects.ensure`).
+- **`maps/<file name>.editor.json`** is the map's sidecar, indented JSON that the game never reads. It sits beside the `.balledit` and is shared with the project. `domain/MapSidecar.ts` holds its schema:
+
+  ```json
+  {
+    "formatVersion": 1,
+    "mapHash": "<SHA-256 of the .balledit it was written for>",
+    "items": {
+      "<key>": {
+        "index": 3,
+        "fingerprint": "BP_Prim_Cube|100,200,8615|0,0,0,1|1,1,1",
+        "name": "Left ramp",
+        "tags": ["start"]
+      }
+    },
+    "tree": [
+      { "kind": "item", "key": "<key>" },
+      { "kind": "group", "id": "<id>", "name": "Bridge", "tags": [], "children": [] }
+    ]
+  }
+  ```
+
+  - A **key** is 12 random URL-safe characters that an item gets when it enters the document (placed, pasted, duplicated, imported). It is the item's one identity in the editor: the store's `ids`, the selection and the sidecar all use it. A group's `id` is made the same way, and keys and ids share one space.
+  - `items` has an entry per item. `index` is its place in `map.items`. `fingerprint` is its class and transform, rounded to 0.01 cm and four places for rotation and scale, with a quaternion and its negative written alike. `name` and `tags` are optional, and tags are free strings. Groups have tags too.
+  - `tree` holds every item in exactly one place, and groups nest to any depth. A group left empty by an edit goes with it, as the game's do.
+  - **Loading** (`loadStructure`, `domain/sidecar.ts`). A `mapHash` equal to the `.balledit`'s hash means `index` is right. Otherwise something rewrote the file, and each entry looks for its item by fingerprint: the same class and transform first, in document order, then the same class and the nearest transform within 1 cm and 0.01 on any rotation or scale component. Items left over get fresh keys and join the root. Entries left over are dropped, and their count is reported (`sidecarUnmatched`). The re-matched sidecar is written back at once, so the loss is reported once and the old file goes to the backups. A hash that matches but indices that can't be right (past the items, or two on one item) re-match the same way.
+  - A map with no sidecar loads with fresh keys, a flat tree, and one tree group per game group ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)). It gets a sidecar on its first Save. A sidecar that doesn't decode leaves the map on its own and says so (`sidecarUnreadable`); the next Save replaces the file, and the old one goes to the backups.
+  - **Saving** writes the `.balledit`, then the sidecar with the `.balledit`'s new hash, each atomically. A crash between the two leaves a sidecar that re-matches on the next open.
+  - The sidecar goes where the map goes. Rename moves it, Duplicate writes one for the copy, and Import replacing a map sends the old one to the backups. Export and Play copy only the `.balledit`. Project settings editing a map that isn't open leaves its sidecar a version behind, and it re-matches without loss on the next open.
 - **`.ballest/link.json`** is `{ "formatVersion": 1, "maps": { "<file name>": <link> } }`, where a link is `{ "origin", "export", "lastSeenHash" }`. `origin` and `export` are each null or `{ "path", "hash", "at" }`: the file's absolute path, the SHA-256 of its bytes (lowercase hex) and an ISO 8601 UTC time.
   - Import sets `origin`.
   - Export to game sets `export` and `lastSeenHash` to the bytes it wrote.
@@ -40,7 +68,7 @@ The code is in `apps/desktop/src/project/`. Main reads and writes only these, th
   - An export found gone sets both to null, and `origin` stays.
 
   The `MapLinks` service owns the file: one update at a time, atomic writes, and a file that doesn't decode reads as empty.
-- **`.ballest/backups/<time> <file name>`** holds the project's copy of a map before anything wrote over it, and the old file after a Rename. The game's copy before an export wrote over it goes to `<userData>/backups/` instead, since it belongs to this machine and not to the project. [DESKTOP.md § Backups](DESKTOP.md#backups) has the rules.
+- **`.ballest/backups/<time> <file name>`** holds the project's copy of a map or sidecar before anything wrote over it, and the old file after a Rename. The game's copy before an export wrote over it goes to `<userData>/backups/` instead, since it belongs to this machine and not to the project. [DESKTOP.md § Backups](DESKTOP.md#backups) has the rules.
 
 `desktop-settings.json` keeps the recent projects under `project.recent`, at most 8, the last one used first. An empty list means Untitled Project. A window has one project, kept in memory, so another running copy changing the list doesn't move it. A project opens in one window at a time. [DESKTOP.md § Other windows](DESKTOP.md#other-windows) has where a window starts and how windows know about each other.
 
@@ -48,12 +76,13 @@ A project is never the game's maps folder. The game loads only from `UserSavedMa
 
 ### Source of truth
 
-**Through the public launch, the `.balledit` in the project is the map.** An export is a byte-for-byte copy plus a link record. Later, the sidecar adds what the format can't hold: hidden and locked pieces, layers, reference underlays, construction planes. The reasons:
+**The `.balledit` in the project is the source of truth for the pieces, and the sidecar for the structure:** the groups, and each item's and group's name and tags. An export is a byte-for-byte copy of the `.balledit` plus a link record. Save regenerates the `.balledit`'s `editorState.groups` from the sidecar's tree, so the game sees what it can hold of the structure ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)). A change to the game's groups never reaches the tree of a map that has a sidecar. Later, the sidecar also holds hidden and locked pieces, layers, reference underlays and construction planes. The reasons:
 
 - Round trips with the game lose nothing, because there is no converter to get wrong.
 - Git diffs of a map are the game's own JSON, readable without the editor.
 - In an emergency, the project file can be copied into `UserSavedMaps` by hand and the game opens it.
-- #112's stable-key problem (sidecar entries surviving an in-game edit) is the same whether the sidecar is small or large, so a new container format gains nothing now.
+- Stable keys have to survive an in-game edit however much the sidecar holds, so a new container format gains nothing now.
+- 0.4.1 deletes `editorState` on an in-game save ([qa/save-roundtrip.md](qa/save-roundtrip.md)). The structure survives that because it doesn't depend on the game keeping it.
 
 **Later, when derived data exists** (generators #93, derived pieces #94, splines #91, shared bases #104), the sidecar carries the generating data, and the pieces it produces are marked as derived in the sidecar by stable key. The `.balledit` in the project stays the rendering, regenerated on save. That keeps the two files and the export path unchanged. For a derived piece the sidecar wins and the `.balledit` entry is output. If an in-game edit moves a derived piece, the piece becomes _detached_: the edit is kept, the generator no longer owns it, and the editor says so. There is no format switch and no migration of user projects.
 
@@ -70,11 +99,10 @@ Later, the Project panel lists the maps in `UserSavedMaps` that aren't in the pr
 
 ## Sync: edits made out of band
 
-The in-game editor can change an exported file at any time, and a save in the game rewrites the whole file, so an exported file rarely stays byte-identical. The link record makes this detectable: compare the game file's hash with the last export's hash, and with the last seen hash so that one change is reported once. [DESKTOP.md § Sync](DESKTOP.md#sync) describes what the app does with that.
+The in-game editor can change an exported file at any time, and a save in the game rewrites the whole file, so an exported file rarely stays byte-identical. The link record makes this detectable: compare the game file's hash with the last export's hash, and with the last seen hash so that one change is reported once. [DESKTOP.md § Sync](DESKTOP.md#sync) describes what the app does with that. Re-import loads the game's version the way any changed file loads, so sidecar entries of unchanged pieces survive it and the rest are reported (§ The files).
 
 Later:
 
-- Re-import re-matches sidecar entries by stable key and reports the ones it can't match (#112).
 - Re-import gets a diff (#105), and "merge" becomes possible for edits that don't overlap. Not before git.
 - A third out-of-band case, the project file itself changing under the editor (git pull, another tool), reloads the map when it has no unsaved edits and reports the change otherwise. Deferred until git.
 

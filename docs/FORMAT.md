@@ -244,6 +244,17 @@ The bounds are the Main mesh's, measured through the game's own gizmo, with thes
 
 The game accepts a file's `localPosition` for all of these and puts the gizmo there.
 
+## Groups (`editorState.groups`)
+
+A game group is flat: item indices, a name and a frame. The load-time rules are under [Load-time validation](#load-time-validation). The editor keeps its groups in the map's sidecar, nested to any depth ([PROJECTS.md § The files](PROJECTS.md#the-files)), which the game never reads. It makes `groups` from them each time it encodes a `.balledit` (`domain/gameGroups.ts`):
+
+- One game group per outermost tree group with at least one item anywhere under it. A nested group has no game group of its own.
+- `members` is every item index under it, flattened and sorted.
+- `name` is the group's name reduced to letters and digits, at most 64 of them, or empty when none are left.
+- `frame` has identity rotation and scale, with its translation at the centre of the box around the members' `itemTransform.translation`. That a frame is there matters to the game; what the game does with its values isn't measured yet.
+
+Going the other way, a map with no sidecar gets one tree group per game group, where its first member is. An unnamed one is called `Group N`, and a member the game would refuse is left out.
+
 ## Decals
 
 A decal (`BP_UGCCircuitDecal`, `BP_UGCShapeDecal`) has no scale of its own. Its `scale3D` stays 1, and the game ignores any other value in a file. Its size is three float properties, in cm, and the game's inspector and gizmo show and change them as the Scale:
