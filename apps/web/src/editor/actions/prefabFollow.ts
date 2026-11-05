@@ -38,13 +38,12 @@ const report = (ref: PrefabRef, updated: number, edited: ReadonlyArray<string>) 
   }
   if (edited.length === 0) return
   const command = { tier: ref.tier, name: ref.name }
+  const [them, plainGroups] = edited.length === 1 ? ["it", "a plain group"] : ["them", "plain groups"]
   notify("info", `${countOf(edited.length, "instance")} of ${ref.name} didn't follow its definition`, {
     kind: "prefabInstancesEdited",
     body: `Edited here, in ${
       [...new Set(edited)].join(", ")
-    }. Update replaces them with the definition, and Detach keeps ${
-      edited.length === 1 ? "it as a plain group" : "them as plain groups"
-    }.`,
+    }. Update replaces ${them} with the definition, and Detach keeps ${them} as ${plainGroups}.`,
     actions: [
       { label: "Update", command: { _tag: "UpdatePrefabInstances", ...command } },
       { label: "Detach", command: { _tag: "DetachPrefabInstances", ...command } }

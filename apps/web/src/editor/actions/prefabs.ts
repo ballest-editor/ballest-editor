@@ -111,11 +111,19 @@ const writePrefab = Effect.fnUntraced(function*(ref: PrefabRef, prefab: PrefabFi
 })
 
 /** What Save selection as prefab… would refuse about the selection, as the game says it; undefined when it can go. */
-export const selectionPrefabProblem = (): string | undefined => {
+const selectionPrefabProblem = (): string | undefined => {
   const s = useEditor.getState()
   const items = selectedIndices(s).flatMap((index) => s.doc.map.items[index] ?? [])
   if (items.length < PREFAB_ITEMS.min || items.length > PREFAB_ITEMS.max) return PREFAB_REFUSALS.selection
   return items.some(isPlayerStart) ? PREFAB_REFUSALS.playerStart : undefined
+}
+
+/** Edit › Save selection as prefab…: names it in a dialog, unless the game would refuse the selection whatever the name. */
+export const startSavePrefab = () => {
+  const { notify, openDialog } = useEditor.getState()
+  const problem = selectionPrefabProblem()
+  if (problem === undefined) openDialog({ id: "savePrefab" })
+  else notify("error", problem, { kind: "prefabRefused" })
 }
 
 /**

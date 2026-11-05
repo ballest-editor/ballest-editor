@@ -34,6 +34,7 @@ import { NameMapDialog } from "./NameMapDialog"
 import { NewMapDialog } from "./NewMapDialog"
 import { NewProjectDialog } from "./NewProjectDialog"
 import { OverwriteChangedDialog } from "./OverwriteChangedDialog"
+import { DeletePrefabDialog, RenamePrefabDialog, SavePrefabDialog } from "./PrefabDialogs"
 import { ProjectChooser } from "./ProjectChooser"
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
 import { RecoverDialog } from "./RecoverDialog"
@@ -169,6 +170,9 @@ export function Editor() {
       <OverwriteChangedDialog open={dialog === "overwriteChanged"} onClose={close} />
       <ImportClashDialog open={dialog === "importClash"} onClose={close} />
       <RecoverDialog open={dialog === "recover"} onClose={close} />
+      <SavePrefabDialog open={dialog === "savePrefab"} onClose={close} />
+      <RenamePrefabDialog open={dialog === "renamePrefab"} onClose={close} />
+      <DeletePrefabDialog open={dialog === "deletePrefab"} onClose={close} />
       <KeybindCheatSheet />
       {/* clear of the status bar */}
       <Toaster position="bottom-right" offset={{ bottom: 40 }} />

@@ -23,6 +23,7 @@ import {
 import {
   activeNodeOf,
   canGroupSelection,
+  exactSelectedGroup,
   groupPathOf,
   groupSelectionStates,
   nodeKeys,
@@ -43,6 +44,7 @@ import {
   visibleRange
 } from "../domain/outline"
 import { findNode } from "../domain/structure"
+import { detachInstance, startSavePrefab, updateInstance } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { itemDisplayNamesOf, nextSelection, useEditor } from "../editor/store"
 import { OUTLINE_INDENT, OUTLINE_ROW_HEIGHT, OutlineRowView } from "./OutlineRow"
@@ -325,6 +327,11 @@ export function Outline() {
   const canGroup = useMemo(() => canGroupSelection(tree, selectedIds), [tree, selectedIds])
   const canUngroup = useMemo(() => selectedGroupIds(tree, selectedIds).length > 0, [tree, selectedIds])
   const hasSelection = selectedIds.length > 0
+  const instance = useMemo(
+    () => exactSelectedGroup(tree, selectedIds, enteredGroupId),
+    [tree, selectedIds, enteredGroupId]
+  )
+  const link = instance?.prefab
   // Rename's field takes the focus, so the closing menu mustn't hand it back.
   const keepFocus = useRef(false)
 
@@ -415,6 +422,17 @@ export function Outline() {
         <ContextMenuContent className="w-max min-w-44" finalFocus={() => !keepFocus.current}>
           <MenuCommand action="groupSelection" disabled={!canGroup}>Group</MenuCommand>
           <MenuCommand action="ungroupSelection" disabled={!canUngroup}>Ungroup</MenuCommand>
+          <ContextMenuItem disabled={!hasSelection} onClick={startSavePrefab}>
+            Save selection as prefab…
+          </ContextMenuItem>
+          {instance !== undefined && link !== undefined && (
+            <>
+              <ContextMenuItem onClick={() => void updateInstance(instance.id, link)}>
+                Update from prefab
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => detachInstance(instance.id)}>Detach from prefab</ContextMenuItem>
+            </>
+          )}
           <ContextMenuSeparator />
           <ContextMenuItem
             disabled={menuRow === null}

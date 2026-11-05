@@ -22,6 +22,9 @@ import {
 } from "./PrefabFile"
 import { quatToRotator, rotatorToQuat } from "./ueMath"
 
+/** A prefab's name, as main checks it. */
+export { isPrefabName, PREFAB_NAME_RULE } from "@ballest/contracts"
+
 export const ORIGIN: Vec3 = { x: 0, y: 0, z: 0 }
 
 /** How far ahead of the camera a spawn puts the nearest of its box, along the view (cm). */
@@ -71,7 +74,7 @@ const meshComponentOf = ({ materials, mesh, tag }: PrefabMesh): MeshComponent =>
 })
 
 /** A class path as a map writes it. A prefab's is bare, though the map's wrapped form loads too. */
-const qualifyClassPath = (path: string): string =>
+export const qualifyClassPath = (path: string): string =>
   path.includes("'") ? path : `/Script/Engine.BlueprintGeneratedClass'${path}'`
 
 /**

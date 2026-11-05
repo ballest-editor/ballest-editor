@@ -1,4 +1,4 @@
-import { IconX } from "@tabler/icons-react"
+import { IconBoxMultiple, IconX } from "@tabler/icons-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -82,7 +82,7 @@ function DocumentTab({ id, index, dragging, dropBefore, dropAfter, onDragStart, 
   const several = useEditor((s) => s.tabIds.length > 1)
   const last = useEditor((s) => s.tabIds.at(-1) === id)
   const activateTab = useEditor((s) => s.activateTab)
-  const { label, unsaved, path, fileName } = useTabSummary(id)
+  const { label, unsaved, path, fileName, prefabTier } = useTabSummary(id)
   const ref = useRef<HTMLDivElement>(null)
   const menuButton = useRef<HTMLButtonElement>(null)
 
@@ -140,7 +140,11 @@ function DocumentTab({ id, index, dragging, dropBefore, dropAfter, onDragStart, 
           showMap()
         }}
       >
+        {prefabTier !== null && <IconBoxMultiple className="mr-1 size-3 shrink-0 text-muted-foreground" />}
         <span className="truncate">{label}</span>
+        {prefabTier !== null && (
+          <span className="ml-1 shrink-0 text-[0.6rem] text-muted-foreground">{projects ? prefabTier : "session"}</span>
+        )}
       </button>
       <span className="relative flex size-4 shrink-0 items-center justify-center">
         {unsaved && (

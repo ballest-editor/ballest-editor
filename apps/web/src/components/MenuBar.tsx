@@ -35,11 +35,12 @@ import {
   quitApp,
   reimportMap,
   setExportOnSave,
+  startSavePrefab,
   switchProject,
   updateSettings
 } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
-import { useEditor, useOpenProjectMap } from "../editor/store"
+import { PREFAB_TAB_STAYS_HERE, useEditor, useOpenPrefab, useOpenProjectMap } from "../editor/store"
 import { openSettings, resetDockLayout, togglePanel, usePanelOpen, useViewMenuPanels } from "./dock/dockControl"
 
 /** The action's primary binding, as the menu shows it (nothing when unbound). */
@@ -211,6 +212,7 @@ export function MenuBar() {
     s.capabilities
   )
   const exportOnSave = useEditor((s) => s.exportOnSave)
+  const inPrefab = useOpenPrefab() !== null
   // Untitled Project has no folder to import into yet (the Project panel's Import is disabled the same way)
   const untitled = useEditor((s) => s.project?.current === null)
   // Re-import needs an export to take the map from
@@ -270,6 +272,8 @@ export function MenuBar() {
         <MenubarSeparator />
         <CommandItem action="groupSelection" disabled={!canGroup}>Group</CommandItem>
         <CommandItem action="ungroupSelection" disabled={!canUngroup}>Ungroup</CommandItem>
+        <MenubarSeparator />
+        <MenubarItem disabled={!hasSelection} onClick={startSavePrefab}>Save selection as prefab…</MenubarItem>
       </Menu>
       <Menu title="View">
         <CommandItem action="focusSelection" disabled={!hasSelection} inset>Focus selection</CommandItem>
@@ -352,7 +356,11 @@ export function MenuBar() {
             {canExport && (
               <>
                 <MenubarSeparator />
-                <MenubarItem inset onClick={() => void exportToGame()}>Export to game</MenubarItem>
+                <span title={inPrefab ? PREFAB_TAB_STAYS_HERE : undefined}>
+                  <MenubarItem inset disabled={inPrefab} onClick={() => void exportToGame()}>
+                    Export to game
+                  </MenubarItem>
+                </span>
                 <MenubarCheckboxItem
                   closeOnClick
                   checked={exportOnSave}
@@ -367,7 +375,11 @@ export function MenuBar() {
                 >
                   Re-import from game
                 </MenubarItem>
-                {canPlay && <CommandItem action="playMap" inset>Play</CommandItem>}
+                {canPlay && (
+                  <span title={inPrefab ? PREFAB_TAB_STAYS_HERE : undefined}>
+                    <CommandItem action="playMap" inset disabled={inPrefab}>Play</CommandItem>
+                  </span>
+                )}
                 {canLaunchGame && <MenubarItem inset onClick={() => void launchGame()}>Launch game</MenubarItem>}
               </>
             )}
@@ -377,7 +389,9 @@ export function MenuBar() {
         )
         : (
           <Menu title="Project">
-            <MenubarItem onClick={() => openDialog({ id: "mapSettings" })}>Project settings…</MenubarItem>
+            <MenubarItem disabled={inPrefab} onClick={() => openDialog({ id: "mapSettings" })}>
+              Project settings…
+            </MenubarItem>
           </Menu>
         )}
     </Menubar>

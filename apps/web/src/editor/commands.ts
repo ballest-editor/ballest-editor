@@ -59,8 +59,9 @@ export const actionCommands = {
   saveMap: () => void saveMap(),
   /** Duplicate… on desktop (Save as is gone: the location is the project), Export… (a download) in a browser. */
   saveMapAs: () => {
-    const { capabilities, openDialog } = useEditor.getState()
-    openDialog({ id: capabilities.projects ? "duplicate" : "saveAs" })
+    const { capabilities, document, openDialog } = useEditor.getState()
+    // a definition's copies are the Prefabs panel's
+    if (document.kind === "map") openDialog({ id: capabilities.projects ? "duplicate" : "saveAs" })
   },
   closeTab: () => void closeActiveTab(),
   nextTab: () => cycleTab(1),

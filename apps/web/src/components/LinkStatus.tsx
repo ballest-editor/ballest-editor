@@ -10,7 +10,7 @@ import {
 import { LINK_STATE_LABELS } from "../domain/linkState"
 import { formatAgo, formatDateTime } from "../domain/time"
 import { exportToGame, playMap, reimportMap, revealGamePath } from "../editor/actions"
-import { useEditor, useOpenProjectMap } from "../editor/store"
+import { useEditor, useOpenPrefab, useOpenProjectMap } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { LINK_STATE_HELP, LinkStateBadge } from "./LinkStateBadge"
 import { PathText } from "./PathText"
@@ -24,7 +24,9 @@ export function LinkStatus() {
   const open = useOpenProjectMap()
   const canExport = useEditor((s) => s.capabilities.exportToGame)
   const canPlay = useEditor((s) => s.capabilities.play)
+  const prefab = useOpenPrefab()
   const now = useNow()
+  if (prefab !== null) return <span className="text-muted-foreground">Prefab {prefab.name}</span>
   if (!canExport) return null
   if (open === null) return <span className="text-muted-foreground">Not saved in the project yet</span>
 

@@ -4,6 +4,7 @@ import type { DockPanelSpec } from "../../domain/dockLayout"
 import { Inspector } from "../Inspector"
 import { Outline } from "../Outline"
 import { Palette } from "../Palette"
+import { PrefabsPanel } from "../PrefabsPanel"
 import { ProjectPanel } from "../ProjectPanel"
 import { SettingsPanel } from "../SettingsPanel"
 
@@ -33,6 +34,7 @@ function DockedSettings({ api }: IDockviewPanelProps) {
 export const dockPanels: ReadonlyArray<DockPanel> = [
   { id: "project", title: "Project", location: "left", component: ProjectPanel, minimumWidth: 180 },
   { id: "pieces", title: "Pieces", location: "left", component: Palette, minimumWidth: 180, renderer: "always" },
+  { id: "prefabs", title: "Prefabs", location: "left", component: PrefabsPanel, minimumWidth: 180 },
   { id: "outline", title: "Outline", location: "left", component: Outline, minimumWidth: 180, renderer: "always" },
   { id: "inspector", title: "Inspector", location: "right", component: Inspector, minimumWidth: 220 },
   { id: "settings", title: "Settings", location: "centre", component: DockedSettings, startsClosed: true }

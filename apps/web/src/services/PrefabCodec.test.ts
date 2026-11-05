@@ -109,7 +109,7 @@ describe("the prefab file", () => {
         const onRead = yield* Effect.flip(codec.decodePrefab(text, catalog))
         assert.strictEqual(onRead._tag, "PrefabRefusedError")
         assert.include(onRead.message, problem)
-        const prefab = Schema.decodeUnknownSync(Schema.fromJsonString(PrefabFile))(text)
+        const prefab = yield* Schema.decodeEffect(Schema.fromJsonString(PrefabFile))(text)
         const onWrite = yield* Effect.flip(codec.encodePrefab(prefab, catalog))
         assert.strictEqual(onWrite._tag, "PrefabRefusedError")
       }).pipe(Effect.provide(MapCodec.layer))

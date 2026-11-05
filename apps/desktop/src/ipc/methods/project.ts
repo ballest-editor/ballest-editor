@@ -15,6 +15,12 @@ const IMPORT_FILTERS = [
   { name: "All files", extensions: ["*"] }
 ]
 
+/** Shows a folder in the file manager; false when it isn't there yet. */
+const reveal = Effect.fnUntraced(function*(folder: Option.Option<string>) {
+  if (Option.isNone(folder)) return false
+  return yield* (yield* ElectronShell).openFolder(folder.value)
+})
+
 export const projectHandlers = {
   projectState: Effect.fn("ipc.projectState")(function*() {
     return yield* (yield* Projects).state
@@ -50,9 +56,7 @@ export const projectHandlers = {
     return yield* (yield* Projects).createNew(name)
   }),
   revealProject: Effect.fn("ipc.revealProject")(function*({ which }) {
-    const folder = yield* (yield* Projects).folderOf(which)
-    if (Option.isNone(folder)) return false
-    return yield* (yield* ElectronShell).openFolder(folder.value)
+    return yield* reveal(yield* (yield* Projects).folderOf(which))
   }),
   /** Project settings › General: the project's name. */
   renameProject: Effect.fn("ipc.renameProject")(function*({ name }) {
@@ -96,9 +100,7 @@ export const projectHandlers = {
     return yield* (yield* Prefabs).rename(payload)
   }),
   revealPrefabs: Effect.fn("ipc.revealPrefabs")(function*({ tier }) {
-    const folder = yield* (yield* Prefabs).folderOf(tier)
-    if (Option.isNone(folder)) return false
-    return yield* (yield* ElectronShell).openFolder(folder.value)
+    return yield* reveal(yield* (yield* Prefabs).folderOf(tier))
   }),
   /** The open dialog, starting in the game's maps folder when it is found. */
   pickImport: Effect.fn("ipc.pickImport")(function*(_, event) {

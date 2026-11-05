@@ -24,7 +24,7 @@ import { rotatorToQuat } from "./ueMath"
 const parsed = Schema.decodeUnknownSync(Catalog)(fixture)
 const catalog = indexCatalog(parsed)
 const cube = parsed.pieces.find((p) => p.className === "BP_Prim_Cube")!
-const prefab = Schema.decodeUnknownSync(Schema.fromJsonString(PrefabFile))(PREFAB_TEXT)
+const prefab = Schema.decodeSync(Schema.fromJsonString(PrefabFile))(PREFAB_TEXT)
 const first = prefab.items[0]!
 const second = prefab.items[1]!
 
