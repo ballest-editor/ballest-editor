@@ -1,37 +1,23 @@
 # Projects, maps and exports
 
-Status: long-term design, written 2026-10-31. Phase 1 and 2 are milestone 0.2 work; the rest is
-sequenced below. Phase 1's project folder, save flow, Import and Export to game are built (#132), and so are the
-unsaved-changes prompt before closing or replacing the open map (#70; [DESKTOP.md](DESKTOP.md) § Window) and backups
-on overwrite with Recover (#137; [DESKTOP.md](DESKTOP.md) § Backups). Of phase 2, the status bar, the notification
-centre and the document tabs are built (#140; [DESKTOP.md](DESKTOP.md) § Renderer describes them), and so is the Game
-link checklist with its notifications (#134; [DESKTOP.md](DESKTOP.md) § Renderer). The first slice of § Shell is built
-too: map tabs only (no Start tab), the Project panel, the Project menu, Project settings and the Game link as a modal; §
-Shell says where it stops short. Play
-is built (#66; [DESKTOP.md](DESKTOP.md) § Play). Phase 3, sync with the in-game editor, is built too (#141; § Sync
-below, [DESKTOP.md](DESKTOP.md) § Sync). [DESKTOP.md](DESKTOP.md) describes the shell this runs in; [FORMAT.md](FORMAT.md) the
-game's file format, which none of this changes.
+This page holds the project model: what the three nouns are, the files on disk, why the `.balledit` stays the source of truth, and the design still to come. Phases 1 to 3 below are built. [DESKTOP.md](DESKTOP.md) describes how the app behaves today, and [FORMAT.md](FORMAT.md) describes the game's file format, which none of this changes.
 
 ## The three nouns
 
-Today the app has one noun, a file, and two verbs that both mean "write the game format" (Save, Save
-to game). That is why #132 has six open questions. The editor adopts three nouns instead:
+| Noun    | What it is                                                                                                              | Where                                                                                                         |
+| ------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Project | A folder the user works in, holding any number of maps. Later a git repository.                                         | `Documents/Ballest Editor/<name>/` when the app makes it, or any folder the user opens.                       |
+| Map     | A document in a project: the game's map. Later, editor-only data too.                                                   | `<project>/maps/<file name>.balledit`. Later a sidecar beside it (#112).                                      |
+| Export  | The `.balledit` the game reads, a byte-for-byte copy of a map. Play is an export plus the handoff to the editor plugin. | The game's maps folder, the only target so far. A folder the user chooses is a later option (`exportTarget`). |
 
-| Noun        | What it is                                                                                     | Where                                                               |
-| ----------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| **Project** | A folder the user works in. Later a git repository. Holds any number of maps.                  | `Documents/Ballest Editor/<project>/` by default; any folder.       |
-| **Map**     | A document in a project: the game's map plus editor-only data.                                 | `<project>/maps/<file name>.balledit` and its sidecar (#112).       |
-| **Export**  | The `.balledit` the game reads, written from a map. Play is an export plus the plugin handoff. | The game's `UserSavedMaps` (default), or a folder the user chooses. |
-
-The link between a map and its export, which is machine-specific and never shared, lives in
-`<project>/.ballest/` (gitignored once the project is a repository).
+The link between a map and its export is specific to this machine and is never shared. It lives in `<project>/.ballest/`, which the project's `.gitignore` leaves out.
 
 ```
 <project>/
-  ballest-project.json         name, format version, default creator, export target
+  ballest-project.json         name, format version, export target
   maps/
     Map_LevelEditorMain&Big Loop_Isaac.balledit
-    Map_LevelEditorMain&Big Loop_Isaac.editor.json    sidecar (#112), only once something needs it
+    Map_LevelEditorMain&Big Loop_Isaac.editor.json    sidecar (#112), later, only once something needs it
   .ballest/
     link.json                  per map: origin, last export (path, hash, time), last seen game hash
     backups/                   previous versions of overwritten files (#137)
@@ -40,244 +26,96 @@ The link between a map and its export, which is machine-specific and never share
 
 ### The files
 
-What phase 1 writes (`apps/desktop/src/project/`). Main reads and writes only these, the game's maps folder, and a
-file the user picked to import; the page names maps by file name, never by path.
+The code is in `apps/desktop/src/project/`. Main reads and writes only these, the game's maps folder, and a file the user picked to import. The page names maps by file name, never by path.
 
-- **`ballest-project.json`**, written once when the project is first made, indented:
-  `{ "formatVersion": 1, "name": "<folder name>", "exportTarget": "game" }`. `defaultCreator` is in the schema but
-  not written yet (new maps take the creator from Settings › General, or Steam, #133). The project is made, with `maps/`, `.ballest/`
-  and a `.gitignore` of `.ballest/`, by the first New map or Import into it.
-- **`.ballest/link.json`**: `{ "formatVersion": 1, "maps": { "<file name>": <link> } }`, where a link is
-  `{ "origin", "export", "lastSeenHash" }`. `origin` and `export` are each null or `{ "path", "hash", "at" }`: the
-  file's absolute path, the SHA-256 of its bytes (lowercase hex) and an ISO 8601 UTC time. Import sets `origin`;
-  Export to game sets `export` and `lastSeenHash` to the bytes it wrote; a map imported from the game's maps folder
-  under its own name gets `export` (and `lastSeenHash`) equal to its `origin`, so it is linked from the start. Rename
-  moves the entry to the new file name. The `MapLinks` service owns the file: one update at a time, atomic writes,
-  and a file that doesn't decode reads as empty. Sync detection (#141) compares a game file's hash with
-  `export.hash` and `lastSeenHash`, and keeps the hash it saw in `lastSeenHash`; Re-import sets `export` and
-  `lastSeenHash` to the game file it took; an export found gone sets both to null (`origin` stays).
-- **`.ballest/backups/<time> <file name>`**: the project's copy of a map before anything wrote over it (Save,
-  Duplicate over it, Import replacing it, Re-import) and the old file after a Rename. The game's copy before an
-  Export (or Play) wrote over it goes to `<userData>/backups/` under the same naming, since it belongs to this machine,
-  not the project. Both go through one step, `Backups.overwrite`; unchanged bytes keep nothing; each folder keeps 20
-  versions per file for 30 days (`desktop-settings.json` › `backups`). Recover previous version… (a map's menu in the
-  Project panel) opens one as unsaved edits ([DESKTOP.md](DESKTOP.md) § Backups).
+- **`ballest-project.json`** is indented JSON: `{ "formatVersion": 1, "name": "<folder name>", "exportTarget": "game" }`. Project settings can change `name` (`renameProject`), and the folder keeps its own name. `defaultCreator` is in the schema, but nothing writes or reads it. New maps take the creator from Settings › General, Steam, or the maps already in the game's maps folder (`domain/creator.ts`).
+- **Making a project.** File › New project…, the first Save in Untitled Project, and naming the project in Project settings all call `Projects.createNew`, which makes the folder, `maps/`, `.ballest/`, `ballest-project.json` and a `.gitignore` of `.ballest/`. A folder chosen with Open project… gets whatever it lacks of these on the first write (`Projects.ensure`).
+- **`.ballest/link.json`** is `{ "formatVersion": 1, "maps": { "<file name>": <link> } }`, where a link is `{ "origin", "export", "lastSeenHash" }`. `origin` and `export` are each null or `{ "path", "hash", "at" }`: the file's absolute path, the SHA-256 of its bytes (lowercase hex) and an ISO 8601 UTC time.
+  - Import sets `origin`.
+  - Export to game sets `export` and `lastSeenHash` to the bytes it wrote.
+  - A map imported from the game's maps folder under its own name gets `export` and `lastSeenHash` equal to its `origin`, so it is linked from the start.
+  - Rename moves the entry to the new file name.
+  - Sync detection compares a game file's hash with `export.hash` and `lastSeenHash`, and keeps the hash it saw in `lastSeenHash`.
+  - Re-import sets `export` and `lastSeenHash` to the game file it took.
+  - An export found gone sets both to null, and `origin` stays.
 
-The project in use and the recent ones (at most 8) are in `desktop-settings.json` under `project.recent`, the one in
-use first; an empty list means the default project.
+  The `MapLinks` service owns the file: one update at a time, atomic writes, and a file that doesn't decode reads as empty.
+- **`.ballest/backups/<time> <file name>`** holds the project's copy of a map before anything wrote over it, and the old file after a Rename. The game's copy before an export wrote over it goes to `<userData>/backups/` instead, since it belongs to this machine and not to the project. [DESKTOP.md § Backups](DESKTOP.md#backups) has the rules.
 
-A project is never the game's maps folder. The game loads only from `UserSavedMaps`, so a map must be
-exported to be played, and a project inside that folder would make the game edit project files
-behind the editor's back. Picking the maps folder (or a folder under it) as a project is refused
-with that explanation.
+`desktop-settings.json` keeps the recent projects under `project.recent`, at most 8, the one in use first. An empty list means Untitled Project.
+
+A project is never the game's maps folder. The game loads only from `UserSavedMaps`, so a map must be exported to be played, and a project inside that folder would let the game edit project files behind the editor's back. Picking the maps folder, or a folder under it, as a project is refused with that explanation.
 
 ### Source of truth
 
-**Now and through the public launch: the `.balledit` in the project is the map.** The sidecar adds
-what the format can't hold (hidden and locked pieces, layers, reference underlays, construction
-planes). An export is a byte-for-byte copy plus a link record. Reasons:
+**Through the public launch, the `.balledit` in the project is the map.** An export is a byte-for-byte copy plus a link record. Later, the sidecar adds what the format can't hold: hidden and locked pieces, layers, reference underlays, construction planes. The reasons:
 
-- Round trips with the game are lossless by construction; there is no converter to get wrong.
+- Round trips with the game lose nothing, because there is no converter to get wrong.
 - Git diffs of a map are the game's own JSON, readable without the editor.
-- In an emergency the project file can be copied into `UserSavedMaps` by hand and the game opens it.
-- #112's stable-key problem (sidecar entries surviving an in-game edit) is the same problem whether
-  the sidecar is small or large, so nothing is gained by a new container format now.
+- In an emergency, the project file can be copied into `UserSavedMaps` by hand and the game opens it.
+- #112's stable-key problem (sidecar entries surviving an in-game edit) is the same whether the sidecar is small or large, so a new container format gains nothing now.
 
-**Later, when derived data exists** (generators #93, derived pieces #94, splines #91, shared bases
-#104), the sidecar carries the generating data and the pieces it produces are marked as derived in
-the sidecar, by stable key. The `.balledit` in the project stays the rendering, regenerated on save.
-That keeps the two files and the export path unchanged; what changes is that for a derived piece the
-sidecar wins and the `.balledit` entry is output. If an in-game edit moves a derived piece, the piece
-becomes _detached_ (the edit is kept, the generator no longer owns it) and the editor says so. No
-format switch, no migration of user projects.
+**Later, when derived data exists** (generators #93, derived pieces #94, splines #91, shared bases #104), the sidecar carries the generating data, and the pieces it produces are marked as derived in the sidecar by stable key. The `.balledit` in the project stays the rendering, regenerated on save. That keeps the two files and the export path unchanged. For a derived piece the sidecar wins and the `.balledit` entry is output. If an in-game edit moves a derived piece, the piece becomes _detached_: the edit is kept, the generator no longer owns it, and the editor says so. There is no format switch and no migration of user projects.
 
-The browser review build has no project. It stays a one-map scratchpad: Open is the file input,
-Export is a download, nothing else applies.
+## Why the flows look this way
 
-## User flows
+The behaviour is in [DESKTOP.md § Renderer](DESKTOP.md#renderer). These are the decisions behind it.
 
-### Create
+- Save writes the map in the project, so the location needs no dialog and Save as is gone. Rename and Duplicate cover what it did.
+- Open on an arbitrary file became Import, which copies it into the project. Nothing is edited in place outside a project. Importing from the game's maps folder links the map from the start, so Export knows where it goes and sync detection works.
+- Export to game replaced Save to game. Export on save exists for people who alternate quickly between the editor and the in-game editor.
+- New map's dialog keeps the read-only "Exports as `Map_LevelEditorMain&<name>_<creator>.balledit`" line, so the game's naming stays visible.
 
-New map asks for the name (creator prefilled from Steam, #133) and saves the map into the project at
-once. There is no untitled state and no "where" dialog. The dialog keeps the read-only "Exports as
-`Map_LevelEditorMain&<name>_<creator>.balledit`" line so the game's naming stays visible. The first
-New map or Import creates the default project lazily; most users never see a project dialog.
+Later, the Project panel lists the maps in `UserSavedMaps` that aren't in the project yet, with an Import button each (#103's first slice).
 
-### Save, rename, duplicate
+## Sync: edits made out of band
 
-Save (Ctrl+S) writes the map in the project and asks nothing. Save as is gone: **Rename** changes the
-name or creator and moves the file to match (the old file goes to backups), **Duplicate** copies the
-map under a new name. A "Choose location…" escape hatch is not needed: the location is the project.
+The in-game editor can change an exported file at any time, and a save in the game rewrites the whole file, so an exported file rarely stays byte-identical. The link record makes this detectable: compare the game file's hash with the last export's hash, and with the last seen hash so that one change is reported once. [DESKTOP.md § Sync](DESKTOP.md#sync) describes what the app does with that.
 
-### Import
+Later:
 
-Open… on an arbitrary `.balledit` or `.ballmap` (Downloads, the Workshop cache, the maps folder)
-becomes **Import**. It copies the file into the project and records its origin in `link.json`. A map
-imported from `UserSavedMaps` is linked to that file from the start, so Export knows where it goes
-and sync detection works. Nothing is edited in place outside a project. Importing a file whose name
-clashes with an existing map asks: replace (backing up), or import as a copy.
-
-Later, the Project panel lists the maps in `UserSavedMaps` that aren't in the project yet, with an Import
-button each (#103's first slice).
-
-### Export and Play
-
-**Export to game** (replacing Save to game) writes the map into the maps folder under the game's file
-name and records the exported bytes' hash and time in `link.json`. **Play** is Export then the plugin
-handoff (#66). The replace-published prompt (`ReplacePublishedDialog`) stays on this path. A per-map
-setting **Export on save** (off by default) makes Save export too, for people who alternate between
-the editor and the in-game editor quickly.
-
-### Sync: edits made out of band
-
-The in-game editor can change an exported file at any time, and the game rewrites `editorState` on
-every save, so an exported file rarely stays byte-identical. The link record makes this detectable:
-compare the game file's hash with the last export's hash (and the last seen hash, so one change is
-reported once).
-
-| When                            | What happens                                                                                                                                                                |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Launch, window focus, Play ends | Every linked map is checked. A changed export becomes a notification: "Big Loop was changed in the game" with **Re-import** and **Ignore**. The status bar shows the state. |
-| Export                          | If the export changed since the last export, a dialog: **Back up and overwrite** (#137), **Re-import first**, **Cancel**.                                                   |
-| Re-import                       | Replaces the project map with the game's version (the project map goes to backups). Sidecar entries are re-matched by stable key; unmatched ones are reported (#112).       |
-| Export deleted in the game      | The link is dropped and the map shows **Not exported**; the next Export writes it again.                                                                                    |
-
-Later, Re-import gets a diff (#105) and "merge" becomes possible for non-overlapping edits. Not
-before git.
-
-Link states, shown in the status bar and in the Project panel: **Not exported**, **In sync**, **Edited
-since export**, **Changed in game**, **Both changed**, **Published draft** (the export has a
-`levelPublishedFileId`).
-
-What is built (#141; [DESKTOP.md](DESKTOP.md) § Sync):
-
-- **The check** is main's `checkExports`: for every map whose link has an export in the game's maps folder, the
-  export's SHA-256 against `export.hash` and `lastSeenHash`, by bytes. The game rewriting `editorState` on its own save
-  counts as a change; nothing is normalised. The hash seen goes into `lastSeenHash`, so a version is reported once
-  however many checks see it. Checks run one at a time in main, and the page joins a check already running rather
-  than starting another (the game closing brings both the focus and the end of Play's session).
-- **The state** comes from the link alone: an export whose `lastSeenHash` differs from `export.hash` is Changed in
-  game, or Both changed when the project map was saved or has unsaved edits since the export.
-- **The notification** is one per change, kind `changedInGame`, not pinned: **Re-import** and **Ignore**. Ignore only
-  marks it read; the state stays Changed in game until a Re-import or an Export settles it.
-- **Export deleted in the game** drops `export` and `lastSeenHash`, with no notification. A maps folder that isn't
-  there (the game not found, a library drive unmounted) drops nothing: nothing is checked.
-- **The Export confirm** also guards Play's export and Export on save. Main answers `ChangedInGame` instead of writing
-  (and marks the version seen, so the next focus doesn't report it again). Back up and overwrite exports after all,
-  through the same backup step; Re-import first re-imports and exports nothing. A game file that already holds the
-  bytes being exported doesn't ask.
-- **Re-import** (the notification, the status bar popover, Project › Re-import from game) asks about the open map's unsaved
-  edits first when it is the one re-imported, then copies the game's file into the project byte for byte through
-  `Backups.overwrite`, records it as the export and reloads the open map.
-
-A third out-of-band case, the project file itself changing under the editor (git pull, another
-tool), is reloaded when the open map has no unsaved edits and reported otherwise. Deferred until git.
+- Re-import re-matches sidecar entries by stable key and reports the ones it can't match (#112).
+- Re-import gets a diff (#105), and "merge" becomes possible for edits that don't overlap. Not before git.
+- A third out-of-band case, the project file itself changing under the editor (git pull, another tool), reloads the map when it has no unsaved edits and reports the change otherwise. Deferred until git.
 
 ## Shell
 
-Decided with the wireframes in [mockups/](mockups/) (rough; the detailed UI comes with the work). The shape, from
-the outside in:
-
-- **Welcome window** (later; [mockups/welcome.html](mockups/welcome.html) § 1). The app's level: recent projects with
-  a thumbnail each, New project, Open…. Shown from the second launch on and when the last project window closes. From a
-  project window, opening another project asks **This window / New window** (IntelliJ), remembered in Settings. One
-  project per window.
-- **Project window.** Always shows a map: every project has at least one, and opening a project opens its last open
-  map, or its first. There is no Start tab and no empty editor. Maps are the document tabs, several at a
-  time. The project's maps live in the **Project panel**, a tab beside Pieces in the left dock: a tree of the
-  project's maps (later folders, sub-assemblies and the rest), each with its link state and a dot while it is open
-  in a tab with unsaved edits, like an editor's file explorer. A click opens a map; its menu holds Rename, Duplicate, Recover,
-  Export, Play, Reveal; the header New map, Import and Project settings.
-- **First launch.** Straight into the editor as **Untitled Project \*** with an Untitled map, nothing on disk. The
-  first Save opens a **Save project** modal: project name, folder (default `Documents/Ballest Editor/<name>`), map
-  name. After it the project exists and the asterisk goes. The Game link checklist shows as a modal on first launch
-  (and from File › Game link…), not as a tab; later launches notify only when a result changes.
-- **Menus.** `File` (New project…, Open project…, Recent projects, Save, Save project…, Close project, Settings…,
-  Game link…, Quit), `Edit`, `View` (Pieces, Project, …), `Project` (New map…, Import map…, Export to game, Export on save,
-  Re-import from game, Play, Launch game, Project settings…). No separate Map or Game menu: a map is only ever the open
-  one, and the game is the project's export target. Rename, Duplicate and Recover are per map in the Project panel;
-  the Game link is the user's machine, not the project's, so it sits with Settings under File.
-- **Project settings** ([mockups/welcome.html](mockups/welcome.html) § 5): one dialog, IntelliJ's Project Structure
-  shape. Left: _Project_ (name, folder, creator, export target; later git), then _Maps_ with an entry per map holding
-  what today's map settings dialog edits (level, difficulty, tags, grid height, Export on save) plus Rename and
-  Duplicate. Project › Project settings… opens on the project; the open map's settings open on its entry.
-- **Status bar.** Left the project (italic with \* while untitled); centre the open map's link state, click for a
-  popover with the export path, last export time, Export, Play, Re-import, Reveal; right the update pill and the
-  notification bell.
-- **Notifications.** Every toast is also a notification. The bell keeps the last 100 across restarts
-  (`<userData>/notifications.json`), with their actions still live. Persistent ones pin to the top until resolved.
-  "Don't show again" is per notification kind.
-- **Settings** (the app: keybinds, camera, appearance (theme, animation speed), and the Game link checklist as its
-  Game page, the game's folders and the editor's plugin) stays its own dialog under File. File › Game link… and Settings › Game are the
-  same checklist in two frames; there is no second description of the folders.
+[DESKTOP.md § Renderer](DESKTOP.md#renderer) describes the window as built: map tabs, the Project panel, the menus, Project settings, the Game link, the status bar and notifications. The shape:
 
 ```
-┌ BE  File  Edit  View  Project                     Big Loop *            v ^ x ┐
-├───┬───────────┬──────────────────────────────────────────────┬────────────────┤
-│ ▣ │ Pieces    │ [Big Loop *] [Golf base]                     │ Inspector      │
-│ ▤ │           │                                              │                │
-│   │           │               viewport                 [cube]│                │
-├───┴───────────┴──────────────────────────────────────────────┴────────────────┤
-│ Season 3 tracks  ⟳ Exported 4 min ago · changed in game  [Export] [Play] │ 1.2.0 🔔3 │
-└───────────────────────────────────────────────────────────────────────────────┘
+┌ BE  File  Edit  View  Project            Season 3 tracks           Play  v ^ x ┐
+├───┬───────────┬──────────────────────────────────────────────┬─────────────────┤
+│ ▣ │ Pieces    │ [Big Loop *] [Golf base]                     │ Inspector       │
+│ ▤ │           │                                              │                 │
+│   │           │               viewport                       │                 │
+├───┴───────────┴──────────────────────────────────────────────┴─────────────────┤
+│               Changed in game · Exported 4 min ago              update  bell 3 │
+└────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Thumbnails are an offscreen render of the map written next to it on save, used by the Project panel and Welcome.
+The wireframes in [mockups/](mockups/) are rough. Use [mockups/welcome.html](mockups/welcome.html) for the Welcome window and Project settings below. Its Project home tab and its Map and Game menus were dropped, and so were the Start page and Start tab in `start-page.html` and `start-tab.html`.
 
-What is built ([DESKTOP.md](DESKTOP.md) § Renderer): the project window as above, without the Welcome window,
-multi-window, the Save project modal, and thumbnails and Delete in the Project panel. Where this first slice stops
-short of the design:
+The rest of the design is still to come:
 
-- **No Welcome yet.** On launch the window opens the last used project (the first of the recent list in
-  `desktop-settings.json`) on the map open when the app last ran, else the project's most recently edited map, else a
-  fresh unsaved map named Untitled. With no project used yet it is **Untitled Project \*** (italic in the title; main's
-  `ProjectState.current` is null): the fresh map in memory, nothing on disk, the Project panel showing only that. New map there
-  stays in memory too; Import is refused with the reason. The first Save's dialog asks the project name as well
-  (`isProjectName`, made under `projectsFolder` by `Projects.createNew`), then writes the map into it; Export and
-  Play go through Save, so they ask the same. Closing the last tab shows the fresh map again.
-- **File › New project…** asks a name and makes `Documents/Ballest Editor/<name>`; a project elsewhere is Open
-  project…, the folder chooser. No Close project yet: without the Welcome window there is nowhere to go.
-- **The Project panel** has no thumbnails and no Delete. Rename, Duplicate, Export and Play open the map first (they
-  act on the open map); Reveal shows the project's maps folder, not the file.
-- **Project settings:** the name is read-only (the folder's), the export target read-only (the game's maps folder);
-  no git yet. A map entry edits a map open in a tab in that tab, any other map on disk through the save path.
-- **Game link** opens by itself on the first launch and when a launch finds the game or its maps folder missing; the
-  plugin manager is an optional row, never red, and never opens it.
+- **Welcome window** ([mockups/welcome.html](mockups/welcome.html) § 1). The app's level: recent projects with a thumbnail each, New project, Open…. It shows from the second launch on and when the last project window closes. Opening another project from a project window asks **This window / New window** (as IntelliJ does), remembered in Settings. One project per window.
+- **Close project** and **Save project…** in the File menu. Close project needs the Welcome window to go back to.
+- **A Save project modal** with a folder choice, for the first Save. Today the Save map dialog asks the project's name and shows the folder it will make, read-only.
+- **Project settings** ([mockups/welcome.html](mockups/welcome.html) § 5), IntelliJ's Project Structure shape, gains a creator, a choice of export target, and git.
+- **Thumbnails.** An offscreen render of the map, written next to it on save, used by the Project panel and Welcome.
+- **The Project panel** gains folders, sub-assemblies and the rest of what a project can hold, beyond its flat list of maps.
 
 ## Phases
 
-The order is chosen so that where files live is settled before anyone installs a release: moving
-users' maps later is the one migration worth avoiding. Thumbnails, git, multi-map and diffs can
-follow at any time without touching saved projects.
+The order settles where files live before anyone installs a release, because moving users' maps later is the one migration worth avoiding. Thumbnails, git, multi-map and diffs can follow at any time without touching saved projects.
 
-| Phase | Milestone | Scope                                                                                                                                                                                                                                                                                      |
-| ----- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1     | 0.2       | **Project folder and the save flow.** Default project created lazily; New map saves at once; Rename and Duplicate replace Save as; Import replaces Open; Export to game replaces Save to game; `link.json`; backups on overwrite; close prompt. Menus and dialog copy use the three nouns. |
-| 2     | 0.2       | **Game link and notifications.** Status bar; notification centre; Start tab as a plain list (no thumbnails; since replaced by the Project panel); Game link checklist; creator from Steam; game not found; plugin manager and plugin install; Play.                                        |
-| 3     | 0.2       | **Sync.** Change detection on launch, focus and after Play; the Export confirm; Re-import; link states in the status bar and Start tab (now the Project panel).                                                                                                                            |
-| 4     | 0.3       | **Public launch**, as planned. No new flow work; docs describe the three nouns.                                                                                                                                                                                                            |
-| 5     | 0.4 (new) | **Editor-only data.** The sidecar (#112) with stable keys and re-matching on Re-import; hide, lock, layers (#81, #111); Map settings tier.                                                                                                                                                 |
-| 6     | 0.5 (new) | **Projects proper.** Thumbnails in the Project panel and Welcome; maps folder and Workshop browser (#103); New and Open project; Project settings tier; git history and diff (#105); multi-map with shared bases (#104).                                                                   |
-| 7     | later     | **Derived data.** Generators, derived pieces and splines make the sidecar authoritative for the pieces they own; detached pieces.                                                                                                                                                          |
+| Phase | Milestone | State | Scope                                                                                                                                                                                                                    |
+| ----- | --------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1     | 0.2       | Built | Project folder and the save flow. New map saves at once in a project; Rename and Duplicate replace Save as; Import replaces Open; Export to game replaces Save to game; `link.json`; backups on overwrite; close prompt. |
+| 2     | 0.2       | Built | Game link and notifications. Status bar, notification centre, Project panel, Game link checklist, creator from Steam, game not found, plugin manager and plugin install, Play.                                           |
+| 3     | 0.2       | Built | Sync. Change detection on launch, focus and after Play; the Export confirm; Re-import; link states in the status bar and the Project panel.                                                                              |
+| 4     | 0.3       | Open  | Public launch. No new flow work.                                                                                                                                                                                         |
+| 5     | 0.4       | Open  | Editor-only data. The sidecar (#112) with stable keys and re-matching on Re-import; hide, lock, layers (#81, #111); Map settings (#142).                                                                                 |
+| 6     | 0.5       | Open  | Projects proper. Thumbnails in the Project panel and Welcome; the maps folder and Workshop browser (#103); the rest of #143; git history and diff (#105); multi-map with shared bases (#104).                            |
+| 7     | later     | Open  | Derived data. Generators, derived pieces and splines make the sidecar authoritative for the pieces they own; detached pieces.                                                                                            |
 
-What stays out of the public launch on purpose: a separate project-manager window (Godot style), git,
-thumbnails in the Project panel, the Workshop browser, multi-map, any merge. Phase 1 to 3 are small on
-disk (a folder, one JSON file, a hash) and large in how the app reads; that is the trade.
-
-### Issues to reshape
-
-| Issue                                           | Change                                                                                                                                                                               |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| #132 save to a default folder                   | Rewrite as phase 1: the project folder, New saves at once, Rename and Duplicate, Import, Export to game. Its "decide first" list is answered above.                                  |
-| #137 back up before overwriting                 | Keep; backups go under `<project>/.ballest/backups/` for project files and `<userData>/backups/` for exports. Recover lives in the Project panel (a map's menu; first the Map menu). |
-| #70 close prompt                                | Keep as is.                                                                                                                                                                          |
-| #133 creator from Steam                         | Keep the discovery; the UI is a Game link row, not a Settings-only field. Done: `useCreator()` is what the row shows (DESKTOP.md § Game paths).                                      |
-| #142 map settings, #143 new and open project    | New, phases 5 and 6; #21's dialog becomes Map settings.                                                                                                                              |
-| #136 restyle the update pill                    | Keep; the pill moves to the status bar.                                                                                                                                              |
-| #118 install the plugin, #66 Play               | Keep; Play exports first and records the link. Install plugin is a Game link row.                                                                                                    |
-| #140 status bar, notifications, Start tab       | Done (phase 2); the Start tab has since given way to the Project panel (§ Shell).                                                                                                    |
-| #134 game link checklist                        | Done (phase 2; #135 merged into it): the checklist, now File › Game link…, and notifications when a result changes between launches.                                                 |
-| #141 sync detection, Export confirm, Re-import  | Done (phase 3).                                                                                                                                                                      |
-| #112 sidecar                                    | Move to 0.4; add "re-match on Re-import" to its scope.                                                                                                                               |
-| #81, #111 hide, lock, layers                    | Move to 0.4.                                                                                                                                                                         |
-| #103 Workshop browser, #104 multi-map, #105 git | Move to 0.5; #103 gains "the maps folder list in the Project panel" as its first slice.                                                                                              |
+What stays out of the public launch on purpose: a separate project-manager window in the Godot style, git, thumbnails in the Project panel, the Workshop browser, multi-map, and any merge. Phases 1 to 3 are small on disk (a folder, one JSON file, a hash) and large in how the app reads; that is the trade.

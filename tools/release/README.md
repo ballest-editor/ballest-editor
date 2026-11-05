@@ -10,7 +10,7 @@ pnpm release:smoke          # stage the current build, lay it out unpacked, chec
 node tools/release/src/main.ts --help
 ```
 
-`desktop` takes `--app-version` (a version or a tag; defaults to `apps/desktop/package.json`'s), `--output` (default `release/`) and `--skip-build`. Builds are unsigned, and electron-builder never publishes: uploading is the release workflow's job.
+`desktop` takes `--platform` (`win` or `linux`, which the two scripts set), `--app-version` (a version or a tag; defaults to `apps/desktop/package.json`'s), `--output` (default `release/`) and `--skip-build`. Builds are unsigned, and electron-builder never publishes: uploading is the release workflow's job.
 
 ## What `desktop` does
 
@@ -20,13 +20,13 @@ node tools/release/src/main.ts --help
    | Staged           | From                                                              | Ships as                         |
    | ---------------- | ----------------------------------------------------------------- | -------------------------------- |
    | `package.json`   | `src/config.ts`; its `build` block is the electron-builder config | read by electron-builder         |
-   | `dist-electron/` | `apps/desktop/dist-electron` (main.cjs, preload.cjs)              | `app.asar`                       |
+   | `dist-electron/` | `apps/desktop/dist-electron` (main.cjs, preload.cjs, icon.png)    | `app.asar`                       |
    | `web/`           | `apps/web/dist` without the game assets                           | `app.asar`                       |
    | `assets/`        | `assets/` (minus raw `pieces/`, `textures/`) + `web-assets/`      | `resources/assets`               |
    | `plugins/`       | `packages/ballest-editor-link/dist` (info.toml, main.as)          | `resources/plugins`              |
    | `build/`         | `apps/desktop/resources/icon.svg`, rendered by `src/icons.ts`     | exe, installer and desktop icons |
 
-   `DesktopEnvironment` reads the renderer from `<app.asar>/web` and the assets from `resources/assets` when packaged, so the 53 MB of meshes and textures ship once. There is no `node_modules`: the main and preload bundles inline every dependency except `electron`.
+   `DesktopEnvironment` reads the renderer from `<app.asar>/web` and the assets from `resources/assets` when packaged, so the 61 MB of meshes and textures ship once. There is no `node_modules`: the main and preload bundles inline every dependency except `electron`.
 3. `electron-builder --<platform> --x64 --publish never`, with `CSC_IDENTITY_AUTO_DISCOVERY=false`.
 4. Checks the output the way the release job will (below), for that platform only.
 
@@ -54,8 +54,8 @@ After 15 s the status bar offers 0.2.1, with the mock release's notes (a heading
 
 Push a tag: `git tag v0.2.0-rc.1 && git push origin v0.2.0-rc.1`, or run the **Release** workflow by hand with a tag (created on the branch's head if new). `.github/workflows/release.yml`, only in `ballest-editor/ballest-editor`:
 
-1. **build bundle** checks the tag is `vX.Y.Z` or `vX.Y.Z-pre` (`main.ts version`), builds once, runs the smoke check and uploads `apps/web/dist`, `apps/desktop/dist-electron`, `packages/ballest-editor-link/dist` and `web-assets/`.
+1. **build bundle** checks the tag is `X.Y.Z` or `X.Y.Z-pre`, with or without a leading `v` (`main.ts version`), builds once, runs the smoke check and uploads `apps/web/dist`, `apps/desktop/dist-electron`, `packages/ballest-editor-link/dist` and `web-assets/`.
 2. **desktop win x64** (`windows-latest`) and **desktop linux x64** (`ubuntu-latest`) run `release-desktop.yml`, which packages with `--skip-build` and uploads the installer, blockmap and manifest.
 3. **publish release** runs `main.ts verify`: both installers, the Windows blockmap and both manifests exist, the manifests are for this version and point at files that exist. It writes `SHA256SUMS` and uploads everything to a draft release, then publishes it. A version with a pre-release part (`-rc.1`) is a GitHub prerelease and never "latest".
 
-The app's version is the tag's. `apps/desktop/package.json`'s version is only for local builds and `pnpm start`.
+The app's version is the tag's. `apps/desktop/package.json`'s version is only for local builds and its `start` script.

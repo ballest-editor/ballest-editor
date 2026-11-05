@@ -1,4 +1,4 @@
-# Ballest Driver plugin
+# Driver plugin (`ballest-driver`)
 
 A plugin for the [Ballest plugin manager](https://anythinggoes-ballest.github.io/ballest-plugin-manager/) that
 `tools/driver` installs into its sandboxed copies of the game, never into a player's game. It does what the host's
