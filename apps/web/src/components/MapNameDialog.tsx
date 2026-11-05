@@ -61,14 +61,19 @@ export function MapNameDialog(props: {
   readonly savedCreator?: ReactNode
   /** Under the creator input; by default, that what is typed is saved to Settings › General. */
   readonly creatorHint?: string
+  /** A field before the map's name, which then takes the focus (Save map's project name). */
+  readonly before?: ReactNode
   /** Extra content above the buttons. */
   readonly children?: ReactNode
   readonly submitLabel: string
+  /** Submit writes over another map: it looks like the other dialogs' Replace. */
+  readonly submitReplaces?: boolean
   readonly canSubmit: boolean
   readonly onSubmit: () => Promise<void>
 }) {
   const { creator } = props
   const fileName = mapFileNameOf(props.name || "name", creator.name || "creator")
+  const help = "text-xs text-muted-foreground"
   return (
     <Dialog open={props.open} onOpenChange={(next) => !next && props.onClose()}>
       <DialogContent>
@@ -83,24 +88,21 @@ export function MapNameDialog(props: {
             <DialogTitle>{props.title}</DialogTitle>
             <DialogDescription>{props.fileNameNote}</DialogDescription>
           </DialogHeader>
+          {props.before}
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground">{props.fileNameLead}</span>
-            <PathField path={fileName} icon={IconFile} />
-          </div>
-          <div className="flex flex-col gap-1">
             <Label htmlFor={`${props.id}-name`}>Map name</Label>
             <Input
               id={`${props.id}-name`}
-              autoFocus
+              autoFocus={props.before === undefined}
               value={props.name}
               onChange={(e) => props.onNameChange(e.target.value)}
               aria-invalid={props.name !== "" && !isValidName(props.name)}
             />
-            <span className="text-[0.7rem] text-muted-foreground">{NAME_RULE_SENTENCE}.</span>
+            <span className={help}>{NAME_RULE_SENTENCE}.</span>
           </div>
           {creator.saved === ""
             ? (
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1.5">
                 <Label htmlFor={`${props.id}-creator`}>Creator (your in-game name)</Label>
                 <Input
                   id={`${props.id}-creator`}
@@ -108,16 +110,25 @@ export function MapNameDialog(props: {
                   onChange={(e) => creator.setDraft(e.target.value)}
                   aria-invalid={creator.draft !== "" && !isValidName(creator.name)}
                 />
-                <span className="text-[0.7rem] text-muted-foreground">
-                  {props.creatorHint ?? "Saved to Settings › General."}
-                </span>
+                <span className={help}>{props.creatorHint ?? "Saved to Settings › General."}</span>
               </div>
             )
             : props.savedCreator}
+          {/* what the names above make: after them, where a preview reads as one */}
+          <div className="flex flex-col gap-1.5">
+            <span className={help}>{props.fileNameLead}</span>
+            <PathField path={fileName} icon={IconFile} />
+          </div>
           {props.children}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={props.onClose}>Cancel</Button>
-            <Button type="submit" disabled={!props.canSubmit}>{props.submitLabel}</Button>
+            <Button
+              type="submit"
+              variant={props.submitReplaces ? "destructive" : "default"}
+              disabled={!props.canSubmit}
+            >
+              {props.submitLabel}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
