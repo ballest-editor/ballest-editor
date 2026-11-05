@@ -37,7 +37,12 @@ export function LinkStatus() {
         render={<Button variant="ghost" size="xs" className="h-5 gap-1.5 px-1.5 text-xs font-normal" />}
       >
         <LinkStateBadge state={state} />
-        {exported !== null && <span className="text-muted-foreground">· exported {formatAgo(exported.at, now)}</span>}
+        {exported !== null && (
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span aria-hidden>·</span>
+            exported {formatAgo(exported.at, now)}
+          </span>
+        )}
       </PopoverTrigger>
       <PopoverContent side="top" className="w-96 gap-3">
         <PopoverHeader>
