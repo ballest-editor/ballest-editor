@@ -2,6 +2,7 @@
   "name": "ballest-editor",
   "version": "0.0.1",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "node tools/dev/src/dev-runner.ts dev",
     "dev:desktop": "node tools/dev/src/dev-runner.ts dev:desktop",

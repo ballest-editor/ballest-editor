@@ -14,4 +14,10 @@ Ballest Editor is an independent map editor for [Ballest of Them All](https://st
 
 ## License
 
-The code doesn't have an open-source license yet. One will be chosen before the public launch; until then, all rights are reserved.
+The code and everything else here that this file doesn't list are under the [MIT License](LICENSE). It doesn't cover:
+
+- The game's content above: `assets/thumbs/`, `assets/*.json` except `assets/verified.json`, and the asset pack, which is also what `web-assets/` and the installers hold. It stays with the game's developers.
+- `samples/`. The Workshop maps belong to their creators.
+- `repos/`, vendored projects under their own licenses.
+
+It gives no rights to the game, its name or its content.
