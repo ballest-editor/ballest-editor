@@ -102,7 +102,7 @@ Each row has its state. The install, maps folder and plugin manager rows also ha
 
 A folder that is there has a Choose another folder… action on its path. One chosen that way says "Chosen here instead of the one Steam knows about." with a reset button (↺) that looks it up again (`resetGamePaths`). In Settings an overridden folder also marks the Game category and the row with the "modified" dot, and Reset game to defaults resets every chosen folder.
 
-The plugin manager (`noPluginManager`) is optional, because only Play needs it. Its row is neutral ("Not installed (optional, for Play)") with an Install docs button to its site (`openExternal`), never red. While its plugins folder isn't found, the row also has Choose folder…, for a plugin manager whose plugins folder is somewhere unusual.
+The plugin manager (`noPluginManager`) is optional, because only Play needs it. Its row is neutral ("Not installed (optional, for Play)") with an Install docs button to its README (`openExternal`), never red. While its plugins folder isn't found, the row also has Choose folder…, for a plugin manager whose plugins folder is somewhere unusual.
 
 Rows that need an earlier one wait for it: the maps folder and the plugin manager need the game, and the plugin needs the plugin manager. A chosen folder is saved as the override, and the other folders and the plugin are looked up again, so the rows update in place. Check again looks everything up again.
 

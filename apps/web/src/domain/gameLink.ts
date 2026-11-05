@@ -46,8 +46,8 @@ export const gameLinkResultOf = (paths: GameFolders, plugin: PluginLookup): Game
 export const sameGameLinkResult = (a: GameLinkResult | null, b: GameLinkResult): boolean =>
   a !== null && a.game === b.game && a.pluginManager === b.pluginManager
 
-/** The plugin manager's site, which has its install steps. */
-export const PLUGIN_MANAGER_URL = "https://anythinggoes-ballest.github.io/ballest-plugin-manager/"
+/** The Install section of the plugin manager's README. */
+export const PLUGIN_MANAGER_URL = "https://github.com/AnythingGoes-ballest/ballest-plugin-manager#install"
 
 /** What a checklist row's button does. ChooseFolder on a row that is fine picks another folder (Change…). */
 export type GameLinkFix =
@@ -410,7 +410,7 @@ export const playWithoutPluginNotice = (
       return {
         ...pluginManagerLost,
         title: `${exported} Play needs the Ballest plugin manager to race it`,
-        body: "It runs the editor's plugin inside the game. Its site has the install steps."
+        body: "It runs the editor's plugin inside the game. Its README has the install steps."
       }
     default:
       return {
