@@ -49,7 +49,9 @@ describe("keybind table", () => {
       ["paste", ["Ctrl+KeyV"]],
       ["duplicate", ["Ctrl+KeyD"]],
       ["delete", ["Backspace", "Delete"]],
-      ["deselect", ["Escape"]]
+      ["deselect", ["Escape"]],
+      ["group", ["Ctrl+KeyG"]],
+      ["ungroup", ["Shift+KeyG"]]
     ])
   })
 

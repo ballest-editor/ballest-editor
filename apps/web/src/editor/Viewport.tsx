@@ -27,7 +27,7 @@ import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
-import { nextSelection, type SelectMode, useEditor } from "./store"
+import { type SelectMode, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
 import { glbUrl, visualsOf } from "./visuals"
 import { waterTopMaterial, waterUnderMaterial } from "./water"
@@ -114,7 +114,7 @@ function StartingMapMeshes({ onSettled }: { readonly onSettled: () => void }) {
  * How a left click selects, from its chord: the add/toggle selection bindings, else a
  * plain click. Null when the chord drives the camera instead (Alt+LMB orbit).
  */
-const selectModeOf = (e: PointerEvent): SelectMode | null => {
+const selectModeOf = (e: MouseEvent): SelectMode | null => {
   if (e.button !== 0) return null
   const chord = mouseChordOf(e)
   const { keybinds } = useEditor.getState()
@@ -125,7 +125,8 @@ const selectModeOf = (e: PointerEvent): SelectMode | null => {
 
 /**
  * Left-click selection, with the add/toggle modifiers, via a manual raycast on click only
- * (cheap for maps with thousands of items).
+ * (cheap for maps with thousands of items). A click reaches the store's click level; a plain
+ * double-click on the same spot enters a group.
  */
 function ClickSelect() {
   const camera = useThree((s) => s.camera)
@@ -134,16 +135,8 @@ function ClickSelect() {
     const el = gl.domElement
     const raycaster = new THREE.Raycaster()
     let down: { x: number; y: number; mode: SelectMode } | null = null
-    const onDown = (e: PointerEvent) => {
-      const mode = selectModeOf(e)
-      down = mode !== null && !sceneRegistry.gizmoActive() ? { x: e.clientX, y: e.clientY, mode } : null
-    }
-    const onUp = (e: PointerEvent) => {
-      if (down === null || e.button !== 0) return
-      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y)
-      const { mode } = down
-      down = null
-      if (moved > CLICK_SLOP_PX || sceneRegistry.gizmoActive()) return
+    let clicked = false
+    const itemAt = (e: MouseEvent): string | null => {
       const rect = el.getBoundingClientRect()
       const ndc = new THREE.Vector2(
         ((e.clientX - rect.left) / rect.width) * 2 - 1,
@@ -151,15 +144,34 @@ function ClickSelect() {
       )
       raycaster.setFromCamera(ndc, camera)
       const root = sceneRegistry.itemsRoot
-      const hits = root === null ? [] : raycaster.intersectObject(root, true)
-      const { selectedIds, select } = useEditor.getState()
-      select(nextSelection(selectedIds, hitItemId(hits), mode))
+      return hitItemId(root === null ? [] : raycaster.intersectObject(root, true))
+    }
+    const onDown = (e: PointerEvent) => {
+      const mode = selectModeOf(e)
+      down = mode !== null && !sceneRegistry.gizmoActive() ? { x: e.clientX, y: e.clientY, mode } : null
+      clicked = false
+    }
+    const onUp = (e: PointerEvent) => {
+      if (down === null || e.button !== 0) return
+      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y)
+      const { mode } = down
+      down = null
+      if (moved > CLICK_SLOP_PX || sceneRegistry.gizmoActive()) return
+      clicked = mode === "replace"
+      useEditor.getState().clickItem(itemAt(e), mode)
+    }
+    const onDoubleClick = (e: MouseEvent) => {
+      if (!clicked) return
+      const key = itemAt(e)
+      if (key !== null) useEditor.getState().doubleClickItem(key)
     }
     el.addEventListener("pointerdown", onDown)
     el.addEventListener("pointerup", onUp)
+    el.addEventListener("dblclick", onDoubleClick)
     return () => {
       el.removeEventListener("pointerdown", onDown)
       el.removeEventListener("pointerup", onUp)
+      el.removeEventListener("dblclick", onDoubleClick)
     }
   }, [camera, gl])
   return null

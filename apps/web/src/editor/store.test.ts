@@ -348,15 +348,15 @@ describe("editor store", () => {
     }
 
     it("selects with replace, add and toggle clicks", () => {
-      assert.deepStrictEqual(nextSelection(["a", "b"], "c", "replace"), ["c"])
-      assert.deepStrictEqual(nextSelection(["a", "b"], null, "replace"), [])
-      assert.deepStrictEqual(nextSelection(["a", "b"], "c", "add"), ["a", "b", "c"])
-      assert.deepStrictEqual(nextSelection(["a", "b"], "a", "add"), ["b", "a"]) // re-adding makes it active
-      assert.deepStrictEqual(nextSelection(["a", "b"], "a", "toggle"), ["b"])
-      assert.deepStrictEqual(nextSelection(["a", "b"], "c", "toggle"), ["a", "b", "c"])
+      assert.deepStrictEqual(nextSelection(["a", "b"], ["c"], "replace"), ["c"])
+      assert.deepStrictEqual(nextSelection(["a", "b"], [], "replace"), [])
+      assert.deepStrictEqual(nextSelection(["a", "b"], ["c"], "add"), ["a", "b", "c"])
+      assert.deepStrictEqual(nextSelection(["a", "b"], ["a"], "add"), ["b", "a"]) // re-adding makes it active
+      assert.deepStrictEqual(nextSelection(["a", "b"], ["a"], "toggle"), ["b"])
+      assert.deepStrictEqual(nextSelection(["a", "b"], ["c"], "toggle"), ["a", "b", "c"])
       // a modifier click on empty space keeps the selection
-      assert.deepStrictEqual(nextSelection(["a", "b"], null, "add"), ["a", "b"])
-      assert.deepStrictEqual(nextSelection(["a", "b"], null, "toggle"), ["a", "b"])
+      assert.deepStrictEqual(nextSelection(["a", "b"], [], "add"), ["a", "b"])
+      assert.deepStrictEqual(nextSelection(["a", "b"], [], "toggle"), ["a", "b"])
     })
 
     it("keeps the selection a set", () => {
@@ -984,5 +984,181 @@ describe("document structure", () => {
     const { doc } = state()
     assert.deepStrictEqual(gameMapOf(doc).editorState?.groups.map((g) => [g.members, g.name]), [[[1, 2], "G1"]])
     assert.deepStrictEqual(doc.map.editorState?.groups, [])
+  })
+})
+
+describe("groups and the selection", () => {
+  /** A new map with four cubes: inner > (a, b) and outer > (inner, c), then d loose; nothing selected. */
+  const nestedMap = () => {
+    mapWithCubes(0, 100, 200, 300)
+    const [, a, b, c, d] = state().doc.ids
+    const inner = state().groupItems([a!, b!], "Inner")!
+    const outer = state().groupItems([inner, c!], "Outer")!
+    state().select([])
+    return { a: a!, b: b!, c: c!, d: d!, inner, outer }
+  }
+  const selected = () => [...state().selectedIds].sort()
+  const sorted = (...keys: ReadonlyArray<string>) => [...keys].sort()
+
+  it("selects the outermost group on a click, with the clicked item active", () => {
+    const { a, b, c } = nestedMap()
+    state().clickItem(b, "replace")
+    assert.deepStrictEqual(selected(), sorted(a, b, c))
+    assert.strictEqual(state().selectedIds.at(-1), b)
+  })
+
+  it("adds and toggles a whole group", () => {
+    const { a, b, c, d } = nestedMap()
+    state().clickItem(d, "replace")
+    state().clickItem(a, "add")
+    assert.deepStrictEqual(selected(), sorted(a, b, c, d))
+    state().clickItem(b, "toggle")
+    assert.deepStrictEqual(selected(), [d])
+    state().clickItem(null, "toggle")
+    assert.deepStrictEqual(selected(), [d])
+  })
+
+  it("enters a level per double-click", () => {
+    const { a, b, inner, outer } = nestedMap()
+    state().doubleClickItem(a)
+    assert.strictEqual(state().enteredGroupId, outer)
+    assert.deepStrictEqual(selected(), sorted(a, b))
+    state().doubleClickItem(a)
+    assert.strictEqual(state().enteredGroupId, inner)
+    assert.deepStrictEqual(selected(), [a])
+    state().doubleClickItem(a)
+    assert.strictEqual(state().enteredGroupId, inner)
+  })
+
+  it("clicks at the entered level", () => {
+    const { a, b, c, outer } = nestedMap()
+    state().doubleClickItem(a)
+    state().clickItem(c, "replace")
+    assert.deepStrictEqual(selected(), [c])
+    state().clickItem(b, "replace")
+    assert.deepStrictEqual(selected(), sorted(a, b))
+    assert.strictEqual(state().enteredGroupId, outer)
+  })
+
+  it("leaves on a click on empty space or outside the group", () => {
+    const { a, d } = nestedMap()
+    state().doubleClickItem(a)
+    state().clickItem(null, "add")
+    assert.isNotNull(state().enteredGroupId)
+    state().clickItem(null, "replace")
+    assert.isNull(state().enteredGroupId)
+    assert.deepStrictEqual(selected(), [])
+    state().doubleClickItem(a)
+    state().clickItem(d, "replace")
+    assert.isNull(state().enteredGroupId)
+    assert.deepStrictEqual(selected(), [d])
+  })
+
+  it("steps out one level on deselect, then clears", () => {
+    const { a, b, c, outer } = nestedMap()
+    state().doubleClickItem(a)
+    state().doubleClickItem(a)
+    state().deselect()
+    assert.strictEqual(state().enteredGroupId, outer)
+    assert.deepStrictEqual(selected(), sorted(a, b))
+    state().deselect()
+    assert.isNull(state().enteredGroupId)
+    assert.deepStrictEqual(selected(), sorted(a, b, c))
+    state().deselect()
+    assert.deepStrictEqual(selected(), [])
+  })
+
+  it("forgets an entered group that goes, and one undo brings back", () => {
+    const { a, inner } = nestedMap()
+    state().enterGroup(inner)
+    state().ungroup(inner)
+    assert.isNull(state().enteredGroupId)
+    state().enterGroup("gone")
+    state().undo()
+    assert.isNull(state().enteredGroupId)
+    state().doubleClickItem(a)
+    assert.isNotNull(state().enteredGroupId)
+  })
+
+  it("keeps the entered group and the collapsed groups per tab", () => {
+    const { inner, outer } = nestedMap()
+    state().enterGroup(inner)
+    state().setGroupCollapsed(outer, true)
+    const first = state().tabId
+    state().loadMap(startOnlyMap(), null, undefined, { into: "newTab" })
+    assert.isNull(state().enteredGroupId)
+    assert.strictEqual(state().collapsedGroups.size, 0)
+    state().activateTab(first)
+    assert.strictEqual(state().enteredGroupId, inner)
+    assert.isTrue(state().collapsedGroups.has(outer))
+  })
+
+  it("keeps collapsed groups out of the history", () => {
+    const { a, outer } = nestedMap()
+    const steps = state().past.length
+    state().setGroupCollapsed(outer, true)
+    assert.strictEqual(state().past.length, steps)
+    state().renameItem(a, "Named")
+    state().undo()
+    assert.isTrue(state().collapsedGroups.has(outer))
+    state().expandGroups([outer])
+    assert.isFalse(state().collapsedGroups.has(outer))
+  })
+
+  it("groups the selection, whole groups staying whole", () => {
+    const { a, b, c, d, outer } = nestedMap()
+    state().select([a, b, c, d])
+    state().groupSelection()
+    const top = state().doc.structure.tree.find((node) => node.kind === "group")
+    assert.deepStrictEqual(top?.kind === "group" ? top.children.map((n) => n.kind === "group" ? n.id : n.key) : [], [
+      outer,
+      d
+    ])
+    assert.deepStrictEqual(selected(), sorted(a, b, c, d))
+    state().undo()
+    assert.strictEqual(state().doc.structure.tree.filter((node) => node.kind === "group").length, 1)
+  })
+
+  it("won't wrap one whole group in another", () => {
+    const { a, b, c } = nestedMap()
+    state().select([a, b, c])
+    const steps = state().past.length
+    state().groupSelection()
+    assert.strictEqual(state().past.length, steps)
+  })
+
+  it("ungroups every whole group in the selection as one step", () => {
+    const { a, b, c, d } = nestedMap()
+    state().select([d])
+    state().groupSelection()
+    state().select([a, b, c, d])
+    const steps = state().past.length
+    state().ungroupSelection()
+    assert.strictEqual(state().past.length, steps + 1)
+    assert.deepStrictEqual(selected(), sorted(a, b, c, d))
+  })
+
+  it("moves several nodes as one undo step", () => {
+    const { a, c, d, inner } = nestedMap()
+    const steps = state().past.length
+    state().moveNodes([c, d], inner, 0)
+    assert.strictEqual(state().past.length, steps + 1)
+    assert.deepStrictEqual(treeKeys(state().doc.structure.tree).slice(1, 4), [c, d, a])
+    state().undo()
+    assert.strictEqual(state().past.length, steps)
+  })
+
+  it("deletes and duplicates a group through the expanded selection", () => {
+    const { a, c } = nestedMap()
+    const groups = () => state().doc.structure.tree.filter((node) => node.kind === "group").length
+    state().clickItem(a, "replace")
+    state().duplicateSelection()
+    assert.strictEqual(groups(), 2)
+    assert.strictEqual(state().selectedIds.length, 3)
+    state().deleteSelection()
+    assert.strictEqual(groups(), 1)
+    state().clickItem(c, "replace")
+    state().deleteSelection()
+    assert.strictEqual(groups(), 0)
   })
 })
