@@ -134,7 +134,7 @@ export function LaserBeam({ beam, itemId }: { readonly beam: Beam; readonly item
   })
 
   return (
-    <group ref={frame} matrixAutoUpdate={false} matrix={ueToThree}>
+    <group ref={frame} userData={{ beam: true }} matrixAutoUpdate={false} matrix={ueToThree}>
       <group position={beam.muzzle} quaternion={orientation}>
         <group ref={span} scale={[beam.length, 1, 1]}>
           <mesh geometry={unitBeam} material={core} scale={[1, beam.coreRadius, beam.coreRadius]} raycast={noRaycast} />

@@ -5,6 +5,7 @@ import {
   clickLevelOf,
   enteredLevelOf,
   exactSelectedGroup,
+  groupBoxTargets,
   groupPathOf,
   groupSelectionStates,
   groupTrail,
@@ -93,6 +94,32 @@ describe("what a selection makes up", () => {
     assert.isTrue(canGroupSelection(tree, ["a", "b", "d"]))
     assert.isFalse(canGroupSelection(tree, ["a", "b"]))
     assert.isFalse(canGroupSelection(tree, []))
+  })
+})
+
+describe("groupBoxTargets", () => {
+  it("boxes each group whole in the selection, and no group for loose items", () => {
+    assert.deepStrictEqual(groupBoxTargets(tree, ["a", "b", "e"], null), [
+      { id: "inner", keys: ["a", "b"], entered: false },
+      { id: "solo", keys: ["e"], entered: false }
+    ])
+    assert.deepStrictEqual(groupBoxTargets(tree, ["d", "c"], null), [])
+  })
+
+  it("keeps the entered group's box, quiet, with a child selected or nothing", () => {
+    const entered = { id: "outer", keys: ["a", "b", "c"], entered: true }
+    assert.deepStrictEqual(groupBoxTargets(tree, ["c"], "outer"), [entered])
+    assert.deepStrictEqual(groupBoxTargets(tree, [], "outer"), [entered])
+    assert.deepStrictEqual(groupBoxTargets(tree, ["a", "b"], "outer"), [
+      { id: "inner", keys: ["a", "b"], entered: false },
+      entered
+    ])
+  })
+
+  it("draws one box for an entered group that's selected whole", () => {
+    assert.deepStrictEqual(groupBoxTargets(tree, ["a", "b", "c"], "outer"), [
+      { id: "outer", keys: ["a", "b", "c"], entered: false }
+    ])
   })
 })
 

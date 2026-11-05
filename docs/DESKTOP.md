@@ -147,6 +147,7 @@ The groups are the sidecar's ([PROJECTS.md § The files](PROJECTS.md#the-files))
 - **A click** on a grouped item in the viewport selects its outermost group, as the game does. The add and toggle chords add or take away that whole group.
 - **A double-click** enters the group, and the next click level is its children, an item or a nested group. Another double-click goes one deeper. The status bar names the entered group, with × to leave it, and the Outline marks its row and dims what is outside it. The entered group is kept per tab in the store.
 - **Leaving:** Escape steps out one level and selects the group it left. A click on empty space leaves altogether. A click outside the group lands in the nearest parent group that holds what was clicked, or at the root.
+- **The box.** Each group whole in the selection has a dashed box around its items in the viewport, in a colour of its own (`editor/groupBox.ts`, `GROUP_BOX_COLORS`), as well as its items' outlines. The entered group keeps a thinner, fainter box while something inside it is selected. The box is drawn over everything, and a laser's beam doesn't count towards it.
 - **The Inspector** shows the group's name and tags above the item properties when the selection is exactly one group, and a single selected item's tags under its actions. Tags are free strings: Enter or a comma adds one, Backspace in the empty field removes the last.
 - **Delete** removes the group's items, and the group goes with them. **Duplicate** copies a whole group as a new group of the same name and shape.
 
