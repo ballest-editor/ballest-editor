@@ -30,6 +30,15 @@ import { itemFromPiece, mapLabelOf, newMapFile } from "../domain/factory"
 import { withGameGroups } from "../domain/gameGroups"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
 import type { GameLinkResult } from "../domain/gameLink"
+import {
+  canGroupSelection,
+  clickLevelOf,
+  enteredLevelOf,
+  groupPathOf,
+  nodeKeys,
+  selectedGroupIds,
+  selectionNodeIds
+} from "../domain/groupSelection"
 import { type PropertyChange, withFlip } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
@@ -45,6 +54,7 @@ import { defaultSettings, type Settings } from "../domain/Settings"
 import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
 import {
   copyStructure,
+  findGroup,
   freshKey,
   freshKeys,
   itemDisplayNames,
@@ -53,8 +63,10 @@ import {
   withGroupName,
   withItemName,
   withMovedNode,
+  withMovedNodes,
   withNewItems,
   withoutGroup,
+  withoutGroups,
   withoutKeys,
   withPasted,
   withTags
@@ -257,6 +269,10 @@ export interface TabState {
   readonly selectedIds: Selection
   /** Opened as the fresh map the app starts on (or closing the last tab leaves): see `isBlankTab`. */
   readonly fresh: boolean
+  /** The group a double-click entered: viewport clicks reach its children (docs/DESKTOP.md § Groups and selection). */
+  readonly enteredGroupId: string | null
+  /** The groups the Outline shows closed. Outside the document and its history, so undo doesn't touch them. */
+  readonly collapsedGroups: ReadonlySet<string>
 }
 
 /**
@@ -458,22 +474,43 @@ export interface EditorState extends TabState {
   /** Sets the tags of an item (by key) or a group (by id) as one undo step. */
   readonly setTags: (target: string, tags: ReadonlyArray<string>) => void
   /**
-   * Groups items as one undo step: the new group goes where the first key's node was, and keys in other groups are
-   * pulled out of them. `name` defaults to `Group N`. Answers the group's id, or undefined when no key is an item.
+   * Groups nodes (items by key, groups by id) as one undo step: the new group goes where the first one was, and nodes
+   * in other groups are pulled out of them. `name` defaults to `Group N`. Answers the group's id, or undefined when
+   * none is in the tree.
    */
   readonly groupItems: (keys: ReadonlyArray<string>, name?: string) => string | undefined
   /** Dissolves a group as one undo step: its children move to its parent, where it was. */
   readonly ungroup: (groupId: string) => void
+  /** Groups what's selected as one undo step, whole groups staying whole inside the new one. */
+  readonly groupSelection: () => void
+  /** Dissolves every group whole in the selection as one undo step; the items stay selected. */
+  readonly ungroupSelection: () => void
   /**
    * Moves an item (by key) or a group (by id) into the group `parentGroupId` (null: the root) at `index` among its
    * children once it has left them, as one undo step. A group can't go into itself.
    */
   readonly moveNode: (nodeId: string, parentGroupId: string | null, index: number) => void
+  /** `moveNode` for several nodes, kept in the order given, as one undo step. */
+  readonly moveNodes: (nodeIds: ReadonlyArray<string>, parentGroupId: string | null, index: number) => void
   /** Restores the previous snapshot, including its selection. */
   readonly undo: () => void
   readonly redo: () => void
   /** Changes the selection; its own undo step when settings.editor.undoSelection is on. */
   readonly select: (ids: Selection) => void
+  /**
+   * A viewport click on item `key` (null: empty space): selects what it reaches at the click level (`clickLevelOf`). A
+   * plain click outside the entered group leaves it.
+   */
+  readonly clickItem: (key: string | null, mode: SelectMode) => void
+  /** A viewport double-click on item `key`: enters the group a click reaches, and selects the next level down. */
+  readonly doubleClickItem: (key: string) => void
+  /** Sets the entered group (null: none), keeping the selection. */
+  readonly enterGroup: (groupId: string | null) => void
+  /** Steps out of the entered group, selecting it; with none entered, clears the selection. */
+  readonly deselect: () => void
+  readonly setGroupCollapsed: (groupId: string, collapsed: boolean) => void
+  /** Opens groups in the Outline. */
+  readonly expandGroups: (groupIds: ReadonlyArray<string>) => void
   readonly setTool: (tool: Tool) => void
   readonly toggleGizmoSpace: () => void
   /** Opens `dialog` in place of the open one (and its payload). */
@@ -527,7 +564,9 @@ const freshTabState = (
   file,
   exportOnSave: options?.exportOnSave ?? false,
   selectedIds: [],
-  fresh: options?.fresh ?? false
+  fresh: options?.fresh ?? false,
+  enteredGroupId: null,
+  collapsedGroups: new Set()
 })
 
 /** The active tab's state, out of the store. */
@@ -540,7 +579,9 @@ const activeTabOf = (s: EditorState): TabState => ({
   file: s.file,
   exportOnSave: s.exportOnSave,
   selectedIds: s.selectedIds,
-  fresh: s.fresh
+  fresh: s.fresh,
+  enteredGroupId: s.enteredGroupId,
+  collapsedGroups: s.collapsedGroups
 })
 
 export const useEditor = create<EditorState>()((set, get) => {
@@ -552,6 +593,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     set((s) => ({
       ...extra,
       doc,
+      enteredGroupId: keptEnteredGroup(doc, s.enteredGroupId),
       past: [...s.past, {
         doc: before?.doc ?? s.doc,
         selectedIds: before?.selectedIds ?? s.selectedIds,
@@ -613,6 +655,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       doc,
       dirty: snapshot.selectionOnly ? s.dirty : true,
       selectedIds: snapshot.selectedIds.filter((id) => existing.has(id)),
+      enteredGroupId: keptEnteredGroup(doc, s.enteredGroupId),
       // the side being left, for the opposite stack
       current: {
         doc: s.doc,
@@ -794,7 +837,7 @@ export const useEditor = create<EditorState>()((set, get) => {
 
     transformItems: (transforms) => {
       const { doc } = get()
-      const entries = [...transforms].map(([id, t]) => [doc.ids.indexOf(id), t] as const)
+      const entries = [...transforms].map(([id, t]) => [indexOfKey(doc.ids, id), t] as const)
       const next = setTransforms(doc.map, entries)
       if (Option.isSome(next)) {
         // a drag that ends where it started leaves no step
@@ -956,8 +999,20 @@ export const useEditor = create<EditorState>()((set, get) => {
       return next === undefined ? undefined : id
     },
     ungroup: (groupId) => commitStructure(withoutGroup(get().doc.structure, groupId)),
+    groupSelection: () => {
+      const { doc, selectedIds, groupItems } = get()
+      if (canGroupSelection(doc.structure.tree, selectedIds)) {
+        groupItems(selectionNodeIds(doc.structure.tree, selectedIds))
+      }
+    },
+    ungroupSelection: () => {
+      const { doc, selectedIds } = get()
+      commitStructure(withoutGroups(doc.structure, selectedGroupIds(doc.structure.tree, selectedIds)))
+    },
     moveNode: (nodeId, parentGroupId, index) =>
       commitStructure(withMovedNode(get().doc.structure, nodeId, parentGroupId, index)),
+    moveNodes: (nodeIds, parentGroupId, index) =>
+      commitStructure(withMovedNodes(get().doc.structure, nodeIds, parentGroupId, index)),
 
     undo: () =>
       set((s) => {
@@ -987,6 +1042,48 @@ export const useEditor = create<EditorState>()((set, get) => {
           selectionOnly: true
         }
         return { selectedIds, past: [...s.past, step].slice(-HISTORY_LIMIT), future: [] }
+      }),
+    clickItem: (key, mode) => {
+      const { doc, selectedIds, enteredGroupId, select } = get()
+      const { tree } = doc.structure
+      const level = key === null ? undefined : clickLevelOf(tree, key, enteredGroupId)
+      // the clicked item is the active one, so the gizmo sits where the click was
+      const reached = level === undefined ? [] : nodeKeys(tree, level.nodeId).filter((id) => id !== key)
+      select(nextSelection(selectedIds, key === null ? [] : [...reached, key], mode))
+      if (mode === "replace") set({ enteredGroupId: level?.enteredGroupId ?? null })
+    },
+    doubleClickItem: (key) => {
+      const { doc, enteredGroupId, select } = get()
+      const { tree } = doc.structure
+      const level = enteredLevelOf(tree, key, enteredGroupId)
+      if (level === undefined) return
+      select(nodeKeys(tree, level.nodeId))
+      set({ enteredGroupId: level.enteredGroupId })
+    },
+    enterGroup: (enteredGroupId) => set({ enteredGroupId }),
+    deselect: () => {
+      const { doc, enteredGroupId, select } = get()
+      if (enteredGroupId === null) {
+        select([])
+        return
+      }
+      const { tree } = doc.structure
+      select(nodeKeys(tree, enteredGroupId))
+      set({ enteredGroupId: groupPathOf(tree, enteredGroupId).at(-1) ?? null })
+    },
+    setGroupCollapsed: (groupId, collapsed) =>
+      set((s) => {
+        if (s.collapsedGroups.has(groupId) === collapsed) return s
+        const collapsedGroups = new Set(s.collapsedGroups)
+        if (collapsed) collapsedGroups.add(groupId)
+        else collapsedGroups.delete(groupId)
+        return { collapsedGroups }
+      }),
+    expandGroups: (groupIds) =>
+      set((s) => {
+        if (!groupIds.some((id) => s.collapsedGroups.has(id))) return s
+        const open = new Set(groupIds)
+        return { collapsedGroups: new Set([...s.collapsedGroups].filter((id) => !open.has(id))) }
       }),
     setTool: (tool) => set({ tool }),
     toggleGizmoSpace: () => set((s) => ({ gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
@@ -1114,6 +1211,10 @@ const clipOf = (doc: Doc, indices: ReadonlyArray<number>): DocClip => {
   return { ...copyItems(doc.map, indices), keys, structure: copyStructure(doc.structure, new Set(keys)) }
 }
 
+/** The entered group, while it is still in `doc`'s tree. */
+const keptEnteredGroup = (doc: Doc, id: string | null): string | null =>
+  id !== null && findGroup(doc.structure.tree, id) !== undefined ? id : null
+
 /** A doc's map as the game gets it: its groups are the projection of the structure (docs/FORMAT.md § Groups). */
 export const gameMapOf = (doc: Doc): MapFile => withGameGroups(doc.map, doc.ids, doc.structure.tree)
 
@@ -1145,23 +1246,38 @@ const sameLighting = (a: Lighting, b: Lighting) =>
 const sameSelection = (a: Selection, b: Selection) => a.length === b.length && a.every((id, i) => id === b[i])
 
 /**
- * The selection after clicking `id` (null: empty space). A plain click selects just that
- * item, or clears; adding keeps the rest and makes the item active; toggling adds or
- * removes it. Clicking empty space with a modifier leaves the selection alone.
+ * The selection after clicking the items `ids` (none: empty space). A plain click selects just those, or clears; adding
+ * keeps the rest and makes them the active end; toggling removes them when all are selected, else adds them. Clicking
+ * empty space with a modifier leaves the selection alone.
  */
-export const nextSelection = (current: Selection, id: string | null, mode: SelectMode): Selection => {
-  if (mode === "replace") return id === null ? [] : [id]
-  if (id === null) return current
-  const rest = current.filter((x) => x !== id)
-  return mode === "toggle" && rest.length < current.length ? rest : [...rest, id]
+export const nextSelection = (current: Selection, ids: ReadonlyArray<string>, mode: SelectMode): Selection => {
+  if (mode === "replace") return ids
+  if (ids.length === 0) return current
+  const clicked = new Set(ids)
+  const rest = current.filter((x) => !clicked.has(x))
+  return mode === "toggle" && rest.length === current.length - clicked.size ? rest : [...rest, ...ids]
 }
+
+/** Each key's place in `ids`, kept per array: a group's selection can be thousands of items. */
+const keyIndices = new WeakMap<ReadonlyArray<string>, ReadonlyMap<string, number>>()
+
+const keyIndicesOf = (ids: ReadonlyArray<string>): ReadonlyMap<string, number> => {
+  const known = keyIndices.get(ids)
+  if (known !== undefined) return known
+  const indices = new Map(ids.map((id, i) => [id, i] as const))
+  keyIndices.set(ids, indices)
+  return indices
+}
+
+/** An item's place in `ids`; -1 for a key that isn't there. */
+const indexOfKey = (ids: ReadonlyArray<string>, key: string): number => keyIndicesOf(ids).get(key) ?? -1
 
 /** Document indices of the selected items, in selection order. */
 export const selectedIndices = (s: EditorState): Array<number> =>
-  s.selectedIds.map((id) => s.doc.ids.indexOf(id)).filter((i) => i >= 0)
+  s.selectedIds.map((id) => indexOfKey(s.doc.ids, id)).filter((i) => i >= 0)
 
 /** Every item's display name, by key: the user's, else its piece's and an ordinal ("Cube 3"). */
-export const itemDisplayNamesOf = (s: EditorState): ReadonlyMap<string, string> =>
+export const itemDisplayNamesOf = (s: Pick<EditorState, "doc" | "catalogIndex">): ReadonlyMap<string, string> =>
   itemDisplayNames(s.doc.map, s.doc.ids, s.doc.structure.items, s.catalogIndex)
 
 /** The active (last selected) item's id, if any. */
@@ -1171,13 +1287,13 @@ export const activeId = (s: EditorState): string | undefined => s.selectedIds.at
 export const shownLighting = (s: EditorState): Lighting => s.lightingPreview ?? lightingOf(s.doc.map.worldSettings)
 
 /** An item's pivot (Default when it has none, or isn't in the document). */
-export const pivotOf = (s: EditorState, id: string): Pivot => pivotAt(s.doc.map, s.doc.ids.indexOf(id))
+export const pivotOf = (s: EditorState, id: string): Pivot => pivotAt(s.doc.map, indexOfKey(s.doc.ids, id))
 
 /** An item's edit transform (see domain/editTransform.ts) as shown: the live preview, else the document. */
 export const shownTransform = (s: EditorState, id: string): UeTransform | undefined => {
   const preview = s.preview?.get(id)
   if (preview !== undefined) return preview
-  const item = s.doc.map.items[s.doc.ids.indexOf(id)]
+  const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
   return item === undefined ? undefined : editTransform(item)
 }
 
@@ -1187,7 +1303,7 @@ export const fitTransforms = (
   transforms: ReadonlyMap<string, UeTransform>
 ): ReadonlyMap<string, UeTransform> =>
   new Map([...transforms].map(([id, t]) => {
-    const item = s.doc.map.items[s.doc.ids.indexOf(id)]
+    const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
     return [id, item === undefined ? t : fitEditTransform(item, t, pivotOf(s, id).localPosition)] as const
   }))
 

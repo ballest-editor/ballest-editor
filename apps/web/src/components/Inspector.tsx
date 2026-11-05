@@ -20,6 +20,7 @@ import { useMemo, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { editTransform, isDecal } from "../domain/editTransform"
+import { exactSelectedGroup } from "../domain/groupSelection"
 import { type Axis, readField, type TransformField } from "../domain/groupTransform"
 import { selectionProperties } from "../domain/itemProperties"
 import { formatBindings, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
@@ -44,6 +45,7 @@ import { PaintSection } from "./PaintSection"
 import { PathText } from "./PathText"
 import { PivotSection } from "./PivotSection"
 import { SectionTitle } from "./SectionTitle"
+import { GroupSection, ItemTags } from "./StructureSection"
 
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
 
@@ -405,6 +407,13 @@ export function Inspector() {
   )
   const units = useEditor((s) => s.settings.general.units)
   const catalogIndex = useEditor((s) => s.catalogIndex)
+  const tree = useEditor((s) => s.doc.structure.tree)
+  const selectedIds = useEditor((s) => s.selectedIds)
+  const enteredGroupId = useEditor((s) => s.enteredGroupId)
+  const group = useMemo(
+    () => exactSelectedGroup(tree, selectedIds, enteredGroupId),
+    [tree, selectedIds, enteredGroupId]
+  )
 
   const first = items[0]
   if (first === undefined) {
@@ -428,8 +437,15 @@ export function Inspector() {
   return (
     <ScrollArea className="h-full bg-card">
       <div className="flex flex-col gap-3 p-3">
+        {group !== undefined && (
+          <>
+            <GroupSection key={group.id} group={group} />
+            <Separator />
+          </>
+        )}
         <SelectionHeader items={items.map((item, i) => ({ item, index: indices[i] ?? -1 }))} />
         <SelectionActions />
+        {items.length === 1 && ids[0] !== undefined && <ItemTags itemKey={ids[0]} />}
 
         <Separator />
         <SectionTitle>Transform</SectionTitle>

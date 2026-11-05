@@ -43,7 +43,9 @@ export const keybindSections = [
       "paste",
       "duplicateSelection",
       "deleteSelection",
-      "deselect"
+      "deselect",
+      "groupSelection",
+      "ungroupSelection"
     ]
   },
   {
@@ -84,6 +86,8 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   undo: "undo",
   redo: "redo",
   deselect: "deselect",
+  groupSelection: "group",
+  ungroupSelection: "ungroup",
   moveForward: "forward",
   moveBack: "reverse",
   moveLeft: "left",
@@ -138,7 +142,11 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   undo:
     "Undo the last change. Ctrl+Z in the game's level editor; a whole gizmo drag or number-field scrub is one step.",
   redo: "Redo the last undone change. Ctrl+Y in the game's level editor; Ctrl+Shift+Z also works.",
-  deselect: "Clear the selection. During a gizmo drag it cancels the drag instead. (The game uses Ctrl+click.)",
+  deselect:
+    "Clear the selection. Inside an entered group it steps out of the group instead, and during a gizmo drag it cancels the drag. (The game uses Ctrl+click.)",
+  groupSelection:
+    "Group the selection. Clicking any item of a group then selects the whole group. Ctrl+G in the game's level editor.",
+  ungroupSelection: "Dissolve the selected groups; their items stay selected. Shift+G in the game's level editor.",
   moveForward: "Fly the camera forward while held.",
   moveBack: "Fly the camera backward while held.",
   moveLeft: "Fly the camera left while held.",
@@ -218,6 +226,8 @@ export const defaultKeybinds: Keybinds = {
   undo: ["Ctrl+KeyZ"],
   redo: ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"],
   deselect: ["Escape"],
+  groupSelection: ["Ctrl+KeyG"],
+  ungroupSelection: ["Shift+KeyG"],
   moveForward: ["KeyW"],
   moveBack: ["KeyS"],
   moveLeft: ["KeyA"],

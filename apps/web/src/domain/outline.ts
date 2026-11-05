@@ -1,0 +1,197 @@
+/**
+ * The Outline panel's data: the tree as a flat list of rows, the filter, where a drop lands and which rows a scroll
+ * shows. Pure, so the panel only draws and handles events (docs/DESKTOP.md § Outline).
+ */
+import { nodeKeys } from "./groupSelection"
+import { classNameOf, type MapFile } from "./MapFile"
+import type { TreeNode } from "./MapSidecar"
+import { findGroup, idOf, type Structure, treeKeys } from "./structure"
+
+export interface OutlineRow {
+  /** An item's key, or a group's id. */
+  readonly id: string
+  readonly kind: "item" | "group"
+  readonly depth: number
+  /** The group it is in; null at the root. */
+  readonly parentId: string | null
+  /** Its place among its parent's children, shown or not. */
+  readonly index: number
+  readonly name: string
+  /** An item's class, short; empty for a group. */
+  readonly className: string
+  readonly tags: ReadonlyArray<string>
+  /** A group's direct children, and all the items under it; 0 for an item. */
+  readonly childCount: number
+  readonly itemCount: number
+  /** A group whose children aren't shown. */
+  readonly collapsed: boolean
+}
+
+/** Each item's short class name, by key. */
+export const itemClassNames = (map: MapFile, ids: ReadonlyArray<string>): ReadonlyMap<string, string> =>
+  new Map(ids.flatMap((key, index) => {
+    const item = map.items[index]
+    return item === undefined ? [] : [[key, classNameOf(item.actorToSpawn)] as const]
+  }))
+
+/** The lower-case words of a filter. */
+const termsOf = (query: string): ReadonlyArray<string> => query.toLowerCase().split(/\s+/).filter((t) => t.length > 0)
+
+const rowMatches = (row: OutlineRow, terms: ReadonlyArray<string>) => {
+  const haystack = `${row.name} ${row.className} ${row.tags.join(" ")}`.toLowerCase()
+  return terms.every((term) => haystack.includes(term))
+}
+
+/**
+ * The rows to show, in tree order. Without a filter a collapsed group hides what's under it. With one, the rows that
+ * match (every word, in a name, a class or a tag) show with the groups around them, whatever is collapsed.
+ */
+export const outlineRows = (
+  structure: Structure,
+  names: ReadonlyMap<string, string>,
+  classNames: ReadonlyMap<string, string>,
+  collapsedGroups: ReadonlySet<string>,
+  query: string
+): ReadonlyArray<OutlineRow> => {
+  const terms = termsOf(query)
+  const filtering = terms.length > 0
+  const rows: Array<OutlineRow> = []
+  const visit = (nodes: ReadonlyArray<TreeNode>, depth: number, parentId: string | null) => {
+    for (const [index, node] of nodes.entries()) {
+      const place = { depth, parentId, index }
+      if (node.kind === "item") {
+        const row: OutlineRow = {
+          ...place,
+          id: node.key,
+          kind: "item",
+          name: names.get(node.key) ?? node.key,
+          className: classNames.get(node.key) ?? "",
+          tags: structure.items.get(node.key)?.tags ?? [],
+          childCount: 0,
+          itemCount: 0,
+          collapsed: false
+        }
+        if (!filtering || rowMatches(row, terms)) rows.push(row)
+        continue
+      }
+      const collapsed = !filtering && collapsedGroups.has(node.id)
+      const row: OutlineRow = {
+        ...place,
+        id: node.id,
+        kind: "group",
+        name: node.name,
+        className: "",
+        tags: node.tags,
+        childCount: node.children.length,
+        itemCount: treeKeys([node]).length,
+        collapsed
+      }
+      const at = rows.length
+      rows.push(row)
+      if (!collapsed) visit(node.children, depth + 1, node.id)
+      if (filtering && rows.length === at + 1 && !rowMatches(row, terms)) rows.pop()
+    }
+  }
+  visit(structure.tree, 0, null)
+  return rows
+}
+
+/**
+ * The rows from `fromId` to `toId` inclusive, in shown order; just `toId` when `fromId` isn't shown. A selection range
+ * by Shift.
+ */
+export const rowRange = (
+  rows: ReadonlyArray<OutlineRow>,
+  fromId: string | null,
+  toId: string
+): ReadonlyArray<OutlineRow> => {
+  const to = rows.findIndex((row) => row.id === toId)
+  const from = rows.findIndex((row) => row.id === fromId)
+  if (to < 0) return []
+  const start = from < 0 ? to : Math.min(from, to)
+  return rows.slice(start, (from < 0 ? to : Math.max(from, to)) + 1)
+}
+
+/** The item keys `rows` stand for, a group's being every item under it. */
+export const rowKeys = (tree: ReadonlyArray<TreeNode>, rows: ReadonlyArray<OutlineRow>): ReadonlyArray<string> =>
+  rows.flatMap((row) => row.kind === "item" ? [row.id] : nodeKeys(tree, row.id))
+
+/** Where a drag would land. */
+export interface DropTarget {
+  /** The row the indicator is drawn on; null below the last row. */
+  readonly rowId: string | null
+  readonly position: "before" | "after" | "into"
+  /** The group the nodes would go in; null is the root. */
+  readonly parentId: string | null
+  /** The gap among its children as they are now, the dragged nodes included. */
+  readonly index: number
+  /** How far the indicator is indented. */
+  readonly depth: number
+}
+
+/** The share of a group row, at its top and at its bottom, that drops beside it rather than into it. */
+const GROUP_EDGE = 0.25
+
+/**
+ * The drop at `fraction` (0 top, 1 bottom) of row `rowIndex`, or past the rows. `dragged` are the nodes on the move: a
+ * node can't land on itself or anything inside it, so that answers undefined. The gap just after an open group is its
+ * first child's; below the last row is the end of the root.
+ */
+export const dropTargetAt = (
+  rows: ReadonlyArray<OutlineRow>,
+  rootLength: number,
+  rowIndex: number,
+  fraction: number,
+  dragged: ReadonlySet<string>
+): DropTarget | undefined => {
+  const row = rows[rowIndex]
+  if (row === undefined) {
+    return rowIndex < 0 ? undefined : { rowId: null, position: "after", parentId: null, index: rootLength, depth: 0 }
+  }
+  const parentOf = new Map(rows.map((r) => [r.id, r.parentId]))
+  for (let id: string | null | undefined = row.id; id !== null && id !== undefined; id = parentOf.get(id)) {
+    if (dragged.has(id)) return undefined
+  }
+  const beside = { rowId: row.id, parentId: row.parentId, depth: row.depth }
+  const before = { ...beside, position: "before", index: row.index } as const
+  if (row.kind === "item") return fraction < 0.5 ? before : { ...beside, position: "after", index: row.index + 1 }
+  if (fraction < GROUP_EDGE) return before
+  if (fraction >= 1 - GROUP_EDGE) {
+    if (!row.collapsed && row.childCount > 0) {
+      return { rowId: row.id, position: "after", parentId: row.id, index: 0, depth: row.depth + 1 }
+    }
+    return { ...beside, position: "after", index: row.index + 1 }
+  }
+  return { rowId: row.id, position: "into", parentId: row.id, index: row.childCount, depth: row.depth + 1 }
+}
+
+/** A drop's gap (`DropTarget.index`) as a place among the parent's children once the dragged nodes have left them. */
+export const indexOnceLeft = (
+  structure: Structure,
+  target: Pick<DropTarget, "parentId" | "index">,
+  dragged: ReadonlySet<string>
+): number => {
+  const siblings = target.parentId === null
+    ? structure.tree
+    : findGroup(structure.tree, target.parentId)?.children ?? []
+  return target.index - siblings.slice(0, target.index).filter((node) => dragged.has(idOf(node))).length
+}
+
+/** The rows to render for a scroll position: those in view and `overscan` either side. */
+export const visibleRange = (
+  scrollTop: number,
+  viewHeight: number,
+  rowHeight: number,
+  rowCount: number,
+  overscan: number
+): { readonly start: number; readonly end: number } => ({
+  start: Math.max(0, Math.floor(scrollTop / rowHeight) - overscan),
+  end: Math.min(rowCount, Math.ceil((scrollTop + viewHeight) / rowHeight) + overscan)
+})
+
+/** The scroll position that shows row `index` with the least movement: the same one when it's in view already. */
+export const scrollToShow = (index: number, scrollTop: number, viewHeight: number, rowHeight: number): number => {
+  const top = index * rowHeight
+  if (top < scrollTop) return top
+  return top + rowHeight > scrollTop + viewHeight ? top + rowHeight - viewHeight : scrollTop
+}

@@ -32,7 +32,8 @@ export const flatStructure = (keys: ReadonlyArray<string>): Structure => ({
   items: new Map()
 })
 
-const idOf = (node: TreeNode): string => node.kind === "item" ? node.key : node.id
+/** A node's identity: an item's key, a group's id. */
+export const idOf = (node: TreeNode): string => node.kind === "item" ? node.key : node.id
 
 /** The item keys under `nodes`, depth first. */
 export const treeKeys = (nodes: ReadonlyArray<TreeNode>): ReadonlyArray<string> =>
@@ -46,7 +47,7 @@ interface FoundNode {
   readonly index: number
 }
 
-const findNode = (
+export const findNode = (
   nodes: ReadonlyArray<TreeNode>,
   id: string,
   path: ReadonlyArray<GroupNode> = []
@@ -61,7 +62,7 @@ const findNode = (
   return undefined
 }
 
-const findGroup = (nodes: ReadonlyArray<TreeNode>, id: string): GroupNode | undefined => {
+export const findGroup = (nodes: ReadonlyArray<TreeNode>, id: string): GroupNode | undefined => {
   const found = findNode(nodes, id)?.node
   return found?.kind === "group" ? found : undefined
 }
@@ -165,39 +166,52 @@ export const nextGroupName = (tree: ReadonlyArray<TreeNode>): string => {
   }
 }
 
+/** The nodes `ids` that are in the tree, each once, in that order, without those inside another of them. */
+const outermostNodes = (tree: ReadonlyArray<TreeNode>, ids: ReadonlyArray<string>): ReadonlyArray<FoundNode> => {
+  const found = [...new Set(ids)].flatMap((id) => findNode(tree, id) ?? [])
+  const given = new Set(found.map(({ node }) => idOf(node)))
+  return found.filter(({ path }) => !path.some((group) => given.has(group.id)))
+}
+
 /**
- * Groups the items `keys`, in that order, as a new group `id` where the first key's node was. Keys in other groups are
- * pulled out of them. Undefined when none of `keys` is an item in the tree.
+ * Groups the nodes `ids` (items and groups), in that order, as a new group `id` where the first one was. Nodes in other
+ * groups are pulled out of them. Undefined when none of `ids` is in the tree.
  */
 export const withGroup = (
   structure: Structure,
-  keys: ReadonlyArray<string>,
+  ids: ReadonlyArray<string>,
   id: string,
   name?: string
 ): Structure | undefined => {
-  const [first, ...others] = [...new Set(keys)].filter((key) => findNode(structure.tree, key)?.node.kind === "item")
+  const nodes = outermostNodes(structure.tree, ids).map(({ node }) => node)
+  const [first] = nodes
   if (first === undefined) return undefined
   const group: GroupNode = {
     kind: "group",
     id,
     name: name?.trim() || nextGroupName(structure.tree),
     tags: [],
-    children: [first, ...others].map(itemNode)
+    children: nodes
   }
-  const pulled = new Set(others)
+  const pulled = new Set(nodes.map(idOf))
   const tree = rewriteTree(structure.tree, (node) => {
-    if (node.kind !== "item") return [node]
-    return node.key === first ? [group] : pulled.has(node.key) ? [] : [node]
+    if (!pulled.has(idOf(node))) return [node]
+    return idOf(node) === idOf(first) ? [group] : []
   })
   return { ...structure, tree }
 }
 
-/** Dissolves a group: its children take its place in its parent. */
-export const withoutGroup = (structure: Structure, id: string): Structure | undefined =>
-  findGroup(structure.tree, id) === undefined ? undefined : {
+/** Dissolves groups: each one's children take its place in its parent. */
+export const withoutGroups = (structure: Structure, ids: ReadonlyArray<string>): Structure | undefined => {
+  const gone = new Set(ids.filter((id) => findGroup(structure.tree, id) !== undefined))
+  return gone.size === 0 ? undefined : {
     ...structure,
-    tree: rewriteTree(structure.tree, (node) => node.kind === "group" && node.id === id ? node.children : [node])
+    tree: rewriteTree(structure.tree, (node) => node.kind === "group" && gone.has(node.id) ? node.children : [node])
   }
+}
+
+/** Dissolves a group: its children take its place in its parent. */
+export const withoutGroup = (structure: Structure, id: string): Structure | undefined => withoutGroups(structure, [id])
 
 /** `nodes` with `edit` applied to the children of group `parentId`, or to `nodes` itself for null. */
 const editChildren = (
@@ -214,30 +228,37 @@ const editChildren = (
   })
 
 /**
- * Moves a node to position `index` (clamped) among `parentId`'s children once it has left them; null is the root. A
- * group can't go into itself. A group the move leaves empty goes too.
+ * Moves nodes, in that order, to position `index` (clamped) among `parentId`'s children once they have left them; null
+ * is the root. A node inside another of them moves with it. A group can't go into itself, and a group the move leaves
+ * empty goes too.
  */
-export const withMovedNode = (
+export const withMovedNodes = (
   structure: Structure,
-  nodeId: string,
+  nodeIds: ReadonlyArray<string>,
   parentId: string | null,
   index: number
 ): Structure | undefined => {
-  const found = findNode(structure.tree, nodeId)
-  if (found === undefined) return undefined
+  const found = outermostNodes(structure.tree, nodeIds)
+  if (found.length === 0) return undefined
   if (parentId !== null) {
-    const insideItself = findNode([found.node], parentId) !== undefined
-    if (insideItself || findGroup(structure.tree, parentId) === undefined) return undefined
+    const insideOne = findNode(found.map(({ node }) => node), parentId) !== undefined
+    if (insideOne || findGroup(structure.tree, parentId) === undefined) return undefined
   }
-  const from = found.path.at(-1)?.id ?? null
-  const siblings = from === null ? structure.tree : found.path.at(-1)?.children ?? []
-  if (from === parentId && Math.max(0, Math.min(index, siblings.length - 1)) === found.index) return undefined
-  const without = (nodes: ReadonlyArray<TreeNode>) => nodes.filter((node) => idOf(node) !== nodeId)
-  const moved = editChildren(editChildren(structure.tree, from, without), parentId, (children) => {
-    const at = Math.max(0, Math.min(index, children.length))
-    return [...children.slice(0, at), found.node, ...children.slice(at)]
-  })
-  const left = new Set(found.path.map((group) => group.id))
+  const moving = new Set(found.map(({ node }) => idOf(node)))
+  const without = (nodes: ReadonlyArray<TreeNode>) => nodes.filter((node) => !moving.has(idOf(node)))
+  const sources = new Set(found.map(({ path }) => path.at(-1)?.id ?? null))
+  const moved = editChildren(
+    [...sources].reduce((tree, source) => editChildren(tree, source, without), structure.tree),
+    parentId,
+    (children) => {
+      const at = Math.max(0, Math.min(index, children.length))
+      return [...children.slice(0, at), ...found.map(({ node }) => node), ...children.slice(at)]
+    }
+  )
+  const childIds = (tree: ReadonlyArray<TreeNode>) =>
+    (parentId === null ? tree : findGroup(tree, parentId)?.children ?? []).map(idOf)
+  if (childIds(moved).join() === childIds(structure.tree).join()) return undefined
+  const left = new Set(found.flatMap(({ path }) => path.map((group) => group.id)))
   return {
     ...structure,
     tree: rewriteTree(
@@ -247,16 +268,25 @@ export const withMovedNode = (
   }
 }
 
+/** Moves one node; see `withMovedNodes`. */
+export const withMovedNode = (
+  structure: Structure,
+  nodeId: string,
+  parentId: string | null,
+  index: number
+): Structure | undefined => withMovedNodes(structure, [nodeId], parentId, index)
+
 /** Whether every item under `group` is in `keys`, and it has one. */
 const isWhole = (group: GroupNode, keys: ReadonlySet<string>) => {
   const inside = treeKeys([group])
   return inside.length > 0 && inside.every((key) => keys.has(key))
 }
 
-const copiedNodes = (nodes: ReadonlyArray<TreeNode>, keys: ReadonlySet<string>): ReadonlyArray<TreeNode> =>
+/** The nodes the items `keys` make up, in tree order: a group with all its items among them whole, else its members. */
+export const wholeNodes = (nodes: ReadonlyArray<TreeNode>, keys: ReadonlySet<string>): ReadonlyArray<TreeNode> =>
   nodes.flatMap((node) => {
     if (node.kind === "item") return keys.has(node.key) ? [node] : []
-    return isWhole(node, keys) ? [node] : copiedNodes(node.children, keys)
+    return isWhole(node, keys) ? [node] : wholeNodes(node.children, keys)
   })
 
 /**
@@ -264,7 +294,7 @@ const copiedNodes = (nodes: ReadonlyArray<TreeNode>, keys: ReadonlySet<string>):
  * leave their copied items loose. It holds the source keys and ids until `withPasted`.
  */
 export const copyStructure = (structure: Structure, keys: ReadonlySet<string>): Structure => ({
-  tree: copiedNodes(structure.tree, keys),
+  tree: wholeNodes(structure.tree, keys),
   items: new Map([...structure.items].filter(([key]) => keys.has(key)))
 })
 

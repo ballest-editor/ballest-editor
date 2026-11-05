@@ -105,7 +105,8 @@ Dockview is themed in `components/dock/dock.css` with the tokens from `packages/
 `components/MenuBar.tsx` holds the menus. Every item calls the entry point its keybind or button uses.
 
 - **File:** New project… (`components/NewProjectDialog.tsx`, a name that becomes `Documents/Ballest Editor/<name>` through `createProject`), Open project…, Recent projects, Save, Close tab, Settings…, Game link…, and Quit, which closes the window the way its × does, so unsaved edits ask.
-- **Edit**, and **View** (the dock's panels and Reset layout, § Dock; the grid, sky, water and theme).
+- **Edit:** Undo, Redo, Cut, Copy, Paste, Duplicate, Delete, Deselect, Group and Ungroup.
+- **View:** Focus selection, the dock's panels and Reset layout (§ Dock), and the display toggles (the grid, sky, water and theme).
 - **Project:** New map…, Import map…; Export to game, Export on save, Re-import from game, Play, Launch game; Project settings….
 - **Web review build:** File (New map…, Open…, Save, Export…, Close tab, Settings…), Edit, View, and Project (Project settings…, the one map's).
 
@@ -121,6 +122,30 @@ There is no Map or Game menu: the menus act on the active tab's map, and the gam
 - The header holds New map…, Import map… and Project settings….
 - Every tab whose map has no file yet (a fresh one, any in Untitled Project, what a switch of projects left open) is a row of its own in italics, above the project's maps. A click makes that tab active.
 - No thumbnails yet.
+
+### Outline
+
+`components/Outline.tsx` is the map's tree of groups and items, a dock panel that starts on the left (View › Outline, § Dock). It fills whatever it is mounted in and scrolls by itself. `domain/outline.ts` holds its rows, filter, drop targets and scroll window.
+
+- A row shows the name, an item's class, tag chips, and a group's child count (its tooltip gives the items under it). Only the rows in view are drawn.
+- A click selects, as `toggleSelection`'s chord toggles and `addToSelection`'s chord selects the range from the last row clicked. A group row stands for every item under it, and it lights up when all of them are selected. A click on empty space clears the selection.
+- A selection made anywhere else scrolls its active row into view once, as far as it takes, and opens the groups around it.
+- Double-click or F2 renames in place: Enter commits, Escape cancels, and an empty name puts an item back on its default name. A group always has a name, so an empty one changes nothing.
+- A drag moves the selection, or just the row when it isn't selected, as one undo step. A line shows a drop before or after a row, and the row lights up for a drop into a group. A group's top and bottom quarters drop beside it, and the gap under an open group is its first child's. Below the last row is the end of the root.
+- Right-click selects the row if it isn't selected, then offers Group, Ungroup, Rename, Duplicate, Delete, Focus and Edit tags….
+- The filter matches names, classes and tags, needing every word. It shows matching rows with the groups around them, whatever is collapsed. A group's items show only if they match too.
+- Which groups are collapsed is kept per tab in the store, outside the sidecar and the history, so undo leaves it alone.
+
+### Groups and selection
+
+The groups are the sidecar's ([PROJECTS.md § The files](PROJECTS.md#the-files)), and the game gets what it can hold of them ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)). `domain/groupSelection.ts` holds the rules below. The selection stays a list of item keys, so the gizmo, the Inspector, Copy and the rest act on a group's items with no group logic of their own. The item clicked is the active one, so the gizmo sits where the click was.
+
+- **Group** (Ctrl+G) puts the selected items in a new group where the first one was, and a group whole in the selection goes in whole, nested. **Ungroup** (Shift+G) dissolves every group whole in the selection, and the items stay selected. Both are in the Edit menu, the Outline's menu and the keybind settings.
+- **A click** on a grouped item in the viewport selects its outermost group, as the game does. The add and toggle chords add or take away that whole group.
+- **A double-click** enters the group, and the next click level is its children, an item or a nested group. Another double-click goes one deeper. The status bar names the entered group, with × to leave it, and the Outline marks its row and dims what is outside it. The entered group is kept per tab in the store.
+- **Leaving:** Escape steps out one level and selects the group it left. A click on empty space leaves altogether. A click outside the group lands in the nearest parent group that holds what was clicked, or at the root.
+- **The Inspector** shows the group's name and tags above the item properties when the selection is exactly one group, and a single selected item's tags under its actions. Tags are free strings: Enter or a comma adds one, Backspace in the empty field removes the last.
+- **Delete** removes the group's items, and the group goes with them. **Duplicate** copies a whole group as a new group of the same name and shape.
 
 ### Game link
 

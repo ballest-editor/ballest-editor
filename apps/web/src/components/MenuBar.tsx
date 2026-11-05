@@ -13,7 +13,8 @@ import {
   MenubarSubTrigger,
   MenubarTrigger
 } from "@workspace/ui/components/menubar"
-import type { ReactNode } from "react"
+import { type ReactNode, useMemo } from "react"
+import { canGroupSelection, selectedGroupIds } from "../domain/groupSelection"
 import { formatBinding, type KeybindAction } from "../domain/Keybinds"
 import type { Settings } from "../domain/Settings"
 import { formatGridSize, GRID_SIZES, type GridSize } from "../domain/snap"
@@ -140,7 +141,11 @@ export function MenuBar() {
   const canUndo = useEditor((s) => s.past.length > 0 && s.preview === null)
   const canCheck = useEditor((s) => s.update !== null && canCheckForUpdates(s.update))
   const canRedo = useEditor((s) => s.future.length > 0 && s.preview === null)
-  const hasSelection = useEditor((s) => s.selectedIds.length > 0)
+  const selectedIds = useEditor((s) => s.selectedIds)
+  const tree = useEditor((s) => s.doc.structure.tree)
+  const hasSelection = selectedIds.length > 0
+  const canGroup = useMemo(() => canGroupSelection(tree, selectedIds), [tree, selectedIds])
+  const canUngroup = useMemo(() => selectedGroupIds(tree, selectedIds).length > 0, [tree, selectedIds])
   const canPaste = useEditor((s) => s.clipboard !== null)
   const openDialog = useEditor((s) => s.openDialog)
   const viewMenuPanels = useViewMenuPanels()
@@ -205,6 +210,9 @@ export function MenuBar() {
         <CommandItem action="duplicateSelection" disabled={!hasSelection}>Duplicate</CommandItem>
         <CommandItem action="deleteSelection" disabled={!hasSelection}>Delete</CommandItem>
         <CommandItem action="deselect" disabled={!hasSelection}>Deselect</CommandItem>
+        <MenubarSeparator />
+        <CommandItem action="groupSelection" disabled={!canGroup}>Group</CommandItem>
+        <CommandItem action="ungroupSelection" disabled={!canUngroup}>Ungroup</CommandItem>
       </Menu>
       <Menu title="View">
         <CommandItem action="focusSelection" disabled={!hasSelection} inset>Focus selection</CommandItem>

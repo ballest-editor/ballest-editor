@@ -1,0 +1,153 @@
+import { assert, describe, it } from "@effect/vitest"
+import {
+  activeNodeOf,
+  canGroupSelection,
+  clickLevelOf,
+  enteredLevelOf,
+  exactSelectedGroup,
+  groupPathOf,
+  groupSelectionStates,
+  groupTrail,
+  nodeKeys,
+  selectedGroupIds,
+  selectionNodeIds
+} from "./groupSelection"
+import type { TreeNode } from "./MapSidecar"
+
+const item = (key: string): TreeNode => ({ kind: "item", key })
+const group = (id: string, ...children: ReadonlyArray<TreeNode>): TreeNode => ({
+  kind: "group",
+  id,
+  name: id,
+  tags: [],
+  children
+})
+
+/** outer > (inner > (a, b), c); d loose; solo > only > e */
+const tree: ReadonlyArray<TreeNode> = [
+  group("outer", group("inner", item("a"), item("b")), item("c")),
+  item("d"),
+  group("solo", group("only", item("e")))
+]
+
+describe("groupPathOf and nodeKeys", () => {
+  it("gives the groups around a node, outermost first", () => {
+    assert.deepStrictEqual(groupPathOf(tree, "a"), ["outer", "inner"])
+    assert.deepStrictEqual(groupPathOf(tree, "inner"), ["outer"])
+    assert.deepStrictEqual(groupPathOf(tree, "d"), [])
+    assert.deepStrictEqual(groupPathOf(tree, "gone"), [])
+  })
+
+  it("expands a group to every item under it", () => {
+    assert.deepStrictEqual(nodeKeys(tree, "outer"), ["a", "b", "c"])
+    assert.deepStrictEqual(nodeKeys(tree, "d"), ["d"])
+    assert.deepStrictEqual(nodeKeys(tree, "gone"), [])
+  })
+})
+
+describe("clickLevelOf", () => {
+  it("reaches the outermost group with nothing entered", () => {
+    assert.deepStrictEqual(clickLevelOf(tree, "a", null), { nodeId: "outer", enteredGroupId: null })
+    assert.deepStrictEqual(clickLevelOf(tree, "d", null), { nodeId: "d", enteredGroupId: null })
+  })
+
+  it("reaches the children of the entered group", () => {
+    assert.deepStrictEqual(clickLevelOf(tree, "a", "outer"), { nodeId: "inner", enteredGroupId: "outer" })
+    assert.deepStrictEqual(clickLevelOf(tree, "c", "outer"), { nodeId: "c", enteredGroupId: "outer" })
+    assert.deepStrictEqual(clickLevelOf(tree, "a", "inner"), { nodeId: "a", enteredGroupId: "inner" })
+  })
+
+  it("climbs to the nearest parent that holds an item outside the entered group", () => {
+    assert.deepStrictEqual(clickLevelOf(tree, "c", "inner"), { nodeId: "c", enteredGroupId: "outer" })
+    assert.deepStrictEqual(clickLevelOf(tree, "d", "inner"), { nodeId: "d", enteredGroupId: null })
+    assert.deepStrictEqual(clickLevelOf(tree, "e", "inner"), { nodeId: "solo", enteredGroupId: null })
+  })
+})
+
+describe("enteredLevelOf", () => {
+  it("goes one group deeper per double-click, and stops at the item", () => {
+    assert.deepStrictEqual(enteredLevelOf(tree, "a", null), { nodeId: "inner", enteredGroupId: "outer" })
+    assert.deepStrictEqual(enteredLevelOf(tree, "a", "outer"), { nodeId: "a", enteredGroupId: "inner" })
+    assert.strictEqual(enteredLevelOf(tree, "a", "inner"), undefined)
+  })
+
+  it("has nothing to enter on a loose item", () => {
+    assert.strictEqual(enteredLevelOf(tree, "d", null), undefined)
+  })
+})
+
+describe("what a selection makes up", () => {
+  it("keeps whole groups whole, in tree order", () => {
+    assert.deepStrictEqual(selectionNodeIds(tree, ["d", "c", "b", "a"]), ["outer", "d"])
+    assert.deepStrictEqual(selectionNodeIds(tree, ["d", "a"]), ["a", "d"])
+    assert.deepStrictEqual(selectionNodeIds(tree, ["b", "a"]), ["inner"])
+  })
+
+  it("finds the groups Ungroup dissolves", () => {
+    assert.deepStrictEqual(selectedGroupIds(tree, ["a", "b", "d"]), ["inner"])
+    assert.deepStrictEqual(selectedGroupIds(tree, ["a", "d"]), [])
+  })
+
+  it("can group anything but one whole group", () => {
+    assert.isTrue(canGroupSelection(tree, ["d"]))
+    assert.isTrue(canGroupSelection(tree, ["a", "b", "d"]))
+    assert.isFalse(canGroupSelection(tree, ["a", "b"]))
+    assert.isFalse(canGroupSelection(tree, []))
+  })
+})
+
+describe("exactSelectedGroup", () => {
+  const idOf = (keys: ReadonlyArray<string>, entered: string | null = null) =>
+    exactSelectedGroup(tree, keys, entered)?.id
+
+  it("matches a selection of just one group's items, in any order", () => {
+    assert.strictEqual(idOf(["c", "a", "b"]), "outer")
+    assert.strictEqual(idOf(["b", "a"]), "inner")
+  })
+
+  it("doesn't match anything else", () => {
+    assert.strictEqual(idOf(["a"]), undefined)
+    assert.strictEqual(idOf(["a", "b", "d"]), undefined)
+    assert.strictEqual(idOf(["d"]), undefined)
+    assert.strictEqual(idOf([]), undefined)
+  })
+
+  it("takes the outermost of nested groups, inside the entered one", () => {
+    assert.strictEqual(idOf(["e"]), "solo")
+    assert.strictEqual(idOf(["e"], "solo"), "only")
+    assert.strictEqual(idOf(["e"], "only"), undefined)
+  })
+})
+
+describe("groupSelectionStates", () => {
+  it("tells whole groups from partly selected ones", () => {
+    const states = groupSelectionStates(tree, new Set(["a", "b"]))
+    assert.strictEqual(states.get("inner"), "all")
+    assert.strictEqual(states.get("outer"), "some")
+    assert.isFalse(states.has("solo"))
+  })
+})
+
+describe("activeNodeOf", () => {
+  it("is the active item, with the groups to open around it", () => {
+    assert.deepStrictEqual(activeNodeOf(tree, ["d", "a"]), { id: "a", parents: ["outer", "inner"] })
+  })
+
+  it("is the outermost whole group the active item is in", () => {
+    assert.deepStrictEqual(activeNodeOf(tree, ["a", "b", "c"]), { id: "outer", parents: [] })
+    assert.deepStrictEqual(activeNodeOf(tree, ["a", "b"]), { id: "inner", parents: ["outer"] })
+  })
+
+  it("is nothing for an empty selection or a key the tree lacks", () => {
+    assert.strictEqual(activeNodeOf(tree, []), undefined)
+    assert.strictEqual(activeNodeOf(tree, ["gone"]), undefined)
+  })
+})
+
+describe("groupTrail", () => {
+  it("runs from the root to the group", () => {
+    assert.deepStrictEqual(groupTrail(tree, "inner").map((g) => g.id), ["outer", "inner"])
+    assert.deepStrictEqual(groupTrail(tree, null), [])
+    assert.deepStrictEqual(groupTrail(tree, "gone"), [])
+  })
+})

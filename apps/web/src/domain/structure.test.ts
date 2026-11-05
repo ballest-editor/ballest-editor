@@ -19,8 +19,10 @@ import {
   withGroupName,
   withItemName,
   withMovedNode,
+  withMovedNodes,
   withNewItems,
   withoutGroup,
+  withoutGroups,
   withoutKeys,
   withPasted,
   withTags
@@ -47,6 +49,18 @@ describe("keys", () => {
 })
 
 describe("withGroup", () => {
+  it("nests a whole group, and leaves out what is inside a node it has", () => {
+    const start = structure(group("x", item("a"), item("b")), item("c"))
+    const next = withGroup(start, ["x", "a", "c"], "g", "Mine")!
+    assert.deepStrictEqual(next.tree, [{
+      kind: "group",
+      id: "g",
+      name: "Mine",
+      tags: [],
+      children: [group("x", item("a"), item("b")), item("c")]
+    }])
+  })
+
   it("puts the group where the first key's node was", () => {
     const next = withGroup(flatStructure(["a", "b", "c", "d"]), ["c", "b"], "g", "Mine")!
     assert.deepStrictEqual(next.tree, [
@@ -76,8 +90,8 @@ describe("withGroup", () => {
     )
   })
 
-  it("answers undefined when no key is an item", () => {
-    assert.isUndefined(withGroup(structure(group("x", item("a"))), ["x", "nope"], "g"))
+  it("answers undefined when no id is in the tree", () => {
+    assert.isUndefined(withGroup(structure(group("x", item("a"))), ["nope"], "g"))
     assert.isUndefined(withGroup(flatStructure(["a"]), [], "g"))
   })
 })
@@ -261,5 +275,50 @@ describe("withNewItems", () => {
   it("adds items loose at the end of the root", () => {
     const start = structure(group("x", item("a")))
     assert.deepStrictEqual(withNewItems(start, ["b"]).tree, [group("x", item("a")), item("b")])
+  })
+})
+
+describe("withMovedNodes", () => {
+  it("moves several nodes together, in the order given", () => {
+    const next = withMovedNodes(flatStructure(["a", "b", "c", "d"]), ["c", "a"], null, 2)!
+    assert.deepStrictEqual(next.tree, [item("b"), item("d"), item("c"), item("a")])
+  })
+
+  it("takes nodes from different groups, and a group left empty goes", () => {
+    const start = structure(group("x", item("a")), group("y", item("b"), item("c")), group("z", item("d")))
+    const next = withMovedNodes(start, ["a", "b"], "z", 0)!
+    assert.deepStrictEqual(next.tree, [group("y", item("c")), group("z", item("a"), item("b"), item("d"))])
+  })
+
+  it("keeps a move's source group up to date beside the target", () => {
+    const start = structure(group("x", item("a"), item("b")), item("c"))
+    const next = withMovedNodes(start, ["a", "c"], null, 1)!
+    assert.deepStrictEqual(next.tree, [group("x", item("b")), item("a"), item("c")])
+  })
+
+  it("moves a node with its group, not on its own", () => {
+    const start = structure(group("x", item("a")), item("b"))
+    assert.deepStrictEqual(withMovedNodes(start, ["x", "a"], null, 1)!.tree, [item("b"), group("x", item("a"))])
+  })
+
+  it("changes nothing for nodes already there", () => {
+    assert.strictEqual(withMovedNodes(flatStructure(["a", "b", "c"]), ["a", "b"], null, 0), undefined)
+    assert.strictEqual(withMovedNodes(flatStructure(["a"]), ["gone"], null, 0), undefined)
+  })
+
+  it("won't put a group inside one of the nodes on the move", () => {
+    const start = structure(group("x", group("y", item("a"))), item("b"))
+    assert.strictEqual(withMovedNodes(start, ["x", "b"], "y", 0), undefined)
+  })
+})
+
+describe("withoutGroups", () => {
+  it("dissolves several groups at once, nested ones too", () => {
+    const start = structure(group("x", group("y", item("a"))), group("z", item("b")), item("c"))
+    assert.deepStrictEqual(withoutGroups(start, ["x", "y", "z"])!.tree, [item("a"), item("b"), item("c")])
+  })
+
+  it("changes nothing without a group to dissolve", () => {
+    assert.strictEqual(withoutGroups(flatStructure(["a"]), ["a", "gone"]), undefined)
   })
 })
