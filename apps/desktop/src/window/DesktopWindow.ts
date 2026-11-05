@@ -118,7 +118,8 @@ export class DesktopWindow extends Context.Service<DesktopWindow, {
           window.show()
         })
 
-        // The app never opens a second window or navigates away from itself: links go to the browser.
+        // A window never opens another in this process (a new window is a new copy, WindowLauncher) or navigates away from
+        // itself: links go to the browser.
         const runFork = Effect.runForkWith(yield* Effect.context())
         window.webContents.setWindowOpenHandler(({ url: target }) => {
           runFork(shell.openExternal(target))

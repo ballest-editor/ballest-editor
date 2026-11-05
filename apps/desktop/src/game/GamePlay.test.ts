@@ -8,6 +8,7 @@ import { ElectronWindow } from "../electron/ElectronWindow"
 import { sha256 } from "../project/files"
 import { layerProjectsAt } from "../project/layers"
 import { MapFiles } from "../project/MapFiles"
+import { WindowRegistry } from "../project/WindowRegistry"
 import { DesktopSettings } from "../settings/DesktopSettings"
 import { layerFakeGamePaths, makeFakePluginBundle, runScoped, tempFakeSteam } from "./fakeSteam"
 import { GameLink, PlayFile } from "./GameLink"
@@ -39,6 +40,7 @@ const setup = Effect.gen(function*() {
     layerProjectsAt(dir, "linux", path.join(dir, "userData", "backups"))
   ).pipe(
     Layer.provideMerge(layerFakeGamePaths(steam.host, settings)),
+    Layer.provideMerge(Layer.effect(WindowRegistry, WindowRegistry.make(path.join(dir, "windows"), 1, () => true))),
     Layer.provideMerge(Layer.effect(DesktopSettings, DesktopSettings.make(settings)))
   )
   const fakes = Layer.mergeAll(

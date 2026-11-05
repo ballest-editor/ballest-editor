@@ -9,18 +9,21 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import { useState } from "react"
+import { type ReactNode, useState } from "react"
 import { pathInFolder } from "../domain/paths"
 import { isProjectName } from "../domain/project"
-import { createProject } from "../editor/actions"
+import { newProject } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { PathText } from "./PathText"
 
 /**
- * File › New project… (desktop): the folder's name is all it asks. The project is made under `projectsFolder`
- * (`Documents/Ballest Editor`) and becomes the one in use; Open project… is the way to use a folder elsewhere.
+ * The name a new project goes by, and where that puts it under `projectsFolder` (`Documents/Ballest Editor`).
+ * `onCreate` hears a usable name; `actions` holds what sits beside Create.
  */
-export function NewProjectDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
+export function NewProjectForm({ actions, onCreate }: {
+  readonly actions: ReactNode
+  readonly onCreate: (name: string) => void
+}) {
   const projectsFolder = useEditor((s) => s.project?.projectsFolder ?? "")
   const recent = useEditor((s) => s.project)
   const [name, setName] = useState("")
@@ -28,48 +31,57 @@ export function NewProjectDialog({ open, onClose }: { readonly open: boolean; re
   const valid = isProjectName(trimmed)
   const taken = recent !== null &&
     [recent.current, ...recent.recent].some((p) => p !== null && p.name.toLowerCase() === trimmed.toLowerCase())
-  const submit = async () => {
-    await createProject(trimmed)
-    setName("")
-    onClose()
-  }
+  return (
+    <form
+      className="contents"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (valid && !taken) onCreate(trimmed)
+      }}
+    >
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="new-project-name">Name</Label>
+        <Input
+          id="new-project-name"
+          autoFocus
+          value={name}
+          placeholder="Season 3 tracks"
+          aria-invalid={trimmed !== "" && (!valid || taken)}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <div className="text-xs text-muted-foreground">
+          {taken
+            ? "A recent project has that name already."
+            : trimmed !== "" && !valid
+            ? "Letters, digits, spaces, - and _ only."
+            : <PathText block>{trimmed === "" ? projectsFolder : pathInFolder(projectsFolder, trimmed)}</PathText>}
+        </div>
+      </div>
+      <DialogFooter>
+        {actions}
+        <Button type="submit" disabled={!valid || taken}>Create</Button>
+      </DialogFooter>
+    </form>
+  )
+}
+
+/**
+ * File › New project… (desktop): the folder's name is all it asks, and where it opens comes next (`newProject`). The
+ * dialog stays up until that's settled, so a name main refuses can be changed. Open project… is the way to use a folder
+ * elsewhere.
+ */
+export function NewProjectDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="sm:max-w-md">
-        <form
-          className="contents"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (valid && !taken) void submit()
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>New project</DialogTitle>
-            <DialogDescription>A folder of maps, exported to the game one by one.</DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="new-project-name">Name</Label>
-            <Input
-              id="new-project-name"
-              autoFocus
-              value={name}
-              placeholder="Season 3 tracks"
-              aria-invalid={trimmed !== "" && (!valid || taken)}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <div className="text-xs text-muted-foreground">
-              {taken
-                ? "A recent project has that name already."
-                : trimmed !== "" && !valid
-                ? "Letters, digits, spaces, - and _ only."
-                : <PathText block>{trimmed === "" ? projectsFolder : pathInFolder(projectsFolder, trimmed)}</PathText>}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={!valid || taken}>Create</Button>
-          </DialogFooter>
-        </form>
+        <DialogHeader>
+          <DialogTitle>New project</DialogTitle>
+          <DialogDescription>A folder of maps, exported to the game one by one.</DialogDescription>
+        </DialogHeader>
+        <NewProjectForm
+          actions={<Button type="button" variant="outline" onClick={onClose}>Cancel</Button>}
+          onCreate={(name) => void newProject(name)}
+        />
       </DialogContent>
     </Dialog>
   )

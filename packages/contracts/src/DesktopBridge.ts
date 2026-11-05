@@ -100,12 +100,28 @@ export const ProjectState = Schema.Struct({
   /** The map last open in the current project (its file name), for the next launch to open again; null when none was. */
   lastOpenMap: Schema.NullOr(MapFileName),
   /** Where New project makes its folders: `Documents/Ballest Editor`. */
-  projectsFolder: FilePath
+  projectsFolder: FilePath,
+  /**
+   * This window must pick a project before anything else (docs/DESKTOP.md § Other windows): `current` is null, but the
+   * window isn't Untitled Project, and it can't become one.
+   */
+  chooserRequired: Schema.Boolean,
+  /** The folders in `recent` that another running window has open. */
+  openElsewhere: Schema.Array(FilePath),
+  /** Why the `--project` this window was started with was refused; null when it wasn't. */
+  startRefused: Schema.NullOr(Schema.String)
 })
 export type ProjectState = typeof ProjectState.Type
 
-/** `chooseProject`'s result: null when the user cancelled the dialog. */
-export const ChooseProjectResult = Schema.NullOr(ProjectState)
+/** `chooseProject`'s result: the folder picked, which nothing uses yet; null when the user cancelled the dialog. */
+export const ChooseProjectResult = Schema.NullOr(ProjectInfo)
+
+/** A project about to be opened: a folder main already knows (recent, or picked in a dialog), or a new one by name. */
+export const ProjectTarget = Schema.TaggedUnion({
+  Existing: { path: FilePath },
+  New: { name: Schema.String }
+})
+export type ProjectTarget = typeof ProjectTarget.Type
 
 export const ProjectPathPayload = Schema.Struct({ path: FilePath })
 export type ProjectPathPayload = typeof ProjectPathPayload.Type
@@ -578,9 +594,16 @@ export const DesktopMethods = {
   ping: { payload: PingPayload, result: PingResult },
   /** The project in use and the recent ones. */
   projectState: { payload: noPayload, result: ProjectState },
-  /** A folder dialog, then uses the chosen folder as the project; null when cancelled. The game's maps folder is refused. */
+  /**
+   * A folder dialog: the folder picked, ready for `switchProject` or `openProjectWindow`; null when cancelled. Nothing
+   * uses it yet. The game's maps folder and a project open in another window are refused.
+   */
   chooseProject: { payload: noPayload, result: ChooseProjectResult },
-  /** Goes back to a recent project. */
+  /** Refuses what `switchProject`, `createProject` or `openProjectWindow` would, changing nothing: asked before asking the user. */
+  checkProject: { payload: ProjectTarget, result: Schema.Void },
+  /** Starts another running copy of the app on the project (a new one is made first); this window stays as it is. */
+  openProjectWindow: { payload: ProjectTarget, result: Schema.Void },
+  /** Uses a recent project, or the folder `chooseProject` picked; refused while another window has it open. */
   switchProject: { payload: ProjectPathPayload, result: ProjectState },
   /** Makes `<projectsFolder>/<name>` a project and uses it; refused when that folder already holds one. */
   createProject: { payload: CreateProjectPayload, result: ProjectState },

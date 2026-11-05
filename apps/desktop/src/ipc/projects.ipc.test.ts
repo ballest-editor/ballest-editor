@@ -26,7 +26,10 @@ describe("Projects over IPC", () => {
               current: null,
               recent: [],
               lastOpenMap: null,
-              projectsFolder: path.dirname(project)
+              projectsFolder: path.dirname(project),
+              chooserRequired: false,
+              openElsewhere: [],
+              startRefused: null
             })
             assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.listMaps), [])
             assert.isFalse(yield* fake.invoke(InvokeChannels.revealProject, { which: "maps" }))
@@ -41,7 +44,10 @@ describe("Projects over IPC", () => {
               current: { path: project, name: "My maps", exists: true },
               recent: [],
               lastOpenMap: null,
-              projectsFolder: path.dirname(project)
+              projectsFolder: path.dirname(project),
+              chooserRequired: false,
+              openElsewhere: [],
+              startRefused: null
             })
             assert.isTrue(yield* fake.invoke(InvokeChannels.revealProject, { which: "maps" }))
             assert.isTrue(yield* fake.invoke(InvokeChannels.revealProject, { which: "project" }))
@@ -76,6 +82,74 @@ describe("Projects over IPC", () => {
       )
   )
 
+  it.effect("refuses a project open in another window, by every way in, with the reason", () =>
+    withHandlers(({ dialogs, dir, fake, launcher, otherWindow, project }) =>
+      Effect.gen(function*() {
+        const path = yield* Path.Path
+        const other = path.join(dir, "Elsewhere")
+        dialogs.answers.push(other)
+        yield* fake.invoke(InvokeChannels.chooseProject)
+        yield* fake.invoke(InvokeChannels.switchProject, { path: other })
+        yield* fake.invoke(InvokeChannels.switchProject, { path: project })
+        yield* otherWindow(other)
+
+        const reason = /is open in another window/
+        const refused = (channel: string, payload?: unknown) =>
+          Effect.flip(fake.invoke(channel, payload)).pipe(Effect.map((error) => String(error.cause)))
+        const target = { _tag: "Existing", path: other }
+        assert.match(yield* refused(InvokeChannels.switchProject, { path: other }), reason)
+        assert.match(yield* refused(InvokeChannels.checkProject, target), reason)
+        assert.match(yield* refused(InvokeChannels.openProjectWindow, target), reason)
+        dialogs.answers.push(other)
+        assert.match(yield* refused(InvokeChannels.chooseProject), reason)
+
+        const state = yield* fake.invokeAs(ProjectState, InvokeChannels.projectState)
+        assert.strictEqual(state.current?.path, project)
+        assert.deepStrictEqual(state.openElsewhere, [other])
+        assert.deepStrictEqual(launcher.started, [])
+      })
+    ))
+
+  it.effect("New window starts a copy on the project, makes a new one first, and changes nothing here", () =>
+    withHandlers(({ fake, launcher, project }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const season = path.join(path.dirname(project), "Season 3")
+
+        yield* fake.invoke(InvokeChannels.checkProject, { _tag: "New", name: "Season 3" })
+        assert.isFalse(yield* fs.exists(season))
+
+        yield* fake.invoke(InvokeChannels.openProjectWindow, { _tag: "New", name: "Season 3" })
+        assert.deepStrictEqual(launcher.started, [season])
+        assert.isTrue(yield* fs.exists(path.join(season, "ballest-project.json")))
+        assert.strictEqual((yield* fake.invokeAs(ProjectState, InvokeChannels.projectState)).current?.path, project)
+      })
+    ))
+
+  it.effect("a window that can't be started is an error the page can show", () =>
+    withHandlers(({ dialogs, dir, fake, launcher }) =>
+      Effect.gen(function*() {
+        const other = (yield* Path.Path).join(dir, "Elsewhere")
+        dialogs.answers.push(other)
+        yield* fake.invoke(InvokeChannels.chooseProject)
+        launcher.failing.now = true
+        const error = yield* Effect.flip(
+          fake.invoke(InvokeChannels.openProjectWindow, { _tag: "Existing", path: other })
+        )
+        assert.match(String(error.cause), /Couldn't start a new window for .*Elsewhere/)
+      })
+    ))
+
+  it.effect("the payload of a project target is decoded before a handler runs", () =>
+    withHandlers(({ fake, launcher }) =>
+      Effect.gen(function*() {
+        const error = yield* Effect.flip(fake.invoke(InvokeChannels.openProjectWindow, { _tag: "Existing", path: 3 }))
+        assert.isDefined(error)
+        assert.deepStrictEqual(launcher.started, [])
+      })
+    ))
+
   it.effect(
     "chooses another project folder, refuses the game's maps folder and switches back",
     () =>
@@ -98,15 +172,17 @@ describe("Projects over IPC", () => {
               assert.match(String(error.cause), /game's maps folder or inside it/)
             }
 
+            // The dialog only picks: the page then says where the folder opens.
             dialogs.answers.push(other)
             const chosen = yield* fake.invoke(InvokeChannels.chooseProject)
-            assert.deepStrictEqual(chosen, {
+            assert.deepStrictEqual(chosen, { path: other, name: "Elsewhere", exists: false })
+            assert.strictEqual((yield* fake.invokeAs(ProjectState, InvokeChannels.projectState)).current?.path, project)
+            const used = yield* fake.invokeAs(ProjectState, InvokeChannels.switchProject, { path: other })
+            assert.deepInclude(used, {
               current: { path: other, name: "Elsewhere", exists: false },
-              recent: [{ path: project, name: "My maps", exists: true }],
-              lastOpenMap: null,
-              projectsFolder: path.dirname(project)
+              recent: [{ path: project, name: "My maps", exists: true }]
             })
-            // Only a recent project can be switched to by path.
+            // Only a recent project or a picked folder can be switched to by path.
             const error = yield* Effect.flip(
               fake.invoke(InvokeChannels.switchProject, { path: path.join(dir, "Random") })
             )

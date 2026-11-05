@@ -19,8 +19,10 @@ import { GameProcess } from "../game/GameProcess"
 import { SteamLibrary } from "../game/SteamLibrary"
 import { NotificationLog } from "../notifications/NotificationLog"
 import { layerProjectsAt } from "../project/layers"
+import { type WindowEntry, WindowRegistry } from "../project/WindowRegistry"
 import { DesktopSettings, DesktopSettingsFile } from "../settings/DesktopSettings"
 import { DesktopUpdates } from "../updates/DesktopUpdates"
+import { WindowLauncher, WindowLaunchError } from "../window/WindowLauncher"
 import { DesktopIpc, type DesktopIpcHandleListener, type DesktopIpcMain } from "./DesktopIpc"
 import { installDesktopIpcHandlers } from "./DesktopIpcHandlers"
 
@@ -141,6 +143,24 @@ const updatesLayer = Layer.succeed(
   })
 )
 
+/** Stands in for starting a copy of the app: records each project, and fails while `failing.now` is set. */
+const fakeLauncher = () => {
+  const started: Array<string> = []
+  const failing = { now: false }
+  const layer = Layer.succeed(
+    WindowLauncher,
+    WindowLauncher.of({
+      open: (folder) =>
+        failing.now
+          ? Effect.fail(new WindowLaunchError({ project: folder, cause: new Error("spawn ENOENT") }))
+          : Effect.sync(() => void started.push(folder))
+    })
+  )
+  return { started, failing, layer }
+}
+
+const TEST_PID = 1000
+
 /** Every service the handlers need, over a temp folder; runs `body` with the handlers installed. */
 export const withHandlers = <A, E>(
   body: (env: {
@@ -150,6 +170,9 @@ export const withHandlers = <A, E>(
     /** The first project, `Documents/Ballest Editor/My maps` in the temp folder, once `createProject` made it. */
     readonly project: string
     readonly steam: Effect.Success<ReturnType<typeof makeFakeSteam>>
+    readonly launcher: ReturnType<typeof fakeLauncher>
+    /** Says, as a running copy would, that another window (a new one each time) has `project` open; null: Untitled Project. */
+    readonly otherWindow: (project: string | null) => Effect.Effect<void>
   }) => Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>,
   machine: Parameters<typeof makeFakeSteam>[1] = { game: "steam", ran: true },
   /** `current`: `project` is the project in use already (remembered in the settings, not yet on disk); `none`: Untitled Project. */
@@ -168,6 +191,17 @@ export const withHandlers = <A, E>(
     }
     const fake = fakeIpcMain()
     const dialogs = fakeDialogs()
+    const launcher = fakeLauncher()
+    const windowsDir = path.join(dir, "userData", "windows")
+    const registry = Layer.effect(WindowRegistry, WindowRegistry.make(windowsDir, TEST_PID, () => true))
+    let nextPid = TEST_PID
+    const otherWindow = (folder: string | null) => {
+      const entry: WindowEntry = { pid: ++nextPid, project: folder, choosing: false }
+      return fs.makeDirectory(windowsDir, { recursive: true }).pipe(
+        Effect.andThen(fs.writeFileString(path.join(windowsDir, `${entry.pid}.json`), JSON.stringify(entry))),
+        Effect.orDie
+      )
+    }
     const steam = yield* makeFakeSteam(path.join(dir, "machine"), machine)
     const bundle = yield* makeFakePluginBundle(dir, "0.2.0")
     const game = Layer.mergeAll(GameCreator.layer, Layer.effect(GameLink, GameLink.make(bundle))).pipe(
@@ -176,7 +210,8 @@ export const withHandlers = <A, E>(
       Layer.provide(Layer.succeed(GameHost, GameHost.of(steam.host)))
     )
     const projects = layerProjectsAt(path.dirname(project), "linux", path.join(dir, "userData", "backups")).pipe(
-      Layer.provideMerge(game)
+      Layer.provideMerge(game),
+      Layer.provideMerge(registry)
     )
     const services = Layer.effect(GamePlay, GamePlay.make).pipe(
       Layer.provideMerge(projects),
@@ -187,6 +222,7 @@ export const withHandlers = <A, E>(
         shellLayer,
         windowLayer,
         updatesLayer,
+        launcher.layer,
         Layer.effect(NotificationLog, NotificationLog.make(path.join(dir, "notifications.json"))),
         DesktopIpc.layer(fake.ipcMain)
       ))
@@ -194,7 +230,7 @@ export const withHandlers = <A, E>(
     yield* Effect.scoped(
       Effect.gen(function*() {
         yield* installDesktopIpcHandlers()
-        yield* body({ fake, dialogs, dir, project, steam })
+        yield* body({ fake, dialogs, dir, project, steam, launcher, otherWindow })
       })
     ).pipe(Effect.provide(services))
     return fake

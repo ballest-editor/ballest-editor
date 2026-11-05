@@ -1,5 +1,6 @@
 import { Config, Context, Effect, Layer, Option, Path } from "effect"
 import { ElectronApp } from "../electron/ElectronApp"
+import { parseProjectArg } from "../window/launchArgs"
 
 /** Where things are, decided once at startup. Everything else asks this service instead of Electron or `process`. */
 export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
@@ -16,6 +17,10 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
   readonly exportBackupsDir: string
   /** `userData/notifications.json`: the bell's last notifications. */
   readonly notificationsPath: string
+  /** `userData/windows`: one file per running copy, saying what it has open (project/WindowRegistry.ts). */
+  readonly windowsDir: string
+  /** The `--project` this copy was started with, as given: what New window asks for (window/launchArgs.ts). */
+  readonly launchProject: Option.Option<string>
   /** `Documents/Ballest Editor`: where New project and the first Save make project folders (docs/PROJECTS.md). */
   readonly projectsDir: string
   readonly preloadPath: string
@@ -49,6 +54,8 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
           settingsPath: path.join(metadata.userData, "desktop-settings.json"),
           exportBackupsDir: path.join(metadata.userData, "backups"),
           notificationsPath: path.join(metadata.userData, "notifications.json"),
+          windowsDir: path.join(metadata.userData, "windows"),
+          launchProject: parseProjectArg(process.argv),
           projectsDir: path.join(metadata.documents, "Ballest Editor"),
           preloadPath: path.join(dirname, "preload.cjs"),
           iconPath: path.join(dirname, "icon.png"),

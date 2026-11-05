@@ -17,7 +17,7 @@ import {
 import { placeDistanceFor, placementPoint } from "../domain/placement"
 import { editorVerticalFov } from "../domain/Settings"
 import { sceneRegistry } from "./sceneRegistry"
-import { useEditor } from "./store"
+import { isModalOpen, useEditor } from "./store"
 
 const FAST_MULTIPLIER = 4
 const LOOK_SENSITIVITY = 0.0025 // radians per pixel at sensitivity 1
@@ -35,7 +35,7 @@ export const isTypingTarget = (target: EventTarget | null): boolean =>
  */
 export const isEditorKeyEvent = (e: KeyboardEvent): boolean =>
   !isTypingTarget(e.target) &&
-  useEditor.getState().dialog === null &&
+  !isModalOpen(useEditor.getState()) &&
   !(e.target instanceof Element && e.target.closest("[role=dialog], [role=menu], [role=menubar]") !== null)
 
 type DragMode = "look" | "orbit" | "pan"

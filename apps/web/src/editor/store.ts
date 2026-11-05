@@ -51,7 +51,8 @@ import type {
   PlatformCapabilities,
   PluginStatus,
   ProjectMap,
-  ProjectState
+  ProjectState,
+  ProjectTarget
 } from "../services/Platform"
 
 import type { GizmoSpace } from "./gizmo/handles"
@@ -154,6 +155,7 @@ export interface ImportClash {
  * - `settings` opens on `category`, or on the page it last showed (`settingsCategory`).
  * - `projectSettings` opens Project settings on the project's page, `mapSettings` on the open map's entry in it.
  * - `replacePublished`, `overwriteChanged` and `importClash` ask about what Export, Play or Import found.
+ * - `whereToOpen` asks whether `target` (shown as `name`) takes over this window or opens in a new one.
  */
 export type DialogState =
   | {
@@ -173,6 +175,7 @@ export type DialogState =
   | { readonly id: "replacePublished" } & PublishedDraft
   | { readonly id: "overwriteChanged" } & ChangedExport
   | { readonly id: "importClash" } & ImportClash
+  | { readonly id: "whereToOpen"; readonly target: ProjectTarget; readonly name: string }
 export type Dialog = DialogState["id"]
 
 /** What `notify` records besides the level and title (docs/PROJECTS.md § Shell). */
@@ -901,11 +904,14 @@ export const useEditor = create<EditorState>()((set, get) => {
     setTool: (tool) => set({ tool }),
     toggleGizmoSpace: () => set((s) => ({ gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
     setLeftTab: (leftTab) => set({ leftTab }),
+    // The required chooser stays on top of everything: what would open behind it (the Game link's) waits for a launch.
     openDialog: (dialog) =>
-      set((s) => ({
-        dialog,
-        settingsCategory: dialog.id === "settings" ? dialog.category ?? s.settingsCategory : s.settingsCategory
-      })),
+      set((s) =>
+        isChooserRequired(s) ? s : ({
+          dialog,
+          settingsCategory: dialog.id === "settings" ? dialog.category ?? s.settingsCategory : s.settingsCategory
+        })
+      ),
     // Drops the payload with the dialog: the saveAs dialog takes its `afterSave` before it closes itself to save.
     closeDialog: () => set({ dialog: null }),
     setCheatSheet: (cheatSheet) => set({ cheatSheet }),
@@ -984,6 +990,20 @@ export const tabsWithoutFile = (s: EditorState): ReadonlyArray<string> =>
  */
 export const isBlankTab = (tab: TabState): boolean =>
   tab.fresh && tab.file === null && !tab.dirty && tab.past.length === 0
+
+/** Whether this window must pick a project before anything else (docs/DESKTOP.md § Other windows). */
+export const isChooserRequired = (s: Pick<EditorState, "project">): boolean => s.project?.chooserRequired === true
+
+/** Whether a modal is up, so the editor's keys are off. */
+export const isModalOpen = (s: Pick<EditorState, "dialog" | "project">): boolean =>
+  s.dialog !== null || isChooserRequired(s)
+
+/**
+ * Whether opening a project would take anything over here, so it asks where it opens. Untitled Project with only its
+ * untouched map has nothing to lose, and neither has the required chooser, whose pick is always this window.
+ */
+export const hasWindowToTakeOver = (s: EditorState): boolean =>
+  !isChooserRequired(s) && (s.project?.current != null || s.tabIds.length > 1 || !isBlankTab(s))
 
 /** A map's name as its tab and the title bar show it: its file's, else the name inside it. */
 export const tabLabelOf = (tab: TabState): string =>
