@@ -31,6 +31,7 @@ import {
 } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { useEditor, useOpenProjectMap } from "../editor/store"
+import { openSettings, resetDockLayout, togglePanel, usePanelOpen, useViewMenuPanels } from "./dock/dockControl"
 
 /** The action's primary binding, as the menu shows it (nothing when unbound). */
 function Shortcut({ action }: { readonly action: KeybindAction }) {
@@ -113,6 +114,15 @@ function RecentProjectsMenu() {
   )
 }
 
+function PanelItem({ id, title }: { readonly id: string; readonly title: string }) {
+  const open = usePanelOpen(id)
+  return (
+    <MenubarCheckboxItem closeOnClick checked={open} onCheckedChange={() => togglePanel(id)}>
+      {title}
+    </MenubarCheckboxItem>
+  )
+}
+
 const THEMES: ReadonlyArray<{ readonly theme: Settings["appearance"]["theme"]; readonly label: string }> = [
   { theme: "dark", label: "Dark" },
   { theme: "light", label: "Light" },
@@ -133,7 +143,7 @@ export function MenuBar() {
   const hasSelection = useEditor((s) => s.selectedIds.length > 0)
   const canPaste = useEditor((s) => s.clipboard !== null)
   const openDialog = useEditor((s) => s.openDialog)
-  const setLeftTab = useEditor((s) => s.setLeftTab)
+  const viewMenuPanels = useViewMenuPanels()
   const { snapping, appearance, lighting, general } = useEditor((s) => s.settings)
   const { projects, exportToGame: canExport, launchGame: canLaunchGame, play: canPlay } = useEditor((s) =>
     s.capabilities
@@ -167,7 +177,7 @@ export function MenuBar() {
             <CommandItem action="saveMap">Save</CommandItem>
             <CommandItem action="closeTab">Close tab</CommandItem>
             <MenubarSeparator />
-            <MenubarItem onClick={() => openDialog({ id: "settings" })}>Settings…</MenubarItem>
+            <MenubarItem onClick={() => openSettings()}>Settings…</MenubarItem>
             <MenubarItem onClick={() => openDialog({ id: "gameLink" })}>Game link…</MenubarItem>
             <MenubarItem disabled={!canCheck} onClick={() => void checkForUpdates()}>Check for updates</MenubarItem>
             <MenubarItem onClick={() => void quitApp()}>Quit</MenubarItem>
@@ -182,7 +192,7 @@ export function MenuBar() {
             <CommandItem action="saveMapAs">Export…</CommandItem>
             <CommandItem action="closeTab">Close tab</CommandItem>
             <MenubarSeparator />
-            <MenubarItem onClick={() => openDialog({ id: "settings" })}>Settings…</MenubarItem>
+            <MenubarItem onClick={() => openSettings()}>Settings…</MenubarItem>
           </Menu>
         )}
       <Menu title="Edit">
@@ -199,8 +209,8 @@ export function MenuBar() {
       <Menu title="View">
         <CommandItem action="focusSelection" disabled={!hasSelection} inset>Focus selection</CommandItem>
         <MenubarSeparator />
-        <MenubarItem inset onClick={() => setLeftTab("pieces")}>Pieces</MenubarItem>
-        <MenubarItem inset onClick={() => setLeftTab("project")}>Project</MenubarItem>
+        {viewMenuPanels.map(({ id, title }) => <PanelItem key={id} id={id} title={title} />)}
+        <MenubarItem inset onClick={resetDockLayout}>Reset layout</MenubarItem>
         <MenubarSeparator />
         <MenubarCheckboxItem
           closeOnClick

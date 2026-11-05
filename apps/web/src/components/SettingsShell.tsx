@@ -150,26 +150,28 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
   )
 }
 
-/**
- * Desktop-style settings: category nav with search on the left, the category's rows on the
- * right, a footer with an optional "reset category" and Done. Changes apply as they are made.
- */
-export function SettingsShell<C extends string>(props: {
-  readonly open: boolean
-  readonly onClose: () => void
-  /** The dialog's name, the first breadcrumb ("Settings", "Project settings"). */
+interface SettingsContentProps<C extends string> {
+  /** The settings' name, the first breadcrumb ("Settings", "Project settings"). */
   readonly title: string
-  /** For screen readers: what these settings are. */
-  readonly description: string
   readonly categories: ReadonlyArray<SettingsCategoryInfo<C>>
   readonly category: C
   readonly onCategoryChange: (category: C) => void
   readonly rows: ReadonlyArray<SettingsRow<C>>
   /** Resets the shown category; without it the footer has no reset button. */
   readonly onResetCategory?: (category: C) => void
-  /** Keeps the dialog open and Done disabled (e.g. while a keybind is being captured). */
-  readonly busy?: boolean
-}) {
+}
+
+/** Category nav with search on the left, the category's rows on the right. Changes apply as they are made. */
+function SettingsContent<C extends string>(
+  props: SettingsContentProps<C> & {
+    /** `title`, as the first breadcrumb: a dialog names itself with it. */
+    readonly heading: ReactNode
+    /** Under the breadcrumbs, for screen readers. */
+    readonly description?: ReactNode
+    /** What the footer holds on its right (the dialog's Done). */
+    readonly footerEnd?: ReactNode
+  }
+) {
   const [query, setQuery] = useState("")
   /** While searching, a category narrows the results; null shows every match. */
   const [scope, setScope] = useState<C | null>(null)
@@ -207,133 +209,166 @@ export function SettingsShell<C extends string>(props: {
   const { onResetCategory } = props
 
   return (
-    <Dialog open={props.open} onOpenChange={(next) => !next && props.busy !== true && props.onClose()}>
+    <>
+      <nav className="flex w-56 shrink-0 flex-col border-r bg-muted/30 p-3">
+        <div className="relative mb-2">
+          <IconSearch className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-7"
+            placeholder="Search settings"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setScope(null)
+            }}
+            aria-label="Search settings"
+          />
+        </div>
+        {/* the search stays put; the categories scroll when there are more than fit (a project with many maps) */}
+        <ScrollArea className="-mx-3 min-h-0 flex-1">
+          <div className="flex flex-col gap-1 px-3 pb-px">
+            {searching && (
+              <Button
+                variant={scope === null ? "secondary" : "ghost"}
+                className="justify-between"
+                onClick={() => setScope(null)}
+              >
+                <span>All results</span>
+                <span className="text-[0.65rem] text-muted-foreground tabular-nums">{matched.length}</span>
+              </Button>
+            )}
+            {props.categories.map(({ id, label, icon: CategoryIcon, section }, i) => {
+              const hits = hitsPerCategory.get(id) ?? 0
+              const active = searching ? scope === id : props.category === id
+              const heading = section !== undefined && section !== props.categories[i - 1]?.section
+              return (
+                <Fragment key={id}>
+                  {heading && (
+                    <div className="mt-2 px-2 pb-0.5 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
+                      {section}
+                    </div>
+                  )}
+                  <Button
+                    variant={active ? "secondary" : "ghost"}
+                    className={cn("justify-start", searching && hits === 0 && "text-muted-foreground/50")}
+                    disabled={searching && hits === 0}
+                    onClick={() => {
+                      if (searching) setScope(id)
+                      else props.onCategoryChange(id)
+                    }}
+                    data-category={id}
+                  >
+                    <CategoryIcon />
+                    <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+                    {searching
+                      ? hits > 0 && (
+                        <span className="rounded-full bg-primary/15 px-1.5 text-[0.65rem] text-primary tabular-nums">
+                          {hits}
+                        </span>
+                      )
+                      : modifiedIn(id) && (
+                        <span className="size-1.5 rounded-full bg-primary" aria-label="Has changed settings" />
+                      )}
+                  </Button>
+                </Fragment>
+              )
+            })}
+          </div>
+        </ScrollArea>
+      </nav>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="border-b px-5 py-3">
+          <Breadcrumb>
+            <BreadcrumbList className="text-sm">
+              <BreadcrumbItem>
+                {props.heading}
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              {searching && (
+                <>
+                  <BreadcrumbItem>Search</BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                </>
+              )}
+              <BreadcrumbItem className="min-w-0">
+                <BreadcrumbPage className="truncate font-medium">
+                  {searching ? `“${query.trim()}”` : labelOf(props.category)}
+                </BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          {props.description}
+        </div>
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="flex flex-col gap-5 px-5 py-3">
+            {groups.map((group) => (
+              <section key={group.key} className="flex flex-col">
+                {group.title !== undefined && group.title !== "" && (
+                  <h3 className="mb-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
+                    {group.title}
+                  </h3>
+                )}
+                <div className="flex flex-col divide-y divide-border/50">
+                  {group.rows.map((row) => <RowView key={row.id} row={row} />)}
+                </div>
+              </section>
+            ))}
+            {groups.length === 0 && <p className="text-xs text-muted-foreground">No settings match.</p>}
+          </div>
+        </ScrollArea>
+        <div
+          className={cn(
+            "flex border-t px-5 py-3 empty:hidden",
+            onResetCategory === undefined ? "justify-end" : "justify-between"
+          )}
+        >
+          {onResetCategory !== undefined && (
+            <Button
+              variant="outline"
+              onClick={() => onResetCategory(props.category)}
+              disabled={searching || !modifiedIn(props.category)}
+            >
+              Reset {labelOf(props.category).toLowerCase()} to defaults
+            </Button>
+          )}
+          {props.footerEnd}
+        </div>
+      </div>
+    </>
+  )
+}
+
+/** Settings in a dialog (Project settings), with a Done button. */
+export function SettingsShell<C extends string>(
+  { open, onClose, description, ...content }: SettingsContentProps<C> & {
+    readonly open: boolean
+    readonly onClose: () => void
+    /** For screen readers: what these settings are. */
+    readonly description: string
+  }
+) {
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
         className="flex h-[min(80vh,720px)] w-full gap-0 overflow-hidden p-0 sm:max-w-4xl"
         showCloseButton
       >
-        <nav className="flex w-56 shrink-0 flex-col border-r bg-muted/30 p-3">
-          <div className="relative mb-2">
-            <IconSearch className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-7"
-              placeholder="Search settings"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value)
-                setScope(null)
-              }}
-              aria-label="Search settings"
-            />
-          </div>
-          {/* the search stays put; the categories scroll when there are more than fit (a project with many maps) */}
-          <ScrollArea className="-mx-3 min-h-0 flex-1">
-            <div className="flex flex-col gap-1 px-3 pb-px">
-              {searching && (
-                <Button
-                  variant={scope === null ? "secondary" : "ghost"}
-                  className="justify-between"
-                  onClick={() => setScope(null)}
-                >
-                  <span>All results</span>
-                  <span className="text-[0.65rem] text-muted-foreground tabular-nums">{matched.length}</span>
-                </Button>
-              )}
-              {props.categories.map(({ id, label, icon: CategoryIcon, section }, i) => {
-                const hits = hitsPerCategory.get(id) ?? 0
-                const active = searching ? scope === id : props.category === id
-                const heading = section !== undefined && section !== props.categories[i - 1]?.section
-                return (
-                  <Fragment key={id}>
-                    {heading && (
-                      <div className="mt-2 px-2 pb-0.5 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
-                        {section}
-                      </div>
-                    )}
-                    <Button
-                      variant={active ? "secondary" : "ghost"}
-                      className={cn("justify-start", searching && hits === 0 && "text-muted-foreground/50")}
-                      disabled={searching && hits === 0}
-                      onClick={() => {
-                        if (searching) setScope(id)
-                        else props.onCategoryChange(id)
-                      }}
-                      data-category={id}
-                    >
-                      <CategoryIcon />
-                      <span className="min-w-0 flex-1 truncate text-left">{label}</span>
-                      {searching
-                        ? hits > 0 && (
-                          <span className="rounded-full bg-primary/15 px-1.5 text-[0.65rem] text-primary tabular-nums">
-                            {hits}
-                          </span>
-                        )
-                        : modifiedIn(id) && (
-                          <span className="size-1.5 rounded-full bg-primary" aria-label="Has changed settings" />
-                        )}
-                    </Button>
-                  </Fragment>
-                )
-              })}
-            </div>
-          </ScrollArea>
-        </nav>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="border-b px-5 py-3">
-            <Breadcrumb>
-              <BreadcrumbList className="text-sm">
-                <BreadcrumbItem>
-                  <DialogTitle className="font-normal text-muted-foreground">{props.title}</DialogTitle>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                {searching && (
-                  <>
-                    <BreadcrumbItem>Search</BreadcrumbItem>
-                    <BreadcrumbSeparator />
-                  </>
-                )}
-                <BreadcrumbItem className="min-w-0">
-                  <BreadcrumbPage className="truncate font-medium">
-                    {searching ? `“${query.trim()}”` : labelOf(props.category)}
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-            <DialogDescription className="sr-only">{props.description}</DialogDescription>
-          </div>
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="flex flex-col gap-5 px-5 py-3">
-              {groups.map((group) => (
-                <section key={group.key} className="flex flex-col">
-                  {group.title !== undefined && group.title !== "" && (
-                    <h3 className="mb-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
-                      {group.title}
-                    </h3>
-                  )}
-                  <div className="flex flex-col divide-y divide-border/50">
-                    {group.rows.map((row) => <RowView key={row.id} row={row} />)}
-                  </div>
-                </section>
-              ))}
-              {groups.length === 0 && <p className="text-xs text-muted-foreground">No settings match.</p>}
-            </div>
-          </ScrollArea>
-          <div
-            className={cn("flex border-t px-5 py-3", onResetCategory === undefined ? "justify-end" : "justify-between")}
-          >
-            {onResetCategory !== undefined && (
-              <Button
-                variant="outline"
-                onClick={() => onResetCategory(props.category)}
-                disabled={searching || !modifiedIn(props.category)}
-              >
-                Reset {labelOf(props.category).toLowerCase()} to defaults
-              </Button>
-            )}
-            <Button onClick={props.onClose} disabled={props.busy === true}>Done</Button>
-          </div>
-        </div>
+        <SettingsContent
+          {...content}
+          heading={<DialogTitle className="font-normal text-muted-foreground">{content.title}</DialogTitle>}
+          description={<DialogDescription className="sr-only">{description}</DialogDescription>}
+          footerEnd={<Button onClick={onClose}>Done</Button>}
+        />
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** Settings as a page of their own: the Settings panel fills its tab with this. */
+export function SettingsPage<C extends string>(props: SettingsContentProps<C>) {
+  return (
+    <div className="flex h-full min-w-0 bg-background">
+      <SettingsContent {...props} heading={<span className="text-muted-foreground">{props.title}</span>} />
+    </div>
   )
 }

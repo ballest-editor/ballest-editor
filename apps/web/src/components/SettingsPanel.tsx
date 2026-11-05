@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Slider } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
+import { usePortalContainer } from "@workspace/ui/lib/portal-container"
 import { cn } from "@workspace/ui/lib/utils"
 import { Struct } from "effect"
 import { useEffect, useState } from "react"
@@ -43,7 +44,7 @@ import { type SettingsCategory, useCreator, useEditor } from "../editor/store"
 import { useDarkTheme } from "../editor/theme"
 import { creatorSettingsRow } from "./CreatorSetting"
 import { CheckAgainButton, GameLinkRows, useGameLinkSummary } from "./GameLink"
-import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
+import { type SettingsCategoryInfo, SettingsPage, type SettingsRow } from "./SettingsShell"
 import { useUpdateCheck } from "./UpdateCheck"
 
 const movementLookItems = {
@@ -196,14 +197,14 @@ function CaptureCap() {
   )
 }
 
-/** Desktop-style settings: category nav on the left, searchable rows on the right. */
-export function SettingsDialog(props: {
-  readonly open: boolean
-  readonly category: SettingsCategory
-  readonly onCategoryChange: (category: SettingsCategory) => void
-  readonly onClose: () => void
-}) {
+/**
+ * The Settings panel, a tab beside the maps (File › Settings…): category nav on the left, searchable rows on the right.
+ * `visible` is whether its tab is the one showing.
+ */
+export function SettingsPanel({ visible }: { readonly visible: boolean }) {
   const settings = useEditor((s) => s.settings)
+  const category = useEditor((s) => s.settingsCategory)
+  const setCategory = useEditor((s) => s.setSettingsCategory)
   const dark = useDarkTheme(settings.appearance.theme)
   const autoGrid = gridColorsOf({ ...settings.appearance, gridCellColor: null, gridSectionColor: null }, dark)
   const keybinds = useEditor((s) => s.keybinds)
@@ -217,10 +218,10 @@ export function SettingsDialog(props: {
   const foundCreator = useEditor((s) => s.foundCreator)
 
   // The game or the plugin manager may have been installed, run or moved since, and Steam logged in as someone else:
-  // look the folders, the plugin and the creator name up each time the dialog opens.
+  // look the folders, the plugin and the creator name up each time the panel comes into view.
   useEffect(() => {
-    if (props.open && hasGame) void refreshGameLink()
-  }, [props.open, hasGame])
+    if (visible && hasGame) void refreshGameLink()
+  }, [visible, hasGame])
 
   const update = <K extends keyof Settings>(section: K, patch: Partial<Settings[K]>) =>
     void saveSettings({ ...settings, [section]: { ...settings[section], ...patch } })
@@ -237,7 +238,9 @@ export function SettingsDialog(props: {
   const setBindings = (action: KeybindAction, bindings: Bindings) =>
     void saveKeybinds({ ...keybinds, [action]: uniqueBindings(bindings) })
 
-  // Capturing: the next key, mouse button or wheel step fills the slot (Esc cancels).
+  // Capturing: the next key, mouse button or wheel step fills the slot (Esc cancels). In the window the panel is in:
+  // popped out, the keys never reach the main window's listeners.
+  const panelWindow = usePortalContainer()?.ownerDocument.defaultView ?? window
   useEffect(() => {
     if (listening === null) return
     const { action, index } = listening
@@ -265,21 +268,21 @@ export function SettingsDialog(props: {
       assign(wheelChordOf(e))
     }
     const onContextMenu = stop
-    window.addEventListener("keydown", onKey, { capture: true })
-    window.addEventListener("mousedown", onMouse, { capture: true })
-    window.addEventListener("mouseup", stop, { capture: true })
-    window.addEventListener("click", stop, { capture: true })
-    window.addEventListener("contextmenu", onContextMenu, { capture: true })
-    window.addEventListener("wheel", onWheel, { capture: true, passive: false })
+    panelWindow.addEventListener("keydown", onKey, { capture: true })
+    panelWindow.addEventListener("mousedown", onMouse, { capture: true })
+    panelWindow.addEventListener("mouseup", stop, { capture: true })
+    panelWindow.addEventListener("click", stop, { capture: true })
+    panelWindow.addEventListener("contextmenu", onContextMenu, { capture: true })
+    panelWindow.addEventListener("wheel", onWheel, { capture: true, passive: false })
     return () => {
-      window.removeEventListener("keydown", onKey, { capture: true })
-      window.removeEventListener("mousedown", onMouse, { capture: true })
-      window.removeEventListener("mouseup", stop, { capture: true })
-      window.removeEventListener("click", stop, { capture: true })
-      window.removeEventListener("contextmenu", onContextMenu, { capture: true })
-      window.removeEventListener("wheel", onWheel, { capture: true })
+      panelWindow.removeEventListener("keydown", onKey, { capture: true })
+      panelWindow.removeEventListener("mousedown", onMouse, { capture: true })
+      panelWindow.removeEventListener("mouseup", stop, { capture: true })
+      panelWindow.removeEventListener("click", stop, { capture: true })
+      panelWindow.removeEventListener("contextmenu", onContextMenu, { capture: true })
+      panelWindow.removeEventListener("wheel", onWheel, { capture: true })
     }
-  }, [listening, keybinds])
+  }, [listening, keybinds, panelWindow])
 
   const rows = ((): ReadonlyArray<Row> => {
     // A chord is a conflict when two actions of the same kind share it. A fly key doubling
@@ -735,23 +738,19 @@ export function SettingsDialog(props: {
     ]
   })()
 
-  const resetCategory = (category: SettingsCategory) => {
-    if (category === "keybinds") void resetKeybinds()
-    else if (category === "game") void resetGamePaths(overridden)
-    else void saveSettings({ ...settings, [category]: defaultSettings[category] })
+  const resetCategory = (reset: SettingsCategory) => {
+    if (reset === "keybinds") void resetKeybinds()
+    else if (reset === "game") void resetGamePaths(overridden)
+    else void saveSettings({ ...settings, [reset]: defaultSettings[reset] })
   }
   return (
-    <SettingsShell
-      open={props.open}
-      onClose={props.onClose}
+    <SettingsPage
       title="Settings"
-      description="Settings for the editor, kept in this browser."
       categories={hasGame ? [...CATEGORIES, GAME_CATEGORY] : CATEGORIES}
-      category={props.category}
-      onCategoryChange={props.onCategoryChange}
+      category={category}
+      onCategoryChange={setCategory}
       rows={rows}
       onResetCategory={resetCategory}
-      busy={listening !== null}
     />
   )
 }

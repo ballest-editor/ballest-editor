@@ -1,6 +1,6 @@
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router"
 
-// The document (title, the saved panel widths) is index.html; main.tsx mounts the router.
+// The document (title, the saved layout's hint) is index.html; main.tsx mounts the router.
 export const Route = createRootRoute({
   component: Outlet,
   notFoundComponent: () => (
