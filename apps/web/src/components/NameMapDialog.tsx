@@ -5,6 +5,7 @@ import { riskyClassesIn } from "../domain/Catalog"
 import { copyNameOf, isValidName, mapFileNameOf } from "../domain/factory"
 import { unconfirmedPropertiesIn } from "../domain/itemProperties"
 import { classNameOf } from "../domain/MapFile"
+import { pathInFolder } from "../domain/paths"
 import { isProjectName } from "../domain/project"
 import { duplicateMap, nameProject, playAsNewDraft, renameOpenMap, saveMapAs } from "../editor/actions"
 import { useEditor } from "../editor/store"
@@ -162,7 +163,7 @@ export function NameMapDialog(
               ? "Letters, digits, spaces, - and _ only."
               : (
                 <PathText block>
-                  {projectTrimmed === "" ? projectsFolder : `${projectsFolder}/${projectTrimmed}`}
+                  {projectTrimmed === "" ? projectsFolder : pathInFolder(projectsFolder, projectTrimmed)}
                 </PathText>
               )}
           </div>

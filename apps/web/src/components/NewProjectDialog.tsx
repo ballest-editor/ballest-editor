@@ -10,6 +10,7 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { useState } from "react"
+import { pathInFolder } from "../domain/paths"
 import { isProjectName } from "../domain/project"
 import { createProject } from "../editor/actions"
 import { useEditor } from "../editor/store"
@@ -61,7 +62,7 @@ export function NewProjectDialog({ open, onClose }: { readonly open: boolean; re
                 ? "A recent project has that name already."
                 : trimmed !== "" && !valid
                 ? "Letters, digits, spaces, - and _ only."
-                : <PathText block>{trimmed === "" ? projectsFolder : `${projectsFolder}/${trimmed}`}</PathText>}
+                : <PathText block>{trimmed === "" ? projectsFolder : pathInFolder(projectsFolder, trimmed)}</PathText>}
             </div>
           </div>
           <DialogFooter>
