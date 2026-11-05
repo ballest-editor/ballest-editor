@@ -124,35 +124,40 @@ export const importAsCopy = () => run(importAsCopyEffect)
 
 /**
  * Uses another project from now on, asking about each tab's unsaved edits first (Save writes them into the project
- * being left). The open maps stay open; they belonged to the old project, so they are unsaved here.
+ * being left). The open maps stay open; they belonged to the old project, so they are unsaved here. Untitled Project
+ * asks nothing: no map is left behind, and Save there would name a project of its own beside the one being chosen.
  */
 const changeProject = (
   change: (platform: Platform["Service"]) => Effect.Effect<Option.Option<ProjectState>, PlatformError>
-) =>
-  run(unlessAnyCancelled(
-    "switchProject",
-    Effect.gen(function*() {
-      const before = useEditor.getState().project?.current?.path ?? null
-      const next = yield* change(yield* Platform)
-      if (Option.isNone(next)) return
-      const after = next.value.current
-      if (after === null || after.path !== before) useEditor.getState().detachFiles()
-      yield* refreshProject
-      useEditor.getState().notify("info", `Using the project ${after?.name ?? "Untitled Project"}`, {
-        kind: "projectChanged",
-        actions: [revealIn("project")]
-      })
+) => {
+  const use = Effect.gen(function*() {
+    const before = useEditor.getState().project?.current?.path ?? null
+    const next = yield* change(yield* Platform)
+    if (Option.isNone(next)) return
+    const after = next.value.current
+    if (after === null || after.path !== before) useEditor.getState().detachFiles()
+    yield* refreshProject
+    useEditor.getState().notify("info", `Using the project ${after?.name ?? "Untitled Project"}`, {
+      kind: "projectChanged",
+      actions: [revealIn("project")]
     })
-  ))
+  })
+  return Effect.suspend(() => hasProject() ? unlessAnyCancelled("switchProject", use) : use)
+}
+
+export const chooseProjectEffect = changeProject((platform) => platform.chooseProject)
 
 /** A folder dialog; the chosen folder becomes the project (the game's maps folder is refused, with the reason). */
-export const chooseProject = () => changeProject((platform) => platform.chooseProject)
+export const chooseProject = () => run(chooseProjectEffect)
 
 /** Goes back to a recent project; the one in use already is left alone. */
 export const switchProject = (path: string) =>
   path === useEditor.getState().project?.current?.path
     ? Promise.resolve(undefined)
-    : changeProject((platform) => Effect.asSome(platform.switchProject(path)))
+    : run(changeProject((platform) => Effect.asSome(platform.switchProject(path))))
 
 /** New project…: `<projectsFolder>/<name>` is made and becomes the project. */
-export const createProject = (name: string) => changeProject((platform) => Effect.asSome(platform.createProject(name)))
+export const createProjectEffect = (name: string) =>
+  changeProject((platform) => Effect.asSome(platform.createProject(name)))
+
+export const createProject = (name: string) => run(createProjectEffect(name))

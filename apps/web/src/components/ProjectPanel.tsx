@@ -23,6 +23,7 @@ import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { type ComponentType, type MouseEvent, useRef } from "react"
+import { useShallow } from "zustand/react/shallow"
 import { mapLabelOf } from "../domain/factory"
 import { LINK_STATE_LABELS, type LinkState, linkStateOf } from "../domain/linkState"
 import { formatAgo, formatDateTime } from "../domain/time"
@@ -35,7 +36,7 @@ import {
   revealProject,
   startNewMap
 } from "../editor/actions"
-import { type ProjectMap, useEditor, useHasUnsavedEdits, useOpenMapLabel } from "../editor/store"
+import { type ProjectMap, tabsWithoutFile, useEditor, useHasUnsavedEdits, useTabSummary } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { PathText } from "./PathText"
 
@@ -185,15 +186,28 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
   )
 }
 
-/** The open map while it has no file yet (a fresh map, or any map in Untitled Project): a row of its own. */
-function UnsavedRow() {
-  const label = useOpenMapLabel()
+/**
+ * A tab whose map has no file yet (`tabsWithoutFile`): a row of its own, in italics, whichever tab is active. A click
+ * makes it the active tab.
+ */
+function UnsavedRow({ tabId }: { readonly tabId: string }) {
+  const { label } = useTabSummary(tabId)
+  const isActive = useEditor((s) => s.tabId === tabId)
+  const activateTab = useEditor((s) => s.activateTab)
   return (
-    <li className={cn(ROW_CLASSES, ACTIVE_ROW_CLASSES)}>
+    <li className={cn(ROW_CLASSES, isActive && ACTIVE_ROW_CLASSES)}>
       <Tooltip>
-        <TooltipTrigger render={<span className="flex min-w-0 flex-1 items-center gap-1.5" />}>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none"
+              onClick={() => activateTab(tabId)}
+            />
+          }
+        >
           <IconMap className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className="truncate font-medium italic">{label}</span>
+          <span className={cn("truncate italic", isActive && "font-medium")}>{label}</span>
           <UnsavedDot />
         </TooltipTrigger>
         <TooltipContent side="right" align="start">
@@ -236,14 +250,14 @@ function HeaderButton(
 /**
  * The left dock's Project tab (docs/PROJECTS.md § Shell): the project and its maps as a tree, the way an editor's
  * file explorer shows a workspace. A click opens a map; the open one is highlighted, with a dot while it has unsaved
- * edits, and each row shows its link state. The header holds New map, Import and Project settings. In a browser,
- * which has no project, it shows the one map in memory.
+ * edits, and each row shows its link state. Every tab whose map has no file yet is a row too, above them. The header
+ * holds New map, Import and Project settings. In a browser, which has no project, only those rows show.
  */
 export function ProjectPanel() {
   const projects = useEditor((s) => s.capabilities.projects)
   const project = useEditor((s) => s.project?.current ?? null)
   const maps = useEditor((s) => s.projectMaps)
-  const unsaved = useEditor((s) => s.file === null)
+  const unsavedTabs = useEditor(useShallow(tabsWithoutFile))
   const openDialog = useEditor((s) => s.openDialog)
   const now = useNow()
   const untitled = projects && project === null
@@ -270,7 +284,7 @@ export function ProjectPanel() {
       </div>
       <ScrollArea className="min-h-0 flex-1">
         <ul className="flex flex-col gap-px pr-2">
-          {unsaved && <UnsavedRow />}
+          {unsavedTabs.map((tabId) => <UnsavedRow key={tabId} tabId={tabId} />)}
           {maps.map((map) => <MapRow key={map.fileName} map={map} now={now} />)}
         </ul>
         {untitled && (

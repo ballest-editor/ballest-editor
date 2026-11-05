@@ -10,6 +10,7 @@ import { type ExportedMap, MapExporter } from "../../services/MapExporter"
 import { Platform } from "../../services/Platform"
 import { type Doc, type OpenFile, tabStateOf, useEditor } from "../store"
 import { ASK_FIRST, writeToGame } from "./gameWrite"
+import { nameProjectEffect } from "./maps"
 import { run } from "./run"
 import { fileOf, projectName, refreshProject, revealIn, saveTabPrefs } from "./shared"
 
@@ -158,6 +159,16 @@ export const saveMapAsEffect = (afterSave: Effect.Effect<void, unknown> = Effect
   })
 
 export const saveMapAs = (afterSave?: Effect.Effect<void, unknown>) => run(saveMapAsEffect(afterSave))
+
+/**
+ * The `saveAs` dialog's last step in Untitled Project: names the project, then saves the open map into it. A name that
+ * can't be used stops here with its own error, and the map stays open, unsaved.
+ */
+export const saveMapInNewProjectEffect = (name: string, afterSave?: Effect.Effect<void, unknown>) =>
+  nameProjectEffect(name).pipe(Effect.andThen(saveMapAsEffect(afterSave)))
+
+export const saveMapInNewProject = (name: string, afterSave?: Effect.Effect<void, unknown>) =>
+  run(saveMapInNewProjectEffect(name, afterSave))
 
 /** Rename: new name and creator, then the file moves to match (the old one goes to backups). */
 export const renameOpenMap = (displayName: string, creatorName: string) => {
