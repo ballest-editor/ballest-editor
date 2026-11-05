@@ -66,4 +66,4 @@ The web review build is the same editor in a browser, without anything that need
 
 ## Notice
 
-The game, its name and its content belong to its developers. See [NOTICE.md](NOTICE.md) for what this repository includes from the game and from Workshop creators, and for the license status.
+The game, its name and its content belong to its developers. The code is under the [MIT License](LICENSE). [NOTICE.md](NOTICE.md) says what this repository includes from the game and from Workshop creators, which that license doesn't cover.

@@ -334,7 +334,7 @@ The extractor's output can't be rebuilt on CI, because that needs the game. So t
 
 These are tracked as issues, and the details are there.
 
-- #73: confirm redistribution rights for the asset pack and for the Workshop maps in `samples/`, and choose a license.
+- #73: confirm redistribution rights for the asset pack and for the Workshop maps in `samples/`.
 - #74: fork-safe CI and branch rules.
 - #75: `CONTRIBUTING.md`, issue templates, `SECURITY.md`, `CODEOWNERS`.
 - #77: code signing.
