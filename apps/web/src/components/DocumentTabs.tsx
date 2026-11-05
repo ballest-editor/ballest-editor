@@ -10,7 +10,6 @@ import { cn } from "@workspace/ui/lib/utils"
 import { type DragEvent, type MouseEvent, useEffect, useRef, useState } from "react"
 import { closeOtherTabs, closeTab, closeTabsToRight, nameProjectMap, revealProject } from "../editor/actions"
 import { useEditor, useTabSummary } from "../editor/store"
-import { showMap } from "./dock/dockControl"
 
 /** A tab being dragged along the strip, and where it would land (an index into the strip's gaps). */
 interface Drag {
@@ -76,8 +75,6 @@ function DocumentTab({ id, index, dragging, dropBefore, dropAfter, onDragStart, 
   readonly onDragOver: (at: number) => void
 }) {
   const active = useEditor((s) => s.tabId === id)
-  // with another tab in front (Settings), no map's tab reads as the one showing
-  const showing = useEditor((s) => s.tabId === id && s.mapInFront)
   const projects = useEditor((s) => s.capabilities.projects)
   const several = useEditor((s) => s.tabIds.length > 1)
   const last = useEditor((s) => s.tabIds.at(-1) === id)
@@ -112,7 +109,7 @@ function DocumentTab({ id, index, dragging, dropBefore, dropAfter, onDragStart, 
       draggable
       className={cn(
         "group relative flex h-full max-w-56 shrink-0 items-center gap-1 border-r pr-1 pl-2 transition-opacity",
-        showing ? "bg-background text-foreground" : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+        active ? "bg-background text-foreground" : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
         "has-[button:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring)]",
         dragging && "opacity-40",
         // where a dragged tab would land
@@ -134,12 +131,9 @@ function DocumentTab({ id, index, dragging, dropBefore, dropAfter, onDragStart, 
       <button
         type="button"
         role="tab"
-        aria-selected={showing}
+        aria-selected={active}
         className="flex h-full min-w-0 items-center outline-none"
-        onClick={() => {
-          activateTab(id)
-          showMap()
-        }}
+        onClick={() => activateTab(id)}
       >
         <span className="truncate">{label}</span>
       </button>
@@ -155,7 +149,7 @@ function DocumentTab({ id, index, dragging, dropBefore, dropAfter, onDragStart, 
           aria-label={`Close ${label}`}
           className={cn(
             "absolute inset-0 flex items-center justify-center rounded-sm opacity-0 outline-none hover:bg-muted focus-visible:opacity-100 group-hover:opacity-100",
-            showing && !unsaved && "opacity-100"
+            active && !unsaved && "opacity-100"
           )}
           onClick={() => void closeTab(id)}
         >

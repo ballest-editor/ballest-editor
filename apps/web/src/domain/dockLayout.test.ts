@@ -7,6 +7,7 @@ import {
   DOCUMENTS_PANEL,
   fitToWindow,
   newPanels,
+  onlyPanels,
   parseSavedDock,
   unfoldedLayout
 } from "./dockLayout"
@@ -65,20 +66,15 @@ describe("parseSavedDock", () => {
 describe("newPanels", () => {
   const panels = [
     { id: "pieces", title: "Pieces", location: "left" },
-    { id: "outline", title: "Outline", location: "left" },
-    { id: "settings", title: "Settings", location: "centre", startsClosed: true }
+    { id: "outline", title: "Outline", location: "left" }
   ] as const
 
   it("adds a panel the saved layout has never heard of", () => {
-    assert.deepStrictEqual(newPanels(panels, ["pieces", "settings"]).map(({ id }) => id), ["outline"])
+    assert.deepStrictEqual(newPanels(panels, ["pieces"]).map(({ id }) => id), ["outline"])
   })
 
   it("leaves a panel the user closed closed: it's known, and just not in the layout", () => {
-    assert.deepStrictEqual(newPanels(panels, ["pieces", "outline", "settings"]), [])
-  })
-
-  it("keeps one that starts closed out of it, known or not", () => {
-    assert.deepStrictEqual(newPanels(panels, []).map(({ id }) => id), ["pieces", "outline"])
+    assert.deepStrictEqual(newPanels(panels, ["pieces", "outline"]), [])
   })
 })
 
@@ -148,12 +144,12 @@ describe("dockedPopouts", () => {
   })
 
   it("adds a panel to the tabs it left, deep in the grid", () => {
-    const left = { ...layout, popoutGroups: [{ gridReferenceGroup: "3", data: { views: ["settings"] } }] }
+    const left = { ...layout, popoutGroups: [{ gridReferenceGroup: "3", data: { views: ["notes"] } }] }
     const { layout: docked } = dockedPopouts(left)
     const column = docked.grid.root.data[1]
     assert.deepStrictEqual(
       column?.type === "branch" ? column.data[1] : null,
-      { type: "leaf", data: { id: "3", views: ["output", "settings"] }, size: 150 }
+      { type: "leaf", data: { id: "3", views: ["output", "notes"] }, size: 150 }
     )
     assert.deepStrictEqual(sizesOf(docked.grid.root), sizesOf(layout.grid.root))
   })
@@ -171,6 +167,77 @@ describe("dockedPopouts", () => {
 
   it("has nothing to do without popouts", () => {
     assert.deepStrictEqual(dockedPopouts(layout), { layout, loose: [] })
+  })
+})
+
+describe("onlyPanels", () => {
+  const current = [DOCUMENTS_PANEL, "pieces", "project", "output", "inspector"]
+  const withGrid = (root: Branch): DockLayout => ({
+    ...layout,
+    grid: { ...layout.grid, root },
+    panels: { ...layout.panels, settings: {} }
+  })
+
+  it("leaves a layout of current panels as it was", () => {
+    assert.deepStrictEqual(onlyPanels(layout, current), layout)
+  })
+
+  it("drops a panel from the group it shared, and the map comes to the front", () => {
+    const centre = {
+      ...leaf("2", [DOCUMENTS_PANEL, "settings"], 800),
+      data: { id: "2", views: [DOCUMENTS_PANEL, "settings"], activeView: "settings" }
+    }
+    const { grid, panels } = onlyPanels(withGrid(branch([leaf("1", ["pieces"], 200), centre], 600)), current)
+    assert.deepStrictEqual(grid.root.data[1], leaf("2", [DOCUMENTS_PANEL], 800))
+    assert.notProperty(panels, "settings")
+  })
+
+  it("keeps the active panel of a group when it's another that goes", () => {
+    const tabs = {
+      ...leaf("1", ["pieces", "settings"], 200),
+      data: { id: "1", views: ["pieces", "settings"], activeView: "pieces" }
+    }
+    const { grid } = onlyPanels(withGrid(branch([tabs, leaf("2", [DOCUMENTS_PANEL], 800)], 600)), current)
+    assert.deepStrictEqual(grid.root.data[0], { ...tabs, data: { id: "1", views: ["pieces"], activeView: "pieces" } })
+  })
+
+  it("gives a group left empty's room to the viewport", () => {
+    const root = branch(
+      [leaf("1", ["pieces"], 200), leaf("2", [DOCUMENTS_PANEL], 500), leaf("5", ["settings"], 300)],
+      600
+    )
+    assert.deepStrictEqual(sizesOf(onlyPanels(withGrid(root), current).grid.root), [200, 800])
+  })
+
+  it("gives it to the largest neighbour in a stack away from the viewport", () => {
+    const stack = branch([leaf("4", ["inspector"], 400), leaf("5", ["settings"], 100), leaf("6", ["output"], 100)], 300)
+    const root = branch([leaf("2", [DOCUMENTS_PANEL], 700), stack], 600)
+    assert.deepStrictEqual(sizesOf(onlyPanels(withGrid(root), current).grid.root), [700, [300, [500, 100]]])
+  })
+
+  it("takes a branch of one out of the grid, as dockview would", () => {
+    const column = branch([leaf("2", [DOCUMENTS_PANEL], 450), leaf("5", ["settings"], 150)], 800)
+    const root = branch([leaf("1", ["pieces"], 200), column], 600)
+    const { grid } = onlyPanels(withGrid(root), current)
+    assert.deepStrictEqual(grid.root.data[1], leaf("2", [DOCUMENTS_PANEL], 800))
+  })
+
+  it("lifts what's left of a branch into the one around it", () => {
+    const row = branch([leaf("2", [DOCUMENTS_PANEL], 500), leaf("4", ["inspector"], 300)], 450)
+    const column = branch([row, leaf("5", ["settings"], 150)], 800)
+    const { grid } = onlyPanels(withGrid(branch([leaf("1", ["pieces"], 200), column], 600)), current)
+    assert.deepStrictEqual(sizesOf(grid.root), [200, 500, 300])
+  })
+
+  it("goes down a branch left with nothing", () => {
+    const column = branch([leaf("5", ["settings"], 300), leaf("6", ["notes"], 300)], 300)
+    const { grid } = onlyPanels(withGrid(branch([leaf("2", [DOCUMENTS_PANEL], 700), column], 600)), current)
+    assert.deepStrictEqual(sizesOf(grid.root), [1000])
+  })
+
+  it("leaves a hidden empty group to whoever put it there", () => {
+    const root = branch([leaf("2", [DOCUMENTS_PANEL], 700), leaf("4", [], 300, false)], 600)
+    assert.deepStrictEqual(onlyPanels(withGrid(root), current).grid.root, root)
   })
 })
 

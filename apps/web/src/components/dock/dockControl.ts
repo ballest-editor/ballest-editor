@@ -11,10 +11,11 @@ import {
   DOCUMENTS_PANEL,
   fitToWindow,
   newPanels,
+  onlyPanels,
   parseSavedDock,
   unfoldedLayout
 } from "../../domain/dockLayout"
-import { type SettingsCategory, useEditor } from "../../editor/store"
+import { useEditor } from "../../editor/store"
 import type { DockPanel } from "./panels"
 import { adoptPopoutWindow } from "./popoutWindow"
 
@@ -22,7 +23,7 @@ import { adoptPopoutWindow } from "./popoutWindow"
 const COLLAPSED_HEIGHT = 32
 /** What a column by the viewport folds down to: the rail of its panels' titles. dock.css draws it. */
 const RAIL_WIDTH = 28
-const SIDE_SIZES: Record<Exclude<DockLocation, "centre">, number> = { left: 260, right: 300, bottom: 240 }
+const SIDE_SIZES: Record<DockLocation, number> = { left: 260, right: 300, bottom: 240 }
 /** The viewport never gets narrower or shorter than this when a panel is dragged wider. */
 const MIN_VIEWPORT = { width: 320, height: 200 }
 const MIN_GROUP = { width: 180, height: 120 }
@@ -77,9 +78,6 @@ const addPanel = (api: DockviewApi, panel: DockPanel, inactive = false): IDockvi
   const centre = centreGroupOf(api)
   if (centre === undefined) return null
   const { location } = panel
-  if (location === "centre") {
-    return api.addPanel({ ...panelOptions(panel), inactive, position: { referenceGroup: centre } })
-  }
   const sibling = dockPanels
     .filter((other) => other.location === location && other.id !== panel.id)
     .map((other) => api.getPanel(other.id))
@@ -92,7 +90,7 @@ const addPanel = (api: DockviewApi, panel: DockPanel, inactive = false): IDockvi
 }
 
 const addDefaultPanels = (api: DockviewApi) => {
-  for (const panel of dockPanels) if (panel.startsClosed !== true) addPanel(api, panel)
+  for (const panel of dockPanels) addPanel(api, panel)
   const documents = api.getPanel(DOCUMENTS_PANEL)
   if (documents !== undefined) documents.group.api.setActive()
 }
@@ -118,9 +116,10 @@ const restoreSaved = (api: DockviewApi): boolean => {
   const saved = parseSavedDock(readSaved())
   if (saved === null) return false
   const { layout, loose } = dockedPopouts(unfoldedLayout(saved.layout, saved.collapsed))
+  const current = onlyPanels(layout, [DOCUMENTS_PANEL, ...dockPanels.map((panel) => panel.id)])
   try {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- it's dockview's own JSON, and fromJSON judges it
-    api.fromJSON(fitToWindow(layout, api.width, api.height) as unknown as SerializedDockview)
+    api.fromJSON(fitToWindow(current, api.width, api.height) as unknown as SerializedDockview)
   } catch (error) {
     console.warn("The saved panel layout doesn't load, so the default one is used.", error)
     return false
@@ -235,14 +234,12 @@ const fitBesideCentre = (api: DockviewApi, group: DockviewGroupPanel) => {
   if (axis === "height") group.api.setSize({ height: SIDE_SIZES.bottom })
 }
 
-/** Follows `api`: saves the layout as it changes, keeps the store and View menu in step, adopts popped-out windows. */
+/** Follows `api`: saves the layout as it changes, keeps the View menu in step, adopts popped-out windows. */
 const followDock = (api: DockviewApi): ReadonlyArray<Disposable> => {
-  const centre = centreGroupOf(api)
   const scheduleSave = () => {
     clearTimeout(saveTimer)
     saveTimer = setTimeout(() => save(api), SAVE_DELAY_MS)
   }
-  const syncMapInFront = () => useEditor.getState().setMapInFront(centre?.activePanel?.id === DOCUMENTS_PANEL)
   const popouts = new Map<string, () => void>()
   const flush = () => {
     clearTimeout(saveTimer)
@@ -250,11 +247,9 @@ const followDock = (api: DockviewApi): ReadonlyArray<Disposable> => {
   }
   window.addEventListener("pagehide", flush)
   const stopFollowingStore = useEditor.subscribe((state, previous) => {
-    if (state.tabId !== previous.tabId) showMap()
     // a dialog shows in the main window, even when a popped-out panel asked for it
     if (state.dialog !== null && previous.dialog === null) window.focus()
   })
-  syncMapInFront()
   return [
     api.onDidLayoutChange(scheduleSave),
     api.onDidAddPanel((panel) => {
@@ -267,8 +262,6 @@ const followDock = (api: DockviewApi): ReadonlyArray<Disposable> => {
       if (panel.group.size === 1) fitBesideCentre(api, panel.group)
     }),
     api.onDidRemoveGroup((group) => collapsed.delete(group.id)),
-    api.onDidActivePanelChange(syncMapInFront),
-    ...(centre === undefined ? [] : [centre.api.onDidActivePanelChange(syncMapInFront)]),
     api.onDidAddPopoutGroup(({ id, group, window: popout }) => {
       popouts.set(id, adoptPopoutWindow(popout, group.activePanel?.title ?? "Ballest Editor"))
     }),
@@ -288,12 +281,10 @@ const followDock = (api: DockviewApi): ReadonlyArray<Disposable> => {
     api.onWillDragGroup((event) => {
       if (isCentreGroup(event.group)) event.nativeEvent.preventDefault()
     }),
-    // The centre takes panels on its sides, and as a tab only what lives there.
+    // The centre takes panels on its sides, never as a tab: one would hide the map.
     api.onWillShowOverlay((event) => {
-      const group = event.group
-      if (group === undefined || !isCentreGroup(group) || event.position !== "center") return
-      const dragged = event.getData()?.panelId
-      if (dockPanels.find((panel) => panel.id === dragged)?.location !== "centre") event.preventDefault()
+      const { group } = event
+      if (group !== undefined && isCentreGroup(group) && event.position === "center") event.preventDefault()
     }),
     { dispose: stopFollowingStore },
     {
@@ -325,35 +316,13 @@ export const resetDockLayout = (): void => {
   addDefaultPanels(dock)
 }
 
-/** Brings the map in front of any other tab in the centre group. */
-export const showMap = (): void => {
-  dock?.getPanel(DOCUMENTS_PANEL)?.api.setActive()
-}
-
-/** Opens `id` if it's closed, brings it to the front, and focuses its window when it's popped out. */
-export const showPanel = (id: string): void => {
-  if (dock === null) return
-  const spec = dockPanels.find((panel) => panel.id === id)
-  const panel = dock.getPanel(id) ?? (spec === undefined ? null : addPanel(dock, spec))
-  if (panel === null) return
-  expandGroup(panel.group)
-  panel.api.setActive()
-  panel.api.getWindow().focus()
-}
-
-/** The View menu's check: closes an open panel, reopens a closed one. */
+/** The View menu's check: closes an open panel, reopens a closed one in front. */
 export const togglePanel = (id: string): void => {
-  const panel = dock?.getPanel(id)
-  if (panel === undefined) showPanel(id)
-  else panel.api.close()
-}
-
-/** File › Settings…, on `category` or the page it last showed. Takes the place of any open dialog, as one would. */
-export const openSettings = (category?: SettingsCategory): void => {
-  const { closeDialog, setSettingsCategory } = useEditor.getState()
-  closeDialog()
-  if (category !== undefined) setSettingsCategory(category)
-  showPanel("settings")
+  if (dock === null) return
+  const open = dock.getPanel(id)
+  const spec = dockPanels.find((panel) => panel.id === id)
+  if (open !== undefined) open.api.close()
+  else if (spec !== undefined) addPanel(dock, spec)
 }
 
 /** Pops the panel out into a window of its own. Closing that window docks it again. */
@@ -433,6 +402,6 @@ export const usePanelCheck = (id: string) => ({
   onCheckedChange: () => togglePanel(id)
 })
 
-/** The panels the menus close and reopen. What lives in the centre has its own way in (File › Settings…). */
+/** The panels the menus close and reopen. */
 export const useViewMenuPanels = (): ReadonlyArray<DockPanel> =>
-  useSyncExternalStore(followDockChanges, () => dockPanels).filter((panel) => panel.location !== "centre")
+  useSyncExternalStore(followDockChanges, () => dockPanels)

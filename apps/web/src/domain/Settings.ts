@@ -78,7 +78,7 @@ export const LightingSettings = Schema.Struct({
   skyVisible: Schema.Boolean
 })
 
-/** Changed from the tool bar rather than the Settings panel, but persisted with the rest. */
+/** Changed from the tool bar rather than the Settings dialog, but persisted with the rest. */
 export const SnappingSettings = Schema.Struct({
   /** Whether gizmo translation lands on the world grid. */
   enabled: Schema.Boolean,

@@ -11,16 +11,14 @@ export const DOCK_STORAGE_KEY = "ballest-editor.dock.v1"
 /** The centre group's own panel: the map tabs and the viewport. It has no dockview tab and can't be closed or moved. */
 export const DOCUMENTS_PANEL = "documents"
 
-/** The one side of the centre a panel starts on, or `centre`: a tab beside the maps. */
-export type DockLocation = "left" | "right" | "bottom" | "centre"
+/** The one side of the centre a panel starts on. */
+export type DockLocation = "left" | "right" | "bottom"
 
 /** What the layout rules need to know of a panel; `components/dock/panels.tsx` adds its component. */
 export interface DockPanelSpec {
   readonly id: string
   readonly title: string
   readonly location: DockLocation
-  /** Closed until asked for (Settings). Otherwise a panel starts open, in a default layout or a saved one from before it existed. */
-  readonly startsClosed?: boolean
 }
 
 /** A group folded down to its tab strip along `axis`; `size` is what expanding it gives back. */
@@ -86,9 +84,9 @@ export const parseSavedDock = (text: string | null): SavedDock | null => {
   return isLayout(layout) ? { ...decoded.value, layout } : null
 }
 
-/** Panels to add to a saved layout on load: new since it was saved, and open by default. */
+/** Panels to add to a saved layout on load: new since it was saved. */
 export const newPanels = <P extends DockPanelSpec>(panels: ReadonlyArray<P>, known: ReadonlyArray<string>): Array<P> =>
-  panels.filter((panel) => panel.startsClosed !== true && !known.includes(panel.id))
+  panels.filter((panel) => !known.includes(panel.id))
 
 type Orientation = "HORIZONTAL" | "VERTICAL"
 interface GridLeaf {
@@ -239,6 +237,48 @@ export const unfoldedLayout = (layout: DockLayout, collapsed: SavedDock["collaps
   ...layout,
   grid: { ...layout.grid, root: unfolded(layout.grid.root, collapsed) }
 })
+
+/** `leaf` with only the panels in `keep`, or null when none of its panels are left. */
+const keptLeaf = (leaf: GridLeaf, keep: ReadonlySet<string>): GridLeaf | null => {
+  const views = leaf.data.views.filter((id) => keep.has(id))
+  if (views.length === leaf.data.views.length) return leaf
+  if (views.length === 0) return null
+  // with its active panel gone, dockview shows the group's last one
+  const { activeView, ...data } = leaf.data
+  const stillActive = activeView !== undefined && views.includes(activeView)
+  return { ...leaf, data: { ...data, views, ...(stillActive && { activeView }) } }
+}
+
+const lengthOf = (nodes: ReadonlyArray<GridNode>): number => nodes.reduce((length, node) => length + node.size, 0)
+
+/** `branch` with only the panels in `keep`: the room of a group that goes goes to the viewport, or failing that the largest. */
+const keptBranch = (branch: GridBranch, orientation: Orientation, keep: ReadonlySet<string>): GridBranch => {
+  const data = branch.data.flatMap((node): ReadonlyArray<GridNode> => {
+    if (node.type === "leaf") return [keptLeaf(node, keep)].filter((leaf) => leaf !== null)
+    const inner = keptBranch(node, crosswise(orientation), keep).data
+    const [only] = inner
+    if (only === undefined) return []
+    if (inner.length > 1) return [{ ...node, data: inner }]
+    // Dockview leaves no branch of one: what's left takes its place, and a branch's children lie along this one.
+    return only.type === "branch" ? only.data : [{ ...only, size: node.size }]
+  })
+  const room = lengthOf(branch.data) - lengthOf(data)
+  const kept = { ...branch, data }
+  if (room === 0 || data.length === 0) return kept
+  if (!data.some(holdsDocuments)) return { ...kept, data: takeRoom(data, -1, -room) }
+  return orientation === "HORIZONTAL" ? growCentre(kept, orientation, room, 0) : growCentre(kept, orientation, 0, room)
+}
+
+/**
+ * `layout` with only the panels in `keep`. A panel the app no longer has (Settings, once) can be anywhere in a saved
+ * layout, and it goes without leaving a gap, so the rest of the layout survives it.
+ */
+export const onlyPanels = (layout: DockLayout, keep: ReadonlyArray<string>): DockLayout => {
+  const kept = new Set(keep)
+  const panels = Object.fromEntries(Object.entries(layout.panels).filter(([id]) => kept.has(id)))
+  const root = keptBranch(layout.grid.root, layout.grid.orientation, kept)
+  return { ...layout, grid: { ...layout.grid, root }, panels }
+}
 
 /** A saved layout with its panels' windows gone: `layout` has what went back in the grid, `loose` the rest. */
 export interface DockedLayout {

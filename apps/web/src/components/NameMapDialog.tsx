@@ -9,7 +9,6 @@ import { pathInFolder } from "../domain/paths"
 import { isProjectName } from "../domain/project"
 import { duplicateMap, playAsNewDraft, renameOpenMap, saveMapAs, saveMapInNewProject } from "../editor/actions"
 import { useEditor } from "../editor/store"
-import { openSettings } from "./dock/dockControl"
 import { type MapCreator, MapNameDialog, useMapCreator } from "./MapNameDialog"
 import { PathText } from "./PathText"
 
@@ -32,6 +31,7 @@ export function NameMapDialog(
   { mode, open, onClose }: { readonly mode: NameMapMode; readonly open: boolean; readonly onClose: () => void }
 ) {
   const levelData = useEditor((s) => s.doc.map.worldSettings.levelData)
+  const openDialog = useEditor((s) => s.openDialog)
   const items = useEditor((s) => s.doc.map.items)
   const catalog = useEditor((s) => s.catalog)
   const projects = useEditor((s) => s.capabilities.projects)
@@ -136,7 +136,7 @@ export function NameMapDialog(
           <button
             type="button"
             className="underline underline-offset-2 hover:text-foreground"
-            onClick={() => openSettings("general")}
+            onClick={() => openDialog({ id: "settings", category: "general" })}
           >
             change
           </button>

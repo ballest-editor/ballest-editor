@@ -71,14 +71,13 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 
 `components/dock/` is everything between the top bar and the status bar, built on [dockview](https://dockview.dev/) (`dockview-react`): the **centre group** with the panels around it, each of which can be dragged to any side of the centre, stacked as tabs, split, resized, collapsed, closed or popped out.
 
-**The centre group** holds the map tabs and the one viewport, which divides into panes of its own (§ View panes). Its only permanent panel is `documents`, whose dockview tab is hidden: `DocumentTabs` stands in for it, in the group's header ahead of any other tab. It can't be closed, dragged or popped out. The viewport keeps its own `renderer: "onlyWhenVisible"`, so it sits in the page's flow and resizes in the same frame as the window. A panel can be dropped on the centre's sides, but only one whose home is the centre can join it as a tab. Dropped there, a panel takes its side's usual size, not dockview's half of the viewport.
+**The centre group** holds the map tabs and the one viewport, which divides into panes of its own (§ View panes). Its only permanent panel is `documents`, whose dockview tab is hidden: `DocumentTabs` stands in for it, in the group's header. It can't be closed, dragged or popped out. The viewport keeps its own `renderer: "onlyWhenVisible"`, so it sits in the page's flow and resizes in the same frame as the window. A panel can be dropped on the centre's sides, but can't join it as a tab. Dropped there, a panel takes its side's usual size, not dockview's half of the viewport.
 
-**Panels** are entries in `components/dock/panels.tsx`: an id, a title, a component and a default location (`left`, `right`, `bottom`, `centre`). That entry is all a panel needs for a tab, a View menu item, a place in the default layout, and a place in layouts saved before it existed. `dockControl.ts` is what the rest of the app calls (`showPanel`, `togglePanel`, `openSettings`, `resetDockLayout`). It's in the page's first chunk, because the menu bar is, so the registry reaches it from `Dock.tsx` and keeps the panels, and WebGL, out of that chunk.
+**Panels** are entries in `components/dock/panels.tsx`: an id, a title, a component and a default location (`left`, `right`, `bottom`). That entry is all a panel needs for a tab, a View menu item, a place in the default layout, and a place in layouts saved before it existed. `dockControl.ts` is what the rest of the app calls (`togglePanel`, `resetDockLayout`). It's in the page's first chunk, because the menu bar is, so the registry reaches it from `Dock.tsx` and keeps the panels, and WebGL, out of that chunk.
 
 - **Pieces** and **Project** start stacked on the left, with Pieces in front, and **Inspector** on the right. A panel `always` rendered (Pieces) stays in the page behind another tab, so a long list keeps its scroll position.
-- **Settings** (`components/SettingsPanel.tsx`) opens as a tab beside the maps from File › Settings…, or comes forward if it's open. It looks the game up again each time it comes into view.
-- View lists every panel not living in the centre, checked while it's open, and Reset layout. Reset closes everything around the centre group and lays out the default again, and the viewport stays mounted.
-- **Each group's "…"** (`GroupMenu.tsx`), at the end of its strip, holds View's panel checks, then Pop out, Collapse and Reset layout. Only a panel whose home is the centre (Settings) has a × on its tab, since no menu closes it.
+- View lists every panel, checked while it's open, and Reset layout. Reset closes everything around the centre group and lays out the default again, and the viewport stays mounted.
+- **Each group's "…"** (`GroupMenu.tsx`), at the end of its strip, holds View's panel checks, then Pop out, Collapse and Reset layout.
 - **Collapse** folds a group: a column by the viewport to a rail, a group in a stack to its header. A group can't fold if its neighbours have nothing left to give, so Collapse is off there. A panel arriving unfolds it, and so does a click on a tab, with that panel in front.
 - **The rail** is 28 px of the panels' titles, read downwards, and nothing else. It's the group's own strip with its header turned to the side, marked `data-dock-rail` and drawn by `dock.css`.
 
@@ -87,6 +86,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 **The layout** is saved in `localStorage` under `ballest-editor.dock.v1`, a moment after each change and when the page goes away: dockview's `toJSON`, the panel ids it was saved with (`known`), the room around the centre (`hint`) and the collapsed groups' sizes. `domain/dockLayout.ts` holds the rules for reading it back.
 
 - A panel in `known` but not in the layout was closed by the user, and stays closed. One not in `known` is new and gets its default place.
+- A panel in the layout that the app no longer has is dropped (`onlyPanels`), and a group left empty gives its room to the viewport.
 - A layout that doesn't decode, has a size that isn't a number, has no centre or that `fromJSON` refuses is dropped for the default.
 - The first paint is the saved layout: index.html sets `hint` as `--dock-<side>` on `<html>`, and `EditorSkeleton` lays out to them, first while the editor's chunk loads and then over the dock until its layout is in.
 
@@ -98,7 +98,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - **The second window has a realm of its own.** Popups in a panel portal to the panel's window through `PortalContainerContext` (`packages/ui`), or they'd open in the main window. `instanceof Element` doesn't hold for what's in it, hence `elementOf`. Listeners in a panel use the window the panel is in. A panel coming back renders afresh, losing local state such as a search, because its elements belong to a window that's gone. Dialogs open in the main window, which takes the focus.
 - `popoutWindow.ts` adopts each window: the main window's `class` and `style` on `<html>` (theme, `--motion`) are mirrored to it, and it gives keys it doesn't use to the main window, where the keybinds listen.
 
-**Keys.** The rules are `isEditorKeyEvent`'s (`editor/keyTargets.ts`): a text field, a dialog or a menu keeps its keys, and everything else drives the editor, unless another tab in the centre group hides the map (`mapInFront`). Chrome hands focus back after a click (`blurChromeAfterClick`), so the keys work again straight away.
+**Keys.** The rules are `isEditorKeyEvent`'s (`editor/keyTargets.ts`): a text field, a dialog or a menu keeps its keys, and everything else drives the editor. Chrome hands focus back after a click (`blurChromeAfterClick`), so the keys work again straight away.
 
 Dockview is themed in `components/dock/dock.css` with the tokens from `packages/ui`, so it follows light and dark and `--motion`. Its strips are `h-8`, like the document tabs. A drag shows a copy of the tab on a card, or of the whole strip when it's a group's (`dragImage.ts`), over dockview's image, which has no option for it. A dockview upgrade should be checked for this too.
 
@@ -128,14 +128,13 @@ Changing projection keeps the point the pane looks at and its size on screen. Nu
 
 - The active pane does. The others keep their pixels (`preserveDrawingBuffer`) and take turns, one at a time and at most every 80 ms (`panesToDraw`), which also keeps moving materials moving. During a gizmo drag the other panes follow at that rate.
 - Every pane draws when its pixels are gone or in the wrong place: a resize, a moved divider, a changed layout or projection, another tab. Dragging a divider on a large map is therefore the slow case.
-- Nothing draws while another tab hides the map.
 - `scene.updateMatrixWorld` runs once a frame, not once a pane, and skips the items: an item's objects work out their matrices when they change (`FixedGroup` in `ItemObject.tsx`). An object that updates its own matrix forces everything under it to update too, so the scene and the items' root keep theirs fixed as well. Code that moves an item outside React has to call `updateMatrix`, as the gizmo does.
 
 ### Menus
 
 `components/MenuBar.tsx` holds the menus. Every item calls the entry point its keybind or button uses.
 
-- **File:** New project… (`components/NewProjectDialog.tsx`, a name that becomes `Documents/Ballest Editor/<name>` through `createProject`), Open project…, Recent projects, Save, Close tab, Settings…, Game link…, and Quit, which closes the window the way its × does, so unsaved edits ask.
+- **File:** New project… (`components/NewProjectDialog.tsx`, a name that becomes `Documents/Ballest Editor/<name>` through `createProject`), Open project…, Recent projects, Save, Close tab, Settings… (`components/SettingsDialog.tsx`, a modal in `SettingsShell`'s shape that looks the game up again each time it opens, and is meant to become a window of its own later), Game link…, and Quit, which closes the window the way its × does, so unsaved edits ask.
 - **Edit:** Undo, Redo, Cut, Copy, Paste, Duplicate, Delete, Deselect, Group and Ungroup.
 - **View:** Focus selection, Frame all, the view's panes and the active pane's projection (§ View panes), the dock's panels and Reset layout (§ Dock), and the display toggles (the grid, sky, water and theme).
 - **Project:** New map…, Import map…; Export to game, Export on save, Re-import from game, Play, Launch game; Project settings….

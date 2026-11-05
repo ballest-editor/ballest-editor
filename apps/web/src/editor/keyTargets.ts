@@ -16,10 +16,9 @@ const isTypingTarget = (target: EventTarget | null): boolean =>
 
 /**
  * Keyboard events that belong to a text field, an open dialog or a menu (the menu bar's arrow keys, Escape and
- * type-ahead) never drive the editor, and nothing does while another tab hides the map (`mapInFront`).
+ * type-ahead) never drive the editor.
  */
 export const isEditorKeyEvent = (e: KeyboardEvent): boolean =>
   !isTypingTarget(e.target) &&
   !isModalOpen(useEditor.getState()) &&
-  useEditor.getState().mapInFront &&
   elementOf(e.target)?.closest("[role=dialog], [role=menu], [role=menubar]") == null

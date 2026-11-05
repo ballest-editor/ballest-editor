@@ -24,7 +24,7 @@ describe("isEditorKeyEvent", () => {
   const element = { nodeType: 1, tagName: "DIV", closest: () => null }
   const outside = node(element)
 
-  beforeEach(() => useEditor.setState({ mapInFront: true, dialog: null }))
+  beforeEach(() => useEditor.setState({ dialog: null }))
 
   it("drives the editor from the page and from a key forwarded by a popped-out panel", () => {
     assert.isTrue(isEditorKeyEvent(key(outside)))
@@ -40,10 +40,10 @@ describe("isEditorKeyEvent", () => {
     assert.isFalse(isEditorKeyEvent(key(node({ ...element, closest: () => ({}) }))))
   })
 
-  it("is off behind a modal dialog, and while another tab hides the map", () => {
-    useEditor.setState({ dialog: { id: "gameLink" } })
+  it("is off behind a modal dialog, and back when it closes", () => {
+    useEditor.getState().openDialog({ id: "settings" })
     assert.isFalse(isEditorKeyEvent(key(outside)))
-    useEditor.setState({ dialog: null, mapInFront: false })
-    assert.isFalse(isEditorKeyEvent(key(outside)))
+    useEditor.getState().closeDialog()
+    assert.isTrue(isEditorKeyEvent(key(outside)))
   })
 })

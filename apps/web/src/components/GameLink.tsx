@@ -29,7 +29,6 @@ import {
   revealGamePath
 } from "../editor/actions"
 import { useCreator, useEditor } from "../editor/store"
-import { openSettings } from "./dock/dockControl"
 import { PathAction, PathField } from "./PathText"
 
 const ICONS: Record<GameLinkRowState, ComponentType<{ readonly className?: string }>> = {
@@ -56,6 +55,7 @@ function StateIcon({ state, className }: { readonly state: GameLinkRowState; rea
  * optional plugin manager's is quiet, since nothing is wrong without it.
  */
 function FixButton({ fix, state }: { readonly fix: GameLinkFix; readonly state: GameLinkRowState }) {
+  const openDialog = useEditor((s) => s.openDialog)
   const [busy, setBusy] = useState(false)
   switch (fix._tag) {
     case "ChooseFolder":
@@ -92,7 +92,7 @@ function FixButton({ fix, state }: { readonly fix: GameLinkFix; readonly state: 
         <Button
           variant={state === "ok" ? "outline" : "default"}
           size="sm"
-          onClick={() => openSettings("general")}
+          onClick={() => openDialog({ id: "settings", category: "general" })}
         >
           {state === "ok" ? "Change…" : "Set name…"}
         </Button>
