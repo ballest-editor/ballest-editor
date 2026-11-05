@@ -13,6 +13,7 @@ import {
   HIDDEN_SECTION,
   indexCatalog,
   paletteSections,
+  riskyClassesIn,
   unavailableReasonOf,
   VerificationFile,
   visibleExtras
@@ -93,6 +94,13 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
     assert.isTrue(pieces.every((p) => unavailableReasonOf(index, p, results)?.includes("opens blank")))
     // the game's panel doesn't paint them, and with no component there is nothing to save paint in
     assert.deepStrictEqual(paintTargets(items, index).items, [])
+  })
+
+  it("doesn't warn about the player start, which isn't in the palette but is in every map", () => {
+    const { results } = Schema.decodeSync(Schema.fromJsonString(VerificationFile))(
+      fs.readFileSync(path.join(repoRoot, "assets", "verified.json"), "utf8")
+    )
+    assert.deepStrictEqual(riskyClassesIn(["MP_PlayerStart"], load().pieces, results), { rejected: [], unverified: [] })
   })
 
   it("places every class with the property lists the game saves for it untouched", () => {

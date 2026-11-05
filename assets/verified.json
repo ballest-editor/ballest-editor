@@ -1,6 +1,12 @@
 {
   "note": "Hand-maintained results of loading single-piece probe maps in the in-game level editor (build 0.4.0-playtest), plus entries `via` the 0.4.1 pak where a patch settles a class without a probe. Palette pieces are assumed ok. A rejected item makes the game discard the whole map and start a default one.",
   "results": {
+    "MP_PlayerStart": {
+      "status": "ok",
+      "note": "every map has one: all 30 samples, drafts and published",
+      "date": "2026-11-04",
+      "via": "samples"
+    },
     "MP_RawPointLight": {
       "status": "ok",
       "date": "2026-10-26"
