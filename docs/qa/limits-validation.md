@@ -131,6 +131,7 @@ The first two decide how big a map can be, and they land far below 100,000 items
 | Member twice, shared by two groups, an empty group, or no frame       | Blank map                   | Blocks it      |
 | Name of 65 characters, or with a space                                | Blank map                   | Blocks it      |
 | Frame with a non-normalised rotation                                  | Blank map                   | Blocks it      |
+| Frame with a scale axis of 0 ([groups-prefabs.md](groups-prefabs.md)) | Blank map                   | Exports        |
 | An entry that isn't an object                                         | Blank map                   | Refuses import |
 
 ### `worldSettings` and the file's shape
@@ -254,6 +255,7 @@ I kept our rule for the start. The wording is loose, but a map with no start can
 These are files we still let through.
 
 - **A material that isn't cooked** opens a blank map and we export it. The known list (`materials.json` plus the catalog) covers all 13,759 material references in the samples, but it isn't the game's full set, so a blocking rule could stop a valid Workshop map from saving. It needs the full list from the pak. The app can't produce such a path, so this takes a hand-edited file.
+- **A group frame with a scale axis of 0** opens a blank map and we export it. Only a hand-edited file has one today, but `gameRules.ts` should refuse it before the app writes frames of its own (#78).
 - **No goal** exports, and Play in the game then does nothing. The map isn't lost, so I didn't block Save, which would stop a player saving mid-edit. A warning at Play would suit it better.
 - **A game save of `MP_OrangeSign`, `BP_TwoCubeOneColor` or `BP_TwoCubeTwoColor`.** The app writes these with `meshComponents: []` and `gameRules.ts` refuses any component, so the app's own file loads. Measured on 0.4.1 from a map the factory wrote: all three opened and drew, alone and together, flipped on either axis, with a surface, scaled and turned. Saving that map in the game wrote two components back on each, and the saved file then opened blank. The app refuses such a file at Save, Export and Play, but it can't stop the game saving one, so `verified.json` keeps these classes `rejected` and players can't place them.
 

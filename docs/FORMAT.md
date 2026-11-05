@@ -11,7 +11,7 @@ Game: Steam app 3339810, Unreal Engine 5.8 (`++UE5+Release-5.8-CL-56702186`), bu
 | Install              | `<library>/steamapps/common/Ballest of Them All`     | same; by default `~/.local/share/Steam/steamapps/common/Ballest of Them All`                                   |                               |
 | Maps folder (drafts) | `%LOCALAPPDATA%\Ballest\Saved\UserSavedMaps`         | `<library>/steamapps/compatdata/3339810/pfx/drive_c/users/steamuser/AppData/Local/Ballest/Saved/UserSavedMaps` | `.balledit`                   |
 | Published (Workshop) | `<library>/steamapps/workshop/content/3339810/<id>/` | same                                                                                                           | `.ballmap` + `.jpg` thumbnail |
-| Prefabs              | `.../Saved/SaveGames/Prefabs/`                       | same                                                                                                           | JSON (`BallestPrefab` v1)     |
+| Prefabs              | `.../Saved/SaveGames/Prefabs/`                       | same                                                                                                           | `.json` (§ Prefab file)       |
 | Plugins folder       | `<install>/Ballest/Binaries/Win64/plugins`           | same                                                                                                           | one folder per plugin         |
 
 The install is read-only for us, and samples are copied into `samples/`.
@@ -49,7 +49,7 @@ Plain UTF-8 JSON, tab-indented, CRLF line endings, no BOM. `.balledit` and `.bal
   items: [ Item ],
   editorState: {                                     // draft-only
     version: 1,
-    groups: [ { members: [ itemIndex ], name, frame: { rotation, translation, scale3D } } ],  // the shape the game loads; no sample has one
+    groups: [ { members: [ itemIndex ], name, frame: { rotation, translation, scale3D } } ],  // frame: the group's gizmo, see "Groups"; no sample has one
     pivots: [ { itemIndex, pivot: { choice: Default|Center|Bottom|Top|Left|Right|Back|Front, localPosition: {x,y,z} } } ],
     bHasCamera, cameraLocation: {x,y,z}, cameraRotation: {pitch,yaw,roll}
   }
@@ -160,7 +160,7 @@ Found by locating the `lea` that references each error string and reading the ad
 | Mesh components per item  | 64                                        | `Item %d contains more than %d saved mesh components.`        | 0x1447EFAFB |
 | Properties per typed list | 4,096                                     | `Item %d contains more than %d saved %s properties.`          | 0x1447B665B |
 | JSON field-name length    | 4,096                                     | `...oversized field name.`                                    | 0x1447EE8C2 |
-| Prefab items              | 2 to 4,096                                | string                                                        | n/a         |
+| Prefab items              | 2 to 4,096 (0.4.1, measured)              | `Select 2 to 4096 items before saving a prefab.`              | n/a         |
 | Workshop `.ballmap` bytes | not recovered (64-bit constant elsewhere) | `...oversized root .ballmap (%lld bytes; maximum %lld)`       | 0x144ECBD1C |
 
 The value and character limits are the ones a big map meets (`docs/qa/budget.md` § The real limits). Every object, array and scalar counts as a value, and every character of the file counts, whitespace and the game's layout included. A real map stops near 46,600 items on characters, and no map gets past 83,331 items on values, so the 100,000-item limit is never the one that binds. Past either, the game drops the map without a message and opens the default new map.
@@ -207,7 +207,7 @@ On load the game does not move items below the water: the `asdf new not loaded` 
 
 Measured on 0.4.1, case by case, in [docs/qa/limits-validation.md](qa/limits-validation.md). A file the game refuses opens a blank map (the level's start and goal under the map's name) with no message, and pressing Save there and accepting the overwrite prompt replaces the file with that blank map. A file it can't list is missing from the Create page.
 
-- Blank map: a rotation outside `abs(1 - abs(q)^2) < 0.01`; a non-finite transform, light value (time, brightness, angle), float property, camera or pivot position; a class that doesn't exist, isn't an actor or is gone from the build; a property its class lacks, in the wrong list, set twice or with no name; a second mesh component on a piece with one; any mesh component on `BP_TwoCubeOneColor`, `BP_TwoCubeTwoColor` or `MP_OrangeSign`, including the two the game saves for each ([docs/qa/exposed-properties.md](qa/exposed-properties.md)); a mesh or material that isn't cooked; a material slot that is negative, repeated or at or past the mesh's slot count (see Materials), or more material paths than slots; `editorState` without `version` 1; a pivot repeated, past the items or with an unknown choice; a group with no members, a member past the items or in two groups, no frame, a non-normalised frame or a name that isn't empty or 1 to 64 letters and digits; any limit above.
+- Blank map: a rotation outside `abs(1 - abs(q)^2) < 0.01`; a non-finite transform, light value (time, brightness, angle), float property, camera or pivot position; a class that doesn't exist, isn't an actor or is gone from the build; a property its class lacks, in the wrong list, set twice or with no name; a second mesh component on a piece with one; any mesh component on `BP_TwoCubeOneColor`, `BP_TwoCubeTwoColor` or `MP_OrangeSign`, including the two the game saves for each ([docs/qa/exposed-properties.md](qa/exposed-properties.md)); a mesh or material that isn't cooked; a material slot that is negative, repeated or at or past the mesh's slot count (see Materials), or more material paths than slots; `editorState` without `version` 1; a pivot repeated, past the items or with an unknown choice; a group with no members, a member past the items or in two groups, no frame, a non-normalised frame, a frame with a scale axis of 0 or a name that isn't empty or 1 to 64 letters and digits; any limit above.
 - Off the Create page: invalid JSON, no `worldSettings`, or a `levelDifficulty` that isn't one of the five names (any case, `EBallgameDifficulty::` allowed; a missing one loads).
 - Lost on the next save: an actor class that isn't an editor item (`BP_KillZone`, `StaticMeshActor`). The game spawns it, the editor doesn't list it, and Save leaves it out.
 - Loads: a missing field takes its default, including `meshComponents`, property lists, `editorState` and every `worldSettings` field except `levelData.userLevelName`, without which the Create entry opens another map. Unknown keys load and Save drops them. Scale, position, `SurfaceAssignment` and `propertyType` aren't checked, and nothing is clamped to the placement bounds. A group of one and a group with no `name` load ([docs/qa/save-roundtrip.md](qa/save-roundtrip.md)).
@@ -215,7 +215,7 @@ Measured on 0.4.1, case by case, in [docs/qa/limits-validation.md](qa/limits-val
 - Start and goal: the editor loads a map with any number of either. On its Play button no start gives a timed run with no ball, two starts use the later one, no goal does nothing, and two goals work.
 - `bIsBaseItem`: true on every item of a `.ballmap`, false in every draft. A flagged item in a draft is in the world and survives Save, but the editor's piece list leaves it out, so the editor writes false.
 - `levelName and username must be strings` is from the exe, about leaderboards or ghosts by its neighbours, and wasn't reached by any probe.
-- Prefab: 2 to 4096 items, no `MP_PlayerStart`.
+- Prefab: see § Prefab file.
 
 ## Game assets
 
@@ -224,6 +224,39 @@ Pak: `Ballest/Content/Paks/Ballest-Windows.{pak,utoc,ucas}`, an IoStore TOC v8 c
 Note: `itemTransform` in a map file is the piece's **Main component** world transform, not the actor transform (e.g. every AirVent item carries Main's scale 0.75,0.75,1).
 
 In-game console (`ballest.editor.*`): `saveprefab`, `spawnprefab`, `listprefabs`, `deleteprefab`, `pivot`, `surface`.
+
+## Groups (`editorState.groups`)
+
+Measured on 0.4.1 in [docs/qa/groups-prefabs.md](qa/groups-prefabs.md). A group is flat: one list of item indices, no nesting, and an item in one group at most. Selecting any member selects them all, and no route selects one alone.
+
+`frame` is the group's gizmo. Its translation is where the gizmo sits and what the group rotates and scales about, and its rotation and scale are what the details panel shows. Members' transforms stay as saved: loading never applies the frame to them, and an edit moves them by the change from the frame's current value. A frame can sit anywhere and any scale loads, except that a 0 on any axis opens a blank map. `{}` is a frame at the world origin.
+
+Ctrl+G makes rotation identity, scale 1 and a translation at the centre of the world-aligned box around the members' bounds, which is what the editor should write. A new group's name is empty. Grouping a selection that spans groups makes one flat group with a new frame and no name.
+
+## Prefab file
+
+`Saved/SaveGames/Prefabs/<name>.json`, written by `saveprefab` from 2 to 4096 selected items. `<name>` is 1 to 64 letters, digits, `_` and `-`. The layout is the map file's: tabs, CRLF, no BOM. Measured on 0.4.1 in [docs/qa/groups-prefabs.md](qa/groups-prefabs.md).
+
+```
+{
+  format: "BallestPrefab",
+  version: 1,
+  group: { rotation: [pitch, yaw, roll], scale: [x, y, z], name? },  // the frame's, less its position; name only if the group has one
+  items: [ {
+    class: "/Game/.../BP_X.BP_X_C",                       // bare class path; the map's wrapped form also loads
+    transform: { location: [x, y, z], rotation: [pitch, yaw, roll], scale: [x, y, z] },  // degrees
+    properties: { bMirror: false, "Field Magnitude": 750000, SurfaceAssignment: 0 },     // name -> bool or number, one map for every type
+    meshes: [ { tag: "SKGMapEditor", mesh: "/Game/.../Box.Box", materials: [ "/Game/.../MI_X.MI_X" ] } ],  // mesh "" where a map writes ""
+    paint: { categories: [ "/Game/.../MaterialCategory_Glossy.MaterialCategory_Glossy" | null ], colors: [ 3 ] }  // per slot
+  } ]
+}
+```
+
+Against a map's `Item`: `rotation` is Euler degrees, not a quaternion. `location` is relative, while `rotation` and `scale` stay world values. `materials` are bare paths in slot order, like `materialAssetPaths`, and `paint` has no map field. There is no `bIsBaseItem`, and no join: a joined item saves and spawns free.
+
+`location` is the offset from a point the file doesn't record, in world axes: the frame's translation when the selection is one whole group, otherwise the centre of the selection's bounds. `spawnprefab` picks that point anew, in front of the camera, and the items arrive selected, as one group with `group`'s rotation, scale and name. The game has no record that they came from a prefab, and a save in the game drops the group as it drops every group.
+
+A hand-written file needs `group` with `rotation` and a `scale` with no 0 in it, and `properties` and `meshes` on each item, both of which can be empty. `paint` is optional and wins over `meshes` where it names a category. The game refuses a property the class lacks, a value of the wrong type, a scale of 0, a class that isn't an item, and `MP_PlayerStart`. Unknown keys are ignored.
 
 ## Pivots (`editorState.pivots`)
 
