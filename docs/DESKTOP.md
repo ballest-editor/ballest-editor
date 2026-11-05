@@ -52,7 +52,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - **Launch game** (Project menu) opens `steam://rungameid/3339810`, or says the game is already running.
 - **Backups.** Every write over a map file keeps the old one first (§ Backups). Recover previous version… in a map's menu in the Project panel lists them.
 - **Toasts** name the project or the maps folder and offer Reveal.
-- **Unsaved changes** are asked about before anything would lose them: closing the window, reloading, quitting, closing a map's tab, replacing a map open in a tab (Re-import, Recover, Import's Replace), and switching projects (New project…, Open project…, Recent projects). New map, opening a map and Import open a tab of their own and ask nothing. See § Window.
+- **Unsaved changes** are asked about before anything would lose them: closing the window, reloading, quitting, closing a map's tab, replacing a map open in a tab (Re-import, Recover, Import's Replace), and switching projects (New project…, Open project…, Recent projects). Untitled Project doesn't ask when it becomes a project: its maps stay open and Save puts them in that project. New map, opening a map and Import open a tab of their own and ask nothing. See § Window.
 
 ### Document tabs
 
@@ -86,7 +86,7 @@ There is no Map or Game menu: the menus act on the active tab's map, and the gam
 - A click opens the map.
 - Its menu (⋮, or a right-click) holds Open, Rename…, Duplicate…, Recover previous version…, Export to game, Play and Reveal. The ones that act on the open map open it first (`withProjectMapOpen`). Reveal shows the project's maps folder, not the file.
 - The header holds New map…, Import map… and Project settings….
-- A map with no file yet, a fresh one or any in Untitled Project, is a row of its own in italics.
+- Every tab whose map has no file yet (a fresh one, any in Untitled Project, what a switch of projects left open) is a row of its own in italics, above the project's maps. A click makes that tab active.
 - No thumbnails yet.
 
 ### Game link

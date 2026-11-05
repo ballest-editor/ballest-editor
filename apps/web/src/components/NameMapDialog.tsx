@@ -7,7 +7,7 @@ import { unconfirmedPropertiesIn } from "../domain/itemProperties"
 import { classNameOf } from "../domain/MapFile"
 import { pathInFolder } from "../domain/paths"
 import { isProjectName } from "../domain/project"
-import { duplicateMap, nameProject, playAsNewDraft, renameOpenMap, saveMapAs } from "../editor/actions"
+import { duplicateMap, playAsNewDraft, renameOpenMap, saveMapAs, saveMapInNewProject } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { type MapCreator, MapNameDialog, useMapCreator } from "./MapNameDialog"
 import { PathText } from "./PathText"
@@ -86,9 +86,8 @@ export function NameMapDialog(
     else if (mode === "newDraft") await playAsNewDraft(name, creator.name, replaces)
     else if (mode === "rename") await renameOpenMap(name, creator.name)
     else {
-      if (namesProject) await nameProject(projectTrimmed)
       useEditor.getState().renameLevel(name, creator.name)
-      await saveMapAs(afterSave)
+      await (namesProject ? saveMapInNewProject(projectTrimmed, afterSave) : saveMapAs(afterSave))
     }
   }
 

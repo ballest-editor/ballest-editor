@@ -972,6 +972,13 @@ export const tabWithFile = (s: EditorState, fileName: string): string | undefine
 export const dirtyTabs = (s: EditorState): ReadonlyArray<string> => s.tabIds.filter((id) => tabStateOf(s, id)?.dirty)
 
 /**
+ * The tabs whose map has no file yet, in tab order: the fresh map, every map in Untitled Project, what a switch of
+ * projects left open. The project's file list can't show them, so the Project panel gives each a row of its own.
+ */
+export const tabsWithoutFile = (s: EditorState): ReadonlyArray<string> =>
+  s.tabIds.filter((id) => tabStateOf(s, id)?.file === null)
+
+/**
  * A tab nobody has used: the fresh map the app starts on (or closing the last tab leaves), never saved, with no edits
  * and no history. A map opened into a new tab takes its place.
  */
