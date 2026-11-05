@@ -20,8 +20,8 @@ const LABEL_WIDTHS = ["45%", "38%", "52%", "41%", "60%", "35%", "48%", "56%", "4
  */
 export function PaletteSkeleton() {
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden pr-2" aria-hidden>
-      <div className="flex items-center gap-1 px-1 py-1 text-[0.65rem]">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2" aria-hidden>
+      <div className="flex items-center gap-1 px-1 py-1 text-eyebrow">
         <span className="flex h-[1lh] items-center">
           <Skeleton className="h-2 w-16 rounded-sm" />
         </span>
@@ -60,8 +60,10 @@ export function EditorSkeletonPanels({ className }: { readonly className?: strin
         style={{ width: dockSide("left", 260) }}
       >
         <div className="h-8 border-b" />
-        <div className="flex h-full flex-col gap-2 p-2">
-          <Input type="search" placeholder="Search pieces…" disabled />
+        <div className="flex h-full flex-col">
+          <div className="flex h-9 shrink-0 items-center px-2">
+            <Input type="search" placeholder="Search pieces…" disabled />
+          </div>
           <PaletteSkeleton />
         </div>
       </div>
@@ -81,7 +83,7 @@ export function EditorSkeletonPanels({ className }: { readonly className?: strin
       >
         <div className="h-8 border-b" />
         <div className="flex flex-col gap-3 p-3">
-          <div className="text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">Map</div>
+          <div className="text-eyebrow text-muted-foreground">Map</div>
           <div className="flex flex-col gap-1">
             <Skeleton className="h-3 w-10 rounded-sm" />
             <Skeleton className="h-7 w-full" />

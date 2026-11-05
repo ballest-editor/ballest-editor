@@ -330,7 +330,7 @@ export function Outline() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-card">
-      <div className="shrink-0 border-b p-2">
+      <div className="flex h-9 shrink-0 items-center px-2">
         <Input
           aria-label="Filter the outline"
           placeholder="Filter by name, class or tag"
@@ -407,7 +407,9 @@ export function Outline() {
             {drag !== null && <DropLine drag={drag} />}
             {rows.length === 0 && (
               <div className="p-3 text-xs text-muted-foreground">
-                {filtering ? "Nothing matches the filter." : "No items in this map yet."}
+                {filtering
+                  ? "Nothing matches the filter."
+                  : "Nothing placed yet. Click a piece in Pieces to add it to the map."}
               </div>
             )}
           </div>
