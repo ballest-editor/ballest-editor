@@ -168,6 +168,14 @@ Each case started from a real saved file and changed one thing. A refusal change
 
 From the console: one selected piece gives "Select 2 to 4096 items before saving a prefab.", the start in the selection gives the `MP_PlayerStart` message, and an existing name asks for `confirm`. `saveprefab <name> confirm` with nothing pending refuses.
 
+## Files written by the app
+
+Run on 2026-11-05, slot 1, against the same build. Each file went through `MapCodec` and `domain/prefab.ts`.
+
+- A prefab of two cubes and an air vent, written by `encodePrefab`, spawned as 3 items with their offsets, rotations, scales and `group.name`.
+- `saveprefab` of that group, and of two loose cubes (one at yaw 30, scale 2, 1, 1), decoded and encoded again byte for byte.
+- For the loose cubes, `prefabOfItems` gave the same `location` values as the game's file, to every digit: (−1058.0127018922194, −566.5063509461097, −650) and (441.9872981077806, 133.4936490538903, −350).
+
 ## What this means for translation
 
 - A top-level group in the editor becomes one entry in `editorState.groups`, with every item below it in `members`. Nesting is ours alone.
