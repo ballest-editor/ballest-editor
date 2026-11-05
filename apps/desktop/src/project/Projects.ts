@@ -2,6 +2,7 @@ import {
   isMapFileName,
   isProjectName,
   MAP_EXTENSIONS,
+  PREFAB_NAME_RULE,
   type ProjectFolder,
   type ProjectInfo,
   type ProjectState,
@@ -28,13 +29,15 @@ export type ProjectFile = typeof ProjectFile.Type
 export const PROJECT_FILE = "ballest-project.json"
 const RECENT_LIMIT = 8
 
-/** The error of every project operation: `Projects`, `MapFiles` and `MapExports` alike. */
+/** The error of every project operation: `Projects`, `MapFiles`, `Prefabs` and `MapExports` alike. */
 export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectError", {
   path: Schema.String,
   reason: Schema.Literals([
     "inGameMaps",
     "fileName",
     "exists",
+    "prefabExists",
+    "prefabName",
     "noProject",
     "projectExists",
     "projectName",
@@ -58,6 +61,10 @@ export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectErr
         return `${this.path} isn't a map file name (a .balledit name, no folders).`
       case "exists":
         return `The project already has a map called ${this.path}.`
+      case "prefabExists":
+        return `There is already a prefab called ${this.path}.`
+      case "prefabName":
+        return `${this.path} isn't a prefab name (${PREFAB_NAME_RULE}).`
       case "noProject":
         return "There is no project yet: Save the map to name one, or open a project."
       case "projectExists":

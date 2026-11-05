@@ -22,6 +22,11 @@ import type {
   PlayResult,
   PlaySessionEnded,
   PluginStatus,
+  PrefabInfo,
+  PrefabInfos,
+  PrefabRead,
+  PrefabRef,
+  PrefabTier,
   ProjectFolder,
   ProjectInfo,
   ProjectMap,
@@ -29,10 +34,13 @@ import type {
   ProjectMaps,
   ProjectState,
   ProjectTarget,
+  RenamePrefabPayload,
   UnloadKind,
   UnsavedChoice,
-  UpdateState
+  UpdateState,
+  WritePrefabPayload
 } from "@ballest/contracts"
+import { prefabSummaryOf } from "@ballest/contracts"
 import { Context, Effect, Layer, Option, Queue, Schema, Stream } from "effect"
 import { discardQuestionOf, type UnsavedAction, unsavedPromptOf } from "../domain/unsaved"
 
@@ -50,6 +58,9 @@ export type {
   PlayResult,
   PlaySessionEnded,
   PluginStatus,
+  PrefabInfo,
+  PrefabRef,
+  PrefabTier,
   ProjectMap,
   ProjectMapFile,
   ProjectState,
@@ -143,6 +154,17 @@ export class Platform extends Context.Service<Platform, {
   readonly writeSidecar: (
     file: { readonly fileName: string; readonly text: string }
   ) => Effect.Effect<void, PlatformError>
+  /** A tier's prefabs by name (docs/DESKTOP.md § Prefabs). A browser keeps its `user` tier in memory, and has no other. */
+  readonly listPrefabs: (tier: PrefabTier) => Effect.Effect<PrefabInfos, PlatformError>
+  readonly readPrefab: (ref: PrefabRef) => Effect.Effect<PrefabRead, PlatformError>
+  /** Writes a prefab; without `replace`, fails when there is one of that name. What it replaces goes to the backups. */
+  readonly writePrefab: (payload: WritePrefabPayload) => Effect.Effect<PrefabInfo, PlatformError>
+  /** Moves a prefab to the backups. */
+  readonly deletePrefab: (ref: PrefabRef) => Effect.Effect<void, PlatformError>
+  /** Moves a prefab to a new name in its tier; fails when the name is taken. */
+  readonly renamePrefab: (payload: RenamePrefabPayload) => Effect.Effect<PrefabInfo, PlatformError>
+  /** Shows a tier's folder in the file manager. */
+  readonly revealPrefabs: (tier: PrefabTier) => Effect.Effect<void, PlatformError>
   /** Copies a picked file into the project. `Clash` (nothing written) when it has a map of that name and not `replace`. */
   readonly importMap: (payload: ImportMapPayload) => Effect.Effect<ImportMapResult, PlatformError>
   /**
@@ -325,6 +347,12 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     saveMap: (file) => call("saveMap", file),
     renameMap: (file) => call("renameMap", file),
     writeSidecar: (file) => call("writeSidecar", file),
+    listPrefabs: (tier) => call("listPrefabs", { tier }),
+    readPrefab: (ref) => call("readPrefab", ref),
+    writePrefab: (payload) => call("writePrefab", payload),
+    deletePrefab: (ref) => call("deletePrefab", ref),
+    renamePrefab: (payload) => call("renamePrefab", payload),
+    revealPrefabs: (tier) => bridgeCheck(call("revealPrefabs", { tier }), "That folder isn't there yet."),
     importMap: (payload) => call("importMap", payload),
     exportMap: (fileName, options) => call("exportMap", { fileName, ...options }),
     checkExports: call("checkExports"),
@@ -392,10 +420,73 @@ const desktopOnly = Effect.fail(new PlatformError({ message: "Only the desktop a
 
 const noProject = Effect.fail(new PlatformError({ message: "Only the desktop app keeps maps in a project." }))
 
+/** The SHA-256 of `text` as lowercase hex, as main hashes a file. */
+const hashOf = (text: string) =>
+  Effect.tryPromise({
+    try: () => crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)),
+    catch: () => new PlatformError({ message: "This browser can't hash a prefab." })
+  }).pipe(Effect.map((digest) => [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("")))
+
+/**
+ * A browser's prefabs: one tier, kept until the page closes (docs/DESKTOP.md § Prefabs). It answers to `user`, so an
+ * instance's link has the same shape, and a `project` tier is empty and takes nothing.
+ */
+const makeMemoryPrefabs = () => {
+  const files = new Map<string, PrefabRead>()
+  const noneOf = (name: string) => new PlatformError({ message: `${name} doesn't exist any more.` })
+  const taken = (name: string) => new PlatformError({ message: `There is already a prefab called ${name}.` })
+  const inMemory = (tier: PrefabTier) =>
+    tier === "user" ? Effect.void : Effect.fail(new PlatformError({ message: "Only the desktop app has projects." }))
+  const infoOf = ({ text: _, ...info }: PrefabRead): PrefabInfo => info
+  const write = (name: string, text: string) =>
+    hashOf(text).pipe(
+      Effect.map((hash) => {
+        const file = {
+          tier: "user",
+          name,
+          path: null,
+          modifiedAt: new Date().toISOString(),
+          hash,
+          ...prefabSummaryOf(text),
+          text
+        } satisfies PrefabRead
+        files.set(name, file)
+        return infoOf(file)
+      })
+    )
+  const read = ({ name, tier }: PrefabRef) =>
+    inMemory(tier).pipe(
+      Effect.andThen(Effect.suspend(() => {
+        const file = files.get(name)
+        return file === undefined ? Effect.fail(noneOf(name)) : Effect.succeed(file)
+      }))
+    )
+  return {
+    listPrefabs: (tier: PrefabTier) =>
+      Effect.sync(() =>
+        tier === "user" ? [...files.values()].map(infoOf).sort((a, b) => a.name.localeCompare(b.name)) : []
+      ),
+    readPrefab: read,
+    writePrefab: ({ name, replace, text, tier }: WritePrefabPayload) =>
+      inMemory(tier).pipe(
+        Effect.andThen(Effect.suspend(() => !replace && files.has(name) ? Effect.fail(taken(name)) : write(name, text)))
+      ),
+    deletePrefab: ({ name, tier }: PrefabRef) =>
+      inMemory(tier).pipe(Effect.andThen(Effect.sync(() => void files.delete(name)))),
+    renamePrefab: ({ from, tier, to }: RenamePrefabPayload) =>
+      read({ name: from, tier }).pipe(
+        Effect.flatMap(({ text }) => files.has(to) ? Effect.fail(taken(to)) : write(to, text)),
+        Effect.tap(() => Effect.sync(() => void files.delete(from)))
+      ),
+    revealPrefabs: () => Effect.fail(new PlatformError({ message: "Prefabs here are in memory: they have no folder." }))
+  }
+}
+
 const makeBrowser = (): Platform["Service"] => {
   // a browser has no game to link; "Don't show again" lasts until the page closes
   const muted = new Set<string>()
   return Platform.of({
+    ...makeMemoryPrefabs(),
     capabilities: browserCapabilities,
     pickMapFile: pickFile(".balledit,.ballmap,.json").pipe(
       Effect.flatMap(Option.match({

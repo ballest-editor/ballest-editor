@@ -5,6 +5,7 @@ import { ElectronShell } from "../../electron/ElectronShell"
 import { GamePaths } from "../../game/GamePaths"
 import { MapExports } from "../../project/MapExports"
 import { MapFiles } from "../../project/MapFiles"
+import { Prefabs } from "../../project/Prefabs"
 import { Projects } from "../../project/Projects"
 import { WindowLauncher } from "../../window/WindowLauncher"
 import type { DesktopIpcHandlers } from "../DesktopIpc"
@@ -78,6 +79,26 @@ export const projectHandlers = {
   }),
   writeSidecar: Effect.fn("ipc.writeSidecar")(function*({ fileName, text }) {
     yield* (yield* MapFiles).writeSidecar(fileName, text)
+  }),
+  listPrefabs: Effect.fn("ipc.listPrefabs")(function*({ tier }) {
+    return yield* (yield* Prefabs).list(tier)
+  }),
+  readPrefab: Effect.fn("ipc.readPrefab")(function*(ref) {
+    return yield* (yield* Prefabs).read(ref)
+  }),
+  writePrefab: Effect.fn("ipc.writePrefab")(function*(payload) {
+    return yield* (yield* Prefabs).write(payload)
+  }),
+  deletePrefab: Effect.fn("ipc.deletePrefab")(function*(ref) {
+    yield* (yield* Prefabs).remove(ref)
+  }),
+  renamePrefab: Effect.fn("ipc.renamePrefab")(function*(payload) {
+    return yield* (yield* Prefabs).rename(payload)
+  }),
+  revealPrefabs: Effect.fn("ipc.revealPrefabs")(function*({ tier }) {
+    const folder = yield* (yield* Prefabs).folderOf(tier)
+    if (Option.isNone(folder)) return false
+    return yield* (yield* ElectronShell).openFolder(folder.value)
   }),
   /** The open dialog, starting in the game's maps folder when it is found. */
   pickImport: Effect.fn("ipc.pickImport")(function*(_, event) {
