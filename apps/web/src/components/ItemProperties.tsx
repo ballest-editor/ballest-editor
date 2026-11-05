@@ -126,7 +126,7 @@ function PropertyValue({ property, id, handleClassName }: {
       const position = Math.min(Math.max(scrub ?? shown ?? range.min, range.min), range.max)
       return (
         // The field keeps room for its widest value; where the slider would be left too short, it goes under the field.
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(4.5rem,1fr)] items-center gap-1.5 @max-[15rem]:grid-cols-1">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(4.5rem,1fr)] items-center gap-2 @max-[15rem]:grid-cols-1">
           <Slider
             aria-label={propertyLabel(property)}
             className="@max-[15rem]:order-last"
@@ -297,7 +297,7 @@ export function ItemProperties({ properties }: { readonly properties: ReadonlyAr
     <>
       <Separator />
       <SectionTitle>Properties</SectionTitle>
-      <div className="grid @container grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_1.5rem] items-center gap-x-1.5 gap-y-1.5">
+      <div className="grid @container grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_1.5rem] items-center gap-x-2 gap-y-1">
         {propertyRows(properties).map((row) => {
           const first = row._tag === "Color" ? row.color.channels[0] : row.property
           return <PropertyRowView key={`${first.list}/${first.name}`} row={row} />

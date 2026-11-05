@@ -13,3 +13,6 @@ export const GROUP_BOX_COLORS = { dark: "#ff3dc8", light: "#c2129a" } as const
  * the canvas hasn't covered yet during a resize.
  */
 export const sceneBackgroundClass = "bg-[#e9ecf1] dark:bg-[#1d2128]"
+
+/** The same colours as an SVG stroke, for a halo that keeps overlay text readable over the scene. */
+export const sceneStrokeClass = "stroke-[#e9ecf1] dark:stroke-[#1d2128]"

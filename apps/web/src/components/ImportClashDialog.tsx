@@ -17,7 +17,7 @@ export function ImportClashDialog({ open, onClose }: { readonly open: boolean; r
   const projectName = useEditor((s) => s.project?.current?.name ?? "Untitled Project")
   return (
     <Dialog open={open && clash !== null} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent>
+      <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Replace the map in the project?</DialogTitle>
           <DialogDescription>
@@ -27,8 +27,8 @@ export function ImportClashDialog({ open, onClose }: { readonly open: boolean; r
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
+          <Button variant="outline" className="sm:mr-auto" onClick={() => void importAsCopy()}>Import as copy</Button>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button variant="outline" onClick={() => void importAsCopy()}>Import as copy</Button>
           <Button variant="destructive" onClick={() => void replaceOnImport()}>Replace</Button>
         </DialogFooter>
       </DialogContent>

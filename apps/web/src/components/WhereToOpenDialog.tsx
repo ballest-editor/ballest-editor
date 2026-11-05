@@ -20,7 +20,7 @@ export function WhereToOpenDialog({ open, onClose }: { readonly open: boolean; r
   const current = useEditor((s) => s.project?.current?.name ?? "Untitled Project")
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Open {asked?.name}</DialogTitle>
           <DialogDescription>
@@ -29,8 +29,8 @@ export function WhereToOpenDialog({ open, onClose }: { readonly open: boolean; r
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
+          <Button variant="outline" className="sm:mr-auto" onClick={() => void openInNewWindow()}>New window</Button>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button variant="outline" onClick={() => void openInNewWindow()}>New window</Button>
           <Button autoFocus onClick={() => void openInThisWindow()}>This window</Button>
         </DialogFooter>
       </DialogContent>

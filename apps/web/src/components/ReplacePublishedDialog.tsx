@@ -20,7 +20,7 @@ export function ReplacePublishedDialog({ open, onClose }: { readonly open: boole
   const draft = useEditor((s) => s.dialog?.id === "replacePublished" ? s.dialog : null)
   return (
     <Dialog open={open && draft !== null} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent>
+      <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Replace a published map's draft?</DialogTitle>
           <DialogDescription>

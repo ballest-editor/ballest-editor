@@ -24,12 +24,12 @@ export function TagInput({ id, inputRef, tags, onChange }: {
         <ul className="flex flex-wrap gap-1" aria-label="Tags">
           {tags.map((tag) => (
             <li key={tag}>
-              <Badge variant="secondary" className="max-w-full pr-1">
+              <Badge variant="secondary" className="max-w-full pr-0.5">
                 <span className="truncate">{tag}</span>
                 <button
                   type="button"
                   aria-label={`Remove tag ${tag}`}
-                  className="rounded-full text-muted-foreground hover:text-foreground"
+                  className="flex size-4 items-center justify-center rounded-full text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => onChange(tags.filter((t) => t !== tag))}
                 >
                   <IconX className="size-2.5" />

@@ -127,7 +127,7 @@ function SlotPaintRow(
           items={Object.fromEntries(paint.map((f) => [f.name, f.name]))}
           onValueChange={changeFinish}
         >
-          <SelectTrigger size="sm" className="w-28" aria-label={`${slotName} material`}>
+          <SelectTrigger className="w-28" aria-label={`${slotName} material`}>
             <SelectValue placeholder="Material" />
           </SelectTrigger>
           <SelectContent>
@@ -136,7 +136,7 @@ function SlotPaintRow(
         </Select>
       </div>
       {finish !== undefined && (
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label={`${slotName} color`}>
+        <div className="flex flex-wrap gap-2" role="group" aria-label={`${slotName} color`}>
           {finish.colors.map((color) => (
             <Swatch
               key={color.color}
@@ -181,7 +181,7 @@ function PaintGroup(
       )}
       {offPanel !== undefined && (
         // Every slot listed for such a piece is off-panel, so it's said once for the group.
-        <div className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground">
+        <div className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
           <Badge variant="outline" title={OFF_PANEL_HINT}>Off-panel</Badge>
           <span>Not in the game's panel, but paint set here draws.</span>
         </div>
