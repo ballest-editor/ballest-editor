@@ -44,6 +44,7 @@ export const InvokeChannels = {
   gameLinkMemory: "ballest:gameLink:memory",
   rememberGameLink: "ballest:gameLink:remember",
   getUpdateState: "ballest:update:get",
+  checkForUpdates: "ballest:update:check",
   downloadUpdate: "ballest:update:download",
   installUpdate: "ballest:update:install"
 } as const

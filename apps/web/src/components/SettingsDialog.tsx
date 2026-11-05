@@ -44,6 +44,7 @@ import { useDarkTheme } from "../editor/theme"
 import { creatorSettingsRow } from "./CreatorSetting"
 import { CheckAgainButton, GameLinkRows, useGameLinkSummary } from "./GameLink"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
+import { useUpdateCheck } from "./UpdateCheck"
 
 const movementLookItems = {
   all: "All movement keys",
@@ -211,6 +212,7 @@ export function SettingsDialog(props: {
   const hasGame = useEditor((s) => s.capabilities.exportToGame)
   const overridden = overriddenFolders(useEditor((s) => s.gamePaths))
   const gameLinkSummary = useGameLinkSummary()
+  const updateCheck = useUpdateCheck()
   const creator = useCreator()
   const foundCreator = useEditor((s) => s.foundCreator)
 
@@ -392,6 +394,19 @@ export function SettingsDialog(props: {
           } satisfies Row
         ]
         : []),
+      ...(updateCheck === null
+        ? []
+        : [
+          {
+            id: "updates",
+            category: "general",
+            label: "Updates",
+            description: updateCheck.summary,
+            keywords: "version release new latest check download install",
+            changes: { modified: false, reset: () => {} },
+            control: updateCheck.button
+          } satisfies Row
+        ]),
       {
         id: "autosave",
         category: "general",

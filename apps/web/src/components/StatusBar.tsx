@@ -1,5 +1,6 @@
 import { LinkStatus } from "./LinkStatus"
 import { NotificationCenter } from "./NotificationCenter"
+import { VersionStatus } from "./UpdateCheck"
 import { UpdatePill } from "./UpdatePill"
 
 /**
@@ -9,7 +10,7 @@ import { UpdatePill } from "./UpdatePill"
 export function StatusBar() {
   return (
     <footer className="grid h-7 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 border-t bg-card px-2 text-xs">
-      <div />
+      <VersionStatus />
       <div className="flex min-w-0 items-center justify-center">
         <LinkStatus />
       </div>

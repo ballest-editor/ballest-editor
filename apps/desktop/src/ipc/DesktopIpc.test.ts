@@ -83,16 +83,17 @@ describe("DesktopIpc", () => {
       })
     ))
 
-  it.effect("reports the update state and passes on download and install", () =>
+  it.effect("reports the update state and passes on check, download and install", () =>
     withHandlers(({ fake }) =>
       Effect.gen(function*() {
         assert.deepInclude(yield* fake.invoke(InvokeChannels.getUpdateState), {
           status: "available",
           availableVersion: "0.2.1"
         })
+        assert.isUndefined(yield* fake.invoke(InvokeChannels.checkForUpdates))
         assert.isUndefined(yield* fake.invoke(InvokeChannels.downloadUpdate))
         assert.isUndefined(yield* fake.invoke(InvokeChannels.installUpdate))
-        assert.deepStrictEqual(updateCalls, { download: 1, install: 1 })
+        assert.deepStrictEqual(updateCalls, { check: 1, download: 1, install: 1 })
         assert.match(
           String((yield* Effect.flip(fake.invoke(InvokeChannels.downloadUpdate, { now: true }))).cause),
           /undefined/

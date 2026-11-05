@@ -80,6 +80,7 @@ export interface TestDisk {
     state: UpdateState
     readonly listeners: Set<(state: UpdateState) => void>
     readonly push: (state: UpdateState) => void
+    checks: number
     downloads: number
     installs: number
   }
@@ -118,6 +119,7 @@ const makeTestUpdater = (): TestDisk["updater"] => {
       updater.state = state
       updater.listeners.forEach((listener) => listener(state))
     },
+    checks: 0,
     downloads: 0,
     installs: 0
   }
@@ -473,6 +475,10 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       return Promise.resolve()
     },
     getUpdateState: () => Promise.resolve(disk.updater.state),
+    checkForUpdates: () => {
+      disk.updater.checks++
+      return Promise.resolve()
+    },
     downloadUpdate: () => {
       disk.updater.downloads++
       return Promise.resolve()

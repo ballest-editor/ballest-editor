@@ -261,6 +261,8 @@ export interface EditorState extends TabState {
   readonly gamePathProblem: { readonly which: GamePathKind; readonly message: string } | null
   /** The desktop updater's state, once main has sent it; null in a browser. */
   readonly update: UpdateState | null
+  /** A check the user asked for has finished: what the app says "up to date" on. */
+  readonly updateChecked: boolean
   /** Every notification (each toast is one), newest first, at most `NOTIFICATION_LIMIT`. */
   readonly notifications: ReadonlyArray<NotificationRecord>
   /** The kinds "Don't show again" muted: `notify` drops them. */
@@ -363,6 +365,7 @@ export interface EditorState extends TabState {
   readonly setGameLink: (gameLink: Partial<EditorState["gameLink"]>) => void
   readonly setGamePathProblem: (problem: EditorState["gamePathProblem"]) => void
   readonly setUpdate: (update: UpdateState) => void
+  readonly setUpdateChecked: (updateChecked: boolean) => void
   readonly placePiece: (piece: CatalogPiece, transform: ItemTransform) => void
   /**
    * Replaces the transforms of several items as one undo step; false (with a notice, and
@@ -580,6 +583,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     gameLink: { firstRun: true, last: null },
     gamePathProblem: null,
     update: null,
+    updateChecked: false,
     notifications: [],
     mutedNotificationKinds: new Set(),
     tool: "translate",
@@ -698,6 +702,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setGameLink: (gameLink) => set((s) => ({ gameLink: { ...s.gameLink, ...gameLink } })),
     setGamePathProblem: (gamePathProblem) => set({ gamePathProblem }),
     setUpdate: (update) => set({ update }),
+    setUpdateChecked: (updateChecked) => set({ updateChecked }),
 
     placePiece: (piece, transform) => {
       const item = validateItem(itemFromPiece(piece, transform))

@@ -120,7 +120,7 @@ const windowLayer = ElectronWindow.layerTest({
 })
 
 /** Answers with a fixed state and counts the downloads and installs it was asked for. */
-export const updateCalls = { download: 0, install: 0 }
+export const updateCalls = { check: 0, download: 0, install: 0 }
 const updatesLayer = Layer.succeed(
   DesktopUpdates,
   DesktopUpdates.of({
@@ -135,7 +135,7 @@ const updatesLayer = Layer.succeed(
       message: null
     }),
     run: Effect.die("unused"),
-    check: Effect.die("unused"),
+    check: Effect.sync(() => void updateCalls.check++),
     download: Effect.sync(() => void updateCalls.download++),
     install: Effect.sync(() => void updateCalls.install++)
   })

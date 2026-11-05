@@ -207,6 +207,8 @@ export class Platform extends Context.Service<Platform, {
   readonly rememberGameLink: (result: GameLinkResult) => Effect.Effect<void, PlatformError>
   /** The updater's state now, then every change to it (desktop); a browser's ends at once. */
   readonly updates: Stream.Stream<UpdateState, PlatformError>
+  /** Checks for a newer release now and ends with the check; what it found arrives on `updates`. */
+  readonly checkForUpdates: Effect.Effect<void, PlatformError>
   /** Starts downloading the release on offer; the progress arrives on `updates`. */
   readonly downloadUpdate: Effect.Effect<void, PlatformError>
   /** Quits the app, installs the downloaded release and starts it. */
@@ -337,6 +339,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     gameLinkMemory: call("gameLinkMemory"),
     rememberGameLink: (result) => call("rememberGameLink", result),
     updates: updateStates(bridge),
+    checkForUpdates: call("checkForUpdates"),
     downloadUpdate: call("downloadUpdate"),
     installUpdate: call("installUpdate")
   })
@@ -432,6 +435,7 @@ const makeBrowser = (): Platform["Service"] => {
     gameLinkMemory: Effect.sync(() => ({ last: null, muted: [...muted] })),
     rememberGameLink: () => Effect.void,
     updates: Stream.empty,
+    checkForUpdates: Effect.void,
     downloadUpdate: Effect.void,
     installUpdate: Effect.void
   })
