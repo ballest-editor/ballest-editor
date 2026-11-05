@@ -16,6 +16,17 @@ export const isMapFileName = (name: string): boolean =>
   // oxlint-disable-next-line eslint/no-control-regex -- control characters are exactly what is refused here
   !/[<>:"/\\|?*\u0000-\u001f]/.test(name) && !name.startsWith(".") && !name.endsWith(" ")
 
+const MAP_EXTENSION = ".balledit"
+const SIDECAR_EXTENSION = ".editor.json"
+
+/** The sidecar of the map `fileName`, beside it in `maps/` (docs/PROJECTS.md § The files). */
+export const sidecarFileNameOf = (fileName: string): string =>
+  `${fileName.slice(0, -MAP_EXTENSION.length)}${SIDECAR_EXTENSION}`
+
+/** Whether `name` is the sidecar of a map, by the same rules as `isMapFileName`. */
+export const isSidecarFileName = (name: string): boolean =>
+  name.endsWith(SIDECAR_EXTENSION) && isMapFileName(`${name.slice(0, -SIDECAR_EXTENSION.length)}${MAP_EXTENSION}`)
+
 /**
  * Map and creator names: letters, digits and spaces only. The game joins them with `_` into `userLevelName` and the
  * file name, so `_` (and anything Windows rejects in a file name) is out.

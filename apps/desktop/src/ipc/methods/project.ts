@@ -76,6 +76,9 @@ export const projectHandlers = {
   renameMap: Effect.fn("ipc.renameMap")(function*({ from, to, text }) {
     return yield* (yield* MapFiles).rename(from, to, text)
   }),
+  writeSidecar: Effect.fn("ipc.writeSidecar")(function*({ fileName, text }) {
+    yield* (yield* MapFiles).writeSidecar(fileName, text)
+  }),
   /** The open dialog, starting in the game's maps folder when it is found. */
   pickImport: Effect.fn("ipc.pickImport")(function*(_, event) {
     const { mapsFolder } = yield* (yield* GamePaths).get

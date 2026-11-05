@@ -21,6 +21,37 @@ import { expectTag, withHandlers } from "./handlersHarness"
 vi.mock("electron", () => ({}))
 
 describe("MapExports over IPC", () => {
+  it.effect("a Re-import leaves the sidecar for the page to re-match, and the game's copies get the map's", () =>
+    withHandlers(({ fake, steam }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const fileName = "Map_LevelEditorMain&Track_me.balledit"
+        const payload = { fileName, replacePublished: false, overwriteChanged: false }
+        yield* fs.makeDirectory(steam.maps, { recursive: true })
+        yield* fake.invoke(InvokeChannels.createMap, { fileName, text: "{\"v\":1}" })
+        yield* fake.invoke(InvokeChannels.writeSidecar, { fileName, text: "sidecar" })
+        yield* fake.invoke(InvokeChannels.exportMap, payload)
+        assert.isFalse(yield* fs.exists(path.join(steam.maps, "Map_LevelEditorMain&Track_me.editor.json")))
+
+        yield* fs.writeFileString(path.join(steam.maps, fileName), "{\"v\":2}")
+        assert.deepInclude(yield* fake.invokeAs(ProjectMapFile, InvokeChannels.reimportMap, { fileName }), {
+          text: "{\"v\":2}",
+          sidecar: "sidecar"
+        })
+
+        yield* fake.invoke(InvokeChannels.saveMap, { fileName, text: "{\"v\":3}" })
+        yield* fs.writeFileString(path.join(steam.maps, fileName), "{\"v\":4}")
+        yield* fake.invoke(InvokeChannels.exportMap, { ...payload, overwriteChanged: true })
+        const backups = yield* fake.invokeAs(MapBackups, InvokeChannels.listBackups)
+        const { id, place } = backups.find((backup) => backup.place === "export")!
+        assert.deepInclude(yield* fake.invokeAs(MapBackupFile, InvokeChannels.readBackup, { place, id }), {
+          text: "{\"v\":4}",
+          sidecar: "sidecar"
+        })
+      })
+    ))
+
   it.effect("imports a map from the game's maps folder linked to it, and exports it back with its hash", () =>
     withHandlers(({ fake, dialogs, dir, project, steam }) =>
       Effect.gen(function*() {

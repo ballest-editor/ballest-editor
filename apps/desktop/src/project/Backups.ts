@@ -1,4 +1,4 @@
-import { isMapFileName } from "@ballest/contracts"
+import { isMapFileName, isSidecarFileName } from "@ballest/contracts"
 import { Context, DateTime, Effect, FileSystem, Layer, Option, Path, Schema, Semaphore } from "effect"
 import { Buffer } from "node:buffer"
 import { DesktopSettings } from "../settings/DesktopSettings"
@@ -31,7 +31,9 @@ export const parseBackupId = (id: string): Option.Option<Backup> => {
   const [, date, h, m, s, ms, fileName = ""] = match
   const at = `${date}T${h}:${m}:${s}.${ms}Z`
   const millis = Date.parse(at)
-  return Number.isNaN(millis) || !isMapFileName(fileName) ? Option.none() : Option.some({ id, fileName, at, millis })
+  return Number.isNaN(millis) || !(isMapFileName(fileName) || isSidecarFileName(fileName))
+    ? Option.none()
+    : Option.some({ id, fileName, at, millis })
 }
 
 const sameBytes = (a: Uint8Array, b: Uint8Array) => a.byteLength === b.byteLength && Buffer.compare(a, b) === 0
@@ -52,8 +54,8 @@ export class BackupError extends Schema.TaggedError<BackupError>()("BackupError"
  * The one way a map file is written over (docs/PROJECTS.md § The files): the old bytes go to a backups folder first,
  * then the new ones are written atomically, then the folder is pruned. Save, Rename, Import replacing a map and Export
  * to game (and so Play) go through it, and so does anything later that replaces a map (Re-import, the Export confirm's
- * Back up and overwrite). A backups folder is flat; every file name has its versions in it. Operations run one at a
- * time.
+ * Back up and overwrite). So does a map's sidecar. A backups folder is flat; every file name has its versions in it.
+ * Operations run one at a time.
  */
 export class Backups extends Context.Service<Backups, {
   /**

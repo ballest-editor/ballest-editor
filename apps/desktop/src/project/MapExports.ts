@@ -189,7 +189,9 @@ export class MapExports extends Context.Service<MapExports, {
       return {
         ...(yield* files.info(project, fileName, link)),
         // the game's bytes as they are: a BOM is kept, like everything else
-        text: new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes)
+        text: new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes),
+        // left as it was: the page re-matches it against these bytes
+        sidecar: yield* files.sidecarOf(project, fileName)
       } satisfies ProjectMapFile
     })
 
