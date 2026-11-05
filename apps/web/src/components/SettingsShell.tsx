@@ -212,7 +212,7 @@ export function SettingsShell<C extends string>(props: {
         className="flex h-[min(80vh,720px)] w-full gap-0 overflow-hidden p-0 sm:max-w-4xl"
         showCloseButton
       >
-        <nav className="flex w-56 shrink-0 flex-col gap-1 border-r bg-muted/30 p-3">
+        <nav className="flex w-56 shrink-0 flex-col border-r bg-muted/30 p-3">
           <div className="relative mb-2">
             <IconSearch className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -226,52 +226,57 @@ export function SettingsShell<C extends string>(props: {
               aria-label="Search settings"
             />
           </div>
-          {searching && (
-            <Button
-              variant={scope === null ? "secondary" : "ghost"}
-              className="justify-between"
-              onClick={() => setScope(null)}
-            >
-              <span>All results</span>
-              <span className="text-[0.65rem] text-muted-foreground tabular-nums">{matched.length}</span>
-            </Button>
-          )}
-          {props.categories.map(({ id, label, icon: CategoryIcon, section }, i) => {
-            const hits = hitsPerCategory.get(id) ?? 0
-            const active = searching ? scope === id : props.category === id
-            const heading = section !== undefined && section !== props.categories[i - 1]?.section
-            return (
-              <Fragment key={id}>
-                {heading && (
-                  <div className="mt-2 px-2 pb-0.5 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
-                    {section}
-                  </div>
-                )}
+          {/* the search stays put; the categories scroll when there are more than fit (a project with many maps) */}
+          <ScrollArea className="-mx-3 min-h-0 flex-1">
+            <div className="flex flex-col gap-1 px-3 pb-px">
+              {searching && (
                 <Button
-                  variant={active ? "secondary" : "ghost"}
-                  className={cn("justify-start", searching && hits === 0 && "text-muted-foreground/50")}
-                  disabled={searching && hits === 0}
-                  onClick={() => {
-                    if (searching) setScope(id)
-                    else props.onCategoryChange(id)
-                  }}
-                  data-category={id}
+                  variant={scope === null ? "secondary" : "ghost"}
+                  className="justify-between"
+                  onClick={() => setScope(null)}
                 >
-                  <CategoryIcon />
-                  <span className="min-w-0 flex-1 truncate text-left">{label}</span>
-                  {searching
-                    ? hits > 0 && (
-                      <span className="rounded-full bg-primary/15 px-1.5 text-[0.65rem] text-primary tabular-nums">
-                        {hits}
-                      </span>
-                    )
-                    : modifiedIn(id) && (
-                      <span className="size-1.5 rounded-full bg-primary" aria-label="Has changed settings" />
-                    )}
+                  <span>All results</span>
+                  <span className="text-[0.65rem] text-muted-foreground tabular-nums">{matched.length}</span>
                 </Button>
-              </Fragment>
-            )
-          })}
+              )}
+              {props.categories.map(({ id, label, icon: CategoryIcon, section }, i) => {
+                const hits = hitsPerCategory.get(id) ?? 0
+                const active = searching ? scope === id : props.category === id
+                const heading = section !== undefined && section !== props.categories[i - 1]?.section
+                return (
+                  <Fragment key={id}>
+                    {heading && (
+                      <div className="mt-2 px-2 pb-0.5 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
+                        {section}
+                      </div>
+                    )}
+                    <Button
+                      variant={active ? "secondary" : "ghost"}
+                      className={cn("justify-start", searching && hits === 0 && "text-muted-foreground/50")}
+                      disabled={searching && hits === 0}
+                      onClick={() => {
+                        if (searching) setScope(id)
+                        else props.onCategoryChange(id)
+                      }}
+                      data-category={id}
+                    >
+                      <CategoryIcon />
+                      <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+                      {searching
+                        ? hits > 0 && (
+                          <span className="rounded-full bg-primary/15 px-1.5 text-[0.65rem] text-primary tabular-nums">
+                            {hits}
+                          </span>
+                        )
+                        : modifiedIn(id) && (
+                          <span className="size-1.5 rounded-full bg-primary" aria-label="Has changed settings" />
+                        )}
+                    </Button>
+                  </Fragment>
+                )
+              })}
+            </div>
+          </ScrollArea>
         </nav>
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="border-b px-5 py-3">

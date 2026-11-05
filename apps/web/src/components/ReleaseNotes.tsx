@@ -1,6 +1,7 @@
 import type { ReleaseNoteBlock, ReleaseNoteList, ReleaseNoteSpan } from "@ballest/contracts"
 import { cn } from "@workspace/ui/lib/utils"
 import type { ReactNode } from "react"
+import { linkTextOf } from "../domain/releaseNotes"
 import { openExternalLink } from "../editor/actions"
 
 /** A link in the notes: opens in the browser (desktop: the default one), never in the window. */
@@ -34,7 +35,7 @@ function keyed<A>(items: ReadonlyArray<A>): ReadonlyArray<readonly [string, A]> 
 }
 
 function Span({ span }: { readonly span: ReleaseNoteSpan }) {
-  let node: ReactNode = span.text
+  let node: ReactNode = span.href === null ? span.text : linkTextOf(span.text, span.href)
   if (span.code) node = <code className="rounded bg-muted px-1 py-px font-mono text-[0.9em]">{node}</code>
   if (span.emphasis) node = <em>{node}</em>
   if (span.strong) node = <strong className="font-semibold text-foreground">{node}</strong>

@@ -207,7 +207,8 @@ function UnsavedRow({ tabId }: { readonly tabId: string }) {
           }
         >
           <IconMap className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className={cn("truncate italic", isActive && "font-medium")}>{label}</span>
+          {/* an italic's last letter leans past its box, and `truncate` would clip it without the padding */}
+          <span className={cn("truncate pr-0.5 italic", isActive && "font-medium")}>{label}</span>
           <UnsavedDot />
         </TooltipTrigger>
         <TooltipContent side="right" align="start">
@@ -265,7 +266,10 @@ export function ProjectPanel() {
     <aside className="flex h-full min-w-0 flex-col gap-1 bg-card p-2">
       <div className="flex h-6 items-center gap-1 px-1">
         <span
-          className={cn("min-w-0 flex-1 truncate text-xs font-medium", untitled && "italic text-muted-foreground")}
+          className={cn(
+            "min-w-0 flex-1 truncate pr-0.5 text-xs font-medium",
+            untitled && "italic text-muted-foreground"
+          )}
           title={project?.path ?? (untitled ? "Not saved anywhere yet: Save the map to name the project." : undefined)}
         >
           {projects ? project?.name ?? "Untitled Project *" : "This browser"}
@@ -285,6 +289,10 @@ export function ProjectPanel() {
       <ScrollArea className="min-h-0 flex-1">
         <ul className="flex flex-col gap-px pr-2">
           {unsavedTabs.map((tabId) => <UnsavedRow key={tabId} tabId={tabId} />)}
+          {/* the tabs above aren't in the project; a rule keeps them from reading as its first maps */}
+          {unsavedTabs.length > 0 && maps.length > 0 && (
+            <li role="separator" aria-orientation="horizontal" className="mx-2 my-1 border-t border-border/60" />
+          )}
           {maps.map((map) => <MapRow key={map.fileName} map={map} now={now} />)}
         </ul>
         {untitled && (

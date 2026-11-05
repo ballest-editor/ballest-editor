@@ -27,7 +27,7 @@ export function useUpdateCheck() {
     button: (
       <Button
         variant="outline"
-        size="xs"
+        size="sm"
         disabled={!canCheckForUpdates(state)}
         onClick={() => void checkForUpdates()}
       >
