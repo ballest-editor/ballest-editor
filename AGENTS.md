@@ -24,6 +24,8 @@ Use one name per thing, in code comments and docs alike.
 | game driver        | `tools/driver`, the MCP server that runs sandboxed copies of the game.                                                                                     |
 | in-game editor     | The game's own map editor (not "track editor" or "level editor").                                                                                          |
 | game's maps folder | `UserSavedMaps`.                                                                                                                                           |
+| dock, centre group | The dockview shell between the top bar and status bar; the centre group is its group of map tabs and the viewport.                                         |
+| popped-out panel   | A dock panel in a window of its own. Not "floating": that's dockview's in-window group, which is off.                                                      |
 | piece, item        | A piece is a kind of thing in the catalog; an item is one placed in a map.                                                                                 |
 
 ## Layout
