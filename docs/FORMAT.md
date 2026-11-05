@@ -233,6 +233,17 @@ Measured on 0.4.1 in [docs/qa/groups-prefabs.md](qa/groups-prefabs.md). A group 
 
 Ctrl+G makes rotation identity, scale 1 and a translation at the centre of the world-aligned box around the members' bounds, which is what the editor should write. A new group's name is empty. Grouping a selection that spans groups makes one flat group with a new frame and no name.
 
+### The editor's projection
+
+The load-time rules are under [Load-time validation](#load-time-validation). The editor keeps its groups in the map's sidecar, nested to any depth ([PROJECTS.md § The files](PROJECTS.md#the-files)), which the game never reads. It makes `groups` from them each time it encodes a `.balledit` (`domain/gameGroups.ts`):
+
+- One game group per outermost tree group with at least one item anywhere under it. A nested group has no game group of its own.
+- `members` is every item index under it, flattened and sorted.
+- `name` is the group's name reduced to letters and digits, at most 64 of them, or empty when none are left.
+- `frame` has identity rotation and scale, with its translation at the centre of the box around the members' `itemTransform.translation`. The game's own Ctrl+G centres it on the members' mesh bounds instead (above), so the editor's gizmo for a group made here sits a little off the game's; using the catalog's bounds is a follow-up.
+
+Going the other way, a map with no sidecar gets one tree group per game group, where its first member is. An unnamed one is called `Group N`, and a member the game would refuse is left out.
+
 ## Prefab file
 
 `Saved/SaveGames/Prefabs/<name>.json`, written by `saveprefab` from 2 to 4096 selected items. `<name>` is 1 to 64 letters, digits, `_` and `-`. The layout is the map file's: tabs, CRLF, no BOM. Measured on 0.4.1 in [docs/qa/groups-prefabs.md](qa/groups-prefabs.md).
@@ -276,17 +287,6 @@ The bounds are the Main mesh's, measured through the game's own gizmo, with thes
 | `BP_Checkpoint`                                          | Moves as the goal animates (Center drifts about 20 cm in X), so no value is exact; the editor keeps the ring's box.                                                                |
 
 The game accepts a file's `localPosition` for all of these and puts the gizmo there.
-
-## Groups (`editorState.groups`)
-
-A game group is flat: item indices, a name and a frame. The load-time rules are under [Load-time validation](#load-time-validation). The editor keeps its groups in the map's sidecar, nested to any depth ([PROJECTS.md § The files](PROJECTS.md#the-files)), which the game never reads. It makes `groups` from them each time it encodes a `.balledit` (`domain/gameGroups.ts`):
-
-- One game group per outermost tree group with at least one item anywhere under it. A nested group has no game group of its own.
-- `members` is every item index under it, flattened and sorted.
-- `name` is the group's name reduced to letters and digits, at most 64 of them, or empty when none are left.
-- `frame` has identity rotation and scale, with its translation at the centre of the box around the members' `itemTransform.translation`. That a frame is there matters to the game; what the game does with its values isn't measured yet.
-
-Going the other way, a map with no sidecar gets one tree group per game group, where its first member is. An unnamed one is called `Group N`, and a member the game would refuse is left out.
 
 ## Decals
 
