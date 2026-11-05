@@ -93,6 +93,16 @@ export function FlyCamera() {
     }
   }, [])
 
+  // What a prefab spawns in front of. An orthographic pane has no distance to speak of, so it looks from the view's centre.
+  useEffect(() => {
+    sceneRegistry.viewRay = () => {
+      const pane = activePaneCamera()
+      const direction = threeToUeVector(pane.camera.getWorldDirection(new THREE.Vector3()))
+      const centre = pane.orthographicPlacement(useEditor.getState().floorHeight)
+      return { origin: centre ?? threeToUeVector(pane.perspective.position), direction }
+    }
+  }, [])
+
   useEffect(() => {
     const el = gl.domElement
     const dragModes: ReadonlyArray<readonly [Bindings, DragMode]> = [

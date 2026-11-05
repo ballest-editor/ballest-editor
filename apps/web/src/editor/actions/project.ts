@@ -11,6 +11,7 @@ import { Platform, PlatformError, type ProjectState, type ProjectTarget } from "
 import type { AppServices } from "../../services/runtime"
 import { hasWindowToTakeOver, type ImportClash, isChooserRequired, useEditor } from "../store"
 import { openProjectMapFile, openStartingMap, readProjectMapIntoEditor } from "./maps"
+import { checkPrefabs } from "./prefabs"
 import { run } from "./run"
 import { hasProject, projectName, refreshProject, revealIn, showMap } from "./shared"
 import { unlessAnyCancelled, unlessCancelledFor } from "./unsaved"
@@ -140,6 +141,7 @@ const changeProject = (
     const after = next.value.current
     if (after === null || after.path !== before) useEditor.getState().detachFiles()
     yield* refreshProject
+    yield* checkPrefabs
     if (starting) yield* openStartingMap
     useEditor.getState().notify("info", `Using the project ${after?.name ?? "Untitled Project"}`, {
       kind: "projectChanged",

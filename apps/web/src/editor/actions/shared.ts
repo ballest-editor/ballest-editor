@@ -14,6 +14,7 @@ import { MapCodec } from "../../services/MapCodec"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { type NotificationAction, Platform, type ProjectMap } from "../../services/Platform"
 import { type Doc, type OpenFile, tabStateOf, type TabTarget, useEditor } from "../store"
+import { followDefinitionsIn } from "./prefabFollow"
 
 /** The project in use, the recent ones and its maps into the store (desktop). */
 export const refreshProject = Effect.gen(function*() {
@@ -137,6 +138,7 @@ export const showMap = Effect.fn("showMap")(function*(
     ...(options?.into !== undefined && { into: options.into }),
     ...(options?.loaded !== undefined && { loaded: options.loaded })
   })
+  yield* followDefinitionsIn(useEditor.getState().tabId)
 })
 
 /**

@@ -10,6 +10,7 @@ import { SettingsStore } from "../../services/SettingsStore"
 import { useEditor } from "../store"
 import { checkGameLinkEffect, findCreatorEffect } from "./gameLink"
 import { followOpenMapEffect, openStartingMap } from "./maps"
+import { checkPrefabs } from "./prefabs"
 import { run, runUntilCleanup } from "./run"
 import { refreshProject } from "./shared"
 import { checkExportsEffect } from "./sync"
@@ -98,6 +99,7 @@ export const loadPlatform = () =>
       const startRefused = useEditor.getState().project?.startRefused ?? null
       if (startRefused !== null) useEditor.getState().notify("error", startRefused, { kind: "projectRefused" })
       yield* findCreatorEffect
+      yield* checkPrefabs
       if (capabilities.projects) {
         yield* openStartingMap
         yield* followOpenMapEffect

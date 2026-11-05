@@ -44,6 +44,9 @@ const SIZE = {
 } as const
 const MIN_SIZE = 10
 
+/** The properties a decal's edit scale lives in: a change to one is a change of transform. */
+export const SCALE_PROPERTIES: ReadonlySet<string> = new Set(Object.values(SIZE).map(({ property }) => property))
+
 type Axis = keyof typeof SIZE
 const AXES: ReadonlyArray<Axis> = ["x", "y", "z"]
 

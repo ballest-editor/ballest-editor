@@ -6,6 +6,7 @@ import { Deferred, Effect, Stream } from "effect"
 import { mapLabelOf } from "../../domain/factory"
 import { Platform } from "../../services/Platform"
 import { useEditor } from "../store"
+import { checkPrefabs } from "./prefabs"
 import { notifyFailure, run, runUntilCleanup } from "./run"
 import { fileOf, loadProjectMapFile, refreshProject, showMap } from "./shared"
 import { unlessCancelledFor } from "./unsaved"
@@ -88,9 +89,9 @@ export const reimportFirst = () => run(reimportFirstEffect)
 
 /**
  * A game session Play started or joined has ended: the game may have changed the export (the in-game editor saves
- * over it), so the exports are checked.
+ * over it) or a prefab (`saveprefab`), so both are checked.
  */
-const playSessionEnded = Effect.suspend(() => checkExportsEffect)
+const playSessionEnded = Effect.suspend(() => checkExportsEffect.pipe(Effect.andThen(checkPrefabs)))
 
 /** Runs `playSessionEnded` at the end of each game session Play started, until interrupted. */
 export const followPlaySessionsEffect = Effect.gen(function*() {
