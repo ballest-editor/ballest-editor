@@ -17,7 +17,7 @@ export function GameLinkDialog({ open, onClose }: { readonly open: boolean; read
   const summary = useGameLinkSummary()
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      {/* a column, not the default grid: a grid's track grows to the longest path, and only the rows should scroll */}
+      {/* a column, not the default grid, so that only the rows scroll */}
       <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Game link</DialogTitle>
