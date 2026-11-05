@@ -18,8 +18,10 @@
   --dv-active-sash-color: color-mix(in oklab, var(--primary) 60%, transparent);
   --dv-active-sash-transition-duration: calc(100ms * var(--motion));
   --dv-active-sash-transition-delay: calc(200ms * var(--motion));
-  --dv-drag-over-background-color: color-mix(in oklab, var(--primary) 18%, transparent);
-  --dv-drag-over-border: 1px solid var(--primary);
+  --dock-drop-color: color-mix(in oklab, var(--primary) 65%, var(--foreground));
+  --dv-drag-over-background-color: color-mix(in oklab, var(--dock-drop-color) 20%, transparent);
+  --dv-drag-over-border-color: var(--dock-drop-color);
+  --dv-drag-over-border: 1px solid var(--dock-drop-color);
   --dv-icon-hover-background-color: var(--muted);
   --dv-tabs-container-scrollbar-color: var(--border);
   --dv-overlay-z-index: 40;
@@ -30,6 +32,38 @@
 .dockview-theme-ballest .dv-drop-target-container,
 .dockview-theme-ballest .dv-drop-target {
   --dv-transition-duration: calc(70ms * var(--motion));
+}
+
+/* Where a dragged panel would land: a side of a group, its whole, or a place in a strip. */
+.dockview-theme-ballest .dv-drop-target-anchor,
+.dockview-theme-ballest .dv-drop-target-selection {
+  border-radius: calc(var(--radius) * 0.75);
+}
+
+/* What follows the pointer in a drag (dragImage.ts): the tab or strip it came from, on a card. */
+.dock-drag-image {
+  position: fixed;
+  top: -9999px;
+  left: 0;
+  display: flex;
+  height: 2rem;
+  width: max-content;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.75);
+  background: var(--card);
+  color: var(--foreground);
+}
+
+.dock-drag-image .dv-tabs-container {
+  display: flex;
+  overflow: visible;
+}
+
+.dockview-theme-ballest .dock-drag-image .dv-tab.dv-tab {
+  border: 0;
+  background: none;
+  box-shadow: none;
 }
 
 /* A line under the whole strip, tabs or not, as the document tabs draw under themselves. */

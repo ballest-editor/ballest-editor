@@ -17,6 +17,7 @@ import { EditorSkeletonPanels } from "../EditorSkeleton"
 import { ViewportControls } from "../ViewControls"
 import "./dock.css"
 import { attachDock, collapseGroup, expandGroup, isCentreGroup, popOutPanel, useGroupCollapsed } from "./dockControl"
+import { followDockDrags } from "./dragImage"
 import { dockPanels } from "./panels"
 
 const dockTheme: DockviewTheme = { name: "ballest", className: "dockview-theme-ballest" }
@@ -164,6 +165,7 @@ function GroupActions({ group, activePanel, location }: IDockviewHeaderActionsPr
 export function Dock() {
   const [ready, setReady] = useState(false)
   const box = useRef<HTMLDivElement>(null)
+  useEffect(() => followDockDrags(document), [])
   return (
     <div ref={box} className="relative min-h-0 flex-1">
       <DockviewReact
