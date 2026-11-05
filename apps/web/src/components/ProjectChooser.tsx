@@ -1,7 +1,7 @@
 import { IconFolderOpen, IconPlus } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@workspace/ui/components/dialog"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { chooseProject, newProject, quitApp, switchProject } from "../editor/actions"
 import { isChooserRequired, useEditor } from "../editor/store"
 import { NewProjectForm } from "./NewProjectDialog"
@@ -25,13 +25,23 @@ export function ProjectChooser() {
   const [naming, setNaming] = useState(false)
   // nothing to list: the only thing left to do here is to start one
   const newOnly = recent.length === 0
+  // The most recent project that can be picked gets the focus, so Enter opens it; the name field does when naming.
+  const firstPick = useRef<HTMLButtonElement>(null)
+  const firstPickable = recent.find(({ path }) => !openElsewhere.includes(path))?.path
 
   return (
     <Dialog open={open} disablePointerDismissal>
-      <DialogContent className="sm:max-w-lg" showCloseButton={false}>
+      <DialogContent
+        // a column, so that the list shrinks before the buttons under it leave the window
+        className="flex flex-col sm:max-w-lg"
+        showCloseButton={false}
+        initialFocus={naming || newOnly ? true : firstPick}
+      >
         <DialogHeader>
           <DialogTitle>{naming || newOnly ? "Start a new project" : "Choose a project"}</DialogTitle>
-          <DialogDescription>A window works on one project, and a project opens in one window.</DialogDescription>
+          <DialogDescription>
+            This window has no project yet. Pick the one it works on. A project can be open in one window at a time.
+          </DialogDescription>
         </DialogHeader>
         {naming || newOnly
           ? (
@@ -53,7 +63,7 @@ export function ProjectChooser() {
           )
           : (
             <>
-              <div className="flex justify-end gap-2">
+              <div className="flex shrink-0 justify-end gap-2">
                 <Button variant="outline" onClick={() => void chooseProject()}>
                   <IconFolderOpen data-icon="inline-start" />
                   Open project…
@@ -63,13 +73,14 @@ export function ProjectChooser() {
                   New project
                 </Button>
               </div>
-              <ul className="flex max-h-72 flex-col overflow-y-auto rounded-md ring-1 ring-foreground/10">
+              <ul className="flex max-h-72 min-h-0 flex-col overflow-y-auto rounded-md ring-1 ring-foreground/10 [scrollbar-width:thin] [scrollbar-color:color-mix(in_oklch,var(--foreground)_25%,transparent)_transparent]">
                 {recent.map(({ name, path }) => {
                   const elsewhere = openElsewhere.includes(path)
                   return (
-                    <li key={path} className="border-b border-foreground/10 last:border-b-0">
+                    <li key={path} className="shrink-0 border-b border-foreground/10 last:border-b-0">
                       <button
                         type="button"
+                        ref={path === firstPickable ? firstPick : undefined}
                         disabled={elsewhere}
                         className="flex w-full min-w-0 flex-col gap-1 px-3 py-2 text-left outline-none hover:bg-muted focus-visible:bg-muted disabled:pointer-events-none"
                         onClick={() => void switchProject(path)}
@@ -78,7 +89,9 @@ export function ProjectChooser() {
                           <span className={elsewhere ? "truncate text-muted-foreground" : "truncate"}>
                             {name}
                           </span>
-                          {elsewhere && <span className="shrink-0 text-muted-foreground">Open in another window</span>}
+                          {elsewhere && (
+                            <span className="shrink-0 text-muted-foreground">· Open in another window</span>
+                          )}
                         </span>
                         <PathText block className="text-muted-foreground">{path}</PathText>
                       </button>
@@ -86,7 +99,7 @@ export function ProjectChooser() {
                   )
                 })}
               </ul>
-              <div className="flex">{quitThisWindow}</div>
+              <div className="flex shrink-0">{quitThisWindow}</div>
             </>
           )}
       </DialogContent>

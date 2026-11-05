@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle
 } from "@workspace/ui/components/dialog"
+import { useRef } from "react"
 import { GameLinkChecklist, useGameLinkSummary } from "./GameLink"
 
 /**
@@ -15,17 +16,19 @@ import { GameLinkChecklist, useGameLinkSummary } from "./GameLink"
  */
 export function GameLinkDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   const summary = useGameLinkSummary()
+  // Done takes the focus: the first row's Reveal would, and open its tooltip with the dialog
+  const done = useRef<HTMLButtonElement>(null)
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       {/* a column, not the default grid, so that only the rows scroll */}
-      <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col sm:max-w-2xl">
+      <DialogContent className="flex flex-col sm:max-w-2xl" initialFocus={done}>
         <DialogHeader>
           <DialogTitle>Game link</DialogTitle>
           <DialogDescription>{summary}</DialogDescription>
         </DialogHeader>
         <GameLinkChecklist />
         <DialogFooter>
-          <Button onClick={onClose}>Done</Button>
+          <Button ref={done} onClick={onClose}>Done</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

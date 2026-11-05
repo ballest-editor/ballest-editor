@@ -101,7 +101,8 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-xl">
+      {/* a column, so that the list shrinks before Close leaves the window */}
+      <DialogContent className="flex flex-col sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Recover a previous version</DialogTitle>
           <DialogDescription>
@@ -117,7 +118,7 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
             <Button size="sm" variant="ghost" onClick={() => setShown(null)}>All backed-up maps</Button>
           )}
         </div>
-        <ScrollArea className="h-72 rounded-md border">
+        <ScrollArea className="h-72 min-h-0 rounded-md border">
           {backups === null
             ? <p className="p-3 text-sm text-muted-foreground">Reading the backups…</p>
             : shown === null

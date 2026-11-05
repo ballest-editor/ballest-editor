@@ -17,12 +17,16 @@ import { useEditor } from "../editor/store"
  */
 export function WhereToOpenDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   const asked = useEditor((s) => s.dialog?.id === "whereToOpen" ? s.dialog : null)
+  const current = useEditor((s) => s.project?.current?.name ?? "Untitled Project")
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Open {asked?.name}</DialogTitle>
-          <DialogDescription>Where should it open?</DialogDescription>
+          <DialogDescription>
+            This window is on <span className="text-foreground">{current}</span>. Open{" "}
+            <span className="text-foreground">{asked?.name}</span> here in its place, or in a new window?
+          </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>

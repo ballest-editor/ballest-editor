@@ -143,31 +143,35 @@ export function NameMapDialog(
         </div>
       }
       submitLabel={replaces ? "Replace" : copy.submit}
+      submitReplaces={replaces}
+      before={namesProject
+        ? (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="saveAs-project">Project name</Label>
+            <Input
+              id="saveAs-project"
+              autoFocus
+              value={projectDraft}
+              placeholder="My tracks"
+              aria-invalid={projectTrimmed !== "" && !projectOk}
+              onChange={(e) => setProjectDraft(e.target.value)}
+            />
+            <div className="text-xs text-muted-foreground">
+              {projectTrimmed !== "" && !projectOk
+                ? "Letters, digits, spaces, - and _ only."
+                : (
+                  <PathText block>
+                    {projectTrimmed === "" ? projectsFolder : pathInFolder(projectsFolder, projectTrimmed)}
+                  </PathText>
+                )}
+            </div>
+          </div>
+        )
+        : undefined}
       canSubmit={isValidName(name) && isValidName(creator.name) && risky.rejected.length === 0 &&
         (!clash || replaces) && projectOk}
       onSubmit={submit}
     >
-      {namesProject && (
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="saveAs-project">Project name</Label>
-          <Input
-            id="saveAs-project"
-            value={projectDraft}
-            placeholder="My tracks"
-            aria-invalid={projectTrimmed !== "" && !projectOk}
-            onChange={(e) => setProjectDraft(e.target.value)}
-          />
-          <div className="text-[0.7rem] text-muted-foreground">
-            {projectTrimmed !== "" && !projectOk
-              ? "Letters, digits, spaces, - and _ only."
-              : (
-                <PathText block>
-                  {projectTrimmed === "" ? projectsFolder : pathInFolder(projectsFolder, projectTrimmed)}
-                </PathText>
-              )}
-          </div>
-        </div>
-      )}
       {mode === "newDraft" && (
         <p className="text-xs text-muted-foreground">
           {levelData.levelDisplayName} is the draft of a Workshop map (item{" "}
