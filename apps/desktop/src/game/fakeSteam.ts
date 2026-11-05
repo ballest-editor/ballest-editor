@@ -84,6 +84,15 @@ export const makeFakePluginBundle = Effect.fn("makeFakePluginBundle")(function*(
   return dir
 })
 
+/** A temp folder, gone with the scope, with a fake Steam in it: the game installed and run, the plugin manager in. */
+export const tempFakeSteam = Effect.gen(function*() {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const dir = yield* fs.makeTempDirectoryScoped()
+  const steam = yield* makeFakeSteam(dir, { game: "steam", ran: true, pluginManager: true })
+  return { dir, fs, path, steam }
+})
+
 /** GamePaths, GameProcess and SteamLibrary over a fake Steam's `host`, with the desktop settings in `settingsFile`. */
 export const layerFakeGamePaths = (host: HostInfo & { readonly procDir: string }, settingsFile: string) =>
   Layer.mergeAll(GamePaths.layer, GameProcess.layer).pipe(

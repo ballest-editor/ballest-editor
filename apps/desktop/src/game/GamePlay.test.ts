@@ -1,6 +1,6 @@
 import { CHARACTERS_PER_FILE, type PlayResult, PlaySessionEnded, PushChannels } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, Fiber, FileSystem, Layer, Path, Schema, Stream } from "effect"
+import { Effect, Fiber, type FileSystem, Layer, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { vi } from "vitest"
 import { ElectronShell } from "../electron/ElectronShell"
@@ -9,7 +9,7 @@ import { sha256 } from "../project/files"
 import { layerProjectsAt } from "../project/layers"
 import { MapFiles } from "../project/MapFiles"
 import { DesktopSettings } from "../settings/DesktopSettings"
-import { layerFakeGamePaths, makeFakePluginBundle, makeFakeSteam, runScoped } from "./fakeSteam"
+import { layerFakeGamePaths, makeFakePluginBundle, runScoped, tempFakeSteam } from "./fakeSteam"
 import { GameLink, PlayFile } from "./GameLink"
 import { GamePlay, SESSION_POLL } from "./GamePlay"
 import { GameProcess } from "./GameProcess"
@@ -27,10 +27,7 @@ const name = "Map_LevelEditorMain&Loop_me.balledit"
  * a shell that counts launches and a window that keeps what main sent.
  */
 const setup = Effect.gen(function*() {
-  const fs = yield* FileSystem.FileSystem
-  const path = yield* Path.Path
-  const dir = yield* fs.makeTempDirectoryScoped()
-  const steam = yield* makeFakeSteam(dir, { game: "steam", ran: true, pluginManager: true })
+  const { dir, fs, path, steam } = yield* tempFakeSteam
   const bundle = yield* makeFakePluginBundle(dir, "0.2.0")
   const game = { running: false, launches: 0, steamAnswers: true }
   const sent: Array<readonly [string, unknown]> = []
