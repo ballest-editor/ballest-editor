@@ -40,7 +40,7 @@ import {
 } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { useEditor, useOpenProjectMap } from "../editor/store"
-import { openSettings, resetDockLayout, togglePanel, usePanelOpen, useViewMenuPanels } from "./dock/dockControl"
+import { openSettings, resetDockLayout, usePanelCheck, useViewMenuPanels } from "./dock/dockControl"
 
 /** The action's primary binding, as the menu shows it (nothing when unbound). */
 function Shortcut({ action }: { readonly action: KeybindAction }) {
@@ -124,12 +124,7 @@ function RecentProjectsMenu() {
 }
 
 function PanelItem({ id, title }: { readonly id: string; readonly title: string }) {
-  const open = usePanelOpen(id)
-  return (
-    <MenubarCheckboxItem closeOnClick checked={open} onCheckedChange={() => togglePanel(id)}>
-      {title}
-    </MenubarCheckboxItem>
-  )
+  return <MenubarCheckboxItem {...usePanelCheck(id)}>{title}</MenubarCheckboxItem>
 }
 
 /** The keybind that puts the active pane on each view; Perspective has only the toggle. */

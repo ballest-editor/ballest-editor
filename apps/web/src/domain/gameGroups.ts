@@ -5,7 +5,7 @@
 import { defaultEditorState, identityTransform } from "./factory"
 import type { EditorGroup, Item, ItemTransform, MapFile } from "./MapFile"
 import type { GroupNode, TreeNode } from "./MapSidecar"
-import { freshKey, itemNode, type Structure, treeKeys } from "./structure"
+import { DEFAULT_GROUP_NAME, freshKey, itemNode, type Structure, treeKeys } from "./structure"
 
 const NAME_LENGTH = 64
 
@@ -74,7 +74,7 @@ export const structureFromGame = (map: MapFile, keys: ReadonlyArray<string>): St
   const groupNode = (n: number): GroupNode => ({
     kind: "group",
     id: freshKey(),
-    name: map.editorState?.groups[n]?.name || `Group ${n + 1}`,
+    name: map.editorState?.groups[n]?.name || DEFAULT_GROUP_NAME,
     tags: [],
     children: (members[n] ?? []).map(itemNode)
   })

@@ -15,17 +15,19 @@ import {
 } from "react"
 import * as THREE from "three"
 import { toTuple3, ueToThreeVector } from "../domain/coords"
+import { groupBoxTargets } from "../domain/groupSelection"
 import { isBound, mouseChordOf } from "../domain/Keybinds"
 import { WATER } from "../domain/level"
 import { gridColorsOf } from "../domain/Settings"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
+import { GroupBox } from "./groupBox"
 import { ItemObject } from "./ItemObject"
 import { advanceGameTime } from "./materials"
 import { OrthoGrid } from "./OrthoGrid"
 import { panePointer, perspectiveOnly } from "./paneCameras"
 import { drawEveryPane, PaneRenderer, useBeforePaneDraw } from "./PaneRenderer"
-import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
+import { GROUP_BOX_COLORS, SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline } from "./selectionOutline"
@@ -325,6 +327,29 @@ function SelectedOutlines() {
   return selectedIds.map((id) => <SelectedOutline key={id} id={id} active={id === active} />)
 }
 
+/** A whole group's box (see groupBox.ts), following its items. */
+function GroupBoxView({ keys, entered }: { readonly keys: ReadonlyArray<string>; readonly entered: boolean }) {
+  const box = useMemo(() => new GroupBox(), [])
+  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
+  useEffect(() => box.setLook(dark ? GROUP_BOX_COLORS.dark : GROUP_BOX_COLORS.light, entered), [box, dark, entered])
+  useEffect(() => () => box.dispose(), [box])
+  useFrame(({ camera, size }) =>
+    box.update(keys.flatMap((key) => sceneRegistry.objects.get(key) ?? []), camera, size.height)
+  )
+  return <primitive object={box} />
+}
+
+function GroupBoxes() {
+  const tree = useEditor((s) => s.doc.structure.tree)
+  const selectedIds = useEditor((s) => s.selectedIds)
+  const enteredGroupId = useEditor((s) => s.enteredGroupId)
+  const targets = useMemo(
+    () => groupBoxTargets(tree, selectedIds, enteredGroupId),
+    [tree, selectedIds, enteredGroupId]
+  )
+  return targets.map(({ id, keys, entered }) => <GroupBoxView key={id} keys={keys} entered={entered} />)
+}
+
 function Overlay() {
   const missing = useEditor((s) => s.missingGlbs)
   const speed = useEditor((s) => s.cameraSpeed)
@@ -370,6 +395,7 @@ export function Viewport(
         <Water />
         <MapItems />
         <SelectedOutlines />
+        <GroupBoxes />
         <GizmoController />
         <ClickSelect />
         <FlyCamera />

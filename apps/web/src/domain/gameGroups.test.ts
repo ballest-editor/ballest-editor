@@ -150,7 +150,7 @@ describe("structureFromGame", () => {
       "k0",
       ["first", ["k3", "k1"]],
       "k2",
-      ["Group 2", ["k4"]]
+      ["Group", ["k4"]]
     ])
   })
 
@@ -163,7 +163,7 @@ describe("structureFromGame", () => {
   it("keeps every item in one place when the file breaks the game's rules", () => {
     const map = withGroups([{ members: [1, 1, 2, 99] }, { members: [2, 3] }, { members: [99] }])
     const { tree } = structureFromGame(map, ids)
-    assert.deepStrictEqual(shape(tree), ["k0", ["Group 1", ["k1", "k2"]], ["Group 2", ["k3"]], "k4"])
+    assert.deepStrictEqual(shape(tree), ["k0", ["Group", ["k1", "k2"]], ["Group", ["k3"]], "k4"])
     assert.sameMembers([...treeKeys(tree)], ids)
   })
 

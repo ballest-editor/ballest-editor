@@ -1,5 +1,6 @@
 import { setWindowTheme } from "../../editor/actions"
 import { elementOf, isEditorKeyEvent } from "../../editor/keyTargets"
+import { followDockDrags } from "./dragImage"
 
 /**
  * Chrome is for the mouse: after a pointer click it gives focus back, so a later Space or Enter can't re-trigger it and
@@ -20,7 +21,7 @@ export const blurChromeAfterClick = (document: Document): () => void => {
 
 /**
  * Makes a popped-out panel's window part of the editor. It follows the main window's theme and animation speed (both
- * live on <html>), its chrome hands focus back, and the keys it doesn't use go to the main window, where the keybinds
+ * live on <html>), its chrome hands focus back, its drags look like the main window's, and the keys it doesn't use go to the main window, where the keybinds
  * listen. Dockview has already copied the stylesheets over. Returns how to stop.
  */
 export const adoptPopoutWindow = (popout: Window, title: string): () => void => {
@@ -38,6 +39,7 @@ export const adoptPopoutWindow = (popout: Window, title: string): () => void => 
   void setWindowTheme(source.classList.contains("dark"))
 
   const stopBlurring = blurChromeAfterClick(popout.document)
+  const stopFollowingDrags = followDockDrags(popout.document)
   const forwardDown = (e: KeyboardEvent) => {
     if (isEditorKeyEvent(e) && !window.dispatchEvent(new KeyboardEvent(e.type, e))) e.preventDefault()
   }
@@ -50,6 +52,7 @@ export const adoptPopoutWindow = (popout: Window, title: string): () => void => 
   return () => {
     observer.disconnect()
     stopBlurring()
+    stopFollowingDrags()
     popout.removeEventListener("keydown", forwardDown)
     popout.removeEventListener("keyup", forwardUp)
     popout.removeEventListener("blur", forwardBlur)

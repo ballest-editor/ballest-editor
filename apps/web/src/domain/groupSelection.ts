@@ -65,6 +65,27 @@ export const selectedGroupIds = (
 ): ReadonlyArray<string> =>
   wholeNodes(tree, new Set(selectedIds)).flatMap((node) => node.kind === "group" ? node.id : [])
 
+/** A group drawn as a box in the viewport. `entered` is the quiet one, standing for the group clicks are inside. */
+export interface GroupBoxTarget {
+  readonly id: string
+  readonly keys: ReadonlyArray<string>
+  readonly entered: boolean
+}
+
+/** The groups the viewport boxes: every one whole in the selection, and the entered group, selected or not. */
+export const groupBoxTargets = (
+  tree: ReadonlyArray<TreeNode>,
+  selectedIds: ReadonlyArray<string>,
+  enteredGroupId: string | null
+): ReadonlyArray<GroupBoxTarget> => {
+  const selected = selectedGroupIds(tree, selectedIds)
+  const quiet = enteredGroupId === null || selected.includes(enteredGroupId) ? [] : [enteredGroupId]
+  return [
+    ...selected.map((id) => ({ id, keys: nodeKeys(tree, id), entered: false })),
+    ...quiet.map((id) => ({ id, keys: nodeKeys(tree, id), entered: true }))
+  ]
+}
+
 /** Whether grouping the selection would change anything: one whole group is a group already. */
 export const canGroupSelection = (
   tree: ReadonlyArray<TreeNode>,

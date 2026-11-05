@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import fixture from "./bundledCatalog.json"
-import { Catalog, indexCatalog } from "./Catalog"
+import { Catalog, indexCatalog, pieceLabelOf } from "./Catalog"
 import { itemFromPiece, newMapFile, placementTransform } from "./factory"
 import type { MapFile } from "./MapFile"
 import type { GroupNode, ItemNode, TreeNode } from "./MapSidecar"
@@ -11,8 +11,10 @@ import {
   flatStructure,
   freshKey,
   freshKeys,
+  groupNames,
   itemDisplayNames,
-  nextGroupName,
+  itemNames,
+  numberedNameText,
   type Structure,
   treeKeys,
   withGroup,
@@ -76,18 +78,10 @@ describe("withGroup", () => {
     assert.deepStrictEqual(next.tree, [
       group(
         "x",
-        { kind: "group", id: "g", name: "Group 1", tags: [], children: [item("a"), item("c"), item("d")] },
+        { kind: "group", id: "g", name: "Group", tags: [], children: [item("a"), item("c"), item("d")] },
         item("b")
       )
     ])
-  })
-
-  it("names groups Group N, the lowest number free", () => {
-    assert.strictEqual(nextGroupName([]), "Group 1")
-    assert.strictEqual(
-      nextGroupName([{ ...group("x"), name: "Group 1" }, group("y", { ...group("z"), name: "Group 2" })]),
-      "Group 3"
-    )
   })
 
   it("answers undefined when no id is in the tree", () => {
@@ -253,21 +247,61 @@ describe("itemDisplayNames", () => {
   const cube = catalog.pieces.find((p) => p.className === "BP_Prim_Cube")!
   const placed = (x: number) => itemFromPiece(cube, placementTransform(cube, { x, y: 0, z: 0 }))
 
-  it("uses the user's name, else the piece's and an ordinal in document order", () => {
+  it("uses the user's name, else the piece's, numbering shared names in document order", () => {
     const base = initialMapForTests()
     const map: MapFile = { ...base, items: [...base.items, placed(0), placed(1), placed(2)] }
     const keys = ["start", "goal", "c1", "c2", "c3"]
     const names = itemDisplayNames(map, keys, new Map([["c2", { name: "Mine" }]]), indexCatalog(catalog))
-    const label = cube.displayName || cube.className
+    const label = pieceLabelOf(cube)
     assert.strictEqual(names.get("c1"), `${label} 1`)
     assert.strictEqual(names.get("c2"), "Mine")
-    assert.strictEqual(names.get("c3"), `${label} 3`)
+    assert.strictEqual(names.get("c3"), `${label} 2`)
   })
 
-  it("falls back on the class's name without a catalog", () => {
+  it("gives a name nothing else has no ordinal", () => {
+    const base = initialMapForTests()
+    const names = itemNames(base, ["start", "goal"], new Map(), indexCatalog(catalog))
+    assert.deepStrictEqual(names.get("start"), { name: "Player Start", ordinal: undefined })
+    assert.isUndefined(names.get("goal")?.ordinal)
+  })
+
+  it("numbers items the user gave the same name", () => {
+    const base = initialMapForTests()
+    const map: MapFile = { ...base, items: [placed(0), placed(1)] }
+    const names = itemNames(map, ["a", "b"], new Map([["a", { name: "Ramp" }], ["b", { name: "Ramp" }]]), null)
+    assert.deepStrictEqual([...names.values()], [{ name: "Ramp", ordinal: 1 }, { name: "Ramp", ordinal: 2 }])
+  })
+
+  it("writes the class out without a catalog", () => {
     const base = initialMapForTests()
     const map: MapFile = { ...base, items: [placed(0)] }
-    assert.strictEqual(itemDisplayNames(map, ["a"], new Map(), null).get("a"), "BP_Prim_Cube 1")
+    assert.strictEqual(itemDisplayNames(map, ["a"], new Map(), null).get("a"), "Prim Cube")
+  })
+})
+
+describe("groupNames", () => {
+  const named = (id: string, name: string, ...children: ReadonlyArray<TreeNode>): TreeNode => ({
+    ...group(id, ...children),
+    name
+  })
+
+  it("numbers groups of the same name in tree order, at any depth", () => {
+    const tree = [named("a", "Group", named("b", "Group")), item("x"), named("c", "Group")]
+    assert.deepStrictEqual([...groupNames(tree).values()].map((name) => name.ordinal), [1, 2, 3])
+  })
+
+  it("leaves a name only one group has alone, and numbers the user's names too", () => {
+    const names = groupNames([named("a", "curves"), named("b", "curves"), named("c", "stairs")])
+    assert.deepStrictEqual(names.get("a"), { name: "curves", ordinal: 1 })
+    assert.deepStrictEqual(names.get("b"), { name: "curves", ordinal: 2 })
+    assert.deepStrictEqual(names.get("c"), { name: "stairs", ordinal: undefined })
+  })
+})
+
+describe("numberedNameText", () => {
+  it("adds the ordinal when there is one", () => {
+    assert.strictEqual(numberedNameText({ name: "Cube", ordinal: 3 }), "Cube 3")
+    assert.strictEqual(numberedNameText({ name: "Goal", ordinal: undefined }), "Goal")
   })
 })
 

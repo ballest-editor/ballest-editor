@@ -78,7 +78,9 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - **Pieces** and **Project** start stacked on the left, with Pieces in front, and **Inspector** on the right. A panel `always` rendered (Pieces) stays in the page behind another tab, so a long list keeps its scroll position.
 - **Settings** (`components/SettingsPanel.tsx`) opens as a tab beside the maps from File › Settings…, or comes forward if it's open. It looks the game up again each time it comes into view.
 - View lists every panel not living in the centre, checked while it's open, and Reset layout. Reset closes everything around the centre group and lays out the default again, and the viewport stays mounted.
-- **Collapse** (a group's − button) folds it to its tab strip: a column by the viewport to a vertical strip, a group in a stack to its header. A group can't fold if its neighbours have nothing left to give, a click on a tab or a panel arriving unfolds it, and so does the + button.
+- **Each group's "…"** (`GroupMenu.tsx`), at the end of its strip, holds View's panel checks, then Pop out, Collapse and Reset layout. Only a panel whose home is the centre (Settings) has a × on its tab, since no menu closes it.
+- **Collapse** folds a group: a column by the viewport to a rail, a group in a stack to its header. A group can't fold if its neighbours have nothing left to give, so Collapse is off there. A panel arriving unfolds it, and so does a click on a tab, with that panel in front.
+- **The rail** is 28 px of the panels' titles, read downwards, and nothing else. It's the group's own strip with its header turned to the side, marked `data-dock-rail` and drawn by `dock.css`.
 
 **Sizes.** A window resize goes to the viewport and the panels keep theirs, like closing a group: dockview would even out the group's neighbours. Neither has an option in dockview, so `dockControl.ts` sets the centre group's `priority` and wraps `gridview.remove`. A dockview upgrade should be checked for these.
 
@@ -88,7 +90,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - A layout that doesn't decode, has a size that isn't a number, has no centre or that `fromJSON` refuses is dropped for the default.
 - The first paint is the saved layout: index.html sets `hint` as `--dock-<side>` on `<html>`, and `EditorSkeleton` lays out to them, first while the editor's chunk loads and then over the dock until its layout is in.
 
-**Popout** (a group's ↗ button) moves the active panel to a window of its own. Closing that window, or the button in its strip, puts it back where it was. Dockview's popout is a `window.open` of `public/popout.html` whose document the main page fills itself, so the panel stays in the same React tree and store. In-window floating groups are turned off.
+**Popout** (Pop out in a group's "…") moves the active panel to a window of its own. Closing that window, or the button in its strip, puts it back where it was. Dockview's popout is a `window.open` of `public/popout.html` whose document the main page fills itself, so the panel stays in the same React tree and store. In-window floating groups are turned off.
 
 - **Desktop.** `DesktopWindow` lets the page open that one URL (`isPopoutUrl`) and nothing else, as a same-origin child: sandboxed like the main window, floating over it and closing with it. It has no native title bar: its tab strip is the title bar, as the top bar is for the main window, and main recolours it with the main window (`setColors`). F11 is that window's, and Ctrl+Q closes the main window, where unsaved changes ask.
 - **Web review build.** The same `window.open`. A blocked pop-up leaves the panel where it was, with a notification.
@@ -98,7 +100,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 
 **Keys.** The rules are `isEditorKeyEvent`'s (`editor/keyTargets.ts`): a text field, a dialog or a menu keeps its keys, and everything else drives the editor, unless another tab in the centre group hides the map (`mapInFront`). Chrome hands focus back after a click (`blurChromeAfterClick`), so the keys work again straight away.
 
-Dockview is themed in `components/dock/dock.css` with the tokens from `packages/ui`, so it follows light and dark and `--motion`. Its strips are `h-8`, like the document tabs.
+Dockview is themed in `components/dock/dock.css` with the tokens from `packages/ui`, so it follows light and dark and `--motion`. Its strips are `h-8`, like the document tabs. A drag shows a copy of the tab on a card, or of the whole strip when it's a group's (`dragImage.ts`), over dockview's image, which has no option for it. A dockview upgrade should be checked for this too.
 
 ### View panes
 
@@ -156,7 +158,10 @@ There is no Map or Game menu: the menus act on the active tab's map, and the gam
 
 `components/Outline.tsx` is the map's tree of groups and items, a dock panel that starts on the left (View › Outline, § Dock). It fills whatever it is mounted in and scrolls by itself. `domain/outline.ts` holds its rows, filter, drop targets and scroll window.
 
-- A row shows the name, an item's class, tag chips, and a group's child count (its tooltip gives the items under it). Only the rows in view are drawn.
+- A row shows its icon, the name, tag chips and, at its right edge, a group's child count (its tooltip gives the items under it). Only the rows in view are drawn.
+- An item's icon is what the Pieces panel shows for its piece, else a generic glyph, and a tooltip on its name gives the class.
+- An item's name is the user's, else its piece's: the catalog's display name, or the class written out where the catalog has none (`MP_PlayerStart` is Player Start; the game places it itself and has no name for it).
+- A name used more than once gets an ordinal, muted, right after it: items among themselves in document order, groups in tree order. A name nothing else has shows none. The ordinal isn't part of the name, so renaming starts from the name alone. The status bar shows a group the same way.
 - A click selects, as `toggleSelection`'s chord toggles and `addToSelection`'s chord selects the range from the last row clicked. A group row stands for every item under it, and it lights up when all of them are selected. A click on empty space clears the selection.
 - A selection made anywhere else scrolls its active row into view once, as far as it takes, and opens the groups around it.
 - Double-click or F2 renames in place: Enter commits, Escape cancels, and an empty name puts an item back on its default name. A group always has a name, so an empty one changes nothing.
@@ -169,10 +174,11 @@ There is no Map or Game menu: the menus act on the active tab's map, and the gam
 
 The groups are the sidecar's ([PROJECTS.md § The files](PROJECTS.md#the-files)), and the game gets what it can hold of them ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)). `domain/groupSelection.ts` holds the rules below. The selection stays a list of item keys, so the gizmo, the Inspector, Copy and the rest act on a group's items with no group logic of their own. The item clicked is the active one, so the gizmo sits where the click was.
 
-- **Group** (Ctrl+G) puts the selected items in a new group where the first one was, and a group whole in the selection goes in whole, nested. **Ungroup** (Shift+G) dissolves every group whole in the selection, and the items stay selected. Both are in the Edit menu, the Outline's menu and the keybind settings.
+- **Group** (Ctrl+G) puts the selected items in a new group called Group where the first one was, and a group whole in the selection goes in whole, nested. **Ungroup** (Shift+G) dissolves every group whole in the selection, and the items stay selected. Both are in the Edit menu, the Outline's menu and the keybind settings.
 - **A click** on a grouped item in the viewport selects its outermost group, as the game does. The add and toggle chords add or take away that whole group.
 - **A double-click** enters the group, and the next click level is its children, an item or a nested group. Another double-click goes one deeper. The status bar names the entered group, with × to leave it, and the Outline marks its row and dims what is outside it. The entered group is kept per tab in the store.
 - **Leaving:** Escape steps out one level and selects the group it left. A click on empty space leaves altogether. A click outside the group lands in the nearest parent group that holds what was clicked, or at the root.
+- **The box.** Each group whole in the selection has a dashed box around its items in the viewport, in a colour of its own (`editor/groupBox.ts`, `GROUP_BOX_COLORS`), as well as its items' outlines. The entered group keeps a thinner, fainter box while something inside it is selected. The box is drawn over everything, and a laser's beam doesn't count towards it.
 - **The Inspector** shows the group's name and tags above the item properties when the selection is exactly one group, and a single selected item's tags under its actions. Tags are free strings: Enter or a comma adds one, Backspace in the empty field removes the last.
 - **Delete** removes the group's items, and the group goes with them. **Duplicate** copies a whole group as a new group of the same name and shape.
 

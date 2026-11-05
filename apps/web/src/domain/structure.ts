@@ -3,7 +3,7 @@
  * game's file (docs/PROJECTS.md § The files). Pure functions, like `edits.ts`: an edit that changes nothing answers
  * undefined, so the store leaves no undo step for it. An item's key is its entry in the store's `ids`.
  */
-import { type CatalogIndex, pieceLabelOf } from "./Catalog"
+import { type CatalogIndex, humanizedClass, pieceLabelOf } from "./Catalog"
 import { classNameOf, type MapFile } from "./MapFile"
 import type { GroupNode, ItemNode, TreeNode } from "./MapSidecar"
 
@@ -148,23 +148,8 @@ export const withTags = (structure: Structure, target: string, tags: ReadonlyArr
   })
 }
 
-/** `Group N` for the lowest N no group in `tree` is called. */
-export const nextGroupName = (tree: ReadonlyArray<TreeNode>): string => {
-  const taken = new Set<string>()
-  const collect = (nodes: ReadonlyArray<TreeNode>) => {
-    for (const node of nodes) {
-      if (node.kind === "group") {
-        taken.add(node.name)
-        collect(node.children)
-      }
-    }
-  }
-  collect(tree)
-  for (let n = 1;; n++) {
-    const name = `Group ${n}`
-    if (!taken.has(name)) return name
-  }
-}
+/** What a group is called until the user names it. Its ordinal tells it from the others (`groupNames`). */
+export const DEFAULT_GROUP_NAME = "Group"
 
 /** The nodes `ids` that are in the tree, each once, in that order, without those inside another of them. */
 const outermostNodes = (tree: ReadonlyArray<TreeNode>, ids: ReadonlyArray<string>): ReadonlyArray<FoundNode> => {
@@ -189,7 +174,7 @@ export const withGroup = (
   const group: GroupNode = {
     kind: "group",
     id,
-    name: name?.trim() || nextGroupName(structure.tree),
+    name: name?.trim() || DEFAULT_GROUP_NAME,
     tags: [],
     children: nodes
   }
@@ -329,24 +314,59 @@ export const withPasted = (
   return { tree: [...tree, ...[...waiting.values()].flat()], items }
 }
 
+/** A name as it's shown: `ordinal` tells apart what shares `name`, and something with a name of its own has none. */
+export interface NumberedName {
+  readonly name: string
+  readonly ordinal: number | undefined
+}
+
+/** `names` by key, numbering in the order given each name that's used more than once. */
+const numbered = (names: ReadonlyArray<readonly [string, string]>): ReadonlyMap<string, NumberedName> => {
+  const totals = new Map<string, number>()
+  for (const [, name] of names) totals.set(name, (totals.get(name) ?? 0) + 1)
+  const seen = new Map<string, number>()
+  return new Map(names.map(([key, name]): readonly [string, NumberedName] => {
+    if (totals.get(name) === 1) return [key, { name, ordinal: undefined }]
+    const ordinal = (seen.get(name) ?? 0) + 1
+    seen.set(name, ordinal)
+    return [key, { name, ordinal }]
+  }))
+}
+
+/** A numbered name as plain text ("Cube 3"), for what can't style the ordinal. */
+export const numberedNameText = ({ name, ordinal }: NumberedName): string =>
+  ordinal === undefined ? name : `${name} ${ordinal}`
+
 /**
- * Every item's display name, by key: the user's, else the catalog's name for its class (the class's own without a
- * catalog) and an ordinal among the items of that class, in document order ("Cube 3").
+ * Every item's name, by key: the user's, else the catalog's for its class (without a catalog, the class written out).
+ * Items with the same name are numbered among themselves in document order.
  */
+export const itemNames = (
+  map: MapFile,
+  ids: ReadonlyArray<string>,
+  items: Structure["items"],
+  catalog: CatalogIndex | null
+): ReadonlyMap<string, NumberedName> =>
+  numbered(ids.flatMap((key, index) => {
+    const item = map.items[index]
+    if (item === undefined) return []
+    const piece = catalog?.pieceByClass.get(item.actorToSpawn)
+    const label = piece === undefined ? humanizedClass(classNameOf(item.actorToSpawn)) : pieceLabelOf(piece)
+    return [[key, items.get(key)?.name ?? label] as const]
+  }))
+
+/** Every group's name, by id, numbered among the groups with the same name in tree order. */
+export const groupNames = (tree: ReadonlyArray<TreeNode>): ReadonlyMap<string, NumberedName> => {
+  const groups = (nodes: ReadonlyArray<TreeNode>): ReadonlyArray<readonly [string, string]> =>
+    nodes.flatMap((node) => node.kind === "group" ? [[node.id, node.name] as const, ...groups(node.children)] : [])
+  return numbered(groups(tree))
+}
+
+/** Every item's display name as plain text, by key ("Cube 3", "Left ramp"). */
 export const itemDisplayNames = (
   map: MapFile,
   ids: ReadonlyArray<string>,
   items: Structure["items"],
   catalog: CatalogIndex | null
-): ReadonlyMap<string, string> => {
-  const counts = new Map<string, number>()
-  return new Map(ids.flatMap((key, index) => {
-    const item = map.items[index]
-    if (item === undefined) return []
-    const piece = catalog?.pieceByClass.get(item.actorToSpawn)
-    const ordinal = (counts.get(item.actorToSpawn) ?? 0) + 1
-    counts.set(item.actorToSpawn, ordinal)
-    const label = piece === undefined ? classNameOf(item.actorToSpawn) : pieceLabelOf(piece)
-    return [[key, items.get(key)?.name ?? `${label} ${ordinal}`] as const]
-  }))
-}
+): ReadonlyMap<string, string> =>
+  new Map([...itemNames(map, ids, items, catalog)].map(([key, name]) => [key, numberedNameText(name)] as const))

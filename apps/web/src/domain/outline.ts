@@ -5,7 +5,7 @@
 import { nodeKeys } from "./groupSelection"
 import { classNameOf, type MapFile } from "./MapFile"
 import type { TreeNode } from "./MapSidecar"
-import { findGroup, idOf, type Structure, treeKeys } from "./structure"
+import { findGroup, idOf, type NumberedName, numberedNameText, type Structure, treeKeys } from "./structure"
 
 export interface OutlineRow {
   /** An item's key, or a group's id. */
@@ -17,6 +17,10 @@ export interface OutlineRow {
   /** Its place among its parent's children, shown or not. */
   readonly index: number
   readonly name: string
+  /** Tells it from others of the same name; those of a name to themselves have none. */
+  readonly ordinal: number | undefined
+  /** An item's `actorToSpawn`; empty for a group. */
+  readonly actorClass: string
   /** An item's class, short; empty for a group. */
   readonly className: string
   readonly tags: ReadonlyArray<string>
@@ -27,29 +31,30 @@ export interface OutlineRow {
   readonly collapsed: boolean
 }
 
-/** Each item's short class name, by key. */
-export const itemClassNames = (map: MapFile, ids: ReadonlyArray<string>): ReadonlyMap<string, string> =>
+/** Each item's `actorToSpawn`, by key. */
+export const itemClasses = (map: MapFile, ids: ReadonlyArray<string>): ReadonlyMap<string, string> =>
   new Map(ids.flatMap((key, index) => {
     const item = map.items[index]
-    return item === undefined ? [] : [[key, classNameOf(item.actorToSpawn)] as const]
+    return item === undefined ? [] : [[key, item.actorToSpawn] as const]
   }))
 
 /** The lower-case words of a filter. */
 const termsOf = (query: string): ReadonlyArray<string> => query.toLowerCase().split(/\s+/).filter((t) => t.length > 0)
 
 const rowMatches = (row: OutlineRow, terms: ReadonlyArray<string>) => {
-  const haystack = `${row.name} ${row.className} ${row.tags.join(" ")}`.toLowerCase()
+  const haystack = `${numberedNameText(row)} ${row.className} ${row.tags.join(" ")}`.toLowerCase()
   return terms.every((term) => haystack.includes(term))
 }
 
 /**
  * The rows to show, in tree order. Without a filter a collapsed group hides what's under it. With one, the rows that
- * match (every word, in a name, a class or a tag) show with the groups around them, whatever is collapsed.
+ * match (every word, in a name, a class or a tag) show with the groups around them, whatever is collapsed. `names` has
+ * the items' names by key and the groups' by id.
  */
 export const outlineRows = (
   structure: Structure,
-  names: ReadonlyMap<string, string>,
-  classNames: ReadonlyMap<string, string>,
+  names: ReadonlyMap<string, NumberedName>,
+  classes: ReadonlyMap<string, string>,
   collapsedGroups: ReadonlySet<string>,
   query: string
 ): ReadonlyArray<OutlineRow> => {
@@ -60,12 +65,14 @@ export const outlineRows = (
     for (const [index, node] of nodes.entries()) {
       const place = { depth, parentId, index }
       if (node.kind === "item") {
+        const actorClass = classes.get(node.key) ?? ""
         const row: OutlineRow = {
           ...place,
           id: node.key,
           kind: "item",
-          name: names.get(node.key) ?? node.key,
-          className: classNames.get(node.key) ?? "",
+          ...names.get(node.key) ?? { name: node.key, ordinal: undefined },
+          actorClass,
+          className: classNameOf(actorClass),
           tags: structure.items.get(node.key)?.tags ?? [],
           childCount: 0,
           itemCount: 0,
@@ -79,7 +86,8 @@ export const outlineRows = (
         ...place,
         id: node.id,
         kind: "group",
-        name: node.name,
+        ...names.get(node.id) ?? { name: node.name, ordinal: undefined },
+        actorClass: "",
         className: "",
         tags: node.tags,
         childCount: node.children.length,

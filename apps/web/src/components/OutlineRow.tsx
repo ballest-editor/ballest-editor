@@ -1,10 +1,12 @@
-import { IconChevronRight, IconFolder, IconFolderOpen } from "@tabler/icons-react"
+import { IconBox, IconChevronRight, IconFolder, IconFolderOpen } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Input } from "@workspace/ui/components/input"
 import { cn } from "@workspace/ui/lib/utils"
 import { memo, useLayoutEffect, useRef } from "react"
 import type { OutlineRow } from "../domain/outline"
 import { useEditor } from "../editor/store"
+import { Ordinal } from "./Ordinal"
+import { PieceThumbnail } from "./PieceThumbnail"
 
 export const OUTLINE_ROW_HEIGHT = 24
 export const OUTLINE_INDENT = 12
@@ -60,6 +62,15 @@ function TagChips({ tags }: { readonly tags: ReadonlyArray<string> }) {
       )}
     </span>
   )
+}
+
+const pieceGlyph = <IconBox className="size-4 shrink-0 text-muted-foreground" />
+
+/** An item's icon: its piece's, as the Pieces panel shows it, else a generic one. */
+function ItemIcon({ actorClass }: { readonly actorClass: string }) {
+  const piece = useEditor((s) => s.catalogIndex?.pieceByClass.get(actorClass))
+  if (piece === undefined) return pieceGlyph
+  return <PieceThumbnail piece={piece} className="size-4 shrink-0 rounded-xs object-fill" placeholder={pieceGlyph} />
 }
 
 export const OutlineRowView = memo(function OutlineRowView({
@@ -133,25 +144,30 @@ export const OutlineRowView = memo(function OutlineRowView({
           </button>
         )
         : <span className="size-4 shrink-0" />}
-      {isGroup && <FolderIcon className="size-3.5 shrink-0 text-muted-foreground" />}
+      {isGroup
+        ? <FolderIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        : <ItemIcon actorClass={row.actorClass} />}
       {renaming
         ? <RenameField name={row.name} onDone={(value) => onRenamed(row, value)} />
         : (
           <>
-            <span className={cn("min-w-0 truncate", isGroup && "font-medium")}>{row.name}</span>
-            {isGroup
-              ? (
-                <span className="shrink-0 text-[0.65rem] text-muted-foreground" title={`${row.itemCount} items`}>
-                  {row.childCount}
-                </span>
-              )
-              : (
-                <span className="min-w-0 flex-1 truncate text-[0.65rem] text-muted-foreground" title={row.className}>
-                  {row.className}
-                </span>
-              )}
-            {isGroup && <span className="flex-1" />}
+            <span
+              className={cn("min-w-0 truncate", isGroup && "font-medium")}
+              {...(row.className !== "" && { title: row.className })}
+            >
+              {row.name}
+            </span>
+            <Ordinal value={row.ordinal} />
+            <span className="flex-1" />
             {row.tags.length > 0 && <TagChips tags={row.tags} />}
+            {isGroup && (
+              <span
+                className="shrink-0 text-[0.65rem] text-muted-foreground tabular-nums"
+                title={`${row.itemCount} items`}
+              >
+                {row.childCount}
+              </span>
+            )}
           </>
         )}
     </div>
