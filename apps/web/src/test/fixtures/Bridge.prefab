@@ -1,0 +1,110 @@
+{
+	"format": "BallestPrefab",
+	"version": 1,
+	"group":
+	{
+		"rotation": [
+			0,
+			90,
+			0
+		],
+		"scale": [
+			1,
+			1,
+			1
+		],
+		"name": "Bridge"
+	},
+	"items": [
+		{
+			"class": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C",
+			"transform":
+			{
+				"location": [
+					-1000,
+					0,
+					-250.5
+				],
+				"rotation": [
+					0,
+					30,
+					0
+				],
+				"scale": [
+					2,
+					1,
+					1
+				]
+			},
+			"properties":
+			{
+				"bMirror": false,
+				"bMirrorX": true,
+				"SurfaceAssignment": 0
+			},
+			"meshes": [
+				{
+					"tag": "SKGMapEditor",
+					"mesh": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materials": [
+						"/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Rough_White.MI_Env_Rough_White"
+					]
+				}
+			],
+			"paint":
+			{
+				"categories": [
+					"/Game/Art/Materials/MaterialCategory_Rough.MaterialCategory_Rough"
+				],
+				"colors": [
+					3
+				]
+			}
+		},
+		{
+			"class": "/Game/LevelEditor/PackageAssets/MultiplayerLevelEditor/ExampleObjects/BallestPieces/BP_Prim_Cube.BP_Prim_Cube_C",
+			"transform":
+			{
+				"location": [
+					1000.25,
+					200,
+					250.5
+				],
+				"rotation": [
+					-20,
+					0,
+					10
+				],
+				"scale": [
+					1,
+					1,
+					3
+				]
+			},
+			"properties":
+			{
+				"bMirror": false,
+				"bMirrorX": true,
+				"SurfaceAssignment": 0
+			},
+			"meshes": [
+				{
+					"tag": "SKGMapEditor",
+					"mesh": "/Game/Art/GreyBoxing/_GENERATED/PC/Box_C559BEB3.Box_C559BEB3",
+					"materials": [
+						"/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Rough_White.MI_Env_Rough_White"
+					]
+				}
+			],
+			"paint":
+			{
+				"categories": [
+					"/Game/Art/Materials/MaterialCategory_Rough.MaterialCategory_Rough"
+				],
+				"colors": [
+					3
+				]
+			}
+		}
+	]
+}

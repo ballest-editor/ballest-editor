@@ -131,6 +131,20 @@ const refused: ReadonlyArray<readonly [string, MapFile, RegExp]> = [
   ["a group name of 65 characters", editorState({ groups: [group("A".repeat(65))] }), /1 to 64/],
   ["a group name with a space", editorState({ groups: [group("A B")] }), /1 to 64/],
   ["a group frame that isn't normalized", editorState({ groups: [group("G", 2)] }), /non-normalized/],
+  [
+    "a group frame with a scale of 0 on one axis",
+    editorState({
+      groups: [{ members: [0, 1], name: "G", frame: { ...frame(), scale3D: { x: 1, y: 0, z: 1 } } }]
+    }),
+    /scale of 0/
+  ],
+  [
+    "a group frame with a scale of 0",
+    editorState({
+      groups: [{ members: [0, 1], name: "G", frame: { ...frame(), scale3D: { x: 0, y: 0, z: 0 } } }]
+    }),
+    /scale of 0/
+  ],
   ...NO_MESH_CLASSES.map((className) =>
     [
       `one mesh component on a ${className}`,

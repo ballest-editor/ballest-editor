@@ -43,7 +43,7 @@ export const gameGroupsOf = (
       ? []
       : [{
         members,
-        name: gameGroupNameOf(node.name),
+        name: gameGroupNameOf(node.prefab?.name ?? node.name),
         frame: groupFrame(members.flatMap((index) => map.items[index] ?? []))
       }]
   })
