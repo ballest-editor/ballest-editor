@@ -48,7 +48,7 @@ function MapItems() {
     sceneRegistry.itemsRoot = root.current
   }, [])
   return (
-    <group ref={root}>
+    <group ref={root} matrixAutoUpdate={false}>
       {(index !== null || !booting) &&
         doc.map.items.map((item, i) => {
           const id = doc.ids[i]

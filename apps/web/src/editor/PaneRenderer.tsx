@@ -93,6 +93,8 @@ export function PaneRenderer() {
   const scene = useThree((s) => s.scene)
   useEffect(() => {
     scene.matrixWorldAutoUpdate = false
+    // Never moves, and an object that updates its own matrix makes everything under it update too (see ItemObject).
+    scene.matrixAutoUpdate = false
   }, [scene])
   useFrame((state) => drawPanes(state, false), 1)
   return null

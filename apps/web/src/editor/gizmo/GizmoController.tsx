@@ -37,6 +37,7 @@ const applyToObject = (object: THREE.Object3D, transform: UeTransform) => {
   object.position.set(...s.position)
   object.quaternion.set(...s.quaternion)
   object.scale.set(...s.scale)
+  object.updateMatrix() // an item's matrix is only worked out when it moves (see ItemObject)
   object.updateMatrixWorld(true)
 }
 
