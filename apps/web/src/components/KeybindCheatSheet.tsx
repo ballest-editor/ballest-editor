@@ -3,6 +3,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { type NamedAction, namedActions } from "../domain/GameKeybinds"
 import { formatBinding, formatBindings } from "../domain/Keybinds"
 import { useEditor } from "../editor/store"
+import { SectionTitle } from "./SectionTitle"
 
 /** Consecutive actions grouped under their section (namedActions is already sorted by section). */
 const bySection = (actions: ReadonlyArray<NamedAction>) => {
@@ -25,19 +26,23 @@ export function KeybindCheatSheet() {
   const defaults = useEditor((s) => s.keybindDefaults)
   if (!open) return null
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/40 p-8">
-      <div className="max-h-full w-full max-w-5xl overflow-hidden rounded-xl border border-border/60 bg-background/85 p-5 shadow-2xl backdrop-blur-md">
-        <h2 className="mb-3 text-sm font-medium">Keybinds</h2>
+    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/60 p-8">
+      <div className="max-h-full w-full max-w-5xl overflow-hidden rounded-xl bg-popover/90 p-6 text-popover-foreground shadow-2xl ring-1 ring-foreground/10 backdrop-blur-md">
+        <h2 className="mb-4 font-heading text-sm font-medium">Keybinds</h2>
         <div className="columns-1 gap-8 sm:columns-2 lg:columns-3">
           {bySection(namedActions(defaults)).map(({ section, actions }) => (
-            <section key={section} className="mb-4 break-inside-avoid">
-              <h3 className="mb-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
-                {section}
-              </h3>
-              <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs">
+            <section key={section} className="mb-5 break-inside-avoid">
+              <SectionTitle>{section}</SectionTitle>
+              <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs">
                 {actions.map(({ action, label }) => (
                   <div key={action} className="contents">
-                    <dt className={cn("font-medium", keybinds[action].length === 0 && "text-muted-foreground")}>
+                    {/* the game names its actions in lower case; the sheet reads them in sentence case like every other label */}
+                    <dt
+                      className={cn(
+                        "font-medium first-letter:uppercase",
+                        keybinds[action].length === 0 && "text-muted-foreground"
+                      )}
+                    >
                       {label}
                     </dt>
                     <dd className="flex flex-wrap justify-end gap-1">

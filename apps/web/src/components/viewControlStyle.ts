@@ -1,8 +1,13 @@
 import type { KeyboardEvent, MouseEvent } from "react"
 
+/**
+ * The one frosted surface every overlay over the viewport sits on: the control groups, the tool bar and the panes'
+ * labels, so they read as one family against any scene.
+ */
+export const FROSTED = "border border-border/60 bg-background/60 shadow-lg backdrop-blur-md"
+
 /** One frosted button group; each control gets its own, like the game's. */
-export const GROUP =
-  "pointer-events-auto flex items-center gap-1 rounded-full border border-border/60 bg-background/60 p-1 shadow-lg backdrop-blur-md"
+export const GROUP = `pointer-events-auto flex items-center gap-1 rounded-full p-1 ${FROSTED}`
 
 /**
  * Popups open from a control's edge; these offsets clear the group's padding and border

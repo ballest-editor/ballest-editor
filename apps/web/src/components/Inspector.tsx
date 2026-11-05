@@ -449,8 +449,8 @@ export function Inspector() {
 
         <Separator />
         <SectionTitle>Transform</SectionTitle>
-        <div className="flex flex-col gap-1.5">
-          <div className="grid grid-cols-[auto_1fr_1fr_1fr] items-center gap-x-1.5 gap-y-1.5">
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-[auto_1fr_1fr_1fr] items-center gap-1">
             {transformRows(units).map((row) => (
               <TransformRow
                 key={row.field}

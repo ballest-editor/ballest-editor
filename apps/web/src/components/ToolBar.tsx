@@ -4,6 +4,7 @@ import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-gr
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { formatBinding, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
 import { type Tool, useEditor } from "../editor/store"
+import { FROSTED } from "./viewControlStyle"
 
 /** Icons chosen to match the game's own tool bar (pointer, cross arrows, circular arrows, diagonal arrows). */
 const TOOLS: ReadonlyArray<{
@@ -28,7 +29,7 @@ export function ToolBar({ disabled = false }: { readonly disabled?: boolean }) {
   const keybinds = useEditor((s) => s.keybinds)
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+    <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
       <ToggleGroup
         value={[tool]}
         onValueChange={(value) => {
@@ -37,7 +38,7 @@ export function ToolBar({ disabled = false }: { readonly disabled?: boolean }) {
         }}
         spacing={1}
         disabled={disabled}
-        className="pointer-events-auto rounded-full border border-border/60 bg-background/60 p-1 shadow-lg backdrop-blur-md"
+        className={`pointer-events-auto rounded-full p-1 ${FROSTED}`}
       >
         {TOOLS.map(({ tool: t, action, icon: Icon }) => (
           <Tooltip key={t}>

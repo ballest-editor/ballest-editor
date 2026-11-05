@@ -23,8 +23,9 @@ import {
 } from "../domain/viewLayout"
 import { AXIS_COLORS } from "../editor/axisColors"
 import { onPaneScaleChange, paneCameraAt } from "../editor/paneCameras"
+import { sceneStrokeClass } from "../editor/sceneColors"
 import { useEditor } from "../editor/store"
-import { GROUP, noFocus, POPUP_OFFSET } from "./viewControlStyle"
+import { FROSTED, GROUP, noFocus, POPUP_OFFSET } from "./viewControlStyle"
 
 const LAYOUT_ICONS = {
   single: IconSquare,
@@ -55,12 +56,17 @@ const paneBox = (layout: ViewLayout, slot: number) => {
 const usePaneScale = (slot: number): number =>
   useSyncExternalStore(onPaneScaleChange, () => paneCameraAt(slot).cmPerPixel)
 
-/** The pane's name and scale, which opens the list of views. */
+/**
+ * The pane's name and scale, which opens the list of views. The pane under the view controls (the top right one of a
+ * split) puts its label beneath them when it is too narrow for both (`underControls`); the pane is a container, so
+ * that follows its own width.
+ */
 function PaneHeader(
-  { slot, projection, disabled }: {
+  { slot, projection, disabled, underControls }: {
     readonly slot: number
     readonly projection: ViewProjection
     readonly disabled: boolean
+    readonly underControls: boolean
   }
 ) {
   const units = useEditor((s) => s.settings.general.units)
@@ -76,7 +82,11 @@ function PaneHeader(
           <button
             type="button"
             aria-label={`Pane view: ${label}`}
-            className="pointer-events-auto absolute top-2 left-2 flex h-6 items-center gap-1 rounded-md bg-background/60 px-1.5 text-xs text-foreground/90 tabular-nums backdrop-blur-md outline-none hover:bg-background/80"
+            className={cn(
+              "pointer-events-auto absolute top-3 left-3 flex h-7 items-center gap-1 rounded-full pr-1.5 pl-2.5 text-xs font-medium tabular-nums outline-none transition-colors hover:bg-background/80 aria-expanded:bg-background/80 disabled:opacity-50",
+              FROSTED,
+              underControls && "@max-[28rem]:top-15"
+            )}
             {...noFocus}
           />
         }
@@ -126,7 +136,12 @@ function AxisArrow(
         textAnchor={across ? "start" : "middle"}
         fill={color}
         fontSize={11}
-        fontWeight={600}
+        fontWeight={700}
+        // a halo in the scene's colour, so the name reads over the grid and the map in either theme
+        className={sceneStrokeClass}
+        strokeWidth={3}
+        strokeLinejoin="round"
+        paintOrder="stroke"
       >
         {name}
       </text>
@@ -140,7 +155,7 @@ function PaneAxes({ view }: { readonly view: OrthoView }) {
   return (
     <svg
       aria-hidden
-      className="pointer-events-none absolute bottom-14 left-1"
+      className="pointer-events-none absolute bottom-14 left-0.5"
       width={SIZE + 8}
       height={SIZE}
       viewBox={`0 0 ${SIZE + 8} ${SIZE}`}
@@ -179,7 +194,12 @@ function PaneDivider({ axis, at }: { readonly axis: "x" | "y"; readonly at: numb
       onPointerMove={onPointerMove}
       onDoubleClick={() => setPaneSplit(axis === "x" ? { x: 0.5 } : { y: 0.5 })}
     >
-      <div className={cn("bg-border group-hover:bg-primary", axis === "x" ? "h-full w-px" : "h-px w-full")} />
+      <div
+        className={cn(
+          "bg-border transition-colors group-hover:bg-primary group-active:bg-primary",
+          axis === "x" ? "h-full w-px" : "h-px w-full"
+        )}
+      />
     </div>
   )
 }
@@ -198,11 +218,16 @@ export function ViewPanes({ disabled }: { readonly disabled: boolean }) {
       {PANE_SLOTS.slice(0, count).map((slot) => {
         const projection = layout.projections[slot]
         return (
-          <div key={slot} className="absolute" style={paneBox(layout, slot)}>
+          <div key={slot} className="absolute @container" style={paneBox(layout, slot)}>
             {count > 1 && slot === activePane && (
-              <div className="absolute inset-0 ring-1 ring-primary/60 ring-inset" data-active-pane />
+              <div className="absolute inset-0 ring-1 ring-primary ring-inset" data-active-pane />
             )}
-            <PaneHeader slot={slot} projection={projection} disabled={disabled} />
+            <PaneHeader
+              slot={slot}
+              projection={projection}
+              disabled={disabled}
+              underControls={slot === 1 && layout.kind !== "rows"}
+            />
             {isOrthoView(projection) && <PaneAxes view={projection} />}
           </div>
         )
@@ -228,7 +253,7 @@ export function ViewLayoutControl({ disabled }: { readonly disabled: boolean }) 
               type="button"
               aria-label={`View panes: ${viewLayoutLabels[kind]}`}
               title="View panes"
-              className="flex size-8 items-center justify-center rounded-full outline-none hover:bg-muted disabled:opacity-50"
+              className="flex size-8 items-center justify-center rounded-full outline-none transition-colors hover:bg-muted aria-expanded:bg-muted disabled:opacity-50"
               {...noFocus}
             />
           }

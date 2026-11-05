@@ -38,7 +38,7 @@ function VersionRow(
   return (
     <li className="flex items-center gap-3 px-3 py-2">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-sm tabular-nums">
+        <div className="flex items-center gap-2 text-xs font-medium tabular-nums">
           {formatTime(backup.at)}
           <Badge variant="outline" title={place.title}>{place.label}</Badge>
         </div>
@@ -111,7 +111,7 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center justify-between gap-2">
-          <div className="truncate text-sm font-medium">
+          <div className="truncate text-xs font-medium">
             {shown === null ? "All backed-up maps" : mapLabelOf(shown)}
           </div>
           {shown !== null && (
@@ -120,20 +120,20 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
         </div>
         <ScrollArea className="h-72 min-h-0 rounded-md border">
           {backups === null
-            ? <p className="p-3 text-sm text-muted-foreground">Reading the backups…</p>
+            ? <p className="p-3 text-xs text-muted-foreground">Reading the backups…</p>
             : shown === null
             ? groups.length === 0
-              ? <p className="p-3 text-sm text-muted-foreground">No backups yet.</p>
+              ? <p className="p-3 text-xs text-muted-foreground">No backups yet.</p>
               : (
                 <ul className="divide-y">
                   {groups.map(([name, list]) => (
                     <li key={name}>
                       <button
                         type="button"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors outline-none hover:bg-muted focus-visible:bg-muted"
                         onClick={() => setShown(name)}
                       >
-                        <span className="min-w-0 flex-1 truncate text-sm">
+                        <span className="min-w-0 flex-1 truncate text-xs font-medium">
                           {mapLabelOf(name)}
                           {name === fileName && <span className="ml-1.5 text-muted-foreground">(open)</span>}
                         </span>
@@ -148,7 +148,7 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
               )
             : versions.length === 0
             ? (
-              <p className="p-3 text-sm text-muted-foreground">
+              <p className="p-3 text-xs text-muted-foreground">
                 No backups of this map yet. One is made each time Save, Rename, Import or Export writes over its file.
               </p>
             )
