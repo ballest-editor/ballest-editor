@@ -205,6 +205,7 @@ export interface ImportClash {
  *   dialog opening in its place.
  * - `rename`, `duplicate` and `recover` are the Project panel's per-map items (desktop); `gameLink` is File › Game
  *   link….
+ * - `settings` opens on `category`, or on the page it last showed (`settingsCategory`).
  * - `projectSettings` opens Project settings on the project's page, `mapSettings` on the open map's entry in it.
  * - `replacePublished`, `overwriteChanged` and `importClash` ask about what Export, Play or Import found.
  * - `whereToOpen` asks whether `target` (shown as `name`) takes over this window or opens in a new one.
@@ -223,6 +224,7 @@ export type DialogState =
       | "recover"
   }
   | { readonly id: "saveAs"; readonly afterSave?: Effect.Effect<void, unknown> }
+  | { readonly id: "settings"; readonly category?: SettingsCategory }
   | { readonly id: "replacePublished" } & PublishedDraft
   | { readonly id: "overwriteChanged" } & ChangedExport
   | { readonly id: "importClash" } & ImportClash
@@ -335,13 +337,8 @@ export interface EditorState extends TabState {
   readonly gizmoSpace: GizmoSpace
   /** The open modal dialog; editor keybinds are suspended while one is open. */
   readonly dialog: DialogState | null
-  /** The Settings panel's page, kept between openings. */
+  /** The Settings dialog's page, kept between openings. */
   readonly settingsCategory: SettingsCategory
-  /**
-   * Whether the map's tab is the one showing in the dock's centre group. With another tab in front (Settings) the
-   * viewport is hidden, so its keybinds are off (`isEditorKeyEvent`).
-   */
-  readonly mapInFront: boolean
   /** The keybind cheat sheet: shown while its binding is held. */
   readonly cheatSheet: boolean
   readonly catalog: LoadedCatalog | null
@@ -538,7 +535,6 @@ export interface EditorState extends TabState {
   readonly closeDialog: () => void
   readonly setCheatSheet: (cheatSheet: boolean) => void
   readonly setSettingsCategory: (category: SettingsCategory) => void
-  readonly setMapInFront: (mapInFront: boolean) => void
   readonly setPreview: (preview: EditorState["preview"]) => void
   readonly setLightingPreview: (lighting: Lighting | null) => void
   readonly setCatalog: (catalog: LoadedCatalog) => void
@@ -738,7 +734,6 @@ export const useEditor = create<EditorState>()((set, get) => {
     gizmoSpace: "world",
     dialog: null,
     settingsCategory: "general",
-    mapInFront: true,
     cheatSheet: false,
     catalog: null,
     catalogIndex: null,
@@ -1121,12 +1116,17 @@ export const useEditor = create<EditorState>()((set, get) => {
     setTool: (tool) => set({ tool }),
     toggleGizmoSpace: () => set((s) => ({ gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
     // The required chooser stays on top of everything: what would open behind it (the Game link's) waits for a launch.
-    openDialog: (dialog) => set((s) => isChooserRequired(s) ? s : { dialog }),
+    openDialog: (dialog) =>
+      set((s) =>
+        isChooserRequired(s) ? s : ({
+          dialog,
+          settingsCategory: dialog.id === "settings" ? dialog.category ?? s.settingsCategory : s.settingsCategory
+        })
+      ),
     // Drops the payload with the dialog: the saveAs dialog takes its `afterSave` before it closes itself to save.
     closeDialog: () => set({ dialog: null }),
     setCheatSheet: (cheatSheet) => set({ cheatSheet }),
     setSettingsCategory: (settingsCategory) => set({ settingsCategory }),
-    setMapInFront: (mapInFront) => set({ mapInFront }),
     setPreview: (preview) => set({ preview }),
     setLightingPreview: (lightingPreview) => set({ lightingPreview }),
     setCatalog: (catalog) => set({ catalog, catalogIndex: indexCatalog(catalog.catalog) }),

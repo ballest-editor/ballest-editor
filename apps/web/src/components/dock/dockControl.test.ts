@@ -1,8 +1,7 @@
 import { assert, beforeEach, describe, it, vi } from "@effect/vitest"
 import type { DockviewApi } from "dockview-react"
-import { DOCK_STORAGE_KEY, DOCUMENTS_PANEL } from "../../domain/dockLayout"
-import { useEditor } from "../../editor/store"
-import { attachDock, expandGroup, openSettings, resetDockLayout, showPanel, togglePanel } from "./dockControl"
+import { DOCK_STORAGE_KEY, type DockLayout, DOCUMENTS_PANEL } from "../../domain/dockLayout"
+import { attachDock, expandGroup, resetDockLayout, togglePanel } from "./dockControl"
 import type { DockPanel } from "./panels"
 
 const panel = (id: string, location: DockPanel["location"], rest: Partial<DockPanel> = {}): DockPanel => ({
@@ -15,15 +14,23 @@ const panel = (id: string, location: DockPanel["location"], rest: Partial<DockPa
 const panels = [
   panel("project", "left"),
   panel("pieces", "left", { renderer: "always" }),
-  panel("inspector", "right"),
-  panel("settings", "centre", { startsClosed: true })
+  panel("inspector", "right")
 ]
 
 const quiet = () => ({ dispose: () => undefined })
 
+interface OverlayEvent {
+  readonly group: unknown
+  readonly position: string
+  readonly preventDefault: () => void
+}
+type OverlayListener = (event: OverlayEvent) => void
+
 /** Enough of a dock to follow: panels in groups, with what was asked of it in `calls`. */
 const fakeDock = ({ failLoad = false, loaded = [DOCUMENTS_PANEL] as ReadonlyArray<string> } = {}) => {
   const calls: Array<string> = []
+  const loads: Array<DockLayout> = []
+  let overlay: OverlayListener = () => undefined
   const open = new Map<string, ReturnType<typeof fakePanel>>()
   const group = {
     id: "1",
@@ -86,8 +93,9 @@ const fakeDock = ({ failLoad = false, loaded = [DOCUMENTS_PANEL] as ReadonlyArra
       calls.push("clear")
       open.clear()
     },
-    fromJSON: () => {
+    fromJSON: (layout: DockLayout) => {
       calls.push("fromJSON")
+      loads.push(layout)
       if (failLoad) throw new Error("no such component")
     },
     toJSON: () => ({ grid: { root: { type: "branch", data: [], size: 0 } } }),
@@ -101,10 +109,13 @@ const fakeDock = ({ failLoad = false, loaded = [DOCUMENTS_PANEL] as ReadonlyArra
     onDidRemovePopoutGroup: quiet,
     onDidOpenPopoutWindowFail: quiet,
     onWillDragGroup: quiet,
-    onWillShowOverlay: quiet
+    onWillShowOverlay: (listener: OverlayListener) => {
+      overlay = listener
+      return quiet()
+    }
   }
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a stand-in for the part of the API the dock uses
-  return { api: api as unknown as DockviewApi, calls }
+  return { api: api as unknown as DockviewApi, calls, loads, overlay: (event: OverlayEvent) => overlay(event) }
 }
 
 const savedLayout = {
@@ -124,7 +135,7 @@ describe("the dock's layout on launch", () => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined)
   })
 
-  it("starts on the default layout: the panels around the centre, Settings closed", () => {
+  it("starts on the default layout: the panels around the centre", () => {
     const { api, calls } = fakeDock({ loaded: [] })
     attachDock(api, panels)
     assert.deepStrictEqual(calls.filter((call) => call.startsWith("add") || call === "fromJSON"), [
@@ -143,10 +154,48 @@ describe("the dock's layout on launch", () => {
   })
 
   it("gives a panel added since the layout was saved its place", () => {
-    storage.set(DOCK_STORAGE_KEY, saved(["project", "pieces", "settings"]))
+    storage.set(DOCK_STORAGE_KEY, saved(["project", "pieces"]))
     const { api, calls } = fakeDock()
     attachDock(api, panels)
     assert.deepStrictEqual(calls, ["fromJSON", "add inspector right"])
+  })
+
+  it("loads a layout saved with a panel the app no longer has, without it", () => {
+    const leaf = (id: string, views: ReadonlyArray<string>, size: number) => ({
+      type: "leaf",
+      data: { id, views, activeView: views.at(-1) },
+      size
+    })
+    const layout = {
+      ...savedLayout,
+      grid: {
+        ...savedLayout.grid,
+        root: {
+          ...savedLayout.grid.root,
+          data: [leaf("1", ["project"], 260), leaf("2", [DOCUMENTS_PANEL, "settings"], 1020)]
+        }
+      },
+      panels: { project: {}, [DOCUMENTS_PANEL]: {}, settings: {} }
+    }
+    storage.set(
+      DOCK_STORAGE_KEY,
+      JSON.stringify({
+        layout,
+        known: [...panels.map(({ id }) => id), "settings"],
+        hint: { left: 0, right: 0, bottom: 0 },
+        collapsed: {}
+      })
+    )
+    const { api, calls, loads } = fakeDock()
+    attachDock(api, panels)
+    assert.deepStrictEqual(calls, ["fromJSON"])
+    const [loaded] = loads
+    assert.notProperty(loaded?.panels, "settings")
+    assert.deepStrictEqual(loaded?.grid.root.data[1], {
+      type: "leaf",
+      data: { id: "2", views: [DOCUMENTS_PANEL] },
+      size: 1020
+    })
   })
 
   it("folds a column saved as a rail again, and a click on a tab undoes it", () => {
@@ -208,21 +257,16 @@ describe("the dock's panels", () => {
     assert.deepStrictEqual(calls.slice(0, 1), ["add inspector right"])
   })
 
-  it("opens Settings as a tab in the centre, or brings it forward when it's open", () => {
-    const { calls } = dock()
-    openSettings("keybinds")
-    assert.strictEqual(useEditor.getState().settingsCategory, "keybinds")
-    assert.strictEqual(calls[0], "add settings")
-    calls.length = 0
-    showPanel("settings")
-    assert.deepStrictEqual(calls, ["active settings", "focus settings"])
-  })
-
-  it("takes the place of an open dialog", () => {
-    dock()
-    useEditor.getState().openDialog({ id: "gameLink" })
-    openSettings()
-    assert.isNull(useEditor.getState().dialog)
+  it("takes a panel on the centre's sides, never as a tab", () => {
+    const made = fakeDock({ loaded: [DOCUMENTS_PANEL] })
+    attachDock(made.api, panels)
+    const refused = (position: string) => {
+      let prevented = false
+      made.overlay({ group: made.api.groups[0], position, preventDefault: () => prevented = true })
+      return prevented
+    }
+    assert.isTrue(refused("center"))
+    assert.isFalse(refused("left"))
   })
 
   it("resets around the centre: the viewport's panel is never touched", () => {

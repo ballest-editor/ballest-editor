@@ -36,6 +36,7 @@ import { ProjectChooser } from "./ProjectChooser"
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
 import { RecoverDialog } from "./RecoverDialog"
 import { ReplacePublishedDialog } from "./ReplacePublishedDialog"
+import { SettingsDialog } from "./SettingsDialog"
 import { StatusBar } from "./StatusBar"
 import { TopBar } from "./TopBar"
 import { WhereToOpenDialog } from "./WhereToOpenDialog"
@@ -105,6 +106,8 @@ const useCheckExportsOnFocus = () =>
 
 export function Editor() {
   const dialog = useEditor((s): Dialog | null => s.dialog?.id ?? null)
+  const settingsCategory = useEditor((s) => s.settingsCategory)
+  const setSettingsCategory = useEditor((s) => s.setSettingsCategory)
   const close = useEditor((s) => s.closeDialog)
 
   useActionKeys()
@@ -161,6 +164,12 @@ export function Editor() {
       <OverwriteChangedDialog open={dialog === "overwriteChanged"} onClose={close} />
       <ImportClashDialog open={dialog === "importClash"} onClose={close} />
       <RecoverDialog open={dialog === "recover"} onClose={close} />
+      <SettingsDialog
+        open={dialog === "settings"}
+        category={settingsCategory}
+        onCategoryChange={setSettingsCategory}
+        onClose={close}
+      />
       <KeybindCheatSheet />
       {/* clear of the status bar */}
       <Toaster position="bottom-right" offset={{ bottom: 40 }} />

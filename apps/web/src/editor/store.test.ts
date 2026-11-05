@@ -554,10 +554,16 @@ describe("editor store", () => {
     assert.deepStrictEqual(shownLighting(state()), before)
   })
 
-  it("tracks the open dialog, and keeps the settings category apart from it", () => {
+  it("tracks the open dialog and settings category", () => {
     const s = () => useEditor.getState()
     assert.isNull(s().dialog)
+    s().openDialog({ id: "settings", category: "keybinds" })
+    assert.strictEqual(s().dialog?.id, "settings")
+    assert.strictEqual(s().settingsCategory, "keybinds")
     s().setSettingsCategory("camera")
+    s().closeDialog()
+    s().openDialog({ id: "settings" })
+    assert.strictEqual(s().settingsCategory, "camera") // the last page shown when no category is given
     s().openDialog({ id: "saveAs" })
     assert.strictEqual(s().dialog?.id, "saveAs")
     assert.strictEqual(s().settingsCategory, "camera")

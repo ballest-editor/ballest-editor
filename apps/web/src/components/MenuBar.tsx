@@ -40,7 +40,7 @@ import {
 } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { useEditor, useOpenProjectMap } from "../editor/store"
-import { openSettings, resetDockLayout, usePanelCheck, useViewMenuPanels } from "./dock/dockControl"
+import { resetDockLayout, usePanelCheck, useViewMenuPanels } from "./dock/dockControl"
 
 /** The action's primary binding, as the menu shows it (nothing when unbound). */
 function Shortcut({ action }: { readonly action: KeybindAction }) {
@@ -234,7 +234,7 @@ export function MenuBar() {
             <CommandItem action="saveMap">Save</CommandItem>
             <CommandItem action="closeTab">Close tab</CommandItem>
             <MenubarSeparator />
-            <MenubarItem onClick={() => openSettings()}>Settings…</MenubarItem>
+            <MenubarItem onClick={() => openDialog({ id: "settings" })}>Settings…</MenubarItem>
             <MenubarItem onClick={() => openDialog({ id: "gameLink" })}>Game link…</MenubarItem>
             <MenubarItem disabled={!canCheck} onClick={() => void checkForUpdates()}>Check for updates</MenubarItem>
             <MenubarItem onClick={() => void quitApp()}>Quit</MenubarItem>
@@ -249,7 +249,7 @@ export function MenuBar() {
             <CommandItem action="saveMapAs">Export…</CommandItem>
             <CommandItem action="closeTab">Close tab</CommandItem>
             <MenubarSeparator />
-            <MenubarItem onClick={() => openSettings()}>Settings…</MenubarItem>
+            <MenubarItem onClick={() => openDialog({ id: "settings" })}>Settings…</MenubarItem>
           </Menu>
         )}
       <Menu title="Edit">

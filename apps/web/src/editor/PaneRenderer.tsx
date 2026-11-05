@@ -51,14 +51,10 @@ const syncPanes = (rects: ReadonlyArray<PaneRect>, panes: ReadonlyArray<PaneCame
 
 /**
  * Draws the panes into the one canvas, each in its own viewport and scissor. The drawing buffer is preserved, so a pane
- * not drawn this frame keeps what it last showed (`panesToDraw` says which those are). Nothing draws behind another tab.
+ * not drawn this frame keeps what it last showed (`panesToDraw` says which those are).
  */
 const drawPanes = ({ gl, scene, size }: Pick<RootState, "gl" | "scene" | "size">, everyPane: boolean): void => {
-  const { tabId, viewLayout, activePane, mapInFront } = useEditor.getState()
-  if (!mapInFront) {
-    shown = ""
-    return
-  }
+  const { tabId, viewLayout, activePane } = useEditor.getState()
   const rects = paneRects(viewLayout, size.width, size.height).filter((r) => r.width > 0 && r.height > 0)
   const panes = paneCamerasOf(tabId)
   syncPanes(rects, panes)

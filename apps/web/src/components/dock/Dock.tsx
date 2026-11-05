@@ -1,4 +1,4 @@
-import { IconArrowsMinimize, IconX } from "@tabler/icons-react"
+import { IconArrowsMinimize } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { PortalContainerContext } from "@workspace/ui/lib/portal-container"
 import {
@@ -66,12 +66,8 @@ const dockComponents = {
   ...Object.fromEntries(dockPanels.map((panel) => [panel.id, inFrame(panel.component)]))
 }
 
-/**
- * A panel's tab. Only what lives in the centre has a ×: the rest open and close from the View menu and a group's "…",
- * and Settings is in neither, wherever it was dragged.
- */
+/** A panel's tab. Panels open and close from the View menu and a group's "…", so it has no ×. */
 function DockTab({ api, containerApi }: IDockviewPanelHeaderProps) {
-  const closable = dockPanels.find((panel) => panel.id === api.id)?.location === "centre"
   const expand = () => {
     const group = containerApi.getPanel(api.id)?.group
     if (group !== undefined) expandGroup(group)
@@ -87,20 +83,6 @@ function DockTab({ api, containerApi }: IDockviewPanelHeaderProps) {
       onMouseDown={(e) => e.button === 1 && e.preventDefault()}
     >
       <span className="truncate">{api.title}</span>
-      {closable && (
-        <button
-          type="button"
-          aria-label={`Close ${api.title}`}
-          className="dock-tab-close"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation()
-            api.close()
-          }}
-        >
-          <IconX className="size-3" />
-        </button>
-      )}
     </div>
   )
 }
@@ -110,7 +92,7 @@ const HiddenTab = () => <span data-dock-hidden-tab />
 
 const dockTabComponents = { hidden: HiddenTab }
 
-/** The map tabs, ahead of any other tab in the centre group (Settings). */
+/** The map tabs, in the centre group's strip. */
 function CentreTabs({ group }: IDockviewHeaderActionsProps) {
   return isCentreGroup(group) ? <DocumentTabs /> : null
 }

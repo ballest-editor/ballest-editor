@@ -113,7 +113,7 @@ Later:
 ```
 ┌ BE  File  Edit  View  Project            Season 3 tracks           Play  v ^ x ┐
 ├───────────────┬──────────────────────────────────────────────┬─────────────────┤
-│ Project Pieces│ [Big Loop *] [Golf base] [Settings]          │ Inspector       │
+│ Project Pieces│ [Big Loop *] [Golf base]                     │ Inspector       │
 │               │                                              │                 │
 │               │               viewport                       │                 │
 ├───────────────┴──────────────────────────────────────────────┴─────────────────┤
@@ -121,7 +121,7 @@ Later:
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Everything between the top bar and the status bar is the dock ([DESKTOP.md § Dock](DESKTOP.md#dock)): the panels can be moved around the map tabs and the viewport, stacked, split, collapsed, closed from View, or popped out into windows of their own, and Settings is a panel beside the maps.
+Everything between the top bar and the status bar is the dock ([DESKTOP.md § Dock](DESKTOP.md#dock)): the panels can be moved around the map tabs and the viewport, stacked, split, collapsed, closed from View, or popped out into windows of their own.
 
 The wireframes in [mockups/](mockups/) are rough. Use [mockups/welcome.html](mockups/welcome.html) for the Welcome window and Project settings below. Its Project home tab and its Map and Game menus were dropped, and so were the Start page and Start tab in `start-page.html` and `start-tab.html`.
 
