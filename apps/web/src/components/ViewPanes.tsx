@@ -1,0 +1,254 @@
+import { IconChevronDown, IconLayoutColumns, IconLayoutGrid, IconLayoutRows, IconSquare } from "@tabler/icons-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger
+} from "@workspace/ui/components/dropdown-menu"
+import { cn } from "@workspace/ui/lib/utils"
+import { type PointerEvent, useSyncExternalStore } from "react"
+import { axisOf, formatPaneScale, ORTHO_AXES } from "../domain/orthoView"
+import {
+  isOrthoView,
+  type OrthoView,
+  paneCountOf,
+  type ViewLayout,
+  type ViewLayoutKind,
+  viewLayoutKinds,
+  viewLayoutLabels,
+  type ViewProjection,
+  viewProjectionLabels,
+  viewProjections
+} from "../domain/viewLayout"
+import { AXIS_COLORS } from "../editor/axisColors"
+import { onPaneScaleChange, paneCameraAt } from "../editor/paneCameras"
+import { useEditor } from "../editor/store"
+import { GROUP, noFocus, POPUP_OFFSET } from "./viewControlStyle"
+
+const LAYOUT_ICONS = {
+  single: IconSquare,
+  columns: IconLayoutColumns,
+  rows: IconLayoutRows,
+  quad: IconLayoutGrid
+} as const
+
+const PANE_SLOTS = [0, 1, 2, 3] as const
+
+/** Where a pane sits in the viewport, as shares of it: the same split the renderer draws to. */
+const paneBox = (layout: ViewLayout, slot: number) => {
+  const { kind, splitX, splitY } = layout
+  const columns = kind === "columns" || kind === "quad"
+  const rows = kind === "rows" || kind === "quad"
+  const right = columns && (kind === "quad" ? slot % 2 === 1 : slot === 1)
+  const below = rows && (kind === "quad" ? slot >= 2 : slot === 1)
+  const percent = (share: number) => `${share * 100}%`
+  return {
+    left: percent(right ? splitX : 0),
+    top: percent(below ? splitY : 0),
+    width: percent(columns ? (right ? 1 - splitX : splitX) : 1),
+    height: percent(rows ? (below ? 1 - splitY : splitY) : 1)
+  }
+}
+
+/** Follows a pane's zoom, which isn't React state: it changes with every wheel notch. */
+const usePaneScale = (slot: number): number =>
+  useSyncExternalStore(onPaneScaleChange, () => paneCameraAt(slot).cmPerPixel)
+
+/** The pane's name and scale, which opens the list of views. */
+function PaneHeader(
+  { slot, projection, disabled }: {
+    readonly slot: number
+    readonly projection: ViewProjection
+    readonly disabled: boolean
+  }
+) {
+  const units = useEditor((s) => s.settings.general.units)
+  const setPaneProjection = useEditor((s) => s.setPaneProjection)
+  const scale = usePaneScale(slot)
+  const name = viewProjectionLabels[projection]
+  const label = isOrthoView(projection) ? `${name} · ${formatPaneScale(scale, units)}` : name
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        disabled={disabled}
+        render={
+          <button
+            type="button"
+            aria-label={`Pane view: ${label}`}
+            className="pointer-events-auto absolute top-2 left-2 flex h-6 items-center gap-1 rounded-md bg-background/60 px-1.5 text-xs text-foreground/90 tabular-nums backdrop-blur-md outline-none hover:bg-background/80"
+            {...noFocus}
+          />
+        }
+      >
+        {label}
+        <IconChevronDown className="size-3 text-muted-foreground" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-36">
+        <DropdownMenuRadioGroup
+          value={projection}
+          onValueChange={(next: ViewProjection) => setPaneProjection(slot, next)}
+        >
+          {viewProjections.map((view) => (
+            <DropdownMenuRadioItem key={view} value={view}>{viewProjectionLabels[view]}</DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+const ARROW = 34
+const ORIGIN = 10
+const SIZE = ORIGIN + ARROW + 14
+
+/** One axis of `PaneAxes`: a line out from the corner, named with its sign ("-Y" when it runs that way). */
+function AxisArrow(
+  { direction, across }: { readonly direction: ReturnType<typeof axisOf>; readonly across: boolean }
+) {
+  const color = AXIS_COLORS[direction.axis]
+  const name = `${direction.positive ? "" : "−"}${direction.axis.toUpperCase()}`
+  const y = SIZE - ORIGIN
+  return (
+    <>
+      <line
+        x1={ORIGIN}
+        y1={y}
+        x2={across ? ORIGIN + ARROW : ORIGIN}
+        y2={across ? y : y - ARROW}
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+      <text
+        x={across ? ORIGIN + ARROW + 3 : ORIGIN}
+        y={across ? y + 4 : y - ARROW - 4}
+        textAnchor={across ? "start" : "middle"}
+        fill={color}
+        fontSize={11}
+        fontWeight={600}
+      >
+        {name}
+      </text>
+    </>
+  )
+}
+
+/** Which way the game's axes run across an orthographic pane, in their colours. */
+function PaneAxes({ view }: { readonly view: OrthoView }) {
+  const { right, up } = ORTHO_AXES[view]
+  return (
+    <svg
+      aria-hidden
+      className="pointer-events-none absolute bottom-14 left-1"
+      width={SIZE + 8}
+      height={SIZE}
+      viewBox={`0 0 ${SIZE + 8} ${SIZE}`}
+    >
+      <AxisArrow direction={axisOf(right)} across />
+      <AxisArrow direction={axisOf(up)} across={false} />
+    </svg>
+  )
+}
+
+/** A drag divider between panes. A double click puts it back in the middle. */
+function PaneDivider({ axis, at }: { readonly axis: "x" | "y"; readonly at: number }) {
+  const setPaneSplit = useEditor((s) => s.setPaneSplit)
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    const box = e.currentTarget.parentElement?.getBoundingClientRect()
+    if (box === undefined || !e.currentTarget.hasPointerCapture(e.pointerId)) return
+    setPaneSplit(
+      axis === "x" ? { x: (e.clientX - box.left) / box.width } : { y: (e.clientY - box.top) / box.height }
+    )
+  }
+  return (
+    <div
+      role="separator"
+      aria-orientation={axis === "x" ? "vertical" : "horizontal"}
+      className={cn(
+        "group pointer-events-auto absolute flex items-center justify-center",
+        axis === "x"
+          ? "inset-y-0 w-2 -translate-x-1/2 cursor-col-resize"
+          : "inset-x-0 h-2 -translate-y-1/2 cursor-row-resize"
+      )}
+      style={axis === "x" ? { left: `${at * 100}%` } : { top: `${at * 100}%` }}
+      onPointerDown={(e) => {
+        e.preventDefault()
+        e.currentTarget.setPointerCapture(e.pointerId)
+      }}
+      onPointerMove={onPointerMove}
+      onDoubleClick={() => setPaneSplit(axis === "x" ? { x: 0.5 } : { y: 0.5 })}
+    >
+      <div className={cn("bg-border group-hover:bg-primary", axis === "x" ? "h-full w-px" : "h-px w-full")} />
+    </div>
+  )
+}
+
+/**
+ * The frames of the view's panes over the one canvas (docs/DESKTOP.md § View panes): each pane's name and scale, the
+ * active pane's outline, an orthographic pane's axes, and the dividers. The pane's top right stays free for the view
+ * cube (#79). All click-through but the labels and dividers: the canvas takes the pointer and sorts it by pane.
+ */
+export function ViewPanes({ disabled }: { readonly disabled: boolean }) {
+  const layout = useEditor((s) => s.viewLayout)
+  const activePane = useEditor((s) => s.activePane)
+  const count = paneCountOf(layout.kind)
+  return (
+    <div className="pointer-events-none absolute inset-0">
+      {PANE_SLOTS.slice(0, count).map((slot) => {
+        const projection = layout.projections[slot]
+        return (
+          <div key={slot} className="absolute" style={paneBox(layout, slot)}>
+            {count > 1 && slot === activePane && (
+              <div className="absolute inset-0 ring-1 ring-primary/60 ring-inset" data-active-pane />
+            )}
+            <PaneHeader slot={slot} projection={projection} disabled={disabled} />
+            {isOrthoView(projection) && <PaneAxes view={projection} />}
+          </div>
+        )
+      })}
+      {(layout.kind === "columns" || layout.kind === "quad") && <PaneDivider axis="x" at={layout.splitX} />}
+      {(layout.kind === "rows" || layout.kind === "quad") && <PaneDivider axis="y" at={layout.splitY} />}
+    </div>
+  )
+}
+
+/** Picks how the view divides into panes. */
+export function ViewLayoutControl({ disabled }: { readonly disabled: boolean }) {
+  const kind = useEditor((s) => s.viewLayout.kind)
+  const setViewLayoutKind = useEditor((s) => s.setViewLayoutKind)
+  const Icon = LAYOUT_ICONS[kind]
+  return (
+    <div className={GROUP}>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          disabled={disabled}
+          render={
+            <button
+              type="button"
+              aria-label={`View panes: ${viewLayoutLabels[kind]}`}
+              title="View panes"
+              className="flex size-8 items-center justify-center rounded-full outline-none hover:bg-muted disabled:opacity-50"
+              {...noFocus}
+            />
+          }
+        >
+          <Icon className="size-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="bottom" sideOffset={POPUP_OFFSET.button} align="end" className="w-40">
+          <DropdownMenuRadioGroup value={kind} onValueChange={(next: ViewLayoutKind) => setViewLayoutKind(next)}>
+            {viewLayoutKinds.map((layout) => {
+              const LayoutIcon = LAYOUT_ICONS[layout]
+              return (
+                <DropdownMenuRadioItem key={layout} value={layout}>
+                  <LayoutIcon className="size-4" />
+                  {viewLayoutLabels[layout]}
+                </DropdownMenuRadioItem>
+              )
+            })}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
+}

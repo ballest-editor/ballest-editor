@@ -52,6 +52,19 @@ export const keybindSections = [
   },
   { name: "mouse and keyboard bindings", actions: ["lookRight", "lookLeft", "lookUp", "lookDown"] },
   { name: "editor camera", actions: ["fastMove", "speedFaster", "speedSlower", "orbit", "pan"] },
+  {
+    name: "view",
+    actions: [
+      "viewTop",
+      "viewBottom",
+      "viewFront",
+      "viewBack",
+      "viewRight",
+      "viewLeft",
+      "toggleOrthographic",
+      "frameAll"
+    ]
+  },
   { name: "file", actions: ["newMap", "openMap", "saveMap", "saveMapAs", "closeTab", "nextTab", "previousTab"] },
   { name: "game", actions: ["playMap"] },
   { name: "help", actions: ["showKeybinds"] }
@@ -100,6 +113,14 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   speedSlower: "camera speed down",
   orbit: "orbit",
   pan: "pan",
+  viewTop: "top view",
+  viewBottom: "bottom view",
+  viewFront: "front view",
+  viewBack: "back view",
+  viewRight: "right view",
+  viewLeft: "left view",
+  toggleOrthographic: "orthographic / perspective",
+  frameAll: "frame all",
   newMap: "new map",
   openMap: "import map",
   saveMap: "save map",
@@ -157,6 +178,15 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   speedSlower: "Lower the camera's fly speed one step.",
   orbit: "Hold and drag to orbit around the focus point.",
   pan: "Hold and drag to slide the camera sideways and up/down.",
+  viewTop: "Look straight down in the active pane, orthographic. Editor only: the game has no orthographic views.",
+  viewBottom: "Look straight up from under the map in the active pane, orthographic.",
+  viewFront: "Look at the map from its front (the +X side, the game's forward) in the active pane, orthographic.",
+  viewBack: "Look at the map from its back (the -X side) in the active pane, orthographic.",
+  viewRight: "Look at the map from its right (the +Y side) in the active pane, orthographic.",
+  viewLeft: "Look at the map from its left (the -Y side) in the active pane, orthographic.",
+  toggleOrthographic:
+    "Switch the active pane between perspective and the orthographic view closest to where it is looking.",
+  frameAll: "Frame the whole map in the active pane.",
   newMap: "Start a new map.",
   openMap:
     "Import a .balledit or .ballmap file: it is copied into the project and opened from there. In the browser, open it.",
@@ -234,6 +264,14 @@ export const defaultKeybinds: Keybinds = {
   speedSlower: ["WheelDown"],
   orbit: ["Alt+Mouse0"],
   pan: ["Mouse1"],
+  viewTop: ["Numpad7"],
+  viewBottom: ["Ctrl+Numpad7"],
+  viewFront: ["Numpad1"],
+  viewBack: ["Ctrl+Numpad1"],
+  viewRight: ["Numpad3"],
+  viewLeft: ["Ctrl+Numpad3"],
+  toggleOrthographic: ["Numpad5"],
+  frameAll: ["Shift+KeyF"],
   newMap: ["Alt+KeyN"],
   openMap: ["Ctrl+KeyO"],
   saveMap: ["Ctrl+KeyS"],
@@ -423,6 +461,7 @@ export const formatBinding = (binding: string): string =>
     .map((part) => {
       if (part.startsWith("Key")) return part.slice(3)
       if (part.startsWith("Digit")) return part.slice(5)
+      if (/^Numpad\d$/.test(part)) return `Num ${part.slice(6)}`
       if (part === "Mouse0") return "LMB"
       if (part === "Mouse1") return "MMB"
       if (part === "Mouse2") return "RMB"

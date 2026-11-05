@@ -7,14 +7,17 @@ import { chordOf } from "../../domain/Keybinds"
 import { localToWorld } from "../../domain/pivot"
 import { transformSelection } from "../actions"
 import { AXIS_COLORS } from "../axisColors"
+import { type PaneCamera, type PanePointer, panePointer } from "../paneCameras"
+import { useBeforePaneDraw } from "../PaneRenderer"
 import { sceneRegistry } from "../sceneRegistry"
 import { activeId, fitTransforms, pivotOf, shownTransform, useEditor } from "../store"
 import { dragAxisWorld, dragDelta, type DragStart, type PointerSample } from "./drag"
 import { GizmoObject, toolHandles } from "./handles"
-import { worldPerPixel } from "./math"
 
 interface ActiveDrag {
   readonly id: string
+  /** The pane the drag started in: it measures the pointer against that pane's camera to the end. */
+  readonly slot: number
   readonly start: DragStart
   /**
    * Every dragged item's transform at drag start, and the pivot they turn about. An Alt+drag
@@ -93,14 +96,19 @@ const toWorld = (v: Vec3) => {
  * preview (inspector stays in sync), one undo entry per drag, Escape to cancel. The gizmo
  * sits on the active item and a drag moves every selected item together. Alt+dragging a
  * translate handle moves a copy instead and leaves the selection in place, like the game.
+ * Every pane shows it, placed for that pane's camera just before it draws; the one under the
+ * pointer picks and drags it, and shows the hover.
  */
 export function GizmoController() {
-  const camera = useThree((s) => s.camera)
   const gl = useThree((s) => s.gl)
   const tool = useEditor((s) => s.tool)
   const gizmo = useMemo(() => (tool === "select" ? null : new GizmoObject(toolHandles[tool])), [tool])
   const hovered = useRef<string | null>(null)
+  /** The pane `hovered` is in. */
+  const hoverSlot = useRef<number | null>(null)
   const drag = useRef<ActiveDrag | null>(null)
+  /** What the gizmo acts on this frame; every pane places it from this. */
+  const frameTarget = useRef<GizmoTarget | undefined>(undefined)
 
   useEffect(() => {
     sceneRegistry.gizmo = gizmo
@@ -120,45 +128,51 @@ export function GizmoController() {
   }, [])
 
   useFrame(() => {
-    // The Canvas camera is perspective; gizmo sizing needs its fov.
-    if (gizmo === null || !(camera instanceof THREE.PerspectiveCamera)) return
-    const target = currentTarget()
-    gizmo.visible = target !== undefined
-    if (target === undefined) {
-      hovered.current = null
-      return
-    }
+    if (gizmo === null) return
+    frameTarget.current = currentTarget()
+    gizmo.visible = frameTarget.current !== undefined
+    if (frameTarget.current === undefined) hovered.current = null
+  })
+
+  /** Sizes and turns the gizmo for one pane's camera. */
+  const placeFor = (pane: PaneCamera, slot: number) => {
+    const target = frameTarget.current
+    if (gizmo === null || target === undefined) return
     const origin = toWorld(target.pivot)
-    const height = gl.domElement.clientHeight
     gizmo.update(
       {
         origin,
-        worldPerPixel: worldPerPixel(camera, origin, height),
+        worldPerPixel: pane.worldPerPixelAt(origin),
         gameRotation: target.rotation,
         space: useEditor.getState().gizmoSpace,
-        cameraQuaternion: camera.quaternion,
-        toCamera: camera.position.clone().sub(origin).normalize()
+        cameraQuaternion: pane.camera.quaternion,
+        toCamera: pane.toCameraFrom(origin)
       },
-      hovered.current,
+      slot === hoverSlot.current ? hovered.current : null,
       drag.current?.id ?? null
     )
+  }
+  const place = useRef(placeFor)
+  useEffect(() => {
+    place.current = placeFor
   })
+  useBeforePaneDraw(placeFor)
 
   useEffect(() => {
     if (gizmo === null) return
     const el = gl.domElement
     const raycaster = new THREE.Raycaster()
 
-    const sample = (e: PointerEvent): PointerSample => {
-      const rect = el.getBoundingClientRect()
-      const px = { x: e.clientX - rect.left, y: e.clientY - rect.top }
-      raycaster.setFromCamera(new THREE.Vector2((px.x / rect.width) * 2 - 1, -(px.y / rect.height) * 2 + 1), camera)
+    const sample = ({ ndc, pane, px }: PanePointer): PointerSample => {
+      raycaster.setFromCamera(ndc, pane.camera)
       return { rayOrigin: raycaster.ray.origin.clone(), rayDir: raycaster.ray.direction.clone(), px }
     }
-    const pick = (e: PointerEvent): string | null => {
+    /** The handle under the pointer, as its pane shows it: panes differ in the gizmo's size and in the handles shown. */
+    const pick = (pointer: PanePointer): string | null => {
       if (!gizmo.visible) return null
-      sample(e)
-      const hit = raycaster.intersectObjects([...gizmo.hitMeshes], false)[0]
+      place.current(pointer.pane, pointer.slot)
+      sample(pointer)
+      const hit = raycaster.intersectObjects([...gizmo.pickableMeshes], false)[0]
       const handleId: unknown = hit?.object.userData["handleId"]
       return typeof handleId === "string" ? handleId : null
     }
@@ -174,10 +188,12 @@ export function GizmoController() {
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return
-      const id = pick(e)
+      const pointer = panePointer(el, e)
+      const id = pick(pointer)
       const target = currentTarget()
       const spec = gizmo.handle(id)?.spec
       if (id === null || target === undefined || spec === undefined) return
+      const { camera } = pointer.pane
       e.stopImmediatePropagation() // the gizmo wins over camera drags and click-select
       e.preventDefault()
       try {
@@ -187,15 +203,17 @@ export function GizmoController() {
       }
       const originWorld = toWorld(target.pivot)
       const projected = originWorld.clone().project(camera)
-      const rect = el.getBoundingClientRect()
       const start: DragStart = {
         spec,
         space: useEditor.getState().gizmoSpace,
         frameRotation: target.rotation,
         originWorld,
-        originPx: { x: ((projected.x + 1) / 2) * rect.width, y: ((1 - projected.y) / 2) * rect.height },
-        toCamera: camera.position.clone().sub(originWorld).normalize(),
-        pointer: sample(e)
+        originPx: {
+          x: ((projected.x + 1) / 2) * pointer.pane.width,
+          y: ((1 - projected.y) / 2) * pointer.pane.height
+        },
+        toCamera: pointer.pane.toCameraFrom(originWorld),
+        pointer: sample(pointer)
       }
       const { settings } = useEditor.getState()
       const duplicate = e.altKey && settings.general.altDragDuplicates
@@ -204,6 +222,7 @@ export function GizmoController() {
         : undefined
       drag.current = {
         id,
+        slot: pointer.slot,
         start,
         startTransforms: target.transforms,
         localPivots: target.localPivots,
@@ -220,11 +239,15 @@ export function GizmoController() {
     const onPointerMove = (e: PointerEvent) => {
       const active = drag.current
       if (active === null) {
-        if (e.buttons === 0) hovered.current = pick(e)
+        if (e.buttons === 0) {
+          const pointer = panePointer(el, e)
+          hoverSlot.current = pointer.slot
+          hovered.current = pick(pointer)
+        }
         return
       }
       const { snapping } = useEditor.getState().settings
-      const delta = dragDelta(active.start, sample(e), {
+      const delta = dragDelta(active.start, sample(panePointer(el, e, active.slot)), {
         grid: snapping.enabled ? { size: snapping.gridSize, pivot: active.pivot } : undefined,
         rotationStep: snapping.rotationEnabled ? snapping.rotationStep : undefined
       })
@@ -295,7 +318,7 @@ export function GizmoController() {
       }
       hovered.current = null
     }
-  }, [gizmo, camera, gl])
+  }, [gizmo, gl])
 
   return gizmo === null ? null : <primitive object={gizmo} />
 }

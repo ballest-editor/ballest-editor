@@ -5,6 +5,8 @@ import { useShallow } from "zustand/react/shallow"
 import { toTuple3, type Tuple3, ueToThreeVector } from "../domain/coords"
 import { ARENA_COLOR, ARENA_RIM, luminance, type Sky, skyIrradiance, skyOf } from "../domain/sky"
 import { sunOf, viewLightOf } from "../domain/sunlight"
+import { perspectiveOnly } from "./paneCameras"
+import { useBeforePaneDraw } from "./PaneRenderer"
 import { setSky, SKY_DOME_RADIUS, SkyMaterial } from "./sky"
 import { shownLighting, useEditor } from "./store"
 import { setWaterLight } from "./water"
@@ -95,9 +97,10 @@ function MapLights() {
 }
 
 /**
- * The visible sky: a sphere that travels with the camera, drawn before everything else, and
+ * The visible sky: a sphere that travels with each pane's camera, drawn before everything else, and
  * fading out just above the grid's height so the theme's background shows under the grid.
  * (The sky light is captured separately, so the fade doesn't change how pieces are lit.)
+ * An orthographic pane has none: a dome means nothing without perspective, and its grid wants the plain background.
  */
 function SkyDome({ sky, clipBelow }: { readonly sky: Sky; readonly clipBelow: number }) {
   const mesh = useRef<THREE.Mesh>(null)
@@ -111,8 +114,20 @@ function SkyDome({ sky, clipBelow }: { readonly sky: Sky; readonly clipBelow: nu
   useEffect(() => {
     material.sky.uClipY.value = clipBelow
   }, [material, clipBelow])
-  useFrame(({ camera }) => void mesh.current?.position.copy(camera.position))
-  return <mesh ref={mesh} geometry={geometry} material={material} renderOrder={-1000} frustumCulled={false} />
+  useBeforePaneDraw(({ perspective }) => {
+    mesh.current?.position.copy(perspective.position)
+    mesh.current?.updateMatrixWorld()
+  })
+  return (
+    <mesh
+      ref={mesh}
+      layers={perspectiveOnly}
+      geometry={geometry}
+      material={material}
+      renderOrder={-1000}
+      frustumCulled={false}
+    />
+  )
 }
 
 /**

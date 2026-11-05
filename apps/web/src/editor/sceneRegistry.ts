@@ -4,11 +4,12 @@
  */
 import type { Camera, Object3D } from "three"
 import type { Vec3 } from "../domain/coords"
+import type { ViewProjection } from "../domain/viewLayout"
 
 export const sceneRegistry = {
   /** item id -> its root Object3D */
   objects: new Map<string, Object3D>(),
-  /** the viewport camera and the active gizmo (debugging / tests) */
+  /** the active pane's camera and the active gizmo (debugging / tests) */
   camera: null as Camera | null,
   gizmo: null as Object3D | null,
   /** parent of all item objects, for click raycasts */
@@ -24,5 +25,7 @@ export const sceneRegistry = {
   /** true while a movement key is flying the camera (a movement key's shortcut then waits) */
   flyKeysActive: () => false,
   /** where a palette click should place a new piece with this footprint (cm), in UE cm */
-  placementPoint: (_footprint: number): Vec3 => ({ x: 0, y: 0, z: 0 })
+  placementPoint: (_footprint: number): Vec3 => ({ x: 0, y: 0, z: 0 }),
+  /** what the orthographic / perspective toggle turns the active pane to (the menu's chunk can't reach the cameras) */
+  toggledProjection: (): ViewProjection => "perspective"
 }

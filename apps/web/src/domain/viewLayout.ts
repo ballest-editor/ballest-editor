@@ -8,9 +8,29 @@ export const orthoViews = ["top", "bottom", "front", "back", "left", "right"] as
 export type OrthoView = (typeof orthoViews)[number]
 
 export const viewProjections = ["perspective", ...orthoViews] as const
+export type ViewProjection = (typeof viewProjections)[number]
+
+export const isOrthoView = (projection: ViewProjection): projection is OrthoView => projection !== "perspective"
+
+export const viewProjectionLabels: Readonly<Record<ViewProjection, string>> = {
+  perspective: "Perspective",
+  top: "Top",
+  bottom: "Bottom",
+  front: "Front",
+  back: "Back",
+  left: "Left",
+  right: "Right"
+}
 
 export const viewLayoutKinds = ["single", "columns", "rows", "quad"] as const
 export type ViewLayoutKind = (typeof viewLayoutKinds)[number]
+
+export const viewLayoutLabels: Readonly<Record<ViewLayoutKind, string>> = {
+  single: "One pane",
+  columns: "Side by side",
+  rows: "Stacked",
+  quad: "Four panes"
+}
 
 /** No divider goes closer to the viewport's edge than this share of it, so a pane can't be dragged away. */
 const MIN_SPLIT = 0.1

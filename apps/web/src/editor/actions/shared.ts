@@ -9,6 +9,7 @@ import { floorHeightOf } from "../../domain/level"
 import type { MapFile } from "../../domain/MapFile"
 import { type MapPrefs, mapPrefsKeyOf } from "../../domain/MapPrefs"
 import { type LoadedStructure, loadStructure, sidecarOf } from "../../domain/sidecar"
+import { isDefaultViewLayout } from "../../domain/viewLayout"
 import { MapCodec } from "../../services/MapCodec"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { type NotificationAction, Platform, type ProjectMap } from "../../services/Platform"
@@ -131,6 +132,7 @@ export const showMap = Effect.fn("showMap")(function*(
   )
   useEditor.getState().loadMap(map, file, prefs.gridHeight, {
     exportOnSave: prefs.exportOnSave === true,
+    viewLayout: prefs.viewLayout,
     dirty: options?.dirty === true,
     ...(options?.into !== undefined && { into: options.into }),
     ...(options?.loaded !== undefined && { loaded: options.loaded })
@@ -139,16 +141,17 @@ export const showMap = Effect.fn("showMap")(function*(
 
 /**
  * A tab's map prefs (the active tab's by default), under its current name: the grid height when it isn't the player
- * start's (what a load would pick anyway), and Export on save when it is on.
+ * start's (what a load would pick anyway), Export on save when it is on, and the view layout when it isn't the default.
  */
 export const saveTabPrefs = Effect.fn("saveTabPrefs")(function*(tabId?: string) {
   const s = useEditor.getState()
   const tab = tabStateOf(s, tabId ?? s.tabId)
   if (tab === undefined) return
-  const { doc, floorHeight, exportOnSave } = tab
+  const { doc, floorHeight, exportOnSave, viewLayout } = tab
   const prefs: MapPrefs = {
     ...(floorHeight !== floorHeightOf(doc.map) && { gridHeight: floorHeight }),
-    ...(exportOnSave && { exportOnSave })
+    ...(exportOnSave && { exportOnSave }),
+    ...(!isDefaultViewLayout(viewLayout) && { viewLayout })
   }
   yield* MapPrefsStore.use((store) => store.save(mapPrefsKeyOf(doc.map), prefs))
 })

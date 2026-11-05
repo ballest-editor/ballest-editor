@@ -5,7 +5,7 @@ import type { Quat4, UeTransform } from "../../domain/coords"
 import { applyGroupDelta } from "../../domain/groupTransform"
 import { rotateVec, rotatorToQuat } from "../../domain/ueMath"
 import { dragDelta, type DragStart, type PointerSample } from "./drag"
-import { GizmoObject, type GizmoSpace, pairOf, SIZE, toolHandles } from "./handles"
+import { GizmoObject, type GizmoSpace, handleFacesCamera, pairOf, SIZE, toolHandles } from "./handles"
 import { axisParamFromRay, axisWorldDir, gameDirToWorld, planeHit, screenAngle } from "./math"
 
 const v3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
@@ -117,13 +117,58 @@ describe("gizmo handles", () => {
 
   it("has one hit mesh per handle and highlights only the hovered one", () => {
     const gizmo = new GizmoObject(toolHandles.scale)
-    expect(gizmo.hitMeshes.length).toBe(toolHandles.scale.length)
+    expect(gizmo.pickableMeshes.length).toBe(toolHandles.scale.length)
     gizmo.update(frame, "s-x", null)
     const colors = gizmo.handles.map((h) => h.materials[0]!.color.getHexString())
     const base = gizmo.handles.map((h) => h.baseColor.getHexString())
     expect(colors.filter((c, i) => c !== base[i])).toHaveLength(1)
     gizmo.update(frame, null, "s-y")
     expect(gizmo.handles.filter((h) => h.materials[0]!.opacity < 1)).toHaveLength(toolHandles.scale.length - 1)
+  })
+})
+
+describe("gizmo handles seen along an axis", () => {
+  const fromAbove = { ...frame, toCamera: v3(0, 1, 0) }
+  const shown = (tool: "translate" | "rotate" | "scale") =>
+    toolHandles[tool].filter((spec) => handleFacesCamera(spec, fromAbove)).map((spec) => spec.id)
+
+  it("drops the axis pointing at the camera", () => {
+    expect(shown("translate")).toEqual(["tp-z", "t-x", "t-y"])
+    expect(shown("scale")).toEqual(["s-x", "s-y", "s-uniform"])
+  })
+
+  it("keeps only the ring it can see open, and the view ring", () => {
+    expect(shown("rotate")).toEqual(["r-z", "r-view"])
+  })
+
+  it("keeps them all from an angle", () => {
+    const threeQuarter = { ...frame, toCamera: v3(1, 1, 1).normalize() }
+    for (const spec of Object.values(toolHandles).flat()) expect(handleFacesCamera(spec, threeQuarter)).toBe(true)
+  })
+
+  it("follows the item's own axes in local space", () => {
+    const tilted = {
+      ...fromAbove,
+      space: "local" as const,
+      gameRotation: rotatorToQuat({ pitch: 45, yaw: 0, roll: 0 })
+    }
+    const zAxis = toolHandles.translate.find((spec) => spec.id === "t-z")
+    expect(zAxis !== undefined && handleFacesCamera(zAxis, tilted)).toBe(true)
+  })
+
+  it("can't be picked once hidden, and comes back in another pane", () => {
+    const gizmo = new GizmoObject(toolHandles.translate)
+    gizmo.update(fromAbove, null, null)
+    expect(gizmo.handle("t-z")?.root.visible).toBe(false)
+    expect(gizmo.pickableMeshes).toHaveLength(3)
+    gizmo.update({ ...frame, toCamera: v3(1, 1, 1).normalize() }, null, null)
+    expect(gizmo.pickableMeshes).toHaveLength(6)
+  })
+
+  it("stays while it's being dragged", () => {
+    const gizmo = new GizmoObject(toolHandles.translate)
+    gizmo.update(fromAbove, null, "t-z")
+    expect(gizmo.handle("t-z")?.root.visible).toBe(true)
   })
 })
 
