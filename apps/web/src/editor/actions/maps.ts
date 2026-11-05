@@ -16,7 +16,16 @@ import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { Platform } from "../../services/Platform"
 import { type TabTarget, tabWithFile, useEditor } from "../store"
 import { notifyFailure, run } from "./run"
-import { fileOf, hasProject, projectName, refreshProject, revealIn, saveTabPrefs, showMap } from "./shared"
+import {
+  fileOf,
+  hasProject,
+  loadProjectMapFile,
+  projectName,
+  refreshProject,
+  revealIn,
+  saveTabPrefs,
+  showMap
+} from "./shared"
 
 /**
  * New map: starts it the way the in-game editor does and, on desktop, saves it into the project at once (making the
@@ -47,11 +56,13 @@ export const createNewMap = Effect.fn("createNewMap")(function*(displayName: str
 export const newMap = (displayName: string, creatorName: string) => run(createNewMap(displayName, creatorName))
 
 /** Reads one of the project's maps into the editor, in the tab `into` says. */
-const readProjectMapIntoEditor = Effect.fn("readProjectMapIntoEditor")(function*(fileName: string, into: TabTarget) {
-  const file = yield* (yield* Platform).readMap(fileName)
-  const map = yield* MapCodec.use((codec) => codec.decode(file.text))
-  yield* showMap(map, fileOf(file), { into })
-})
+export const readProjectMapIntoEditor = Effect.fn("readProjectMapIntoEditor")(
+  function*(fileName: string, into: TabTarget) {
+    const file = yield* (yield* Platform).readMap(fileName)
+    const { loaded, map } = yield* loadProjectMapFile(file)
+    yield* showMap(map, fileOf(file), { into, loaded })
+  }
+)
 
 /**
  * Opens one of the project's maps: the tab that has it open becomes the active one, else it opens in a new tab (in

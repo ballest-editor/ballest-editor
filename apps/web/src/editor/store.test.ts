@@ -9,7 +9,18 @@ import { isPlayerStart } from "../domain/MapFile"
 import { withDifficulty } from "../domain/mapTags"
 import { mirrorFlagsOf } from "../domain/mirror"
 import { defaultSettings } from "../domain/Settings"
-import { initialMap, nextSelection, pivotOf, shownLighting, shownTransform, useEditor } from "./store"
+import { loadStructure, sidecarOf, structureOfMap } from "../domain/sidecar"
+import { treeKeys } from "../domain/structure"
+import {
+  gameMapOf,
+  initialMap,
+  itemDisplayNamesOf,
+  nextSelection,
+  pivotOf,
+  shownLighting,
+  shownTransform,
+  useEditor
+} from "./store"
 
 const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!
 
@@ -728,5 +739,250 @@ describe("document tabs", () => {
     state().setLightingPreview(null)
     state().activateTab(first)
     assert.strictEqual(state().tabId, first)
+  })
+})
+
+describe("document structure", () => {
+  const structure = () => state().doc.structure
+  const tree = () => structure().tree
+  /** The tree as nested lists: an item's key, or a group's name and children. */
+  const shape = (nodes = tree()): ReadonlyArray<unknown> =>
+    nodes.map((node) => node.kind === "item" ? node.key : [node.name, shape(node.children)])
+  /** The store's one rule: `ids` and the tree hold the same items, each in one place. */
+  const assertConsistent = () => {
+    const placed = treeKeys(tree())
+    assert.lengthOf(placed, state().doc.ids.length)
+    assert.sameMembers([...placed], [...state().doc.ids])
+  }
+  /** A map of the player start and three cubes, and their keys. */
+  const threeCubes = () => {
+    mapWithCubes(0, 100, 200)
+    const [start = "", a = "", b = "", c = ""] = state().doc.ids
+    return { start, a, b, c }
+  }
+  /** Those cubes as `Outer` holding `Inner` (the first two cubes) and the third. */
+  const nestedGroups = () => {
+    const cubes = threeCubes()
+    const inner = state().groupItems([cubes.a, cubes.b], "Inner")!
+    const outer = state().groupItems([cubes.c], "Outer")!
+    state().moveNode(inner, outer, 0)
+    return { ...cubes, inner }
+  }
+  /** `action` as one undo step: undo goes back to the shape before it, redo to the shape after. */
+  const assertUndoable = (action: () => void) => {
+    const before = state().doc
+    const steps = state().past.length
+    action()
+    assertConsistent()
+    assert.strictEqual(state().past.length, steps + 1)
+    assert.isTrue(state().dirty)
+    const after = state().doc
+    state().undo()
+    assert.strictEqual(state().doc, before)
+    state().redo()
+    assert.strictEqual(state().doc, after)
+  }
+
+  it("gives every item a key when it enters the document, one identity with the selection", () => {
+    const { a } = threeCubes()
+    assert.match(a, /^[\w-]{12}$/)
+    assert.deepStrictEqual(state().selectedIds, state().doc.ids.slice(3))
+    assertConsistent()
+  })
+
+  it("renames an item, and clears the name with null", () => {
+    const { a } = threeCubes()
+    assertUndoable(() => state().renameItem(a, "Left ramp"))
+    assert.deepStrictEqual(structure().items.get(a), { name: "Left ramp" })
+    assert.strictEqual(itemDisplayNamesOf(state()).get(a), "Left ramp")
+    assertUndoable(() => state().renameItem(a, null))
+    assert.isFalse(structure().items.has(a))
+    const steps = state().past.length
+    state().renameItem(a, null)
+    state().renameItem("gone", "x")
+    assert.strictEqual(state().past.length, steps)
+  })
+
+  it("groups items where the first key was, and answers the group's id", () => {
+    const { a, b, c, start } = threeCubes()
+    let id: string | undefined
+    assertUndoable(() => {
+      id = state().groupItems([b, c])
+    })
+    assert.deepStrictEqual(shape(), [start, a, ["Group 1", [b, c]]])
+    const group = tree().find((node) => node.kind === "group")
+    assert.strictEqual(group?.kind === "group" ? group.id : undefined, id)
+    assert.isUndefined(state().groupItems(["gone"]))
+  })
+
+  it("pulls a selection that spans groups out of them, and a group left empty goes", () => {
+    const { a, b, c, start } = threeCubes()
+    state().groupItems([a, b], "One")
+    state().groupItems([c], "Two")
+    assertUndoable(() => state().groupItems([a, c], "Three"))
+    assert.deepStrictEqual(shape(), [start, ["One", [["Three", [a, c]], b]]])
+  })
+
+  it("renames and tags a group, and tags an item", () => {
+    const { a, b } = threeCubes()
+    const id = state().groupItems([a, b])!
+    assertUndoable(() => state().renameGroup(id, "Bridge"))
+    assertUndoable(() => state().setTags(id, ["start", "start ", "fast"]))
+    assertUndoable(() => state().setTags(a, ["fast"]))
+    const group = tree().find((node) => node.kind === "group")
+    assert.deepInclude(group, { name: "Bridge", tags: ["start", "fast"] })
+    assert.deepStrictEqual(structure().items.get(a), { tags: ["fast"] })
+    const steps = state().past.length
+    state().renameGroup(id, " ")
+    state().setTags(a, ["fast"])
+    assert.strictEqual(state().past.length, steps)
+  })
+
+  it("ungroups into the parent, where the group was", () => {
+    const { a, b, c, inner, start } = nestedGroups()
+    assert.deepStrictEqual(shape(), [start, ["Outer", [["Inner", [a, b]], c]]])
+    assertUndoable(() => state().ungroup(inner))
+    assert.deepStrictEqual(shape(), [start, ["Outer", [a, b, c]]])
+  })
+
+  it("moves nodes, refusing a group into itself", () => {
+    const { a, b, c, start } = threeCubes()
+    const id = state().groupItems([a, b], "G")!
+    assertUndoable(() => state().moveNode(c, id, 1))
+    assert.deepStrictEqual(shape(), [start, ["G", [a, c, b]]])
+    assertUndoable(() => state().moveNode(id, null, 0))
+    assert.deepStrictEqual(shape(), [["G", [a, c, b]], start])
+    const steps = state().past.length
+    state().moveNode(id, id, 0)
+    assert.strictEqual(state().past.length, steps)
+  })
+
+  it("places a new item loose at the end", () => {
+    const { a, b, c, start } = threeCubes()
+    state().groupItems([a, b], "G")
+    assertUndoable(() => state().placePiece(cube, placementTransform(cube, { x: 300, y: 0, z: 0 })))
+    assert.deepStrictEqual(shape(), [start, ["G", [a, b]], c, state().doc.ids[4]])
+  })
+
+  it("takes deleted items out of the tree with their data, and undo brings them back", () => {
+    const { a, b, c, start } = threeCubes()
+    state().groupItems([a, b], "G")
+    state().renameItem(a, "Named")
+    state().select([a, b])
+    assertUndoable(() => state().deleteSelection())
+    assert.deepStrictEqual(shape(), [start, c])
+    assert.isFalse(structure().items.has(a))
+    state().undo()
+    assert.deepStrictEqual(shape(), [start, ["G", [a, b]], c])
+    assert.deepStrictEqual(structure().items.get(a), { name: "Named" })
+  })
+
+  it("duplicates a whole group as a new group beside it, keeping names and tags", () => {
+    const { a, b, c, start } = threeCubes()
+    state().groupItems([a, b], "G")
+    state().renameItem(a, "Named")
+    state().setTags(b, ["t"])
+    state().select([a, b])
+    assertUndoable(() => state().duplicateSelection())
+    const [copyA = "", copyB = ""] = state().selectedIds
+    assert.deepStrictEqual(shape(), [start, ["G", [a, b]], ["G", [copyA, copyB]], c])
+    assert.deepStrictEqual(structure().items.get(copyA), { name: "Named" })
+    assert.deepStrictEqual(structure().items.get(copyB), { tags: ["t"] })
+    const groups = tree().flatMap((node) => node.kind === "group" ? [node.id] : [])
+    assert.strictEqual(new Set(groups).size, 2)
+  })
+
+  it("duplicates nested groups with their shape", () => {
+    const { a, b, c, start } = nestedGroups()
+    state().select([a, b, c])
+    state().duplicateSelection()
+    const [copyA, copyB, copyC] = state().selectedIds
+    assert.deepStrictEqual(shape(), [
+      start,
+      ["Outer", [["Inner", [a, b]], c]],
+      ["Outer", [["Inner", [copyA, copyB]], copyC]]
+    ])
+    assertConsistent()
+  })
+
+  it("keeps a copy of part of a group in that group", () => {
+    const { a, b, c, start } = threeCubes()
+    state().groupItems([a, b], "G")
+    state().select([a])
+    state().duplicateSelection()
+    assert.deepStrictEqual(shape(), [start, ["G", [a, state().selectedIds[0], b]], c])
+  })
+
+  it("cuts and pastes a group with its structure", () => {
+    const { a, b, c, start } = threeCubes()
+    state().groupItems([a, b], "G")
+    state().select([a, b])
+    assertUndoable(() => state().cutSelection())
+    assert.deepStrictEqual(shape(), [start, c])
+    assertUndoable(() => state().paste())
+    const [copyA, copyB] = state().selectedIds
+    assert.deepStrictEqual(shape(), [start, c, ["G", [copyA, copyB]]])
+  })
+
+  it("pastes into another tab's map, where the sources don't exist", () => {
+    const { a, b } = threeCubes()
+    state().groupItems([a, b], "G")
+    state().select([a, b])
+    state().copySelection()
+    state().loadMap(startOnlyMap(), null, undefined, { into: "newTab" })
+    state().paste()
+    assertConsistent()
+    assert.deepStrictEqual(shape(), [state().doc.ids[0], ["G", [...state().selectedIds]]])
+  })
+
+  it("keeps the tree through an Alt+drag duplicate, committed or cancelled", () => {
+    const { a, b, c, start } = threeCubes()
+    state().groupItems([a, b], "G")
+    state().select([a, b])
+    const before = state().doc
+    state().beginDuplicateDrag()
+    assertConsistent()
+    assert.strictEqual(state().endDuplicateDrag(null), false)
+    assert.strictEqual(state().doc, before)
+
+    const copies = state().beginDuplicateDrag()!
+    const [copyA = "", copyB = ""] = [...copies.values()]
+    const moved = new Map(
+      [...copies.values()].map((id) => [id, { ...transformOf(id), translation: { x: 1, y: 2, z: 3 } }])
+    )
+    assert.isTrue(state().endDuplicateDrag(moved))
+    assertConsistent()
+    assert.deepStrictEqual(shape(), [start, ["G", [a, b]], ["G", [copyA, copyB]], c])
+    state().undo()
+    assert.strictEqual(state().doc, before)
+  })
+
+  it("loads what a sidecar gives, keeping keys and structure", () => {
+    const { a, b } = threeCubes()
+    state().groupItems([a, b], "G")
+    state().renameItem(a, "Named")
+    const { doc } = state()
+    const hash = "a".repeat(64)
+    const sidecar = sidecarOf(doc.map, doc.ids, doc.structure, hash)
+    state().loadMap(doc.map, null, undefined, { loaded: loadStructure(doc.map, hash, sidecar) })
+    assert.deepStrictEqual(state().doc.ids, doc.ids)
+    assert.deepStrictEqual(state().doc.structure.tree, doc.structure.tree)
+    assert.deepStrictEqual(structure().items.get(a), { name: "Named" })
+  })
+
+  it("makes a tree of the game groups of a map that has no sidecar", () => {
+    const map = startOnlyMap()
+    const { ids } = structureOfMap(map)
+    assert.lengthOf(ids, 1)
+    state().loadMap(map, null)
+    assertConsistent()
+  })
+
+  it("projects its groups into the map the game gets, and the document's own map isn't touched", () => {
+    const { a, b } = threeCubes()
+    state().groupItems([a, b], "G 1")
+    const { doc } = state()
+    assert.deepStrictEqual(gameMapOf(doc).editorState?.groups.map((g) => [g.members, g.name]), [[[1, 2], "G1"]])
+    assert.deepStrictEqual(doc.map.editorState?.groups, [])
   })
 })

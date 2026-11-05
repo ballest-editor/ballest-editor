@@ -10,9 +10,9 @@ import { MapExporter } from "../../services/MapExporter"
 import { Platform, PlatformError, type ProjectState, type ProjectTarget } from "../../services/Platform"
 import type { AppServices } from "../../services/runtime"
 import { hasWindowToTakeOver, type ImportClash, isChooserRequired, useEditor } from "../store"
-import { openProjectMapFile, openStartingMap } from "./maps"
+import { openProjectMapFile, openStartingMap, readProjectMapIntoEditor } from "./maps"
 import { run } from "./run"
-import { fileOf, hasProject, projectName, refreshProject, revealIn, showMap } from "./shared"
+import { hasProject, projectName, refreshProject, revealIn, showMap } from "./shared"
 import { unlessAnyCancelled, unlessCancelledFor } from "./unsaved"
 
 /** Opens one of the project's maps (`openProjectMapFile`): its tab if it has one, else a new tab. */
@@ -53,7 +53,8 @@ const importInto = Effect.fn("importInto")(function*(pending: ImportClash, repla
     useEditor.getState().openDialog({ id: "importClash", ...pending })
     return
   }
-  yield* showMap(map, fileOf(result.map), { into: open ? "active" : "newTab" })
+  // from the project, which keeps what a map imported from the project itself has in its sidecar
+  yield* readProjectMapIntoEditor(result.map.fileName, open ? "active" : "newTab")
   yield* refreshProject
   useEditor.getState().notify(
     "info",
