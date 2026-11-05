@@ -38,7 +38,7 @@ export function DocumentTabs() {
     <div
       role="tablist"
       aria-label="Documents"
-      className="flex h-8 shrink-0 items-stretch overflow-x-auto overflow-y-hidden border-b bg-card text-xs [scrollbar-width:none]"
+      className="flex h-8 shrink-0 items-stretch overflow-x-auto overflow-y-hidden bg-card text-xs shadow-[inset_0_-1px_var(--border)] [scrollbar-width:none]"
       onDragOver={(e) => {
         if (drag === null) return
         e.preventDefault()
@@ -113,6 +113,7 @@ function DocumentTab({ id, index, dragging, dropBefore, dropAfter, onDragStart, 
       className={cn(
         "group relative flex h-full max-w-56 shrink-0 items-center gap-1 border-r pr-1 pl-2 transition-opacity",
         showing ? "bg-background text-foreground" : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+        "has-[button:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring)]",
         dragging && "opacity-40",
         // where a dragged tab would land
         dropBefore && "before:absolute before:inset-y-0 before:-left-px before:z-10 before:w-0.5 before:bg-primary",

@@ -85,7 +85,7 @@ function Menu({ title, children }: { readonly title: string; readonly children: 
         })
       }}
     >
-      <MenubarTrigger className="px-2.5">{title}</MenubarTrigger>
+      <MenubarTrigger className="h-7 px-2.5">{title}</MenubarTrigger>
       {/* Sized to the longest row (label and shortcut on one line), not to the menu's title. */}
       <MenubarContent className="w-max min-w-40" finalFocus={(closeType) => closeType === "keyboard"}>
         {children}

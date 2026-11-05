@@ -74,7 +74,7 @@ function StateGlyph({ state }: { readonly state: LinkState }) {
 
 /** The dot a map carries while it is open with unsaved edits, or isn't saved anywhere yet (the tab shows the same). */
 function UnsavedDot() {
-  return <span className="size-1.5 shrink-0 rounded-full bg-foreground/70" aria-label="unsaved" />
+  return <span className="size-1.5 shrink-0 rounded-full bg-foreground/60" aria-label="unsaved" />
 }
 
 /** What the row has no room for: the full name, where the file is (or that it isn't saved), when it was edited. */
@@ -263,11 +263,11 @@ export function ProjectPanel() {
   const now = useNow()
   const untitled = projects && project === null
   return (
-    <aside className="flex h-full min-w-0 flex-col gap-1 bg-card p-2">
-      <div className="flex h-6 items-center gap-1 px-1">
+    <aside className="flex h-full min-w-0 flex-col bg-card">
+      <div className="flex h-9 shrink-0 items-center gap-1 px-2">
         <span
           className={cn(
-            "min-w-0 flex-1 truncate pr-0.5 text-xs font-medium",
+            "min-w-0 flex-1 truncate px-1 text-xs font-medium",
             untitled && "italic text-muted-foreground"
           )}
           title={project?.path ?? (untitled ? "Not saved anywhere yet: Save the map to name the project." : undefined)}
@@ -275,19 +275,19 @@ export function ProjectPanel() {
           {projects ? project?.name ?? "Untitled Project *" : "This browser"}
         </span>
         <HeaderButton label="New map…" onClick={startNewMap}>
-          <IconPlus />
+          <IconPlus className="size-3.5" />
         </HeaderButton>
         <HeaderButton label={projects ? "Import map…" : "Open…"} disabled={untitled} onClick={() => void importMap()}>
-          <IconFileImport />
+          <IconFileImport className="size-3.5" />
         </HeaderButton>
         {projects && (
           <HeaderButton label="Project settings…" onClick={() => openDialog({ id: "projectSettings" })}>
-            <IconSettings />
+            <IconSettings className="size-3.5" />
           </HeaderButton>
         )}
       </div>
       <ScrollArea className="min-h-0 flex-1">
-        <ul className="flex flex-col gap-px pr-2">
+        <ul className="flex flex-col gap-px px-2 pb-2">
           {unsavedTabs.map((tabId) => <UnsavedRow key={tabId} tabId={tabId} />)}
           {/* the tabs above aren't in the project; a rule keeps them from reading as its first maps */}
           {unsavedTabs.length > 0 && maps.length > 0 && (
@@ -296,8 +296,14 @@ export function ProjectPanel() {
           {maps.map((map) => <MapRow key={map.fileName} map={map} now={now} />)}
         </ul>
         {untitled && (
-          <p className="px-2 py-3 text-[0.7rem] text-muted-foreground">
+          <p className="px-3 py-2 text-[0.6875rem] text-muted-foreground">
             Save the map to name the project; it is kept in Documents/Ballest Editor from then on.
+          </p>
+        )}
+        {!projects && unsavedTabs.length === 0 && (
+          <p className="px-3 py-2 text-[0.6875rem] text-muted-foreground">
+            This browser has no project: maps live in their tabs, and Save downloads the file. The desktop app keeps
+            them in a project folder.
           </p>
         )}
       </ScrollArea>

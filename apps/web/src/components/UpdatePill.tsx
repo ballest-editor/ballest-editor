@@ -211,7 +211,7 @@ function Pill(
       </Tooltip>
       <PopoverContent side="top" align="end" initialFocus={notes} className="w-96 gap-0 p-0">
         <div className="flex flex-col gap-0.5 px-3 pt-3 pb-2.5">
-          <p className="text-[0.6875rem] font-medium text-muted-foreground uppercase">What's new</p>
+          <p className="text-eyebrow text-muted-foreground">What's new</p>
           <PopoverTitle>Ballest Editor {state.availableVersion}</PopoverTitle>
           <PopoverDescription>
             {released === null ? `You have ${state.currentVersion}` : `${released} · You have ${state.currentVersion}`}

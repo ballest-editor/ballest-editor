@@ -13,20 +13,22 @@
 :root {
     --background: oklch(1 0 0);
     --foreground: oklch(0.141 0.005 285.823);
-    --card: oklch(1 0 0);
+    /* Chrome (panels, strips, bars) sits a step below the page, as the dark theme's card does, so the shell reads as
+     * chrome around the content rather than one white sheet. Hovers are a step below that. */
+    --card: oklch(0.975 0.001 286.375);
     --card-foreground: oklch(0.141 0.005 285.823);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.141 0.005 285.823);
     --primary: oklch(0.488 0.243 264.376);
     --primary-foreground: oklch(0.97 0.014 254.604);
-    --secondary: oklch(0.967 0.001 286.375);
+    --secondary: oklch(0.945 0.002 286.375);
     --secondary-foreground: oklch(0.21 0.006 285.885);
-    --muted: oklch(0.967 0.001 286.375);
+    --muted: oklch(0.945 0.002 286.375);
     --muted-foreground: oklch(0.552 0.016 285.938);
-    --accent: oklch(0.967 0.001 286.375);
+    --accent: oklch(0.945 0.002 286.375);
     --accent-foreground: oklch(0.21 0.006 285.885);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.92 0.004 286.32);
+    --border: oklch(0.9 0.004 286.32);
     --input: oklch(0.92 0.004 286.32);
     --ring: oklch(0.705 0.015 286.067);
     --chart-1: oklch(0.809 0.105 251.813);
@@ -35,13 +37,13 @@
     --chart-4: oklch(0.488 0.243 264.376);
     --chart-5: oklch(0.424 0.199 265.638);
     --radius: 0.45rem;
-    --sidebar: oklch(0.985 0 0);
+    --sidebar: oklch(0.975 0.001 286.375);
     --sidebar-foreground: oklch(0.141 0.005 285.823);
     --sidebar-primary: oklch(0.546 0.245 262.881);
     --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
-    --sidebar-accent: oklch(0.967 0.001 286.375);
+    --sidebar-accent: oklch(0.945 0.002 286.375);
     --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-    --sidebar-border: oklch(0.92 0.004 286.32);
+    --sidebar-border: oklch(0.9 0.004 286.32);
     --sidebar-ring: oklch(0.705 0.015 286.067);
 }
 
@@ -155,4 +157,16 @@
 @utility duration-* {
   --tw-duration: calc(--value(integer) * 1ms * var(--motion));
   transition-duration: calc(--value(integer) * 1ms * var(--motion));
+}
+
+/*
+ * The one small-caps label of the shell: section titles, panel tabs, group headings in lists and popovers. One size and
+ * one tracking everywhere, so a heading looks the same in the Pieces panel, the Inspector, Settings and the bell.
+ */
+@utility text-eyebrow {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }

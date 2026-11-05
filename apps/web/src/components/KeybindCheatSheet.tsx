@@ -31,7 +31,7 @@ export function KeybindCheatSheet() {
         <div className="columns-1 gap-8 sm:columns-2 lg:columns-3">
           {bySection(namedActions(defaults)).map(({ section, actions }) => (
             <section key={section} className="mb-4 break-inside-avoid">
-              <h3 className="mb-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
+              <h3 className="mb-1 text-eyebrow text-muted-foreground">
                 {section}
               </h3>
               <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs">

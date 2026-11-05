@@ -95,7 +95,7 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
         )
         : label}
       {!row.tooltip && row.description !== undefined && (
-        <span className={cn("text-[0.7rem] text-muted-foreground", row.disabled && "opacity-60")}>
+        <span className={cn("text-[0.6875rem] text-muted-foreground", row.disabled && "opacity-60")}>
           {row.description}
         </span>
       )}
@@ -234,7 +234,7 @@ function SettingsContent<C extends string>(
                 onClick={() => setScope(null)}
               >
                 <span>All results</span>
-                <span className="text-[0.65rem] text-muted-foreground tabular-nums">{matched.length}</span>
+                <span className="text-[0.625rem] text-muted-foreground tabular-nums">{matched.length}</span>
               </Button>
             )}
             {props.categories.map(({ id, label, icon: CategoryIcon, section }, i) => {
@@ -244,7 +244,7 @@ function SettingsContent<C extends string>(
               return (
                 <Fragment key={id}>
                   {heading && (
-                    <div className="mt-2 px-2 pb-0.5 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
+                    <div className="mt-2 px-2 pb-0.5 text-eyebrow text-muted-foreground">
                       {section}
                     </div>
                   )}
@@ -262,7 +262,7 @@ function SettingsContent<C extends string>(
                     <span className="min-w-0 flex-1 truncate text-left">{label}</span>
                     {searching
                       ? hits > 0 && (
-                        <span className="rounded-full bg-primary/15 px-1.5 text-[0.65rem] text-primary tabular-nums">
+                        <span className="rounded-full bg-primary/15 px-1.5 text-[0.625rem] text-primary tabular-nums">
                           {hits}
                         </span>
                       )
@@ -304,7 +304,7 @@ function SettingsContent<C extends string>(
             {groups.map((group) => (
               <section key={group.key} className="flex flex-col">
                 {group.title !== undefined && group.title !== "" && (
-                  <h3 className="mb-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
+                  <h3 className="mb-1 text-eyebrow text-muted-foreground">
                     {group.title}
                   </h3>
                 )}
