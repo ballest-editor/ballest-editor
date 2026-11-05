@@ -9,7 +9,7 @@ import {
 } from "../../test/desktopBridge"
 import { balledits, edit, fileNameOf, layerFor, noticesWhile, reset, s } from "../../test/editorActions"
 import { readSample } from "../../test/samples"
-import { tabLabelOf, tabStateOf, tabsWithoutFile } from "../store"
+import { dirtyTabs, tabLabelOf, tabStateOf, tabsWithoutFile } from "../store"
 import { createNewMap } from "./maps"
 import { chooseProjectEffect, createProjectEffect, importMapFile } from "./project"
 import { duplicateMapEffect, saveMapAsEffect, saveMapFile, saveMapInNewProjectEffect } from "./save"
@@ -55,6 +55,18 @@ describe("maps made in Untitled Project", () => {
       s().activateTab(tabNamed("Big Loop"))
       assert.deepStrictEqual(unsavedRows(), ["Big Loop", "Hairpin", "Shuttle"])
       assert.strictEqual(disk.files.size, 0)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("count as unsaved from the start, so closing asks, until the first Save", () => {
+    const disk = untitledDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      assert.deepStrictEqual(dirtyTabs(s()), [])
+      yield* createNewMap("Big Loop", "Isaac")
+      assert.deepStrictEqual(dirtyTabs(s()), [tabNamed("Big Loop")])
+      yield* saveMapInNewProjectEffect("My tracks")
+      assert.deepStrictEqual(dirtyTabs(s()), [])
     }).pipe(Effect.provide(layerFor(disk)))
   })
 

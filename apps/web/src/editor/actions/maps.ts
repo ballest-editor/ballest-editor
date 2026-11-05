@@ -28,9 +28,10 @@ export const createNewMap = Effect.fn("createNewMap")(function*(displayName: str
   const catalog = useEditor.getState().catalog?.catalog
   const playerStartPiece = catalog?.pieces.find((p) => p.classPath === PLAYER_START_CLASS)
   const map = newMapFile({ displayName, creatorName, createdAt, playerStartPiece })
-  // a browser keeps it in memory; so does Untitled Project, until the first Save names a project
+  // a browser keeps it in memory; so does Untitled Project, until the first Save names a project. It has a name someone
+  // gave it and no file to fall back on, so closing it asks, unlike the blank map the app starts on.
   if (!platform.capabilities.projects || !hasProject()) {
-    useEditor.getState().loadMap(map, null, undefined, { into: "newTab" })
+    useEditor.getState().loadMap(map, null, undefined, { into: "newTab", dirty: true })
     return
   }
   const result = yield* (yield* MapExporter).prepare(map)

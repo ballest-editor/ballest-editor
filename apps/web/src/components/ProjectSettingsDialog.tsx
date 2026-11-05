@@ -18,6 +18,7 @@ import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-gr
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { type ReactNode, useEffect, useState } from "react"
+import { useShallow } from "zustand/react/shallow"
 import { usableCreatorName } from "../domain/creator"
 import { setLevelData as setMapLevelData, withLevelNames } from "../domain/edits"
 import { isValidName, mapFileNameOf, mapLabelOf, NAME_RULE_SENTENCE } from "../domain/factory"
@@ -52,19 +53,22 @@ import {
   setGridHeight,
   setLevelData
 } from "../editor/actions"
-import { tabStateOf, tabWithFile, useCreator, useEditor } from "../editor/store"
+import { tabLabelOf, tabStateOf, tabsWithoutFile, tabWithFile, useCreator, useEditor } from "../editor/store"
 import { NumberField } from "./NumberField"
 import { PathAction, PathField, PathText } from "./PathText"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
 /**
  * The dialog's pages (docs/PROJECTS.md § Shell): the project, then one entry per map. `map:<file name>` is a map in
- * the project; `map:open` the open map while it has no file yet.
+ * the project; `map:open` the open map while it has no file yet; `map:tab:<tab id>` another tab's map while it has none.
  */
 type Category = "project" | `map:${string}`
 type Row = SettingsRow<Category>
 
 const OPEN_UNSAVED: Category = "map:open"
+const UNSAVED_TAB = "map:tab:"
+const unsavedTabEntry = (tabId: string): Category => `map:tab:${tabId}`
+const unsavedLabelOf = (name: string) => `${name} (unsaved)`
 const entryOf = (fileName: string): Category => `map:${fileName}`
 
 const TAG_DESCRIPTIONS: Readonly<Record<TagGroup, string>> = {
@@ -214,7 +218,7 @@ const useOpenMapEntry = (): MapEntry => {
   const fileName = useEditor((s) => s.file?.name ?? null)
   return {
     category: fileName === null ? OPEN_UNSAVED : entryOf(fileName),
-    label: fileName === null ? `${levelData.levelDisplayName.trim() || "Untitled"} (unsaved)` : mapLabelOf(fileName),
+    label: fileName === null ? unsavedLabelOf(levelData.levelDisplayName.trim() || "Untitled") : mapLabelOf(fileName),
     fileName,
     levelData,
     floorHeight,
@@ -230,12 +234,12 @@ const useOpenMapEntry = (): MapEntry => {
 /** A map open in a tab that isn't the active one: edited in that tab (undo steps there, its prefs), like the open map. */
 const useTabMapEntry = (tabId: string | null): MapEntry | null => {
   const tab = useEditor((s) => tabId === null ? undefined : tabStateOf(s, tabId))
-  const file = tab?.file ?? null
-  if (tabId === null || tab === undefined || file === null) return null
+  if (tabId === null || tab === undefined) return null
+  const { file } = tab
   return {
-    category: entryOf(file.name),
-    label: mapLabelOf(file.name),
-    fileName: file.name,
+    category: file === null ? unsavedTabEntry(tabId) : entryOf(file.name),
+    label: file === null ? unsavedLabelOf(tabLabelOf(tab)) : mapLabelOf(file.name),
+    fileName: file?.name ?? null,
     levelData: tab.doc.map.worldSettings.levelData,
     floorHeight: tab.floorHeight,
     startHeight: floorHeightOf(tab.doc.map),
@@ -522,23 +526,40 @@ export function ProjectSettingsDialog(
   }
 
   // the shown entry's map, when it isn't the open one, is read from its file
-  const shownFile = category.startsWith("map:") && category !== openMap.category && category !== OPEN_UNSAVED
+  const shownUnsaved = category.startsWith(UNSAVED_TAB) ? category.slice(UNSAVED_TAB.length) : null
+  const shownFile = shownUnsaved === null && category.startsWith("map:") && category !== openMap.category &&
+      category !== OPEN_UNSAVED
     ? category.slice("map:".length)
     : null
-  const shownTab = useEditor((s) => shownFile === null ? undefined : tabWithFile(s, shownFile)) ?? null
+  const shownTab = useEditor((s) => shownUnsaved ?? (shownFile === null ? undefined : tabWithFile(s, shownFile))) ??
+    null
   const tabMap = useTabMapEntry(shownTab)
   const diskMap = useDiskMapEntry(
     shownTab === null ? shownFile : null,
     maps.find((m) => m.fileName === shownFile)?.modifiedAt
   )
-  const entry = shownFile === null ? openMap : tabMap ?? diskMap
+  const entry = shownFile === null && shownUnsaved === null ? openMap : tabMap ?? diskMap
 
   const mapEntries = maps.map((m) => m.fileName)
+  // the other tabs' maps with no file yet, which the project's list can't show
+  const otherUnsaved = useEditor(useShallow((s) => tabsWithoutFile(s).filter((id) => id !== s.tabId)))
+  const otherUnsavedNames = useEditor(useShallow((s) =>
+    otherUnsaved.map((id) => {
+      const tab = tabStateOf(s, id)
+      return tab === undefined ? "Untitled" : tabLabelOf(tab)
+    })
+  ))
   const categories: ReadonlyArray<SettingsCategoryInfo<Category>> = [
     ...(projects ? [{ id: "project" as const, label: "General", icon: IconFolder, section: "Project" }] : []),
     ...(openMap.fileName === null || !projects
       ? [{ id: openMap.category, label: openMap.label, icon: IconMap, section: "Maps" }]
       : []),
+    ...otherUnsaved.map((tabId, index) => ({
+      id: unsavedTabEntry(tabId),
+      label: unsavedLabelOf(otherUnsavedNames[index] ?? "Untitled"),
+      icon: IconMap,
+      section: "Maps"
+    })),
     ...(projects
       ? mapEntries.map((fileName) => ({
         id: entryOf(fileName),
