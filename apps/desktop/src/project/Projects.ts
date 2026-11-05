@@ -6,7 +6,7 @@ import {
   type ProjectInfo,
   type ProjectState
 } from "@ballest/contracts"
-import { Context, Effect, FileSystem, Option, Path, Schema } from "effect"
+import { Context, Effect, FileSystem, Option, Path, Ref, Schema } from "effect"
 import { GamePaths } from "../game/GamePaths"
 import { DesktopSettings, type ProjectSettings } from "../settings/DesktopSettings"
 import { isSamePath, isWithin, writeJson } from "./files"
@@ -88,8 +88,8 @@ export const mapsFolderIn = (path: Path.Path, project: string) => path.join(proj
 export const backupsFolderIn = (path: Path.Path, project: string) => path.join(project, ".ballest", "backups")
 
 /**
- * Which project is in use (docs/PROJECTS.md). One project is in use at a time, the most recent one; with none (the
- * first launch) the window is Untitled Project and nothing is on disk until the first Save names a project
+ * Which project is in use (docs/PROJECTS.md). A window has one project: it starts on the most recent one and keeps it
+ * whatever another running copy does; with none (the first launch) the window is Untitled Project and nothing is on disk until the first Save names a project
  * (`createNew`). A project exists on disk from `createNew`, or from the first New map or Import into a chosen folder
  * (`ensure`). A project is never the game's maps folder or inside it. Its maps are `MapFiles`', their exports
  * `MapExports`'.
@@ -125,12 +125,10 @@ export class Projects extends Context.Service<Projects, {
     const same = (a: string, b: string) => isSamePath(path, a, b, platform)
 
     const remembered = settings.get.pipe(Effect.map((s): ProjectSettings => s.project ?? {}))
-    const current: Effect.Effect<Option.Option<string>> = remembered.pipe(
-      Effect.map((s) => {
-        const [first] = s.recent ?? []
-        return first === undefined ? Option.none() : Option.some(first)
-      })
-    )
+    // This window's project, for as long as it runs. A window has one project: it starts on the most recent, and only
+    // this window's own choices move it. Settings are shared with any other running copy, so they can't be what says.
+    const inWindow = yield* Ref.make(Option.fromNullishOr((yield* remembered).recent?.[0]))
+    const current: Effect.Effect<Option.Option<string>> = Ref.get(inWindow)
     const inUse: Effect.Effect<string, ProjectError> = current.pipe(
       Effect.flatMap(Effect.fromOption),
       Effect.mapError(projectError("noProject", projectsFolder))
@@ -146,7 +144,8 @@ export class Projects extends Context.Service<Projects, {
 
     const state = Effect.gen(function*() {
       const { recent = [], lastOpenMap: kept = {} } = yield* remembered
-      const [folder, ...others] = recent
+      const folder = Option.getOrUndefined(yield* current)
+      const others = folder === undefined ? recent : recent.filter((p) => !same(p, folder))
       const lastOpenMap = folder === undefined ? null : kept[folder] ?? null
       return {
         current: folder === undefined ? null : yield* info(folder),
@@ -181,6 +180,7 @@ export class Projects extends Context.Service<Projects, {
         const others = (s.project?.recent ?? []).filter((p) => !same(p, folder))
         return { ...s, project: { ...s.project, recent: [folder, ...others].slice(0, RECENT_LIMIT) } }
       }).pipe(Effect.mapError(projectError("write", raw)))
+      yield* Ref.set(inWindow, Option.some(folder))
       return yield* state
     })
 

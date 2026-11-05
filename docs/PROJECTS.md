@@ -42,7 +42,7 @@ The code is in `apps/desktop/src/project/`. Main reads and writes only these, th
   The `MapLinks` service owns the file: one update at a time, atomic writes, and a file that doesn't decode reads as empty.
 - **`.ballest/backups/<time> <file name>`** holds the project's copy of a map before anything wrote over it, and the old file after a Rename. The game's copy before an export wrote over it goes to `<userData>/backups/` instead, since it belongs to this machine and not to the project. [DESKTOP.md § Backups](DESKTOP.md#backups) has the rules.
 
-`desktop-settings.json` keeps the recent projects under `project.recent`, at most 8, the one in use first. An empty list means Untitled Project.
+`desktop-settings.json` keeps the recent projects under `project.recent`, at most 8, the last one used first. An empty list means Untitled Project. A window has one project: it starts on the first of that list and keeps its project in memory, so another running copy changing the list doesn't move it.
 
 A project is never the game's maps folder. The game loads only from `UserSavedMaps`, so a map must be exported to be played, and a project inside that folder would let the game edit project files behind the editor's back. Picking the maps folder, or a folder under it, as a project is refused with that explanation.
 
