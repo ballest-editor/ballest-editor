@@ -1,16 +1,19 @@
 import { cn } from "@workspace/ui/lib/utils"
+import type { ComponentType } from "react"
 import { type LeftTab, useEditor } from "../editor/store"
+import { Outline } from "./Outline"
 import { Palette } from "./Palette"
 import { ProjectPanel } from "./ProjectPanel"
 
-const TABS: ReadonlyArray<{ readonly id: LeftTab; readonly label: string }> = [
-  { id: "project", label: "Project" },
-  { id: "pieces", label: "Pieces" }
+const TABS: ReadonlyArray<{ readonly id: LeftTab; readonly label: string; readonly Panel: ComponentType }> = [
+  { id: "project", label: "Project", Panel: ProjectPanel },
+  { id: "pieces", label: "Pieces", Panel: Palette },
+  { id: "outline", label: "Outline", Panel: Outline }
 ]
 
 /**
- * The left side panel: a tab strip over the piece palette and the Project panel (docs/PROJECTS.md § Shell). Both stay
- * mounted, so the palette keeps its search and open sections while the project is in front.
+ * The left side panel: a tab strip over the Project panel, the piece palette and the Outline (docs/PROJECTS.md § Shell).
+ * All stay mounted, so each keeps its search, its open sections and its scroll while another is in front.
  */
 export function LeftDock() {
   const tab = useEditor((s) => s.leftTab)
@@ -37,12 +40,11 @@ export function LeftDock() {
           </button>
         ))}
       </div>
-      <div className={cn("min-h-0 flex-1", tab !== "pieces" && "hidden")}>
-        <Palette />
-      </div>
-      <div className={cn("min-h-0 flex-1", tab !== "project" && "hidden")}>
-        <ProjectPanel />
-      </div>
+      {TABS.map(({ id, Panel }) => (
+        <div key={id} className={cn("min-h-0 flex-1", tab !== id && "hidden")}>
+          <Panel />
+        </div>
+      ))}
     </div>
   )
 }

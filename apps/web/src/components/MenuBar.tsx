@@ -209,6 +209,7 @@ export function MenuBar() {
         <MenubarSeparator />
         <MenubarItem inset onClick={() => setLeftTab("pieces")}>Pieces</MenubarItem>
         <MenubarItem inset onClick={() => setLeftTab("project")}>Project</MenubarItem>
+        <MenubarItem inset onClick={() => setLeftTab("outline")}>Outline</MenubarItem>
         <MenubarSeparator />
         <MenubarCheckboxItem
           closeOnClick
