@@ -17,6 +17,7 @@ import {
   optionLabel,
   type Options,
   propertyLabel,
+  type PropertyRange,
   type PropertyRow,
   propertyRows,
   sliderStep
@@ -47,6 +48,16 @@ const scrubStep = (reference: number): number => {
 
 const sliderValue = (value: number | ReadonlyArray<number>): number | undefined =>
   typeof value === "number" ? value : value[0]
+
+/**
+ * Decimals a ranged float shows: enough to tell its slider's positions apart (a density runs 0 to 0.01), few
+ * enough that a big value (a vent's 750000) still fits the field. The stored value keeps whatever was typed.
+ */
+const displayDigits = ({ min, max, step }: PropertyRange): number => {
+  if (step >= 1) return 0
+  const span = max - min
+  return Math.min(5, Math.max(span >= 10000 ? 0 : 1, 4 - Math.ceil(Math.log10(span))))
+}
 
 /** A saved value with labelled choices; one outside them is listed too, with what the game makes of it. */
 function OptionValue(props: {
@@ -97,6 +108,7 @@ function PropertyValue({ property, id, handleClassName }: {
       const shown = typeof value === "number" ? value : null
       const reference = typeof property.default === "number" ? property.default : shown ?? 0
       const commit = (v: number) => set(clampToRange(property, integer ? Math.round(v) : v))
+      const { range } = property
       const field = (
         <NumberField
           label={property.name}
@@ -105,22 +117,24 @@ function PropertyValue({ property, id, handleClassName }: {
           onScrub={setScrub}
           onScrubCommit={commit}
           step={integer ? 1 : scrubStep(reference)}
-          digits={integer ? 0 : 3}
+          digits={integer ? 0 : range === undefined ? 3 : displayDigits(range)}
           {...(handleClassName === undefined ? {} : { handleClassName })}
         />
       )
-      const { range } = property
       if (range === undefined) return field
       // The slider stays inside its range; the field shows a value past it, as the game's text box does.
       const position = Math.min(Math.max(scrub ?? shown ?? range.min, range.min), range.max)
       return (
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-1.5">
+        // The field keeps room for its widest value; where the slider would be left too short, it goes under the field.
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(4.5rem,1fr)] items-center gap-1.5 @max-[15rem]:grid-cols-1">
           <Slider
             aria-label={propertyLabel(property)}
+            className="@max-[15rem]:order-last"
             min={range.min}
             max={range.max}
             step={sliderStep(range)}
-            value={position}
+            // one thumb: the shared Slider draws a thumb per array entry, and a bare number as a range
+            value={[position]}
             onValueChange={(v) => setScrub(sliderValue(v) ?? null)}
             onValueCommitted={(v) => {
               const next = sliderValue(v)
@@ -167,8 +181,8 @@ function ColorValue({ color, id }: { readonly color: ColorProperty; readonly id:
         id={id}
         title={mixed ? "Mixed" : hex}
         aria-label={mixed ? `${color.label}: mixed` : `${color.label}: ${hex}`}
-        className="flex h-7 w-full min-w-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-input text-xs text-muted-foreground transition-colors hover:border-ring/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-        render={<ColorSwatch color={mixed ? null : hex} className="rounded-md ring-0" />}
+        className="flex h-7 w-full min-w-0 cursor-pointer items-center justify-center overflow-hidden rounded-md text-xs text-muted-foreground transition-shadow hover:ring-foreground/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        render={<ColorSwatch color={mixed ? null : hex} className="rounded-md" />}
       >
         {mixed && "Mixed"}
       </PopoverTrigger>
@@ -283,7 +297,7 @@ export function ItemProperties({ properties }: { readonly properties: ReadonlyAr
     <>
       <Separator />
       <SectionTitle>Properties</SectionTitle>
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_1.5rem] items-center gap-x-1.5 gap-y-1.5">
+      <div className="grid @container grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_1.5rem] items-center gap-x-1.5 gap-y-1.5">
         {propertyRows(properties).map((row) => {
           const first = row._tag === "Color" ? row.color.channels[0] : row.property
           return <PropertyRowView key={`${first.list}/${first.name}`} row={row} />

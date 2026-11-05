@@ -79,9 +79,8 @@ function Swatch(
  * otherwise it only shows that finish's colours until one is picked.
  */
 function SlotPaintRow(
-  { members, offPanel, target }: {
+  { members, target }: {
     readonly members: ReadonlyArray<SelectedItem>
-    readonly offPanel: boolean
     readonly target: SlotTarget
   }
 ) {
@@ -122,10 +121,7 @@ function SlotPaintRow(
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-xs">
-          {slotName}
-          {offPanel && <Badge variant="outline" title={OFF_PANEL_HINT}>Off-panel</Badge>}
-        </span>
+        <span className="text-xs">{slotName}</span>
         <Select
           value={finish?.name ?? null}
           items={Object.fromEntries(paint.map((f) => [f.name, f.name]))}
@@ -183,12 +179,18 @@ function PaintGroup(
           <span className="ml-1 font-normal text-muted-foreground">× {members.length}</span>
         </div>
       )}
+      {offPanel !== undefined && (
+        // Every slot listed for such a piece is off-panel, so it's said once for the group.
+        <div className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground">
+          <Badge variant="outline" title={OFF_PANEL_HINT}>Off-panel</Badge>
+          <span>Not in the game's panel, but paint set here draws.</span>
+        </div>
+      )}
       {slotsOf(members, offPanel).map((target) => (
         <SlotPaintRow
           // a different set of items starts with no finish being browsed
           key={`${members.map((m) => m.id).join(",")}:${target.component}:${target.slot}`}
           members={members}
-          offPanel={offPanel !== undefined}
           target={target}
         />
       ))}

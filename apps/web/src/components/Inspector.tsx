@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/component
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Separator } from "@workspace/ui/components/separator"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { editTransform, isDecal } from "../domain/editTransform"
@@ -33,7 +33,7 @@ import {
   setSelectionField
 } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
-import { selectedIndices, shownTransform, useEditor } from "../editor/store"
+import { selectedIndices, useEditor } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { FlipSection } from "./FlipSection"
 import { ItemProperties } from "./ItemProperties"
@@ -396,7 +396,13 @@ export function Inspector() {
   ))
   const indices = useEditor(useShallow(selectedIndices))
   const ids = useEditor(useShallow((s) => selectedIndices(s).map((i) => s.doc.ids[i] ?? "")))
-  const transforms = useEditor(useShallow((s) => s.selectedIds.flatMap((id) => shownTransform(s, id) ?? [])))
+  const preview = useEditor((s) => s.preview)
+  // As `shownTransform` reads them, but memoised: `editTransform` builds a decal's or an elevator's transform afresh
+  // each call, and a selector returning fresh objects would re-render without end.
+  const transforms = useMemo(
+    () => items.map((item, i) => preview?.get(ids[i] ?? "") ?? editTransform(item)),
+    [items, ids, preview]
+  )
   const units = useEditor((s) => s.settings.general.units)
   const catalogIndex = useEditor((s) => s.catalogIndex)
 
