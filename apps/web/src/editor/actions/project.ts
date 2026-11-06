@@ -10,7 +10,7 @@ import { MapCodec } from "../../services/MapCodec"
 import { MapExporter } from "../../services/MapExporter"
 import { Platform, PlatformError, type ProjectState, type ProjectTarget } from "../../services/Platform"
 import type { AppServices } from "../../services/runtime"
-import { blankTabs, type ImportClash, isChooserRequired, useEditor } from "../store"
+import { blankTabs, dirtyTabs, type ImportClash, isChooserRequired, useEditor } from "../store"
 import { openProjectMapFile, openStartingMap, readProjectMapIntoEditor } from "./maps"
 import { checkPrefabs } from "./prefabs"
 import { run } from "./run"
@@ -175,20 +175,20 @@ const openInWindow = Effect.fnUntraced(function*(target: ProjectTarget, name: st
 
 /**
  * Opens a project the way an editor does: main refuses what it can't open (another window has it, the name is taken)
- * before anything is asked, then the whereToOpen dialog asks where it goes, whatever this window holds. Only the
- * required chooser never asks, its pick being this window's start, and an Always do this has answered already. Nothing
- * is written until that is settled.
+ * before anything is asked, then it opens in this window. The whereToOpen dialog asks first only while this window has
+ * unsaved changes, and an Always do this has answered that already. The required chooser never asks, its pick being
+ * this window's start. Nothing is written until that is settled.
  */
 const openProjectEffect = Effect.fn("openProjectEffect")(function*(target: ProjectTarget, name: string) {
   yield* (yield* Platform).checkProject(target).pipe(Effect.tapError(() => Effect.ignore(refreshProject)))
   const state = useEditor.getState()
   const opensIn = isChooserRequired(state) ? "thisWindow" : state.settings.general.projectOpensIn
-  if (opensIn === "ask") {
+  if (opensIn === "ask" && dirtyTabs(state).length > 0) {
     state.openDialog({ id: "whereToOpen", target, name })
     return
   }
   state.closeDialog()
-  yield* opensIn === "thisWindow" ? openHere(target) : openInWindow(target, name)
+  yield* opensIn === "newWindow" ? openInWindow(target, name) : openHere(target)
 })
 
 export const chooseProjectEffect = Effect.gen(function*() {
@@ -212,10 +212,35 @@ export const switchProjectEffect = (path: string) =>
 /** A recent project: where it opens, as with Open project…; the one in use already is left alone. */
 export const switchProject = (path: string) => run(switchProjectEffect(path))
 
-export const newProjectEffect = (name: string) => openProjectEffect({ _tag: "New", name }, name)
+/** `folder` is one picked in a dialog (`pickProjectFolder`); without it, `<projectsFolder>/<name>`. */
+export const newProjectEffect = (name: string, folder?: string) =>
+  openProjectEffect({ _tag: "New", name, ...(folder !== undefined && { folder }) }, name)
 
 /** File › New project…, once it has a name: where it opens, as with Open project…, and only then is the folder made. */
-export const newProject = (name: string) => run(newProjectEffect(name))
+export const newProject = (name: string, folder?: string) => run(newProjectEffect(name, folder))
+
+/** Open in new window for a recent project: whatever Settings says, and refused as any opening is. */
+export const openRecentInNewWindowEffect = ({ name, path }: { readonly name: string; readonly path: string }) =>
+  Effect.gen(function*() {
+    const target: ProjectTarget = { _tag: "Existing", path }
+    yield* (yield* Platform).checkProject(target).pipe(Effect.tapError(() => Effect.ignore(refreshProject)))
+    yield* openInWindow(target, name)
+  })
+
+export const openRecentInNewWindow = (project: { readonly name: string; readonly path: string }) =>
+  run(openRecentInNewWindowEffect(project))
+
+/** Reveal for a recent project, which needn't be the one in use. */
+export const revealRecentProject = (path: string) =>
+  run(Effect.flatMap(Effect.service(Platform), (platform) => platform.revealRecentProject(path)))
+
+export const forgetRecentProjectEffect = (path: string) =>
+  Effect.flatMap(Effect.service(Platform), (platform) => platform.forgetRecentProject(path)).pipe(
+    Effect.andThen(refreshProject)
+  )
+
+/** Remove from recent: only the list changes, and the project's folder stays. */
+export const forgetRecentProject = (path: string) => run(forgetRecentProjectEffect(path))
 
 /** An answer to the whereToOpen dialog: it closes, and `open` goes on with its project. Nothing when it isn't open. */
 const answerWhereToOpen = <E, R>(open: (target: ProjectTarget, name: string) => Effect.Effect<void, E, R>) =>

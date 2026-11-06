@@ -288,6 +288,47 @@ describe("a new project in a folder the user chose", () => {
     })))
 })
 
+describe("the recent projects", () => {
+  it.effect("say when each was last opened: only what was opened since the times were kept has one", () =>
+    runScoped(Effect.gen(function*() {
+      const { at, open } = yield* machine(["old"])
+      const projects = yield* open(1)
+      yield* projects.use(at("first"))
+      yield* projects.use(at("second"))
+      const { recent } = yield* projects.state
+      assert.deepStrictEqual(recent.map((p) => p.path), [at("first"), at("old")])
+      assert.isString(recent[0]?.lastOpened)
+      assert.isNull(recent[1]?.lastOpened)
+    })))
+
+  it.effect("forgetting one takes it and its time off the list, and leaves its folder", () =>
+    runScoped(Effect.gen(function*() {
+      const { at, fs, open } = yield* machine([])
+      const projects = yield* open(1)
+      yield* fs.makeDirectory(at("gone"))
+      yield* projects.use(at("gone"))
+      yield* projects.use(at("kept"))
+      assert.deepStrictEqual((yield* projects.forget(at("gone"))).recent, [])
+      assert.isTrue(yield* fs.exists(at("gone")))
+
+      // back on the list, it starts over
+      assert.isTrue(Option.isNone(yield* Effect.option(projects.knownFolder(at("gone")))))
+      yield* projects.use(at("gone"))
+      yield* projects.use(at("kept"))
+      assert.strictEqual((yield* projects.state).recent[0]?.path, at("gone"))
+    })))
+
+  it.effect("are the only folders that can be revealed by path, and one that's gone says so", () =>
+    runScoped(Effect.gen(function*() {
+      const { at, dir, fs, open } = yield* machine(["there", "gone"])
+      const projects = yield* open(1)
+      yield* fs.makeDirectory(at("there"))
+      assert.strictEqual(Option.getOrNull(yield* projects.knownFolder(at("there"))), at("there"))
+      assert.isTrue(Option.isNone(yield* projects.knownFolder(at("gone"))))
+      assert.match(yield* refusalOf(projects.knownFolder(dir)), /picked/i)
+    })))
+})
+
 describe("preparing a new window", () => {
   it.effect("checking a new project writes nothing; preparing makes its folder without using it", () =>
     runScoped(Effect.gen(function*() {

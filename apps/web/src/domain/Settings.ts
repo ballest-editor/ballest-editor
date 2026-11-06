@@ -23,7 +23,10 @@ export const GeneralSettings = Schema.Struct({
   altDragDuplicates: Schema.Boolean,
   /** Whether every Save also exports the map to the game (desktop), whatever the map's own Export on save says. */
   exportOnSave: Schema.Boolean,
-  /** Where a project opens (desktop): `ask` shows the whereToOpen dialog; its Always do this stores the answer here. */
+  /**
+   * Where a project opens (desktop). `ask`: in this window, with the whereToOpen dialog first while this window has
+   * unsaved changes; that dialog's Always do this stores the answer here.
+   */
   projectOpensIn: Schema.Literals(["ask", "thisWindow", "newWindow"])
 })
 

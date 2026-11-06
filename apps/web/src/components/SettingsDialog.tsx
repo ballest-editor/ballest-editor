@@ -479,11 +479,11 @@ export function SettingsDialog(props: {
             ...setting("general", "projectOpensIn"),
             label: "Open projects in",
             description: "Where a project you open or make goes.",
-            info: "For New project, Open project and Recent projects.",
+            info: "Ask if unsaved opens it in this window and asks first only when this window has unsaved changes.",
             control: (
               <Choice
                 value={settings.general.projectOpensIn}
-                items={{ ask: "Ask each time", thisWindow: "This window", newWindow: "A new window" }}
+                items={{ ask: "Ask if unsaved", thisWindow: "This window", newWindow: "A new window" }}
                 onChange={(v) => update("general", { projectOpensIn: v })}
               />
             )

@@ -255,7 +255,10 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
   const NO_PROJECT = "There is no project yet: Save the map to name one, or open a project."
   const state = () => ({
     current: disk.project.current === null ? null : info(disk.project.current),
-    recent: disk.project.recent.filter((p) => p !== disk.project.current).map(info),
+    recent: disk.project.recent.filter((p) => p !== disk.project.current).map((p) => ({
+      ...info(p),
+      lastOpened: TIME
+    })),
     lastOpenMap: disk.project.lastOpenMap[current()] ?? null,
     projectsFolder: TEST_PROJECTS_FOLDER,
     chooserRequired: disk.project.chooserRequired,
@@ -381,6 +384,15 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
         which === "project" ? project : which === "maps" ? `${project}/maps` : `${project}/.ballest/backups`
       )
       return Promise.resolve(true)
+    },
+    revealRecentProject: ({ path }) => {
+      if (!disk.project.recent.includes(path)) return fail(`${path} isn't a folder this window knows.`)
+      disk.external.push(path)
+      return Promise.resolve(true)
+    },
+    forgetRecentProject: ({ path }) => {
+      disk.project.recent = disk.project.recent.filter((p) => p !== path)
+      return Promise.resolve(state())
     },
     renameProject: ({ name }) => {
       const project = disk.project.current

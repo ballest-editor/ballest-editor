@@ -99,8 +99,20 @@ export function EditorSkeletonPanels({ className }: { readonly className?: strin
   )
 }
 
+/**
+ * Whether main started this window on the start screen (`DesktopWindow`), known from the first frame. `ProjectState`
+ * has the last word once it arrives, so a reload after a pick costs nothing.
+ */
+export const startsOnChooser = (): boolean => new URLSearchParams(window.location.search).has("chooser")
+
+/** The empty window a start screen comes up in, with no editor to take it for. */
+export function ChooserSkeleton() {
+  return <div className="h-svh bg-background" aria-busy />
+}
+
 /** The editor's layout with placeholder content, shown while the editor's code loads. */
 export function EditorSkeleton() {
+  if (startsOnChooser()) return <ChooserSkeleton />
   return (
     <div className="flex h-svh flex-col bg-background text-foreground" aria-busy>
       <TopBar />

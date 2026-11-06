@@ -14,7 +14,7 @@ import { TitledDialog } from "./TitledDialog"
  * The name a new project goes by, and where that puts it under `projectsFolder` (`Documents/Ballest Editor`).
  * `onCreate` hears a usable name; `actions` holds what sits beside Create.
  */
-export function NewProjectForm({ actions, onCreate }: {
+function NewProjectForm({ actions, onCreate }: {
   readonly actions: ReactNode
   readonly onCreate: (name: string) => void
 }) {

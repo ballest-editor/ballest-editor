@@ -9,6 +9,7 @@ import {
   type ElectronWindowCreateError,
   type ElectronWindowLoadError
 } from "../electron/ElectronWindow"
+import { Projects } from "../project/Projects"
 import { DesktopSettings, type WindowState } from "../settings/DesktopSettings"
 import {
   isAppUrl,
@@ -46,6 +47,7 @@ export class DesktopWindow extends Context.Service<DesktopWindow, {
       const electronWindow = yield* ElectronWindow
       const shell = yield* ElectronShell
       const settings = yield* DesktopSettings
+      const projects = yield* Projects
       const url = desktopUrl(environment.isDevelopment)
       const appUrl = new URL(url)
 
@@ -150,7 +152,10 @@ export class DesktopWindow extends Context.Service<DesktopWindow, {
           keepLinksOut(popout)
         })
 
-        yield* electronWindow.load(window, url)
+        // A window that must choose says so in its URL, so that its first paint is the start screen's, not the editor's
+        // skeleton: the page hears `ProjectState` only once its code has loaded.
+        const { chooserRequired } = yield* projects.state
+        yield* electronWindow.load(window, chooserRequired ? `${url}?chooser` : url)
         yield* electronWindow.closed(window)
       }).pipe(Effect.scoped)
 

@@ -157,13 +157,17 @@ export const ProjectInfo = Schema.Struct({
 })
 export type ProjectInfo = typeof ProjectInfo.Type
 
+/** A project used before: `lastOpened` is when this machine last opened it, null when that wasn't kept. */
+export const RecentProject = Schema.Struct({ ...ProjectInfo.fields, lastOpened: Schema.NullOr(IsoTime) })
+export type RecentProject = typeof RecentProject.Type
+
 /**
  * The project in use and the ones used before it, most recent first. `current` is null while there is none: the
  * window is then Untitled Project, nothing on disk, and the first Save names one (docs/PROJECTS.md § Shell).
  */
 export const ProjectState = Schema.Struct({
   current: Schema.NullOr(ProjectInfo),
-  recent: Schema.Array(ProjectInfo),
+  recent: Schema.Array(RecentProject),
   /** The map last open in the current project (its file name), for the next launch to open again; null when none was. */
   lastOpenMap: Schema.NullOr(MapFileName),
   /** Where New project makes its folders: `Documents/Ballest Editor`. */
@@ -706,6 +710,10 @@ export const DesktopMethods = {
   createProject: { payload: CreateProjectPayload, result: ProjectState },
   /** Shows one of the project's folders in the file manager; false when it doesn't exist or fails to open. */
   revealProject: { payload: RevealProjectPayload, result: Schema.Boolean },
+  /** Shows a recent project's folder in the file manager; false when it isn't there. Any other folder is refused. */
+  revealRecentProject: { payload: ProjectPathPayload, result: Schema.Boolean },
+  /** Takes a project off the recent ones. Nothing on disk changes. */
+  forgetRecentProject: { payload: ProjectPathPayload, result: ProjectState },
   /** Renames the project in `ballest-project.json`; the folder keeps its name. */
   renameProject: { payload: RenameProjectPayload, result: ProjectState },
   /** Keeps which map is open in the project, so the next launch opens it again (`ProjectState.lastOpenMap`). */

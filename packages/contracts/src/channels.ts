@@ -13,6 +13,8 @@ export const InvokeChannels = {
   switchProject: "ballest:project:switch",
   createProject: "ballest:project:create",
   revealProject: "ballest:project:reveal",
+  revealRecentProject: "ballest:project:revealRecent",
+  forgetRecentProject: "ballest:project:forgetRecent",
   renameProject: "ballest:project:rename",
   rememberOpenMap: "ballest:project:rememberOpenMap",
   listMaps: "ballest:project:listMaps",
