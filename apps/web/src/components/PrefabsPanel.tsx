@@ -26,22 +26,23 @@ function PrefabThumbnail({ prefab }: { readonly prefab: PrefabInfo }) {
   const piece = useEditor((s) =>
     prefab.firstClass === null ? undefined : s.catalogIndex?.pieceByClass.get(qualifyClassPath(prefab.firstClass))
   )
+  const glyph = (
+    <span
+      className={cn(
+        "grid size-6 shrink-0 place-items-center rounded-control bg-muted",
+        prefab.itemCount === null ? "text-fg-disabled" : "text-fg-secondary"
+      )}
+    >
+      <IconBoxMultiple className="size-4" />
+    </span>
+  )
   return piece === undefined
-    ? (
-      <span
-        className={cn(
-          "grid size-6 shrink-0 place-items-center rounded-control bg-muted",
-          prefab.itemCount === null ? "text-fg-disabled" : "text-fg-secondary"
-        )}
-      >
-        <IconBoxMultiple className="size-4" />
-      </span>
-    )
+    ? glyph
     : (
       <PieceThumbnail
         piece={piece}
         className="size-6 shrink-0 rounded-control bg-muted object-fill"
-        placeholder={<span className="size-6 shrink-0 rounded-control bg-muted" />}
+        placeholder={glyph}
       />
     )
 }

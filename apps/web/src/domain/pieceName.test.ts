@@ -3,8 +3,8 @@ import { Schema } from "effect"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { repoRoot } from "../test/samples"
-import { Catalog } from "./Catalog"
-import { pieceDisplayName, pieceLabelOf, pieceTitleOf } from "./pieceName"
+import { Catalog, paletteSections } from "./Catalog"
+import { inSizeOrder, pieceDisplayName, pieceLabelOf, pieceTitleOf } from "./pieceName"
 
 const game = (displayName: string, className: string) => pieceDisplayName({ displayName, className })
 
@@ -106,6 +106,39 @@ describe("pieceLabelOf", () => {
   })
 })
 
+describe("inSizeOrder", () => {
+  const named = (...names: ReadonlyArray<string>) =>
+    names.map((displayName) => ({ displayName, className: "BP_Piece" }))
+  const order = (...names: ReadonlyArray<string>) => inSizeOrder(named(...names)).map((p) => p.displayName)
+
+  it("sorts a family S, M, L", () => {
+    assert.deepStrictEqual(order("Curve2 M", "Curve2 S", "Curve2 L"), ["Curve2 S", "Curve2 M", "Curve2 L"])
+  })
+
+  it("brings a family together where its first piece stands", () => {
+    assert.deepStrictEqual(order("Track S", "Track L", "Curve S", "Curve L", "Track M"), [
+      "Track S",
+      "Track M",
+      "Track L",
+      "Curve S",
+      "Curve L"
+    ])
+  })
+
+  it("leaves a piece with no size where it is, even with a family's name", () => {
+    assert.deepStrictEqual(order("Goal", "Curve L", "Curve", "Curve S"), ["Goal", "Curve S", "Curve L", "Curve"])
+  })
+
+  it("keeps file order between pieces of one name and size", () => {
+    const pieces = [
+      { displayName: "Curve L", className: "BP_A" },
+      { displayName: "Curve L", className: "BP_B" },
+      { displayName: "Curve S", className: "BP_C" }
+    ]
+    assert.deepStrictEqual(inSizeOrder(pieces).map((p) => p.className), ["BP_C", "BP_A", "BP_B"])
+  })
+})
+
 // assets/catalog.json is git-tracked extractor output; the suite skips it if a checkout lacks it.
 const catalogPath = path.join(repoRoot, "assets", "catalog.json")
 
@@ -124,5 +157,18 @@ describe.skipIf(!fs.existsSync(catalogPath))("the real catalog", () => {
     const palette = pieces().filter((p) => p.inPalette !== false)
     const labels = palette.map((p) => `${p.category ?? ""}: ${pieceLabelOf(p)}`)
     assert.deepStrictEqual(labels.filter((label, i) => labels.indexOf(label) !== i), [])
+  })
+
+  it("lists every family in the palette together, smallest first", () => {
+    for (const section of paletteSections(pieces())) {
+      const sized = section.pieces.map(pieceDisplayName).filter((piece) => piece.size !== undefined)
+      const runs = sized.map((piece) => piece.name).filter((name, i, names) => name !== names[i - 1])
+      assert.deepStrictEqual(runs, [...new Set(runs)], section.name)
+      sized.forEach((piece, i) => {
+        const previous = sized[i - 1]
+        if (previous?.name !== piece.name) return
+        assert.isAtMost("SML".indexOf(previous.size ?? ""), "SML".indexOf(piece.size ?? ""), piece.name)
+      })
+    }
   })
 })

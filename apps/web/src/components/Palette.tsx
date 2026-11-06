@@ -1,4 +1,5 @@
 import {
+  IconBox,
   IconChevronRight,
   IconChevronsDown,
   IconChevronsUp,
@@ -116,8 +117,19 @@ function PieceButton({ piece, category, view, onPlace, onHover, unavailable, unv
   const { name, size } = pieceDisplayName(piece)
   const grid = view === "grid"
   const thumbnailSize = grid ? "size-16" : "size-6"
-  const placeholder = <span className={cn("shrink-0 rounded-control bg-muted", thumbnailSize)} />
-  const thumbnail = unavailable === undefined
+  const disabled = unavailable !== undefined
+  const placeholder = (
+    <span
+      className={cn(
+        "grid shrink-0 place-items-center rounded-control bg-muted",
+        disabled ? "text-fg-disabled" : "text-fg-tertiary",
+        thumbnailSize
+      )}
+    >
+      <IconBox className={grid ? "size-6" : "size-4"} />
+    </span>
+  )
+  const thumbnail = !disabled
     ? (
       <PieceThumbnail
         piece={piece}
@@ -127,7 +139,6 @@ function PieceButton({ piece, category, view, onPlace, onHover, unavailable, unv
     )
     : placeholder
   const note = unavailable ?? (unverified === true ? UNVERIFIED_NOTE : undefined)
-  const disabled = unavailable !== undefined
   return (
     <Tooltip>
       {/* A disabled button takes no pointer events, so the tooltip is on a wrapper. */}

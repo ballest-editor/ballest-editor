@@ -511,7 +511,7 @@ describe("saving a selection as a prefab", () => {
         assert.strictEqual(selectionPrefabProblem(s()), lone.message)
         s().select(s().doc.ids.slice(0, 2))
         const start = yield* Effect.flip(saveSelectionAsPrefabEffect({ tier: "user", name: "Pair" }, false))
-        assert.include(start.message, "MP_PlayerStart")
+        assert.strictEqual(start.message, "Player Start can't go in a prefab.")
         assert.strictEqual(selectionPrefabProblem(s()), start.message)
         s().select(s().doc.ids.slice(-2))
         assert.isUndefined(selectionPrefabProblem(s()))

@@ -168,7 +168,11 @@ function MapSettings() {
                 <InfoHint>Your creator name is set in Settings › General.</InfoHint>
               </>
             )
-            : <TipText tip={levelData.creatorName} className="min-w-0 truncate">{levelData.creatorName}</TipText>}
+            : (
+              <TipText tip={levelData.creatorName} className="max-w-40 min-w-0 truncate">
+                {levelData.creatorName}
+              </TipText>
+            )}
         </Fact>
         <Fact label="Items">{itemCount.toLocaleString()}</Fact>
         <CreatedFact createdAt={levelData.createdAt} />
