@@ -1,16 +1,28 @@
-/** Spreads palette placements out, so pieces placed from one view don't pile up on one spot. */
+/**
+ * Puts palette pieces in the map: at the camera, spread out so pieces placed from one view don't pile up on one spot, or at
+ * a point a drag was dropped on. Either way the piece goes into the Pieces panel's Recent.
+ */
+import { type CatalogPiece, pieceIdOf } from "../../domain/Catalog"
 import type { Vec3 } from "../../domain/coords"
+import { itemFromPiece, placementTransform } from "../../domain/factory"
 import { type Box, itemsBoxOf } from "../../domain/itemBounds"
+import type { ItemTransform } from "../../domain/MapFile"
 import {
   clearOfBoxes,
+  frameStanding,
   nextInRun,
+  pieceFootprint,
   type PlacementRun,
   type PlacementView,
   runPoint,
   startPlacementRun,
+  wholeCm,
   wouldLandOn
 } from "../../domain/placement"
+import { withFavouriteToggled, withRecentPiece } from "../../domain/recentPieces"
+import { sceneRegistry } from "../sceneRegistry"
 import { type EditorState, useEditor } from "../store"
+import { updateSettings } from "./startup"
 
 /** The run in progress and what the next placement checks it against. */
 interface Placing {
@@ -75,4 +87,34 @@ export const spreadPlacement = (point: Vec3, width: number, view: PlacementView,
   const at = runPoint(run, view)
   placing = { run, view, itemCount: s.doc.ids.length, first: next?.first, stepped: next?.stepped ?? minus(at, point) }
   return at
+}
+
+/** Places `piece`, and lists it under Recent if it went in: a catalog entry that makes no valid item doesn't. */
+const place = (piece: CatalogPiece, transform: ItemTransform) => {
+  const { doc, placePiece } = useEditor.getState()
+  placePiece(piece, transform)
+  const { doc: after, settings } = useEditor.getState()
+  if (after === doc) return
+  void updateSettings("panels", { recentPieces: withRecentPiece(settings.panels.recentPieces, pieceIdOf(piece)) })
+}
+
+/** A click in the Pieces panel: `piece` goes where the active pane puts it. */
+export const placeAtCamera = (piece: CatalogPiece) =>
+  place(piece, placementTransform(piece, sceneRegistry.placementPoint(pieceFootprint(piece))))
+
+/**
+ * A drop on the viewport: `piece` stands on `hit`, centred over it with its underside there. It isn't part of a run, so
+ * the next click starts one at the view's centre.
+ */
+export const placeAt = (piece: CatalogPiece, hit: Vec3) => {
+  const origin = placementTransform(piece, { x: 0, y: 0, z: 0 })
+  const box = itemsBoxOf([itemFromPiece(piece, origin)], useEditor.getState().catalogIndex)
+  placing = undefined
+  place(piece, placementTransform(piece, wholeCm(box === undefined ? hit : frameStanding(box, hit))))
+}
+
+/** Stars `piece`, or takes its star off. */
+export const toggleFavouritePiece = (piece: CatalogPiece) => {
+  const { favouritePieces } = useEditor.getState().settings.panels
+  return updateSettings("panels", { favouritePieces: withFavouriteToggled(favouritePieces, pieceIdOf(piece)) })
 }

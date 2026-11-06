@@ -108,6 +108,9 @@ export const mapsFolderIn = (path: Path.Path, project: string) => path.join(proj
 /** A project's backups folder, `.ballest/backups/`. */
 export const backupsFolderIn = (path: Path.Path, project: string) => path.join(project, ".ballest", "backups")
 
+/** A project's map thumbnails, `.ballest/thumbnails/`. */
+export const thumbnailsFolderIn = (path: Path.Path, project: string) => path.join(project, ".ballest", "thumbnails")
+
 /**
  * Which project is in use (docs/PROJECTS.md). A window has one project, and a project one window: it starts where
  * `decideStart` says and keeps its project whatever another running copy does; with none the window is Untitled Project

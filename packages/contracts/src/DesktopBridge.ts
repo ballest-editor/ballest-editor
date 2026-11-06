@@ -247,6 +247,21 @@ export type OpenMapPayload = typeof OpenMapPayload.Type
 export const WriteMapPayload = Schema.Struct({ fileName: MapFileName, text: FileText })
 export type WriteMapPayload = typeof WriteMapPayload.Type
 
+/** A map's thumbnail, a small PNG as a data URL: what the page renders and shows, and main keeps as a `.png`. */
+export const MapThumbnailPng = Schema.String.check(
+  Schema.isMaxLength(1024 * 1024),
+  Schema.isPattern(/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/)
+)
+export type MapThumbnailPng = typeof MapThumbnailPng.Type
+
+/** `readMapThumbnail`: thumbnails go by the hash of the map's file, so one for other bytes is never shown. */
+export const MapThumbnailRef = Schema.Struct({ hash: FileHash })
+export type MapThumbnailRef = typeof MapThumbnailRef.Type
+
+/** `writeMapThumbnail`: the hash of the file that was rendered, and its render. */
+export const WriteMapThumbnailPayload = Schema.Struct({ ...MapThumbnailRef.fields, png: MapThumbnailPng })
+export type WriteMapThumbnailPayload = typeof WriteMapThumbnailPayload.Type
+
 /** `writeSidecar`: the map the sidecar belongs to, and the sidecar's text. */
 export const WriteSidecarPayload = Schema.Struct({ fileName: MapFileName, text: FileText })
 export type WriteSidecarPayload = typeof WriteSidecarPayload.Type
@@ -753,6 +768,10 @@ export const DesktopMethods = {
    */
   renameMap: { payload: RenameMapPayload, result: ProjectMap },
   writeSidecar: { payload: WriteSidecarPayload, result: Schema.Void },
+  /** The thumbnail kept for a map's file; null when it has none. */
+  readMapThumbnail: { payload: MapThumbnailRef, result: Schema.NullOr(MapThumbnailPng) },
+  /** Keeps a map's thumbnail in `.ballest/thumbnails/`, unless no map has that hash any more, and drops the rest. */
+  writeMapThumbnail: { payload: WriteMapThumbnailPayload, result: Schema.Void },
   listPrefabs: { payload: PrefabTierPayload, result: PrefabInfos },
   readPrefab: { payload: PrefabRef, result: PrefabRead },
   writePrefab: { payload: WritePrefabPayload, result: PrefabInfo },

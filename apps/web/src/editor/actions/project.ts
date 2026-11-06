@@ -11,7 +11,13 @@ import { MapExporter } from "../../services/MapExporter"
 import { Platform, PlatformError, type ProjectState, type ProjectTarget } from "../../services/Platform"
 import type { AppServices } from "../../services/runtime"
 import { blankTabs, dirtyTabs, type ImportClash, isChooserRequired, useEditor } from "../store"
-import { openProjectMapFile, openStartingMap, readProjectMapIntoEditor } from "./maps"
+import {
+  openProjectMapAtGap,
+  openProjectMapBehind,
+  openProjectMapFile,
+  openStartingMap,
+  readProjectMapIntoEditor
+} from "./maps"
 import { checkPrefabs } from "./prefabs"
 import { run } from "./run"
 import { hasProject, projectName, refreshProject, revealIn, showMap } from "./shared"
@@ -20,6 +26,14 @@ import { unlessAnyCancelled, unlessCancelledFor } from "./unsaved"
 /** Opens one of the project's maps (`openProjectMapFile`): its tab if it has one, else a new tab. */
 export const openProjectMap = (fileName: string) =>
   run(openProjectMapFile(fileName).pipe(Effect.ensuring(Effect.ignore(refreshProject))))
+
+/** A middle click on a map's row: `openProjectMapBehind`. */
+export const openProjectMapInBackground = (fileName: string) =>
+  run(openProjectMapBehind(fileName).pipe(Effect.ensuring(Effect.ignore(refreshProject))))
+
+/** A map's row dropped on the tab strip: `openProjectMapAtGap`. */
+export const openProjectMapAt = (fileName: string, at: number) =>
+  run(openProjectMapAtGap(fileName, at).pipe(Effect.ensuring(Effect.ignore(refreshProject))))
 
 /**
  * Rename…, Duplicate… or Backups… for one of the project's maps from the Project panel: the dialogs act on the open

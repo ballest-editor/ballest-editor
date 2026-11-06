@@ -10,7 +10,7 @@ import {
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type MouseEvent, type ReactNode, useRef } from "react"
+import { type MouseEvent, type ReactNode, useEffect, useRef } from "react"
 import { useShallow } from "zustand/react/shallow"
 import { mapLabelOf } from "../domain/factory"
 import { type LinkState, linkStateDetailOf, linkStateOf, syncStatusOf } from "../domain/linkState"
@@ -18,15 +18,42 @@ import { formatAgo, formatDateTime } from "../domain/time"
 import {
   exportProjectMapFromPanel,
   importMap,
+  loadMapThumbnail,
   nameProjectMap,
   openProjectMap,
+  openProjectMapInBackground,
   playProjectMapFromPanel,
   revealProject,
   startNewMap
 } from "../editor/actions"
-import { type ProjectMap, tabsWithoutFile, useEditor, useHasUnsavedEdits, useTabSummary } from "../editor/store"
+import { startMapDrag } from "../editor/mapDrag"
+import {
+  type ProjectMap,
+  tabsWithoutFile,
+  useEditedAt,
+  useEditor,
+  useHasUnsavedEdits,
+  useTabSummary
+} from "../editor/store"
 import { useNow } from "../editor/useNow"
+import { onMiddleClick } from "./middleClick"
+import { THUMBNAIL_TILE } from "./PieceThumbnail"
 import { StatusChip, SyncStatusChip } from "./SyncStatusChip"
+
+/**
+ * A row is a grid: its tile, then the name and the chip on the first line, and under them a second line as wide as both.
+ * Its button is the name alone, but its `after` covers the row, so a click anywhere opens it (`ROW_BUTTON_CLASSES`);
+ * what has a click or a tooltip of its own sits above that (`ROW_CHIP_CLASSES`, the ⋮ button).
+ */
+const ROW_CLASSES =
+  "group relative grid h-10 min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] grid-rows-[1.25rem_1rem] content-center gap-x-2 rounded-control px-2 text-body transition-colors focus-ring-row hover:bg-hover active:bg-pressed"
+
+const ROW_BUTTON_CLASSES = "min-w-0 truncate text-left outline-none after:absolute after:inset-0"
+
+const ROW_CHIP_CLASSES = "relative z-10 self-center"
+
+/** Past the row's second line: the name and the chip are on its first, and their tooltips open below the row. */
+const ROW_TIP_OFFSET = 24
 
 /** A map's sync status, with its link state and when it was last exported on hover. */
 function RowStatus(
@@ -39,8 +66,12 @@ function RowStatus(
 ) {
   return (
     <Tooltip>
-      <TooltipTrigger render={<SyncStatusChip status={syncStatusOf(state, unsaved)} icon={false} />} />
-      <TooltipContent side="bottom" align="end">{linkStateDetailOf(map, state, now)}</TooltipContent>
+      <TooltipTrigger
+        render={<SyncStatusChip status={syncStatusOf(state, unsaved)} icon={false} className={ROW_CHIP_CLASSES} />}
+      />
+      <TooltipContent side="bottom" align="end" sideOffset={ROW_TIP_OFFSET}>
+        {linkStateDetailOf(map, state, now)}
+      </TooltipContent>
     </Tooltip>
   )
 }
@@ -62,55 +93,84 @@ function RowDetails(
   )
 }
 
-const ROW_CLASSES =
-  "group flex h-6 min-w-0 items-center gap-1.5 rounded-control pl-2 text-body transition-colors focus-ring-row hover:bg-hover active:bg-pressed"
-
 /** The map in the active tab: tinted, with a bar at its left, so it reads at a glance. */
 const ACTIVE_ROW_CLASSES =
   "bg-selected text-foreground shadow-[inset_2px_0_0_0] shadow-primary hover:lift-selected active:press-selected"
 
+/** What a row leads with: the map's top-down render, or the glyph until a Save has made one. */
+function MapTile({ png }: { readonly png?: string | undefined }) {
+  return (
+    <span
+      className={cn(
+        "row-span-2 flex size-8 items-center justify-center self-center overflow-hidden rounded-control",
+        THUMBNAIL_TILE
+      )}
+    >
+      {png === undefined
+        ? <IconMap className="size-4 text-fg-secondary" />
+        : <img src={png} alt="" draggable={false} className="size-full" />}
+    </span>
+  )
+}
+
+/** A row's second line: what there is to say of its file. */
+function RowDetail({ children }: { readonly children: ReactNode }) {
+  return <span className="col-span-2 col-start-2 row-start-2 truncate text-caption text-fg-tertiary">{children}</span>
+}
+
 /**
- * One of the project's maps: a click opens it, its menu (also on right-click) holds what used to be the Project menu's
- * per-map items. The open map is highlighted, and the badge says what it has unsaved or left to export. The tooltips
- * open below the row, so they never cover its badge or ⋮ button.
+ * One of the project's maps: a click opens it, a middle click opens it behind the active tab, and a drag onto the tab
+ * strip opens it there. Its menu (also on right-click) holds what used to be the Project menu's per-map items. The open
+ * map is highlighted, and the badge says what it has unsaved or left to export. The tooltips open below the row, so they
+ * never cover its badge or ⋮ button.
  */
 function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }) {
   const isOpen = useEditor((s) => s.file?.name === map.fileName)
   const unsaved = useHasUnsavedEdits(map.fileName)
+  const editedAt = useEditedAt(map.fileName, map.modifiedAt)
+  const png = useEditor((s) => s.mapThumbnails.get(map.hash))
   const canExport = useEditor((s) => s.capabilities.exportToGame)
   const canPlay = useEditor((s) => s.capabilities.play)
   const menuButton = useRef<HTMLButtonElement>(null)
   const label = mapLabelOf(map.fileName)
   const state = linkStateOf(map, { unsaved })
+  useEffect(() => loadMapThumbnail(map.hash), [map.hash])
   // right-click opens the same menu the ⋮ button does
   const onContextMenu = (e: MouseEvent) => {
     e.preventDefault()
     menuButton.current?.click()
   }
   return (
-    <li className={cn(ROW_CLASSES, isOpen && ACTIVE_ROW_CLASSES)} onContextMenu={onContextMenu}>
+    <li
+      draggable
+      className={cn(ROW_CLASSES, isOpen && ACTIVE_ROW_CLASSES)}
+      onContextMenu={onContextMenu}
+      onDragStart={(e) => startMapDrag(e.dataTransfer, map.fileName)}
+      {...onMiddleClick(() => void openProjectMapInBackground(map.fileName))}
+    >
+      <MapTile png={png} />
       <Tooltip>
         <TooltipTrigger
           render={
             <button
               type="button"
-              className="flex min-w-0 flex-1 items-center gap-1.5 text-left focus-visible:outline-none"
+              className={cn(ROW_BUTTON_CLASSES, isOpen && "text-body-strong")}
               onClick={() => void openProjectMap(map.fileName)}
             />
           }
         >
-          <IconMap className="size-4 shrink-0 text-fg-secondary" />
-          <span className={cn("truncate", isOpen && "text-body-strong")}>{label}</span>
+          {label}
         </TooltipTrigger>
-        <TooltipContent side="bottom" align="start">
+        <TooltipContent side="bottom" align="start" sideOffset={ROW_TIP_OFFSET}>
           <RowDetails
             name={label}
             unsaved={unsaved ? "Unsaved edits" : null}
-            edited={`${formatAgo(map.modifiedAt, now)} (${formatDateTime(map.modifiedAt)})`}
+            edited={formatDateTime(editedAt)}
           />
         </TooltipContent>
       </Tooltip>
       <RowStatus map={map} state={state} unsaved={unsaved} now={now} />
+      <RowDetail>Edited {formatAgo(editedAt, now)}</RowDetail>
       <DropdownMenu>
         <DropdownMenuTrigger
           ref={menuButton}
@@ -118,7 +178,7 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
             <Button
               variant="ghost"
               size="icon-sm"
-              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100"
+              className="absolute right-1 bottom-0 z-10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100"
               aria-label={`More for ${label}`}
             />
           }
@@ -160,24 +220,25 @@ function UnsavedRow({ tabId }: { readonly tabId: string }) {
   const activateTab = useEditor((s) => s.activateTab)
   return (
     <li className={cn(ROW_CLASSES, isActive && ACTIVE_ROW_CLASSES)}>
+      <MapTile />
       <Tooltip>
         <TooltipTrigger
           render={
             <button
               type="button"
-              className="flex min-w-0 flex-1 items-center gap-1.5 text-left focus-visible:outline-none"
+              className={cn(ROW_BUTTON_CLASSES, isActive && "text-body-strong")}
               onClick={() => activateTab(tabId)}
             />
           }
         >
-          <IconMap className="size-4 shrink-0 text-fg-secondary" />
-          <span className={cn("truncate", isActive && "text-body-strong")}>{label}</span>
+          {label}
         </TooltipTrigger>
-        <TooltipContent side="bottom" align="start">
+        <TooltipContent side="bottom" align="start" sideOffset={ROW_TIP_OFFSET}>
           <RowDetails name={label} unsaved="Not saved yet" edited={null} />
         </TooltipContent>
       </Tooltip>
-      {unsaved && <SyncStatusChip status="unsaved" icon={false} className="mr-7.5" />}
+      {unsaved && <SyncStatusChip status="unsaved" icon={false} className={ROW_CHIP_CLASSES} />}
+      <RowDetail>Not saved yet</RowDetail>
     </li>
   )
 }

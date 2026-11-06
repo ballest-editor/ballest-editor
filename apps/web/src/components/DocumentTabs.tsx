@@ -10,7 +10,7 @@ import {
 } from "@workspace/ui/components/context-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type DragEvent, type MouseEvent, useEffect, useRef, useState } from "react"
+import { type DragEvent, useEffect, useRef, useState } from "react"
 import type { KeybindAction } from "../domain/Keybinds"
 import { LINK_STATE_LABELS, type LinkedMap, linkStateOf } from "../domain/linkState"
 import { prefabTierLabel } from "../domain/prefab"
@@ -20,12 +20,15 @@ import {
   closeTab,
   closeTabsToRight,
   nameProjectMap,
+  openProjectMapAt,
   revealProject,
   startNewMap
 } from "../editor/actions"
+import { droppedMap, isMapDrag } from "../editor/mapDrag"
 import { useEditor, useTabSummary } from "../editor/store"
 import { StripButton } from "./dock/StripButton"
 import { KeyChip } from "./KeyChip"
+import { onMiddleClick } from "./middleClick"
 
 /**
  * How far along the strip a tab's tooltip opens: past the tab's ×, and on the last tab past the + too. Along it, not
@@ -34,19 +37,8 @@ import { KeyChip } from "./KeyChip"
 const TIP_PAST_CLOSE = 36
 const TIP_PAST_NEW_MAP = 68
 
-/** A tab being dragged along the strip, and the gap it would land in. */
-type TabDrag = { readonly id: string; readonly at: number } | null
-
-/** What makes a tab of either strip close on a middle click. */
-export const closesOnMiddleClick = (close: () => void) => ({
-  onAuxClick: (e: MouseEvent) => {
-    if (e.button !== 1) return
-    e.preventDefault()
-    close()
-  },
-  // a middle press would otherwise start autoscroll
-  onMouseDown: (e: MouseEvent) => e.button === 1 && e.preventDefault()
-})
+/** A tab being dragged along the strip (`id`; null for a map's row over it), and the gap it would land in. */
+type TabDrag = { readonly id: string | null; readonly at: number } | null
 
 /**
  * What a tab's tooltip says of it: unsaved edits first, then a blank tab, which has nothing to save, then how its
@@ -61,15 +53,20 @@ export const tabStatusOf = (unsaved: boolean, map: LinkedMap | undefined, blank 
 /**
  * The map tabs in the centre group's strip (docs/DESKTOP.md § Document tabs). A tab's dot marks unsaved edits and gives
  * way to the × while the tab is hovered. The + after the last tab stays in view while the tabs scroll. Not `group-hover`:
- * that is off under `(hover: none)`, which a window with a mouse can report, and the × would never show.
+ * that is off under `(hover: none)`, which a window with a mouse can report, and the × would never show. A map's row
+ * dropped on the strip opens the map there.
  */
 export function DocumentTabs() {
   const tabIds = useEditor((s) => s.tabIds)
   const moveTab = useEditor((s) => s.moveTab)
   const [drag, setDrag] = useState<TabDrag>(null)
 
-  const drop = () => {
-    if (drag !== null) moveTab(drag.id, drag.at > tabIds.indexOf(drag.id) ? drag.at - 1 : drag.at)
+  const drop = (e: DragEvent) => {
+    if (drag !== null && drag.id !== null) {
+      moveTab(drag.id, drag.at > tabIds.indexOf(drag.id) ? drag.at - 1 : drag.at)
+    }
+    const map = droppedMap(e.dataTransfer)
+    if (map !== undefined) void openProjectMapAt(map, drag?.at ?? tabIds.length)
     setDrag(null)
   }
 
@@ -77,11 +74,19 @@ export function DocumentTabs() {
     <div
       className="flex h-8 shrink-0 items-stretch bg-background text-body"
       onDragOver={(e) => {
-        if (drag === null) return
+        const over = drag ?? (isMapDrag(e.dataTransfer) ? { id: null, at: tabIds.length } : null)
+        if (over === null) return
         e.preventDefault()
-        e.dataTransfer.dropEffect = "move"
+        e.dataTransfer.dropEffect = over.id === null ? "copy" : "move"
         // past every tab: the strip's empty end
-        if (e.target === e.currentTarget && drag.at !== tabIds.length) setDrag({ ...drag, at: tabIds.length })
+        const at = e.target === e.currentTarget ? tabIds.length : over.at
+        if (drag === null || at !== drag.at) setDrag({ ...over, at })
+      }}
+      // a map's row has no dragend here to end on, so it goes when it leaves; a tab keeps its place along the strip
+      onDragLeave={(e) => {
+        if (drag?.id === null && !(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) {
+          setDrag(null)
+        }
       }}
       onDrop={drop}
       onDragEnd={() => setDrag(null)}
@@ -116,7 +121,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
   readonly id: string
   readonly index: number
   readonly drag: TabDrag
-  readonly onDrag: (drag: TabDrag) => void
+  readonly onDrag: (drag: NonNullable<TabDrag>) => void
 }) {
   const active = useEditor((s) => s.tabId === id)
   const projects = useEditor((s) => s.capabilities.projects)
@@ -140,11 +145,12 @@ function DocumentTab({ id, index, drag, onDrag }: {
     setViewLayoutKind(kind)
   }
   const onDragOverTab = (e: DragEvent<HTMLDivElement>) => {
+    if (drag === null && !isMapDrag(e.dataTransfer)) return
     e.preventDefault()
     e.stopPropagation()
     const box = e.currentTarget.getBoundingClientRect()
     const at = e.clientX < box.left + box.width / 2 ? index : index + 1
-    if (drag !== null && drag.at !== at) onDrag({ ...drag, at })
+    if (drag?.at !== at) onDrag({ id: drag?.id ?? null, at })
   }
 
   return (
@@ -169,7 +175,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
           last && drag?.at === index + 1 &&
             "after:absolute after:inset-y-0 after:-right-px after:z-10 after:w-0.5 after:bg-primary"
         )}
-        {...closesOnMiddleClick(() => void closeTab(id))}
+        {...onMiddleClick(() => void closeTab(id))}
         onDragStart={(e) => {
           setHinted(false)
           e.dataTransfer.effectAllowed = "move"

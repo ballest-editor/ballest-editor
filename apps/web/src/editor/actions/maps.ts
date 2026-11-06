@@ -35,6 +35,26 @@ export const openProjectMapFile = Effect.fn("openProjectMapFile")(function*(file
   else useEditor.getState().activateTab(open)
 })
 
+/** Opens one of the project's maps in a new tab behind the active one, which stays active. An open map stays as it is. */
+export const openProjectMapBehind = Effect.fn("openProjectMapBehind")(function*(fileName: string) {
+  if (tabWithFile(useEditor.getState(), fileName) === undefined) {
+    yield* readProjectMapIntoEditor(fileName, "backgroundTab")
+  }
+})
+
+/**
+ * Opens one of the project's maps with its tab in the gap `at` of the strip as it stands now: a map dropped on it. An
+ * open map's tab moves there, and it becomes the active one either way.
+ */
+export const openProjectMapAtGap = Effect.fn("openProjectMapAtGap")(function*(fileName: string, at: number) {
+  const tabsBefore = useEditor.getState().tabIds
+  yield* openProjectMapFile(fileName)
+  const { moveTab, tabId } = useEditor.getState()
+  const from = tabsBefore.indexOf(tabId)
+  // `moveTab` counts without the tab it moves
+  moveTab(tabId, from >= 0 && at > from ? at - 1 : at)
+})
+
 /**
  * A new map the way the in-game editor starts one: the player start and the goal ring where the game puts them, and the
  * creator in use (none yet: the first Save asks). Nothing is written.

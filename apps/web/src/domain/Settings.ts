@@ -99,7 +99,11 @@ export const SnappingSettings = Schema.Struct({
 /** Changed from a panel's own header rather than the Settings dialog, but persisted with the rest. */
 export const PanelSettings = Schema.Struct({
   /** How the Pieces panel lays out its pieces. */
-  piecesView: Schema.Literals(["list", "grid"])
+  piecesView: Schema.Literals(["list", "grid"]),
+  /** What the Pieces panel's Recent lists, as `pieceIdOf` gives them, newest first (see domain/recentPieces). */
+  recentPieces: Schema.Array(Schema.String),
+  /** What its Favourites lists, in the order they were starred. */
+  favouritePieces: Schema.Array(Schema.String)
 })
 
 /** The axis gizmo's sizes, as the Display popover offers them. */
@@ -156,7 +160,7 @@ export const defaultSettings: Settings = {
     rotationEnabled: false,
     rotationStep: DEFAULT_ROTATION_STEP
   },
-  panels: { piecesView: "list" },
+  panels: { piecesView: "list", recentPieces: [], favouritePieces: [] },
   gizmo: { size: "m", showForGroups: true }
 }
 

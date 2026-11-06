@@ -4,6 +4,7 @@ import fixture from "./bundledCatalog.json"
 import { Catalog } from "./Catalog"
 import {
   clearOfBoxes,
+  dropPoint,
   footprintOf,
   frameStanding,
   nextInRun,
@@ -319,5 +320,22 @@ describe("placement runs", () => {
     it("stands centred over the point with its underside there", () => {
       assert.deepStrictEqual(frameStanding(box, { x: 5000, y: 5000, z: 8615 }), { x: 4000, y: 4500, z: 8915 })
     })
+  })
+})
+
+describe("dropPoint", () => {
+  const origin = { x: 0, y: 0, z: 1000 }
+
+  it("lands on the floor under the ray, past the distance a click would stop at", () => {
+    assert.deepStrictEqual(dropPoint(origin, { x: 4, y: 0, z: -1 }, 0, 60_000, 2000), { x: 4000, y: 0, z: 0 })
+  })
+
+  it("stops in the air along a ray above the horizon", () => {
+    assert.deepStrictEqual(dropPoint(origin, { x: 1, y: 0, z: 0 }, 0, 60_000, 2000), { x: 2000, y: 0, z: 1000 })
+    assert.deepStrictEqual(dropPoint(origin, { x: 3, y: 0, z: 4 }, 0, 60_000, 500), { x: 300, y: 0, z: 1400 })
+  })
+
+  it("stops in the air when the floor is past where the grid ends", () => {
+    assert.deepStrictEqual(dropPoint(origin, { x: 1000, y: 0, z: -1 }, 0, 60_000, 2000), { x: 2000, y: 0, z: 998 })
   })
 })
