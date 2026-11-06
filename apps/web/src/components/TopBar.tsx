@@ -50,8 +50,8 @@ function PlayButton() {
 /**
  * In the desktop app this is the window's title bar (docs/DESKTOP.md § Window): it drags the window, and Electron
  * draws the window controls over one end of it. The padding keeps clear of them: `titlebar-area-*` is the part of
- * the bar they leave free, on whichever side the desktop puts them. A browser defines neither, so it gets plain
- * padding and no drag.
+ * the bar they leave free, on whichever side the desktop puts them, so `titlebar-area-x` is 0 with the controls on the
+ * right and their width with them on the left. A browser defines neither, so it gets plain padding and no drag.
  */
 const TITLE_BAR_CLASSES = [
   "[-webkit-app-region:drag] [&_button]:[-webkit-app-region:no-drag]",
