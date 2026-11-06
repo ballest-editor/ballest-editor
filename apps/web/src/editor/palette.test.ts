@@ -114,6 +114,11 @@ describe("the palette", () => {
         }
       })
 
+      // ::selection is bg-primary/30 under text-foreground
+      it(`${theme}: selected text on --${panel} can be read`, () => {
+        assert.isAtLeast(contrast(color("foreground"), over(color("primary"), 0.3, color(panel))), TEXT)
+      })
+
       // bg-destructive/12 text-destructive, and a tag's bg-size-s/15 text-size-s
       it(`${theme}: a filled tint on --${panel} can be read`, () => {
         for (

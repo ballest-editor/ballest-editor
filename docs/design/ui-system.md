@@ -46,13 +46,14 @@ Components use the tokens, never a palette class (`emerald-500`) or a hex. The s
 
 A hover on a row or a ghost control is `bg-foreground/6`, and on a menu row `bg-foreground/8`. That is a step on whatever sits under it. An opaque `--accent` is nearly the same tone as `--popover`, so it would vanish there and on glass.
 
-**`--primary` is the one accent, and it means "interactive".** Dark `#1d9daf`, light `#007787`. It is for primary buttons, the active tab's underline, the active tool, selection, focus rings (`--ring` is the same value) and links, and nothing else. In dark, `--primary-foreground` is near-black, because white on it is 3.2:1. A chroma of 0.12 at this hue falls outside sRGB and clips to a harsher cyan, so the values stop near 0.1.
+**`--primary` is the one accent, and it means "interactive".** Dark `#1d9daf`, light `#007787`. It is for primary buttons, the active tab's underline, the active tool, selection, focus rings (`--ring` is the same value), links and the hero band's track and ball, and nothing else. In dark, `--primary-foreground` is near-black, because white on it is 3.2:1. A chroma of 0.12 at this hue falls outside sRGB and clips to a harsher cyan, so the values stop near 0.1.
 
-| Class           | For                                                                          |
-| --------------- | ---------------------------------------------------------------------------- |
-| `bg-primary/12` | A selection wash: selected rows, a pressed toggle. Its text keeps its colour |
-| `text-primary`  | Links, and any accent text: it reads on `--card` and `--popover`             |
-| `bg-dirty`      | The dirty dot, and nothing else. It is the one yellow in the app             |
+| Class           | For                                                                            |
+| --------------- | ------------------------------------------------------------------------------ |
+| `bg-primary/12` | A selection wash: selected rows, a pressed toggle. Its text keeps its colour   |
+| `bg-primary/30` | Selected text (`::selection`, set once in `globals.css`), under `--foreground` |
+| `text-primary`  | Links, and any accent text: it reads on `--card` and `--popover`               |
+| `bg-dirty`      | The dirty dot, and nothing else. It is the one yellow in the app               |
 
 `--destructive` is red, used as `text-destructive` on `bg-destructive/12`.
 
@@ -77,7 +78,9 @@ A button pressed scales to 0.97 and drops its shadow, except one that opens a po
 
 ## Glass
 
-`glass` is whatever floats over content: menus, popovers, tooltips, the viewport's controls. It is `--popover` at 80% with `backdrop-filter: blur(12px) saturate(1.2)`, so what's behind shows as colour without detail. A dialog isn't glass: the overlay behind it has already blurred the page.
+`glass` is whatever floats over content: menus, popovers, tooltips, toasts. It is `--popover` at 95% with `backdrop-filter: blur(12px) saturate(1.2)`, so what's behind is a faint tone and never a shape. Any thinner and a 3D scene shows through as a smudge, and a popover across a panel's edge takes that edge as a seam. A dialog isn't glass: the overlay behind it has already blurred the page.
+
+The viewport's own pills and chips are `SURFACE` (`viewControlStyle.ts`), `--card` at 80%. Thinner than `glass`, because they're small and hold little text.
 
 Put it on the element itself. A blur on a `::before` can't see past its parent while the parent fades, so it would pop in at the end. Submenus are safe because base-ui portals them beside their parent.
 

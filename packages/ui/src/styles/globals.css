@@ -228,11 +228,18 @@
   body {
     @apply bg-background text-body text-foreground tabular-nums;
     }
+  /* Selected text takes the accent as a wash, as a selected row does, and not the browser's blue. */
+  ::selection {
+    @apply bg-primary/30 text-foreground;
+    }
 }
 
-/* Whatever floats over content: the popover's surface over a blur, so what's behind shows as colour without detail. */
+/*
+ * Whatever floats over content: nearly the popover's own surface, over a blur. Over chrome that reads as glass; any
+ * thinner and a 3D scene behind it shows through as a smudge.
+ */
 @utility glass {
-  background-color: color-mix(in oklab, var(--popover) 80%, transparent);
+  background-color: color-mix(in oklab, var(--popover) 95%, transparent);
   backdrop-filter: blur(12px) saturate(1.2);
 }
 

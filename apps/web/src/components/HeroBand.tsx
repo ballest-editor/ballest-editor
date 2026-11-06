@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 
 const TRACK = "M-8 18C70 18 96 104 176 104S300 74 368 26"
 
-/** A stretch of track with the ball on it. The track is `--primary` and the ball `--foreground`, so both follow the theme. */
+/** A stretch of track with the ball on it, both `--primary`: the track a line and a wash, the ball solid, so it pops. */
 function TrackArt() {
   return (
     <svg
@@ -16,7 +16,7 @@ function TrackArt() {
     >
       <path d={TRACK} stroke="currentColor" strokeWidth="14" strokeLinecap="round" opacity="0.45" />
       <path d={TRACK} stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="252" cy="72" r="13" className="fill-foreground" />
+      <circle cx="252" cy="72" r="13" className="fill-primary" />
     </svg>
   )
 }
