@@ -4,6 +4,7 @@ import { ueToThreeVector, type Vec3 } from "../domain/coords"
 import { type OrthoView, orthoViews, paneClose, paneCloseColumn, paneSwap } from "../domain/viewLayout"
 import {
   changePanes,
+  floorGridOnly,
   forgetClosedTabs,
   orthographicOnly,
   PaneCamera,
@@ -314,12 +315,18 @@ describe("easing to a new view", () => {
     assert.strictEqual(pane.drawCamera, pane.orthographic)
   })
 
-  it("sees the map alone, with neither the sky nor a grid", () => {
+  it("sees the grid of the view it's heading for, and no sky", () => {
     const pane = shownPane()
     pane.setProjection("right")
     pane.stepTween(1000, MS)
+    assert.isTrue(pane.drawCamera.layers.test(orthographicOnly))
+    assert.isFalse(pane.drawCamera.layers.test(floorGridOnly))
     assert.isFalse(pane.drawCamera.layers.test(perspectiveOnly))
+    pane.setProjection("perspective")
+    pane.stepTween(1010, MS)
+    assert.isTrue(pane.drawCamera.layers.test(floorGridOnly))
     assert.isFalse(pane.drawCamera.layers.test(orthographicOnly))
+    assert.isFalse(pane.drawCamera.layers.test(perspectiveOnly))
   })
 })
 
