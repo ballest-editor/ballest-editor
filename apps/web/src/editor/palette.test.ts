@@ -79,7 +79,8 @@ const pairsOf = (theme: "dark" | "light"): ReadonlyArray<readonly [string, strin
     // links and the active tab's text, as well as lines and dots
     ["primary", panel, TEXT] as const,
     ["destructive", panel, TEXT] as const,
-    ["dirty", panel, GRAPHIC] as const,
+    // one small dot is the whole signal, so it holds the text bar
+    ["dirty", panel, TEXT] as const,
     // Settings › Game uses a status's text with no fill
     ...STATUSES.map((status) => [`${status}-foreground`, panel, TEXT] as const)
   ]),

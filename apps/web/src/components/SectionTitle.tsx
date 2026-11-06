@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 
 export const SectionTitle = ({ children }: { readonly children: ReactNode }) => (
-  <div className="text-caption uppercase tracking-wider text-fg-secondary">{children}</div>
+  <div className="text-caption uppercase tracking-wider text-fg-secondary dark:text-foreground">{children}</div>
 )
 
 /** A block of a panel: blocks sit apart by space alone, with no rule between them, so the titles carry the structure. */

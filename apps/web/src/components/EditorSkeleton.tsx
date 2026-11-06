@@ -8,6 +8,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { cn } from "@workspace/ui/lib/utils"
 import { sceneBackgroundClass } from "../editor/sceneColors"
+import { SectionTitle } from "./SectionTitle"
 import { TopBar } from "./TopBar"
 import { ViewportControls } from "./ViewControls"
 
@@ -83,7 +84,7 @@ export function EditorSkeletonPanels({ className }: { readonly className?: strin
       >
         <div className="h-7 border-b" />
         <div className="flex flex-col gap-3 p-3">
-          <div className="text-caption uppercase tracking-wider text-fg-secondary">Map</div>
+          <SectionTitle>Map</SectionTitle>
           <div className="flex flex-col gap-1">
             <Skeleton className="h-3 w-10 rounded-control" />
             <Skeleton className="h-7 w-full" />
