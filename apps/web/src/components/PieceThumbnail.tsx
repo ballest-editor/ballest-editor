@@ -13,7 +13,7 @@ import { lightGlyphOf } from "./outlineGlyphs"
 export const THUMBNAIL_TILE = "bg-foreground/14"
 
 /** True from the first time the element comes into view, so a long list only renders what gets looked at. */
-const useSeen = () => {
+export const useSeen = () => {
   const ref = useRef<HTMLSpanElement>(null)
   const [seen, setSeen] = useState(false)
   useEffect(() => {

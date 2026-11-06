@@ -9,6 +9,8 @@ import { itemFromPiece, placementTransform } from "./factory"
 import { DEFAULT_PLAYER_START } from "./level"
 import { type Item, objectPathOf } from "./MapFile"
 import {
+  freePrefabName,
+  isPrefabName,
   itemOfPrefab,
   mapOfPrefab,
   ORIGIN,
@@ -16,7 +18,8 @@ import {
   prefabOfItems,
   prefabOfTab,
   prefabSourcesOf,
-  prefabTierLabel
+  prefabTierLabel,
+  selectionLabelOf
 } from "./prefab"
 import { PrefabFile } from "./PrefabFile"
 import { rotatorToQuat } from "./ueMath"
@@ -161,5 +164,40 @@ describe("a definition's tab", () => {
 
   it("measures an item's transform as the editor edits it", () => {
     assert.deepStrictEqual(editTransform(map.items[0]!).scale3D, { x: 2, y: 1, z: 1 })
+  })
+})
+
+describe("the name a selection suggests", () => {
+  const kicker = { className: "BP_Ramp_Kicker1_Short", displayName: "Kicker1 S" }
+  const curve = { className: "BP_Ramp_Curve1", displayName: "Curve1 M" }
+
+  it("reads two of a piece as a pair of its family, and more as a count of the piece", () => {
+    assert.strictEqual(selectionLabelOf([kicker, kicker]), "Kicker pair")
+    assert.strictEqual(selectionLabelOf([curve, curve, curve]), "Curve 1 Medium x3")
+  })
+
+  it("reads a mix as a set of the first piece's family", () => {
+    assert.strictEqual(selectionLabelOf([kicker, curve, curve]), "Kicker set")
+  })
+
+  it("names a piece the catalog doesn't know from its class", () => {
+    assert.strictEqual(
+      selectionLabelOf([{ className: "BP_Odd_Thing" }, { className: "BP_Odd_Thing" }]),
+      "Odd Thing pair"
+    )
+  })
+
+  it("keeps saveprefab's rule, whatever the label holds", () => {
+    assert.strictEqual(freePrefabName("Curve 1 Medium x3", new Set()), "Curve_1_Medium_x3")
+    assert.strictEqual(freePrefabName(" Left (pair)! ", new Set()), "Left_pair")
+    assert.strictEqual(freePrefabName("×", new Set()), "Prefab")
+    assert.isTrue(isPrefabName(freePrefabName("x".repeat(80), new Set())))
+  })
+
+  it("steers clear of the names in use, and stays in the rule's length doing it", () => {
+    assert.strictEqual(freePrefabName("Kicker pair", new Set(["Kicker_pair"])), "Kicker_pair_2")
+    assert.strictEqual(freePrefabName("Kicker pair", new Set(["Kicker_pair", "Kicker_pair_2"])), "Kicker_pair_3")
+    const long = "x".repeat(60)
+    assert.isTrue(isPrefabName(freePrefabName(long, new Set([long]))))
   })
 })

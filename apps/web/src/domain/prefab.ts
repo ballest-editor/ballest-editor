@@ -7,12 +7,13 @@ import type { PrefabRef, PrefabTier } from "@ballest/contracts"
 import { Predicate } from "effect"
 import type { CatalogIndex, CatalogPiece } from "./Catalog"
 import type { Vec3 } from "./coords"
-import { meshComponentFor, newMapFile, qualifyMaterialPath } from "./factory"
+import { meshComponentFor, newMapFile, nextNumberedName, qualifyMaterialPath } from "./factory"
 import { gameGroupNameOf } from "./gameGroups"
 import { refusesMeshComponents } from "./gameRules"
 import { boxCentreOf, itemsBoxOf } from "./itemBounds"
 import { DEFAULT_PLAYER_START } from "./level"
 import { type Item, type MapFile, type MeshComponent, objectPathOf, PropertyList } from "./MapFile"
+import { pieceDisplayName, pieceLabelOf } from "./pieceName"
 import {
   PREFAB_FORMAT,
   PREFAB_VERSION,
@@ -35,6 +36,28 @@ export const PREFAB_NEEDS_PROJECT = "Name the project first."
 export const isSamePrefab = (a: PrefabRef, b: PrefabRef): boolean => a.tier === b.tier && a.name === b.name
 
 export const ORIGIN: Vec3 = { x: 0, y: 0, z: 0 }
+
+type NamedPiece = Pick<CatalogPiece, "className"> & Partial<Pick<CatalogPiece, "displayName">>
+
+/** A piece's name without its size or number: "Kicker" for Kicker 1 Small. */
+const familyOf = (piece: NamedPiece) => pieceDisplayName(piece).name.replace(/\s+\d+$/, "")
+
+/** What a selection of `pieces` reads as: "Kicker pair", "Curve 1 Medium x3", "Kicker set" for a mix. */
+export const selectionLabelOf = (pieces: ReadonlyArray<NamedPiece>): string => {
+  const [first] = pieces
+  if (first === undefined) return "Prefab"
+  if (new Set(pieces.map(pieceLabelOf)).size > 1) return `${familyOf(first)} set`
+  return pieces.length === 2 ? `${familyOf(first)} pair` : `${pieceLabelOf(first)} x${pieces.length}`
+}
+
+/**
+ * `label` as a prefab may be called, and clear of the names in `taken`. A name is its file's, so `saveprefab`'s rule
+ * turns spaces into underscores, and room is left for the number a copy gets (`nextNumberedName`).
+ */
+export const freePrefabName = (label: string, taken: ReadonlySet<string>): string => {
+  const name = label.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "Prefab"
+  return taken.has(name) ? nextNumberedName(name, "_", (next) => taken.has(next)) : name
+}
 
 /** What each property list holds when the catalog doesn't say: how a value's type shows in a map. */
 const listOfValue = (value: PrefabPropertyValue): { readonly list: PropertyList; readonly type: string } => {

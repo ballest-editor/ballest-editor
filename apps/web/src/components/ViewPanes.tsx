@@ -51,6 +51,7 @@ import { sceneAxisColors } from "../editor/axisColors"
 import { changePanes, onPaneScaleChange, paneCameraAt } from "../editor/paneCameras"
 import { useEditor } from "../editor/store"
 import { useDarkTheme } from "../editor/theme"
+import { InstanceBanner } from "./InstanceBanner"
 import { GROUP, noFocus, SEGMENT, SURFACE } from "./viewControlStyle"
 import { ViewTip } from "./ViewTip"
 
@@ -332,6 +333,7 @@ export function ViewPanes({ disabled }: { readonly disabled: boolean }) {
       })}
       {(layout.kind === "columns" || layout.kind === "quad") && <PaneDivider axis="x" at={layout.splitX} />}
       {(layout.kind === "rows" || layout.kind === "quad") && <PaneDivider axis="y" at={layout.splitY} />}
+      <InstanceBanner />
     </div>
   )
 }

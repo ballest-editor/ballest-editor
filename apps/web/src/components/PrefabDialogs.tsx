@@ -7,10 +7,11 @@ import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-gr
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { type ReactNode, useState } from "react"
 import { isPrefabName, isSamePrefab, PREFAB_NAME_RULE, PREFAB_NEEDS_PROJECT, prefabTierLabel } from "../domain/prefab"
-import { deletePrefab, renamePrefab, saveSelectionAsPrefab } from "../editor/actions"
+import { deletePrefab, renamePrefab, saveSelectionAsPrefab, suggestPrefabName } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { PREFAB_TIER_HINTS } from "./PrefabsPanel"
 import { TitledDialog } from "./TitledDialog"
+import { useOnOpen } from "./useOnOpen"
 
 interface DialogProps {
   readonly open: boolean
@@ -48,6 +49,8 @@ function PrefabNameForm({ canSubmit, children, name, nameProblem, onChange, onCl
         <Input
           id="prefab-name"
           autoFocus
+          // a name is usually replaced whole: the suggestion, or the one a rename starts on
+          onFocus={(e) => e.currentTarget.select()}
           value={name}
           aria-invalid={problem !== undefined}
           onChange={(e) => onChange(e.target.value)}
@@ -80,12 +83,16 @@ function TierSegment({ disabled, hint, label, tier }: {
   )
 }
 
-/** Edit › Save selection as prefab…: its name and where it is stored. A name the tier has already replaces that prefab, and says so. */
+/**
+ * Edit › Save selection as prefab…: its name, which starts on what the selection reads as, and where it is stored. A name
+ * the tier has already replaces that prefab, and says so.
+ */
 export function SavePrefabDialog({ open, onClose }: DialogProps) {
   const projects = useEditor((s) => s.capabilities.projects)
   const hasProject = useEditor((s) => s.project?.current != null)
   const prefabs = useEditor((s) => s.prefabs)
   const [name, setName] = useState("")
+  useOnOpen(open, () => setName(suggestPrefabName(useEditor.getState())))
   const [chosenTier, setTier] = useState<PrefabTier>("project")
   // only a named project has a tier of its own
   const tier = projects && hasProject ? chosenTier : "user"
@@ -105,10 +112,7 @@ export function SavePrefabDialog({ open, onClose }: DialogProps) {
         canSubmit={valid}
         submitLabel={taken ? "Replace" : "Save"}
         onClose={onClose}
-        onSubmit={() => {
-          setName("")
-          void saveSelectionAsPrefab({ tier, name }, taken)
-        }}
+        onSubmit={() => void saveSelectionAsPrefab({ tier, name }, taken)}
       >
         {projects && (
           <div className="flex flex-col gap-1.5">

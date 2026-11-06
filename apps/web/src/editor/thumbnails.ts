@@ -1,5 +1,5 @@
 /**
- * Every piece's thumbnail. Each is rendered once, on demand, from the same glbs and materials
+ * Every piece's thumbnail, and every prefab definition's. Each is rendered once, on demand, from the same glbs and materials
  * the viewport draws, three-quarter view from above-front like the game's own renders, on a
  * transparent background so it sits on whatever panel shows it. The game's renders have its dark
  * backdrop baked in, unevenly enough that it can't be keyed out cleanly, so they are only the
@@ -9,12 +9,15 @@
  *
  * `frameBox`, `SerialQueue`, `texturesOf` and `whenTexturesReady` are unit-tested; the WebGL part is a thin wrapper.
  */
+import type { PrefabRef } from "@ballest/contracts"
 import * as THREE from "three"
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { type CatalogIndex, type CatalogPiece, pieceIdOf } from "../domain/Catalog"
-import { type Tuple3, UE_TO_THREE_MATRIX, ueToScene } from "../domain/coords"
+import { type Tuple3, UE_TO_THREE_MATRIX, ueToScene, type UeTransform } from "../domain/coords"
+import { editTransform } from "../domain/editTransform"
 import { itemFromPiece, placementTransform } from "../domain/factory"
+import type { Item } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
 import { applySlotMaterials, shaderPatchOf, textureLoaded } from "./materials"
 import { isMesh, isTexture } from "./threeGuards"
@@ -90,15 +93,15 @@ const loadGlb = (url: string): Promise<THREE.Group> => {
 
 const ueToThree = new THREE.Matrix4().set(...UE_TO_THREE_MATRIX)
 
-/** The piece as the viewport would draw it when freshly placed at the origin; undefined if it has no mesh. */
-const buildPiece = async (
-  piece: CatalogPiece,
+/** The item as the viewport would draw it at `at`; undefined if it has no mesh. */
+const buildItem = async (
+  item: Item,
+  at: UeTransform,
   index: CatalogIndex,
   table: MaterialTable
 ): Promise<THREE.Group | undefined> => {
-  const item = itemFromPiece(piece, placementTransform(piece, { x: 0, y: 0, z: 0 }))
   const root = new THREE.Group()
-  const transform = ueToScene(item.itemTransform)
+  const transform = ueToScene(at)
   root.position.set(...transform.position)
   root.quaternion.set(...transform.quaternion)
   root.scale.set(...transform.scale)
@@ -127,6 +130,20 @@ const buildPiece = async (
       root.add(placed)
     }
   })
+  return root.children.length === 0 ? undefined : root
+}
+
+/** The piece as the viewport would draw it when freshly placed at the origin; undefined if it has no mesh. */
+const buildPiece = (piece: CatalogPiece, index: CatalogIndex, table: MaterialTable) => {
+  const item = itemFromPiece(piece, placementTransform(piece, { x: 0, y: 0, z: 0 }))
+  return buildItem(item, item.itemTransform, index, table)
+}
+
+/** Everything `items` draw, each where it stands; undefined if none of them has a mesh. */
+const buildItems = async (items: ReadonlyArray<Item>, index: CatalogIndex, table: MaterialTable) => {
+  const parts = await Promise.all(items.map((item) => buildItem(item, editTransform(item), index, table)))
+  const root = new THREE.Group()
+  for (const part of parts) if (part !== undefined) root.add(part)
   return root.children.length === 0 ? undefined : root
 }
 
@@ -201,8 +218,8 @@ const stageOf = (): Stage => {
   return stage
 }
 
-const render = async (piece: CatalogPiece, index: CatalogIndex, table: MaterialTable): Promise<string | undefined> => {
-  const object = await buildPiece(piece, index, table)
+/** `object` framed whole, as a PNG data URL; undefined when there is nothing to draw. */
+const photograph = async (object: THREE.Group | undefined): Promise<string | undefined> => {
   if (object === undefined) return undefined
   await whenTexturesReady(texturesOf(object), TEXTURE_WAIT_MS)
   const { camera, renderer, scene } = stageOf()
@@ -220,6 +237,9 @@ const render = async (piece: CatalogPiece, index: CatalogIndex, table: MaterialT
   scene.remove(object)
   return url
 }
+
+const render = async (piece: CatalogPiece, index: CatalogIndex, table: MaterialTable) =>
+  photograph(await buildPiece(piece, index, table))
 
 const queue = new SerialQueue()
 const cache = new Map<string, Promise<string | undefined>>()
@@ -241,5 +261,32 @@ export const thumbnailFor = (
     return undefined
   })
   cache.set(id, promise)
+  return promise
+}
+
+/** One version of a definition's file, which is what its picture is of. */
+const definitionCacheKey = ({ hash, name, tier }: PrefabRef & { readonly hash: string }) =>
+  `prefab:${tier}:${name}:${hash}`
+
+/**
+ * A rendered thumbnail of a definition: everything in it, framed whole, from the same queue and cache as a piece's.
+ * Rendered once per version of its file, so `readItems` runs only then.
+ */
+export const definitionThumbnailFor = (
+  definition: PrefabRef & { readonly hash: string },
+  readItems: () => Promise<ReadonlyArray<Item>>,
+  index: CatalogIndex,
+  table: MaterialTable
+): Promise<string | undefined> => {
+  const key = definitionCacheKey(definition)
+  const cached = cache.get(key)
+  if (cached !== undefined) return cached
+  const promise = queue.run(async () => photograph(await buildItems(await readItems(), index, table))).catch(
+    (error: unknown) => {
+      console.warn(`Couldn't render a thumbnail for the prefab ${definition.name}.`, error)
+      return undefined
+    }
+  )
+  cache.set(key, promise)
   return promise
 }
