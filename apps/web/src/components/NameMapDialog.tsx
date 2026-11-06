@@ -1,11 +1,12 @@
 import { Button } from "@workspace/ui/components/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { useMemo, useState } from "react"
-import { pieceLabelOf, riskyClassesIn } from "../domain/Catalog"
+import { riskyClassesIn } from "../domain/Catalog"
 import { usableCreatorName } from "../domain/creator"
 import { copyNameOf, isValidName, mapFileNameOf } from "../domain/factory"
 import { unconfirmedPropertiesIn } from "../domain/itemProperties"
 import { classNameOf } from "../domain/MapFile"
+import { pieceLabelOf } from "../domain/pieceName"
 import {
   canMakeProject,
   duplicateMap,
