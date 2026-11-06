@@ -1,10 +1,11 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import fixture from "./bundledCatalog.json"
-import { Catalog, indexCatalog, pieceLabelOf } from "./Catalog"
+import { Catalog, indexCatalog } from "./Catalog"
 import { itemFromPiece, newMapFile, placementTransform } from "./factory"
 import type { MapFile } from "./MapFile"
 import type { GroupNode, ItemNode, TreeNode } from "./MapSidecar"
+import { pieceLabelOf } from "./pieceName"
 
 import {
   copyStructure,

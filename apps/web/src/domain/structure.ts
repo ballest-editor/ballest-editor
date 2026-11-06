@@ -3,9 +3,10 @@
  * game's file (docs/PROJECTS.md § The files). Pure functions, like `edits.ts`: an edit that changes nothing answers
  * undefined, so the store leaves no undo step for it. An item's key is its entry in the store's `ids`.
  */
-import { type CatalogIndex, humanizedClass, pieceLabelOf } from "./Catalog"
+import type { CatalogIndex } from "./Catalog"
 import { classNameOf, type MapFile } from "./MapFile"
 import type { GroupNode, ItemNode, PrefabLink, TreeNode } from "./MapSidecar"
+import { pieceLabelOf } from "./pieceName"
 
 /** What an item has beyond the game's data. An item with neither has no entry. */
 export interface ItemMeta {
@@ -336,8 +337,9 @@ export const itemNames = (
   numbered(ids.flatMap((key, index) => {
     const item = map.items[index]
     if (item === undefined) return []
-    const piece = catalog?.pieceByClass.get(item.actorToSpawn)
-    const label = piece === undefined ? humanizedClass(classNameOf(item.actorToSpawn)) : pieceLabelOf(piece)
+    const label = pieceLabelOf(
+      catalog?.pieceByClass.get(item.actorToSpawn) ?? { className: classNameOf(item.actorToSpawn) }
+    )
     return [[key, items.get(key)?.name ?? label] as const]
   }))
 

@@ -1,19 +1,25 @@
-import { IconChevronRight, IconFoldDown, IconFoldUp } from "@tabler/icons-react"
+import {
+  IconChevronRight,
+  IconChevronsDown,
+  IconChevronsUp,
+  IconLayoutGrid,
+  IconLayoutList,
+  IconSearch,
+  IconX
+} from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/ui/components/collapsible"
 import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
-import { type MouseEvent, useMemo, useState } from "react"
-import {
-  type CatalogPiece,
-  paletteSections,
-  pieceIdOf,
-  pieceLabelOf,
-  unavailableReasonOf,
-  verificationOf
-} from "../domain/Catalog"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
+import { cn } from "@workspace/ui/lib/utils"
+import { type MouseEvent, type ReactNode, useMemo, useState } from "react"
+import { type CatalogPiece, paletteSections, pieceIdOf, unavailableReasonOf, verificationOf } from "../domain/Catalog"
 import { placementTransform } from "../domain/factory"
+import { pieceDisplayName, pieceLabelOf, type PieceSize } from "../domain/pieceName"
 import { pieceFootprint } from "../domain/placement"
+import type { Settings } from "../domain/Settings"
+import { updateSettings } from "../editor/actions"
 import { preloadPiece } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
 import { useEditor } from "../editor/store"
@@ -21,68 +27,150 @@ import { focusViewport } from "../editor/Viewport"
 import { PaletteSkeleton } from "./EditorSkeleton"
 import { PieceThumbnail } from "./PieceThumbnail"
 
+type PiecesView = Settings["panels"]["piecesView"]
+
+const UNVERIFIED_NOTE =
+  "Not yet confirmed to load in the in-game editor. A rejected item makes the game discard the whole map."
+
+/**
+ * A click's feedback, in CSS alone: an overlay appears on press and fades after release, whatever the row's hover state
+ * is doing. It sits on `::after` so hovering a row stays quick while the fade is slow.
+ */
+const PLACED_FLASH =
+  "relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:bg-primary/40 after:opacity-0 after:transition-opacity after:duration-500 active:after:opacity-100 active:after:duration-0"
+
 const matches = (piece: CatalogPiece, terms: ReadonlyArray<string>) => {
-  const haystack = `${pieceLabelOf(piece)} ${piece.className} ${piece.meshAssetPath ?? ""} ${piece.category ?? ""}`
+  const haystack = `${pieceLabelOf(piece)} ${piece.displayName ?? ""} ${piece.className} ${piece.meshAssetPath ?? ""} ${
+    piece.category ?? ""
+  }`
     .toLowerCase()
   return terms.every((t) => haystack.includes(t))
 }
 
-function PieceButton({ piece, onPlace, onHover, unavailable, unverified }: {
+function SizeTag({ size, className }: { readonly size: PieceSize; readonly className?: string }) {
+  return (
+    <span
+      className={cn(
+        "flex size-4 shrink-0 items-center justify-center rounded-control bg-muted text-caption text-fg-secondary",
+        className
+      )}
+    >
+      {size}
+    </span>
+  )
+}
+
+/** An icon button in the panel's header. A disabled button takes no pointer events, so the tooltip is on a wrapper. */
+function HeaderButton({ label, pressed, disabled, onClick, children }: {
+  readonly label: string
+  readonly pressed?: boolean
+  readonly disabled?: boolean
+  readonly onClick: () => void
+  readonly children: ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
+        <Button
+          variant={pressed === true ? "secondary" : "ghost"}
+          size="icon-sm"
+          className="text-fg-secondary"
+          aria-label={label}
+          aria-pressed={pressed}
+          disabled={disabled}
+          onClick={onClick}
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+function PieceButton({ piece, category, view, onPlace, onHover, unavailable, unverified }: {
   readonly piece: CatalogPiece
+  /** The section it is listed under. */
+  readonly category: string
+  readonly view: PiecesView
   readonly onPlace: (e: MouseEvent<HTMLButtonElement>) => void
   readonly onHover: () => void
-  /** Set for pieces that can't be placed; shown disabled with this as the tooltip. */
+  /** Set for pieces that can't be placed; shown disabled, with this in the tooltip. */
   readonly unavailable?: string | undefined
   /** Hidden piece nobody has loaded in-game yet: placeable, but flagged. */
   readonly unverified?: boolean
 }) {
-  const button = (
-    <Button
-      variant="ghost"
-      disabled={unavailable !== undefined}
-      className="h-auto w-full justify-start gap-2 px-2 py-1 text-left"
-      title={unavailable ?? `${piece.className}\n${piece.meshAssetPath ?? "(no main mesh)"}`}
-      onClick={onPlace}
-      onPointerEnter={onHover}
-      onKeyDown={(e) => {
-        if (e.key === " " || e.key === "Enter") e.preventDefault()
-      }}
-    >
-      {unavailable === undefined && (
-        <PieceThumbnail
-          piece={piece}
-          className="size-8 shrink-0 rounded-control bg-muted object-fill"
-          placeholder={<span className="size-8 shrink-0 rounded-control bg-muted" />}
-        />
-      )}
-      <span className="flex min-w-0 flex-col">
-        <span className="flex items-center gap-1.5 truncate text-body-strong">
-          {pieceLabelOf(piece)}
-          {unverified && (
-            <span
-              className="rounded-control border border-amber-500/40 bg-amber-500/15 px-1 text-caption font-normal text-amber-700 dark:text-amber-300"
-              title="Not yet confirmed to load in the in-game editor. A rejected item makes the game discard the whole map."
-            >
-              unverified
-            </span>
+  const { name, size } = pieceDisplayName(piece)
+  const grid = view === "grid"
+  const thumbnailSize = grid ? "size-16" : "size-6"
+  const placeholder = <span className={cn("shrink-0 rounded-control bg-muted", thumbnailSize)} />
+  const thumbnail = unavailable === undefined
+    ? (
+      <PieceThumbnail
+        piece={piece}
+        className={cn("shrink-0 rounded-control bg-muted object-contain", thumbnailSize)}
+        placeholder={placeholder}
+      />
+    )
+    : placeholder
+  const note = unavailable ?? (unverified === true ? UNVERIFIED_NOTE : undefined)
+  return (
+    <Tooltip>
+      {/* A disabled button takes no pointer events, so the tooltip is on a wrapper. */}
+      <TooltipTrigger render={<span className={cn("block", unavailable !== undefined && "cursor-not-allowed")} />}>
+        <Button
+          variant="ghost"
+          disabled={unavailable !== undefined}
+          className={cn(
+            PLACED_FLASH,
+            grid ? "flex h-auto w-full flex-col gap-1 p-1" : "flex h-8 w-full justify-start gap-2 px-1 text-left"
           )}
-        </span>
-        {!piece.thumbnail && piece.displayName && piece.displayName !== piece.className && (
-          <span className="truncate text-caption text-fg-tertiary">{piece.className}</span>
-        )}
-      </span>
-    </Button>
+          onClick={onPlace}
+          onPointerEnter={onHover}
+          onKeyDown={(e) => {
+            if (e.key === " " || e.key === "Enter") e.preventDefault()
+          }}
+        >
+          {grid
+            ? (
+              <>
+                <span className="relative">
+                  {thumbnail}
+                  {size !== undefined && <SizeTag size={size} className="absolute top-0.5 right-0.5" />}
+                  {unverified === true && <span className="absolute top-1 left-1 size-2 rounded-full bg-amber-500" />}
+                </span>
+                <span className="line-clamp-2 h-8 w-full text-center text-caption whitespace-normal">{name}</span>
+              </>
+            )
+            : (
+              <>
+                {thumbnail}
+                <span className="min-w-0 flex-1 truncate">{name}</span>
+                {unverified === true && (
+                  <span className="shrink-0 rounded-control border border-amber-500/40 bg-amber-500/15 px-1 text-caption text-amber-700 dark:text-amber-300">
+                    unverified
+                  </span>
+                )}
+                {size !== undefined && <SizeTag size={size} />}
+              </>
+            )}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="right" className="flex-col items-start gap-0">
+        {grid && <span>{pieceLabelOf(piece)}</span>}
+        <span>{piece.className}</span>
+        <span className="text-caption">{category}</span>
+        {note !== undefined && <span className="mt-1 text-caption">{note}</span>}
+      </TooltipContent>
+    </Tooltip>
   )
-  // Disabled buttons get no pointer events, so the tooltip lives on a wrapper.
-  return unavailable === undefined
-    ? button
-    : <span className="block cursor-not-allowed" title={`${piece.className}: ${unavailable}`}>{button}</span>
 }
 
 export function Palette() {
   const catalog = useEditor((s) => s.catalog)
   const booting = useEditor((s) => s.booting)
   const placePiece = useEditor((s) => s.placePiece)
+  const view = useEditor((s) => s.settings.panels.piecesView)
   const [query, setQuery] = useState("")
   const [open, setOpen] = useState<Readonly<Record<string, boolean>>>({})
   const [allCollapsed, setAllCollapsed] = useState(false)
@@ -122,24 +210,45 @@ export function Palette() {
   return (
     <aside className="flex h-full min-w-0 flex-col bg-card">
       <div className="flex h-9 shrink-0 items-center gap-1 px-2">
-        <Input
-          type="search"
-          placeholder="Search pieces…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="min-w-0 flex-1"
-        />
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="shrink-0 text-fg-secondary"
-          aria-label={allCollapsed ? "Expand all groups" : "Collapse all groups"}
-          title={allCollapsed ? "Expand all groups" : "Collapse all groups"}
+        <div className="relative min-w-0 flex-1">
+          <IconSearch className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-fg-tertiary" />
+          <Input
+            type="search"
+            aria-label="Search pieces"
+            placeholder="Search pieces"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="pr-7 pl-7 [&::-webkit-search-cancel-button]:hidden"
+          />
+          {query.length > 0 && (
+            <span className="absolute top-0.5 right-0.5 inline-flex">
+              <HeaderButton label="Clear search" onClick={() => setQuery("")}>
+                <IconX />
+              </HeaderButton>
+            </span>
+          )}
+        </div>
+        <HeaderButton
+          label="List view"
+          pressed={view === "list"}
+          onClick={() => void updateSettings("panels", { piecesView: "list" })}
+        >
+          <IconLayoutList />
+        </HeaderButton>
+        <HeaderButton
+          label="Grid view"
+          pressed={view === "grid"}
+          onClick={() => void updateSettings("panels", { piecesView: "grid" })}
+        >
+          <IconLayoutGrid />
+        </HeaderButton>
+        <HeaderButton
+          label={allCollapsed ? "Expand all groups" : "Collapse all groups"}
           disabled={terms.length > 0}
           onClick={toggleAll}
         >
-          {allCollapsed ? <IconFoldDown /> : <IconFoldUp />}
-        </Button>
+          {allCollapsed ? <IconChevronsDown /> : <IconChevronsUp />}
+        </HeaderButton>
       </div>
       {catalog === null && !booting && (
         <div className="px-3 py-2 text-body text-fg-tertiary">The piece catalog couldn't be loaded.</div>
@@ -156,22 +265,35 @@ export function Palette() {
                   open={isOpen}
                   onOpenChange={(next) => setOpen((o) => ({ ...o, [section.name]: next }))}
                 >
-                  <CollapsibleTrigger
-                    className="group flex h-8 w-full items-center gap-1.5 rounded-control px-1.5 text-caption uppercase tracking-wider text-fg-secondary hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60 focus-visible:outline-none"
-                    onMouseDown={(e) => e.preventDefault()}
-                  >
-                    <IconChevronRight className="size-3.5 transition-transform duration-200 group-data-[panel-open]:rotate-90" />
-                    <span className="truncate">{section.name}</span>
-                    <span className="ml-auto font-normal tabular-nums">{section.pieces.length}</span>
-                  </CollapsibleTrigger>
+                  <Tooltip disabled={!section.hidden}>
+                    <TooltipTrigger
+                      render={
+                        <CollapsibleTrigger
+                          className="group flex h-8 w-full items-center gap-1.5 rounded-control px-1.5 text-caption uppercase tracking-wider text-fg-secondary hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60 focus-visible:outline-none"
+                          onMouseDown={(e) => e.preventDefault()}
+                        />
+                      }
+                    >
+                      <IconChevronRight className="size-3.5 transition-transform duration-200 group-data-[panel-open]:rotate-90" />
+                      <span className="truncate">{section.name}</span>
+                      <span className="ml-auto text-fg-tertiary tabular-nums">{section.pieces.length}</span>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">Not in the in-game browser</TooltipContent>
+                  </Tooltip>
                   <CollapsibleContent className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-200 ease-out data-[ending-style]:h-0 data-[starting-style]:h-0">
-                    <ul className="flex flex-col gap-0.5 pb-1">
+                    <ul
+                      className={view === "grid"
+                        ? "grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-1 pb-1"
+                        : "flex flex-col gap-0.5 pb-1"}
+                    >
                       {section.pieces.map((piece) => {
                         const unavailable = unavailableReason(piece)
                         return (
                           <li key={pieceIdOf(piece)}>
                             <PieceButton
                               piece={piece}
+                              category={section.name}
+                              view={view}
                               onPlace={place(piece, unavailable)}
                               onHover={() => index !== null && preloadPiece(piece, index)}
                               unavailable={unavailable}
