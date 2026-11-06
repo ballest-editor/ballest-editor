@@ -44,13 +44,13 @@ import { creatorSettingsRow } from "./CreatorSetting"
 import { CheckAgainButton, useGameLinkSettings } from "./GameLink"
 import { NumberField } from "./NumberField"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
-import { useUpdateCheck } from "./UpdateCheck"
 
+/** Each answers the row's label, "Movement keys need the look button". */
 const movementLookItems = {
-  all: "All movement keys",
-  upDown: "Up and down",
-  conflicting: "Only conflicting keys",
-  nothing: "Nothing"
+  all: "All",
+  upDown: "Up, down and shared keys",
+  conflicting: "Only keys shared with a tool",
+  nothing: "None"
 } as const
 const movementLookDescriptions = {
   all: "Every key needs look. The game's default.",
@@ -180,9 +180,9 @@ interface Listening {
 }
 
 /**
- * An action's bindings as key caps (hover or focus one to reveal its ×, which slides in), a
- * dashed + cap for a secondary binding, and a capture cap while listening. Caps bound to more
- * than one action of the same kind are marked red.
+ * An action's bindings as key caps (hover or focus one to reveal its ×, which slides in), then a
+ * dashed + cap to add one, after the word Unbound when there are none, and a capture cap while
+ * listening. Caps bound to more than one action of the same kind are marked red.
  */
 function KeybindControl(props: {
   readonly action: KeybindAction
@@ -229,15 +229,17 @@ function KeybindControl(props: {
       {props.listening === props.bindings.length
         ? <CaptureCap />
         : (
-          <button
-            type="button"
-            className="inline-flex h-6 min-w-6 items-center justify-center gap-1 rounded-control border border-dashed border-border px-1.5 text-caption text-fg-secondary hover:border-foreground/40 hover:text-foreground"
-            onClick={() => props.onListen(props.bindings.length)}
-            aria-label={props.bindings.length === 0 ? `Bind ${label}` : `Add a binding for ${label}`}
-          >
-            <IconPlus className="size-3" />
-            {props.bindings.length === 0 && <span className={CAP_TEXT}>Unbound</span>}
-          </button>
+          <>
+            {props.bindings.length === 0 && <span className="px-1 text-caption text-fg-tertiary">Unbound</span>}
+            <button
+              type="button"
+              className="inline-flex size-6 items-center justify-center rounded-control border border-dashed border-border text-fg-secondary hover:border-foreground/40 hover:text-foreground"
+              onClick={() => props.onListen(props.bindings.length)}
+              aria-label={props.bindings.length === 0 ? `Bind ${label}` : `Add a binding for ${label}`}
+            >
+              <IconPlus className="size-3" />
+            </button>
+          </>
         )}
     </div>
   )
@@ -292,7 +294,6 @@ export function SettingsDialog(props: {
   const projects = useEditor((s) => s.capabilities.projects)
   const overridden = overriddenFolders(useEditor((s) => s.gamePaths))
   const gameRows = useGameLinkSettings()
-  const updateCheck = useUpdateCheck()
   const creator = useCreator()
   const foundCreator = useEditor((s) => s.foundCreator)
 
@@ -308,14 +309,10 @@ export function SettingsDialog(props: {
     update(section, Struct.pick(defaultSettings[section], [key]))
   const isDefault = <K extends keyof Settings>(section: K, key: keyof Settings[K]) =>
     settings[section][key] === defaultSettings[section][key]
-  /** A settings row's modified flag and reset, from its field. */
-  const changesOf = <K extends keyof Settings>(section: K, key: keyof Settings[K]) => ({
-    changes: { modified: !isDefault(section, key), reset: () => resetField(section, key) }
-  })
-  /** The same, for a row on the page named after its section. */
+  /** A row on the page named after its section: its modified flag and reset, from its field. */
   const setting = <K extends keyof Settings & SettingsCategory>(section: K, key: keyof Settings[K]) => ({
     category: section,
-    ...changesOf(section, key)
+    changes: { modified: !isDefault(section, key), reset: () => resetField(section, key) }
   })
 
   const setBindings = (action: KeybindAction, bindings: Bindings) =>
@@ -368,9 +365,9 @@ export function SettingsDialog(props: {
 
   const rows = ((): ReadonlyArray<Row> => {
     // A chord is a conflict when two actions of the same kind share it. A fly key doubling
-    // as a tool shortcut (W: forward + translate, as in the game) is fine: the "fly only while
-    // looking" setting decides which one it does. Mouse drags and selection clicks share a
-    // kind: a camera drag chord never reaches click selection.
+    // as a tool shortcut (W: forward + translate, as in the game) is fine: the "movement keys
+    // need the look button" setting decides which one it does. Mouse drags and selection clicks
+    // share a kind: a camera drag chord never reaches click selection.
     const kinds = new Map<string, Set<string>>()
     for (const action of keybindActions) {
       const bindings = keybinds[action]
@@ -419,7 +416,6 @@ export function SettingsDialog(props: {
     ]
     const presetItems = Object.fromEntries(presetEntries)
     const a = settings.appearance
-    const l = settings.lighting
     return [
       {
         id: "units",
@@ -490,19 +486,6 @@ export function SettingsDialog(props: {
           } satisfies Row
         ]
         : []),
-      ...(updateCheck === null
-        ? []
-        : [
-          {
-            id: "version",
-            category: "general",
-            label: "Version",
-            description: updateCheck.summary,
-            keywords: "version release new latest check download install",
-            changes: { modified: false, reset: () => {} },
-            control: updateCheck.button
-          } satisfies Row
-        ]),
       {
         id: "placeDistance",
         ...setting("editor", "placeDistance"),
@@ -624,8 +607,9 @@ export function SettingsDialog(props: {
         ...setting("camera", "lockPointer"),
         label: "Lock pointer while looking",
         description: "Hide the cursor while dragging the camera.",
-        info:
-          "Automatic locks it in the desktop app and not in a browser: browsers show a notice on every lock, and Firefox on Linux turns slow diagonal looks into steps.",
+        info: projects
+          ? "Automatic locks it in the desktop app."
+          : "Automatic locks it in the desktop app and not in a browser: browsers show a notice on every lock, and Firefox on Linux turns slow diagonal looks into steps.",
         control: (
           <Choice
             value={c.lockPointer}
@@ -637,19 +621,20 @@ export function SettingsDialog(props: {
       {
         id: "movementNeedsLook",
         ...setting("camera", "movementNeedsLook"),
-        label: "Fly only while looking",
-        description: "Which movement keys need the look button held.",
+        label: "Movement keys need the look button",
+        description: "Shared keys are the ones a tool uses too.",
+        keywords: "fly only while looking",
         control: (
           <Select
             value={c.movementNeedsLook}
             items={movementLookItems}
             onValueChange={(v) => v !== null && update("camera", { movementNeedsLook: v })}
           >
-            <SelectTrigger className="w-44">
+            <SelectTrigger className="w-56">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="w-auto" align="end" alignItemWithTrigger={false}>
-              {movementLookModes.map((m) => (
+              {movementLookModes.toReversed().map((m) => (
                 <SelectItem key={m} value={m} className="py-1.5 pr-7">
                   <span className="flex flex-col gap-0.5">
                     <span>{movementLookItems[m]}</span>
@@ -688,13 +673,6 @@ export function SettingsDialog(props: {
         )
       },
       {
-        id: "gridVisible",
-        ...setting("appearance", "gridVisible"),
-        group: VIEWPORT,
-        label: "Show grid",
-        control: <Switch checked={a.gridVisible} onCheckedChange={(v) => update("appearance", { gridVisible: v })} />
-      },
-      {
         id: "gridCell",
         ...setting("appearance", "gridCellColor"),
         group: VIEWPORT,
@@ -724,35 +702,6 @@ export function SettingsDialog(props: {
           />
         )
       },
-      {
-        id: "waterVisible",
-        ...setting("appearance", "waterVisible"),
-        group: VIEWPORT,
-        label: "Show water",
-        description: "The level's water surface.",
-        info: "In game, pieces below it are hidden, and a ball that falls in respawns.",
-        control: <Switch checked={a.waterVisible} onCheckedChange={(v) => update("appearance", { waterVisible: v })} />
-      },
-      {
-        id: "mapLighting",
-        category: "appearance",
-        ...changesOf("lighting", "mapLighting"),
-        group: VIEWPORT,
-        label: "Map lighting",
-        description: "Light the viewport with the map's sun and sky.",
-        info: "The inspector's Lighting section sets them. Off: fixed studio lights.",
-        control: <Switch checked={l.mapLighting} onCheckedChange={(v) => update("lighting", { mapLighting: v })} />
-      },
-      {
-        id: "skyVisible",
-        category: "appearance",
-        ...changesOf("lighting", "skyVisible"),
-        group: VIEWPORT,
-        label: "Show sky",
-        description: "The game's sky with the map's sun in it.",
-        info: "Off: the theme's background.",
-        control: <Switch checked={l.skyVisible} onCheckedChange={(v) => update("lighting", { skyVisible: v })} />
-      },
       ...(hasGame ? gameRows : [])
     ]
   })()
@@ -761,7 +710,9 @@ export function SettingsDialog(props: {
     if (category === "keybinds") void resetKeybinds()
     else if (category === "game") void resetGamePaths(overridden)
     else if (category === "appearance") {
-      void saveSettings({ ...settings, appearance: defaultSettings.appearance, lighting: defaultSettings.lighting })
+      // What the page shows: the Display popover's switches are in the same section, and they stay as they are.
+      const shown = Struct.pick(defaultSettings.appearance, ["theme", "motion", "gridCellColor", "gridSectionColor"])
+      void saveSettings({ ...settings, appearance: { ...settings.appearance, ...shown } })
     } else void saveSettings({ ...settings, [category]: defaultSettings[category] })
   }
   return (
@@ -769,7 +720,7 @@ export function SettingsDialog(props: {
       open={props.open}
       onClose={props.onClose}
       title="Settings"
-      description="Settings for the editor, kept in this browser."
+      description={`Settings for the editor, kept ${projects ? "on this computer" : "in this browser"}.`}
       categories={hasGame ? [...CATEGORIES, GAME_CATEGORY] : CATEGORIES}
       category={props.category}
       onCategoryChange={props.onCategoryChange}

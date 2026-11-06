@@ -219,14 +219,14 @@ A prefab is a reusable assembly, kept as a file in the game's format ([FORMAT.md
 
 The install, maps folder and plugin manager rows have Reveal, and a row's info icon holds how it was found and its full path, which the page shows nowhere else. A missing one carries its fix:
 
-- **The install:** Choose folder…, a folder dialog. A folder without the game's exe keeps the row red with main's reason, and nothing is saved.
+- **The install:** Choose folder…, a folder dialog. A folder without the game's exe keeps the row marked missing with main's reason, and nothing is saved.
 - **The maps folder,** once the game is found: "Run the game once to create its maps folder" and Choose folder….
 - **The editor plugin:** Install or Update (§ Installing the plugin).
 - **The creator:** Set name… (Settings › General).
 
-A folder that is there has a Choose another folder… icon button. One chosen that way says "Chosen here", and its row's reset button (↺) looks it up again (`resetGamePaths`). An overridden folder marks the Game category and the row with the "modified" dot, and Reset game to defaults resets every chosen folder.
+A folder that is there has two icon buttons, each named by its tooltip: Reveal in file manager (a folder) and Choose folder… (a pencil). One chosen that way says "Chosen here", and its row's reset button (↺) looks it up again (`resetGamePaths`). An overridden folder marks the Game category and the row with the "modified" dot, and Reset game to defaults resets every chosen folder.
 
-The plugin manager (`noPluginManager`) is optional, because only Play needs it. Its row is neutral ("Not installed (optional, for Play)") with an Install docs button to its README (`openExternal`), never red. While its plugins folder isn't found, the row also has Choose folder…, for a plugin manager whose plugins folder is somewhere unusual.
+The plugin manager (`noPluginManager`) is optional, because only Play needs it. Its row is neutral ("Not installed (optional, for Play)") with an Install docs button to its README (`openExternal`), never marked missing. While its plugins folder isn't found, the row also has Choose folder…, for a plugin manager whose plugins folder is somewhere unusual.
 
 Rows that need an earlier one wait for it: the maps folder and the plugin manager need the game, and the plugin needs the plugin manager. A chosen folder is saved as the override, and the other folders and the plugin are looked up again, so the rows update in place. Check again looks everything up again.
 

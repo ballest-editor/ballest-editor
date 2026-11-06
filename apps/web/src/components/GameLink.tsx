@@ -3,7 +3,6 @@ import {
   IconCircleDashed,
   IconCircleX,
   IconFolderOpen,
-  IconFolderSearch,
   IconPencil,
   IconRefresh
 } from "@tabler/icons-react"
@@ -38,11 +37,12 @@ const ICONS: Record<GameLinkRowState, ComponentType<{ readonly className?: strin
   waiting: IconCircleDashed
 }
 
+/** The theme's status colours. Each falls back to a token that is always there, so a row never loses its icon. */
 const TONES: Record<GameLinkRowState, string> = {
-  ok: "text-emerald-600 dark:text-emerald-400",
-  missing: "text-destructive",
-  optional: "text-fg-tertiary",
-  waiting: "text-fg-tertiary"
+  ok: "text-[var(--status-ok,var(--foreground))]",
+  missing: "text-[var(--status-warn,var(--destructive))]",
+  optional: "text-[var(--status-neutral,var(--fg-tertiary))]",
+  waiting: "text-[var(--status-neutral,var(--fg-tertiary))]"
 }
 
 /** On the label's line: the icon is 16px, the line 20px. */
@@ -64,8 +64,8 @@ function FixButton({ fix, state }: { readonly fix: GameLinkFix; readonly state: 
       return found
         ? (
           <PathAction
-            label="Choose another folder…"
-            icon={IconFolderSearch}
+            label="Choose folder…"
+            icon={IconPencil}
             onClick={() => void chooseGameLinkFolder(fix.which)}
           />
         )
