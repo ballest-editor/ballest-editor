@@ -107,7 +107,7 @@ function Block({ block }: { readonly block: ReleaseNoteBlock }) {
  */
 export function ReleaseNotes({ blocks }: { readonly blocks: ReadonlyArray<ReleaseNoteBlock> }) {
   return (
-    <div className="flex flex-col gap-2 leading-relaxed break-words text-fg-secondary">
+    <div className="flex flex-col gap-2 leading-relaxed break-words text-fg-secondary select-text">
       {keyed(blocks).map(([key, block]) => <Block key={key} block={block} />)}
     </div>
   )

@@ -186,7 +186,7 @@ function ValidationList({ errors, warnings }: MapValidation) {
   ]
   return (
     <ScrollArea className="rounded-surface bg-muted [&_[data-slot=scroll-area-viewport]]:max-h-48">
-      <ul className="flex flex-col gap-1 p-2 text-fg-secondary">
+      <ul className="flex flex-col gap-1 p-2 text-fg-secondary select-text">
         {rows.map(({ icon, text }) => (
           <li key={text} className="flex gap-1.5">
             <span className="flex h-5 items-center">{icon}</span>

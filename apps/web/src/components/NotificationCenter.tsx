@@ -45,7 +45,7 @@ function Section(
         {pinned && <IconPin className="size-3" />}
         {title}
       </h3>
-      <ul className="flex flex-col gap-1">
+      <ul className="flex flex-col gap-1 select-text">
         {notices.map((notice) => <NotificationItem key={notice.id} notice={notice} />)}
       </ul>
     </section>
