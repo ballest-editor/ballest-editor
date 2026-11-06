@@ -11,6 +11,7 @@ import {
   type GameLinkRow,
   gameLinkRows,
   MUTABLE_KINDS,
+  openInGameProblem,
   openWithoutPluginNotice,
   overriddenFolders,
   pathCrumbs,
@@ -184,6 +185,22 @@ describe("Game link checklist", () => {
     assert.strictEqual(
       openWithoutPluginNotice("Big Loop", stale).title,
       "Restart the game to open Big Loop in the in-game editor"
+    )
+  })
+
+  it("says in a few words why Open in game can't open maps yet", () => {
+    assert.isNull(openInGameProblem(plugin("current", "0.2.0")))
+    assert.strictEqual(openInGameProblem(plugin("noGame")), "The game wasn't found")
+    assert.strictEqual(openInGameProblem(plugin("noPluginManager")), "Needs the Ballest plugin manager")
+    assert.strictEqual(openInGameProblem(plugin("missing")), "Install the editor's plugin first")
+    assert.strictEqual(openInGameProblem(plugin("outdated", "0.1.0")), "Update the editor's plugin to 0.2.0 first")
+    assert.strictEqual(
+      openInGameProblem({ ...plugin("outdated", "0.1.0"), hostVersion: "0.33.2", hostTooOld: true }),
+      "Needs plugin manager 0.34.0 (the game has 0.33.2)"
+    )
+    assert.strictEqual(
+      openInGameProblem({ ...plugin("current", "0.2.0"), runningOlder: true }),
+      "Restart the game to load the updated plugin"
     )
   })
 

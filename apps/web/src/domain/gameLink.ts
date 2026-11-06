@@ -246,7 +246,7 @@ const PLUGIN_NOTE = "Play and Open in game reach the game through it."
 
 /** "needs 0.34.0 (the game has 0.33.2)": what is wrong with a plugin manager too old for the app's plugin. */
 const hostShortfallOf = ({ hostVersion, requiredHost }: PluginLookup) =>
-  `needs ${requiredHost}${hostVersion === null ? "" : ` (the game has ${hostVersion})`}`
+  `${requiredHost}${hostVersion === null ? "" : ` (the game has ${hostVersion})`}`
 
 const UPDATE_HOST_STEPS = "Update it in the game, from the plugin manager's window, then restart the game."
 
@@ -257,7 +257,7 @@ const pluginRow = (plugin: PluginLookup | null): GameLinkRow => {
     if (plugin.hostTooOld && plugin.status !== "noGame" && plugin.status !== "noPluginManager") {
       return {
         state: "missing",
-        title: `Plugin manager ${hostShortfallOf(plugin)}`,
+        title: `Plugin manager needs ${hostShortfallOf(plugin)}`,
         note: `This app's plugin won't run on it. ${UPDATE_HOST_STEPS}`,
         path: plugin.folder
       }
@@ -476,7 +476,7 @@ export const pluginUpdateNotice = (plugin: PluginLookup, wanted: string): GameLi
     return {
       ...notice,
       title: `Update the plugin manager to ${wanted}`,
-      body: `The editor's plugin ${hostShortfallOf(plugin)}. ${UPDATE_HOST_STEPS}`,
+      body: `The editor's plugin needs ${hostShortfallOf(plugin)}. ${UPDATE_HOST_STEPS}`,
       actions: [{ label: "Plugin manager", command: { _tag: "OpenExternal", url: PLUGIN_MANAGER_URL } }]
     }
   }
@@ -487,6 +487,25 @@ export const pluginUpdateNotice = (plugin: PluginLookup, wanted: string): GameLi
     body: `Version ${plugin.bundledVersion} is ready. The game loads it the next time it starts.`,
     actions: [{ label: "Update plugin", command: { _tag: "InstallPlugin" } }]
   }
+}
+
+/**
+ * Why Open in game can't open maps yet, in a few words for the button's tooltip and the toast; null when it can. The
+ * notice (`openWithoutPluginNotice`) has the steps.
+ */
+export const openInGameProblem = (plugin: PluginLookup): string | null => {
+  switch (plugin.status) {
+    case "noGame":
+      return "The game wasn't found"
+    case "noPluginManager":
+      return "Needs the Ballest plugin manager"
+    default:
+  }
+  if (plugin.hostTooOld) return `Needs plugin manager ${hostShortfallOf(plugin)}`
+  if (plugin.status === "missing") return "Install the editor's plugin first"
+  if (plugin.status === "outdated") return `Update the editor's plugin to ${plugin.bundledVersion} first`
+  if (plugin.runningOlder) return "Restart the game to load the updated plugin"
+  return null
 }
 
 /** Why Open in game wrote nothing (`NeedsPlugin`), and what fixes it. */

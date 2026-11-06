@@ -3,6 +3,7 @@ import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import type { ReactNode } from "react"
+import { openInGameProblem } from "../domain/gameLink"
 import { openInGame, playMap } from "../editor/actions"
 import { exportProblemOf, projectTitleOf, projectUnsavedOf, useEditor } from "../editor/store"
 import { KeyChip } from "./KeyChip"
@@ -52,6 +53,7 @@ function GameButton({ children, onClick, tooltip, variant }: {
  */
 function OpenInGameButton() {
   const openedInGame = useEditor((s) => s.openedInGame !== null && s.openedInGame === s.file?.name)
+  const problem = useEditor((s) => s.pluginStatus === null ? null : openInGameProblem(s.pluginStatus))
   const olderInGame = useEditor((s) =>
     openedInGame && s.projectMaps.find((m) => m.fileName === s.file?.name)?.link?.exportedWhileRunning === true
   )
@@ -59,9 +61,16 @@ function OpenInGameButton() {
     <GameButton
       variant="outline"
       onClick={() => void openInGame()}
-      tooltip={openedInGame
-        ? `Export and reload it in the in-game editor.${olderInGame ? " The game shows an older version." : ""}`
-        : "Export and open it in the in-game editor"}
+      tooltip={
+        <span className="flex flex-col gap-1">
+          <span>
+            {openedInGame
+              ? `Export and reload it in the in-game editor.${olderInGame ? " The game shows an older version." : ""}`
+              : "Export and open it in the in-game editor"}
+          </span>
+          {problem !== null && <span className="text-fg-tertiary">{problem}. Press for the steps.</span>}
+        </span>
+      }
     >
       <IconEdit data-icon="inline-start" />
       {openedInGame ? "Update in game" : "Open in game"}

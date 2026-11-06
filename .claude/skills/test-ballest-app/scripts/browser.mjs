@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // A private headless Chromium for checking the app (../SKILL.md). Each checkout gets its own browser and profile, on a
 // port the browser picks, and `stop` ends only that browser. Commands:
-//   start <url> [--size 1280x800]   eval <js>   click <selector>   key <key>   shot <file>   open-map <file>   stop
+//   start <url> [--size 1280x800]   eval <js>   click <selector>   hover <selector>   key <key>   shot <file>   open-map <file>   stop
 import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
@@ -124,6 +124,17 @@ const commands = {
         await sleep(16)
       }
       await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: bx, y: by, button: "left", clickCount: 1 })
+    }),
+  // A real pointer over the element: tooltips open on this, not on synthetic events.
+  hover: (selector) =>
+    withPage(async (send) => {
+      const box = await evaluate(
+        send,
+        `(() => { const r = document.querySelector(${JSON.stringify(selector)})?.getBoundingClientRect();
+          return r && { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`
+      )
+      if (box === undefined) throw new Error(`Nothing matches ${selector}.`)
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...box })
     }),
   key: (key) =>
     withPage(async (send) => {

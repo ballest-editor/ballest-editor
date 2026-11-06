@@ -28,6 +28,7 @@ node $B start http://localhost:<port>/   # a private headless Chromium, 1280x800
 node $B open-map .dev-project/maps/<file>
 node $B eval '__ballest.useEditor.getState().doc.map.items.length'
 node $B click '[aria-label="Settings"]'
+node $B hover 'header button'          # a real pointer, which opens tooltips
 node $B key Escape
 node $B drag 640 400 700 400             # a left-button drag between page pixels, for a gizmo handle
 node $B shot /tmp/after.png
