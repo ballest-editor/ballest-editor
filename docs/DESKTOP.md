@@ -212,22 +212,22 @@ A prefab is a reusable assembly, kept as a file in the game's format ([FORMAT.md
 
 ### Game link
 
-`components/GameLink.tsx`, with rows from `domain/gameLink.ts`, is the one place the app describes the game's install, its maps folder, the creator name (`useCreator()`), the plugin manager and the editor plugin. It has two frames: `components/GameLinkDialog.tsx`, a modal from File › Game link…, and Settings › Game, a page with the same rows flush like other settings, its summary line as the description and Check again where a row's reset goes.
+`components/GameLink.tsx`, with rows from `domain/gameLink.ts`, is the one place the app describes the game's install, its maps folder, the creator name (`useCreator()`), the plugin manager and the editor plugin. Settings › Game is its home: each row is a settings row with a state icon, its name, a one-line status ("Found", "Not found") and its buttons at the right of the name's line, and Check again is in the page's footer. `components/GameLinkDialog.tsx`, also File › Game link…, lists only the missing rows, each with what is wrong, and an Open Settings › Game button.
 
-Each row has its state. The install, maps folder and plugin manager rows also have their path and Reveal, and the editor plugin row its path. A missing one carries its fix:
+The install, maps folder and plugin manager rows have Reveal, and a row's info icon holds how it was found and its full path, which the page shows nowhere else. A missing one carries its fix:
 
 - **The install:** Choose folder…, a folder dialog. A folder without the game's exe keeps the row red with main's reason, and nothing is saved.
 - **The maps folder,** once the game is found: "Run the game once to create its maps folder" and Choose folder….
 - **The editor plugin:** Install or Update (§ Installing the plugin).
 - **The creator:** Set name… (Settings › General).
 
-A folder that is there has a Choose another folder… action on its path. One chosen that way says "Chosen here instead of the one Steam knows about." with a reset button (↺) that looks it up again (`resetGamePaths`). In Settings an overridden folder also marks the Game category and the row with the "modified" dot, and Reset game to defaults resets every chosen folder.
+A folder that is there has a Choose another folder… icon button. One chosen that way says "Chosen here", and its row's reset button (↺) looks it up again (`resetGamePaths`). An overridden folder marks the Game category and the row with the "modified" dot, and Reset game to defaults resets every chosen folder.
 
 The plugin manager (`noPluginManager`) is optional, because only Play needs it. Its row is neutral ("Not installed (optional, for Play)") with an Install docs button to its README (`openExternal`), never red. While its plugins folder isn't found, the row also has Choose folder…, for a plugin manager whose plugins folder is somewhere unusual.
 
 Rows that need an earlier one wait for it: the maps folder and the plugin manager need the game, and the plugin needs the plugin manager. A chosen folder is saved as the override, and the other folders and the plugin are looked up again, so the rows update in place. Check again looks everything up again.
 
-The dialog opens by itself on the first launch (`gameLink.firstRun`) and when the startup check finds the game or its maps folder missing, which is what Export needs. A missing plugin manager never opens it.
+The dialog opens by itself when the startup check finds the game or its maps folder missing, which is what Export needs, and on the first launch if any row is missing. With everything found, the first launch shows nothing. A missing plugin manager never opens it.
 
 ### Project settings
 
@@ -259,7 +259,7 @@ The store's `notify(level, title, { kind, body, persistent, actions })` records 
 
 **Game link notifications.** At startup the page looks up the folders and the plugin (`checkGameLinkEffect`) and compares whether the game and the plugin manager are found with what the last launch found, kept in `desktop-settings.json` (`gameLink.last`, IPC `ballest:gameLink:memory` / `ballest:gameLink:remember`). Only a change is notified: the game lost (`gameNotFound`, persistent, Choose folder…) or found again (`gameFound`), and while the game stays, the plugin manager gone (`pluginManagerMissing`, persistent, Install steps) or back (`pluginManagerFound`). Play reports a missing game or plugin manager under the same two kinds (§ Play).
 
-The first launch notifies nothing, since the checklist is in front of the user. A persistent one resolves itself as soon as a lookup finds its cause gone (at startup, or after Choose folder…, reset or Install in this session), and that lookup's result is kept, so a fix made in the editor isn't announced again on the next launch. These kinds offer Don't show again: the kind goes into `desktop-settings.json` (`notifications.muted`, IPC `ballest:notifications:mute`), its notifications leave the list, and `notify` drops new ones.
+The first launch notifies nothing: the dialog says what is missing. A persistent one resolves itself as soon as a lookup finds its cause gone (at startup, or after Choose folder…, reset or Install in this session), and that lookup's result is kept, so a fix made in the editor isn't announced again on the next launch. These kinds offer Don't show again: the kind goes into `desktop-settings.json` (`notifications.muted`, IPC `ballest:notifications:mute`), its notifications leave the list, and `notify` drops new ones.
 
 ### Backups
 

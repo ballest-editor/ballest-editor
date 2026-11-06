@@ -6,7 +6,6 @@ import {
   IconPencil,
   IconPlus,
   IconSettings,
-  IconSun,
   IconX
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
@@ -16,8 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
 import { cn } from "@workspace/ui/lib/utils"
-import { Struct } from "effect"
-import { type ReactNode, useEffect, useState } from "react"
+import { String as Str, Struct } from "effect"
+import { useEffect, useState } from "react"
 import { movementLookModes } from "../domain/flyKeys"
 import { namedActions } from "../domain/GameKeybinds"
 import { overriddenFolders } from "../domain/gameLink"
@@ -42,7 +41,8 @@ import { refreshGameLink, resetGamePaths, resetKeybinds, saveKeybinds, saveSetti
 import { type SettingsCategory, useCreator, useEditor } from "../editor/store"
 import { useDarkTheme } from "../editor/theme"
 import { creatorSettingsRow } from "./CreatorSetting"
-import { CheckAgainButton, GameLinkRows, useGameLinkSummary } from "./GameLink"
+import { CheckAgainButton, useGameLinkSettings } from "./GameLink"
+import { NumberField } from "./NumberField"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 import { useUpdateCheck } from "./UpdateCheck"
 
@@ -64,11 +64,10 @@ const CATEGORIES: ReadonlyArray<SettingsCategoryInfo<SettingsCategory>> = [
   { id: "editor", label: "Editor", icon: IconPencil },
   { id: "camera", label: "Camera", icon: IconCamera },
   { id: "keybinds", label: "Keybinds", icon: IconKeyboard },
-  { id: "appearance", label: "Appearance", icon: IconPalette },
-  { id: "lighting", label: "Lighting", icon: IconSun }
+  { id: "appearance", label: "Appearance", icon: IconPalette }
 ]
 
-/** Desktop only: the Game link checklist, File › Game link…'s rows without its box. */
+/** Desktop only: the Game link's home. */
 const GAME_CATEGORY: SettingsCategoryInfo<SettingsCategory> = { id: "game", label: "Game", icon: IconDeviceGamepad2 }
 
 type Row = SettingsRow<SettingsCategory>
@@ -92,32 +91,47 @@ function Choice<V extends string>({ value, items, onChange, className = "w-40" }
   )
 }
 
-/** A setting on a slider, with its value (`children`) written out beside it. */
-function SliderControl({ value, disabled = false, onChange, children, ...range }: {
+/**
+ * A setting on a slider: 160px of track, then its value as a field with its unit. `scale` is how much of the stored
+ * value one shown unit is (centimetres to the metre). What is typed lands on a step of the slider, inside its range.
+ */
+function SliderControl({ label, unit, digits = 0, scale = 1, value, onChange, ...range }: {
+  readonly label: string
+  readonly unit: string
+  readonly digits?: number
+  readonly scale?: number
   readonly min: number
   readonly max: number
   readonly step: number
   readonly largeStep?: number
   readonly value: number
-  readonly disabled?: boolean
   readonly onChange: (value: number) => void
-  readonly children: ReactNode
 }) {
+  const { min, max, step } = range
   return (
     <>
-      <Slider
-        className="w-48"
-        {...range}
-        value={value}
-        disabled={disabled}
-        onValueChange={(v) => {
-          const next = sliderValue(v)
-          if (next !== undefined) onChange(next)
-        }}
-      />
-      <span className={cn("w-20 text-right font-mono text-body tabular-nums", disabled && "text-fg-disabled")}>
-        {children}
-      </span>
+      {/* its own box: the Slider fills what it is given, and a width on it loses to that */}
+      <div className="w-40 shrink-0">
+        <Slider
+          aria-label={label}
+          {...range}
+          value={value}
+          onValueChange={(v) => {
+            const next = sliderValue(v)
+            if (next !== undefined) onChange(next)
+          }}
+        />
+      </div>
+      <div className="w-16 shrink-0">
+        <NumberField
+          label={label}
+          value={value / scale}
+          digits={digits}
+          handle={false}
+          onCommit={(n) => onChange(Math.min(max, Math.max(min, Math.round((n * scale) / step) * step)))}
+        />
+      </div>
+      <span className="w-7 shrink-0 text-body whitespace-nowrap text-fg-tertiary">{unit}</span>
     </>
   )
 }
@@ -138,12 +152,10 @@ function ColorSetting(props: {
     <Popover>
       <PopoverTrigger
         aria-label={`${props.label}: ${props.value ?? `automatic (${props.auto})`}`}
-        className="flex h-7 w-36 cursor-pointer items-center gap-2 rounded-control border border-input px-2 text-body transition-colors hover:border-ring/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+        className="flex h-7 w-40 cursor-pointer items-center gap-2 rounded-control border border-input px-2 text-body transition-colors hover:border-ring/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
       >
         <ColorSwatch color={shown} />
-        <span className={cn("font-mono", props.value === null && "text-fg-tertiary")}>
-          {props.value ?? "Automatic"}
-        </span>
+        <span className={cn("tabular-nums", props.value === null && "text-fg-tertiary")}>{shown}</span>
       </PopoverTrigger>
       <PopoverContent side="left" align="start" className="w-56 gap-2">
         <ColorPicker value={shown} onCommit={props.onChange} />
@@ -155,7 +167,11 @@ function ColorSetting(props: {
   )
 }
 
-const GRID_COLOR_DESCRIPTION = "Automatic suits the dark or light theme."
+/** A grid colour's line: the swatch shows what it resolves to, this says where that comes from. */
+const gridColorDescription = (value: string | null) => value === null ? "Automatic: follows the theme." : "Custom."
+
+/** The Appearance page's group for what the viewport draws. */
+const VIEWPORT = "Viewport"
 
 /** A binding being captured: a fresh slot (`index` = bindings.length) or a replacement. */
 interface Listening {
@@ -164,8 +180,8 @@ interface Listening {
 }
 
 /**
- * An action's bindings as key caps (hover one to reveal its ×, which slides in), a dashed
- * + cap for a secondary binding, and a capture cap while listening. Caps bound to more
+ * An action's bindings as key caps (hover or focus one to reveal its ×, which slides in), a
+ * dashed + cap for a secondary binding, and a capture cap while listening. Caps bound to more
  * than one action of the same kind are marked red.
  */
 function KeybindControl(props: {
@@ -186,7 +202,7 @@ function KeybindControl(props: {
             <span
               key={binding}
               className={cn(
-                "group/cap inline-flex h-6 items-stretch overflow-hidden rounded-control border bg-muted font-mono text-caption leading-none text-foreground tabular-nums",
+                "group/cap inline-flex h-6 items-stretch overflow-hidden rounded-control border bg-muted text-caption leading-none text-foreground tabular-nums",
                 props.conflicts.has(binding) ? "border-destructive text-destructive" : "border-border"
               )}
               title={props.conflicts.has(binding) ? "Also bound to another action" : undefined}
@@ -201,10 +217,9 @@ function KeybindControl(props: {
               </button>
               <button
                 type="button"
-                className="flex w-0 items-center justify-center overflow-hidden text-fg-secondary transition-[width] duration-150 group-hover/cap:w-5 group-hover/cap:border-l group-hover/cap:border-border hover:bg-destructive/15 hover:text-destructive focus-visible:w-5"
+                className="flex w-0 items-center justify-center overflow-hidden text-fg-secondary transition-[width] duration-150 group-focus-within/cap:w-5 group-focus-within/cap:border-l group-focus-within/cap:border-border group-hover/cap:w-5 group-hover/cap:border-l group-hover/cap:border-border hover:bg-destructive/15 hover:text-destructive"
                 onClick={() => props.onRemove(index)}
                 aria-label={`Unbind ${formatBinding(binding)} from ${label}`}
-                tabIndex={-1}
               >
                 <IconX className="size-3 shrink-0" />
               </button>
@@ -216,7 +231,7 @@ function KeybindControl(props: {
         : (
           <button
             type="button"
-            className="inline-flex h-6 min-w-6 items-center justify-center gap-1 rounded-control border border-dashed border-border px-1.5 font-mono text-caption text-fg-secondary hover:border-foreground/40 hover:text-foreground"
+            className="inline-flex h-6 min-w-6 items-center justify-center gap-1 rounded-control border border-dashed border-border px-1.5 text-caption text-fg-secondary hover:border-foreground/40 hover:text-foreground"
             onClick={() => props.onListen(props.bindings.length)}
             aria-label={props.bindings.length === 0 ? `Bind ${label}` : `Add a binding for ${label}`}
           >
@@ -228,13 +243,13 @@ function KeybindControl(props: {
   )
 }
 
-/** Shown in place of the cap being (re)bound: same shape, primary ring, blinking caret. */
 /** Trims the line box to the glyphs' cap height (Chrome 133+); older engines fall back to leading-none. */
 const CAP_TEXT = "leading-none [text-box:trim-both_cap_alphabetic]"
 
+/** Shown in place of the cap being (re)bound: same shape, primary ring, blinking caret. */
 function CaptureCap() {
   return (
-    <span className="inline-flex h-6 items-center gap-1.5 rounded-control border border-primary/40 bg-primary/15 px-2 font-mono text-caption font-medium text-[color-mix(in_oklch,var(--primary),var(--foreground)_45%)]">
+    <span className="inline-flex h-6 items-center gap-1.5 rounded-control border border-primary/40 bg-primary/15 px-2 text-caption text-[color-mix(in_oklch,var(--primary),var(--foreground)_45%)]">
       <span className="size-1.5 animate-pulse rounded-full bg-primary" aria-hidden />
       <span className={CAP_TEXT}>Press a key</span>
     </span>
@@ -276,7 +291,7 @@ export function SettingsDialog(props: {
   const hasGame = useEditor((s) => s.capabilities.exportToGame)
   const projects = useEditor((s) => s.capabilities.projects)
   const overridden = overriddenFolders(useEditor((s) => s.gamePaths))
-  const gameLinkSummary = useGameLinkSummary()
+  const gameRows = useGameLinkSettings()
   const updateCheck = useUpdateCheck()
   const creator = useCreator()
   const foundCreator = useEditor((s) => s.foundCreator)
@@ -293,10 +308,14 @@ export function SettingsDialog(props: {
     update(section, Struct.pick(defaultSettings[section], [key]))
   const isDefault = <K extends keyof Settings>(section: K, key: keyof Settings[K]) =>
     settings[section][key] === defaultSettings[section][key]
-  /** The parts of a settings row that come from its field: category, modified flag, reset. */
-  const setting = <K extends keyof Settings>(section: K, key: keyof Settings[K]) => ({
-    category: section,
+  /** A settings row's modified flag and reset, from its field. */
+  const changesOf = <K extends keyof Settings>(section: K, key: keyof Settings[K]) => ({
     changes: { modified: !isDefault(section, key), reset: () => resetField(section, key) }
+  })
+  /** The same, for a row on the page named after its section. */
+  const setting = <K extends keyof Settings & SettingsCategory>(section: K, key: keyof Settings[K]) => ({
+    category: section,
+    ...changesOf(section, key)
   })
 
   const setBindings = (action: KeybindAction, bindings: Bindings) =>
@@ -374,7 +393,7 @@ export function SettingsDialog(props: {
       id: `key-${action}`,
       category: "keybinds",
       group: section,
-      label,
+      label: Str.capitalize(label),
       description: keybindActionDescriptions[action],
       tooltip: true,
       changes: {
@@ -395,19 +414,19 @@ export function SettingsDialog(props: {
 
     const c = settings.camera
     const presetEntries: ReadonlyArray<readonly [string, string]> = [
-      ...defaults.cameraPresets.map((p) => [p.id, `${p.label} (fov ${p.fov})`] as const),
-      [CUSTOM_FOV_PRESET, `Custom (fov ${c.customFov})`]
+      ...defaults.cameraPresets.map((p) => [p.id, `${p.label} (${p.fov}°)`] as const),
+      [CUSTOM_FOV_PRESET, "Custom"]
     ]
     const presetItems = Object.fromEntries(presetEntries)
     const a = settings.appearance
     const l = settings.lighting
-    const customFovOff = c.fovPreset !== CUSTOM_FOV_PRESET
     return [
       {
         id: "units",
         ...setting("general", "units"),
         label: "Units",
-        description: "How positions are shown in the inspector. Map files always store centimetres.",
+        description: "How the inspector shows positions.",
+        info: "Map files always store centimetres.",
         control: (
           <Choice
             value={settings.general.units}
@@ -426,8 +445,9 @@ export function SettingsDialog(props: {
         id: "altDragDuplicates",
         ...setting("general", "altDragDuplicates"),
         label: "Alt+drag duplicates",
-        description:
-          "Alt+drag on a translate handle moves a copy and leaves the original in place, like the game. Off: Alt+drag is a plain move.",
+        description: "Alt+drag moves a copy, like the game.",
+        info:
+          "Alt+drag on a translate handle moves a copy and leaves the original in place. Off: Alt+drag is a plain move.",
         control: (
           <Switch
             checked={settings.general.altDragDuplicates}
@@ -441,8 +461,8 @@ export function SettingsDialog(props: {
             id: "exportOnSaveAll",
             ...setting("general", "exportOnSave"),
             label: "Export every save",
-            description:
-              "Every Save also exports the map to the game. Off: only maps with their own Export on save are exported.",
+            description: "Every Save also exports the map to the game.",
+            info: "Off: only maps with their own Export on save are exported.",
             control: (
               <Switch
                 checked={settings.general.exportOnSave}
@@ -458,7 +478,8 @@ export function SettingsDialog(props: {
             id: "projectOpensIn",
             ...setting("general", "projectOpensIn"),
             label: "Open projects in",
-            description: "Where New project, Open project and Recent projects open a project.",
+            description: "Where a project you open or make goes.",
+            info: "For New project, Open project and Recent projects.",
             control: (
               <Choice
                 value={settings.general.projectOpensIn}
@@ -473,9 +494,9 @@ export function SettingsDialog(props: {
         ? []
         : [
           {
-            id: "updates",
+            id: "version",
             category: "general",
-            label: "Updates",
+            label: "Version",
             description: updateCheck.summary,
             keywords: "version release new latest check download install",
             changes: { modified: false, reset: () => {} },
@@ -483,31 +504,23 @@ export function SettingsDialog(props: {
           } satisfies Row
         ]),
       {
-        id: "autosave",
-        category: "general",
-        label: "Autosave",
-        description: "Coming later.",
-        disabled: true,
-        changes: { modified: false, reset: () => {} },
-        control: <Switch disabled checked={false} />
-      },
-      {
         id: "placeDistance",
         ...setting("editor", "placeDistance"),
         label: "Placement distance",
-        description:
-          "How far from the camera a new piece lands when the floor is out of reach. Wider pieces go further.",
+        description: "Where a piece lands with no floor in reach.",
+        info: "How far from the camera a new piece lands when the floor is out of reach. Wider pieces go further.",
         control: (
           <SliderControl
+            label="Placement distance"
+            unit="m"
+            scale={100}
             min={500}
             max={10000}
             step={100}
             largeStep={1000}
             value={settings.editor.placeDistance}
             onChange={(placeDistance) => update("editor", { placeDistance })}
-          >
-            {(settings.editor.placeDistance / 100).toFixed(0)} m
-          </SliderControl>
+          />
         )
       },
       {
@@ -526,8 +539,9 @@ export function SettingsDialog(props: {
         id: "fov",
         ...setting("camera", "fovPreset"),
         label: "Field of view",
-        description:
-          "The game's camera presets (from its camera settings). Only the field of view applies to the editor.",
+        description: "The game's camera presets.",
+        info: "From the game's camera settings. Only the field of view applies to the editor.",
+        keywords: "custom fov",
         control: (
           <Choice
             className="w-56"
@@ -537,42 +551,43 @@ export function SettingsDialog(props: {
           />
         )
       },
-      {
-        id: "customFov",
-        ...setting("camera", "customFov"),
-        label: "Custom field of view",
-        description: customFovOff
-          ? "Horizontal degrees. Choose the Custom preset to use it."
-          : "Horizontal degrees, used by the Custom preset (like the game).",
-        disabled: customFovOff,
-        control: (
-          <SliderControl
-            min={30}
-            max={140}
-            step={1}
-            value={c.customFov}
-            disabled={customFovOff}
-            onChange={(customFov) => update("camera", { customFov })}
-          >
-            {c.customFov}°
-          </SliderControl>
-        )
-      },
+      ...(c.fovPreset === CUSTOM_FOV_PRESET
+        ? [
+          {
+            id: "customFov",
+            ...setting("camera", "customFov"),
+            label: "Custom field of view",
+            description: "Horizontal, like the game's.",
+            control: (
+              <SliderControl
+                label="Custom field of view"
+                unit="°"
+                min={30}
+                max={140}
+                step={1}
+                value={c.customFov}
+                onChange={(customFov) => update("camera", { customFov })}
+              />
+            )
+          } satisfies Row
+        ]
+        : []),
       {
         id: "flySpeed",
         ...setting("camera", "flySpeed"),
         label: "Fly speed",
-        description: "Base camera speed. Camera speed up/down multiply it.",
+        description: "Camera speed up and down multiply it.",
         control: (
           <SliderControl
+            label="Fly speed"
+            unit="m/s"
+            scale={100}
             min={100}
             max={20000}
             step={100}
             value={c.flySpeed}
             onChange={(flySpeed) => update("camera", { flySpeed })}
-          >
-            {(c.flySpeed / 100).toFixed(0)} m/s
-          </SliderControl>
+          />
         )
       },
       {
@@ -581,14 +596,15 @@ export function SettingsDialog(props: {
         label: "Look sensitivity",
         control: (
           <SliderControl
+            label="Look sensitivity"
+            unit="×"
+            digits={1}
             min={0.1}
             max={5}
             step={0.1}
             value={c.lookSensitivity}
             onChange={(lookSensitivity) => update("camera", { lookSensitivity })}
-          >
-            ×{c.lookSensitivity.toFixed(1)}
-          </SliderControl>
+          />
         )
       },
       {
@@ -607,12 +623,13 @@ export function SettingsDialog(props: {
         id: "lockPointer",
         ...setting("camera", "lockPointer"),
         label: "Lock pointer while looking",
-        description:
-          "Hide the cursor and keep it in place while dragging the camera. Browsers show a notice on every lock, and Firefox on Linux turns slow diagonal looks into steps.",
+        description: "Hide the cursor while dragging the camera.",
+        info:
+          "Automatic locks it in the desktop app and not in a browser: browsers show a notice on every lock, and Firefox on Linux turns slow diagonal looks into steps.",
         control: (
           <Choice
             value={c.lockPointer}
-            items={{ desktop: "Desktop app only", always: "Always", never: "Never" }}
+            items={{ desktop: "Automatic", always: "Always", never: "Never" }}
             onChange={(v) => update("camera", { lockPointer: v })}
           />
         )
@@ -661,7 +678,7 @@ export function SettingsDialog(props: {
         id: "motion",
         ...setting("appearance", "motion"),
         label: "Animation speed",
-        description: "How fast panels, menus and tabs animate. Off skips every animation.",
+        description: "How fast panels, menus and tabs animate.",
         control: (
           <Choice
             value={a.motion}
@@ -673,14 +690,16 @@ export function SettingsDialog(props: {
       {
         id: "gridVisible",
         ...setting("appearance", "gridVisible"),
+        group: VIEWPORT,
         label: "Show grid",
         control: <Switch checked={a.gridVisible} onCheckedChange={(v) => update("appearance", { gridVisible: v })} />
       },
       {
         id: "gridCell",
         ...setting("appearance", "gridCellColor"),
+        group: VIEWPORT,
         label: "Grid colour (1 m cells)",
-        description: GRID_COLOR_DESCRIPTION,
+        description: gridColorDescription(a.gridCellColor),
         control: (
           <ColorSetting
             label="Grid colour (1 m cells)"
@@ -693,8 +712,9 @@ export function SettingsDialog(props: {
       {
         id: "gridSection",
         ...setting("appearance", "gridSectionColor"),
+        group: VIEWPORT,
         label: "Grid colour (10 m sections)",
-        description: GRID_COLOR_DESCRIPTION,
+        description: gridColorDescription(a.gridSectionColor),
         control: (
           <ColorSetting
             label="Grid colour (10 m sections)"
@@ -707,50 +727,42 @@ export function SettingsDialog(props: {
       {
         id: "waterVisible",
         ...setting("appearance", "waterVisible"),
+        group: VIEWPORT,
         label: "Show water",
-        description:
-          "The level's water surface. In game, pieces below it are hidden, and a ball that falls in respawns.",
+        description: "The level's water surface.",
+        info: "In game, pieces below it are hidden, and a ball that falls in respawns.",
         control: <Switch checked={a.waterVisible} onCheckedChange={(v) => update("appearance", { waterVisible: v })} />
       },
       {
         id: "mapLighting",
-        ...setting("lighting", "mapLighting"),
+        category: "appearance",
+        ...changesOf("lighting", "mapLighting"),
+        group: VIEWPORT,
         label: "Map lighting",
-        description:
-          "Light the viewport with the map's sun and sky (the inspector's Lighting section). Off: fixed studio lights.",
+        description: "Light the viewport with the map's sun and sky.",
+        info: "The inspector's Lighting section sets them. Off: fixed studio lights.",
         control: <Switch checked={l.mapLighting} onCheckedChange={(v) => update("lighting", { mapLighting: v })} />
       },
       {
         id: "skyVisible",
-        ...setting("lighting", "skyVisible"),
+        category: "appearance",
+        ...changesOf("lighting", "skyVisible"),
+        group: VIEWPORT,
         label: "Show sky",
-        description: "The game's sky with the map's sun in it. Off: the theme's background.",
+        description: "The game's sky with the map's sun in it.",
+        info: "Off: the theme's background.",
         control: <Switch checked={l.skyVisible} onCheckedChange={(v) => update("lighting", { skyVisible: v })} />
       },
-      ...(hasGame
-        ? [
-          {
-            id: "gameLink",
-            category: "game",
-            label: "Game link",
-            description: gameLinkSummary,
-            keywords:
-              "steam proton install folder path UserSavedMaps maps plugins plugin manager ballest-editor-link editor plugin play update version",
-            wide: true,
-            changes: { modified: overridden.length > 0, reset: () => void resetGamePaths(overridden) },
-            // Check again where the reset goes: each chosen folder has its own reset, and so does the footer.
-            action: <CheckAgainButton size="xs" />,
-            control: <GameLinkRows framed={false} />
-          } satisfies Row
-        ]
-        : [])
+      ...(hasGame ? gameRows : [])
     ]
   })()
 
   const resetCategory = (category: SettingsCategory) => {
     if (category === "keybinds") void resetKeybinds()
     else if (category === "game") void resetGamePaths(overridden)
-    else void saveSettings({ ...settings, [category]: defaultSettings[category] })
+    else if (category === "appearance") {
+      void saveSettings({ ...settings, appearance: defaultSettings.appearance, lighting: defaultSettings.lighting })
+    } else void saveSettings({ ...settings, [category]: defaultSettings[category] })
   }
   return (
     <SettingsShell
@@ -763,6 +775,7 @@ export function SettingsDialog(props: {
       onCategoryChange={props.onCategoryChange}
       rows={rows}
       onResetCategory={resetCategory}
+      footerAction={props.category === "game" && <CheckAgainButton />}
       busy={listening !== null}
     />
   )

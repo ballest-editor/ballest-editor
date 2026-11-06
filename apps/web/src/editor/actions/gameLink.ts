@@ -3,11 +3,14 @@
  * editor's plugin, looked up at startup and on request; the notifications for what changed; Launch game.
  */
 import { Effect, Option } from "effect"
+import { creatorOf } from "../../domain/creator"
 import {
+  anythingMissing,
   exportReady,
   gameLinkChanges,
   type GameLinkResult,
   gameLinkResultOf,
+  gameLinkRows,
   PLUGIN_MISSING,
   sameGameLinkResult
 } from "../../domain/gameLink"
@@ -78,10 +81,10 @@ const noteGameLink = Effect.gen(function*() {
 
 /**
  * The startup check behind the Game link (desktop): looks up the game's folders and the plugin, and notifies only
- * what changed since the last launch (none on the first, when the checklist itself is in front of the user).
- * Persistent notices (game not found, plugin manager missing) stay pinned until their cause goes away. The Game link
- * dialog opens by itself on the first launch, and whenever a folder Export needs is missing; the plugin manager, which
- * only Play needs, never opens it.
+ * what changed since the last launch (none on the first). Persistent notices (game not found, plugin manager missing)
+ * stay pinned until their cause goes away. The Game link dialog opens by itself whenever a folder Export needs is
+ * missing, and on the first launch if anything else is; with everything found nothing shows, and the plugin manager,
+ * which only Play needs, never opens it.
  */
 export const checkGameLinkEffect = Effect.gen(function*() {
   const platform = yield* Platform
@@ -95,7 +98,9 @@ export const checkGameLinkEffect = Effect.gen(function*() {
   const current = gameLinkResultOf(paths, plugin)
   reportGameLink(memory.last, current)
   yield* rememberGameLink(current)
-  if (memory.last === null || !exportReady(paths)) useEditor.getState().openDialog({ id: "gameLink" })
+  const { foundCreator, openDialog, settings } = useEditor.getState()
+  const rows = gameLinkRows(paths, plugin, creatorOf(settings.general.creatorName, foundCreator))
+  if (!exportReady(paths) || (memory.last === null && anythingMissing(rows))) openDialog({ id: "gameLink" })
 }).pipe(Effect.catch((error) => Effect.logWarning("Couldn't check the Game link", error)))
 
 /** Runs a lookup that may return the game's folders (none: the user cancelled) and shows them, and the plugin. */

@@ -17,7 +17,7 @@ export function VersionStatus() {
   )
 }
 
-/** Settings › General's updates row: its text and its button. Null in a browser. */
+/** Settings › General's version row: its text and its button. Null in a browser. */
 export function useUpdateCheck() {
   const state = useUpdateState()
   const checked = useEditor((s) => s.updateChecked)

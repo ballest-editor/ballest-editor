@@ -1,8 +1,8 @@
 /**
- * The Game link checklist (docs/PROJECTS.md § Shell; on desktop, File › Game link… and the Settings › Game page): the
- * game's install, its maps folder, the creator name, the plugin manager and the editor's plugin, each found or not,
- * with the fix for a missing one and, for a folder, Change… and reset. And what changed since the last launch, which
- * is what the notification centre is told about.
+ * The Game link checklist (docs/PROJECTS.md § Shell; on desktop, the Settings › Game page, and the short dialog when
+ * something is missing): the game's install, its maps folder, the creator name, the plugin manager and the editor's
+ * plugin, each found or not, with the fix for a missing one and, for a folder, Change… and reset. And what changed
+ * since the last launch, which is what the notification centre is told about.
  */
 import { Option } from "effect"
 import { type Creator, creatorProblem, foundCreatorLabel } from "./creator"
@@ -71,6 +71,8 @@ export interface GameLinkRow {
   readonly state: GameLinkRowState
   /** What was found, or what is wrong. */
   readonly title: string
+  /** The one line Settings › Game shows ("Found", "Not found"): the title, unless a shorter word says the same. */
+  readonly status: string
   /** A second line: how it was found, or how to fix it. */
   readonly note: string | null
   /** The folder it is in, when it has one. */
@@ -93,6 +95,7 @@ const row = (
   id,
   label,
   short: label.toLowerCase(),
+  status: fields.title,
   note: null,
   path: null,
   reveal: null,
@@ -108,6 +111,7 @@ const folderThere = (paths: GameFolders, which: GameFolderKind, found: string) =
   const folder = paths[which]
   const overridden = folder.status === "overridden"
   return {
+    status: overridden ? "Chosen here" : "Found",
     note: overridden ? "Chosen here instead of the one Steam knows about." : found,
     path: folder.path,
     reveal: which,
@@ -129,6 +133,7 @@ const installRow = (paths: GameFolders | null): GameLinkRow => {
   return row("install", "Game", {
     state: "missing",
     title: "Couldn't find Ballest of Them All",
+    status: "Not found",
     note:
       "Steam doesn't list it in any of its libraries. Choose the folder that holds Ballest/Binaries/Win64/Ballest-Win64-Shipping.exe.",
     fixes: [choose("install")]
@@ -149,6 +154,7 @@ const mapsRow = (paths: GameFolders | null): GameLinkRow => {
       ? {
         state: "missing",
         title: "Couldn't work out where the game keeps its maps",
+        status: "Not found",
         note: "Choose its UserSavedMaps folder.",
         fixes: [choose("mapsFolder")]
       }
@@ -201,7 +207,11 @@ const pluginManagerRow = (paths: GameFolders | null, plugin: PluginLookup | null
   const { pluginsFolder } = paths
   switch (plugin.status) {
     case "noGame":
-      return row("pluginManager", label, { state: "waiting", title: "Looked for once the game is found" })
+      return row("pluginManager", label, {
+        state: "waiting",
+        title: "Looked for once the game is found",
+        reset: pluginsFolder.status === "overridden" ? "pluginsFolder" : null
+      })
     case "noPluginManager": {
       const docs: GameLinkFix = { _tag: "OpenPluginDocs" }
       const why = "Play races the open map through it; Export doesn't need it."
@@ -261,6 +271,7 @@ const pluginRow = (plugin: PluginLookup | null): GameLinkRow => {
         return {
           state: "ok",
           title: `ballest-editor-link ${plugin.installedVersion}`,
+          status: `Version ${plugin.installedVersion}`,
           note: "Play races the open map in the game through it.",
           path: plugin.folder
         }
@@ -367,7 +378,7 @@ const pluginManagerBack: GameLinkNotice = {
 
 /**
  * What to tell the notification centre about `current`, given what the last launch found (`previous`; null on the
- * first launch, when the checklist itself is in front of the user and nothing is notified). `resolve`: the persistent
+ * first launch, when nothing is notified: the Game link dialog says what is missing). `resolve`: the persistent
  * kinds whose cause has gone away. The plugin manager is reported only while the game is found both times: without
  * the game it can't be looked for, and the game's own notice says so.
  */

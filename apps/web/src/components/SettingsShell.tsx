@@ -1,4 +1,4 @@
-import { type Icon, IconRestore, IconSearch } from "@tabler/icons-react"
+import { type Icon, IconInfoCircle, IconRestore, IconSearch } from "@tabler/icons-react"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -20,8 +20,12 @@ export interface SettingsRow<C extends string> {
   readonly category: C
   readonly group?: string
   readonly label: string
-  /** Under the label; a string is searched too, a node (a path on its own line) needs `keywords` for that. */
+  /** One short line under the label; a string is searched too, a node needs `keywords` for that. */
   readonly description?: ReactNode
+  /** The mechanics behind the short line, in the tooltip of an info icon beside the label; a string is searched too. */
+  readonly info?: ReactNode
+  /** A status icon before the label. The control then sits on the label's line, not centred on the row. */
+  readonly icon?: ReactNode
   /** Description shown as a hover tooltip on the label instead of under it. */
   readonly tooltip?: boolean
   /** More text the search matches (e.g. the choices inside the control). */
@@ -72,10 +76,31 @@ function ResetButton({ modified, reset }: NonNullable<SettingsRow<string>["chang
   )
 }
 
+function InfoTip({ label, children }: { readonly label: string; readonly children: ReactNode }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" className="-my-0.5 text-fg-tertiary" aria-label={`About ${label}`} />
+        }
+      >
+        <IconInfoCircle />
+      </TooltipTrigger>
+      <TooltipContent side="right" className="max-w-xs">{children}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 function RowView({ row }: { readonly row: SettingsRow<string> }) {
-  const label = (
+  const name = (
     <span className={cn("text-body-strong", row.disabled && "text-fg-disabled")}>
       {row.label}
+    </span>
+  )
+  const label = row.info == null ? name : (
+    <span className="flex items-center gap-0.5">
+      {name}
+      <InfoTip label={row.label}>{row.info}</InfoTip>
     </span>
   )
   const text = (
@@ -138,8 +163,13 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
           </>
         )
         : (
-          <div className="flex min-h-7 items-center gap-6">
-            {text}
+          <div className={cn("flex min-h-7 gap-6", row.icon == null ? "items-center" : "items-start")}>
+            {row.icon == null ? text : (
+              <div className="flex min-w-0 flex-1 items-start gap-2">
+                {row.icon}
+                {text}
+              </div>
+            )}
             <div className="flex shrink-0 items-center gap-2">
               {row.control}
               {trailing}
@@ -167,6 +197,8 @@ export function SettingsShell<C extends string>(props: {
   readonly rows: ReadonlyArray<SettingsRow<C>>
   /** Resets the shown category; without it the footer has no reset button. */
   readonly onResetCategory?: (category: C) => void
+  /** What the shown category adds to the footer, before Done (Check again); searching shows no category, so not then. */
+  readonly footerAction?: ReactNode
   /** Keeps the dialog open and Done disabled (e.g. while a keybind is being captured). */
   readonly busy?: boolean
 }) {
@@ -179,9 +211,9 @@ export function SettingsShell<C extends string>(props: {
   const searching = terms.length > 0
   const matches = (r: SettingsRow<C>) =>
     terms.every((t) =>
-      `${r.label} ${typeof r.description === "string" ? r.description : ""} ${r.group ?? ""} ${r.keywords ?? ""} ${
-        labelOf(r.category)
-      }`
+      `${r.label} ${typeof r.description === "string" ? r.description : ""} ${
+        typeof r.info === "string" ? r.info : ""
+      } ${r.group ?? ""} ${r.keywords ?? ""} ${labelOf(r.category)}`
         .toLowerCase()
         .includes(t)
     )
@@ -321,14 +353,18 @@ export function SettingsShell<C extends string>(props: {
           >
             {onResetCategory !== undefined && (
               <Button
-                variant="outline"
+                variant="ghost"
+                className="text-fg-secondary"
                 onClick={() => onResetCategory(props.category)}
                 disabled={searching || !modifiedIn(props.category)}
               >
                 Reset {labelOf(props.category).toLowerCase()} to defaults
               </Button>
             )}
-            <Button onClick={props.onClose} disabled={props.busy === true}>Done</Button>
+            <div className="flex items-center gap-2">
+              {!searching && props.footerAction}
+              <Button onClick={props.onClose} disabled={props.busy === true}>Done</Button>
+            </div>
           </div>
         </div>
       </DialogContent>

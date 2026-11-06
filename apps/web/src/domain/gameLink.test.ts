@@ -72,7 +72,8 @@ describe("Game link checklist", () => {
       reveal: "pluginsFolder",
       fixes: [{ _tag: "ChooseFolder", which: "pluginsFolder" }]
     })
-    assert.deepInclude(editorPlugin, { title: "ballest-editor-link 0.2.0", fixes: [] })
+    assert.deepInclude(editorPlugin, { title: "ballest-editor-link 0.2.0", status: "Version 0.2.0", fixes: [] })
+    assert.deepStrictEqual([install.status, mapsFolder.status, pluginManager.status], ["Found", "Found", "Found"])
     assert.deepStrictEqual(overriddenFolders(everything), [])
   })
 
@@ -94,11 +95,22 @@ describe("Game link checklist", () => {
     assert.deepInclude(install, {
       state: "missing",
       title: "Couldn't find Ballest of Them All",
+      status: "Not found",
       fixes: [{ _tag: "ChooseFolder", which: "install" }]
     })
     assert.deepInclude(mapsFolder, { state: "waiting", fixes: [] })
-    assert.deepInclude(pluginManager, { state: "waiting", fixes: [] })
+    assert.deepInclude(pluginManager, { state: "waiting", reset: null, fixes: [] })
     assert.deepInclude(editorPlugin, { state: "waiting", fixes: [] })
+  })
+
+  it("without the game can still reset a plugins folder chosen here", () => {
+    const paths: GameFolders = {
+      install: { status: "missing", path: null },
+      mapsFolder: { status: "missing", path: null },
+      pluginsFolder: { status: "overridden", path: PLUGINS }
+    }
+    const { pluginManager } = byId(gameLinkRows(paths, plugin("noGame"), isaac))
+    assert.deepInclude(pluginManager, { state: "waiting", reset: "pluginsFolder" })
   })
 
   it("with the game but no maps folder yet says to run the game once", () => {
@@ -106,6 +118,7 @@ describe("Game link checklist", () => {
     assert.deepInclude(byId(gameLinkRows(paths, plugin("current", "0.2.0"), isaac)).mapsFolder, {
       state: "missing",
       title: "Run the game once to create its maps folder",
+      status: "Run the game once to create its maps folder",
       reveal: null,
       fixes: [{ _tag: "ChooseFolder", which: "mapsFolder" }]
     })

@@ -5,22 +5,25 @@ import { type Creator, creatorProblem, type FoundCreator, foundCreatorLabel } fr
 import type { SettingsCategory } from "../editor/store"
 import type { SettingsRow } from "./SettingsShell"
 
-const ABOUT = "Your in-game name. Written into every exported map and its file name (letters, digits and spaces)."
+const ABOUT = "Written into every exported map and its file name (letters, digits and spaces)."
 
 const USE_FOUND = { steam: "Use Steam name", mapsFolder: "Use name from maps" } as const
 
-/** Where the name in use came from, then what it is for. */
-const describe = (creator: Creator, found: Option.Option<FoundCreator>): string => {
+/** The row's line, where the name in use came from, and its info: what the name is for, and the one found instead. */
+const describe = (creator: Creator, found: Option.Option<FoundCreator>) => {
   if (creator.source === "steam" || creator.source === "mapsFolder") {
-    return `${foundCreatorLabel(creator.source)}. ${ABOUT}`
+    return { description: foundCreatorLabel(creator.source), info: ABOUT }
   }
-  return Option.match(found, {
-    onNone: () => ABOUT,
-    onSome: ({ name, source }) =>
-      creator.source === "user" && creator.name !== name
-        ? `${ABOUT} ${foundCreatorLabel(source)}: ${name}.`
-        : ABOUT
-  })
+  return {
+    description: "Your in-game name.",
+    info: Option.match(found, {
+      onNone: () => ABOUT,
+      onSome: ({ name, source }) =>
+        creator.source === "user" && creator.name !== name
+          ? `${ABOUT} ${foundCreatorLabel(source)}: ${name}.`
+          : ABOUT
+    })
+  }
 }
 
 /**
@@ -43,7 +46,7 @@ export const creatorSettingsRow = (props: {
     id: "creatorName",
     category: "general",
     label: "Creator name",
-    description: describe(creator, found),
+    ...describe(creator, found),
     keywords: "steam persona in-game name",
     changes: { modified: typed, reset: () => onChange(null) },
     ...(typed && Option.isSome(found)
