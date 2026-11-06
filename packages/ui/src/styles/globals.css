@@ -9,92 +9,114 @@
 @source "../../../components/**/*.{ts,tsx}";
 @source "../**/*.{ts,tsx}";
 
+/*
+ * Colour: docs/design/ui-system.md § Colour says where each value comes from in the game and what each token is for.
+ * Surfaces get lighter as they rise, in both themes: --background, --card, --popover.
+ */
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.141 0.005 285.823);
-    /* Chrome (panels, strips, bars) sits a step below the page, as the dark theme's card does, so the shell reads as
-     * chrome around the content rather than one white sheet. Hovers are a step below that. */
-    --card: oklch(0.975 0.001 286.375);
-    --card-foreground: oklch(0.141 0.005 285.823);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.141 0.005 285.823);
-    --primary: oklch(0.488 0.243 264.376);
-    --primary-foreground: oklch(0.97 0.014 254.604);
-    --secondary: oklch(0.945 0.002 286.375);
-    --secondary-foreground: oklch(0.21 0.006 285.885);
-    --muted: oklch(0.945 0.002 286.375);
+    /* Daylight: paper and sand, inked in the stadium's navy. */
+    --background: oklch(0.925 0.024 86);
+    --foreground: oklch(0.25 0.075 272);
+    --card: oklch(0.965 0.015 88);
+    --card-foreground: oklch(0.25 0.075 272);
+    --popover: oklch(0.995 0.005 90);
+    --popover-foreground: oklch(0.25 0.075 272);
+    --primary: oklch(0.64 0.137 72);
+    --primary-foreground: oklch(0.22 0.07 272);
+    --secondary: oklch(0.905 0.035 225);
+    --secondary-foreground: oklch(0.3 0.08 255);
+    --muted: oklch(0.915 0.024 86);
     /* Text below --foreground, one step each: docs/design/ui-system.md. */
-    --fg-secondary: oklch(0.4 0.012 286);
-    --fg-tertiary: oklch(0.52 0.012 286);
-    --fg-disabled: oklch(0.72 0.012 286);
-    --accent: oklch(0.945 0.002 286.375);
-    --accent-foreground: oklch(0.21 0.006 285.885);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.85 0.004 286.32);
-    --input: oklch(0.92 0.004 286.32);
-    --ring: oklch(0.705 0.015 286.067);
-    --chart-1: oklch(0.809 0.105 251.813);
-    --chart-2: oklch(0.623 0.214 259.815);
-    --chart-3: oklch(0.546 0.245 262.881);
-    --chart-4: oklch(0.488 0.243 264.376);
-    --chart-5: oklch(0.424 0.199 265.638);
-    --sidebar: oklch(0.975 0.001 286.375);
-    --sidebar-foreground: oklch(0.141 0.005 285.823);
-    --sidebar-primary: oklch(0.546 0.245 262.881);
-    --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
-    --sidebar-accent: oklch(0.945 0.002 286.375);
-    --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-    --sidebar-border: oklch(0.9 0.004 286.32);
-    --sidebar-ring: oklch(0.705 0.015 286.067);
-    /* Sync status badges: an opaque fill and the text on it (docs/design/ui-system.md). Placeholders for the palette. */
-    --status-ok: oklch(0.92 0.05 165);
-    --status-ok-foreground: oklch(0.432 0.095 166.913);
-    --status-warn: oklch(0.93 0.06 85);
-    --status-warn-foreground: oklch(0.473 0.137 46.201);
-    --status-neutral: var(--muted);
-    --status-neutral-foreground: var(--foreground);
+    --fg-secondary: oklch(0.39 0.06 272);
+    --fg-tertiary: oklch(0.5 0.05 272);
+    --fg-disabled: oklch(0.71 0.03 272);
+    --accent: oklch(0.64 0.09 210);
+    --accent-foreground: oklch(0.25 0.075 272);
+    --destructive: oklch(0.5 0.186 27);
+    --border: oklch(0.84 0.028 84);
+    --input: oklch(0.82 0.03 84);
+    --ring: oklch(0.54 0.102 226);
+    --chart-1: oklch(0.54 0.102 226);
+    --chart-2: oklch(0.36 0.115 273);
+    --chart-3: oklch(0.64 0.137 72);
+    --chart-4: oklch(0.5 0.186 27);
+    --chart-5: oklch(0.5 0.099 170);
+    --sidebar: oklch(0.965 0.015 88);
+    --sidebar-foreground: oklch(0.25 0.075 272);
+    --sidebar-primary: oklch(0.64 0.137 72);
+    --sidebar-primary-foreground: oklch(0.22 0.07 272);
+    --sidebar-accent: oklch(0.64 0.09 210);
+    --sidebar-accent-foreground: oklch(0.25 0.075 272);
+    --sidebar-border: oklch(0.84 0.028 84);
+    --sidebar-ring: oklch(0.54 0.102 226);
+    /* An opaque fill, and text that reads on that fill and on the bare surfaces too (Settings › Game has no fill). */
+    --status-ok: oklch(0.9 0.06 172);
+    --status-ok-foreground: oklch(0.43 0.083 172);
+    --status-warn: oklch(0.91 0.07 72);
+    --status-warn-foreground: oklch(0.47 0.125 50);
+    --status-neutral: oklch(0.89 0.03 240);
+    --status-neutral-foreground: oklch(0.42 0.06 262);
+    --difficulty-1: oklch(0.25 0.075 272);
+    --difficulty-2: oklch(0.56 0.138 155);
+    --difficulty-3: oklch(0.5 0.165 255);
+    --difficulty-4: oklch(0.54 0.21 25);
+    --difficulty-5: oklch(0.64 0.133 78);
+    --size-s: oklch(0.5 0.1 232);
+    --size-m: oklch(0.5 0.12 295);
+    --size-l: oklch(0.52 0.16 20);
+    --shadow-tint: oklch(0.36 0.09 273 / 18%);
 }
 
 .dark {
-    --background: oklch(0.141 0.005 285.823);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.21 0.006 285.885);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.21 0.006 285.885);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.424 0.199 265.638);
-    --primary-foreground: oklch(0.97 0.014 254.604);
-    --secondary: oklch(0.274 0.006 286.033);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.274 0.006 286.033);
-    --fg-secondary: oklch(0.8 0.012 286);
-    --fg-tertiary: oklch(0.66 0.012 286);
-    --fg-disabled: oklch(0.48 0.012 286);
-    --accent: oklch(0.274 0.006 286.033);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.552 0.016 285.938);
-    --chart-1: oklch(0.809 0.105 251.813);
-    --chart-2: oklch(0.623 0.214 259.815);
-    --chart-3: oklch(0.546 0.245 262.881);
-    --chart-4: oklch(0.488 0.243 264.376);
-    --chart-5: oklch(0.424 0.199 265.638);
-    --sidebar: oklch(0.21 0.006 285.885);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.623 0.214 259.815);
-    --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
-    --sidebar-accent: oklch(0.274 0.006 286.033);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.552 0.016 285.938);
-    --status-ok: oklch(0.3 0.05 165);
-    --status-ok-foreground: oklch(0.845 0.143 164.978);
-    --status-warn: oklch(0.31 0.05 75);
-    --status-warn-foreground: oklch(0.879 0.169 91.605);
-    --status-neutral: var(--muted);
-    --status-neutral-foreground: var(--foreground);
+    /* Night at the stadium: the navy under the stands, the goal's yellow. */
+    --background: oklch(0.2 0.065 270);
+    --foreground: oklch(0.97 0.01 260);
+    --card: oklch(0.245 0.055 271);
+    --card-foreground: oklch(0.97 0.01 260);
+    --popover: oklch(0.29 0.058 272);
+    --popover-foreground: oklch(0.97 0.01 260);
+    --primary: oklch(0.86 0.17 90);
+    --primary-foreground: oklch(0.22 0.07 272);
+    --secondary: oklch(0.355 0.065 262);
+    --secondary-foreground: oklch(0.97 0.01 260);
+    --muted: oklch(0.32 0.058 270);
+    --fg-secondary: oklch(0.87 0.025 262);
+    --fg-tertiary: oklch(0.75 0.04 262);
+    --fg-disabled: oklch(0.54 0.045 266);
+    --accent: oklch(0.5 0.085 210);
+    --accent-foreground: oklch(0.985 0.006 210);
+    --destructive: oklch(0.72 0.17 25);
+    --border: oklch(0.75 0.07 262 / 16%);
+    --input: oklch(0.75 0.07 262 / 22%);
+    --ring: oklch(0.72 0.13 235);
+    --chart-1: oklch(0.72 0.13 235);
+    --chart-2: oklch(0.86 0.17 90);
+    --chart-3: oklch(0.8 0.12 172);
+    --chart-4: oklch(0.72 0.17 25);
+    --chart-5: oklch(0.66 0.12 290);
+    --sidebar: oklch(0.245 0.055 271);
+    --sidebar-foreground: oklch(0.97 0.01 260);
+    --sidebar-primary: oklch(0.86 0.17 90);
+    --sidebar-primary-foreground: oklch(0.22 0.07 272);
+    --sidebar-accent: oklch(0.5 0.085 210);
+    --sidebar-accent-foreground: oklch(0.985 0.006 210);
+    --sidebar-border: oklch(0.75 0.07 262 / 16%);
+    --sidebar-ring: oklch(0.72 0.13 235);
+    --status-ok: oklch(0.36 0.07 172);
+    --status-ok-foreground: oklch(0.86 0.12 172);
+    --status-warn: oklch(0.38 0.08 58);
+    --status-warn-foreground: oklch(0.86 0.112 72);
+    --status-neutral: oklch(0.37 0.05 255);
+    --status-neutral-foreground: oklch(0.86 0.04 250);
+    --difficulty-1: oklch(0.97 0.01 260);
+    --difficulty-2: oklch(0.72 0.16 155);
+    --difficulty-3: oklch(0.68 0.15 248);
+    --difficulty-4: oklch(0.66 0.22 24);
+    --difficulty-5: oklch(0.9 0.18 98);
+    --size-s: oklch(0.78 0.1 232);
+    --size-m: oklch(0.78 0.1 295);
+    --size-l: oklch(0.78 0.12 20);
+    --shadow-tint: oklch(0.1 0.05 272 / 55%);
 }
 
 @theme inline {
@@ -137,6 +159,19 @@
     --color-status-warn-foreground: var(--status-warn-foreground);
     --color-status-neutral: var(--status-neutral);
     --color-status-neutral-foreground: var(--status-neutral-foreground);
+    --color-difficulty-1: var(--difficulty-1);
+    --color-difficulty-2: var(--difficulty-2);
+    --color-difficulty-3: var(--difficulty-3);
+    --color-difficulty-4: var(--difficulty-4);
+    --color-difficulty-5: var(--difficulty-5);
+    --color-size-s: var(--size-s);
+    --color-size-m: var(--size-m);
+    --color-size-l: var(--size-l);
+    /* Elevation: the tint is the theme's, so a shadow on navy is deeper navy rather than grey. */
+    --shadow-sm: 0 1px 2px var(--shadow-tint);
+    --shadow-md: 0 4px 12px -2px var(--shadow-tint), 0 2px 4px -2px var(--shadow-tint);
+    --shadow-lg: 0 10px 24px -6px var(--shadow-tint), 0 4px 8px -4px var(--shadow-tint);
+    --shadow-2xl: 0 24px 56px -12px var(--shadow-tint);
     --font-sans: 'Manrope Variable', sans-serif;
     /* Bundled, so numbers sit the same on every machine (system mono fonts differ in their vertical metrics). */
     --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -201,26 +236,6 @@
   --animate-out: exit var(--tw-animation-duration, var(--tw-duration, calc(0.15s * var(--motion)))) var(--tw-ease, ease)
     var(--tw-animation-delay, 0s) var(--tw-animation-iteration-count, 1) var(--tw-animation-direction, normal)
     var(--tw-animation-fill-mode, none);
-}
-
-/*
- * The five Workshop difficulties, easiest first: bars 1 to 4 and Baller's warning sign. The same in both themes, except
- * that the first follows the text colour.
- */
-:root {
-  --difficulty-1: var(--foreground);
-  --difficulty-2: oklch(76.5% 0.177 163.223);
-  --difficulty-3: oklch(54.6% 0.245 262.881);
-  --difficulty-4: oklch(57.7% 0.245 27.325);
-  --difficulty-5: oklch(85.2% 0.199 91.936);
-}
-
-@theme inline {
-  --color-difficulty-1: var(--difficulty-1);
-  --color-difficulty-2: var(--difficulty-2);
-  --color-difficulty-3: var(--difficulty-3);
-  --color-difficulty-4: var(--difficulty-4);
-  --color-difficulty-5: var(--difficulty-5);
 }
 
 @utility duration-* {

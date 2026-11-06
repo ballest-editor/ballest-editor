@@ -1,5 +1,5 @@
 /** The viewport's clear colour per theme: the ground under the grid, and all an orthographic pane shows behind it. */
-export const SCENE_COLORS = { dark: "#18242d", light: "#c8dbe8" } as const
+export const SCENE_COLORS = { dark: "#12283a", light: "#c8dbe8" } as const
 
 const channelsOf = (hex: string): ReadonlyArray<number> => [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16))
 

@@ -5,9 +5,9 @@ export const GROUP_BOX_COLORS = { dark: "#ff3dc8", light: "#c2129a" } as const
 
 /** The sky a perspective pane draws when the map's own is hidden: never a flat band above the floor. */
 export const THEME_SKY_COLORS = {
-  dark: { zenith: "#10141b", horizon: "#3f4b5c" },
-  light: { zenith: "#8db6e2", horizon: "#f7f9fb" }
+  dark: { zenith: "#0e1330", horizon: "#3d4f80" },
+  light: { zenith: "#7fb4e0", horizon: "#fbf4e6" }
 } as const
 
 /** The same as Tailwind classes, spelled out so Tailwind picks them up: what shows before and around the canvas. */
-export const sceneBackgroundClass = "bg-[#c8dbe8] dark:bg-[#18242d]"
+export const sceneBackgroundClass = "bg-[#c8dbe8] dark:bg-[#12283a]"
