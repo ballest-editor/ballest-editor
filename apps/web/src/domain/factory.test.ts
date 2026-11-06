@@ -10,6 +10,7 @@ import {
   newMapFile,
   placementTransform,
   qualifyMaterialPath,
+  savableNameOf,
   untitledNameOf
 } from "./factory"
 import { DEFAULT_GOAL, DEFAULT_PLAYER_START } from "./level"
@@ -119,6 +120,13 @@ describe("factory", () => {
 })
 
 describe("names a new map or project goes by", () => {
+  it("a name that can't be saved loses what the rule doesn't allow", () => {
+    assert.strictEqual(savableNameOf("asdf (backup)"), "asdf backup")
+    assert.strictEqual(savableNameOf("asdf (backup) 2"), "asdf backup 2")
+    assert.strictEqual(savableNameOf("Big Loop"), "Big Loop")
+    assert.strictEqual(savableNameOf(" (!) "), "")
+  })
+
   it("Untitled, then the lowest number the open tabs leave free", () => {
     assert.strictEqual(untitledNameOf(new Set()), "Untitled")
     assert.strictEqual(untitledNameOf(new Set(["Big Loop"])), "Untitled")
