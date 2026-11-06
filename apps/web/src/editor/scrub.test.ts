@@ -6,9 +6,9 @@ import type { UeTransform, Vec3 } from "../domain/coords"
 import { placementTransform } from "../domain/factory"
 import { applyGroupDelta, type Axis, readField, selectionAxisEdit, type TransformField } from "../domain/groupTransform"
 import { localToWorld } from "../domain/pivot"
-import { quatConjugate, quatMul, rotateVec, rotatorToQuat } from "../domain/ueMath"
+import { quatConjugate, quatMul, rotateVec, rotatorToQuat, vecAdd } from "../domain/ueMath"
 import { editSelectionAxis, previewSelectionAxis, setSelectionField, setSelectionPivot } from "./actions"
-import { initialMap, pivotOf, shownPivotPoint, shownTransform, useEditor } from "./store"
+import { initialMap, pivotOf, selectionPivot, shownPivotPoint, shownTransform, useEditor } from "./store"
 
 const catalog = Schema.decodeUnknownSync(Catalog)(fixture)
 const cube = catalog.pieces.find((p) => p.className === "BP_Prim_Cube")!
@@ -43,6 +43,14 @@ const sameTransform = (a: UeTransform, b: UeTransform, message: string) => {
   expectVec(a.scale3D, b.scale3D, `${message} scale`)
   for (const v of [{ x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }]) {
     expectVec(rotateVec(a.rotation, v), rotateVec(b.rotation, v), `${message} rotation`)
+  }
+}
+
+/** Every item in `before` swung a quarter turn about `pivot` (yaw is a turn about game Z: heights stay). */
+const expectQuarterTurnAbout = (before: ReadonlyMap<string, UeTransform>, pivot: Vec3) => {
+  for (const [id, from] of before) {
+    const d0 = { x: from.translation.x - pivot.x, y: from.translation.y - pivot.y }
+    expectVec(docTransform(id).translation, { x: pivot.x - d0.y, y: pivot.y + d0.x, z: from.translation.z }, id)
   }
 }
 
@@ -112,13 +120,7 @@ describe("scrubbing a transform field over a turned multi-selection (#43)", () =
   it("turns the selection rigidly about the active item, like the gizmo", () => {
     const { ids, before } = setup()
     editSelectionAxis("rotation", "z", { kind: "offset", by: 90 })
-    const pivot = before.get(ids.at(-1)!)!.translation
-    for (const id of ids) {
-      const [from, to] = [before.get(id)!, docTransform(id)]
-      // yaw is a turn about game Z: offsets from the pivot rotate by 90 degrees, heights stay
-      const d0 = { x: from.translation.x - pivot.x, y: from.translation.y - pivot.y }
-      expectVec(to.translation, { x: pivot.x - d0.y, y: pivot.y + d0.x, z: from.translation.z }, id)
-    }
+    expectQuarterTurnAbout(before, before.get(ids.at(-1)!)!.translation)
     // the active item turns in place and only its yaw changes
     const active = docTransform(ids.at(-1)!)
     expectVec(readField(active, "rotation"), { x: 5, y: -15, z: -150 }, "active rotator")
@@ -174,22 +176,92 @@ describe("scrubbing with pivots (#51)", () => {
     }
   })
 
-  it("sets rotation about each item's own pivot", () => {
+  it("takes a typed value as the change from the active item, rigid about its pivot, as the game does", () => {
+    // docs/qa/joins-and-typed-rotation.md: typing a yaw turns every piece by the change about the active pivot
+    const { ids, before } = withPivots()
+    const activeId = ids.at(-1)!
+    const pivot = pivotPoint(activeId, before.get(activeId))
+    const yaw = readField(before.get(activeId)!, "rotation").z
+    editSelectionAxis("rotation", "z", { kind: "set", value: yaw + 90 })
+    expectVec(pivotPoint(activeId), pivot, "active pivot")
+    // the rotator wraps past 180, as the game's panel does (225 typed into 0 reads -135)
+    assert.closeTo((readField(docTransform(activeId), "rotation").z - (yaw + 90) + 720) % 360, 0, 1e-6)
+    expectQuarterTurnAbout(before, pivot)
+    // a typed location moves every item by the change; only a pasted row sets them all
+    const z = before.get(activeId)!.translation.z
+    editSelectionAxis("translation", "z", { kind: "set", value: z + 70 })
+    for (const id of ids) assert.closeTo(docTransform(id).translation.z, before.get(id)!.translation.z + 70, 1e-6)
+    setSelectionField("translation", { x: 1, y: 2, z: 3 })
+    for (const id of ids) expectVec(docTransform(id).translation, { x: 1, y: 2, z: 3 }, id)
+  })
+
+  it("pastes a rotation about each item's own pivot", () => {
     const { ids } = withPivots()
-    const where = () => new Map(ids.map((id) => [id, pivotPoint(id)]))
-    for (
-      const edit of [
-        () => editSelectionAxis("rotation", "x", { kind: "set", value: 30 }),
-        () => setSelectionField("rotation", { x: 10, y: 20, z: 30 })
-      ]
-    ) {
-      const before = where()
-      edit()
-      for (const id of ids) expectVec(pivotPoint(id), before.get(id)!, id)
+    const before = new Map(ids.map((id) => [id, pivotPoint(id)]))
+    setSelectionField("rotation", { x: 10, y: 20, z: 30 })
+    for (const id of ids) {
+      expectVec(pivotPoint(id), before.get(id)!, id)
+      expectVec(readField(docTransform(id), "rotation"), { x: 10, y: 20, z: 30 }, id)
     }
-    // a typed location still sets the origin
-    editSelectionAxis("translation", "z", { kind: "set", value: 70 })
-    for (const id of ids) assert.strictEqual(docTransform(id).translation.z, 70)
+  })
+})
+
+describe("a whole group's Transform rows, over its frame", () => {
+  const grouped = () => {
+    const setUp = setup()
+    s().groupSelection()
+    const unit = () => selectionPivot(s(), (id) => shownTransform(s(), id))!.unit
+    return { ...setUp, unit }
+  }
+
+  it("is a point with no turn and no scale of its own, at the group's pivot", () => {
+    const { unit } = grouped()
+    const frame = unit()
+    expectVec(frame.translation, selectionPivot(s(), (id) => docTransform(id))!.pivot, "pivot")
+    expectVec(readField(frame, "rotation"), { x: 0, y: 0, z: 0 }, "rotation")
+    expectVec(frame.scale3D, { x: 1, y: 1, z: 1 }, "scale")
+  })
+
+  it("moves the group by a typed location, so the frame lands on the value", () => {
+    const { ids, before, unit } = grouped()
+    const from = unit().translation
+    editSelectionAxis("translation", "x", { kind: "set", value: from.x + 250 })
+    expectVec(unit().translation, { ...from, x: from.x + 250 }, "frame")
+    for (const id of ids) {
+      expectVec(docTransform(id).translation, vecAdd(before.get(id)!.translation, { x: 250, y: 0, z: 0 }), id)
+    }
+  })
+
+  it("turns the group rigidly about its pivot by a typed yaw, and the row reads 0 again", () => {
+    const { ids, before, unit } = grouped()
+    const pivot = unit().translation
+    editSelectionAxis("rotation", "z", { kind: "set", value: 90 })
+    expectQuarterTurnAbout(before, pivot)
+    for (const id of ids) {
+      sameTransform(
+        docTransform(id),
+        applyGroupDelta(before.get(id)!, pivot, {
+          kind: "rotate",
+          rotation: rotatorToQuat({ roll: 0, pitch: 0, yaw: 90 })
+        }),
+        id
+      )
+    }
+    expectVec(readField(unit(), "rotation"), { x: 0, y: 0, z: 0 }, "rotation")
+  })
+
+  it("scales every item by a typed factor about the pivot, along its own axes, and the row reads 1 again", () => {
+    const { ids, before, unit } = grouped()
+    const pivot = unit().translation
+    editSelectionAxis("scale3D", "y", { kind: "set", value: 2 })
+    for (const id of ids) {
+      sameTransform(
+        docTransform(id),
+        applyGroupDelta(before.get(id)!, pivot, { kind: "scale", factor: 2, axis: "y" }),
+        id
+      )
+    }
+    expectVec(unit().scale3D, { x: 1, y: 1, z: 1 }, "scale")
   })
 })
 

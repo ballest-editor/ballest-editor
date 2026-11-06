@@ -1664,6 +1664,11 @@ export interface SelectionPivot {
   readonly rotation: Quat4
   /** The active item's pivot point, which grid snapping lands on. */
   readonly activePivot: Vec3
+  /**
+   * What the Inspector's Transform rows show and edit as one thing: the active item, or for a whole group its frame,
+   * at `pivot` with no turn and no scale of its own, so a value typed there is a change about the frame.
+   */
+  readonly unit: UeTransform
 }
 
 /**
@@ -1680,14 +1685,17 @@ export const selectionPivot = (
   const active = activeKey === undefined ? undefined : transformOf(activeKey)
   if (activeKey === undefined || active === undefined) return undefined
   const activePivot = localToWorld(active, pivotOf(s, activeKey).localPosition)
-  const own = { active, pivot: activePivot, rotation: active.rotation, activePivot }
+  const own = { active, pivot: activePivot, rotation: active.rotation, activePivot, unit: active }
   const group = soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId)
   if (group === undefined) return own
-  const frame = { ...own, rotation: identityTransform().rotation }
+  const frame = (pivot: Vec3): SelectionPivot => {
+    const unit = identityTransform(pivot)
+    return { ...own, pivot, rotation: unit.rotation, unit }
+  }
   const origin = group.prefab === undefined ? undefined : instanceOrigin(s.doc, group, group.prefab)
   const inDoc = s.doc.map.items[indexOfKey(s.doc.ids, activeKey)]
   if (origin !== undefined && inDoc !== undefined) {
-    return { ...frame, pivot: vecAdd(origin, vecSub(active.translation, editTransform(inDoc).translation)) }
+    return frame(vecAdd(origin, vecSub(active.translation, editTransform(inDoc).translation)))
   }
   const box = placedBoxOf(
     s.selectedIds.flatMap((id) => {
@@ -1697,7 +1705,7 @@ export const selectionPivot = (
     }),
     s.catalogIndex
   )
-  return box === undefined ? own : { ...frame, pivot: boxCentreOf(box) }
+  return box === undefined ? own : frame(boxCentreOf(box))
 }
 
 /**

@@ -79,13 +79,15 @@ describe("group transforms", () => {
     expect(out.scale3D.x).toBeGreaterThan(0)
   })
 
-  it("sets one axis on every item, or offsets the selection like the gizmo", () => {
+  it("takes an axis to a typed value on the active item and the rest along by the change, like the gizmo", () => {
     const t = at(10, 20, 30)
-    const set = (field: TransformField, axis: Axis, value: number) =>
-      selectionAxisEdit(t, field, axis, { kind: "set", value })(t)
+    const set = (field: TransformField, axis: Axis, value: number, item = t) =>
+      selectionAxisEdit(t, field, axis, { kind: "set", value })(item)
     const offset = (field: TransformField, axis: Axis, by: number, item = t) =>
       selectionAxisEdit(t, field, axis, { kind: "offset", by })(item)
     expect(set("translation", "y", 5).translation).toEqual({ x: 10, y: 5, z: 30 })
+    // another item moves by what the active one did, not to the value
+    expect(set("translation", "y", 5, at(0, 0, 0)).translation).toEqual({ x: 0, y: -15, z: 0 })
     expect(offset("translation", "z", -5).translation).toEqual({ x: 10, y: 20, z: 25 })
     expect(set("scale3D", "x", 0).scale3D.x).toBeGreaterThan(0)
     expect(offset("scale3D", "x", 0.5).scale3D).toEqual({ x: 1.5, y: 1, z: 1 })

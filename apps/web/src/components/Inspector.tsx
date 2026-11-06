@@ -41,7 +41,16 @@ import {
   setSelectionField
 } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
-import { noTabOpen, selectedIndices, shownValidation, useCreator, useEditor, useOpenPrefab } from "../editor/store"
+import {
+  noTabOpen,
+  selectedIndices,
+  selectionPivot,
+  shownTransform,
+  shownValidation,
+  useCreator,
+  useEditor,
+  useOpenPrefab
+} from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { Disclosure } from "./Disclosure"
@@ -49,7 +58,7 @@ import { Fact, Facts } from "./Facts"
 import { FlipSection } from "./FlipSection"
 import { HintBadge } from "./HintBadge"
 import { InfoHint } from "./InfoHint"
-import { ItemProperties, sharedValue } from "./ItemProperties"
+import { ItemProperties } from "./ItemProperties"
 import { ShiftClick } from "./KeyChip"
 import { LightingSettings } from "./LightingSettings"
 import { NumberField } from "./NumberField"
@@ -302,35 +311,45 @@ interface TransformRowSpec {
 
 const AXIS_LABELS: Readonly<Record<Axis, string>> = { x: "X", y: "Y", z: "Z" }
 
-const transformRows = (units: "cm" | "m"): ReadonlyArray<TransformRowSpec> => [
-  {
-    field: "translation",
-    label: "Location",
-    unit: units,
-    help: `The piece's origin, as the map stores it, in ${units === "m" ? "metres" : "centimetres"}, Z up`,
-    axisLabels: AXIS_LABELS,
-    step: units === "m" ? 0.01 : 1,
-    digits: units === "m" ? 3 : 1
-  },
-  {
-    field: "rotation",
-    label: "Rotation",
-    unit: "°",
-    help: "Degrees: roll, pitch, yaw",
-    axisLabels: { x: "X roll", y: "Y pitch", z: "Z yaw" },
-    step: 1,
-    digits: 1
-  },
-  {
-    field: "scale3D",
-    label: "Scale",
-    unit: "×",
-    help: "A factor of the piece's own size",
-    axisLabels: AXIS_LABELS,
-    step: 0.01,
-    digits: 2
-  }
-]
+/** The rows for an item (its own transform) or a whole group (its frame: a point, with no turn or scale of its own). */
+const transformRows = (units: "cm" | "m", of: "item" | "group"): ReadonlyArray<TransformRowSpec> => {
+  const unitName = units === "m" ? "metres" : "centimetres"
+  return [
+    {
+      field: "translation",
+      label: "Location",
+      unit: units,
+      help: of === "item"
+        ? `The piece's origin, as the map stores it, in ${unitName}, Z up`
+        : `Where the group pivots, in ${unitName}, Z up: the centre of its items, or an instance's origin`,
+      axisLabels: AXIS_LABELS,
+      step: units === "m" ? 0.01 : 1,
+      digits: units === "m" ? 3 : 1
+    },
+    {
+      field: "rotation",
+      label: "Rotation",
+      unit: "°",
+      help: of === "item"
+        ? "Degrees: roll, pitch, yaw"
+        : "Degrees: roll, pitch, yaw. A group holds no turn of its own, so a value here turns it by that much about its pivot",
+      axisLabels: { x: "X roll", y: "Y pitch", z: "Z yaw" },
+      step: 1,
+      digits: 1
+    },
+    {
+      field: "scale3D",
+      label: "Scale",
+      unit: "×",
+      help: of === "item"
+        ? "A factor of the piece's own size"
+        : "A group holds no scale of its own, so a value here scales its items by that much about its pivot, each along its own axes",
+      axisLabels: AXIS_LABELS,
+      step: 0.01,
+      digits: 2
+    }
+  ]
+}
 
 /** A decal's scale is its size (domain/editTransform.ts): cm, so a factor's step would crawl. */
 const DECAL_SIZE_ROW: TransformRowSpec = {
@@ -352,17 +371,20 @@ const copiedRows = new Map<TransformField, Vec3>()
 /**
  * One editable row over the whole selection: its name and unit, a button whose menu (or
  * Shift+click shortcuts) copies and pastes all three axes, then an X/Y/Z field each, side by side
- * while a big coordinate still fits. A typed value sets
- * every selected item; a scrub, or a `+` or `-` typed into a mixed field, moves or turns the selection together like the
- * gizmo, so a mixed selection keeps its spread; with snapping on, a scrub lands on the grid or rotation step
- * (a mixed selection moves in whole steps). `perUnit` converts display units to the stored value.
+ * while a big coordinate still fits. The fields show the selection's unit: the active item, or a whole group's frame.
+ * A typed value takes the unit's axis there and the rest of the selection follows by the same change, as a scrub
+ * does and as the game's panel does, so a selection keeps its spread; items that differ from the unit are marked
+ * Mixed. Paste is the one edit that sets every item to a value. With snapping on, a scrub lands on the grid or
+ * rotation step. `perUnit` converts display units to the stored value.
  */
 function TransformRow(props: {
   readonly row: TransformRowSpec
-  /** The selection's transforms as shown (live while a drag or scrub is in progress). */
-  readonly shown: ReadonlyArray<UeTransform>
-  /** The active item's document transform, which a copy reads. */
-  readonly active: UeTransform
+  /** The unit's transform as shown (live while a drag or scrub is in progress). */
+  readonly unit: UeTransform
+  /** The axes on which the selection's items differ from the unit. */
+  readonly mixed: ReadonlySet<Axis>
+  /** The active item's document transform, which a copy reads; a group's frame has nothing worth copying. */
+  readonly active?: UeTransform | undefined
   readonly perUnit: number
 }) {
   const notify = useEditor((s) => s.notify)
@@ -377,8 +399,10 @@ function TransformRow(props: {
     : undefined
   const [open, setOpen] = useState(false)
   const rowName = row.label.toLowerCase()
+  const { active } = props
   const copy = () => {
-    copiedRows.set(field, readField(props.active, field))
+    if (active === undefined) return
+    copiedRows.set(field, readField(active, field))
     notify("info", `Copied ${rowName}.`)
   }
   const paste = () => {
@@ -398,86 +422,98 @@ function TransformRow(props: {
             <span>{FIELD_HELP}</span>
           </TooltipContent>
         </Tooltip>
-        <Popover
-          open={open}
-          onOpenChange={(next, details) => {
-            // Shift+click pastes instead of opening the menu
-            if (next && details.event instanceof MouseEvent && details.event.shiftKey) return
-            setOpen(next)
-          }}
-        >
+        {props.mixed.size > 0 && (
           <Tooltip>
-            <TooltipTrigger
-              render={
-                <PopoverTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-fg-tertiary"
-                      aria-label={`Copy or paste ${rowName}`}
-                      onClick={(e) => {
-                        if (e.shiftKey) paste()
-                      }}
-                      onContextMenu={(e) => {
-                        if (!e.shiftKey) return
-                        e.preventDefault()
-                        copy()
-                      }}
-                    />
-                  }
-                />
-              }
-            >
-              <IconClipboard />
-            </TooltipTrigger>
-            <TooltipContent side="left" sideOffset={8} className="flex flex-col items-start py-2 pr-3 pl-2.5">
-              <div className="text-body-strong">Copy / paste axis values</div>
-              <div className="mt-1.5 grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-1 opacity-80">
-                <span>Copy</span>
-                <ShiftClick button="right" />
-                <span>Paste</span>
-                <ShiftClick button="left" />
-              </div>
+            <TooltipTrigger render={<span className="ml-auto text-caption text-fg-tertiary" />}>Mixed</TooltipTrigger>
+            <TooltipContent side="left">
+              {`The items differ on ${
+                [...props.mixed].map((a) => AXIS_LABELS[a]).join(", ")
+              }: the active one is shown, and a change here moves them all together`}
             </TooltipContent>
           </Tooltip>
-          <PopoverContent side="left" align="start" className="w-auto gap-1 p-1">
-            <div className="px-2 py-1 text-body text-fg-secondary">{row.label}</div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="justify-between gap-4"
-              onClick={() => {
-                copy()
-                setOpen(false)
-              }}
-            >
-              <span className="flex items-center gap-2">
-                <IconCopy />Copy X, Y, Z
-              </span>
-              <ShiftClick button="right" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="justify-between gap-4"
-              disabled={copiedRows.get(field) === undefined}
-              onClick={() => {
-                paste()
-                setOpen(false)
-              }}
-            >
-              <span className="flex items-center gap-2">
-                <IconClipboard />Paste
-              </span>
-              <ShiftClick button="left" />
-            </Button>
-          </PopoverContent>
-        </Popover>
+        )}
+        {active !== undefined && (
+          <Popover
+            open={open}
+            onOpenChange={(next, details) => {
+              // Shift+click pastes instead of opening the menu
+              if (next && details.event instanceof MouseEvent && details.event.shiftKey) return
+              setOpen(next)
+            }}
+          >
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-fg-tertiary"
+                        aria-label={`Copy or paste ${rowName}`}
+                        onClick={(e) => {
+                          if (e.shiftKey) paste()
+                        }}
+                        onContextMenu={(e) => {
+                          if (!e.shiftKey) return
+                          e.preventDefault()
+                          copy()
+                        }}
+                      />
+                    }
+                  />
+                }
+              >
+                <IconClipboard />
+              </TooltipTrigger>
+              <TooltipContent side="left" sideOffset={8} className="flex flex-col items-start py-2 pr-3 pl-2.5">
+                <div className="text-body-strong">Copy / paste axis values</div>
+                <div className="mt-1.5 grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-1 opacity-80">
+                  <span>Copy</span>
+                  <ShiftClick button="right" />
+                  <span>Paste</span>
+                  <ShiftClick button="left" />
+                </div>
+              </TooltipContent>
+            </Tooltip>
+            <PopoverContent side="left" align="start" className="w-auto gap-1 p-1">
+              <div className="px-2 py-1 text-body text-fg-secondary">{row.label}</div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="justify-between gap-4"
+                onClick={() => {
+                  copy()
+                  setOpen(false)
+                }}
+              >
+                <span className="flex items-center gap-2">
+                  <IconCopy />Copy X, Y, Z
+                </span>
+                <ShiftClick button="right" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="justify-between gap-4"
+                disabled={copiedRows.get(field) === undefined}
+                onClick={() => {
+                  paste()
+                  setOpen(false)
+                }}
+              >
+                <span className="flex items-center gap-2">
+                  <IconClipboard />Paste
+                </span>
+                <ShiftClick button="left" />
+              </Button>
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
       <div className="grid grid-cols-3 gap-1 @max-[16rem]:grid-cols-1">
         {axes.map((axis) => {
-          const value = sharedValue(props.shown.map((t) => readField(t, field)[axis] / perUnit)) ?? null
+          const value = readField(props.unit, field)[axis] / perUnit
           const offset = (v: number, from: number) => ({ kind: "offset", by: (v - from) * perUnit }) as const
           return (
             <NumberField
@@ -487,7 +523,6 @@ function TransformRow(props: {
               onCommit={(v) => editSelectionAxis(field, axis, { kind: "set", value: v * perUnit })}
               onScrub={(v, from) => previewSelectionAxis(field, axis, v === null ? null : offset(v, from))}
               onScrubCommit={(v, from) => editSelectionAxis(field, axis, offset(v, from))}
-              onMixedOffset={(by) => editSelectionAxis(field, axis, offset(by, 0))}
               step={row.step}
               snap={snap}
               digits={row.digits}
@@ -615,35 +650,80 @@ function ItemDetails({ item, index }: { readonly item: Item; readonly index: num
   )
 }
 
-/** Everything that edits the selection's items, all of them at once. */
-function ItemEditor({ items, ids, transforms, placed }: {
-  readonly items: ReadonlyArray<Item>
-  readonly ids: ReadonlyArray<string>
+/** The axes on which any of `transforms` differs from `unit`, in the field's units. */
+const mixedAxes = (unit: UeTransform, transforms: ReadonlyArray<UeTransform>, field: TransformField): Set<Axis> => {
+  const reference = readField(unit, field)
+  const values = transforms.map((t) => readField(t, field))
+  return new Set(AXES.filter((axis) => values.some((v) => Math.abs(v[axis] - reference[axis]) > 1e-6)))
+}
+
+/**
+ * The Transform section: the selection's unit, edited as one thing. For items that is the active one with the rest
+ * following; for a whole group it is the frame, with the group's items as `transforms` only to mark what differs.
+ */
+function TransformSection({ of, unit, transforms, active, decals = false, children }: {
+  readonly of: "item" | "group"
+  readonly unit: UeTransform
   readonly transforms: ReadonlyArray<UeTransform>
-  readonly placed: ReadonlyArray<PlacedItem>
+  /** The active item's document transform, for Copy; none for a group. */
+  readonly active?: UeTransform | undefined
+  /** Whether every item is a decal, whose scale is a size. */
+  readonly decals?: boolean
+  readonly children?: ReactNode
 }) {
   const units = useEditor((s) => s.settings.general.units)
   // Display units only; the map always stores centimetres (rotation and scale don't convert).
   const perUnit = units === "m" ? 100 : 1
+  return (
+    <Section>
+      <SectionTitle>Transform</SectionTitle>
+      <div className="flex @container flex-col gap-2">
+        {transformRows(units, of).map((row) => (
+          <TransformRow
+            key={row.field}
+            row={row.field === "scale3D" && decals ? DECAL_SIZE_ROW : row}
+            unit={unit}
+            mixed={of === "item" ? mixedAxes(unit, transforms, row.field) : EMPTY_AXES}
+            active={active}
+            perUnit={row.field === "translation" ? perUnit : 1}
+          />
+        ))}
+        {children}
+      </div>
+    </Section>
+  )
+}
+
+const AXES: ReadonlyArray<Axis> = ["x", "y", "z"]
+const EMPTY_AXES: ReadonlySet<Axis> = new Set()
+
+/**
+ * Everything that edits the selection's items, all of them at once. A whole group's items get no Transform section:
+ * the group has its own, over its frame.
+ */
+function ItemEditor({ items, ids, transforms, placed, transform }: {
+  readonly items: ReadonlyArray<Item>
+  readonly ids: ReadonlyArray<string>
+  readonly transforms: ReadonlyArray<UeTransform>
+  readonly placed: ReadonlyArray<PlacedItem>
+  readonly transform: boolean
+}) {
   const active = items.at(-1)
-  if (active === undefined) return null
+  const shownActive = transforms.at(-1)
+  if (active === undefined || shownActive === undefined) return null
   return (
     <>
-      <Section>
-        <SectionTitle>Transform</SectionTitle>
-        <div className="flex @container flex-col gap-2">
-          {transformRows(units).map((row) => (
-            <TransformRow
-              key={row.field}
-              row={row.field === "scale3D" && items.every(isDecal) ? DECAL_SIZE_ROW : row}
-              shown={transforms}
-              active={editTransform(active)}
-              perUnit={row.field === "translation" ? perUnit : 1}
-            />
-          ))}
+      {transform && (
+        <TransformSection
+          of="item"
+          unit={shownActive}
+          transforms={transforms}
+          active={editTransform(active)}
+          decals={items.every(isDecal)}
+        >
           <FlipSection items={placed} />
-        </div>
-      </Section>
+        </TransformSection>
+      )}
       <PivotSection />
       <Section>
         <SectionTitle>Paint</SectionTitle>
@@ -680,6 +760,14 @@ export function Inspector() {
     () => exactSelectedGroup(tree, selectedIds, enteredGroupId),
     [tree, selectedIds, enteredGroupId]
   )
+  // A whole group's frame as shown, which its Transform rows edit. Read from the store at the time, since the frame
+  // is built afresh from the items' shown transforms and a selector returning it would re-render without end.
+  const frame = useMemo(() => {
+    if (group === undefined) return undefined
+    const s = useEditor.getState()
+    return selectionPivot(s, (id) => shownTransform(s, id))?.unit
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- `transforms` and `catalogIndex` are what the frame is made of
+  }, [group, transforms, catalogIndex])
 
   const prefab = useOpenPrefab()
   const noTab = useEditor(noTabOpen)
@@ -708,7 +796,9 @@ export function Inspector() {
   }
 
   const placed = items.map((item) => ({ item, piece: catalogIndex?.pieceByClass.get(item.actorToSpawn) }))
-  const editor = <ItemEditor items={items} ids={ids} transforms={transforms} placed={placed} />
+  const editor = (
+    <ItemEditor items={items} ids={ids} transforms={transforms} placed={placed} transform={group === undefined} />
+  )
 
   return (
     <ScrollArea className="h-full bg-card">
@@ -737,10 +827,20 @@ export function Inspector() {
                 <PieceCounts items={items} />
               </GroupSection>
               {group.prefab !== undefined && <InstanceSection group={group} link={group.prefab} />}
+              {frame !== undefined && (
+                <TransformSection of="group" unit={frame} transforms={transforms}>
+                  <FlipSection items={placed} />
+                </TransformSection>
+              )}
               <Disclosure
                 key={`${group.id}/items`}
                 title={items.length === 1 ? "Edit its item" : `Edit all ${items.length} items`}
               >
+                {group.prefab !== undefined && (
+                  <p className="text-body text-fg-tertiary">
+                    An edit in here changes the instance, so it no longer follows its definition.
+                  </p>
+                )}
                 {editor}
               </Disclosure>
             </>

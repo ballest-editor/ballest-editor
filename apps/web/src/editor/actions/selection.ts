@@ -61,18 +61,24 @@ const withSelectionEdit = (
     )
   )
 
-/** An axis edit made from the document transforms, about the selection's pivot like the gizmo. */
+/**
+ * An axis edit made from the document transforms, as a change to the selection's unit (the active item, or a whole
+ * group's frame) about the selection's pivot, like the gizmo.
+ */
 const withAxisEdit = (field: TransformField, axis: Axis, edit: AxisEdit) => {
   const target = selectionPivot(useEditor.getState(), docTransform)
   if (target === undefined) return new Map()
-  return withSelectionEdit(selectionAxisEdit(target.active, field, axis, edit, target.pivot))
+  return withSelectionEdit(selectionAxisEdit(target.unit, field, axis, edit, target.pivot))
 }
 
-/** Sets all three axes of `field` on every selected item (pasting a copied row), about each one's pivot. */
+/**
+ * Sets all three axes of `field` on every selected item (pasting a copied row), about each one's pivot: the one edit
+ * that sets items to a value rather than changing them together.
+ */
 export const setSelectionField = (field: TransformField, value: Vec3): boolean =>
   transformSelection(withSelectionEdit((t, localPivot) => writeFieldAbout(t, field, value, localPivot)))
 
-/** Applies an axis edit (an inspector field) to every selected item. */
+/** Applies an axis edit (an inspector field) to the selection. */
 export const editSelectionAxis = (field: TransformField, axis: Axis, edit: AxisEdit): boolean =>
   transformSelection(withAxisEdit(field, axis, edit))
 
