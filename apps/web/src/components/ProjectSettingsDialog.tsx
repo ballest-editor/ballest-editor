@@ -698,7 +698,8 @@ export function ProjectSettingsDialog(
     <SettingsShell
       open={open}
       onClose={onClose}
-      title={onWorkshop ? `Project settings › ${entry.label}` : "Project settings"}
+      title="Project settings"
+      crumbs={onWorkshop ? [entry.label] : []}
       description="The project's name and folders; then each map's name, file, difficulty and tags."
       categories={categories}
       category={category}

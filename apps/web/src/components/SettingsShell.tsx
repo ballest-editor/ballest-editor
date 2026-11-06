@@ -192,6 +192,8 @@ export function SettingsShell<C extends string>(props: {
   readonly onClose: () => void
   /** The dialog's name, the first breadcrumb ("Settings", "Project settings"). */
   readonly title: string
+  /** The breadcrumbs between the title and the page ("Harbor Loop"): the shell draws every separator. A search has its own. */
+  readonly crumbs?: ReadonlyArray<string>
   /** For screen readers: what these settings are. */
   readonly description: string
   readonly categories: ReadonlyArray<SettingsCategoryInfo<C>>
@@ -241,6 +243,8 @@ export function SettingsShell<C extends string>(props: {
   // What the right side is showing. Base UI measures a scroll area when its viewport resizes, not when its content does,
   // so each page gets its own: a short page after a long one would otherwise keep the long one's scrollbar.
   const page = searching ? `search:${scope ?? ""}:${query}` : `category:${props.category}`
+
+  const trail = searching ? ["Search"] : props.crumbs ?? []
 
   const modifiedIn = (category: C) => props.rows.some((r) => r.category === category && isModified(r))
   const { onResetCategory } = props
@@ -322,12 +326,14 @@ export function SettingsShell<C extends string>(props: {
                   <DialogTitle className="text-fg-secondary">{props.title}</DialogTitle>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
-                {searching && (
-                  <>
-                    <BreadcrumbItem>Search</BreadcrumbItem>
+                {trail.map((crumb) => (
+                  <Fragment key={crumb}>
+                    <BreadcrumbItem className="min-w-0">
+                      <span className="truncate">{crumb}</span>
+                    </BreadcrumbItem>
                     <BreadcrumbSeparator />
-                  </>
-                )}
+                  </Fragment>
+                ))}
                 <BreadcrumbItem className="min-w-0">
                   <BreadcrumbPage className="truncate">
                     {searching ? `“${query.trim()}”` : labelOf(props.category)}
