@@ -268,7 +268,7 @@ describe("instances following their definition", () => {
       Effect.gen(function*() {
         yield* started(disk)
         const id = yield* placed
-        s().detachInstances(s().tabId, [id])
+        s().relinkInstances(s().tabId, [[id, undefined]])
         assert.isDefined(instance(id))
         assert.isUndefined(instance(id)?.prefab)
         s().undo()

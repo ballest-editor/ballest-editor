@@ -3,6 +3,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { useMemo, useState } from "react"
 import type { GroupNode, PrefabLink } from "../domain/MapSidecar"
+import { isSamePrefab } from "../domain/prefab"
 import { checkInstance } from "../domain/prefabInstance"
 import { treeKeys } from "../domain/structure"
 import { detachInstance, openPrefab, updateInstance } from "../editor/actions"
@@ -45,7 +46,6 @@ export function GroupSection({ group }: { readonly group: GroupNode }) {
   )
 }
 
-/** How an instance stands against its definition. */
 const instanceStatusOf = (found: boolean, current: boolean, unmodified: boolean) => {
   if (!found) return "Its definition has gone. It keeps its items."
   if (current) return unmodified ? "It follows its definition." : "Edited here, so it no longer follows its definition."
@@ -55,7 +55,7 @@ const instanceStatusOf = (found: boolean, current: boolean, unmodified: boolean)
 /** A selection that is exactly one prefab instance: what it is an instance of, and what can be done about it. */
 export function InstanceSection({ group, link }: { readonly group: GroupNode; readonly link: PrefabLink }) {
   const doc = useEditor((s) => s.doc)
-  const definition = useEditor((s) => s.prefabs.find((p) => p.tier === link.tier && p.name === link.name))
+  const definition = useEditor((s) => s.prefabs.find((p) => isSamePrefab(p, link)))
   const { unmodified } = useMemo(() => checkInstance(doc, group, link), [doc, group, link])
   const found = definition !== undefined
   const current = definition?.hash === link.hash
@@ -86,7 +86,6 @@ export function InstanceSection({ group, link }: { readonly group: GroupNode; re
   )
 }
 
-/** A single selected item's tags. */
 export function ItemTags({ itemKey }: { readonly itemKey: string }) {
   const tags = useEditor((s) => s.doc.structure.items.get(itemKey)?.tags)
   const setTags = useEditor((s) => s.setTags)

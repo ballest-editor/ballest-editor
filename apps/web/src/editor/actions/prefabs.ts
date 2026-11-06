@@ -2,12 +2,14 @@
  * Prefabs in the editor (docs/DESKTOP.md § Prefabs): the two tiers in the store, placing a prefab, saving a selection as
  * one, a definition's tab and the instances of it in the open maps.
  */
-import type { PrefabInfo, PrefabRef, PrefabTier } from "@ballest/contracts"
+import { prefabFileNameOf, type PrefabInfo, type PrefabRef, PrefabTier } from "@ballest/contracts"
 import { Effect } from "effect"
+import { nextNumberedName } from "../../domain/factory"
 import { PREFAB_ITEMS, PREFAB_REFUSALS } from "../../domain/gameRules"
 import { exactSelectedGroup } from "../../domain/groupSelection"
 import { isPlayerStart } from "../../domain/MapFile"
 import {
+  isSamePrefab,
   itemOfPrefab,
   mapOfPrefab,
   prefabOfItems,
@@ -17,44 +19,43 @@ import {
 } from "../../domain/prefab"
 import type { PrefabFile } from "../../domain/PrefabFile"
 import { definitionOf } from "../../domain/prefabInstance"
-import { flatStructure, freshKeys, withPrefabLink } from "../../domain/structure"
+import { flatStructure, freshKeys } from "../../domain/structure"
 import { MapCodec } from "../../services/MapCodec"
 import { Platform, PlatformError } from "../../services/Platform"
 import { sceneRegistry } from "../sceneRegistry"
-import { type PrefabDocument, selectedIndices, tabStateOf, tabWithPrefab, useEditor } from "../store"
-import { followDefinitions, instancesInTab, readDefinition } from "./prefabFollow"
+import { type EditorState, type PrefabDocument, selectedIndices, tabStateOf, tabWithPrefab, useEditor } from "../store"
+import { followDefinitions, instancesInTab, readDefinition, readPrefabFile, staleInstances } from "./prefabFollow"
 import { run } from "./run"
-
-const TIERS: ReadonlyArray<PrefabTier> = ["user", "project"]
-
-const sameRef = (a: PrefabRef, b: PrefabRef) => a.tier === b.tier && a.name === b.name
-
-/** A notice in the words a failure of this kind takes: it stops the action, and `run` shows it. */
-const refused = (message: string) => new PlatformError({ message })
 
 /** Both tiers into the store; answers the prefabs that are new or whose file changed since the last look. */
 const listPrefabs = Effect.gen(function*() {
   const platform = yield* Platform
-  const lists = yield* Effect.forEach(TIERS, (tier) => platform.listPrefabs(tier))
+  const lists = yield* Effect.forEach(PrefabTier.literals, (tier) => platform.listPrefabs(tier))
   const prefabs = lists.flat()
   const known = useEditor.getState().prefabs
   useEditor.getState().setPrefabs(prefabs)
-  return prefabs.filter((info) => known.find((other) => sameRef(other, info))?.hash !== info.hash)
+  return prefabs.filter((info) => known.find((other) => isSamePrefab(other, info))?.hash !== info.hash)
 })
+
+/** The tab that has the definition `ref` open, and what it holds. */
+const definitionTab = (ref: PrefabRef) => {
+  const s = useEditor.getState()
+  const tabId = tabWithPrefab(s, ref)
+  const tab = tabId === undefined ? undefined : tabStateOf(s, tabId)
+  return tabId === undefined || tab?.document.kind !== "prefab" ? undefined : { tabId, tab, document: tab.document }
+}
 
 /** A definition's tab reads a file that changed behind it again, unless it has edits, which say so instead. */
 const reloadDefinitionTabs = Effect.fn("reloadDefinitionTabs")(function*(changed: ReadonlyArray<PrefabInfo>) {
   for (const info of changed) {
-    const s = useEditor.getState()
-    const tabId = tabWithPrefab(s, info)
-    const tab = tabId === undefined ? undefined : tabStateOf(s, tabId)
-    if (tabId === undefined || tab?.document.kind !== "prefab" || tab.document.hash === info.hash) continue
-    if (tab.dirty) {
-      s.notify("info", `${info.name} changed on disk`, {
+    const open = definitionTab(info)
+    if (open === undefined || open.document.hash === info.hash) continue
+    if (open.tab.dirty) {
+      useEditor.getState().notify("info", `${info.name} changed on disk`, {
         kind: "prefabChangedOnDisk",
         body: "Its tab has unsaved edits. Saving writes over the file, and the version on disk goes to the backups."
       })
-    } else yield* loadDefinition(info, { tabId })
+    } else yield* loadDefinition(info, { tabId: open.tabId })
   }
 })
 
@@ -77,15 +78,11 @@ export const followOpenTabs = () =>
     return followDefinitions(tabIds, prefabs)
   }))
 
-const decoded = Effect.fnUntraced(function*(ref: PrefabRef) {
-  const read = yield* (yield* Platform).readPrefab(ref)
-  const prefab = yield* MapCodec.use((codec) => codec.decodePrefab(read.text, useEditor.getState().catalogIndex))
-  return { prefab, read }
-})
-
 const needsCatalog = Effect.suspend(() => {
   const { catalogIndex } = useEditor.getState()
-  return catalogIndex === null ? Effect.fail(refused("The catalog is still loading.")) : Effect.succeed(catalogIndex)
+  return catalogIndex === null
+    ? Effect.fail(new PlatformError({ message: "The catalog is still loading." }))
+    : Effect.succeed(catalogIndex)
 })
 
 /**
@@ -94,7 +91,7 @@ const needsCatalog = Effect.suspend(() => {
  */
 export const placePrefabEffect = Effect.fn("placePrefabEffect")(function*(ref: PrefabRef) {
   const catalog = yield* needsCatalog
-  const { prefab, read } = yield* decoded(ref)
+  const { prefab, read } = yield* readPrefabFile(ref)
   const definition = definitionOf(prefab, read, catalog)
   const frame = spawnFrameOf(definition.items, sceneRegistry.viewRay(), catalog)
   const s = useEditor.getState()
@@ -104,16 +101,16 @@ export const placePrefabEffect = Effect.fn("placePrefabEffect")(function*(ref: P
 
 export const placePrefab = (ref: PrefabRef) => run(placePrefabEffect(ref))
 
-/** Writes `prefab`, in the game's layout, then lets everything that depends on it follow. */
 const writePrefab = Effect.fnUntraced(function*(ref: PrefabRef, prefab: PrefabFile, replace: boolean) {
   const text = yield* MapCodec.use((codec) => codec.encodePrefab(prefab, useEditor.getState().catalogIndex))
   return yield* (yield* Platform).writePrefab({ ...ref, text, replace })
 })
 
+const selectedItems = (s: EditorState) => selectedIndices(s).flatMap((index) => s.doc.map.items[index] ?? [])
+
 /** What Save selection as prefab… would refuse about the selection, as the game says it; undefined when it can go. */
 const selectionPrefabProblem = (): string | undefined => {
-  const s = useEditor.getState()
-  const items = selectedIndices(s).flatMap((index) => s.doc.map.items[index] ?? [])
+  const items = selectedItems(useEditor.getState())
   if (items.length < PREFAB_ITEMS.min || items.length > PREFAB_ITEMS.max) return PREFAB_REFUSALS.selection
   return items.some(isPlayerStart) ? PREFAB_REFUSALS.playerStart : undefined
 }
@@ -133,11 +130,10 @@ export const startSavePrefab = () => {
 export const saveSelectionAsPrefabEffect = Effect.fn("saveSelectionAsPrefabEffect")(
   function*(ref: PrefabRef, replace: boolean) {
     const problem = selectionPrefabProblem()
-    if (problem !== undefined) return yield* refused(problem)
+    if (problem !== undefined) return yield* new PlatformError({ message: problem })
     const s = useEditor.getState()
-    const items = selectedIndices(s).flatMap((index) => s.doc.map.items[index] ?? [])
     const group = exactSelectedGroup(s.doc.structure.tree, s.selectedIds, s.enteredGroupId)
-    yield* writePrefab(ref, prefabOfItems(items, s.catalogIndex, group?.name), replace)
+    yield* writePrefab(ref, prefabOfItems(selectedItems(s), s.catalogIndex, group?.name), replace)
     yield* checkPrefabs
     s.notify("info", `Saved the prefab ${ref.name}`, { kind: "prefabSaved" })
   }
@@ -149,7 +145,7 @@ export const saveSelectionAsPrefab = (ref: PrefabRef, replace: boolean) =>
 /** Reads a definition into a tab: the one `into` names, or a new one. */
 const loadDefinition = Effect.fnUntraced(function*(ref: PrefabRef, into: "newTab" | { readonly tabId: string }) {
   const catalog = yield* needsCatalog
-  const { prefab, read } = yield* decoded(ref)
+  const { prefab, read } = yield* readPrefabFile(ref)
   const map = mapOfPrefab(ref.name, prefab, catalog)
   const ids = freshKeys(map.items.length)
   const document: PrefabDocument = {
@@ -160,7 +156,7 @@ const loadDefinition = Effect.fnUntraced(function*(ref: PrefabRef, into: "newTab
     hash: read.hash,
     sources: prefabSourcesOf(prefab, map.items, ids)
   }
-  const file = { name: `${ref.name}.json`, path: read.path }
+  const file = { name: prefabFileNameOf(ref.name), path: read.path }
   useEditor.getState().loadMap(map, file, undefined, {
     document,
     into,
@@ -192,7 +188,7 @@ export const savePrefabTab = Effect.gen(function*() {
     tabId,
     doc,
     { ...document, file: prefab, hash: info.hash, sources: prefabSourcesOf(prefab, doc.map.items, doc.ids) },
-    { name: `${name}.json`, path: info.path }
+    { name: prefabFileNameOf(name), path: info.path }
   )
   yield* checkPrefabs
   useEditor.getState().notify("info", `Saved the prefab ${name}`, { kind: "prefabSaved" })
@@ -201,14 +197,9 @@ export const savePrefabTab = Effect.gen(function*() {
 /** The first of `<name>_2`, `<name>_3`, ... that the tier doesn't have. */
 const copyNameOf = (name: string, tier: PrefabTier) => {
   const taken = new Set(useEditor.getState().prefabs.filter((p) => p.tier === tier).map((p) => p.name))
-  const base = name.replace(/_\d+$/, "").slice(0, 60)
-  for (let n = 2;; n++) {
-    const copy = `${base}_${n}`
-    if (!taken.has(copy)) return copy
-  }
+  return nextNumberedName(name.replace(/_\d+$/, "").slice(0, 60), "_", (copy) => taken.has(copy))
 }
 
-/** Copies a prefab's file into `tier` under `name`. */
 const copyPrefab = Effect.fnUntraced(function*(from: PrefabRef, to: PrefabRef) {
   const platform = yield* Platform
   const { text } = yield* platform.readPrefab(from)
@@ -227,20 +218,13 @@ export const copyPrefabToTier = (ref: PrefabRef, tier: PrefabTier) => run(copyPr
 export const renamePrefabEffect = Effect.fn("renamePrefabEffect")(function*(ref: PrefabRef, to: string) {
   const info = yield* (yield* Platform).renamePrefab({ tier: ref.tier, from: ref.name, to })
   const s = useEditor.getState()
-  const tabId = tabWithPrefab(s, ref)
-  const tab = tabId === undefined ? undefined : tabStateOf(s, tabId)
-  if (tabId !== undefined && tab?.document.kind === "prefab") {
-    s.setTabDocument(tabId, { ...tab.document, name: to }, { name: `${to}.json`, path: info.path })
+  const open = definitionTab(ref)
+  if (open !== undefined) {
+    const file = { name: prefabFileNameOf(to), path: info.path }
+    s.patchTab(open.tabId, { document: { ...open.document, name: to }, file })
   }
-  for (const id of s.tabIds) {
-    const instances = instancesInTab(id, ref)
-    s.editTabDoc(id, (doc) => {
-      const structure = instances.reduce(
-        (current, { id: group, prefab }) => withPrefabLink(current, group, { ...prefab, name: to }) ?? current,
-        doc.structure
-      )
-      return structure === doc.structure ? undefined : { ...doc, structure }
-    })
+  for (const tabId of s.tabIds) {
+    s.relinkInstances(tabId, instancesInTab(tabId, ref).map(({ id, prefab }) => [id, { ...prefab, name: to }]))
   }
   yield* checkPrefabs
 })
@@ -253,58 +237,46 @@ export const renamePrefab = (ref: PrefabRef, to: string) => run(renamePrefabEffe
  */
 export const deletePrefabEffect = Effect.fn("deletePrefabEffect")(function*(ref: PrefabRef) {
   yield* (yield* Platform).deletePrefab(ref)
-  const s = useEditor.getState()
-  const tabId = tabWithPrefab(s, ref)
-  const tab = tabId === undefined ? undefined : tabStateOf(s, tabId)
-  if (tabId !== undefined && tab !== undefined) s.setTabDocument(tabId, tab.document, null)
+  const open = definitionTab(ref)
+  if (open !== undefined) useEditor.getState().patchTab(open.tabId, { file: null })
   yield* checkPrefabs
 })
 
 export const deletePrefab = (ref: PrefabRef) => run(deletePrefabEffect(ref))
 
 export const revealPrefabs = (tier: PrefabTier) =>
-  run(
-    Effect.gen(function*() {
-      yield* (yield* Platform).revealPrefabs(tier)
-    })
-  )
+  run(Effect.flatMap(Effect.service(Platform), (platform) => platform.revealPrefabs(tier)))
 
 /** The Inspector's and the Outline's Update on one instance in the active tab: it takes the definition as it is now. */
 export const updateInstance = (groupId: string, ref: PrefabRef) =>
-  run(
-    Effect.gen(function*() {
-      const definition = yield* readDefinition(ref)
-      const { tabId, updateInstances } = useEditor.getState()
-      updateInstances(tabId, [groupId], definition)
-    })
-  )
+  run(Effect.map(readDefinition(ref), (definition) => {
+    const { tabId, updateInstances } = useEditor.getState()
+    updateInstances(tabId, [groupId], definition)
+  }))
 
 /** Detach on one instance in the active tab: it stays a group, and no longer follows anything. */
 export const detachInstance = (groupId: string) => {
-  const { detachInstances, tabId } = useEditor.getState()
-  detachInstances(tabId, [groupId])
+  const { relinkInstances, tabId } = useEditor.getState()
+  relinkInstances(tabId, [[groupId, undefined]])
 }
 
 /** The instances of `ref` that didn't follow it, by tab: what its report's buttons act on. */
 const editedInstances = (ref: PrefabRef) => {
   const s = useEditor.getState()
-  const current = s.prefabs.find((info) => sameRef(info, ref))?.hash
-  return s.tabIds.flatMap((tabId) => {
-    const stale = instancesInTab(tabId, ref).filter(({ prefab }) => prefab.hash !== current)
-    return stale.length === 0 ? [] : [{ tabId, ids: stale.map(({ id }) => id) }]
-  })
+  return staleInstances(s.tabIds, ref, s.prefabs.find((info) => isSamePrefab(info, ref))?.hash)
 }
 
 /** The report's Update: the instances that didn't follow are replaced with the definition, where they stand. */
 export const updateEditedInstances = (ref: PrefabRef) =>
-  run(
-    Effect.gen(function*() {
-      const definition = yield* readDefinition(ref)
-      for (const { ids, tabId } of editedInstances(ref)) useEditor.getState().updateInstances(tabId, ids, definition)
-    })
-  )
+  run(Effect.map(readDefinition(ref), (definition) => {
+    for (const { stale, tabId } of editedInstances(ref)) {
+      useEditor.getState().updateInstances(tabId, stale.map(({ id }) => id), definition)
+    }
+  }))
 
 /** The report's Detach: the instances that didn't follow keep their items as plain groups. */
 export const detachEditedInstances = (ref: PrefabRef) => {
-  for (const { ids, tabId } of editedInstances(ref)) useEditor.getState().detachInstances(tabId, ids)
+  for (const { stale, tabId } of editedInstances(ref)) {
+    useEditor.getState().relinkInstances(tabId, stale.map(({ id }) => [id, undefined]))
+  }
 }

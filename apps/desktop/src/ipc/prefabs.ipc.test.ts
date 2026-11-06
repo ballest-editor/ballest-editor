@@ -1,11 +1,4 @@
-import {
-  InvokeChannels,
-  PrefabBackups,
-  PrefabBackupSummary,
-  PrefabInfo,
-  PrefabInfos,
-  PrefabRead
-} from "@ballest/contracts"
+import { InvokeChannels, PrefabBackups, PrefabInfo, PrefabInfos, PrefabRead, PrefabSummary } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, FileSystem, Path } from "effect"
 import { vi } from "vitest"
@@ -137,7 +130,7 @@ describe("prefabs over IPC", () => {
           { name: "p", tier: "project" }
         ])
         const ref = { id: kept.find((backup) => backup.name === "p")?.id, tier: "project" }
-        assert.deepStrictEqual(yield* fake.invokeAs(PrefabBackupSummary, InvokeChannels.describePrefabBackup, ref), {
+        assert.deepStrictEqual(yield* fake.invokeAs(PrefabSummary, InvokeChannels.describePrefabBackup, ref), {
           itemCount: 3,
           firstClass: "/Game/A.A_C"
         })

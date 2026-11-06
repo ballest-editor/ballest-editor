@@ -1,4 +1,4 @@
-import type { CreateProjectPayload, ProjectInfo } from "@ballest/contracts"
+import type { ProjectInfo } from "@ballest/contracts"
 import { IconFolderOpen, IconRestore } from "@tabler/icons-react"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
@@ -10,24 +10,11 @@ import { useEditor } from "../editor/store"
 import { PathAction, PathField } from "./PathText"
 
 /** The project the Save map dialog makes in Untitled Project: its name, and a folder the user may have chosen. */
-export interface NewProjectDraft {
-  readonly name: string
-  readonly setName: (name: string) => void
-  /** The folder Choose… picked; null: `<projectsFolder>/<name>`. */
-  readonly chosen: ProjectInfo | null
-  readonly setChosen: (chosen: ProjectInfo | null) => void
-  /** Back to the name a new project is offered, in its usual folder. */
-  readonly reset: () => void
-  /** Whether a project can be asked for: main has the last word (`canMakeProject`). */
-  readonly ok: boolean
-  /** What to ask main for. */
-  readonly project: CreateProjectPayload
-}
-
-export const useNewProjectDraft = (): NewProjectDraft => {
+export const useNewProjectDraft = () => {
   const state = useEditor((s) => s.project)
   const offered = () => defaultProjectNameOf((state?.recent ?? []).map((p) => p.name))
   const [name, setName] = useState(offered)
+  // the folder Choose… picked; null: `<projectsFolder>/<name>`
   const [chosen, setChosen] = useState<ProjectInfo | null>(null)
   const trimmed = name.trim()
   return {
@@ -39,13 +26,14 @@ export const useNewProjectDraft = (): NewProjectDraft => {
       setName(offered())
       setChosen(null)
     },
+    // whether a project can be asked for: main has the last word (`canMakeProject`)
     ok: isProjectName(trimmed) && chosen?.exists !== true,
     project: { name: trimmed, ...(chosen !== null && { folder: chosen.path }) }
   }
 }
 
 /** The Save map dialog's project name and folder, for the first Save in Untitled Project. */
-export function NewProjectFields({ draft }: { readonly draft: NewProjectDraft }) {
+export function NewProjectFields({ draft }: { readonly draft: ReturnType<typeof useNewProjectDraft> }) {
   const projectsFolder = useEditor((s) => s.project?.projectsFolder ?? "")
   const { chosen, name, setChosen, setName } = draft
   const trimmed = name.trim()

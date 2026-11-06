@@ -4,7 +4,7 @@ import { hasCatalog, listSamples, readCatalog, readSample } from "../test/sample
 import { expectVec } from "../test/vec"
 import { indexCatalog } from "./Catalog"
 import { defaultEditorState, identityTransform, newMapFile, playerStartItem } from "./factory"
-import { gameGroupNameOf, gameGroupsOf, structureFromGame, withGameGroups } from "./gameGroups"
+import { gameGroupNameOf, structureFromGame, withGameGroups } from "./gameGroups"
 import { gameLoadProblems } from "./limits"
 import { type Item, ItemTransform, MapFile } from "./MapFile"
 import type { GroupNode, TreeNode } from "./MapSidecar"
@@ -14,6 +14,9 @@ import { rotatorToQuat } from "./ueMath"
 
 const decodeMap = Schema.decodeUnknownSync(Schema.fromJsonString(MapFile))
 const decodeFrame = Schema.decodeUnknownSync(ItemTransform)
+
+/** The groups `withGameGroups` gives `map`. */
+const gameGroupsOf = (...args: Parameters<typeof withGameGroups>) => withGameGroups(...args).editorState?.groups ?? []
 
 const item = (key: string): TreeNode => ({ kind: "item", key })
 const group = (name: string, ...children: ReadonlyArray<TreeNode>): GroupNode => ({
@@ -103,7 +106,7 @@ describe.skipIf(!hasCatalog)("a group's frame against the game", () => {
   })
 })
 
-describe("gameGroupsOf", () => {
+describe("withGameGroups' groups", () => {
   const ids = ["k0", "k1", "k2", "k3", "k4"]
   const map = mapWith(10, 20, 30, 50)
 

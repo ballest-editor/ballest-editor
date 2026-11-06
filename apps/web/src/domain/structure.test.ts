@@ -12,7 +12,6 @@ import {
   freshKey,
   freshKeys,
   groupNames,
-  itemDisplayNames,
   itemNames,
   numberedNameText,
   type Structure,
@@ -20,10 +19,8 @@ import {
   withGroup,
   withGroupName,
   withItemName,
-  withMovedNode,
   withMovedNodes,
   withNewItems,
-  withoutGroup,
   withoutGroups,
   withoutKeys,
   withPasted,
@@ -90,33 +87,33 @@ describe("withGroup", () => {
   })
 })
 
-describe("withoutGroup", () => {
+describe("withoutGroups", () => {
   it("moves the children to the parent, in the group's place", () => {
     const start = structure(group("p", item("a"), group("x", item("b"), group("y", item("c"))), item("d")))
     assert.deepStrictEqual(
-      withoutGroup(start, "x")!.tree,
+      withoutGroups(start, ["x"])!.tree,
       [group("p", item("a"), item("b"), group("y", item("c")), item("d"))]
     )
-    assert.isUndefined(withoutGroup(start, "a"))
-    assert.isUndefined(withoutGroup(start, "nope"))
+    assert.isUndefined(withoutGroups(start, ["a"]))
+    assert.isUndefined(withoutGroups(start, ["nope"]))
   })
 })
 
-describe("withMovedNode", () => {
+describe("withMovedNodes", () => {
   const start = structure(item("a"), group("x", item("b"), item("c")), group("y", item("d")))
 
   it("moves an item between groups and the root, at an index counted once it has left", () => {
-    assert.deepStrictEqual(withMovedNode(start, "a", "x", 1)!.tree, [
+    assert.deepStrictEqual(withMovedNodes(start, ["a"], "x", 1)!.tree, [
       group("x", item("b"), item("a"), item("c")),
       group("y", item("d"))
     ])
-    assert.deepStrictEqual(withMovedNode(start, "b", null, 0)!.tree, [
+    assert.deepStrictEqual(withMovedNodes(start, ["b"], null, 0)!.tree, [
       item("b"),
       item("a"),
       group("x", item("c")),
       group("y", item("d"))
     ])
-    assert.deepStrictEqual(withMovedNode(start, "b", "x", 1)!.tree, [
+    assert.deepStrictEqual(withMovedNodes(start, ["b"], "x", 1)!.tree, [
       item("a"),
       group("x", item("c"), item("b")),
       group("y", item("d"))
@@ -124,11 +121,11 @@ describe("withMovedNode", () => {
   })
 
   it("moves a group with what is in it, clamps the index and drops a group it empties", () => {
-    assert.deepStrictEqual(withMovedNode(start, "x", "y", 99)!.tree, [
+    assert.deepStrictEqual(withMovedNodes(start, ["x"], "y", 99)!.tree, [
       item("a"),
       group("y", item("d"), group("x", item("b"), item("c")))
     ])
-    assert.deepStrictEqual(withMovedNode(start, "d", "x", 0)!.tree, [
+    assert.deepStrictEqual(withMovedNodes(start, ["d"], "x", 0)!.tree, [
       item("a"),
       group("x", item("d"), item("b"), item("c"))
     ])
@@ -136,17 +133,17 @@ describe("withMovedNode", () => {
 
   it("keeps a target that held only the emptied group", () => {
     const nested = structure(group("a", group("b", item("k"))))
-    assert.deepStrictEqual(withMovedNode(nested, "k", "a", 0)!.tree, [group("a", item("k"))])
+    assert.deepStrictEqual(withMovedNodes(nested, ["k"], "a", 0)!.tree, [group("a", item("k"))])
   })
 
   it("refuses a move into itself, or a parent that isn't a group, and a move that changes nothing", () => {
     const nested = structure(group("x", group("y", item("a"))))
-    assert.isUndefined(withMovedNode(nested, "x", "y", 0))
-    assert.isUndefined(withMovedNode(nested, "x", "x", 0))
-    assert.isUndefined(withMovedNode(nested, "y", "a", 0))
-    assert.isUndefined(withMovedNode(nested, "nope", null, 0))
-    assert.isUndefined(withMovedNode(start, "a", null, 0))
-    assert.isUndefined(withMovedNode(start, "c", "x", 5))
+    assert.isUndefined(withMovedNodes(nested, ["x"], "y", 0))
+    assert.isUndefined(withMovedNodes(nested, ["x"], "x", 0))
+    assert.isUndefined(withMovedNodes(nested, ["y"], "a", 0))
+    assert.isUndefined(withMovedNodes(nested, ["nope"], null, 0))
+    assert.isUndefined(withMovedNodes(start, ["a"], null, 0))
+    assert.isUndefined(withMovedNodes(start, ["c"], "x", 5))
   })
 })
 
@@ -242,7 +239,7 @@ describe("copy and paste", () => {
   })
 })
 
-describe("itemDisplayNames", () => {
+describe("itemNames", () => {
   const catalog = Schema.decodeUnknownSync(Catalog)(fixture)
   const cube = catalog.pieces.find((p) => p.className === "BP_Prim_Cube")!
   const placed = (x: number) => itemFromPiece(cube, placementTransform(cube, { x, y: 0, z: 0 }))
@@ -251,11 +248,11 @@ describe("itemDisplayNames", () => {
     const base = initialMapForTests()
     const map: MapFile = { ...base, items: [...base.items, placed(0), placed(1), placed(2)] }
     const keys = ["start", "goal", "c1", "c2", "c3"]
-    const names = itemDisplayNames(map, keys, new Map([["c2", { name: "Mine" }]]), indexCatalog(catalog))
+    const names = itemNames(map, keys, new Map([["c2", { name: "Mine" }]]), indexCatalog(catalog))
     const label = pieceLabelOf(cube)
-    assert.strictEqual(names.get("c1"), `${label} 1`)
-    assert.strictEqual(names.get("c2"), "Mine")
-    assert.strictEqual(names.get("c3"), `${label} 2`)
+    assert.strictEqual(numberedNameText(names.get("c1")!), `${label} 1`)
+    assert.strictEqual(numberedNameText(names.get("c2")!), "Mine")
+    assert.strictEqual(numberedNameText(names.get("c3")!), `${label} 2`)
   })
 
   it("gives a name nothing else has no ordinal", () => {
@@ -275,7 +272,7 @@ describe("itemDisplayNames", () => {
   it("writes the class out without a catalog", () => {
     const base = initialMapForTests()
     const map: MapFile = { ...base, items: [placed(0)] }
-    assert.strictEqual(itemDisplayNames(map, ["a"], new Map(), null).get("a"), "Prim Cube")
+    assert.strictEqual(numberedNameText(itemNames(map, ["a"], new Map(), null).get("a")!), "Prim Cube")
   })
 })
 

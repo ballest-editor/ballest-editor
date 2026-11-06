@@ -25,11 +25,11 @@ import type {
   PluginStatus,
   PrefabBackupRef,
   PrefabBackups,
-  PrefabBackupSummary,
   PrefabInfo,
   PrefabInfos,
   PrefabRead,
   PrefabRef,
+  PrefabSummary,
   PrefabTier,
   ProjectFolder,
   ProjectInfo,
@@ -205,7 +205,7 @@ export class Platform extends Context.Service<Platform, {
   readonly readBackup: (ref: BackupRef) => Effect.Effect<MapBackupFile, PlatformError>
   /** The prefabs' backups in both tiers, newest first (desktop). */
   readonly listPrefabBackups: Effect.Effect<PrefabBackups, PlatformError>
-  readonly describePrefabBackup: (ref: PrefabBackupRef) => Effect.Effect<PrefabBackupSummary, PlatformError>
+  readonly describePrefabBackup: (ref: PrefabBackupRef) => Effect.Effect<PrefabSummary, PlatformError>
   /** Writes a backup back as its prefab; the file it replaces goes to the backups. */
   readonly restorePrefabBackup: (ref: PrefabBackupRef) => Effect.Effect<PrefabInfo, PlatformError>
   readonly openExternal: (url: string) => Effect.Effect<void, PlatformError>

@@ -10,8 +10,17 @@ import { newMapFile } from "./factory"
 import { applyGroupDelta, type GroupDelta } from "./groupTransform"
 import { itemOfPrefab } from "./prefab"
 import { PrefabFile } from "./PrefabFile"
-import { checkInstance, definitionOf, type DocParts, instancesIn, withUpdatedInstance } from "./prefabInstance"
-import { findGroup, flatStructure, freshKeys, type Structure, treeKeys, withGroup, withPrefabLink } from "./structure"
+import { checkInstance, definitionOf, instancesIn, withUpdatedInstance } from "./prefabInstance"
+import {
+  type Doc,
+  findGroup,
+  flatStructure,
+  freshKeys,
+  type Structure,
+  treeKeys,
+  withGroup,
+  withPrefabLink
+} from "./structure"
 import { rotatorToQuat } from "./ueMath"
 
 const catalog = indexCatalog(Schema.decodeUnknownSync(Catalog)(fixture))
@@ -25,7 +34,7 @@ const FRAME = { x: 3000, y: -2000, z: 8000 }
 const GROUP = "instance"
 
 /** A map holding one loose item, then an instance of the fixture. */
-const placedDoc = (): DocParts => {
+const placedDoc = (): Doc => {
   const map = newMapFile({ displayName: "A", creatorName: "B", createdAt: "" })
   const [start] = map.items
   const items = prefab.items.map((item) => itemOfPrefab(item, FRAME, catalog))
@@ -39,12 +48,12 @@ const placedDoc = (): DocParts => {
   return { map: { ...map, items: [start!, ...items] }, ids: [...startKeys, ...keys], structure }
 }
 
-const groupOf = (doc: DocParts) => findGroup(doc.structure.tree, GROUP)!
-const check = (doc: DocParts) => checkInstance(doc, groupOf(doc), groupOf(doc).prefab!)
-const instanceKeys = (doc: DocParts) => treeKeys([groupOf(doc)])
+const groupOf = (doc: Doc) => findGroup(doc.structure.tree, GROUP)!
+const check = (doc: Doc) => checkInstance(doc, groupOf(doc), groupOf(doc).prefab!)
+const instanceKeys = (doc: Doc) => treeKeys([groupOf(doc)])
 
 /** `doc` with `delta` applied to the instance's items about `pivot`, as a gizmo drag on the whole group would. */
-const withDelta = (doc: DocParts, delta: GroupDelta, pivot = FRAME): DocParts => {
+const withDelta = (doc: Doc, delta: GroupDelta, pivot = FRAME): Doc => {
   const entries = instanceKeys(doc).map((key) => {
     const index = doc.ids.indexOf(key)
     return [index, applyGroupDelta(editTransform(doc.map.items[index]!), pivot, delta)] as const
@@ -52,7 +61,7 @@ const withDelta = (doc: DocParts, delta: GroupDelta, pivot = FRAME): DocParts =>
   return { ...doc, map: Option.getOrThrow(setTransforms(doc.map, entries)) }
 }
 
-const moved = (doc: DocParts, key: string, by: number): DocParts => {
+const moved = (doc: Doc, key: string, by: number): Doc => {
   const index = doc.ids.indexOf(key)
   const t: UeTransform = editTransform(doc.map.items[index]!)
   const next = { ...t, translation: { ...t.translation, x: t.translation.x + by } }
@@ -130,7 +139,7 @@ describe("whether an instance is unmodified", () => {
     const doc = placedDoc()
     const [, second] = instanceKeys(doc)
     const index = doc.ids.indexOf(second!)
-    const fewer: DocParts = {
+    const fewer: Doc = {
       ...doc,
       map: { ...doc.map, items: doc.map.items.filter((_, i) => i !== index) },
       ids: doc.ids.filter((key) => key !== second),
@@ -193,7 +202,7 @@ describe("updating an instance", () => {
     const shorter = definitionOf(decode(twoItems), { tier: "user", name: "Bridge", hash: NEW_HASH }, catalog)
     const three = withUpdatedInstance(doc, GROUP, nextDefinition)!
     const key = instanceKeys(three)[2]!
-    const named: DocParts = {
+    const named: Doc = {
       ...three,
       structure: { ...three.structure, items: new Map([[key, { name: "Keep me" }]]) } satisfies Structure
     }

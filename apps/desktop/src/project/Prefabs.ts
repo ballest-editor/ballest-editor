@@ -3,13 +3,13 @@ import {
   type PrefabBackup,
   type PrefabBackupRef,
   type PrefabBackups,
-  type PrefabBackupSummary,
   prefabFileNameOf,
   type PrefabInfo,
   type PrefabInfos,
   prefabNameOfFile,
   type PrefabRead,
   type PrefabRef,
+  type PrefabSummary,
   prefabSummaryOf,
   type PrefabTier,
   type RenamePrefabPayload,
@@ -20,10 +20,9 @@ import { type GamePathError, GamePaths } from "../game/GamePaths"
 import { prefabsFolderBeside } from "../game/locations"
 import { type BackupError, Backups, parseBackupId } from "./Backups"
 import { MAX_MAP_BYTES, sha256 } from "./files"
-import { backupsFolderIn, type ProjectError, projectError, Projects } from "./Projects"
+import { backupsFolderIn, type ProjectError, projectError, Projects, readError } from "./Projects"
 
-/** A tier's folder in a project. */
-export const prefabsFolderIn = (path: Path.Path, project: string) => path.join(project, "prefabs")
+const prefabsFolderIn = (path: Path.Path, project: string) => path.join(project, "prefabs")
 
 type PrefabsEffect<A> = Effect.Effect<A, ProjectError | GamePathError | BackupError>
 
@@ -49,7 +48,7 @@ export class Prefabs extends Context.Service<Prefabs, {
   /** Both tiers' backups, newest first. */
   readonly backups: Effect.Effect<PrefabBackups>
   /** What a backup `backups` listed holds; any other name is refused. */
-  readonly describeBackup: (ref: PrefabBackupRef) => Effect.Effect<PrefabBackupSummary, ProjectError>
+  readonly describeBackup: (ref: PrefabBackupRef) => Effect.Effect<PrefabSummary, ProjectError>
   /** Writes a backup's bytes back as its prefab, keeping the file they replace; any other name is refused. */
   readonly restoreBackup: (ref: PrefabBackupRef) => PrefabsEffect<PrefabInfo>
 }>()("ballest/desktop/project/Prefabs") {
@@ -61,9 +60,13 @@ export class Prefabs extends Context.Service<Prefabs, {
     const game = yield* GamePaths
     const backups = yield* Backups
 
+    /** A folder of the project in use, while there is one. */
+    const inProject = (folderIn: (path: Path.Path, project: string) => string) =>
+      Effect.map(projects.current, Option.map((project) => folderIn(path, project)))
+
     /** Where `tier` keeps its prefabs for reading, if it has anywhere yet. */
     const folderToRead = Effect.fnUntraced(function*(tier: PrefabTier) {
-      if (tier === "project") return Option.map(yield* projects.current, (project) => prefabsFolderIn(path, project))
+      if (tier === "project") return yield* inProject(prefabsFolderIn)
       const { mapsFolder } = yield* game.get
       return mapsFolder.path === null ? Option.none() : Option.some(prefabsFolderBeside(mapsFolder.path, path))
     })
@@ -82,15 +85,10 @@ export class Prefabs extends Context.Service<Prefabs, {
       return path.join(folder, prefabFileNameOf(name))
     })
 
-    const stamps = new Map<
-      string,
-      { readonly stamp: string; readonly hash: string } & ReturnType<typeof prefabSummaryOf>
-    >()
+    const stamps = new Map<string, { readonly stamp: string; readonly hash: string } & PrefabSummary>()
 
     const infoAt = Effect.fnUntraced(function*(tier: PrefabTier, name: string, file: string) {
-      const stat = yield* fs.stat(file).pipe(
-        Effect.mapError((cause) => projectError(cause.reason._tag === "NotFound" ? "notFound" : "read", file)(cause))
-      )
+      const stat = yield* fs.stat(file).pipe(Effect.mapError(readError(file)))
       if (Number(stat.size) > MAX_MAP_BYTES) return yield* projectError("tooLarge", file)()
       const modifiedAt = Option.getOrElse(stat.mtime, () => new Date(0)).toISOString()
       const stamp = `${modifiedAt} ${stat.size}`
@@ -107,11 +105,15 @@ export class Prefabs extends Context.Service<Prefabs, {
       return { tier, name, path: file, modifiedAt, hash, itemCount, firstClass } satisfies PrefabInfo
     })
 
-    const list = Effect.fn("Prefabs.list")(function*(tier: PrefabTier) {
+    const folderOf = Effect.fnUntraced(function*(tier: PrefabTier) {
       const folder = yield* folderToRead(tier)
+      return Option.isSome(folder) && (yield* fs.exists(folder.value)) ? folder : Option.none<string>()
+    }, Effect.orElseSucceed(() => Option.none<string>()))
+
+    const list = Effect.fn("Prefabs.list")(function*(tier: PrefabTier) {
+      const folder = yield* folderOf(tier)
       if (Option.isNone(folder)) return []
       const dir = folder.value
-      if (!(yield* fs.exists(dir).pipe(Effect.orElseSucceed(() => false)))) return []
       const files = yield* fs.readDirectory(dir).pipe(Effect.mapError(projectError("read", dir)))
       const infos = yield* Effect.forEach(files, (file) => {
         const name = prefabNameOfFile(file)
@@ -129,12 +131,14 @@ export class Prefabs extends Context.Service<Prefabs, {
       return { ...info, text } satisfies PrefabRead
     })
 
-    const exists = (file: string) => fs.exists(file).pipe(Effect.mapError(projectError("read", file)))
-
-    const write = Effect.fn("Prefabs.write")(function*({ name, replace, text, tier }: WritePrefabPayload) {
+    const write = Effect.fn("Prefabs.write")(function*(
+      { name, replace, text, tier }: Omit<WritePrefabPayload, "text"> & { readonly text: string | Uint8Array }
+    ) {
       const { folder, kept } = yield* folderToWrite(tier)
       const file = yield* fileIn(folder, name)
-      if (!replace && (yield* exists(file))) return yield* projectError("prefabExists", name)()
+      if (!replace && (yield* fs.exists(file).pipe(Effect.mapError(projectError("read", file))))) {
+        return yield* projectError("prefabExists", name)()
+      }
       yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.mapError(projectError("write", folder)))
       yield* backups.overwrite(kept, file, text)
       return yield* infoAt(tier, name, file)
@@ -152,23 +156,9 @@ export class Prefabs extends Context.Service<Prefabs, {
       return saved
     })
 
-    const folderOf = (tier: PrefabTier) =>
-      folderToRead(tier).pipe(
-        Effect.flatMap((folder) =>
-          Option.match(folder, {
-            onNone: () => Effect.succeedNone,
-            onSome: (dir) => fs.exists(dir).pipe(Effect.map((found) => found ? Option.some(dir) : Option.none()))
-          })
-        ),
-        Effect.orElseSucceed(() => Option.none<string>())
-      )
-
     /** Where `tier`'s backups are for reading: none for the project's while there is no project. */
-    const keptToRead = Effect.fnUntraced(function*(tier: PrefabTier) {
-      return tier === "user"
-        ? Option.some(userBackups)
-        : Option.map(yield* projects.current, (project) => backupsFolderIn(path, project))
-    })
+    const keptToRead = (tier: PrefabTier) =>
+      tier === "user" ? Effect.succeedSome(userBackups) : inProject(backupsFolderIn)
 
     const backupsIn = Effect.fnUntraced(function*(tier: PrefabTier) {
       const kept = yield* keptToRead(tier)
@@ -191,9 +181,7 @@ export class Prefabs extends Context.Service<Prefabs, {
       const name = Option.isSome(backup) ? prefabNameOfFile(backup.value.fileName) : undefined
       if (Option.isNone(kept) || name === undefined) return yield* projectError("notFound", id)()
       const file = path.join(kept.value, id)
-      const bytes = yield* fs.readFile(file).pipe(
-        Effect.mapError((cause) => projectError(cause.reason._tag === "NotFound" ? "notFound" : "read", file)(cause))
-      )
+      const bytes = yield* fs.readFile(file).pipe(Effect.mapError(readError(file)))
       return { bytes, name }
     })
 
@@ -204,11 +192,7 @@ export class Prefabs extends Context.Service<Prefabs, {
 
     const restoreBackup = Effect.fn("Prefabs.restoreBackup")(function*(ref: PrefabBackupRef) {
       const { bytes, name } = yield* readKept(ref)
-      const { folder, kept } = yield* folderToWrite(ref.tier)
-      const file = yield* fileIn(folder, name)
-      yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.mapError(projectError("write", folder)))
-      yield* backups.overwrite(kept, file, bytes)
-      return yield* infoAt(ref.tier, name, file)
+      return yield* write({ name, replace: true, text: bytes, tier: ref.tier })
     })
 
     return Prefabs.of({

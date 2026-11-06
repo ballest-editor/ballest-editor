@@ -2,6 +2,7 @@
  * What the action modules share about the project, the open map and notices; internal to `editor/actions`, not
  * re-exported.
  */
+import type { ProjectMapFile } from "@ballest/contracts"
 import { Effect } from "effect"
 import { mapLabelOf } from "../../domain/factory"
 import type { GameLinkNotice } from "../../domain/gameLink"
@@ -47,34 +48,12 @@ export const writeSidecarOf = Effect.fn("writeSidecarOf")(function*(doc: Doc, fi
 })
 
 /** A map file with what the desktop keeps beside it. */
-interface MapFileRead {
-  readonly fileName: string
-  readonly text: string
-  readonly hash: string
-  readonly sidecar: string | null
-}
-
-/** A map and what its sidecar adds to it. */
-export interface LoadedMap {
-  readonly map: MapFile
-  readonly loaded: LoadedStructure
-}
-
-/** Tells that a sidecar lost entries to a `.balledit` changed behind the editor's back. */
-const notifyUnmatched = (fileName: string, unmatched: number) =>
-  useEditor.getState().notify(
-    "info",
-    `${mapLabelOf(fileName)}: ${unmatched} ${unmatched === 1 ? "piece" : "pieces"} lost their editor data`,
-    {
-      kind: "sidecarUnmatched",
-      body:
-        "The map changed outside the editor and these pieces can't be found in it any more, so their names, tags and places in groups are gone."
-    }
-  )
+type MapFileRead = Pick<ProjectMapFile, "fileName" | "text" | "hash" | "sidecar">
 
 /**
- * Decodes a map and its sidecar and puts them together (`loadStructure`), reporting the entries that matched nothing. A
- * sidecar that won't decode leaves the map on its own, and says so: the next Save replaces it, and it goes to backups.
+ * Decodes a map and its sidecar and puts them together (`loadStructure`), reporting the entries that matched nothing: a
+ * `.balledit` changed behind the editor's back. A sidecar that won't decode leaves the map on its own, and says so: the
+ * next Save replaces it, and it goes to backups.
  */
 export const loadMapFile = Effect.fn("loadMapFile")(function*({ fileName, hash, sidecar, text }: MapFileRead) {
   const codec = yield* MapCodec
@@ -84,22 +63,31 @@ export const loadMapFile = Effect.fn("loadMapFile")(function*({ fileName, hash, 
     : yield* codec.decodeSidecar(sidecar).pipe(
       Effect.catchTag(
         "SidecarDecodeError",
-        (error) =>
-          Effect.logWarning(`Ignoring the sidecar of ${fileName}`, error.message).pipe(
-            Effect.andThen(Effect.sync(() =>
-              useEditor.getState().notify("error", `${mapLabelOf(fileName)}: its editor data couldn't be read`, {
-                kind: "sidecarUnreadable",
-                body:
-                  "It opened without its names, tags and nested groups. The next Save replaces that file; the old one goes to the backups."
-              })
-            )),
-            Effect.as(null)
-          )
+        Effect.fnUntraced(function*(error) {
+          yield* Effect.logWarning(`Ignoring the sidecar of ${fileName}`, error.message)
+          useEditor.getState().notify("error", `${mapLabelOf(fileName)}: its editor data couldn't be read`, {
+            kind: "sidecarUnreadable",
+            body:
+              "It opened without its names, tags and nested groups. The next Save replaces that file; the old one goes to the backups."
+          })
+          return null
+        })
       )
     )
   const loaded = loadStructure(map, hash, decoded)
-  if (loaded.unmatched > 0) notifyUnmatched(fileName, loaded.unmatched)
-  return { map, loaded } satisfies LoadedMap
+  const { unmatched } = loaded
+  if (unmatched > 0) {
+    useEditor.getState().notify(
+      "info",
+      `${mapLabelOf(fileName)}: ${unmatched} ${unmatched === 1 ? "piece" : "pieces"} lost their editor data`,
+      {
+        kind: "sidecarUnmatched",
+        body:
+          "The map changed outside the editor and these pieces can't be found in it any more, so their names, tags and places in groups are gone."
+      }
+    )
+  }
+  return { map, loaded }
 })
 
 /**
@@ -118,6 +106,12 @@ export const loadProjectMapFile = Effect.fn("loadProjectMapFile")(function*(file
   return opened
 })
 
+/** The prefs kept for `map`; unreadable ones only cost the saved grid height, Export on save and view layout. */
+export const prefsOf = (map: MapFile) =>
+  Effect.flatMap(Effect.service(MapPrefsStore), (store) => store.load(mapPrefsKeyOf(map))).pipe(
+    Effect.orElseSucceed((): MapPrefs => ({}))
+  )
+
 /**
  * Puts a map into the editor, with the prefs saved for it, in the tab `into` says (the active one by default); `dirty`
  * opens it as unsaved edits of `file`. `loaded` is what its sidecar gave.
@@ -127,16 +121,13 @@ export const showMap = Effect.fn("showMap")(function*(
   file: OpenFile | null,
   options?: { readonly dirty?: boolean; readonly into?: TabTarget; readonly loaded?: LoadedStructure }
 ) {
-  // unreadable prefs only cost the saved grid height and Export on save
-  const prefs = yield* MapPrefsStore.use((store) => store.load(mapPrefsKeyOf(map))).pipe(
-    Effect.orElseSucceed((): MapPrefs => ({}))
-  )
+  const prefs = yield* prefsOf(map)
   useEditor.getState().loadMap(map, file, prefs.gridHeight, {
     exportOnSave: prefs.exportOnSave === true,
     viewLayout: prefs.viewLayout,
     dirty: options?.dirty === true,
-    ...(options?.into !== undefined && { into: options.into }),
-    ...(options?.loaded !== undefined && { loaded: options.loaded })
+    into: options?.into,
+    loaded: options?.loaded
   })
   yield* followDefinitionsIn(useEditor.getState().tabId)
 })
@@ -156,6 +147,14 @@ export const saveTabPrefs = Effect.fn("saveTabPrefs")(function*(tabId?: string) 
     ...(!isDefaultViewLayout(viewLayout) && { viewLayout })
   }
   yield* MapPrefsStore.use((store) => store.save(mapPrefsKeyOf(doc.map), prefs))
+})
+
+/** Writes `text` over the project map `fileName`, or moves it to `to` when the map's name changed. */
+export const writeProjectMap = Effect.fn("writeProjectMap")(function*(fileName: string, to: string, text: string) {
+  const platform = yield* Platform
+  return yield* to === fileName
+    ? platform.saveMap({ fileName, text })
+    : platform.renameMap({ from: fileName, to, text })
 })
 
 /** Records a Game link notice (or one of Play's, which share its kinds) in the notification centre. */

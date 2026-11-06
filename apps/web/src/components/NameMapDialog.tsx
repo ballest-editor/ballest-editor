@@ -14,6 +14,7 @@ import {
 import { useEditor } from "../editor/store"
 import { type MapCreator, MapNameDialog, useMapCreator } from "./MapNameDialog"
 import { NewProjectFields, useNewProjectDraft } from "./NewProjectFields"
+import { useOnOpen } from "./useOnOpen"
 
 /**
  * Names the open map before it is written: `saveAs` for a map that has no file yet (desktop: into the project) or for
@@ -66,15 +67,11 @@ export function NameMapDialog(
       : levelData.levelDisplayName
   const [name, setName] = useState(startName)
   // Each time the dialog opens, start from the map as it is now.
-  const [wasOpen, setWasOpen] = useState(open)
-  if (open !== wasOpen) {
-    setWasOpen(open)
-    if (open) {
-      setName(startName())
-      ownCreator.setDraft(mapCreator || settingsCreator.name)
-      newProject.reset()
-    }
-  }
+  useOnOpen(open, () => {
+    setName(startName())
+    ownCreator.setDraft(mapCreator || settingsCreator.name)
+    newProject.reset()
+  })
 
   const target = mapFileNameOf(name.trim(), creator.name)
   const clash = projects && target !== fileName && taken.has(target)
@@ -96,13 +93,13 @@ export function NameMapDialog(
 
   const copy = {
     saveAs: projects
-      ? namesProject
-        ? {
-          title: "Save map",
-          note: "Makes a project and saves the map in it. This window becomes that project.",
-          submit: "Save"
-        }
-        : { title: "Save map", note: `Saves it in ${project?.name ?? "the project"}.`, submit: "Save" }
+      ? {
+        title: "Save map",
+        note: namesProject
+          ? "Makes a project and saves the map in it. This window becomes that project."
+          : `Saves it in ${project?.name ?? "the project"}.`,
+        submit: "Save"
+      }
       : {
         title: "Export map",
         note: "Downloads it. Put it in the game's UserSavedMaps folder; don't rename the file.",

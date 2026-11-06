@@ -32,9 +32,7 @@ export const parseBackupId = (id: string): Option.Option<Backup> => {
   const at = `${date}T${h}:${m}:${s}.${ms}Z`
   const millis = Date.parse(at)
   const known = isMapFileName(fileName) || isSidecarFileName(fileName) || prefabNameOfFile(fileName) !== undefined
-  return Number.isNaN(millis) || !known
-    ? Option.none()
-    : Option.some({ id, fileName, at, millis })
+  return Number.isNaN(millis) || !known ? Option.none() : Option.some({ id, fileName, at, millis })
 }
 
 const sameBytes = (a: Uint8Array, b: Uint8Array) => a.byteLength === b.byteLength && Buffer.compare(a, b) === 0

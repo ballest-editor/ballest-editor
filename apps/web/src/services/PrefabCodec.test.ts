@@ -28,8 +28,8 @@ describe("the prefab file", () => {
   it.effect("round-trips byte for byte in the game's layout", () =>
     Effect.gen(function*() {
       const codec = yield* MapCodec
-      const prefab = yield* codec.decodePrefab(PREFAB_TEXT)
-      assert.strictEqual(yield* codec.encodePrefab(prefab), PREFAB_TEXT)
+      const prefab = yield* codec.decodePrefab(PREFAB_TEXT, null)
+      assert.strictEqual(yield* codec.encodePrefab(prefab, null), PREFAB_TEXT)
       assert.include(PREFAB_TEXT, "\r\n\t\"format\"")
       assert.notStrictEqual(PREFAB_TEXT.charCodeAt(0), 0xfeff)
     }).pipe(Effect.provide(MapCodec.layer)))
@@ -41,7 +41,7 @@ describe("the prefab file", () => {
         json.fromAPlugin = 1
         first(json).future = "kept"
       })
-      const out = yield* codec.encodePrefab(yield* codec.decodePrefab(`\uFEFF${text}`))
+      const out = yield* codec.encodePrefab(yield* codec.decodePrefab(`\uFEFF${text}`, null), null)
       assert.include(out, "\"fromAPlugin\": 1")
       assert.include(out, "\"future\": \"kept\"")
     }).pipe(Effect.provide(MapCodec.layer)))

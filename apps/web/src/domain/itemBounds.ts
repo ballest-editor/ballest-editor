@@ -50,7 +50,6 @@ export const placedBoxOf = (placed: ReadonlyArray<PlacedItem>, catalog: CatalogI
 export const itemsBoxOf = (items: ReadonlyArray<Item>, catalog: CatalogIndex | null): Box | undefined =>
   placedBoxOf(items.map((item) => ({ item, transform: editTransform(item) })), catalog)
 
-/** The middle of `box`. */
 export const boxCentreOf = ({ max, min }: Box): Vec3 => ({
   x: (min.x + max.x) / 2,
   y: (min.y + max.y) / 2,

@@ -98,6 +98,10 @@ export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectErr
 export const projectError = (reason: ProjectError["reason"], file: string) => (cause?: unknown) =>
   new ProjectError({ path: file, reason, ...(cause === undefined ? {} : { cause }) })
 
+/** The `ProjectError` of a file that wouldn't read: it has gone, or something else went wrong. */
+export const readError = (file: string) => (cause: { readonly reason: { readonly _tag: string } }) =>
+  projectError(cause.reason._tag === "NotFound" ? "notFound" : "read", file)(cause)
+
 /** A project's `maps/` folder. */
 export const mapsFolderIn = (path: Path.Path, project: string) => path.join(project, "maps")
 

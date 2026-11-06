@@ -3,6 +3,8 @@
  * and quaternions, bare and class-qualified paths, the flat `properties` map and the typed lists. Also the frame the game
  * measures a prefab against, and where a spawn puts it.
  */
+import type { PrefabRef } from "@ballest/contracts"
+import { Predicate } from "effect"
 import type { CatalogIndex, CatalogPiece } from "./Catalog"
 import type { Vec3 } from "./coords"
 import { meshComponentFor, newMapFile, qualifyMaterialPath } from "./factory"
@@ -21,8 +23,9 @@ import {
 } from "./PrefabFile"
 import { quatToRotator, rotatorToQuat } from "./ueMath"
 
-/** A prefab's name, as main checks it. */
 export { isPrefabName, PREFAB_NAME_RULE } from "@ballest/contracts"
+
+export const isSamePrefab = (a: PrefabRef, b: PrefabRef): boolean => a.tier === b.tier && a.name === b.name
 
 export const ORIGIN: Vec3 = { x: 0, y: 0, z: 0 }
 
@@ -37,10 +40,6 @@ const listOfValue = (value: PrefabPropertyValue): { readonly list: PropertyList;
     ? { list: "intProperties", type: "Integer" }
     : { list: "floatProperties", type: "Float" }
 }
-
-const isBoolean = (value: PrefabPropertyValue) => typeof value === "boolean"
-const isNumber = (value: PrefabPropertyValue) => typeof value === "number"
-const isAnything = (_: PrefabPropertyValue): _ is PrefabPropertyValue => true
 
 const propertyListsOf = (item: PrefabItem, piece: CatalogPiece | undefined): Pick<Item, PropertyList> => {
   const entries = Object.entries(item.properties).map(([propertyName, currentValue]) => {
@@ -58,12 +57,12 @@ const propertyListsOf = (item: PrefabItem, piece: CatalogPiece | undefined): Pic
       list === wanted && is(currentValue) ? [{ currentValue, propertyName, propertyType }] : []
     )
   return {
-    boolProperties: listed("boolProperties", isBoolean),
-    floatProperties: listed("floatProperties", isNumber),
-    intProperties: listed("intProperties", isNumber),
-    textProperties: listed("textProperties", isAnything),
-    nameProperties: listed("nameProperties", isAnything),
-    stringProperties: listed("stringProperties", isAnything)
+    boolProperties: listed("boolProperties", Predicate.isBoolean),
+    floatProperties: listed("floatProperties", Predicate.isNumber),
+    intProperties: listed("intProperties", Predicate.isNumber),
+    textProperties: listed("textProperties", Predicate.isNotNullish),
+    nameProperties: listed("nameProperties", Predicate.isNotNullish),
+    stringProperties: listed("stringProperties", Predicate.isNotNullish)
   }
 }
 
@@ -145,7 +144,6 @@ export const prefabOfItems = (items: ReadonlyArray<Item>, catalog: CatalogIndex 
   }
 }
 
-/** Where a view starts and what it looks along. */
 export interface ViewRay {
   readonly origin: Vec3
   readonly direction: Vec3

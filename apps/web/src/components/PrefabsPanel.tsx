@@ -10,7 +10,7 @@ import {
 } from "@workspace/ui/components/dropdown-menu"
 import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
-import { type MouseEvent, useMemo, useRef, useState } from "react"
+import { type MouseEvent, useRef, useState } from "react"
 import { qualifyClassPath } from "../domain/prefab"
 import { copyPrefabToTier, duplicatePrefab, openPrefab, placePrefab, revealPrefabs } from "../editor/actions"
 import { startPrefabDrag } from "../editor/prefabDrag"
@@ -18,8 +18,6 @@ import { useEditor } from "../editor/store"
 import { focusViewport } from "../editor/Viewport"
 import { PieceThumbnail } from "./PieceThumbnail"
 import { SectionTitle } from "./SectionTitle"
-
-const TIER_TITLES: Readonly<Record<PrefabTier, string>> = { user: "User", project: "Project" }
 
 /** The first piece's picture, else a glyph: a prefab has no picture of its own. */
 function PrefabThumbnail({ prefab }: { readonly prefab: PrefabInfo }) {
@@ -121,21 +119,6 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
   )
 }
 
-function PrefabSection({ title, prefabs, empty }: {
-  readonly title: string
-  readonly prefabs: ReadonlyArray<PrefabInfo>
-  readonly empty: string
-}) {
-  return (
-    <section className="flex flex-col gap-1">
-      <SectionTitle>{title}</SectionTitle>
-      {prefabs.length === 0
-        ? <p className="px-2 text-xs text-muted-foreground">{empty}</p>
-        : <ul>{prefabs.map((prefab) => <PrefabRow key={prefab.name} prefab={prefab} />)}</ul>}
-    </section>
-  )
-}
-
 /**
  * The library of prefabs (docs/DESKTOP.md § Prefabs), one section per tier. A browser has the one tier, in memory.
  */
@@ -144,10 +127,24 @@ export function PrefabsPanel() {
   const projects = useEditor((s) => s.capabilities.projects)
   const hasProject = useEditor((s) => s.project?.current != null)
   const [query, setQuery] = useState("")
-  const terms = useMemo(() => query.toLowerCase().split(/\s+/).filter((t) => t.length > 0), [query])
+  const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 0)
   const inTier = (tier: PrefabTier) =>
     prefabs.filter((p) => p.tier === tier && terms.every((term) => p.name.toLowerCase().includes(term)))
-  const emptyOf = (none: string) => terms.length > 0 ? "Nothing matches the filter." : none
+  const sections: ReadonlyArray<{ readonly tier: PrefabTier; readonly title: string; readonly empty: string }> =
+    projects
+      ? [
+        {
+          tier: "project",
+          title: "Project",
+          empty: hasProject ? "This project has no prefabs yet." : "Name the project to keep prefabs in it."
+        },
+        { tier: "user", title: "User", empty: "Prefabs here are the game's own: the in-game editor lists them too." }
+      ]
+      : [{
+        tier: "user",
+        title: "This session",
+        empty: "Select two or more items, then Edit › Save selection as prefab…"
+      }]
   return (
     <aside className="flex h-full min-w-0 flex-col gap-2 bg-card p-2">
       <Input
@@ -162,30 +159,18 @@ export function PrefabsPanel() {
       />
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-3">
-          {projects
-            ? (
-              <>
-                <PrefabSection
-                  title={TIER_TITLES.project}
-                  prefabs={inTier("project")}
-                  empty={emptyOf(
-                    hasProject ? "This project has no prefabs yet." : "Name the project to keep prefabs in it."
-                  )}
-                />
-                <PrefabSection
-                  title={TIER_TITLES.user}
-                  prefabs={inTier("user")}
-                  empty={emptyOf("Prefabs here are the game's own: the in-game editor lists them too.")}
-                />
-              </>
-            )
-            : (
-              <PrefabSection
-                title="This session"
-                prefabs={inTier("user")}
-                empty={emptyOf("Select two or more items, then Edit › Save selection as prefab…")}
-              />
-            )}
+          {sections.map(({ empty, tier, title }) => (
+            <section key={tier} className="flex flex-col gap-1">
+              <SectionTitle>{title}</SectionTitle>
+              {inTier(tier).length === 0
+                ? (
+                  <p className="px-2 text-xs text-muted-foreground">
+                    {terms.length > 0 ? "Nothing matches the filter." : empty}
+                  </p>
+                )
+                : <ul>{inTier(tier).map((prefab) => <PrefabRow key={prefab.name} prefab={prefab} />)}</ul>}
+            </section>
+          ))}
         </div>
       </ScrollArea>
     </aside>

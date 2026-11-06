@@ -88,7 +88,7 @@ describe("the sidecar", () => {
     return Effect.gen(function*() {
       const { c, group } = yield* authored
       const outer = s().groupItems([c], "Outer")!
-      s().moveNode(group, outer, 0)
+      s().moveNodes([group], outer, 0)
       yield* saveMapFile
       const saved = yield* MapCodec.use((codec) => codec.decode(disk.files.get(projectFile(NAME))!))
       assert.deepStrictEqual(saved.editorState?.groups.map((g) => [g.members, g.name]), [[[2, 3, 4], "Outer"]])
@@ -226,9 +226,10 @@ describe("the sidecar", () => {
   it.effect("Recover brings back the version's structure with it", () => {
     const disk = makeTestDisk()
     return Effect.gen(function*() {
-      const { a, b, group } = yield* authored
+      const { a, b } = yield* authored
       const ids = s().doc.ids
-      s().ungroup(group)
+      s().select([a, b])
+      s().ungroupSelection()
       s().renameItem(a, "Renamed")
       edit()
       yield* saveMapFile

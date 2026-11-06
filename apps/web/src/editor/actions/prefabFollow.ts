@@ -4,29 +4,38 @@
  */
 import type { PrefabInfo, PrefabRef } from "@ballest/contracts"
 import { Effect } from "effect"
+import { isSamePrefab } from "../../domain/prefab"
 import { checkInstance, definitionOf, instancesIn } from "../../domain/prefabInstance"
-import { withPrefabLink } from "../../domain/structure"
 import { MapCodec } from "../../services/MapCodec"
 import { Platform } from "../../services/Platform"
 import { tabLabelOf, tabStateOf, useEditor } from "../store"
 
-const isOf = ({ name, tier }: PrefabRef) => (link: PrefabRef) => link.tier === tier && link.name === name
+/** A prefab's file, and what it decodes to. */
+export const readPrefabFile = Effect.fnUntraced(function*(ref: PrefabRef) {
+  const read = yield* (yield* Platform).readPrefab(ref)
+  const prefab = yield* MapCodec.use((codec) => codec.decodePrefab(read.text, useEditor.getState().catalogIndex))
+  return { prefab, read }
+})
 
 /** A definition, as an instance takes it. The catalog says which list each property goes in, so it has to be loaded. */
 export const readDefinition = Effect.fn("readDefinition")(function*(ref: PrefabRef) {
-  const file = yield* (yield* Platform).readPrefab(ref)
-  const { catalogIndex } = useEditor.getState()
-  const prefab = yield* MapCodec.use((codec) => codec.decodePrefab(file.text, catalogIndex))
-  return definitionOf(prefab, file, catalogIndex)
+  const { prefab, read } = yield* readPrefabFile(ref)
+  return definitionOf(prefab, read, useEditor.getState().catalogIndex)
 })
 
 /** The instances of `ref` in tab `tabId`'s map; a definition's tab keeps none, its file having no place for a link. */
 export const instancesInTab = (tabId: string, ref: PrefabRef) => {
   const tab = tabStateOf(useEditor.getState(), tabId)
   if (tab?.document.kind !== "map") return []
-  const matches = isOf(ref)
-  return instancesIn(tab.doc.structure.tree).filter(({ prefab }) => matches(prefab))
+  return instancesIn(tab.doc.structure.tree).filter(({ prefab }) => isSamePrefab(prefab, ref))
 }
+
+/** The instances of `ref` in tabs `tabIds` that link to a file other than the one of hash `hash`, by tab. */
+export const staleInstances = (tabIds: ReadonlyArray<string>, ref: PrefabRef, hash: string | undefined) =>
+  tabIds.flatMap((tabId) => {
+    const stale = instancesInTab(tabId, ref).filter(({ prefab }) => prefab.hash !== hash)
+    return stale.length === 0 ? [] : [{ tabId, stale }]
+  })
 
 const countOf = (n: number, what: string) => `${n} ${what}${n === 1 ? "" : "s"}`
 
@@ -51,16 +60,9 @@ const report = (ref: PrefabRef, updated: number, edited: ReadonlyArray<string>) 
   })
 }
 
-/** The instances of a changed definition in tabs `tabIds`: what links to an older file. */
-const behind = (tabIds: ReadonlyArray<string>, info: PrefabInfo) =>
-  tabIds.flatMap((tabId) => {
-    const stale = instancesInTab(tabId, info).filter(({ prefab }) => prefab.hash !== info.hash)
-    return stale.length === 0 ? [] : [{ tabId, stale }]
-  })
-
 /** Brings tabs `tabIds` up to one definition; one that won't read leaves its instances as they are. */
 const followOne = Effect.fnUntraced(function*(tabIds: ReadonlyArray<string>, info: PrefabInfo) {
-  const tabs = behind(tabIds, info)
+  const tabs = staleInstances(tabIds, info, info.hash)
   if (tabs.length === 0) return
   const definition = yield* readDefinition(info)
   let updated = 0
@@ -86,15 +88,10 @@ const relinkRenamed = (tabId: string) => {
   const tab = tabStateOf(s, tabId)
   if (tab?.document.kind !== "map") return
   for (const { id, prefab } of instancesIn(tab.doc.structure.tree)) {
-    const moved = s.prefabs.some(isOf(prefab))
+    const moved = s.prefabs.some((info) => isSamePrefab(info, prefab))
       ? undefined
       : s.prefabs.find(({ hash, tier }) => tier === prefab.tier && hash === prefab.hash)
-    if (moved !== undefined) {
-      s.editTabDoc(tabId, (doc) => {
-        const structure = withPrefabLink(doc.structure, id, { ...prefab, name: moved.name })
-        return structure === undefined ? undefined : { ...doc, structure }
-      })
-    }
+    if (moved !== undefined) s.relinkInstances(tabId, [[id, { ...prefab, name: moved.name }]])
   }
 }
 

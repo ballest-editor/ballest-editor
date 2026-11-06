@@ -1,17 +1,12 @@
 import { Button } from "@workspace/ui/components/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from "@workspace/ui/components/dialog"
+import { DialogFooter } from "@workspace/ui/components/dialog"
 import { Label } from "@workspace/ui/components/label"
 import { Switch } from "@workspace/ui/components/switch"
 import { useState } from "react"
 import { openInNewWindow, openInThisWindow, updateSettings } from "../editor/actions"
 import { useEditor } from "../editor/store"
+import { TitledDialog } from "./TitledDialog"
+import { useOnOpen } from "./useOnOpen"
 
 /**
  * New project…, Open project… and a recent project ask this once the project is known, in any window but the required
@@ -22,41 +17,39 @@ import { useEditor } from "../editor/store"
 export function WhereToOpenDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   const [always, setAlways] = useState(false)
   // Each time it asks, it starts unset: a Cancel keeps nothing.
-  const [wasOpen, setWasOpen] = useState(open)
-  if (open !== wasOpen) {
-    setWasOpen(open)
-    if (open) setAlways(false)
-  }
+  useOnOpen(open, () => setAlways(false))
   const remember = (opensIn: "thisWindow" | "newWindow") =>
     always ? updateSettings("general", { projectOpensIn: opensIn }) : Promise.resolve(undefined)
   const asked = useEditor((s) => s.dialog?.id === "whereToOpen" ? s.dialog : null)
   const current = useEditor((s) => s.project?.current?.name ?? "Untitled Project")
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-md" showCloseButton={false}>
-        <DialogHeader>
-          <DialogTitle>Open {asked?.name}</DialogTitle>
-          <DialogDescription>
-            This window is on <span className="text-foreground">{current}</span>. Open{" "}
-            <span className="text-foreground">{asked?.name}</span> here in its place, or in a new window?
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex items-center gap-2">
-          <Switch id="where-always" checked={always} onCheckedChange={setAlways} />
-          <Label htmlFor="where-always">Always do this</Label>
-        </div>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            className="sm:mr-auto"
-            onClick={() => void remember("newWindow").then(openInNewWindow)}
-          >
-            New window
-          </Button>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button autoFocus onClick={() => void remember("thisWindow").then(openInThisWindow)}>This window</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <TitledDialog
+      open={open}
+      onClose={onClose}
+      showCloseButton={false}
+      title={<>Open {asked?.name}</>}
+      description={
+        <>
+          This window is on <span className="text-foreground">{current}</span>. Open{" "}
+          <span className="text-foreground">{asked?.name}</span> here in its place, or in a new window?
+        </>
+      }
+    >
+      <div className="flex items-center gap-2">
+        <Switch id="where-always" checked={always} onCheckedChange={setAlways} />
+        <Label htmlFor="where-always">Always do this</Label>
+      </div>
+      <DialogFooter>
+        <Button
+          variant="outline"
+          className="sm:mr-auto"
+          onClick={() => void remember("newWindow").then(openInNewWindow)}
+        >
+          New window
+        </Button>
+        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button autoFocus onClick={() => void remember("thisWindow").then(openInThisWindow)}>This window</Button>
+      </DialogFooter>
+    </TitledDialog>
   )
 }

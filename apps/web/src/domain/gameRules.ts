@@ -51,7 +51,6 @@ const GROUP_NAME = /^[A-Za-z0-9]{1,64}$/
 /** How many items a prefab file holds, and what `saveprefab` takes from a selection. */
 export const PREFAB_ITEMS = { min: 2, max: 4096 } as const
 
-/** The class no prefab may hold. */
 const PLAYER_START = "MP_PlayerStart"
 
 /** The game's own words for a prefab it won't spawn. */
@@ -247,8 +246,7 @@ const hasZero = (scale: Triple) => scale.includes(0)
 const prefabItemProblems = (item: PrefabItem, index: number, piece: CatalogPiece | undefined): Array<string> => {
   const name = classNameOf(item.class)
   if (name === PLAYER_START) return [PREFAB_REFUSALS.playerStart]
-  const properties = Object.entries(item.properties)
-  const wrongProperty = piece?.properties !== undefined && properties.some(([property, value]) => {
+  const wrongProperty = piece?.properties !== undefined && Object.entries(item.properties).some(([property, value]) => {
     const list = piece.properties?.find((known) => known.name === property)?.list
     return list === undefined || (list !== null && !validPrefabValue(list, value))
   })

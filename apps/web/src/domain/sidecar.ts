@@ -101,7 +101,6 @@ const NEAR = [-1, 0, 1]
 const cellsAround = (print: Fingerprint): ReadonlyArray<string> =>
   NEAR.flatMap((dx) => NEAR.flatMap((dy) => NEAR.map((dz) => cellOf(print, dx, dy, dz))))
 
-/** Adds `value` to the list at `key`. */
 const addTo = <K, V>(lists: Map<K, Array<V>>, key: K, value: V) => {
   const list = lists.get(key)
   if (list === undefined) lists.set(key, [value])
@@ -201,11 +200,6 @@ export interface LoadedStructure {
   readonly rematched: boolean
 }
 
-const metaOf = ({ name, tags }: SidecarItem): ItemMeta => ({
-  ...(name !== undefined && { name }),
-  ...(tags !== undefined && tags.length > 0 && { tags })
-})
-
 /** A map's structure from nothing but itself: fresh keys, and its game groups as tree groups. */
 export const structureOfMap = (map: MapFile): LoadedStructure => {
   const ids = freshKeys(map.items.length)
@@ -224,8 +218,11 @@ export const loadStructure = (map: MapFile, mapHash: string, sidecar: MapSidecar
   const keys = byIndex ?? keysByFingerprint(map, entries)
   const matched = new Set(keys.flatMap((key) => key ?? []))
   const ids = keys.map((key) => key ?? freshKey())
-  const items = new Map(entries.flatMap(([key, entry]) => {
-    const meta = metaOf(entry)
+  const items = new Map(entries.flatMap(([key, { name, tags }]) => {
+    const meta: ItemMeta = {
+      ...(name !== undefined && { name }),
+      ...(tags !== undefined && tags.length > 0 && { tags })
+    }
     return matched.has(key) && Object.keys(meta).length > 0 ? [[key, meta] as const] : []
   }))
   return {
