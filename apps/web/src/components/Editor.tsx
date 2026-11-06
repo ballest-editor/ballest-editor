@@ -38,6 +38,7 @@ import { DeletePrefabDialog, RenamePrefabDialog, SavePrefabDialog } from "./Pref
 import { ProjectChooser } from "./ProjectChooser"
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
 import { RecoverDialog } from "./RecoverDialog"
+import { RecoverUnsavedDialog } from "./RecoverUnsavedDialog"
 import { ReplacePublishedDialog } from "./ReplacePublishedDialog"
 import { SettingsDialog } from "./SettingsDialog"
 import { StatusBar } from "./StatusBar"
@@ -180,6 +181,7 @@ export function Editor() {
       <OverwriteChangedDialog open={dialog === "overwriteChanged"} onClose={close} />
       <ImportClashDialog open={dialog === "importClash"} onClose={close} />
       <RecoverDialog open={dialog === "recover"} onClose={close} />
+      <RecoverUnsavedDialog open={dialog === "recoverUnsaved"} onClose={close} />
       <SettingsDialog
         open={dialog === "settings"}
         category={settingsCategory}

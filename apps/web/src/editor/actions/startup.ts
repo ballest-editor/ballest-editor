@@ -11,6 +11,8 @@ import { useEditor } from "../store"
 import { checkGameLinkEffect, findCreatorEffect } from "./gameLink"
 import { followOpenMapEffect, openStartingMap } from "./maps"
 import { checkPrefabs } from "./prefabs"
+import { offerRecovery } from "./recovery"
+import { followRecovery } from "./recoverySnapshots"
 import { run, runUntilCleanup } from "./run"
 import { refreshProject } from "./shared"
 import { checkExportsEffect } from "./sync"
@@ -104,9 +106,12 @@ export const loadPlatform = () =>
       if (capabilities.projects) {
         yield* openStartingMap
         yield* followOpenMapEffect
+        yield* followRecovery
       }
       if (capabilities.exportToGame) yield* checkGameLinkEffect
       yield* checkExportsEffect
+      // last: a dialog that opens takes another's place, and this is the one not to miss
+      yield* offerRecovery
     })
   )
 

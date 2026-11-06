@@ -19,6 +19,7 @@ import { GameProcess } from "../game/GameProcess"
 import { SteamLibrary } from "../game/SteamLibrary"
 import { NotificationLog } from "../notifications/NotificationLog"
 import { layerProjectsAt } from "../project/layers"
+import { Recovery } from "../project/Recovery"
 import { type WindowEntry, WindowRegistry } from "../project/WindowRegistry"
 import { DesktopSettings, DesktopSettingsFile } from "../settings/DesktopSettings"
 import { DesktopUpdates } from "../updates/DesktopUpdates"
@@ -210,7 +211,11 @@ export const withHandlers = <A, E>(
       Layer.provide(SteamLibrary.layer),
       Layer.provide(Layer.succeed(GameHost, GameHost.of(steam.host)))
     )
-    const projects = layerProjectsAt(path.dirname(project), "linux", path.join(dir, "userData", "backups")).pipe(
+    const recovery = Layer.effect(Recovery, Recovery.make(path.join(dir, "userData", "recovery")))
+    const projects = Layer.merge(
+      layerProjectsAt(path.dirname(project), "linux", path.join(dir, "userData", "backups")),
+      recovery
+    ).pipe(
       Layer.provideMerge(game),
       Layer.provideMerge(registry)
     )

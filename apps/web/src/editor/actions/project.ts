@@ -19,6 +19,7 @@ import {
   readProjectMapIntoEditor
 } from "./maps"
 import { checkPrefabs } from "./prefabs"
+import { offerRecovery } from "./recovery"
 import { run } from "./run"
 import { hasProject, projectName, refreshProject, revealIn, showMap } from "./shared"
 import { unlessAnyCancelled, unlessCancelledFor } from "./unsaved"
@@ -169,6 +170,7 @@ const changeProject = (change: (platform: Platform["Service"]) => Effect.Effect<
       kind: "projectChanged",
       actions: [revealIn("project")]
     })
+    yield* offerRecovery
   })
   return Effect.suspend(() => hasProject() ? unlessAnyCancelled("switchProject", use) : use)
 }

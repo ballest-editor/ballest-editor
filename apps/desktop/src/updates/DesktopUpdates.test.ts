@@ -23,6 +23,7 @@ const installedBuild = {
   exportBackupsDir: "/user/backups",
   notificationsPath: "/user/notifications.json",
   windowsDir: "/tmp/windows",
+  recoveryDir: "/tmp/recovery",
   launchProject: Option.none(),
   projectsDir: "/home/me/Documents/Ballest Editor",
   preloadPath: "/app/preload.cjs",

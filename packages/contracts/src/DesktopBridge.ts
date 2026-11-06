@@ -358,6 +358,17 @@ export type PrefabBackup = typeof PrefabBackup.Type
 export const PrefabBackups = Schema.Array(PrefabBackup)
 export type PrefabBackups = typeof PrefabBackups.Type
 
+/** One tab's name among the recovery snapshots: a UUID the page picks, which keeps paths out of it. */
+const RecoveryKey = Schema.String.check(Schema.isPattern(/^[0-9a-f-]{36}$/))
+
+const RecoveryKeyPayload = Schema.Struct({ key: RecoveryKey })
+
+/** A recovery snapshot (docs/DESKTOP.md § Recovery): the page encodes and decodes `text`, main only keeps it. */
+export const RecoveryEntry = Schema.Struct({ key: RecoveryKey, text: FileText })
+export type RecoveryEntry = typeof RecoveryEntry.Type
+
+const RecoveryEntries = Schema.Array(RecoveryEntry)
+
 const WindowThemePayload = Schema.Struct({ dark: Schema.Boolean })
 
 /** `confirmUnsaved`: the question and the line under it, worded by the page; main shows them with its three buttons. */
@@ -756,6 +767,12 @@ export const DesktopMethods = {
   listPrefabBackups: { payload: noPayload, result: PrefabBackups },
   describePrefabBackup: { payload: PrefabBackupRef, result: PrefabSummary },
   restorePrefabBackup: { payload: PrefabBackupRef, result: PrefabInfo },
+  /** The recovery snapshots no running window owns: what a window that went away without its page's say left behind. */
+  listRecovery: { payload: noPayload, result: RecoveryEntries },
+  /** Keeps a tab's recovery snapshot, over the one this key had. */
+  writeRecovery: { payload: RecoveryEntry, result: Schema.Void },
+  /** Lets a recovery snapshot go, whichever window wrote it. */
+  removeRecovery: { payload: RecoveryKeyPayload, result: Schema.Void },
   /** The native open dialog for a map file anywhere; null when cancelled. The file may then be imported. */
   pickImport: { payload: noPayload, result: PickImportResult },
   /** Copies a picked file into the project and records where it came from (a map it replaces goes to backups). */

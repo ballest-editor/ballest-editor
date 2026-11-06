@@ -15,6 +15,8 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
   readonly settingsPath: string
   /** `userData/backups`: the files Export wrote over in the game's maps folder (project/Backups.ts). */
   readonly exportBackupsDir: string
+  /** `userData/recovery`: the tabs' unsaved edits, while they have any (project/Recovery.ts). */
+  readonly recoveryDir: string
   /** `userData/notifications.json`: the bell's last notifications. */
   readonly notificationsPath: string
   /** `userData/windows`: one file per running copy, saying what it has open (project/WindowRegistry.ts). */
@@ -53,6 +55,7 @@ export class DesktopEnvironment extends Context.Service<DesktopEnvironment, {
           userData: metadata.userData,
           settingsPath: path.join(metadata.userData, "desktop-settings.json"),
           exportBackupsDir: path.join(metadata.userData, "backups"),
+          recoveryDir: path.join(metadata.userData, "recovery"),
           notificationsPath: path.join(metadata.userData, "notifications.json"),
           windowsDir: path.join(metadata.userData, "windows"),
           launchProject: parseProjectArg(process.argv),

@@ -1,7 +1,8 @@
 // The Electron half of `pnpm dev:desktop` (docs/DESKTOP.md § Dev workflow). `vite build --watch` starts it after its
 // first build. It waits for both bundles and the renderer's Vite dev server, runs Electron against that server, and
-// restarts it whenever main.cjs or preload.cjs is rewritten. Renderer edits don't come through here: Vite hot-reloads
-// them through the ballest-dev:// proxy.
+// restarts it whenever main.cjs or preload.cjs changes. A rebuild that writes the same bytes leaves it running: a
+// restart drops unsaved edits, and a `pnpm install` in another checkout sets off such a rebuild. Renderer edits don't
+// come through here: Vite hot-reloads them through the ballest-dev:// proxy.
 //
 // BALLEST_REMOTE_DEBUGGING_PORT=9222 opens the window to Chrome DevTools Protocol clients on that port.
 import { type ChildProcess, spawn } from "node:child_process"
@@ -9,6 +10,7 @@ import * as fs from "node:fs"
 import * as net from "node:net"
 import * as path from "node:path"
 import { setTimeout as sleep } from "node:timers/promises"
+import { bundleDigest } from "./bundleDigest.ts"
 import { desktopDir, electronEnv, electronPath } from "./electron.ts"
 
 const log = (message: string) => console.log(`[dev-electron] ${message}`)
@@ -65,8 +67,11 @@ let current: ChildProcess | null = null
 let restartTimer: NodeJS.Timeout | undefined
 /** Restarts run one after another, so a burst of rebuilds never leaves two windows open. */
 let restartQueue = Promise.resolve()
+/** The bundles the last Electron started from. */
+let startedFrom = ""
 
 const start = () => {
+  startedFrom = bundleDigest(bundleDir, bundles)
   const args = [...(remoteDebuggingPort ? [`--remote-debugging-port=${remoteDebuggingPort}`] : []), desktopDir]
   const child = spawn(electronPath, args, {
     cwd: desktopDir,
@@ -79,7 +84,7 @@ const start = () => {
     current = null
     // Not restarted here: a main process that fails at startup would bring its error box back in a loop.
     if (!shuttingDown) {
-      log(`Electron exited (${signal ?? code}); it starts again on the next rebuild of main or preload`)
+      log(`Electron exited (${signal ?? code}); it starts again when main or preload changes`)
     }
   })
 }
@@ -104,6 +109,7 @@ const scheduleRestart = () => {
   clearTimeout(restartTimer)
   restartTimer = setTimeout(() => {
     restartQueue = restartQueue.then(async () => {
+      if (bundleDigest(bundleDir, bundles) === startedFrom) return
       await stop()
       if (!shuttingDown) {
         log("bundle changed, restarting Electron")

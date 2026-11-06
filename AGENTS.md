@@ -33,6 +33,7 @@ Use one name per thing, in code comments and docs alike.
 | user, project tier | Where prefabs live: the game's own prefabs folder, and `<project>/prefabs/`.                                                                               |
 | sidecar            | `maps/<file name>.editor.json`, what a map holds that the game's format can't.                                                                             |
 | stable key         | An item's one identity in the editor: `Doc.ids` in the store, the keys in the sidecar.                                                                     |
+| recovery snapshot  | A tab's unsaved document, kept in `<userData>/recovery/` until it is saved or given up. Not a backup, which is a version of a saved file.                  |
 
 ## Layout
 

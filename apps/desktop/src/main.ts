@@ -20,6 +20,7 @@ import { SteamLibrary } from "./game/SteamLibrary"
 import { DesktopIpc } from "./ipc/DesktopIpc"
 import { NotificationLog } from "./notifications/NotificationLog"
 import { layerProjects } from "./project/layers"
+import { Recovery } from "./project/Recovery"
 import { WindowRegistry } from "./project/WindowRegistry"
 import { DesktopSettings } from "./settings/DesktopSettings"
 import { DesktopUpdates } from "./updates/DesktopUpdates"
@@ -52,7 +53,7 @@ const layerGame = Layer.mergeAll(GameCreator.layer, GameLink.layer).pipe(
   Layer.provideMerge(GameHost.layer)
 )
 
-const layerProjectsAndGame = layerProjects.pipe(
+const layerProjectsAndGame = Layer.merge(layerProjects, Recovery.layer).pipe(
   Layer.provideMerge(layerGame),
   Layer.provideMerge(WindowRegistry.layer)
 )

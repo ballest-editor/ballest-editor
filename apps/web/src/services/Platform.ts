@@ -40,6 +40,7 @@ import type {
   ProjectMaps,
   ProjectState,
   ProjectTarget,
+  RecoveryEntry,
   RenamePrefabPayload,
   UnloadKind,
   UnsavedChoice,
@@ -221,6 +222,12 @@ export class Platform extends Context.Service<Platform, {
   readonly describePrefabBackup: (ref: PrefabBackupRef) => Effect.Effect<PrefabSummary, PlatformError>
   /** Writes a backup back as its prefab; the file it replaces goes to the backups. */
   readonly restorePrefabBackup: (ref: PrefabBackupRef) => Effect.Effect<PrefabInfo, PlatformError>
+  /** The recovery snapshots no other running window owns (desktop; always empty in a browser, which keeps none). */
+  readonly listRecovery: Effect.Effect<ReadonlyArray<RecoveryEntry>, PlatformError>
+  /** Keeps a tab's recovery snapshot, over the one that key had; nothing in a browser. */
+  readonly writeRecovery: (entry: RecoveryEntry) => Effect.Effect<void, PlatformError>
+  /** Lets a recovery snapshot go; nothing in a browser. */
+  readonly removeRecovery: (key: string) => Effect.Effect<void, PlatformError>
   readonly openExternal: (url: string) => Effect.Effect<void, PlatformError>
   /** Tells the desktop window the page's resolved theme (its window controls follow it); nothing in a browser. */
   readonly setWindowTheme: (dark: boolean) => Effect.Effect<void, PlatformError>
@@ -393,6 +400,9 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     listPrefabBackups: call("listPrefabBackups"),
     describePrefabBackup: ({ id, tier }) => call("describePrefabBackup", { id, tier }),
     restorePrefabBackup: ({ id, tier }) => call("restorePrefabBackup", { id, tier }),
+    listRecovery: call("listRecovery"),
+    writeRecovery: (entry) => call("writeRecovery", entry),
+    removeRecovery: (key) => call("removeRecovery", { key }),
     setWindowTheme: (dark) => call("setWindowTheme", { dark }),
     confirmUnsaved: (action, map) => call("confirmUnsaved", unsavedPromptOf(action, map)),
     unloadRequests: pushed((listener) => bridge.onUnloadRequest(listener)),
@@ -563,6 +573,9 @@ const makeBrowser = (): Platform["Service"] => {
     listPrefabBackups: Effect.succeed([]),
     describePrefabBackup: () => desktopOnly,
     restorePrefabBackup: () => desktopOnly,
+    listRecovery: Effect.succeed([]),
+    writeRecovery: () => Effect.void,
+    removeRecovery: () => Effect.void,
     setWindowTheme: () => Effect.void,
     confirmUnsaved: (action, map) =>
       Effect.sync(() => window.confirm(discardQuestionOf(action, map)) ? "discard" : "cancel"),

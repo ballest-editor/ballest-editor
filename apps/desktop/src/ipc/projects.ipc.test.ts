@@ -1,6 +1,6 @@
 import { InvokeChannels, ProjectState } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, FileSystem, Option, Path } from "effect"
+import { Effect, Exit, FileSystem, Option, Path } from "effect"
 import { vi } from "vitest"
 import { readSettings, withHandlers } from "./handlersHarness"
 
@@ -209,4 +209,20 @@ describe("Projects over IPC", () => {
         "none"
       )
   )
+
+  it.effect("a recovery snapshot goes through main under a UUID, and no other name is taken", () =>
+    withHandlers(({ fake }) =>
+      Effect.gen(function*() {
+        const key = "00000000-0000-4000-8000-00000000000a"
+        yield* fake.invoke(InvokeChannels.writeRecovery, { key, text: "{}" })
+        assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.listRecovery), [{ key, text: "{}" }])
+        yield* fake.invoke(InvokeChannels.removeRecovery, { key })
+        assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.listRecovery), [])
+
+        const refused = yield* Effect.exit(
+          fake.invoke(InvokeChannels.writeRecovery, { key: "../../escape", text: "{}" })
+        )
+        assert.isTrue(Exit.isFailure(refused))
+      })
+    ))
 })

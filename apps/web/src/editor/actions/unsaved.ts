@@ -7,6 +7,7 @@ import type { UnsavedAction } from "../../domain/unsaved"
 import { Platform, type UnloadKind } from "../../services/Platform"
 import { dirtyTabs, inNamedProject, tabWithFile, useEditor } from "../store"
 import { freshMapEffect } from "./maps"
+import { dropRecovery } from "./recoverySnapshots"
 import { notifyFailure, run, runUntilCleanup } from "./run"
 import { saveOpenMapThen } from "./save"
 
@@ -59,20 +60,26 @@ export const unlessAnyCancelled = <E, R>(
   })
 
 /**
- * Runs `next` for the project map `fileName`, which is about to be replaced: when a tab has it open, that tab is made
- * active and asked about first (`unlessCancelled`), and `next` hears `true`; otherwise it runs at once with `false`.
+ * Runs `next` for what tab `tabId` has open, which is about to be replaced: that tab is made active and asked about first
+ * (`unlessCancelled`), and `next` hears `true`. With no such tab it runs at once with `false`.
  */
-export const unlessCancelledFor = <E, R>(
-  fileName: string,
+export const unlessCancelledIn = <E, R>(
+  tabId: string | undefined,
   action: UnsavedAction,
   next: (open: boolean) => Effect.Effect<void, E, R>
 ) =>
   Effect.suspend(() => {
-    const tabId = tabWithFile(useEditor.getState(), fileName)
     if (tabId === undefined) return next(false)
     useEditor.getState().activateTab(tabId)
     return unlessCancelled(action, next(true))
   })
+
+/** `unlessCancelledIn` the tab that has the project map `fileName` open. */
+export const unlessCancelledFor = <E, R>(
+  fileName: string,
+  action: UnsavedAction,
+  next: (open: boolean) => Effect.Effect<void, E, R>
+) => Effect.suspend(() => unlessCancelledIn(tabWithFile(useEditor.getState(), fileName), action, next))
 
 /** Whether the page holds a close or a reload (its `beforeunload` cancels it) so the prompt can ask first. */
 export const holdsUnload = () => dirtyTabs(useEditor.getState()).length > 0 && !leaving
@@ -83,6 +90,8 @@ export const answerUnloadRequest = (kind: UnloadKind) =>
     kind,
     Effect.gen(function*() {
       leaving = true
+      // every tab was answered for: nothing here is for the next launch to offer
+      yield* dropRecovery
       yield* (yield* Platform).leave(kind)
     })
   )
