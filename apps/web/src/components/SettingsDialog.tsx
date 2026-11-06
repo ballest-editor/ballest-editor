@@ -442,8 +442,7 @@ export function SettingsDialog(props: {
         ...setting("general", "altDragDuplicates"),
         label: "Alt+drag duplicates",
         description: "Alt+drag moves a copy, like the game.",
-        info:
-          "Alt+drag on a translate handle moves a copy and leaves the original in place. Off: Alt+drag is a plain move.",
+        info: "Alt+drag on a move handle moves a copy and leaves the original in place. Off: Alt+drag is a plain move.",
         control: (
           <Switch
             checked={settings.general.altDragDuplicates}
