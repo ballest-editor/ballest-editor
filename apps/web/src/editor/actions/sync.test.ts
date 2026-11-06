@@ -334,10 +334,16 @@ describe("sync", () => {
       assert.deepStrictEqual(disk.game.opens, [])
       const update = s().notifications.find((n) => n.kind === "pluginUpdate")
       assert.deepInclude(update?.actions[0], { label: "Update plugin" })
+      // the press itself answers, not only the bell
+      assert.strictEqual(
+        s().toasts[0]?.title,
+        `Can't open ${label} in the in-game editor: update the editor's plugin to 0.2.0 first`
+      )
 
       disk.game.plugin = { ...disk.game.plugin, hostTooOld: true, hostVersion: "0.33.2" }
       yield* openInGameEffect
       assert.match(s().notifications.find((n) => n.kind === "pluginUpdate")?.title ?? "", /Update the plugin manager/)
+      assert.match(s().toasts[0]?.title ?? "", /: needs plugin manager 0\.34\.0 \(the game has 0\.33\.2\)$/)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 

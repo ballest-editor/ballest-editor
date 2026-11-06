@@ -7,7 +7,12 @@
 import { ExportRefusal } from "@ballest/contracts"
 import { Effect, Stream } from "effect"
 import { mapLabelOf } from "../../domain/factory"
-import { openWithoutPluginNotice, playWithoutPluginNotice, RESOLVED_BY_PLAY } from "../../domain/gameLink"
+import {
+  openInGameProblem,
+  openWithoutPluginNotice,
+  playWithoutPluginNotice,
+  RESOLVED_BY_PLAY
+} from "../../domain/gameLink"
 import type { GameWrite } from "../../domain/linkState"
 import { type ExportOptions, type OpenInGameResult, Platform, type PlayResult } from "../../services/Platform"
 import { type PublishedDraft, useEditor } from "../store"
@@ -167,8 +172,16 @@ export const writeToGame = Effect.fn("writeToGame")(
         yield* refreshProject
         notifyOpening(fileName, result, options)
         return
-      case "NeedsPlugin":
+      case "NeedsPlugin": {
+        // the pinned notice has the steps; the press itself gets an answer too, or the button looks dead
+        const problem = openInGameProblem(result.plugin) ?? "the plugin didn't answer"
+        useEditor.getState().notify(
+          "error",
+          `Can't open ${mapLabelOf(fileName)} in the in-game editor: ${problem[0]?.toLowerCase()}${problem.slice(1)}`,
+          { kind: "openInGame", body: "The notifications have the steps." }
+        )
         notifyNotice(openWithoutPluginNotice(mapLabelOf(fileName), result.plugin))
+      }
     }
   },
   (effect, intent, fileName) => showingGameWrite({ intent, fileName, stage: "copy" })(effect)
