@@ -90,7 +90,7 @@ Viewport chrome is one shape, rounded rects at the control radius (`viewControlS
 
 ## Status colours
 
-A sync status (`syncStatusOf`, `domain/linkState.ts`) wears one of three pairs: an opaque fill and the text on it. The text also has to read with no fill, on `--card` and `--popover`, because Settings › Game uses it alone. `SyncStatusChip.tsx` is the one place that names them; don't use Tailwind's palette (`emerald-500`) for a status.
+A sync status (`syncStatusOf`, `domain/linkState.ts`) wears one of three pairs: an opaque fill and the text on it. The text also has to read with no fill, on `--card` and `--popover`, because Settings › Game uses it alone. `SyncStatusChip.tsx` is the one place that names them; don't use Tailwind's palette (`emerald-500`) for a status. A chip is a `rounded-full` pill filled with its tone, the same component in the status bar and on a Project panel row.
 
 | Fill                | Text                             | For                           |
 | ------------------- | -------------------------------- | ----------------------------- |
@@ -98,4 +98,4 @@ A sync status (`syncStatusOf`, `domain/linkState.ts`) wears one of three pairs: 
 | `bg-status-warn`    | `text-status-warn-foreground`    | Unsaved, Changed since export |
 | `bg-status-neutral` | `text-status-neutral-foreground` | Not exported, Published draft |
 
-The variables are `--status-ok`, `--status-warn`, `--status-neutral`, and each with `-foreground`. A hover is the fill at 80%, which is why the fill has to be opaque.
+Not exported is every map's resting state, so it wears neutral, the quietest pair: colour means something needs a look or has just gone right. The variables are `--status-ok`, `--status-warn`, `--status-neutral`, and each with `-foreground`. A hover is the fill at 80%, which is why the fill has to be opaque.

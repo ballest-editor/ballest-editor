@@ -1,5 +1,4 @@
 import { IconDotsVertical, IconDownload, IconMap, IconMapPlus, IconSettings } from "@tabler/icons-react"
-import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import {
   DropdownMenu,
@@ -27,7 +26,7 @@ import {
 } from "../editor/actions"
 import { type ProjectMap, tabsWithoutFile, useEditor, useHasUnsavedEdits, useTabSummary } from "../editor/store"
 import { useNow } from "../editor/useNow"
-import { SyncStatusBadge } from "./SyncStatusChip"
+import { StatusChip, SyncStatusChip } from "./SyncStatusChip"
 
 /** A map's sync status, with its link state and when it was last exported on hover. */
 function RowStatus(
@@ -40,7 +39,7 @@ function RowStatus(
 ) {
   return (
     <Tooltip>
-      <TooltipTrigger render={<SyncStatusBadge status={syncStatusOf(state, unsaved)} />} />
+      <TooltipTrigger render={<SyncStatusChip status={syncStatusOf(state, unsaved)} icon={false} />} />
       <TooltipContent side="bottom" align="end">{linkStateDetailOf(map, state, now)}</TooltipContent>
     </Tooltip>
   )
@@ -64,10 +63,10 @@ function RowDetails(
 }
 
 const ROW_CLASSES =
-  "group flex h-6 min-w-0 items-center gap-1.5 rounded-control pl-2 text-body hover:bg-muted/60 has-[button:focus-visible]:bg-muted/60"
+  "group flex h-6 min-w-0 items-center gap-1.5 rounded-control pl-2 text-body hover:bg-accent has-[button:focus-visible]:bg-accent"
 
 /** The map in the active tab: tinted, with a bar at its left, so it reads at a glance. */
-const ACTIVE_ROW_CLASSES = "bg-primary/15 text-foreground shadow-[inset_2px_0_0_0] shadow-primary hover:bg-primary/20"
+const ACTIVE_ROW_CLASSES = "bg-primary/12 text-foreground shadow-[inset_2px_0_0_0] shadow-primary hover:bg-primary/20"
 
 /**
  * One of the project's maps: a click opens it, its menu (also on right-click) holds what used to be the Project menu's
@@ -177,7 +176,7 @@ function UnsavedRow({ tabId }: { readonly tabId: string }) {
           <RowDetails name={label} unsaved="Not saved yet" edited={null} />
         </TooltipContent>
       </Tooltip>
-      <SyncStatusBadge status="unsaved" className="mr-7.5" />
+      <SyncStatusChip status="unsaved" icon={false} className="mr-7.5" />
     </li>
   )
 }
@@ -218,7 +217,7 @@ function ProjectName({ name, path }: { readonly name: string | null; readonly pa
     return (
       <span className="flex min-w-0 flex-1">
         <Tooltip>
-          <TooltipTrigger render={<Badge variant="outline" className="text-fg-secondary" />}>Untitled</TooltipTrigger>
+          <TooltipTrigger render={<StatusChip tone="neutral" />}>Untitled</TooltipTrigger>
           <TooltipContent side="bottom">Saving a map creates the project</TooltipContent>
         </Tooltip>
       </span>
@@ -247,8 +246,8 @@ export function ProjectPanel() {
   const openDialog = useEditor((s) => s.openDialog)
   const now = useNow()
   const untitled = projects && project === null
-  // a project with no maps yet; Untitled Project is always that, with a tab's row above (closing the last opens another)
-  const empty = maps.length === 0 && (projects || unsavedTabs.length === 0)
+  // nothing to list: a tab with no file is a row, so Untitled Project, which always has one, never gets here
+  const empty = maps.length === 0 && unsavedTabs.length === 0
   return (
     <aside className="flex h-full min-w-0 flex-col bg-card">
       {/* the name lines up with the rows' glyphs, and the last button with their ⋮ */}

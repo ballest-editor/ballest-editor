@@ -1,6 +1,5 @@
 import { IconCircleCheck, IconCircleDashed, IconPencil, IconRefreshAlert, IconWorldUpload } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
-import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 import type { ComponentProps, ComponentType } from "react"
 import { SYNC_STATUS_LABELS, SYNC_STATUS_TONES, type SyncStatus, type SyncTone } from "../domain/linkState"
@@ -13,50 +12,44 @@ const ICONS: Record<SyncStatus, ComponentType<{ readonly className?: string }>> 
   publishedDraft: IconWorldUpload
 }
 
-/** `fill` and `text` are a badge's colours; a chip adds `hover`, with `text` on a span so the button's hover leaves it alone. */
-const TONES: Record<SyncTone, { readonly fill: string; readonly hover: string; readonly text: string }> = {
-  neutral: {
-    fill: "bg-status-neutral",
-    hover: "hover:bg-status-neutral/80 aria-expanded:bg-status-neutral/80 dark:hover:bg-status-neutral/80",
-    text: "text-status-neutral-foreground"
-  },
-  ok: {
-    fill: "bg-status-ok",
-    hover: "hover:bg-status-ok/80 aria-expanded:bg-status-ok/80 dark:hover:bg-status-ok/80",
-    text: "text-status-ok-foreground"
-  },
-  warn: {
-    fill: "bg-status-warn",
-    hover: "hover:bg-status-warn/80 aria-expanded:bg-status-warn/80 dark:hover:bg-status-warn/80",
-    text: "text-status-warn-foreground"
-  }
+/** A tone's fill and text, and the hover a chip gets when it renders as a button. */
+const TONES: Record<SyncTone, string> = {
+  neutral:
+    "bg-status-neutral text-status-neutral-foreground [button]:hover:bg-status-neutral/80 [button]:aria-expanded:bg-status-neutral/80",
+  ok: "bg-status-ok text-status-ok-foreground [button]:hover:bg-status-ok/80 [button]:aria-expanded:bg-status-ok/80",
+  warn:
+    "bg-status-warn text-status-warn-foreground [button]:hover:bg-status-warn/80 [button]:aria-expanded:bg-status-warn/80"
 }
 
-/** A sync status as a button: its colour, icon and label, then `children`. */
-export function SyncStatusChip(
-  { status, className, children, ...props }: ComponentProps<typeof Button> & { readonly status: SyncStatus }
+/** A pill in a status tone: a span, or whatever `render` gives it. */
+export function StatusChip(
+  { tone, className, ...props }: ComponentProps<typeof Badge> & { readonly tone: SyncTone }
 ) {
-  const Icon = ICONS[status]
-  const tone = TONES[SYNC_STATUS_TONES[status]]
   return (
-    <Button variant="ghost" size="sm" className={cn("h-5 px-1.5", tone.fill, tone.hover, className)} {...props}>
-      <span className={cn("inline-flex items-center gap-1 whitespace-nowrap", tone.text)}>
-        <Icon className="size-4" />
-        {SYNC_STATUS_LABELS[status]}
-        {children}
-      </span>
-    </Button>
+    <Badge
+      variant="secondary"
+      className={cn("rounded-full outline-none [&>svg]:size-3.5!", TONES[tone], className)}
+      {...props}
+    />
   )
 }
 
-/** A sync status as a badge, in the chip's colours and words, for a row. */
-export function SyncStatusBadge(
-  { status, className, ...props }: ComponentProps<typeof Badge> & { readonly status: SyncStatus }
+/**
+ * A sync status as a chip: its colour, icon and label, then `children`. The one chip for the status bar, where `render`
+ * makes it a button, and a Project panel row, which has no room for the icon.
+ */
+export function SyncStatusChip(
+  { status, icon = true, children, ...props }: ComponentProps<typeof Badge> & {
+    readonly status: SyncStatus
+    readonly icon?: boolean
+  }
 ) {
-  const tone = TONES[SYNC_STATUS_TONES[status]]
+  const Icon = ICONS[status]
   return (
-    <Badge variant="secondary" className={cn(tone.fill, tone.text, className)} {...props}>
+    <StatusChip tone={SYNC_STATUS_TONES[status]} {...props}>
+      {icon && <Icon />}
       {SYNC_STATUS_LABELS[status]}
-    </Badge>
+      {children}
+    </StatusChip>
   )
 }

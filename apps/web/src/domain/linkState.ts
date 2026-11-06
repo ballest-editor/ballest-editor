@@ -63,7 +63,7 @@ export const SYNC_STATUS_LABELS: Record<SyncStatus, string> = {
   publishedDraft: "Published draft"
 }
 
-/** Which `--status-*` colours a status wears (docs/design/ui-system.md). */
+/** Which `--status-*` colours a status wears (docs/design/ui-system.md): neutral at rest, colour only when it says something. */
 export type SyncTone = "neutral" | "ok" | "warn"
 
 export const SYNC_STATUS_TONES: Record<SyncStatus, SyncTone> = {
