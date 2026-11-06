@@ -5,7 +5,7 @@
 import type { PrefabInfo, PrefabRef } from "@ballest/contracts"
 import { Effect } from "effect"
 import { isSamePrefab } from "../../domain/prefab"
-import { checkInstance, definitionOf, instancesIn } from "../../domain/prefabInstance"
+import { checkInstance, definitionOf, instancesIn, instancesOfPrefab } from "../../domain/prefabInstance"
 import { MapCodec } from "../../services/MapCodec"
 import { Platform } from "../../services/Platform"
 import { tabLabelOf, tabStateOf, useEditor } from "../store"
@@ -27,7 +27,7 @@ export const readDefinition = Effect.fn("readDefinition")(function*(ref: PrefabR
 export const instancesInTab = (tabId: string, ref: PrefabRef) => {
   const tab = tabStateOf(useEditor.getState(), tabId)
   if (tab?.document.kind !== "map") return []
-  return instancesIn(tab.doc.structure.tree).filter(({ prefab }) => isSamePrefab(prefab, ref))
+  return instancesOfPrefab(tab.doc.structure.tree, ref)
 }
 
 /** The instances of `ref` in tabs `tabIds` that link to a file other than the one of hash `hash`, by tab. */
@@ -37,7 +37,7 @@ export const staleInstances = (tabIds: ReadonlyArray<string>, ref: PrefabRef, ha
     return stale.length === 0 ? [] : [{ tabId, stale }]
   })
 
-const countOf = (n: number, what: string) => `${n} ${what}${n === 1 ? "" : "s"}`
+export const countOf = (n: number, what: string) => `${n} ${what}${n === 1 ? "" : "s"}`
 
 /** Tells what following a definition did, and offers the choice for what it couldn't follow. */
 const report = (ref: PrefabRef, updated: number, edited: ReadonlyArray<string>) => {
@@ -60,10 +60,13 @@ const report = (ref: PrefabRef, updated: number, edited: ReadonlyArray<string>) 
   })
 }
 
-/** Brings tabs `tabIds` up to one definition; one that won't read leaves its instances as they are. */
-const followOne = Effect.fnUntraced(function*(tabIds: ReadonlyArray<string>, info: PrefabInfo) {
+/**
+ * Brings tabs `tabIds` up to one definition, and answers how many instances took it. One that won't read leaves its
+ * instances as they are. `quiet` keeps the updated ones out of the notification centre: whoever saved says so.
+ */
+const followOne = Effect.fnUntraced(function*(tabIds: ReadonlyArray<string>, info: PrefabInfo, quiet: boolean) {
   const tabs = staleInstances(tabIds, info, info.hash)
-  if (tabs.length === 0) return
+  if (tabs.length === 0) return 0
   const definition = yield* readDefinition(info)
   let updated = 0
   const edited: Array<string> = []
@@ -76,7 +79,8 @@ const followOne = Effect.fnUntraced(function*(tabIds: ReadonlyArray<string>, inf
     edited.push(...Array.from({ length: stale.length - unmodified.length }, () => tabLabelOf(tab)))
     state.updateInstances(tabId, unmodified.map(({ id }) => id), definition)
   }
-  report(info, updated, edited)
+  report(info, quiet ? 0 : updated, edited)
+  return updated
 })
 
 /**
@@ -96,17 +100,22 @@ const relinkRenamed = (tabId: string) => {
 }
 
 /**
- * Brings tabs `tabIds` up to the definitions `infos`, each reported once. Nothing happens before the catalog is in:
- * startup goes through every tab once it is.
+ * Brings tabs `tabIds` up to the definitions `infos`, each reported once, except that the one `saved` is left for the
+ * caller to report: this answers how many of its instances took it. Nothing happens before the catalog is in: startup
+ * goes through every tab once it is.
  */
 export const followDefinitions = Effect.fn("followDefinitions")(
-  function*(tabIds: ReadonlyArray<string>, infos: ReadonlyArray<PrefabInfo>) {
-    if (useEditor.getState().catalogIndex === null) return
+  function*(tabIds: ReadonlyArray<string>, infos: ReadonlyArray<PrefabInfo>, saved?: PrefabRef) {
+    let savedUpdated = 0
+    if (useEditor.getState().catalogIndex === null) return savedUpdated
     for (const info of infos) {
-      yield* followOne(tabIds, info).pipe(
-        Effect.catch((error) => Effect.logWarning(`Couldn't follow the prefab ${info.name}`, error))
+      const isSaved = saved !== undefined && isSamePrefab(info, saved)
+      const updated = yield* followOne(tabIds, info, isSaved).pipe(
+        Effect.catch((error) => Effect.as(Effect.logWarning(`Couldn't follow the prefab ${info.name}`, error), 0))
       )
+      if (isSaved) savedUpdated = updated
     }
+    return savedUpdated
   }
 )
 

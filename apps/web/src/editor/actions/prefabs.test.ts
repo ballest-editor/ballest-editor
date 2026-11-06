@@ -34,10 +34,14 @@ import {
   deletePrefabEffect,
   openPrefabEffect,
   placePrefabEffect,
+  projectMapsUsingPrefabEffect,
   renamePrefabEffect,
   savePrefabTab,
   saveSelectionAsPrefabEffect,
-  selectionPrefabProblem
+  selectInstances,
+  selectionPrefabProblem,
+  suggestPrefabName,
+  tabsUsingPrefab
 } from "./prefabs"
 import { saveMapFile } from "./save"
 import { closeTabEffect } from "./unsaved"
@@ -54,12 +58,13 @@ const AIM = { x: 3000, y: 0, z: 9000 }
 
 const decodeSidecar = Schema.decodeUnknownSync(Schema.fromJsonString(MapSidecar))
 const notices = (kind: string) => s().notifications.filter((n) => n.kind === kind)
+const toastsOf = (kind: string) => s().toasts.filter((n) => n.kind === kind)
 
 /** A saved map and the catalog, with the fixture in the game's prefabs folder. */
 const started = (disk: TestDisk) =>
   Effect.gen(function*() {
     yield* reset
-    useEditor.setState({ notifications: [], prefabs: [], catalogIndex: indexCatalog(parsed) })
+    useEditor.setState({ notifications: [], toasts: [], prefabs: [], catalogIndex: indexCatalog(parsed) })
     sceneRegistry.placementPoint = (width, height) => spreadPlacement(AIM, width, VIEW_DOWN, height)
     disk.files.set(userPrefabFile("Bridge"), PREFAB_TEXT)
     yield* createNewMap("Big Loop", "Isaac")
@@ -121,6 +126,11 @@ const moveAll = (id: string, by: number) => {
     )
   )
 }
+
+const openDefinition = Effect.gen(function*() {
+  yield* openPrefabEffect(USER)
+  return s().tabId
+})
 
 const withDisk = (
   body: (disk: TestDisk) => Effect.Effect<void, unknown, Layer.Success<ReturnType<typeof layerFor>>>
@@ -349,11 +359,6 @@ describe("instances following their definition", () => {
 })
 
 describe("a definition's tab", () => {
-  const openDefinition = Effect.gen(function*() {
-    yield* openPrefabEffect(USER)
-    return s().tabId
-  })
-
   it.effect("is a tab like a map's that knows what it holds", () =>
     withDisk((disk) =>
       Effect.gen(function*() {
@@ -431,6 +436,38 @@ describe("a definition's tab", () => {
       })
     ))
 
+  it.effect("says in one toast that Save updated the instances, and keeps them out of the notification centre", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        yield* placed
+        yield* placed
+        yield* placed
+        yield* openDefinition
+        moveItem(s().doc.ids[0] ?? "", 300)
+        yield* saveMapFile
+        const [toast, ...others] = toastsOf("prefabSaved")
+        assert.strictEqual(toast?.title, "3 instances updated")
+        assert.strictEqual(toast?.body, "Saved the prefab Bridge")
+        assert.lengthOf(others, 0)
+        assert.lengthOf(notices("prefabInstancesUpdated"), 0)
+      })
+    ))
+
+  it.effect("says it saved when no instance had to follow, and leaves an edited one to the notification centre", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        const { key } = yield* placedFirst
+        moveItem(key, 100)
+        yield* openDefinition
+        moveItem(s().doc.ids[0] ?? "", 300)
+        yield* saveMapFile
+        assert.strictEqual(toastsOf("prefabSaved")[0]?.title, "Saved the prefab Bridge")
+        assert.lengthOf(notices("prefabInstancesEdited"), 1)
+      })
+    ))
+
   it.effect("has its unsaved edits asked about like a map's, and Save goes to the file", () =>
     withDisk((disk) =>
       Effect.gen(function*() {
@@ -504,11 +541,82 @@ describe("a definition's tab", () => {
     ))
 })
 
+describe("the instances of a definition", () => {
+  it.effect("selecting them takes in every instance, whatever is entered, and nothing else", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        const first = yield* placed
+        yield* placePrefabEffect(USER)
+        const second = s().doc.structure.tree.flatMap((n) => n.kind === "group" && n.id !== first ? [n.id] : [])[0] ??
+          ""
+        s().placePiece(cube, placementTransform(cube, { x: 1000, y: 0, z: 5000 }))
+        s().enterGroup(first)
+        selectInstances(USER)
+        assert.isNull(s().enteredGroupId)
+        assert.sameMembers([...s().selectedIds], [...treeKeys([instance(first)!, instance(second)!])])
+      })
+    ))
+
+  it.effect("are found in every open map, the ones behind other tabs too, and not in the definition's own tab", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        const mapTab = yield* started(disk)
+        assert.deepStrictEqual(tabsUsingPrefab(s(), USER), [])
+        yield* placed
+        assert.deepStrictEqual(tabsUsingPrefab(s(), USER), [mapTab])
+        yield* openDefinition
+        assert.deepStrictEqual(tabsUsingPrefab(s(), USER), [mapTab])
+        assert.deepStrictEqual(tabsUsingPrefab(s(), { tier: "project", name: "Bridge" }), [])
+      })
+    ))
+
+  it.effect("are found in the project's maps by their sidecars, leaving out what won't read", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        yield* placed
+        yield* saveMapFile
+        const [map] = s().projectMaps
+        assert.deepStrictEqual(yield* projectMapsUsingPrefabEffect(USER, s().projectMaps), [MAP])
+        const arch = { tier: "user", name: "Arch" } as const
+        assert.deepStrictEqual(yield* projectMapsUsingPrefabEffect(arch, s().projectMaps), [])
+        const gone = { ...map!, fileName: "Map_LevelEditorMain&Gone_Isaac.balledit" }
+        assert.deepStrictEqual(yield* projectMapsUsingPrefabEffect(USER, [gone]), [])
+      })
+    ))
+})
+
 describe("saving a selection as a prefab", () => {
   const placeCubes = () => {
     for (const x of [1000, 3000]) s().placePiece(cube, placementTransform(cube, { x, y: 0, z: 5000 }))
     s().select(s().doc.ids.slice(-2))
   }
+
+  it.effect("suggests what the pieces read as, within the rule and clear of the names in use", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        placeCubes()
+        const suggested = suggestPrefabName(s())
+        assert.match(suggested, /^[A-Za-z0-9_-]+_pair$/)
+        yield* saveSelectionAsPrefabEffect({ tier: "user", name: suggested }, false)
+        assert.strictEqual(suggestPrefabName(s()), `${suggested}_2`)
+      })
+    ))
+
+  it.effect("suggests the name of the group it is exactly, unless that was never given", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        placeCubes()
+        const unnamed = suggestPrefabName(s())
+        s().groupItems(s().selectedIds)
+        assert.strictEqual(suggestPrefabName(s()), unnamed)
+        s().renameGroup(s().doc.structure.tree.flatMap((n) => n.kind === "group" ? [n.id] : [])[0] ?? "", "Left pair")
+        assert.strictEqual(suggestPrefabName(s()), "Left_pair")
+      })
+    ))
 
   it.effect("writes the game's format to the tier asked, changing nothing in the map", () =>
     withDisk((disk) =>

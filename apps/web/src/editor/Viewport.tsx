@@ -364,7 +364,8 @@ function Overlay() {
   const missing = useEditor((s) => s.missingGlbs)
   const speed = useEditor((s) => s.cameraSpeed)
   return (
-    <div className="pointer-events-none absolute inset-x-2 top-10 bottom-2 flex flex-col items-start gap-1.5">
+    // under the pane picker and the instance banner (components/InstanceBanner.tsx)
+    <div className="pointer-events-none absolute inset-x-2 top-21 bottom-2 flex flex-col items-start gap-1.5">
       {missing.size > 0 && (
         <Badge variant="destructive" className="pointer-events-auto" title={[...missing].join("\n")}>
           {missing.size} mesh file{missing.size === 1 ? "" : "s"} failed to load

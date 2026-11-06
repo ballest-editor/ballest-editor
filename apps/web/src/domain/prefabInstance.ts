@@ -10,7 +10,7 @@ import { removeItems } from "./edits"
 import { editTransform, SCALE_PROPERTIES, withEditTransform } from "./editTransform"
 import { classNameOf, type Item, objectPathOf, PropertyList } from "./MapFile"
 import type { GroupNode, PrefabLink, TreeNode } from "./MapSidecar"
-import { itemOfPrefab, ORIGIN } from "./prefab"
+import { isSamePrefab, itemOfPrefab, ORIGIN } from "./prefab"
 import type { PrefabFile } from "./PrefabFile"
 import { type Doc, findGroup, freshKey, freshKeys, itemNode, rewriteTree, treeKeys } from "./structure"
 import { quatConjugate, quatMul, quatNormalize, rotateVec, vecAdd, vecSub } from "./ueMath"
@@ -225,6 +225,10 @@ export const instancesIn = (nodes: ReadonlyArray<TreeNode>): ReadonlyArray<Group
     const inside = instancesIn(node.children)
     return node.prefab === undefined ? inside : [{ ...node, prefab: node.prefab }, ...inside]
   })
+
+/** The instances of `ref` under `nodes`. */
+export const instancesOfPrefab = (nodes: ReadonlyArray<TreeNode>, ref: PrefabRef) =>
+  instancesIn(nodes).filter(({ prefab }) => isSamePrefab(prefab, ref))
 
 /**
  * The instance `groupId` with its items replaced by `definition`'s, where its placement puts them. The items that stay

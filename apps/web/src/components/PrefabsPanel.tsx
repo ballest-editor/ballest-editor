@@ -12,40 +12,56 @@ import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type MouseEvent, type ReactNode, useRef, useState } from "react"
-import { PREFAB_NEEDS_PROJECT, prefabTierLabel, qualifyClassPath } from "../domain/prefab"
-import { copyPrefabToTier, duplicatePrefab, openPrefab, placePrefab, revealPrefabs } from "../editor/actions"
+import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react"
+import { PREFAB_NEEDS_PROJECT, prefabTierLabel } from "../domain/prefab"
+import { instancesOfPrefab } from "../domain/prefabInstance"
+import {
+  copyPrefabToTier,
+  duplicatePrefab,
+  openPrefab,
+  placePrefab,
+  readDefinitionItems,
+  revealPrefabs,
+  selectInstances
+} from "../editor/actions"
 import { startPrefabDrag } from "../editor/prefabDrag"
 import { useEditor, useOpenPrefab } from "../editor/store"
+import { definitionThumbnailFor } from "../editor/thumbnails"
 import { focusViewport } from "../editor/Viewport"
-import { PieceThumbnail, THUMBNAIL_TILE } from "./PieceThumbnail"
+import { THUMBNAIL_TILE, useSeen } from "./PieceThumbnail"
 import { SectionTitle } from "./SectionTitle"
 
-/** The first piece's picture, else a glyph: a prefab has no picture of its own. */
+/** Everything in the definition, framed whole; a glyph until that has rendered, and for a file that won't read. */
 function PrefabThumbnail({ prefab }: { readonly prefab: PrefabInfo }) {
-  const piece = useEditor((s) =>
-    prefab.firstClass === null ? undefined : s.catalogIndex?.pieceByClass.get(qualifyClassPath(prefab.firstClass))
-  )
-  const glyph = (
-    <span
-      className={cn(
-        "grid size-6 shrink-0 place-items-center rounded-control",
-        THUMBNAIL_TILE,
-        prefab.itemCount === null ? "text-fg-disabled" : "text-fg-secondary"
-      )}
-    >
-      <IconBoxMultiple className="size-4" />
+  const index = useEditor((s) => s.catalogIndex)
+  const table = useEditor((s) => s.materialTable)
+  const { ref, seen } = useSeen()
+  // by version of the file, so a render that lands late can't stand in for the file as it is now
+  const [renders, setRenders] = useState<Readonly<Record<string, string | undefined>>>({})
+  useEffect(() => {
+    if (!seen || index === null || table === null || prefab.itemCount === null) return
+    void definitionThumbnailFor(prefab, () => readDefinitionItems(prefab), index, table).then((url) =>
+      setRenders((known) => ({ ...known, [prefab.hash]: url }))
+    )
+  }, [prefab, seen, index, table])
+  const rendered = renders[prefab.hash]
+  return (
+    <span ref={ref} className="flex shrink-0">
+      {rendered === undefined
+        ? (
+          <span
+            className={cn(
+              "grid size-6 place-items-center rounded-control",
+              THUMBNAIL_TILE,
+              prefab.itemCount === null ? "text-fg-disabled" : "text-fg-secondary"
+            )}
+          >
+            <IconBoxMultiple className="size-4" />
+          </span>
+        )
+        : <img src={rendered} alt="" className={cn("size-6 rounded-control object-fill", THUMBNAIL_TILE)} />}
     </span>
   )
-  return piece === undefined
-    ? glyph
-    : (
-      <PieceThumbnail
-        piece={piece}
-        className={cn("size-6 shrink-0 rounded-control object-fill", THUMBNAIL_TILE)}
-        placeholder={glyph}
-      />
-    )
 }
 
 /** One prefab: a click places it, a drag onto the viewport does too, and its menu (also on right-click) has the rest. */
@@ -54,6 +70,8 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
   const hasProject = useEditor((s) => s.project?.current != null)
   const openDialog = useEditor((s) => s.openDialog)
   const inDefinition = useOpenPrefab() !== null
+  const tree = useEditor((s) => s.doc.structure.tree)
+  const placed = useMemo(() => instancesOfPrefab(tree, prefab).length, [tree, prefab])
   const menuButton = useRef<HTMLButtonElement>(null)
   const { name, tier } = prefab
   const ref = { tier, name }
@@ -93,8 +111,28 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
         <span className="min-w-0 flex-1 truncate text-body">{name}</span>
         <span className={cn("shrink-0 text-caption", readable ? "text-fg-tertiary" : "text-fg-disabled")}>
           {readable ? `${prefab.itemCount} item${prefab.itemCount === 1 ? "" : "s"}` : "Unreadable"}
+          {placed > 0 && " ·"}
         </span>
       </button>
+      {placed > 0 && (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="link"
+                className="h-auto shrink-0 border-0 px-0 text-caption"
+                onClick={() => {
+                  selectInstances(ref)
+                  focusViewport()
+                }}
+              />
+            }
+          >
+            {placed} placed
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Select {placed === 1 ? "it" : "them"} in this map</TooltipContent>
+        </Tooltip>
+      )}
       <DropdownMenu>
         <Tooltip
           // the menu hands the focus back as it closes, and the tooltip would stay up with the pointer long gone
