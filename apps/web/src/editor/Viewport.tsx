@@ -39,7 +39,7 @@ import { SKY_DOME_RADIUS } from "./sky"
 import { groupBoxOf, type SelectMode, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
 import { glbUrl, visualsOf } from "./visuals"
-import { setWaterTheme, waterTopMaterial, waterUnderMaterial } from "./water"
+import { setWaterFloor, setWaterTheme, waterTopMaterial, waterUnderMaterial } from "./water"
 
 const CLICK_SLOP_PX = 4
 
@@ -295,6 +295,8 @@ function Water() {
   const appearance = useEditor((s) => s.settings.appearance)
   const dark = useDarkTheme(appearance.theme)
   useEffect(() => setWaterTheme(dark ? "dark" : "light"), [dark])
+  const floorHeight = useEditor((s) => s.floorHeight)
+  useEffect(() => setWaterFloor(floorHeight), [floorHeight])
   const geometry = useMemo(() => new THREE.PlaneGeometry(WATER.size, WATER.size), [])
   useEffect(() => () => geometry.dispose(), [geometry])
   if (!appearance.waterVisible) return null

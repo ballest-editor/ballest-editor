@@ -1,10 +1,15 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
+import { SKY_HAZE_BELOW } from "./sky"
 import {
-  addDistanceFade,
+  addFade,
+  setWaterFloor,
   setWaterLight,
   setWaterTheme,
+  THIN_INTO_SKY,
+  THIN_WITH_DISTANCE,
   WATER_LOOKS,
+  waterHaze,
   waterTopMaterial,
   waterUnderMaterial
 } from "./water"
@@ -38,14 +43,30 @@ describe("water", () => {
     assert.isFalse(waterUnderMaterial.toneMapped)
   })
 
-  it("thins out with distance, in a perspective pane only, before the rest of the fragment's output", () => {
+  it("thins out in a perspective pane only, before the rest of the fragment's output", () => {
     const { fragmentShader, vertexShader } = THREE.ShaderLib.basic
-    const shader = addDistanceFade({ fragmentShader, vertexShader }, "/* extra */")
+    const shader = addFade({ fragmentShader, vertexShader }, "/* fade */", "/* extra */")
     assert.include(shader.vertexShader, "vWaterWorld = ")
-    const fade = shader.fragmentShader.indexOf("if (!isOrthographic)")
+    const orthographic = shader.fragmentShader.indexOf("if (!isOrthographic)")
+    const fade = shader.fragmentShader.indexOf("/* fade */")
     const extra = shader.fragmentShader.indexOf("/* extra */")
     const output = shader.fragmentShader.indexOf("#include <opaque_fragment>")
-    assert.isTrue(fade >= 0 && fade < extra && extra < output)
-    assert.include(shader.fragmentShader, "smoothstep(8000.0, 60000.0, away)")
+    assert.isTrue(orthographic >= 0 && orthographic < fade && fade < extra && extra < output)
+  })
+
+  // Both go by the sky's own curve, so the water can't thin out before the haze has come in.
+  it("thins out from above by the sky's haze, for the floor and the theme", () => {
+    assert.include(THIN_INTO_SKY, "ballestSkyHaze(toWater, min(uClipY, cameraPosition.y), uHazeBelow)")
+    setWaterFloor(8615)
+    setWaterTheme("light")
+    assert.strictEqual(waterHaze.uClipY.value, 8615)
+    assert.strictEqual(waterHaze.uHazeBelow.value, SKY_HAZE_BELOW.light)
+    setWaterTheme("dark")
+    assert.strictEqual(waterHaze.uHazeBelow.value, SKY_HAZE_BELOW.dark)
+  })
+
+  it("thins out from below by distance, because looking up is all haze", () => {
+    assert.include(THIN_WITH_DISTANCE, "smoothstep(8000.0, 60000.0, away)")
+    assert.notInclude(THIN_WITH_DISTANCE, "ballestSkyHaze")
   })
 })

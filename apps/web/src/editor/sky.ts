@@ -20,6 +20,17 @@ export const SKY_DOME_RADIUS = 60_000
 export const SKY_HAZE_BELOW = { dark: SKY_DOME_RADIUS * 0.12, light: SKY_DOME_RADIUS * 0.34 } as const
 const SKY_HAZE_ABOVE = SKY_DOME_RADIUS * 0.05
 
+/**
+ * GLSL: how far the sky has faded in (0 to 1) along direction `d`, over a floor at `clipY`. It measures how far above the
+ * floor `d` meets the dome. The water thins out by the same curve, so the two cross over with nothing showing between.
+ */
+export const SKY_HAZE_GLSL = /* glsl */ `
+float ballestSkyHaze( vec3 d, float clipY, float below ) {
+  float above = cameraPosition.y + d.y * ${SKY_DOME_RADIUS.toFixed(1)} - clipY;
+  return smoothstep( -below, ${SKY_HAZE_ABOVE.toFixed(1)}, above );
+}
+`
+
 /** Exposure on the visible sky; the game's auto exposure has no counterpart here. */
 const SKY_EXPOSURE = 1.6
 
@@ -44,7 +55,7 @@ uniform vec3 uGround;
 uniform float uClipY;
 uniform float uHazeBelow;
 varying vec3 vDir;
-
+${SKY_HAZE_GLSL}
 float ballestHash( vec2 p ) {
   return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 );
 }
@@ -68,10 +79,8 @@ void main() {
     // The stands' top edge isn't a line in the distance: a soft step, and the normal maps don't break it into specks.
     color = mix( uGround, color, smoothstep( ${(ARENA_RIM * 0.8).toFixed(4)}, ${(ARENA_RIM * 1.2).toFixed(4)}, d.y ) );
   #else
-    // How far above the grid's height this direction meets the dome (from the exact
-    // direction, not the faceted mesh); the sky fades in around there.
-    float above = cameraPosition.y + d.y * ${SKY_DOME_RADIUS.toFixed(1)} - uClipY;
-    alpha = smoothstep( -uHazeBelow, ${SKY_HAZE_ABOVE.toFixed(1)}, above );
+    // From the exact direction, not the faceted mesh.
+    alpha = ballestSkyHaze( d, uClipY, uHazeBelow );
     if ( alpha <= 0.0 ) discard;
     color += uSun * clamp( 1.0 - abs( dot( d, uToSun ) - 1.0 ) / ${SUN_RADIUS.toFixed(6)}, 0.0, 1.0 );
   #endif
