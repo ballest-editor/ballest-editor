@@ -240,8 +240,12 @@
   * {
     @apply border-border/65 outline-ring/50;
     }
+  /* The chrome isn't text to select: Ctrl+A or a stray drag would highlight it. What is text to copy says so itself. */
   body {
-    @apply bg-background text-body text-foreground tabular-nums;
+    @apply bg-background text-body text-foreground tabular-nums select-none;
+    }
+  input, textarea {
+    @apply select-text;
     }
   /* Selected text takes the accent as a wash, as a selected row does, and not the browser's blue. */
   ::selection {

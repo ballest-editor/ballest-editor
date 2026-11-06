@@ -284,6 +284,7 @@ export function MenuBar() {
   const canGroup = useMemo(() => canGroupSelection(tree, selectedIds), [tree, selectedIds])
   const canUngroup = useMemo(() => selectedGroupIds(tree, selectedIds).length > 0, [tree, selectedIds])
   const canPaste = useEditor((s) => s.clipboard !== null)
+  const canSelectAll = useEditor((s) => s.doc.ids.length > 0)
   const openDialog = useEditor((s) => s.openDialog)
   const viewMenuPanels = useViewMenuPanels()
   const { snapping, general } = useEditor((s) => s.settings)
@@ -346,6 +347,7 @@ export function MenuBar() {
         <CommandItem action="paste" reason={canPaste ? null : "Copy something first."}>Paste</CommandItem>
         <CommandItem action="duplicateSelection" reason={selectionOff}>Duplicate</CommandItem>
         <CommandItem action="deleteSelection" reason={selectionOff}>Delete</CommandItem>
+        <CommandItem action="selectAll" reason={canSelectAll ? null : "Nothing to select."}>Select all</CommandItem>
         <CommandItem action="deselect" reason={selectionOff}>Deselect</CommandItem>
         <MenubarSeparator />
         <CommandItem action="groupSelection" reason={canGroup ? null : "Select what to group first."}>

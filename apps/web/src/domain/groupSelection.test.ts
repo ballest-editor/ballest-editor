@@ -10,6 +10,7 @@ import {
   groupSelectionStates,
   groupTrail,
   nodeKeys,
+  selectableKeys,
   selectedGroupIds,
   selectionNodeIds,
   selectionSummaryOf
@@ -98,6 +99,17 @@ describe("what a selection makes up", () => {
   })
 })
 
+describe("selectableKeys", () => {
+  it("is every item in the map, in or out of a group", () => {
+    assert.deepStrictEqual(selectableKeys(tree, null), ["a", "b", "c", "d", "e"])
+  })
+
+  it("is the entered group's items, nested ones too", () => {
+    assert.deepStrictEqual(selectableKeys(tree, "outer"), ["a", "b", "c"])
+    assert.deepStrictEqual(selectableKeys(tree, "inner"), ["a", "b"])
+  })
+})
+
 describe("selectionSummaryOf", () => {
   const nested = [
     item("loose"),
@@ -106,7 +118,10 @@ describe("selectionSummaryOf", () => {
   ]
   const names = new Map([
     ["loose", { name: "Goal", ordinal: undefined }],
-    ["a", { name: "Cube", ordinal: 2 }]
+    ["a", { name: "Cube", ordinal: 2 }],
+    ["outer", { name: "Group", ordinal: undefined }],
+    ["inner", { name: "Group", ordinal: 2 }],
+    ["one", { name: "Left ramp", ordinal: undefined }]
   ])
   const summary = (selected: ReadonlyArray<string>) => selectionSummaryOf(nested, selected, names)
 
@@ -124,15 +139,20 @@ describe("selectionSummaryOf", () => {
     assert.strictEqual(summary(["a", "b"])?.name, "2 items")
   })
 
-  it("counts a group's items and the group, the outermost one for nested groups", () => {
-    assert.strictEqual(summary(["b", "c"])?.name, "2 items · 1 group")
-    assert.strictEqual(summary(["a", "b", "c"])?.name, "3 items · 1 group")
-    assert.strictEqual(summary(["loose", "a", "b", "c"])?.name, "4 items · 1 group")
+  it("names one whole group, the outermost one for nested groups", () => {
+    assert.deepStrictEqual(summary(["a", "b", "c"]), { name: "Group", ordinal: undefined })
+    assert.deepStrictEqual(summary(["b", "c"]), { name: "Group", ordinal: 2 })
+    assert.deepStrictEqual(summary(["d"]), { name: "Left ramp", ordinal: undefined })
   })
 
-  it("says one item and many groups as such", () => {
-    assert.strictEqual(summary(["d"])?.name, "1 item · 1 group")
-    assert.strictEqual(summary(["b", "c", "d"])?.name, "3 items · 2 groups")
+  it("counts several whole groups", () => {
+    assert.deepStrictEqual(summary(["b", "c", "d"]), { name: "2 groups", ordinal: undefined })
+  })
+
+  it("counts items and groups when a selection mixes them", () => {
+    assert.strictEqual(summary(["loose", "a", "b", "c"])?.name, "4 items · 1 group")
+    assert.strictEqual(summary(["loose", "d"])?.name, "2 items · 1 group")
+    assert.strictEqual(summary(["a", "d"])?.name, "2 items · 1 group")
   })
 
   it("counts a lone item without a name rather than showing nothing", () => {

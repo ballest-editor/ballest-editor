@@ -44,6 +44,7 @@ export const keybindSections = [
       "paste",
       "duplicateSelection",
       "deleteSelection",
+      "selectAll",
       "deselect",
       "groupSelection",
       "ungroupSelection"
@@ -114,6 +115,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   paste: "paste",
   undo: "undo",
   redo: "redo",
+  selectAll: "select all",
   deselect: "deselect",
   groupSelection: "group",
   ungroupSelection: "ungroup",
@@ -178,6 +180,7 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Add the copied items where they were when copied, and select them. Ctrl+V in the in-game editor, which also pastes in place.",
   undo: "Undo the last change. Ctrl+Z in the in-game editor; a whole gizmo drag or number-field scrub is one step.",
   redo: "Redo the last undone change. Ctrl+Y in the in-game editor; Ctrl+Shift+Z also works.",
+  selectAll: "Select every item in the map; inside an entered group, every item in that group.",
   deselect:
     "Clear the selection. Inside an entered group it steps out of the group instead, and during a gizmo drag it cancels the drag. (The game uses Ctrl+click.)",
   groupSelection:
@@ -281,6 +284,7 @@ export const defaultKeybinds: Keybinds = {
   paste: ["Ctrl+KeyV"],
   undo: ["Ctrl+KeyZ"],
   redo: ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"],
+  selectAll: ["Ctrl+KeyA"],
   deselect: ["Escape"],
   groupSelection: ["Ctrl+KeyG"],
   ungroupSelection: ["Shift+KeyG"],

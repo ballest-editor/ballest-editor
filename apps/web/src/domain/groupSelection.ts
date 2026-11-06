@@ -15,6 +15,12 @@ export const nodeKeys = (tree: ReadonlyArray<TreeNode>, id: string): ReadonlyArr
   return node === undefined ? [] : treeKeys([node])
 }
 
+/** What Select all selects: every item in the tree, or in the entered group. */
+export const selectableKeys = (
+  tree: ReadonlyArray<TreeNode>,
+  enteredGroupId: string | null
+): ReadonlyArray<string> => enteredGroupId === null ? treeKeys(tree) : nodeKeys(tree, enteredGroupId)
+
 /** Where a click on an item lands. */
 export interface ClickLevel {
   /** The node it selects: the item, or the group of it that is one level inside `enteredGroupId`. */
@@ -68,8 +74,9 @@ export const selectedGroupIds = (
 const counted = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`
 
 /**
- * What the status bar says of a selection: a lone item's name from `names`, else how many items it has and how many
- * groups they make up ("3 items · 1 group"). Null for an empty selection.
+ * What the status bar says of a selection, null when it's empty. A lone item or whole group is named from `names`, which
+ * has the items' by key and the groups' by id; several whole groups are counted ("2 groups"); anything else says how many
+ * items it has and how many groups are among them ("3 items · 1 group").
  */
 export const selectionSummaryOf = (
   tree: ReadonlyArray<TreeNode>,
@@ -78,11 +85,16 @@ export const selectionSummaryOf = (
 ): NumberedName | null => {
   const [first] = selectedIds
   if (first === undefined) return null
-  const groups = selectedGroupIds(tree, selectedIds).length
-  const lone = selectedIds.length === 1 && groups === 0 ? names.get(first) : undefined
+  const nodes = wholeNodes(tree, new Set(selectedIds))
+  const groups = nodes.filter((node) => node.kind === "group")
+  const [only] = nodes
+  const lone = nodes.length !== 1 || only === undefined ? undefined : names.get(idOf(only))
   if (lone !== undefined) return lone
+  if (groups.length > 0 && groups.length === nodes.length) {
+    return { name: counted(groups.length, "group"), ordinal: undefined }
+  }
   const items = counted(selectedIds.length, "item")
-  return { name: groups === 0 ? items : `${items} · ${counted(groups, "group")}`, ordinal: undefined }
+  return { name: groups.length === 0 ? items : `${items} · ${counted(groups.length, "group")}`, ordinal: undefined }
 }
 
 /** A group drawn as a box in the viewport. `entered` is the quiet one, standing for the group clicks are inside. */

@@ -64,7 +64,7 @@ describe("isMovementChord", () => {
 
 describe("formsChord", () => {
   it("shortcuts and non-movement keys make Ctrl a chord modifier; movement keys don't", () => {
-    const chords = ["Ctrl+KeyZ", "Ctrl+KeyY", "Ctrl+Shift+KeyZ", "Ctrl+KeyD", "Ctrl+KeyC", "Ctrl+KeyV"]
+    const chords = ["Ctrl+KeyZ", "Ctrl+KeyY", "Ctrl+Shift+KeyZ", "Ctrl+KeyD", "Ctrl+KeyC", "Ctrl+KeyV", "Ctrl+KeyA"]
     expect(chords.filter((chord) => !formsChord(defaultKeybinds, chord))).toEqual([])
     expect(formsChord(defaultKeybinds, "Ctrl+KeyW")).toBe(false)
     expect(formsChord(defaultKeybinds, "Ctrl+Space")).toBe(false)

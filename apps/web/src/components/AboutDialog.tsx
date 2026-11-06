@@ -27,7 +27,7 @@ function BuildInfo({ version }: { readonly version: string | null }) {
   })
   return (
     <div className="flex items-start justify-between gap-2 rounded-surface bg-muted p-2.5">
-      <pre className="min-w-0 overflow-x-auto font-mono text-caption text-fg-secondary">{text}</pre>
+      <pre className="min-w-0 overflow-x-auto font-mono text-caption text-fg-secondary select-text">{text}</pre>
       <Button
         variant="outline"
         onClick={() => void copyText(text).then((done) => setCopied(done === true))}

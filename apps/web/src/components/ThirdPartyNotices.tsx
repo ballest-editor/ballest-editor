@@ -33,7 +33,7 @@ function Notice({ notice }: { readonly notice: (typeof notices)[number] }) {
 export default function ThirdPartyNotices() {
   return (
     <ScrollArea className="h-[min(60vh,480px)]">
-      <div className="flex flex-col pr-3">
+      <div className="flex flex-col pr-3 select-text">
         {notices.map((notice) => <Notice key={notice.name} notice={notice} />)}
       </div>
     </ScrollArea>
