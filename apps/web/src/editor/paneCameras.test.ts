@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
 import { ueToThreeVector, type Vec3 } from "../domain/coords"
-import { type OrthoView, orthoViews, paneClose, paneCloseColumn } from "../domain/viewLayout"
+import { type OrthoView, orthoViews, paneClose, paneCloseColumn, paneSwap } from "../domain/viewLayout"
 import {
   changePanes,
   forgetClosedTabs,
@@ -361,6 +361,20 @@ describe("a tab's panes", () => {
     changePanes(paneClose(0))
     assert.strictEqual(paneCamerasOf(tabId)[0], right)
     assert.strictEqual(useEditor.getState().viewLayout.kind, "single")
+    assert.strictEqual(useEditor.getState().activePane, 0)
+  })
+
+  it("swaps two panes' cameras with their views, and the active pane moves with its camera", () => {
+    const { tabId, setViewLayoutKind, setPaneProjection, setActivePane } = useEditor.getState()
+    setViewLayoutKind("quad")
+    setPaneProjection(0, "perspective")
+    setPaneProjection(3, "right")
+    setActivePane(3)
+    const [first, , , last] = paneCamerasOf(tabId)
+    changePanes(paneSwap("quad", 0, 3))
+    assert.strictEqual(paneCamerasOf(tabId)[0], last)
+    assert.strictEqual(paneCamerasOf(tabId)[3], first)
+    assert.strictEqual(useEditor.getState().viewLayout.projections[0], "right")
     assert.strictEqual(useEditor.getState().activePane, 0)
   })
 

@@ -99,12 +99,19 @@ import type { Surfaces } from "../domain/surface"
 import {
   clampSplit,
   defaultViewLayout,
+  maximisedSlotOf,
   type PaneChange,
   paneCountOf,
+  type PaneDisplay,
+  paneDisplayOf,
+  type PaneSlot,
   type ViewLayout,
   type ViewLayoutKind,
   type ViewProjection,
-  withPaneChange
+  withMaximisedToggled,
+  withoutMaximised,
+  withPaneChange,
+  withPaneDisplay
 } from "../domain/viewLayout"
 import type { LoadedCatalog } from "../services/CatalogLoader"
 import type {
@@ -619,10 +626,20 @@ export interface EditorState extends TabState {
   readonly setPaneSplit: (split: { readonly x?: number; readonly y?: number }) => void
   /** Splits or closes panes. Their cameras move with them: use `changePanes` (editor/paneCameras). */
   readonly applyPaneChange: (change: PaneChange) => void
+  /** Fills the viewport with the pane in `slot`, or goes back to the layout if a pane already fills it. */
+  readonly togglePaneMaximised: (slot: PaneSlot) => void
+  /** Whether the pane in `slot` shows `part`, whatever the Display popover says (`withPaneDisplay`). */
+  readonly setPaneDisplay: (slot: PaneSlot, part: keyof PaneDisplay, on: boolean) => void
   /** What the pane in `slot` looks along. */
   readonly setPaneProjection: (slot: number, projection: ViewProjection) => void
   readonly setActivePane: (slot: number) => void
 }
+
+/** What the Display popover sets for every pane. */
+const displayOf = ({ appearance, lighting }: Settings): PaneDisplay => ({
+  grid: appearance.gridVisible,
+  sky: lighting.skyVisible
+})
 
 /** A tab's state for `map`, opened with no history and nothing selected. */
 const freshTabState = (
@@ -648,7 +665,7 @@ const freshTabState = (
     enteredGroupId: null,
     collapsedGroups: new Set(),
     viewLayout: options?.viewLayout ?? defaultViewLayout,
-    activePane: 0
+    activePane: options?.viewLayout === undefined ? 0 : maximisedSlotOf(options.viewLayout) ?? 0
   }
 }
 
@@ -1276,7 +1293,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     requestFrameAll: () => set((s) => ({ frameAllRequest: s.frameAllRequest + 1 })),
     setViewLayoutKind: (kind) =>
       set((s) => ({
-        viewLayout: { ...s.viewLayout, kind },
+        viewLayout: { ...withoutMaximised(s.viewLayout), kind },
         activePane: Math.min(s.activePane, paneCountOf(kind) - 1)
       })),
     setPaneSplit: ({ x, y }) =>
@@ -1295,6 +1312,13 @@ export const useEditor = create<EditorState>()((set, get) => {
           activePane: slot < paneCountOf(change.kind) ? slot : 0
         }
       }),
+    togglePaneMaximised: (slot) =>
+      set((s) => {
+        const viewLayout = withMaximisedToggled(s.viewLayout, slot)
+        return { viewLayout, activePane: maximisedSlotOf(viewLayout) ?? s.activePane }
+      }),
+    setPaneDisplay: (slot, part, on) =>
+      set((s) => ({ viewLayout: withPaneDisplay(s.viewLayout, slot, displayOf(s.settings), part, on) })),
     setPaneProjection: (slot, projection) =>
       set((s) => {
         const [a, b, c, d] = s.viewLayout.projections
@@ -1304,6 +1328,10 @@ export const useEditor = create<EditorState>()((set, get) => {
     setActivePane: (slot) => set((s) => s.activePane === slot ? s : { activePane: slot })
   }
 })
+
+/** What the pane in `slot` of the active tab shows. */
+export const paneDisplayIn = (s: EditorState, slot: PaneSlot): PaneDisplay =>
+  paneDisplayOf(s.viewLayout, slot, displayOf(s.settings))
 
 /** Tab `tabId`'s state, wherever it is; undefined when no tab has that id. */
 export const tabStateOf = (s: EditorState, tabId: string): TabState | undefined =>

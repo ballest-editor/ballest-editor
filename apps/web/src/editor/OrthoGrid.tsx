@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import * as THREE from "three"
 import { threeToUeVector } from "../domain/coords"
 import { axisOf, dot, gridLevels, MAX_GRID_LEVELS, ORTHO_AXES } from "../domain/orthoView"
@@ -6,7 +6,7 @@ import { gridColorsOf } from "../domain/Settings"
 import { sceneAxisColors } from "./axisColors"
 import { orthographicOnly } from "./paneCameras"
 import { useBeforePaneDraw } from "./PaneRenderer"
-import { useEditor } from "./store"
+import { paneDisplayIn, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
 
 /** Lines stay readable over the map's pieces without hiding them. */
@@ -101,20 +101,23 @@ export function OrthoGrid() {
     uniforms.uSection.value.set(section)
   }, [cell, section])
 
-  useBeforePaneDraw((pane) => {
+  const mesh = useRef<THREE.Mesh>(null)
+  useBeforePaneDraw((pane, slot) => {
     const { view } = pane
-    if (view === undefined) return
+    if (view === undefined || mesh.current === null) return
+    const state = useEditor.getState()
+    mesh.current.visible = paneDisplayIn(state, slot).grid
     const { right, up } = ORTHO_AXES[view]
-    const { snapping } = useEditor.getState().settings
+    const { snapping } = state.settings
     const target = threeToUeVector(pane.target)
     const cmPerPixel = pane.cmPerPixel / window.devicePixelRatio
     const levels = gridLevels(cmPerPixel, snapping.enabled ? snapping.gridSize : undefined)
     uniforms.uCentre.value.set(dot(target, right), dot(target, up))
     uniforms.uHalf.value.set((pane.width / 2) * pane.cmPerPixel, (pane.height / 2) * pane.cmPerPixel)
     uniforms.uCmPerPixel.value = cmPerPixel
-    uniforms.uLevels.value.forEach((slot, i) => {
+    uniforms.uLevels.value.forEach((uniform, i) => {
       const level = levels[i]
-      slot.set(level?.size ?? 0, level?.opacity ?? 0, level?.section === true ? 1 : 0)
+      uniform.set(level?.size ?? 0, level?.opacity ?? 0, level?.section === true ? 1 : 0)
     })
     const axisColors = sceneAxisColors(dark)
     uniforms.uAxisAcross.value.set(axisColors[axisOf(right).axis])
@@ -122,9 +125,9 @@ export function OrthoGrid() {
     material.uniformsNeedUpdate = true
   })
 
-  if (!appearance.gridVisible) return null
   return (
     <mesh
+      ref={mesh}
       layers={orthographicOnly}
       geometry={geometry}
       material={material}

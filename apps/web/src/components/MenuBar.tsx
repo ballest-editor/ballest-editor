@@ -23,6 +23,7 @@ import { type KeybindAction, PROJECTION_ACTIONS } from "../domain/Keybinds"
 import { formatGridSize, GRID_SIZES } from "../domain/snap"
 import { updateCheckBlockedBy } from "../domain/updates"
 import {
+  shownKindOf,
   viewLayoutKinds,
   viewLayoutLabels,
   type ViewProjection,
@@ -214,7 +215,7 @@ function MenuSection({ title, children }: { readonly title: string; readonly chi
 
 /** How the view divides into panes, and what the active pane looks along (docs/DESKTOP.md § View panes). */
 function PaneMenus() {
-  const kind = useEditor((s) => s.viewLayout.kind)
+  const kind = useEditor((s) => shownKindOf(s.viewLayout))
   const projection = useEditor((s) => s.viewLayout.projections[s.activePane] ?? "perspective")
   const setViewLayoutKind = useEditor((s) => s.setViewLayoutKind)
   const lookAlong = (next: ViewProjection) => {

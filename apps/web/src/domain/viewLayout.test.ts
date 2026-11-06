@@ -6,20 +6,28 @@ import {
   firstPaneTurns,
   IDLE_PANE_INTERVAL_MS,
   isDefaultViewLayout,
+  maximisedSlotOf,
   paneClose,
   paneCloseColumn,
   paneCloseRow,
   paneCountOf,
+  paneDisplayOf,
   paneRectAt,
   paneRects,
+  paneShares,
   paneSplitDown,
   paneSplitRight,
   panesToDraw,
+  paneSwap,
+  shownKindOf,
   toolStripOf,
   ViewLayout,
   type ViewLayoutKind,
   viewLayoutKinds,
-  withPaneChange
+  withMaximisedToggled,
+  withoutMaximised,
+  withPaneChange,
+  withPaneDisplay
 } from "./viewLayout"
 
 const layoutOf = (kind: ViewLayoutKind, splitX = 0.5, splitY = 0.5): ViewLayout => ({
@@ -35,14 +43,17 @@ describe("pane rectangles", () => {
       const rects = paneRects(layoutOf(kind, 0.3, 0.7), 1001, 603)
       assert.strictEqual(rects.length, paneCountOf(kind))
       assert.deepStrictEqual(rects.map((r) => r.slot), rects.map((_, i) => i))
-      assert.strictEqual(rects.reduce((area, r) => area + r.width * r.height, 0), 1001 * (603 - toolStripOf(kind)))
+      assert.strictEqual(
+        rects.reduce((area, r) => area + r.width * r.height, 0),
+        1001 * (603 - toolStripOf(layoutOf(kind)))
+      )
     }
   })
 
   it("keeps a 44px strip under several panes, and none under one", () => {
-    assert.strictEqual(toolStripOf("single"), 0)
+    assert.strictEqual(toolStripOf(layoutOf("single")), 0)
     for (const kind of ["columns", "rows", "quad"] as const) {
-      assert.strictEqual(toolStripOf(kind), 44)
+      assert.strictEqual(toolStripOf(layoutOf(kind)), 44)
       const lowest = Math.max(...paneRects(layoutOf(kind), 1000, 600).map((r) => r.y + r.height))
       assert.strictEqual(lowest, 556)
     }
@@ -200,5 +211,123 @@ describe("splitting and closing panes", () => {
     for (const change of [paneClose(0), paneCloseRow(0), paneCloseColumn(0), paneCloseColumn(1)]) {
       assert.sameMembers([...withPaneChange(layoutShowing("quad"), change).projections], [...views])
     }
+  })
+})
+
+describe("swapping panes", () => {
+  const quad = layoutOf("quad", 0.3, 0.7)
+
+  it("trades the two panes' views and leaves the rest where they are", () => {
+    const { kind, projections, splitX, splitY } = withPaneChange(quad, paneSwap("quad", 0, 3))
+    assert.deepStrictEqual(projections, ["right", "top", "front", "perspective"])
+    assert.deepStrictEqual([kind, splitX, splitY], ["quad", 0.3, 0.7])
+  })
+
+  it("takes the panes' overrides along", () => {
+    const hidden = withPaneDisplay(quad, 0, { grid: true, sky: true }, "grid", false)
+    const swapped = withPaneChange(hidden, paneSwap("quad", 0, 2))
+    assert.deepStrictEqual(swapped.overrides, [{}, {}, { grid: false }, {}])
+  })
+
+  it("undoes itself", () => {
+    const change = paneSwap("columns", 1, 0)
+    assert.deepStrictEqual(withPaneChange(withPaneChange(layoutOf("columns"), change), change), layoutOf("columns"))
+  })
+})
+
+describe("a maximised pane", () => {
+  const quad = layoutOf("quad", 0.3, 0.7)
+  const maximised = withMaximisedToggled(quad, 2)
+
+  it("fills the viewport, in its own slot, with the tool bar floating over it", () => {
+    assert.strictEqual(toolStripOf(maximised), 0)
+    assert.deepStrictEqual(paneRects(maximised, 800, 600), [{ slot: 2, x: 0, y: 0, width: 800, height: 600 }])
+    assert.deepStrictEqual(paneShares(maximised), [{ slot: 2, x: 0, y: 0, width: 1, height: 1 }])
+    assert.strictEqual(shownKindOf(maximised), "single")
+    assert.strictEqual(maximised.kind, "quad")
+  })
+
+  it("goes back to the layout it left, dividers and all", () => {
+    assert.deepStrictEqual(withMaximisedToggled(maximised, 2), quad)
+    assert.deepStrictEqual(withMaximisedToggled(maximised, 0), quad)
+  })
+
+  it("has nothing to fill in one pane", () => {
+    const single = layoutOf("single")
+    assert.strictEqual(withMaximisedToggled(single, 0), single)
+  })
+
+  it("ends with any change to the panes", () => {
+    assert.isUndefined(withPaneChange(maximised, paneCloseRow(0)).maximised)
+    assert.isUndefined(withoutMaximised(maximised).maximised)
+  })
+
+  it("doesn't count in a layout without that slot", () => {
+    const stale = { ...layoutOf("columns"), maximised: 3 as const }
+    assert.isUndefined(maximisedSlotOf(stale))
+    assert.strictEqual(paneRects(stale, 100, 100).length, 2)
+    assert.strictEqual(toolStripOf(stale), 44)
+  })
+})
+
+describe("what a pane shows", () => {
+  const quad = layoutOf("quad")
+  const everything = { grid: true, sky: true }
+  const nothing = { grid: false, sky: false }
+
+  it("follows the Display popover, but an orthographic pane has no sky unasked", () => {
+    assert.deepStrictEqual(paneDisplayOf(quad, 0, everything), everything)
+    assert.deepStrictEqual(paneDisplayOf(quad, 1, everything), { grid: true, sky: false })
+    assert.deepStrictEqual(paneDisplayOf(quad, 0, nothing), nothing)
+  })
+
+  it("lets a pane's override win, either way, and only for that pane", () => {
+    const off = withPaneDisplay(quad, 0, everything, "grid", false)
+    assert.deepStrictEqual(paneDisplayOf(off, 0, everything), { grid: false, sky: true })
+    assert.isTrue(paneDisplayOf(off, 2, everything).grid)
+    const on = withPaneDisplay(quad, 1, everything, "sky", true)
+    assert.isTrue(paneDisplayOf(on, 1, nothing).sky)
+    assert.isFalse(paneDisplayOf(on, 3, nothing).sky)
+  })
+
+  it("keeps an override when the Display popover changes", () => {
+    const off = withPaneDisplay(quad, 0, everything, "grid", false)
+    assert.isFalse(paneDisplayOf(off, 0, everything).grid)
+    assert.isFalse(paneDisplayOf(off, 0, nothing).grid)
+  })
+
+  it("goes back to following once it's set to what it would show anyway", () => {
+    const off = withPaneDisplay(quad, 0, everything, "grid", false)
+    const back = withPaneDisplay(off, 0, everything, "grid", true)
+    assert.notProperty(back, "overrides")
+    assert.deepStrictEqual(back, quad)
+  })
+
+  it("keeps the pane's other override when one is dropped", () => {
+    const both = withPaneDisplay(withPaneDisplay(quad, 0, everything, "grid", false), 0, everything, "sky", false)
+    assert.deepStrictEqual(withPaneDisplay(both, 0, everything, "grid", true).overrides?.[0], { sky: false })
+  })
+})
+
+describe("a stored layout", () => {
+  const roundTrip = (layout: ViewLayout) => Schema.decodeSync(ViewLayout)(Schema.encodeSync(ViewLayout)(layout))
+
+  it("keeps its dividers, overrides and maximised pane", () => {
+    const shown = withPaneDisplay(layoutOf("quad", 0.3, 0.7), 1, { grid: true, sky: true }, "sky", true)
+    const layout = withMaximisedToggled(shown, 3)
+    assert.deepStrictEqual(roundTrip(layout), layout)
+  })
+
+  it("from before overrides and maximising still decodes", () => {
+    const { kind, splitX, splitY, projections } = layoutOf("rows")
+    assert.deepStrictEqual(
+      Schema.decodeSync(ViewLayout)({ kind, splitX, splitY, projections }),
+      layoutOf("rows")
+    )
+  })
+
+  it("with anything set isn't the default", () => {
+    assert.isFalse(isDefaultViewLayout(withPaneDisplay(defaultViewLayout, 0, { grid: true, sky: true }, "grid", false)))
+    assert.isFalse(isDefaultViewLayout({ ...defaultViewLayout, maximised: 0 }))
   })
 })

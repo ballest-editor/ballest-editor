@@ -21,13 +21,14 @@ const TOOLS: ReadonlyArray<{
 ]
 
 /**
- * Tool switcher, bottom-centre of the viewport. It belongs to no pane: over one it floats, and under several it sits in
- * the strip they leave it (`toolStripOf`), so no divider runs through it. Pointer-only, so keybinds stay with the viewport.
+ * Tool switcher, bottom-centre of the viewport. It belongs to no pane: over one, maximised or not, it floats, and under
+ * several it sits in the strip they leave it (`toolStripOf`), so no divider runs through it. Pointer-only, so keybinds
+ * stay with the viewport.
  */
 export function ToolBar({ disabled }: { readonly disabled: boolean }) {
   const tool = useEditor((s) => s.tool)
   const setTool = useEditor((s) => s.setTool)
-  const strip = useEditor((s) => toolStripOf(s.viewLayout.kind))
+  const strip = useEditor((s) => toolStripOf(s.viewLayout))
 
   return (
     <div
