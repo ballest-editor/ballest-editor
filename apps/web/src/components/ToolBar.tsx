@@ -19,7 +19,10 @@ const TOOLS: ReadonlyArray<{
   { tool: "scale", label: "Scale", action: "scaleMode", icon: IconArrowsMaximize }
 ]
 
-/** Floating tool switcher, bottom-centre of the viewport. Pointer-only, so keybinds stay with the viewport. */
+/**
+ * Floating tool switcher, bottom-centre of the viewport. It belongs to no pane: it's drawn after them all, so a split's
+ * divider and the active pane's frame pass under it. Pointer-only, so keybinds stay with the viewport.
+ */
 export function ToolBar({ disabled }: { readonly disabled: boolean }) {
   const tool = useEditor((s) => s.tool)
   const setTool = useEditor((s) => s.setTool)
