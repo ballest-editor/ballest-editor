@@ -2,6 +2,7 @@
  * How a project map stands against its export in the game's maps folder (docs/PROJECTS.md § Sync), shown in the status
  * bar and in the Project panel.
  */
+import { formatAgo, formatDateTime } from "./time"
 
 /** The file a link record points at (`LinkedFile` in @ballest/contracts): its path, its bytes' hash, and when. */
 export interface LinkedFile {
@@ -72,4 +73,11 @@ export const linkStateOf = (map: LinkedMap, check: LinkCheck = {}): LinkState =>
   if (changedInGame(map)) return edited ? "bothChanged" : "changedInGame"
   if (map.publishedFileId > 0) return "publishedDraft"
   return edited ? "editedSinceExport" : "inSync"
+}
+
+/** `state` in a line with when `map` was last exported, for a tooltip. */
+export const linkStateDetailOf = (map: LinkedMap, state: LinkState, now: number): string => {
+  const exported = map.link?.export ?? null
+  if (exported === null) return "Not exported yet"
+  return `${LINK_STATE_LABELS[state]} · exported ${formatAgo(exported.at, now)} (${formatDateTime(exported.at)})`
 }

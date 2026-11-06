@@ -22,8 +22,8 @@ export const openProjectMap = (fileName: string) =>
   run(openProjectMapFile(fileName).pipe(Effect.ensuring(Effect.ignore(refreshProject))))
 
 /**
- * Rename…, Duplicate… or Recover previous version… for one of the project's maps from the Project panel or Project
- * settings: the dialogs act on the open map, so the map is opened first, then its dialog.
+ * Rename…, Duplicate… or Backups… for one of the project's maps from the Project panel: the dialogs act on the open
+ * map, so the map is opened first, then its dialog.
  */
 export const nameProjectMap = (fileName: string, mode: "rename" | "duplicate" | "recover") =>
   withProjectMapOpen(fileName, Effect.sync(() => useEditor.getState().openDialog({ id: mode })))

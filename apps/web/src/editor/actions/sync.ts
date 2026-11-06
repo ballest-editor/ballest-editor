@@ -71,7 +71,7 @@ export const reimportMapEffect = (fileName: string) =>
       if (open) yield* showMap(map, fileOf(file), { loaded })
       useEditor.getState().notify("info", `Re-imported ${mapLabelOf(fileName)} from the game`, {
         kind: "mapReimported",
-        body: "The project's previous version is in the backups (Project › Recover previous version…).",
+        body: "The project's previous version is in the backups (the map's menu › Backups…).",
         actions: open ? [] : [{ label: "Open", command: { _tag: "OpenMap", fileName } }]
       })
     }))
