@@ -11,9 +11,9 @@ import { useOnOpen } from "./useOnOpen"
 /**
  * New project…, Open project… and a recent project open in this window; this asks first, once the project is known,
  * only while this window has unsaved changes (docs/DESKTOP.md § Other windows). This window goes on to the
- * unsaved-changes rule (§ Window); New window starts another copy of the app and leaves this one as it is. Cancel does
- * nothing, and a new project's folder doesn't exist yet. Always do this keeps the answer in Settings › General, which is
- * where it is undone.
+ * unsaved-changes rule (§ Window); New window starts another copy of the app and leaves this one as it is, which makes
+ * it the safe answer and the primary one. Cancel does nothing, and a new project's folder doesn't exist yet. Always do
+ * this keeps the answer in Settings › General, which is where it is undone.
  */
 export function WhereToOpenDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   const [always, setAlways] = useState(false)
@@ -35,15 +35,11 @@ export function WhereToOpenDialog({ open, onClose }: { readonly open: boolean; r
         <Label htmlFor="where-always">Always do this</Label>
       </div>
       <DialogFooter>
-        <Button
-          variant="outline"
-          className="sm:mr-auto"
-          onClick={() => void remember("newWindow").then(openInNewWindow)}
-        >
-          New window
-        </Button>
         <Button variant="outline" onClick={onClose}>Cancel</Button>
-        <Button autoFocus onClick={() => void remember("thisWindow").then(openInThisWindow)}>This window</Button>
+        <Button variant="outline" onClick={() => void remember("thisWindow").then(openInThisWindow)}>
+          This window
+        </Button>
+        <Button autoFocus onClick={() => void remember("newWindow").then(openInNewWindow)}>New window</Button>
       </DialogFooter>
     </TitledDialog>
   )

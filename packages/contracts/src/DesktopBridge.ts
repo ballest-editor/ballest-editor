@@ -649,8 +649,14 @@ export const ReleaseNoteBlock = Schema.Union([
 ])
 export type ReleaseNoteBlock = typeof ReleaseNoteBlock.Type
 
+/** This repository on GitHub. */
+export const REPOSITORY_URL = "https://github.com/ballest-editor/ballest-editor"
+
 /** This repository's GitHub Releases: the feed the packaged app checks, and Help › Release notes. */
-export const RELEASES_URL = "https://github.com/ballest-editor/ballest-editor/releases"
+export const RELEASES_URL = `${REPOSITORY_URL}/releases`
+
+/** The licence, as Help › About links it. */
+export const LICENSE_URL = `${REPOSITORY_URL}/blob/main/LICENSE`
 
 export const UpdateState = Schema.Struct({
   status: UpdateStatus,

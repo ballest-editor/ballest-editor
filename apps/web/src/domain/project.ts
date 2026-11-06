@@ -11,3 +11,15 @@ export const defaultProjectNameOf = (taken: ReadonlyArray<string>): string => {
   const names = new Set(taken.map((name) => name.toLowerCase()))
   return nextFreeName("My Maps", (name) => names.has(name.toLowerCase()))
 }
+
+/** The names, in lower case, that more than one of `projects` goes by (any case): a name alone can't tell those apart. */
+export const sharedProjectNames = (projects: ReadonlyArray<{ readonly name: string }>): ReadonlySet<string> => {
+  const seen = new Set<string>()
+  const shared = new Set<string>()
+  for (const { name } of projects) {
+    const key = name.toLowerCase()
+    if (seen.has(key)) shared.add(key)
+    seen.add(key)
+  }
+  return shared
+}

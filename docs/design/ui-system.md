@@ -21,7 +21,7 @@ Each class sets size, line height and weight together, so don't add `font-*`, an
 | ------------------- | ------------------------- | -------------------------- | ------------------------------------------------------------ |
 | `text-fg-secondary` | 9.5:1                     | 8.6:1                      | Eyebrows, section labels, field labels, inactive tabs, icons |
 | `text-fg-tertiary`  | 5.7:1                     | 5.1:1                      | Placeholders, helper copy, statuses, shortcut hints, counts  |
-| `text-fg-disabled`  | 2.7:1                     | 2.3:1                      | Disabled text, and everything inside a disabled row          |
+| `text-fg-disabled`  | 2.7:1                     | 2.3:1                      | Disabled text, and what's inside a disabled row but its name |
 
 The variables are `--fg-secondary`, `--fg-tertiary`, `--fg-disabled`. They aren't `text-secondary`: `secondary` is shadcn's surface colour. Disabled is a colour, not `opacity-50`, except on filled buttons and on graphics (a switch, a slider).
 
