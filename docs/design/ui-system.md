@@ -88,7 +88,7 @@ Put it on the element itself. A blur on a `::before` can't see past its parent w
 
 ## Motion
 
-120 to 180ms, ease-out, everywhere: hover tints, press, the tab underline, the segmented pill, and a popup's fade and 4px rise. The default transition is 150ms and `cubic-bezier(0, 0, 0.2, 1)`, so a bare `transition-colors` needs nothing more. No bounce, and nothing at 300ms. Every duration goes through `--motion` (Settings › Appearance).
+120 to 180ms, ease-out, everywhere: hover tints, press, the tab underline, the segmented pill, and a popup's fade and 4px rise. The default transition is 150ms and `cubic-bezier(0, 0, 0.2, 1)`, so a bare `transition-colors` needs nothing more. No bounce, and nothing at 300ms. Every duration goes through `--motion` (Settings › Appearance). A status chip has no transition, hover included: its label can't fade, so a fading colour would sit under the wrong label.
 
 ## Difficulty colours
 
