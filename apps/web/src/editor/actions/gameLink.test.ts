@@ -102,7 +102,7 @@ describe("game link actions", () => {
   const kinds = () => s().notifications.map((n) => n.kind)
   const pinned = () => s().notifications.filter((n) => n.persistent && n.resolvedAt === null).map((n) => n.kind)
 
-  it.effect("the first launch opens the checklist and notifies nothing; the next one opens nothing", () => {
+  it.effect("a first launch that finds everything shows nothing, and neither does the next one", () => {
     const disk = makeTestDisk()
     installed(disk)
     s().setSettings({ ...defaultSettings, general: { ...defaultSettings.general, creatorName: "Isaac" } })
@@ -113,14 +113,42 @@ describe("game link actions", () => {
       assert.isTrue(allFound(gameLinkRows(s().gamePaths, s().pluginStatus, creatorOf("Isaac", Option.none()))))
       assert.deepStrictEqual(kinds(), [])
       assert.deepStrictEqual(disk.gameLink.last, found)
-      // the checklist opens as a dialog on the first launch only, while everything Export needs is there
-      assert.strictEqual(s().dialog?.id, "gameLink")
-      s().closeDialog()
+      assert.isNull(s().dialog)
 
       yield* restart
       yield* checkGameLinkEffect
       assert.isFalse(s().gameLink.firstRun)
       assert.deepStrictEqual(kinds(), [])
+      assert.isNull(s().dialog)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a first launch opens the dialog for a missing row; a later one only for what Export needs", () => {
+    const disk = makeTestDisk()
+    installed(disk)
+    disk.game.plugin = { ...disk.game.plugin, status: "missing", installedVersion: null }
+    s().setSettings({ ...defaultSettings, general: { ...defaultSettings.general, creatorName: "Isaac" } })
+    return Effect.gen(function*() {
+      yield* restart
+      yield* checkGameLinkEffect
+      assert.strictEqual(s().dialog?.id, "gameLink")
+      s().closeDialog()
+
+      yield* restart
+      yield* checkGameLinkEffect
+      assert.isNull(s().dialog)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a first launch doesn't open the dialog for the optional plugin manager", () => {
+    const disk = makeTestDisk()
+    installed(disk)
+    disk.game.paths = { ...disk.game.paths, pluginsFolder: { status: "missing", path: null } }
+    disk.game.plugin = { ...disk.game.plugin, status: "noPluginManager", installedVersion: null }
+    s().setSettings({ ...defaultSettings, general: { ...defaultSettings.general, creatorName: "Isaac" } })
+    return Effect.gen(function*() {
+      yield* restart
+      yield* checkGameLinkEffect
       assert.isNull(s().dialog)
     }).pipe(Effect.provide(layerFor(disk)))
   })

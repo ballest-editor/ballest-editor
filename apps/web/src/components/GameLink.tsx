@@ -4,11 +4,10 @@ import {
   IconCircleX,
   IconFolderOpen,
   IconFolderSearch,
-  IconRefresh,
-  IconRestore
+  IconPencil,
+  IconRefresh
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
-import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { cn } from "@workspace/ui/lib/utils"
 import { type ComponentType, useState } from "react"
 import {
@@ -28,8 +27,9 @@ import {
   resetGamePaths,
   revealGamePath
 } from "../editor/actions"
-import { useCreator, useEditor } from "../editor/store"
-import { PathAction, PathField } from "./PathText"
+import { type SettingsCategory, useCreator, useEditor } from "../editor/store"
+import { PathAction } from "./PathText"
+import type { SettingsRow } from "./SettingsShell"
 
 const ICONS: Record<GameLinkRowState, ComponentType<{ readonly className?: string }>> = {
   ok: IconCircleCheck,
@@ -45,39 +45,43 @@ const TONES: Record<GameLinkRowState, string> = {
   waiting: "text-fg-tertiary"
 }
 
-function StateIcon({ state, className }: { readonly state: GameLinkRowState; readonly className?: string }) {
+/** On the label's line: the icon is 16px, the line 20px. */
+function StateIcon({ state }: { readonly state: GameLinkRowState }) {
   const Icon = ICONS[state]
-  return <Icon className={cn("size-3.5 shrink-0", TONES[state], className)} />
+  return <Icon className={cn("mt-0.5 size-4 shrink-0", TONES[state])} />
 }
 
 /**
- * A row's fix. Only a missing row's is filled: on a row that is fine it changes what was found (Change…), and the
- * optional plugin manager's is quiet, since nothing is wrong without it.
+ * A row's fix. On a row that is fine it is an icon button, which changes what was found; on one that isn't it says what
+ * it does, filled when the row is missing and quiet on the optional plugin manager, since nothing is wrong without it.
  */
 function FixButton({ fix, state }: { readonly fix: GameLinkFix; readonly state: GameLinkRowState }) {
   const openDialog = useEditor((s) => s.openDialog)
   const [busy, setBusy] = useState(false)
+  const found = state === "ok"
   switch (fix._tag) {
     case "ChooseFolder":
-      return (
-        <Button
-          variant={state === "missing" ? "default" : "outline"}
-          size="sm"
-          onClick={() => void chooseGameLinkFolder(fix.which)}
-        >
-          {state === "ok" ? "Change…" : "Choose folder…"}
-        </Button>
-      )
+      return found
+        ? (
+          <PathAction
+            label="Choose another folder…"
+            icon={IconFolderSearch}
+            onClick={() => void chooseGameLinkFolder(fix.which)}
+          />
+        )
+        : (
+          <Button
+            variant={state === "missing" ? "default" : "outline"}
+            onClick={() => void chooseGameLinkFolder(fix.which)}
+          >
+            Choose folder…
+          </Button>
+        )
     case "OpenPluginDocs":
-      return (
-        <Button variant="outline" size="sm" onClick={() => void openExternalLink(PLUGIN_MANAGER_URL)}>
-          Install docs
-        </Button>
-      )
+      return <Button variant="outline" onClick={() => void openExternalLink(PLUGIN_MANAGER_URL)}>Install docs</Button>
     case "InstallPlugin":
       return (
         <Button
-          size="sm"
           disabled={busy}
           onClick={() => {
             setBusy(true)
@@ -87,16 +91,12 @@ function FixButton({ fix, state }: { readonly fix: GameLinkFix; readonly state: 
           {fix.update ? "Update" : "Install"}
         </Button>
       )
-    case "EditCreator":
-      return (
-        <Button
-          variant={state === "ok" ? "outline" : "default"}
-          size="sm"
-          onClick={() => openDialog({ id: "settings", category: "general" })}
-        >
-          {state === "ok" ? "Change…" : "Set name…"}
-        </Button>
-      )
+    case "EditCreator": {
+      const edit = () => openDialog({ id: "settings", category: "general" })
+      return found
+        ? <PathAction label="Change in Settings › General" icon={IconPencil} onClick={edit} />
+        : <Button onClick={edit}>Set name…</Button>
+    }
   }
 }
 
@@ -106,131 +106,109 @@ const chosenFolder = (row: GameLinkRow): GameFolderKind | null => {
   return null
 }
 
-/**
- * One row, in the settings rows' shape: the state icon, the row's name with what was found (or what is wrong) under
- * it, and its fix as a button at the right. A folder that is there shows as a `PathField` under that, with Reveal,
- * Change and (for one chosen here) reset as the field's icon actions, so the folder rows line up with Project
- * settings' Locations.
- */
-function ChecklistRow({ row, framed }: { readonly row: GameLinkRow; readonly framed: boolean }) {
-  const folder = chosenFolder(row)
-  const problem = useEditor((s) => s.gamePathProblem?.which === folder ? s.gamePathProblem.message : null)
-  const { reveal, reset } = row
-  const quiet = row.state === "waiting" || row.state === "optional"
-  // a folder that is there is changed from its field; its fix button only shows while it is missing
-  const inField = row.state === "ok" && row.path !== null ? folder : null
-  const buttons = row.fixes.filter((fix) => !(inField !== null && fix._tag === "ChooseFolder"))
+/** The note and the full path: the only place a row spells either out. */
+function RowInfo({ row }: { readonly row: GameLinkRow }) {
   return (
-    <li
-      className={cn(
-        "flex flex-col gap-2.5 py-3",
-        framed ? "px-4" : "first:pt-0 last:pb-0",
-        row.path !== null && "pb-4 last:pb-1"
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <StateIcon state={problem === null ? row.state : "missing"} className="mt-0.5" />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <span className="text-body-strong">{row.label}</span>
-          <span className={cn("text-caption text-fg-tertiary", quiet && "opacity-80")}>
-            <span className={cn(!quiet && "text-foreground/80")}>{row.title}</span>
-            {row.note !== null && `. ${row.note}`}
-          </span>
-          {problem !== null && <span className="text-caption text-destructive">{problem}</span>}
-        </div>
-        {buttons.length > 0 && (
-          <div className="flex shrink-0 items-center gap-1.5">
-            {buttons.map((fix) => <FixButton key={fix._tag} fix={fix} state={row.state} />)}
-          </div>
-        )}
-      </div>
-      {row.path !== null && (
-        <div className="pl-[1.625rem]">
-          <PathField
-            path={row.path}
-            actions={reveal === null && inField === null && reset === null ? undefined : (
-              <>
-                {reveal !== null && (
-                  <PathAction
-                    label="Reveal in file manager"
-                    icon={IconFolderOpen}
-                    onClick={() => void revealGamePath(reveal)}
-                  />
-                )}
-                {inField !== null && (
-                  <PathAction
-                    label="Choose another folder…"
-                    icon={IconFolderSearch}
-                    onClick={() => void chooseGameLinkFolder(inField)}
-                  />
-                )}
-                {reset !== null && (
-                  <PathAction
-                    label="Use the folder Steam knows about"
-                    icon={IconRestore}
-                    onClick={() => void resetGamePaths([reset])}
-                  />
-                )}
-              </>
-            )}
-          />
-        </div>
-      )}
-    </li>
+    <span className="flex min-w-0 flex-col gap-1">
+      {row.note !== null && <span>{row.note}</span>}
+      {row.path !== null && <span className="break-all">{row.path}</span>}
+    </span>
   )
 }
 
-/** What the checklist says over its rows: looking, all there, or what is still needed. */
-export function useGameLinkSummary(): string {
+/** Reveal and the row's fixes, in one line at the right of the row. */
+function RowActions({ row }: { readonly row: GameLinkRow }) {
+  const { reveal } = row
+  return (
+    <>
+      {reveal !== null && (
+        <PathAction
+          label="Reveal in file manager"
+          icon={IconFolderOpen}
+          onClick={() => void revealGamePath(reveal)}
+        />
+      )}
+      {row.fixes.map((fix) => <FixButton key={fix._tag} fix={fix} state={row.state} />)}
+    </>
+  )
+}
+
+const useGameLinkRows = (): ReadonlyArray<GameLinkRow> => {
   const paths = useEditor((s) => s.gamePaths)
   const plugin = useEditor((s) => s.pluginStatus)
   const creator = useCreator()
-  if (paths === null || plugin === null) return "Looking for the game…"
-  return anythingMissing(gameLinkRows(paths, plugin, creator))
+  return gameLinkRows(paths, plugin, creator)
+}
+
+/** What the Game link dialog says over its rows: looking, all there, or what is still needed. */
+export function useGameLinkSummary(): string {
+  const rows = useGameLinkRows()
+  const looking = useEditor((s) => s.gamePaths === null || s.pluginStatus === null)
+  if (looking) return "Looking for the game…"
+  return anythingMissing(rows)
     ? "Export, Launch game and Play need these."
     : "Everything Export and Launch game need is here."
 }
 
+const KEYWORDS =
+  "steam proton install folder path UserSavedMaps maps plugins plugin manager ballest-editor-link editor plugin play update version"
+
 /**
- * The Game link checklist's rows (docs/PROJECTS.md § Shell, desktop): the game's install, its maps folder, the creator
- * name, the plugin manager and the editor's plugin, each with its path and, when missing, its fix. A folder can be
- * changed, and one chosen here reset to the one Steam knows about. The plugin manager is optional: only Play needs it.
- * Framed, they are padded for `GameLinkChecklist`'s box; unframed (Settings › Game), they sit flush between dividers
- * like the other settings.
+ * Settings › Game (docs/DESKTOP.md § Game link), the Game link's home: the game's install, its maps folder, the creator
+ * name, the plugin manager and the editor plugin, each a settings row with its state, its status in one line, and
+ * Reveal and its fix at the right. The full path is in the row's info. A folder chosen here has the row's reset, which
+ * looks up the one Steam knows about.
  */
-export function GameLinkRows({ framed }: { readonly framed: boolean }) {
-  const paths = useEditor((s) => s.gamePaths)
-  const plugin = useEditor((s) => s.pluginStatus)
-  const creator = useCreator()
-  const rows = gameLinkRows(paths, plugin, creator)
+export function useGameLinkSettings(): ReadonlyArray<SettingsRow<SettingsCategory>> {
+  const rows = useGameLinkRows()
+  const pathProblem = useEditor((s) => s.gamePathProblem)
+  return rows.map((row) => {
+    const { reset } = row
+    const problem = pathProblem !== null && pathProblem.which === chosenFolder(row) ? pathProblem.message : null
+    return {
+      id: `game-${row.id}`,
+      category: "game",
+      icon: <StateIcon state={problem === null ? row.state : "missing"} />,
+      label: row.label,
+      description: problem === null ? row.status : <span className="text-destructive">{problem}</span>,
+      info: row.note === null && row.path === null ? undefined : <RowInfo row={row} />,
+      keywords: `${KEYWORDS} ${row.title} ${row.note ?? ""} ${row.path ?? ""}`,
+      changes: {
+        modified: reset !== null,
+        reset: () => {
+          if (reset !== null) void resetGamePaths([reset])
+        }
+      },
+      control: <RowActions row={row} />
+    }
+  })
+}
+
+/** The rows that are missing, each with what is wrong. Empty when File › Game link… opens with everything found. */
+export function MissingGameLinkRows() {
+  const missing = useGameLinkRows().filter((row) => row.state === "missing")
+  if (missing.length === 0) return null
   return (
-    <ul className={cn("flex flex-col divide-y divide-border/50 text-body", framed && "py-1")}>
-      {rows.map((row) => <ChecklistRow key={row.id} row={row} framed={framed} />)}
+    <ul className="flex flex-col gap-2">
+      {missing.map((row) => (
+        <li key={row.id} className="flex items-start gap-2">
+          <StateIcon state={row.state} />
+          <div className="flex min-w-0 flex-col">
+            <span className="text-body-strong">{row.label}</span>
+            <span className="text-caption text-fg-tertiary">{row.title}</span>
+          </div>
+        </li>
+      ))}
     </ul>
   )
 }
 
 /** Looks the folders, the plugin and the creator up again. */
-export function CheckAgainButton({ size = "sm" }: { readonly size?: "xs" | "sm" }) {
+export function CheckAgainButton() {
   return (
-    <Button variant="ghost" size={size} className="text-fg-secondary" onClick={() => void refreshGameLink()}>
+    <Button variant="secondary" onClick={() => void refreshGameLink()}>
       <IconRefresh data-icon="inline-start" />
       Check again
     </Button>
-  )
-}
-
-/** The checklist in its own box with Check again under it, as File › Game link… shows it. */
-export function GameLinkChecklist() {
-  return (
-    <div className="flex min-h-0 flex-col rounded-surface border">
-      {/* a column, so its viewport can shrink: the dialog has only a max height, which `size-full` can't resolve */}
-      <ScrollArea className="flex min-h-0 flex-1 flex-col">
-        <GameLinkRows framed />
-      </ScrollArea>
-      <div className="flex shrink-0 items-center justify-end border-t px-2 py-1">
-        <CheckAgainButton />
-      </div>
-    </div>
   )
 }
