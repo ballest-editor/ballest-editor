@@ -19,8 +19,8 @@ describe("elementOf", () => {
 })
 
 describe("isEditorKeyEvent", () => {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- only its target is read, and node has no KeyboardEvent
-  const key = (target: EventTarget) => ({ target }) as KeyboardEvent
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- only its target and key are read, and node has no KeyboardEvent
+  const key = (target: EventTarget, name = "g") => ({ target, key: name }) as KeyboardEvent
   const element = { nodeType: 1, tagName: "DIV", closest: () => null }
   const outside = node(element)
 
@@ -38,6 +38,28 @@ describe("isEditorKeyEvent", () => {
 
   it("leaves dialogs and menus theirs", () => {
     assert.isFalse(isEditorKeyEvent(key(node({ ...element, closest: () => ({}) }))))
+  })
+
+  describe("on a menu bar title", () => {
+    const inBar = { ...element, closest: (selector: string) => selector === "[role=menubar]" ? {} : null }
+    const closedTitle = node({ ...inBar, ariaExpanded: "false" })
+
+    it("drives the editor while the menu is closed", () => {
+      assert.isTrue(isEditorKeyEvent(key(closedTitle, "g")))
+      assert.isTrue(isEditorKeyEvent(key(closedTitle, "Delete")))
+    })
+
+    it("leaves the title the keys it walks the bar with, opens its menu with and leaves by", () => {
+      for (
+        const name of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "Enter", " ", "Escape", "Tab"]
+      ) {
+        assert.isFalse(isEditorKeyEvent(key(closedTitle, name)), name)
+      }
+    })
+
+    it("leaves every key to an open menu", () => {
+      assert.isFalse(isEditorKeyEvent(key(node({ ...inBar, ariaExpanded: "true" }), "g")))
+    })
   })
 
   it("is off behind a modal dialog, and back when it closes", () => {
