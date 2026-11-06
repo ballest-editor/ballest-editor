@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { LINK_STATE_LABELS, type LinkedMap, linkStateOf } from "./linkState"
+import { LINK_STATE_LABELS, type LinkedMap, linkStateDetailOf, linkStateOf } from "./linkState"
 
 const exported = { path: "/game/UserSavedMaps/a.balledit", hash: "a".repeat(64), at: "2026-10-31T12:00:00.000Z" }
 const map = (
@@ -48,5 +48,18 @@ describe("linkStateOf", () => {
       "Both changed",
       "Published draft"
     ])
+  })
+})
+
+describe("linkStateDetailOf", () => {
+  const now = Date.parse(exported.at) + 5 * 60_000
+
+  it("says when the map was last exported", () => {
+    const detail = linkStateDetailOf(map("b".repeat(64)), "editedSinceExport", now)
+    assert.isTrue(detail.startsWith("Edited since export · exported 5 min ago ("))
+  })
+
+  it("has no time to give for a map with no export", () => {
+    assert.strictEqual(linkStateDetailOf(map("a".repeat(64), -1, null), "notExported", now), "Not exported yet")
   })
 })
