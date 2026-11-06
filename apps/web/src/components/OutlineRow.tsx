@@ -3,11 +3,13 @@ import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { cn } from "@workspace/ui/lib/utils"
-import { createElement, memo, useLayoutEffect, useRef } from "react"
+import { createElement, memo, useLayoutEffect, useRef, useState } from "react"
+import type { CatalogPiece } from "../domain/Catalog"
 import type { OutlineRow } from "../domain/outline"
 import { useEditor } from "../editor/store"
 import { Ordinal } from "./Ordinal"
-import { itemGlyphOf } from "./outlineGlyphs"
+import { type Glyph, hasOwnGlyph, itemGlyphOf } from "./outlineGlyphs"
+import { PieceThumbnail } from "./PieceThumbnail"
 
 export const OUTLINE_ROW_HEIGHT = 24
 export const OUTLINE_INDENT = 12
@@ -65,13 +67,36 @@ function TagChips({ tags }: { readonly tags: ReadonlyArray<string> }) {
   )
 }
 
-/** Every row's glyph, group or item, is one of these. */
-const GLYPH_CLASS = "mr-1 size-4 shrink-0 text-fg-secondary"
+/** Where every row's glyph, group or item, sits. */
+const GLYPH_SLOT = "mr-1 size-4 shrink-0"
+const GLYPH_COLOUR = "text-fg-secondary"
 
-/** An item's glyph, by what it is. */
+/**
+ * A piece's thumbnail, laid over its glyph until it has loaded, and the glyph for good if it never does. The glyph then
+ * goes rather than sitting behind it: some of the game's renders are see-through. An image's load reaches this span
+ * through React's tree, though the DOM's event doesn't bubble.
+ */
+function PieceIcon({ piece, glyph }: { readonly piece: CatalogPiece; readonly glyph: Glyph }) {
+  const [loaded, setLoaded] = useState(false)
+  return (
+    <span className={cn("relative", GLYPH_SLOT)} onLoad={() => setLoaded(true)}>
+      {!loaded && createElement(glyph, { className: cn("size-4", GLYPH_COLOUR) })}
+      <PieceThumbnail
+        piece={piece}
+        className={cn("absolute top-0 left-0 size-4 rounded-control object-cover", loaded && "bg-muted")}
+        placeholder={null}
+      />
+    </span>
+  )
+}
+
+/** An item's picture. The player start, the goal and anything the catalog doesn't know have only a glyph. */
 function ItemIcon({ actorClass }: { readonly actorClass: string }) {
-  const category = useEditor((s) => s.catalogIndex?.pieceByClass.get(actorClass)?.category)
-  return createElement(itemGlyphOf(actorClass, category), { className: GLYPH_CLASS })
+  const piece = useEditor((s) => s.catalogIndex?.pieceByClass.get(actorClass))
+  const glyph = itemGlyphOf(actorClass, piece?.category)
+  return piece === undefined || hasOwnGlyph(actorClass)
+    ? createElement(glyph, { className: cn(GLYPH_SLOT, GLYPH_COLOUR) })
+    : <PieceIcon key={actorClass} piece={piece} glyph={glyph} />
 }
 
 /** What a row's name says when the pointer rests on it: an item's class, a group's item count. */
@@ -107,10 +132,10 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
       data-row-index={rowIndex}
       className={cn(
         "absolute inset-x-0 flex items-center pr-2 text-body hover:bg-muted/60",
-        selected && "bg-primary/20 hover:bg-primary/25",
+        selected && "bg-primary/12 hover:bg-primary/15",
         partial && !selected && "bg-primary/5",
         entered && "shadow-[inset_2px_0_0_var(--primary)]",
-        dimmed && "text-fg-disabled **:text-fg-disabled",
+        dimmed && "text-fg-disabled **:text-fg-disabled [&_img]:opacity-50",
         dragged && "opacity-40",
         dropInto && "bg-primary/30 ring-1 ring-primary ring-inset"
       )}
@@ -139,7 +164,7 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
           </Button>
         )
         : <span className="size-6 shrink-0" />}
-      {isGroup ? <FolderIcon className={GLYPH_CLASS} /> : <ItemIcon actorClass={row.actorClass} />}
+      {isGroup ? <FolderIcon className={cn(GLYPH_SLOT, GLYPH_COLOUR)} /> : <ItemIcon actorClass={row.actorClass} />}
       {renaming
         ? <RenameField name={row.name} onDone={(value) => onRenamed(row, value)} />
         : (
