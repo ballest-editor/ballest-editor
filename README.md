@@ -47,24 +47,25 @@ The web review build is the same editor in a browser, without anything that need
 
 ## Documentation
 
-| Read                                                                   | For                                                                           |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [docs/VISION.md](docs/VISION.md)                                       | Why the editor exists, what's built and what's next                           |
-| [docs/FORMAT.md](docs/FORMAT.md)                                       | The map format, the game's limits and validation rules, where files live      |
-| [docs/PROJECTS.md](docs/PROJECTS.md)                                   | Projects, maps and exports: the model, the files on disk, the design to come  |
-| [docs/DESKTOP.md](docs/DESKTOP.md)                                     | How the desktop app behaves and why                                           |
-| [docs/DRIVER.md](docs/DRIVER.md)                                       | The game driver: its design and what was measured                             |
-| [docs/design/ui-system.md](docs/design/ui-system.md)                   | The UI's type, greys, radii and spacing: the one system every view follows    |
-| [docs/qa](docs/qa)                                                     | What was measured in the game, case by case                                   |
-| [apps/web/README.md](apps/web/README.md)                               | The editor itself: scene, gizmos, materials, keybinds, coordinates            |
-| [apps/desktop/README.md](apps/desktop/README.md)                       | The main process: developing it, IPC, the protocol handler, updates, security |
-| [packages/ballest-editor-link](packages/ballest-editor-link/README.md) | The editor plugin and `play.json`                                             |
-| [packages/ballest-driver](packages/ballest-driver/README.md)           | The driver plugin                                                             |
-| [tools/extract](tools/extract/README.md)                               | Getting meshes, the catalog, keybinds and materials out of the game           |
-| [tools/compress](tools/compress/README.md)                             | The asset pack                                                                |
-| [tools/release](tools/release/README.md)                               | Installers and releases                                                       |
-| [tools/driver](tools/driver/README.md)                                 | Running the game driver                                                       |
-| [tools/map](tools/map/README.md)                                       | Inspecting, validating, diffing and generating maps                           |
+| Read                                                                   | For                                                                            |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [docs/VISION.md](docs/VISION.md)                                       | Why the editor exists, what's built and what's next                            |
+| [docs/FORMAT.md](docs/FORMAT.md)                                       | The map format, the game's limits and validation rules, where files live       |
+| [docs/PROJECTS.md](docs/PROJECTS.md)                                   | Projects, maps and exports: the model, the files on disk, the design to come   |
+| [docs/DESKTOP.md](docs/DESKTOP.md)                                     | How the desktop app behaves and why                                            |
+| [docs/DRIVER.md](docs/DRIVER.md)                                       | The game driver: its design and what was measured                              |
+| [docs/design/ui-system.md](docs/design/ui-system.md)                   | The UI's type, greys, radii and spacing: the one system every view follows     |
+| [docs/qa](docs/qa)                                                     | What was measured in the game, case by case                                    |
+| [apps/web/README.md](apps/web/README.md)                               | The editor itself: scene, gizmos, materials, keybinds, coordinates             |
+| [apps/desktop/README.md](apps/desktop/README.md)                       | The main process: developing it, IPC, the protocol handler, updates, security  |
+| [packages/ballest-editor-link](packages/ballest-editor-link/README.md) | The editor plugin and `play.json`                                              |
+| [packages/ballest-driver](packages/ballest-driver/README.md)           | The driver plugin                                                              |
+| [tools/extract](tools/extract/README.md)                               | Getting meshes, the catalog, keybinds and materials out of the game            |
+| [tools/compress](tools/compress/README.md)                             | The asset pack                                                                 |
+| [tools/release](tools/release/README.md)                               | Installers and releases                                                        |
+| [tools/driver](tools/driver/README.md)                                 | Running the game driver                                                        |
+| [tools/map](tools/map/README.md)                                       | Inspecting, validating, diffing and generating maps                            |
+| [tools/app-driver](tools/app-driver/README.md)                         | Putting the editor in a known state, then capturing, measuring or comparing it |
 
 ## Notice
 

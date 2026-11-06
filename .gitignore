@@ -4,6 +4,8 @@ node_modules/
 .tanstack/
 dist/
 dist-electron/
+# tools/app-driver's runs, profiles and session
+.app-driver/
 # apps/desktop's dev profile (scripts/dev-electron.ts)
 .dev-user-data/
 # `pnpm map seed`

@@ -17,6 +17,8 @@
       ]
     },
     "apps/web": {
+      // Read by tools/app-driver and the coverage test, never imported by the app.
+      "entry": ["src/**/*.states.ts"],
       "ignoreDependencies": [
         "tailwindcss"
       ]
@@ -37,6 +39,7 @@
       // Imported by path; the dependency is what makes turbo rebuild this tool's hash when the domain code changes.
       "ignoreDependencies": ["@ballest/web"]
     },
+    "tools/app-driver": {},
     "packages/ballest-driver": {}
   }
 }

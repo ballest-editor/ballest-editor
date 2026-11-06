@@ -3,6 +3,10 @@
     "ballest-driver": {
       "command": "node",
       "args": ["tools/driver/src/main.ts", "serve"]
+    },
+    "ballest-app-driver": {
+      "command": "node",
+      "args": ["tools/app-driver/src/main.ts", "serve"]
     }
   }
 }

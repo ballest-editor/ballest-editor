@@ -113,6 +113,15 @@ export const importMapFile = Effect.gen(function*() {
 
 export const importMap = () => run(importMapFile)
 
+/** A map's text into a new tab, held in memory as a browser's Open… holds it: how the app driver opens its fixtures. */
+export const openMapText = (name: string, text: string) =>
+  run(
+    Effect.gen(function*() {
+      const map = yield* MapCodec.use((codec) => codec.decode(text))
+      yield* showMap(map, { name, path: null }, { into: "newTab" })
+    })
+  )
+
 /**
  * The clash dialog's Replace: the project's map of that name goes to backups. When a tab has it open, that tab is asked
  * about its unsaved edits first and shows the import.
