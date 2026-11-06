@@ -45,6 +45,7 @@ import {
   selectedGroupIds,
   selectionNodeIds
 } from "../domain/groupSelection"
+import { placedBoxOf } from "../domain/itemBounds"
 import { type PropertyChange, withFlip } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
@@ -1395,7 +1396,8 @@ const keptEnteredGroup = (doc: Doc, id: string | null): string | null =>
   id !== null && findGroup(doc.structure.tree, id) !== undefined ? id : null
 
 /** A doc's map as the game gets it: its groups are the projection of the structure (docs/FORMAT.md § Groups). */
-export const gameMapOf = (doc: Doc): MapFile => withGameGroups(doc.map, doc.ids, doc.structure.tree)
+export const gameMapOf = (doc: Doc, catalog: CatalogIndex | null): MapFile =>
+  withGameGroups(doc.map, doc.ids, doc.structure.tree, catalog)
 
 const INVALID_TRANSFORM = "That transform isn't valid for the game (non-finite or zero rotation)."
 
@@ -1450,6 +1452,19 @@ const keyIndicesOf = (ids: ReadonlyArray<string>): ReadonlyMap<string, number> =
 
 /** An item's place in `ids`; -1 for a key that isn't there. */
 const indexOfKey = (ids: ReadonlyArray<string>, key: string): number => keyIndicesOf(ids).get(key) ?? -1
+
+/** The box around the items at `keys` where they show, which is ahead of the document during a continuous edit. */
+export const groupBoxOf = (
+  { catalogIndex, doc, preview }: Pick<EditorState, "catalogIndex" | "doc" | "preview">,
+  keys: ReadonlyArray<string>
+) =>
+  placedBoxOf(
+    keys.flatMap((key) => {
+      const item = doc.map.items[indexOfKey(doc.ids, key)]
+      return item === undefined ? [] : [{ item, transform: preview?.get(key) ?? editTransform(item) }]
+    }),
+    catalogIndex
+  )
 
 /** Document indices of the selected items, in selection order. */
 export const selectedIndices = (s: EditorState): Array<number> =>

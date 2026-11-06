@@ -5,13 +5,12 @@
  */
 import type { CatalogIndex, CatalogPiece } from "./Catalog"
 import type { Vec3 } from "./coords"
-import { editTransform } from "./editTransform"
 import { meshComponentFor, newMapFile, qualifyMaterialPath } from "./factory"
 import { gameGroupNameOf } from "./gameGroups"
 import { refusesMeshComponents } from "./gameRules"
+import { boxCentreOf, itemsBoxOf } from "./itemBounds"
 import { DEFAULT_PLAYER_START } from "./level"
 import { type Item, type MapFile, type MeshComponent, objectPathOf, PropertyList } from "./MapFile"
-import { localToWorld, pivotBoundsOf } from "./pivot"
 import {
   PREFAB_FORMAT,
   PREFAB_VERSION,
@@ -130,44 +129,13 @@ export const prefabItemOf = (item: Item, frame: Vec3): PrefabItem => {
   }
 }
 
-interface Box {
-  readonly min: Vec3
-  readonly max: Vec3
-}
-
-/** The corners of an item's turned bounds, or its origin when its bounds are unknown. */
-const cornersOf = (item: Item, catalog: CatalogIndex | null): ReadonlyArray<Vec3> => {
-  const transform = editTransform(item)
-  const bounds = pivotBoundsOf(item, catalog)
-  if (bounds === undefined) return [transform.translation]
-  const [x0, y0, z0] = bounds.min
-  const [x1, y1, z1] = bounds.max
-  return [x0, x1].flatMap((x) => [y0, y1].flatMap((y) => [z0, z1].map((z) => localToWorld(transform, { x, y, z }))))
-}
-
-/** The world-aligned box around the items' turned bounds. */
-const boxOf = (items: ReadonlyArray<Item>, catalog: CatalogIndex | null): Box => {
-  const corners = items.flatMap((item) => cornersOf(item, catalog))
-  const along = (pick: (...values: Array<number>) => number): Vec3 => ({
-    x: pick(...corners.map((c) => c.x)),
-    y: pick(...corners.map((c) => c.y)),
-    z: pick(...corners.map((c) => c.z))
-  })
-  return { min: along(Math.min), max: along(Math.max) }
-}
-
-/** The centre of that box: the frame the game makes for loose pieces, and what Ctrl+G makes (docs/FORMAT.md § Groups). */
-const frameOf = (items: ReadonlyArray<Item>, catalog: CatalogIndex | null): Vec3 => {
-  const { max, min } = boxOf(items, catalog)
-  return { x: (min.x + max.x) / 2, y: (min.y + max.y) / 2, z: (min.z + max.z) / 2 }
-}
-
 /**
  * A new prefab of `items`, as `saveprefab` writes one: `location` from the frame, with no turn or scale, and the group's
  * name as the game takes it, when that leaves any.
  */
 export const prefabOfItems = (items: ReadonlyArray<Item>, catalog: CatalogIndex | null, groupName = ""): PrefabFile => {
-  const frame = frameOf(items, catalog)
+  const box = itemsBoxOf(items, catalog)
+  const frame = box === undefined ? ORIGIN : boxCentreOf(box)
   const name = gameGroupNameOf(groupName)
   return {
     format: PREFAB_FORMAT,
@@ -195,7 +163,7 @@ export const spawnFrameOf = (
 ): Vec3 => {
   const length = Math.hypot(direction.x, direction.y, direction.z) || 1
   const d = { x: direction.x / length, y: direction.y / length, z: direction.z / length }
-  const { max, min } = boxOf(items, catalog)
+  const { max, min } = itemsBoxOf(items, catalog) ?? { min: ORIGIN, max: ORIGIN }
   const nearest = (d.x < 0 ? max.x : min.x) * d.x + (d.y < 0 ? max.y : min.y) * d.y + (d.z < 0 ? max.z : min.z) * d.z
   const along = SPAWN_DISTANCE - nearest
   return { x: origin.x + d.x * along, y: origin.y + d.y * along, z: origin.z + d.z * along }

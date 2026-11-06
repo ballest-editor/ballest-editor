@@ -23,7 +23,7 @@ const writeOpenMapToGame = (intent: ExportIntent) =>
   Effect.suspend(() => {
     const { catalogIndex, doc, document, openDialog } = useEditor.getState()
     if (document.kind === "prefab") return Effect.fail(new ExportValidationError({ message: PREFAB_TAB_STAYS_HERE }))
-    const problems = gameLoadProblems(gameMapOf(doc), catalogIndex)
+    const problems = gameLoadProblems(gameMapOf(doc, catalogIndex), catalogIndex)
     if (problems.length > 0) return Effect.fail(new ExportValidationError({ message: problems.slice(0, 3).join(" ") }))
     return intent === "play" && !isNeverPublished(doc.map.worldSettings.levelData.levelPublishedFileId)
       ? Effect.sync(() => openDialog({ id: "newDraft" }))

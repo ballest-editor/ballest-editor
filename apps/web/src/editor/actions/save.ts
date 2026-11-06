@@ -21,7 +21,7 @@ import { fileOf, projectName, refreshProject, revealIn, saveTabPrefs, writeSidec
  */
 const exportOpenMap = Effect.gen(function*() {
   const { catalogIndex, doc, tabId } = useEditor.getState()
-  const result = yield* (yield* MapExporter).prepare(gameMapOf(doc), catalogIndex)
+  const result = yield* (yield* MapExporter).prepare(gameMapOf(doc, catalogIndex), catalogIndex)
   return { doc, tabId, result }
 })
 
@@ -191,7 +191,7 @@ export const renameOpenMap = (displayName: string, creatorName: string) => {
 export const duplicateMapEffect = Effect.fn("duplicateMapEffect")(
   function*(displayName: string, creatorName: string, replace = false, newDraft = false) {
     const { catalogIndex, doc, file, tabId } = useEditor.getState()
-    const named = setLevelNames(gameMapOf(doc), displayName, creatorName)
+    const named = setLevelNames(gameMapOf(doc, catalogIndex), displayName, creatorName)
     const result = yield* (yield* MapExporter).prepare(newDraft ? asNewDraft(named) : named, catalogIndex)
     const created = yield* createAsOpenMap({ doc, tabId, result }, replace)
     const from = file === null ? "" : ` from ${mapLabelOf(file.name)}`

@@ -109,6 +109,28 @@ describe.skipIf(!fs.existsSync(catalogPath))("pivots in samples/", () => {
     return pivotFor(item, index, choice)?.localPosition
   }
 
+  // The game's box for this bevel through `piece_measure`, with its origin at 0: x -909.81 to 863.81 unflipped.
+  it("flips the bounds with the mesh, as the game does", () => {
+    const piece = catalog.pieces.find((p) => p.className === "Bevel_Full_ShortUScoop_R")!
+    const flipped = (...names: ReadonlyArray<string>) =>
+      pivotBoundsOf({
+        ...playerStartItem(),
+        actorToSpawn: piece.classPath,
+        meshComponents: [],
+        boolProperties: names.map((propertyName) => ({ propertyName, propertyType: "bool", currentValue: true }))
+      }, index)
+    const along = (bounds: ReturnType<typeof flipped>) => [
+      Math.round(bounds!.min[0]),
+      Math.round(bounds!.max[0]),
+      Math.round(bounds!.min[1]),
+      Math.round(bounds!.max[1])
+    ]
+    assert.deepStrictEqual(along(flipped()), [-910, 864, -1122, 594])
+    assert.deepStrictEqual(along(flipped("bMirror")), [-910, 864, -594, 1122])
+    assert.deepStrictEqual(along(flipped("bMirrorX")), [-864, 910, -1122, 594])
+    assert.deepStrictEqual(along(flipped("bMirror", "bMirrorX")), [-864, 910, -594, 1122])
+  })
+
   // The game's own answers, read from its gizmo through each pivot button on 0.4.1.
   it("matches the game on the pieces the Main mesh doesn't describe", () => {
     const cases: ReadonlyArray<readonly [string, PivotChoice, readonly [number, number, number]]> = [

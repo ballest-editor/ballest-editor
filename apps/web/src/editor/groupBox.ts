@@ -1,13 +1,14 @@
 /**
  * The box around a whole group, so it reads as one unit where its items' outlines (selectionOutline.ts) read as pieces.
- * Axis-aligned in the scene, it's rebuilt from the meshes under the group's items whenever they end up elsewhere. Its
- * dashes stay a steady length on screen at the box's distance, whatever the group's size.
+ * It is the box a group's frame is the centre of (`domain/itemBounds.ts`), axis-aligned in the scene. Its dashes stay a
+ * steady length on screen at the box's distance, whatever the group's size.
  */
 import * as THREE from "three"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
-import { isMesh } from "./threeGuards"
+import { ueToThreeVector } from "../domain/coords"
+import type { Box } from "../domain/itemBounds"
 
 /** How far outside its items the box sits (cm), so its lines clear theirs. */
 const PADDING = 8
@@ -39,31 +40,6 @@ const EDGES = [
 
 const cornerOf = (corner: number, min: THREE.Vector3, max: THREE.Vector3, target: THREE.Vector3) =>
   target.set(corner & 1 ? max.x : min.x, corner & 2 ? max.y : min.y, corner & 4 ? max.z : min.z)
-
-const meshBox = new THREE.Box3()
-
-const addMeshes = (object: THREE.Object3D, bounds: THREE.Box3): void => {
-  if (!object.visible || object.userData["beam"] === true) return
-  if (isMesh(object)) {
-    const { geometry } = object
-    if (geometry.boundingBox === null) geometry.computeBoundingBox()
-    if (geometry.boundingBox !== null) bounds.union(meshBox.copy(geometry.boundingBox).applyMatrix4(object.matrixWorld))
-  }
-  for (const child of object.children) addMeshes(child, bounds)
-}
-
-/**
- * The box around what `objects` show, in `bounds`: their visible meshes, where the frame's edits have put them, leaving
- * out a laser's beam, which reaches past the item. Empty until a mesh has loaded.
- */
-export const meshBoundsOf = (objects: ReadonlyArray<THREE.Object3D>, bounds: THREE.Box3): THREE.Box3 => {
-  bounds.makeEmpty()
-  for (const object of objects) {
-    object.updateWorldMatrix(true, true)
-    addMeshes(object, bounds)
-  }
-  return bounds
-}
 
 const next = new THREE.Box3()
 const centre = new THREE.Vector3()
@@ -107,11 +83,13 @@ export class GroupBox extends LineSegments2 {
     this.material.opacity = entered ? ENTERED_LOOK.opacity : 1
   }
 
-  /** Fits the box to `objects` and its dashes to how `camera` sees it, `viewHeight` pixels tall. */
-  update(objects: ReadonlyArray<THREE.Object3D>, camera: THREE.Camera, viewHeight: number): void {
-    meshBoundsOf(objects, next)
-    this.visible = !next.isEmpty()
-    if (!this.visible) return
+  /** Fits the box to `bounds` (none hides it) and its dashes to how `camera` sees it, `viewHeight` pixels tall. */
+  update(bounds: Box | undefined, camera: THREE.Camera, viewHeight: number): void {
+    this.visible = bounds !== undefined
+    if (bounds === undefined) return
+    const [min, max] = [ueToThreeVector(bounds.min), ueToThreeVector(bounds.max)]
+    next.min.set(min.x, min.y, min.z)
+    next.max.set(max.x, max.y, max.z)
     next.expandByScalar(PADDING)
     if (!next.equals(this.shown)) {
       this.shown.copy(next)

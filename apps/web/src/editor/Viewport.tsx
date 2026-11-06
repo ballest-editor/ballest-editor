@@ -34,7 +34,7 @@ import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
-import { type SelectMode, useEditor } from "./store"
+import { groupBoxOf, type SelectMode, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
 import { glbUrl, visualsOf } from "./visuals"
 import { waterTopMaterial, waterUnderMaterial } from "./water"
@@ -335,9 +335,11 @@ function GroupBoxView({ keys, entered }: { readonly keys: ReadonlyArray<string>;
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
   useEffect(() => box.setLook(dark ? GROUP_BOX_COLORS.dark : GROUP_BOX_COLORS.light, entered), [box, dark, entered])
   useEffect(() => () => box.dispose(), [box])
-  useFrame(({ camera, size }) =>
-    box.update(keys.flatMap((key) => sceneRegistry.objects.get(key) ?? []), camera, size.height)
-  )
+  const doc = useEditor((s) => s.doc)
+  const preview = useEditor((s) => s.preview)
+  const catalogIndex = useEditor((s) => s.catalogIndex)
+  const bounds = useMemo(() => groupBoxOf({ doc, preview, catalogIndex }, keys), [doc, preview, catalogIndex, keys])
+  useFrame(({ camera, size }) => box.update(bounds, camera, size.height))
   return <primitive object={box} />
 }
 
