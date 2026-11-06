@@ -6,6 +6,7 @@
 import type { CatalogIndex, CatalogPiece } from "./Catalog"
 import { classNameOf, type EditorGroup, type Item, type MapFile, PropertyList } from "./MapFile"
 import { sourceMeshOf } from "./mirror"
+import { pieceLabelOf } from "./pieceName"
 import type { PrefabFile, PrefabItem, Triple } from "./PrefabFile"
 
 /** UE's THRESH_QUAT_NORMALIZED: |1 - |q|^2| must be below this. */
@@ -53,12 +54,12 @@ export const PREFAB_ITEMS = { min: 2, max: 4096 } as const
 
 const PLAYER_START = "MP_PlayerStart"
 
-/** The game's own words for a prefab it won't spawn. */
+/** Why the game won't spawn a prefab: its own words, but for a class it names, which goes by the piece's name here. */
 export const PREFAB_REFUSALS = {
   document:
     `Expected a BallestPrefab version 1 document with a valid group and ${PREFAB_ITEMS.min} to ${PREFAB_ITEMS.max} items.`,
   selection: `Select ${PREFAB_ITEMS.min} to ${PREFAB_ITEMS.max} items before saving a prefab.`,
-  playerStart: "MP_PlayerStart is forbidden in prefabs.",
+  playerStart: `${pieceLabelOf({ className: PLAYER_START })} can't go in a prefab.`,
   groupName: "A prefab group name must contain 1 to 64 letters A-Z or digits 0-9.",
   itemClass: "A prefab item must reference a concrete level-editor item class.",
   item: (index: number) => `Item ${index} has an invalid transform, unknown property, or incorrect property value type.`

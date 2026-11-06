@@ -109,8 +109,8 @@ const writePrefab = Effect.fnUntraced(function*(ref: PrefabRef, prefab: PrefabFi
 const selectedItems = (s: EditorState) => selectedIndices(s).flatMap((index) => s.doc.map.items[index] ?? [])
 
 /**
- * What Save selection as prefab… would refuse about the selection, as the game says it; undefined when it can go. The
- * menu items are off while there is one, and show it.
+ * What Save selection as prefab… would refuse about the selection; undefined when it can go. The menu items are off
+ * while there is one, and show it.
  */
 export const selectionPrefabProblem = (s: EditorState): string | undefined => {
   const items = selectedItems(s)
