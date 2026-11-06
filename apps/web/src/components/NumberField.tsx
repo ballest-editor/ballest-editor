@@ -171,7 +171,7 @@ export function NumberField(props: {
   })
   const scrubbable = props.onScrub !== undefined
   return (
-    <div className="flex h-7 min-w-0 overflow-hidden rounded-control border border-input bg-input/20 transition-colors duration-150 ease-out focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30 dark:bg-input/30">
+    <div className="flex h-7 min-w-0 overflow-hidden rounded-control border border-border/70 bg-input transition-colors duration-150 ease-out focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30 dark:bg-input/30">
       {props.handle !== false && (
         <Label
           htmlFor={id}

@@ -54,7 +54,7 @@ function TagChips({ tags }: { readonly tags: ReadonlyArray<string> }) {
   return (
     <span className="flex shrink-0 items-center gap-0.5" title={tags.join(", ")}>
       {shown.map((tag) => (
-        <Badge key={tag} variant="secondary" className="h-4 max-w-16 px-1 text-caption">
+        <Badge key={tag} variant="neutral" className="h-4 max-w-16 px-1 text-caption">
           <span className="truncate">{tag}</span>
         </Badge>
       ))}

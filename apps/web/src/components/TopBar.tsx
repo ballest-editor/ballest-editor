@@ -97,8 +97,8 @@ export function TopBar() {
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {catalog?.warning !== undefined && (
           <Badge
-            variant="secondary"
-            className="rounded-full bg-status-warn text-status-warn-foreground"
+            variant="warn"
+            className="rounded-full"
             title={catalog.warning}
           >
             Fixture catalog

@@ -13,7 +13,7 @@ import { setGridHeight, updateSettings } from "../editor/actions"
 import { useEditor, useOpenPrefab } from "../editor/store"
 import { NumberField } from "./NumberField"
 import { ToolBar } from "./ToolBar"
-import { GROUP, GROUP_DIVIDER, noFocus, releaseFocus, SEGMENT, SEGMENT_ON } from "./viewControlStyle"
+import { GROUP, GROUP_DIVIDER, noFocus, releaseFocus, SEGMENT } from "./viewControlStyle"
 import { ViewLayoutControl, ViewPanes } from "./ViewPanes"
 import { ViewTip } from "./ViewTip"
 
@@ -250,7 +250,7 @@ function SnapGroup<V extends number>(props: {
             onPressedChange={props.onToggle}
             disabled={disabled}
             aria-label={props.label}
-            className={cn(SEGMENT, SEGMENT_ON)}
+            className={cn(SEGMENT, "aria-pressed:bg-primary/12 aria-pressed:text-foreground")}
             {...noFocus}
           />
         }

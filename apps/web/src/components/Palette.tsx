@@ -298,13 +298,13 @@ export function Palette() {
                         />
                       }
                     >
-                      <IconChevronRight className="size-3.5 transition-transform duration-200 group-data-[panel-open]:rotate-90" />
+                      <IconChevronRight className="size-3.5 transition-transform duration-150 group-data-[panel-open]:rotate-90" />
                       <span className="truncate">{section.name}</span>
                       <span className="ml-auto text-fg-tertiary tabular-nums">{section.pieces.length}</span>
                     </TooltipTrigger>
                     <TooltipContent side="right">Not in the in-game browser</TooltipContent>
                   </Tooltip>
-                  <CollapsibleContent className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-200 ease-out data-[ending-style]:h-0 data-[starting-style]:h-0">
+                  <CollapsibleContent className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-150 ease-out data-[ending-style]:h-0 data-[starting-style]:h-0">
                     <ul
                       className={view === "grid"
                         ? "grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-1 pb-1"

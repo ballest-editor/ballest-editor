@@ -384,7 +384,7 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
     >
       <Canvas
         // Hidden until the first scene is ready, then a quick fade up from translucent.
-        className={revealed ? "animate-in fade-in-30 duration-300 ease-out" : "opacity-0"}
+        className={revealed ? "animate-in fade-in-30 duration-150 ease-out" : "opacity-0"}
         // A pane that isn't drawn this frame keeps its pixels (see PaneRenderer).
         gl={{ antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: true }}
       >

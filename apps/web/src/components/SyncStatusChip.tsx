@@ -27,7 +27,7 @@ export function StatusChip(
 ) {
   return (
     <Badge
-      variant="secondary"
+      variant="neutral"
       className={cn("rounded-full outline-none [&>svg]:size-3.5!", TONES[tone], className)}
       {...props}
     />

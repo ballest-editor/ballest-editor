@@ -461,7 +461,7 @@ const mapRows = (
         wide: true,
         control: (
           <div className="flex flex-wrap gap-1">
-            {others.map((tag) => <Badge key={tag} variant="secondary" className={CHIP}>{tag}</Badge>)}
+            {others.map((tag) => <Badge key={tag} variant="neutral" className={CHIP}>{tag}</Badge>)}
           </div>
         )
       } satisfies Row

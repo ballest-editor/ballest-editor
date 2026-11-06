@@ -26,7 +26,7 @@ export function TagInput({ id, inputRef, tags, onChange }: {
         <ul className="flex flex-wrap gap-1" aria-label="Tags">
           {tags.map((tag) => (
             <li key={tag}>
-              <Badge variant="secondary" className={cn(CHIP, "max-w-full pr-0.5")}>
+              <Badge variant="neutral" className={cn(CHIP, "max-w-full pr-0.5")}>
                 <span className="truncate">{tag}</span>
                 <button
                   type="button"

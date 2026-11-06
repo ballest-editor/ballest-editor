@@ -152,7 +152,7 @@ function ColorSetting(props: {
     <Popover>
       <PopoverTrigger
         aria-label={`${props.label}: ${props.value ?? `automatic (${props.auto})`}`}
-        className="flex h-7 w-40 cursor-pointer items-center gap-2 rounded-control border border-input px-2 text-body transition-colors duration-150 ease-out hover:border-ring/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+        className="flex h-7 w-40 cursor-pointer items-center gap-2 rounded-control border border-border/70 bg-input px-2 text-body transition-colors duration-150 ease-out hover:border-ring/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
       >
         <ColorSwatch color={shown} />
         <span className={cn("tabular-nums", props.value === null && "text-fg-tertiary")}>{shown}</span>

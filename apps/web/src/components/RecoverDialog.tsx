@@ -87,7 +87,7 @@ function VersionRow({ backup, onClose }: { readonly backup: MapBackup; readonly 
       at={backup.at}
       badge={
         <Tooltip>
-          <TooltipTrigger render={<Badge variant="secondary" className={CHIP} />}>{place.label}</TooltipTrigger>
+          <TooltipTrigger render={<Badge variant="neutral" className={CHIP} />}>{place.label}</TooltipTrigger>
           <TooltipContent side="bottom">{place.title}</TooltipContent>
         </Tooltip>
       }

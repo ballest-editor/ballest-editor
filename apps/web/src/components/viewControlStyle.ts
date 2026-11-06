@@ -16,10 +16,6 @@ export const GROUP_DIVIDER = "mx-0.5 h-4 w-px shrink-0 bg-border"
 export const SEGMENT =
   "flex h-full min-w-7 items-center justify-center gap-1.5 rounded-full px-2 text-fg-secondary outline-none transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground disabled:text-fg-disabled"
 
-/** A toggle segment that's on. */
-export const SEGMENT_ON =
-  "aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/85 aria-pressed:hover:text-primary-foreground"
-
 /** Keeps keyboard focus with the viewport: no focus on mousedown, no Space/Enter activation. */
 export const noFocus = {
   tabIndex: -1,
