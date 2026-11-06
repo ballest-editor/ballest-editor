@@ -1,15 +1,11 @@
 import type { MapBackup, PrefabBackup, PrefabSummary, PrefabTier } from "@ballest/contracts"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from "@workspace/ui/components/dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@workspace/ui/components/dialog"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
+import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
+import { cn } from "@workspace/ui/lib/utils"
 import { type ReactNode, useEffect, useMemo, useState } from "react"
 import { mapLabelOf } from "../domain/factory"
 import {
@@ -23,6 +19,7 @@ import {
 } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { SectionTitle } from "./SectionTitle"
+import { HintedButton } from "./TitledDialog"
 import { useOnOpen } from "./useOnOpen"
 
 const formatTime = (at: string) => new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
@@ -37,7 +34,10 @@ const TIERS: ReadonlyArray<{ readonly tier: PrefabTier; readonly title: string }
   { tier: "project", title: "Project prefabs" }
 ]
 
-/** What the dialog shows the versions of; null shows everything with backups. */
+/** The segment not picked steps back, as an inactive tab does. */
+const SEGMENT = "text-fg-secondary aria-pressed:text-foreground"
+
+/** What the dialog shows the versions of. */
 type Shown =
   | { readonly kind: "map"; readonly fileName: string }
   | { readonly kind: "prefab"; readonly tier: PrefabTier; readonly name: string }
@@ -45,7 +45,7 @@ type Shown =
 /** One version's row: when, the badge saying whose copy, what it holds, and the button that brings it back. */
 function VersionLine(
   { action, at, badge, onAct, status }: {
-    readonly action: { readonly label: string; readonly disabled: boolean }
+    readonly action: { readonly label: string; readonly hint: string; readonly disabled: boolean }
     readonly at: string
     readonly badge?: ReactNode
     readonly onAct: () => void
@@ -61,9 +61,9 @@ function VersionLine(
         </div>
         <div className="truncate text-body text-fg-tertiary">{status}</div>
       </div>
-      <Button size="sm" variant="outline" disabled={action.disabled} onClick={onAct}>
+      <HintedButton hint={action.hint} variant="outline" disabled={action.disabled} onClick={onAct}>
         {action.label}
-      </Button>
+      </HintedButton>
     </li>
   )
 }
@@ -88,13 +88,22 @@ function VersionRow({ backup, onClose }: { readonly backup: MapBackup; readonly 
   return (
     <VersionLine
       at={backup.at}
-      badge={<Badge variant="outline" title={place.title}>{place.label}</Badge>}
+      badge={
+        <Tooltip>
+          <TooltipTrigger render={<Badge variant="outline" />}>{place.label}</TooltipTrigger>
+          <TooltipContent side="bottom">{place.title}</TooltipContent>
+        </Tooltip>
+      }
       status={summary === null
         ? "Reading…"
         : summary._tag === "Map"
         ? `${summary.items.toLocaleString()} items · ${summary.displayName} by ${summary.creatorName}`
         : `Can't be opened: ${summary.message}`}
-      action={{ label: "Open", disabled: summary?._tag !== "Map" }}
+      action={{
+        label: "Open",
+        hint: "Opens as unsaved edits. Save backs up the current file first.",
+        disabled: summary?._tag !== "Map"
+      }}
       onAct={() => {
         onClose()
         void recoverBackup(backup)
@@ -115,7 +124,11 @@ function PrefabVersionRow({ backup, onClose }: { readonly backup: PrefabBackup; 
         : items === null
         ? "Can't be restored: it doesn't read as a prefab"
         : `${items.toLocaleString()} ${items === 1 ? "item" : "items"}`}
-      action={{ label: "Restore", disabled: items === null }}
+      action={{
+        label: "Restore",
+        hint: "Writes it back now. The current file is backed up first.",
+        disabled: items === null
+      }}
       onAct={() => {
         onClose()
         void restorePrefabBackup(backup)
@@ -140,13 +153,16 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
   const fileName = useEditor((s) => s.file?.name ?? null)
   const [backups, setBackups] = useState<ReadonlyArray<MapBackup> | null>(null)
   const [prefabBackups, setPrefabBackups] = useState<ReadonlyArray<PrefabBackup>>([])
+  // The versions the first segment shows; null, with no map open, leaves All backups alone.
   const [shown, setShown] = useState<Shown | null>(null)
+  const [all, setAll] = useState(false)
 
   // Each time the dialog opens, list the backups again and start on the open map's.
   useOnOpen(open, () => {
     setBackups(null)
     setPrefabBackups([])
     setShown(fileName === null ? null : { kind: "map", fileName })
+    setAll(fileName === null)
   })
   useEffect(() => {
     if (!open) return
@@ -189,11 +205,6 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
       ].filter(({ rows }) => rows.length > 0),
     [backups, prefabBackups, fileName]
   )
-  const versions = shown?.kind === "map" ? backups?.filter((b) => b.fileName === shown.fileName) ?? [] : []
-  const prefabVersions = shown?.kind === "prefab"
-    ? prefabBackups.filter((b) => b.tier === shown.tier && b.name === shown.name)
-    : []
-
   const everything = sections.map(({ rows, title }) => (
     <section key={title}>
       <div className="px-3 pt-3 pb-1">
@@ -205,7 +216,10 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
             <button
               type="button"
               className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors outline-none hover:bg-muted focus-visible:bg-muted"
-              onClick={() => setShown(shows)}
+              onClick={() => {
+                setShown(shows)
+                setAll(false)
+              }}
             >
               <span className="min-w-0 flex-1 truncate text-body-strong">{label}</span>
               <span className="shrink-0 text-body text-fg-tertiary tabular-nums">
@@ -218,49 +232,47 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
     </section>
   ))
 
+  const versions = shown?.kind === "prefab"
+    ? prefabBackups.filter((b) => b.tier === shown.tier && b.name === shown.name)
+      .map((backup) => <PrefabVersionRow key={backup.id} backup={backup} onClose={onClose} />)
+    : shown?.kind === "map"
+    ? (backups ?? []).filter((b) => b.fileName === shown.fileName)
+      .map((backup) => <VersionRow key={`${backup.place} ${backup.id}`} backup={backup} onClose={onClose} />)
+    : []
+  const empty = all ? sections.length === 0 : versions.length === 0
+
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       {/* a column, so that the list shrinks before Close leaves the window */}
       <DialogContent className="flex flex-col sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Recover a previous version</DialogTitle>
-          <DialogDescription>
-            Copies kept before a file was written over: a project map's on Save, Rename and Import, the game's on
-            Export, a prefab's on a save, Rename or Delete. A map's version opens as unsaved edits, and Save backs up
-            the current file first. A prefab's is written back at once, and the file it replaces is backed up first.
-          </DialogDescription>
         </DialogHeader>
-        <div className="flex items-center justify-between gap-2">
-          <div className="truncate text-body-strong">
-            {shown === null ? "All backups" : shown.kind === "map" ? mapLabelOf(shown.fileName) : shown.name}
-          </div>
-          {shown !== null && <Button size="sm" variant="ghost" onClick={() => setShown(null)}>All backups</Button>}
-        </div>
-        <ScrollArea className="h-72 min-h-0 rounded-control border">
-          {backups === null
-            ? <p className="p-3 text-body text-fg-tertiary">Reading the backups…</p>
-            : shown === null
-            ? sections.length === 0 ? <p className="p-3 text-body text-fg-tertiary">No backups yet.</p> : everything
-            : shown.kind === "prefab"
-            ? (
-              <ul className="divide-y">
-                {prefabVersions.map((backup) => <PrefabVersionRow key={backup.id} backup={backup} onClose={onClose} />)}
-              </ul>
-            )
-            : versions.length === 0
-            ? (
-              <p className="p-3 text-body text-fg-tertiary">
-                No backups of this map yet. One is made each time Save, Rename, Import or Export writes over its file.
-              </p>
-            )
-            : (
-              <ul className="divide-y">
-                {versions.map((backup) => (
-                  <VersionRow key={`${backup.place} ${backup.id}`} backup={backup} onClose={onClose} />
-                ))}
-              </ul>
-            )}
-        </ScrollArea>
+        {shown !== null && (
+          <ToggleGroup
+            className="max-w-full"
+            value={[all ? "all" : "shown"]}
+            variant="outline"
+            spacing={0}
+            onValueChange={([picked]) => {
+              if (picked !== undefined) setAll(picked === "all")
+            }}
+          >
+            <ToggleGroupItem value="shown" className={cn(SEGMENT, "min-w-0 shrink")}>
+              <span className="truncate">{shown.kind === "map" ? mapLabelOf(shown.fileName) : shown.name}</span>
+            </ToggleGroupItem>
+            <ToggleGroupItem value="all" className={SEGMENT}>All backups</ToggleGroupItem>
+          </ToggleGroup>
+        )}
+        {backups === null
+          ? <p className="text-body text-fg-tertiary">Reading the backups…</p>
+          : empty
+          ? <p className="text-body text-fg-tertiary">No backups yet.</p>
+          : (
+            <ScrollArea className="h-72 min-h-0 rounded-control border">
+              {all ? everything : <ul className="divide-y">{versions}</ul>}
+            </ScrollArea>
+          )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Close</Button>
         </DialogFooter>

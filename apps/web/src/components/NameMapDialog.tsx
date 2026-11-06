@@ -1,5 +1,8 @@
+import { Button } from "@workspace/ui/components/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { useMemo, useState } from "react"
-import { riskyClassesIn } from "../domain/Catalog"
+import { pieceLabelOf, riskyClassesIn } from "../domain/Catalog"
+import { usableCreatorName } from "../domain/creator"
 import { copyNameOf, isValidName, mapFileNameOf } from "../domain/factory"
 import { unconfirmedPropertiesIn } from "../domain/itemProperties"
 import { classNameOf } from "../domain/MapFile"
@@ -11,8 +14,8 @@ import {
   saveMapAs,
   saveMapInNewProject
 } from "../editor/actions"
-import { useEditor } from "../editor/store"
-import { type MapCreator, MapNameDialog, useMapCreator } from "./MapNameDialog"
+import { useCreator, useEditor } from "../editor/store"
+import { MapNameDialog } from "./MapNameDialog"
 import { NewProjectFields, useNewProjectDraft } from "./NewProjectFields"
 import { useOnOpen } from "./useOnOpen"
 
@@ -25,11 +28,8 @@ import { useOnOpen } from "./useOnOpen"
  */
 export type NameMapMode = "saveAs" | "rename" | "duplicate" | "newDraft"
 
-/** The map's own creator, editable: Rename and Duplicate may change it. */
-const useOwnCreator = (initial: string): MapCreator => {
-  const [draft, setDraft] = useState(initial)
-  return { saved: "", draft, setDraft, name: draft.trim(), persist: () => Promise.resolve() }
-}
+const ERROR = "text-body text-destructive"
+const WARNING = "text-body text-amber-700 dark:text-amber-300"
 
 export function NameMapDialog(
   { mode, open, onClose }: { readonly mode: NameMapMode; readonly open: boolean; readonly onClose: () => void }
@@ -51,76 +51,64 @@ export function NameMapDialog(
   const risky = useMemo(() => {
     const pieces = catalog?.catalog.pieces ?? []
     const classes = riskyClassesIn(items.map((it) => classNameOf(it.actorToSpawn)), pieces, catalog?.verified ?? {})
-    // a surface or mirror flag on a piece no 0.4.1 save has shown with one
-    return { ...classes, unverified: [...classes.unverified, ...unconfirmedPropertiesIn(items, pieces)] }
+    const labelOf = (className: string) => {
+      const piece = pieces.find((p) => p.className === className)
+      return piece === undefined ? className : pieceLabelOf(piece)
+    }
+    return {
+      rejected: classes.rejected.map(labelOf),
+      // a surface or mirror flag on a piece no 0.4.1 save has shown with one
+      unverified: [...classes.unverified, ...unconfirmedPropertiesIn(items, pieces)]
+    }
   }, [items, catalog])
-  const settingsCreator = useMapCreator()
+  const savedCreator = usableCreatorName(useCreator())
   const mapCreator = levelData.creatorName.trim()
-  const ownCreator = useOwnCreator(mapCreator || settingsCreator.name)
-  const creator = mode === "saveAs" ? settingsCreator : ownCreator
+  // Only Settings › General sets a creator. Save gives the map that one; Rename and Duplicate keep the map's own, unless
+  // it has none a file name can hold. "" when there is no creator to use.
+  const creator = mode === "saveAs" || !isValidName(mapCreator) ? savedCreator : mapCreator
   const taken = useMemo(() => new Set(projectMaps.map((m) => m.fileName)), [projectMaps])
   // a copy: a new draft is one too
   const copies = mode === "duplicate" || mode === "newDraft"
   const startName = () =>
-    copies
-      ? copyNameOf(levelData.levelDisplayName.trim(), mapCreator || settingsCreator.name, taken)
-      : levelData.levelDisplayName
+    copies ? copyNameOf(levelData.levelDisplayName.trim(), creator, taken) : levelData.levelDisplayName
   const [name, setName] = useState(startName)
   // Each time the dialog opens, start from the map as it is now.
   useOnOpen(open, () => {
     setName(startName())
-    ownCreator.setDraft(mapCreator || settingsCreator.name)
     newProject.reset()
   })
 
-  const target = mapFileNameOf(name.trim(), creator.name)
+  const trimmed = name.trim()
+  const target = mapFileNameOf(trimmed, creator)
   const clash = projects && target !== fileName && taken.has(target)
   // Duplicate may write over another map (it goes to the backups); Rename and Save never do.
   const replaces = clash && copies
   const submit = async () => {
     // a project main refuses leaves the dialog up, so its name or folder can be changed
     if (namesProject && (await canMakeProject(newProject.project)) !== true) return
-    await creator.persist()
     onClose()
-    if (mode === "duplicate") await duplicateMap(name, creator.name, replaces)
-    else if (mode === "newDraft") await playAsNewDraft(name, creator.name, replaces)
-    else if (mode === "rename") await renameOpenMap(name, creator.name)
+    if (mode === "duplicate") await duplicateMap(trimmed, creator, replaces)
+    else if (mode === "newDraft") await playAsNewDraft(trimmed, creator, replaces)
+    else if (mode === "rename") await renameOpenMap(trimmed, creator)
     else {
-      useEditor.getState().renameLevel(name, creator.name)
+      useEditor.getState().renameLevel(trimmed, creator)
       await (namesProject ? saveMapInNewProject(newProject.project, afterSave) : saveMapAs(afterSave))
     }
   }
 
   const copy = {
     saveAs: projects
-      ? {
-        title: "Save map",
-        note: namesProject
-          ? "Makes a project and saves the map in it. This window becomes that project."
-          : `Saves it in ${project?.name ?? "the project"}.`,
-        submit: "Save"
-      }
-      : {
-        title: "Export map",
-        note: "Downloads it. Put it in the game's UserSavedMaps folder; don't rename the file.",
-        submit: "Download"
-      },
-    rename: {
-      title: "Rename map",
-      note: "The file moves to the new name; the old one goes to the backups.",
-      submit: "Rename"
-    },
-    duplicate: {
-      title: "Duplicate map",
-      note: "Saves a copy of the map as it is now and goes on editing the copy. The original keeps its last save.",
-      submit: "Duplicate"
-    },
+      ? { title: "Save map", submit: "Save" }
+      : { title: "Export map", note: "Put the file in the game's maps folder and keep its name.", submit: "Download" },
+    rename: { title: "Rename map", submit: "Rename" },
+    duplicate: { title: "Duplicate map", note: "You'll go on editing the copy.", submit: "Duplicate" },
     newDraft: {
       title: "Play a new draft",
-      note: "Saves a copy as a new draft, goes on editing it and races it. The published draft keeps its last save.",
+      note: "Play can't race a published map, so it races a copy.",
       submit: "Save and play"
     }
   }[mode]
+  const { unverified } = risky
 
   return (
     <MapNameDialog
@@ -128,60 +116,44 @@ export function NameMapDialog(
       onClose={onClose}
       id={mode}
       title={copy.title}
-      fileNameLead="Exports as"
-      fileNameNote={copy.note}
+      {...(copy.note !== undefined && { description: copy.note })}
       name={name}
       onNameChange={setName}
-      creator={creator}
-      {...(mode !== "saveAs" && { creatorHint: "The map's creator; Settings › General keeps the one new maps get." })}
-      savedCreator={
-        <div className="text-body text-fg-tertiary">
-          Creator: <span className="text-foreground">{creator.saved}</span>{" "}
-          <button
-            type="button"
-            className="underline underline-offset-2 hover:text-foreground"
-            onClick={() => openDialog({ id: "settings", category: "general" })}
-          >
-            change
-          </button>
-        </div>
-      }
+      nameNote={replaces
+        ? <span className={WARNING}>Already in the project. Replacing keeps the old one in the backups.</span>
+        : clash && <span className={ERROR}>The project already has a map called {trimmed}.</span>}
       submitLabel={replaces ? "Replace" : copy.submit}
       submitReplaces={replaces}
-      canSubmit={isValidName(name) && isValidName(creator.name) && risky.rejected.length === 0 &&
+      canSubmit={isValidName(trimmed) && isValidName(creator) && risky.rejected.length === 0 &&
         (!clash || replaces) && (!namesProject || newProject.ok)}
       onSubmit={submit}
     >
       {namesProject && <NewProjectFields draft={newProject} />}
-      {mode === "newDraft" && (
-        <p className="text-body text-fg-tertiary">
-          {levelData.levelDisplayName} is the draft of a Workshop map (item{" "}
-          {levelData.levelPublishedFileId}). The plugin manager races only maps never published, so Play races a copy
-          under another name, not linked to the Workshop item.
-        </p>
-      )}
-      {replaces && (
-        <p className="rounded-control border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-body text-amber-700 dark:text-amber-300">
-          The project already has {name.trim()} by {creator.name}. {mode === "newDraft" ? "Save and play" : "Duplicate"}
-          {" "}
-          replaces it; the current file goes to the backups.
-        </p>
-      )}
-      {clash && !replaces && (
-        <p className="rounded-control border border-destructive/40 bg-destructive/10 px-3 py-2 text-body text-destructive">
-          The project already has {name.trim()} by {creator.name}.
-        </p>
+      {creator === "" && (
+        <div className="flex items-center justify-between gap-2">
+          <span className={ERROR}>Set your creator name first.</span>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => openDialog({ id: "settings", category: "general" })}
+          >
+            Open Settings
+          </Button>
+        </div>
       )}
       {risky.rejected.length > 0 && (
-        <p className="rounded-control border border-destructive/40 bg-destructive/10 px-3 py-2 text-body text-destructive">
-          The game rejects {risky.rejected.join(", ")} and would discard the whole map. Remove them first.
-        </p>
+        <p className={ERROR}>The game rejects {risky.rejected.join(", ")}. Remove them first.</p>
       )}
-      {risky.unverified.length > 0 && (
-        <p className="rounded-control border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-body text-amber-700 dark:text-amber-300">
-          Not yet confirmed to load in-game:{" "}
-          {risky.unverified.join(", ")}. If the game rejects one, it discards the whole map. Test with a copy.
-        </p>
+      {unverified.length > 0 && (
+        <Tooltip>
+          <TooltipTrigger render={<p className={WARNING} />}>
+            {unverified.length === 1 ? "1 piece isn't" : `${unverified.length} pieces aren't`}{" "}
+            confirmed to load in game.
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            If the game rejects one, it discards the whole map, so test with a copy: {unverified.join(", ")}
+          </TooltipContent>
+        </Tooltip>
       )}
     </MapNameDialog>
   )
