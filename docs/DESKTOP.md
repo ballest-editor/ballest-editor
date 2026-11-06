@@ -245,7 +245,7 @@ A map's Map page has the name, the file (its name, the path on hover, Reveal and
 
 ### Status bar
 
-The status bar runs along the bottom. The project is the window's title, centred in the top bar, with the document tab's dot while a tab has unsaved edits or the project is Untitled Project. The top bar's right end has the open map's link state and Play.
+The status bar runs along the bottom. The project is the window's title, centred in the top bar, with the document tab's dot while a tab has unsaved edits or the project is Untitled Project. The top bar's right end has Play.
 
 - On the left: what a check for updates is doing, and the entered group.
 - In the middle: the open map's sync status and when it was last exported, as a coloured chip. Its popover's title is the status, then the link state when that adds something (which side changed, or what stands behind Unsaved), the last export's time, Reveal, Export and Play. A map with no file shows "Not saved in the project yet".
