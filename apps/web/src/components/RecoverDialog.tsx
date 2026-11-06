@@ -25,11 +25,11 @@ import {
   restorePrefabBackup
 } from "../editor/actions"
 import { useEditor } from "../editor/store"
-import { mapThumbnailFor } from "../editor/thumbnails"
 import { CHIP } from "./chipStyle"
 import { THUMBNAIL_TILE } from "./PieceThumbnail"
 import { SectionTitle } from "./SectionTitle"
 import { HintedButton } from "./TitledDialog"
+import { useMapPicture } from "./useMapPicture"
 import { useOnOpen } from "./useOnOpen"
 
 const formatShortTime = (at: string) =>
@@ -157,21 +157,7 @@ function VersionRow({ backup, onClose, onSelect, selected }: {
 
 /** The top-down picture of a backup's items, rendered once they have been read. */
 function BackupPicture({ preview }: { readonly preview: BackupPreview | null }) {
-  const index = useEditor((s) => s.catalogIndex)
-  const table = useEditor((s) => s.materialTable)
-  const surfaces = useEditor((s) => s.surfaces)
-  // undefined while it renders, null when there is nothing to show
-  const [rendered, setRendered] = useState<string | null | undefined>(undefined)
-  useEffect(() => {
-    if (preview?._tag !== "Map" || index === null || table === null) return
-    let live = true
-    void mapThumbnailFor(preview.id, preview.items, index, table, surfaces).then((url) => {
-      if (live) setRendered(url ?? null)
-    })
-    return () => {
-      live = false
-    }
-  }, [preview, index, table, surfaces])
+  const rendered = useMapPicture(preview?._tag === "Map" ? preview : null)
   const image = preview?._tag === "Unreadable" ? null : rendered
   return (
     <div className={cn("flex size-60 items-center justify-center overflow-hidden rounded-surface", THUMBNAIL_TILE)}>

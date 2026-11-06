@@ -71,6 +71,8 @@ export interface TestDisk {
   readonly backups: Array<MapBackupFile>
   /** What main kept of the prefabs it wrote over, renamed or deleted, oldest first. */
   readonly prefabBackups: Array<PrefabBackup & { readonly text: string }>
+  /** The recovery snapshots main keeps, by key. */
+  readonly recovery: Map<string, string>
   /** How many times the page asked main to check the exports (`checkExports`). */
   exportChecks: number
   /** What `notifications.json` holds. */
@@ -192,6 +194,7 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   gameWriteProgress: makeTestPush<GameWriteProgress>(),
   links: new Map(),
   backups: [],
+  recovery: new Map(),
   prefabBackups: [],
   exportChecks: 0,
   notifications: [],
@@ -613,6 +616,9 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       disk.files.set(path, backup.text)
       return Promise.resolve(prefabInfo(ref.tier, backup.name, path, backup.text))
     },
+    listRecovery: () => Promise.resolve([...disk.recovery].map(([key, text]) => ({ key, text }))),
+    writeRecovery: ({ key, text }) => Promise.resolve(void disk.recovery.set(key, text)),
+    removeRecovery: ({ key }) => Promise.resolve(void disk.recovery.delete(key)),
     setWindowTheme: () => Promise.resolve(),
     confirmUnsaved: (prompt) => {
       disk.prompts.push(prompt)

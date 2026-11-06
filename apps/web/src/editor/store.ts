@@ -72,6 +72,7 @@ import { localToWorld, type Pivot, pivotAt } from "../domain/pivot"
 import { isSamePrefab, prefabSaveProblem, type PrefabSource } from "../domain/prefab"
 import type { PrefabFile } from "../domain/PrefabFile"
 import { instanceOrigin, type PrefabDefinition, withUpdatedInstance } from "../domain/prefabInstance"
+import type { RecoveredTab } from "../domain/recovery"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
 import {
@@ -262,6 +263,7 @@ export interface ImportClash {
  * - `replacePublished`, `overwriteChanged` and `importClash` ask about what Export, Play or Import found.
  * - `whereToOpen` asks whether `target` (shown as `name`) takes over this window or opens in a new one.
  * - `savePrefab` names a prefab made from the selection; `renamePrefab` and `deletePrefab` are the Prefabs panel's.
+ * - `recoverUnsaved` offers `tabs`, what the last session left unsaved (docs/DESKTOP.md § Recovery).
  */
 export type DialogState =
   | {
@@ -285,6 +287,7 @@ export type DialogState =
   | { readonly id: "whereToOpen"; readonly target: ProjectTarget; readonly name: string }
   | { readonly id: "savePrefab" }
   | { readonly id: "renamePrefab" | "deletePrefab"; readonly prefab: PrefabRef }
+  | { readonly id: "recoverUnsaved"; readonly tabs: ReadonlyArray<RecoveredTab> }
 export type Dialog = DialogState["id"]
 
 /** What `notify` records besides the level and title (docs/DESKTOP.md § Notifications). */

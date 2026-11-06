@@ -4,6 +4,7 @@ import { PREFAB_REFUSALS, prefabProblems } from "../domain/gameRules"
 import { MapFile } from "../domain/MapFile"
 import { MapSidecar } from "../domain/MapSidecar"
 import { PrefabFile } from "../domain/PrefabFile"
+import { RecoverySnapshot } from "../domain/recovery"
 import { stringifyUe } from "../domain/ueJson"
 import { MapDecodeError, MapEncodeError, PrefabDecodeError, PrefabRefusedError, SidecarDecodeError } from "./errors"
 
@@ -13,6 +14,8 @@ const decodeSidecarJson = Schema.decodeUnknownEffect(Schema.fromJsonString(MapSi
 const encodeSidecarObject = Schema.encodeEffect(MapSidecar)
 const decodePrefabJson = Schema.decodeUnknownEffect(Schema.fromJsonString(PrefabFile))
 const encodePrefabObject = Schema.encodeEffect(PrefabFile)
+const decodeRecoveryJson = Schema.decodeUnknownEffect(Schema.fromJsonString(RecoverySnapshot))
+const encodeRecoveryObject = Schema.encodeEffect(RecoverySnapshot)
 
 /** UE writes no BOM, but tolerate one from other tools. */
 const withoutBom = (text: string) => text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
@@ -36,9 +39,10 @@ const refusingPrefab = (prefab: PrefabFile, catalog: CatalogIndex | null) => {
 }
 
 /**
- * Text <-> MapFile, text <-> a map's sidecar and text <-> a prefab. A map or prefab is encoded in the game's own layout
- * (tabs, CRLF, Allman braces, %.17g), a sidecar as indented JSON like the project's other files. A prefab the game would
- * refuse fails both ways, so none is placed, opened or written.
+ * Text <-> MapFile, text <-> a map's sidecar, text <-> a prefab and text <-> a recovery snapshot. A map or prefab is
+ * encoded in the game's own layout (tabs, CRLF, Allman braces, %.17g), a sidecar as indented JSON like the project's
+ * other files, a snapshot as plain JSON, which only the editor reads. A prefab the game would refuse fails both ways, so
+ * none is placed, opened or written.
  */
 export class MapCodec extends Context.Service<MapCodec, {
   decode(text: string): Effect.Effect<MapFile, MapDecodeError>
@@ -53,6 +57,8 @@ export class MapCodec extends Context.Service<MapCodec, {
     prefab: PrefabFile,
     catalog: CatalogIndex | null
   ): Effect.Effect<string, MapEncodeError | PrefabRefusedError>
+  decodeRecovery(text: string): Effect.Effect<RecoverySnapshot, MapDecodeError>
+  encodeRecovery(snapshot: RecoverySnapshot): Effect.Effect<string, MapEncodeError>
 }>()("ballest/services/MapCodec") {
   static readonly layer = Layer.succeed(
     MapCodec,
@@ -82,6 +88,14 @@ export class MapCodec extends Context.Service<MapCodec, {
       encodePrefab: Effect.fn("MapCodec.encodePrefab")(function*(prefab: PrefabFile, catalog: CatalogIndex | null) {
         yield* refusingPrefab(prefab, catalog)
         return yield* written(encodePrefabObject(prefab), stringifyUe)
+      }),
+      decodeRecovery: Effect.fn("MapCodec.decodeRecovery")(function*(text: string) {
+        return yield* decodeRecoveryJson(text).pipe(
+          Effect.mapError((error) => new MapDecodeError({ message: error.message }))
+        )
+      }),
+      encodeRecovery: Effect.fn("MapCodec.encodeRecovery")(function*(snapshot: RecoverySnapshot) {
+        return yield* written(encodeRecoveryObject(snapshot), (value) => JSON.stringify(value))
       })
     })
   )

@@ -10,7 +10,7 @@ From the repo root:
 pnpm dev:desktop    # Vite for the page, a watch build for main and preload, and Electron
 ```
 
-Edits to the page hot-reload in the window. Edits under `src/` here rebuild `main.cjs` or `preload.cjs`, and Electron restarts. Ctrl+C stops everything.
+Edits to the page hot-reload in the window. Edits under `src/` here rebuild `main.cjs` or `preload.cjs`, and Electron restarts if their bytes changed. Unsaved edits are kept through a restart ([docs/DESKTOP.md § Recovery](../../docs/DESKTOP.md#recovery)). Ctrl+C stops everything.
 
 Or run it against a production build:
 
@@ -28,7 +28,7 @@ Installers (`pnpm dist:desktop:win`, `pnpm dist:desktop:linux`) and releases are
 - **The port.** The main checkout gets 3000. A linked worktree gets a port from 3001 to 5000, hashed from its path, so it keeps its own port and its own localStorage, which the browser keys by origin, and several can run at once. `PORT=4000 pnpm dev` overrides it.
 - **The environment.** The runner sets `PORT`, `HOST` and `VITE_DEV_SERVER_URL` and runs the packages' `dev` tasks through turbo with `--env-mode=loose`. Turbo's strict mode would strip those variables and the session ones Electron needs (`WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, ...).
 - **Vite.** apps/web's Vite listens on that port with `strictPort`, so a clash fails instead of moving the window onto someone else's server. It tells the HMR client the socket's host and port, which the page's own URL, `ballest-dev://app/`, doesn't have.
-- **The bundles.** Main and preload are bundled to CJS with `electron` as the only external, as t3-code does. `vite build --watch` writes them, and once both are written it spawns `scripts/dev-electron.ts` over an IPC channel, so that script exits with it. It starts Electron once the bundles and the Vite port exist, and restarts it when `main.cjs` or `preload.cjs` change.
+- **The bundles.** Main and preload are bundled to CJS with `electron` as the only external, as t3-code does. `vite build --watch` writes them, and once both are written it spawns `scripts/dev-electron.ts` over an IPC channel, so that script exits with it. It starts Electron once the bundles and the Vite port exist, and restarts it when the bytes of `main.cjs` or `preload.cjs` change. A rebuild alone doesn't: pnpm hard-links `node_modules` from one store, so a `pnpm install` in any other checkout, such as a new worktree's, touches the files this watch build follows and sets one off.
 - **The profile.** `dev-electron.ts` keeps the dev profile in `apps/desktop/.dev-user-data/`, through `BALLEST_USER_DATA_DIR`, which main applies before `ready`. So worktrees don't share Chromium's storage lock.
 - **`ELECTRON_RUN_AS_NODE`.** Both launchers drop it. Electron-based terminals (T3 Code, VS Code) export it, and it turns the binary into plain Node.
 - **NixOS.** Electron runs through `nix-ld`, whose default libraries have no `libEGL.so.1` or `libGL.so.1`, so its GPU process exits and the page has no WebGL. When the system doesn't provide `libEGL.so.1`, both launchers build the flake's `libglvnd` and add it to `LD_LIBRARY_PATH` (`scripts/nixGl.ts`). If that fails they warn; adding `libglvnd` to `programs.nix-ld.libraries` fixes it instead.

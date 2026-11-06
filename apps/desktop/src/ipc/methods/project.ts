@@ -7,6 +7,7 @@ import { MapExports } from "../../project/MapExports"
 import { MapFiles } from "../../project/MapFiles"
 import { Prefabs } from "../../project/Prefabs"
 import { Projects } from "../../project/Projects"
+import { Recovery } from "../../project/Recovery"
 import { WindowLauncher } from "../../window/WindowLauncher"
 import type { DesktopIpcHandlers } from "../DesktopIpc"
 
@@ -57,6 +58,9 @@ export const projectHandlers = {
   /** Keeps which map is open in the project, so the next launch opens it again. */
   rememberOpenMap: ({ fileName }) =>
     Effect.flatMap(Effect.service(Projects), (projects) => projects.rememberOpenMap(fileName)),
+  listRecovery: () => Effect.flatMap(Effect.service(Recovery), (recovery) => recovery.list),
+  writeRecovery: (entry) => Effect.flatMap(Effect.service(Recovery), (recovery) => recovery.write(entry)),
+  removeRecovery: ({ key }) => Effect.flatMap(Effect.service(Recovery), (recovery) => recovery.remove(key)),
   listMaps: () => Effect.flatMap(Effect.service(MapFiles), (files) => files.list),
   readMap: ({ fileName }) => Effect.flatMap(Effect.service(MapFiles), (files) => files.read(fileName)),
   createMap: ({ fileName, text }) => Effect.flatMap(Effect.service(MapFiles), (files) => files.create(fileName, text)),
