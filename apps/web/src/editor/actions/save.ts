@@ -7,14 +7,14 @@ import type { CreateProjectPayload } from "@ballest/contracts"
 import { Effect } from "effect"
 import { asNewDraft, setLevelNames } from "../../domain/edits"
 import { mapFileNameOf, mapLabelOf } from "../../domain/factory"
-import { type ExportedMap, MapExporter } from "../../services/MapExporter"
+import { MapExporter } from "../../services/MapExporter"
 import { Platform } from "../../services/Platform"
-import { type Doc, gameMapOf, type OpenFile, tabStateOf, useEditor } from "../store"
+import { type Doc, gameMapOf, type OpenFile, type ProjectMap, tabStateOf, useEditor } from "../store"
 import { ASK_FIRST, writeToGame } from "./gameWrite"
 import { nameProjectEffect } from "./maps"
 import { savePrefabTab } from "./prefabs"
 import { run } from "./run"
-import { fileOf, projectName, refreshProject, revealIn, saveTabPrefs, writeSidecarOf } from "./shared"
+import { fileOf, projectName, refreshProject, revealIn, saveTabPrefs, writeProjectMap, writeSidecarOf } from "./shared"
 
 /**
  * The open map encoded the way the game wants it written, with the document it was made from and its tab (the save
@@ -26,21 +26,25 @@ const exportOpenMap = Effect.gen(function*() {
   return { doc, tabId, result }
 })
 
-/**
- * Writes `result` (made from `doc`) into the project as a new map, which tab `tabId` then has open. `replace` writes
- * over a map of that name instead (it goes to the project's backups).
- */
-const createAsOpenMap = Effect.fn("createAsOpenMap")(function*(
-  { doc, tabId, result }: { readonly doc: Doc; readonly tabId: string; readonly result: ExportedMap },
-  replace = false
-) {
-  const platform = yield* Platform
-  const file = { fileName: result.filename, text: result.text }
-  const created = yield* replace ? platform.saveMap(file) : platform.createMap(file)
-  useEditor.getState().markSaved(tabId, doc, result.map, fileOf(created))
-  yield* writeSidecarOf(doc, created.fileName, created.hash)
+type ExportedOpenMap = Effect.Success<typeof exportOpenMap>
+
+/** Tab `tabId` has the map `written` open, with its sidecar and prefs under the name it went to. */
+const afterWrite = Effect.fnUntraced(function*({ doc, result, tabId }: ExportedOpenMap, written: ProjectMap) {
+  useEditor.getState().markSaved(tabId, doc, result.map, fileOf(written))
+  yield* writeSidecarOf(doc, written.fileName, written.hash)
   yield* saveTabPrefs(tabId)
   yield* refreshProject
+})
+
+/**
+ * Writes the open map into the project as a new map, which its tab then has open. `replace` writes over a map of that
+ * name instead (it goes to the project's backups).
+ */
+const createAsOpenMap = Effect.fn("createAsOpenMap")(function*(opened: ExportedOpenMap, replace = false) {
+  const platform = yield* Platform
+  const file = { fileName: opened.result.filename, text: opened.result.text }
+  const created = yield* replace ? platform.saveMap(file) : platform.createMap(file)
+  yield* afterWrite(opened, created)
   return created
 })
 
@@ -59,16 +63,10 @@ const createFromOpenMap = Effect.gen(function*() {
  * the map inside it. Export on save then exports it too.
  */
 const writeOpenMap = Effect.fn("writeOpenMap")(function*(file: OpenFile, options: { readonly exportAfter: boolean }) {
-  const platform = yield* Platform
-  const { doc, tabId, result } = yield* exportOpenMap
-  const saved = result.filename === file.name
-    ? yield* platform.saveMap({ fileName: file.name, text: result.text })
-    : yield* platform.renameMap({ from: file.name, to: result.filename, text: result.text })
-  useEditor.getState().markSaved(tabId, doc, result.map, fileOf(saved))
-  yield* writeSidecarOf(doc, saved.fileName, saved.hash)
-  // a rename moves the prefs to the new name
-  yield* saveTabPrefs(tabId)
-  yield* refreshProject
+  const opened = yield* exportOpenMap
+  const { result, tabId } = opened
+  const saved = yield* writeProjectMap(file.name, result.filename, result.text)
+  yield* afterWrite(opened, saved)
   const label = mapLabelOf(saved.fileName)
   useEditor.getState().notify(
     "info",

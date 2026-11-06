@@ -5,6 +5,7 @@ import { Catalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { setLevelNames, withLevelNames } from "../domain/edits"
 import { placementTransform } from "../domain/factory"
+import { nodeKeys } from "../domain/groupSelection"
 import { isPlayerStart } from "../domain/MapFile"
 import { withDifficulty } from "../domain/mapTags"
 import { mirrorFlagsOf } from "../domain/mirror"
@@ -15,8 +16,8 @@ import { defaultViewLayout } from "../domain/viewLayout"
 import {
   gameMapOf,
   initialMap,
-  itemDisplayNamesOf,
   nextSelection,
+  nodeNamesOf,
   pivotOf,
   shownLighting,
   shownTransform,
@@ -82,7 +83,7 @@ describe("editor store", () => {
     const s = () => useEditor.getState()
     s().loadMap(initialMap(), null, 1200)
     assert.strictEqual(s().floorHeight, 1200)
-    s().setFloorHeight(-50)
+    s().patchTab(s().tabId, { floorHeight: -50 })
     assert.strictEqual(s().floorHeight, -50)
     assert.strictEqual(s().past.length, 0)
   })
@@ -767,7 +768,7 @@ describe("document structure", () => {
     const cubes = threeCubes()
     const inner = state().groupItems([cubes.a, cubes.b], "Inner")!
     const outer = state().groupItems([cubes.c], "Outer")!
-    state().moveNode(inner, outer, 0)
+    state().moveNodes([inner], outer, 0)
     return { ...cubes, inner }
   }
   /** `action` as one undo step: undo goes back to the shape before it, redo to the shape after. */
@@ -796,7 +797,7 @@ describe("document structure", () => {
     const { a } = threeCubes()
     assertUndoable(() => state().renameItem(a, "Left ramp"))
     assert.deepStrictEqual(structure().items.get(a), { name: "Left ramp" })
-    assert.strictEqual(itemDisplayNamesOf(state()).get(a), "Left ramp")
+    assert.deepStrictEqual(nodeNamesOf(state()).get(a), { name: "Left ramp", ordinal: undefined })
     assertUndoable(() => state().renameItem(a, null))
     assert.isFalse(structure().items.has(a))
     const steps = state().past.length
@@ -841,21 +842,22 @@ describe("document structure", () => {
   })
 
   it("ungroups into the parent, where the group was", () => {
-    const { a, b, c, inner, start } = nestedGroups()
+    const { a, b, c, start } = nestedGroups()
     assert.deepStrictEqual(shape(), [start, ["Outer", [["Inner", [a, b]], c]]])
-    assertUndoable(() => state().ungroup(inner))
+    state().select([a, b])
+    assertUndoable(() => state().ungroupSelection())
     assert.deepStrictEqual(shape(), [start, ["Outer", [a, b, c]]])
   })
 
   it("moves nodes, refusing a group into itself", () => {
     const { a, b, c, start } = threeCubes()
     const id = state().groupItems([a, b], "G")!
-    assertUndoable(() => state().moveNode(c, id, 1))
+    assertUndoable(() => state().moveNodes([c], id, 1))
     assert.deepStrictEqual(shape(), [start, ["G", [a, c, b]]])
-    assertUndoable(() => state().moveNode(id, null, 0))
+    assertUndoable(() => state().moveNodes([id], null, 0))
     assert.deepStrictEqual(shape(), [["G", [a, c, b]], start])
     const steps = state().past.length
-    state().moveNode(id, id, 0)
+    state().moveNodes([id], id, 0)
     assert.strictEqual(state().past.length, steps)
   })
 
@@ -1072,8 +1074,9 @@ describe("groups and the selection", () => {
 
   it("forgets an entered group that goes, and one undo brings back", () => {
     const { a, inner } = nestedMap()
+    state().select(nodeKeys(state().doc.structure.tree, inner))
     state().enterGroup(inner)
-    state().ungroup(inner)
+    state().ungroupSelection()
     assert.isNull(state().enteredGroupId)
     state().enterGroup("gone")
     state().undo()

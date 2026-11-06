@@ -8,19 +8,12 @@ import type { CatalogIndex } from "./Catalog"
 import type { Quat4, UeTransform, Vec3 } from "./coords"
 import { removeItems } from "./edits"
 import { editTransform, SCALE_PROPERTIES, withEditTransform } from "./editTransform"
-import { classNameOf, type Item, type MapFile, objectPathOf, PropertyList } from "./MapFile"
+import { classNameOf, type Item, objectPathOf, PropertyList } from "./MapFile"
 import type { GroupNode, PrefabLink, TreeNode } from "./MapSidecar"
 import { itemOfPrefab, ORIGIN } from "./prefab"
 import type { PrefabFile } from "./PrefabFile"
-import { findGroup, freshKey, freshKeys, itemNode, rewriteTree, type Structure, treeKeys } from "./structure"
-import { quatConjugate, quatMul, quatNormalize, rotateVec } from "./ueMath"
-
-/** A document's parts, as the store's `Doc` has them. */
-export interface DocParts {
-  readonly map: MapFile
-  readonly ids: ReadonlyArray<string>
-  readonly structure: Structure
-}
+import { type Doc, findGroup, freshKey, freshKeys, itemNode, rewriteTree, treeKeys } from "./structure"
+import { quatConjugate, quatMul, quatNormalize, rotateVec, vecAdd, vecSub } from "./ueMath"
 
 /** A definition as an instance takes it: its items in its own frame, and the link they make. */
 export interface PrefabDefinition {
@@ -51,18 +44,11 @@ const ONE: Vec3 = { x: 1, y: 1, z: 1 }
 
 const times = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x * b.x, y: a.y * b.y, z: a.z * b.z })
 
-const placed = (placement: Placement, t: UeTransform): UeTransform => {
-  const offset = rotateVec(placement.rotation, times(placement.spread, t.translation))
-  return {
-    translation: {
-      x: placement.translation.x + offset.x,
-      y: placement.translation.y + offset.y,
-      z: placement.translation.z + offset.z
-    },
-    rotation: quatNormalize(quatMul(placement.rotation, t.rotation)),
-    scale3D: times(placement.scale, t.scale3D)
-  }
-}
+const placed = (placement: Placement, t: UeTransform): UeTransform => ({
+  translation: vecAdd(placement.translation, rotateVec(placement.rotation, times(placement.spread, t.translation))),
+  rotation: quatNormalize(quatMul(placement.rotation, t.rotation)),
+  scale3D: times(placement.scale, t.scale3D)
+})
 
 /** The rounding in a signature: 0.001 cm, eight places for a rotation, so 0.001 cm across a kilometre, and six for a scale. */
 const PLACES = { translation: 3, rotation: 8, scale: 6 } as const
@@ -103,13 +89,7 @@ const signatureOf = (item: Item): string => {
   ].join("|")
 }
 
-interface Signature {
-  readonly className: string
-  readonly transform: UeTransform
-  readonly content: string
-}
-
-const parseSignature = (text: string): Signature => {
+const parseSignature = (text: string) => {
   const [className = "", t = "", r = "", s = "", content = ""] = text.split("|")
   const numbers = (part: string) => part.split(",").map(Number)
   const [x = 0, y = 0, z = 0] = numbers(t)
@@ -139,15 +119,12 @@ const near = (a: number, b: number, tolerance: number) => Math.abs(a - b) <= tol
 const sameScale = (a: Vec3, b: Vec3) =>
   [[a.x, b.x], [a.y, b.y], [a.z, b.z]].every(([x = 0, y = 0]) => near(x, y, TOLERANCE.scale * Math.max(1, Math.abs(y))))
 
-const distanceBetween = (a: Vec3, b: Vec3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
-
 const lengthOf = ({ x, y, z }: Vec3) => Math.hypot(x, y, z)
 
-/** Whether `actual` is where `placement` puts `expected`. */
 const agrees = (placement: Placement, expected: UeTransform, actual: UeTransform): boolean => {
   const want = placed(placement, expected)
   const reach = lengthOf(expected.translation) * Math.max(1, lengthOf(placement.spread))
-  return distanceBetween(want.translation, actual.translation) <=
+  return lengthOf(vecSub(want.translation, actual.translation)) <=
       TOLERANCE.translation + TOLERANCE.perCentimetre * reach &&
     sameRotation(want.rotation, actual.rotation) && sameScale(want.scale3D, actual.scale3D)
 }
@@ -163,70 +140,54 @@ const placementsFrom = (expected: UeTransform, actual: UeTransform): ReadonlyArr
   }
   const uniform = near(scale.x, scale.y, TOLERANCE.scale) && near(scale.y, scale.z, TOLERANCE.scale)
   const spreads = uniform && !near(scale.x, 1, TOLERANCE.scale) ? [ONE, scale] : [ONE]
-  return spreads.map((spread) => {
-    const offset = rotateVec(rotation, times(spread, expected.translation))
-    return {
-      rotation,
-      scale,
-      spread,
-      translation: {
-        x: actual.translation.x - offset.x,
-        y: actual.translation.y - offset.y,
-        z: actual.translation.z - offset.z
-      }
-    }
-  })
+  return spreads.map((spread) => ({
+    rotation,
+    scale,
+    spread,
+    translation: vecSub(actual.translation, rotateVec(rotation, times(spread, expected.translation)))
+  }))
 }
 
-/** An instance's items, in document order, which is the definition's. */
-const itemsOf = ({ ids, map }: DocParts, group: GroupNode): ReadonlyArray<Item> => {
+/** Where an instance's items are in the document: in document order, which is the definition's. */
+const indicesOf = ({ ids }: Doc, group: GroupNode): ReadonlyArray<number> => {
   const inside = new Set(treeKeys([group]))
-  return ids.flatMap((key, index) => {
-    const item = inside.has(key) ? map.items[index] : undefined
-    return item === undefined ? [] : [item]
-  })
+  return ids.flatMap((key, index) => inside.has(key) ? [index] : [])
 }
 
 /** How many items the fit tries an anchor on. One is enough for an instance nobody edited. */
 const ANCHORS = 8
 
-/** Where an instance's items sit, as near as they say, and whether they are what was placed. */
-interface InstanceCheck {
-  readonly placement: Placement
-  readonly unmodified: boolean
-}
-
 const centreOf = (transforms: ReadonlyArray<UeTransform>): Vec3 => {
   const n = transforms.length || 1
-  const sum = transforms.reduce(
-    (total, { translation: t }) => ({ x: total.x + t.x, y: total.y + t.y, z: total.z + t.z }),
-    ORIGIN
-  )
-  return { x: sum.x / n, y: sum.y / n, z: sum.z / n }
+  const { x, y, z } = transforms.reduce((total, { translation }) => vecAdd(total, translation), ORIGIN)
+  return { x: x / n, y: y / n, z: z / n }
 }
 
 /**
  * Fits the items an instance holds to what its link says was placed. Every item matching means an unedited instance. An
  * edited one takes the placement most of its items agree on, so an Update leaves it about where it was.
  */
-export const checkInstance = (doc: DocParts, group: GroupNode, link: PrefabLink): InstanceCheck => {
-  const items = itemsOf(doc, group)
+export const checkInstance = (
+  doc: Doc,
+  group: GroupNode,
+  link: PrefabLink
+): { readonly placement: Placement; readonly unmodified: boolean } => {
+  const items = indicesOf(doc, group).flatMap((index) => doc.map.items[index] ?? [])
   const expected = link.items.map(parseSignature)
   const transforms = items.map(editTransform)
-  const sameClass = (index: number) => {
+  // the items still of the class they were placed as
+  const kept = expected.flatMap(({ className, transform }, index) => {
     const item = items[index]
-    return item !== undefined && classNameOf(item.actorToSpawn) === expected[index]?.className
-  }
-  const candidates = expected.slice(0, ANCHORS).flatMap(({ transform }, index) => {
     const actual = transforms[index]
-    return actual === undefined || !sameClass(index) ? [] : placementsFrom(transform, actual)
+    return item === undefined || actual === undefined || classNameOf(item.actorToSpawn) !== className
+      ? []
+      : [{ index, transform, actual }]
   })
-  const agreeing = (placement: Placement) =>
-    expected.filter(({ transform }, index) => {
-      const actual = transforms[index]
-      return actual !== undefined && sameClass(index) && agrees(placement, transform, actual)
-    }).length
-  const scored = candidates.map((placement) => ({ placement, count: agreeing(placement) }))
+  const anchors = kept.filter(({ index }) => index < ANCHORS)
+  const scored = anchors.flatMap(({ actual, transform }) => placementsFrom(transform, actual)).map((placement) => ({
+    placement,
+    count: kept.filter(({ actual, transform }) => agrees(placement, transform, actual)).length
+  }))
   const best = scored.reduce<typeof scored[number] | undefined>(
     (top, next) => top === undefined || next.count > top.count ? next : top,
     undefined
@@ -238,10 +199,9 @@ export const checkInstance = (doc: DocParts, group: GroupNode, link: PrefabLink)
       unmodified: items.length === expected.length && best.count === expected.length && sameContent
     }
   }
-  const [from, to] = [centreOf(expected.map(({ transform }) => transform)), centreOf(transforms)]
   return {
     placement: {
-      translation: { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z },
+      translation: vecSub(centreOf(transforms), centreOf(expected.map(({ transform }) => transform))),
       rotation: { x: 0, y: 0, z: 0, w: 1 },
       scale: ONE,
       spread: ONE
@@ -259,7 +219,6 @@ const placedItem = (item: Item, placement: Placement): Item => {
   }, ORIGIN)
 }
 
-/** Every instance in `nodes`, however deep. */
 export const instancesIn = (nodes: ReadonlyArray<TreeNode>): ReadonlyArray<GroupNode & { prefab: PrefabLink }> =>
   nodes.flatMap((node) => {
     if (node.kind === "item") return []
@@ -272,22 +231,16 @@ export const instancesIn = (nodes: ReadonlyArray<TreeNode>): ReadonlyArray<Group
  * the same class keep their keys, so their names, tags and places in nested groups stay too. Its link moves on to
  * `definition`, and an item it gained joins the end of the group.
  */
-export const withUpdatedInstance = (
-  doc: DocParts,
-  groupId: string,
-  definition: PrefabDefinition
-): DocParts | undefined => {
+export const withUpdatedInstance = (doc: Doc, groupId: string, definition: PrefabDefinition): Doc | undefined => {
   const group = findGroup(doc.structure.tree, groupId)
   if (group?.prefab === undefined) return undefined
   const { placement } = checkInstance(doc, group, group.prefab)
   const fresh = definition.items.map((item) => placedItem(item, placement))
-  const inside = new Set(treeKeys([group]))
-  const indices = doc.ids.flatMap((key, index) => inside.has(key) ? [index] : [])
+  const indices = indicesOf(doc, group)
   const items = [...doc.map.items]
   const ids = [...doc.ids]
   /** Each key that gives way to a new item of another class, and what takes its place. */
   const swapped = new Map<string, string>()
-  const swappedIndices = new Set<number>()
   indices.forEach((index, n) => {
     const item = fresh[n]
     const key = ids[index]
@@ -295,7 +248,6 @@ export const withUpdatedInstance = (
     if (items[index]?.actorToSpawn !== item.actorToSpawn) {
       const next = freshKey()
       swapped.set(key, next)
-      swappedIndices.add(index)
       ids[index] = next
     }
     items[index] = item
@@ -307,7 +259,7 @@ export const withUpdatedInstance = (
   const editorState = doc.map.editorState === undefined ? {} : {
     editorState: {
       ...doc.map.editorState,
-      pivots: doc.map.editorState.pivots.filter(({ itemIndex }) => !swappedIndices.has(itemIndex))
+      pivots: doc.map.editorState.pivots.filter(({ itemIndex }) => !swapped.has(doc.ids[itemIndex] ?? ""))
     }
   }
   const kept = removeItems({ ...doc.map, items, ...editorState }, removed)

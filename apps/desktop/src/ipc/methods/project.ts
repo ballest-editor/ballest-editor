@@ -22,9 +22,7 @@ const reveal = Effect.fnUntraced(function*(folder: Option.Option<string>) {
 })
 
 export const projectHandlers = {
-  projectState: Effect.fn("ipc.projectState")(function*() {
-    return yield* (yield* Projects).state
-  }),
+  projectState: () => Effect.flatMap(Effect.service(Projects), (projects) => projects.state),
   /** A folder dialog starting at the project in use; the page then says where the folder opens. */
   chooseProject: Effect.fn("ipc.chooseProject")(function*(_, event) {
     const projects = yield* Projects
@@ -41,76 +39,37 @@ export const projectHandlers = {
     if (Option.isNone(picked)) return null
     return yield* projects.pick(picked.value)
   }),
-  checkProject: Effect.fn("ipc.checkProject")(function*(target) {
-    yield* (yield* Projects).check(target)
-  }),
+  checkProject: (target) => Effect.flatMap(Effect.service(Projects), (projects) => projects.check(target)),
   /** New window: this window keeps its project; the new copy takes `target` (a new project is made here first). */
   openProjectWindow: Effect.fn("ipc.openProjectWindow")(function*(target) {
     yield* (yield* WindowLauncher).open(yield* (yield* Projects).prepareWindow(target))
   }),
-  switchProject: Effect.fn("ipc.switchProject")(function*({ path }) {
-    return yield* (yield* Projects).switchTo(path)
-  }),
-  /** New project: the folder picked, or `<projectsFolder>/<name>`, made and used. */
-  createProject: Effect.fn("ipc.createProject")(function*(project) {
-    return yield* (yield* Projects).createNew(project)
-  }),
-  revealProject: Effect.fn("ipc.revealProject")(function*({ which }) {
-    return yield* reveal(yield* (yield* Projects).folderOf(which))
-  }),
+  switchProject: ({ path }) => Effect.flatMap(Effect.service(Projects), (projects) => projects.switchTo(path)),
+  createProject: (project) => Effect.flatMap(Effect.service(Projects), (projects) => projects.createNew(project)),
+  revealProject: ({ which }) =>
+    Effect.flatMap(Effect.service(Projects), (projects) => projects.folderOf(which)).pipe(Effect.flatMap(reveal)),
   /** Project settings › General: the project's name. */
-  renameProject: Effect.fn("ipc.renameProject")(function*({ name }) {
-    return yield* (yield* Projects).setName(name)
-  }),
+  renameProject: ({ name }) => Effect.flatMap(Effect.service(Projects), (projects) => projects.setName(name)),
   /** Keeps which map is open in the project, so the next launch opens it again. */
-  rememberOpenMap: Effect.fn("ipc.rememberOpenMap")(function*({ fileName }) {
-    yield* (yield* Projects).rememberOpenMap(fileName)
-  }),
-  listMaps: Effect.fn("ipc.listMaps")(function*() {
-    return yield* (yield* MapFiles).list
-  }),
-  readMap: Effect.fn("ipc.readMap")(function*({ fileName }) {
-    return yield* (yield* MapFiles).read(fileName)
-  }),
-  createMap: Effect.fn("ipc.createMap")(function*({ fileName, text }) {
-    return yield* (yield* MapFiles).create(fileName, text)
-  }),
-  saveMap: Effect.fn("ipc.saveMap")(function*({ fileName, text }) {
-    return yield* (yield* MapFiles).save(fileName, text)
-  }),
-  renameMap: Effect.fn("ipc.renameMap")(function*({ from, to, text }) {
-    return yield* (yield* MapFiles).rename(from, to, text)
-  }),
-  writeSidecar: Effect.fn("ipc.writeSidecar")(function*({ fileName, text }) {
-    yield* (yield* MapFiles).writeSidecar(fileName, text)
-  }),
-  listPrefabs: Effect.fn("ipc.listPrefabs")(function*({ tier }) {
-    return yield* (yield* Prefabs).list(tier)
-  }),
-  readPrefab: Effect.fn("ipc.readPrefab")(function*(ref) {
-    return yield* (yield* Prefabs).read(ref)
-  }),
-  writePrefab: Effect.fn("ipc.writePrefab")(function*(payload) {
-    return yield* (yield* Prefabs).write(payload)
-  }),
-  deletePrefab: Effect.fn("ipc.deletePrefab")(function*(ref) {
-    yield* (yield* Prefabs).remove(ref)
-  }),
-  renamePrefab: Effect.fn("ipc.renamePrefab")(function*(payload) {
-    return yield* (yield* Prefabs).rename(payload)
-  }),
-  revealPrefabs: Effect.fn("ipc.revealPrefabs")(function*({ tier }) {
-    return yield* reveal(yield* (yield* Prefabs).folderOf(tier))
-  }),
-  listPrefabBackups: Effect.fn("ipc.listPrefabBackups")(function*() {
-    return yield* (yield* Prefabs).backups
-  }),
-  describePrefabBackup: Effect.fn("ipc.describePrefabBackup")(function*(ref) {
-    return yield* (yield* Prefabs).describeBackup(ref)
-  }),
-  restorePrefabBackup: Effect.fn("ipc.restorePrefabBackup")(function*(ref) {
-    return yield* (yield* Prefabs).restoreBackup(ref)
-  }),
+  rememberOpenMap: ({ fileName }) =>
+    Effect.flatMap(Effect.service(Projects), (projects) => projects.rememberOpenMap(fileName)),
+  listMaps: () => Effect.flatMap(Effect.service(MapFiles), (files) => files.list),
+  readMap: ({ fileName }) => Effect.flatMap(Effect.service(MapFiles), (files) => files.read(fileName)),
+  createMap: ({ fileName, text }) => Effect.flatMap(Effect.service(MapFiles), (files) => files.create(fileName, text)),
+  saveMap: ({ fileName, text }) => Effect.flatMap(Effect.service(MapFiles), (files) => files.save(fileName, text)),
+  renameMap: ({ from, to, text }) => Effect.flatMap(Effect.service(MapFiles), (files) => files.rename(from, to, text)),
+  writeSidecar: ({ fileName, text }) =>
+    Effect.flatMap(Effect.service(MapFiles), (files) => files.writeSidecar(fileName, text)),
+  listPrefabs: ({ tier }) => Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.list(tier)),
+  readPrefab: (ref) => Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.read(ref)),
+  writePrefab: (payload) => Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.write(payload)),
+  deletePrefab: (ref) => Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.remove(ref)),
+  renamePrefab: (payload) => Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.rename(payload)),
+  revealPrefabs: ({ tier }) =>
+    Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.folderOf(tier)).pipe(Effect.flatMap(reveal)),
+  listPrefabBackups: () => Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.backups),
+  describePrefabBackup: (ref) => Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.describeBackup(ref)),
+  restorePrefabBackup: (ref) => Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.restoreBackup(ref)),
   /** The open dialog, starting in the game's maps folder when it is found. */
   pickImport: Effect.fn("ipc.pickImport")(function*(_, event) {
     const { mapsFolder } = yield* (yield* GamePaths).get
@@ -123,23 +82,11 @@ export const projectHandlers = {
     if (Option.isNone(picked)) return null
     return yield* (yield* MapFiles).pick(picked.value)
   }),
-  importMap: Effect.fn("ipc.importMap")(function*(payload) {
-    return yield* (yield* MapFiles).importMap(payload)
-  }),
-  exportMap: Effect.fn("ipc.exportMap")(function*(payload) {
-    return yield* (yield* MapExports).exportMap(payload)
-  }),
+  importMap: (payload) => Effect.flatMap(Effect.service(MapFiles), (files) => files.importMap(payload)),
+  exportMap: (payload) => Effect.flatMap(Effect.service(MapExports), (exports) => exports.exportMap(payload)),
   /** Sync detection: the exports the game changed since the last look, and the ones gone (docs/PROJECTS.md § Sync). */
-  checkExports: Effect.fn("ipc.checkExports")(function*() {
-    return yield* (yield* MapExports).checkExports
-  }),
-  reimportMap: Effect.fn("ipc.reimportMap")(function*({ fileName }) {
-    return yield* (yield* MapExports).reimportMap(fileName)
-  }),
-  listBackups: Effect.fn("ipc.listBackups")(function*() {
-    return yield* (yield* MapFiles).backups
-  }),
-  readBackup: Effect.fn("ipc.readBackup")(function*(ref) {
-    return yield* (yield* MapFiles).readBackup(ref)
-  })
+  checkExports: () => Effect.flatMap(Effect.service(MapExports), (exports) => exports.checkExports),
+  reimportMap: ({ fileName }) => Effect.flatMap(Effect.service(MapExports), (exports) => exports.reimportMap(fileName)),
+  listBackups: () => Effect.flatMap(Effect.service(MapFiles), (files) => files.backups),
+  readBackup: (ref) => Effect.flatMap(Effect.service(MapFiles), (files) => files.readBackup(ref))
 } satisfies Partial<DesktopIpcHandlers>

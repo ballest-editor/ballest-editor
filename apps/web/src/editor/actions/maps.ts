@@ -9,14 +9,14 @@ import { creatorOf, usableCreatorName } from "../../domain/creator"
 import { setLevelData as setMapLevelData } from "../../domain/edits"
 import { currentCreatedAt, newMapFile, untitledNameOf } from "../../domain/factory"
 import { type LevelData, type MapFile, PLAYER_START_CLASS } from "../../domain/MapFile"
-import { type MapPrefs, mapPrefsKeyOf } from "../../domain/MapPrefs"
+import type { MapPrefs } from "../../domain/MapPrefs"
 import { MapCodec } from "../../services/MapCodec"
 import { MapExporter } from "../../services/MapExporter"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { Platform } from "../../services/Platform"
 import { tabLabels, type TabTarget, tabWithFile, useEditor } from "../store"
 import { notifyFailure, run } from "./run"
-import { fileOf, loadProjectMapFile, refreshProject, saveTabPrefs, showMap } from "./shared"
+import { fileOf, loadProjectMapFile, prefsOf, refreshProject, saveTabPrefs, showMap, writeProjectMap } from "./shared"
 
 /** Reads one of the project's maps into the editor, in the tab `into` says. */
 export const readProjectMapIntoEditor = Effect.fn("readProjectMapIntoEditor")(
@@ -123,10 +123,7 @@ export const readProjectMapSettings = (fileName: string) =>
     Effect.gen(function*() {
       const file = yield* (yield* Platform).readMap(fileName)
       const map = yield* MapCodec.use((codec) => codec.decode(file.text))
-      const prefs = yield* MapPrefsStore.use((store) => store.load(mapPrefsKeyOf(map))).pipe(
-        Effect.orElseSucceed((): MapPrefs => ({}))
-      )
-      return { map, prefs } satisfies ProjectMapSettings
+      return { map, prefs: yield* prefsOf(map) } satisfies ProjectMapSettings
     })
   )
 
@@ -138,7 +135,6 @@ export const readProjectMapSettings = (fileName: string) =>
  */
 export const patchProjectMapEffect = Effect.fn("patchProjectMapEffect")(
   function*(fileName: string, patch: (map: MapFile) => MapFile) {
-    const platform = yield* Platform
     const s = useEditor.getState()
     const tabId = tabWithFile(s, fileName)
     if (tabId !== undefined) {
@@ -146,12 +142,10 @@ export const patchProjectMapEffect = Effect.fn("patchProjectMapEffect")(
       yield* saveTabPrefs(tabId)
       return undefined
     }
-    const read = yield* platform.readMap(fileName)
+    const read = yield* (yield* Platform).readMap(fileName)
     const map = yield* MapCodec.use((codec) => codec.decode(read.text))
     const result = yield* (yield* MapExporter).prepare(patch(map))
-    const saved = result.filename === fileName
-      ? yield* platform.saveMap({ fileName, text: result.text })
-      : yield* platform.renameMap({ from: fileName, to: result.filename, text: result.text })
+    const saved = yield* writeProjectMap(fileName, result.filename, result.text)
     yield* refreshProject
     return saved
   }
@@ -162,15 +156,11 @@ export const patchProjectMap = (fileName: string, patch: (map: MapFile) => MapFi
 
 /** Project settings changing a map's prefs (grid height, Export on save) without opening it; the open map's go through the editor. */
 export const saveProjectMapPrefs = (key: string, prefs: MapPrefs) =>
-  run(
-    Effect.gen(function*() {
-      yield* (yield* MapPrefsStore).save(key, prefs)
-    })
-  )
+  run(Effect.flatMap(Effect.service(MapPrefsStore), (store) => store.save(key, prefs)))
 
 /** Export on save for a tab's map (the active tab's by default), kept with its prefs. */
 export const setExportOnSave = (exportOnSave: boolean, tabId = useEditor.getState().tabId) => {
-  useEditor.getState().setTabExportOnSave(tabId, exportOnSave)
+  useEditor.getState().patchTab(tabId, { exportOnSave })
   return run(saveTabPrefs(tabId))
 }
 
@@ -187,7 +177,7 @@ export const setLevelData = (levelData: LevelData, tabId = useEditor.getState().
 
 /** Moves a tab's grid (and where pieces land; the active tab's by default); saved with the map's prefs, not in its history. */
 export const setGridHeight = (gridHeight: number, tabId = useEditor.getState().tabId) => {
-  useEditor.getState().setTabFloorHeight(tabId, gridHeight)
+  useEditor.getState().patchTab(tabId, { floorHeight: gridHeight })
   return run(saveTabPrefs(tabId))
 }
 
@@ -205,33 +195,23 @@ export const nameProject = (name: string) => run(nameProjectEffect({ name }))
 /** Refuses a project the first Save would make, with the reason; true when it can be made. Nothing is written. */
 export const canMakeProject = (project: CreateProjectPayload) =>
   run(
-    Effect.gen(function*() {
-      yield* (yield* Platform).checkProject({ _tag: "New", ...project })
-      return true
-    })
+    Effect.flatMap(Effect.service(Platform), (platform) => platform.checkProject({ _tag: "New", ...project })).pipe(
+      Effect.as(true)
+    )
   )
 
 /** The Save map dialog's Choose…: a folder for the new project, refused as Open project… refuses it; null on Cancel. */
 export const pickProjectFolder = () =>
-  run(
-    Effect.gen(function*() {
-      return Option.getOrNull(yield* (yield* Platform).chooseProject)
-    })
-  )
+  run(Effect.flatMap(Effect.service(Platform), (platform) => platform.chooseProject).pipe(Effect.map(Option.getOrNull)))
 
 /** Shows one of the project's folders in the file manager: its `maps/` unless asked otherwise. */
 export const revealProject = (which: ProjectFolder = "maps") =>
-  run(
-    Effect.gen(function*() {
-      yield* (yield* Platform).revealProject(which)
-    })
-  )
+  run(Effect.flatMap(Effect.service(Platform), (platform) => platform.revealProject(which)))
 
 /** Project settings › General: the project's name, in its file; the folder keeps its name. */
 export const renameProject = (name: string) =>
   run(
-    Effect.gen(function*() {
-      yield* (yield* Platform).renameProject(name)
-      yield* refreshProject
-    })
+    Effect.flatMap(Effect.service(Platform), (platform) => platform.renameProject(name)).pipe(
+      Effect.andThen(refreshProject)
+    )
   )

@@ -66,9 +66,9 @@ export const listPrefabBackups = () =>
 /** What a prefab's backup holds; a file that has gone or can't be read holds no prefab, as one that isn't a prefab. */
 export const describePrefabBackup = (backup: PrefabBackup) =>
   run(
-    Effect.gen(function*() {
-      return yield* (yield* Platform).describePrefabBackup(backup)
-    }).pipe(Effect.orElseSucceed(() => ({ itemCount: null, firstClass: null })))
+    Effect.flatMap(Effect.service(Platform), (platform) => platform.describePrefabBackup(backup)).pipe(
+      Effect.orElseSucceed(() => ({ itemCount: null, firstClass: null }))
+    )
   )
 
 /**

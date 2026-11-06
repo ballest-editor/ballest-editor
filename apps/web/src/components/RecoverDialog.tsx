@@ -1,4 +1,4 @@
-import type { MapBackup, PrefabBackup, PrefabBackupSummary, PrefabTier } from "@ballest/contracts"
+import type { MapBackup, PrefabBackup, PrefabSummary, PrefabTier } from "@ballest/contracts"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -23,6 +23,7 @@ import {
 } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { SectionTitle } from "./SectionTitle"
+import { useOnOpen } from "./useOnOpen"
 
 const formatTime = (at: string) => new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
 
@@ -67,18 +68,22 @@ function VersionLine(
   )
 }
 
-/** A map's version: what it holds, decoded the way Open would, with Open. */
-function VersionRow(
-  { backup, onOpen }: { readonly backup: MapBackup; readonly onOpen: (backup: MapBackup) => void }
-) {
-  const [summary, setSummary] = useState<BackupSummary | null>(null)
+/** What `describe` says `backup` holds; null until it has answered. */
+const useSummary = <B, S>(backup: B, describe: (backup: B) => Promise<S | undefined>) => {
+  const [summary, setSummary] = useState<S | null>(null)
   useEffect(() => {
     let live = true
-    void describeBackup(backup).then((found) => live && found !== undefined && setSummary(found))
+    void describe(backup).then((found) => live && found !== undefined && setSummary(found))
     return () => {
       live = false
     }
-  }, [backup])
+  }, [backup, describe])
+  return summary
+}
+
+/** A map's version: what it holds, decoded the way Open would, with Open. */
+function VersionRow({ backup, onClose }: { readonly backup: MapBackup; readonly onClose: () => void }) {
+  const summary = useSummary<MapBackup, BackupSummary>(backup, describeBackup)
   const place = PLACES[backup.place]
   return (
     <VersionLine
@@ -90,23 +95,17 @@ function VersionRow(
         ? `${summary.items.toLocaleString()} items · ${summary.displayName} by ${summary.creatorName}`
         : `Can't be opened: ${summary.message}`}
       action={{ label: "Open", disabled: summary?._tag !== "Map" }}
-      onAct={() => onOpen(backup)}
+      onAct={() => {
+        onClose()
+        void recoverBackup(backup)
+      }}
     />
   )
 }
 
 /** A prefab's version: how many items it holds, with Restore. A file that isn't a prefab can't come back from here. */
-function PrefabVersionRow(
-  { backup, onRestore }: { readonly backup: PrefabBackup; readonly onRestore: (backup: PrefabBackup) => void }
-) {
-  const [summary, setSummary] = useState<PrefabBackupSummary | null>(null)
-  useEffect(() => {
-    let live = true
-    void describePrefabBackup(backup).then((found) => live && found !== undefined && setSummary(found))
-    return () => {
-      live = false
-    }
-  }, [backup])
+function PrefabVersionRow({ backup, onClose }: { readonly backup: PrefabBackup; readonly onClose: () => void }) {
+  const summary = useSummary<PrefabBackup, PrefabSummary>(backup, describePrefabBackup)
   const items = summary?.itemCount ?? null
   return (
     <VersionLine
@@ -117,7 +116,10 @@ function PrefabVersionRow(
         ? "Can't be restored: it doesn't read as a prefab"
         : `${items.toLocaleString()} ${items === 1 ? "item" : "items"}`}
       action={{ label: "Restore", disabled: items === null }}
-      onAct={() => onRestore(backup)}
+      onAct={() => {
+        onClose()
+        void restorePrefabBackup(backup)
+      }}
     />
   )
 }
@@ -129,46 +131,6 @@ function groupBy<T>(backups: ReadonlyArray<T>, keyOf: (backup: T) => string) {
   return [...groups]
 }
 
-/** Every file that has backups, the open map's first, then by its newest backup. */
-const groupByFile = (backups: ReadonlyArray<MapBackup>, open: string | null) =>
-  groupBy(backups, (backup) => backup.fileName).sort(([a], [b]) => Number(b === open) - Number(a === open))
-
-/** A file with backups in the list of everything: its name, how many versions and the newest one's time. */
-function BackedUpRow(
-  { at, count, label, onShow }: {
-    readonly at: string
-    readonly count: number
-    readonly label: ReactNode
-    readonly onShow: () => void
-  }
-) {
-  return (
-    <li>
-      <button
-        type="button"
-        className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors outline-none hover:bg-muted focus-visible:bg-muted"
-        onClick={onShow}
-      >
-        <span className="min-w-0 flex-1 truncate text-xs font-medium">{label}</span>
-        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-          {count === 1 ? "1 version" : `${count} versions`} · {formatTime(at)}
-        </span>
-      </button>
-    </li>
-  )
-}
-
-function BackedUpSection({ children, title }: { readonly children: ReactNode; readonly title: string }) {
-  return (
-    <section>
-      <div className="px-3 pt-3 pb-1">
-        <SectionTitle>{title}</SectionTitle>
-      </div>
-      <ul className="divide-y">{children}</ul>
-    </section>
-  )
-}
-
 /**
  * Project › Recover previous version… (desktop): the versions the app kept of a map file or a prefab before writing over
  * it, newest first, for the open map or any other. Opening a map's makes it the open map's unsaved edits, and Save keeps
@@ -178,19 +140,14 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
   const fileName = useEditor((s) => s.file?.name ?? null)
   const [backups, setBackups] = useState<ReadonlyArray<MapBackup> | null>(null)
   const [prefabBackups, setPrefabBackups] = useState<ReadonlyArray<PrefabBackup>>([])
-  /** What's shown the versions of; null shows everything backed up. */
   const [shown, setShown] = useState<Shown | null>(null)
 
   // Each time the dialog opens, list the backups again and start on the open map's.
-  const [wasOpen, setWasOpen] = useState(open)
-  if (open !== wasOpen) {
-    setWasOpen(open)
-    if (open) {
-      setBackups(null)
-      setPrefabBackups([])
-      setShown(fileName === null ? null : { kind: "map", fileName })
-    }
-  }
+  useOnOpen(open, () => {
+    setBackups(null)
+    setPrefabBackups([])
+    setShown(fileName === null ? null : { kind: "map", fileName })
+  })
   useEffect(() => {
     if (!open) return
     let live = true
@@ -204,65 +161,62 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
     }
   }, [open])
 
-  const groups = useMemo(() => groupByFile(backups ?? [], fileName), [backups, fileName])
-  const prefabGroups = useMemo(
+  // every map with backups, the open one's first, then by its newest backup; then every prefab's, by tier
+  const sections = useMemo(
     () =>
-      TIERS.map(({ tier, title }) => ({
-        tier,
-        title,
-        prefabs: groupBy(prefabBackups.filter((backup) => backup.tier === tier), (backup) => backup.name)
-      })).filter(({ prefabs }) => prefabs.length > 0),
-    [prefabBackups]
+      [
+        {
+          title: "Maps",
+          rows: groupBy(backups ?? [], (backup) => backup.fileName)
+            .sort(([a], [b]) => Number(b === fileName) - Number(a === fileName))
+            .map(([name, list]) => ({
+              name,
+              list,
+              label: (
+                <>
+                  {mapLabelOf(name)}
+                  {name === fileName && <span className="ml-1.5 text-muted-foreground">(open)</span>}
+                </>
+              ),
+              shows: { kind: "map", fileName: name } as const
+            }))
+        },
+        ...TIERS.map(({ tier, title }) => ({
+          title,
+          rows: groupBy(prefabBackups.filter((backup) => backup.tier === tier), (backup) => backup.name)
+            .map(([name, list]) => ({ name, list, label: name, shows: { kind: "prefab", tier, name } as const }))
+        }))
+      ].filter(({ rows }) => rows.length > 0),
+    [backups, prefabBackups, fileName]
   )
   const versions = shown?.kind === "map" ? backups?.filter((b) => b.fileName === shown.fileName) ?? [] : []
   const prefabVersions = shown?.kind === "prefab"
     ? prefabBackups.filter((b) => b.tier === shown.tier && b.name === shown.name)
     : []
-  const recover = (backup: MapBackup) => {
-    onClose()
-    void recoverBackup(backup)
-  }
-  const restore = (backup: PrefabBackup) => {
-    onClose()
-    void restorePrefabBackup(backup)
-  }
 
-  const nothingYet = <p className="p-3 text-xs text-muted-foreground">No backups yet.</p>
-  const everything = (
-    <>
-      {groups.length > 0 && (
-        <BackedUpSection title="Maps">
-          {groups.map(([name, list]) => (
-            <BackedUpRow
-              key={name}
-              at={list[0]?.at ?? ""}
-              count={list.length}
-              label={
-                <>
-                  {mapLabelOf(name)}
-                  {name === fileName && <span className="ml-1.5 text-muted-foreground">(open)</span>}
-                </>
-              }
-              onShow={() => setShown({ kind: "map", fileName: name })}
-            />
-          ))}
-        </BackedUpSection>
-      )}
-      {prefabGroups.map(({ prefabs, tier, title }) => (
-        <BackedUpSection key={tier} title={title}>
-          {prefabs.map(([name, list]) => (
-            <BackedUpRow
-              key={name}
-              at={list[0]?.at ?? ""}
-              count={list.length}
-              label={name}
-              onShow={() => setShown({ kind: "prefab", tier, name })}
-            />
-          ))}
-        </BackedUpSection>
-      ))}
-    </>
-  )
+  const everything = sections.map(({ rows, title }) => (
+    <section key={title}>
+      <div className="px-3 pt-3 pb-1">
+        <SectionTitle>{title}</SectionTitle>
+      </div>
+      <ul className="divide-y">
+        {rows.map(({ label, list, name, shows }) => (
+          <li key={name}>
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors outline-none hover:bg-muted focus-visible:bg-muted"
+              onClick={() => setShown(shows)}
+            >
+              <span className="min-w-0 flex-1 truncate text-xs font-medium">{label}</span>
+              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                {list.length === 1 ? "1 version" : `${list.length} versions`} · {formatTime(list[0]?.at ?? "")}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -286,17 +240,11 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
           {backups === null
             ? <p className="p-3 text-xs text-muted-foreground">Reading the backups…</p>
             : shown === null
-            ? groups.length === 0 && prefabGroups.length === 0 ? nothingYet : everything
+            ? sections.length === 0 ? <p className="p-3 text-xs text-muted-foreground">No backups yet.</p> : everything
             : shown.kind === "prefab"
             ? (
               <ul className="divide-y">
-                {prefabVersions.map((backup) => (
-                  <PrefabVersionRow
-                    key={backup.id}
-                    backup={backup}
-                    onRestore={restore}
-                  />
-                ))}
+                {prefabVersions.map((backup) => <PrefabVersionRow key={backup.id} backup={backup} onClose={onClose} />)}
               </ul>
             )
             : versions.length === 0
@@ -308,7 +256,7 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
             : (
               <ul className="divide-y">
                 {versions.map((backup) => (
-                  <VersionRow key={`${backup.place} ${backup.id}`} backup={backup} onOpen={recover} />
+                  <VersionRow key={`${backup.place} ${backup.id}`} backup={backup} onClose={onClose} />
                 ))}
               </ul>
             )}

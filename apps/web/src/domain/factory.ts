@@ -63,23 +63,21 @@ export const mapLabelOf = (fileName: string): string => {
   return at > 0 ? full.slice(0, at) : full
 }
 
-/** The first of `<name> 2`, `<name> 3`, ... whose file name isn't `taken`: the name a copy gets. */
-export const copyNameOf = (displayName: string, creatorName: string, taken: ReadonlySet<string>): string => {
-  const base = displayName.replace(/ \d+$/, "")
+/** The first of `<base><separator>2`, `<base><separator>3`, ... that isn't taken. */
+export const nextNumberedName = (base: string, separator: string, isTaken: (name: string) => boolean): string => {
   for (let n = 2;; n++) {
-    const name = `${base} ${n}`
-    if (!taken.has(mapFileNameOf(name, creatorName))) return name
-  }
-}
-
-/** `base`, else `base 2`, `base 3`... whichever comes first that isn't taken. */
-export const nextFreeName = (base: string, isTaken: (name: string) => boolean): string => {
-  if (!isTaken(base)) return base
-  for (let n = 2;; n++) {
-    const name = `${base} ${n}`
+    const name = `${base}${separator}${n}`
     if (!isTaken(name)) return name
   }
 }
+
+/** The first of `<name> 2`, `<name> 3`, ... whose file name isn't `taken`: the name a copy gets. */
+export const copyNameOf = (displayName: string, creatorName: string, taken: ReadonlySet<string>): string =>
+  nextNumberedName(displayName.replace(/ \d+$/, ""), " ", (name) => taken.has(mapFileNameOf(name, creatorName)))
+
+/** `base`, else `base 2`, `base 3`... whichever comes first that isn't taken. */
+export const nextFreeName = (base: string, isTaken: (name: string) => boolean): string =>
+  isTaken(base) ? nextNumberedName(base, " ", isTaken) : base
 
 /** The name a new map goes by until its first Save: Untitled, or the next number the open tabs (`taken`) leave free. */
 export const untitledNameOf = (taken: ReadonlySet<string>): string =>

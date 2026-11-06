@@ -106,7 +106,7 @@ describe("save actions", () => {
       yield* saveMapFile
       assert.isFalse(disk.files.has(`${TEST_MAPS_FOLDER}/${name}`))
 
-      s().setExportOnSave(true)
+      s().patchTab(s().tabId, { exportOnSave: true })
       yield* saveMapFile
       assert.strictEqual(disk.files.get(`${TEST_MAPS_FOLDER}/${name}`), disk.files.get(projectFile(name)))
     }).pipe(Effect.provide(layerFor(disk)))

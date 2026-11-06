@@ -19,7 +19,7 @@ import { GamePaths } from "../game/GamePaths"
 import { type Backup, type BackupError, Backups, parseBackupId } from "./Backups"
 import { isSamePath, MAX_MAP_BYTES, sha256, writeAtomic } from "./files"
 import { emptyLink, type MapLinkError, MapLinks } from "./MapLinks"
-import { backupsFolderIn, mapsFolderIn, type ProjectError, projectError, Projects } from "./Projects"
+import { backupsFolderIn, mapsFolderIn, type ProjectError, projectError, Projects, readError } from "./Projects"
 
 /** Only the field Export looks at in a map file; everything else is ignored. */
 export const PublishedId = Schema.fromJsonString(Schema.Struct({
@@ -153,19 +153,14 @@ export class MapFiles extends Context.Service<MapFiles, {
       fs.stat(file).pipe(
         Effect.filterOrFail((stat) => Number(stat.size) <= MAX_MAP_BYTES, () => projectError("tooLarge", file)()),
         Effect.andThen(read),
-        Effect.catchTag(
-          "PlatformError",
-          (cause) => Effect.fail(projectError(cause.reason._tag === "NotFound" ? "notFound" : "read", file)(cause))
-        )
+        Effect.catchTag("PlatformError", (cause) => Effect.fail(readError(file)(cause)))
       )
 
     const readBytes = (file: string) => readMapFile(file, fs.readFile(file))
     const readText = (file: string) => readMapFile(file, fs.readFileString(file))
 
     const sidecarFileIn = (project: string, fileName: string) =>
-      fileOf(project, fileName).pipe(
-        Effect.map((file) => path.join(path.dirname(file), sidecarFileNameOf(fileName)))
-      )
+      Effect.map(fileOf(project, fileName), (file) => path.join(path.dirname(file), sidecarFileNameOf(fileName)))
 
     /** What a sidecar holds; a file that can't be read costs only what it held, so it never stops a map opening. */
     const readSidecarAt = (file: string) =>
@@ -177,9 +172,8 @@ export class MapFiles extends Context.Service<MapFiles, {
         )
       )
 
-    const sidecarOf = Effect.fnUntraced(function*(project: string, fileName: string) {
-      return yield* readSidecarAt(yield* sidecarFileIn(project, fileName))
-    })
+    const sidecarOf = (project: string, fileName: string) =>
+      Effect.flatMap(sidecarFileIn(project, fileName), readSidecarAt)
 
     const read = Effect.fn("MapFiles.read")(function*(fileName: string) {
       const project = yield* projects.inUse
@@ -281,16 +275,16 @@ export class MapFiles extends Context.Service<MapFiles, {
       at
     })
 
+    /** The maps' backups in `folder`, which also keeps the sidecars' and the prefabs'. */
+    const mapBackupsIn = (folder: string, place: BackupRef["place"]) =>
+      backupStore.list(folder).pipe(
+        Effect.map((all) => all.filter((backup) => isMapFileName(backup.fileName)).map(backupOf(place)))
+      )
+
     const backups = Effect.gen(function*() {
       const project = Option.getOrNull(yield* projects.current)
-      const inProject = project === null
-        ? []
-        : (yield* backupStore.list(backupsFolderIn(path, project)))
-          .filter((backup) => isMapFileName(backup.fileName))
-          .map(backupOf("project"))
-      const exported = (yield* backupStore.list(exportBackups))
-        .filter((backup) => isMapFileName(backup.fileName))
-        .map(backupOf("export"))
+      const inProject = project === null ? [] : yield* mapBackupsIn(backupsFolderIn(path, project), "project")
+      const exported = yield* mapBackupsIn(exportBackups, "export")
       return [...inProject, ...exported].sort((a, b) => b.at.localeCompare(a.at))
     }).pipe(Effect.withSpan("MapFiles.backups"))
 

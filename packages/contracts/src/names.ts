@@ -51,10 +51,9 @@ export const isProjectName = (name: string): boolean => /^[\p{L}\p{N}_-][\p{L}\p
 export const isPrefabName = (name: string): boolean => /^[A-Za-z0-9_-]{1,64}$/.test(name)
 export const PREFAB_NAME_RULE = "1 to 64 letters, digits, _ and -"
 
-/** The file of the prefab `name`, in a prefabs folder. */
-export const prefabFileNameOf = (name: string): string => `${name}.json`
-
 const PREFAB_EXTENSION = ".json"
+
+export const prefabFileNameOf = (name: string): string => `${name}${PREFAB_EXTENSION}`
 
 /** The prefab a file in a prefabs folder holds; undefined for a file that isn't one's. */
 export const prefabNameOfFile = (fileName: string): string | undefined => {

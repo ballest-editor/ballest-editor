@@ -17,12 +17,15 @@ const encodePrefabObject = Schema.encodeEffect(PrefabFile)
 /** UE writes no BOM, but tolerate one from other tools. */
 const withoutBom = (text: string) => text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
 
-/** What `encoded` gives, in the game's own layout. */
-const writtenByGame = <E extends { readonly message: string }>(encoded: Effect.Effect<unknown, E>) =>
+/** What `encoded` gives, as `layout` writes it. */
+const written = <E extends { readonly message: string }>(
+  encoded: Effect.Effect<unknown, E>,
+  layout: (value: unknown) => string
+) =>
   encoded.pipe(
     Effect.mapError((error) => new MapEncodeError({ message: error.message })),
     Effect.flatMap((value) =>
-      Effect.try({ try: () => stringifyUe(value), catch: (cause) => new MapEncodeError({ message: String(cause) }) })
+      Effect.try({ try: () => layout(value), catch: (cause) => new MapEncodeError({ message: String(cause) }) })
     )
   )
 
@@ -44,11 +47,11 @@ export class MapCodec extends Context.Service<MapCodec, {
   encodeSidecar(sidecar: MapSidecar): Effect.Effect<string, MapEncodeError>
   decodePrefab(
     text: string,
-    catalog?: CatalogIndex | null
+    catalog: CatalogIndex | null
   ): Effect.Effect<PrefabFile, PrefabDecodeError | PrefabRefusedError>
   encodePrefab(
     prefab: PrefabFile,
-    catalog?: CatalogIndex | null
+    catalog: CatalogIndex | null
   ): Effect.Effect<string, MapEncodeError | PrefabRefusedError>
 }>()("ballest/services/MapCodec") {
   static readonly layer = Layer.succeed(
@@ -60,7 +63,7 @@ export class MapCodec extends Context.Service<MapCodec, {
         )
       }),
       encode: Effect.fn("MapCodec.encode")(function*(map: MapFile) {
-        return yield* writtenByGame(encodeObject(map))
+        return yield* written(encodeObject(map), stringifyUe)
       }),
       decodeSidecar: Effect.fn("MapCodec.decodeSidecar")(function*(text: string) {
         return yield* decodeSidecarJson(text).pipe(
@@ -68,23 +71,18 @@ export class MapCodec extends Context.Service<MapCodec, {
         )
       }),
       encodeSidecar: Effect.fn("MapCodec.encodeSidecar")(function*(sidecar: MapSidecar) {
-        const encoded = yield* encodeSidecarObject(sidecar).pipe(
-          Effect.mapError((error) => new MapEncodeError({ message: error.message }))
-        )
-        return `${JSON.stringify(encoded, null, 2)}\n`
+        return yield* written(encodeSidecarObject(sidecar), (value) => `${JSON.stringify(value, null, 2)}\n`)
       }),
-      decodePrefab: Effect.fn("MapCodec.decodePrefab")(function*(text: string, catalog: CatalogIndex | null = null) {
+      decodePrefab: Effect.fn("MapCodec.decodePrefab")(function*(text: string, catalog: CatalogIndex | null) {
         const prefab = yield* decodePrefabJson(withoutBom(text)).pipe(
           Effect.mapError((error) => new PrefabDecodeError({ message: `${PREFAB_REFUSALS.document} ${error.message}` }))
         )
         return yield* refusingPrefab(prefab, catalog)
       }),
-      encodePrefab: Effect.fn("MapCodec.encodePrefab")(
-        function*(prefab: PrefabFile, catalog: CatalogIndex | null = null) {
-          yield* refusingPrefab(prefab, catalog)
-          return yield* writtenByGame(encodePrefabObject(prefab))
-        }
-      )
+      encodePrefab: Effect.fn("MapCodec.encodePrefab")(function*(prefab: PrefabFile, catalog: CatalogIndex | null) {
+        yield* refusingPrefab(prefab, catalog)
+        return yield* written(encodePrefabObject(prefab), stringifyUe)
+      })
     })
   )
 }

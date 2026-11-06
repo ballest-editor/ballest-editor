@@ -51,18 +51,17 @@ export interface GroupNode {
 
 export type TreeNode = ItemNode | GroupNode
 
-const ItemNodeSchema = Schema.Struct({ kind: Schema.Literal("item"), key: NodeId })
-
-const GroupNodeSchema = Schema.Struct({
-  kind: Schema.Literal("group"),
-  id: NodeId,
-  name: Schema.String,
-  tags: Tags,
-  children: Schema.Array(Schema.suspend((): Schema.Codec<TreeNode> => TreeNode)),
-  prefab: Schema.optionalKey(PrefabLink)
-})
-
-const TreeNode: Schema.Codec<TreeNode> = Schema.Union([ItemNodeSchema, GroupNodeSchema])
+const TreeNode: Schema.Codec<TreeNode> = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("item"), key: NodeId }),
+  Schema.Struct({
+    kind: Schema.Literal("group"),
+    id: NodeId,
+    name: Schema.String,
+    tags: Tags,
+    children: Schema.Array(Schema.suspend((): Schema.Codec<TreeNode> => TreeNode)),
+    prefab: Schema.optionalKey(PrefabLink)
+  })
+])
 
 export class MapSidecar extends Schema.Opaque<MapSidecar>()(
   Schema.Struct({

@@ -1,3 +1,4 @@
+import { prefabFileNameOf } from "@ballest/contracts"
 import {
   type Icon,
   IconArrowsMaximize,
@@ -66,15 +67,12 @@ function Facts({ facts }: { readonly facts: ReadonlyArray<readonly [string, stri
 function PrefabSettings({ prefab }: { readonly prefab: PrefabDocument }) {
   const itemCount = useEditor((s) => s.doc.map.items.length)
   const path = useEditor((s) => s.file?.path ?? null)
-  const facts: ReadonlyArray<readonly [string, string]> = [
-    ["Tier", prefab.tier],
-    ["Items", String(itemCount)],
-    ["File", path ?? `${prefab.name}.json`]
-  ]
   return (
     <div className="flex flex-col gap-3">
       <SectionTitle>Prefab {prefab.name}</SectionTitle>
-      <Facts facts={facts} />
+      <Facts
+        facts={[["Tier", prefab.tier], ["Items", String(itemCount)], ["File", path ?? prefabFileNameOf(prefab.name)]]}
+      />
     </div>
   )
 }
