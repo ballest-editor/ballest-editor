@@ -65,7 +65,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - The active tab's map is kept per project in `desktop-settings.json` (`project.lastOpenMap`, by project folder; `ProjectState.lastOpenMap`, IPC `ballest:project:rememberOpenMap`), written whenever the active tab's file changes after the startup load. The other tabs aren't reopened yet.
 - A tab shows the map's name without the creator (`mapLabelOf`), its tooltip is the file's path or "Not saved yet", and tabs can be dragged into another order.
 - A tab's ×, a middle click or Ctrl+F4 closes it after the unsaved-changes prompt (§ Window). Closing the last one shows a fresh map the same way.
-- A right-click opens the tab's menu: Close, Close others, Close to the right, and on desktop Rename…, Duplicate… and Reveal.
+- A right-click opens the tab's menu: Close, Close others, Close to the right, Split right and Split down (the tab's view goes to two panes, § View panes), and on desktop Rename…, Duplicate… and Reveal, which are off until the map has a file.
 - A tab can hold a prefab's definition instead of a map (§ Prefabs). `TabState.document` says which, and it is one tab model: Save, the prompts and the menus ask it.
 - Ctrl+Tab and Ctrl+Shift+Tab, or Ctrl+PageDown and PageUp, cycle the tabs.
 
@@ -75,11 +75,12 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 
 **The centre group** holds the map tabs and the one viewport, which divides into panes of its own (§ View panes). Its only permanent panel is `documents`, whose dockview tab is hidden: `DocumentTabs` stands in for it, in the group's header. It can't be closed, dragged or popped out. The viewport keeps its own `renderer: "onlyWhenVisible"`, so it sits in the page's flow and resizes in the same frame as the window. A panel can be dropped on the centre's sides, but can't join it as a tab. Dropped there, a panel takes its side's usual size, not dockview's half of the viewport.
 
-**Panels** are entries in `components/dock/panels.tsx`: an id, a title, a component and a default location (`left`, `right`, `bottom`). That entry is all a panel needs for a tab, a View menu item, a place in the default layout, and a place in layouts saved before it existed. `dockControl.ts` is what the rest of the app calls (`togglePanel`, `resetDockLayout`). It's in the page's first chunk, because the menu bar is, so the registry reaches it from `Dock.tsx` and keeps the panels, and WebGL, out of that chunk.
+**Panels** are entries in `components/dock/panels.tsx`: an id, a title, an icon, a component and a default location (`left`, `right`, `bottom`). That entry is all a panel needs for a tab, a View menu item, a place in the default layout, and a place in layouts saved before it existed. `dockControl.ts` is what the rest of the app calls (`togglePanel`, `resetDockLayout`). It's in the page's first chunk, because the menu bar is, so the registry reaches it from `Dock.tsx` and keeps the panels, and WebGL, out of that chunk.
 
-- **Pieces**, **Prefabs** and **Project** start stacked on the left, with Pieces in front, and **Inspector** on the right. A panel `always` rendered (Pieces) stays in the page behind another tab, so a long list keeps its scroll position.
+- **Project**, **Pieces**, **Prefabs** and **Outline** start stacked on the left, with Outline in front, and **Inspector** on the right. A panel `always` rendered (Pieces) stays in the page behind another tab, so a long list keeps its scroll position.
 - View lists every panel, checked while it's open, and Reset layout. Reset closes everything around the centre group and lays out the default again, and the viewport stays mounted.
-- **Each group's "…"** (`GroupMenu.tsx`), at the end of its strip, holds View's panel checks, then Pop out, Collapse and Reset layout.
+- **A panel's tab** shows its icon and title. A strip too narrow for every title keeps the active tab's, and narrower still only the icons (`dock.css`); a hidden title is the tab's tooltip. Hovering a tab shows its ×, and a middle click closes it too.
+- **Each group's "…"** (`GroupMenu.tsx`), at the end of its strip, holds Pop out, Collapse and Close panel for the panel in front, Panels › with the closed panels (when there are any), and Reset layout. The centre group has only the last two. The list of every panel is in the View menu.
 - **Collapse** folds a group: a column by the viewport to a rail, a group in a stack to its header. A group can't fold if its neighbours have nothing left to give, so Collapse is off there. A panel arriving unfolds it, and so does a click on a tab, with that panel in front.
 - **The rail** is 28 px of the panels' titles, read downwards, and nothing else. It's the group's own strip with its header turned to the side, marked `data-dock-rail` and drawn by `dock.css`.
 
