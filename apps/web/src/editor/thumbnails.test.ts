@@ -15,6 +15,12 @@ describe("top-down framing", () => {
     assert.isBelow(framing.halfSize, 250)
   })
 
+  it("fits the longer side, whichever it is, and the height doesn't count", () => {
+    const wide = frameTopDown([0, 0, 0], [1000, 9000, 100])
+    const deep = frameTopDown([0, 0, 0], [100, 0, 1000])
+    assert.strictEqual(wide.halfSize, deep.halfSize)
+  })
+
   it("keeps the whole height between the planes", () => {
     const framing = frameTopDown([0, -500, 0], [10, 1500, 10])
     assert.isAtLeast(framing.position[1] - framing.near, 1500)

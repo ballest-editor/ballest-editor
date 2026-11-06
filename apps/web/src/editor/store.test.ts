@@ -12,8 +12,10 @@ import { mirrorFlagsOf } from "../domain/mirror"
 import { defaultSettings } from "../domain/Settings"
 import { loadStructure, sidecarOf, structureOfMap } from "../domain/sidecar"
 import { treeKeys } from "../domain/structure"
+import { lightingOf } from "../domain/sunlight"
 import { defaultViewLayout } from "../domain/viewLayout"
 import {
+  editedAtOf,
   gameMapOf,
   initialMap,
   nextSelection,
@@ -796,6 +798,38 @@ describe("document tabs", () => {
     state().loadMap(named("C"), { name: "c.balledit", path: null }, undefined, { into: "newTab" })
     assert.deepStrictEqual(state().tabIds, [first, state().tabId, second])
     assert.strictEqual(state().file?.name, "c.balledit")
+  })
+
+  it("opens a map in a background tab after the active one, whatever is active, and leaves that active", () => {
+    oneTab()
+    const first = state().tabId
+    state().loadMap(named("A"), fileOf("a"), undefined, { into: "backgroundTab" })
+    assert.strictEqual(state().tabId, first)
+    assert.isNull(state().file)
+    assert.strictEqual(state().tabIds[0], first)
+    assert.strictEqual(state().tabIds.length, 2)
+    const behind = state().tabIds[1]!
+    assert.strictEqual(state().parkedTabs.get(behind)?.file?.name, "a.balledit")
+
+    state().activateTab(behind)
+    assert.strictEqual(state().file?.name, "a.balledit")
+    assert.strictEqual(state().doc.map.worldSettings.levelData.levelDisplayName, "A")
+  })
+
+  it("says a map was edited when a tab has its edits, and when its file changed otherwise", () => {
+    oneTab()
+    const modifiedAt = "2026-01-01T00:00:00.000Z"
+    state().loadMap(named("A"), fileOf("a"), undefined)
+    assert.strictEqual(editedAtOf(state(), "a.balledit", modifiedAt), modifiedAt)
+    assert.strictEqual(editedAtOf(state(), "other.balledit", modifiedAt), modifiedAt)
+
+    state().setLighting({ ...lightingOf(state().doc.map.worldSettings), timeOfDay: 3 })
+    const edited = editedAtOf(state(), "a.balledit", modifiedAt)
+    assert.isAbove(Date.parse(edited), Date.parse(modifiedAt))
+
+    // an undo back to what the file holds has no edits left to date
+    state().undo()
+    assert.strictEqual(editedAtOf(state(), "a.balledit", modifiedAt), modifiedAt)
   })
 
   it("keeps each tab's document, history, selection and file while another is active", () => {

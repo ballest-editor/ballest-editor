@@ -6,7 +6,7 @@
  * fallback (components/PieceThumbnail.tsx). The lights here are fixed, so a thumbnail looks the
  * same in both themes and is cached once per piece and fill, as a PNG data URL. Renders run one at a time
  * off a queue so a long list never stalls the UI. A whole map's items go through the same stage, seen from straight
- * above (`mapThumbnailFor`).
+ * above (`mapThumbnailFor`, and through it the Project panel's rows in `mapThumbnails.ts`).
  *
  * `frameBox`, `frameTopDown`, `SerialQueue`, `texturesOf` and `whenTexturesReady` are unit-tested; the WebGL part is a
  * thin wrapper.
@@ -49,7 +49,10 @@ const VIEW_DIRECTION: Tuple3 = [1, 0.8, 1]
 /** Fraction of the frame the piece's bounding sphere may fill. */
 const FILL = 0.92
 /** How long to wait for a piece's textures before rendering it as is. */
-const TEXTURE_WAIT_MS = 3000
+export const TEXTURE_WAIT_MS = 3000
+
+/** A box's opposite corners. */
+export type Bounds = readonly [min: Tuple3, max: Tuple3]
 
 export interface Framing {
   readonly position: Tuple3
@@ -144,11 +147,11 @@ const bodyScaleOf = (item: Item, index: CatalogIndex): Tuple3 => {
 }
 
 /** The item as the viewport draws it at `at`; undefined if it has no mesh. */
-const buildItem = async (
+export const buildItem = async (
   item: Item,
   at: UeTransform,
   index: CatalogIndex,
-  table: MaterialTable,
+  table: MaterialTable | null,
   surfaces?: Surfaces
 ): Promise<THREE.Group | undefined> => {
   const root = new THREE.Group()
@@ -200,7 +203,7 @@ const buildPiece = (piece: CatalogPiece, index: CatalogIndex, table: MaterialTab
 const buildItems = async (
   items: ReadonlyArray<Item>,
   index: CatalogIndex,
-  table: MaterialTable,
+  table: MaterialTable | null,
   surfaces?: Surfaces
 ): Promise<THREE.Group | undefined> => {
   const root = new THREE.Group()
@@ -287,7 +290,7 @@ const newStage = (): Stage => {
   return { renderer, scene, camera }
 }
 
-/** The stage, its canvas `size` px square. Renders take turns on `queue`, so nothing else is using it. */
+/** The stage, its canvas `size` px square. Renders take turns on `stageQueue`, so nothing else is using it. */
 const stageOf = (size: number): Stage => {
   stage ??= newStage()
   if (stage.renderer.domElement.width !== size) stage.renderer.setSize(size, size, false)
@@ -295,33 +298,50 @@ const stageOf = (size: number): Stage => {
 }
 
 /**
- * `object` on the stage at `size` px, through the camera `aim` sets up for its bounding box, as a PNG data URL; undefined
- * when there is nothing to draw.
+ * `object` as `camera` sees it on the stage, `size` px square, as a PNG data URL. Its shaders compile first, off the
+ * page's thread: left to the render, a map's many materials would hold the page up for as long as they take.
+ */
+export const snapshot = async (
+  object: THREE.Object3D,
+  camera: THREE.Camera,
+  size = THUMBNAIL_SIZE
+): Promise<string> => {
+  const { renderer, scene } = stageOf(size)
+  scene.add(object)
+  try {
+    await renderer.compileAsync(scene, camera)
+    renderer.render(scene, camera)
+    return renderer.domElement.toDataURL("image/png")
+  } finally {
+    scene.remove(object)
+  }
+}
+
+/**
+ * `object` at `size` px through the camera `aim` sets up for it, as a PNG data URL; undefined when there is nothing to
+ * draw.
  */
 const shoot = async (
   object: THREE.Group | undefined,
   size: number,
-  aim: (box: THREE.Box3, stage: Stage) => THREE.Camera
+  aim: (object: THREE.Group, stage: Stage) => THREE.Camera
 ): Promise<string | undefined> => {
   if (object === undefined) return undefined
   await whenTexturesReady(texturesOf(object), TEXTURE_WAIT_MS)
-  const onStage = stageOf(size)
-  const { renderer, scene } = onStage
-  scene.add(object)
   object.updateMatrixWorld(true)
-  renderer.render(scene, aim(new THREE.Box3().setFromObject(object), onStage))
-  const url = renderer.domElement.toDataURL("image/png")
-  scene.remove(object)
-  return url
+  return snapshot(object, aim(object, stageOf(size)), size)
 }
+
+const boundsOf = (box: THREE.Box3): Bounds => [box.min.toArray(), box.max.toArray()]
 
 /**
  * `object` framed whole from the three-quarter view, drawn at `fill` of the size that frame allows, as a PNG data URL;
  * undefined when there is nothing to draw.
  */
 const photograph = (object: THREE.Group | undefined, fill = 1) =>
-  shoot(object, THUMBNAIL_SIZE, (box, { camera }) => {
-    const framing = frameBox(box.min.toArray(), box.max.toArray(), camera.aspect, VIEW_DIRECTION, fill)
+  shoot(object, THUMBNAIL_SIZE, (framed, { camera }) => {
+    const [min, max] = boundsOf(new THREE.Box3().setFromObject(framed))
+    const framing = frameBox(min, max, camera.aspect, VIEW_DIRECTION, fill)
     camera.position.set(...framing.position)
     camera.near = framing.near
     camera.far = framing.far
@@ -333,30 +353,46 @@ const photograph = (object: THREE.Group | undefined, fill = 1) =>
 const render = async (piece: CatalogPiece, index: CatalogIndex, table: MaterialTable, fill: number) =>
   photograph(await buildPiece(piece, index, table), fill)
 
+/** How a map is pictured: `size` px square, framed to all of it unless `frame` picks what counts from each item's bounds. */
+export interface MapShot {
+  readonly size: number
+  readonly frame?: (items: ReadonlyArray<Bounds>) => Bounds
+}
+
+/** What a map's picture is framed to: `frame`'s pick of its items, or else the whole of them. */
+const mapBounds = (map: THREE.Group, frame: MapShot["frame"]): Bounds => {
+  if (frame === undefined) return boundsOf(new THREE.Box3().setFromObject(map))
+  const boxes = map.children.map((item) => new THREE.Box3().setFromObject(item))
+  return frame(boxes.filter((box) => !box.isEmpty()).map(boundsOf))
+}
+
 /** A map's items from straight above, with X up the picture and Y to the right, like the Top pane. */
 const renderMap = async (
   items: ReadonlyArray<Item>,
   index: CatalogIndex,
-  table: MaterialTable,
-  surfaces: Surfaces
+  table: MaterialTable | null,
+  surfaces: Surfaces,
+  { frame, size }: MapShot
 ): Promise<string | undefined> => {
   // A light's meshes are stand-ins, with no body worth a picture.
   const drawn = items.filter((item) => index.pieceByClass.get(item.actorToSpawn)?.category !== "Lights")
-  return shoot(await buildItems(drawn, index, table, surfaces), MAP_THUMBNAIL_SIZE, (box) => {
-    const { far, halfSize, near, position } = frameTopDown(box.min.toArray(), box.max.toArray())
+  return shoot(await buildItems(drawn, index, table, surfaces), size, (map) => {
+    const [min, max] = mapBounds(map, frame)
+    const { far, halfSize, near, position } = frameTopDown(min, max)
     const camera = new THREE.OrthographicCamera(-halfSize, halfSize, halfSize, -halfSize, near, far)
     const up = ueToThreeVector(ORTHO_AXES.top.up)
     camera.up.set(up.x, up.y, up.z)
     camera.position.set(...position)
-    camera.lookAt(position[0], box.min.y, position[2])
+    camera.lookAt(position[0], min[1], position[2])
     return camera
   })
 }
 
-const queue = new SerialQueue()
+/** One render at a time on the stage. */
+export const stageQueue = new SerialQueue()
 const cache = new Map<string, Promise<string | undefined>>()
 
-/** What `draw` makes, from the queue, once per `key`; undefined if it fails, which is logged as being about `subject`. */
+/** What `draw` makes, from the stage's queue, once per `key`; undefined if it fails, which is logged as being about `subject`. */
 const renderedOnce = (
   key: string,
   subject: string,
@@ -364,7 +400,7 @@ const renderedOnce = (
 ): Promise<string | undefined> => {
   const cached = cache.get(key)
   if (cached !== undefined) return cached
-  const promise = queue.run(draw).catch((error: unknown) => {
+  const promise = stageQueue.run(draw).catch((error: unknown) => {
     console.warn(`Couldn't render a thumbnail for ${subject}.`, error)
     return undefined
   })
@@ -406,13 +442,15 @@ export const definitionThumbnailFor = (
 
 /**
  * A map's items as a top-down picture (PNG data URL) on a transparent background, or undefined when none of them has
- * anything to draw or rendering failed. `id` names those items, which never change under it (a backup's hash): each is
- * rendered once.
+ * anything to draw or rendering failed. `id` names those items and this shot of them, neither of which ever changes
+ * under it (a backup's hash): each is rendered once.
  */
 export const mapThumbnailFor = (
   id: string,
   items: ReadonlyArray<Item>,
   index: CatalogIndex,
-  table: MaterialTable,
-  surfaces: Surfaces
-): Promise<string | undefined> => renderedOnce(`map:${id}`, "a map", () => renderMap(items, index, table, surfaces))
+  table: MaterialTable | null,
+  surfaces: Surfaces,
+  shot: MapShot = { size: MAP_THUMBNAIL_SIZE }
+): Promise<string | undefined> =>
+  renderedOnce(`map:${id}`, "a map", () => renderMap(items, index, table, surfaces, shot))

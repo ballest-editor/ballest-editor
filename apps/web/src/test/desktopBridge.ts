@@ -39,6 +39,8 @@ import { Option, Schema } from "effect"
  */
 export interface TestDisk {
   readonly files: Map<string, string>
+  /** The map thumbnails main keeps, by file hash. */
+  readonly thumbnails: Map<string, string>
   readonly answers: Array<string | null>
   readonly dialogs: Array<{ readonly kind: "import" | "project" | "folder" }>
   readonly external: Array<string>
@@ -179,6 +181,7 @@ const makeTestPush = <A>() => {
 
 export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   files: new Map(Object.entries(files)),
+  thumbnails: new Map(),
   answers: [],
   dialogs: [],
   external: [],
@@ -453,6 +456,11 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     },
     writeSidecar: ({ fileName, text }) => {
       disk.files.set(sidecarFile(fileName, current()), text)
+      return Promise.resolve()
+    },
+    readMapThumbnail: ({ hash }) => Promise.resolve(disk.thumbnails.get(hash) ?? null),
+    writeMapThumbnail: ({ hash, png }) => {
+      disk.thumbnails.set(hash, png)
       return Promise.resolve()
     },
     listPrefabs: ({ tier }) => {

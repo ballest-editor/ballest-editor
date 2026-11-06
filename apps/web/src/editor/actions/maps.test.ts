@@ -9,7 +9,16 @@ import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { makeTestDisk, projectFile, TEST_PROJECT } from "../../test/desktopBridge"
 import { balledits, edit, fileNameOf, layerFor, noticesWhile, reset, s, twoMaps } from "../../test/editorActions"
 import { readSample } from "../../test/samples"
-import { followOpenMapEffect, freshMapEffect, openProjectMapFile, openStartingMap, patchProjectMapEffect } from "./maps"
+import {
+  followOpenMapEffect,
+  freshMapEffect,
+  newMapEffect,
+  openProjectMapAtGap,
+  openProjectMapBehind,
+  openProjectMapFile,
+  openStartingMap,
+  patchProjectMapEffect
+} from "./maps"
 import { openProjectMap } from "./project"
 import { refreshProject, saveTabPrefs } from "./shared"
 import { followViewLayouts } from "./viewLayouts"
@@ -124,6 +133,79 @@ describe("map actions", () => {
       assert.isTrue(s().dirty)
       s().undo()
       assert.isFalse(s().past.length > 0)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a middle click opens a map behind the active tab, which stays active, and only once", () => {
+    const { first, second, disk } = twoMaps()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(first)
+      const active = s().tabId
+      yield* openProjectMapBehind(second)
+      assert.strictEqual(s().tabId, active)
+      assert.strictEqual(s().file?.name, first)
+      assert.strictEqual(s().tabIds.length, 2)
+      assert.strictEqual(s().tabIds[0], active)
+      const behind = s().tabIds[1]!
+      assert.strictEqual(s().parkedTabs.get(behind)?.file?.name, second)
+
+      yield* openProjectMapBehind(second)
+      yield* openProjectMapBehind(first)
+      assert.strictEqual(s().tabIds.length, 2)
+      assert.strictEqual(s().tabId, active)
+
+      s().activateTab(behind)
+      assert.strictEqual(s().file?.name, second)
+      assert.isFalse(s().dirty)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a middle click leaves an untouched fresh map where it is", () => {
+    const { first, disk } = twoMaps()
+    return Effect.gen(function*() {
+      yield* reset
+      const fresh = s().tabId
+      yield* openProjectMapBehind(first)
+      assert.strictEqual(s().tabId, fresh)
+      assert.strictEqual(s().tabIds.length, 2)
+      assert.isNull(s().file)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a row dropped on the strip opens the map in that gap, active; an open one's tab moves there", () => {
+    const { first, second, disk } = twoMaps()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(first)
+      const a = s().tabId
+      yield* newMapEffect
+      const b = s().tabId
+      edit()
+
+      yield* openProjectMapAtGap(second, 0)
+      const c = s().tabId
+      assert.strictEqual(s().file?.name, second)
+      assert.deepStrictEqual(s().tabIds, [c, a, b])
+
+      yield* openProjectMapAtGap(first, 3)
+      assert.strictEqual(s().tabId, a)
+      assert.deepStrictEqual(s().tabIds, [c, b, a])
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a row dropped on the strip takes an untouched fresh map's place, and lands in the gap", () => {
+    const { first, second, disk } = twoMaps()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(first)
+      const a = s().tabId
+      yield* newMapEffect
+      const fresh = s().tabId
+      yield* openProjectMapAtGap(second, 0)
+      assert.deepStrictEqual(s().tabIds, [fresh, a])
+      assert.strictEqual(s().tabId, fresh)
+      assert.strictEqual(s().file?.name, second)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
