@@ -7,7 +7,7 @@
  * picker on every slot; docs/qa/materials.md has what was measured.
  */
 import { Option, Schema } from "effect"
-import type { CatalogIndex } from "./Catalog"
+import { type CatalogIndex, humanizedClass } from "./Catalog"
 import { type Item, objectPathOf } from "./MapFile"
 import { assetNameOf, type MaterialSpec, NEUTRAL } from "./Materials"
 import { open } from "./schema"
@@ -104,6 +104,17 @@ export const choiceOf = (picker: PaintPicker, material: string | undefined): Pai
   return all.find(({ color }) => objectPathOf(color.material) === path) ??
     all.find(({ color }) => assetNameOf(color.material) === name)
 }
+
+/** A finish as a person would write it: "smooth" reads "Smooth". */
+export const finishLabelOf = (finish: PaintFinish): string =>
+  `${finish.name.charAt(0).toUpperCase()}${finish.name.slice(1)}`
+
+/** A colour as a person would write it: "SkyBlue" reads "Sky Blue". */
+export const colorLabelOf = (color: PaintColor): string => humanizedClass(color.color)
+
+/** A material the picker doesn't offer, by its asset's name: "M_BaseSurface_Metal" reads "Base Surface Metal". */
+export const materialLabelOf = (material: string): string =>
+  humanizedClass(assetNameOf(material).replace(/^MI?C?_/, ""))
 
 /** The panel's colour for a slot that isn't on a picker choice: EBallestMaterialColors' first value. */
 const UNSET_COLOR = "Grey"

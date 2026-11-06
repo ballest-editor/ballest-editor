@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { dayLabel, formatAgo } from "./time"
+import { createdAtIso, dayLabel, formatAgo } from "./time"
 
 // Local times, so the tests pass in any time zone.
 const now = new Date(2026, 9, 31, 15, 0).getTime()
@@ -17,6 +17,11 @@ describe("time", () => {
     // a clock that went backwards isn't "in the future"
     assert.strictEqual(formatAgo(at(31, 16), now), "just now")
     assert.strictEqual(formatAgo("not a time", now), "at an unknown time")
+  })
+
+  it("reads the game's createdAt as UTC", () => {
+    assert.strictEqual(createdAtIso("2026.11.04-20.05.42"), "2026-11-04T20:05:42.000Z")
+    assert.isNull(createdAtIso("last Tuesday"))
   })
 
   it("groups by local day", () => {

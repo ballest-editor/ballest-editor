@@ -1,18 +1,23 @@
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import { useMemo, useState } from "react"
+import { type ReactNode, useMemo, useState } from "react"
 import type { GroupNode, PrefabLink } from "../domain/MapSidecar"
 import { isSamePrefab } from "../domain/prefab"
 import { checkInstance } from "../domain/prefabInstance"
 import { treeKeys } from "../domain/structure"
 import { detachInstance, openPrefab, updateInstance } from "../editor/actions"
 import { useEditor } from "../editor/store"
-import { SectionTitle } from "./SectionTitle"
+import { SectionHeader, SectionTitle } from "./SectionTitle"
 import { TagInput } from "./TagInput"
 
-/** A selection that is exactly one group: its name and tags. */
-export function GroupSection({ group }: { readonly group: GroupNode }) {
+/** A selection that is exactly one group: its name and tags, then the summary it's given. */
+export function GroupSection({ group, actions, children }: {
+  readonly group: GroupNode
+  /** The selection's icon buttons, at the section's header. */
+  readonly actions: ReactNode
+  readonly children: ReactNode
+}) {
   const renameGroup = useEditor((s) => s.renameGroup)
   const setTags = useEditor((s) => s.setTags)
   // An edit in progress; otherwise the input shows the group's name.
@@ -23,8 +28,8 @@ export function GroupSection({ group }: { readonly group: GroupNode }) {
   }
   const count = treeKeys([group]).length
   return (
-    <div className="flex flex-col gap-2">
-      <SectionTitle>Group of {count} item{count === 1 ? "" : "s"}</SectionTitle>
+    <div className="flex flex-col gap-3">
+      <SectionHeader title={`Group of ${count} item${count === 1 ? "" : "s"}`}>{actions}</SectionHeader>
       <div className="flex flex-col gap-1">
         <Label htmlFor="group-name" className="text-fg-secondary">Name</Label>
         <Input
@@ -42,6 +47,7 @@ export function GroupSection({ group }: { readonly group: GroupNode }) {
         <Label htmlFor="group-tags" className="text-fg-secondary">Tags</Label>
         <TagInput id="group-tags" tags={group.tags} onChange={(tags) => setTags(group.id, tags)} />
       </div>
+      {children}
     </div>
   )
 }
