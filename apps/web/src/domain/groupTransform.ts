@@ -82,6 +82,10 @@ export const scaleAbout = (t: UeTransform, scale3D: Vec3, pivot: Vec3): UeTransf
   }
 }
 
+/** Where a landing takes a point of the world. */
+export const landedPoint = (point: Vec3, { about, offset, rotation }: RigidDelta): Vec3 =>
+  vecAdd(vecAdd(about, rotateVec(rotation, vecSub(point, about))), offset)
+
 /** One item's transform after `delta`, about `pivot` (world). */
 export const applyGroupDelta = (t: UeTransform, pivot: Vec3, delta: GroupDelta): UeTransform => {
   switch (delta.kind) {
@@ -90,10 +94,7 @@ export const applyGroupDelta = (t: UeTransform, pivot: Vec3, delta: GroupDelta):
     case "rigid":
       return {
         ...t,
-        translation: vecAdd(
-          vecAdd(delta.about, rotateVec(delta.rotation, vecSub(t.translation, delta.about))),
-          delta.offset
-        ),
+        translation: landedPoint(t.translation, delta),
         rotation: quatNormalize(quatMul(delta.rotation, t.rotation))
       }
     case "rotate":

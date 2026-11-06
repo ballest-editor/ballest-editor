@@ -7,10 +7,12 @@ import { PrefabFile } from "../domain/PrefabFile"
 import { defaultSettings } from "../domain/Settings"
 import { defaultSnapConfig } from "../domain/snapConfig"
 import { annotationsOf, findGroup } from "../domain/structure"
-import { rotatorToQuat } from "../domain/ueMath"
+import { ORIGIN, rotatorToQuat } from "../domain/ueMath"
 import { PREFAB_TEXT } from "../test/prefabs"
 import { grouped, loadPieces } from "../test/snapFixtures"
-import { snapConfigOf, useEditor } from "./store"
+import { assertVec } from "../test/vec"
+import { previewMove } from "./snap/moveSession"
+import { selectionPivot, shownPivotDots, shownPivotPoint, shownTransform, snapConfigOf, useEditor } from "./store"
 
 /** Two pieces whose near ends meet, and a third some way off. */
 const load = () => {
@@ -224,6 +226,59 @@ describe("a snapped commit on a group with a Point pivot", () => {
     useEditor.getState().undo()
     assert.deepStrictEqual(pivotOfGroup(id), POINT)
     assert.lengthOf(jointsNow(), 1)
+  })
+
+  describe("while a landing is only a preview", () => {
+    const landedTo = (at: { readonly x: number }) => ({
+      ...identityTransform({ x: 0, y: at.x, z: 100 }),
+      rotation: landing.rotation
+    })
+    const preview = (b: string, c: string) => new Map([[b, landedTo({ x: 500 })], [c, landedTo({ x: 5000 })]])
+    const livePivot = () => {
+      const s = useEditor.getState()
+      return selectionPivot(s, (id) => shownTransform(s, id))?.pivot
+    }
+    const LANDED = { x: 0, y: 450, z: 100 }
+
+    it("shows the Point where it will land, and the commit leaves it there", () => {
+      const { b, c, id } = joinedGroup()
+      useEditor.getState().select([b, c])
+      previewMove(preview(b, c), landing)
+      assertVec(livePivot() ?? ORIGIN, LANDED, "the gizmo")
+      assertVec(shownPivotPoint(useEditor.getState()) ?? ORIGIN, LANDED, "the Pivot section")
+      assertVec(shownPivotDots(useEditor.getState())[0]?.pivot ?? ORIGIN, LANDED, "the dot")
+      assert.deepStrictEqual(pivotOfGroup(id), POINT, "the document waits for the commit")
+      useEditor.getState().setPreview(null)
+      useEditor.getState().transformItems(preview(b, c), { landing })
+      assertVec(livePivot() ?? ORIGIN, LANDED, "no jump on release")
+    })
+
+    it("goes back with the preview when the drag is cancelled", () => {
+      const { b, c, id } = joinedGroup()
+      useEditor.getState().select([b, c])
+      previewMove(preview(b, c), landing)
+      useEditor.getState().setPreview(null)
+      assert.isNull(useEditor.getState().previewLanding)
+      assertVec(livePivot() ?? ORIGIN, POINT.world, "the Point it had")
+      assert.deepStrictEqual(pivotOfGroup(id), POINT)
+    })
+
+    it("is said by the landing and not by the turn, which leaves the Point where it is", () => {
+      const { b, c } = joinedGroup()
+      useEditor.getState().select([b, c])
+      previewMove(preview(b, c), { kind: "rotate", rotation: landing.rotation })
+      assertVec(livePivot() ?? ORIGIN, POINT.world, "a turn is about it")
+      previewMove(preview(b, c), landing)
+      previewMove(preview(b, c), { kind: "translate", offset: ORIGIN })
+      assert.isNull(useEditor.getState().previewLanding, "the next sample's off the target")
+    })
+
+    it("leaves the Point of a group the landing has only part of", () => {
+      const { b, c } = joinedGroup()
+      useEditor.getState().select([b, c])
+      previewMove(new Map([[b, landedTo({ x: 500 })]]), landing)
+      assertVec(livePivot() ?? ORIGIN, POINT.world, "not the group's own move")
+    })
   })
 
   /** Two pieces that can be copied, grouped with a Point pivot, and a measurement. */

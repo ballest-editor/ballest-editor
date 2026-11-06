@@ -6,6 +6,7 @@ import {
   applyGroupDelta,
   forUnit,
   type GroupDelta,
+  landedPoint,
   readField,
   type RigidDelta,
   rotatorOffset,
@@ -19,11 +20,14 @@ import { ORIGIN, quatToRotator, rotateVec, rotatorToQuat } from "./ueMath"
 import {
   applyDelta,
   applyUnitEdit,
+  applyUnitOffsets,
+  carriedKeys,
   deltaEdit,
   effectivePivotMode,
   leadingKeys,
   pivotDotsOf,
   pivotUnitOf,
+  type SelectionUnits,
   selectionUnitsOf,
   turnAccumulates,
   type UnitContext,
@@ -76,7 +80,7 @@ const contextOf = (
     return box
   },
   instanceOriginOf: () => undefined,
-  liveOffsetOf: () => undefined
+  livePointOf: (_, world) => world
 })
 
 const yawOf = (t: UeTransform) => quatToRotator(t.rotation).yaw
@@ -132,7 +136,7 @@ describe("units of a selection", () => {
     // a live move of the whole group carries the point along
     const live = {
       ...ctx({ choice: "point", world: { x: 1, y: 2, z: 3 } }),
-      liveOffsetOf: () => ({ x: 10, y: 0, z: 0 })
+      livePointOf: (_: ReadonlyArray<string>, { x, y, z }: Vec3) => ({ x: x + 10, y, z })
     }
     assertVec(selectionUnitsOf(["b", "c"], null, live)!.active.pivot, { x: 11, y: 2, z: 3 }, "point, live")
     // a member the group doesn't hold falls back to the centre
@@ -303,6 +307,29 @@ describe("chains", () => {
     assert.deepStrictEqual([...scaled.keys()], ["l3"])
   })
 
+  it("moves each unit whole by its own offset, a selected link's being its own and passing to the links after it", () => {
+    const by = (x: number): Vec3 => ({ x, y: 0, z: 0 })
+    const moved = (sel: SelectionUnits, offsets: Readonly<Record<string, number>>) => {
+      const out = applyUnitOffsets(sel, transforms, (unit) => by(offsets[unit.id] ?? 0))
+      return new Map([...out].map(([key, t]) => [key, t.translation.x]))
+    }
+    const inside = selectionUnitsOf(["l2", "l4"], "chain", contextOf([chain], transforms))!
+    assert.deepStrictEqual(
+      moved(inside, { l2: 100, l4: 0 }),
+      new Map([["l2", 1100], ["l3", 2100], ["l4", 3000], ["l5", 4000]]),
+      "from the first selected link down, and l4 stays put"
+    )
+    const whole = selectionUnitsOf(links, null, contextOf([chain], transforms))!
+    assert.strictEqual(moved(whole, { chain: 100 }).size, links.length, "a whole chain is one unit")
+    assert.strictEqual(moved(whole, { chain: 100 }).get("l5"), 4100)
+  })
+
+  it("reaches the links a selected link carries, and every item of a whole unit", () => {
+    const ctx = contextOf([chain], transforms)
+    assert.sameMembers([...carriedKeys(selectionUnitsOf(["l3"], "chain", ctx)!)], ["l3", "l4", "l5"])
+    assert.sameMembers([...carriedKeys(selectionUnitsOf(links, null, ctx)!)], [...links])
+  })
+
   it("accumulates through the selected links only when several are selected inside the chain", () => {
     const sel = selectionUnitsOf(["l1", "l3"], "chain", contextOf([chain], transforms))!
     const out = applyUnitEdit(sel, "each", transforms, deltaEdit(turn(10)))
@@ -415,13 +442,14 @@ describe("pivot dots and Point pivots", () => {
     const before = new Map([["a", at(0)], ["b", at(2000)]])
     const landing: RigidDelta = { kind: "rigid", rotation: yawed(90), about: ORIGIN, offset: { x: 0, y: 0, z: 50 } }
     const after = new Map([...before].map(([k, t]) => [k, applyGroupDelta(t, ORIGIN, landing)]))
-    const landed = withCarriedPoints(structure, (k) => before.get(k), after, landing)
+    const through = (world: Vec3) => landedPoint(world, landing)
+    const landed = withCarriedPoints(structure, (k) => before.get(k), after, through)
     const pivot = landed?.tree[0]?.kind === "group" ? landed.tree[0].pivot : undefined
     assert.strictEqual(pivot?.choice, "point")
     if (pivot?.choice === "point") assertVec(pivot.world, { x: 0, y: 100, z: 50 }, "the Point lands with the group")
     assert.isUndefined(withCarriedPoints(structure, (k) => before.get(k), after), "as a turn, it stays")
     const part = new Map([["a", applyGroupDelta(at(0), ORIGIN, landing)]])
-    assert.isUndefined(withCarriedPoints(structure, (k) => before.get(k), part, landing), "part of its group")
+    assert.isUndefined(withCarriedPoints(structure, (k) => before.get(k), part, through), "part of its group")
   })
 
   it("reads a rotator offset about a unit's own axis for the Inspector", () => {

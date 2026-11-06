@@ -1,9 +1,9 @@
 import { assert, beforeEach, describe, it } from "@effect/vitest"
 import { indexCatalog } from "../../domain/Catalog"
 import { editTransform } from "../../domain/editTransform"
-import { MIRROR_Y, mirrorFlagsOf } from "../../domain/mirror"
+import { MIRROR_X, MIRROR_Y, mirrorFlagsOf } from "../../domain/mirror"
 import { defaultSettings } from "../../domain/Settings"
-import { annotationsOf } from "../../domain/structure"
+import { annotationsOf, findGroup } from "../../domain/structure"
 import { catalogWithEnds, endAlongX, grouped, loadPieces } from "../../test/snapFixtures"
 import { type PickedTarget, snapConfigOf, useEditor } from "../store"
 import {
@@ -32,6 +32,11 @@ const xOf = (key: string) => {
   const { doc } = useEditor.getState()
   const item = doc.map.items[doc.ids.indexOf(key)]
   return item === undefined ? NaN : editTransform(item).translation.x
+}
+
+const pointOf = (id: string) => {
+  const pivot = findGroup(useEditor.getState().doc.structure.tree, id)?.pivot
+  return pivot?.choice === "point" ? pivot.world : undefined
 }
 
 /** Answers the target picker's waiting request. */
@@ -116,6 +121,78 @@ describe("align and distribute", () => {
     assert.closeTo(xOf(b), 500, 1e-6)
     assert.strictEqual(useEditor.getState().past.length, before + 1)
   })
+
+  it("aligns a whole group by its box, which keeps its spacing", () => {
+    const [a = "", b = "", c = ""] = load([0, 1000, 5000])
+    grouped([a, b])
+    useEditor.getState().select([c, a, b])
+    alignSelection("x", "min", "first")
+    assert.closeTo(xOf(a), 5000, 1e-6)
+    assert.closeTo(xOf(b), 6000, 1e-6)
+    assert.strictEqual(xOf(c), 5000)
+    useEditor.getState().undo()
+    alignSelection("x", "max", "bounds")
+    assert.closeTo(xOf(a), 4000, 1e-6, "the group's far side on the box's")
+    assert.closeTo(xOf(b), 5000, 1e-6)
+    assert.strictEqual(xOf(c), 5000)
+  })
+
+  it("aligns on the first selected unit whichever comes first in the tree", () => {
+    const [a = "", b = "", c = ""] = load([0, 1000, 5000])
+    grouped([a, b])
+    useEditor.getState().select([a, b, c])
+    alignSelection("x", "max", "first")
+    assert.closeTo(xOf(c), 1000, 1e-6, "on the group's far side, not its first item's")
+    assert.strictEqual(xOf(a), 0)
+    assert.strictEqual(xOf(b), 1000)
+  })
+
+  it("spreads a whole group as one unit, by equal spacing or equal gaps", () => {
+    const [a = "", b = "", c = "", d = ""] = load([0, 400, 1000, 5000])
+    grouped([a, b])
+    useEditor.getState().select([a, b, c, d])
+    distributeSelection("x", "spacing")
+    assert.closeTo(xOf(c), 2600, 1e-6, "halfway from the group's centre to the last")
+    assert.strictEqual(xOf(a), 0)
+    assert.strictEqual(xOf(b), 400)
+    assert.strictEqual(xOf(d), 5000)
+    const [e = "", f = "", g = "", h = ""] = load([1000, 1400, 0, 5000])
+    grouped([e, f])
+    useEditor.getState().select([e, f, g, h])
+    distributeSelection("x", "gaps")
+    assert.closeTo(xOf(e), 2300, 1e-6, "the middle unit between the outer two, whatever a piece's size")
+    assert.closeTo(xOf(f), 2700, 1e-6)
+  })
+
+  it("leaves one whole group alone, which has nothing to line up on", () => {
+    const [a = "", b = "", c = ""] = load([0, 400, 1000])
+    grouped([a, b, c])
+    useEditor.getState().select([a, b, c])
+    const before = useEditor.getState().past.length
+    alignSelection("x", "min", "bounds")
+    distributeSelection("x", "spacing")
+    assert.lengthOf(useEditor.getState().past, before)
+  })
+
+  it("takes a Point along with its whole group", () => {
+    const [a = "", b = "", c = ""] = load([0, 1000, 5000])
+    const id = grouped([a, b])
+    useEditor.getState().setGroupPivot(id, { choice: "point", world: { x: 10, y: 20, z: 30 } })
+    useEditor.getState().select([c, a, b])
+    alignSelection("x", "min", "first")
+    assert.deepStrictEqual(pointOf(id), { x: 5010, y: 20, z: 30 })
+  })
+
+  it("carries the links after a selected link inside an entered chain, up to the next selected one", () => {
+    const [root = "", one = "", two = "", three = ""] = load([0, 1000, 2000, 3000])
+    useEditor.getState().enterGroup(grouped([root, one, two, three], true))
+    useEditor.getState().select([three, one])
+    alignSelection("x", "min", "first")
+    assert.strictEqual(xOf(root), 0)
+    assert.closeTo(xOf(one), 3000, 1e-6)
+    assert.closeTo(xOf(two), 4000, 1e-6, "carried by the link before it")
+    assert.strictEqual(xOf(three), 3000, "a selected link takes its own offset, here none")
+  })
 })
 
 describe("measure", () => {
@@ -146,6 +223,68 @@ describe("mirror", () => {
     mirrorSelection({ origin: { x: 100, y: 0, z: 0 }, normal: { x: 1, y: 0, z: 0 } })
     assert.closeTo(xOf(a), -100, 1e-6)
     assert.strictEqual(useEditor.getState().past.length, before + 1)
+  })
+
+  const acrossX = (x: number) => ({ origin: { x, y: 0, z: 0 }, normal: { x: 1, y: 0, z: 0 } })
+  /** Items that can flip: a stored flag is what says so for a class the catalog lists none on. */
+  const loadFlippable = (xs: ReadonlyArray<number>) => {
+    const keys = load(xs)
+    const { doc } = useEditor.getState()
+    const items = doc.map.items.map((item) => ({
+      ...item,
+      meshComponents: [],
+      boolProperties: [{ propertyName: MIRROR_X, propertyType: "Bool", currentValue: false }]
+    }))
+    useEditor.setState({ doc: { ...doc, map: { ...doc.map, items } } })
+    return keys
+  }
+  const flipped = (key: string) => {
+    const { doc } = useEditor.getState()
+    const item = doc.map.items[doc.ids.indexOf(key)]
+    return item !== undefined && mirrorFlagsOf(item).x
+  }
+
+  const world = { x: 500, y: 40, z: 0 }
+  /** Two items that can flip, grouped on a Point at `world`. */
+  const pointGroup = () => {
+    const [a = "", b = ""] = loadFlippable([300, 700])
+    const id = grouped([a, b])
+    useEditor.getState().setGroupPivot(id, { choice: "point", world })
+    return { a, b, id }
+  }
+
+  it("reflects a whole group item by item, and its Point with it, as one step", () => {
+    const { a, b, id } = pointGroup()
+    useEditor.getState().select([a, b])
+    const before = useEditor.getState().past.length
+    mirrorSelection(acrossX(100))
+    assert.closeTo(xOf(a), -100, 1e-6)
+    assert.closeTo(xOf(b), -500, 1e-6, "its spacing, the other way")
+    assert.isTrue(flipped(a) && flipped(b))
+    assert.deepStrictEqual(pointOf(id), { x: -300, y: 40, z: 0 })
+    assert.lengthOf(useEditor.getState().past, before + 1)
+    useEditor.getState().undo()
+    assert.deepStrictEqual(pointOf(id), world)
+  })
+
+  it("leaves the Point of a group it only took part of", () => {
+    const { a, id } = pointGroup()
+    useEditor.getState().enterGroup(id)
+    useEditor.getState().select([a])
+    mirrorSelection(acrossX(100))
+    assert.deepStrictEqual(pointOf(id), world)
+  })
+
+  it("reflects the links a selected link carries inside an entered chain, even one sitting on the plane", () => {
+    const [root = "", one = "", two = ""] = loadFlippable([0, 1000, 1500])
+    useEditor.getState().enterGroup(grouped([root, one, two], true))
+    useEditor.getState().select([one])
+    mirrorSelection(acrossX(1000))
+    assert.strictEqual(xOf(root), 0)
+    assert.isFalse(flipped(root))
+    assert.closeTo(xOf(one), 1000, 1e-6)
+    assert.closeTo(xOf(two), 500, 1e-6)
+    assert.isTrue(flipped(one) && flipped(two), "carried, and mirrored like the link that carries it")
   })
 })
 
@@ -178,7 +317,7 @@ describe("flip to fit", () => {
     const catalog = catalogWithEnds(ends)
     const [piece] = catalog.pieces
     if (piece === undefined) return assert.fail("no piece")
-    const [a = "", b = ""] = load([0, 1000])
+    const [a = "", b = "", companion = ""] = load([0, 1000, 1500])
     const { doc } = useEditor.getState()
     const flippable = doc.map.items.map((item) => ({
       ...item,
@@ -188,7 +327,7 @@ describe("flip to fit", () => {
     useEditor.setState({ catalogIndex: indexCatalog(catalog), doc: { ...doc, map: { ...doc.map, items: flippable } } })
     const before = useEditor.getState().past.length
     useEditor.getState().setFlipOffer({
-      keys: [b],
+      keys: [b, companion],
       axis: "y",
       own: { item: b, end: 1 },
       other: { item: a, end: 0 }
@@ -200,6 +339,7 @@ describe("flip to fit", () => {
     const item = s.doc.map.items[s.doc.ids.indexOf(b)]
     if (item === undefined) return assert.fail("no item")
     assert.isTrue(mirrorFlagsOf(item).y)
+    assert.isFalse(mirrorFlagsOf(s.doc.map.items[s.doc.ids.indexOf(companion)]!).y)
     assert.closeTo(editTransform(item).translation.y, 400, 1e-6)
     assert.lengthOf(annotationsOf(s.doc.structure).joints, 1)
   })

@@ -7,7 +7,7 @@ import { endsOf, meetingTurn } from "../../domain/connectors"
 import type { UeTransform, Vec3 } from "../../domain/coords"
 import { editTransform } from "../../domain/editTransform"
 import { applyGroupDelta, type RigidDelta } from "../../domain/groupTransform"
-import { type Box, itemsBoxOf, placedBoxOf } from "../../domain/itemBounds"
+import { type Box, itemsBoxOf } from "../../domain/itemBounds"
 import { withFlip } from "../../domain/itemProperties"
 import { connectedKeys } from "../../domain/joints"
 import type { Item } from "../../domain/MapFile"
@@ -38,8 +38,8 @@ import {
   type WorldPlane
 } from "../../domain/snapTools"
 import { annotationsOf, freshKey } from "../../domain/structure"
-import { ORIGIN, rotateVec, vecAdd, vecSub } from "../../domain/ueMath"
-import { applyDelta } from "../../domain/units"
+import { ORIGIN, rotateVec, vecSub } from "../../domain/ueMath"
+import { applyDelta, applyUnitOffsets, carriedKeys, type SelectionUnits, type Unit } from "../../domain/units"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
 import {
   editedKeys,
@@ -86,14 +86,17 @@ const editTransformOf = (s: EditorState, key: string): UeTransform | undefined =
   return item === undefined ? undefined : editTransform(item)
 }
 
-/** The item `key`s through `delta`, and when they are the selection, the links it carries inside an entered chain. */
-const movedBy = (s: EditorState, keys: ReadonlyArray<string>, delta: RigidDelta) => {
-  const selection = keys === s.selectedIds ? selectionUnits(s, (key) => editTransformOf(s, key)) : undefined
-  const reached = selection === undefined ? keys : editedKeys(s)
-  const start = new Map(reached.flatMap((key) => {
+/** The document's transforms of `keys`. */
+const editTransformsOf = (s: EditorState, keys: ReadonlyArray<string>) =>
+  new Map(keys.flatMap((key) => {
     const t = editTransformOf(s, key)
     return t === undefined ? [] : [[key, t] as const]
   }))
+
+/** The item `key`s through `delta`, and when they are the selection, the links it carries inside an entered chain. */
+const movedBy = (s: EditorState, keys: ReadonlyArray<string>, delta: RigidDelta) => {
+  const selection = keys === s.selectedIds ? selectionUnits(s, (key) => editTransformOf(s, key)) : undefined
+  const start = editTransformsOf(s, selection === undefined ? keys : editedKeys(s))
   return selection === undefined
     ? new Map([...start].map(([key, t]) => [key, applyGroupDelta(t, t.translation, delta)] as const))
     : applyDelta(selection, s.pivotMode, start, delta)
@@ -159,49 +162,59 @@ export const startFlush = () =>
 export const setFlushOptions = (options: { readonly mode?: FaceMeeting; readonly offset?: number }) =>
   useEditor.setState((s) => ({ flushMode: options.mode ?? s.flushMode, flushOffset: options.offset ?? s.flushOffset }))
 
-/** Whole-selection boxes, one per item, where the document has them. */
-const selectedBoxes = (s: EditorState): ReadonlyArray<readonly [string, Box]> =>
-  s.selectedIds.flatMap((key) => {
-    const item = s.doc.map.items[s.doc.ids.indexOf(key)]
-    const box = item === undefined ? undefined : itemsBoxOf([item], s.catalogIndex)
-    return box === undefined ? [] : [[key, box] as const]
-  })
+const itemsOf = (s: EditorState, keys: ReadonlyArray<string>) =>
+  keys.flatMap((key) => s.doc.map.items[s.doc.ids.indexOf(key)] ?? [])
 
-const offsetAll = (keys: ReadonlyArray<string>, offsets: ReadonlyArray<Vec3>, description: string) => {
-  const s = useEditor.getState()
-  const moved = new Map(keys.flatMap((key, i) => {
-    const t = editTransformOf(s, key)
-    const offset = offsets[i]
-    return t === undefined || offset === undefined
-      ? []
-      : [[key, { ...t, translation: vecAdd(t.translation, offset) }] as const]
-  }))
-  s.transformItems(fitTransforms(s, moved), { description })
+/** A unit of the selection and the box around all of it. */
+interface UnitBox {
+  readonly unit: Unit
+  readonly box: Box
 }
 
-/** Lines the selection's `side` up on `axis`: on the first selected item, or on the box around them all. */
+/** The selection as units, each with its box where the document has one. */
+const selectedBoxes = (s: EditorState) => {
+  const selection = selectionUnits(s, (key) => editTransformOf(s, key))
+  const boxes = (selection?.units ?? []).flatMap((unit): ReadonlyArray<UnitBox> => {
+    const box = itemsBoxOf(itemsOf(s, unit.keys), s.catalogIndex)
+    return box === undefined ? [] : [{ unit, box }]
+  })
+  return { selection, boxes }
+}
+
+/** Moves each of `boxes`' units whole by its offset, as one undo step. */
+const offsetUnits = (
+  selection: SelectionUnits,
+  boxes: ReadonlyArray<UnitBox>,
+  offsets: ReadonlyArray<Vec3>,
+  description: (count: number) => string
+) => {
+  const s = useEditor.getState()
+  const byUnit = new Map(boxes.map(({ unit }, i) => [unit.id, offsets[i] ?? ORIGIN] as const))
+  const moved = applyUnitOffsets(
+    selection,
+    editTransformsOf(s, editedKeys(s)),
+    (unit) => byUnit.get(unit.id) ?? ORIGIN
+  )
+  s.transformItems(fitTransforms(s, moved), { description: description(moved.size) })
+}
+
+/** Lines the selection's `side` up on `axis`: on the first selected unit, or on the box around them all. */
 export const alignSelection = (axis: BoxAxis, side: BoxSide, to: "first" | "bounds") => {
   const s = useEditor.getState()
-  const boxes = selectedBoxes(s)
-  const first = boxes[0]?.[1]
-  const all = placedBoxOf(
-    s.selectedIds.flatMap((key) => {
-      const item = s.doc.map.items[s.doc.ids.indexOf(key)]
-      return item === undefined ? [] : [{ item, transform: editTransform(item) }]
-    }),
-    s.catalogIndex
-  )
+  const { boxes, selection } = selectedBoxes(s)
+  const first = s.selectedIds.flatMap((key) => boxes.filter(({ unit }) => unit.keys.includes(key)))[0]?.box
+  const all = itemsBoxOf(itemsOf(s, boxes.flatMap(({ unit }) => unit.keys)), s.catalogIndex)
   const reference = to === "first" ? first : all
-  if (reference === undefined || boxes.length < 2) return
-  const offsets = alignOffsets(boxes.map(([, box]) => box), axis, side, reference)
-  offsetAll(boxes.map(([key]) => key), offsets, `Align ${boxes.length} items on ${axis.toUpperCase()}`)
+  if (selection === undefined || reference === undefined || boxes.length < 2) return
+  const offsets = alignOffsets(boxes.map(({ box }) => box), axis, side, reference)
+  offsetUnits(selection, boxes, offsets, (count) => `Align ${count} items on ${axis.toUpperCase()}`)
 }
 
 export const distributeSelection = (axis: BoxAxis, by: Distribution) => {
-  const boxes = selectedBoxes(useEditor.getState())
-  if (boxes.length < 3) return
-  const offsets = distributeOffsets(boxes.map(([, box]) => box), axis, by)
-  offsetAll(boxes.map(([key]) => key), offsets, `Distribute ${boxes.length} items along ${axis.toUpperCase()}`)
+  const { boxes, selection } = selectedBoxes(useEditor.getState())
+  if (selection === undefined || boxes.length < 3) return
+  const offsets = distributeOffsets(boxes.map(({ box }) => box), axis, by)
+  offsetUnits(selection, boxes, offsets, (count) => `Distribute ${count} items along ${axis.toUpperCase()}`)
 }
 
 const round = (value: number) => Math.round(value * 10) / 10
@@ -232,10 +245,15 @@ export const startMeasure = () =>
 
 export const clearMeasurements = () => useEditor.getState().clearMeasurements()
 
-/** Reflects the selection in `plane`, as one undo step. Items that can't flip in the game only move, and it says so. */
+/**
+ * Reflects the selection in `plane`, as one undo step: every unit, and the links it carries inside an entered chain, item
+ * by item, so what they make up comes out as its mirror image. Items that can't flip in the game only move, and it says so.
+ */
 export const mirrorSelection = (plane: MirrorPlane) => {
   const s = useEditor.getState()
-  const placed = s.selectedIds.flatMap((key) => {
+  const selection = selectionUnits(s, (key) => shownTransform(s, key))
+  if (selection === undefined) return
+  const placed = carriedKeys(selection).flatMap((key) => {
     const item = s.doc.map.items[s.doc.ids.indexOf(key)]
     const t = shownTransform(s, key)
     return item === undefined || t === undefined ? [] : [{ key, item, t }]
@@ -246,7 +264,10 @@ export const mirrorSelection = (plane: MirrorPlane) => {
   })
   if (placed.length === 0) return
   const moved = new Map(placed.map(({ key, t }) => [key, mirroredTransform(t, plane)] as const))
-  s.mirrorItems(moved, new Set(flippable.map(({ key }) => key)), "x", { description: `Mirror ${placed.length} items` })
+  s.mirrorItems(moved, new Set(flippable.map(({ key }) => key)), "x", {
+    description: `Mirror ${placed.length} items`,
+    reflection: plane
+  })
   const rigid = placed.length - flippable.length
   if (rigid > 0) {
     s.notify("info", `${rigid} of ${placed.length} pieces can't flip in the game, so they only moved across.`, {
@@ -345,7 +366,7 @@ export const applyFlipOffer = () => {
     const t = editTransformOf(s, key)
     return t === undefined ? [] : [[key, applyGroupDelta(t, t.translation, delta)] as const]
   }))
-  s.mirrorItems(fitTransforms(s, moved), new Set(offer.keys), offer.axis, {
+  s.mirrorItems(fitTransforms(s, moved), new Set([offer.own.item]), offer.axis, {
     description: "Flip to fit",
     connected: true,
     landing: delta

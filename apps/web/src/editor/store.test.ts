@@ -6,6 +6,7 @@ import type { UeTransform, Vec3 } from "../domain/coords"
 import { setLevelNames, withLevelNames } from "../domain/edits"
 import { placementTransform } from "../domain/factory"
 import { nodeKeys } from "../domain/groupSelection"
+import { applyGroupDelta, type RigidDelta } from "../domain/groupTransform"
 import { isPlayerStart } from "../domain/MapFile"
 import { withDifficulty } from "../domain/mapTags"
 import { mirrorFlagsOf } from "../domain/mirror"
@@ -1572,6 +1573,21 @@ describe("groups and the selection", () => {
       return { ...t, translation: { ...t.translation, x: t.translation.x + 300 } }
     }
     assert.closeTo(selectionPivot(state(), live)?.pivot.x ?? 0, 5300, 0.01)
+    const landing: RigidDelta = {
+      kind: "rigid",
+      about: { x: 0, y: 0, z: 0 },
+      offset: { x: 100, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 }
+    }
+    state().setPreview(
+      new Map(keys.map((key) => [key, applyGroupDelta(transformOf(key), { x: 0, y: 0, z: 0 }, landing)])),
+      landing
+    )
+    const previewPivot = selectionPivot(state(), (key) => shownTransform(state(), key))?.pivot
+    assert.closeTo(previewPivot?.x ?? 0, 100, 0.01)
+    assert.closeTo(previewPivot?.y ?? 0, 5000, 0.01)
+    state().setPreview(null)
+    assert.closeTo(selectionPivot(state(), transformOf)?.pivot.x ?? 0, 5000, 0.01)
     // edited, it has no origin left, so it's any group
     moveItem(keys[0]!, { ...transformOf(keys[0]!).translation, x: 9000 })
     assert.isAbove(Math.abs(selectionPivot(state(), transformOf)?.pivot.z ?? 0), 1)

@@ -50,7 +50,7 @@ import {
   selectionNodeIds,
   soleGroupOf
 } from "../domain/groupSelection"
-import type { RigidDelta } from "../domain/groupTransform"
+import { landedPoint, type RigidDelta } from "../domain/groupTransform"
 import { placedBoxOf } from "../domain/itemBounds"
 import { type PropertyChange, withFlip } from "../domain/itemProperties"
 import { jointsAfterMove } from "../domain/joints"
@@ -82,7 +82,7 @@ import { defaultSettings, type Settings } from "../domain/Settings"
 import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
 import type { SnapConfig } from "../domain/snapConfig"
 import type { TrackedPoint } from "../domain/snapFrame"
-import type { FaceMeeting } from "../domain/snapTools"
+import { type FaceMeeting, mirroredPoint, type MirrorPlane } from "../domain/snapTools"
 import {
   annotationsOf,
   copyStructure,
@@ -215,6 +215,8 @@ export interface TransformOptions {
   readonly description?: string | undefined
   /** The move took a target's rotation too, which a Point pivot follows as it wouldn't a turn (`withCarriedPoints`). */
   readonly landing?: RigidDelta | undefined
+  /** The edit reflected what it took in this plane, and a Point pivot goes with it. */
+  readonly reflection?: MirrorPlane | undefined
 }
 
 /** What a current snap says while a drag is under way, for the pane's label and the status bar. */
@@ -561,6 +563,8 @@ export interface EditorState extends TabState {
    * undo and redo wait while it (or lightingPreview) is set.
    */
   readonly preview: ReadonlyMap<string, UeTransform> | null
+  /** The landing the preview is, when it is one: a Point pivot follows that as it wouldn't a turn (`liveLandingOf`). */
+  readonly previewLanding: RigidDelta | null
   /** Live sun settings while a lighting slider or field is dragged; committed on release. */
   readonly lightingPreview: Lighting | null
   /** The points tracking has acquired, oldest first. A drag's working set: never saved, and gone with the tab. */
@@ -755,7 +759,7 @@ export interface EditorState extends TabState {
   readonly setOpenedInGame: (fileName: string | null) => void
   readonly setCheatSheet: (cheatSheet: boolean) => void
   readonly setSettingsCategory: (category: SettingsCategory) => void
-  readonly setPreview: (preview: EditorState["preview"]) => void
+  readonly setPreview: (preview: EditorState["preview"], landing?: RigidDelta) => void
   readonly setLightingPreview: (lighting: Lighting | null) => void
   readonly setCatalog: (catalog: LoadedCatalog) => void
   readonly finishBoot: () => void
@@ -931,6 +935,7 @@ const withMovedItems = (
   options: TransformOptions | undefined,
   catalog: CatalogIndex | null
 ): Doc => {
+  const { landing, reflection } = options ?? {}
   const structure = withCarriedPoints(
     doc.structure,
     (id) => {
@@ -938,7 +943,11 @@ const withMovedItems = (
       return item === undefined ? undefined : editTransform(item)
     },
     transforms,
-    options?.landing
+    landing !== undefined
+      ? (world) => landedPoint(world, landing)
+      : reflection !== undefined
+      ? (world) => mirroredPoint(world, reflection)
+      : undefined
   )
   return withJointsAfter(
     { ...doc, map, structure: structure ?? doc.structure },
@@ -1066,6 +1075,7 @@ export const useEditor = create<EditorState>()((set, get) => {
   /** Interaction state that belongs to the active tab and doesn't survive leaving it. */
   const leftBehind = {
     preview: null,
+    previewLanding: null,
     lightingPreview: null,
     tracked: [],
     snapFeedback: null,
@@ -1122,6 +1132,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     missingGlbs: new Set(),
     clipboard: null,
     preview: null,
+    previewLanding: null,
     lightingPreview: null,
     tracked: [],
     snapFeedback: null,
@@ -1588,7 +1599,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setOpenedInGame: (openedInGame) => set({ openedInGame }),
     setCheatSheet: (cheatSheet) => set({ cheatSheet }),
     setSettingsCategory: (settingsCategory) => set({ settingsCategory }),
-    setPreview: (preview) => set({ preview }),
+    setPreview: (preview, landing) => set({ preview, previewLanding: landing ?? null }),
     setLightingPreview: (lightingPreview) => set({ lightingPreview }),
     setCatalog: (catalog) => set({ catalog, catalogIndex: indexCatalog(catalog.catalog) }),
     finishBoot: () => set({ booting: false }),
@@ -2002,6 +2013,19 @@ export interface SelectionPivot {
   readonly selection: SelectionUnits
 }
 
+/** The landing the preview is, when `transformOf` reads every one of `keys` from it. */
+const liveLandingOf = (
+  { preview, previewLanding }: Pick<EditorState, "preview" | "previewLanding">,
+  transformOf: (id: string) => UeTransform | undefined,
+  keys: ReadonlyArray<string>
+): RigidDelta | undefined => {
+  const live = keys.every((id) => {
+    const shown = preview?.get(id)
+    return shown !== undefined && transformOf(id) === shown
+  })
+  return live && previewLanding !== null ? previewLanding : undefined
+}
+
 /** How the units are read, given how to read an item's transform: the document, or a live edit. */
 const unitContext = (s: EditorState, transformOf: (id: string) => UeTransform | undefined): UnitContext => ({
   tree: s.doc.structure.tree,
@@ -2020,17 +2044,23 @@ const unitContext = (s: EditorState, transformOf: (id: string) => UeTransform | 
   instanceOriginOf: (group) => {
     if (group.prefab === undefined) return undefined
     const origin = instanceOrigin(s.doc, group, group.prefab)
+    const landing = liveLandingOf(s, transformOf, treeKeys([group]))
+    if (origin !== undefined && landing !== undefined) return landedPoint(origin, landing)
     const key = treeKeys([group]).find((id) => transformOf(id) !== undefined)
     const inDoc = key === undefined ? undefined : s.doc.map.items[indexOfKey(s.doc.ids, key)]
     const now = key === undefined ? undefined : transformOf(key)
     if (origin === undefined || inDoc === undefined || now === undefined) return origin
     return vecAdd(origin, vecSub(now.translation, editTransform(inDoc).translation))
   },
-  liveOffsetOf: (keys) =>
-    commonMoveOf(keys, (id) => {
+  livePointOf: (keys, world) => {
+    const landing = liveLandingOf(s, transformOf, keys)
+    if (landing !== undefined) return landedPoint(world, landing)
+    const offset = commonMoveOf(keys, (id) => {
       const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
       return item === undefined ? undefined : editTransform(item)
     }, transformOf)
+    return offset === undefined ? world : vecAdd(world, offset)
+  }
 })
 
 /** The items an edit of the selection reaches (`reachableKeys`): inside an entered chain, the carried links too. */

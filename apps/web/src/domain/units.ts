@@ -11,7 +11,7 @@
 import type { Quat4, UeTransform, Vec3 } from "./coords"
 import { identityTransform } from "./factory"
 import { selectedNodes } from "./groupSelection"
-import { applyGroupDelta, forUnit, type GroupDelta, type RigidDelta } from "./groupTransform"
+import { applyGroupDelta, forUnit, type GroupDelta } from "./groupTransform"
 import type { Box } from "./itemBounds"
 import { boxCentreOf } from "./itemBounds"
 import type { GroupNode, GroupPivot, GroupPivotFace, TreeNode } from "./MapSidecar"
@@ -45,10 +45,10 @@ export interface UnitContext {
   /** A prefab instance's origin as it stands now; undefined for a group that isn't one, or one that was edited. */
   readonly instanceOriginOf: (group: GroupNode) => Vec3 | undefined
   /**
-   * How far a live edit has moved every one of `keys` from the document, when it moved them all alike: what a Point
-   * pivot follows during a drag, before `withCarriedPoints` moves it for good. Undefined for the document itself.
+   * Where a Point pivot at `world` stands while a live edit has `keys` where they are: it follows what `withCarriedPoints`
+   * will move it by for good, a move of them all alike or a landing. Just `world` for the document itself.
    */
-  readonly liveOffsetOf: (keys: ReadonlyArray<string>) => Vec3 | undefined
+  readonly livePointOf: (keys: ReadonlyArray<string>, world: Vec3) => Vec3
 }
 
 const faceOf = (box: Box, face: GroupPivotFace): Vec3 => {
@@ -90,7 +90,7 @@ const groupPivotOf = (
     if (item !== undefined) return { pivot: item.pivot, transform: item.transform }
   }
   if (choice?.choice === "point") {
-    const world = vecAdd(choice.world, ctx.liveOffsetOf(keys) ?? ORIGIN)
+    const world = ctx.livePointOf(keys, choice.world)
     return { pivot: world, transform: identityTransform(world) }
   }
   const box = ctx.boxOf(keys)
@@ -267,6 +267,14 @@ const chainPass = (
   }
 }
 
+/** The items one motion of the whole selection takes: every unit's, and inside an entered chain the links it carries. */
+export const carriedKeys = ({ chain, units }: SelectionUnits): ReadonlyArray<string> => {
+  const selected = new Set(units.map((unit) => unit.id))
+  const first = chain?.findIndex((link) => selected.has(link.id)) ?? -1
+  const carried = chain === undefined || first < 0 ? [] : chain.slice(first).flatMap((link) => link.keys)
+  return [...new Set([...carried, ...units.flatMap((unit) => unit.keys)])]
+}
+
 /**
  * Every selected item through `edit`, by `mode`: Together puts them all through the active unit's edit, so they move
  * as one; Each puts each unit through its own. Inside an entered chain a selected link carries the links after it.
@@ -284,11 +292,9 @@ export const applyUnitEdit = (
   if (effectivePivotMode(mode, selection) === "together") {
     const unit = pivotUnitOf(selection, mode)
     const f = edit(unit)
-    const first = chain?.findIndex((link) => selected.has(link.id)) ?? -1
     // a move or turn of a link carries the links after it; a scale stays with its link
-    const carries = chain !== undefined && first >= 0 && motionOf(f, unit.pivot) !== undefined
-    const keys = carries ? chain.slice(first).flatMap((link) => link.keys) : units.flatMap((u) => u.keys)
-    applyTo(out, keys, transforms, f)
+    const carries = chain !== undefined && motionOf(f, unit.pivot) !== undefined
+    applyTo(out, carries ? carriedKeys(selection) : units.flatMap((u) => u.keys), transforms, f)
     return out
   }
   if (chain !== undefined) {
@@ -313,6 +319,30 @@ export const applyDelta = (
   delta: GroupDelta
 ): ReadonlyMap<string, UeTransform> =>
   applyUnitEdit(selection, delta.kind === "rigid" ? "together" : mode, transforms, deltaEdit(delta))
+
+/**
+ * Each unit moved whole by its own offset, as Align and Distribute do. Inside an entered chain a selected link takes
+ * exactly its offset, and the links after it follow by that offset as far as the next selected link.
+ */
+export const applyUnitOffsets = (
+  { chain, units }: SelectionUnits,
+  transforms: ReadonlyMap<string, UeTransform>,
+  offsetOf: (unit: Unit) => Vec3
+): ReadonlyMap<string, UeTransform> => {
+  const out = new Map<string, UeTransform>()
+  const move = (keys: ReadonlyArray<string>, by: Vec3) =>
+    applyTo(out, keys, transforms, (t) => ({ ...t, translation: vecAdd(t.translation, by) }))
+  const selected = new Map(units.map((unit) => [unit.id, unit]))
+  let carried: Vec3 | undefined
+  for (const link of chain ?? []) {
+    const own = selected.get(link.id)
+    if (own !== undefined) carried = offsetOf(own)
+    if (carried !== undefined) move(link.keys, carried)
+    selected.delete(link.id)
+  }
+  for (const unit of selected.values()) move(unit.keys, offsetOf(unit))
+  return out
+}
 
 /**
  * The items snapping measures an edit by `mode` on: those that take it as the gizmo shows it. In Together that is every
@@ -358,23 +388,19 @@ export const commonMoveOf = (
 /**
  * A Point pivot moves with its group's own moves and is left alone by turns and scales, since it is what they are
  * about (docs/design/pivot-modes-and-chains.md § Group pivot). `after` is an edit about to be committed, and a group
- * whose every item it moved by one offset, with no turn or scale, takes its Point along. `landing` says the edit was a
- * move that took a target's rotation too: every item's turn is the move's and not one about the Point, so a group the
- * edit took whole goes with it. Undefined when no Point moves.
+ * whose every item it moved by one offset, with no turn or scale, takes its Point along. `through` says the edit was one
+ * motion of the world, a landing or a reflection, and where it takes a point: every item's turn is the motion's and not
+ * one about the Point, so a group the edit took whole goes with it. Undefined when no Point moves.
  */
 export const withCarriedPoints = (
   structure: Structure,
   before: (key: string) => UeTransform | undefined,
   after: ReadonlyMap<string, UeTransform>,
-  landing?: RigidDelta
+  through?: (world: Vec3) => Vec3
 ): Structure | undefined => {
   const moved: Array<string> = []
   const carried = (keys: ReadonlyArray<string>, world: Vec3): Vec3 | undefined => {
-    if (landing !== undefined) {
-      return keys.every((key) => after.has(key))
-        ? applyGroupDelta(identityTransform(world), ORIGIN, landing).translation
-        : undefined
-    }
+    if (through !== undefined) return keys.every((key) => after.has(key)) ? through(world) : undefined
     const offset = commonMoveOf(keys, before, (key) => after.get(key))
     return offset === undefined ? undefined : vecAdd(world, offset)
   }

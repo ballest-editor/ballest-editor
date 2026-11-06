@@ -3,6 +3,7 @@
  * the two can't drift apart (docs/DESKTOP.md § Menus).
  */
 import { type RecentProject, RELEASES_URL } from "@ballest/contracts"
+import { selectedNodes } from "../domain/groupSelection"
 import type { KeybindAction } from "../domain/Keybinds"
 import { PROJECTION_ACTIONS } from "../domain/Keybinds"
 import { termsOf } from "../domain/outline"
@@ -169,7 +170,7 @@ export interface MenuState {
   /** What the next undo and redo did, when they say. */
   readonly undoDescription: string | undefined
   readonly redoDescription: string | undefined
-  /** How many items are selected, for what needs a few. */
+  /** How many units the selection makes up (a whole group is one), for what needs a few. */
   readonly selectionCount: number
   /** How many measurements the map keeps. */
   readonly measurements: number
@@ -505,7 +506,7 @@ export const useMenus = (): Menus => {
   const snapping = useEditor(snapConfigOf)
   const undoDescription = useEditor((s) => s.past.at(-1)?.description)
   const redoDescription = useEditor((s) => s.future[0]?.description)
-  const selectionCount = useEditor((s) => s.selectedIds.length)
+  const selectionCount = useEditor((s) => selectedNodes(s.doc.structure.tree, s.selectedIds, s.enteredGroupId).length)
   const measurements = useEditor((s) => annotationsOf(s.doc.structure).measurements.length)
   const layout = useEditor((s) => s.viewLayout)
   const projection = useEditor((s) => s.viewLayout.projections[s.activePane] ?? "perspective")

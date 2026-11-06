@@ -4,7 +4,7 @@
  * The same session measures a turn's and a scale's targets, for the Rotate and Scale rows of Affect.
  */
 import type { WorldEnd } from "../../domain/connectors"
-import type { Quat4, Vec3 } from "../../domain/coords"
+import type { Quat4, UeTransform, Vec3 } from "../../domain/coords"
 import type { GroupDelta } from "../../domain/groupTransform"
 import type { Box } from "../../domain/itemBounds"
 import type { Keybinds } from "../../domain/Keybinds"
@@ -213,6 +213,10 @@ export class MoveSession {
     return this.lastHit
   }
 }
+
+/** Shows a drag's live transforms, and says when `delta` is a landing, which a Point pivot follows. */
+export const previewMove = (next: ReadonlyMap<string, UeTransform>, delta: GroupDelta): void =>
+  useEditor.getState().setPreview(next, delta.kind === "rigid" ? delta : undefined)
 
 /** Shows a hit: its marks in the scene, its words in the pane's corner and the status bar. */
 const publish = (hit: SnapHit | undefined, free: Vec3 | undefined) => {

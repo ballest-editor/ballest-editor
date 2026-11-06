@@ -121,16 +121,19 @@ export interface MirrorPlane {
 
 const reflected = (v: Vec3, normal: Vec3) => vecSub(v, vecScale(normal, 2 * vecDot(v, normal)))
 
+/** Where `plane` reflects a point of the world. */
+export const mirroredPoint = (point: Vec3, { normal, origin }: MirrorPlane): Vec3 =>
+  vecAdd(origin, reflected(vecSub(point, origin), vecNormalize(normal)))
+
 /**
  * `t` reflected in `plane`. A reflection can't be a rotation, so the item also takes a Flip X: its origin is reflected,
  * and its axes are the reflection's with X turned back, which the flip then undoes.
  */
 export const mirroredTransform = <T extends UeTransform>(t: T, plane: MirrorPlane): T => {
   const normal = vecNormalize(plane.normal)
-  const point = vecAdd(plane.origin, reflected(vecSub(t.translation, plane.origin), normal))
   const forward = vecScale(reflected(rotateVec(t.rotation, { x: 1, y: 0, z: 0 }), normal), -1)
   const up = reflected(rotateVec(t.rotation, { x: 0, y: 0, z: 1 }), normal)
-  return { ...t, translation: point, rotation: quatFromFrame(forward, up) }
+  return { ...t, translation: mirroredPoint(t.translation, plane), rotation: quatFromFrame(forward, up) }
 }
 
 const DEFAULT_EXTENT = 1000

@@ -1,17 +1,25 @@
 import { assert, beforeEach, describe, it } from "@effect/vitest"
 import type { Quat4, Vec3 } from "../../domain/coords"
-import type { GroupDelta } from "../../domain/groupTransform"
+import { identityTransform } from "../../domain/factory"
+import { type GroupDelta, landedPoint } from "../../domain/groupTransform"
 import { defaultKeybinds } from "../../domain/Keybinds"
 import { defaultSnapConfig, type SnapConfig } from "../../domain/snapConfig"
 import type { Ray } from "../../domain/snapFrame"
-import { loadPieces } from "../../test/snapFixtures"
+import { findGroup } from "../../domain/structure"
+import { ORIGIN, rotatorToQuat } from "../../domain/ueMath"
+import { applyDelta } from "../../domain/units"
+import { grouped, loadPieces } from "../../test/snapFixtures"
+import { assertVec } from "../../test/vec"
 import { PaneCamera } from "../paneCameras"
-import { useEditor } from "../store"
+import { selectionPivot, shownTransform, useEditor } from "../store"
 import { type DragKeyEvent, handleDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
-import { dragKeysOf, endSnapDisplay, MoveSession } from "./moveSession"
+import { dragKeysOf, endSnapDisplay, MoveSession, type MoveStart, previewMove } from "./moveSession"
+import { selectionSnapStart } from "./selectionStart"
 import { snapMarks } from "./snapMarks"
 import { snapItemsOf } from "./snapScene"
 import { snapViewOf } from "./snapView"
+
+const yawTo = (yaw: number) => rotatorToQuat({ roll: 0, pitch: 0, yaw })
 
 const topPane = () => {
   const pane = new PaneCamera()
@@ -39,7 +47,7 @@ const load = (config: SnapConfig | null) => {
 }
 
 /** A session moving the first item by `pivot`, and how to point at a world position. */
-const moving = (key: string, pivot: Vec3 = { x: 0, y: 0, z: 0 }, frame?: Quat4) => {
+const moving = (key: string, pivot: Vec3 = { x: 0, y: 0, z: 0 }, frame?: Quat4, over: Partial<MoveStart> = {}) => {
   const pane = topPane()
   const view = snapViewOf(pane)
   const rayAt = (x: number, y: number): { readonly ray: Ray; readonly px: { x: number; y: number } } => {
@@ -57,7 +65,8 @@ const moving = (key: string, pivot: Vec3 = { x: 0, y: 0, z: 0 }, frame?: Quat4) 
     frame,
     constraint: { kind: "surface", normal: { x: 0, y: 0, z: 1 } },
     ray: start.ray,
-    px: start.px
+    px: start.px,
+    ...over
   })
   return { rayAt, session, pointAt: (x: number, y: number) => session.update(rayAt(x, y).ray, rayAt(x, y).px, up) }
 }
@@ -352,6 +361,69 @@ describe("MoveSession snap-and-go", () => {
     assert.deepStrictEqual(session.commitOptions(1), {})
     pointPast(2)
     assert.include(session.commitOptions(1).description ?? "", "Move 1 item to corner of ")
+  })
+})
+
+describe("a landing that turns a group with a Point pivot", () => {
+  const WORLD = { x: 950, y: 0, z: 0 }
+
+  /** `a` with its +X end facing +Y, `b` and `c` grouped on a Point, and a live drag bringing `b`'s end up to `a`'s. */
+  const landingDrag = () => {
+    const [a = "", b = "", c = ""] = loadPieces([{ x: 0, y: 0, z: 0 }, { x: 1000, y: 0, z: 0 }, {
+      x: 1500,
+      y: 0,
+      z: 0
+    }])
+    const { connectors } = defaultSnapConfig.targets
+    const grid = { ...defaultSnapConfig.targets.grid, enabled: false }
+    useEditor.getState().setTabSnap(onlyGrid({
+      targets: { ...onlyGrid().targets, connectors: { ...connectors, enabled: true }, grid }
+    }))
+    useEditor.getState().transformItems(new Map([[a, { ...identityTransform(), rotation: yawTo(90) }]]))
+    const id = grouped([b, c])
+    useEditor.getState().setGroupPivot(id, { choice: "point", world: WORLD })
+    useEditor.getState().select([b, c])
+    const s = useEditor.getState()
+    const startTransforms = new Map([b, c].flatMap((key) => {
+      const t = shownTransform(s, key)
+      return t === undefined ? [] : [[key, t] as const]
+    }))
+    const target = selectionPivot(s, (key) => startTransforms.get(key))
+    if (target === undefined) return assert.fail("nothing to drag")
+    const { ends } = selectionSnapStart(s, startTransforms, [b, c])
+    const drag = moving(b, target.pivot, undefined, { keys: new Set([b, c]), ends })
+    // the pointer as far from the pivot as `b`'s -X end is from `a`'s +X end
+    const { delta } = drag.pointAt(WORLD.x - 750, 250)
+    if (delta?.kind !== "rigid") return assert.fail(`the end didn't land: ${delta?.kind}`)
+    const next = applyDelta(target.selection, "together", startTransforms, delta)
+    return { delta, next, session: drag.session, id }
+  }
+  const shownPivot = () => {
+    const s = useEditor.getState()
+    return selectionPivot(s, (key) => shownTransform(s, key))?.pivot ?? ORIGIN
+  }
+
+  it("carries the gizmo with the landing as it shows, and the commit leaves it there", () => {
+    const { delta, next, session } = landingDrag()
+    const landed = landedPoint(WORLD, delta)
+    assert.isAbove(Math.abs(landed.y - WORLD.y), 1, "the landing moves the Point")
+    previewMove(next, delta)
+    assertVec(shownPivot(), landed, "live")
+    const options = session.commitOptions(next.size)
+    useEditor.getState().setPreview(null)
+    useEditor.getState().transformItems(next, options)
+    assertVec(shownPivot(), landed, "committed")
+  })
+
+  it("puts the gizmo back when the drag is cancelled", () => {
+    const { delta, id, next } = landingDrag()
+    previewMove(next, delta)
+    useEditor.getState().setPreview(null)
+    assertVec(shownPivot(), WORLD, "the Point it had")
+    assert.deepStrictEqual(findGroup(useEditor.getState().doc.structure.tree, id)?.pivot, {
+      choice: "point",
+      world: WORLD
+    })
   })
 })
 

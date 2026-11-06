@@ -21,7 +21,7 @@ import { type PaneCamera, type PanePointer, panePointer } from "../paneCameras"
 import { useBeforePaneDraw } from "../PaneRenderer"
 import { sceneRegistry } from "../sceneRegistry"
 import { type DragKeyState, handleDragKey, seedDragKeys, syncDragKeys } from "../snap/dragKeys"
-import { dragKeysOf, endSnapDisplay, flipOfferOf, MoveSession, showSnap } from "../snap/moveSession"
+import { dragKeysOf, endSnapDisplay, flipOfferOf, MoveSession, previewMove, showSnap } from "../snap/moveSession"
 import { baseFaceOf, type DragTarget, dragTargetOf, selectionSnapStart } from "../snap/selectionStart"
 import { snapItemsOf } from "../snap/snapScene"
 import { gameRayOf, snapViewOf, toThree } from "../snap/snapView"
@@ -399,7 +399,7 @@ export function GizmoController() {
       )
       active.last = next
       applyToObjects(next)
-      useEditor.getState().setPreview(next)
+      previewMove(next, delta)
     }
 
     const onPointerUp = (e: PointerEvent) => {

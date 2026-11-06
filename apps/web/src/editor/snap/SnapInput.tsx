@@ -14,7 +14,7 @@ import { type PaneCamera, panePointer } from "../paneCameras"
 import { sceneRegistry } from "../sceneRegistry"
 import { fitTransforms, type PickerRequest, snapConfigOf, useEditor } from "../store"
 import { type DragKeyState, handleDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
-import { dragKeysOf, endSnapDisplay, flipOfferOf, MoveSession } from "./moveSession"
+import { dragKeysOf, endSnapDisplay, flipOfferOf, MoveSession, previewMove } from "./moveSession"
 import { hitUnder, pickedOf } from "./pickTarget"
 import { dragTargetOf, selectionSnapStart } from "./selectionStart"
 import { snapMarks } from "./snapMarks"
@@ -56,8 +56,6 @@ const surfaceOf = (pane: PaneCamera): Constraint => ({
     ? { x: 0, y: 0, z: 1 }
     : toGame(pane.camera.getWorldDirection(new THREE.Vector3()).normalize())
 })
-
-const applyToObjects = (transforms: ReadonlyMap<string, UeTransform>) => useEditor.getState().setPreview(transforms)
 
 const itemUnder = (el: HTMLElement, e: PointerEvent, raycaster: THREE.Raycaster, slot?: number): string | null => {
   const { ndc, pane } = panePointer(el, e, slot)
@@ -143,7 +141,7 @@ export function SnapInput() {
       if (delta === undefined) return
       const next = fitTransforms(s, applyDelta(active.selection, active.pivotMode, active.startTransforms, delta))
       active.last = next
-      applyToObjects(next)
+      previewMove(next, delta)
     }
 
     const stopHover = () => {
