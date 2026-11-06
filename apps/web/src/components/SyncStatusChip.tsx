@@ -40,10 +40,11 @@ const WRITE_ICONS: Record<GameWrite["intent"], ComponentType<{ readonly classNam
 /** A tone's fill and text, and the hover a chip gets when it renders as a button. */
 const TONES: Record<SyncTone, string> = {
   neutral:
-    "bg-status-neutral text-status-neutral-foreground [button]:hover:bg-status-neutral/80 [button]:aria-expanded:bg-status-neutral/80",
-  ok: "bg-status-ok text-status-ok-foreground [button]:hover:bg-status-ok/80 [button]:aria-expanded:bg-status-ok/80",
+    "bg-status-neutral text-status-neutral-foreground [button]:hover:lift-status-neutral [button]:active:press-status-neutral [button]:aria-expanded:lift-status-neutral",
+  ok:
+    "bg-status-ok text-status-ok-foreground [button]:hover:lift-status-ok [button]:active:press-status-ok [button]:aria-expanded:lift-status-ok",
   warn:
-    "bg-status-warn text-status-warn-foreground [button]:hover:bg-status-warn/80 [button]:aria-expanded:bg-status-warn/80"
+    "bg-status-warn text-status-warn-foreground [button]:hover:lift-status-warn [button]:active:press-status-warn [button]:aria-expanded:lift-status-warn"
 }
 
 /**
@@ -56,7 +57,7 @@ export function StatusChip(
   return (
     <Badge
       variant="neutral"
-      className={cn("rounded-full outline-none transition-none [&>svg]:size-3.5!", TONES[tone], className)}
+      className={cn("rounded-full transition-none focus-ring [&>svg]:size-3.5!", TONES[tone], className)}
       {...props}
     />
   )

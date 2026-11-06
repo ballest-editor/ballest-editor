@@ -320,7 +320,7 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
           <li key={name}>
             <button
               type="button"
-              className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-150 ease-out outline-none hover:bg-accent focus-visible:bg-accent"
+              className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors focus-ring-inset hover:bg-hover active:bg-pressed"
               onClick={() => {
                 setShown(shows)
                 setAll(false)

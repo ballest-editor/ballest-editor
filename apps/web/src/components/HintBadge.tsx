@@ -8,7 +8,7 @@ export const HintBadge = ({ label, children }: { readonly label: string; readonl
   <Tooltip>
     <TooltipTrigger
       aria-label={`${label}: ${children}`}
-      className={cn(badgeVariants({ variant: "secondary" }), CHIP, "cursor-help outline-none")}
+      className={cn(badgeVariants({ variant: "secondary" }), CHIP, "cursor-help focus-ring")}
     >
       {label}
     </TooltipTrigger>

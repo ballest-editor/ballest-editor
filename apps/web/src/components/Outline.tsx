@@ -430,7 +430,7 @@ export function Outline() {
             role="tree"
             aria-label="Outline"
             tabIndex={0}
-            className={cn("relative min-h-full outline-none", dragging && "cursor-grabbing")}
+            className={cn("relative min-h-full focus-ring-inset", dragging && "cursor-grabbing")}
             style={{ height: rows.length * OUTLINE_ROW_HEIGHT }}
             onClick={(e) => {
               if (dragged.current) return

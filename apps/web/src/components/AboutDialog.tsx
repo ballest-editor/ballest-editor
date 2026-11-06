@@ -66,7 +66,7 @@ function TextLink({ children, onClick }: { readonly children: string; readonly o
   return (
     <button
       type="button"
-      className="rounded-control underline underline-offset-3 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      className="rounded-control underline underline-offset-3 focus-ring hover:text-foreground"
       onClick={onClick}
     >
       {children}

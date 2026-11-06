@@ -15,7 +15,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { Fragment, type ReactNode, useState } from "react"
 
 /** The page or scope that's open in the sidebar: the selection's wash, which a hover doesn't change. */
-const SELECTED = "bg-primary/12 text-foreground hover:bg-primary/12"
+const SELECTED = "bg-selected text-foreground hover:bg-selected"
 
 /** One searchable setting. `group` is a sub-heading inside the category (keybind sections). */
 export interface SettingsRow<C extends string> {

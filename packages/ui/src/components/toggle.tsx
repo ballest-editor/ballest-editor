@@ -3,7 +3,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { cva, type VariantProps } from "class-variance-authority"
 
 const toggleVariants = cva(
-  "group/toggle inline-flex items-center justify-center gap-1 rounded-control text-body-strong whitespace-nowrap transition-all outline-none hover:bg-foreground/6 hover:text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 active:scale-[0.97] disabled:pointer-events-none disabled:text-fg-disabled aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-primary/12 aria-pressed:text-foreground dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/toggle inline-flex items-center justify-center gap-1 rounded-control text-body-strong whitespace-nowrap transition-all focus-ring hover:bg-hover hover:text-foreground active:scale-[0.97] active:bg-pressed disabled:pointer-events-none disabled:text-fg-disabled aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-selected aria-pressed:text-foreground aria-pressed:hover:lift-selected aria-pressed:active:press-selected dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {

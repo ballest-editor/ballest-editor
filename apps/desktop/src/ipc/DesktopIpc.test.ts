@@ -58,7 +58,7 @@ describe("DesktopIpc", () => {
         assert.deepStrictEqual(recoloured, [[1, {
           overlay: { color: "#01000000", symbolColor: "#393d42", height: 40 },
           popoutOverlay: { color: "#01000000", symbolColor: "#393d42", height: 32 },
-          background: "#f3f5f6"
+          background: "#eef1f3"
         }]])
         assert.match(
           String((yield* Effect.flip(fake.invoke(InvokeChannels.setWindowTheme, { dark: "yes" }))).cause),

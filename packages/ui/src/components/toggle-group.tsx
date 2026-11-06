@@ -84,7 +84,7 @@ const pillVariants = cva(
 
 /** The item's size inside a track: the track's 2px of padding each side keep the whole group on the control heights. */
 const itemVariants = cva(
-  "relative z-1 inline-flex shrink-0 items-center justify-center gap-1 rounded-[calc(var(--radius-control)-2px)] text-body-strong whitespace-nowrap text-fg-secondary transition-colors outline-none group-[.rounded-full]/toggle-group:rounded-full hover:bg-foreground/6 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:text-fg-disabled aria-pressed:text-foreground aria-pressed:hover:bg-transparent group-data-multiple/toggle-group:aria-pressed:bg-primary/12 group-data-[pill=primary]/toggle-group:aria-pressed:text-primary-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "relative z-1 inline-flex shrink-0 items-center justify-center gap-1 rounded-[calc(var(--radius-control)-2px)] text-body-strong whitespace-nowrap text-fg-secondary transition-colors focus-ring group-[.rounded-full]/toggle-group:rounded-full hover:bg-hover hover:text-foreground active:bg-pressed disabled:pointer-events-none disabled:text-fg-disabled aria-pressed:text-foreground aria-pressed:hover:bg-transparent aria-pressed:active:bg-transparent group-data-multiple/toggle-group:aria-pressed:bg-selected group-data-multiple/toggle-group:aria-pressed:hover:lift-selected group-data-multiple/toggle-group:aria-pressed:active:press-selected group-data-[pill=primary]/toggle-group:aria-pressed:text-primary-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       size: {

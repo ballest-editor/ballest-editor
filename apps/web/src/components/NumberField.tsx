@@ -206,7 +206,7 @@ export function NumberField(props: {
     }
   })
   return (
-    <div className="flex h-7 min-w-0 overflow-hidden rounded-control border border-border/70 bg-input transition-colors duration-150 ease-out focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30 dark:bg-input/30">
+    <div className="flex h-7 min-w-0 overflow-hidden rounded-control border border-border/70 bg-input focus-ring-within dark:bg-input/30">
       {props.handle !== false && (
         <Label
           htmlFor={id}
@@ -228,7 +228,7 @@ export function NumberField(props: {
         aria-label={props.handle === false ? props.label : undefined}
         inputMode="decimal"
         className={cn(
-          "h-full min-w-0 rounded-none border-0 bg-transparent px-1 py-0 text-right font-mono tabular-nums leading-none focus-visible:border-0 focus-visible:ring-0 md:leading-none dark:bg-transparent",
+          "h-full min-w-0 rounded-none border-0 bg-transparent px-1 py-0 text-right font-mono tabular-nums leading-none focus-visible:outline-none md:leading-none dark:bg-transparent",
           scrubbable && "cursor-ew-resize focus:cursor-text"
         )}
         value={text}

@@ -1,8 +1,8 @@
 /**
  * The game's sky as a three.js material (see domain/sky for where each term comes from).
  * `dome` draws the visible sky, with the sun disc and stars, hazing out over the far floor
- * (`uClipY`) so the clear colour shows nearer in; `backdrop` draws it flat behind an orthographic
- * pane that asks for it; `capture` draws the same sky without the sun, and with the arena below
+ * (`uClipY`) so the clear colour shows nearer in, and in dark towards the pane's top edge; `backdrop` draws it flat behind an
+ * orthographic pane that asks for it; `capture` draws the same sky without the sun, and with the arena below
  * `ARENA_RIM`, for the environment map the scene is lit by (the game's sky light is a real-time
  * capture of this sky).
  */
@@ -22,6 +22,15 @@ export const SKY_HAZE_BELOW = { dark: SKY_DOME_RADIUS * 0.12, light: SKY_DOME_RA
 const SKY_HAZE_ABOVE = SKY_DOME_RADIUS * 0.05
 
 /**
+ * How much the sky fades out towards the top of a pane, where the pane meets the chrome: all of it in dark, so a bright
+ * horizon can't sit against the near-black strip above it. It goes by the pane and not the sky, so it holds wherever the
+ * camera points. The sky has gone by `SKY_PANE_TOP_END`, in the pane's height from -1 to 1 (the top 25 px of 1,000).
+ */
+export const SKY_PANE_TOP_FADE = { dark: 1, light: 0 } as const
+const SKY_PANE_TOP_START = 0.45
+const SKY_PANE_TOP_END = 0.95
+
+/**
  * GLSL: how far the sky has faded in (0 to 1) along direction `d`, over a floor at `clipY`. It measures how far above the
  * floor `d` meets the dome. The water thins out by the same curve, so the two cross over with nothing showing between.
  */
@@ -37,6 +46,7 @@ const SKY_EXPOSURE = 1.6
 
 const vertexShader = /* glsl */ `
 varying vec3 vDir;
+varying vec2 vPaneY;
 void main() {
   #ifdef BALLEST_BACKDROP
     // The whole pane, whatever the camera: no direction is "up" in it, so the horizon is at its foot and the zenith at its head.
@@ -46,6 +56,7 @@ void main() {
     vDir = position; // the dome is centred on the camera
     gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
   #endif
+  vPaneY = gl_Position.yw;
 }
 `
 
@@ -61,7 +72,9 @@ uniform float uGain;
 uniform vec3 uGround;
 uniform float uClipY;
 uniform float uHazeBelow;
+uniform float uPaneTopFade;
 varying vec3 vDir;
+varying vec2 vPaneY;
 ${SKY_HAZE_GLSL}
 float ballestHash( vec2 p ) {
   return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 );
@@ -89,6 +102,9 @@ void main() {
     #ifndef BALLEST_BACKDROP
       // From the exact direction, not the faceted mesh.
       alpha = ballestSkyHaze( d, uClipY, uHazeBelow );
+      alpha *= 1.0 - uPaneTopFade * smoothstep( ${SKY_PANE_TOP_START.toFixed(2)}, ${
+  SKY_PANE_TOP_END.toFixed(2)
+}, vPaneY.x / vPaneY.y );
       if ( alpha <= 0.0 ) discard;
     #endif
     color += uSun * clamp( 1.0 - abs( dot( d, uToSun ) - 1.0 ) / ${SUN_RADIUS.toFixed(6)}, 0.0, 1.0 );
@@ -129,7 +145,8 @@ const skyUniforms = (kind: SkyKind) => ({
   uGround: { value: new THREE.Color() },
   /** World height (scene units) of the grid, which the visible dome's fade is measured from. */
   uClipY: { value: -Infinity },
-  uHazeBelow: { value: SKY_HAZE_BELOW.light }
+  uHazeBelow: { value: SKY_HAZE_BELOW.light },
+  uPaneTopFade: { value: SKY_PANE_TOP_FADE.light as number }
 })
 
 /**

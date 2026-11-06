@@ -299,7 +299,7 @@ export function Palette() {
                     <TooltipTrigger
                       render={
                         <CollapsibleTrigger
-                          className="group flex h-8 w-full items-center gap-1.5 rounded-control px-1.5 text-caption uppercase tracking-wider text-fg-secondary transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:outline-none"
+                          className="group flex h-8 w-full items-center gap-1.5 rounded-control px-1.5 text-caption uppercase tracking-wider text-fg-secondary transition-colors focus-ring hover:bg-hover hover:text-foreground active:bg-pressed"
                           onMouseDown={(e) => e.preventDefault()}
                         />
                       }

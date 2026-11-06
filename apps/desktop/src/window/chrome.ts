@@ -51,7 +51,7 @@ export const popoutOverlay = (overlay: Electron.TitleBarOverlayOptions): Electro
 })
 
 /** The page's `--background`, so a resize never flashes the other theme's colour. */
-export const windowBackground = (dark: boolean): string => dark ? "#0b0d0f" : "#f3f5f6"
+export const windowBackground = (dark: boolean): string => dark ? "#0b0d0f" : "#eef1f3"
 
 /**
  * The application menu of unpackaged builds, for its reload and DevTools keys. Nothing here may close the window:
