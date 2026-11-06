@@ -3,9 +3,8 @@ import { elementOf, isEditorKeyEvent } from "../../editor/keyTargets"
 import { followDockDrags } from "./dragImage"
 
 /**
- * Chrome is for the mouse: after a pointer click it gives focus back, so a later Space or Enter can't re-trigger it and
- * editor keybinds keep working. Not in dialogs, nor in the menu bar: its menus open in the next frame and would close
- * on the blur (they hand focus back themselves when they close). Returns how to stop.
+ * Chrome hands focus back after a pointer click (docs/DESKTOP.md § Dock). Not in dialogs, nor in the menu bar: its menus
+ * open in the next frame and would close on the blur, and they hand focus back themselves. Returns how to stop.
  */
 export const blurChromeAfterClick = (document: Document): () => void => {
   const onPointerUp = (e: PointerEvent) => {
@@ -21,8 +20,8 @@ export const blurChromeAfterClick = (document: Document): () => void => {
 
 /**
  * Makes a popped-out panel's window part of the editor. It follows the main window's theme and animation speed (both
- * live on <html>), its chrome hands focus back, its drags look like the main window's, and the keys it doesn't use go to the main window, where the keybinds
- * listen. Dockview has already copied the stylesheets over. Returns how to stop.
+ * live on <html>), its chrome hands focus back, its drags look like the main window's, and the keys it doesn't use go
+ * to the main window, where the keybinds listen. Dockview has already copied the stylesheets over. Returns how to stop.
  */
 export const adoptPopoutWindow = (popout: Window, title: string): () => void => {
   popout.document.title = title
@@ -40,21 +39,18 @@ export const adoptPopoutWindow = (popout: Window, title: string): () => void => 
 
   const stopBlurring = blurChromeAfterClick(popout.document)
   const stopFollowingDrags = followDockDrags(popout.document)
-  const forwardDown = (e: KeyboardEvent) => {
+  const forwarding = new AbortController()
+  const { signal } = forwarding
+  popout.addEventListener("keydown", (e) => {
     if (isEditorKeyEvent(e) && !window.dispatchEvent(new KeyboardEvent(e.type, e))) e.preventDefault()
-  }
-  const forwardUp = (e: KeyboardEvent) => void window.dispatchEvent(new KeyboardEvent(e.type, e))
+  }, { signal })
+  popout.addEventListener("keyup", (e) => void window.dispatchEvent(new KeyboardEvent(e.type, e)), { signal })
   // held keys stop flying when the focus leaves, as they do in the main window
-  const forwardBlur = () => void window.dispatchEvent(new Event("blur"))
-  popout.addEventListener("keydown", forwardDown)
-  popout.addEventListener("keyup", forwardUp)
-  popout.addEventListener("blur", forwardBlur)
+  popout.addEventListener("blur", () => void window.dispatchEvent(new Event("blur")), { signal })
   return () => {
     observer.disconnect()
     stopBlurring()
     stopFollowingDrags()
-    popout.removeEventListener("keydown", forwardDown)
-    popout.removeEventListener("keyup", forwardUp)
-    popout.removeEventListener("blur", forwardBlur)
+    forwarding.abort()
   }
 }

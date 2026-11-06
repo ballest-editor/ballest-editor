@@ -10,7 +10,6 @@ import {
   type DockLocation,
   DOCUMENTS_PANEL,
   fitToWindow,
-  newPanels,
   onlyPanels,
   parseSavedDock,
   unfoldedLayout
@@ -19,37 +18,33 @@ import { useEditor } from "../../editor/store"
 import type { DockPanel } from "./panels"
 import { adoptPopoutWindow } from "./popoutWindow"
 
-/** What a group in a stack folds down to: its tab strip, `h-8` like the document tabs. */
-const COLLAPSED_HEIGHT = 32
-/** What a column by the viewport folds down to: the rail of its panels' titles. dock.css draws it. */
-const RAIL_WIDTH = 28
+/** A column by the viewport folds to the rail dock.css draws, a group in a stack to its strip (`h-8`, as the map tabs). */
+const FOLDED_SIZE = { width: 28, height: 32 }
 const SIDE_SIZES: Record<DockLocation, number> = { left: 260, right: 300, bottom: 240 }
-/** The viewport never gets narrower or shorter than this when a panel is dragged wider. */
 const MIN_VIEWPORT = { width: 320, height: 200 }
 const MIN_GROUP = { width: 180, height: 120 }
-/** A popped-out panel's window starts at least this big, whatever the group it left. */
 const MIN_POPOUT = { width: 320, height: 360 }
 const SAVE_DELAY_MS = 250
 
-interface Disposable {
-  readonly dispose: () => void
-}
+type Axis = CollapsedGroup["axis"]
 
 let dock: DockviewApi | null = null
 /** The panel registry, handed over by `Dock`: this module is in the page's first chunk, and the panels aren't. */
 let dockPanels: ReadonlyArray<DockPanel> = []
-/** Everything following the dock; replaced when the dock is. */
-let following: ReadonlyArray<Disposable> = []
+let stopFollowing = () => {}
 /** Folded groups by id. Saved with the layout: dockview keeps their size and header position, not what they were. */
 const collapsed = new Map<string, CollapsedGroup>()
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 
 let openPanels: ReadonlySet<string> = new Set()
+/** What renders from the dock: the View menus' checks, and whatever shows a group folded. */
 const dockListeners = new Set<() => void>()
+const notifyDock = () => {
+  for (const listener of dockListeners) listener()
+}
 
 const centreGroupOf = (api: DockviewApi): DockviewGroupPanel | undefined => api.getPanel(DOCUMENTS_PANEL)?.group
 
-/** Whether `group` is the centre group: the one the map tabs and viewport live in. */
 export const isCentreGroup = (group: DockviewGroupPanel): boolean =>
   group.panels.some((panel) => panel.id === DOCUMENTS_PANEL)
 
@@ -61,17 +56,6 @@ const panelOptions = (panel: DockPanel) => ({
   minimumWidth: panel.minimumWidth ?? MIN_GROUP.width,
   minimumHeight: MIN_GROUP.height
 })
-
-const addDocumentsPanel = (api: DockviewApi) =>
-  api.addPanel({
-    id: DOCUMENTS_PANEL,
-    component: DOCUMENTS_PANEL,
-    tabComponent: "hidden",
-    title: "Maps",
-    renderer: "onlyWhenVisible",
-    minimumWidth: MIN_VIEWPORT.width,
-    minimumHeight: MIN_VIEWPORT.height
-  })
 
 /** Adds `panel` where it belongs: with the panels of its location if any are docked, else beside the centre. */
 const addPanel = (api: DockviewApi, panel: DockPanel, inactive = false): IDockviewPanel | null => {
@@ -98,7 +82,15 @@ const addDefaultPanels = (api: DockviewApi) => {
 const defaultLayout = (api: DockviewApi) => {
   api.clear()
   collapsed.clear()
-  const documents = addDocumentsPanel(api)
+  const documents = api.addPanel({
+    id: DOCUMENTS_PANEL,
+    component: DOCUMENTS_PANEL,
+    tabComponent: "hidden",
+    title: "Maps",
+    renderer: "onlyWhenVisible",
+    minimumWidth: MIN_VIEWPORT.width,
+    minimumHeight: MIN_VIEWPORT.height
+  })
   giveResizesToCentre(documents.group)
   addDefaultPanels(api)
 }
@@ -133,7 +125,8 @@ const restoreSaved = (api: DockviewApi): boolean => {
     if (group !== undefined) fold(group, axis)
   }
   const lost = dockPanels.filter((panel) => loose.includes(panel.id))
-  for (const panel of [...lost, ...newPanels(dockPanels, saved.known)]) addPanel(api, panel, true)
+  const added = dockPanels.filter((panel) => !saved.known.includes(panel.id))
+  for (const panel of [...lost, ...added]) addPanel(api, panel, true)
   return true
 }
 
@@ -169,21 +162,24 @@ const save = (api: DockviewApi) => {
 
 const notifyOpenPanels = (api: DockviewApi) => {
   openPanels = new Set(api.panels.map((panel) => panel.id))
-  for (const listener of dockListeners) listener()
+  notifyDock()
 }
 
-const fold = (group: DockviewGroupPanel, axis: CollapsedGroup["axis"]) => {
-  collapsed.set(group.id, { axis, size: axis === "width" ? group.width : group.height })
+const sizeAlong = (group: DockviewGroupPanel, axis: Axis, size: number, min: number, max: number) => {
+  group.api.setConstraints(
+    axis === "width" ? { minimumWidth: min, maximumWidth: max } : { minimumHeight: min, maximumHeight: max }
+  )
+  group.api.setSize({ [axis]: size })
+}
+
+const fold = (group: DockviewGroupPanel, axis: Axis) => {
+  collapsed.set(group.id, { axis, size: group[axis] })
   if (axis === "width") {
     group.element.dataset["dockRail"] = ""
     group.api.setHeaderPosition("left")
-    group.api.setConstraints({ minimumWidth: RAIL_WIDTH, maximumWidth: RAIL_WIDTH })
-    group.api.setSize({ width: RAIL_WIDTH })
-  } else {
-    group.api.setConstraints({ minimumHeight: COLLAPSED_HEIGHT, maximumHeight: COLLAPSED_HEIGHT })
-    group.api.setSize({ height: COLLAPSED_HEIGHT })
   }
-  notifyCollapsed()
+  sizeAlong(group, axis, FOLDED_SIZE[axis], FOLDED_SIZE[axis], FOLDED_SIZE[axis])
+  notifyDock()
 }
 
 /**
@@ -193,11 +189,8 @@ const fold = (group: DockviewGroupPanel, axis: CollapsedGroup["axis"]) => {
 const giveResizesToCentre = (centre: DockviewGroupPanel) =>
   Object.defineProperty(centre, "priority", { value: "high", configurable: true })
 
-interface Sizing {
-  readonly type: string
-}
 interface GridviewInternals {
-  readonly gridview: { remove: (view: unknown, sizing?: Sizing) => unknown }
+  readonly gridview: { remove: (view: unknown, sizing?: { readonly type: string }) => unknown }
 }
 
 /**
@@ -230,12 +223,11 @@ const gridOf = (api: DockviewApi) => (api.toJSON() as unknown as DockLayout).gri
 /** A panel dropped beside the centre takes its usual room. Dockview would give it half of the viewport. */
 const fitBesideCentre = (api: DockviewApi, group: DockviewGroupPanel) => {
   const axis = axisBesideCentre(gridOf(api), group.id)
-  if (axis === "width") group.api.setSize({ width: SIDE_SIZES.right })
-  if (axis === "height") group.api.setSize({ height: SIDE_SIZES.bottom })
+  if (axis !== null) group.api.setSize({ [axis]: axis === "width" ? SIDE_SIZES.right : SIDE_SIZES.bottom })
 }
 
 /** Follows `api`: saves the layout as it changes, keeps the View menu in step, adopts popped-out windows. */
-const followDock = (api: DockviewApi): ReadonlyArray<Disposable> => {
+const followDock = (api: DockviewApi): () => void => {
   const scheduleSave = () => {
     clearTimeout(saveTimer)
     saveTimer = setTimeout(() => save(api), SAVE_DELAY_MS)
@@ -250,7 +242,7 @@ const followDock = (api: DockviewApi): ReadonlyArray<Disposable> => {
     // a dialog shows in the main window, even when a popped-out panel asked for it
     if (state.dialog !== null && previous.dialog === null) window.focus()
   })
-  return [
+  const listeners = [
     api.onDidLayoutChange(scheduleSave),
     api.onDidAddPanel((panel) => {
       expandGroup(panel.group)
@@ -285,26 +277,25 @@ const followDock = (api: DockviewApi): ReadonlyArray<Disposable> => {
     api.onWillShowOverlay((event) => {
       const { group } = event
       if (group !== undefined && isCentreGroup(group) && event.position === "center") event.preventDefault()
-    }),
-    { dispose: stopFollowingStore },
-    {
-      dispose: () => {
-        window.removeEventListener("pagehide", flush)
-        clearTimeout(saveTimer)
-        for (const stop of popouts.values()) stop()
-      }
-    }
+    })
   ]
+  return () => {
+    for (const listener of listeners) listener.dispose()
+    stopFollowingStore()
+    window.removeEventListener("pagehide", flush)
+    clearTimeout(saveTimer)
+    for (const stop of popouts.values()) stop()
+  }
 }
 
 /** Takes over a newly mounted dock: the saved layout, or the default one when that's missing or broken. */
 export const attachDock = (api: DockviewApi, panels: ReadonlyArray<DockPanel>): void => {
-  for (const follower of following) follower.dispose()
+  stopFollowing()
   dock = api
   dockPanels = panels
   if (!restoreSaved(api)) defaultLayout(api)
   keepSizesWhenGroupsGo(api)
-  following = followDock(api)
+  stopFollowing = followDock(api)
   notifyOpenPanels(api)
 }
 
@@ -325,7 +316,6 @@ export const togglePanel = (id: string): void => {
   else if (spec !== undefined) addPanel(dock, spec)
 }
 
-/** Pops the panel out into a window of its own. Closing that window docks it again. */
 export const popOutPanel = (panel: IDockviewPanel): void => {
   expandGroup(panel.group)
   const { left, top, width, height } = panel.group.element.getBoundingClientRect()
@@ -340,18 +330,14 @@ export const popOutPanel = (panel: IDockviewPanel): void => {
   })
 }
 
-const collapseAxisOf = (group: DockviewGroupPanel): CollapsedGroup["axis"] | null =>
+const collapseAxisOf = (group: DockviewGroupPanel): Axis | null =>
   dock === null || isCentreGroup(group) || collapsed.has(group.id)
     ? null
     : collapseAxis(gridOf(dock), group.id, new Set(collapsed.keys()))
 
-/** Whether `group` can fold: there's somewhere for its space to go. */
 export const canCollapseGroup = (group: DockviewGroupPanel): boolean => collapseAxisOf(group) !== null
 
-/**
- * Folds `group` down: a column by the viewport to a rail of its panels' titles, a group in a stack to its header. Does
- * nothing when there's nowhere for the space to go.
- */
+/** Folds `group`, when there's somewhere for its space to go. */
 export const collapseGroup = (group: DockviewGroupPanel): void => {
   const axis = collapseAxisOf(group)
   if (axis !== null) fold(group, axis)
@@ -362,38 +348,22 @@ export const expandGroup = (group: DockviewGroupPanel): void => {
   const folded = collapsed.get(group.id)
   if (folded === undefined) return
   collapsed.delete(group.id)
-  const widest = Number.MAX_SAFE_INTEGER
   if (folded.axis === "width") {
     delete group.element.dataset["dockRail"]
     group.api.setHeaderPosition("top")
-    group.api.setConstraints({ minimumWidth: MIN_GROUP.width, maximumWidth: widest })
-    group.api.setSize({ width: folded.size })
-  } else {
-    group.api.setConstraints({ minimumHeight: MIN_GROUP.height, maximumHeight: widest })
-    group.api.setSize({ height: folded.size })
   }
-  notifyCollapsed()
+  sizeAlong(group, folded.axis, folded.size, MIN_GROUP[folded.axis], Number.MAX_SAFE_INTEGER)
+  notifyDock()
 }
-
-const collapsedListeners = new Set<() => void>()
-function notifyCollapsed() {
-  for (const listener of collapsedListeners) listener()
-}
-
-/** The way `group` is folded, if it is, following it. */
-export const useGroupFold = (group: DockviewGroupPanel): CollapsedGroup["axis"] | undefined =>
-  useSyncExternalStore(
-    (listener) => {
-      collapsedListeners.add(listener)
-      return () => collapsedListeners.delete(listener)
-    },
-    () => collapsed.get(group.id)?.axis
-  )
 
 const followDockChanges = (listener: () => void) => {
   dockListeners.add(listener)
   return () => dockListeners.delete(listener)
 }
+
+/** The way `group` is folded, if it is, following it. */
+export const useGroupFold = (group: DockviewGroupPanel): Axis | undefined =>
+  useSyncExternalStore(followDockChanges, () => collapsed.get(group.id)?.axis)
 
 /** A checkbox menu item for panel `id`: checked while it's open anywhere in the dock, and toggling it. */
 export const usePanelCheck = (id: string) => ({
@@ -402,6 +372,5 @@ export const usePanelCheck = (id: string) => ({
   onCheckedChange: () => togglePanel(id)
 })
 
-/** The panels the menus close and reopen. */
 export const useViewMenuPanels = (): ReadonlyArray<DockPanel> =>
   useSyncExternalStore(followDockChanges, () => dockPanels)

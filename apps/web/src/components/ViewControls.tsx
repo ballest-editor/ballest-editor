@@ -14,51 +14,17 @@ import { GROUP, noFocus, POPUP_OFFSET } from "./viewControlStyle"
 import { ViewLayoutControl, ViewPanes } from "./ViewPanes"
 
 /**
- * Floating view controls, top-right of the viewport, like the game's: how the view divides into panes, the
- * gizmo's local (cube) or world (globe) axes, then grid and rotation snapping, each in its own group. Icons are
- * named in their tooltips.
- * Pointer-only like the tool bar, so keybinds stay with the viewport.
+ * Everything floating over the viewport: its panes' frames, the tool bar (bottom) and, top right like the game's, how the
+ * view divides into panes, the gizmo's local (cube) or world (globe) axes, then grid and rotation snapping. Pointer-only,
+ * so keybinds stay with the viewport.
  */
-export function ViewControls({ disabled = false }: { readonly disabled?: boolean }) {
+export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
   const gizmoSpace = useEditor((s) => s.gizmoSpace)
   const toggleGizmoSpace = useEditor((s) => s.toggleGizmoSpace)
   const keybinds = useEditor((s) => s.keybinds)
+  const settings = useEditor((s) => s.settings)
   const local = gizmoSpace === "local"
   const label = local ? "Using piece-local axes" : "Using world axes"
-
-  return (
-    <div className="pointer-events-none absolute top-3 right-3 flex justify-end gap-2">
-      <ViewLayoutControl disabled={disabled} />
-      <div className={GROUP}>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Toggle
-                pressed={local}
-                onPressedChange={toggleGizmoSpace}
-                disabled={disabled}
-                aria-label={label}
-                className="size-8 rounded-full aria-pressed:bg-transparent aria-pressed:hover:bg-muted"
-                {...noFocus}
-              />
-            }
-          >
-            {local ? <IconCube /> : <IconWorld />}
-          </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={POPUP_OFFSET.button} className="flex items-center gap-1.5">
-            {label}
-            {keybinds.toggleGizmoSpace.map((binding) => <Kbd key={binding}>{formatBinding(binding)}</Kbd>)}
-          </TooltipContent>
-        </Tooltip>
-      </div>
-      <SnapControls disabled={disabled} />
-    </div>
-  )
-}
-
-/** Grid and rotation snapping, each its own group like the game's. Saved with the settings. */
-function SnapControls({ disabled }: { readonly disabled: boolean }) {
-  const settings = useEditor((s) => s.settings)
   const { enabled, gridSize, rotationEnabled, rotationStep } = settings.snapping
   const units = settings.general.units
   const update = (snapping: Partial<Settings["snapping"]>) => void updateSettings("snapping", snapping)
@@ -66,41 +32,65 @@ function SnapControls({ disabled }: { readonly disabled: boolean }) {
 
   return (
     <>
-      <SnapGroup
-        icon={<IconGrid4x4 />}
-        label="Snap to grid"
-        enabled={enabled}
-        onToggle={(pressed) => update({ enabled: pressed })}
-        value={gridSize}
-        options={GRID_SIZES}
-        onPick={(size) => update({ enabled: true, gridSize: size })}
-        valueLabel={`Grid size (${units})`}
-        // The button shows just the number, like the game's; the menu and tooltip carry the unit.
-        short={(size) => String(units === "m" ? size / 100 : size)}
-        long={(size) => formatGridSize(size, units)}
-        disabled={disabled}
-      />
-      <SnapGroup
-        icon={<IconAngle />}
-        label="Snap rotation"
-        enabled={rotationEnabled}
-        onToggle={(pressed) => update({ rotationEnabled: pressed })}
-        value={rotationStep}
-        options={ROTATION_STEPS}
-        onPick={(step) => update({ rotationEnabled: true, rotationStep: step })}
-        valueLabel="Rotation step"
-        short={degrees}
-        long={degrees}
-        disabled={disabled}
-      />
+      <ViewPanes disabled={disabled} />
+      <div className="pointer-events-none absolute top-3 right-3 flex justify-end gap-2">
+        <ViewLayoutControl disabled={disabled} />
+        <div className={GROUP}>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Toggle
+                  pressed={local}
+                  onPressedChange={toggleGizmoSpace}
+                  disabled={disabled}
+                  aria-label={label}
+                  className="size-8 rounded-full aria-pressed:bg-transparent aria-pressed:hover:bg-muted"
+                  {...noFocus}
+                />
+              }
+            >
+              {local ? <IconCube /> : <IconWorld />}
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={POPUP_OFFSET.button} className="flex items-center gap-1.5">
+              {label}
+              {keybinds.toggleGizmoSpace.map((binding) => <Kbd key={binding}>{formatBinding(binding)}</Kbd>)}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+        <SnapGroup
+          icon={<IconGrid4x4 />}
+          label="Snap to grid"
+          enabled={enabled}
+          onToggle={(pressed) => update({ enabled: pressed })}
+          value={gridSize}
+          options={GRID_SIZES}
+          onPick={(size) => update({ enabled: true, gridSize: size })}
+          valueLabel={`Grid size (${units})`}
+          // The button shows just the number, like the game's; the menu and tooltip carry the unit.
+          short={(size) => String(units === "m" ? size / 100 : size)}
+          long={(size) => formatGridSize(size, units)}
+          disabled={disabled}
+        />
+        <SnapGroup
+          icon={<IconAngle />}
+          label="Snap rotation"
+          enabled={rotationEnabled}
+          onToggle={(pressed) => update({ rotationEnabled: pressed })}
+          value={rotationStep}
+          options={ROTATION_STEPS}
+          onPick={(step) => update({ rotationEnabled: true, rotationStep: step })}
+          valueLabel="Rotation step"
+          short={degrees}
+          long={degrees}
+          disabled={disabled}
+        />
+      </div>
+      <ToolBar disabled={disabled} />
     </>
   )
 }
 
-/**
- * One kind of gizmo snapping: the icon turns it on and off, the number next to it picks the
- * step from a menu (and turns snapping on).
- */
+/** One kind of gizmo snapping: the icon turns it on and off, the number next to it picks the step and turns it on. */
 function SnapGroup<V extends number>(props: {
   readonly icon: ReactNode
   readonly label: string
@@ -176,16 +166,5 @@ function SnapGroup<V extends number>(props: {
         </SelectContent>
       </Select>
     </div>
-  )
-}
-
-/** Everything floating over the viewport: its panes' frames, the view controls (top right) and the tool bar (bottom). */
-export function ViewportControls({ disabled = false }: { readonly disabled?: boolean }) {
-  return (
-    <>
-      <ViewPanes disabled={disabled} />
-      <ViewControls disabled={disabled} />
-      <ToolBar disabled={disabled} />
-    </>
   )
 }

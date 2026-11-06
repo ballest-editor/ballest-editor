@@ -33,7 +33,7 @@ export const ORTHO_AXES: Readonly<Record<OrthoView, OrthoAxes>> = {
   right: { forward: minus(Y), up: Z, right: X }
 }
 
-const dot = (a: Vec3, b: Vec3): number => a.x * b.x + a.y * b.y + a.z * b.z
+export const dot = (a: Vec3, b: Vec3): number => a.x * b.x + a.y * b.y + a.z * b.z
 
 export type GameAxis = "x" | "y" | "z"
 
@@ -56,11 +56,6 @@ const MAX_CM_PER_PIXEL = 5000
 export const clampCmPerPixel = (cmPerPixel: number): number =>
   Math.min(MAX_CM_PER_PIXEL, Math.max(MIN_CM_PER_PIXEL, cmPerPixel))
 
-export interface Bounds3 {
-  readonly min: Vec3
-  readonly max: Vec3
-}
-
 /** The room left around what a pane frames. */
 const FRAME_MARGIN = 1.15
 
@@ -69,7 +64,7 @@ const FRAME_MARGIN = 1.15
  * an empty map from filling the pane.
  */
 export const orthoFraming = (
-  bounds: Bounds3,
+  bounds: { readonly min: Vec3; readonly max: Vec3 },
   view: OrthoView,
   width: number,
   height: number,

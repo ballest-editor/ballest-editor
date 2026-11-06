@@ -1,7 +1,7 @@
 import { type RootState, useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useRef } from "react"
 import { editorVerticalFov } from "../domain/Settings"
-import { firstPaneTurns, type PaneRect, paneRects, panesToDraw, type PaneTurns } from "../domain/viewLayout"
+import { firstPaneTurns, paneRects, panesToDraw, type PaneTurns } from "../domain/viewLayout"
 import { mapBox, type PaneCamera, paneCamerasOf } from "./paneCameras"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
@@ -27,40 +27,31 @@ export const useBeforePaneDraw = (callback: BeforePaneDraw): void => {
 }
 
 /** What the canvas's pixels show, as a key: another one means every pane has to draw again. */
-const shownKey = (tabId: string, rects: ReadonlyArray<PaneRect>, panes: ReadonlyArray<PaneCamera>): string =>
-  JSON.stringify([tabId, rects, rects.map((r) => panes[r.slot]?.projection)])
-
 let shown = ""
 let turns: PaneTurns = firstPaneTurns
-
-/** Brings the visible panes' cameras up to the store, the pane sizes and the FOV setting, framing any new to the screen. */
-const syncPanes = (rects: ReadonlyArray<PaneRect>, panes: ReadonlyArray<PaneCamera>): void => {
-  const { viewLayout, settings, keybindDefaults } = useEditor.getState()
-  const fov = editorVerticalFov(settings.camera, keybindDefaults.cameraPresets)
-  for (const rect of rects) {
-    const pane = panes[rect.slot]
-    if (pane === undefined) continue
-    pane.resize(rect.width, rect.height, fov)
-    pane.setProjection(viewLayout.projections[rect.slot] ?? "perspective")
-    if (pane.needsFraming) {
-      pane.needsFraming = false
-      pane.frameMap(mapBox())
-    }
-  }
-}
 
 /**
  * Draws the panes into the one canvas, each in its own viewport and scissor. The drawing buffer is preserved, so a pane
  * not drawn this frame keeps what it last showed (`panesToDraw` says which those are).
  */
 const drawPanes = ({ gl, scene, size }: Pick<RootState, "gl" | "scene" | "size">, everyPane: boolean): void => {
-  const { tabId, viewLayout, activePane } = useEditor.getState()
+  const { tabId, viewLayout, activePane, settings, keybindDefaults } = useEditor.getState()
   const rects = paneRects(viewLayout, size.width, size.height).filter((r) => r.width > 0 && r.height > 0)
   const panes = paneCamerasOf(tabId)
-  syncPanes(rects, panes)
+  const fov = editorVerticalFov(settings.camera, keybindDefaults.cameraPresets)
+  for (const rect of rects) {
+    const pane = panes[rect.slot]
+    if (pane === undefined) continue
+    pane.resize(rect.width, rect.height, fov)
+    pane.setProjection(viewLayout.projections[rect.slot])
+    if (pane.needsFraming) {
+      pane.needsFraming = false
+      pane.frameMap(mapBox())
+    }
+  }
   sceneRegistry.camera = panes[activePane]?.camera ?? null
 
-  const key = shownKey(tabId, rects, panes)
+  const key = JSON.stringify([tabId, rects, rects.map((r) => panes[r.slot]?.projection)])
   const plan = panesToDraw(rects.map((r) => r.slot), activePane, performance.now(), turns, everyPane || key !== shown)
   shown = key
   turns = plan.turns

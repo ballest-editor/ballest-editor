@@ -1,20 +1,18 @@
-/* The dock in the app's tokens: light and dark come from them, and every duration from `--motion`. */
+/*
+ * The dock in the app's tokens: light and dark come from them, and every duration from `--motion`. A theme of dockview's
+ * own sets what's left out here, so an unset tab background or sash is transparent.
+ */
 .dockview-theme-ballest {
   --dv-tabs-and-actions-container-height: 2rem;
   --dv-tabs-and-actions-container-font-size: 0.75rem;
   --dv-group-view-background-color: var(--card);
   --dv-tabs-and-actions-container-background-color: var(--card);
-  --dv-activegroup-visiblepanel-tab-background-color: transparent;
-  --dv-activegroup-hiddenpanel-tab-background-color: transparent;
-  --dv-inactivegroup-visiblepanel-tab-background-color: transparent;
-  --dv-inactivegroup-hiddenpanel-tab-background-color: transparent;
   --dv-activegroup-visiblepanel-tab-color: var(--foreground);
   --dv-inactivegroup-visiblepanel-tab-color: var(--foreground);
   --dv-activegroup-hiddenpanel-tab-color: var(--muted-foreground);
   --dv-inactivegroup-hiddenpanel-tab-color: var(--muted-foreground);
   --dv-tab-divider-color: transparent;
   --dv-separator-border: var(--border);
-  --dv-sash-color: transparent;
   --dv-active-sash-color: color-mix(in oklab, var(--primary) 60%, transparent);
   --dv-active-sash-transition-duration: calc(100ms * var(--motion));
   --dv-active-sash-transition-delay: calc(200ms * var(--motion));
@@ -22,7 +20,6 @@
   --dv-drag-over-background-color: color-mix(in oklab, var(--dock-drop-color) 20%, transparent);
   --dv-drag-over-border-color: var(--dock-drop-color);
   --dv-drag-over-border: 1px solid var(--dock-drop-color);
-  --dv-icon-hover-background-color: var(--muted);
   --dv-tabs-container-scrollbar-color: var(--border);
   --dv-overlay-z-index: 40;
   font-family: var(--font-sans);
@@ -40,21 +37,7 @@
   border-radius: calc(var(--radius) * 0.75);
 }
 
-/* What follows the pointer in a drag (dragImage.ts): the tab or strip it came from, on a card. */
-.dock-drag-image {
-  position: fixed;
-  top: -9999px;
-  left: 0;
-  display: flex;
-  height: 2rem;
-  width: max-content;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) * 0.75);
-  background: var(--card);
-  color: var(--foreground);
-}
-
+/* What follows the pointer in a drag (dragImage.ts): the tab or strip it came from, bare on its card. */
 .dock-drag-image .dv-tabs-container {
   display: flex;
   overflow: visible;
@@ -71,20 +54,7 @@
   box-shadow: inset 0 -1px var(--border);
 }
 
-/* The panels' tabs: small caps (the `text-eyebrow` of globals.css), the active one underlined. */
-.dock-tab {
-  display: flex;
-  height: 100%;
-  min-width: 0;
-  align-items: center;
-  padding-inline: 0.625rem;
-  font-size: 0.6875rem;
-  line-height: 1rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
+/* The panels' tabs, the active one underlined; `DockTab` styles what's in them. */
 .dockview-theme-ballest .dv-tab {
   padding: 0;
   box-shadow: inset 0 -2px transparent;
@@ -136,7 +106,6 @@
 
 .dockview-theme-ballest .dv-groupview[data-dock-rail] .dv-tabs-container .dv-tab {
   padding: 0.625rem 0;
-  color: var(--muted-foreground);
   box-shadow: inset 2px 0 transparent;
   transition: background-color calc(100ms * var(--motion)), color calc(100ms * var(--motion));
 }
@@ -147,7 +116,6 @@
 }
 
 .dockview-theme-ballest .dv-groupview[data-dock-rail] .dv-tabs-container .dv-tab.dv-active-tab {
-  color: var(--foreground);
   box-shadow: inset 2px 0 var(--primary);
 }
 
@@ -155,14 +123,6 @@
   width: 100%;
   justify-content: center;
   padding: 0;
-}
-
-.dock-actions {
-  display: flex;
-  height: 100%;
-  align-items: center;
-  gap: 0.125rem;
-  padding-inline: 0.25rem;
 }
 
 /* A popped-out group's strip is the desktop window's title bar: it drags the window, and clears the window controls. */

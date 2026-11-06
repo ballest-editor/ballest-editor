@@ -73,19 +73,7 @@ function ItemIcon({ actorClass }: { readonly actorClass: string }) {
   return <PieceThumbnail piece={piece} className="size-4 shrink-0 rounded-xs object-fill" placeholder={pieceGlyph} />
 }
 
-export const OutlineRowView = memo(function OutlineRowView({
-  row,
-  rowIndex,
-  selected,
-  partial,
-  entered,
-  dimmed,
-  dragged,
-  dropInto,
-  filtering,
-  renaming,
-  onRenamed
-}: {
+export const OutlineRowView = memo(function OutlineRowView(props: {
   readonly row: OutlineRow
   readonly rowIndex: number
   readonly selected: boolean
@@ -101,6 +89,7 @@ export const OutlineRowView = memo(function OutlineRowView({
   readonly renaming: boolean
   readonly onRenamed: (row: OutlineRow, value: string | null) => void
 }) {
+  const { row, rowIndex, selected, partial, entered, dimmed, dragged, dropInto, filtering, renaming, onRenamed } = props
   const setGroupCollapsed = useEditor((s) => s.setGroupCollapsed)
   const isGroup = row.kind === "group"
   const FolderIcon = row.instance ? IconBoxMultiple : row.collapsed ? IconFolder : IconFolderOpen

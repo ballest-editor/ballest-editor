@@ -1,5 +1,4 @@
 import { IconArrowsMinimize } from "@tabler/icons-react"
-import { Button } from "@workspace/ui/components/button"
 import { PortalContainerContext } from "@workspace/ui/lib/portal-container"
 import {
   DockviewReact,
@@ -12,30 +11,23 @@ import "dockview-react/dist/styles/dockview.css"
 import { type ComponentType, type ReactNode, useEffect, useRef, useState } from "react"
 import { DOCUMENTS_PANEL } from "../../domain/dockLayout"
 import { Viewport } from "../../editor/Viewport"
-import { DocumentTabs } from "../DocumentTabs"
+import { closesOnMiddleClick, DocumentTabs } from "../DocumentTabs"
 import { EditorSkeletonPanels } from "../EditorSkeleton"
 import { ViewportControls } from "../ViewControls"
 import "./dock.css"
 import { attachDock, expandGroup, isCentreGroup, useGroupFold } from "./dockControl"
 import { followDockDrags } from "./dragImage"
-import { GroupMenu } from "./GroupMenu"
+import { GroupMenu, StripButton } from "./GroupMenu"
 import { dockPanels } from "./panels"
 
 const dockTheme: DockviewTheme = { name: "ballest", className: "dockview-theme-ballest" }
 
 /** The centre group's panel: the map tabs are in its header (`CentreTabs`), so this is only the viewport. */
-function DocumentsPanel() {
-  return (
-    <div className="relative h-full">
-      <Viewport controls={ViewportControls} />
-    </div>
-  )
-}
+const DocumentsPanel = () => <Viewport controls={ViewportControls} />
 
 /**
- * What a panel renders in: it fills its tab, and its popups go to the window it's in (`PortalContainerContext`). Elements
- * made while it's popped out belong to that window, whose `Element` nothing here recognises and which goes away, so a
- * panel coming back to the main window renders afresh (`returns`). That costs it its local state, such as a search.
+ * What a panel renders in: it fills its tab, its popups go to the window it's in, and it renders afresh coming back to
+ * the main window (`returns`), as its elements belong to the window that went (docs/DESKTOP.md § Dock).
  */
 function PanelFrame({ api, children }: { readonly api: IDockviewPanelProps["api"]; readonly children: ReactNode }) {
   const [panelWindow, setPanelWindow] = useState(() => api.getWindow())
@@ -74,13 +66,9 @@ function DockTab({ api, containerApi }: IDockviewPanelHeaderProps) {
   }
   return (
     <div
-      className="dock-tab"
+      className="dock-tab flex h-full min-w-0 items-center px-2.5 text-eyebrow"
       onClick={expand}
-      onAuxClick={(e) => {
-        if (e.button === 1) api.close()
-      }}
-      // a middle press would otherwise start autoscroll
-      onMouseDown={(e) => e.button === 1 && e.preventDefault()}
+      {...closesOnMiddleClick(() => api.close())}
     >
       <span className="truncate">{api.title}</span>
     </div>
@@ -97,28 +85,17 @@ function CentreTabs({ group }: IDockviewHeaderActionsProps) {
   return isCentreGroup(group) ? <DocumentTabs /> : null
 }
 
-/**
- * What a group's strip holds at its end: its "…", or in a popped-out window the way back. A rail is only its panels'
- * titles.
- */
+/** The end of a group's strip: its "…", or in a popped-out window the way back. A rail has neither. */
 function GroupActions({ group, activePanel, location }: IDockviewHeaderActionsProps) {
   const fold = useGroupFold(group)
   if (fold === "width") return null
-  const back = "Back to the main window"
   return (
-    <div className="dock-actions">
+    <div className="flex h-full items-center px-1">
       {location?.type === "popout"
         ? (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="size-6 text-muted-foreground"
-            aria-label={back}
-            title={back}
-            onClick={() => group.api.getWindow().close()}
-          >
+          <StripButton label="Back to the main window" onClick={() => group.api.getWindow().close()}>
             <IconArrowsMinimize className="size-3.5" />
-          </Button>
+          </StripButton>
         )
         : <GroupMenu group={group} activePanel={activePanel} />}
     </div>
@@ -126,9 +103,8 @@ function GroupActions({ group, activePanel, location }: IDockviewHeaderActionsPr
 }
 
 /**
- * The window between the top bar and the status bar (docs/DESKTOP.md § Dock): the centre group, the map tabs over the
- * viewport, and the panels around it. A dock has no size until its first effect, so the skeleton stays over it until
- * the layout is in: the first paint is the saved layout, not a flash of an empty dock.
+ * Everything between the top bar and the status bar (docs/DESKTOP.md § Dock). A dock has no size until its first effect,
+ * so the skeleton stays over it until the layout is in: the first paint is the saved layout, not an empty dock.
  */
 export function Dock() {
   const [ready, setReady] = useState(false)

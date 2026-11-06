@@ -68,7 +68,7 @@ describe("orthographic panes", () => {
     const pane = paneOn("top")
     const point = { x: 50, y: 80, z: 0 }
     const before = onScreen(pane, point)
-    pane.dragOrthographic(30, -12)
+    pane.slide(-30 * pane.cmPerPixel, -12 * pane.cmPerPixel)
     assert.closeTo(apart(onScreen(pane, point), { x: before.x + 30, y: before.y - 12 }), 0, 1e-3)
   })
 

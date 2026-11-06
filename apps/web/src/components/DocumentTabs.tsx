@@ -18,23 +18,28 @@ import {
 } from "../editor/actions"
 import { useEditor, useTabSummary } from "../editor/store"
 
-/** A tab being dragged along the strip, and where it would land (an index into the strip's gaps). */
-interface Drag {
-  readonly id: string
-  readonly at: number
-}
+/** A tab being dragged along the strip, and the gap it would land in. */
+type TabDrag = { readonly id: string; readonly at: number } | null
+
+/** What makes a tab of either strip close on a middle click. */
+export const closesOnMiddleClick = (close: () => void) => ({
+  onAuxClick: (e: MouseEvent) => {
+    if (e.button !== 1) return
+    e.preventDefault()
+    close()
+  },
+  // a middle press would otherwise start autoscroll
+  onMouseDown: (e: MouseEvent) => e.button === 1 && e.preventDefault()
+})
 
 /**
- * The document tabs over the viewport (docs/PROJECTS.md § Shell): one per open map, in the order they were opened
- * or dragged into. A click makes a tab active; its × (or a middle click) closes it, asking about unsaved edits first;
- * a right-click opens its menu. Closing the last tab leaves a fresh map in its place: there is always a map. The dot
- * marks a map with unsaved edits, or one not saved anywhere yet; it gives way to the × while the tab is hovered. The +
- * after the last tab is New map; it stays in view while the tabs scroll.
+ * The map tabs in the centre group's strip (docs/DESKTOP.md § Document tabs). A tab's dot marks unsaved edits and gives
+ * way to the × while the tab is hovered. The + after the last tab stays in view while the tabs scroll.
  */
 export function DocumentTabs() {
   const tabIds = useEditor((s) => s.tabIds)
   const moveTab = useEditor((s) => s.moveTab)
-  const [drag, setDrag] = useState<Drag | null>(null)
+  const [drag, setDrag] = useState<TabDrag>(null)
 
   const drop = () => {
     if (drag !== null) moveTab(drag.id, drag.at > tabIds.indexOf(drag.id) ? drag.at - 1 : drag.at)
@@ -59,18 +64,7 @@ export function DocumentTabs() {
         aria-label="Documents"
         className="flex min-w-0 items-stretch overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
       >
-        {tabIds.map((id, index) => (
-          <DocumentTab
-            key={id}
-            id={id}
-            index={index}
-            dragging={drag?.id === id}
-            dropBefore={drag !== null && drag.at === index}
-            dropAfter={drag !== null && index === tabIds.length - 1 && drag.at === tabIds.length}
-            onDragStart={() => setDrag({ id, at: index })}
-            onDragOver={(at) => drag !== null && drag.at !== at && setDrag({ ...drag, at })}
-          />
-        ))}
+        {tabIds.map((id, index) => <DocumentTab key={id} id={id} index={index} drag={drag} onDrag={setDrag} />)}
       </div>
       <button
         type="button"
@@ -85,15 +79,11 @@ export function DocumentTabs() {
   )
 }
 
-function DocumentTab({ id, index, dragging, dropBefore, dropAfter, onDragStart, onDragOver }: {
+function DocumentTab({ id, index, drag, onDrag }: {
   readonly id: string
   readonly index: number
-  readonly dragging: boolean
-  readonly dropBefore: boolean
-  readonly dropAfter: boolean
-  readonly onDragStart: () => void
-  /** The gap the dragged tab would land in, from where the pointer is over this tab. */
-  readonly onDragOver: (at: number) => void
+  readonly drag: TabDrag
+  readonly onDrag: (drag: TabDrag) => void
 }) {
   const active = useEditor((s) => s.tabId === id)
   const projects = useEditor((s) => s.capabilities.projects)
@@ -108,11 +98,6 @@ function DocumentTab({ id, index, dragging, dropBefore, dropAfter, onDragStart, 
     if (active) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }, [active])
 
-  const onAuxClick = (e: MouseEvent) => {
-    if (e.button !== 1) return
-    e.preventDefault()
-    void closeTab(id)
-  }
   const onContextMenu = (e: MouseEvent) => {
     e.preventDefault()
     menuButton.current?.click()
@@ -121,7 +106,8 @@ function DocumentTab({ id, index, dragging, dropBefore, dropAfter, onDragStart, 
     e.preventDefault()
     e.stopPropagation()
     const box = e.currentTarget.getBoundingClientRect()
-    onDragOver(e.clientX < box.left + box.width / 2 ? index : index + 1)
+    const at = e.clientX < box.left + box.width / 2 ? index : index + 1
+    if (drag !== null && drag.at !== at) onDrag({ ...drag, at })
   }
 
   return (
@@ -132,20 +118,20 @@ function DocumentTab({ id, index, dragging, dropBefore, dropAfter, onDragStart, 
         "group relative flex h-full max-w-56 shrink-0 items-center gap-1 border-r pr-1 pl-2 transition-opacity",
         active ? "bg-background text-foreground" : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
         "has-[button:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring)]",
-        dragging && "opacity-40",
+        drag?.id === id && "opacity-40",
         // where a dragged tab would land
-        dropBefore && "before:absolute before:inset-y-0 before:-left-px before:z-10 before:w-0.5 before:bg-primary",
-        dropAfter && "after:absolute after:inset-y-0 after:-right-px after:z-10 after:w-0.5 after:bg-primary"
+        drag?.at === index &&
+          "before:absolute before:inset-y-0 before:-left-px before:z-10 before:w-0.5 before:bg-primary",
+        last && drag?.at === index + 1 &&
+          "after:absolute after:inset-y-0 after:-right-px after:z-10 after:w-0.5 after:bg-primary"
       )}
       title={path ?? "Not saved yet"}
-      onAuxClick={onAuxClick}
+      {...closesOnMiddleClick(() => void closeTab(id))}
       onContextMenu={onContextMenu}
-      // a middle press would otherwise start autoscroll
-      onMouseDown={(e) => e.button === 1 && e.preventDefault()}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move"
         e.dataTransfer.setData("text/plain", label)
-        onDragStart()
+        onDrag({ id, at: index })
       }}
       onDragOver={onDragOverTab}
     >
