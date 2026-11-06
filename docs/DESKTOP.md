@@ -29,7 +29,7 @@ The renderer never imports `electron`. It gets a `Platform` service (`apps/web/s
 | Open / Import      | `<input type=file>` | native open dialog; the file is copied into the project      |
 | Save               | download link       | writes the map in the project, asking nothing                |
 | Export to game     | hidden              | copies the project map into `UserSavedMaps`                  |
-| Launch game, Play  | hidden              | `steam://rungameid/3339810`, plugin handoff                  |
+| Open game, Play    | hidden              | `steam://rungameid/3339810`, plugin handoff                  |
 | Open external link | `window.open`       | `shell.openExternal`                                         |
 | Updates            | none                | electron-updater state stream                                |
 
@@ -49,7 +49,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - **Import** (Project › Import map…, Ctrl+O) replaces Open. A `.balledit`, `.ballmap` or `.json` from anywhere is copied into `maps/` under the game's file name for it and opened from there: a `.balledit` byte for byte, a `.ballmap` as the `.balledit` the game would make of it. Its origin goes into `.ballest/link.json`, and a file imported from the game's maps folder under its own name is linked as that file's export from the start. A name the project already has asks: Replace (the project's copy and its sidecar go to backups) or Import as copy (`<name> 2`). Import is off in Untitled Project.
 - **Export to game** (Project menu) saves unsaved edits, then copies the project file byte for byte into the game's maps folder and records the export's path, hash and time in `link.json`. The page first runs Save's checks on the open map, because an imported file or a map with no edits reaches the game without passing through Save. A file past the game's character limit is refused at this step, on the bytes about to be copied, and nothing is written. A file in that folder whose `levelPublishedFileId` is above 0 is a published map's draft, and the editor asks before replacing it.
 - **Export on save** (Project menu, or the map's entry in Project settings; off by default, kept with the map's prefs) makes every Save of that map export too. Settings › General › Export every save does it for every map. The first Save of a new map doesn't export under either.
-- **Launch game** (Project menu) opens `steam://rungameid/3339810`, or says the game is already running.
+- **Open game (Steam)** (Project menu) opens `steam://rungameid/3339810`, or says the game is already running.
 - **Backups.** Every write over a map file keeps the old one first (§ Backups). Backups… in a map's menu in the Project panel lists them.
 - **Toasts** name the project or the maps folder and offer Reveal.
 - **Unsaved changes** are asked about before anything would lose them: closing the window, reloading, quitting, closing a map's tab, replacing a map open in a tab (Re-import, Recover, Import's Replace), and leaving a named project ([§ Window](#window) has the rule for switching projects). New map, opening a map and Import open a tab of their own and ask nothing.
@@ -109,7 +109,7 @@ Dockview is themed in `components/dock/dock.css` with the tokens from `packages/
 
 The viewport is one canvas divided into **panes**, each its own camera on the same map. Selection and the document are shared; only cameras differ. The dock knows nothing of this: to it the viewport is still one panel in the centre group, under the map tabs.
 
-**Layouts.** One pane, two side by side, two stacked, or four, picked from the control at the viewport's top right or View › Panes. `domain/viewLayout.ts` holds a layout: its kind, where the dividers sit, and what each of the four slots looks along. A slot keeps its view while a smaller layout hides it. A divider drags, stays a tenth of the viewport from the edge, and goes back to the middle on a double click.
+**Layouts.** One pane, two side by side, two stacked, or four, picked from the control at the viewport's top right or View › Layout. `domain/viewLayout.ts` holds a layout: its kind, where the dividers sit, and what each of the four slots looks along. A slot keeps its view while a smaller layout hides it. A divider drags, stays a tenth of the viewport from the edge, and goes back to the middle on a double click.
 
 A layout is per tab (`TabState.viewLayout`), and remembered per map in `MapPrefs` in `localStorage`, not the sidecar: it's how this machine looks at the map, not part of the map. `followViewLayouts` writes it a moment after a change. Cameras aren't remembered: a map opens framed.
 
@@ -135,15 +135,16 @@ Changing projection keeps the point the pane looks at and its size on screen. Nu
 
 ### Menus
 
-`components/MenuBar.tsx` holds the menus. Every item calls the entry point its keybind or button uses.
+`components/MenuBar.tsx` holds the menus. Every item calls the entry point its keybind or button uses. A disabled item says why in a tooltip. Shortcuts everywhere are `components/KeyChip.tsx`, one caption chip per chord.
 
-- **File:** New map, New project… (`components/NewProjectDialog.tsx`, a name that becomes `Documents/Ballest Editor/<name>`, shown as it is typed), Open project…, Recent projects, Save, Close tab, Settings… (`components/SettingsDialog.tsx`, a modal in `SettingsShell`'s shape that looks the game up again each time it opens, and is meant to become a window of its own later), Game link…, and Quit, which closes the window the way its × does, so unsaved edits ask.
+- **File:** New map, New project… (`components/NewProjectDialog.tsx`, a name that becomes `Documents/Ballest Editor/<name>`, shown as it is typed), Open project…, Recent projects, Save, Close tab, Settings… (`components/SettingsDialog.tsx`, a modal in `SettingsShell`'s shape that looks the game up again each time it opens, and is meant to become a window of its own later), and Quit, which closes the window the way its × does, so unsaved edits ask.
 - **Edit:** Undo, Redo, Cut, Copy, Paste, Duplicate, Delete, Deselect, Group, Ungroup and Save selection as prefab….
-- **View:** Focus selection, Frame all, the view's panes and the active pane's projection (§ View panes), the dock's panels and Reset layout (§ Dock), and the display toggles (the grid, sky, water and theme).
-- **Project:** New map, Import map…; Export to game, Export on save, Re-import from game, Play, Launch game; Project settings….
-- **Web review build:** File (New map, Open…, Save, Export…, Close tab, Settings…), Edit, View, and Project (Project settings…, the one map's).
+- **View:** four named sections. Camera: Focus selection, Frame all. Panels: the dock's panels and Reset layout (§ Dock), the one place every panel can be toggled. Panes: Layout and Active pane (§ View panes), each submenu headed by a line saying what it does. Grid: Show grid, Snap to grid, Grid size.
+- **Project:** New map, Import map…, Export to game, Re-import from game; Play, Open game (Steam); Export on save; Project settings….
+- **Help:** Keyboard shortcuts (the keybind cheat sheet as a dialog that stays open; holding Shift+/ shows it only while held), Check for updates, Release notes (the GitHub Releases page), About Ballest Editor (the version).
+- **Web review build:** File (New map, Open…, Save, Export…, Close tab, Settings…), Edit, View, Project (Project settings…, the one map's), and Help without its update rows.
 
-There is no Map or Game menu: the menus act on the active tab's map, and the game is the project's export target. Rename, Duplicate and Backups are per map in the Project panel. The Game link is the user's machine, not the project's, so it sits with Settings under File.
+There is no Map or Game menu: the menus act on the active tab's map, and the game is the project's export target. Rename, Duplicate and Backups are per map in the Project panel. The Game link is the user's machine, not the project's, so it is a page of Settings, Settings › Game.
 
 ### Project panel
 
@@ -212,7 +213,7 @@ A prefab is a reusable assembly, kept as a file in the game's format ([FORMAT.md
 
 ### Game link
 
-`components/GameLink.tsx`, with rows from `domain/gameLink.ts`, is the one place the app describes the game's install, its maps folder, the creator name (`useCreator()`), the plugin manager and the editor plugin. Settings › Game is its home: each row is a settings row with a state icon, its name, a one-line status ("Found", "Not found") and its buttons at the right of the name's line, and Check again is in the page's footer. `components/GameLinkDialog.tsx`, also File › Game link…, lists only the missing rows, each with what is wrong, and an Open Settings › Game button.
+`components/GameLink.tsx`, with rows from `domain/gameLink.ts`, is the one place the app describes the game's install, its maps folder, the creator name (`useCreator()`), the plugin manager and the editor plugin. Settings › Game is its home: each row is a settings row with a state icon, its name, a one-line status ("Found", "Not found") and its buttons at the right of the name's line, and Check again is in the page's footer. `components/GameLinkDialog.tsx`, which opens by itself on the first launch or when Export's folders are missing, lists only the missing rows, each with what is wrong, and an Open Settings › Game button.
 
 The install, maps folder and plugin manager rows have Reveal, and a row's info icon holds how it was found and its full path, which the page shows nowhere else. A missing one carries its fix:
 
@@ -242,7 +243,7 @@ A map's Map page has the name, the file (its name, the path on hover, Reveal and
 
 ### Status bar
 
-The status bar runs along the bottom. The project is the window's title, centred in the top bar.
+The status bar runs along the bottom. The project is the window's title, centred in the top bar, with the document tab's dot while a tab has unsaved edits or the project is Untitled Project. The top bar's right end has the open map's link state and Play.
 
 - On the left: what a check for updates is doing, and the entered group.
 - In the middle: the open map's link state (`domain/linkState.ts`) and when it was last exported, as a chip coloured by state: neutral when not exported, amber when either side has changed, green in sync. Its popover has the last export's time, Reveal, Export and Play. A map with no file shows "Not saved in the project yet".

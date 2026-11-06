@@ -1,6 +1,6 @@
 import type { UpdateState } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
-import { canCheckForUpdates, updateStatusOf, updateSummaryOf } from "./updates"
+import { canCheckForUpdates, updateCheckBlockedBy, updateStatusOf, updateSummaryOf } from "./updates"
 
 const state = (status: UpdateState["status"], changes: Partial<UpdateState> = {}): UpdateState => ({
   status,
@@ -15,6 +15,15 @@ const state = (status: UpdateState["status"], changes: Partial<UpdateState> = {}
 })
 
 describe("updates", () => {
+  it("says why a check can't start", () => {
+    assert.isNull(updateCheckBlockedBy(state("idle")))
+    assert.isNull(updateCheckBlockedBy(state("error", { message: "net::ERR_FAILED" })))
+    const dev = state("disabled", { message: "Updates only run in an installed build." })
+    assert.strictEqual(updateCheckBlockedBy(dev), "Updates only run in an installed build.")
+    assert.match(updateCheckBlockedBy(state("checking")) ?? "", /Already checking/)
+    assert.match(updateCheckBlockedBy(state("ready", { availableVersion: "0.2.1" })) ?? "", /0\.2\.1 is available/)
+  })
+
   it("only says the app is up to date after a check the user asked for", () => {
     assert.strictEqual(updateSummaryOf(state("idle"), false), "Ballest Editor 0.2.0.")
     assert.strictEqual(updateSummaryOf(state("idle"), true), "Ballest Editor 0.2.0. This is the latest version.")

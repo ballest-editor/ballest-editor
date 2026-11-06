@@ -41,7 +41,7 @@ Numbers are issues. The [milestones](https://github.com/ballest-editor/ballest-e
 - **Linting** stops a save on the first problems it finds. Still to come: a lint view and the checks the game doesn't make itself, such as a missing goal and pieces outside the palette (#98).
 - **Prefabs** read and write the game's `BallestPrefab` files in a user and a project tier, and place as instances that follow their definition ([DESKTOP.md](DESKTOP.md#prefabs)). Still to come: the ballestrecords library (#102).
 - **Importing from the Workshop cache** works through the file dialog. Still to come: finding maps there for study and remix (#103).
-- **Menus** are missing Select, Tools and Help.
+- **Menus** are missing Select and Tools.
 
 ### Planned
 

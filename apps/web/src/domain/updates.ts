@@ -1,8 +1,24 @@
 /** What the page says about the updater outside the status bar, which only shows a release on offer. */
 import type { UpdateState } from "@ballest/contracts"
 
-/** Whether a check can start: main ignores one while a check runs, or once a release is on offer. */
-export const canCheckForUpdates = (state: UpdateState): boolean => state.status === "idle" || state.status === "error"
+/** Why a check can't start, or null when it can: main ignores one while a check runs, or once a release is on offer. */
+export const updateCheckBlockedBy = (state: UpdateState): string | null => {
+  switch (state.status) {
+    case "idle":
+    case "error":
+      return null
+    case "disabled":
+      return state.message ?? "Updates are off."
+    case "checking":
+      return "Already checking for updates."
+    case "available":
+    case "downloading":
+    case "ready":
+      return `${state.availableVersion ?? "A new version"} is available: see the status bar.`
+  }
+}
+
+export const canCheckForUpdates = (state: UpdateState): boolean => updateCheckBlockedBy(state) === null
 
 /** Beside the version in the status bar; null when there's nothing to say, or the update pill is saying it. */
 export const updateStatusOf = (state: UpdateState, checked: boolean): string | null => {

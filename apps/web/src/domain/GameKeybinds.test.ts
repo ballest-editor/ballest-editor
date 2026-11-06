@@ -3,7 +3,14 @@ import { Schema } from "effect"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { repoRoot } from "../test/samples"
-import { deriveKeybinds, GameKeybindsFile, mappingDirection, namedActions, UE_KEY_TO_CODE } from "./GameKeybinds"
+import {
+  cheatSheetSections,
+  deriveKeybinds,
+  GameKeybindsFile,
+  mappingDirection,
+  namedActions,
+  UE_KEY_TO_CODE
+} from "./GameKeybinds"
 import { actionsFor, defaultKeybinds, keybindSections } from "./Keybinds"
 
 const negate = { type: "InputModifierNegate", settings: { bX: true, bY: true, bZ: true } }
@@ -85,6 +92,23 @@ describe("GameKeybinds", () => {
     assert.deepStrictEqual(named[0], { action: "selectMode", section: "level editor", label: "select" })
     const sections = named.map((n) => n.section)
     assert.deepStrictEqual(sections, [...sections].sort((a, b) => sections.indexOf(a) - sections.indexOf(b)))
+  })
+
+  it("shows the camera's three sections as one on the cheat sheet, every action once", () => {
+    const named = namedActions(deriveKeybinds(Schema.decodeSync(GameKeybindsFile)({ contexts: [] })))
+    const sections = cheatSheetSections(named)
+    assert.deepStrictEqual(sections.map((s) => s.section), [
+      "level editor",
+      "edit",
+      "camera",
+      "view",
+      "file",
+      "game",
+      "help"
+    ])
+    assert.strictEqual(sections.flatMap((s) => s.actions).length, named.length)
+    const camera = sections.find((s) => s.section === "camera")?.actions.map((a) => a.action)
+    assert.includeMembers(camera ?? [], ["moveForward", "lookRight", "orbit"])
   })
 
   it("takes labels and sections from the file when present", () => {

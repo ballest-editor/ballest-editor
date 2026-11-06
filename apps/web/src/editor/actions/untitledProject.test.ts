@@ -20,7 +20,15 @@ import {
   submitSaveMap
 } from "../../test/editorActions"
 import { readSample } from "../../test/samples"
-import { dirtyTabs, projectTitleOf, tabLabelOf, tabLabels, tabStateOf, tabsWithoutFile } from "../store"
+import {
+  dirtyTabs,
+  projectTitleOf,
+  projectUnsavedOf,
+  tabLabelOf,
+  tabLabels,
+  tabStateOf,
+  tabsWithoutFile
+} from "../store"
 import { canMakeProject, newMapEffect } from "./maps"
 import {
   chooseProjectEffect,
@@ -166,7 +174,8 @@ describe("the first Save in Untitled Project", () => {
       yield* newMapEffect
       edit()
       s().renameLevel("Big Loop", "Isaac")
-      assert.strictEqual(projectTitleOf(s()), "Untitled Project *")
+      assert.strictEqual(projectTitleOf(s()), "Untitled Project")
+      assert.isTrue(projectUnsavedOf(s()))
       yield* saveMapInNewProjectEffect({ name: "My tracks" })
       assert.strictEqual(projectTitleOf(s()), "My tracks")
       assert.deepInclude(s().project?.current, { path: project })

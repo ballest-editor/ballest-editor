@@ -1,8 +1,11 @@
+import { RELEASES_URL } from "@ballest/contracts"
 import {
   Menubar,
   MenubarCheckboxItem,
   MenubarContent,
+  MenubarGroup,
   MenubarItem,
+  MenubarLabel,
   MenubarMenu,
   MenubarRadioGroup,
   MenubarRadioItem,
@@ -13,12 +16,13 @@ import {
   MenubarSubTrigger,
   MenubarTrigger
 } from "@workspace/ui/components/menubar"
-import { type ReactNode, useMemo } from "react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
+import { type ReactElement, type ReactNode, useMemo } from "react"
 import { canGroupSelection, selectedGroupIds } from "../domain/groupSelection"
-import { formatBinding, type KeybindAction } from "../domain/Keybinds"
+import type { KeybindAction } from "../domain/Keybinds"
 import type { Settings } from "../domain/Settings"
 import { formatGridSize, GRID_SIZES } from "../domain/snap"
-import { canCheckForUpdates } from "../domain/updates"
+import { updateCheckBlockedBy } from "../domain/updates"
 import {
   viewLayoutKinds,
   viewLayoutLabels,
@@ -31,6 +35,7 @@ import {
   chooseProject,
   exportToGame,
   launchGame,
+  openExternalLink,
   openRecentInNewWindow,
   quitApp,
   reimportMap,
@@ -39,32 +44,61 @@ import {
   updateSettings
 } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
-import { PREFAB_TAB_STAYS_HERE, useEditor, useOpenPrefab, useOpenProjectMap } from "../editor/store"
+import { PREFAB_TAB_STAYS_HERE, useEditor, useOpenPrefab, useOpenProjectMap, useUpdateState } from "../editor/store"
 import { resetDockLayout, usePanelCheck, useViewMenuPanels } from "./dock/dockControl"
+import { KeyChip } from "./KeyChip"
 import { SavePrefabItem } from "./SavePrefabItem"
+
+const NOTHING_SELECTED = "Select something first."
+const SAVE_PROJECT_FIRST = "Save first: Untitled Project has no folder to import into."
 
 /** The action's primary binding, as the menu shows it (nothing when unbound). */
 function Shortcut({ action }: { readonly action: KeybindAction }) {
   const binding = useEditor((s) => s.keybinds[action][0])
-  return binding === undefined ? null : <MenubarShortcut className="pl-6">{formatBinding(binding)}</MenubarShortcut>
+  return binding === undefined ? null : (
+    <MenubarShortcut className="pl-6">
+      <KeyChip binding={binding} />
+    </MenubarShortcut>
+  )
 }
 
-/** A menu item that runs the same command as the action's keybind, and shows that keybind. */
-function CommandItem({ action, disabled = false, inset, children }: {
-  readonly action: CommandAction
-  readonly disabled?: boolean
+/** Says why a row is off. A disabled row gets no pointer events, so the tooltip lives on a wrapper. */
+function DisabledReason({ reason, children }: { readonly reason: string | null; readonly children: ReactElement }) {
+  if (reason === null) return children
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<div />}>{children}</TooltipTrigger>
+      <TooltipContent side="right">{reason}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+interface ItemProps {
+  /** Why the row is off; null or absent when it's on. */
+  readonly reason?: string | null
   /**
    * Lines the label up with checkbox and radio items in the same menu. Absent otherwise:
    * any `data-inset` attribute, even "false", draws the checkmark gutter.
    */
   readonly inset?: boolean
   readonly children: ReactNode
-}) {
+}
+
+function Item({ reason = null, inset, onClick, children }: ItemProps & { readonly onClick: () => void }) {
   return (
-    <MenubarItem disabled={disabled} {...(inset && { inset })} onClick={() => actionCommands[action]()}>
+    <DisabledReason reason={reason}>
+      <MenubarItem disabled={reason !== null} {...(inset && { inset })} onClick={onClick}>{children}</MenubarItem>
+    </DisabledReason>
+  )
+}
+
+/** A menu item that runs the same command as the action's keybind, and shows that keybind. */
+function CommandItem({ action, children, ...item }: ItemProps & { readonly action: CommandAction }) {
+  return (
+    <Item {...item} onClick={() => actionCommands[action]()}>
       {children}
       <Shortcut action={action} />
-    </MenubarItem>
+    </Item>
   )
 }
 
@@ -105,7 +139,9 @@ function RecentProjectsMenu() {
   const closed = recent.filter((project) => !openElsewhere.includes(project.path))
   return (
     <MenubarSub>
-      <MenubarSubTrigger disabled={recent.length === 0}>Recent projects</MenubarSubTrigger>
+      <DisabledReason reason={recent.length === 0 ? "No recent projects yet." : null}>
+        <MenubarSubTrigger disabled={recent.length === 0}>Recent projects</MenubarSubTrigger>
+      </DisabledReason>
       <MenubarSubContent className="w-max max-w-96">
         {recent.map((project) => (
           <MenubarItem
@@ -143,7 +179,7 @@ function PanelItem({ id, title }: { readonly id: string; readonly title: string 
   return <MenubarCheckboxItem {...usePanelCheck(id)}>{title}</MenubarCheckboxItem>
 }
 
-type ViewSetting = "appearance" | "lighting" | "snapping"
+type ViewSetting = "appearance" | "snapping"
 type FlagOf<S extends ViewSetting> = {
   [K in keyof Settings[S]]: Settings[S][K] extends boolean ? K : never
 }[keyof Settings[S]]
@@ -167,10 +203,10 @@ function SettingCheck<S extends ViewSetting>({ section, flag, children }: {
   )
 }
 
-/** A submenu picking one of `options`, each drawn by `children`. */
-function RadioMenu<V extends string | number>({ title, className, value, options, onPick, children }: {
+/** A submenu picking one of `options`, each drawn by `children`, under a line saying what it picks when it needs one. */
+function RadioMenu<V extends string | number>({ title, description, value, options, onPick, children }: {
   readonly title: string
-  readonly className?: string
+  readonly description?: string
   readonly value: V
   readonly options: ReadonlyArray<V>
   readonly onPick: (value: V) => void
@@ -179,7 +215,12 @@ function RadioMenu<V extends string | number>({ title, className, value, options
   return (
     <MenubarSub>
       <MenubarSubTrigger inset>{title}</MenubarSubTrigger>
-      <MenubarSubContent {...(className !== undefined && { className })}>
+      <MenubarSubContent className="w-max max-w-72">
+        {description !== undefined && (
+          <MenubarGroup>
+            <MenubarLabel className="text-fg-tertiary">{description}</MenubarLabel>
+          </MenubarGroup>
+        )}
         <MenubarRadioGroup value={value} onValueChange={(next: V) => onPick(next)}>
           {options.map((option) => (
             <MenubarRadioItem closeOnClick key={option} value={option}>{children(option)}</MenubarRadioItem>
@@ -187,6 +228,16 @@ function RadioMenu<V extends string | number>({ title, className, value, options
         </MenubarRadioGroup>
       </MenubarSubContent>
     </MenubarSub>
+  )
+}
+
+/** A named part of a menu whose rows are too different to read as one list. */
+function MenuSection({ title, children }: { readonly title: string; readonly children: ReactNode }) {
+  return (
+    <MenubarGroup>
+      <MenubarLabel inset className="uppercase tracking-wider">{title}</MenubarLabel>
+      {children}
+    </MenubarGroup>
   )
 }
 
@@ -211,11 +262,23 @@ function PaneMenus() {
     setPaneProjection(activePane, next)
   }
   return (
-    <>
-      <RadioMenu title="Panes" value={kind} options={viewLayoutKinds} onPick={setViewLayoutKind}>
+    <MenuSection title="Panes">
+      <RadioMenu
+        title="Layout"
+        description="Split the viewport, one camera per pane."
+        value={kind}
+        options={viewLayoutKinds}
+        onPick={setViewLayoutKind}
+      >
         {(layout) => viewLayoutLabels[layout]}
       </RadioMenu>
-      <RadioMenu title="Active pane" className="w-max" value={projection} options={viewProjections} onPick={lookAlong}>
+      <RadioMenu
+        title="Active pane"
+        description="The view in the pane you last used."
+        value={projection}
+        options={viewProjections}
+        onPick={lookAlong}
+      >
         {(view) => (
           <>
             {viewProjectionLabels[view]}
@@ -223,32 +286,51 @@ function PaneMenus() {
           </>
         )}
       </RadioMenu>
-    </>
+    </MenuSection>
   )
 }
 
-const THEMES = { dark: "Dark", light: "Light", system: "System" } as const
-const THEME_KEYS = ["dark", "light", "system"] as const
+/** Help, in both builds; a browser has no updater, so no update rows. */
+function HelpMenu() {
+  const update = useUpdateState()
+  const openDialog = useEditor((s) => s.openDialog)
+  return (
+    <Menu title="Help">
+      {/* not the keybind's command: that one shows the sheet only while the key is held */}
+      <MenubarItem onClick={() => openDialog({ id: "keybinds" })}>
+        Keyboard shortcuts
+        <Shortcut action="showKeybinds" />
+      </MenubarItem>
+      <MenubarSeparator />
+      {update !== null && (
+        <>
+          <Item reason={updateCheckBlockedBy(update)} onClick={() => void checkForUpdates()}>Check for updates</Item>
+          <MenubarItem onClick={() => void openExternalLink(RELEASES_URL)}>Release notes</MenubarItem>
+        </>
+      )}
+      <MenubarItem onClick={() => openDialog({ id: "about" })}>About Ballest Editor</MenubarItem>
+    </Menu>
+  )
+}
 
-/** File, Edit, View and Project (docs/DESKTOP.md § Menus). Every item calls the entry point its keybind or button uses. */
+/** File, Edit, View, Project and Help (docs/DESKTOP.md § Menus). Every item calls the entry point its keybind or button uses. */
 export function MenuBar() {
   const canUndo = useEditor((s) => s.past.length > 0 && s.preview === null)
-  const canCheck = useEditor((s) => s.update !== null && canCheckForUpdates(s.update))
   const canRedo = useEditor((s) => s.future.length > 0 && s.preview === null)
   const selectedIds = useEditor((s) => s.selectedIds)
   const tree = useEditor((s) => s.doc.structure.tree)
-  const hasSelection = selectedIds.length > 0
+  const selectionOff = selectedIds.length > 0 ? null : NOTHING_SELECTED
   const canGroup = useMemo(() => canGroupSelection(tree, selectedIds), [tree, selectedIds])
   const canUngroup = useMemo(() => selectedGroupIds(tree, selectedIds).length > 0, [tree, selectedIds])
   const canPaste = useEditor((s) => s.clipboard !== null)
   const openDialog = useEditor((s) => s.openDialog)
   const viewMenuPanels = useViewMenuPanels()
-  const { snapping, appearance, general } = useEditor((s) => s.settings)
+  const { snapping, general } = useEditor((s) => s.settings)
   const { projects, exportToGame: canExport, launchGame: canLaunchGame, play: canPlay } = useEditor((s) =>
     s.capabilities
   )
   const exportOnSave = useEditor((s) => s.exportOnSave)
-  const inPrefab = useOpenPrefab() !== null
+  const prefabOff = useOpenPrefab() === null ? null : PREFAB_TAB_STAYS_HERE
   // Untitled Project has no folder to import into yet (the Project panel's Import is disabled the same way)
   const untitled = useEditor((s) => s.project?.current === null)
   // Re-import needs an export to take the map from
@@ -279,8 +361,7 @@ export function MenuBar() {
             <CommandItem action="closeTab">Close tab</CommandItem>
             <MenubarSeparator />
             <MenubarItem onClick={() => openDialog({ id: "settings" })}>Settings…</MenubarItem>
-            <MenubarItem onClick={() => openDialog({ id: "gameLink" })}>Game link…</MenubarItem>
-            <MenubarItem disabled={!canCheck} onClick={() => void checkForUpdates()}>Check for updates</MenubarItem>
+            <MenubarSeparator />
             <MenubarItem onClick={() => void quitApp()}>Quit</MenubarItem>
           </Menu>
         )
@@ -297,65 +378,70 @@ export function MenuBar() {
           </Menu>
         )}
       <Menu title="Edit">
-        <CommandItem action="undo" disabled={!canUndo}>Undo</CommandItem>
-        <CommandItem action="redo" disabled={!canRedo}>Redo</CommandItem>
+        <CommandItem action="undo" reason={canUndo ? null : "Nothing to undo."}>Undo</CommandItem>
+        <CommandItem action="redo" reason={canRedo ? null : "Nothing to redo."}>Redo</CommandItem>
         <MenubarSeparator />
-        <CommandItem action="cutSelection" disabled={!hasSelection}>Cut</CommandItem>
-        <CommandItem action="copySelection" disabled={!hasSelection}>Copy</CommandItem>
-        <CommandItem action="paste" disabled={!canPaste}>Paste</CommandItem>
-        <CommandItem action="duplicateSelection" disabled={!hasSelection}>Duplicate</CommandItem>
-        <CommandItem action="deleteSelection" disabled={!hasSelection}>Delete</CommandItem>
-        <CommandItem action="deselect" disabled={!hasSelection}>Deselect</CommandItem>
+        <CommandItem action="cutSelection" reason={selectionOff}>Cut</CommandItem>
+        <CommandItem action="copySelection" reason={selectionOff}>Copy</CommandItem>
+        <CommandItem action="paste" reason={canPaste ? null : "Copy something first."}>Paste</CommandItem>
+        <CommandItem action="duplicateSelection" reason={selectionOff}>Duplicate</CommandItem>
+        <CommandItem action="deleteSelection" reason={selectionOff}>Delete</CommandItem>
+        <CommandItem action="deselect" reason={selectionOff}>Deselect</CommandItem>
         <MenubarSeparator />
-        <CommandItem action="groupSelection" disabled={!canGroup}>Group</CommandItem>
-        <CommandItem action="ungroupSelection" disabled={!canUngroup}>Ungroup</CommandItem>
+        <CommandItem action="groupSelection" reason={canGroup ? null : "Select what to group first."}>
+          Group
+        </CommandItem>
+        <CommandItem action="ungroupSelection" reason={canUngroup ? null : "Select a group first."}>
+          Ungroup
+        </CommandItem>
         <MenubarSeparator />
         <SavePrefabItem item={MenubarItem} />
       </Menu>
       <Menu title="View">
-        <CommandItem action="focusSelection" disabled={!hasSelection} inset>Focus selection</CommandItem>
-        <CommandItem action="frameAll" inset>Frame all</CommandItem>
+        <MenuSection title="Camera">
+          <CommandItem action="focusSelection" reason={selectionOff} inset>Focus selection</CommandItem>
+          <CommandItem action="frameAll" inset>Frame all</CommandItem>
+        </MenuSection>
+        <MenubarSeparator />
+        <MenuSection title="Panels">
+          {viewMenuPanels.map(({ id, title }) => <PanelItem key={id} id={id} title={title} />)}
+          <MenubarItem inset onClick={resetDockLayout}>Reset layout</MenubarItem>
+        </MenuSection>
+        <MenubarSeparator />
         <PaneMenus />
         <MenubarSeparator />
-        {viewMenuPanels.map(({ id, title }) => <PanelItem key={id} id={id} title={title} />)}
-        <MenubarItem inset onClick={resetDockLayout}>Reset layout</MenubarItem>
-        <MenubarSeparator />
-        <SettingCheck section="appearance" flag="gridVisible">Show grid</SettingCheck>
-        <SettingCheck section="snapping" flag="enabled">Snap to grid</SettingCheck>
-        <RadioMenu
-          title="Grid size"
-          value={snapping.gridSize}
-          options={GRID_SIZES}
-          onPick={(gridSize) => void updateSettings("snapping", { enabled: true, gridSize })}
-        >
-          {(size) => <span className="tabular-nums">{formatGridSize(size, general.units)}</span>}
-        </RadioMenu>
-        <MenubarSeparator />
-        <SettingCheck section="lighting" flag="mapLighting">Map lighting</SettingCheck>
-        <SettingCheck section="lighting" flag="skyVisible">Show sky</SettingCheck>
-        <SettingCheck section="appearance" flag="waterVisible">Show water</SettingCheck>
-        <RadioMenu
-          title="Theme"
-          value={appearance.theme}
-          options={THEME_KEYS}
-          onPick={(theme) => void updateSettings("appearance", { theme })}
-        >
-          {(theme) => THEMES[theme]}
-        </RadioMenu>
+        <MenuSection title="Grid">
+          <SettingCheck section="appearance" flag="gridVisible">Show grid</SettingCheck>
+          <SettingCheck section="snapping" flag="enabled">Snap to grid</SettingCheck>
+          <RadioMenu
+            title="Grid size"
+            value={snapping.gridSize}
+            options={GRID_SIZES}
+            onPick={(gridSize) => void updateSettings("snapping", { enabled: true, gridSize })}
+          >
+            {(size) => <span className="tabular-nums">{formatGridSize(size, general.units)}</span>}
+          </RadioMenu>
+        </MenuSection>
       </Menu>
       {projects
         ? (
           <Menu title="Project">
             <CommandItem action="newMap" inset>New map</CommandItem>
-            <CommandItem action="openMap" inset disabled={untitled}>Import map…</CommandItem>
+            <CommandItem action="openMap" inset reason={untitled ? SAVE_PROJECT_FIRST : null}>Import map…</CommandItem>
             {canExport && (
               <>
+                <Item inset reason={prefabOff} onClick={() => void exportToGame()}>Export to game</Item>
+                <Item
+                  inset
+                  reason={reimportable === null ? "Export this map first: the game has no copy of it yet." : null}
+                  onClick={() => reimportable !== null && void reimportMap(reimportable)}
+                >
+                  Re-import from game
+                </Item>
+                {(canPlay || canLaunchGame) && <MenubarSeparator />}
+                {canPlay && <CommandItem action="playMap" inset reason={prefabOff}>Play</CommandItem>}
+                {canLaunchGame && <MenubarItem inset onClick={() => void launchGame()}>Open game (Steam)</MenubarItem>}
                 <MenubarSeparator />
-                <span title={inPrefab ? PREFAB_TAB_STAYS_HERE : undefined}>
-                  <MenubarItem inset disabled={inPrefab} onClick={() => void exportToGame()}>
-                    Export to game
-                  </MenubarItem>
-                </span>
                 <MenubarCheckboxItem
                   closeOnClick
                   checked={exportOnSave}
@@ -363,19 +449,6 @@ export function MenuBar() {
                 >
                   Export on save
                 </MenubarCheckboxItem>
-                <MenubarItem
-                  inset
-                  disabled={reimportable === null}
-                  onClick={() => reimportable !== null && void reimportMap(reimportable)}
-                >
-                  Re-import from game
-                </MenubarItem>
-                {canPlay && (
-                  <span title={inPrefab ? PREFAB_TAB_STAYS_HERE : undefined}>
-                    <CommandItem action="playMap" inset disabled={inPrefab}>Play</CommandItem>
-                  </span>
-                )}
-                {canLaunchGame && <MenubarItem inset onClick={() => void launchGame()}>Launch game</MenubarItem>}
               </>
             )}
             <MenubarSeparator />
@@ -384,11 +457,10 @@ export function MenuBar() {
         )
         : (
           <Menu title="Project">
-            <MenubarItem disabled={inPrefab} onClick={() => openDialog({ id: "mapSettings" })}>
-              Project settings…
-            </MenubarItem>
+            <Item reason={prefabOff} onClick={() => openDialog({ id: "mapSettings" })}>Project settings…</Item>
           </Menu>
         )}
+      <HelpMenu />
     </Menubar>
   )
 }

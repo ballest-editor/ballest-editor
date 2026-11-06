@@ -333,6 +333,27 @@ export interface NamedAction {
   readonly label: string
 }
 
+/** The sections that all move the camera. The game's two are kept apart in Settings, under the game's own names. */
+const CAMERA_SECTIONS: ReadonlySet<string> = new Set([
+  "mouse and keyboard free camera",
+  "mouse and keyboard bindings",
+  "editor camera"
+])
+
+/** `named` as the keybind cheat sheet groups it: by section, first seen first, with the camera's sections as one. */
+export const cheatSheetSections = (
+  named: ReadonlyArray<NamedAction>
+): ReadonlyArray<{ readonly section: string; readonly actions: ReadonlyArray<NamedAction> }> => {
+  const sections = new Map<string, Array<NamedAction>>()
+  for (const action of named) {
+    const section = CAMERA_SECTIONS.has(action.section) ? "camera" : action.section
+    const actions = sections.get(section)
+    if (actions === undefined) sections.set(section, [action])
+    else actions.push(action)
+  }
+  return Array.from(sections, ([section, actions]) => ({ section, actions }))
+}
+
 /**
  * Every action with the section and label to show it under (keybinds.json naming when the
  * extractor provides it, else the built-in table), ordered by section: ours first in table
