@@ -32,7 +32,7 @@ function ExternalLink({ children, url }: { readonly children: string; readonly u
   return (
     <button
       type="button"
-      className="rounded-control underline underline-offset-3 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      className="rounded-control underline underline-offset-3 focus-ring hover:text-foreground"
       onClick={() => void openExternalLink(url)}
     >
       {children}

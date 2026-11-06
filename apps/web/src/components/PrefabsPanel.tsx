@@ -73,7 +73,7 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
   }
   return (
     <li
-      className="group flex h-8 min-w-0 items-center gap-1 rounded-control pr-1 transition-colors duration-150 ease-out hover:bg-accent"
+      className="group flex h-8 min-w-0 items-center gap-1 rounded-control pr-1 transition-colors focus-ring-row hover:bg-hover active:bg-pressed"
       onContextMenu={onContextMenu}
     >
       <button
@@ -81,8 +81,7 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
         draggable={readable}
         title={readable ? prefab.path ?? name : "Can't be read as a prefab"}
         className={cn(
-          "flex h-full min-w-0 flex-1 items-center gap-2 rounded-control pl-2 text-left outline-none",
-          "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+          "flex h-full min-w-0 flex-1 items-center gap-2 rounded-control pl-2 text-left focus-visible:outline-none",
           readable ? "cursor-grab active:cursor-grabbing" : "text-fg-disabled"
         )}
         disabled={!readable}

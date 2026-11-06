@@ -4,6 +4,8 @@
 @import "@fontsource-variable/geist-mono";
 
 @custom-variant dark (&:is(.dark *));
+/* Tailwind's own `hover:` is off under `(hover: none)`, which a window with a mouse can report: nothing would lift but the dock's tabs. */
+@custom-variant hover (&:hover);
 @source "../../../apps/**/*.{ts,tsx}";
 @source "../../../components/**/*.{ts,tsx}";
 @source "../**/*.{ts,tsx}";
@@ -14,29 +16,34 @@
  * a status, and it means "interactive". The game's colours live in the viewport.
  */
 :root {
-    --background: oklch(0.968 0.003 250);
+    --background: oklch(0.956 0.004 250);
     --foreground: oklch(0.225 0.01 250);
-    --card: oklch(0.992 0.0015 250);
+    --card: oklch(1 0 0);
     --card-foreground: oklch(0.225 0.01 250);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.225 0.01 250);
     --primary: oklch(0.52 0.095 210);
     --primary-foreground: oklch(0.99 0.002 250);
-    --secondary: oklch(0.94 0.004 250);
+    --secondary: oklch(0.928 0.004 250);
     --secondary-foreground: oklch(0.225 0.01 250);
-    --muted: oklch(0.948 0.004 250);
+    --muted: oklch(0.936 0.004 250);
     /* Text below --foreground, one step each: docs/design/ui-system.md. */
     --fg-secondary: oklch(0.355 0.012 250);
     --fg-tertiary: oklch(0.48 0.012 250);
     --fg-disabled: oklch(0.7 0.01 250);
-    --accent: oklch(0.952 0.004 250);
+    --accent: oklch(0.94 0.004 250);
     --accent-foreground: oklch(0.225 0.01 250);
     --destructive: oklch(0.52 0.18 27);
     /* The hairline, and the well a field sits in: both alpha, so they hold on every surface. */
     --border: oklch(0.225 0.01 250 / 10%);
     --input: oklch(0.225 0.01 250 / 3%);
+    /* What a pointer does to anything it can act on: the foreground as a wash. docs/design/ui-system.md § Hover and press. */
+    --hover: oklch(0.225 0.01 250 / 10%);
+    --pressed: oklch(0.225 0.01 250 / 16%);
+    /* The 1px edge of what floats. */
+    --edge: oklch(0 0 0 / 8%);
     --ring: oklch(0.52 0.095 210);
-    --dirty: oklch(0.56 0.114 85);
+    --dirty: oklch(0.535 0.105 85);
     --chart-1: oklch(0.52 0.095 210);
     --chart-2: oklch(0.42 0.085 165);
     --chart-3: oklch(0.46 0.095 65);
@@ -46,7 +53,7 @@
     --sidebar-foreground: oklch(0.225 0.01 250);
     --sidebar-primary: oklch(0.52 0.095 210);
     --sidebar-primary-foreground: oklch(0.99 0.002 250);
-    --sidebar-accent: oklch(0.952 0.004 250);
+    --sidebar-accent: oklch(0.94 0.004 250);
     --sidebar-accent-foreground: oklch(0.225 0.01 250);
     --sidebar-border: oklch(0.225 0.01 250 / 10%);
     --sidebar-ring: oklch(0.52 0.095 210);
@@ -55,7 +62,7 @@
     --status-ok-foreground: oklch(0.42 0.085 165);
     --status-warn: oklch(0.95 0.04 85);
     --status-warn-foreground: oklch(0.46 0.095 65);
-    --status-neutral: oklch(0.94 0.008 250);
+    --status-neutral: oklch(0.928 0.008 250);
     --status-neutral-foreground: oklch(0.42 0.025 250);
     --difficulty-1: oklch(0.225 0.01 250);
     --difficulty-2: oklch(0.55 0.12 155);
@@ -89,6 +96,9 @@
     --destructive: oklch(0.7 0.188 25);
     --border: oklch(1 0 0 / 11%);
     --input: oklch(0 0 0 / 24%);
+    --hover: oklch(0.975 0.0035 250 / 10%);
+    --pressed: oklch(0.975 0.0035 250 / 16%);
+    --edge: oklch(0.975 0.0035 250 / 8%);
     --ring: oklch(0.72 0.124 210);
     --dirty: oklch(0.86 0.175 95);
     --chart-1: oklch(0.72 0.124 210);
@@ -142,6 +152,11 @@
     --color-destructive: var(--destructive);
     --color-border: var(--border);
     --color-input: var(--input);
+    --color-hover: var(--hover);
+    --color-pressed: var(--pressed);
+    --color-edge: var(--edge);
+    /* `bg-primary/12` by a name, so `lift-selected` can take it. */
+    --color-selected: color-mix(in srgb, var(--primary) 12%, transparent);
     --color-dirty: var(--dirty);
     --color-ring: var(--ring);
     --color-chart-1: var(--chart-1);
@@ -244,6 +259,64 @@
 }
 
 /*
+ * `bg-hover` and `bg-pressed`, for what already has a fill of its own: the same wash, mixed into `--color-<name>` because
+ * a background has one colour. `hover:lift-primary active:press-primary`. The percentages are `--hover`'s and `--pressed`'s.
+ */
+@utility lift-* {
+  background-color: color-mix(in srgb, --value(--color-*), var(--foreground) 10%);
+}
+
+@utility press-* {
+  background-color: color-mix(in srgb, --value(--color-*), var(--foreground) 16%);
+}
+
+/*
+ * The one keyboard focus, each of these the same ring: docs/design/ui-system.md § Focus. An outline, so it follows the
+ * radius and leaves box-shadows alone. Only its style changes on focus, so a `transition-all` has nothing to animate.
+ * `-inset` turns it inwards, for what fills a strip or a scroller that would clip it. `-within` is for a field whose focus
+ * is on its input, and `-row` for a row whose focus is on its first child, a button: the row's other buttons ring themselves.
+ */
+@utility focus-ring {
+  outline: 2px none var(--ring);
+  outline-offset: 2px;
+  &:focus-visible {
+    outline-style: solid;
+  }
+}
+
+@utility focus-ring-inset {
+  outline: 2px none var(--ring);
+  outline-offset: -4px;
+  &:focus-visible {
+    outline-style: solid;
+  }
+}
+
+@utility focus-ring-within {
+  outline: 2px none var(--ring);
+  outline-offset: 2px;
+  &:has(:focus-visible) {
+    outline-style: solid;
+  }
+}
+
+@utility focus-ring-row {
+  outline: 2px none var(--ring);
+  outline-offset: 2px;
+  &:has(> button:first-child:focus-visible) {
+    outline-style: solid;
+  }
+}
+
+@utility focus-ring-row-inset {
+  outline: 2px none var(--ring);
+  outline-offset: -4px;
+  &:has(> button:first-child:focus-visible) {
+    outline-style: solid;
+  }
+}
+
+/*
  * Animation speed (the editor's Settings › Appearance): `--motion` on <html> scales every duration, 0 turns animation
  * off. It goes into the theme's default transition duration, the `duration-*` utilities (so a `duration-300` is 300ms
  * at Normal) and the fallback of tw-animate's enter and exit animations; nothing is forced on elements that set their
@@ -254,7 +327,7 @@
 }
 
 @theme inline {
-  --default-transition-duration: calc(150ms * var(--motion));
+  --default-transition-duration: calc(120ms * var(--motion));
   --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
   --animate-in: enter var(--tw-animation-duration, var(--tw-duration, calc(0.15s * var(--motion)))) var(--tw-ease, cubic-bezier(0, 0, 0.2, 1))
     var(--tw-animation-delay, 0s) var(--tw-animation-iteration-count, 1) var(--tw-animation-direction, normal)

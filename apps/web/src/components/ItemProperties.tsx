@@ -179,7 +179,7 @@ function ColorValue({ color, id }: { readonly color: ColorProperty; readonly id:
         id={id}
         title={mixed ? "Mixed" : hex}
         aria-label={mixed ? `${color.label}: mixed` : `${color.label}: ${hex}`}
-        className="flex h-7 w-full min-w-0 cursor-pointer items-center justify-center overflow-hidden rounded-control text-body text-fg-tertiary transition-shadow duration-150 ease-out hover:ring-foreground/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className="flex h-7 w-full min-w-0 cursor-pointer items-center justify-center overflow-hidden rounded-control text-body text-fg-tertiary transition-shadow focus-ring hover:ring-foreground/40"
         render={<ColorSwatch color={mixed ? null : hex} className="rounded-control" />}
       >
         {mixed && "Mixed"}

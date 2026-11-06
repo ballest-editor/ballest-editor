@@ -197,7 +197,7 @@ function Pill(
                   className={cn(
                     "h-5 px-1.5 tabular-nums",
                     offer === "ready" &&
-                      "bg-primary text-primary-foreground hover:bg-primary/85 hover:text-primary-foreground aria-expanded:bg-primary/85 aria-expanded:text-primary-foreground"
+                      "bg-primary text-primary-foreground hover:lift-primary hover:text-primary-foreground active:press-primary aria-expanded:lift-primary aria-expanded:text-primary-foreground"
                   )}
                 />
               }
@@ -220,7 +220,7 @@ function Pill(
           ref={notes}
           tabIndex={0}
           aria-label="Release notes"
-          className="max-h-[min(50vh,22rem)] overflow-y-auto border-t px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-inset dark:scheme-dark"
+          className="max-h-[min(50vh,22rem)] overflow-y-auto border-t px-3 py-2.5 focus-ring-inset dark:scheme-dark"
         >
           {state.releaseNotes === null
             ? <p className="text-fg-tertiary">This release has no notes.</p>

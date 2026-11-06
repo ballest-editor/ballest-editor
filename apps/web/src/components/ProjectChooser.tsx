@@ -74,8 +74,8 @@ function RecentRow({ project, elsewhere, first, nameShared, now }: {
   return (
     <li
       className={cn(
-        "flex h-8 items-center gap-1 rounded-control pr-1 hover:bg-muted",
-        !resting && "has-[button:focus-visible]:bg-muted"
+        "flex h-8 items-center gap-1 rounded-control pr-1 transition-colors hover:bg-hover active:bg-pressed",
+        !resting && "focus-ring-row"
       )}
     >
       <Tooltip
@@ -94,7 +94,7 @@ function RecentRow({ project, elsewhere, first, nameShared, now }: {
                 autoFocus={first}
                 aria-disabled={elsewhere}
                 className={cn(
-                  "flex h-full min-w-0 flex-1 items-center gap-2 pl-2 text-left outline-none",
+                  "flex h-full min-w-0 flex-1 items-center gap-2 pl-2 text-left focus-visible:outline-none",
                   elsewhere && "cursor-default"
                 )}
                 onClick={elsewhere ? undefined : () => void switchProject(path)}

@@ -12,7 +12,7 @@ const present = (notice: NotificationRecord) => {
   toast.custom(
     (id) => (
       // a toast behind the front one is as tall as the front one, as sonner's own are
-      <div className="w-(--width) glass overflow-hidden rounded-sheet p-2 text-popover-foreground shadow-md ring-1 ring-foreground/8 in-data-[front=false]:in-data-[expanded=false]:max-h-(--front-toast-height)">
+      <div className="w-(--width) glass overflow-hidden rounded-sheet p-2 text-popover-foreground shadow-md ring-1 ring-edge in-data-[front=false]:in-data-[expanded=false]:max-h-(--front-toast-height)">
         <NoticeRow
           notice={notice}
           actions={notice.actions.slice(0, 1)}

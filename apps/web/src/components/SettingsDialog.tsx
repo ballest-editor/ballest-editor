@@ -152,7 +152,7 @@ function ColorSetting(props: {
     <Popover>
       <PopoverTrigger
         aria-label={`${props.label}: ${props.value ?? `automatic (${props.auto})`}`}
-        className="flex h-7 w-40 cursor-pointer items-center gap-2 rounded-control border border-border/70 bg-input px-2 text-body transition-colors duration-150 ease-out hover:border-ring/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+        className="flex h-7 w-40 cursor-pointer items-center gap-2 rounded-control border border-border/70 bg-input px-2 text-body transition-colors focus-ring hover:border-ring/60"
       >
         <ColorSwatch color={shown} />
         <span className={cn("tabular-nums", props.value === null && "text-fg-tertiary")}>{shown}</span>
@@ -209,7 +209,7 @@ function KeybindControl(props: {
             >
               <button
                 type="button"
-                className="flex cursor-pointer items-center justify-center px-2.5 transition-colors duration-150 ease-out hover:bg-foreground/10"
+                className="flex cursor-pointer items-center justify-center px-2.5 transition-colors focus-ring-inset hover:bg-hover active:bg-pressed"
                 onClick={() => props.onListen(index)}
                 aria-label={`Rebind ${label} (${formatBinding(binding)})`}
               >
@@ -233,7 +233,7 @@ function KeybindControl(props: {
             {props.bindings.length === 0 && <span className="px-1 text-caption text-fg-tertiary">Unbound</span>}
             <button
               type="button"
-              className="inline-flex size-6 items-center justify-center rounded-full bg-muted text-fg-secondary transition-colors duration-150 ease-out hover:bg-foreground/10 hover:text-foreground"
+              className="inline-flex size-6 items-center justify-center rounded-full bg-muted text-fg-secondary transition-colors focus-ring hover:lift-muted hover:text-foreground active:press-muted"
               onClick={() => props.onListen(props.bindings.length)}
               aria-label={props.bindings.length === 0 ? `Bind ${label}` : `Add a binding for ${label}`}
             >

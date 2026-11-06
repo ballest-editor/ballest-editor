@@ -63,10 +63,11 @@ function RowDetails(
 }
 
 const ROW_CLASSES =
-  "group flex h-6 min-w-0 items-center gap-1.5 rounded-control pl-2 text-body hover:bg-accent has-[button:focus-visible]:bg-accent"
+  "group flex h-6 min-w-0 items-center gap-1.5 rounded-control pl-2 text-body transition-colors focus-ring-row hover:bg-hover active:bg-pressed"
 
 /** The map in the active tab: tinted, with a bar at its left, so it reads at a glance. */
-const ACTIVE_ROW_CLASSES = "bg-primary/12 text-foreground shadow-[inset_2px_0_0_0] shadow-primary hover:bg-primary/20"
+const ACTIVE_ROW_CLASSES =
+  "bg-selected text-foreground shadow-[inset_2px_0_0_0] shadow-primary hover:lift-selected active:press-selected"
 
 /**
  * One of the project's maps: a click opens it, its menu (also on right-click) holds what used to be the Project menu's
@@ -93,7 +94,7 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
           render={
             <button
               type="button"
-              className="flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none"
+              className="flex min-w-0 flex-1 items-center gap-1.5 text-left focus-visible:outline-none"
               onClick={() => void openProjectMap(map.fileName)}
             />
           }
@@ -164,7 +165,7 @@ function UnsavedRow({ tabId }: { readonly tabId: string }) {
           render={
             <button
               type="button"
-              className="flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none"
+              className="flex min-w-0 flex-1 items-center gap-1.5 text-left focus-visible:outline-none"
               onClick={() => activateTab(tabId)}
             />
           }

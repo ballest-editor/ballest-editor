@@ -87,7 +87,7 @@ function AxesToggle({ disabled }: { readonly disabled: boolean }) {
           onPressedChange={toggleGizmoSpace}
           disabled={disabled}
           aria-label={label}
-          className={cn(SEGMENT, "aria-pressed:bg-transparent aria-pressed:hover:bg-accent")}
+          className={cn(SEGMENT, "aria-pressed:bg-transparent aria-pressed:hover:bg-hover")}
           {...noFocus}
         />
       }
@@ -272,7 +272,7 @@ function SnapGroup<V extends number>(props: {
               tabIndex={-1}
               className={cn(
                 SEGMENT,
-                "border-none bg-transparent px-2 tabular-nums data-[size=default]:h-full dark:bg-transparent dark:hover:bg-accent [&>svg]:hidden",
+                "border-none bg-transparent px-2 tabular-nums data-[size=default]:h-full dark:bg-transparent [&>svg]:hidden",
                 enabled ? "text-foreground" : "text-fg-tertiary"
               )}
             />

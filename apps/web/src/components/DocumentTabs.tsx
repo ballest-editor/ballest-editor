@@ -158,11 +158,10 @@ function DocumentTab({ id, index, drag, onDrag }: {
         ref={ref}
         draggable
         className={cn(
-          "group relative flex h-full max-w-56 shrink-0 cursor-grab items-center gap-1 rounded-t-control pr-1 pl-2 transition-[background-color,color,opacity] active:cursor-grabbing",
+          "group relative flex h-full max-w-56 shrink-0 cursor-grab items-center gap-1 rounded-t-control pr-1 pl-2 transition-[background-color,color,opacity] focus-ring-row-inset active:cursor-grabbing",
           active
             ? "dock-active-tab bg-card text-foreground"
-            : "text-fg-secondary hover:bg-accent hover:text-accent-foreground",
-          "has-[button:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring)]",
+            : "text-fg-secondary hover:bg-hover hover:text-accent-foreground active:bg-pressed",
           drag?.id === id && "opacity-40",
           // where a dragged tab would land
           drag?.at === index &&
@@ -192,7 +191,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
                 type="button"
                 role="tab"
                 aria-selected={active}
-                className="flex h-full min-w-0 cursor-[inherit] items-center outline-none"
+                className="flex h-full min-w-0 cursor-[inherit] items-center focus-visible:outline-none"
                 onClick={() => activateTab(id)}
               />
             }

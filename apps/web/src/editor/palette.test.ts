@@ -18,6 +18,13 @@ const oklchOf = (tokens: ReadonlyMap<string, string>, name: string): Rgb => {
   return [Number(match[1]), Number(match[2]), Number(match[3])]
 }
 
+/** An alpha token's colour and alpha, as `oklchOf` won't read them. */
+const washOf = (tokens: ReadonlyMap<string, string>, name: string) => {
+  const match = tokens.get(name)?.match(/^oklch\(([\d.]+) ([\d.]+) ([\d.]+) \/ ([\d.]+)%\)$/)
+  if (!match) throw new Error(`--${name} isn't an alpha oklch(): ${tokens.get(name)}`)
+  return { oklch: [Number(match[1]), Number(match[2]), Number(match[3])] as Rgb, alpha: Number(match[4]) / 100 }
+}
+
 /** OKLCH to linear sRGB (Ottosson's matrices). A channel outside 0 to 1 is outside sRGB. */
 const unclippedOf = ([lightness, chroma, hue]: Rgb): Rgb => {
   const a = chroma * Math.cos((hue * Math.PI) / 180)
@@ -48,6 +55,9 @@ const over = (top: Rgb, alpha: number, under: Rgb): Rgb => {
   return [mix(0), mix(1), mix(2)]
 }
 
+/** The 8-bit sRGB a browser shows for a linear colour. */
+const shownOf = (rgb: Rgb) => rgb.map((channel) => Math.round(encoded(channel) * 255))
+
 const contrast = (a: Rgb, b: Rgb) => {
   const luminance = ([r, g, bl]: Rgb) => 0.2126 * r + 0.7152 * g + 0.0722 * bl
   const [low, high] = [luminance(a), luminance(b)].sort((x, y) => x - y)
@@ -61,17 +71,27 @@ const GRAPHIC = 3
 /** The steps' contrast on --card, as docs/design/ui-system.md gives them. */
 const STEPS = {
   dark: { foreground: 16, "fg-secondary": 8.5, "fg-tertiary": 5.5, "fg-disabled": 3.2 },
-  light: { "fg-secondary": 10.7, "fg-tertiary": 6.3, "fg-disabled": 2.6 }
+  light: { "fg-secondary": 11, "fg-tertiary": 6.5, "fg-disabled": 2.6 }
 }
 
 const PANELS = ["card", "popover"]
 const SURFACES = ["background", "card", "popover"]
+/** Everything a hover lands on: the strips, the panels, the menus, and a segmented control's track. */
+const HOVERED = [...SURFACES, "muted"]
+/** A wash moves a surface a share of the way to the foreground, so a surface further from it moves a little more. */
+const MAX_LIFT_SPREAD = 1 / 8
 /** Past this a surface starts to read as blue: docs/design/ui-system.md § Colour. */
 const MAX_SURFACE_CHROMA = 0.012
 const STATUSES = ["status-ok", "status-warn", "status-neutral"]
 
 const pairsOf = (theme: "dark" | "light"): ReadonlyArray<readonly [string, string, number]> => [
   ...Object.entries(STEPS[theme]).map(([step, bar]) => [step, "card", bar] as const),
+  // the strips sit on --background, with the dirty dot, the active tab's underline and the inactive tabs' text
+  ["foreground", "background", TEXT],
+  ["fg-secondary", "background", TEXT],
+  ["fg-tertiary", "background", TEXT],
+  ["primary", "background", TEXT],
+  ["dirty", "background", TEXT],
   ...PANELS.flatMap((panel) => [
     ["foreground", panel, TEXT] as const,
     ["fg-secondary", panel, TEXT] as const,
@@ -106,11 +126,37 @@ describe("the palette", () => {
       })
     }
 
-    // A menu row's focus is bg-foreground/8 under text-accent-foreground, on the glass's own surface.
-    it(`${theme}: a focused menu item can be read`, () => {
-      const row = over(color("foreground"), 0.08, color("popover"))
-      assert.isAtLeast(contrast(color("accent-foreground"), row), TEXT)
+    const hover = washOf(tokens, "hover")
+    const pressed = washOf(tokens, "pressed")
+    const washed = (wash: typeof hover, surface: Rgb) => over(linearOf(wash.oklch), wash.alpha, surface)
+
+    // docs/design/ui-system.md § Hover and press
+    it(`${theme}: --hover and --pressed are the foreground at 10% and 16%`, () => {
+      assert.deepEqual(hover.oklch, oklchOf(tokens, "foreground"))
+      assert.deepEqual(pressed.oklch, oklchOf(tokens, "foreground"))
+      assert.strictEqual(hover.alpha, 0.1)
+      assert.strictEqual(pressed.alpha, 0.16)
     })
+
+    for (const wash of [hover, pressed]) {
+      it(`${theme}: a ${wash.alpha * 100}% wash lands the same on every surface`, () => {
+        const lifts = HOVERED.map((name) => {
+          const surface = shownOf(color(name))
+          const lifted = shownOf(washed(wash, color(name)))
+          return lifted.reduce((sum, channel, i) => sum + Math.abs(channel - (surface[i] ?? 0)), 0) / 3
+        })
+        assert.isAtMost((Math.max(...lifts) - Math.min(...lifts)) / Math.max(...lifts), MAX_LIFT_SPREAD)
+      })
+
+      // A segmented item on --muted goes to text-foreground under the pointer, so only the panels hold fg-secondary.
+      for (const surface of HOVERED) {
+        it(`${theme}: text can be read under a ${wash.alpha * 100}% wash on --${surface}`, () => {
+          for (const text of surface === "muted" ? ["foreground"] : ["foreground", "fg-secondary"]) {
+            assert.isAtLeast(contrast(color(text), washed(wash, color(surface))), TEXT)
+          }
+        })
+      }
+    }
 
     // bg-primary/12: everything a selected row holds has to survive the wash.
     for (const panel of PANELS) {
@@ -136,24 +182,48 @@ describe("the palette", () => {
       })
     }
 
-    // bg-foreground/6 on a panel and /8 on a menu: docs/design/ui-system.md § Colour.
     it(`${theme}: a hover rises further than the surfaces step`, () => {
-      const step = contrast(color("card"), color("popover"))
-      assert.isAbove(contrast(over(color("foreground"), 0.06, color("card")), color("card")), step)
-      assert.isAbove(contrast(over(color("foreground"), 0.08, color("popover")), color("popover")), step)
+      const step = contrast(color("background"), color("card"))
+      for (const surface of PANELS) {
+        assert.isAbove(contrast(washed(hover, color(surface)), color(surface)), step)
+      }
     })
 
-    it(`${theme}: each surface rises above the last, with no hue to name`, () => {
+    it(`${theme}: each surface sits above the last, with no hue to name`, () => {
       const [background, card, popover] = SURFACES.map((name) => oklchOf(tokens, name))
       assert.isBelow(background?.[0] ?? 1, card?.[0] ?? 0)
-      assert.isBelow(card?.[0] ?? 1, popover?.[0] ?? 0)
+      assert.isAtMost(card?.[0] ?? 1, popover?.[0] ?? 0)
       for (const name of [...SURFACES, "muted", "accent", "secondary"]) {
         assert.isAtMost(oklchOf(tokens, name)[1], MAX_SURFACE_CHROMA)
       }
     })
   }
 
+  // lift-* and press-* can't read an alpha out of a colour, so they spell the tokens' percentages.
+  it("a fill's lift is the same wash as bg-hover and bg-pressed", () => {
+    for (const [utility, token] of [["lift", "hover"], ["press", "pressed"]] as const) {
+      const percent = css.match(new RegExp(`@utility ${utility}-\\* \\{[^}]*var\\(--foreground\\) ([\\d.]+)%`))?.[1]
+      assert.strictEqual(Number(percent) / 100, washOf(THEMES.light, token).alpha)
+    }
+  })
+
   const dark = THEMES.dark
+  const light = THEMES.light
+
+  // docs/design/ui-system.md § Colour gives these as hex, and the reviewer samples them on screen.
+  it("light: the surfaces are the panel's grey and white", () => {
+    const hexOf = (name: string) =>
+      `#${shownOf(linearOf(oklchOf(light, name))).map((channel) => channel.toString(16).padStart(2, "0")).join("")}`
+    assert.strictEqual(hexOf("background"), "#eef1f3")
+    assert.strictEqual(hexOf("card"), "#ffffff")
+    assert.strictEqual(hexOf("popover"), "#ffffff")
+  })
+
+  // A card and a popover are the same white, so all that holds a menu off a panel is its shadow and its edge.
+  it("light: what floats has a 12% shadow and an 8% black edge", () => {
+    assert.strictEqual(washOf(light, "shadow-float").alpha, 0.12)
+    assert.deepEqual(washOf(light, "edge"), { oklch: [0, 0, 0] as Rgb, alpha: 0.08 })
+  })
 
   // A track or a key chip sits on --popover in a dialog or a menu, so it can't share that tone.
   it("dark: the neutral fills rise above --popover", () => {

@@ -10,7 +10,7 @@ function ExternalLink({ href, children }: { readonly href: string; readonly chil
     <a
       href={href}
       title={href}
-      className="text-foreground underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground"
+      className="rounded-control text-foreground underline decoration-foreground/30 underline-offset-2 focus-ring hover:decoration-foreground"
       onClick={(e) => {
         e.preventDefault()
         void openExternalLink(href)

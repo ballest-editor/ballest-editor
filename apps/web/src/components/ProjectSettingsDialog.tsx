@@ -169,7 +169,7 @@ function TagChips(
             key={tag}
             pressed={on}
             onPressedChange={(next) => onChange(withTag(levelData, name, next))}
-            className="rounded-full bg-muted px-3 text-fg-secondary transition-colors duration-150 ease-out hover:bg-foreground/10 aria-pressed:bg-primary/12 aria-pressed:text-foreground aria-pressed:hover:bg-primary/20"
+            className="rounded-full bg-muted px-3 text-fg-secondary transition-colors hover:lift-muted active:press-muted aria-pressed:bg-selected aria-pressed:text-foreground aria-pressed:hover:lift-selected aria-pressed:active:press-selected"
           >
             {on && <IconCheck data-icon="inline-start" />}
             {tag}

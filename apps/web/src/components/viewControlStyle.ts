@@ -14,7 +14,7 @@ export const GROUP_DIVIDER = "mx-0.5 h-4 w-px shrink-0 bg-border"
 
 /** A button in a group. */
 export const SEGMENT =
-  "flex h-full min-w-7 items-center justify-center gap-1.5 rounded-full px-2 text-fg-secondary outline-none transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground disabled:text-fg-disabled"
+  "flex h-full min-w-7 items-center justify-center gap-1.5 rounded-full px-2 text-fg-secondary transition-colors focus-ring hover:bg-hover hover:text-foreground active:bg-pressed aria-expanded:bg-hover aria-expanded:text-foreground disabled:text-fg-disabled"
 
 /** Keeps keyboard focus with the viewport: no focus on mousedown, no Space/Enter activation. */
 export const noFocus = {

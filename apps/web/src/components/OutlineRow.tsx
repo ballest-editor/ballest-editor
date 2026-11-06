@@ -131,8 +131,8 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
       {...(isGroup && { "aria-expanded": !row.collapsed })}
       data-row-index={rowIndex}
       className={cn(
-        "absolute inset-x-0 flex items-center pr-2 text-body hover:bg-muted/60",
-        selected && "bg-primary/12 hover:bg-primary/15",
+        "absolute inset-x-0 flex items-center pr-2 text-body transition-colors hover:bg-hover active:bg-pressed",
+        selected && "bg-selected hover:lift-selected active:press-selected",
         partial && !selected && "bg-primary/5",
         entered && "shadow-[inset_2px_0_0_var(--primary)]",
         dimmed && "text-fg-disabled **:text-fg-disabled [&_img]:opacity-50",
