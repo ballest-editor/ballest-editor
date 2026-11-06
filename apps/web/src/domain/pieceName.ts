@@ -18,6 +18,8 @@ type Named = Pick<CatalogPiece, "className" | "displayName">
 
 const SIZE_WORDS: Readonly<Record<PieceSize, string>> = { S: "Small", M: "Medium", L: "Large" }
 
+const SIZE_RANKS: Readonly<Record<PieceSize, number>> = { S: 0, M: 1, L: 2 }
+
 const SIZES: Readonly<Record<string, PieceSize>> = {
   S: "S",
   M: "M",
@@ -128,6 +130,28 @@ export const pieceLabelOf = (piece: Named): string => joined(piece, " ")
 
 /** The name with the size set apart ("Curve 1 · Medium"), for a tooltip's first line. */
 export const pieceTitleOf = (piece: Named): string => joined(piece, " · ")
+
+/**
+ * Each family of sizes together where its first piece stands, smallest first: the game's own order has Curve 2 as M, S,
+ * L and Track as S, L with M further on. A family is the pieces sharing a name; a piece with no size stays where it is.
+ */
+export const inSizeOrder = <P extends Named>(pieces: ReadonlyArray<P>): ReadonlyArray<P> => {
+  const families = new Map<string, Array<{ readonly piece: P; readonly size: PieceSize }>>()
+  for (const piece of pieces) {
+    const { name, size } = pieceDisplayName(piece)
+    if (size !== undefined) families.set(name, [...families.get(name) ?? [], { piece, size }])
+  }
+  const placed = new Set<string>()
+  return pieces.flatMap((piece) => {
+    const { name, size } = pieceDisplayName(piece)
+    if (size === undefined) return [piece]
+    if (placed.has(name)) return []
+    placed.add(name)
+    return (families.get(name) ?? [])
+      .toSorted((a, b) => SIZE_RANKS[a.size] - SIZE_RANKS[b.size])
+      .map((member) => member.piece)
+  })
+}
 
 /** A class or asset name written out: "BP_SkyBlue_Metal" reads "Sky Blue Metal". For names that aren't pieces. */
 export const humanizedClass = (className: string): string =>

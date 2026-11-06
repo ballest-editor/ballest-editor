@@ -9,6 +9,7 @@
  */
 import { Option, Schema } from "effect"
 import { PropertyList } from "./MapFile"
+import { inSizeOrder } from "./pieceName"
 import { open } from "./schema"
 
 const Vec3Tuple = Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite])
@@ -271,7 +272,7 @@ export interface PaletteSection {
 
 /**
  * Palette sections: in-game categories in file order, then "Other" (no category), then the
- * pieces the in-game browser doesn't show (`inPalette: false`). Piece order is file order.
+ * pieces the in-game browser doesn't show (`inPalette: false`). Piece order is file order, but for `inSizeOrder`.
  */
 export const paletteSections = (pieces: ReadonlyArray<CatalogPiece>): ReadonlyArray<PaletteSection> => {
   const byCategory = new Map<string, Array<CatalogPiece>>()
@@ -287,9 +288,9 @@ export const paletteSections = (pieces: ReadonlyArray<CatalogPiece>): ReadonlyAr
     }
   }
   return [
-    ...[...byCategory].map(([name, list]) => ({ name, pieces: list, hidden: false })),
-    ...(other.length > 0 ? [{ name: OTHER_SECTION, pieces: other, hidden: false }] : []),
-    ...(hidden.length > 0 ? [{ name: HIDDEN_SECTION, pieces: hidden, hidden: true }] : [])
+    ...[...byCategory].map(([name, list]) => ({ name, pieces: inSizeOrder(list), hidden: false })),
+    ...(other.length > 0 ? [{ name: OTHER_SECTION, pieces: inSizeOrder(other), hidden: false }] : []),
+    ...(hidden.length > 0 ? [{ name: HIDDEN_SECTION, pieces: inSizeOrder(hidden), hidden: true }] : [])
   ]
 }
 
