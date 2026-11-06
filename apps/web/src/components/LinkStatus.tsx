@@ -118,6 +118,9 @@ export function LinkStatus() {
       lines={
         <>
           {detail !== null && <p className="text-fg-tertiary">{detail}</p>}
+          {status === "notExported" && (
+            <p className="text-fg-tertiary">Export puts this map in the game's maps folder.</p>
+          )}
           {exported !== null && (
             <Tooltip>
               <TooltipTrigger render={<p className="w-fit text-fg-tertiary" />}>

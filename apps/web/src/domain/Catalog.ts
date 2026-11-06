@@ -307,6 +307,7 @@ export const paletteSections = (pieces: ReadonlyArray<CatalogPiece>): ReadonlyAr
 }
 
 const NO_MESH = "This piece has no mesh to show."
+const REJECTED = "The game can't load this piece; maps that use it open blank."
 
 /** The user's words for why the extractor couldn't resolve a class; its own reasons are notes for whoever runs it. */
 const unresolvedCopyOf = (reason: string): string => {
@@ -319,7 +320,7 @@ const unresolvedCopyOf = (reason: string): string => {
 /**
  * Why a piece can't be placed, as the user reads it, or undefined if it can: the extractor lists it as unresolved (base
  * classes, runtime-generated geometry, a class the game dropped), the in-game editor rejects it, or it has no mesh of
- * any kind. Unresolved comes first, because what `verified.json` notes about such a class is written for this repo.
+ * any kind. Unresolved comes first, because it says more: a class the game dropped is rejected too.
  */
 export const unavailableReasonOf = (
   index: CatalogIndex,
@@ -328,11 +329,7 @@ export const unavailableReasonOf = (
 ): string | undefined => {
   const unresolved = index.unresolvedReasons.get(piece.classPath)
   if (unresolved !== undefined) return unresolvedCopyOf(unresolved)
-  if (verificationOf(piece, verified) === "rejected") {
-    return `The in-game editor rejects this piece${
-      verified[piece.className]?.note ? ` (${verified[piece.className]?.note})` : ""
-    }.`
-  }
+  if (verificationOf(piece, verified) === "rejected") return REJECTED
   return piece.meshAssetPath === null && (piece.extraMeshes ?? []).length === 0 ? NO_MESH : undefined
 }
 
@@ -344,6 +341,7 @@ export const VerificationStatus = Schema.Literals(["ok", "rejected"])
 export const VerificationEntry = open({
   status: VerificationStatus,
   date: Schema.optionalKey(Schema.String),
+  /** What the probe found, for whoever reads the file. The user reads `unavailableReasonOf`. */
   note: Schema.optionalKey(Schema.String)
 })
 export const VerificationFile = open({ results: Schema.Record(Schema.String, VerificationEntry) })

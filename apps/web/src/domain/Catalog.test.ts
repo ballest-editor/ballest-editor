@@ -96,7 +96,14 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
       newMapFile({ displayName: "A", creatorName: "B", createdAt: "" })
     )
     assert.deepStrictEqual(gameLoadProblems(map, index), [])
-    assert.isTrue(pieces.every((p) => unavailableReasonOf(index, p, results)?.includes("opens blank")))
+    // verified.json's note on each is for this repo; the user reads the one line
+    for (const piece of pieces) {
+      assert.isDefined(results[piece.className]?.note)
+      assert.strictEqual(
+        unavailableReasonOf(index, piece, results),
+        "The game can't load this piece; maps that use it open blank."
+      )
+    }
     // the game's panel doesn't paint them, and with no component there is nothing to save paint in
     assert.deepStrictEqual(paintTargets(items, index).items, [])
   })

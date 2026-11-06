@@ -67,7 +67,9 @@ export function InstanceSection({ group, link }: { readonly group: GroupNode; re
   const current = definition?.hash === link.hash
   return (
     <div className="flex flex-col gap-2">
-      <SectionTitle>Instance of {link.name}</SectionTitle>
+      <SectionTitle>
+        Instance of <span className="tracking-normal normal-case">{link.name}</span>
+      </SectionTitle>
       <p className="text-body text-fg-tertiary">{instanceStatusOf(found, current, unmodified)}</p>
       <div className="flex flex-wrap gap-1">
         <Button
