@@ -1,12 +1,13 @@
-import { IconBox, IconBoxMultiple, IconChevronRight, IconFolder, IconFolderOpen } from "@tabler/icons-react"
+import { IconBoxMultiple, IconChevronRight, IconFolder, IconFolderOpen } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
+import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { cn } from "@workspace/ui/lib/utils"
-import { memo, useLayoutEffect, useRef } from "react"
+import { createElement, memo, useLayoutEffect, useRef } from "react"
 import type { OutlineRow } from "../domain/outline"
 import { useEditor } from "../editor/store"
 import { Ordinal } from "./Ordinal"
-import { PieceThumbnail } from "./PieceThumbnail"
+import { itemGlyphOf } from "./outlineGlyphs"
 
 export const OUTLINE_ROW_HEIGHT = 24
 export const OUTLINE_INDENT = 12
@@ -64,16 +65,18 @@ function TagChips({ tags }: { readonly tags: ReadonlyArray<string> }) {
   )
 }
 
-const pieceGlyph = <IconBox className="size-4 shrink-0 text-fg-secondary" />
+/** Every row's glyph, group or item, is one of these. */
+const GLYPH_CLASS = "mr-1 size-4 shrink-0 text-fg-secondary"
 
-/** An item's icon: its piece's, as the Pieces panel shows it, else a generic one. */
+/** An item's glyph, by what it is. */
 function ItemIcon({ actorClass }: { readonly actorClass: string }) {
-  const piece = useEditor((s) => s.catalogIndex?.pieceByClass.get(actorClass))
-  if (piece === undefined) return pieceGlyph
-  return (
-    <PieceThumbnail piece={piece} className="size-4 shrink-0 rounded-control object-fill" placeholder={pieceGlyph} />
-  )
+  const category = useEditor((s) => s.catalogIndex?.pieceByClass.get(actorClass)?.category)
+  return createElement(itemGlyphOf(actorClass, category), { className: GLYPH_CLASS })
 }
+
+/** What a row's name says when the pointer rests on it: an item's class, a group's item count. */
+const nameTooltip = (row: OutlineRow): string =>
+  row.kind === "item" ? row.className : `${row.itemCount} ${row.itemCount === 1 ? "item" : "items"}`
 
 export const OutlineRowView = memo(function OutlineRowView(props: {
   readonly row: OutlineRow
@@ -103,27 +106,28 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
       {...(isGroup && { "aria-expanded": !row.collapsed })}
       data-row-index={rowIndex}
       className={cn(
-        "absolute inset-x-0 flex items-center gap-1 pr-2 text-body hover:bg-muted/60",
+        "absolute inset-x-0 flex items-center pr-2 text-body hover:bg-muted/60",
         selected && "bg-primary/20 hover:bg-primary/25",
         partial && !selected && "bg-primary/5",
         entered && "shadow-[inset_2px_0_0_var(--primary)]",
-        dimmed && "opacity-50",
+        dimmed && "text-fg-disabled **:text-fg-disabled",
         dragged && "opacity-40",
         dropInto && "bg-primary/30 ring-1 ring-primary ring-inset"
       )}
       style={{
         top: rowIndex * OUTLINE_ROW_HEIGHT,
         height: OUTLINE_ROW_HEIGHT,
-        paddingLeft: 4 + row.depth * OUTLINE_INDENT
+        paddingLeft: row.depth * OUTLINE_INDENT
       }}
     >
       {isGroup
         ? (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             aria-label={row.collapsed ? `Expand ${row.name}` : `Collapse ${row.name}`}
             disabled={filtering}
-            className="grid size-4 shrink-0 place-items-center rounded-control text-fg-secondary hover:text-foreground disabled:opacity-40"
+            className="text-fg-secondary"
             onClick={(e) => {
               e.stopPropagation()
               setGroupCollapsed(row.id, !row.collapsed)
@@ -131,34 +135,21 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
             onDoubleClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <IconChevronRight className={cn("size-3 transition-transform", !row.collapsed && "rotate-90")} />
-          </button>
+            <IconChevronRight className={cn("transition-transform", !row.collapsed && "rotate-90")} />
+          </Button>
         )
-        : <span className="size-4 shrink-0" />}
-      {isGroup
-        ? <FolderIcon className="size-3.5 shrink-0 text-fg-secondary" />
-        : <ItemIcon actorClass={row.actorClass} />}
+        : <span className="size-6 shrink-0" />}
+      {isGroup ? <FolderIcon className={GLYPH_CLASS} /> : <ItemIcon actorClass={row.actorClass} />}
       {renaming
         ? <RenameField name={row.name} onDone={(value) => onRenamed(row, value)} />
         : (
           <>
-            <span
-              className={cn("min-w-0 truncate", isGroup && "text-body-strong")}
-              {...(row.className !== "" && { title: row.className })}
-            >
+            <span className={cn("mr-1 min-w-0 truncate", selected && "text-body-strong")} title={nameTooltip(row)}>
               {row.name}
             </span>
             <Ordinal value={row.ordinal} />
             <span className="flex-1" />
             {row.tags.length > 0 && <TagChips tags={row.tags} />}
-            {isGroup && (
-              <span
-                className="shrink-0 text-caption text-fg-tertiary tabular-nums"
-                title={`${row.itemCount} items`}
-              >
-                {row.childCount}
-              </span>
-            )}
           </>
         )}
     </div>

@@ -1,3 +1,5 @@
+import { IconFoldDown, IconFoldUp } from "@tabler/icons-react"
+import { Button } from "@workspace/ui/components/button"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -9,6 +11,7 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import { Popover, PopoverContent } from "@workspace/ui/components/popover"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import {
   type MouseEvent,
@@ -43,11 +46,12 @@ import {
   scrollToShow,
   visibleRange
 } from "../domain/outline"
-import { findNode, numberedNameText } from "../domain/structure"
+import { findNode, groupNames, numberedNameText } from "../domain/structure"
 import { detachInstance, startSavePrefab, updateInstance } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { elementOf } from "../editor/keyTargets"
 import { nextSelection, nodeNamesOf, useEditor } from "../editor/store"
+import { EnteredGroupBreadcrumb } from "./EnteredGroupStatus"
 import { OUTLINE_INDENT, OUTLINE_ROW_HEIGHT, OutlineRowView } from "./OutlineRow"
 import { TagInput } from "./TagInput"
 
@@ -135,6 +139,40 @@ function TagsPopover({ target, onClose }: {
   )
 }
 
+/** Folds every group, or opens them all once they're folded. Only there when the map has groups. */
+function CollapseAllButton({ groupIds, disabled }: {
+  readonly groupIds: ReadonlyArray<string>
+  readonly disabled: boolean
+}) {
+  const allCollapsed = useEditor((s) => groupIds.every((id) => s.collapsedGroups.has(id)))
+  if (groupIds.length === 0) return null
+  const label = allCollapsed ? "Expand all groups" : "Collapse all groups"
+  const toggleAll = () => {
+    const { expandGroups, setGroupCollapsed } = useEditor.getState()
+    if (allCollapsed) expandGroups(groupIds)
+    else for (const id of groupIds) setGroupCollapsed(id, true)
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-fg-secondary"
+            aria-label={label}
+            disabled={disabled}
+            onClick={toggleAll}
+          />
+        }
+      >
+        {allCollapsed ? <IconFoldDown /> : <IconFoldUp />}
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 /**
  * The map's tree, a self-contained panel: it fills what it is mounted in and scrolls by itself, drawing only the rows in
  * view (docs/DESKTOP.md § Outline). Selection is the store's, so it stays in step with the viewport both ways.
@@ -156,6 +194,7 @@ export function Outline() {
     () => outlineRows(structure, names, classes, collapsedGroups, query),
     [structure, names, classes, collapsedGroups, query]
   )
+  const groupIds = useMemo(() => [...groupNames(tree).keys()], [tree])
   const selected = useMemo(() => new Set(selectedIds), [selectedIds])
   const groupStates = useMemo(() => groupSelectionStates(tree, selected), [tree, selected])
   const enteredRange = useMemo(() => {
@@ -329,22 +368,40 @@ export function Outline() {
     [tree, selectedIds, enteredGroupId]
   )
   const link = instance?.prefab
+  // The group "Select all in group" means: the row's own, or the one the row is in.
+  const menuGroupId = menuRow === null ? null : menuRow.kind === "group" ? menuRow.id : menuRow.parentId
+  const enterRow = (id: string) => {
+    const s = useEditor.getState()
+    s.expandGroups([...groupPathOf(s.doc.structure.tree, id), id])
+    selectHere([])
+    s.enterGroup(id)
+  }
+  const selectAllIn = (id: string) => {
+    const s = useEditor.getState()
+    const { tree: current } = s.doc.structure
+    selectHere(nodeKeys(current, id))
+    const { enteredGroupId: entered } = s
+    if (entered !== null && entered !== id && !groupPathOf(current, id).includes(entered)) s.enterGroup(null)
+  }
   // Rename's field takes the focus, so the closing menu mustn't hand it back.
   const keepFocus = useRef(false)
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-card">
-      <div className="flex h-9 shrink-0 items-center px-2">
+      <div className="flex h-9 shrink-0 items-center gap-1 px-2">
         <Input
           aria-label="Filter the outline"
-          placeholder="Filter by name, class or tag"
+          placeholder="Filter"
+          className="min-w-0 flex-1"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Escape") setQuery("")
           }}
         />
+        <CollapseAllButton groupIds={groupIds} disabled={filtering} />
       </div>
+      <EnteredGroupBreadcrumb />
       <ContextMenu>
         <ContextMenuTrigger
           render={<ScrollArea className="min-h-0 flex-1" viewportRef={scroller} />}
@@ -434,6 +491,22 @@ export function Outline() {
           )}
           <ContextMenuSeparator />
           <ContextMenuItem
+            disabled={menuRow?.kind !== "group" || menuRow.id === enteredGroupId}
+            onClick={() => {
+              if (menuRow !== null) enterRow(menuRow.id)
+            }}
+          >
+            Enter group
+          </ContextMenuItem>
+          <ContextMenuItem
+            disabled={menuGroupId === null}
+            onClick={() => {
+              if (menuGroupId !== null) selectAllIn(menuGroupId)
+            }}
+          >
+            Select all in group
+          </ContextMenuItem>
+          <ContextMenuItem
             disabled={menuRow === null}
             onClick={() => {
               if (menuRow === null) return
@@ -458,7 +531,7 @@ export function Outline() {
               setTagsTarget({ id: menuRow.id, name: numberedNameText(menuRow), anchor: el.getBoundingClientRect() })
             }}
           >
-            Edit tags…
+            Edit tags
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
