@@ -15,12 +15,14 @@ import {
   useState
 } from "react"
 import * as THREE from "three"
-import { toTuple3, ueToThreeVector } from "../domain/coords"
+import type { CatalogPiece } from "../domain/Catalog"
+import { threeToUeVector, toTuple3, ueToThreeVector } from "../domain/coords"
 import { groupBoxTargets } from "../domain/groupSelection"
 import { isBound, mouseChordOf } from "../domain/Keybinds"
 import { WATER } from "../domain/level"
+import { dropPoint, pieceFootprint } from "../domain/placement"
 import { gridColorsOf } from "../domain/Settings"
-import { placePrefab } from "./actions"
+import { placeAt, placePrefab } from "./actions"
 import { fadeFineLines } from "./floorGrid"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
@@ -30,6 +32,7 @@ import { advanceGameTime } from "./materials"
 import { OrthoGrid } from "./OrthoGrid"
 import { panePointer, perspectiveOnly } from "./paneCameras"
 import { drawEveryPane, PaneRenderer, useBeforePaneDraw } from "./PaneRenderer"
+import { draggedPiece, isPieceDrag } from "./pieceDrag"
 import { droppedPrefab, isPrefabDrag } from "./prefabDrag"
 import { GROUP_BOX_COLORS, ORTHO_GROUND, SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { SceneLights } from "./SceneLights"
@@ -38,6 +41,7 @@ import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
 import { groupBoxOf, type SelectMode, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
+import { isMesh } from "./threeGuards"
 import { glbUrl, visualsOf } from "./visuals"
 import { setWaterFloor, setWaterTheme, waterTopMaterial, waterUnderMaterial } from "./water"
 
@@ -192,6 +196,35 @@ const hitItemId = (hits: ReadonlyArray<THREE.Intersection>): string | null => {
     }
   }
   return null
+}
+
+/**
+ * Places `piece` under a pointer: on the item it is over, else on the floor it is over, or in an orthographic view on the
+ * plane a click would place on. The raycast is here rather than on every drag event, for the same reason as a click's.
+ */
+const dropPiece = (piece: CatalogPiece, canvas: HTMLElement, e: { clientX: number; clientY: number }) => {
+  const { ndc, pane, slot } = panePointer(canvas, e)
+  const { floorHeight, setActivePane, settings } = useEditor.getState()
+  setActivePane(slot)
+  const raycaster = new THREE.Raycaster()
+  raycaster.setFromCamera(ndc, pane.camera)
+  const { ray } = raycaster
+  const root = sceneRegistry.itemsRoot
+  const surface = (root === null ? [] : raycaster.intersectObject(root, true))
+    .find((hit) => isMesh(hit.object) && hitItemId([hit]) !== null)
+  placeAt(
+    piece,
+    surface !== undefined
+      ? threeToUeVector(surface.point)
+      : pane.orthographicPlacement(floorHeight, ray.closestPointToPoint(pane.target, new THREE.Vector3())) ??
+        dropPoint(
+          threeToUeVector(ray.origin),
+          threeToUeVector(ray.direction),
+          floorHeight,
+          SKY_DOME_RADIUS,
+          pane.placeDistance(pieceFootprint(piece), settings.editor.placeDistance)
+        )
+  )
 }
 
 /**
@@ -388,16 +421,19 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
       data-viewport
       onPointerDown={(e) => e.currentTarget.focus({ preventScroll: true })}
       onDragOver={(e) => {
-        if (!isPrefabDrag(e.dataTransfer)) return
+        if (!isPrefabDrag(e.dataTransfer) && !isPieceDrag(e.dataTransfer)) return
         e.preventDefault()
         e.dataTransfer.dropEffect = "copy"
       }}
       onDrop={(e) => {
         const prefab = droppedPrefab(e.dataTransfer)
-        if (prefab === undefined) return
+        const piece = isPieceDrag(e.dataTransfer) ? draggedPiece() : undefined
+        const canvas = e.currentTarget.querySelector("canvas")
+        if (prefab === undefined && (piece === undefined || canvas === null)) return
         e.preventDefault()
         e.currentTarget.focus({ preventScroll: true })
-        void placePrefab(prefab)
+        if (prefab !== undefined) void placePrefab(prefab)
+        else if (piece !== undefined && canvas !== null) dropPiece(piece, canvas, e)
       }}
     >
       <Canvas

@@ -69,6 +69,25 @@ export const placementPoint = (origin: Vec3, direction: Vec3, floor: number, max
   }
 }
 
+/**
+ * Where a drop along a pointer's ray goes, in UE cm: on the floor when the ray meets it within `floorReach`, however far
+ * from the camera that is. A ray that doesn't, above the horizon say, stops `airDistance` along.
+ */
+export const dropPoint = (
+  origin: Vec3,
+  direction: Vec3,
+  floor: number,
+  floorReach: number,
+  airDistance: number
+): Vec3 => {
+  const length = Math.hypot(direction.x, direction.y, direction.z)
+  const hit = direction.z === 0 ? Infinity : (floor - origin.z) * length / direction.z
+  return placementPoint(origin, direction, floor, hit >= 0 && hit <= floorReach ? floorReach : airDistance)
+}
+
+/** `point` in whole centimetres. */
+export const wholeCm = ({ x, y, z }: Vec3): Vec3 => ({ x: cm(x), y: cm(y), z: cm(z) })
+
 /** The space a run of placements leaves between its pieces, in cm. */
 export const PLACEMENT_GAP = 100
 

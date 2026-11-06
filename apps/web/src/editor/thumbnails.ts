@@ -4,8 +4,8 @@
  * transparent background so it sits on whatever panel shows it. The game's renders have its dark
  * backdrop baked in, unevenly enough that it can't be keyed out cleanly, so they are only the
  * fallback (components/PieceThumbnail.tsx). The lights here are fixed, so a thumbnail looks the
- * same in both themes and is cached once per piece, as a PNG data URL. Renders run one at a time
- * off a queue so a long list never stalls the UI.
+ * same in both themes and is cached once per piece and fill, as a PNG data URL. Renders run one at
+ * a time off a queue so a long list never stalls the UI.
  *
  * `frameBox`, `SerialQueue`, `texturesOf` and `whenTexturesReady` are unit-tested; the WebGL part is a thin wrapper.
  */
@@ -41,14 +41,20 @@ export interface Framing {
 /**
  * Where a perspective camera (`fov` vertical degrees, `aspect`) stands, looking down
  * `direction` at the box's centre, so the box's bounding sphere fills `FILL` of the frame's
- * tighter dimension.
+ * tighter dimension, or `fill` of that for a piece drawn smaller than the frame allows.
  */
-export const frameBox = (min: Tuple3, max: Tuple3, aspect: number, direction: Tuple3 = VIEW_DIRECTION): Framing => {
+export const frameBox = (
+  min: Tuple3,
+  max: Tuple3,
+  aspect: number,
+  direction: Tuple3 = VIEW_DIRECTION,
+  fill = 1
+): Framing => {
   const center: Tuple3 = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2]
   const radius = Math.max(1, Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2)
   const vertical = THREE.MathUtils.degToRad(FOV) / 2
   const horizontal = Math.atan(Math.tan(vertical) * aspect)
-  const distance = radius / (Math.sin(Math.min(vertical, horizontal)) * FILL)
+  const distance = radius / (Math.sin(Math.min(vertical, horizontal)) * FILL * fill)
   const dir = new THREE.Vector3(...direction).normalize()
   const position = new THREE.Vector3(...center).addScaledVector(dir, distance)
   return {
@@ -201,7 +207,12 @@ const stageOf = (): Stage => {
   return stage
 }
 
-const render = async (piece: CatalogPiece, index: CatalogIndex, table: MaterialTable): Promise<string | undefined> => {
+const render = async (
+  piece: CatalogPiece,
+  index: CatalogIndex,
+  table: MaterialTable,
+  fill: number
+): Promise<string | undefined> => {
   const object = await buildPiece(piece, index, table)
   if (object === undefined) return undefined
   await whenTexturesReady(texturesOf(object), TEXTURE_WAIT_MS)
@@ -209,7 +220,7 @@ const render = async (piece: CatalogPiece, index: CatalogIndex, table: MaterialT
   scene.add(object)
   object.updateMatrixWorld(true)
   const box = new THREE.Box3().setFromObject(object)
-  const framing = frameBox(box.min.toArray(), box.max.toArray(), camera.aspect)
+  const framing = frameBox(box.min.toArray(), box.max.toArray(), camera.aspect, VIEW_DIRECTION, fill)
   camera.position.set(...framing.position)
   camera.near = framing.near
   camera.far = framing.far
@@ -225,18 +236,19 @@ const queue = new SerialQueue()
 const cache = new Map<string, Promise<string | undefined>>()
 
 /**
- * A rendered thumbnail (PNG data URL) for `piece`, or undefined when it has nothing to draw
- * or rendering failed. Rendered once per piece, in request order, one at a time.
+ * A rendered thumbnail (PNG data URL) for `piece`, filling `fill` of the frame (`sizeScalesOf`), or undefined when it has
+ * nothing to draw or rendering failed. Rendered once per piece and fill, in request order, one at a time.
  */
 export const thumbnailFor = (
   piece: CatalogPiece,
   index: CatalogIndex,
-  table: MaterialTable
+  table: MaterialTable,
+  fill = 1
 ): Promise<string | undefined> => {
-  const id = pieceIdOf(piece)
+  const id = `${pieceIdOf(piece)}|${fill}`
   const cached = cache.get(id)
   if (cached !== undefined) return cached
-  const promise = queue.run(() => render(piece, index, table)).catch((error: unknown) => {
+  const promise = queue.run(() => render(piece, index, table, fill)).catch((error: unknown) => {
     console.warn(`Couldn't render a thumbnail for ${piece.className}.`, error)
     return undefined
   })

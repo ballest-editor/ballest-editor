@@ -1,17 +1,20 @@
 import { assert, beforeEach, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import fixture from "../../domain/bundledCatalog.json"
-import { Catalog, indexCatalog } from "../../domain/Catalog"
+import { Catalog, indexCatalog, pieceIdOf } from "../../domain/Catalog"
 import type { Vec3 } from "../../domain/coords"
 import { placementTransform } from "../../domain/factory"
+import { itemsBoxOf } from "../../domain/itemBounds"
 import { pieceFootprint, PLACEMENT_COLUMNS, PLACEMENT_GAP } from "../../domain/placement"
 import { defaultSettings } from "../../domain/Settings"
 import { VIEW_DOWN } from "../../test/placementView"
 import { initialMap, useEditor } from "../store"
-import { spreadPlacement } from "./placement"
+import { placeAt, placeAtCamera, spreadPlacement, toggleFavouritePiece } from "./placement"
 
 const catalog = Schema.decodeUnknownSync(Catalog)(fixture)
-const cube = catalog.pieces.find((p) => p.className === "BP_Prim_Cube")!
+const pieceOf = (className: string) => catalog.pieces.find((p) => p.className === className)!
+const cube = pieceOf("BP_Prim_Cube")
+const track = pieceOf("BP_Track_Short1")
 const width = pieceFootprint(cube)
 const STEP = width + PLACEMENT_GAP
 
@@ -149,5 +152,72 @@ describe("spreadPlacement", () => {
     const item = s().doc.map.items.at(-1)!
     s().transformItems(new Map([[lastId(), { ...item.itemTransform, scale3D: { x: 2, y: 3, z: 1 } }]]))
     assert.strictEqual(click().y, 3 * width + PLACEMENT_GAP)
+  })
+})
+
+describe("placeAt", () => {
+  const box = () => itemsBoxOf(s().doc.map.items.slice(-1), s().catalogIndex)!
+
+  beforeEach(() => {
+    useEditor.setState({ catalogIndex: indexCatalog(catalog), settings: defaultSettings })
+    s().loadMap(initialMap(), null)
+  })
+
+  it("stands the piece on the hit point, centred over it, whatever its pivot", () => {
+    const offCentre = {
+      ...track,
+      mainRelativeTransform: { ...track.mainRelativeTransform!, location: [100, 0, -50] as const }
+    }
+    for (const piece of [cube, offCentre]) {
+      placeAt(piece, { x: 1200, y: -300, z: 40 })
+      const { max, min } = box()
+      assert.closeTo((min.x + max.x) / 2, 1200, 1)
+      assert.closeTo((min.y + max.y) / 2, -300, 1)
+      assert.closeTo(min.z, 40, 1)
+    }
+  })
+
+  it("selects what it placed, as one undo step", () => {
+    const before = s().doc.ids.length
+    placeAt(cube, POINT)
+    assert.deepStrictEqual(s().selectedIds, [lastId()])
+    s().undo()
+    assert.strictEqual(s().doc.ids.length, before)
+  })
+
+  it("lets the next click start a run of its own", () => {
+    click()
+    placeAt(cube, { x: 9000, y: 9000, z: 0 })
+    assert.deepStrictEqual(click(), { ...POINT, y: STEP })
+  })
+})
+
+describe("Recent and Favourites", () => {
+  const recent = () => s().settings.panels.recentPieces
+
+  beforeEach(() => {
+    useEditor.setState({ catalogIndex: indexCatalog(catalog), settings: defaultSettings })
+    s().loadMap(initialMap(), null)
+  })
+
+  it("lists what a click or a drop placed, newest first", () => {
+    placeAtCamera(cube)
+    placeAt(track, POINT)
+    assert.deepStrictEqual(recent(), [pieceIdOf(track), pieceIdOf(cube)])
+  })
+
+  it("leaves out a piece that didn't go in", () => {
+    const placePiece = s().placePiece
+    useEditor.setState({ placePiece: () => undefined })
+    placeAtCamera(cube)
+    useEditor.setState({ placePiece })
+    assert.deepStrictEqual(recent(), [])
+  })
+
+  it("stars a piece, and takes the star off", () => {
+    void toggleFavouritePiece(cube)
+    assert.deepStrictEqual(s().settings.panels.favouritePieces, [pieceIdOf(cube)])
+    void toggleFavouritePiece(cube)
+    assert.deepStrictEqual(s().settings.panels.favouritePieces, [])
   })
 })
