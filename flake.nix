@@ -34,6 +34,8 @@
       packages = forAll (pkgs: {
         # tools/compress builds this when avifenc isn't on PATH, so encodes follow flake.lock.
         libavif = pkgs.libavif;
+        # apps/desktop/scripts/nixGl.ts builds this for Electron's GL on NixOS.
+        libglvnd = pkgs.libglvnd;
         extract = pkgs.writeShellApplication {
           name = "ballest-extract";
           runtimeInputs = toolsFor pkgs;
