@@ -243,10 +243,10 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      {/* a column, so that the list shrinks before Close leaves the window */}
-      <DialogContent className="flex flex-col sm:max-w-xl">
+      {/* a column, so that the list shrinks before Close leaves the window; as wide as what it shows, up to a limit */}
+      <DialogContent className="flex flex-col sm:w-max sm:max-w-xl sm:min-w-sm">
         <DialogHeader>
-          <DialogTitle>Recover a previous version</DialogTitle>
+          <DialogTitle>Backups</DialogTitle>
         </DialogHeader>
         {shown !== null && (
           <ToggleGroup
@@ -269,7 +269,7 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
           : empty
           ? <p className="text-body text-fg-tertiary">No backups yet.</p>
           : (
-            <ScrollArea className="h-72 min-h-0 rounded-control border">
+            <ScrollArea className="flex min-h-0 flex-col rounded-control border [&_[data-slot=scroll-area-viewport]]:max-h-72 [&_[data-slot=scroll-area-viewport]]:min-h-0">
               {all ? everything : <ul className="divide-y">{versions}</ul>}
             </ScrollArea>
           )}
