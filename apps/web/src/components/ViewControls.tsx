@@ -15,7 +15,7 @@ import { NumberField } from "./NumberField"
 import { ToolBar } from "./ToolBar"
 import { GROUP, GROUP_DIVIDER, noFocus, releaseFocus, SEGMENT } from "./viewControlStyle"
 import { ViewLayoutControl, ViewPanes } from "./ViewPanes"
-import { ViewTip } from "./ViewTip"
+import { ViewTip, ViewTipBoundary } from "./ViewTip"
 
 /**
  * Everything floating over the viewport: its panes' frames, the tool bar (bottom) and, in the viewport's top right like
@@ -29,7 +29,7 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
   const update = (snapping: Partial<Settings["snapping"]>) => void updateSettings("snapping", snapping)
 
   return (
-    <>
+    <ViewTipBoundary>
       <ViewPanes disabled={disabled} />
       <div className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap justify-end gap-2">
         <div className={GROUP}>
@@ -68,7 +68,7 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
         </div>
       </div>
       <ToolBar disabled={disabled} />
-    </>
+    </ViewTipBoundary>
   )
 }
 
