@@ -32,9 +32,13 @@ export default states({
     "replacePublished",
     app.openDialog({ id: "replacePublished", name: "Waterfront", publishedFileId: 3339810, from: "export" })
   ),
-  "dialog/overwrite-changed": dialog(
-    "overwriteChanged",
-    app.openDialog({ id: "overwriteChanged", name: "Waterfront", from: "export", replacePublished: false })
+  "dialog/sync-conflict": dialog(
+    "syncConflict",
+    app.openDialog({ id: "syncConflict", name: "Waterfront", from: "export", replacePublished: false, diff: null })
+  ),
+  "dialog/replace-in-game": dialog(
+    "replaceInGame",
+    app.openDialog({ id: "replaceInGame", name: "Waterfront", inGame: "Waterfront", replacePublished: false })
   ),
   "dialog/import-clash": dialog("importClash", app.importClash("Waterfront.balledit")),
   "dialog/where-to-open": dialog(
