@@ -16,6 +16,7 @@ import {
   prefabOfItems,
   prefabOfTab,
   prefabSourcesOf,
+  prefabTierLabel,
   spawnFrameOf
 } from "./prefab"
 import { PrefabFile } from "./PrefabFile"
@@ -29,6 +30,14 @@ const first = prefab.items[0]!
 const second = prefab.items[1]!
 
 const cubeAt = (x: number, y = 0, z = 0): Item => itemFromPiece(cube, placementTransform(cube, { x, y, z }))
+
+describe("a tier's name in the UI", () => {
+  it("says Game for the game's own folder, and Session where there are no projects", () => {
+    assert.strictEqual(prefabTierLabel("user", true), "Game")
+    assert.strictEqual(prefabTierLabel("project", true), "Project")
+    assert.strictEqual(prefabTierLabel("user", false), "Session")
+  })
+})
 
 describe("a prefab's items", () => {
   it("become map items at a frame", () => {

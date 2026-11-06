@@ -3,7 +3,7 @@
  * and quaternions, bare and class-qualified paths, the flat `properties` map and the typed lists. Also the frame the game
  * measures a prefab against, and where a spawn puts it.
  */
-import type { PrefabRef } from "@ballest/contracts"
+import type { PrefabRef, PrefabTier } from "@ballest/contracts"
 import { Predicate } from "effect"
 import type { CatalogIndex, CatalogPiece } from "./Catalog"
 import type { Vec3 } from "./coords"
@@ -24,6 +24,13 @@ import {
 import { quatToRotator, rotatorToQuat } from "./ueMath"
 
 export { isPrefabName, PREFAB_NAME_RULE } from "@ballest/contracts"
+
+/** A tier as the UI names it: `user` is the game's own folder. A browser's one tier lasts the session. */
+export const prefabTierLabel = (tier: PrefabTier, projects: boolean): string =>
+  !projects ? "Session" : tier === "user" ? "Game" : "Project"
+
+/** Why the project tier is off in Untitled Project. */
+export const PREFAB_NEEDS_PROJECT = "Name the project first."
 
 export const isSamePrefab = (a: PrefabRef, b: PrefabRef): boolean => a.tier === b.tier && a.name === b.name
 

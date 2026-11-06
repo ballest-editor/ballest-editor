@@ -1,4 +1,3 @@
-import { prefabFileNameOf } from "@ballest/contracts"
 import {
   type Icon,
   IconArrowsMaximize,
@@ -35,7 +34,7 @@ import {
   setSelectionField
 } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
-import { type PrefabDocument, selectedIndices, useEditor, useOpenPrefab } from "../editor/store"
+import { selectedIndices, useEditor, useOpenPrefab } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { FlipSection } from "./FlipSection"
 import { ItemProperties } from "./ItemProperties"
@@ -45,6 +44,7 @@ import { NumberField } from "./NumberField"
 import { PaintSection } from "./PaintSection"
 import { PathText } from "./PathText"
 import { PivotSection } from "./PivotSection"
+import { PrefabSettings } from "./PrefabSettings"
 import { SectionTitle } from "./SectionTitle"
 import { GroupSection, InstanceSection, ItemTags } from "./StructureSection"
 
@@ -60,20 +60,6 @@ function Facts({ facts }: { readonly facts: ReadonlyArray<readonly [string, stri
         </div>
       ))}
     </dl>
-  )
-}
-
-/** A definition's tab with nothing selected: what it is. Its name and tier change in the Prefabs panel. */
-function PrefabSettings({ prefab }: { readonly prefab: PrefabDocument }) {
-  const itemCount = useEditor((s) => s.doc.map.items.length)
-  const path = useEditor((s) => s.file?.path ?? null)
-  return (
-    <div className="flex flex-col gap-3">
-      <SectionTitle>Prefab {prefab.name}</SectionTitle>
-      <Facts
-        facts={[["Tier", prefab.tier], ["Items", String(itemCount)], ["File", path ?? prefabFileNameOf(prefab.name)]]}
-      />
-    </div>
   )
 }
 
