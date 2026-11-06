@@ -261,10 +261,12 @@ function ViewportGrid() {
       position={[0, floorHeight, 0]}
       side={THREE.DoubleSide} // drei's default (BackSide) hides it from below
       infiniteGrid
+      followCamera // with the plane below, the grid has no edge to see: it ends where its fade does, wherever the camera is
+      args={[2, 2]} // drei scales this by the fade distance, and the 1 x 1 default stops at half of it, still visible
       cellSize={100}
       sectionSize={1000}
       fadeDistance={SKY_DOME_RADIUS}
-      fadeStrength={3} // a stronger fade keeps the far grid from hardening into a band at the horizon
+      fadeStrength={2}
       cellThickness={1} // drei's half-pixel default makes the 1 m lines unreadable in the light theme
       cellColor={colors.cell}
       sectionColor={colors.section}

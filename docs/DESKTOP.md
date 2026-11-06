@@ -126,7 +126,7 @@ Changing projection keeps the point the pane looks at and its size on screen. Nu
 
 **The world grid** (`editor/OrthoGrid.tsx`) is a shader over each orthographic pane, drawn over the map at a low opacity so it can be read against a floor that fills the view. It has lines on multiples of their size from the world's origin, which is where snapping puts things: 1 m lines and 10 m sections like the perspective floor grid, fading in 10 cm and 1 cm lines closer in and leaving only the coarser ones further out (`gridLevels`). With snapping on, a step that isn't a power of ten (25 cm) gets lines of its own. The X, Y and Z axes through the origin are in the game's colours. Show grid hides both grids. An orthographic pane has no sky or floor grid: they sit on a layer only perspective cameras see.
 
-**The sky** (`editor/SceneLights.tsx`) of a perspective pane is the map's, hazing out over the far floor into the theme's background. With Show sky off, a gradient from `THEME_SKY_COLORS` takes its place, so neither reads as a flat band above the floor.
+**The sky** (`editor/SceneLights.tsx`) of a perspective pane is the map's, hazing out over the far floor into the clear colour. With Show sky off there is no dome: the pane shows the clear colour, and the floor grid fades only with distance.
 
 **Editing** works the same in every pane: clicks, the gizmos and Alt+drag all sort the pointer by pane and measure it against that pane's camera. The gizmo is placed for each pane just before it draws, so it keeps its size and faces each camera. An axis handle pointing at the camera, and a plane handle or ring seen edge-on, are hidden and can't be grabbed (`handleFacesCamera`), as in Blender. Hover shows only in the pane under the pointer.
 

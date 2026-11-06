@@ -1,21 +1,20 @@
 /**
  * The game's sky as a three.js material (see domain/sky for where each term comes from).
  * `dome` draws the visible sky, with the sun disc and stars, hazing out over the far floor
- * (`uClipY`) so the theme's background shows nearer in; `capture` draws the same sky without
+ * (`uClipY`) so the clear colour shows nearer in; `capture` draws the same sky without
  * the sun, and with the arena below `ARENA_RIM`, for the environment map the scene is lit by
- * (the game's sky light is a real-time capture of this sky). `theme` is the dome with colours
- * taken as they are, for the sky that stands in when the map's is hidden.
+ * (the game's sky light is a real-time capture of this sky).
  */
 import * as THREE from "three"
 import { type Tuple3, ueToThreeVector } from "../domain/coords"
 import { ARENA_RIM, type Sky, SKY_GAIN, SUN_RADIUS } from "../domain/sky"
 
-/** The visible dome's radius (cm), which is also where the floor grid finishes fading out, inside the sky's haze. */
+/** The visible dome's radius (cm), which is also where the floor grid finishes fading out, with or without the sky. */
 export const SKY_DOME_RADIUS = 60_000
 
 /**
  * Where the sky fades in, on the dome, from below the grid's height to above it (cm): the far floor hazes into the
- * horizon instead of ending in a band of the theme's flat background. About 20° below and 3° above, seen from the floor.
+ * horizon instead of ending in a flat band of the clear colour. About 20° below and 3° above, seen from the floor.
  */
 const SKY_HAZE_BELOW = SKY_DOME_RADIUS * 0.34
 const SKY_HAZE_ABOVE = SKY_DOME_RADIUS * 0.05
@@ -88,9 +87,9 @@ void main() {
 }
 `
 
-type SkyKind = "dome" | "capture" | "theme"
+type SkyKind = "dome" | "capture"
 
-const skyGain: Readonly<Record<SkyKind, number>> = { dome: SKY_GAIN * SKY_EXPOSURE, capture: SKY_GAIN, theme: 1 }
+const skyGain: Readonly<Record<SkyKind, number>> = { dome: SKY_GAIN * SKY_EXPOSURE, capture: SKY_GAIN }
 
 const skyUniforms = (kind: SkyKind) => ({
   uZenith: { value: new THREE.Color() },
@@ -134,8 +133,8 @@ export class SkyMaterial extends THREE.ShaderMaterial {
       this.blendSrcAlpha = THREE.ZeroFactor
       this.blendDstAlpha = THREE.OneFactor
     }
-    // three tone-maps the map's sky; the capture stays linear for lighting, and the theme's colours are final.
-    this.toneMapped = kind === "dome"
+    // three tone-maps the visible sky; the capture stays linear for lighting.
+    this.toneMapped = !capture
   }
 }
 
@@ -151,18 +150,3 @@ export const setSky = (material: SkyMaterial, sky: Sky, ground: Tuple3): void =>
   u.uStars.value = sky.stars
   u.uGround.value.setRGB(...ground, THREE.LinearSRGBColorSpace)
 }
-
-const linearOf = (color: string): Tuple3 => {
-  const { r, g, b } = new THREE.Color(color)
-  return [r, g, b]
-}
-
-/** Horizon to zenith between two colours, with no sun or stars: the sky of a map whose own is hidden. */
-export const themeSkyOf = (colors: { readonly zenith: string; readonly horizon: string }): Sky => ({
-  zenith: linearOf(colors.zenith),
-  horizon: linearOf(colors.horizon),
-  horizonFalloff: 3,
-  toSun: { x: 0, y: 0, z: 1 },
-  sunBrightness: 0,
-  stars: 0
-})
