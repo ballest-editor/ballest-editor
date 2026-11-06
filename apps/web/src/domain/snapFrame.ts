@@ -54,6 +54,8 @@ export interface BasePoint {
   readonly label: string
   /** The end it is, for a piece with ends. */
   readonly end?: WorldEnd
+  /** Only lands on targets under a hard constraint: the grid and the drawn base stay with what the Base setting names. */
+  readonly station?: boolean
 }
 
 /** What a target is, for sliding along it, and for telling when a drag gets to it. */
@@ -99,7 +101,7 @@ export interface SnapHit {
   /** The item the target is on. */
   readonly item?: string
   readonly meeting?: EndMeeting
-  /** The renderer's own first face under the pixel: nothing can hide it. */
+  /** The renderer's own first face under the pixel, or a plane a hard constraint stops at: nothing can hide it. */
   readonly frontmost?: boolean
   /** The single targets this one lands on together: an alignment along each of the move's axes. */
   readonly parts?: ReadonlyArray<SnapHit>

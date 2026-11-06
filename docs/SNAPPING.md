@@ -38,6 +38,8 @@ Closest is what makes dropping a piece against another feel right without first 
 
 With the Connectors target on, a piece that has ends uses its nearest end as the base for a move whatever the base setting says. Joining end to end is the point of a piece with ends, and the pivot keeps its meaning for rotation and scale.
 
+Under a handle or a lock the pivot and the selection's stations land too, whatever the setting says: its near face, centre and far face along each axis of the move, from its bounds. The one whose match is nearest is the one meant, as under Closest, and the status bar names it. They only land on targets: the grid and the drawn dot stay with what the setting names.
+
 ### Snap targets
 
 Where the base can land. Each target is a row in the Snap popover with its own toggle, its own parameters, and a place in the priority list (§ Priority). A target that is off contributes nothing.
@@ -73,13 +75,25 @@ The geometry of other items: their meshes or, cheaper, their bounds. This is the
 
 Parameters:
 
-- **Elements**, each its own toggle: bounds corners, bounds face centres, bounds faces, vertices, sharp edges, edge midpoints, face centres, faces. Bounds is on by default and costs nothing, since every catalog piece has bounds. The mesh elements are on by default too and come from the piece's mesh as the renderer has it.
+- **Elements**, each its own toggle: bounds corners, bounds face centres, bounds faces, vertices, sharp edges, edge midpoints, face centres, faces. All are on by default. The mesh elements come from the piece's mesh as the renderer has it. Bounds stand in for a piece whose mesh hasn't loaded, and a piece with a mesh offers none of them, so a curved piece doesn't offer a box face or a corner in the air.
 - **Sharp edge angle**: an edge counts when its two faces meet at more than this angle. Default 30°. Below it, flat faces would offer their triangulation as edges, which is never wanted.
 - **Occlusion**: In front only (the default), or Through pieces. In front only means a target hidden behind a surface from the active pane's camera doesn't count, so a drag can't land on a vertex the user can't see.
 - **Rotate to face**: Keep rotation (the default), Upright on the face, or Align to the face's normal. Upright turns the item about Z only, so its +X faces out of the face and it stays standing: a lamp on a wall. Align is Unreal's "rotate to surface normal": its +Z leaves the face, and a decal or a light placed on a slope faces out of it.
 - **Offset**: a distance from the face, in cm, along its normal. Default 0. For things that hover (lights, floating decals).
 
 Bounds snapping is also the alignment target's data (§ Alignment).
+
+##### Under a constrained move
+
+A move along a handle or a lock wants the places that matter along that axis, not every vertex of a neighbour that happens to line up with it. So under a line or a plane the Mesh target offers each near item's stations, and no vertices, edges or edge midpoints:
+
+- **Its faces across the move**: a flat face whose normal runs along the line, or lies in the plane, within 5°. Faces use the Faces toggle. A plane target, it stops the move wherever the rest of the base is, and the Offset and Rotate to face apply as they do on any face.
+- **The middle** between the two outermost of those along each direction, when they face apart. It uses the Faces toggle too, and shows as a dashed guide between them.
+- **The centres of its faces**, as points, under the Face centres toggle: on a plane handle, this is what lands on the middle of a cap that looks along the plane's normal.
+
+A flat face counts when it is at least 0.25% of the mesh's surface. Below that it is a facet of something curved: a bent tube has 802 flat faces, and its two caps are the only ones that pass. A piece that is curved all the way round, a sphere, has no stations, and Alignment is what lines it up. Bounds stand in here as they do elsewhere: until its mesh has loaded, a piece offers the faces of its box, their middle and their centres, under the bounds toggles.
+
+With the selection's own stations (§ Snap base), moving a piece along X into another offers its near face on their near face, centre on centre and far face on far face, and the cross combinations. Nothing hides a station, as it isn't something the pointer picks by sight: a piece moved inside another still stops on its faces. On a plane handle a station stops one axis at a time.
 
 #### Construction
 
@@ -120,15 +134,15 @@ Two presets, as buttons at the top of the list:
 
 The order is per map, saved with the snap settings in the sidecar. A new map takes the setting's default order (§ Settings). A prefab definition's tab has the same settings, kept in the editor's own prefs since a definition has no sidecar.
 
-Within one target the nearest candidate wins, measured in screen pixels in the active pane. Across elements of the Mesh target a point beats an edge and an edge beats a face, as in Blender, so that a corner is reachable through the face it sits on.
+Within one target the nearest candidate wins, measured in screen pixels in the active pane. Across elements of the Mesh target a point beats an edge and an edge beats a face, as in Blender, so that a corner is reachable through the face it sits on. That is a drag by the body: under a handle or a lock Mesh offers stations and not vertices or edges (§ Under a constrained move), which is why a vertex stops a body drag and not an axis drag.
 
 ### Affect
 
 Which transforms snapping applies to. Move is always on. Rotate and Scale are toggles, as today's rotation toggle is.
 
 - **Move**: the base lands on a target.
-- **Rotate**: rotation snaps to the step, and with a Mesh face or a Connector in range it snaps the base face (the face the pivot is on, or the piece's end) flush to the target, so a quarter turn that would meet a face stops there. Connectors' Match rotation and Mesh's Rotate to face are the per-target parts of this.
-- **Scale**: scale snaps to the step, along the item's own axes. With a Mesh face in range along the scaled axis, the scaled face stops on it, which is how a wall is stretched to meet another.
+- **Rotate**: rotation snaps to the step, and with a Mesh face (a face of § Under a constrained move, or of the bounds until the mesh has loaded) or a Connector in range it snaps the base face (the face the pivot is on, or the piece's end) flush to the target, so a quarter turn that would meet a face stops there. Connectors' Match rotation and Mesh's Rotate to face are the per-target parts of this.
+- **Scale**: scale snaps to the step, along the item's own axes. With a face of a neighbour's bounds in range along the scaled axis, the scaled face stops on it, which is how a wall is stretched to meet another. Bounds, here, even where a mesh has loaded: a stop can be anywhere along the axis, and finding one in the mesh would mean placing every mesh in the map when the drag starts.
 
 ### Under the pivot setting
 
@@ -154,7 +168,7 @@ Every target but the Grid is a place to get to, and the Grid is a rounding of ev
 
 - **A line, edge or plane** is reached when the move crosses it, or comes within a pixel of it. Then the selection slides along it.
 - **A point** can't be expected to be crossed exactly in two dimensions, so it is reached when the move passes it within a third of the threshold: the selection moves sideways by at most that, never forwards. On a line the move can only go through it. A point on a line or edge the selection is sliding along is met by the selection, however far off to the side the pointer is.
-- **A face under the pointer** needs no reaching: the selection is on it the moment the pointer is, with nothing to jump across on screen.
+- **A face under the pointer** needs no reaching: the selection is on it the moment the pointer is, with nothing to jump across on screen. A handle or a lock doesn't take one: its faces are stations, which are planes.
 
 A drag only arrives at what it was coming up to. It doesn't catch on a target it started on or turned back from, and a sample that goes past a target by more than the threshold has gone through it, which is how a fast move ignores what it passes. A lock starts afresh, as what the pointer means has changed.
 
@@ -243,7 +257,8 @@ This is one more parameter on the Alignment target, "Gap guides: In orthographic
 
 ## Decisions
 
-- **Bounds before meshes, and both before anything clever.** Bounds give most of the straight-piece work with no new data, and the Mesh target's bounds elements are the first thing to build. Mesh elements come next, behind the same toggles.
+- **Meshes, with bounds standing in.** A piece's real faces are what a user means, and a box face of a curved piece is somewhere in the air. Bounds cost nothing and every catalog piece has them, so they carry a piece until its mesh has loaded, and no longer.
+- **Stations under a constraint.** A body drag goes where the pointer is, so what's under the pointer is what's meant, Blender's rule. A handle or a lock goes along an axis, where a neighbour's vertices are only noise: thousands on a curved piece, each stopping the move. There the question is where along the axis, and the answer is a face, a middle, or the far face.
 - **Connectors are a data project, and worth it.** Roughly half the Tracks, Ramps, Tubes and Pipes pieces are curved, and for them only connectors or mesh elements join cleanly; connectors also carry the rotation and the profile, which mesh elements can't. The measuring is per family and can start with Track and Bevel_F.
 - **Tracking, not global guides.** Excalidraw's always-on search over everything is right for a page and wrong for a map of thousands of items. Acquired points, plus alignment limited to the active pane and the handle's axes, keep guides predictable.
 - **Priority is visible.** FreeCAD ranks snaps implicitly (a weak Near snap loses to any strong snap in range) and the user can't see it. A list that reads top to bottom is the rule.

@@ -1,7 +1,7 @@
 /**
  * What a turn and a scale can meet (docs/SNAPPING.md § Affect), worked out once when the drag starts: nothing else moves
  * until it ends. A turn stops with the base face flush on a neighbour's, or the piece's end facing another; a scale stops
- * the scaled face on a neighbour's.
+ * the scaled face on a neighbour's box.
  */
 import type { WorldEnd } from "../../domain/connectors"
 import type { Quat4, UeTransform, Vec3 } from "../../domain/coords"
@@ -31,7 +31,7 @@ export const faceNormalOf = (choice: string, rotation: Quat4): Vec3 | undefined 
 }
 
 /** Each face of an item's box: where it is and which way it faces. */
-const facesOf = ({ bounds, transform }: SnapItem) => {
+const boundsFacesOf = ({ bounds, transform }: SnapItem) => {
   if (bounds === undefined) return []
   const [x0, y0, z0] = bounds.min
   const [x1, y1, z1] = bounds.max
@@ -92,7 +92,7 @@ export const flushPairsOf = (
   const near = items.filter((item) => touches(box, item.box, reach))
   const faces = config.targets.mesh.enabled && base !== undefined
     ? near.flatMap((item) =>
-      facesOf(item).map((face): FlushPair => ({
+      (item.mesh()?.faces ?? boundsFacesOf(item)).map((face): FlushPair => ({
         normal: base,
         target: face.normal,
         label: `Face of ${item.name}`,
@@ -118,14 +118,17 @@ export const flushPairsOf = (
   return [...meetings, ...faces]
 }
 
-/** The faces of `items` square to `axis`, as stops at their distance from `pivotPoint`. */
+/**
+ * The faces of `items`' boxes square to `axis`, as stops at their distance from `pivotPoint`. Boxes, as a stop can be
+ * anywhere along the axis, and placing every mesh in the map to find them would stall the drag's start.
+ */
 export const scaleStopsOf = (
   axis: Vec3,
   pivotPoint: Vec3,
   items: ReadonlyArray<SnapItem>
 ): ReadonlyArray<ScaleStop> =>
   items.flatMap((item) =>
-    facesOf(item).flatMap((face): ReadonlyArray<ScaleStop> =>
+    boundsFacesOf(item).flatMap((face): ReadonlyArray<ScaleStop> =>
       Math.abs(vecDot(face.normal, axis)) < 0.999
         ? []
         : [{

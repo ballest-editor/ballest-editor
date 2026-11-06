@@ -27,10 +27,10 @@ import { vecDot, vecScale, vecSub } from "./ueMath"
 /** How many of the nearest points are asked whether something hides them. */
 const OCCLUSION_TRIES = 12
 
-/** The base the pointer is nearest. */
+/** The base the pointer is nearest, of what the Base setting names. */
 export const baseNearPointer = (frame: SnapFrame): BasePoint | undefined => {
   const measured = frame.bases.flatMap((base) => {
-    const reference = referenceOf(frame, base)
+    const reference = base.station === true ? undefined : referenceOf(frame, base)
     return reference === undefined ? [] : [{ base, distance: pixelDistance(reference, frame.pointer) }]
   })
   return measured.sort((a, b) => a.distance - b.distance)[0]?.base ?? frame.bases[0]

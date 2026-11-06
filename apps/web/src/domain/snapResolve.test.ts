@@ -1,9 +1,11 @@
 import { assert, describe, it } from "@effect/vitest"
-import { boxAt, cubeAt, topView } from "../test/snapFixtures"
+import { boxAt, cubeAt, meshOfBox, topView } from "../test/snapFixtures"
 import type { Vec3 } from "./coords"
 import { defaultSnapConfig, type SnapConfig, type SnapTarget, withPreset, withTargetMoved } from "./snapConfig"
-import type { BasePoint, SnapFrame, TrackedPoint } from "./snapFrame"
+import type { BasePoint, SnapFrame, SnapHit, TrackedPoint } from "./snapFrame"
 import { moveOf, resolveDrag, resolveSnap } from "./snapResolve"
+import { meshHits } from "./snapTargets"
+import { selectionBases } from "./snapTools"
 import { IDENTITY_QUAT, ORIGIN } from "./ueMath"
 
 const on = (config: SnapConfig, ...targets: ReadonlyArray<SnapTarget>): SnapConfig => {
@@ -100,7 +102,8 @@ describe("resolveSnap", () => {
     const mesh = () => ({
       vertices: [{ x: 100, y: 0, z: 0 }],
       edges: [[{ x: 90, y: -100, z: 0 }, { x: 90, y: 100, z: 0 }] as const],
-      faceCentres: []
+      faceCentres: [],
+      faces: []
     })
     const items = [cubeAt("a", { x: 200, y: 200, z: 0 }, { mesh, box: boxAt({ x: 95, y: 0, z: 0 }, 200) })]
     assert.strictEqual(resolveSnap(frameOf({ x: 92, y: 0, z: 0 }, { config, items }))?.rank, 0)
@@ -172,12 +175,15 @@ describe("resolveSnap", () => {
 
   it("doesn't pull a locked move to a face it would have to jump to", () => {
     const config = on(defaultSnapConfig, "mesh")
-    const surfaceAt = () => ({ point: { x: 900, y: 40, z: 0 }, normal: { x: 0, y: 0, z: 1 }, item: "a", corners: [] })
     const line = { kind: "line", direction: { x: 1, y: 0, z: 0 } } as const
-    assert.isUndefined(resolveSnap(frameOf({ x: 150, y: 0, z: 0 }, { config, surfaceAt, constraint: line })))
-    const near = () => ({ point: { x: 155, y: 40, z: 0 }, normal: { x: 0, y: 0, z: 1 }, item: "a", corners: [] })
-    const hit = resolveSnap(frameOf({ x: 150, y: 0, z: 0 }, { config, surfaceAt: near, constraint: line }))
-    assert.deepStrictEqual(hit?.landing, { x: 155, y: 0, z: 0 })
+    const slab = (from: number) => {
+      const box = { min: { x: from, y: -50, z: -50 }, max: { x: 1000, y: 50, z: 50 } }
+      return [cubeAt("a", ORIGIN, { box, mesh: () => meshOfBox(box) })]
+    }
+    const inside = { x: 150, y: 0, z: 0 }
+    const reachedFrom = (from: number) => resolveSnap(frameOf(inside, { config, items: slab(from), constraint: line }))
+    assert.isUndefined(reachedFrom(-900))
+    assert.deepStrictEqual(reachedFrom(155)?.landing, { x: 155, y: 0, z: 0 })
   })
 
   it("picks the base nearest its target with Closest", () => {
@@ -270,6 +276,159 @@ describe("resolveSnap", () => {
   })
 })
 
+describe("the Mesh target under a move's constraint", () => {
+  const X = { x: 1, y: 0, z: 0 }
+  const line = { kind: "line", direction: X } as const
+  const plane = { kind: "plane", normal: { x: 0, y: 0, z: 1 } } as const
+  const config = on(defaultSnapConfig, "mesh")
+  const at = { x: 300, y: 0, z: 0 }
+  const meshed = cubeAt("a", at, { mesh: () => meshOfBox(boxAt(at)) })
+  const unloaded = cubeAt("a", at)
+  /** What the item offers a base in its middle, in a pane where the whole cube is in range. */
+  const offered = (item: typeof meshed, constraint: SnapFrame["constraint"]) =>
+    meshHits(frameOf(at, { config, view: topView(10), items: [item], constraint }))
+  const labels = (hits: ReadonlyArray<{ readonly label: string }>) =>
+    [...new Set(hits.map(({ label }) => label))].sort()
+  const planes = (hits: ReadonlyArray<SnapHit>) => hits.flatMap(({ held }) => held.shape === "plane" ? [held] : [])
+
+  it("offers the faces along a line, the plane between them and the face centres, and no vertex", () => {
+    const hits = offered(meshed, line)
+    assert.deepStrictEqual(labels(hits), ["Centre of a face of Cube", "Face of Cube", "Middle of Cube"])
+    const stops = hits.filter(({ rank }) => rank === 2).map(({ landing }) => landing.x).toSorted((a, b) => a - b)
+    assert.deepStrictEqual(stops, [250, 300, 350])
+    assert.deepStrictEqual(planes(hits)[0], {
+      shape: "plane",
+      origin: { x: 250, y: 0, z: 0 },
+      normal: { x: -1, y: 0, z: 0 }
+    })
+    assert.lengthOf(hits.filter(({ rank }) => rank === 0), 6)
+  })
+
+  it("offers vertices, edges and midpoints to a surface drag, and no stations", () => {
+    const names = labels(offered(meshed, { kind: "surface", normal: { x: 0, y: 0, z: 1 } }))
+    assert.includeMembers(names, ["Vertex of Cube", "Edge of Cube", "Middle of an edge of Cube"])
+    assert.notInclude(names, "Middle of Cube")
+  })
+
+  it("offers the faces along both of a plane's axes, and leaves the other value alone", () => {
+    const hits = planes(offered(meshed, plane))
+    const normals = hits.map(({ normal }) => [Math.abs(normal.x), Math.abs(normal.y), Math.abs(normal.z)].join())
+    assert.deepStrictEqual([...new Set(normals)].sort(), ["0,1,0", "1,0,0"])
+    const free = { x: 345, y: 20, z: 0 }
+    const landing = resolveSnap(frameOf(free, { config, items: [meshed], constraint: plane }))?.landing
+    assert.deepStrictEqual(landing, { x: 350, y: 20, z: 0 })
+  })
+
+  it("counts a face a few degrees off the move, and lands where the move crosses it", () => {
+    const turn = 3 * Math.PI / 180
+    const normal = { x: Math.cos(turn), y: Math.sin(turn), z: 0 }
+    const tilted = (n: Vec3) => ({
+      ...meshOfBox(boxAt(at)),
+      faces: [{ centre: { x: 340, y: 100, z: 0 }, normal: n, corners: [] }]
+    })
+    const hit = (n: Vec3) =>
+      meshHits(
+        frameOf(at, { config, items: [{ ...meshed, mesh: () => tilted(n) }], view: topView(10), constraint: line })
+      )
+        .find(({ label }) => label === "Face of Cube")
+    assert.closeTo(hit(normal)?.landing.x ?? 0, 340 + 100 * Math.tan(turn), 1e-6)
+    assert.isUndefined(hit({ x: Math.SQRT1_2, y: Math.SQRT1_2, z: 0 }))
+  })
+
+  it("keeps a face's Offset, and leaves it off the middle", () => {
+    const mesh = { ...config.targets.mesh, offset: 7 }
+    const offset = { ...config, targets: { ...config.targets, mesh } }
+    const hits = meshHits(frameOf(at, { config: offset, view: topView(10), items: [meshed], constraint: line }))
+    const stops = hits.filter(({ rank }) => rank === 2).map(({ landing }) => landing.x).toSorted((a, b) => a - b)
+    assert.deepStrictEqual(stops, [243, 300, 357])
+  })
+
+  it("stops at a station something hides, as the move doesn't look at it", () => {
+    const hit = resolveSnap(
+      frameOf({ x: 345, y: 0, z: 0 }, { config, items: [meshed], constraint: line, occluded: () => true })
+    )
+    assert.deepStrictEqual(hit?.landing, { x: 350, y: 0, z: 0 })
+  })
+
+  it("lets bounds stand in only for an item with no mesh", () => {
+    const surface = { kind: "surface", normal: { x: 0, y: 0, z: 1 } } as const
+    assert.includeMembers(labels(offered(unloaded, surface)), ["Corner of Cube", "Face of Cube"])
+    assert.notInclude(labels(offered(meshed, surface)), "Corner of Cube")
+    assert.notInclude(labels(offered(meshed, surface)), "Face of Cube")
+    assert.deepStrictEqual(labels(offered(unloaded, line)), [
+      "Centre of a face of Cube",
+      "Face of Cube",
+      "Middle of Cube"
+    ])
+  })
+
+  it("leaves the faces and the centres to their own toggles, by what stands in", () => {
+    const { elements } = config.targets.mesh
+    const without = (off: Partial<typeof elements>) => ({
+      ...config,
+      targets: { ...config.targets, mesh: { ...config.targets.mesh, elements: { ...elements, ...off } } }
+    })
+    const hitsOf = (item: typeof meshed, off: Partial<typeof elements>) =>
+      labels(meshHits(frameOf(at, { config: without(off), view: topView(10), items: [item], constraint: line })))
+    assert.deepStrictEqual(hitsOf(meshed, { faces: false }), ["Centre of a face of Cube"])
+    assert.deepStrictEqual(hitsOf(meshed, { faceCentres: false }), ["Face of Cube", "Middle of Cube"])
+    assert.deepStrictEqual(hitsOf(unloaded, { boundsFaces: false }), ["Centre of a face of Cube"])
+    assert.deepStrictEqual(hitsOf(unloaded, { boundsFaceCentres: false }), ["Face of Cube", "Middle of Cube"])
+  })
+
+  it("lands start on start, centre on centre and end on end, moving a 500 cm piece into a 1000 cm one", () => {
+    const box = { min: { x: -250, y: -50, z: -50 }, max: { x: 250, y: 50, z: 50 } }
+    const long = { min: { x: 1500, y: -50, z: -50 }, max: { x: 2500, y: 50, z: 50 } }
+    const { mesh } = config.targets
+    const centred = {
+      ...config,
+      base: "centre" as const,
+      targets: { ...config.targets, mesh: { ...mesh, elements: { ...mesh.elements, faceCentres: false } } }
+    }
+    const bases = selectionBases(centred, { pivot: { x: 0, y: 0, z: -50 }, box, ends: [] }, line)
+    const items = [cubeAt("a", ORIGIN, { box: long, mesh: () => meshOfBox(long) })]
+    let from: Vec3 = ORIGIN
+    let current: ReturnType<typeof resolveDrag>
+    const stops = new Map<number, string>()
+    for (let x = 1200; x < 2800; x += 4) {
+      const offset = { x, y: 0, z: 0 }
+      current = resolveDrag(frameOf(offset, { config: centred, box, bases, items, constraint: line }), {
+        from,
+        current
+      })
+      from = offset
+      if (current !== undefined) stops.set(moveOf(current).offset.x, current.base.label)
+    }
+    assert.deepStrictEqual([...stops], [
+      [1250, "Far face"],
+      [1500, "Centre"],
+      [1750, "Near face"],
+      [2000, "Centre"],
+      [2250, "Far face"],
+      [2500, "Centre"],
+      [2750, "Near face"]
+    ])
+  })
+
+  it("leaves the grid with the base the setting names, however near a station is", () => {
+    const bases = selectionBases(on(defaultSnapConfig, "grid"), {
+      pivot: { x: 3, y: 0, z: 0 },
+      box: { min: { x: -500, y: -50, z: -50 }, max: { x: 500, y: 50, z: 50 } },
+      ends: []
+    }, line)
+    const hit = resolveSnap(
+      frameOf({ x: 100, y: 0, z: 0 }, {
+        config: on(defaultSnapConfig, "grid"),
+        bases,
+        constraint: line,
+        pointer: { x: 600, y: 0 }
+      })
+    )
+    assert.strictEqual(hit?.base.label, "Pivot")
+    assert.strictEqual(hit?.landing.x, 100)
+  })
+})
+
 describe("resolveDrag", () => {
   const X = { x: 1, y: 0, z: 0 }
   const line = { kind: "line", direction: X } as const
@@ -299,8 +458,9 @@ describe("resolveDrag", () => {
   })
 
   it("stops a locked move at a face in reach only once the move gets there", () => {
-    const surfaceAt = () => ({ point: { x: 155, y: 40, z: 0 }, normal: { x: 0, y: 0, z: 1 }, item: "a", corners: [] })
-    const hits = dragAlong([100, 150, 154, 156, 164, 168], { config: only("mesh"), surfaceAt, constraint: line })
+    const box = { min: { x: 155, y: -50, z: -50 }, max: { x: 1000, y: 50, z: 50 } }
+    const items = [cubeAt("a", ORIGIN, { box, mesh: () => meshOfBox(box) })]
+    const hits = dragAlong([100, 150, 154, 156, 164, 168], { config: only("mesh"), items, constraint: line })
     assert.deepStrictEqual(hits.map((hit) => hit?.landing.x), [undefined, undefined, 155, 155, 155, undefined])
   })
 
@@ -322,7 +482,7 @@ describe("resolveDrag", () => {
 
   it("takes a point on the edge it's sliding along", () => {
     const edge = [{ x: -500, y: 0, z: 0 }, { x: 500, y: 0, z: 0 }] as const
-    const mesh = () => ({ vertices: [{ x: 300, y: 0, z: 0 }], edges: [edge], faceCentres: [] })
+    const mesh = () => ({ vertices: [{ x: 300, y: 0, z: 0 }], edges: [edge], faceCentres: [], faces: [] })
     const items = [cubeAt("a", { x: 0, y: 0, z: 0 }, { mesh, box: boxAt(ORIGIN, 600), bounds: undefined })]
     const config = only("mesh")
     const slide = (x: number, from: Vec3, current?: ReturnType<typeof resolveDrag>) =>

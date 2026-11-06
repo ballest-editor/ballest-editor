@@ -101,6 +101,14 @@ const onlyCorners = (grid: boolean): SnapConfig => {
   }
 }
 
+/** Only the faces of other items' bounds. */
+const onlyBoundsFaces = (): SnapConfig => {
+  const config = onlyCorners(false)
+  const { mesh } = config.targets
+  const elements = { ...mesh.elements, boundsCorners: false, boundsFaces: true }
+  return { ...config, targets: { ...config.targets, mesh: { ...mesh, elements } } }
+}
+
 /** A session moving the first of two items, and the corner of the second it comes up to, along X. */
 const towardsCorner = (config: SnapConfig) => {
   const [a = ""] = load(config)
@@ -347,11 +355,22 @@ describe("MoveSession snap-and-go", () => {
   })
 
   it("starts over when a lock changes what the move can reach", () => {
-    const { session, pointPast } = towardsCorner(onlyCorners(false))
+    const { session, pointPast } = towardsCorner(onlyBoundsFaces())
     pointPast(-3)
-    pointPast(2)
+    assert.isDefined(pointPast(2).hit)
     session.toggleLock({ axis: "x", plane: false })
     assert.isUndefined(pointPast(3).hit)
+  })
+
+  it("stops an axis lock at a neighbour's faces and not at its corners", () => {
+    const { session, pointPast } = towardsCorner(onlyCorners(false))
+    session.toggleLock({ axis: "x", plane: false })
+    pointPast(-3)
+    assert.isUndefined(pointPast(2).hit, "only its corners are on")
+    const faces = towardsCorner(onlyBoundsFaces())
+    faces.session.toggleLock({ axis: "x", plane: false })
+    faces.pointPast(-3)
+    assert.match(faces.pointPast(2).hit?.label ?? "", /^Face of /)
   })
 
   it("names the target it ended on for the history, and nothing it only came near", () => {

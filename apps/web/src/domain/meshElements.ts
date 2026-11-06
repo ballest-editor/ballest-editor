@@ -1,10 +1,31 @@
 /**
- * What a mesh offers the Mesh target (docs/SNAPPING.md § Mesh): its vertices, its sharp edges and the centres of its
- * flat faces. Worked out from the triangles the renderer has, with a mesh's repeated corners welded, since a corner is
- * repeated once per normal it needs. No renderer here: the editor hands in the arrays.
+ * What a mesh offers the Mesh target (docs/SNAPPING.md § Mesh): its vertices, its sharp edges, the centres of its flat
+ * faces, and those flat faces that are faces of the piece. Worked out from the triangles the renderer has, with a mesh's
+ * repeated corners welded, since a corner is repeated once per normal it needs. No renderer here: the editor hands in
+ * the arrays.
  */
 import type { Vec3 } from "./coords"
-import { vecAdd, vecCross, vecDot, vecLength, vecLerp, vecNormalize, vecScale, vecSub } from "./ueMath"
+import {
+  ORIGIN,
+  squareTo,
+  vecAdd,
+  vecCross,
+  vecDot,
+  vecLength,
+  vecLerp,
+  vecNormalize,
+  vecScale,
+  vecSub
+} from "./ueMath"
+
+/** A flat face of a mesh that is a face of the piece, and not a facet of something curved. */
+export interface MeshFace {
+  readonly centre: Vec3
+  /** Out of the face, unit length. */
+  readonly normal: Vec3
+  /** The rectangle around it, for the tint. */
+  readonly corners: ReadonlyArray<Vec3>
+}
 
 export interface MeshElements {
   readonly vertices: ReadonlyArray<Vec3>
@@ -12,6 +33,8 @@ export interface MeshElements {
   readonly edges: ReadonlyArray<readonly [Vec3, Vec3]>
   /** The middle of each flat face, however many triangles make it. */
   readonly faceCentres: ReadonlyArray<Vec3>
+  /** The flat faces that are at least `FACE_SHARE` of its surface. */
+  readonly faces: ReadonlyArray<MeshFace>
 }
 
 /** The same elements in the world. */
@@ -21,6 +44,11 @@ export type WorldMesh = MeshElements
 const WELD_CM = 0.01
 /** Two triangles this close to one plane make one flat face, in degrees. */
 const FLAT_DEGREES = 0.5
+/**
+ * A flat face under this share of the mesh's surface is a facet of something curved. Measured on the pieces: it leaves a
+ * bent tube its two caps out of 802 flat faces and a sphere none, and the smallest real face, a long tube's cap, is 0.36%.
+ */
+const FACE_SHARE = 0.0025
 
 interface Triangle {
   readonly corners: readonly [number, number, number]
@@ -94,11 +122,11 @@ const facesOfEdges = (triangles: ReadonlyArray<Triangle>) => {
   return edges
 }
 
-/** The centre of each run of flat triangles sharing edges. */
-const flatFaceCentres = (
+/** Each run of flat triangles sharing edges. */
+const flatRuns = (
   triangles: ReadonlyArray<Triangle>,
   edges: ReturnType<typeof facesOfEdges>
-): ReadonlyArray<Vec3> => {
+): ReadonlyArray<ReadonlyArray<Triangle>> => {
   const flat = Math.cos(FLAT_DEGREES * Math.PI / 180)
   const roots = triangles.map((_, i) => i)
   const rootOf = (i: number): number => {
@@ -119,15 +147,37 @@ const flatFaceCentres = (
       }
     }
   }
-  const sums = new Map<number, { sum: Vec3; area: number }>()
-  triangles.forEach(({ area, centre }, i) => {
+  const runs = new Map<number, Array<Triangle>>()
+  triangles.forEach((triangle, i) => {
     const root = rootOf(i)
-    const sum = sums.get(root) ?? { sum: { x: 0, y: 0, z: 0 }, area: 0 }
-    sum.sum = vecAdd(sum.sum, vecScale(centre, area))
-    sum.area += area
-    sums.set(root, sum)
+    const run = runs.get(root)
+    if (run === undefined) runs.set(root, [triangle])
+    else run.push(triangle)
   })
-  return [...sums.values()].map(({ area, sum }) => vecScale(sum, 1 / area))
+  return [...runs.values()]
+}
+
+const areaOf = (run: ReadonlyArray<Triangle>) => run.reduce((sum, { area }) => sum + area, 0)
+
+/** The middle of a run, however many triangles make it. */
+const centreOf = (run: ReadonlyArray<Triangle>): Vec3 =>
+  vecScale(run.reduce((sum, { area, centre }) => vecAdd(sum, vecScale(centre, area)), ORIGIN), 1 / areaOf(run))
+
+/** A run as a face: the rectangle around it lies along the mesh's own axes, so a square-cut face fills it. */
+const faceOf = (run: ReadonlyArray<Triangle>, vertices: ReadonlyArray<Vec3>): MeshFace => {
+  const centre = centreOf(run)
+  const normal = vecNormalize(run.reduce((sum, { area, normal: n }) => vecAdd(sum, vecScale(n, area)), ORIGIN))
+  const u = squareTo(normal)
+  const v = vecCross(normal, u)
+  const points = run.flatMap(({ corners }) => corners.flatMap((corner) => vertices[corner] ?? []))
+  const reach = (axis: Vec3) =>
+    points.reduce<readonly [number, number]>(([low, high], point) => {
+      const along = vecDot(vecSub(point, centre), axis)
+      return [Math.min(low, along), Math.max(high, along)]
+    }, [Infinity, -Infinity])
+  const [[u0, u1], [v0, v1]] = [reach(u), reach(v)]
+  const corner = (a: number, b: number) => vecAdd(vecAdd(centre, vecScale(u, a)), vecScale(v, b))
+  return { centre, normal, corners: [corner(u0, v0), corner(u1, v0), corner(u1, v1), corner(u0, v1)] }
 }
 
 /**
@@ -151,14 +201,35 @@ export const meshElementsOf = (
     const bends = p !== undefined && q !== undefined && vecDot(p.normal, q.normal) < sharp
     return isRim || bends ? [[from, to] as const] : []
   })
-  return { vertices, edges, faceCentres: flatFaceCentres(triangles, faces) }
+  const runs = flatRuns(triangles, faces)
+  const least = areaOf(triangles) * FACE_SHARE
+  return {
+    vertices,
+    edges,
+    faceCentres: runs.map(centreOf),
+    faces: runs.filter((run) => areaOf(run) >= least).map((run) => faceOf(run, vertices))
+  }
+}
+
+/** Which way a face looks under `place`: a mirror reverses the cross product, which the normal's own image gives away. */
+const placedNormal = ({ centre, normal }: MeshFace, place: (point: Vec3) => Vec3): Vec3 => {
+  const from = place(centre)
+  const image = (direction: Vec3) => vecSub(place(vecAdd(centre, direction)), from)
+  const across = squareTo(normal)
+  const turned = vecCross(image(across), image(vecCross(normal, across)))
+  return vecNormalize(vecDot(turned, image(normal)) < 0 ? vecScale(turned, -1) : turned)
 }
 
 /** `elements` under `place`, which takes a point of the mesh to the world. */
 export const placedMesh = (elements: MeshElements, place: (point: Vec3) => Vec3): WorldMesh => ({
   vertices: elements.vertices.map(place),
   edges: elements.edges.map(([a, b]) => [place(a), place(b)] as const),
-  faceCentres: elements.faceCentres.map(place)
+  faceCentres: elements.faceCentres.map(place),
+  faces: elements.faces.map((face) => ({
+    centre: place(face.centre),
+    normal: placedNormal(face, place),
+    corners: face.corners.map(place)
+  }))
 })
 
 /** Where an edge's middle is. */

@@ -12,6 +12,7 @@ import { snapValue } from "./snap"
 import { rangeOf, type SnapConfig, type SnapTarget } from "./snapConfig"
 import {
   type BasePoint,
+  type Constraint,
   freePoint,
   lineNearRay,
   pixelDistance,
@@ -221,12 +222,12 @@ const boundsFaceUnder = (faces: ReadonlyArray<BoundsFace>, ray: ReturnType<SnapF
   return hits.sort((a, b) => a.depth - b.depth)[0]
 }
 
-/** The Mesh target's points of one item. */
+/** The Mesh target's points of one item, its bounds standing in until its mesh has loaded. */
 const meshSpotsOf = (config: SnapConfig, item: SnapItem): ReadonlyArray<Spot> => {
   const { elements } = config.targets.mesh
   const of = ` of ${item.name}`
-  const box = boundsOf(item)
-  const mesh = elements.vertices || elements.faceCentres || elements.edgeMidpoints ? item.mesh() : undefined
+  const mesh = item.mesh()
+  const box = mesh === undefined ? boundsOf(item) : undefined
   const spots = (points: ReadonlyArray<Vec3>, label: string) =>
     points.map((at): Spot => ({ at, label: `${label}${of}`, item: item.key }))
   return [
@@ -268,7 +269,7 @@ const edgeHits = (
   })
 }
 
-/** Faces under the base: the renderer's for a mesh, and a box's own. */
+/** Faces under the base: the renderer's for a mesh, and a box's own for an item whose mesh hasn't loaded. */
 const faceHits = (
   frame: SnapFrame,
   { base, reference }: { readonly base: BasePoint; readonly reference: ScreenPoint },
@@ -295,7 +296,7 @@ const faceHits = (
       }]),
     ...(elements.boundsFaces
       ? near.flatMap((item) => {
-        const box = boundsOf(item)
+        const box = item.mesh() === undefined ? boundsOf(item) : undefined
         const under = box === undefined ? undefined : boundsFaceUnder(box.faces, ray)
         return under === undefined
           ? []
@@ -305,10 +306,132 @@ const faceHits = (
   ]
 }
 
+/** How far off a hard constraint's axis a face's normal can be, in degrees, for the face to stand across the move. */
+const ACROSS_DEGREES = 5
+
+const ACROSS = Math.cos(ACROSS_DEGREES * Math.PI / 180)
+
+/** The way a move under `constraint` crosses a plane of `normal`; undefined when the plane doesn't stand across it. */
+const moveAcross = (constraint: Constraint, normal: Vec3): Vec3 | undefined => {
+  const along = constraint.kind === "line"
+    ? vecScale(constraint.direction, vecDot(normal, constraint.direction))
+    : vecSub(normal, vecScale(constraint.normal, vecDot(normal, constraint.normal)))
+  return vecLength(along) < ACROSS ? undefined : vecNormalize(along)
+}
+
+interface StationFace {
+  readonly centre: Vec3
+  readonly normal: Vec3
+  readonly corners: ReadonlyArray<Vec3>
+}
+
+/** A plane a hard constraint can stop at. */
+interface Station {
+  readonly origin: Vec3
+  readonly normal: Vec3
+  /** The way the move crosses it. */
+  readonly along: Vec3
+  readonly label: string
+  readonly marks: ReadonlyArray<SnapMark>
+  readonly rotation?: Quat4 | undefined
+}
+
+/** A face and the way the move crosses it. */
+type FaceAcross = { readonly face: StationFace; readonly along: Vec3 }
+
+/** The plane halfway between the two outermost faces along each way the move crosses `faces`, when they face apart. */
+const middlesOf = (item: SnapItem, faces: ReadonlyArray<FaceAcross>): ReadonlyArray<Station> => {
+  const runs: Array<{ readonly along: Vec3; readonly faces: Array<StationFace> }> = []
+  for (const { along, face } of faces) {
+    const run = runs.find((one) => Math.abs(vecDot(one.along, along)) >= ACROSS)
+    if (run === undefined) runs.push({ along, faces: [face] })
+    else run.faces.push(face)
+  }
+  return runs.flatMap((run): ReadonlyArray<Station> => {
+    const { along } = run
+    const inOrder = run.faces.toSorted((a, b) => vecDot(a.centre, along) - vecDot(b.centre, along))
+    const [near, far] = [inOrder[0], inOrder.at(-1)]
+    if (near === undefined || far === undefined || vecDot(near.normal, far.normal) >= 0) return []
+    return [{
+      origin: vecScale(vecAdd(near.centre, far.centre), 0.5),
+      normal: along,
+      along,
+      label: `Middle of ${item.name}`,
+      marks: [{ kind: "guide", from: near.centre, to: far.centre }]
+    }]
+  })
+}
+
+/** What a hard constraint stops at on one item: its faces across the move, their middles, and its faces' centres. */
+const stationsOf = (frame: SnapFrame, item: SnapItem) => {
+  const { elements, offset } = frame.config.targets.mesh
+  const mesh = item.mesh()
+  const faces: ReadonlyArray<StationFace> = mesh?.faces ?? boundsOf(item)?.faces ?? []
+  const [planes, points] = mesh === undefined
+    ? [elements.boundsFaces, elements.boundsFaceCentres]
+    : [elements.faces, elements.faceCentres]
+  const across = planes
+    ? faces.flatMap((face): ReadonlyArray<FaceAcross> => {
+      const along = moveAcross(frame.constraint, face.normal)
+      return along === undefined ? [] : [{ face, along }]
+    })
+    : []
+  const stations = across.map(({ along, face: { centre, corners, normal } }): Station => ({
+    origin: vecAdd(centre, vecScale(normal, offset)),
+    normal,
+    along,
+    label: `Face of ${item.name}`,
+    marks: [{ kind: "face", corners }],
+    rotation: faceTurn(frame, normal)
+  }))
+  const centres = points
+    ? faces.map(({ centre }): Spot => ({ at: centre, label: `Centre of a face of ${item.name}`, item: item.key }))
+    : []
+  return { centres, stations: [...stations, ...middlesOf(item, across)] }
+}
+
+/** A base stopping at a station, when the move has it within `range`: it isn't looked at, so nothing can hide it. */
+const stationHit = (
+  frame: SnapFrame,
+  base: BasePoint,
+  item: SnapItem,
+  { along, label, marks, normal, origin, rotation }: Station,
+  range: number
+): ReadonlyArray<SnapHit> => {
+  const free = freePoint(frame, base)
+  const landing = vecAdd(free, vecScale(along, vecDot(vecSub(origin, free), normal) / vecDot(along, normal)))
+  const [shown, from] = [frame.view.project(landing), frame.view.project(free)]
+  if (shown === undefined || from === undefined) return []
+  const distance = pixelDistance(shown, from)
+  if (distance > range) return []
+  return [{
+    target: "mesh",
+    rank: 2,
+    distance,
+    base,
+    landing,
+    label,
+    marks,
+    held: { shape: "plane", origin, normal },
+    item: item.key,
+    frontmost: true,
+    ...(rotation !== undefined && { rotation })
+  }]
+}
+
 export const meshHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
   const range = rangeOf(frame.config, "mesh")
   const measured = measuredBases(frame)
   const near = itemsNear(frame, measured.map(({ reference }) => reference), range)
+  if (frame.constraint.kind !== "surface") {
+    return near.flatMap((item) => {
+      const { centres, stations } = stationsOf(frame, item)
+      return [
+        ...stations.flatMap((station) => measured.flatMap(({ base }) => stationHit(frame, base, item, station, range))),
+        ...centres.flatMap((spot) => measured.flatMap((one) => pointHit(frame, "mesh", one, spot, range)))
+      ]
+    })
+  }
   const { elements } = frame.config.targets.mesh
   return measured.flatMap((one) => [
     ...near.flatMap((item) => [

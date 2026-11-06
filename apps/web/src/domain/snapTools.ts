@@ -7,7 +7,7 @@ import type { Quat4, UeTransform, Vec3 } from "./coords"
 import { type Box, boxCentreOf } from "./itemBounds"
 import type { ConstructionAxis, ConstructionPlane } from "./MapSidecar"
 import type { SnapConfig } from "./snapConfig"
-import type { BasePoint } from "./snapFrame"
+import { axesOf, type BasePoint, type Constraint } from "./snapFrame"
 import {
   IDENTITY_QUAT,
   ORIGIN,
@@ -18,6 +18,7 @@ import {
   squareTo,
   vecAdd,
   vecCross,
+  vecDistance,
   vecDot,
   vecLength,
   vecNormalize,
@@ -240,11 +241,26 @@ const boxPoints = ({ max, min }: Box): ReadonlyArray<BasePoint> => {
   )
 }
 
-/**
- * The selection's points that can land: its ends when Connectors is on and it has any, whatever the base setting says,
- * since joining end to end is the point of a piece with ends; else what the setting names.
- */
-export const selectionBases = (config: SnapConfig, { box, ends, pivot }: BaseSelection): ReadonlyArray<BasePoint> => {
+/** What counts as one point of the selection, in cm. */
+const SAME_BASE_CM = 1e-3
+
+/** The selection's near face, centre and far face along each way `constraint` moves. */
+const stationBases = ({ max, min }: Box, constraint: Constraint): ReadonlyArray<BasePoint> => {
+  const centre = boxCentreOf({ max, min })
+  const half = vecScale(vecSub(max, min), 0.5)
+  return axesOf(constraint).flatMap(({ x, y, z }): ReadonlyArray<BasePoint> => {
+    const axis = { x, y, z }
+    const reach = Math.abs(x) * half.x + Math.abs(y) * half.y + Math.abs(z) * half.z
+    return [
+      { start: vecAdd(centre, vecScale(axis, -reach)), label: "Near face", station: true },
+      { start: centre, label: "Centre", station: true },
+      { start: vecAdd(centre, vecScale(axis, reach)), label: "Far face", station: true }
+    ]
+  })
+}
+
+/** What the Base setting names: a selection's ends when Connectors is on and it has any, else the setting's own points. */
+const chosenBases = (config: SnapConfig, { box, ends, pivot }: BaseSelection): ReadonlyArray<BasePoint> => {
   if (config.targets.connectors.enabled && ends.length > 0) {
     return ends.map((end) => ({ start: end.position, label: "End", end }))
   }
@@ -256,4 +272,28 @@ export const selectionBases = (config: SnapConfig, { box, ends, pivot }: BaseSel
     case "closest":
       return boxPoints(box)
   }
+}
+
+/**
+ * The selection's points that can land: its ends when Connectors is on and it has any, whatever the base setting says,
+ * since joining end to end is the point of a piece with ends; else what the setting names. Under a line or a plane
+ * (`constraint`) the pivot and the selection's stations land too, the nearest match saying which is meant.
+ */
+export const selectionBases = (
+  config: SnapConfig,
+  selection: BaseSelection,
+  constraint?: Constraint
+): ReadonlyArray<BasePoint> => {
+  const chosen = chosenBases(config, selection)
+  if (constraint === undefined || constraint.kind === "surface") return chosen
+  const bases = [...chosen]
+  for (
+    const base of [
+      { start: selection.pivot, label: "Pivot", station: true },
+      ...stationBases(selection.box, constraint)
+    ]
+  ) {
+    if (!bases.some(({ start }) => vecDistance(start, base.start) < SAME_BASE_CM)) bases.push(base)
+  }
+  return bases
 }

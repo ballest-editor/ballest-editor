@@ -89,7 +89,6 @@ export class MoveSession {
   private readonly casts: ReturnType<typeof snapCasts>
   /** Where the pointer sat off the pivot at the start, in pixels. */
   private readonly grab: ScreenPoint
-  private readonly bases: SnapFrame["bases"]
   private readonly config: SnapConfig
   private lastOffset: Vec3 = { x: 0, y: 0, z: 0 }
   /** A lock changed what the pointer means: the next sample starts a path of its own. */
@@ -108,7 +107,6 @@ export class MoveSession {
     this.casts = snapCasts(this.items, start.pane, this.view)
     const shown = this.view.project(start.pivot) ?? start.px
     this.grab = { x: start.px.x - shown.x, y: start.px.y - shown.y }
-    this.bases = selectionBases(this.config, { pivot: start.pivot, box: start.box, ends: start.ends })
   }
 
   /** The constraint under the lock, if one is set. */
@@ -148,7 +146,7 @@ export class MoveSession {
       pointer: px,
       offset,
       slip,
-      bases: this.bases,
+      bases: selectionBases(this.config, start, constraint),
       box: start.box,
       rotation: start.rotation,
       units: s.settings.general.units,

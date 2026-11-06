@@ -164,6 +164,34 @@ describe("selectionBases", () => {
     assert.lengthOf(selectionBases({ ...defaultSnapConfig, base: "closest" }, selection), 26)
   })
 
+  const line = { kind: "line", direction: { x: 1, y: 0, z: 0 } } as const
+
+  it("adds the near face, the centre and the far face along a line, whatever the setting", () => {
+    const pivot = { x: 1, y: 2, z: 3 }
+    assert.deepStrictEqual(selectionBases(defaultSnapConfig, selection, line), [
+      { start: pivot, label: "Pivot" },
+      { start: { x: -100, y: 0, z: 100 }, label: "Near face", station: true },
+      { start: { x: 0, y: 0, z: 100 }, label: "Centre", station: true },
+      { start: { x: 100, y: 0, z: 100 }, label: "Far face", station: true }
+    ])
+    const centred = selectionBases({ ...defaultSnapConfig, base: "centre" }, selection, line)
+    assert.deepStrictEqual(centred.map(({ label }) => label), ["Centre", "Pivot", "Near face", "Far face"])
+  })
+
+  it("adds them along both of a plane's axes, and none on a surface", () => {
+    const plane = { kind: "plane", normal: { x: 0, y: 0, z: 1 } } as const
+    assert.lengthOf(selectionBases(defaultSnapConfig, selection, plane), 6, "the pivot, four faces and the centre")
+    const surface = { kind: "surface", normal: { x: 0, y: 0, z: 1 } } as const
+    assert.lengthOf(selectionBases(defaultSnapConfig, selection, surface), 1)
+  })
+
+  it("reaches a box's far corner along a slanted line", () => {
+    const slant = { kind: "line", direction: { x: Math.SQRT1_2, y: Math.SQRT1_2, z: 0 } } as const
+    const far = selectionBases(defaultSnapConfig, selection, slant).find(({ label }) => label === "Far face")
+    assert.closeTo(far?.start.x ?? 0, 100, 1e-6)
+    assert.closeTo(far?.start.y ?? 0, 100, 1e-6)
+  })
+
   it("lets a piece's ends take over with Connectors on, whatever the setting", () => {
     const end = {
       ref: { item: "a", end: 0 },
@@ -174,6 +202,8 @@ describe("selectionBases", () => {
     }
     const bases = selectionBases(defaultSnapConfig, { ...selection, ends: [end] })
     assert.deepStrictEqual(bases.map(({ start }) => start), [end.position])
+    const constrained = selectionBases(defaultSnapConfig, { ...selection, ends: [end] }, line)
+    assert.deepStrictEqual(constrained.map(({ label }) => label), ["End", "Pivot", "Near face", "Centre", "Far face"])
     const off = {
       ...defaultSnapConfig,
       targets: { ...defaultSnapConfig.targets, connectors: { ...defaultSnapConfig.targets.connectors, enabled: false } }

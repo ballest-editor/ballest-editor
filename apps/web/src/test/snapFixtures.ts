@@ -6,6 +6,7 @@ import type { Vec3 } from "../domain/coords"
 import { identityTransform, itemFromPiece, newMapFile } from "../domain/factory"
 import type { Box } from "../domain/itemBounds"
 import type { Item } from "../domain/MapFile"
+import type { WorldMesh } from "../domain/meshElements"
 import { defaultSettings } from "../domain/Settings"
 import type { SnapItem, SnapView } from "../domain/snapFrame"
 import { useEditor } from "../editor/store"
@@ -73,6 +74,32 @@ export const boxAt = ({ x, y, z }: Vec3, half = 50): Box => ({
   min: { x: x - half, y: y - half, z: z - half },
   max: { x: x + half, y: y + half, z: z + half }
 })
+
+/** The mesh of a plain box: eight corners, twelve edges, six faces. */
+export const meshOfBox = ({ max, min }: Box): WorldMesh => {
+  const mid = { x: (min.x + max.x) / 2, y: (min.y + max.y) / 2, z: (min.z + max.z) / 2 }
+  const axes = ["x", "y", "z"] as const
+  const at = (a: Vec3, axis: "x" | "y" | "z", value: number): Vec3 => ({ ...a, [axis]: value })
+  const corners = [min.x, max.x].flatMap((x) => [min.y, max.y].flatMap((y) => [min.z, max.z].map((z) => ({ x, y, z }))))
+  const faces = axes.flatMap((axis, i) =>
+    ([[min, -1], [max, 1]] as const).map(([side, sign]) => {
+      const centre = at(mid, axis, side[axis])
+      const [u = "x", v = "y"] = [axes[(i + 1) % 3], axes[(i + 2) % 3]]
+      const corner = (a: Vec3, b: Vec3) => at(at(centre, u, a[u]), v, b[v])
+      return {
+        centre,
+        normal: at({ x: 0, y: 0, z: 0 }, axis, sign),
+        corners: [corner(min, min), corner(max, min), corner(max, max), corner(min, max)]
+      }
+    })
+  )
+  const edges = corners.flatMap((from, i) =>
+    corners.slice(i + 1).flatMap((to) =>
+      axes.filter((axis) => from[axis] !== to[axis]).length === 1 ? [[from, to] as const] : []
+    )
+  )
+  return { vertices: corners, edges, faceCentres: faces.map(({ centre }) => centre), faces }
+}
 
 /** A 100 cm cube at `at`, as a target. */
 export const cubeAt = (key: string, at: Vec3, over: Partial<SnapItem> = {}): SnapItem => ({
