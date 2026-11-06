@@ -33,7 +33,7 @@ function GroupCard({ items, transforms }: {
   )
   const count = `${items.length.toLocaleString()} item${items.length === 1 ? "" : "s"}`
   return (
-    <div className="flex items-center justify-between gap-2 rounded-surface bg-muted/40 py-1 pr-1 pl-3">
+    <div className="flex items-center justify-between gap-2 rounded-surface bg-muted/40 py-1 pr-1 pl-3 ring-edge not-dark:ring-1">
       <span className="min-w-0 text-body">{box === undefined ? count : `${count} · ${formatBoxSize(box)}`}</span>
       <Button variant="secondary" size="sm" className="shrink-0" onClick={requestFocus}>Frame</Button>
     </div>

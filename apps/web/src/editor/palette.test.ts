@@ -71,7 +71,7 @@ const GRAPHIC = 3
 /** The steps' contrast on --card, as docs/design/ui-system.md gives them. */
 const STEPS = {
   dark: { foreground: 16, "fg-secondary": 8.5, "fg-tertiary": 5.5, "fg-disabled": 3.2 },
-  light: { "fg-secondary": 11, "fg-tertiary": 6.5, "fg-disabled": 2.6 }
+  light: { "fg-secondary": 10.5, "fg-tertiary": 6.2, "fg-disabled": 3 }
 }
 
 const PANELS = ["card", "popover"]
@@ -192,7 +192,7 @@ describe("the palette", () => {
     it(`${theme}: each surface sits above the last, with no hue to name`, () => {
       const [background, card, popover] = SURFACES.map((name) => oklchOf(tokens, name))
       assert.isBelow(background?.[0] ?? 1, card?.[0] ?? 0)
-      assert.isAtMost(card?.[0] ?? 1, popover?.[0] ?? 0)
+      assert.isBelow(card?.[0] ?? 1, popover?.[0] ?? 0)
       for (const name of [...SURFACES, "muted", "accent", "secondary"]) {
         assert.isAtMost(oklchOf(tokens, name)[1], MAX_SURFACE_CHROMA)
       }
@@ -210,16 +210,23 @@ describe("the palette", () => {
   const dark = THEMES.dark
   const light = THEMES.light
 
+  // A disabled menu item. Dark's --popover rises towards its text, so this bar is light's.
+  it("light: --fg-disabled reads on --popover and sits below --fg-tertiary", () => {
+    const color = (name: string) => linearOf(oklchOf(light, name))
+    assert.isAtLeast(contrast(color("fg-disabled"), color("popover")), GRAPHIC)
+    assert.isAbove(contrast(color("fg-tertiary"), color("card")), contrast(color("fg-disabled"), color("card")) * 1.5)
+  })
+
   // docs/design/ui-system.md § Colour gives these as hex, and the reviewer samples them on screen.
-  it("light: the surfaces are the panel's grey and white", () => {
+  it("light: the surfaces are three greys, to white", () => {
     const hexOf = (name: string) =>
       `#${shownOf(linearOf(oklchOf(light, name))).map((channel) => channel.toString(16).padStart(2, "0")).join("")}`
     assert.strictEqual(hexOf("background"), "#eef1f3")
-    assert.strictEqual(hexOf("card"), "#ffffff")
+    assert.strictEqual(hexOf("card"), "#fafbfc")
     assert.strictEqual(hexOf("popover"), "#ffffff")
   })
 
-  // A card and a popover are the same white, so all that holds a menu off a panel is its shadow and its edge.
+  // A popover is a step off a card, too small to hold a menu off a panel alone: its shadow and its edge do that.
   it("light: what floats has a 12% shadow and an 8% black edge", () => {
     assert.strictEqual(washOf(light, "shadow-float").alpha, 0.12)
     assert.deepEqual(washOf(light, "edge"), { oklch: [0, 0, 0] as Rgb, alpha: 0.08 })

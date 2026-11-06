@@ -20,9 +20,9 @@ The font is the system's (`--font-sans`), so the type is never where the persona
 
 | Class               | Dark contrast on `--card` | Light contrast on `--card` | For                                                          |
 | ------------------- | ------------------------- | -------------------------- | ------------------------------------------------------------ |
-| `text-fg-secondary` | 9.0:1                     | 11.1:1                     | Eyebrows, section labels, field labels, inactive tabs, icons |
-| `text-fg-tertiary`  | 6.4:1                     | 6.5:1                      | Placeholders, helper copy, statuses, shortcut hints, counts  |
-| `text-fg-disabled`  | 3.2:1                     | 2.7:1                      | Disabled text, and what's inside a disabled row but its name |
+| `text-fg-secondary` | 9.0:1                     | 10.7:1                     | Eyebrows, section labels, field labels, inactive tabs, icons |
+| `text-fg-tertiary`  | 6.4:1                     | 6.3:1                      | Placeholders, helper copy, statuses, shortcut hints, counts  |
+| `text-fg-disabled`  | 3.2:1                     | 3.1:1                      | Disabled text, and what's inside a disabled row but its name |
 
 The variables are `--fg-secondary`, `--fg-tertiary`, `--fg-disabled`. They aren't `text-secondary`: `secondary` is shadcn's surface colour. Disabled is a colour, not `opacity-50`, except on filled buttons and on graphics (a switch, a slider).
 
@@ -33,14 +33,14 @@ The chrome has no hue, only elevation, and the colour on screen comes from the v
 | Surface        | Dark      | Light                  | For                                                                       |
 | -------------- | --------- | ---------------------- | ------------------------------------------------------------------------- |
 | `--background` | `#0b0d0f` | `#eef1f3`              | Behind everything: the start screen, the strips, the window's edges       |
-| `--card`       | `#16191c` | `#ffffff`              | Panels, bars                                                              |
+| `--card`       | `#16191c` | `#fafbfc`              | Panels, bars                                                              |
 | `--popover`    | `#1e2226` | `#ffffff`              | Dialogs, and what `glass` is made of                                      |
 | `--muted`      | one up    | one down               | The track of a segmented control, skeletons, a key chip                   |
 | `--secondary`  | one up    | one down               | Secondary buttons                                                         |
 | `--accent`     | one up    | one down               | shadcn's neutral surface, opaque. `--accent-foreground` is the foreground |
 | `--sidebar-*`  | `--card`  | a shade under `--card` | shadcn's sidebar                                                          |
 
-Both themes are one cool neutral at hue 250, lighter as they rise: `--background`, `--card`, `--popover`. In light `--card` and `--popover` are both white, so what floats stands off a panel by its shadow and edge (§ Depth), not its tone. Separate things by that step first. A row or a group on a panel takes a tone, not a border. Dark is near-black, so the window reads as black with the chrome lifting off it, and each step is 8 to 11 points. `--muted`, `--accent` and `--secondary` sit above `--popover` there, because a track or a key chip also sits on a dialog or a menu.
+Both themes are one cool neutral at hue 250, lighter as they rise: `--background`, `--card`, `--popover`. In light the steps are small, `--popover` is white and `--card` only just under it, so what floats stands off a panel by its shadow and edge (§ Depth) as well as its tone. Separate things by that step first. A row or a group on a panel takes a tone, not a border; in light a raised card takes the edge too. Dark is near-black, so the window reads as black with the chrome lifting off it, and each step is 8 to 11 points. `--muted`, `--accent` and `--secondary` sit above `--popover` there, because a track or a key chip also sits on a dialog or a menu.
 
 Components use the tokens, never a palette class (`emerald-500`) or a hex. The scene is the exception, because it draws the game's world and not the chrome: `sceneGround.ts`, `sceneColors.ts` and `axisColors.ts` keep their own colours. The clear colour sits near the chrome base, so the map's sky and water are the only real colour in the viewport: a cool near-black in dark, between the chrome's base and its panels, and in light a very pale cool grey-blue. Light's orthographic panes sit one step bluer (`ORTHO_GROUND`), so a side view that sees the water edge-on stays in the family of the panes that see it from above. The water has a look per theme and skips tone mapping, so its colours are what reach the screen before the map's light dims them: deep and muted in dark so the pieces pop, thicker in light so a pale piece's side faces stand off it. From above it thins out by the sky's own haze curve, so it runs straight into the horizon with no clear colour between them, and from below it thins out with distance (`water.ts`). The sky's haze over the far floor is tighter in dark, where a bright sky would otherwise light up a third of the pane, and in dark the sky also fades out towards the top of each pane, so the top 25 px of a 1,000 px pane are the clear colour wherever the camera points (`sky.ts`). The floor grid's lines fade before they get too fine to draw (`floorGrid.ts`).
 
@@ -103,6 +103,8 @@ A dock tab takes the inset ring on dockview's own focus line (`dock.css`). A 24p
 | `shadow-md`      | 12px at 12%, 20% in dark                                                  | Popovers, menus, tooltips, toasts     |
 | `ring-edge`      | A 1px edge, `--edge`: black at 8%, the foreground at 8% in dark           | With a shadow, on whatever floats     |
 | `shadow-lg`      | 24px at 12%, 20% in dark                                                  | Dialogs                               |
+
+A raised card is `ring-edge not-dark:ring-1`: in light its tone is too near the panel's to show where it ends, and in dark the tone is enough. The start screen's cards stand alone, so in light they also take `shadow-md`, and in dark they keep a `border-border` hairline.
 
 A button pressed scales to 0.97 and drops its shadow, except one that opens a popup, which holds still under it.
 

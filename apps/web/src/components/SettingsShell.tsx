@@ -370,7 +370,7 @@ export function SettingsShell<C extends string>(props: {
                   {group.title !== undefined && group.title !== "" && (
                     <h3 className="mb-1 text-caption uppercase tracking-wider text-fg-secondary">{group.title}</h3>
                   )}
-                  <div className="flex flex-col rounded-surface bg-muted/40 pr-3">
+                  <div className="flex flex-col rounded-surface bg-muted/40 pr-3 ring-edge not-dark:ring-1">
                     {group.rows.map((row) => <RowView key={row.id} row={row} />)}
                   </div>
                 </section>
