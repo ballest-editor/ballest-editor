@@ -27,12 +27,9 @@ import {
   DropdownMenuTrigger
 } from "@workspace/ui/components/dropdown-menu"
 import { cn } from "@workspace/ui/lib/utils"
-import { type PointerEvent, useSyncExternalStore } from "react"
+import type { PointerEvent } from "react"
 import { type KeybindAction, PROJECTION_ACTIONS } from "../domain/Keybinds"
-import { axisOf, formatPaneScale, ORTHO_AXES } from "../domain/orthoView"
 import {
-  isOrthoView,
-  type OrthoView,
   paneClose,
   paneCloseColumn,
   paneCloseRow,
@@ -40,6 +37,7 @@ import {
   paneShares,
   paneSplitDown,
   paneSplitRight,
+  toolStripOf,
   type ViewLayoutKind,
   viewLayoutKinds,
   viewLayoutLabels,
@@ -47,12 +45,12 @@ import {
   viewProjectionLabels,
   viewProjections
 } from "../domain/viewLayout"
-import { sceneAxisColors } from "../editor/axisColors"
-import { changePanes, onPaneScaleChange, paneCameraAt } from "../editor/paneCameras"
+import { changePanes } from "../editor/paneCameras"
 import { useEditor } from "../editor/store"
-import { useDarkTheme } from "../editor/theme"
 import { InstanceBanner } from "./InstanceBanner"
+import { PaneReadout } from "./PaneReadout"
 import { GROUP, noFocus, SEGMENT, SURFACE } from "./viewControlStyle"
+import { ViewGizmo } from "./ViewGizmo"
 import { ViewTip } from "./ViewTip"
 
 const LAYOUT_ICONS = {
@@ -211,62 +209,26 @@ function PaneHeader({ pane, projection, disabled, active }: {
   )
 }
 
-const ARROW = 30
-const ORIGIN = 6
-const SIZE = ORIGIN + ARROW + 14
-
-/** One axis of `PaneCorner`: a line out from the corner, named with its sign ("-Y" when it runs that way). */
-function AxisArrow({ direction, across, color }: {
-  readonly direction: ReturnType<typeof axisOf>
-  readonly across: boolean
-  readonly color: string
-}) {
-  const name = `${direction.positive ? "" : "−"}${direction.axis.toUpperCase()}`
-  const y = SIZE - ORIGIN
-  return (
-    <>
-      <line
-        x1={ORIGIN}
-        y1={y}
-        x2={across ? ORIGIN + ARROW : ORIGIN}
-        y2={across ? y : y - ARROW}
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-      />
-      <text
-        x={across ? ORIGIN + ARROW + 3 : ORIGIN}
-        y={across ? y + 4 : y - ARROW - 4}
-        textAnchor={across ? "start" : "middle"}
-        fill={color}
-        className="text-caption"
-      >
-        {name}
-      </text>
-    </>
-  )
-}
-
 /**
- * The bottom left of an orthographic pane, 8px above the tool bar, which reaches into the right column's pane: which way
- * the game's axes run across it, in their colours, and its zoom. On a chip of its own, so a busy map doesn't swallow them.
+ * The bottom left of a pane, 8px above a single pane's tool bar, which it would otherwise meet in a narrow viewport: the
+ * axis gizmo and the pane's scale. On a chip of its own, so a busy map doesn't swallow them.
  */
-function PaneCorner({ slot, view }: { readonly slot: number; readonly view: OrthoView }) {
-  const units = useEditor((s) => s.settings.general.units)
-  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
-  // The zoom isn't React state: it changes with every wheel notch.
-  const scale = useSyncExternalStore(onPaneScaleChange, () => paneCameraAt(slot).cmPerPixel)
-  const { right, up } = ORTHO_AXES[view]
-  const across = axisOf(right)
-  const upward = axisOf(up)
-  const colors = sceneAxisColors(dark)
+function PaneCorner({ slot, projection, disabled }: {
+  readonly slot: number
+  readonly projection: ViewProjection
+  readonly disabled: boolean
+}) {
+  const clearsToolBar = useEditor((s) => toolStripOf(s.viewLayout.kind) === 0)
   return (
-    <div className={cn("pointer-events-none absolute bottom-14 left-3 rounded-sheet p-1.5", SURFACE)}>
-      <svg aria-hidden width={SIZE + 8} height={SIZE} viewBox={`0 0 ${SIZE + 8} ${SIZE}`}>
-        <AxisArrow direction={across} across color={colors[across.axis]} />
-        <AxisArrow direction={upward} across={false} color={colors[upward.axis]} />
-      </svg>
-      <div className="px-0.5 text-caption text-fg-tertiary tabular-nums">{formatPaneScale(scale, units)}</div>
+    <div
+      className={cn(
+        "pointer-events-none absolute left-3 flex flex-col gap-0.5 rounded-sheet p-1.5",
+        clearsToolBar ? "bottom-14" : "bottom-3",
+        SURFACE
+      )}
+    >
+      <ViewGizmo slot={slot} projection={projection} disabled={disabled} />
+      <PaneReadout slot={slot} projection={projection} />
     </div>
   )
 }
@@ -316,7 +278,10 @@ export function ViewPanes({ disabled }: { readonly disabled: boolean }) {
   const activePane = useEditor((s) => s.activePane)
   const panes = paneShares(layout)
   return (
-    <div className="pointer-events-none absolute inset-0 @container/viewport">
+    <div
+      className="pointer-events-none absolute inset-x-0 top-0 @container/viewport"
+      style={{ bottom: toolStripOf(layout.kind) }}
+    >
       {panes.map((pane) => {
         const { slot } = pane
         const projection = layout.projections[slot]
@@ -327,7 +292,7 @@ export function ViewPanes({ disabled }: { readonly disabled: boolean }) {
               <div className="absolute inset-0 ring-2 ring-ring ring-inset" data-active-pane />
             )}
             <PaneHeader pane={pane} projection={projection} disabled={disabled} active={active} />
-            {isOrthoView(projection) && <PaneCorner slot={slot} view={projection} />}
+            <PaneCorner slot={slot} projection={projection} disabled={disabled} />
           </div>
         )
       })}

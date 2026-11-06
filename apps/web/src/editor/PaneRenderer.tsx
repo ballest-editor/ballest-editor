@@ -1,8 +1,8 @@
 import { type RootState, useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useRef } from "react"
-import { editorVerticalFov } from "../domain/Settings"
+import { editorVerticalFov, MOTION_SCALE } from "../domain/Settings"
 import { firstPaneTurns, paneRects, panesToDraw, type PaneTurns } from "../domain/viewLayout"
-import { mapBox, type PaneCamera, paneCamerasOf } from "./paneCameras"
+import { mapBox, type PaneCamera, paneCamerasOf, VIEW_TWEEN_MS } from "./paneCameras"
 import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
 
@@ -39,6 +39,7 @@ const drawPanes = ({ gl, scene, size }: Pick<RootState, "gl" | "scene" | "size">
   const rects = paneRects(viewLayout, size.width, size.height).filter((r) => r.width > 0 && r.height > 0)
   const panes = paneCamerasOf(tabId)
   const fov = editorVerticalFov(settings.camera, keybindDefaults.cameraPresets)
+  const now = performance.now()
   for (const rect of rects) {
     const pane = panes[rect.slot]
     if (pane === undefined) continue
@@ -48,11 +49,12 @@ const drawPanes = ({ gl, scene, size }: Pick<RootState, "gl" | "scene" | "size">
       pane.needsFraming = false
       pane.frameMap(mapBox())
     }
+    pane.stepTween(now, VIEW_TWEEN_MS * MOTION_SCALE[settings.appearance.motion])
   }
   sceneRegistry.camera = panes[activePane]?.camera ?? null
 
   const key = JSON.stringify([tabId, rects, rects.map((r) => panes[r.slot]?.projection)])
-  const plan = panesToDraw(rects.map((r) => r.slot), activePane, performance.now(), turns, everyPane || key !== shown)
+  const plan = panesToDraw(rects.map((r) => r.slot), activePane, now, turns, everyPane || key !== shown)
   shown = key
   turns = plan.turns
 
@@ -67,7 +69,7 @@ const drawPanes = ({ gl, scene, size }: Pick<RootState, "gl" | "scene" | "size">
     gl.setViewport(rect.x, bottom, rect.width, rect.height)
     gl.setScissor(rect.x, bottom, rect.width, rect.height)
     for (const callback of beforeDraw) callback(pane, slot)
-    gl.render(scene, pane.camera)
+    gl.render(scene, pane.drawCamera)
   }
   gl.setScissorTest(false)
 }
