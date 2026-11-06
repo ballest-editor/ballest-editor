@@ -50,8 +50,8 @@ function PlayButton() {
 /**
  * In the desktop app this is the window's title bar (docs/DESKTOP.md § Window): it drags the window, and Electron
  * draws the window controls over one end of it. The padding keeps clear of them: `titlebar-area-*` is the part of
- * the bar they leave free, on whichever side the desktop puts them. A browser defines neither, so it gets plain
- * padding and no drag.
+ * the bar they leave free, on whichever side the desktop puts them, so `titlebar-area-x` is 0 with the controls on the
+ * right and their width with them on the left. A browser defines neither, so it gets plain padding and no drag.
  */
 const TITLE_BAR_CLASSES = [
   "[-webkit-app-region:drag] [&_button]:[-webkit-app-region:no-drag]",
@@ -61,8 +61,7 @@ const TITLE_BAR_CLASSES = [
 
 /**
  * The window's title: the project in use (desktop), centred like any document window's, its folder on hover. The dot
- * is the document tab's: a tab has unsaved edits, or it is Untitled Project and nothing is on disk yet
- * (docs/PROJECTS.md § Shell).
+ * is the document tab's: a tab has unsaved edits.
  */
 function ProjectTitle() {
   const state = useEditor((s) => s.project)

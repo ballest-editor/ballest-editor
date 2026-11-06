@@ -21,6 +21,11 @@ describe("a document tab's status", () => {
     assert.strictEqual(tabStatusOf(false, exported), "In sync")
   })
 
+  it("says New map of a blank tab, until it has edits", () => {
+    assert.strictEqual(tabStatusOf(false, undefined, true), "New map")
+    assert.strictEqual(tabStatusOf(true, undefined, true), "Unsaved")
+  })
+
   it("says Saved of what has no link state, such as a definition", () => {
     assert.strictEqual(tabStatusOf(false, undefined), "Saved")
   })

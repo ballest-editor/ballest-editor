@@ -27,7 +27,8 @@ import {
   tabLabelOf,
   tabLabels,
   tabStateOf,
-  tabsWithoutFile
+  tabsWithoutFile,
+  windowTitleOf
 } from "../store"
 import { canMakeProject, newMapEffect } from "./maps"
 import {
@@ -167,6 +168,17 @@ describe("the first Save in Untitled Project", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
+  it.effect("the window's title has no dot until a tab has edits", () => {
+    const disk = untitledDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      assert.isFalse(projectUnsavedOf(s()))
+      assert.strictEqual(windowTitleOf(s()), "Untitled Project – Ballest Editor")
+      edit()
+      assert.strictEqual(windowTitleOf(s()), "• Untitled Project – Ballest Editor")
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
   it.effect("makes the project, which this window then is, and the other tabs stay for their own first Save", () => {
     const disk = untitledDisk()
     return Effect.gen(function*() {
@@ -176,6 +188,7 @@ describe("the first Save in Untitled Project", () => {
       s().renameLevel("Big Loop", "Isaac")
       assert.strictEqual(projectTitleOf(s()), "Untitled Project")
       assert.isTrue(projectUnsavedOf(s()))
+      assert.strictEqual(windowTitleOf(s()), "• Untitled Project – Ballest Editor")
       yield* saveMapInNewProjectEffect({ name: "My tracks" })
       assert.strictEqual(projectTitleOf(s()), "My tracks")
       assert.deepInclude(s().project?.current, { path: project })

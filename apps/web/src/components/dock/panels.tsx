@@ -21,7 +21,7 @@ export interface DockPanel {
   readonly renderer?: DockviewPanelRenderer
 }
 
-/** Every dock panel (docs/DESKTOP.md § Dock), in the order of a group's tabs. The last of a group starts in front. */
+/** Every dock panel (docs/DESKTOP.md § Dock), in the order of a group's tabs. The first of a group starts in front. */
 export const dockPanels: ReadonlyArray<DockPanel> = [
   { id: "project", title: "Project", icon: IconFolder, location: "left", component: ProjectPanel },
   { id: "pieces", title: "Pieces", icon: IconBox, location: "left", component: Palette, renderer: "always" },

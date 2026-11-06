@@ -20,14 +20,7 @@ import {
 } from "../editor/actions"
 import { warmCatalog } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
-import {
-  type Dialog,
-  isChooserRequired,
-  projectTitleOf,
-  projectUnsavedOf,
-  useEditor,
-  useOpenMapLabel
-} from "../editor/store"
+import { APP_TITLE, type Dialog, isChooserRequired, useEditor, windowTitleOf } from "../editor/store"
 import { watchResolvedTheme } from "../editor/theme"
 import { useActionKeys } from "../editor/useActionKeys"
 import { AboutDialog } from "./AboutDialog"
@@ -74,20 +67,12 @@ const useMotion = () => {
   }, [motion])
 }
 
-/**
- * The OS window's title. On desktop it is the project, as the top bar says, so the taskbar and alt-tab tell windows
- * apart. A browser, which has no project, shows the open map. Either is marked while it has unsaved changes.
- */
-const useDocumentTitle = () => {
-  const label = useOpenMapLabel()
-  const dirty = useEditor((s) => s.dirty)
-  const project = useEditor(projectTitleOf)
-  const projectUnsaved = useEditor(projectUnsavedOf)
+/** The OS window's title (`windowTitleOf`). `waitingToChoose`: the start screen is coming, so nothing is open yet. */
+const useDocumentTitle = (waitingToChoose: boolean) => {
+  const title = useEditor((s) => waitingToChoose ? APP_TITLE : windowTitleOf(s))
   useEffect(() => {
-    document.title = project === null
-      ? `${dirty ? "• " : ""}${label} — Ballest Editor`
-      : `${projectUnsaved ? "• " : ""}${project} – Ballest Editor`
-  }, [label, dirty, project, projectUnsaved])
+    document.title = title
+  }, [title])
 }
 
 /**
@@ -133,7 +118,7 @@ export function Editor() {
   const waitingToChoose = useEditor((s) => s.project === null) && startsOnChooser()
 
   useActionKeys()
-  useDocumentTitle()
+  useDocumentTitle(waitingToChoose)
   useUnsavedGuard()
   useTheme()
   useMotion()

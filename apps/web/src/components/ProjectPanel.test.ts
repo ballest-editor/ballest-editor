@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   projectMaps: [] as ReadonlyArray<unknown>,
   tabIds: [] as ReadonlyArray<string>,
   tabId: "untitled",
+  unsaved: true,
   openDialog: () => undefined,
   activateTab: () => undefined
 }))
@@ -19,7 +20,7 @@ vi.mock("../editor/store", () => ({
   tabsWithoutFile: (s: typeof state) => s.tabIds,
   useEditor: (selector: (s: typeof state) => unknown) => selector(state),
   useHasUnsavedEdits: () => false,
-  useTabSummary: () => ({ label: "Untitled" })
+  useTabSummary: () => ({ label: "Untitled", unsaved: state.unsaved })
 }))
 
 vi.mock("../editor/actions", () => ({}))
@@ -29,6 +30,7 @@ const panel = () => renderToStaticMarkup(createElement(ProjectPanel))
 describe("the Project panel with no maps", () => {
   beforeEach(() => {
     state.tabIds = []
+    state.unsaved = true
   })
 
   it("lists an unsaved tab and leaves out the empty state", () => {
@@ -36,6 +38,14 @@ describe("the Project panel with no maps", () => {
     const markup = panel()
     assert.include(markup, "Unsaved")
     assert.notInclude(markup, "No maps yet")
+  })
+
+  it("lists a blank tab with no Unsaved badge", () => {
+    state.tabIds = ["untitled"]
+    state.unsaved = false
+    const markup = panel()
+    assert.include(markup, "Untitled")
+    assert.notInclude(markup, "Unsaved")
   })
 
   it("shows the empty state when there is nothing at all", () => {
