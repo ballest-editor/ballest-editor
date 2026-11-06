@@ -41,7 +41,7 @@ The dark theme is the stadium at night and the light theme is the game's cover a
 | Ball red    | The ball on the cover, `#b61f1e` to `#f03f3c`           | tints     | tints     | `--destructive`, `--difficulty-4`              |
 | Dawn        | The dawn sky, blue through mauve to the rim's coral     | tints     | tints     | `--size-s`, `--size-m`, `--size-l`             |
 
-Components use the tokens, never a palette class (`emerald-500`) or a hex. The scene is the exception, because it draws the game's world and not the chrome: `sceneGround.ts`, `sceneColors.ts` and `axisColors.ts` keep their own colours, and the ground and theme sky lean to water so a pane doesn't read as a panel.
+Components use the tokens, never a palette class (`emerald-500`) or a hex. The scene is the exception, because it draws the game's world and not the chrome: `sceneGround.ts`, `sceneColors.ts` and `axisColors.ts` keep their own colours. The clear colour is a neutral near the chrome base, so the map's sky and water are the only colour in the viewport.
 
 | Token                              | For                                                                                                                                                                       |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

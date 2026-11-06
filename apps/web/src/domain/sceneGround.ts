@@ -1,5 +1,8 @@
-/** The viewport's clear colour per theme: the ground under the grid, and all an orthographic pane shows behind it. */
-export const SCENE_COLORS = { dark: "#12283a", light: "#c8dbe8" } as const
+/**
+ * The viewport's clear colour per theme: the ground under the grid, all an orthographic pane shows behind it, and all
+ * a perspective pane shows with the sky off. Neutral, close to the chrome, so the map's sky and water are the only colour.
+ */
+export const SCENE_COLORS = { dark: "#1a1d21", light: "#dcdfe3" } as const
 
 const channelsOf = (hex: string): ReadonlyArray<number> => [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16))
 
