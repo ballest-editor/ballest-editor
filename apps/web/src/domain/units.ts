@@ -314,27 +314,36 @@ const sameQuat = (a: Quat4, b: Quat4) =>
  * about (docs/design/pivot-modes-and-chains.md § Group pivot). `after` is an edit about to be committed, and a group
  * whose every item it moved by one offset, with no turn or scale, takes its Point along. Undefined when no Point moves.
  */
+/**
+ * How far an edit moved every one of `keys` from `before` to `after`, when it moved them all by one offset with no turn
+ * or scale: the one kind of edit a Point pivot follows. Undefined otherwise, or when nothing moved.
+ */
+export const commonMoveOf = (
+  keys: ReadonlyArray<string>,
+  before: (key: string) => UeTransform | undefined,
+  after: (key: string) => UeTransform | undefined
+): Vec3 | undefined => {
+  let offset: Vec3 | undefined
+  for (const key of keys) {
+    const [from, to] = [before(key), after(key)]
+    if (from === undefined || to === undefined) return undefined
+    if (!sameQuat(from.rotation, to.rotation) || !nearVec(from.scale3D, to.scale3D)) return undefined
+    const d = vecSub(to.translation, from.translation)
+    if (offset === undefined) offset = d
+    else if (!nearVec(offset, d)) return undefined
+  }
+  return offset === undefined || nearVec(offset, ORIGIN) ? undefined : offset
+}
+
 export const withCarriedPoints = (
   structure: Structure,
   before: (key: string) => UeTransform | undefined,
   after: ReadonlyMap<string, UeTransform>
 ): Structure | undefined => {
   const moved: Array<string> = []
-  const offsetOf = (keys: ReadonlyArray<string>): Vec3 | undefined => {
-    let offset: Vec3 | undefined
-    for (const key of keys) {
-      const [from, to] = [before(key), after.get(key)]
-      if (from === undefined || to === undefined) return undefined
-      if (!sameQuat(from.rotation, to.rotation) || !nearVec(from.scale3D, to.scale3D)) return undefined
-      const d = vecSub(to.translation, from.translation)
-      if (offset === undefined) offset = d
-      else if (!nearVec(offset, d)) return undefined
-    }
-    return offset === undefined || nearVec(offset, { x: 0, y: 0, z: 0 }) ? undefined : offset
-  }
   const tree = rewriteTree(structure.tree, (node) => {
     if (node.kind !== "group" || node.pivot?.choice !== "point") return [node]
-    const offset = offsetOf(treeKeys([node]))
+    const offset = commonMoveOf(treeKeys([node]), before, (key) => after.get(key))
     if (offset === undefined) return [node]
     moved.push(node.id)
     return [{ ...node, pivot: { choice: "point", world: vecAdd(node.pivot.world, offset) } }]

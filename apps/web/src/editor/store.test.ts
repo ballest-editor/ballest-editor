@@ -1503,6 +1503,25 @@ describe("groups and the selection", () => {
     assert.strictEqual(groupPivot()?.choice, "point")
   })
 
+  it("shows a Point pivot carried by a live move, and left alone by a live turn or scale", () => {
+    const { a, b, c, outer } = nestedMap()
+    state().select([a, b, c])
+    state().setGroupPivot(outer, { choice: "point", world: { x: 0, y: 0, z: 0 } })
+    const shown = (edit: (t: UeTransform, i: number) => UeTransform) => {
+      const live = new Map([a, b, c].map((id, i) => [id, edit(transformOf(id), i)]))
+      return selectionPivot(state(), (id) => live.get(id) ?? transformOf(id))?.pivot
+    }
+    // offsets that differ only by floating-point noise still count as one move
+    const by = (t: UeTransform, i: number) => ({
+      ...t,
+      translation: { ...t.translation, x: t.translation.x + 0.1 + (i === 0 ? 0 : 1e-12) }
+    })
+    assert.closeTo(shown(by)?.x ?? NaN, 0.1, 1e-9)
+    const turned = { x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 }
+    assert.deepStrictEqual(shown((t) => ({ ...t, rotation: turned })), { x: 0, y: 0, z: 0 })
+    assert.deepStrictEqual(shown((t) => ({ ...t, scale3D: { x: 2, y: 1, z: 1 } })), { x: 0, y: 0, z: 0 })
+  })
+
   it("makes, reverses and unmakes a chain, and groups a selection as one in selection order", () => {
     mapWithCubes(0, 100, 200)
     const [a = "", b = "", c = ""] = state().doc.ids.slice(1)

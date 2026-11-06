@@ -134,6 +134,7 @@ import type {
 } from "../services/Platform"
 
 import {
+  commonMoveOf,
   effectivePivotMode,
   pivotDotsOf,
   type PivotDotSpec,
@@ -1762,18 +1763,11 @@ const unitContext = (s: EditorState, transformOf: (id: string) => UeTransform | 
     if (origin === undefined || inDoc === undefined || now === undefined) return origin
     return vecAdd(origin, vecSub(now.translation, editTransform(inDoc).translation))
   },
-  liveOffsetOf: (keys) => {
-    let offset: Vec3 | undefined
-    for (const id of keys) {
+  liveOffsetOf: (keys) =>
+    commonMoveOf(keys, (id) => {
       const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
-      const now = transformOf(id)
-      if (item === undefined || now === undefined) return undefined
-      const d = vecSub(now.translation, editTransform(item).translation)
-      if (offset === undefined) offset = d
-      else if (!sameVec(offset, d)) return undefined
-    }
-    return offset
-  }
+      return item === undefined ? undefined : editTransform(item)
+    }, transformOf)
 })
 
 /** The items an edit of the selection reaches (`reachableKeys`): inside an entered chain, the carried links too. */
