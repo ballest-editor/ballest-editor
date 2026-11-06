@@ -1,5 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
-import { ARENA_RIM, evalCurve, SKY_GAIN, skyIrradiance, skyOf, skyRadiance } from "./sky"
+import { Option } from "effect"
+import { hexToLinear } from "./color"
+import { ARENA_RIM, evalCurve, SKY_GAIN, skyColorAt, skyIrradiance, skyOf, skyRadiance } from "./sky"
 import { sunOf } from "./sunlight"
 
 const EPSILON = 1e-4
@@ -7,6 +9,13 @@ const skyAt = (timeOfDay: number) => skyOf(sunOf({ timeOfDay, brightness: 12, an
 const UP = { x: 0, y: 0, z: 1 }
 
 describe("sky", () => {
+  it("gives a swatch of the sky at a time: blue at noon, warm at sunrise, dark at midnight", () => {
+    const [noon, sunrise, midnight] = [12, 6, 0].map((t) => Option.getOrThrow(hexToLinear(skyColorAt(t))))
+    assert.isTrue(noon![2] > noon![1] && noon![1] > noon![0])
+    assert.isTrue(sunrise![0] > sunrise![1] && sunrise![1] > sunrise![2])
+    assert.isTrue(Math.max(...midnight!) < Math.min(noon![2], sunrise![0]))
+  })
+
   it("evaluates UE curves through their keys and holds the ends", () => {
     const keys = [[0, 1, 0, 0], [1, 3, 2, 2], [2, 0, 0, 0]] as const
     assert.closeTo(evalCurve(keys, 0), 1, EPSILON)
