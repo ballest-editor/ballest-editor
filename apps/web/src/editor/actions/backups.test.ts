@@ -1,14 +1,39 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
+import fixture from "../../domain/bundledCatalog.json"
+import { Catalog } from "../../domain/Catalog"
+import { identityTransform } from "../../domain/factory"
 import { lightingOf } from "../../domain/sunlight"
 import { MapCodec } from "../../services/MapCodec"
 import { makeTestDisk, projectFile, TEST_MAPS_FOLDER, testBridge, testHash } from "../../test/desktopBridge"
 import { createNewMap, layerFor, reset, s } from "../../test/editorActions"
 import { listSamples, readSample } from "../../test/samples"
-import { describeBackupEffect, recoverBackupEffect } from "./backups"
+import { tabLabelOf } from "../store"
+import { describeBackupEffect, previewBackupEffect, recoverBackupEffect, restoreBackupAsNewEffect } from "./backups"
 import { exportToGameEffect } from "./exportPlay"
 import { duplicateMapEffect, saveMapFile } from "./save"
 import { unlessCancelledFor } from "./unsaved"
+
+const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!
+
+/** Places one more item in the open map. */
+const placeItem = () => s().placePiece(cube, identityTransform({ x: 500 + s().doc.map.items.length, y: 0, z: 0 }))
+
+/** A disk with one backup, of text that doesn't decode. */
+const diskWithBrokenBackup = () => {
+  const fileName = "Map_LevelEditorMain&Broken_me.balledit"
+  const disk = makeTestDisk()
+  disk.backups.push({
+    place: "project",
+    id: `0 ${fileName}`,
+    fileName,
+    at: "2026-10-31T12:00:00.000Z",
+    text: "{",
+    hash: testHash("{"),
+    sidecar: null
+  })
+  return disk
+}
 
 describe("backup actions", () => {
   it.effect("Save keeps the file it writes over; Recover opens it as unsaved edits and Save writes it back", () => {
@@ -107,18 +132,93 @@ describe("backup actions", () => {
     }
   )
 
-  it.effect("a backup that doesn't decode is described as such", () => {
-    const fileName = "Map_LevelEditorMain&Broken_me.balledit"
+  it.effect("previews a backup against the open map, unsaved edits included", () => {
     const disk = makeTestDisk()
-    disk.backups.push({
-      place: "project",
-      id: `0 ${fileName}`,
-      fileName,
-      at: "2026-10-31T12:00:00.000Z",
-      text: "{",
-      hash: testHash("{"),
-      sidecar: null
-    })
+    return Effect.gen(function*() {
+      yield* reset
+      yield* createNewMap("Big Loop", "Isaac")
+      const name = "Map_LevelEditorMain&Big Loop_Isaac.balledit"
+      const before = s().doc.map.items.length
+      placeItem()
+      yield* saveMapFile
+      const [backup] = yield* Effect.promise(() => testBridge(disk).listBackups())
+      const text = disk.backups[0]!.text
+      assert.deepInclude(yield* previewBackupEffect(backup!), {
+        _tag: "Map",
+        id: testHash(text),
+        bytes: new TextEncoder().encode(text).length,
+        diff: { added: 1, removed: 0, moved: 0 }
+      })
+      assert.strictEqual(disk.backups[0]!.fileName, name)
+
+      // What isn't saved yet counts too.
+      placeItem()
+      const preview = yield* previewBackupEffect(backup!)
+      assert.deepInclude(preview, { diff: { added: 2, removed: 0, moved: 0 } })
+      assert.strictEqual(preview._tag === "Map" ? preview.items.length : -1, before)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("previews a backup of a map no tab has open against its file, and of a gone one against nothing", () => {
+    const disk = makeTestDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* createNewMap("Big Loop", "Isaac")
+      const name = "Map_LevelEditorMain&Big Loop_Isaac.balledit"
+      placeItem()
+      yield* saveMapFile
+      const [backup] = yield* Effect.promise(() => testBridge(disk).listBackups())
+      yield* createNewMap("Other", "Isaac")
+      s().closeTab(s().tabIds[0]!)
+      assert.deepInclude(yield* previewBackupEffect(backup!), { diff: { added: 1, removed: 0, moved: 0 } })
+      disk.files.delete(projectFile(name))
+      assert.deepInclude(yield* previewBackupEffect(backup!), { diff: null })
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a backup that doesn't decode has no preview", () => {
+    const disk = diskWithBrokenBackup()
+    return Effect.gen(function*() {
+      yield* reset
+      assert.deepStrictEqual(yield* previewBackupEffect(disk.backups[0]!), { _tag: "Unreadable" })
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("Restore as new opens a tab of its own, leaving the map and its edits alone", () => {
+    const disk = makeTestDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* createNewMap("asdf", "Isaac")
+      const name = "Map_LevelEditorMain&asdf_Isaac.balledit"
+      const first = s().doc.map.items.length
+      placeItem()
+      yield* saveMapFile
+      placeItem()
+      const original = s().tabId
+      const edited = s().doc.map.items.length
+      const [backup] = yield* Effect.promise(() => testBridge(disk).listBackups())
+
+      yield* restoreBackupAsNewEffect(backup!)
+      assert.strictEqual(disk.prompts.length, 0)
+      assert.notStrictEqual(s().tabId, original)
+      assert.strictEqual(tabLabelOf(s()), "asdf (backup)")
+      assert.isNull(s().file)
+      assert.isTrue(s().dirty)
+      assert.strictEqual(s().doc.map.items.length, first)
+      assert.strictEqual(s().doc.map.worldSettings.levelData.createdAt, "")
+
+      // A second one doesn't take the first's name.
+      yield* restoreBackupAsNewEffect(backup!)
+      assert.strictEqual(tabLabelOf(s()), "asdf (backup) 2")
+
+      s().activateTab(original)
+      assert.deepStrictEqual(s().file?.name, name)
+      assert.strictEqual(s().doc.map.items.length, edited)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a backup that doesn't decode is described as such", () => {
+    const disk = diskWithBrokenBackup()
     return Effect.gen(function*() {
       const summary = yield* describeBackupEffect(disk.backups[0]!)
       assert.strictEqual(summary._tag, "Unreadable")

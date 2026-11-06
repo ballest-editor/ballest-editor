@@ -4,7 +4,27 @@ import { parseMaterialsFile } from "../domain/Materials"
 import { materialsFile, OUTLINE, PIPE, primitive, WIND } from "../test/materials"
 import { applySlotMaterials, materialFor, shaderPatchOf } from "./materials"
 import { isTexture } from "./threeGuards"
-import { frameBox, SerialQueue, texturesOf, whenTexturesReady } from "./thumbnails"
+import { frameBox, frameTopDown, SerialQueue, texturesOf, whenTexturesReady } from "./thumbnails"
+
+describe("top-down framing", () => {
+  it("stands over the box's plan and sees all of it, by its longer side", () => {
+    const framing = frameTopDown([-100, 10, 200], [300, 60, 300])
+    assert.deepStrictEqual([framing.position[0], framing.position[2]], [100, 250])
+    assert.isAbove(framing.position[1], 60)
+    assert.isAtLeast(framing.halfSize, 200)
+    assert.isBelow(framing.halfSize, 250)
+  })
+
+  it("keeps the whole height between the planes", () => {
+    const framing = frameTopDown([0, -500, 0], [10, 1500, 10])
+    assert.isAtLeast(framing.position[1] - framing.near, 1500)
+    assert.isAtMost(framing.position[1] - framing.far, -500)
+  })
+
+  it("has a size for an empty box", () => {
+    assert.isAbove(frameTopDown([5, 5, 5], [5, 5, 5]).halfSize, 0)
+  })
+})
 
 describe("thumbnail framing", () => {
   const fits = (min: readonly [number, number, number], max: readonly [number, number, number], aspect: number) => {

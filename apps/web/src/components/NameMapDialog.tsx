@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/component
 import { useMemo, useState } from "react"
 import { riskyClassesIn } from "../domain/Catalog"
 import { usableCreatorName } from "../domain/creator"
-import { copyNameOf, isValidName, mapFileNameOf } from "../domain/factory"
+import { copyNameOf, isValidName, mapFileNameOf, savableNameOf } from "../domain/factory"
 import { unconfirmedPropertiesIn } from "../domain/itemProperties"
 import { classNameOf } from "../domain/MapFile"
 import { pieceLabelOf } from "../domain/pieceName"
@@ -70,8 +70,11 @@ export function NameMapDialog(
   const taken = useMemo(() => new Set(projectMaps.map((m) => m.fileName)), [projectMaps])
   // a copy: a new draft is one too
   const copies = mode === "duplicate" || mode === "newDraft"
-  const startName = () =>
-    copies ? copyNameOf(levelData.levelDisplayName.trim(), creator, taken) : levelData.levelDisplayName
+  const startName = () => {
+    // a map that has only ever been in a tab can go by a name no file can have: `asdf (backup)`
+    const savable = savableNameOf(levelData.levelDisplayName)
+    return copies ? copyNameOf(savable, creator, taken) : savable
+  }
   const [name, setName] = useState(startName)
   // Each time the dialog opens, start from the map as it is now.
   useOnOpen(open, () => {

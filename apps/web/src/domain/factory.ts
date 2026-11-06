@@ -63,6 +63,9 @@ export const mapLabelOf = (fileName: string): string => {
   return at > 0 ? full.slice(0, at) : full
 }
 
+/** `name` with what `NAME_RULE` doesn't allow taken out: `asdf (backup)` is saved as `asdf backup`. */
+export const savableNameOf = (name: string): string => name.replace(/[^\p{L}\p{N} ]/gu, "").replace(/ +/g, " ").trim()
+
 /** The first of `<base><separator>2`, `<base><separator>3`, ... that isn't taken. */
 export const nextNumberedName = (base: string, separator: string, isTaken: (name: string) => boolean): string => {
   for (let n = 2;; n++) {
