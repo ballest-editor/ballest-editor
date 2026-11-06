@@ -235,6 +235,10 @@ export function SettingsShell<C extends string>(props: {
     else groups.push({ key: `${row.category}-${title ?? ""}`, title, rows: [row] })
   }
 
+  // What the right side is showing. Base UI measures a scroll area when its viewport resizes, not when its content does,
+  // so each page gets its own: a short page after a long one would otherwise keep the long one's scrollbar.
+  const page = searching ? `search:${scope ?? ""}:${query}` : `category:${props.category}`
+
   const modifiedIn = (category: C) => props.rows.some((r) => r.category === category && isModified(r))
   const { onResetCategory } = props
 
@@ -330,7 +334,7 @@ export function SettingsShell<C extends string>(props: {
             </Breadcrumb>
             <DialogDescription className="sr-only">{props.description}</DialogDescription>
           </div>
-          <ScrollArea className="min-h-0 flex-1">
+          <ScrollArea key={page} className="min-h-0 flex-1">
             <div className="flex flex-col gap-5 px-dialog py-3">
               {groups.map((group) => (
                 <section key={group.key} className="flex flex-col">
