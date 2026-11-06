@@ -5,7 +5,7 @@ import { type ComponentProps, type ReactNode, useState } from "react"
 import { SYNC_STATUS_LABELS, syncDetailOf, type SyncStatus, syncStatusOf } from "../domain/linkState"
 import { formatAgo, formatDateTime } from "../domain/time"
 import { exportToGame, playMap, reimportMap, revealGamePath, saveMap } from "../editor/actions"
-import { useEditor, useOpenPrefab, useOpenProjectMap } from "../editor/store"
+import { useEditor, useOpenPrefab, useOpenProjectMap, useTabSummary } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { SyncStatusChip } from "./SyncStatusChip"
 
@@ -64,10 +64,12 @@ export function LinkStatus() {
   const canExport = useEditor((s) => s.capabilities.exportToGame)
   const canPlay = useEditor((s) => s.capabilities.play)
   const prefab = useOpenPrefab()
+  const tabId = useEditor((s) => s.tabId)
+  const { blank } = useTabSummary(tabId)
   const now = useNow()
   if (prefab !== null) return <span className="text-fg-tertiary">Prefab {prefab.name}</span>
   if (!canExport) return null
-  if (open === null) return <NeverSavedStatus />
+  if (open === null) return blank ? null : <NeverSavedStatus /> // a blank map has nothing to save yet
 
   const { state, map } = open
   const exported = map.link?.export ?? null

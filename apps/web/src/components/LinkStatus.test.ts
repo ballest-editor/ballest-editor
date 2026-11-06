@@ -5,11 +5,13 @@ import { vi } from "vitest"
 import { LinkStatus } from "./LinkStatus"
 
 // The server render reads a store's initial state, so the test gives it the state it means instead.
+let blank = false
 vi.mock("../editor/store", () => ({
   useEditor: (selector: (s: unknown) => unknown) =>
-    selector({ dirty: false, capabilities: { exportToGame: true, play: true } }),
+    selector({ dirty: false, tabId: "tab-1", capabilities: { exportToGame: true, play: true } }),
   useOpenPrefab: () => null,
-  useOpenProjectMap: () => null
+  useOpenProjectMap: () => null,
+  useTabSummary: () => ({ label: "Untitled", unsaved: !blank, blank, fileName: null, prefabTier: null })
 }))
 
 vi.mock("../editor/actions", () => ({}))
@@ -30,5 +32,14 @@ describe("the status bar, on a map that was never saved", () => {
 
   it("no longer says it in plain text", () => {
     assert.notInclude(markup, "Not saved in the project yet")
+  })
+
+  it("shows nothing at all while the map is blank: there is nothing to save yet", () => {
+    blank = true
+    try {
+      assert.strictEqual(renderToStaticMarkup(createElement(LinkStatus)), "")
+    } finally {
+      blank = false
+    }
   })
 })
