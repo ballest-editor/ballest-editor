@@ -20,7 +20,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/component
 import { type ReactElement, type ReactNode, useMemo } from "react"
 import { canGroupSelection, selectedGroupIds } from "../domain/groupSelection"
 import type { KeybindAction } from "../domain/Keybinds"
-import type { Settings } from "../domain/Settings"
 import { formatGridSize, GRID_SIZES } from "../domain/snap"
 import { updateCheckBlockedBy } from "../domain/updates"
 import {
@@ -39,7 +38,6 @@ import {
   openRecentInNewWindow,
   quitApp,
   reimportMap,
-  setExportOnSave,
   switchProject,
   updateSettings
 } from "../editor/actions"
@@ -51,6 +49,7 @@ import { SavePrefabItem } from "./SavePrefabItem"
 
 const NOTHING_SELECTED = "Select something first."
 const SAVE_PROJECT_FIRST = "Save first: Untitled Project has no folder to import into."
+const EXPORT_FIRST = "Export this map first: the game has no copy of it yet."
 
 /** The action's primary binding, as the menu shows it (nothing when unbound). */
 function Shortcut({ action }: { readonly action: KeybindAction }) {
@@ -128,26 +127,28 @@ function Menu({ title, children }: { readonly title: string; readonly children: 
 }
 
 /**
- * Desktop only: the projects used before, by name (the folder is the tooltip). A pick opens here (`switchProject`);
- * Open in new window, at the end, is the other way. One open in another window says so, and picking it still gets
- * main's refusal, which says what to do.
+ * Desktop only: the projects used before, by name (the folder is the tooltip). A pick opens here (`switchProject`),
+ * Shift+click in a new window. One open in another window says so, and picking it still gets main's refusal, which says
+ * what to do.
  */
 function RecentProjectsMenu() {
   const state = useEditor((s) => s.project)
   const recent = state?.recent ?? []
   const openElsewhere = state?.openElsewhere ?? []
-  const closed = recent.filter((project) => !openElsewhere.includes(project.path))
   return (
     <MenubarSub>
       <DisabledReason reason={recent.length === 0 ? "No recent projects yet." : null}>
         <MenubarSubTrigger disabled={recent.length === 0}>Recent projects</MenubarSubTrigger>
       </DisabledReason>
       <MenubarSubContent className="w-max max-w-96">
+        <MenubarGroup>
+          <MenubarLabel className="text-fg-tertiary">Shift+click opens in a new window</MenubarLabel>
+        </MenubarGroup>
         {recent.map((project) => (
           <MenubarItem
             key={project.path}
             title={project.path}
-            onClick={() => void switchProject(project.path)}
+            onClick={(e) => void (e.shiftKey ? openRecentInNewWindow(project) : switchProject(project.path))}
           >
             <span className="truncate">{project.name}</span>
             {openElsewhere.includes(project.path) && (
@@ -155,21 +156,6 @@ function RecentProjectsMenu() {
             )}
           </MenubarItem>
         ))}
-        <MenubarSeparator />
-        <MenubarSub>
-          <MenubarSubTrigger disabled={closed.length === 0}>Open in new window</MenubarSubTrigger>
-          <MenubarSubContent className="w-max max-w-96">
-            {closed.map((project) => (
-              <MenubarItem
-                key={project.path}
-                title={project.path}
-                onClick={() => void openRecentInNewWindow(project)}
-              >
-                <span className="truncate">{project.name}</span>
-              </MenubarItem>
-            ))}
-          </MenubarSubContent>
-        </MenubarSub>
       </MenubarSubContent>
     </MenubarSub>
   )
@@ -177,30 +163,6 @@ function RecentProjectsMenu() {
 
 function PanelItem({ id, title }: { readonly id: string; readonly title: string }) {
   return <MenubarCheckboxItem {...usePanelCheck(id)}>{title}</MenubarCheckboxItem>
-}
-
-type ViewSetting = "appearance" | "snapping"
-type FlagOf<S extends ViewSetting> = {
-  [K in keyof Settings[S]]: Settings[S][K] extends boolean ? K : never
-}[keyof Settings[S]]
-
-/** A check on a boolean setting. */
-function SettingCheck<S extends ViewSetting>({ section, flag, children }: {
-  readonly section: S
-  readonly flag: FlagOf<S>
-  readonly children: ReactNode
-}) {
-  const checked = useEditor((s) => s.settings[section][flag] === true)
-  return (
-    <MenubarCheckboxItem
-      closeOnClick
-      checked={checked}
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `FlagOf` says it's a boolean of `section`
-      onCheckedChange={(on) => void updateSettings(section, { [flag]: on } as Partial<Settings[S]>)}
-    >
-      {children}
-    </MenubarCheckboxItem>
-  )
 }
 
 /** A submenu picking one of `options`, each drawn by `children`, under a line saying what it picks when it needs one. */
@@ -329,7 +291,6 @@ export function MenuBar() {
   const { projects, exportToGame: canExport, launchGame: canLaunchGame, play: canPlay } = useEditor((s) =>
     s.capabilities
   )
-  const exportOnSave = useEditor((s) => s.exportOnSave)
   const prefabOff = useOpenPrefab() === null ? null : PREFAB_TAB_STAYS_HERE
   // Untitled Project has no folder to import into yet (the Project panel's Import is disabled the same way)
   const untitled = useEditor((s) => s.project?.current === null)
@@ -411,8 +372,13 @@ export function MenuBar() {
         <PaneMenus />
         <MenubarSeparator />
         <MenuSection title="Grid">
-          <SettingCheck section="appearance" flag="gridVisible">Show grid</SettingCheck>
-          <SettingCheck section="snapping" flag="enabled">Snap to grid</SettingCheck>
+          <MenubarCheckboxItem
+            closeOnClick
+            checked={snapping.enabled}
+            onCheckedChange={(enabled) => void updateSettings("snapping", { enabled })}
+          >
+            Snap to grid
+          </MenubarCheckboxItem>
           <RadioMenu
             title="Grid size"
             value={snapping.gridSize}
@@ -426,33 +392,24 @@ export function MenuBar() {
       {projects
         ? (
           <Menu title="Project">
-            <CommandItem action="newMap" inset>New map</CommandItem>
-            <CommandItem action="openMap" inset reason={untitled ? SAVE_PROJECT_FIRST : null}>Import map…</CommandItem>
+            <CommandItem action="newMap">New map</CommandItem>
+            <CommandItem action="openMap" reason={untitled ? SAVE_PROJECT_FIRST : null}>Import map…</CommandItem>
             {canExport && (
               <>
-                <Item inset reason={prefabOff} onClick={() => void exportToGame()}>Export to game</Item>
+                <Item reason={prefabOff} onClick={() => void exportToGame()}>Export to game</Item>
                 <Item
-                  inset
-                  reason={reimportable === null ? "Export this map first: the game has no copy of it yet." : null}
+                  reason={prefabOff ?? (reimportable === null ? EXPORT_FIRST : null)}
                   onClick={() => reimportable !== null && void reimportMap(reimportable)}
                 >
                   Re-import from game
                 </Item>
                 {(canPlay || canLaunchGame) && <MenubarSeparator />}
-                {canPlay && <CommandItem action="playMap" inset reason={prefabOff}>Play</CommandItem>}
-                {canLaunchGame && <MenubarItem inset onClick={() => void launchGame()}>Open game (Steam)</MenubarItem>}
-                <MenubarSeparator />
-                <MenubarCheckboxItem
-                  closeOnClick
-                  checked={exportOnSave}
-                  onCheckedChange={(on) => void setExportOnSave(on)}
-                >
-                  Export on save
-                </MenubarCheckboxItem>
+                {canPlay && <CommandItem action="playMap" reason={prefabOff}>Play</CommandItem>}
+                {canLaunchGame && <MenubarItem onClick={() => void launchGame()}>Open game (Steam)</MenubarItem>}
               </>
             )}
             <MenubarSeparator />
-            <MenubarItem inset onClick={() => openDialog({ id: "projectSettings" })}>Project settings…</MenubarItem>
+            <MenubarItem onClick={() => openDialog({ id: "projectSettings" })}>Project settings…</MenubarItem>
           </Menu>
         )
         : (
