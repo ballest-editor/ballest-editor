@@ -4,7 +4,7 @@ import type { KeyboardEvent, MouseEvent } from "react"
  * The one surface every overlay over the viewport sits on, so they read as one family against any scene: glass, the
  * card's colour with what's behind it showing through as colour without detail.
  */
-export const SURFACE = "border border-border bg-card/80 shadow-sm backdrop-blur-md backdrop-saturate-150"
+export const SURFACE = "border border-border bg-card/95 shadow-sm backdrop-blur-md backdrop-saturate-150"
 
 /** One control group: a 32px glass pill holding its segments, each a smaller pill of its own. */
 export const GROUP = `pointer-events-auto flex h-8 w-fit items-center gap-0.5 rounded-full p-0.5 ${SURFACE}`
