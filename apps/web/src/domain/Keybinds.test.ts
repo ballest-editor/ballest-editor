@@ -14,10 +14,25 @@ import {
   keybindSections,
   mergeKeybinds,
   MODIFIER_HOLD_MS,
+  PROJECTION_ACTIONS,
   releasesBinding
 } from "./Keybinds"
+import { viewProjections } from "./viewLayout"
 
 describe("keybind table", () => {
+  it("has each pane view's own key, for its tooltip and the View menu", () => {
+    expect(Object.fromEntries(viewProjections.map((view) => [view, defaultKeybinds[PROJECTION_ACTIONS[view]]])))
+      .toEqual({
+        perspective: ["Numpad5"],
+        top: ["Numpad7"],
+        bottom: ["Ctrl+Numpad7"],
+        front: ["Numpad1"],
+        back: ["Ctrl+Numpad1"],
+        left: ["Ctrl+Numpad3"],
+        right: ["Numpad3"]
+      })
+  })
+
   it("lists every action exactly once, with a lower-case label, a description and a default", () => {
     const listed = keybindSections.flatMap((s) => s.actions)
     expect(new Set(listed).size).toBe(listed.length)
