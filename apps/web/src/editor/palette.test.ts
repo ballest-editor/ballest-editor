@@ -110,7 +110,8 @@ const pairsOf = (theme: "dark" | "light"): ReadonlyArray<readonly [string, strin
   ["accent-foreground", "accent", TEXT],
   ["secondary-foreground", "secondary", TEXT],
   ...STATUSES.map((status) => [`${status}-foreground`, status, TEXT] as const),
-  ...[1, 2, 3, 4, 5].map((level) => [`difficulty-${level}`, "popover", GRAPHIC] as const)
+  // the difficulty control's marks stay in colour on its track
+  ...[1, 2, 3, 4, 5].flatMap((level) => ["popover", "muted"].map((on) => [`difficulty-${level}`, on, GRAPHIC] as const))
 ]
 
 describe("the palette", () => {
@@ -121,6 +122,14 @@ describe("the palette", () => {
     for (const [text, on, bar] of pairsOf(theme)) {
       it(`${theme}: --${text} reads on --${on}`, () => {
         assert.isAtLeast(contrast(color(text), color(on)), bar)
+      })
+    }
+
+    // and on the neutral pill: --card in light, the foreground at 15% over the track in dark
+    const neutralPill = theme === "dark" ? over(color("foreground"), 0.15, color("muted")) : color("card")
+    for (const level of [1, 2, 3, 4, 5]) {
+      it(`${theme}: --difficulty-${level} reads on the neutral pill`, () => {
+        assert.isAtLeast(contrast(color(`difficulty-${level}`), neutralPill), GRAPHIC)
       })
     }
 

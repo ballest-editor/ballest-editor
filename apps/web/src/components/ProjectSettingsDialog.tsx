@@ -11,9 +11,9 @@ import {
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
-import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
 import { Toggle } from "@workspace/ui/components/toggle"
+import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { type ReactNode, useEffect, useState } from "react"
@@ -59,6 +59,7 @@ import {
   saveProjectSettings
 } from "../editor/actions"
 import {
+  noTabOpen,
   type ProjectMap,
   tabLabelOf,
   tabStateOf,
@@ -105,21 +106,16 @@ const BAR_COLORS: Readonly<Record<Exclude<Difficulty, "baller">, string>> = {
   expert: "bg-difficulty-4"
 }
 
-/** Its bars, or its sign: in the difficulty's colours when `filled`, greyed when it is only one of the choices. */
-function DifficultyIcon({ difficulty, filled }: { readonly difficulty: Difficulty; readonly filled: boolean }) {
-  if (difficulty === "baller") {
-    return <IconAlertTriangleFilled className={cn("size-3", filled ? "text-difficulty-5" : "text-fg-tertiary")} />
-  }
-  const bars = DIFFICULTIES.findIndex((d) => d.tag === difficulty) + 1
+/** Its bars, or its sign, always in the difficulty's colours: what is picked shows by the pill behind it. */
+function DifficultyIcon({ difficulty }: { readonly difficulty: Difficulty }) {
+  if (difficulty === "baller") return <IconAlertTriangleFilled className="size-4 text-difficulty-5" />
+  const filled = DIFFICULTIES.findIndex((d) => d.tag === difficulty) + 1
   return (
     <span className="flex gap-px" aria-hidden>
       {[1, 2, 3, 4].map((bar) => (
         <span
           key={bar}
-          className={cn(
-            "h-3 w-1 rounded-full",
-            bar > bars ? "bg-fg-tertiary/30" : filled ? BAR_COLORS[difficulty] : "bg-fg-tertiary"
-          )}
+          className={cn("h-3 w-1 rounded-full", bar <= filled ? BAR_COLORS[difficulty] : "bg-fg-tertiary/30")}
         />
       ))}
     </span>
@@ -135,67 +131,45 @@ const DIFFICULTY_TIPS: Readonly<Record<Difficulty, string>> = {
   baller: "Baller: a yellow warning sign in the game"
 }
 
-const LAST_DIFFICULTY = DIFFICULTIES.length - 1
-
-/** Half the slider's thumb, which stops that far inside each end of its track: a stop has to sit under its centre. */
-const THUMB_RADIUS = "0.4375rem"
-
 /**
- * The game's five difficulties are ordered, so one track with a stop for each, its icon and name under it. Dragging,
- * the arrow keys and a click on a stop all pick one. A map with no difficulty yet has no thumb until one is picked.
+ * The game's five difficulties, each with its icon and name; picking the chosen one again keeps it. They are ordered,
+ * so the arrow keys pick as they go and stop at the ends. The group only moves focus on a key down, so the pick is on
+ * the key up, in the item the focus reached. Tab lands on the chosen one, for the arrows to step from it.
  */
-function DifficultySlider(
+function DifficultyPicker(
   { value, onChange }: { readonly value: Difficulty | undefined; readonly onChange: (d: Difficulty) => void }
 ) {
-  const selected = DIFFICULTIES.findIndex((d) => d.tag === value)
   return (
-    <div className="max-w-lg px-7">
-      <Slider
-        aria-label="Difficulty"
-        className={cn(selected < 0 && "[&_[data-slot=slider-range]]:hidden [&_[data-slot=slider-thumb]]:opacity-0")}
-        min={0}
-        max={LAST_DIFFICULTY}
-        step={1}
-        value={[Math.max(selected, 0)]}
-        getAriaValueText={(_, stop) => selected < 0 ? "Not set" : DIFFICULTIES[stop]?.level ?? ""}
-        onValueChange={(next) => {
-          const picked = DIFFICULTIES[sliderValue(next) ?? selected]
-          if (picked !== undefined && picked.tag !== value) onChange(picked.tag)
-        }}
-      />
-      <div className="relative mt-2 h-14">
-        {DIFFICULTIES.map((d, index) => (
-          <Tooltip key={d.tag}>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  // the slider's thumb is the one tab stop; its arrow keys walk these
-                  tabIndex={-1}
-                  aria-pressed={index === selected}
-                  className={cn(
-                    "absolute top-0 flex w-max -translate-x-1/2 flex-col items-center gap-1 rounded-control px-2 pt-1 pb-1.5 text-caption transition-colors",
-                    index === selected
-                      ? "bg-primary/12 text-foreground"
-                      : "text-fg-tertiary hover:bg-foreground/6 hover:text-fg-secondary"
-                  )}
-                  style={{
-                    left: `calc(${THUMB_RADIUS} + (100% - 2 * ${THUMB_RADIUS}) * ${index / LAST_DIFFICULTY})`
-                  }}
-                  onClick={() => {
-                    if (index !== selected) onChange(d.tag)
-                  }}
-                />
-              }
-            >
-              <DifficultyIcon difficulty={d.tag} filled={index === selected} />
-              {d.level}
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{DIFFICULTY_TIPS[d.tag]}</TooltipContent>
-          </Tooltip>
-        ))}
-      </div>
-    </div>
+    <ToggleGroup
+      aria-label="Difficulty"
+      loopFocus={false}
+      value={value === undefined ? [] : [value]}
+      onValueChange={(next) => {
+        const picked = DIFFICULTIES.find((d) => next.includes(d.tag) && d.tag !== value)
+        if (picked !== undefined) onChange(picked.tag)
+      }}
+    >
+      {DIFFICULTIES.map((d) => (
+        <Tooltip key={d.tag}>
+          <TooltipTrigger
+            render={
+              <ToggleGroupItem
+                value={d.tag}
+                className="gap-1.5"
+                data-composite-item-active={d.tag === value ? "" : undefined}
+                onKeyUp={(event) => {
+                  if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && d.tag !== value) onChange(d.tag)
+                }}
+              />
+            }
+          >
+            <DifficultyIcon difficulty={d.tag} />
+            {d.level}
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{DIFFICULTY_TIPS[d.tag]}</TooltipContent>
+        </Tooltip>
+      ))}
+    </ToggleGroup>
   )
 }
 
@@ -438,7 +412,7 @@ const mapRows = (
       description: "Easiest to hardest, with the game's icons.",
       keywords: `${entry.label} ${DIFFICULTIES.map((d) => d.level).join(" ")}`,
       wide: true,
-      control: <DifficultySlider value={difficulty} onChange={(d) => editWorkshop(withDifficulty(levelData, d))} />
+      control: <DifficultyPicker value={difficulty} onChange={(d) => editWorkshop(withDifficulty(levelData, d))} />
     },
     ...TAG_GROUPS.map((group): Row => {
       const names = group.tags.map((tag) => tagNameOf(group.group, tag))
@@ -534,7 +508,8 @@ export function ProjectSettingsDialog(
   const gameMapsFolder = useEditor((s) => s.gamePaths?.mapsFolder.path ?? null)
   const savedCreator = usableCreatorName(creator)
   const openMap = useOpenMapEntry()
-  const inPrefab = useEditor((s) => s.document.kind === "prefab")
+  // a definition's tab, or none at all, has no map of its own to list
+  const noOpenMap = useEditor((s) => s.document.kind === "prefab" || noTabOpen(s))
 
   const [category, setCategory] = useState<Category>(openMap.category)
   const [buffer, setBuffer] = useState<SettingsBuffer>(EMPTY_BUFFER)
@@ -599,7 +574,7 @@ export function ProjectSettingsDialog(
     })
   ))
   const mapCategories: ReadonlyArray<SettingsCategoryInfo<Category>> = [
-    ...(!inPrefab && (openMap.fileName === null || !projects) ? [mapCategory(openMap.category, openMap.label)] : []),
+    ...(!noOpenMap && (openMap.fileName === null || !projects) ? [mapCategory(openMap.category, openMap.label)] : []),
     ...otherUnsaved.map((tabId, index) =>
       mapCategory(unsavedTabEntry(tabId), unsavedLabelOf(otherUnsavedNames[index] ?? "Untitled"))
     ),

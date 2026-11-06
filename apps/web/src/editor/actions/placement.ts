@@ -24,7 +24,7 @@ import {
 import { withFavouriteToggled, withRecentPiece } from "../../domain/recentPieces"
 import { ORIGIN, sameVec, vecAdd, vecSub } from "../../domain/ueMath"
 import { sceneRegistry } from "../sceneRegistry"
-import { type EditorState, useEditor } from "../store"
+import { type EditorState, NO_TAB_OPEN, noTabOpen, useEditor } from "../store"
 import { updateSettings } from "./startup"
 
 /** The run in progress and what the next placement checks it against. */
@@ -89,7 +89,12 @@ export const spreadPlacement = (point: Vec3, width: number, view: PlacementView,
 
 /** Places `piece`, and lists it under Recent if it went in: a catalog entry that makes no valid item doesn't. */
 const place = (piece: CatalogPiece, transform: ItemTransform) => {
-  const { doc, placePiece } = useEditor.getState()
+  const s = useEditor.getState()
+  if (noTabOpen(s)) {
+    s.notify("info", NO_TAB_OPEN)
+    return
+  }
+  const { doc, placePiece } = s
   placePiece(piece, transform)
   const { doc: after, settings } = useEditor.getState()
   if (after === doc) return

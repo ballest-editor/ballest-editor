@@ -41,7 +41,7 @@ import {
   setSelectionField
 } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
-import { selectedIndices, shownValidation, useCreator, useEditor, useOpenPrefab } from "../editor/store"
+import { noTabOpen, selectedIndices, shownValidation, useCreator, useEditor, useOpenPrefab } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { Disclosure } from "./Disclosure"
@@ -682,7 +682,11 @@ export function Inspector() {
   )
 
   const prefab = useOpenPrefab()
+  const noTab = useEditor(noTabOpen)
   const first = items[0]
+  if (noTab) {
+    return <div className="flex h-full items-center justify-center bg-card p-4 text-fg-tertiary">Nothing selected</div>
+  }
   if (first === undefined) {
     return (
       <ScrollArea className="h-full bg-card">

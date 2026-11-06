@@ -6,7 +6,7 @@ import { Platform } from "../../services/Platform"
 import { makeTestDisk, projectFile, type TestDisk } from "../../test/desktopBridge"
 import { afterSaveOf, balledits, createNewMap, edit, fileNameOf, layerFor, reset, s } from "../../test/editorActions"
 import { readSample } from "../../test/samples"
-import { dirtyTabs, isBlankTab, isUnsavedTab, tabLabelOf } from "../store"
+import { dirtyTabs, isBlankTab, isUnsavedTab, noTabOpen, tabLabelOf } from "../store"
 import { newMapEffect, openProjectMapFile } from "./maps"
 import { saveMapAsEffect, saveMapFile } from "./save"
 import { answerUnloadRequest, closeTabEffect, holdsUnload, unlessCancelled } from "./unsaved"
@@ -55,8 +55,9 @@ describe("a map nobody has edited", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("closing the last tab leaves a clean Untitled, and that closes without asking", () => {
+  it.effect("closing Untitled Project's last tab leaves a clean Untitled, and that closes without asking", () => {
     const disk = makeTestDisk()
+    disk.project.current = null
     return Effect.gen(function*() {
       yield* reset
       edit()
@@ -138,11 +139,46 @@ describe("unsaved changes", () => {
       assert.deepStrictEqual(s().tabIds, [second])
       assert.strictEqual(s().file?.name, "Map_LevelEditorMain&Second_Isaac.balledit")
 
-      // a clean tab closes without asking; the last one leaves a fresh map
+      // a clean tab closes without asking; the last one leaves the project overview
       yield* closeTabEffect(second)
       assert.strictEqual(disk.prompts.length, 2)
-      assert.strictEqual(s().tabIds.length, 1)
+      assert.isTrue(noTabOpen(s()))
       assert.include(s(), { file: null, dirty: false })
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("asks about the last tab before leaving the project overview, and a Cancel keeps it", () => {
+    const disk = makeTestDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* createNewMap("Big Loop", "Isaac")
+      edit()
+      disk.promptAnswers.push("cancel", "discard")
+      yield* closeTabEffect(s().tabId)
+      assert.isFalse(noTabOpen(s()))
+      yield* closeTabEffect(s().tabId)
+      assert.isTrue(noTabOpen(s()))
+      assert.isFalse(holdsUnload())
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("the overview's maps open in the first tab, and a blank tab's close goes there too", () => {
+    const disk = makeTestDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* createNewMap("Big Loop", "Isaac")
+      const fileName = s().file?.name ?? ""
+      yield* closeTabEffect(s().tabId)
+      yield* openProjectMapFile(fileName)
+      assert.lengthOf(s().tabIds, 1)
+      assert.strictEqual(s().file?.name, fileName)
+
+      yield* closeTabEffect(s().tabId)
+      yield* newMapEffect
+      assert.lengthOf(s().tabIds, 1)
+      assert.isTrue(isBlankTab(s()))
+      yield* closeTabEffect(s().tabId)
+      assert.isTrue(noTabOpen(s()))
     }).pipe(Effect.provide(layerFor(disk)))
   })
 

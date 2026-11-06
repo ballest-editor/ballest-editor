@@ -3,7 +3,7 @@ import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { playMap } from "../editor/actions"
-import { PREFAB_TAB_STAYS_HERE, projectTitleOf, projectUnsavedOf, useEditor, useOpenPrefab } from "../editor/store"
+import { exportProblemOf, projectTitleOf, projectUnsavedOf, useEditor } from "../editor/store"
 import { KeyChip } from "./KeyChip"
 import { Logo } from "./Logo"
 import { MenuBar } from "./MenuBar"
@@ -18,13 +18,13 @@ const NO_DRAG = "[-webkit-app-region:no-drag]"
 function PlayButton() {
   const canPlay = useEditor((s) => s.capabilities.play)
   const keybinds = useEditor((s) => s.keybinds.playMap)
-  const prefab = useOpenPrefab()
+  const refused = useEditor(exportProblemOf)
   if (!canPlay) return null
   const icon = <IconPlayerPlayFilled data-icon="inline-start" />
-  if (prefab !== null) {
+  if (refused !== null) {
     return (
       // keyed: switching tabs would otherwise reuse the enabled button's tooltip, which then never opens on the wrapper
-      <Tooltip key="prefab">
+      <Tooltip key="refused">
         {/* a disabled button gets no pointer events, so the tooltip lives on a wrapper */}
         <TooltipTrigger render={<span className={`cursor-not-allowed ${NO_DRAG}`} />}>
           <Button disabled>
@@ -32,7 +32,7 @@ function PlayButton() {
             Play
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="left">{PREFAB_TAB_STAYS_HERE}</TooltipContent>
+        <TooltipContent side="left">{refused}</TooltipContent>
       </Tooltip>
     )
   }

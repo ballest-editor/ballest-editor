@@ -68,7 +68,7 @@ import {
 } from "../domain/notifications"
 import type { PaintPicker } from "../domain/Paint"
 import { type Pivot, pivotAt } from "../domain/pivot"
-import { isSamePrefab, type PrefabSource } from "../domain/prefab"
+import { isSamePrefab, prefabSaveProblem, type PrefabSource } from "../domain/prefab"
 import type { PrefabFile } from "../domain/PrefabFile"
 import { type PrefabDefinition, withUpdatedInstance } from "../domain/prefabInstance"
 import { defaultSettings, type Settings } from "../domain/Settings"
@@ -105,16 +105,13 @@ import {
   maximisedSlotOf,
   type PaneChange,
   paneCountOf,
-  type PaneDisplay,
-  paneDisplayOf,
   type PaneSlot,
   type ViewLayout,
   type ViewLayoutKind,
   type ViewProjection,
   withMaximisedToggled,
   withoutMaximised,
-  withPaneChange,
-  withPaneDisplay
+  withPaneChange
 } from "../domain/viewLayout"
 import type { LoadedCatalog } from "../services/CatalogLoader"
 import type {
@@ -214,6 +211,9 @@ export type TabDocument = { readonly kind: "map" } | PrefabDocument
 
 /** Why a definition's tab can't Export or Play. */
 export const PREFAB_TAB_STAYS_HERE = "A prefab isn't a map: place it in one to export or play it."
+
+/** Why what acts on the open document is off in the project overview. */
+export const NO_TAB_OPEN = "Open a map first."
 
 /**
  * A file in the game's maps folder that is the draft of a published map (`levelPublishedFileId` > 0), found by Export
@@ -335,7 +335,7 @@ export interface TabState {
   /** The map's "Export on save" (desktop, off by default; kept with the map's prefs). */
   readonly exportOnSave: boolean
   readonly selectedIds: Selection
-  /** Opened as a fresh map: the one the app starts on, New map's, the one closing the last tab leaves. See `isBlankTab`. */
+  /** Opened as a fresh document: what the app starts on, New map's, New prefab's. See `isBlankTab`. */
   readonly fresh: boolean
   /** Restored from a backup as a map of its own; see `isBackupTab`. */
   readonly backup: boolean
@@ -355,7 +355,7 @@ export interface TabState {
  * Where `loadMap` puts a map: over the active tab's, over another tab's (`tabId`), or in a new tab after the active
  * one (`newTab`), which takes the active tab's place instead while that is blank (`isBlankTab`). `addedTab` is a new tab
  * there whatever the active tab holds, unless a drag or scrub is under way. `backgroundTab` is a new tab there too,
- * always, and the active tab stays active.
+ * always, and the active tab stays active. With no tab open, every one of them opens the first tab, as the active one.
  */
 export type TabTarget = "active" | "newTab" | "addedTab" | "backgroundTab" | { readonly tabId: string }
 
@@ -371,9 +371,9 @@ interface TabOptions {
 }
 
 export interface EditorState extends TabState {
-  /** The document tabs, in order. */
+  /** The document tabs, in order. Empty in a named project once its last tab closes (`noTabOpen`). */
   readonly tabIds: ReadonlyArray<string>
-  /** The active tab, whose state is the `TabState` fields here. */
+  /** The active tab, whose state is the `TabState` fields here; with no tab open, the id the next one takes. */
   readonly tabId: string
   /** Every other tab's state, as it was left. */
   readonly parkedTabs: ReadonlyMap<string, TabState>
@@ -482,7 +482,8 @@ export interface EditorState extends TabState {
   readonly patchTab: (tabId: string, patch: Partial<TabState>) => void
   /**
    * Closes `tabId` without asking (editor/actions asks about its unsaved edits first); the tab after it, else the one
-   * before, becomes active in its place. The last tab stays: there is always a map.
+   * before, becomes active in its place. The last tab closes only in a named project, which has its overview to show;
+   * elsewhere it stays.
    */
   readonly closeTab: (tabId: string) => void
   /**
@@ -642,18 +643,10 @@ export interface EditorState extends TabState {
   readonly applyPaneChange: (change: PaneChange) => void
   /** Fills the viewport with the pane in `slot`, or goes back to the layout if a pane already fills it. */
   readonly togglePaneMaximised: (slot: PaneSlot) => void
-  /** Whether the pane in `slot` shows `part`, whatever the Display popover says (`withPaneDisplay`). */
-  readonly setPaneDisplay: (slot: PaneSlot, part: keyof PaneDisplay, on: boolean) => void
   /** What the pane in `slot` looks along. */
   readonly setPaneProjection: (slot: number, projection: ViewProjection) => void
   readonly setActivePane: (slot: number) => void
 }
-
-/** What the Display popover sets for every pane. */
-const displayOf = ({ appearance, lighting }: Settings): PaneDisplay => ({
-  grid: appearance.gridVisible,
-  sky: lighting.skyVisible
-})
 
 /** A tab's state for `map`, opened with no history and nothing selected. */
 const freshTabState = (
@@ -687,6 +680,12 @@ const freshTabState = (
     validation: null
   }
 }
+
+/**
+ * What the top of the store holds with no tab open, as its fields can't be absent. Nothing shows it: `commit` refuses to
+ * edit it, and it has no items, so it can't be selected, saved or left with anything to lose.
+ */
+const noTabState = (): TabState => freshTabState({ ...initialMap(), items: [] }, null)
 
 /** The active tab's state, out of the store. */
 const activeTabOf = (s: EditorState): TabState => ({
@@ -730,14 +729,16 @@ export const useEditor = create<EditorState>()((set, get) => {
    * the doc; clears the redo stack.
    */
   const commit = (doc: Doc, extra: Partial<EditorState> = {}, before?: DocState) =>
-    set((s) => ({
-      ...extra,
-      doc,
-      enteredGroupId: keptEnteredGroup(doc, s.enteredGroupId),
-      ...stepFrom(s.past, before ?? s, extra.selectedIds ?? s.selectedIds),
-      dirty: true,
-      editedAt: new Date().toISOString()
-    }))
+    set((s) =>
+      noTabOpen(s) ? s : ({
+        ...extra,
+        doc,
+        enteredGroupId: keptEnteredGroup(doc, s.enteredGroupId),
+        ...stepFrom(s.past, before ?? s, extra.selectedIds ?? s.selectedIds),
+        dirty: true,
+        editedAt: new Date().toISOString()
+      })
+    )
 
   /**
    * Document indices of the selected items that can be copied, in selection order. A map has
@@ -893,7 +894,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         updateTab(into.tabId, () => tab)
         return
       }
-      if (into === "backgroundTab") {
+      if (into === "backgroundTab" && !noTabOpen(get())) {
         set((s) => {
           const tabId = freshTabId()
           return { tabIds: withTabAfterActive(s, tabId), parkedTabs: new Map(s.parkedTabs).set(tabId, tab) }
@@ -903,6 +904,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       set((s) => {
         if (into === "addedTab" && (interacting(s) || duplicateDragBase !== null)) return s
         const shown = { ...tab, ...leftBehind, mapShownRequest: s.mapShownRequest + 1 }
+        if (noTabOpen(s)) return { ...shown, tabIds: [s.tabId] }
         if (into === "newTab" ? isBlankTab(s) : into !== "addedTab") return shown
         const tabId = freshTabId()
         return {
@@ -942,7 +944,15 @@ export const useEditor = create<EditorState>()((set, get) => {
     closeTab: (tabId) => {
       const { tabIds, tabId: active } = get()
       const index = tabIds.indexOf(tabId)
-      if (index < 0 || tabIds.length === 1) return
+      if (index < 0) return
+      if (tabIds.length === 1) {
+        set((s) =>
+          inNamedProject(s) && !interacting(s) && duplicateDragBase === null
+            ? { ...noTabState(), ...leftBehind, tabIds: [], tabId: freshTabId() }
+            : s
+        )
+        return
+      }
       if (tabId === active) get().activateTab(tabIds[index + 1] ?? tabIds[index - 1] ?? tabId)
       set((s) => {
         // a drag kept the closing tab active
@@ -1368,8 +1378,6 @@ export const useEditor = create<EditorState>()((set, get) => {
         const viewLayout = withMaximisedToggled(s.viewLayout, slot)
         return { viewLayout, activePane: maximisedSlotOf(viewLayout) ?? s.activePane }
       }),
-    setPaneDisplay: (slot, part, on) =>
-      set((s) => ({ viewLayout: withPaneDisplay(s.viewLayout, slot, displayOf(s.settings), part, on) })),
     setPaneProjection: (slot, projection) =>
       set((s) => {
         const [a, b, c, d] = s.viewLayout.projections
@@ -1380,13 +1388,11 @@ export const useEditor = create<EditorState>()((set, get) => {
   }
 })
 
-/** What the pane in `slot` of the active tab shows. */
-export const paneDisplayIn = (s: EditorState, slot: PaneSlot): PaneDisplay =>
-  paneDisplayOf(s.viewLayout, slot, displayOf(s.settings))
-
 /** Tab `tabId`'s state, wherever it is; undefined when no tab has that id. */
-export const tabStateOf = (s: EditorState, tabId: string): TabState | undefined =>
-  tabId === s.tabId ? activeTabOf(s) : s.parkedTabs.get(tabId)
+export const tabStateOf = (s: EditorState, tabId: string): TabState | undefined => {
+  if (noTabOpen(s)) return undefined
+  return tabId === s.tabId ? activeTabOf(s) : s.parkedTabs.get(tabId)
+}
 
 /** The tabs `test` picks, in tab order. */
 export const tabsWhere = (s: EditorState, test: (tab: TabState) => boolean): ReadonlyArray<string> =>
@@ -1415,9 +1421,9 @@ export const tabsWithoutFile = (s: EditorState): ReadonlyArray<string> =>
   tabsWhere(s, (tab) => tab.file === null && tab.document.kind === "map")
 
 /**
- * A tab nobody has edited: a fresh map (the one the app starts on, New map's, the one closing the last tab leaves), never
- * saved, with no edits. Selecting in it isn't an edit. It holds nothing to lose: closing it asks nothing, a map opened
- * into a new tab takes its place, and a switch of projects drops it.
+ * A tab nobody has edited: a fresh document (what the app starts on, New map's, New prefab's), never saved, with no
+ * edits. Selecting in it isn't an edit. It holds nothing to lose: closing it asks nothing, a map opened into a new tab
+ * takes its place, and a switch of projects drops it.
  */
 export const isBlankTab = (tab: TabState): boolean => tab.fresh && tab.file === null && !tab.dirty
 
@@ -1428,6 +1434,24 @@ export const isUnsavedTab = (tab: TabState): boolean => tab.dirty || (tab.file =
 export const isBackupTab = (tab: TabState): boolean => tab.backup && tab.file === null
 
 export const blankTabs = (s: EditorState): ReadonlyArray<string> => tabsWhere(s, isBlankTab)
+
+/** Whether no tab is open: the centre group shows the project overview (docs/DESKTOP.md § Document tabs). */
+export const noTabOpen = (s: Pick<EditorState, "tabIds">): boolean => s.tabIds.length === 0
+
+/** Whether a project is in use: not Untitled Project, and not a browser. */
+export const inNamedProject = (s: Pick<EditorState, "project">): boolean => s.project?.current != null
+
+/** Why Save has nothing to write; null when it has. */
+export const saveProblemOf = (s: Pick<EditorState, "tabIds" | "document" | "doc">): string | null => {
+  if (noTabOpen(s)) return NO_TAB_OPEN
+  return s.document.kind === "prefab" ? prefabSaveProblem(s.doc.map.items.length) : null
+}
+
+/** Why Export and Play have no map to take; null when they have. */
+export const exportProblemOf = (s: Pick<EditorState, "tabIds" | "document">): string | null => {
+  if (noTabOpen(s)) return NO_TAB_OPEN
+  return s.document.kind === "prefab" ? PREFAB_TAB_STAYS_HERE : null
+}
 
 /** Whether this window must pick a project before anything else (docs/DESKTOP.md § Other windows). */
 export const isChooserRequired = (s: Pick<EditorState, "project">): boolean => s.project?.chooserRequired === true

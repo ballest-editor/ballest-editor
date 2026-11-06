@@ -18,12 +18,14 @@ import { termsOf } from "../domain/outline"
 /** The page or scope that's open in the sidebar: the selection's wash, which a hover doesn't change. */
 const SELECTED = "bg-selected text-foreground hover:bg-selected"
 
-/** A search box with its icon: `className` is for the box, the rest for the input. */
-export function SearchField({ className, ...input }: ComponentProps<typeof Input>) {
+/** A search box with its icon: `className` is for the box, `inputClassName` and the rest for the input. */
+export function SearchField({ className, inputClassName, ...input }: ComponentProps<typeof Input> & {
+  readonly inputClassName?: string
+}) {
   return (
     <div className={cn("relative", className)}>
       <IconSearch className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-fg-secondary" />
-      <Input className="pl-7" {...input} />
+      <Input className={cn("pl-7", inputClassName)} {...input} />
     </div>
   )
 }

@@ -30,9 +30,7 @@ import { useEditor, useUpdateState } from "../editor/store"
 import { HeroBand } from "./HeroBand"
 import { Logo } from "./Logo"
 import { SectionTitle } from "./SectionTitle"
-
-/** A card on the start screen. In light it floats, on the edge and shadow of what floats; in dark, on a hairline. */
-const CARD = "rounded-surface bg-card ring-edge not-dark:shadow-md not-dark:ring-1 dark:border dark:border-border"
+import { START_CARD } from "./startCard"
 
 /** A recent project's "…": what a click on its row doesn't do. */
 function RecentMenu({ project, elsewhere }: { readonly project: RecentProject; readonly elsewhere: boolean }) {
@@ -132,7 +130,7 @@ function RecentProjects() {
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <SectionTitle>Recent projects</SectionTitle>
-      <ul className={cn("flex flex-col gap-0.5 p-1", CARD)}>
+      <ul className={cn("flex flex-col gap-0.5 p-1", START_CARD)}>
         {recent.map((project) => (
           <RecentRow
             key={project.path}
@@ -157,7 +155,7 @@ function WhatsNew() {
   return (
     <aside className="flex flex-col gap-2 self-start">
       <SectionTitle>What's new</SectionTitle>
-      <div className={cn("flex flex-col items-start gap-2 p-dialog", CARD)}>
+      <div className={cn("flex flex-col items-start gap-2 p-dialog", START_CARD)}>
         {update !== null && <p className="text-body-strong tabular-nums">Version {update.currentVersion}</p>}
         <p className="text-fg-tertiary">Each release lists what it added and fixed.</p>
         <Button variant="outline" onClick={() => void openExternalLink(RELEASES_URL)}>
@@ -199,7 +197,7 @@ function NewProjectForm({ onBack }: { readonly onBack: (() => void) | null }) {
   }
   return (
     <form
-      className={cn("flex flex-col gap-4 p-dialog", CARD)}
+      className={cn("flex flex-col gap-4 p-dialog", START_CARD)}
       onSubmit={(e) => {
         e.preventDefault()
         if (canCreate) void newProject(trimmed, chosen?.path)
@@ -254,7 +252,7 @@ export function ProjectChooser() {
       <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-10">
         {/* `m-auto`, not `justify-center`: a list too long for the window scrolls from its top, where centring would clip it */}
         <div className="m-auto grid w-full max-w-4xl grid-cols-[minmax(0,1fr)_16rem] gap-x-8 gap-y-6">
-          <HeroBand className={cn("col-span-2 p-6", CARD)}>
+          <HeroBand className={cn("col-span-2 p-6", START_CARD)}>
             <div className="flex items-center gap-3">
               <Logo className="size-12 shrink-0" />
               <div>

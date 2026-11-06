@@ -48,7 +48,7 @@
     --difficulty-2: oklch(0.55 0.12 155);
     --difficulty-3: oklch(0.5 0.13 250);
     --difficulty-4: oklch(0.54 0.18 25);
-    --difficulty-5: oklch(0.66 0.135 75);
+    --difficulty-5: oklch(0.62 0.135 75);
     --shadow-soft: oklch(0.225 0.01 250 / 5%);
     --shadow-float: oklch(0.225 0.01 250 / 12%);
 }
@@ -86,7 +86,7 @@
     --difficulty-1: oklch(0.975 0.0035 250);
     --difficulty-2: oklch(0.72 0.12 155);
     --difficulty-3: oklch(0.68 0.11 250);
-    --difficulty-4: oklch(0.68 0.16 25);
+    --difficulty-4: oklch(0.7 0.16 25);
     --difficulty-5: oklch(0.8 0.13 85);
     --shadow-soft: oklch(0 0 0 / 5%);
     --shadow-float: oklch(0 0 0 / 20%);

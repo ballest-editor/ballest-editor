@@ -36,8 +36,11 @@ import { isMesh, isTexture } from "./threeGuards"
 import { glbUrl, visualsOf } from "./visuals"
 import { fixSceneWinding } from "./winding"
 
-/** Every slot a thumbnail shows in is square, at most 64 px: this is that at twice the pixel density. */
-const THUMBNAIL_SIZE = 128
+/**
+ * Every slot a thumbnail shows in is square, at most 96 px (the Pieces panel's largest tile): this is that at twice the
+ * pixel density. Smaller slots scale the same picture down, so one render per piece serves every size.
+ */
+const THUMBNAIL_SIZE = 192
 /** A map's picture shows at 240 px: this is that at twice the pixel density. */
 const MAP_THUMBNAIL_SIZE = 480
 /** How many items are built before the page gets a turn, so a large map doesn't hold up the dialog showing it. */

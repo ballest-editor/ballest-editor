@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import { axisOf, ORTHO_AXES } from "./orthoView"
-import { gizmoEnds, gizmoViewOf, sameGizmoEnds, type ScreenAxes } from "./viewGizmo"
+import { gizmoEnds, gizmoTurnOf, gizmoViewOf, isGizmoDrag, sameGizmoEnds, type ScreenAxes } from "./viewGizmo"
 import { type OrthoView, orthoViews } from "./viewLayout"
 
 const axesOf = (view: OrthoView): ScreenAxes => {
@@ -77,5 +77,40 @@ describe("the axis gizmo's ends", () => {
     const turned = { ...threeQuarter, right: { x: 0.68, y: 0.73, z: 0 } }
     assert.isFalse(sameGizmoEnds(ends, gizmoEnds(turned)))
     assert.isFalse(sameGizmoEnds(ends, gizmoEnds(axesOf("top"))))
+  })
+})
+
+describe("a drag on the axis gizmo", () => {
+  it("is a click until it has moved a few pixels, in any direction", () => {
+    assert.isFalse(isGizmoDrag(0, 0))
+    assert.isFalse(isGizmoDrag(3, 0))
+    assert.isFalse(isGizmoDrag(-2, 2))
+    assert.isTrue(isGizmoDrag(4, 0))
+    assert.isTrue(isGizmoDrag(0, -4))
+    assert.isTrue(isGizmoDrag(3, 3))
+  })
+
+  it("swings the camera against the pointer across the screen and lifts it as the pointer goes down", () => {
+    assert.isBelow(gizmoTurnOf(10, 0).yaw, 0)
+    assert.isAbove(gizmoTurnOf(-10, 0).yaw, 0)
+    assert.isBelow(gizmoTurnOf(0, 10).pitch, 0)
+    assert.isAbove(gizmoTurnOf(0, -10).pitch, 0)
+  })
+
+  it("turns one way for each axis of the move", () => {
+    assert.closeTo(gizmoTurnOf(10, 0).pitch, 0, 1e-12)
+    assert.closeTo(gizmoTurnOf(0, 10).yaw, 0, 1e-12)
+  })
+
+  it("turns the same however the move is split up", () => {
+    const whole = gizmoTurnOf(30, -12)
+    const first = gizmoTurnOf(10, -4)
+    const rest = gizmoTurnOf(20, -8)
+    assert.closeTo(first.yaw + rest.yaw, whole.yaw, 1e-12)
+    assert.closeTo(first.pitch + rest.pitch, whole.pitch, 1e-12)
+  })
+
+  it("takes a quarter turn in a few hundred pixels", () => {
+    assert.closeTo(gizmoTurnOf(225, 0).yaw, -Math.PI / 2, 1e-9)
   })
 })

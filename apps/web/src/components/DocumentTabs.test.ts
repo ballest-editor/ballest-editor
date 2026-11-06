@@ -22,8 +22,9 @@ describe("a document tab's status", () => {
   })
 
   it("says New map of a blank tab, until it has edits", () => {
-    assert.strictEqual(tabStatusOf(false, undefined, true), "New map")
-    assert.strictEqual(tabStatusOf(true, undefined, true), "Unsaved")
+    assert.strictEqual(tabStatusOf(false, undefined, "map"), "New map")
+    assert.strictEqual(tabStatusOf(false, undefined, "prefab"), "New prefab")
+    assert.strictEqual(tabStatusOf(true, undefined, "map"), "Unsaved")
   })
 
   it("says Saved of what has no link state, such as a definition", () => {

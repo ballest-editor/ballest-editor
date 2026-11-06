@@ -1,6 +1,9 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
 import { ueToThreeVector, type Vec3 } from "../domain/coords"
+import { DEFAULT_PLAYER_START } from "../domain/level"
+import { distanceForScale } from "../domain/orthoView"
+import { gizmoEnds, gizmoTurnOf } from "../domain/viewGizmo"
 import { type OrthoView, orthoViews, paneClose, paneCloseColumn, paneSwap } from "../domain/viewLayout"
 import {
   changePanes,
@@ -198,6 +201,15 @@ describe("changing a pane's projection", () => {
     assert.strictEqual(pane.cmPerPixel, cmPerPixel)
   })
 
+  it("frames a document with no items on the default start, where a definition's frame is", () => {
+    const { doc, floorHeight } = useEditor.getState()
+    useEditor.setState({ doc: { ...doc, map: { ...doc.map, items: [] } } })
+    const centre = mapBox().getCenter(new THREE.Vector3())
+    useEditor.setState({ doc })
+    const { x, y, z } = ueToThreeVector({ ...DEFAULT_PLAYER_START, z: floorHeight })
+    assert.deepStrictEqual(centre.toArray(), [x, y, z])
+  })
+
   describe("following the store", () => {
     const framedOn = (view: OrthoView) => {
       const pane = paneOn(view)
@@ -364,6 +376,132 @@ describe("easing to a new view", () => {
     assert.isTrue(pane.drawCamera.layers.test(floorGridOnly))
     assert.isFalse(pane.drawCamera.layers.test(orthographicOnly))
     assert.isFalse(pane.drawCamera.layers.test(perspectiveOnly))
+  })
+})
+
+describe("orbiting a pane", () => {
+  /** A pane on screen, looking at the origin from a three-quarter view. */
+  const shownPerspective = () => {
+    const pane = paneOn("perspective")
+    pane.needsFraming = false
+    pane.perspective.position.set(1000, 800, 1000)
+    pane.perspective.lookAt(0, 0, 0)
+    return pane
+  }
+
+  const shownOrtho = (view: OrthoView) => {
+    const pane = paneOn(view)
+    pane.needsFraming = false
+    return pane
+  }
+
+  const drag = (pane: PaneCamera, dx: number, dy: number) => {
+    const { yaw, pitch } = gizmoTurnOf(dx, dy)
+    pane.orbit(yaw, pitch)
+  }
+
+  const pointingAtPivot = (pane: PaneCamera) => {
+    const { perspective, target } = pane
+    const forward = perspective.getWorldDirection(new THREE.Vector3())
+    return forward.angleTo(target.clone().sub(perspective.position))
+  }
+
+  it("tilts an orthographic view into perspective at once, with nothing to ease", () => {
+    for (const view of orthoViews) {
+      const pane = shownOrtho(view)
+      drag(pane, 12, 40)
+      assert.strictEqual(pane.projection, "perspective")
+      assert.isFalse(pane.easing)
+      assert.strictEqual(pane.drawCamera, pane.perspective)
+    }
+  })
+
+  it("stays on the pivot, at the size the orthographic view showed it", () => {
+    for (const view of orthoViews) {
+      const pane = shownOrtho(view)
+      pane.target.set(300, 40, -200)
+      drag(pane, 30, -30)
+      const distance = distanceForScale(pane.cmPerPixel, HEIGHT, FOV)
+      assert.closeTo(pane.perspective.position.distanceTo(pane.target), distance, 1e-6)
+      assert.closeTo(pointingAtPivot(pane), 0, 1e-6)
+    }
+  })
+
+  it("leaves the orbit to the store's view: following perspective afterwards changes nothing", () => {
+    const pane = shownOrtho("right")
+    drag(pane, 25, 10)
+    const position = pane.perspective.position.clone()
+    pane.followProjection("perspective")
+    assert.isFalse(pane.easing)
+    assert.deepStrictEqual(pane.perspective.position.toArray(), position.toArray())
+  })
+
+  it("carries the side of the gizmo facing the eye along with the pointer", () => {
+    const facing = (pane: PaneCamera) => {
+      const end = gizmoEnds(pane.screenAxes()).filter((e) => e.depth > 0).sort((a, b) => b.depth - a.depth)[0]
+      if (end === undefined) throw new Error("No end faces the eye")
+      return end
+    }
+    const across = shownPerspective()
+    const { view, x } = facing(across)
+    drag(across, 10, 0)
+    const moved = gizmoEnds(across.screenAxes()).find((e) => e.view === view)
+    assert.isAbove(moved?.x ?? -Infinity, x)
+
+    const down = shownPerspective()
+    const before = facing(down)
+    drag(down, 0, 10)
+    const lowered = gizmoEnds(down.screenAxes()).find((e) => e.view === before.view)
+    assert.isBelow(lowered?.y ?? Infinity, before.y)
+  })
+
+  it("keeps the horizon level, however far it's dragged", () => {
+    const pane = shownOrtho("front")
+    drag(pane, 70, 40)
+    drag(pane, -200, 90)
+    drag(pane, 15, -300)
+    const { right } = pane.screenAxes()
+    assert.closeTo(right.z, 0, 1e-9)
+  })
+
+  it("stops short of looking straight down, and turns back from there", () => {
+    const pane = shownPerspective()
+    drag(pane, 0, 2000)
+    const { toward } = pane.screenAxes()
+    assert.isBelow(toward.z, 1)
+    assert.isAbove(toward.z, 0.999)
+    drag(pane, 0, -225)
+    assert.closeTo(pane.screenAxes().toward.z, 0, 0.01)
+  })
+
+  it("turns a Top view around the world's up without dropping out of it", () => {
+    const pane = shownOrtho("top")
+    drag(pane, 225, 0)
+    const { toward, right } = pane.screenAxes()
+    assert.isAbove(toward.z, 0.999)
+    assert.closeTo(Math.abs(right.x), 1, 0.01)
+  })
+
+  it("keeps a pivot that's off centre where it is in the picture", () => {
+    const pane = shownPerspective()
+    pane.target.set(200, 0, -150)
+    const distance = pane.perspective.position.distanceTo(pane.target)
+    const off = pointingAtPivot(pane)
+    drag(pane, 40, 25)
+    assert.closeTo(pane.perspective.position.distanceTo(pane.target), distance, 1e-6)
+    assert.closeTo(pointingAtPivot(pane), off, 1e-6)
+  })
+
+  it("lets a snap already on its way finish, heading for where the drag has got to", () => {
+    const pane = shownPerspective()
+    pane.setProjection("top")
+    pane.stepTween(1000, 150)
+    assert.isTrue(pane.easing)
+    drag(pane, 10, 10)
+    assert.isTrue(pane.easing)
+    pane.stepTween(1200, 150)
+    assert.isFalse(pane.easing)
+    assert.strictEqual(pane.drawCamera, pane.perspective)
   })
 })
 

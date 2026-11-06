@@ -30,6 +30,26 @@ describe("withFavouriteToggled", () => {
   })
 })
 
+describe("the Pieces panel's thumbnail size", () => {
+  it("comes back as saved", () => {
+    const panels = { ...defaultSettings.panels, piecesThumbnailSize: "l" as const }
+    const saved: unknown = JSON.parse(JSON.stringify({ ...defaultSettings, panels }))
+    assert.strictEqual(mergeSettings(saved).panels.piecesThumbnailSize, "l")
+  })
+
+  it("is the default in a save from before it existed, or one that doesn't read", () => {
+    const { piecesThumbnailSize } = defaultSettings.panels
+    assert.strictEqual(
+      mergeSettings({ panels: { piecesView: "grid" } }).panels.piecesThumbnailSize,
+      piecesThumbnailSize
+    )
+    assert.strictEqual(
+      mergeSettings({ panels: { piecesThumbnailSize: "xl" } }).panels.piecesThumbnailSize,
+      piecesThumbnailSize
+    )
+  })
+})
+
 describe("the lists in settings", () => {
   it("come back as saved", () => {
     const panels = { ...defaultSettings.panels, recentPieces: ["a", "b"], favouritePieces: ["b"] }

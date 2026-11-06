@@ -34,6 +34,8 @@ interface ThumbnailProps {
   readonly placeholder: ReactNode
   /** How much of the frame the piece fills (`sizeScalesOf`), for a list that sets one shape's sizes side by side. */
   readonly fill?: number
+  /** A light's glyph, where the tile is bigger than a row's. */
+  readonly glyphClassName?: string
 }
 
 /**
@@ -86,7 +88,7 @@ export function PieceThumbnail(props: ThumbnailProps) {
     ? <RenderedThumbnail {...props} />
     : (
       <span className={cn("grid place-items-center text-fg-secondary", props.className)}>
-        {createElement(glyph, { className: "size-4" })}
+        {createElement(glyph, { className: props.glyphClassName ?? "size-4" })}
       </span>
     )
 }

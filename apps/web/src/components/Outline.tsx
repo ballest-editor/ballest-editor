@@ -48,7 +48,7 @@ import { findNode, groupNames, numberedNameText } from "../domain/structure"
 import { detachInstance, updateInstance } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { elementOf } from "../editor/keyTargets"
-import { nextSelection, nodeNamesOf, useCanGroup, useEditor } from "../editor/store"
+import { nextSelection, nodeNamesOf, noTabOpen, useCanGroup, useEditor } from "../editor/store"
 import { EnteredGroupBreadcrumb } from "./EnteredGroupStatus"
 import { MenuKey } from "./KeyChip"
 import { OUTLINE_INDENT, OUTLINE_ROW_HEIGHT, OutlineRowView } from "./OutlineRow"
@@ -188,6 +188,7 @@ export function Outline() {
 
   const [query, setQuery] = useState("")
   const filtering = query.trim().length > 0
+  const noTab = useEditor(noTabOpen)
   const names = useMemo(() => nodeNamesOf({ doc, catalogIndex }), [doc, catalogIndex])
   const classes = useMemo(() => itemClasses(map, ids), [map, ids])
   const rows = useMemo(
@@ -472,6 +473,8 @@ export function Outline() {
               <div className="p-3 text-body text-fg-tertiary">
                 {filtering
                   ? "Nothing matches the filter."
+                  : noTab
+                  ? "No map open."
                   : "Nothing placed yet. Click a piece in Pieces to add it to the map."}
               </div>
             )}

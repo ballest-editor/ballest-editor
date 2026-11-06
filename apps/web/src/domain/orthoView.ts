@@ -162,9 +162,3 @@ export const gridLevels = (cmPerPixel: number, snapStep?: number): ReadonlyArray
       const opacity = smoothstep(GRID_FADE_FROM_PX, GRID_FADE_TO_PX, size / cmPerPixel)
       return opacity > 0 ? [{ size, opacity, section: size >= SECTION_CM }] : []
     })
-
-const twoFigures = (value: number): number => Number(value.toPrecision(2))
-
-/** A pane's scale for its label: "1 px = 2 cm", or in metres when the editor shows metres. */
-export const formatPaneScale = (cmPerPixel: number, units: "cm" | "m"): string =>
-  units === "m" ? `1 px = ${twoFigures(cmPerPixel / 100)} m` : `1 px = ${twoFigures(cmPerPixel)} cm`

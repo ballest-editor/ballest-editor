@@ -40,7 +40,7 @@ import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
-import { groupBoxOf, paneDisplayIn, type SelectMode, useEditor } from "./store"
+import { groupBoxOf, noTabOpen, type SelectMode, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
 import { isMesh } from "./threeGuards"
 import { glbUrl, visualsOf } from "./visuals"
@@ -278,8 +278,7 @@ function ViewportBackground() {
 
 /**
  * The floor grid (1 m cells, 10 m sections) at the map's floor height, in the user's
- * colours or ones derived from the ground they sit on. It follows the camera, so it ends where its fade ends. Each pane
- * says whether it shows it.
+ * colours or ones derived from the ground they sit on. It follows the camera, so it ends where its fade ends.
  */
 function ViewportGrid() {
   const appearance = useEditor((s) => s.settings.appearance)
@@ -296,10 +295,9 @@ function ViewportGrid() {
     material.needsUpdate = true
   }, [])
   // drei fades the grid from R3F's camera, and each pane has its own.
-  useBeforePaneDraw(({ perspective: { position } }, slot) => {
+  useBeforePaneDraw(({ perspective: { position } }) => {
     const material = grid.current?.material
-    if (grid.current === null || !(material instanceof THREE.ShaderMaterial)) return
-    grid.current.visible = paneDisplayIn(useEditor.getState(), slot).grid
+    if (!(material instanceof THREE.ShaderMaterial)) return
     const fadeFrom: unknown = material.uniforms["worldCamProjPosition"]?.value
     if (fadeFrom instanceof THREE.Vector3) fadeFrom.set(position.x, floorHeight, position.z)
     material.uniformsNeedUpdate = true
@@ -308,6 +306,7 @@ function ViewportGrid() {
     <Grid
       ref={grid}
       layers={floorGridOnly}
+      visible={appearance.gridVisible}
       position={[0, floorHeight, 0]}
       side={THREE.DoubleSide} // drei's default (BackSide) hides it from below
       infiniteGrid
@@ -416,6 +415,7 @@ function Overlay() {
 export function Viewport({ controls: Controls }: { readonly controls: ComponentType<{ readonly disabled: boolean }> }) {
   const [revealed, setRevealed] = useState(false)
   const reveal = useCallback(() => setRevealed(true), [])
+  const hidden = useEditor(noTabOpen)
   return (
     <div
       // [&_canvas]: the canvas element always fills the container, even on frames where its
@@ -441,6 +441,7 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
       }}
     >
       <Canvas
+        frameloop={hidden ? "never" : "always"}
         // Hidden until the first scene is ready, then a quick fade up from translucent.
         className={revealed ? "animate-in fade-in-30 duration-150 ease-out" : "opacity-0"}
         // A pane that isn't drawn this frame keeps its pixels (see PaneRenderer).

@@ -25,14 +25,16 @@ import { ColorSetting } from "./ColorSetting"
 import { NumberField } from "./NumberField"
 import { SectionTitle } from "./SectionTitle"
 import { ToolBar } from "./ToolBar"
-import { GROUP, GROUP_DIVIDER, noFocus, releaseFocus, SEGMENT } from "./viewControlStyle"
+import { CONTROL_WORD, GROUP, GROUP_DIVIDER, noFocus, releaseFocus, SEGMENT } from "./viewControlStyle"
 import { ViewLayoutControl, ViewPanes } from "./ViewPanes"
 import { ViewTip, ViewTipBoundary } from "./ViewTip"
 
 /**
  * Everything floating over the viewport: its panes' frames, the tool bar (bottom) and, in the viewport's top right like
  * the game's, over every pane since they all share them, two pills: how the view divides into panes and what it displays,
- * then the gizmo's axes with grid and rotation snapping. Pointer-only, so keybinds stay with the viewport.
+ * then the gizmo's axes with grid and rotation snapping. They sit in the top right pane's corner (`ViewPanes`): as that
+ * pane narrows they go to icons, and only then does the second pill drop under the first, clear of the pane's label.
+ * Pointer-only, so keybinds stay with the viewport.
  */
 export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
   const settings = useEditor((s) => s.settings)
@@ -42,43 +44,44 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
 
   return (
     <ViewTipBoundary>
-      <ViewPanes disabled={disabled} />
-      <div className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap justify-end gap-2">
-        <div className={GROUP}>
-          <ViewLayoutControl disabled={disabled} />
-          <span aria-hidden className={GROUP_DIVIDER} />
-          <DisplayControl disabled={disabled} />
+      <ViewPanes disabled={disabled}>
+        <div className="absolute top-3 right-3 flex items-end gap-2 @max-[30rem]/corner:flex-col" data-view-controls>
+          <div className={GROUP}>
+            <ViewLayoutControl disabled={disabled} />
+            <span aria-hidden className={GROUP_DIVIDER} />
+            <DisplayControl disabled={disabled} />
+          </div>
+          <div className={GROUP}>
+            <AxesToggle disabled={disabled} />
+            <span aria-hidden className={GROUP_DIVIDER} />
+            <SnapGroup
+              icon={<IconGrid4x4 />}
+              label="Snap to grid"
+              enabled={enabled}
+              onToggle={(pressed) => update({ enabled: pressed })}
+              value={gridSize}
+              options={GRID_SIZES}
+              onPick={(size) => update({ enabled: true, gridSize: size })}
+              valueLabel="Grid size"
+              format={(size) => formatGridSize(size, units)}
+              disabled={disabled}
+            />
+            <span aria-hidden className={GROUP_DIVIDER} />
+            <SnapGroup
+              icon={<IconAngle />}
+              label="Snap rotation"
+              enabled={rotationEnabled}
+              onToggle={(pressed) => update({ rotationEnabled: pressed })}
+              value={rotationStep}
+              options={ROTATION_STEPS}
+              onPick={(step) => update({ rotationEnabled: true, rotationStep: step })}
+              valueLabel="Rotation step"
+              format={formatRotationStep}
+              disabled={disabled}
+            />
+          </div>
         </div>
-        <div className={GROUP}>
-          <AxesToggle disabled={disabled} />
-          <span aria-hidden className={GROUP_DIVIDER} />
-          <SnapGroup
-            icon={<IconGrid4x4 />}
-            label="Snap to grid"
-            enabled={enabled}
-            onToggle={(pressed) => update({ enabled: pressed })}
-            value={gridSize}
-            options={GRID_SIZES}
-            onPick={(size) => update({ enabled: true, gridSize: size })}
-            valueLabel="Grid size"
-            format={(size) => formatGridSize(size, units)}
-            disabled={disabled}
-          />
-          <span aria-hidden className={GROUP_DIVIDER} />
-          <SnapGroup
-            icon={<IconAngle />}
-            label="Snap rotation"
-            enabled={rotationEnabled}
-            onToggle={(pressed) => update({ rotationEnabled: pressed })}
-            value={rotationStep}
-            options={ROTATION_STEPS}
-            onPick={(step) => update({ rotationEnabled: true, rotationStep: step })}
-            valueLabel="Rotation step"
-            format={formatRotationStep}
-            disabled={disabled}
-          />
-        </div>
-      </div>
+      </ViewPanes>
       <ToolBar disabled={disabled} />
     </ViewTipBoundary>
   )
@@ -105,7 +108,7 @@ function AxesToggle({ disabled }: { readonly disabled: boolean }) {
       }
     >
       {local ? <IconCube /> : <IconWorld />}
-      <span className="text-foreground">{local ? "Local" : "World"}</span>
+      <span className={cn("text-foreground", CONTROL_WORD)}>{local ? "Local" : "World"}</span>
     </ViewTip>
   )
 }
@@ -291,13 +294,13 @@ function DisplayControl({ disabled }: { readonly disabled: boolean }) {
         render={
           <PopoverTrigger
             disabled={disabled}
-            render={<button type="button" className={SEGMENT} {...noFocus} />}
+            render={<button type="button" aria-label="Display" className={SEGMENT} {...noFocus} />}
           />
         }
       >
         <IconHaze className="size-4" />
-        <span className="text-foreground">Display</span>
-        <IconChevronDown className="size-3" />
+        <span className={cn("text-foreground", CONTROL_WORD)}>Display</span>
+        <IconChevronDown className={cn("size-3", CONTROL_WORD)} />
       </ViewTip>
       <PopoverContent align="end" initialFocus={false} finalFocus={false} className="w-72 gap-0 px-3 py-1">
         <DisplayRows />
@@ -349,14 +352,14 @@ function SnapGroup<V extends number>(props: {
         onOpenChangeComplete={releaseFocus}
       >
         <ViewTip
-          label={props.valueLabel}
+          label={`${props.valueLabel}: ${props.format(props.value)}`}
           render={
             <SelectTrigger
               aria-label={props.valueLabel}
               tabIndex={-1}
               className={cn(
                 SEGMENT,
-                "border-none bg-transparent px-2 tabular-nums data-[size=default]:h-full dark:bg-transparent [&>svg]:hidden",
+                "border-none bg-transparent px-2 tabular-nums data-[size=default]:h-full dark:bg-transparent [&>svg]:hidden @max-[42rem]/corner:px-1 @max-[42rem]/corner:*:data-[slot=select-value]:hidden @max-[42rem]/corner:[&>svg]:block",
                 enabled ? "text-foreground" : "text-fg-tertiary"
               )}
             />

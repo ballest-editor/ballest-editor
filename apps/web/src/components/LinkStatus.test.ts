@@ -7,11 +7,13 @@ import { LastExportStatus, LinkStatus } from "./LinkStatus"
 
 // The server render reads a store's initial state, so the test gives it the state it means instead.
 let blank = false
+let noTab = false
 let file: { readonly name: string } | null = null
 let dirty = false
 let gameWrite: GameWrite | null = null
 let openMap: { readonly map: { readonly link: { readonly export: { readonly at: string } } } } | null = null
 vi.mock("../editor/store", () => ({
+  noTabOpen: () => noTab,
   useEditor: (selector: (s: unknown) => unknown) =>
     selector({
       dirty,
@@ -28,6 +30,14 @@ vi.mock("../editor/store", () => ({
 }))
 
 vi.mock("../editor/actions", () => ({}))
+
+describe("the status bar, with no tab open", () => {
+  it("has no chip", () => {
+    noTab = true
+    assert.strictEqual(renderToStaticMarkup(createElement(LinkStatus)), "")
+    noTab = false
+  })
+})
 
 describe("the status bar, on a map that was never saved", () => {
   const markup = renderToStaticMarkup(createElement(LinkStatus))

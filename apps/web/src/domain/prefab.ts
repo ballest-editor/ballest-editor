@@ -9,7 +9,7 @@ import type { CatalogIndex, CatalogPiece } from "./Catalog"
 import type { Vec3 } from "./coords"
 import { meshComponentFor, newMapFile, nextNumberedName, qualifyMaterialPath } from "./factory"
 import { gameGroupNameOf } from "./gameGroups"
-import { refusesMeshComponents } from "./gameRules"
+import { PREFAB_ITEMS, refusesMeshComponents } from "./gameRules"
 import { boxCentreOf, itemsBoxOf } from "./itemBounds"
 import { DEFAULT_PLAYER_START } from "./level"
 import { type Item, type MapFile, type MeshComponent, objectPathOf, PropertyList } from "./MapFile"
@@ -38,6 +38,10 @@ export const PREFAB_TIER_HINTS: Readonly<Record<PrefabTier, string>> = {
 
 /** Why the project tier is off in Untitled Project. */
 export const PREFAB_NEEDS_PROJECT = "Name the project first."
+
+/** Why a definition's tab holding `itemCount` items can't be saved yet; null when it can. */
+export const prefabSaveProblem = (itemCount: number): string | null =>
+  itemCount < PREFAB_ITEMS.min ? `A prefab needs at least ${PREFAB_ITEMS.min} items to save.` : null
 
 export const isSamePrefab = (a: PrefabRef, b: PrefabRef): boolean => a.tier === b.tier && a.name === b.name
 

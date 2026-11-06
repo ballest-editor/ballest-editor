@@ -1,6 +1,6 @@
 /**
  * The axis gizmo in a pane's corner (docs/DESKTOP.md § View panes): the six ends of the game's axes as the pane's picture
- * turns them, and the view each one snaps to. Everything here is in game space.
+ * turns them, the view each one snaps to, and how a drag on it turns the pane. The ends are in game space.
  */
 import type { Vec3 } from "./coords"
 import { dot, type GameAxis } from "./orthoView"
@@ -58,6 +58,24 @@ export const gizmoEnds = ({ right, up, toward }: ScreenAxes): ReadonlyArray<Gizm
       return [{ axis, positive, view: gizmoViewOf(axis, positive), x, y, depth: sign * dot(direction, toward) }]
     })
   )
+
+/** How far a press on the gizmo moves before it's a drag and not a click (px). */
+const DRAG_START_PX = 4
+
+/** Whether a press on the gizmo that has moved this far is a drag. */
+export const isGizmoDrag = (dx: number, dy: number): boolean => Math.hypot(dx, dy) >= DRAG_START_PX
+
+/** What a drag on the gizmo turns the pane by for each pixel (radians): Blender's 0.4°. */
+const TURN_PER_PIXEL = (0.4 * Math.PI) / 180
+
+/**
+ * What a pointer's move of `dx` and `dy` pixels (y down) turns the pane by, for `PaneCamera.orbit`. The side of the gizmo
+ * that faces the eye goes with the pointer, as if it were held: right swings the camera left, down lifts it.
+ */
+export const gizmoTurnOf = (dx: number, dy: number): { readonly yaw: number; readonly pitch: number } => ({
+  yaw: -dx * TURN_PER_PIXEL,
+  pitch: -dy * TURN_PER_PIXEL
+})
 
 /** Under a twentieth of a pixel on the gizmo: not worth drawing again. */
 const SAME_END = 0.002

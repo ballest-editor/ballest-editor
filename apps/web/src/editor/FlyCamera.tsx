@@ -20,6 +20,7 @@ import { spreadPlacement } from "./actions/placement"
 import { isEditorKeyEvent } from "./keyTargets"
 import {
   activePaneCamera,
+  clampPitch,
   FOCUS_SPAN,
   forgetClosedTabs,
   mapBox,
@@ -36,7 +37,6 @@ const KEY_LOOK_SPEED = 1.6 // radians per second for the arrow-key look actions
 const ORTHO_KEY_ZOOM = 1.5 // e-foldings per second for the forward and reverse keys in an orthographic pane
 const LOCK_SETTLE_MS = 50 // moves dropped after a pointer lock is asked for, taken or lost
 const CHORD_MODIFIERS = ["ControlLeft", "ControlRight", "MetaLeft", "MetaRight", "AltLeft", "AltRight"]
-const clampPitch = (pitch: number) => THREE.MathUtils.clamp(pitch, -Math.PI / 2 + 0.001, Math.PI / 2 - 0.001)
 
 type DragMode = "look" | "orbit" | "pan"
 

@@ -12,12 +12,15 @@ import {
   type IDockviewPanelProps
 } from "dockview-react"
 import "dockview-react/dist/styles/dockview.css"
+import { cn } from "@workspace/ui/lib/utils"
 import { type ComponentType, useEffect, useRef, useState } from "react"
 import { DOCUMENTS_PANEL } from "../../domain/dockLayout"
+import { noTabOpen, useEditor } from "../../editor/store"
 import { Viewport } from "../../editor/Viewport"
 import { DocumentTabs } from "../DocumentTabs"
 import { EditorSkeletonPanels } from "../EditorSkeleton"
 import { onMiddleClick } from "../middleClick"
+import { ProjectOverview } from "../ProjectOverview"
 import { ViewportControls } from "../ViewControls"
 import "./dock.css"
 import { attachDock, expandGroup, isCentreGroup, togglePanel, useClosedPanelsIn, useGroupFold } from "./dockControl"
@@ -28,8 +31,21 @@ import { StripButton } from "./StripButton"
 
 const dockTheme: DockviewTheme = { name: "ballest", className: "dockview-theme-ballest" }
 
-/** The centre group's panel: the map tabs are in its header (`CentreTabs`), so this is only the viewport. */
-const DocumentsPanel = () => <Viewport controls={ViewportControls} />
+/**
+ * The centre group's panel: the map tabs are in its header (`CentreTabs`), so this is the viewport, or with no tab open
+ * the project overview over it. The viewport stays mounted, hidden, so the next tab opens without a new WebGL context.
+ */
+function DocumentsPanel() {
+  const overview = useEditor(noTabOpen)
+  return (
+    <div className="relative h-full">
+      <div className={cn("h-full", overview && "invisible")}>
+        <Viewport controls={ViewportControls} />
+      </div>
+      {overview && <ProjectOverview />}
+    </div>
+  )
+}
 
 /** The window a panel or group is in, and how many times it has come back to the main one. */
 function useDockWindow(api: DockviewPanelApi | DockviewGroupPanelApi) {

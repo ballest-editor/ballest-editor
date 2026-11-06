@@ -9,26 +9,36 @@ import { nodeKeys } from "../domain/groupSelection"
 import { isPlayerStart } from "../domain/MapFile"
 import { withDifficulty } from "../domain/mapTags"
 import { mirrorFlagsOf } from "../domain/mirror"
+import { prefabOfItems } from "../domain/prefab"
 import { defaultSettings } from "../domain/Settings"
 import { loadStructure, sidecarOf, structureOfMap } from "../domain/sidecar"
 import { findGroup, treeKeys } from "../domain/structure"
 import { lightingOf } from "../domain/sunlight"
 import { defaultViewLayout } from "../domain/viewLayout"
+import type { ProjectState } from "../services/Platform"
 import {
   editedAtOf,
+  exportProblemOf,
   gameMapOf,
   initialMap,
   nextSelection,
+  NO_TAB_OPEN,
   nodeNamesOf,
-  paneDisplayIn,
+  noTabOpen,
   pivotOf,
+  PREFAB_TAB_STAYS_HERE,
+  saveProblemOf,
   shownLighting,
   shownTransform,
   shownValidation,
-  useEditor
+  tabStateOf,
+  useEditor,
+  windowTitleOf
 } from "./store"
 
 const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!
+
+const emptyPrefab = prefabOfItems([], null)
 
 const state = () => useEditor.getState()
 /** A new map with only its player start, so these tests own every other item and index. */
@@ -872,6 +882,124 @@ describe("document tabs", () => {
     assert.deepStrictEqual(state().tabIds, [first])
   })
 
+  describe("the last tab of a named project", () => {
+    const NAMED: ProjectState = {
+      current: { path: "/projects/Season 3", name: "Season 3", exists: true },
+      recent: [],
+      lastOpenMap: null,
+      chooserRequired: false,
+      openElsewhere: [],
+      projectsFolder: "/projects",
+      startRefused: null
+    }
+    /** A project's one tab, with its map; the project goes when the test does. */
+    const inProject = (test: () => void) => () => {
+      const { project } = state()
+      oneTab()
+      state().setProject(NAMED, [])
+      state().loadMap(named("A"), fileOf("a"))
+      try {
+        test()
+      } finally {
+        useEditor.setState({ project })
+        oneTab()
+      }
+    }
+    const closeTheTab = () => state().closeTab(state().tabId)
+
+    it(
+      "closes, leaving no tab and nothing of it behind",
+      inProject(() => {
+        const closed = state().tabId
+        closeTheTab()
+        assert.isTrue(noTabOpen(state()))
+        assert.deepStrictEqual(state().tabIds, [])
+        assert.notStrictEqual(state().tabId, closed)
+        assert.strictEqual(state().parkedTabs.size, 0)
+        assert.isNull(state().file)
+        assert.isFalse(state().dirty)
+        assert.deepStrictEqual(state().doc.ids, [])
+        assert.isUndefined(tabStateOf(state(), state().tabId))
+      })
+    )
+
+    it(
+      "keeps the window's title on the project, with no dot",
+      inProject(() => {
+        state().setLighting({ ...lightingOf(state().doc.map.worldSettings), timeOfDay: 3 })
+        assert.strictEqual(windowTitleOf(state()), "• Season 3 – Ballest Editor")
+        closeTheTab()
+        assert.strictEqual(windowTitleOf(state()), "Season 3 – Ballest Editor")
+      })
+    )
+
+    it(
+      "edits nothing while no tab is open",
+      inProject(() => {
+        closeTheTab()
+        const { doc } = state()
+        state().placePiece(cube, placementTransform(cube, { x: 0, y: 0, z: 0 }))
+        state().placeGroup([], "Bridge")
+        state().setLighting({ ...lightingOf(doc.map.worldSettings), timeOfDay: 3 })
+        state().renameLevel("Other", "me")
+        assert.strictEqual(state().doc, doc)
+        assert.isFalse(state().dirty)
+        assert.lengthOf(state().past, 0)
+      })
+    )
+
+    it(
+      "gives Save, Export and Play nothing to act on while no tab is open",
+      inProject(() => {
+        assert.isNull(saveProblemOf(state()))
+        assert.isNull(exportProblemOf(state()))
+        closeTheTab()
+        assert.strictEqual(saveProblemOf(state()), NO_TAB_OPEN)
+        assert.strictEqual(exportProblemOf(state()), NO_TAB_OPEN)
+      })
+    )
+
+    for (const into of ["active", "newTab", "addedTab", "backgroundTab"] as const) {
+      it(
+        `opens the first tab again, as the active one (${into})`,
+        inProject(() => {
+          closeTheTab()
+          const { mapShownRequest, tabId } = state()
+          state().loadMap(named("B"), fileOf("b"), undefined, { into })
+          assert.deepStrictEqual(state().tabIds, [tabId])
+          assert.strictEqual(state().tabId, tabId)
+          assert.strictEqual(state().file?.name, "b.balledit")
+          assert.strictEqual(state().mapShownRequest, mapShownRequest + 1)
+          assert.isFalse(noTabOpen(state()))
+        })
+      )
+    }
+
+    it(
+      "stays while a drag is under way",
+      inProject(() => {
+        const { tabId } = state()
+        state().setPreview(new Map())
+        closeTheTab()
+        state().setPreview(null)
+        assert.deepStrictEqual(state().tabIds, [tabId])
+      })
+    )
+
+    it(
+      "says a definition's tab isn't a map, and closes like one",
+      inProject(() => {
+        state().patchTab(state().tabId, {
+          document: { kind: "prefab", tier: "project", name: "Bridge", hash: "", file: emptyPrefab, sources: new Map() }
+        })
+        assert.strictEqual(exportProblemOf(state()), PREFAB_TAB_STAYS_HERE)
+        closeTheTab()
+        assert.strictEqual(state().document.kind, "map")
+        assert.isTrue(noTabOpen(state()))
+      })
+    )
+  })
+
   it("marks the tab a save started from as saved, even when another is active by then", () => {
     oneTab()
     const first = state().tabId
@@ -1407,18 +1535,6 @@ describe("view panes", () => {
     const viewLayout = { ...defaultViewLayout, kind: "quad" as const, maximised: 3 as const }
     state().loadMap(initialMap(), null, undefined, { viewLayout })
     assert.strictEqual(state().activePane, 3)
-  })
-
-  it("resolves what a pane shows against the Display popover", () => {
-    resetStore()
-    state().setViewLayoutKind("quad")
-    state().setPaneDisplay(0, "sky", false)
-    state().setPaneDisplay(1, "sky", true)
-    assert.isFalse(paneDisplayIn(state(), 0).sky)
-    assert.isTrue(paneDisplayIn(state(), 1).sky)
-    assert.isTrue(paneDisplayIn(state(), 0).grid)
-    state().setPaneDisplay(0, "sky", true)
-    assert.deepStrictEqual(state().viewLayout.overrides, [{}, { sky: true }, {}, {}])
   })
 
   it("keeps a tab's dividers while another tab is in front", () => {

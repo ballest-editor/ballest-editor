@@ -403,18 +403,15 @@ export const useGroupFold = (group: DockviewGroupPanel): Axis | undefined =>
   useSyncExternalStore(followDockChanges, () => collapsed.get(group.id)?.axis)
 
 /** A checkbox menu item for panel `id`: checked while it's open anywhere in the dock, and toggling it. */
-export const usePanelCheck = (id: string) => ({
-  closeOnClick: true,
-  checked: useSyncExternalStore(followDockChanges, () => openPanels.has(id)),
-  onCheckedChange: () => togglePanel(id)
-})
+/** The ids of the panels open anywhere in the dock. */
+export const useOpenPanels = (): ReadonlySet<string> => useSyncExternalStore(followDockChanges, () => openPanels)
 
 export const useViewMenuPanels = (): ReadonlyArray<DockPanel> =>
   useSyncExternalStore(followDockChanges, () => dockPanels)
 
 /** The panels a group's "…" can bring back: every one that's open nowhere in the dock. */
 export const useClosedPanels = (): ReadonlyArray<DockPanel> => {
-  const open = useSyncExternalStore(followDockChanges, () => openPanels)
+  const open = useOpenPanels()
   return useViewMenuPanels().filter((panel) => !open.has(panel.id))
 }
 

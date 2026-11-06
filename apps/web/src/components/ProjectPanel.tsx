@@ -117,7 +117,7 @@ function RowDetail({ children }: { readonly children: ReactNode }) {
  * and the chip says what it has unsaved or left to export. The tooltips open below the row, so they never cover its
  * chip or ⋮ button.
  */
-function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }) {
+export function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }) {
   const isOpen = useEditor((s) => s.file?.name === map.fileName)
   const unsaved = useHasUnsavedEdits(map.fileName)
   const editedAt = useEditedAt(map.fileName, map.modifiedAt)
@@ -277,7 +277,7 @@ export function ProjectPanel() {
         )}
       </div>
       <ScrollArea className={empty ? "min-h-0" : "min-h-0 flex-1"}>
-        <ul className="flex flex-col gap-px px-2 pb-2">
+        <ul className="flex flex-col gap-0.5 px-2 pb-2">
           {unsavedTabs.map((tabId) => <UnsavedRow key={tabId} tabId={tabId} />)}
           {/* the tabs above aren't in the project; a rule keeps them from reading as its first maps */}
           {unsavedTabs.length > 0 && maps.length > 0 && (

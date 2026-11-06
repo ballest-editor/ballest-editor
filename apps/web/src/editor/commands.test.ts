@@ -21,6 +21,18 @@ describe("commands", () => {
     s().setCapabilities(before)
   })
 
+  it("has nothing to Save or Frame with no tab open", () => {
+    const s = () => useEditor.getState()
+    const { frameAllRequest } = s()
+    useEditor.setState({ tabIds: [] })
+    commandFor("saveMap")?.()
+    commandFor("saveMapAs")?.()
+    commandFor("frameAll")?.()
+    assert.isNull(s().dialog)
+    assert.strictEqual(s().frameAllRequest, frameAllRequest)
+    useEditor.setState({ tabIds: [s().tabId] })
+  })
+
   it("runs the same store entry points as the keybinds", () => {
     const s = () => useEditor.getState()
     s().loadMap(initialMap(), null)

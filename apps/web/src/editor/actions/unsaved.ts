@@ -5,7 +5,7 @@
 import { Effect, Stream } from "effect"
 import type { UnsavedAction } from "../../domain/unsaved"
 import { Platform, type UnloadKind } from "../../services/Platform"
-import { dirtyTabs, tabWithFile, useEditor } from "../store"
+import { dirtyTabs, inNamedProject, tabWithFile, useEditor } from "../store"
 import { freshMapEffect } from "./maps"
 import { notifyFailure, run, runUntilCleanup } from "./run"
 import { saveOpenMapThen } from "./save"
@@ -101,8 +101,8 @@ export const followUnloadRequests = () =>
   )
 
 /**
- * Closes a tab, asking about its unsaved edits first (it is made the active tab to ask). Closing the last tab shows a
- * fresh, unsaved map in its place: there is always a map.
+ * Closes a tab, asking about its unsaved edits first (it is made the active tab to ask). Closing the last tab leaves the
+ * project overview in a named project, and elsewhere, with nothing to list, a fresh, unsaved map in its place.
  */
 export const closeTabEffect = (tabId: string) =>
   Effect.suspend(() => {
@@ -113,7 +113,7 @@ export const closeTabEffect = (tabId: string) =>
       "closeTab",
       Effect.suspend(() => {
         const s = useEditor.getState()
-        if (s.tabIds.length > 1) return Effect.sync(() => s.closeTab(tabId))
+        if (s.tabIds.length > 1 || inNamedProject(s)) return Effect.sync(() => s.closeTab(tabId))
         return freshMapEffect
       })
     )

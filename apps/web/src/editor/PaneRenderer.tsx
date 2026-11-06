@@ -4,7 +4,7 @@ import { editorVerticalFov, MOTION_SCALE } from "../domain/Settings"
 import { firstPaneTurns, paneRects, type PaneSlot, panesToDraw, type PaneTurns } from "../domain/viewLayout"
 import { mapBox, type PaneCamera, paneCamerasOf, VIEW_TWEEN_MS } from "./paneCameras"
 import { sceneRegistry } from "./sceneRegistry"
-import { paneDisplayIn, useEditor } from "./store"
+import { useEditor } from "./store"
 
 type BeforePaneDraw = (pane: PaneCamera, slot: PaneSlot) => void
 
@@ -35,8 +35,7 @@ let turns: PaneTurns = firstPaneTurns
  * not drawn this frame keeps what it last showed (`panesToDraw` says which those are).
  */
 const drawPanes = ({ gl, scene, size }: Pick<RootState, "gl" | "scene" | "size">, everyPane: boolean): void => {
-  const state = useEditor.getState()
-  const { tabId, viewLayout, activePane, settings, keybindDefaults } = state
+  const { tabId, viewLayout, activePane, settings, keybindDefaults } = useEditor.getState()
   const rects = paneRects(viewLayout, size.width, size.height).filter((r) => r.width > 0 && r.height > 0)
   const panes = paneCamerasOf(tabId)
   const fov = editorVerticalFov(settings.camera, keybindDefaults.cameraPresets)
@@ -58,7 +57,8 @@ const drawPanes = ({ gl, scene, size }: Pick<RootState, "gl" | "scene" | "size">
     tabId,
     rects,
     rects.map((r) => panes[r.slot]?.projection),
-    rects.map((r) => paneDisplayIn(state, r.slot))
+    settings.appearance.gridVisible,
+    settings.lighting.skyVisible
   ])
   const plan = panesToDraw(rects.map((r) => r.slot), activePane, now, turns, everyPane || key !== shown)
   shown = key

@@ -4,7 +4,7 @@
  */
 import { prefabFileNameOf, type PrefabInfo, type PrefabRef, PrefabTier, type ProjectMap } from "@ballest/contracts"
 import { Effect } from "effect"
-import { nextNumberedName } from "../../domain/factory"
+import { nextFreeName, nextNumberedName } from "../../domain/factory"
 import { PREFAB_ITEMS, PREFAB_REFUSALS } from "../../domain/gameRules"
 import { counted, exactSelectedGroup } from "../../domain/groupSelection"
 import { itemsBoxOf } from "../../domain/itemBounds"
@@ -16,8 +16,10 @@ import {
   isSamePrefab,
   itemOfPrefab,
   mapOfPrefab,
+  PREFAB_NEEDS_PROJECT,
   prefabOfItems,
   prefabOfTab,
+  prefabSaveProblem,
   prefabSourcesOf,
   selectionLabelOf
 } from "../../domain/prefab"
@@ -29,8 +31,12 @@ import { Platform, PlatformError } from "../../services/Platform"
 import { sceneRegistry } from "../sceneRegistry"
 import {
   type EditorState,
+  inNamedProject,
+  NO_TAB_OPEN,
+  noTabOpen,
   type PrefabDocument,
   selectedIndices,
+  tabLabels,
   tabStateOf,
   tabsWhere,
   tabWithPrefab,
@@ -108,6 +114,7 @@ const needsCatalog = Effect.suspend(() => {
  * a link, so there it is a plain group.
  */
 export const placePrefabEffect = Effect.fn("placePrefabEffect")(function*(ref: PrefabRef) {
+  if (noTabOpen(useEditor.getState())) return yield* new PlatformError({ message: NO_TAB_OPEN })
   const catalog = yield* needsCatalog
   const { prefab, read } = yield* readPrefabFile(ref)
   const definition = definitionOf(prefab, read, catalog)
@@ -204,21 +211,59 @@ export const openPrefabEffect = Effect.fn("openPrefabEffect")(function*(ref: Pre
 
 export const openPrefab = (ref: PrefabRef) => run(openPrefabEffect(ref))
 
+/** What a new prefab's name is until its first Save gives it a file's. */
+const NEW_PREFAB_NAME = "Untitled prefab"
+
+/** The tier a new prefab goes in: the project's, and a browser's one tier. */
+const newPrefabTier = ({ capabilities }: EditorState): PrefabTier => capabilities.projects ? "project" : "user"
+
+/** Why New prefab is off; undefined when it can go. Untitled Project has no project tier to put it in. */
+export const newPrefabProblem = (s: EditorState): string | undefined =>
+  newPrefabTier(s) === "project" && !inNamedProject(s) ? PREFAB_NEEDS_PROJECT : undefined
+
+/**
+ * New prefab: an empty definition in a tab of its own, as New map is a map's. It asks nothing and writes nothing, and it
+ * goes by Untitled prefab until the first Save, which the game's two items hold back (`prefabSaveProblem`).
+ */
+export const newPrefabEffect = Effect.sync(() => {
+  const s = useEditor.getState()
+  if (newPrefabProblem(s) !== undefined) return
+  const taken = new Set(tabLabels(s))
+  const name = nextFreeName(NEW_PREFAB_NAME, (label) => taken.has(label))
+  const file = prefabOfItems([], s.catalogIndex)
+  const document: PrefabDocument = {
+    kind: "prefab",
+    tier: newPrefabTier(s),
+    name,
+    file,
+    hash: "",
+    sources: new Map()
+  }
+  s.loadMap(mapOfPrefab(name, file, s.catalogIndex), null, undefined, { document, fresh: true, into: "addedTab" })
+})
+
+export const startNewPrefab = () => run(newPrefabEffect)
+
 /**
  * Save on a definition's tab: its items back into the prefab's file, and the instances of it in the open maps follow, in
  * the same step, with one toast for both. What the game would refuse stops here with the game's words, and the tab keeps
- * its edits. A tab that lost its file to a switch of projects writes a new prefab in the project now in use.
+ * its edits. A tab that lost its file to a switch of projects writes a new prefab in the project now in use, and a new
+ * prefab takes its file's name here, clear of what the tier has by now.
  */
 export const savePrefabTab = Effect.gen(function*() {
-  const { doc, document, file, tabId } = useEditor.getState()
+  const { doc, document, file, fresh, prefabs, tabId } = useEditor.getState()
   if (document.kind !== "prefab") return
-  const { name, sources, tier } = document
+  const problem = prefabSaveProblem(doc.map.items.length)
+  if (problem !== null) return yield* new PlatformError({ message: problem })
+  const { sources, tier } = document
+  const taken = new Set(prefabs.filter((p) => p.tier === tier).map((p) => p.name))
+  const name = file === null && fresh ? freePrefabName(document.name, taken) : document.name
   const prefab = prefabOfTab(document.file, doc.map.items, doc.ids, sources)
   const info = yield* writePrefab({ tier, name }, prefab, file !== null)
   useEditor.getState().markPrefabSaved(
     tabId,
     doc,
-    { ...document, file: prefab, hash: info.hash, sources: prefabSourcesOf(prefab, doc.map.items, doc.ids) },
+    { ...document, name, file: prefab, hash: info.hash, sources: prefabSourcesOf(prefab, doc.map.items, doc.ids) },
     { name: prefabFileNameOf(name), path: info.path }
   )
   const updated = yield* lookAtPrefabs({ tier, name })

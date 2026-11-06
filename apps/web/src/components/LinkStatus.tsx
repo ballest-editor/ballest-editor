@@ -18,7 +18,7 @@ import {
 } from "../domain/linkState"
 import { formatAgo, formatDateTime } from "../domain/time"
 import { exportToGame, playMap, reimportMap, revealGamePath, saveMap } from "../editor/actions"
-import { useEditor, useOpenPrefab, useOpenProjectMap, useTabSummary } from "../editor/store"
+import { noTabOpen, useEditor, useOpenPrefab, useOpenProjectMap, useTabSummary } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { StatusBarChip } from "./SyncStatusChip"
 
@@ -135,8 +135,9 @@ export function LinkStatus() {
   const status = open === null ? unlisted : syncStatusOf(open.state, unsaved)
   const chip = useChipStatus({ opened, savedDoc, status })
   const write = useShownGameWrite()
+  const noTab = useEditor(noTabOpen)
   if (prefab !== null) return <span className="text-fg-tertiary">Prefab {prefab.name}</span>
-  if (!canExport) return null
+  if (!canExport || noTab) return null
   if (open === null) return blank ? null : <NeverSavedStatus chip={chip} write={write} /> // a blank map has nothing to save yet
 
   const { state, map } = open

@@ -5,10 +5,10 @@ import { useShallow } from "zustand/react/shallow"
 import { toTuple3, type Tuple3, ueToThreeVector } from "../domain/coords"
 import { ARENA_COLOR, ARENA_RIM, luminance, type Sky, skyIrradiance, skyOf } from "../domain/sky"
 import { sunOf, viewLightOf } from "../domain/sunlight"
-import { orthographicOnly, perspectiveOnly } from "./paneCameras"
+import { perspectiveOnly } from "./paneCameras"
 import { useBeforePaneDraw } from "./PaneRenderer"
-import { setSky, SKY_DOME_RADIUS, SKY_HAZE_BELOW, SKY_PANE_TOP_FADE, type SkyKind, SkyMaterial } from "./sky"
-import { paneDisplayIn, shownLighting, useEditor } from "./store"
+import { setSky, SKY_DOME_RADIUS, SKY_HAZE_BELOW, type SkyKind, SkyMaterial } from "./sky"
+import { shownLighting, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
 import { setWaterLight } from "./water"
 
@@ -62,12 +62,7 @@ const useMapSun = () => {
 function MapSky() {
   const { sky } = useMapSun()
   const floorHeight = useEditor((s) => s.floorHeight)
-  return (
-    <>
-      <SkyDome sky={sky} clipBelow={floorHeight} />
-      <SkyBackdrop sky={sky} />
-    </>
-  )
+  return <SkyDome sky={sky} clipBelow={floorHeight} />
 }
 
 function StudioLights() {
@@ -102,7 +97,6 @@ function MapLights() {
 }
 
 const domeGeometry = () => new THREE.SphereGeometry(SKY_DOME_RADIUS, 64, 32)
-const backdropGeometry = () => new THREE.PlaneGeometry(2, 2)
 
 /** A material showing `sky` and the geometry to show it on, kept for as long as the component is. */
 const useShownSky = (kind: SkyKind, makeGeometry: () => THREE.BufferGeometry, sky: Sky) => {
@@ -120,7 +114,7 @@ const useShownSky = (kind: SkyKind, makeGeometry: () => THREE.BufferGeometry, sk
  * The visible sky: a sphere that travels with each pane's camera, drawn before everything else, and
  * hazing out over the far floor so the clear colour shows under the near grid.
  * (The sky light is captured separately, so the fade doesn't change how pieces are lit.)
- * An orthographic pane has none: a dome means nothing without perspective. `SkyBackdrop` is its sky.
+ * An orthographic pane has none: a dome means nothing without perspective.
  */
 function SkyDome({ sky, clipBelow }: { readonly sky: Sky; readonly clipBelow: number }) {
   const mesh = useRef<THREE.Mesh>(null)
@@ -130,44 +124,23 @@ function SkyDome({ sky, clipBelow }: { readonly sky: Sky; readonly clipBelow: nu
   }, [material, clipBelow])
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
   useEffect(() => {
-    const theme = dark ? "dark" : "light"
-    material.sky.uHazeBelow.value = SKY_HAZE_BELOW[theme]
-    material.sky.uPaneTopFade.value = SKY_PANE_TOP_FADE[theme]
+    material.sky.uHazeBelow.value = SKY_HAZE_BELOW[dark ? "dark" : "light"]
   }, [material, dark])
-  useBeforePaneDraw(({ perspective }, slot) => {
+  const visible = useEditor((s) => s.settings.lighting.skyVisible)
+  useBeforePaneDraw(({ perspective }) => {
     if (mesh.current === null) return
-    mesh.current.visible = paneDisplayIn(useEditor.getState(), slot).sky
     mesh.current.position.copy(perspective.position)
     mesh.current.updateMatrixWorld()
   })
   return (
     <mesh
       ref={mesh}
+      visible={visible}
       layers={perspectiveOnly}
       geometry={geometry}
       material={material}
       renderOrder={-1000}
       frustumCulled={false}
-    />
-  )
-}
-
-/** What an orthographic pane that asks for the sky shows behind the map: the sky flat across the pane, drawn first. */
-function SkyBackdrop({ sky }: { readonly sky: Sky }) {
-  const mesh = useRef<THREE.Mesh>(null)
-  const { material, geometry } = useShownSky("backdrop", backdropGeometry, sky)
-  useBeforePaneDraw((_pane, slot) => {
-    if (mesh.current !== null) mesh.current.visible = paneDisplayIn(useEditor.getState(), slot).sky
-  })
-  return (
-    <mesh
-      ref={mesh}
-      layers={orthographicOnly}
-      geometry={geometry}
-      material={material}
-      renderOrder={-1000}
-      frustumCulled={false}
-      raycast={() => {}}
     />
   )
 }

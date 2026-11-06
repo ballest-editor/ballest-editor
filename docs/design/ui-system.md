@@ -41,9 +41,9 @@ The chrome has no hue, only elevation, and the colour on screen comes from the v
 
 Both themes are one cool neutral at hue 250, lighter as they rise: `--background`, `--card`, `--popover`. In light the steps are small, `--popover` is white and `--card` only just under it, so what floats stands off a panel by its shadow and edge (§ Depth) as well as its tone. Separate things by that step first. A row or a group on a panel takes a tone, not a border; in light a raised card takes the edge too. Dark is near-black, so the window reads as black with the chrome lifting off it, and each step is 8 to 11 points. `--muted`, `--accent` and `--secondary` sit above `--popover` there, because a track or a key chip also sits on a dialog or a menu.
 
-Components use the tokens, never a palette class (`emerald-500`) or a hex. The scene is the exception, because it draws the game's world and not the chrome: `sceneGround.ts`, `sceneColors.ts` and `axisColors.ts` keep their own colours. The clear colour sits near the chrome base, so the map's sky and water are the only real colour in the viewport: a cool near-black in dark, between the chrome's base and its panels, and in light a very pale cool grey-blue. Light's orthographic panes sit one step bluer (`ORTHO_GROUND`), so a side view that sees the water edge-on stays in the family of the panes that see it from above. The water has a look per theme and skips tone mapping, so its colours are what reach the screen before the map's light dims them: deep and muted in dark so the pieces pop, thicker in light so a pale piece's side faces stand off it. From above it thins out by the sky's own haze curve, so it runs straight into the horizon with no clear colour between them, and from below it thins out with distance (`water.ts`). The sky's haze over the far floor is tighter in dark, where a bright sky would otherwise light up a third of the pane, and in dark the sky also fades out towards the top of each pane, so the top 25 px of a 1,000 px pane are the clear colour wherever the camera points (`sky.ts`). The floor grid's lines fade before they get too fine to draw (`floorGrid.ts`).
+Components use the tokens, never a palette class (`emerald-500`) or a hex. The scene is the exception, because it draws the game's world and not the chrome: `sceneGround.ts`, `sceneColors.ts` and `axisColors.ts` keep their own colours. The clear colour is the blue a default-painted piece shows on screen (`M_BaseSurface_Metal` under the default light, OKLCH hue about 230), so the ground and the pieces read as one family: in dark that blue taken down until the pieces pop off it, with the chrome still near-black around it, and in light that blue pale and desaturated. Orthographic panes sit one step bluer (`ORTHO_GROUND`), so a side view that sees the water edge-on stays in the family of the panes that see it from above. The water has a look per theme and skips tone mapping, so its colours are what reach the screen before the map's light dims them: deep and muted in dark so the pieces pop, thicker in light so a pale piece's side faces stand off it. From above it thins out by the sky's own haze curve, so it runs straight into the horizon with no clear colour between them, and from below it thins out with distance (`water.ts`). The sky's haze over the far floor is tighter in dark, where a bright sky would otherwise light up a third of the pane (`sky.ts`). The sky runs to the top of the pane and stops there, with no fade into the chrome. The floor grid's lines fade before they get too fine to draw (`floorGrid.ts`).
 
-A piece's thumbnail is rendered in the app on a transparent background (`editor/thumbnails.ts`), so it sits on its tile in both themes; the game's own renders are the fallback. In the Pieces panel a family's sizes draw at 60%, 80% and 100% of the tile, measured from its largest (`sizeScalesOf`), so S, M and L differ at a glance. A light has no body worth a picture, so it shows its own glyph in `text-fg-secondary` wherever a thumbnail goes (`components/outlineGlyphs.ts`). The tile is `THUMBNAIL_TILE` (`PieceThumbnail.tsx`), `bg-foreground/14`: further off the panel than `--muted`, so a white piece reads in light and a near-black one in dark.
+A piece's thumbnail is rendered in the app on a transparent background (`editor/thumbnails.ts`), so it sits on its tile in both themes; the game's own renders are the fallback. One render at twice the largest slot (96px) serves every size, scaled down. In the Pieces panel a family's sizes draw at 60%, 80% and 100% of the tile, measured from its largest (`sizeScalesOf`), so S, M and L differ at a glance. A light has no body worth a picture, so it shows its own glyph in `text-fg-secondary` wherever a thumbnail goes (`components/outlineGlyphs.ts`). The tile is `THUMBNAIL_TILE` (`PieceThumbnail.tsx`), `bg-foreground/14`: further off the panel than `--muted`, so a white piece reads in light and a near-black one in dark.
 
 **`--primary` is the one accent, and it means "interactive".** Dark `#05b9cf`, light `#007787`. It is for primary buttons, the active tab's underline, the active tool, selection, focus rings (`--ring` is the same value), links and the hero band's track and ball, and nothing else. In dark, `--primary-foreground` is near-black, because white on it is 2.4:1. Past sRGB this hue clips to a harsher cyan, so dark's chroma of 0.124 is the most L 0.72 holds at hue 210.
 
@@ -100,7 +100,7 @@ A dock tab takes the inset ring on dockview's own focus line (`dock.css`). On th
 | `ring-edge`      | A 1px edge, `--edge`: black at 8%, the foreground at 8% in dark           | With a shadow, on whatever floats     |
 | `shadow-lg`      | 24px at 12%, 20% in dark                                                  | Dialogs                               |
 
-A raised card is `ring-edge not-dark:ring-1`: in light its tone is too near the panel's to show where it ends, and in dark the tone is enough. The start screen's cards stand alone, so in light they also take `shadow-md`, and in dark they keep a `border-border` hairline.
+A raised card is `ring-edge not-dark:ring-1`: in light its tone is too near the panel's to show where it ends, and in dark the tone is enough. The start screen's and the project overview's cards stand alone (`START_CARD`), so in light they also take `shadow-md`, and in dark they keep a `border-border` hairline.
 
 A button pressed scales to 0.97 and drops its shadow, except one that opens a popup, which holds still under it.
 
@@ -118,7 +118,7 @@ Put it on the element itself. A blur on a `::before` can't see past its parent w
 
 ## Difficulty colours
 
-`--difficulty-1` to `--difficulty-5` (`bg-difficulty-1`, `text-difficulty-5`) are the five Workshop difficulties, easiest first: white, green, blue and red bars, and an amber warning sign for Baller. They follow the game's order, quieted to sit on the chrome. The first is `--foreground`, so in the light theme it is dark. A difficulty mark uses these, never a palette class.
+`--difficulty-1` to `--difficulty-5` (`bg-difficulty-1`, `text-difficulty-5`) are the five Workshop difficulties, easiest first: white, green, blue and red bars, and an amber warning sign for Baller. They follow the game's order, quieted to sit on the chrome. The first is `--foreground`, so in the light theme it is dark. A difficulty mark uses these, never a palette class, and keeps them whether or not it is picked: the pill shows the choice, so an unpicked mark is never greyed.
 
 ## Radii: three, and the pill
 
@@ -133,18 +133,20 @@ A segmented control is `ToggleGroup`, one track with a pill inside that slides t
 
 ## Spacing: 4px steps, 8px between groups
 
-| What               | Size                                                                                  |
-| ------------------ | ------------------------------------------------------------------------------------- |
-| Inputs, buttons    | 28px (`h-7`); menu items too                                                          |
-| Segmented control  | 28px: 24px items in a track with 2px of padding                                       |
-| Rows               | 24px dense (outline, thumbnails at 16px), 32px with a larger thumbnail or second line |
-| Rows with a tile   | 40px: a 32px thumbnail beside two lines (the Project panel)                           |
-| Icon buttons       | 24px target, 16px icon: `Button size="icon-sm"`, no size classes                      |
-| Panel tab strip    | 28px                                                                                  |
-| Document tab strip | 32px, as is a popped-out panel's strip (the window controls' height)                  |
-| Dialog padding     | `p-dialog` (16px) at every dialog size; `px-dialog` for split dialogs                 |
-| Tooltip delay      | 300ms, the default; don't set `delay`                                                 |
-| Tooltip side       | Down from top strips, up from the status bar; along the strip to clear a control      |
+| What               | Size                                                                                                                               |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Inputs, buttons    | 28px (`h-7`); menu items too                                                                                                       |
+| Segmented control  | 28px: 24px items in a track with 2px of padding                                                                                    |
+| Rows               | 24px dense (outline, thumbnails at 16px), 32px with a larger thumbnail or second line                                              |
+| Rows with a tile   | 40px: a 32px thumbnail beside two lines (the Project panel)                                                                        |
+| Pieces panel       | Small, Medium, Large: list thumbnails 24, 32, 48px in a row 8px taller; grid tiles 48, 64, 96px, cells 8px wider (`PIECE_LAYOUTS`) |
+| Rows in a list     | 2px apart (`gap-0.5`), `rounded-control`: Project, Pieces, Prefabs. The Outline is a tree, flush and square                        |
+| Icon buttons       | 24px target, 16px icon: `Button size="icon-sm"`, no size classes                                                                   |
+| Panel tab strip    | 28px                                                                                                                               |
+| Document tab strip | 32px, as is a popped-out panel's strip (the window controls' height)                                                               |
+| Dialog padding     | `p-dialog` (16px) at every dialog size; `px-dialog` for split dialogs                                                              |
+| Tooltip delay      | 300ms, the default; don't set `delay`                                                                                              |
+| Tooltip side       | Down from top strips, up from the status bar; along the strip to clear a control                                                   |
 
 ## Icons
 

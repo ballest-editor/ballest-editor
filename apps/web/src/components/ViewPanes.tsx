@@ -26,15 +26,13 @@ import {
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuSwitchItem,
   DropdownMenuTrigger
 } from "@workspace/ui/components/dropdown-menu"
 import { cn } from "@workspace/ui/lib/utils"
 import { type ComponentProps, type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react"
-import { useShallow } from "zustand/react/shallow"
 import { type KeybindAction, PROJECTION_ACTIONS } from "../domain/Keybinds"
 import {
+  cornerPaneOf,
   maximisedSlotOf,
   paneClose,
   paneCloseColumn,
@@ -56,11 +54,10 @@ import {
   viewProjections
 } from "../domain/viewLayout"
 import { changePanes } from "../editor/paneCameras"
-import { paneDisplayIn, useEditor } from "../editor/store"
+import { useEditor } from "../editor/store"
 import { InstanceBanner } from "./InstanceBanner"
 import { ChordText } from "./KeyChip"
-import { PaneReadout } from "./PaneReadout"
-import { GROUP, GROUP_DIVIDER, noFocus, SEGMENT, SURFACE } from "./viewControlStyle"
+import { CONTROL_WORD, GROUP, GROUP_DIVIDER, noFocus, SEGMENT, SURFACE } from "./viewControlStyle"
 import { ViewGizmo } from "./ViewGizmo"
 import { ViewTip } from "./ViewTip"
 
@@ -101,11 +98,11 @@ function ViewPicker<V extends string>({
   tip,
   action,
   word,
+  wordClass,
   strong,
   disabled,
   root,
-  trigger,
-  children
+  trigger
 }: {
   readonly value: V
   readonly options: ReadonlyArray<V>
@@ -116,14 +113,14 @@ function ViewPicker<V extends string>({
   readonly action?: KeybindAction
   /** What the button says beside its icon. */
   readonly word: ReactNode
+  /** When the word gives way to the icon alone. */
+  readonly wordClass?: string | undefined
   /** Whether the word stands out, or stays quiet like the icon. */
   readonly strong: boolean
   readonly disabled: boolean
   /** For a picker that opens its menu itself. */
   readonly root?: ComponentProps<typeof DropdownMenu>
   readonly trigger?: ComponentProps<typeof DropdownMenuTrigger>
-  /** What the menu holds after the options. */
-  readonly children?: ReactNode
 }) {
   const Icon: typeof IconSquare = icons[value]
   const title = `${tip}: ${labels[value]}`
@@ -141,8 +138,8 @@ function ViewPicker<V extends string>({
         }
       >
         <Icon className="size-4" />
-        <span className={cn(strong && "text-foreground")}>{word}</span>
-        <IconChevronDown className="size-3" />
+        <span className={cn(strong && "text-foreground", wordClass)}>{word}</span>
+        <IconChevronDown className={cn("size-3", wordClass)} />
       </ViewTip>
       <DropdownMenuContent className="w-max min-w-40">
         <DropdownMenuRadioGroup value={value} onValueChange={onPick}>
@@ -156,7 +153,6 @@ function ViewPicker<V extends string>({
             )
           })}
         </DropdownMenuRadioGroup>
-        {children}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -222,17 +218,10 @@ function PaneMenuItems({ slot, kind }: { readonly slot: PaneSlot; readonly kind:
 }
 
 /**
- * Where a pane's label goes when it would meet the view controls in the viewport's top right: beneath them. Only the top
- * row can, and a pane in the right column by its own width (it's a container), one in the left by the viewport's.
+ * The label's word in the pane that shares its corner with the view controls, the last thing to go: they have gone to
+ * icons and stacked, and `Perspective` still can't fit beside the top pill. A label never moves out of the way.
  */
-const labelClearance = ({ x, y }: PaneRect, maximised: boolean) =>
-  maximised
-    ? "@max-[60rem]/viewport:top-12"
-    : y > 0
-    ? undefined
-    : x > 0
-    ? "@max-[38rem]:top-12"
-    : "@max-[38rem]/viewport:top-12"
+const CORNER_LABEL_WORD = "@max-[16rem]:hidden"
 
 /** A maximised pane's way back, beside its label: a click, or the key it names (`useActionKeys`). */
 function RestoreChip({ slot, disabled }: { readonly slot: PaneSlot; readonly disabled: boolean }) {
@@ -255,7 +244,7 @@ function RestoreChip({ slot, disabled }: { readonly slot: PaneSlot; readonly dis
         }
       >
         <IconArrowsMinimize className="size-4" />
-        <span className="text-caption @max-[38rem]/viewport:hidden">
+        <span className="text-caption @max-[60rem]/viewport:hidden">
           {binding === undefined ? "Restore" : (
             <>
               {binding === "Escape" ? "Esc" : <ChordText binding={binding} />} to restore
@@ -263,23 +252,6 @@ function RestoreChip({ slot, disabled }: { readonly slot: PaneSlot; readonly dis
           )}
         </span>
       </ViewTip>
-    </>
-  )
-}
-
-/** What a pane shows, its own choice over the Display popover's. */
-function PaneDisplayItems({ slot }: { readonly slot: PaneSlot }) {
-  const { grid, sky } = useEditor(useShallow((s) => paneDisplayIn(s, slot)))
-  const setPaneDisplay = useEditor((s) => s.setPaneDisplay)
-  return (
-    <>
-      <DropdownMenuSeparator />
-      <DropdownMenuSwitchItem checked={grid} onCheckedChange={(on) => setPaneDisplay(slot, "grid", on)}>
-        Show grid
-      </DropdownMenuSwitchItem>
-      <DropdownMenuSwitchItem checked={sky} onCheckedChange={(on) => setPaneDisplay(slot, "sky", on)}>
-        Show sky
-      </DropdownMenuSwitchItem>
     </>
   )
 }
@@ -300,11 +272,13 @@ interface PaneDragHandlers {
  * maximises it, and a right click splits or closes it. The menu opens on the click, not the press, or every drag would
  * start with it. It isn't modal, so a double click's second press reaches the label: the two clicks open and close it.
  */
-function PaneHeader({ pane, projection, disabled, active, drag }: {
+function PaneHeader({ pane, projection, disabled, active, inCorner, drag }: {
   readonly pane: PaneRect
   readonly projection: ViewProjection
   readonly disabled: boolean
   readonly active: boolean
+  /** Whether the view controls sit in this pane's top right. */
+  readonly inCorner: boolean
   readonly drag: PaneDragHandlers
 }) {
   const kind = useEditor((s) => shownKindOf(s.viewLayout))
@@ -364,9 +338,7 @@ function PaneHeader({ pane, projection, disabled, active, drag }: {
   }
   return (
     <ContextMenu disabled={disabled}>
-      <ContextMenuTrigger
-        className={cn(GROUP, "absolute top-3 left-3", labelClearance(pane, maximised), dragging && "opacity-50")}
-      >
+      <ContextMenuTrigger className={cn(GROUP, "absolute top-3 left-3", dragging && "opacity-50")}>
         <ViewPicker
           value={projection}
           options={viewProjections}
@@ -378,16 +350,15 @@ function PaneHeader({ pane, projection, disabled, active, drag }: {
           word={
             <>
               {viewProjectionLabels[projection]}
-              {maximised && <span className="@max-[38rem]/viewport:hidden">{" · Maximised"}</span>}
+              {maximised && <span className="@max-[60rem]/viewport:hidden">{" · Maximised"}</span>}
             </>
           }
+          wordClass={inCorner ? CORNER_LABEL_WORD : undefined}
           strong={active}
           disabled={disabled}
           root={{ open, onOpenChange: setOpen, modal: false }}
           trigger={trigger}
-        >
-          <PaneDisplayItems slot={pane.slot} />
-        </ViewPicker>
+        />
         {maximised && <RestoreChip slot={pane.slot} disabled={disabled} />}
       </ContextMenuTrigger>
       <ContextMenuContent>
@@ -399,7 +370,7 @@ function PaneHeader({ pane, projection, disabled, active, drag }: {
 
 /**
  * The bottom left of a pane, 8px above a single pane's tool bar, which it would otherwise meet in a narrow viewport: the
- * axis gizmo and the pane's scale. On a chip of its own, so a busy map doesn't swallow them.
+ * axis gizmo, on a card of its own so a busy map doesn't swallow it.
  */
 function PaneCorner({ slot, projection, disabled }: {
   readonly slot: number
@@ -410,13 +381,12 @@ function PaneCorner({ slot, projection, disabled }: {
   return (
     <div
       className={cn(
-        "pointer-events-none absolute left-3 flex flex-col gap-0.5 rounded-sheet p-1.5",
+        "pointer-events-none absolute left-3 rounded-sheet p-1.5",
         clearsToolBar ? "bottom-14" : "bottom-3",
         SURFACE
       )}
     >
       <ViewGizmo slot={slot} projection={projection} disabled={disabled} />
-      <PaneReadout slot={slot} projection={projection} />
     </div>
   )
 }
@@ -483,12 +453,14 @@ function DraggedLabel(
 
 /**
  * What's drawn over the one canvas for its panes (docs/DESKTOP.md § View panes). All click-through but the labels and
- * dividers: the canvas takes the pointer and sorts it by pane.
+ * dividers: the canvas takes the pointer and sorts it by pane. `children`, the view controls, go in a box the size of the
+ * top right pane, which is the width they have to share with its label, and under the labels, which stay in reach.
  */
-export function ViewPanes({ disabled }: { readonly disabled: boolean }) {
+export function ViewPanes({ disabled, children }: { readonly disabled: boolean; readonly children: ReactNode }) {
   const layout = useEditor((s) => s.viewLayout)
   const activePane = useEditor((s) => s.activePane)
   const panes = paneShares(layout)
+  const corner = cornerPaneOf(panes)
   const shownKind = shownKindOf(layout)
   const overlay = useRef<HTMLDivElement>(null)
   const [paneDrag, setPaneDrag] = useState<PaneDrag | null>(null)
@@ -516,6 +488,7 @@ export function ViewPanes({ disabled }: { readonly disabled: boolean }) {
       className="pointer-events-none absolute inset-x-0 top-0 @container/viewport"
       style={{ bottom: toolStripOf(layout) }}
     >
+      <div className="absolute @container/corner" style={paneBox(corner)}>{children}</div>
       {panes.map((pane) => {
         const { slot } = pane
         const projection = layout.projections[slot]
@@ -533,6 +506,7 @@ export function ViewPanes({ disabled }: { readonly disabled: boolean }) {
               projection={projection}
               disabled={disabled}
               active={active}
+              inCorner={slot === corner.slot}
               drag={dragHandlers(slot)}
             />
             <PaneCorner slot={slot} projection={projection} disabled={disabled} />
@@ -554,6 +528,7 @@ export function ViewLayoutControl({ disabled }: { readonly disabled: boolean }) 
   const layout = useEditor((s) => s.viewLayout)
   const setViewLayoutKind = useEditor((s) => s.setViewLayoutKind)
   const labels = viewLayoutLabelsOf(layout)
+  const maximised = maximisedSlotOf(layout) !== undefined
   return (
     <ViewPicker
       value={layout.kind}
@@ -562,7 +537,8 @@ export function ViewLayoutControl({ disabled }: { readonly disabled: boolean }) 
       icons={LAYOUT_ICONS}
       onPick={setViewLayoutKind}
       tip="Panes"
-      word={maximisedSlotOf(layout) === undefined ? "Panes" : labels[layout.kind]}
+      word={maximised ? labels[layout.kind] : "Panes"}
+      wordClass={maximised ? "@max-[50rem]/corner:hidden" : CONTROL_WORD}
       strong
       disabled={disabled}
     />

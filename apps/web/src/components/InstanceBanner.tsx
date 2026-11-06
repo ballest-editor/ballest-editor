@@ -6,8 +6,7 @@ import { useEditor } from "../editor/store"
 import { GROUP, GROUP_DIVIDER, noFocus, SEGMENT } from "./viewControlStyle"
 
 /**
- * Over the viewport while the selection is exactly one instance, under the first pane's picker and moving down with it
- * (`labelClearance`): what it is an instance of, and the two ways out of being one, so neither needs the Inspector.
+ * Over the viewport while the selection is exactly one instance, under the first pane's picker: what it is an instance of, and the two ways out of being one, so neither needs the Inspector.
  */
 export function InstanceBanner() {
   const group = useEditor((s) => exactSelectedGroup(s.doc.structure.tree, s.selectedIds, s.enteredGroupId))
@@ -16,7 +15,7 @@ export function InstanceBanner() {
   if (group === undefined || link === undefined) return null
   return (
     <div
-      className={cn(GROUP, "absolute top-12 left-3 max-w-[calc(100%-1.5rem)] @max-[38rem]/viewport:top-21")}
+      className={cn(GROUP, "absolute top-12 left-3 max-w-[calc(100%-1.5rem)]")}
       data-instance-banner
     >
       <span className="min-w-0 truncate px-2 text-fg-secondary" title={link.name}>

@@ -2,4 +2,4 @@
 export const GROUP_BOX_COLORS = { dark: "#ff3dc8", light: "#c2129a" } as const
 
 /** The same as Tailwind classes, spelled out so Tailwind picks them up: what shows before and around the canvas. */
-export const sceneBackgroundClass = "bg-[#d8e1e8] dark:bg-[#0e1013]"
+export const sceneBackgroundClass = "bg-[#d0e4ef] dark:bg-[#0f242f]"

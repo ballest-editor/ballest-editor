@@ -96,10 +96,15 @@ export const SnappingSettings = Schema.Struct({
   rotationStep: Schema.Literals(ROTATION_STEPS)
 })
 
+/** The Pieces panel's thumbnail sizes, as its header offers them. */
+export const piecesThumbnailSizes = ["s", "m", "l"] as const
+
 /** Changed from a panel's own header rather than the Settings dialog, but persisted with the rest. */
 export const PanelSettings = Schema.Struct({
   /** How the Pieces panel lays out its pieces. */
   piecesView: Schema.Literals(["list", "grid"]),
+  /** How big it draws their thumbnails, in either view. */
+  piecesThumbnailSize: Schema.Literals(piecesThumbnailSizes),
   /** What the Pieces panel's Recent lists, as `pieceIdOf` gives them, newest first (see domain/recentPieces). */
   recentPieces: Schema.Array(Schema.String),
   /** What its Favourites lists, in the order they were starred. */
@@ -160,7 +165,7 @@ export const defaultSettings: Settings = {
     rotationEnabled: false,
     rotationStep: DEFAULT_ROTATION_STEP
   },
-  panels: { piecesView: "list", recentPieces: [], favouritePieces: [] },
+  panels: { piecesView: "list", piecesThumbnailSize: "m", recentPieces: [], favouritePieces: [] },
   gizmo: { size: "m", showForGroups: true }
 }
 

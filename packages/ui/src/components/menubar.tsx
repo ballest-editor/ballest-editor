@@ -115,4 +115,37 @@ function MenubarSubTrigger({ className, ...props }: React.ComponentProps<typeof 
   )
 }
 
-export { Menubar, MenubarCheckboxItem, MenubarContent, MenubarRadioItem, MenubarSubTrigger, MenubarTrigger }
+/** A menu that filters: wraps the menu, with `MenubarInput` and `MenubarList` in its popup. */
+const MenubarFilterProvider = MenuPrimitive.FilterProvider
+
+function MenubarInput(props: MenuPrimitive.Input.Props) {
+  return <MenuPrimitive.Input data-slot="menubar-input" {...props} />
+}
+
+function MenubarList(props: MenuPrimitive.List.Props) {
+  return <MenuPrimitive.List data-slot="menubar-list" {...props} />
+}
+
+/** Shows when a filtering menu's list has no rows. */
+function MenubarEmpty({ className, ...props }: MenuPrimitive.Empty.Props) {
+  return (
+    <MenuPrimitive.Empty
+      data-slot="menubar-empty"
+      className={cn("px-2 py-1 text-body text-fg-tertiary", className)}
+      {...props}
+    />
+  )
+}
+
+export {
+  Menubar,
+  MenubarCheckboxItem,
+  MenubarContent,
+  MenubarEmpty,
+  MenubarFilterProvider,
+  MenubarInput,
+  MenubarList,
+  MenubarRadioItem,
+  MenubarSubTrigger,
+  MenubarTrigger
+}

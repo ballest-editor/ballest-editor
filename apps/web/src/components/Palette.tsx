@@ -5,6 +5,7 @@ import {
   IconChevronsUp,
   IconLayoutGrid,
   IconLayoutList,
+  IconResize,
   IconSearch,
   IconStar,
   IconStarFilled,
@@ -12,6 +13,13 @@ import {
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/ui/components/collapsible"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger
+} from "@workspace/ui/components/dropdown-menu"
 import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
@@ -27,13 +35,14 @@ import {
 } from "../domain/Catalog"
 import { termsOf } from "../domain/outline"
 import { pieceDisplayName, pieceLabelOf, type PieceSize, pieceTitleOf, sizeScalesOf } from "../domain/pieceName"
-import type { Settings } from "../domain/Settings"
+import { piecesThumbnailSizes, type Settings } from "../domain/Settings"
 import { placeAtCamera, toggleFavouritePiece, updateSettings } from "../editor/actions"
 import { endPieceDrag, startPieceDrag } from "../editor/pieceDrag"
 import { preloadPiece } from "../editor/preload"
 import { useEditor } from "../editor/store"
 import { focusViewport } from "../editor/Viewport"
 import { CHIP } from "./chipStyle"
+import { StripButton } from "./dock/StripButton"
 import { DropGhost } from "./DropGhost"
 import { PaletteSkeleton } from "./EditorSkeleton"
 import { HeaderButton } from "./HeaderButton"
@@ -41,6 +50,55 @@ import { PieceThumbnail, THUMBNAIL_TILE } from "./PieceThumbnail"
 import { EYEBROW } from "./SectionTitle"
 
 type PiecesView = Settings["panels"]["piecesView"]
+type ThumbnailSize = Settings["panels"]["piecesThumbnailSize"]
+
+const THUMBNAIL_SIZE_LABELS: Readonly<Record<ThumbnailSize, string>> = { s: "Small", m: "Medium", l: "Large" }
+
+/** One thumbnail size in one view. Every class is written out whole, for Tailwind to find. */
+interface PieceLayout {
+  readonly thumbnail: string
+  /** The glyph on the tile of a piece that has no picture. */
+  readonly glyph: string
+  /** The list's row, 8px taller than its thumbnail; a grid's tile sets its own cell's height. */
+  readonly row?: string
+  /** The grid's columns, 8px wider than its tile. */
+  readonly columns?: string
+  /** A tile's name: two lines where the tile is narrow, so a row of tiles stays short. */
+  readonly name?: string
+  /** The star, on the bottom corner of a grid's tile. */
+  readonly star?: string
+}
+
+const PIECE_LAYOUTS: Readonly<Record<PiecesView, Readonly<Record<ThumbnailSize, PieceLayout>>>> = {
+  list: {
+    s: { thumbnail: "size-6", glyph: "size-4", row: "h-8" },
+    m: { thumbnail: "size-8", glyph: "size-4", row: "h-10" },
+    l: { thumbnail: "size-12", glyph: "size-6", row: "h-14" }
+  },
+  grid: {
+    s: {
+      thumbnail: "size-12",
+      glyph: "size-4",
+      columns: "grid-cols-[repeat(auto-fill,minmax(3.5rem,1fr))]",
+      name: "line-clamp-2",
+      star: "top-7 right-[calc(50%-1.5rem)]"
+    },
+    m: {
+      thumbnail: "size-16",
+      glyph: "size-6",
+      columns: "grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))]",
+      name: "line-clamp-3",
+      star: "top-11 right-[calc(50%-2rem)]"
+    },
+    l: {
+      thumbnail: "size-24",
+      glyph: "size-8",
+      columns: "grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))]",
+      name: "line-clamp-3",
+      star: "top-19 right-[calc(50%-3rem)]"
+    }
+  }
+}
 
 const UNVERIFIED_NOTE =
   "Not yet confirmed to load in the in-game editor. A rejected item makes the game discard the whole map."
@@ -107,9 +165,10 @@ function SizeTag({ size, disabled, className }: {
 }
 
 /** The star on a row: shows under the pointer or on keyboard focus, and stays on a favourite. */
-function FavouriteStar({ favourite, grid, onToggle }: {
+function FavouriteStar({ favourite, tileCorner, onToggle }: {
   readonly favourite: boolean
-  readonly grid: boolean
+  /** Where it sits on a grid's tile; a list's row has none. */
+  readonly tileCorner: string | undefined
   readonly onToggle: () => void
 }) {
   const label = favourite ? "Remove from Favourites" : "Add to Favourites"
@@ -123,7 +182,7 @@ function FavouriteStar({ favourite, grid, onToggle }: {
             className={cn(
               "absolute transition-opacity",
               // On the tile's corner in a grid, over a picture, so it takes a surface; a row keeps room for it.
-              grid ? "top-11 right-[calc(50%-2rem)] rounded-full bg-card" : "top-1 right-1",
+              tileCorner === undefined ? "top-1/2 right-1 -translate-y-1/2" : cn(tileCorner, "rounded-full bg-card"),
               favourite
                 ? "text-foreground"
                 : "text-fg-secondary opacity-0 group-hover/piece:opacity-100 focus-visible:opacity-100"
@@ -143,23 +202,32 @@ function FavouriteStar({ favourite, grid, onToggle }: {
 }
 
 function PieceButton(
-  { listing: { category, fill, piece }, view, favourite, onPlace, onHover, onToggleFavourite, unavailable, unverified }:
-    {
-      readonly listing: Listing
-      readonly view: PiecesView
-      readonly favourite: boolean
-      readonly onPlace: (e: MouseEvent<HTMLButtonElement>) => void
-      readonly onHover: () => void
-      readonly onToggleFavourite: () => void
-      /** Set for pieces that can't be placed; shown disabled, with this in the tooltip. */
-      readonly unavailable: string | undefined
-      /** Hidden piece nobody has loaded in-game yet: placeable, but flagged. */
-      readonly unverified: boolean
-    }
+  {
+    listing: { category, fill, piece },
+    view,
+    layout,
+    favourite,
+    onPlace,
+    onHover,
+    onToggleFavourite,
+    unavailable,
+    unverified
+  }: {
+    readonly listing: Listing
+    readonly view: PiecesView
+    readonly layout: PieceLayout
+    readonly favourite: boolean
+    readonly onPlace: (e: MouseEvent<HTMLButtonElement>) => void
+    readonly onHover: () => void
+    readonly onToggleFavourite: () => void
+    /** Set for pieces that can't be placed; shown disabled, with this in the tooltip. */
+    readonly unavailable: string | undefined
+    /** Hidden piece nobody has loaded in-game yet: placeable, but flagged. */
+    readonly unverified: boolean
+  }
 ) {
   const { name, size } = pieceDisplayName(piece)
   const grid = view === "grid"
-  const thumbnailSize = grid ? "size-16" : "size-6"
   const disabled = unavailable !== undefined
   const placeholder = (
     <span
@@ -167,10 +235,10 @@ function PieceButton(
         "grid shrink-0 place-items-center rounded-control",
         THUMBNAIL_TILE,
         disabled ? "text-fg-disabled" : "text-fg-tertiary",
-        thumbnailSize
+        layout.thumbnail
       )}
     >
-      <IconBox className={grid ? "size-6" : "size-4"} />
+      <IconBox className={layout.glyph} />
     </span>
   )
   const thumbnail = !disabled
@@ -178,7 +246,8 @@ function PieceButton(
       <PieceThumbnail
         piece={piece}
         fill={fill}
-        className={cn("shrink-0 rounded-control object-contain", THUMBNAIL_TILE, thumbnailSize)}
+        className={cn("shrink-0 rounded-control object-contain", THUMBNAIL_TILE, layout.thumbnail)}
+        glyphClassName={layout.glyph}
         placeholder={placeholder}
       />
     )
@@ -196,7 +265,9 @@ function PieceButton(
             className={cn(
               PLACED_FLASH,
               !disabled && "cursor-grab active:cursor-grabbing",
-              grid ? "flex h-auto w-full flex-col gap-1 p-1" : "flex h-8 w-full justify-start gap-2 pr-7 pl-1 text-left"
+              grid
+                ? "flex h-auto w-full flex-col gap-1 p-1"
+                : cn("flex w-full justify-start gap-2 pr-7 pl-1 text-left", layout.row)
             )}
             onClick={onPlace}
             onDragStart={(e) => startPieceDrag(e.dataTransfer, piece)}
@@ -218,7 +289,7 @@ function PieceButton(
                       <span className="absolute top-1 left-1 size-2 rounded-full bg-status-warn-foreground" />
                     )}
                   </span>
-                  <span className="line-clamp-3 w-full text-center text-caption leading-3.5 whitespace-normal">
+                  <span className={cn("w-full text-center text-caption leading-3.5 whitespace-normal", layout.name)}>
                     {name}
                   </span>
                 </>
@@ -244,8 +315,35 @@ function PieceButton(
           <span className="text-caption text-fg-tertiary">{piece.className}</span>
         </TooltipContent>
       </Tooltip>
-      {(!disabled || favourite) && <FavouriteStar favourite={favourite} grid={grid} onToggle={onToggleFavourite} />}
+      {(!disabled || favourite) && (
+        <FavouriteStar favourite={favourite} tileCorner={layout.star} onToggle={onToggleFavourite} />
+      )}
     </div>
+  )
+}
+
+/** The panel's one thumbnail size, for both views. A menu, as a segmented control would crowd out the search field. */
+function ThumbnailSizeMenu({ size }: { readonly size: ThumbnailSize }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<StripButton label={`Thumbnail size: ${THUMBNAIL_SIZE_LABELS[size]}`} />}
+      >
+        <IconResize />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-max min-w-32">
+        <DropdownMenuRadioGroup
+          value={size}
+          onValueChange={(piecesThumbnailSize: ThumbnailSize) => void updateSettings("panels", { piecesThumbnailSize })}
+        >
+          {piecesThumbnailSizes.map((option) => (
+            <DropdownMenuRadioItem key={option} value={option} closeOnClick>
+              {THUMBNAIL_SIZE_LABELS[option]}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -253,6 +351,8 @@ export function Palette() {
   const catalog = useEditor((s) => s.catalog)
   const booting = useEditor((s) => s.booting)
   const view = useEditor((s) => s.settings.panels.piecesView)
+  const thumbnailSize = useEditor((s) => s.settings.panels.piecesThumbnailSize)
+  const layout = PIECE_LAYOUTS[view][thumbnailSize]
   const favourites = useEditor((s) => s.settings.panels.favouritePieces)
   const [pointerInside, setPointerInside] = useState(false)
   const shownFavourites = useHeld(favourites, pointerInside)
@@ -286,8 +386,8 @@ export function Palette() {
   }, [listings, shownFavourites, shownRecent, terms])
   const shown = [...lists, ...sections]
   // Base UI measures a scroll area when its viewport resizes, not when its content does, so each height of results gets
-  // its own: an empty search after the whole list would otherwise keep the list's scrollbar.
-  const results = sections.map((section) => `${section.name}:${section.pieces.length}`).join()
+  // its own: an empty search after the whole list would otherwise keep the list's scrollbar, as would a change of layout.
+  const results = [view, thumbnailSize, ...sections.map((section) => `${section.name}:${section.pieces.length}`)].join()
 
   const unavailableReason = (piece: CatalogPiece) =>
     catalog === null || index === null ? undefined : unavailableReasonOf(index, piece, catalog.verified)
@@ -322,7 +422,7 @@ export function Palette() {
             placeholder="Search pieces"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="pr-7 pl-7 [&::-webkit-search-cancel-button]:hidden"
+            className={cn("pl-7 [&::-webkit-search-cancel-button]:hidden", query.length > 0 && "pr-7")}
           />
           {query.length > 0 && (
             <span className="absolute top-0.5 right-0.5 inline-flex">
@@ -348,6 +448,7 @@ export function Palette() {
         >
           <IconLayoutGrid />
         </HeaderButton>
+        <ThumbnailSizeMenu size={thumbnailSize} />
         <HeaderButton
           label={allCollapsed ? "Expand all groups" : "Collapse all groups"}
           className="shrink-0"
@@ -392,9 +493,7 @@ export function Palette() {
                   </Tooltip>
                   <CollapsibleContent className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-150 ease-out data-[ending-style]:h-0 data-[starting-style]:h-0">
                     <ul
-                      className={view === "grid"
-                        ? "grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-1 pb-1"
-                        : "flex flex-col gap-0.5 pb-1"}
+                      className={view === "grid" ? cn("grid gap-1 pb-1", layout.columns) : "flex flex-col gap-0.5 pb-1"}
                     >
                       {section.pieces.map((piece) => {
                         const id = pieceIdOf(piece)
@@ -404,6 +503,7 @@ export function Palette() {
                             <PieceButton
                               listing={listings.get(id) ?? { piece, category: section.name, fill: 1 }}
                               view={view}
+                              layout={layout}
                               favourite={favourites.includes(id)}
                               onPlace={place(piece, unavailable)}
                               onHover={() => index !== null && preloadPiece(piece, index)}

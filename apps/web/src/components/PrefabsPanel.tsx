@@ -26,7 +26,7 @@ import {
   selectInstances
 } from "../editor/actions"
 import { startPrefabDrag } from "../editor/prefabDrag"
-import { useEditor, useOpenPrefab } from "../editor/store"
+import { NO_TAB_OPEN, noTabOpen, useEditor, useOpenPrefab } from "../editor/store"
 import { definitionThumbnailFor } from "../editor/thumbnails"
 import { focusViewport } from "../editor/Viewport"
 import { StripButton } from "./dock/StripButton"
@@ -34,7 +34,7 @@ import { THUMBNAIL_TILE, useSeen } from "./PieceThumbnail"
 import { SectionTitle } from "./SectionTitle"
 
 /** Everything in the definition, framed whole; a glyph until that has rendered, and for a file that won't read. */
-function PrefabThumbnail({ prefab }: { readonly prefab: PrefabInfo }) {
+export function PrefabThumbnail({ prefab }: { readonly prefab: PrefabInfo }) {
   const index = useEditor((s) => s.catalogIndex)
   const table = useEditor((s) => s.materialTable)
   const { ref, seen } = useSeen()
@@ -72,6 +72,7 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
   const hasProject = useEditor((s) => s.project?.current != null)
   const openDialog = useEditor((s) => s.openDialog)
   const inDefinition = useOpenPrefab() !== null
+  const noTab = useEditor(noTabOpen)
   const tree = useEditor((s) => s.doc.structure.tree)
   const placed = useMemo(() => instancesOfPrefab(tree, prefab).length, [tree, prefab])
   const menuButton = useRef<HTMLButtonElement>(null)
@@ -148,9 +149,11 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
           <IconDots />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem disabled={!readable} onClick={() => void placePrefab(ref)}>
-            Place in {inDefinition ? "prefab" : "map"}
-          </DropdownMenuItem>
+          <span title={noTab ? NO_TAB_OPEN : undefined}>
+            <DropdownMenuItem disabled={!readable || noTab} onClick={() => void placePrefab(ref)}>
+              Place in {inDefinition ? "prefab" : "map"}
+            </DropdownMenuItem>
+          </span>
           <DropdownMenuItem disabled={!readable} onClick={() => void openPrefab(ref)}>Open definition</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => openDialog({ id: "renamePrefab", prefab: ref })}>Rename…</DropdownMenuItem>
@@ -172,7 +175,7 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
 }
 
 /** A section with nothing to list: one line, centred, and what to do about it underneath if there is anything. */
-function EmptySection({ children, line }: { readonly children?: ReactNode; readonly line: string }) {
+export function EmptySection({ children, line }: { readonly children?: ReactNode; readonly line: string }) {
   return (
     <div className="flex flex-col items-center gap-2 px-2 py-1 text-center">
       <p className="text-body text-fg-tertiary">{line}</p>
@@ -232,7 +235,11 @@ export function PrefabsPanel() {
                 <TooltipContent side="right">{hint}</TooltipContent>
               </Tooltip>
               {inTier(tier).length > 0
-                ? <ul>{inTier(tier).map((prefab) => <PrefabRow key={prefab.name} prefab={prefab} />)}</ul>
+                ? (
+                  <ul className="flex flex-col gap-0.5">
+                    {inTier(tier).map((prefab) => <PrefabRow key={prefab.name} prefab={prefab} />)}
+                  </ul>
+                )
                 : terms.length > 0
                 ? <EmptySection line="Nothing matches the filter." />
                 : tier === "project" && !hasProject

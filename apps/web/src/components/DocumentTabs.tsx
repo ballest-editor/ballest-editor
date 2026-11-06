@@ -7,6 +7,12 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger
 } from "@workspace/ui/components/context-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@workspace/ui/components/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { type DragEvent, useEffect, useRef, useState } from "react"
@@ -19,9 +25,11 @@ import {
   closeTab,
   closeTabsToRight,
   nameProjectMap,
+  newPrefabProblem,
   openProjectMapAt,
   revealProject,
-  startNewMap
+  startNewMap,
+  startNewPrefab
 } from "../editor/actions"
 import { droppedMap, isMapDrag } from "../editor/mapDrag"
 import { useEditor, useTabSummary } from "../editor/store"
@@ -41,19 +49,19 @@ const TIP_PAST_NEW_MAP = 68
 type TabDrag = { readonly id: string | null; readonly at: number } | null
 
 /**
- * What a tab's tooltip says of it: unsaved edits first, then a blank tab, which has nothing to save, then how its
- * project map stands against the export, if it has one.
+ * What a tab's tooltip says of it: unsaved edits first, then a blank tab (`blank` says of what), which has nothing to
+ * save, then how its project map stands against the export, if it has one.
  */
-export const tabStatusOf = (unsaved: boolean, map: LinkedMap | undefined, blank = false): string => {
+export const tabStatusOf = (unsaved: boolean, map: LinkedMap | undefined, blank?: "map" | "prefab"): string => {
   if (unsaved) return "Unsaved"
-  if (blank) return "New map"
+  if (blank !== undefined) return `New ${blank}`
   return map === undefined ? "Saved" : LINK_STATE_LABELS[linkStateOf(map)]
 }
 
 /**
  * The map tabs in the centre group's strip (docs/DESKTOP.md § Document tabs). A tab's dot marks unsaved edits and gives
- * way to the × while the tab is hovered. The + after the last tab stays in view while the tabs scroll. A map's row dropped
- * on the strip opens the map there.
+ * way to the × while the tab is hovered. The + after the last tab, which is what's left with none open, stays in view
+ * while the tabs scroll. A map's row dropped on the strip opens the map there.
  */
 export function DocumentTabs() {
   const tabIds = useEditor((s) => s.tabIds)
@@ -97,11 +105,50 @@ export function DocumentTabs() {
         {tabIds.map((id, index) => <DocumentTab key={id} id={id} index={index} drag={drag} onDrag={setDrag} />)}
       </div>
       <div className="flex shrink-0 items-center px-1">
-        <StripButton label="New map" onClick={() => void startNewMap()}>
-          <IconPlus />
-        </StripButton>
+        <NewDocumentMenu />
       </div>
     </div>
+  )
+}
+
+/**
+ * The + on the strip, by a click or a right-click: a new tab for a map or a prefab. The right-click sets `open` itself: the
+ * trigger takes a click after a press of its own as that press's, and a right press opens nothing.
+ */
+function NewDocumentMenu() {
+  const prefabProblem = useEditor(newPrefabProblem)
+  const [open, setOpen] = useState(false)
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger
+        render={
+          <StripButton
+            label="New"
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setOpen(true)
+            }}
+          />
+        }
+      >
+        <IconPlus />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="w-max min-w-40"
+        finalFocus={(closeType) => closeType === "keyboard"}
+      >
+        <DropdownMenuItem onClick={() => void startNewMap()}>
+          New map
+          <TabShortcut action="newMap" active />
+        </DropdownMenuItem>
+        <span title={prefabProblem}>
+          <DropdownMenuItem disabled={prefabProblem !== undefined} onClick={() => void startNewPrefab()}>
+            New prefab
+          </DropdownMenuItem>
+        </span>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -202,7 +249,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
             {backup && <NameChip className="ml-1">backup</NameChip>}
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={last ? TIP_PAST_NEW_MAP : TIP_PAST_CLOSE}>
-            {label} · {tabStatusOf(unsaved, map, blank)}
+            {label} · {tabStatusOf(unsaved, map, !blank ? undefined : prefabTier === null ? "map" : "prefab")}
           </TooltipContent>
         </Tooltip>
         <span className="relative flex size-6 shrink-0 items-center justify-center">

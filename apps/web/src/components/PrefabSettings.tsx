@@ -5,7 +5,7 @@ import { useShallow } from "zustand/react/shallow"
 import { mapLabelOf } from "../domain/factory"
 import { prefabTierLabel } from "../domain/prefab"
 import { openProjectMap, projectMapsUsingPrefab, revealPrefabs, tabsUsingPrefab } from "../editor/actions"
-import { type PrefabDocument, tabWithFile, useEditor, useTabSummary } from "../editor/store"
+import { type PrefabDocument, saveProblemOf, tabWithFile, useEditor, useTabSummary } from "../editor/store"
 import { Fact, Facts } from "./Facts"
 import { PathAction, PathName } from "./PathText"
 import { SectionTitle } from "./SectionTitle"
@@ -51,8 +51,10 @@ function UsedIn({ prefab: { name, tier } }: { readonly prefab: PrefabDocument })
 /** A definition's tab with nothing selected: what it is. Its name and where it is stored change in the Prefabs panel. */
 export function PrefabSettings({ prefab }: { readonly prefab: PrefabDocument }) {
   const itemCount = useEditor((s) => s.doc.map.items.length)
+  const hasFile = useEditor((s) => s.file !== null)
   const path = useEditor((s) => s.file?.path ?? null)
   const projects = useEditor((s) => s.capabilities.projects)
+  const saveProblem = useEditor(saveProblemOf)
   return (
     <div className="flex flex-col gap-3">
       <div className="flex min-w-0 flex-col">
@@ -63,8 +65,9 @@ export function PrefabSettings({ prefab }: { readonly prefab: PrefabDocument }) 
         <Fact dense label="Stored in">{prefabTierLabel(prefab.tier, projects)}</Fact>
         <Fact dense label="Items">{itemCount}</Fact>
         <Fact dense label="File">
-          {/* a deleted definition has no path */}
-          <PathName name={prefabFileNameOf(prefab.name)} path={path} className="min-w-0 truncate" />
+          {hasFile
+            ? <PathName name={prefabFileNameOf(prefab.name)} path={path} className="min-w-0 truncate" />
+            : <span className="text-fg-tertiary">Not saved yet</span>}
           {projects && path !== null && (
             <PathAction
               label="Reveal in folder"
@@ -79,6 +82,7 @@ export function PrefabSettings({ prefab }: { readonly prefab: PrefabDocument }) 
           <UsedIn prefab={prefab} />
         </dd>
       </Facts>
+      {saveProblem !== null && <p className="text-fg-tertiary">{saveProblem}</p>}
     </div>
   )
 }

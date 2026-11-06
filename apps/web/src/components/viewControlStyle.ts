@@ -17,6 +17,12 @@ export const GROUP_DIVIDER = "mx-0.5 h-4 w-px shrink-0 bg-border"
 export const SEGMENT =
   "flex h-full min-w-7 items-center justify-center gap-1.5 rounded-full px-2 text-fg-secondary transition-colors focus-ring hover:bg-hover hover:text-foreground active:bg-pressed aria-expanded:bg-hover aria-expanded:text-foreground disabled:text-fg-disabled"
 
+/**
+ * A view control's word: the first thing to go when the top right pane (`@container/corner`) can't hold them all beside
+ * its label, the longest of which is `Perspective` with a maximised pane's chip.
+ */
+export const CONTROL_WORD = "@max-[42rem]/corner:hidden"
+
 /** Keeps keyboard focus with the viewport: no focus on mousedown, no Space/Enter activation. */
 export const noFocus = {
   tabIndex: -1,
