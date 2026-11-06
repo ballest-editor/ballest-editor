@@ -110,12 +110,27 @@ const pidOf = (child: ChildProcess): number => {
   return child.pid
 }
 
+/** Whether any process of the group is left: a leader can go first while its children still write to the profile. */
+const groupAlive = (pid: number): boolean => {
+  try {
+    process.kill(-pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const waitForGroup = async (pid: number) => {
+  for (let i = 0; i < 30 && groupAlive(pid); i++) await sleep(100)
+}
+
 const stopGroup = async (pid: number) => {
   if (!isOurs(pid)) return
   try {
     process.kill(-pid, "SIGTERM")
-    for (let i = 0; i < 30 && isOurs(pid); i++) await sleep(100)
-    if (isOurs(pid)) process.kill(-pid, "SIGKILL")
+    await waitForGroup(pid)
+    if (groupAlive(pid)) process.kill(-pid, "SIGKILL")
+    await waitForGroup(pid)
   } catch {
     // Already gone.
   }

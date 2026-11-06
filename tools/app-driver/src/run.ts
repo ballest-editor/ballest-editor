@@ -200,7 +200,16 @@ const runOne = async (
     return { ...row, pass: null, failures: [], metrics: {}, shot, windows: [], error: String(error).slice(0, 400) }
   } finally {
     await driven.close()
-    fs.rmSync(scratch, { recursive: true, force: true })
+    removeScratch(scratch)
+  }
+}
+
+/** A leftover scratch folder is harmless, and never worth losing a run over. */
+const removeScratch = (folder: string) => {
+  try {
+    fs.rmSync(folder, { recursive: true, force: true })
+  } catch (error) {
+    console.error(`left ${folder}: ${String(error)}`)
   }
 }
 
@@ -250,7 +259,7 @@ export const runStates = async (options: RunOptions): Promise<RunReport> => {
       }
     }
     browser.close()
-    fs.rmSync(path.join(dir, "scratch"), { recursive: true, force: true })
+    removeScratch(path.join(dir, "scratch"))
     writeResults(dir, rows)
     const comparison = options.since === undefined ? null : compareRuns(options.since, dir)
     const changed = comparison === null ? null : new Set(comparison.changed)
