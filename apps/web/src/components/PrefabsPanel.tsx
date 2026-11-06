@@ -208,6 +208,8 @@ export function PrefabsPanel() {
       <Input
         type="search"
         aria-label="Filter the prefabs"
+        spellCheck={false}
+        autoComplete="off"
         placeholder="Filter prefabs…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}

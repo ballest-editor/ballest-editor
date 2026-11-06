@@ -399,6 +399,8 @@ export function Outline() {
       <div className="flex h-9 shrink-0 items-center gap-1 px-2">
         <Input
           aria-label="Filter the outline"
+          spellCheck={false}
+          autoComplete="off"
           placeholder="Filter"
           className="min-w-0 flex-1"
           value={query}

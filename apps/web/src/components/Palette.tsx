@@ -243,6 +243,8 @@ export function Palette() {
           <Input
             type="search"
             aria-label="Search pieces"
+            spellCheck={false}
+            autoComplete="off"
             placeholder="Search pieces"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

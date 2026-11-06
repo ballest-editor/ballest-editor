@@ -264,6 +264,8 @@ export function SettingsShell<C extends string>(props: {
                 setScope(null)
               }}
               aria-label="Search settings"
+              spellCheck={false}
+              autoComplete="off"
             />
           </div>
           {/* the search stays put; the categories scroll when there are more than fit (a project with many maps) */}
