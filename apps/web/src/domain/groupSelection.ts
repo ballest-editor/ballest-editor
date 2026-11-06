@@ -2,7 +2,7 @@
  * What a click reaches in a tree of groups, and which groups a selection makes up. The selection itself stays a list of
  * item keys, so everything that acts on it works on groups unchanged (docs/DESKTOP.md § Groups and selection).
  */
-import type { TreeNode } from "./MapSidecar"
+import type { GroupNode, TreeNode } from "./MapSidecar"
 import { findGroup, findNode, idOf, type NumberedName, treeKeys, wholeNodes } from "./structure"
 
 /** The groups a node is in, outermost first; empty at the root and for a node that isn't in the tree. */
@@ -90,6 +90,16 @@ export const selectedGroupIds = (
   enteredGroupId: string | null
 ): ReadonlyArray<string> =>
   selectedNodes(tree, selectedIds, enteredGroupId).flatMap((node) => node.kind === "group" ? node.id : [])
+
+/** The group the selection is exactly, if it is: the one case where the game's gizmo sits on a group's frame. */
+export const soleGroupOf = (
+  tree: ReadonlyArray<TreeNode>,
+  selectedIds: ReadonlyArray<string>,
+  enteredGroupId: string | null
+): GroupNode | undefined => {
+  const [first, second] = selectedNodes(tree, selectedIds, enteredGroupId)
+  return first?.kind === "group" && second === undefined ? first : undefined
+}
 
 /** "1 group", "2 groups". */
 export const counted = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" : "s"}`

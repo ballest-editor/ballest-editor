@@ -40,6 +40,8 @@ describe("commands", () => {
     assert.strictEqual(s().tool, "rotate")
     commandFor("toggleGizmoSpace")?.()
     assert.strictEqual(s().gizmoSpace, "local")
+    commandFor("toggleGizmoSpace")?.()
+    assert.strictEqual(s().gizmoSpace, "world")
     commandFor("saveMapAs")?.()
     assert.strictEqual(s().dialog?.id, "saveAs")
     s().closeDialog()

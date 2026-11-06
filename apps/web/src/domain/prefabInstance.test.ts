@@ -1,6 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Option, Schema } from "effect"
 import { changedPrefab, PREFAB_TEXT } from "../test/prefabs"
+import { expectVec } from "../test/vec"
 import fixture from "./bundledCatalog.json"
 import { Catalog, indexCatalog } from "./Catalog"
 import type { UeTransform } from "./coords"
@@ -10,7 +11,14 @@ import { newMapFile } from "./factory"
 import { applyGroupDelta, type GroupDelta } from "./groupTransform"
 import { itemOfPrefab } from "./prefab"
 import { PrefabFile } from "./PrefabFile"
-import { checkInstance, definitionOf, instancesIn, instancesOfPrefab, withUpdatedInstance } from "./prefabInstance"
+import {
+  checkInstance,
+  definitionOf,
+  instanceOrigin,
+  instancesIn,
+  instancesOfPrefab,
+  withUpdatedInstance
+} from "./prefabInstance"
 import {
   type Doc,
   findGroup,
@@ -52,14 +60,18 @@ const groupOf = (doc: Doc) => findGroup(doc.structure.tree, GROUP)!
 const check = (doc: Doc) => checkInstance(doc, groupOf(doc), groupOf(doc).prefab!)
 const instanceKeys = (doc: Doc) => treeKeys([groupOf(doc)])
 
-/** `doc` with `delta` applied to the instance's items about `pivot`, as a gizmo drag on the whole group would. */
-const withDelta = (doc: Doc, delta: GroupDelta, pivot = FRAME): Doc => {
+/** `doc` with each of the instance's items put through `edit`. */
+const withItems = (doc: Doc, edit: (t: UeTransform) => UeTransform): Doc => {
   const entries = instanceKeys(doc).map((key) => {
     const index = doc.ids.indexOf(key)
-    return [index, applyGroupDelta(editTransform(doc.map.items[index]!), pivot, delta)] as const
+    return [index, edit(editTransform(doc.map.items[index]!))] as const
   })
   return { ...doc, map: Option.getOrThrow(setTransforms(doc.map, entries)) }
 }
+
+/** `doc` with `delta` applied to the instance's items about `pivot`, as a gizmo drag on the whole group would. */
+const withDelta = (doc: Doc, delta: GroupDelta, pivot = FRAME): Doc =>
+  withItems(doc, (t) => applyGroupDelta(t, pivot, delta))
 
 const moved = (doc: Doc, key: string, by: number): Doc => {
   const index = doc.ids.indexOf(key)
@@ -88,23 +100,54 @@ describe("whether an instance is unmodified", () => {
     assert.isTrue(check(c).unmodified)
   })
 
+  it("stays unmodified through scales about its origin, however many, whatever its members' turns", () => {
+    const origin = () => instanceOrigin(doc, groupOf(doc), groupOf(doc).prefab!)!
+    let doc = placedDoc()
+    expectVec(origin(), FRAME, 2)
+    for (
+      const delta of [{ kind: "scale", factor: 2.5, axis: "x" }, { kind: "scale", factor: 0.4, axis: "y" }] as const
+    ) {
+      doc = withDelta(doc, delta, origin())
+      assert.isTrue(check(doc).unmodified)
+      expectVec(origin(), FRAME, 2)
+    }
+    doc = withDelta(doc, { kind: "translate", offset: { x: 700, y: 0, z: 0 } })
+    expectVec(origin(), { ...FRAME, x: FRAME.x + 700 }, 2)
+    doc = withDelta(doc, { kind: "scale", factor: 1.5, axis: "z" }, origin())
+    assert.isTrue(check(doc).unmodified)
+  })
+
+  it("has no origin to go by once it's edited", () => {
+    const placed = placedDoc()
+    const doc = moved(placed, instanceKeys(placed)[1]!, 500)
+    assert.isUndefined(instanceOrigin(doc, groupOf(doc), groupOf(doc).prefab!))
+  })
+
+  it("allows a scale along one axis then a turn, or the other way round", () => {
+    const turn = rotatorToQuat({ pitch: 12, yaw: 33, roll: -71 })
+    const stretch = { kind: "scale", factor: 2.5, axis: "x" } as const
+    const placed = placedDoc()
+    assert.isTrue(check(withDelta(withDelta(placed, stretch), { kind: "rotate", rotation: turn })).unmodified)
+    assert.isTrue(check(withDelta(withDelta(placed, { kind: "rotate", rotation: turn }), stretch)).unmodified)
+  })
+
+  it("allows a scale that left the items' offsets, as the editor's used to", () => {
+    const stretched = withItems(placedDoc(), (t) => ({ ...t, scale3D: { ...t.scale3D, y: t.scale3D.y * 3 } }))
+    assert.isTrue(check(stretched).unmodified)
+  })
+
   it("allows the game's scale, which spreads the items too", () => {
-    const doc = placedDoc()
-    const entries = instanceKeys(doc).map((key) => {
-      const index = doc.ids.indexOf(key)
-      const t = editTransform(doc.map.items[index]!)
-      const stretch = (value: number, from: number) => from + (value - from) * 2
-      return [index, {
-        ...t,
-        translation: {
-          x: stretch(t.translation.x, FRAME.x),
-          y: stretch(t.translation.y, FRAME.y),
-          z: stretch(t.translation.z, FRAME.z)
-        },
-        scale3D: { x: t.scale3D.x * 2, y: t.scale3D.y * 2, z: t.scale3D.z * 2 }
-      }] as const
-    })
-    assert.isTrue(check({ ...doc, map: Option.getOrThrow(setTransforms(doc.map, entries)) }).unmodified)
+    const stretch = (value: number, from: number) => from + (value - from) * 2
+    const spread = withItems(placedDoc(), (t) => ({
+      ...t,
+      translation: {
+        x: stretch(t.translation.x, FRAME.x),
+        y: stretch(t.translation.y, FRAME.y),
+        z: stretch(t.translation.z, FRAME.z)
+      },
+      scale3D: { x: t.scale3D.x * 2, y: t.scale3D.y * 2, z: t.scale3D.z * 2 }
+    }))
+    assert.isTrue(check(spread).unmodified)
   })
 
   it("survives the group being renamed and tagged, and items reordered in the outline", () => {

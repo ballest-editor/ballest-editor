@@ -210,11 +210,14 @@ Traps from the budget QA (docs/qa/budget.md):
 
 - `-RenderOffscreen` (measured): no window, real frames through `render`, the host's `tap` and `gamekey` for input.
   `tap` and `gamekey` are mutations, so they need the sandbox.
-- A window on a nested display (unmeasured): `gamescope --headless -W 1280 -H 720 -- umu-run ...` gives each slot its
-  own Xwayland display with GPU rendering and no window on the user's screen. There, `xdotool` on that display drives
-  the game's own menus and editor without the sandbox, as `/tmp/ballest-probe/ui.sh` did on the real game. This is the
-  fallback route into the editor for a slot without the patched host: xdotool to navigate, the driver plugin to
-  place and frame, `render` to look. Xvfb is the poorer version of this (no GPU, DXVK may refuse it).
+- A window on a private display (measured): `gamescope --backend headless -W 1280 -H 720 -w 1280 -h 720 -- <command>`
+  gives its own Xwayland display (it reports the number as `$DISPLAY` to `<command>`) with GPU rendering and no window on
+  the user's screen, and `DISPLAY=:<n> pnpm driver start --slot <n> --window` starts a slot there, since `slots.ts` takes
+  `DISPLAY` from the process. It's how a gizmo gets dragged: the gizmo reads the mouse natively, so `hover` and `gamehold`
+  can't reach it, but `xdotool` on that display can, with `mousemove`, `mousedown 1`, a few `mousemove` steps and
+  `mouseup 1`. docs/qa/gizmo-scale.md is what it measured. Use the store's `gamescope`, not the setuid wrapper in
+  `/run/wrappers/bin`, which fails with "failed to inherit capabilities" here. Don't use `--window` on the desktop's own
+  display for this: xdotool takes the user's pointer and focus. Xvfb is the poorer version (no GPU, DXVK may refuse it).
 
 ## Open problems
 

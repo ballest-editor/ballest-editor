@@ -36,7 +36,10 @@ interface Placement {
   readonly rotation: Quat4
   /** Each item's scale is this times its own, along its own axes. */
   readonly scale: Vec3
-  /** The items' offsets are this times their own: 1 for the editor's scale, which leaves them, `scale` for the game's. */
+  /**
+   * Each item's offset is this times its own, along the item's own axes: `scale` for a scale as the game does it, 1 for
+   * one that leaves the offsets, as the editor's did.
+   */
   readonly spread: Vec3
 }
 
@@ -44,8 +47,17 @@ const ONE: Vec3 = { x: 1, y: 1, z: 1 }
 
 const times = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x * b.x, y: a.y * b.y, z: a.z * b.z })
 
+/**
+ * `t`'s offset spread along its own axes. A turn of the whole instance can't change this, so it's taken before one. With
+ * no spread it's the offset as it stands: a signature's rounded rotation wouldn't quite turn it there and back.
+ */
+const spreadOffset = (spread: Vec3, t: UeTransform): Vec3 =>
+  spread === ONE
+    ? t.translation
+    : rotateVec(t.rotation, times(spread, rotateVec(quatConjugate(t.rotation), t.translation)))
+
 const placed = (placement: Placement, t: UeTransform): UeTransform => ({
-  translation: vecAdd(placement.translation, rotateVec(placement.rotation, times(placement.spread, t.translation))),
+  translation: vecAdd(placement.translation, rotateVec(placement.rotation, spreadOffset(placement.spread, t))),
   rotation: quatNormalize(quatMul(placement.rotation, t.rotation)),
   scale3D: times(placement.scale, t.scale3D)
 })
@@ -138,13 +150,12 @@ const placementsFrom = (expected: UeTransform, actual: UeTransform): ReadonlyArr
     y: ratio(actual.scale3D.y, expected.scale3D.y),
     z: ratio(actual.scale3D.z, expected.scale3D.z)
   }
-  const uniform = near(scale.x, scale.y, TOLERANCE.scale) && near(scale.y, scale.z, TOLERANCE.scale)
-  const spreads = uniform && !near(scale.x, 1, TOLERANCE.scale) ? [ONE, scale] : [ONE]
-  return spreads.map((spread) => ({
+  const scaled = [scale.x, scale.y, scale.z].some((axis) => !near(axis, 1, TOLERANCE.scale))
+  return (scaled ? [ONE, scale] : [ONE]).map((spread) => ({
     rotation,
     scale,
     spread,
-    translation: vecSub(actual.translation, rotateVec(rotation, times(spread, expected.translation)))
+    translation: vecSub(actual.translation, rotateVec(rotation, spreadOffset(spread, expected)))
   }))
 }
 
@@ -208,6 +219,24 @@ export const checkInstance = (
     },
     unmodified: false
   }
+}
+
+/** Each document's instances' origins, since the gizmo asks every frame. */
+const origins = new WeakMap<Doc, Map<string, Vec3 | undefined>>()
+
+/**
+ * Where an instance's offsets count from, undefined once it's edited. It's where the game's frame would be: a prefab's
+ * offsets are from the frame, and spawning keeps them (docs/qa/groups-prefabs.md). A scale has to be about this point, or
+ * one along an axis of members turned differently is no longer a placement of the definition.
+ */
+export const instanceOrigin = (doc: Doc, group: GroupNode, link: PrefabLink): Vec3 | undefined => {
+  const known = origins.get(doc) ?? new Map<string, Vec3 | undefined>()
+  origins.set(doc, known)
+  if (known.has(group.id)) return known.get(group.id)
+  const { placement, unmodified } = checkInstance(doc, group, link)
+  const origin = unmodified ? placement.translation : undefined
+  known.set(group.id, origin)
+  return origin
 }
 
 const placedItem = (item: Item, placement: Placement): Item => {

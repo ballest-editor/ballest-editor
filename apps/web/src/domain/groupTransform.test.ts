@@ -30,37 +30,40 @@ describe("group transforms", () => {
     expect(applyGroupDelta(at(0, 0, 0), pivot, { kind: "rotate", rotation: yaw90 }).translation).toEqual(pivot)
   })
 
-  it("scales uniformly in place, as the game does: the pivot doesn't move items", () => {
-    const out = applyGroupDelta(at(100, 0, 0), { x: 50, y: 0, z: 0 }, { kind: "scale", factor: 2 })
-    expect(out.translation).toEqual({ x: 100, y: 0, z: 0 })
-    expect(out.scale3D).toEqual({ x: 2, y: 2, z: 2 })
-  })
-
-  it("scales along each item's own axis, wherever it is and however it's turned", () => {
-    const pivot = { x: 0, y: 0, z: 0 }
+  it("scales along each item's own axis about the one pivot, as the game does", () => {
+    const pivot = { x: 50, y: 0, z: 0 }
+    const uniform = applyGroupDelta(at(100, 0, 0), pivot, { kind: "scale", factor: 2 })
+    expect(uniform.translation).toEqual({ x: 150, y: 0, z: 0 })
+    expect(uniform.scale3D).toEqual({ x: 2, y: 2, z: 2 })
     const axisX = { kind: "scale", factor: 3, axis: "x" } as const
-    const aligned = applyGroupDelta(at(10, 20, 0), pivot, axisX)
-    expect(aligned.translation).toEqual({ x: 10, y: 20, z: 0 })
+    const aligned = applyGroupDelta(at(10, 20, 0), { x: 0, y: 0, z: 0 }, axisX)
+    expect(aligned.translation).toEqual({ x: 30, y: 20, z: 0 })
     expect(aligned.scale3D).toEqual({ x: 3, y: 1, z: 1 })
-    const turned = applyGroupDelta(at(5, 5, 5, yaw90), pivot, axisX)
-    expect(turned.translation).toEqual({ x: 5, y: 5, z: 5 })
+    // turned 90, its own X lies along game Y, so that's the way it spreads
+    const turned = applyGroupDelta(at(10, 20, 0, yaw90), { x: 0, y: 0, z: 0 }, axisX)
+    expectVec(turned.translation, { x: 10, y: 60, z: 0 })
     expect(turned.scale3D).toEqual({ x: 3, y: 1, z: 1 })
-    // a mirrored item keeps its sign
     const mirrored = applyGroupDelta({ ...at(0, 0, 0), scale3D: { x: -1, y: 1, z: 1 } }, pivot, axisX)
     expect(mirrored.scale3D).toEqual({ x: -3, y: 1, z: 1 })
   })
 
-  it("scales about each item's own pivot, which stays put", () => {
-    const top = { x: 0, y: 0, z: 100 }
+  it("leaves an item on the pivot where it is, and keeps a pivot on the item in place", () => {
     const turned = { ...at(10, 20, 30, yaw90), scale3D: { x: 2, y: 1, z: 0.5 } }
+    const top = { x: 0, y: 0, z: 100 }
+    const pivot = localToWorld(turned, top)
     for (const delta of [{ kind: "scale", factor: 3 }, { kind: "scale", factor: 0.5, axis: "z" }] as const) {
-      const out = applyGroupDelta(turned, { x: 999, y: 0, z: 0 }, delta, top)
-      expectVec(localToWorld(out, top), localToWorld(turned, top))
+      expect(applyGroupDelta(turned, turned.translation, delta).translation).toEqual(turned.translation)
+      expectVec(localToWorld(applyGroupDelta(turned, pivot, delta), top), pivot)
     }
     // a pivot along X doesn't move under a Z scale
-    const back = { x: 250, y: 0, z: 0 }
-    const out = applyGroupDelta(turned, { x: 0, y: 0, z: 0 }, { kind: "scale", factor: 4, axis: "z" }, back)
-    expectVec(out.translation, turned.translation)
+    const back = localToWorld(turned, { x: 250, y: 0, z: 0 })
+    expectVec(applyGroupDelta(turned, back, { kind: "scale", factor: 4, axis: "z" }).translation, turned.translation)
+  })
+
+  it("stays finite for an item with a scale of 0 on the axis", () => {
+    const flat = { ...at(10, 0, 0), scale3D: { x: 0, y: 1, z: 1 } }
+    const out = applyGroupDelta(flat, { x: 0, y: 0, z: 0 }, { kind: "scale", factor: 2, axis: "x" })
+    expect(out.translation).toEqual({ x: 10, y: 0, z: 0 })
   })
 
   it("turns the group about the active item's pivot point", () => {
@@ -85,7 +88,15 @@ describe("group transforms", () => {
     expect(set("translation", "y", 5).translation).toEqual({ x: 10, y: 5, z: 30 })
     expect(offset("translation", "z", -5).translation).toEqual({ x: 10, y: 20, z: 25 })
     expect(set("scale3D", "x", 0).scale3D.x).toBeGreaterThan(0)
-    expect(offset("scale3D", "x", 0.5, { ...t, scale3D: { x: 2, y: 1, z: 1 } }).scale3D).toEqual({ x: 2.5, y: 1, z: 1 })
+    expect(offset("scale3D", "x", 0.5).scale3D).toEqual({ x: 1.5, y: 1, z: 1 })
+    // another item takes the active one's ratio, not its amount
+    expect(offset("scale3D", "x", 0.5, { ...t, scale3D: { x: 2, y: 1, z: 1 } }).scale3D).toEqual({ x: 3, y: 1, z: 1 })
+    // a value typed on the active item is that value, not that value through a ratio's rounding
+    const third = { ...t, scale3D: { x: 3, y: 1, z: 1 } }
+    expect(selectionAxisEdit(third, "scale3D", "x", { kind: "set", value: 0.7 })(third).scale3D.x).toBe(0.7)
+    // an active item with a 0 there has no ratio to give, so every item takes the value
+    const flat = { ...t, scale3D: { x: 0, y: 1, z: 1 } }
+    expect(selectionAxisEdit(flat, "scale3D", "x", { kind: "set", value: 2 })(t).scale3D.x).toBe(2)
     // rotation is edited in rotator degrees; a yaw of 90 is the quaternion (0, 0, sin 45, cos 45)
     const turned = set("rotation", "z", 90)
     expect(turned.rotation.z).toBeCloseTo(Math.SQRT1_2, 6)
@@ -117,5 +128,78 @@ describe("group transforms", () => {
         }
       }
     }
+  })
+})
+
+/**
+ * Real drags and typed values in the game (docs/qa/gizmo-scale.md), to within what the game's read-outs round to. Each
+ * cube is one at its measured place and turn; the factors are read from the panel, so they carry their own rounding.
+ */
+describe("a scale of several items, against the game", () => {
+  const cube = (x: number, y: number, z: number, pitch: number, yaw: number, roll: number, sx = 1): UeTransform => ({
+    ...at(x, y, z, rotatorToQuat({ pitch, yaw, roll })),
+    scale3D: { x: sx, y: 1, z: 1 }
+  })
+  const flat = cube(0, 0, 5000, 0, 0, 0)
+  const diagonal = cube(0, 3000, 5000, 0, 45, 0)
+  const side = cube(0, -3000, 5500, 0, 90, 0)
+  const tilted = cube(-2000, 1500, 6000, 30, 20, 10, 2)
+  const active = cube(3000, 0, 5000, 0, 30, 0)
+  const near = (a: UeTransform, x: number, y: number, z: number) => expectVec(a.translation, { x, y, z }, 0)
+
+  it("matches a Y handle drag on a loose selection, about the active item", () => {
+    const delta = { kind: "scale", factor: 2.37281, axis: "y" } as const
+    const scaled = (t: UeTransform) => applyGroupDelta(t, active.translation, delta)
+    near(scaled(flat), 0, 0, 5000)
+    near(scaled(diagonal), -4118.43, 7118.43, 5000)
+    near(scaled(side), -4118.43, -3000, 5500)
+    near(scaled(tilted), -2896.46, 4854.63, 5471.81)
+    near(scaled(active), 3000, 0, 5000)
+    expectVec(scaled(tilted).scale3D, { x: 2, y: 2.37281, z: 1 })
+  })
+
+  it("matches the uniform handle: a plain scale about the pivot", () => {
+    const delta = { kind: "scale", factor: 2.28601 } as const
+    const out = applyGroupDelta(cube(-2896.46, 4854.63, 5471.81, 30, 20, 10), active.translation, delta)
+    near(out, -10479.4, 11097.7, 6078.56)
+    expect(out.scale3D).toEqual({ x: 2.28601, y: 2.28601, z: 2.28601 })
+  })
+
+  it("matches an X handle drag on a group, about its frame, without a shear", () => {
+    const frame = { x: 109.749, y: 103.553, z: 6214.03 }
+    const scaled = (t: UeTransform) => applyGroupDelta(t, frame, { kind: "scale", factor: 3.8843, axis: "x" })
+    near(scaled(flat), -316.548, 0, 5000)
+    near(scaled(diagonal), 4018.83, 7018.83, 5000)
+    near(scaled(side), 0, -11951.6, 5500)
+    near(scaled(tilted), -5310.3, 295.149, 3966.14)
+    near(scaled(active), 9122.92, 3535.07, 5000)
+    expect(scaled(tilted).rotation).toEqual(tilted.rotation)
+    expectVec(scaled(tilted).scale3D, { x: 7.7686, y: 1, z: 1 }, 3)
+  })
+
+  it("matches a group whose frame is turned: the members still go by their own axes", () => {
+    const frame = { x: 1103.553, y: 603.553, z: 5500 }
+    const scaled = (t: UeTransform) => applyGroupDelta(t, frame, { kind: "scale", factor: 2.36546, axis: "y" })
+    const first = scaled(cube(449.625, -470.916, 5000, 0, 30, 0))
+    near(first, 861.69, -1184.63, 5000)
+    near(scaled(cube(1681.676, 1395.11, 5000, 0, 75, 0)), 2147.99, 1270.16, 5000)
+    expect(first.scale3D).toEqual({ x: 1, y: 2.36546, z: 1 })
+  })
+
+  it("matches a scale typed in the panel: a ratio from the active item, not a value for each", () => {
+    const typed = selectionAxisEdit(active, "scale3D", "x", { kind: "set", value: 2 }, active.translation)
+    near(typed(flat), -3000, 0, 5000)
+    near(typed(diagonal), 0, 3000, 5000)
+    near(typed(tilted), -4542.87, 574.472, 4437.65)
+    expect(typed(tilted).scale3D.x).toBe(4)
+    expect(typed(active).scale3D.x).toBe(2)
+  })
+
+  it("matches the active item's pivot standing in for everyone's", () => {
+    const top = { x: 3000, y: 0, z: 6000 }
+    near(applyGroupDelta(side, top, { kind: "scale", factor: 2, axis: "z" }), 0, -3000, 5000)
+    const typed = selectionAxisEdit(active, "scale3D", "z", { kind: "set", value: 2 }, top)(cube(0, 0, 5000, 0, 90, 0))
+    near(typed, 0, 0, 4000)
+    expect(typed.scale3D).toEqual({ x: 1, y: 1, z: 2 })
   })
 })
