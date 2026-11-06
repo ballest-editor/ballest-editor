@@ -65,7 +65,7 @@ export const enteredLevelOf = (
 }
 
 /** The nodes the selected items make up, in tree order. Inside the entered group, all of it selected is its members. */
-const selectedNodes = (
+export const selectedNodes = (
   tree: ReadonlyArray<TreeNode>,
   selectedIds: ReadonlyArray<string>,
   enteredGroupId: string | null

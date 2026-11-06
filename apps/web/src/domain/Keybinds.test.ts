@@ -55,6 +55,7 @@ describe("keybind table", () => {
       ["rotate", ["KeyE"]],
       ["scale", ["KeyR"]],
       ["local / world axes", ["KeyC"]],
+      ["together / each pivot", ["Period"]], // editor only
       ["focus selection", ["KeyF"]],
       ["add to selection", ["Shift+Mouse0"]],
       ["toggle selection", ["Ctrl+Mouse0"]]

@@ -32,6 +32,7 @@ import {
   selectionPivot,
   shownGizmoSpace,
   shownLighting,
+  shownPivotMode,
   shownTransform,
   shownValidation,
   tabStateOf,
@@ -1453,6 +1454,70 @@ describe("groups and the selection", () => {
     assert.deepStrictEqual(pivot()?.rotation, transformOf(b).rotation)
     state().select([])
     assert.isUndefined(pivot())
+  })
+
+  it("holds the pivot setting at Together until two units are selected, and toggles it", () => {
+    const { a, b, c, d } = nestedMap()
+    assert.strictEqual(state().pivotMode, "together")
+    state().togglePivotMode()
+    assert.strictEqual(state().pivotMode, "each")
+    state().select([a, b, c])
+    assert.strictEqual(shownPivotMode(state()), "together", "one whole group is one unit")
+    state().select([a, b, c, d])
+    assert.strictEqual(shownPivotMode(state()), "each")
+    // in Each the gizmo sits on the active unit, which is the group when its item is active
+    state().select([d, a, b, c])
+    assert.deepStrictEqual(selectionPivot(state(), transformOf)?.pivot, {
+      x: 100,
+      y: 0,
+      z: transformOf(a).translation.z
+    })
+    state().togglePivotMode()
+    assert.deepStrictEqual(selectionPivot(state(), transformOf)?.pivot, transformOf(c).translation)
+  })
+
+  it("sets, freezes and clears a group's pivot as undo steps, and carries a Point with a move", () => {
+    const { a, b, c, outer } = nestedMap()
+    const groupPivot = () => findGroup(state().doc.structure.tree, outer)?.pivot
+    state().select([a, b, c])
+    const steps = state().past.length
+    state().setGroupPivot(outer, { choice: "Top" })
+    assert.deepStrictEqual(groupPivot(), { choice: "Top" })
+    state().freezeGroupPivot(outer)
+    // frozen where the Top pivot was: the top of the members' box (no catalog, so each is its origin)
+    assert.deepStrictEqual(groupPivot(), { choice: "point", world: { x: 100, y: 0, z: transformOf(a).translation.z } })
+    assert.strictEqual(state().past.length, steps + 2, "two pivot edits")
+    // a move of the whole group takes the point along; a move of one member doesn't
+    state().transformItems(
+      new Map(
+        [a, b, c].map((id) => [id, { ...transformOf(id), translation: { ...transformOf(id).translation, y: 50 } }])
+      )
+    )
+    assert.deepStrictEqual(groupPivot(), { choice: "point", world: { x: 100, y: 50, z: transformOf(a).translation.z } })
+    moveItem(a, { ...transformOf(a).translation, y: 500 })
+    const kept = groupPivot()
+    assert.strictEqual(kept?.choice === "point" ? kept.world.y : undefined, 50)
+    state().setGroupPivot(outer, undefined)
+    assert.isUndefined(groupPivot())
+    state().undo()
+    assert.strictEqual(groupPivot()?.choice, "point")
+  })
+
+  it("makes, reverses and unmakes a chain, and groups a selection as one in selection order", () => {
+    mapWithCubes(0, 100, 200)
+    const [a = "", b = "", c = ""] = state().doc.ids.slice(1)
+    state().select([c, a, b])
+    state().chainSelection()
+    const chain = state().doc.structure.tree.find((n) => n.kind === "group")
+    assert.strictEqual(chain?.kind === "group" ? chain.chain : undefined, true)
+    assert.deepStrictEqual(chain?.kind === "group" ? treeKeys(chain.children) : [], [c, a, b], "selection order")
+    const id = chain?.kind === "group" ? chain.id : ""
+    state().reverseChain(id)
+    assert.deepStrictEqual(treeKeys(findGroup(state().doc.structure.tree, id)!.children), [b, a, c])
+    state().setChain(id, false)
+    assert.isUndefined(findGroup(state().doc.structure.tree, id)?.chain)
+    state().undo()
+    assert.strictEqual(findGroup(state().doc.structure.tree, id)?.chain, true)
   })
 
   it("pivots a prefab instance on its origin, and follows a live move", () => {

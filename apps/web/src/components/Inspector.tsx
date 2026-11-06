@@ -67,7 +67,7 @@ import { PathAction, PathText } from "./PathText"
 import { PivotSection } from "./PivotSection"
 import { PrefabSettings } from "./PrefabSettings"
 import { Section, SectionHeader, SectionTitle } from "./SectionTitle"
-import { GroupSection, InstanceSection, ItemTags, LabelledField } from "./StructureSection"
+import { ChainSection, GroupSection, InstanceSection, ItemTags, LabelledField } from "./StructureSection"
 
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
 
@@ -714,17 +714,19 @@ function ItemEditor({ items, ids, transforms, placed, transform }: {
   return (
     <>
       {transform && (
-        <TransformSection
-          of="item"
-          unit={shownActive}
-          transforms={transforms}
-          active={editTransform(active)}
-          decals={items.every(isDecal)}
-        >
-          <FlipSection items={placed} />
-        </TransformSection>
+        <>
+          <TransformSection
+            of="item"
+            unit={shownActive}
+            transforms={transforms}
+            active={editTransform(active)}
+            decals={items.every(isDecal)}
+          >
+            <FlipSection items={placed} />
+          </TransformSection>
+          <PivotSection />
+        </>
       )}
-      <PivotSection />
       <Section>
         <SectionTitle>Paint</SectionTitle>
         <PaintSection selected={items.map((item, i) => ({ item, id: ids[i] ?? "" }))} />
@@ -827,11 +829,13 @@ export function Inspector() {
                 <PieceCounts items={items} />
               </GroupSection>
               {group.prefab !== undefined && <InstanceSection group={group} link={group.prefab} />}
+              <ChainSection group={group} />
               {frame !== undefined && (
                 <TransformSection of="group" unit={frame} transforms={transforms}>
                   <FlipSection items={placed} />
                 </TransformSection>
               )}
+              <PivotSection />
               <Disclosure
                 key={`${group.id}/items`}
                 title={items.length === 1 ? "Edit its item" : `Edit all ${items.length} items`}

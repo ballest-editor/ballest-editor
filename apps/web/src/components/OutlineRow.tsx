@@ -1,4 +1,4 @@
-import { IconBoxMultiple, IconChevronRight, IconFolder, IconFolderOpen } from "@tabler/icons-react"
+import { IconBoxMultiple, IconChevronRight, IconFolder, IconFolderOpen, IconLink } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
@@ -101,7 +101,9 @@ function ItemIcon({ actorClass }: { readonly actorClass: string }) {
 
 /** What a row's name says when the pointer rests on it: an item's class, a group's item count. */
 const nameTooltip = (row: OutlineRow): string =>
-  row.kind === "item" ? row.className : `${row.itemCount} ${row.itemCount === 1 ? "item" : "items"}`
+  row.kind === "item"
+    ? row.className
+    : `${row.itemCount} ${row.itemCount === 1 ? "item" : "items"}${row.chain ? `, a chain of ${row.childCount}` : ""}`
 
 export const OutlineRowView = memo(function OutlineRowView(props: {
   readonly row: OutlineRow
@@ -122,7 +124,7 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
   const { row, rowIndex, selected, partial, entered, dimmed, dragged, dropInto, filtering, renaming, onRenamed } = props
   const setGroupCollapsed = useEditor((s) => s.setGroupCollapsed)
   const isGroup = row.kind === "group"
-  const FolderIcon = row.instance ? IconBoxMultiple : row.collapsed ? IconFolder : IconFolderOpen
+  const FolderIcon = row.instance ? IconBoxMultiple : row.chain ? IconLink : row.collapsed ? IconFolder : IconFolderOpen
   return (
     <div
       role="treeitem"
@@ -165,6 +167,14 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
           </Button>
         )
         : <span className="size-6 shrink-0" />}
+      {row.link !== undefined && (
+        <span
+          className="mr-1 w-4 shrink-0 text-right text-caption tabular-nums text-fg-tertiary"
+          title={`Link ${row.link}`}
+        >
+          {row.link}
+        </span>
+      )}
       {isGroup ? <FolderIcon className={cn(GLYPH_SLOT, GLYPH_COLOUR)} /> : <ItemIcon actorClass={row.actorClass} />}
       {renaming
         ? <RenameField name={row.name} onDone={(value) => onRenamed(row, value)} />

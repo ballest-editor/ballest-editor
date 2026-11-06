@@ -7,6 +7,7 @@ import { placementTransform } from "../domain/factory"
 import { applyGroupDelta, type Axis, readField, selectionAxisEdit, type TransformField } from "../domain/groupTransform"
 import { localToWorld } from "../domain/pivot"
 import { quatConjugate, quatMul, rotateVec, rotatorToQuat, vecAdd } from "../domain/ueMath"
+import { assertVec } from "../test/vec"
 import { editSelectionAxis, previewSelectionAxis, setSelectionField, setSelectionPivot } from "./actions"
 import { initialMap, pivotOf, selectionPivot, shownPivotPoint, shownTransform, useEditor } from "./store"
 
@@ -34,9 +35,7 @@ const setup = () => {
   return { ids, before: new Map(ids.map((id) => [id, docTransform(id)])), steps: s().past.length }
 }
 
-const expectVec = (a: Vec3, b: Vec3, message: string) => {
-  for (const k of ["x", "y", "z"] as const) assert.closeTo(a[k], b[k], 1e-6, `${message}: ${k}`)
-}
+const expectVec = assertVec
 /** Same position and orientation (a quaternion and its negation are the same turn). */
 const sameTransform = (a: UeTransform, b: UeTransform, message: string) => {
   expectVec(a.translation, b.translation, `${message} translation`)
@@ -127,20 +126,20 @@ describe("scrubbing a transform field over a turned multi-selection (#43)", () =
   })
 })
 
-describe("scrubbing with pivots (#51)", () => {
-  /** setup(), with a different pivot on each cube (the cube's bounds run 0..1000 in Z). */
-  const withPivots = () => {
-    const setUp = setup()
-    const pivots = [
-      { choice: "Top", localPosition: { x: 0, y: 0, z: 1000 } },
-      { choice: "Back", localPosition: { x: 500, y: 0, z: 500 } },
-      { choice: "Left", localPosition: { x: 0, y: -500, z: 500 } }
-    ]
-    s().setItemPivots(new Map(setUp.ids.map((id, i) => [id, pivots[i]!])))
-    return { ...setUp, pivots: new Map(setUp.ids.map((id) => [id, pivotOf(s(), id).localPosition])) }
-  }
-  const pivotPoint = (id: string, t = docTransform(id)) => localToWorld(t, pivotOf(s(), id).localPosition)
+/** setup(), with a different pivot on each cube (the cube's bounds run 0..1000 in Z). */
+const withPivots = () => {
+  const setUp = setup()
+  const pivots = [
+    { choice: "Top", localPosition: { x: 0, y: 0, z: 1000 } },
+    { choice: "Back", localPosition: { x: 500, y: 0, z: 500 } },
+    { choice: "Left", localPosition: { x: 0, y: -500, z: 500 } }
+  ]
+  s().setItemPivots(new Map(setUp.ids.map((id, i) => [id, pivots[i]!])))
+  return { ...setUp, pivots: new Map(setUp.ids.map((id) => [id, pivotOf(s(), id).localPosition])) }
+}
+const pivotPoint = (id: string, t = docTransform(id)) => localToWorld(t, pivotOf(s(), id).localPosition)
 
+describe("scrubbing with pivots (#51)", () => {
   it("turns the selection about the active item's pivot, as the gizmo does", () => {
     const { ids, before } = withPivots()
     const activeId = ids.at(-1)!
@@ -203,6 +202,53 @@ describe("scrubbing with pivots (#51)", () => {
       expectVec(pivotPoint(id), before.get(id)!, id)
       expectVec(readField(docTransform(id), "rotation"), { x: 10, y: 20, z: 30 }, id)
     }
+  })
+})
+
+describe("Each in the Inspector", () => {
+  it("scales every unit by the active one's ratio, not by its difference", () => {
+    const { ids } = setup()
+    s().togglePivotMode()
+    const [a = "", b = "", active = ""] = ids
+    s().transformItems(new Map([[a, { ...docTransform(a), scale3D: { x: 2, y: 1, z: 1 } }]]))
+    editSelectionAxis("scale3D", "x", { kind: "set", value: 2 })
+    assert.closeTo(docTransform(a).scale3D.x, 4, 1e-9, "twice its own")
+    assert.closeTo(docTransform(b).scale3D.x, 2, 1e-9)
+    assert.closeTo(docTransform(active).scale3D.x, 2, 1e-9)
+    s().togglePivotMode()
+  })
+
+  it("carries the links after a link edited inside an entered chain", () => {
+    const { ids } = setup()
+    const [l1 = "", l2 = "", l3 = ""] = ids
+    s().chainSelection()
+    const chain = s().doc.structure.tree.find((n) => n.kind === "group")
+    s().enterGroup(chain?.kind === "group" ? chain.id : null)
+    s().select([l2])
+    const before = new Map(ids.map((id) => [id, docTransform(id)]))
+    editSelectionAxis("translation", "y", { kind: "offset", by: 40 })
+    assert.deepStrictEqual(docTransform(l1), before.get(l1), "the link before stays")
+    assert.strictEqual(docTransform(l2).translation.y, before.get(l2)!.translation.y + 40)
+    assert.strictEqual(docTransform(l3).translation.y, before.get(l3)!.translation.y + 40, "carried")
+    s().enterGroup(null)
+  })
+
+  it("turns each piece about its own pivot by a typed yaw, so every pivot stays put", () => {
+    const { ids, before } = withPivots()
+    s().togglePivotMode()
+    const where = () => new Map(ids.map((id) => [id, pivotPoint(id)]))
+    const pivots = where()
+    editSelectionAxis("rotation", "z", { kind: "set", value: readField(before.get(ids.at(-1)!)!, "rotation").z + 30 })
+    for (const id of ids) {
+      expectVec(pivotPoint(id), pivots.get(id)!, id)
+      assert.closeTo(
+        (readField(docTransform(id), "rotation").z - readField(before.get(id)!, "rotation").z + 720) % 360,
+        30,
+        1e-6,
+        id
+      )
+    }
+    s().togglePivotMode()
   })
 })
 

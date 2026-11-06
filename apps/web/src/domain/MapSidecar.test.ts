@@ -34,6 +34,25 @@ describe("MapSidecar", () => {
     assert.deepStrictEqual(JSON.parse(Schema.encodeSync(Codec)(decoded)), sidecar)
   })
 
+  it("round-trips a group's pivot and a chain, and refuses a pivot it doesn't know", () => {
+    const decodes = (value: unknown) => Option.isSome(Schema.decodeUnknownOption(MapSidecar)(value))
+    const withGroups = (...groups: ReadonlyArray<Record<string, unknown>>) => ({
+      ...sidecar,
+      tree: groups.map((extra, i) => ({ kind: "group", id: `p${i}`, name: "G", tags: [], children: [], ...extra }))
+    })
+    const good = withGroups(
+      { pivot: { choice: "Top" } },
+      { pivot: { choice: "item", key: "k3" } },
+      { pivot: { choice: "point", world: { x: 1, y: -2.5, z: 3 } }, chain: true }
+    )
+    const text = JSON.stringify(good)
+    assert.deepStrictEqual(JSON.parse(Schema.encodeSync(Codec)(Schema.decodeSync(Codec)(text))), good)
+    assert.isFalse(decodes(withGroups({ pivot: { choice: "Centre" } })))
+    assert.isFalse(decodes(withGroups({ pivot: { choice: "item" } })))
+    assert.isFalse(decodes(withGroups({ pivot: { choice: "point", world: { x: 1, y: 2 } } })))
+    assert.isFalse(decodes(withGroups({ chain: false })))
+  })
+
   it("refuses a sidecar of another format version, or a key that isn't URL-safe", () => {
     const decodes = (value: unknown) => Option.isSome(Schema.decodeUnknownOption(MapSidecar)(value))
     assert.isTrue(decodes(sidecar))

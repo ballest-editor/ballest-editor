@@ -54,7 +54,7 @@ const showDefinition = (
     file: prefab.file,
     sources: new Map(prefab.sources.map(({ key, ...source }) => [key, source]))
   }
-  const loaded = loadStructure(map, RECOVERY_MAP_HASH, sidecar)
+  const loaded = loadStructure(map, RECOVERY_MAP_HASH, sidecar, useEditor.getState().catalogIndex)
   useEditor.getState().loadMap(map, file, undefined, { document, dirty: true, fresh, into, loaded })
 }
 
@@ -63,7 +63,7 @@ const showRecoveredMap = Effect.fnUntraced(function*({ snapshot }: RecoveredTab,
   const { backup, file, map, sidecar } = snapshot
   const inProject = useEditor.getState().projectMaps.find((m) => m.fileName === file?.name)
   const openFile: OpenFile | null = inProject === undefined ? null : fileOf(inProject)
-  const loaded = loadStructure(map, RECOVERY_MAP_HASH, sidecar)
+  const loaded = loadStructure(map, RECOVERY_MAP_HASH, sidecar, useEditor.getState().catalogIndex)
   yield* showMap(map, openFile, { dirty: true, backup, into, loaded })
 })
 

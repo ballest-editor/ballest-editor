@@ -118,7 +118,10 @@
         ]
       }
     ],
-    "vitest/expect-expect": ["error", { "assertFunctionNames": ["expect", "expectVec", "assert", "assert.*"] }],
+    "vitest/expect-expect": [
+      "error",
+      { "assertFunctionNames": ["expect", "expectVec", "assertVec", "assert", "assert.*"] }
+    ],
 
     // Off, as in Effect's own oxlintrc: `_tag` is the Effect discriminant; local
     // helpers in components/tests read better next to their use; sort() on fresh arrays is fine.

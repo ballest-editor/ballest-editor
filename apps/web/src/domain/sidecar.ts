@@ -3,6 +3,7 @@
  * a document's keys and structure out of a sidecar, re-matching its entries when the `.balledit` isn't the one it was
  * written for.
  */
+import type { CatalogIndex } from "./Catalog"
 import { structureFromGame } from "./gameGroups"
 import { classNameOf, type Item, type MapFile } from "./MapFile"
 import type { MapSidecar, SidecarItem } from "./MapSidecar"
@@ -201,9 +202,9 @@ export interface LoadedStructure {
 }
 
 /** A map's structure from nothing but itself: fresh keys, and its game groups as tree groups. */
-export const structureOfMap = (map: MapFile): LoadedStructure => {
+export const structureOfMap = (map: MapFile, catalog: CatalogIndex | null = null): LoadedStructure => {
   const ids = freshKeys(map.items.length)
-  return { ids, structure: structureFromGame(map, ids), unmatched: 0, rematched: false }
+  return { ids, structure: structureFromGame(map, ids, catalog), unmatched: 0, rematched: false }
 }
 
 /**
@@ -211,8 +212,13 @@ export const structureOfMap = (map: MapFile): LoadedStructure => {
  * indices are right. Otherwise the file was rewritten, and each entry finds its item by fingerprint; items left over
  * get fresh keys, and entries left over are dropped and counted. Without a sidecar the map stands on its own.
  */
-export const loadStructure = (map: MapFile, mapHash: string, sidecar: MapSidecar | null): LoadedStructure => {
-  if (sidecar === null) return structureOfMap(map)
+export const loadStructure = (
+  map: MapFile,
+  mapHash: string,
+  sidecar: MapSidecar | null,
+  catalog: CatalogIndex | null = null
+): LoadedStructure => {
+  if (sidecar === null) return structureOfMap(map, catalog)
   const entries = Object.entries(sidecar.items).sort(([, a], [, b]) => a.index - b.index)
   const byIndex = sidecar.mapHash === mapHash ? keysByIndex(map, entries) : undefined
   const keys = byIndex ?? keysByFingerprint(map, entries)

@@ -34,7 +34,7 @@ import {
   validateItem
 } from "../domain/edits"
 import { editTransform, fitEditTransform } from "../domain/editTransform"
-import { identityTransform, itemFromPiece, mapLabelOf, newMapFile } from "../domain/factory"
+import { itemFromPiece, mapLabelOf, newMapFile } from "../domain/factory"
 import { withGameGroups } from "../domain/gameGroups"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
 import type { GameLinkResult } from "../domain/gameLink"
@@ -48,7 +48,7 @@ import {
   selectionNodeIds,
   soleGroupOf
 } from "../domain/groupSelection"
-import { boxCentreOf, placedBoxOf } from "../domain/itemBounds"
+import { placedBoxOf } from "../domain/itemBounds"
 import { type PropertyChange, withFlip } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
@@ -56,7 +56,7 @@ import { LIMITS } from "../domain/limits"
 import { type GameWrite, type LinkState, linkStateOf } from "../domain/linkState"
 import type { MapDiff } from "../domain/mapDiff"
 import { isPlayerStart, type Item, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
-import type { PrefabLink } from "../domain/MapSidecar"
+import type { GroupPivot, PrefabLink } from "../domain/MapSidecar"
 import type { MaterialTable } from "../domain/Materials"
 import { type FlipAxis, withMirrorMesh } from "../domain/mirror"
 import {
@@ -87,8 +87,11 @@ import {
   type NumberedName,
   sameStrings,
   type Structure,
+  treeKeys,
+  withChain,
   withGroup,
   withGroupName,
+  withGroupPivot,
   withItemName,
   withMovedNodes,
   withNewItems,
@@ -96,6 +99,7 @@ import {
   withoutKeys,
   withPasted,
   withPrefabLink,
+  withReversedChain,
   withTags
 } from "../domain/structure"
 import { type Lighting, lightingOf } from "../domain/sunlight"
@@ -129,6 +133,19 @@ import type {
   ProjectTarget
 } from "../services/Platform"
 
+import {
+  effectivePivotMode,
+  pivotDotsOf,
+  type PivotDotSpec,
+  type PivotMode,
+  pivotUnitOf,
+  reachableKeys,
+  type SelectionUnits,
+  selectionUnitsOf,
+  type UnitContext,
+  unitOf,
+  withCarriedPoints
+} from "../domain/units"
 import type { GizmoSpace } from "./gizmo/handles"
 
 export type { Doc } from "../domain/structure"
@@ -430,6 +447,8 @@ export interface EditorState extends TabState {
   readonly tool: Tool
   /** Whether the gizmo follows the selected item's axes or the world's. */
   readonly gizmoSpace: GizmoSpace
+  /** What a selection pivots about: one point for all (the game's rule), or each unit its own (`domain/units.ts`). */
+  readonly pivotMode: PivotMode
   /** The open modal dialog; editor keybinds are suspended while one is open. */
   readonly dialog: DialogState | null
   /** The Export or Play under way, for the status bar's chip; null when there is none. */
@@ -604,6 +623,15 @@ export interface EditorState extends TabState {
   readonly groupSelection: () => void
   /** Dissolves every group whole in the selection as one undo step; the items stay selected. */
   readonly ungroupSelection: () => void
+  /** Sets where a group pivots (`withGroupPivot`), one undo step; undefined is the centre of its items' box. */
+  readonly setGroupPivot: (id: string, pivot: GroupPivot | undefined) => void
+  /** Freezes a group's pivot where it is now as a Point, so a turn no longer moves it. */
+  readonly freezeGroupPivot: (id: string) => void
+  /** Makes a group a chain of its children in outline order, or a plain group again (`withChain`). */
+  readonly setChain: (id: string, chain: boolean) => void
+  /** Groups the selection, in selection order, as a chain. */
+  readonly chainSelection: () => void
+  readonly reverseChain: (id: string) => void
   /** `withMovedNodes` as one undo step. */
   readonly moveNodes: (nodeIds: ReadonlyArray<string>, parentGroupId: string | null, index: number) => void
   /** Restores the previous snapshot, including its selection. */
@@ -629,6 +657,7 @@ export interface EditorState extends TabState {
   readonly expandGroups: (groupIds: ReadonlyArray<string>) => void
   readonly setTool: (tool: Tool) => void
   readonly toggleGizmoSpace: () => void
+  readonly togglePivotMode: () => void
   /** Opens `dialog` in place of the open one (and its payload). */
   readonly openDialog: (dialog: DialogState) => void
   readonly closeDialog: () => void
@@ -889,6 +918,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     mutedNotificationKinds: new Set(),
     tool: "translate",
     gizmoSpace: "world",
+    pivotMode: "together",
     dialog: null,
     gameWrite: null,
     openedInGame: null,
@@ -1081,7 +1111,11 @@ export const useEditor = create<EditorState>()((set, get) => {
       if (Option.isSome(next)) {
         // a drag that ends where it started leaves no step
         if (!entries.every(([index]) => sameItemTransform(doc.map, next.value, index))) {
-          commit({ ...doc, map: next.value })
+          const structure = withCarriedPoints(doc.structure, (id) => {
+            const item = doc.map.items[indexOfKey(doc.ids, id)]
+            return item === undefined ? undefined : editTransform(item)
+          }, transforms)
+          commit({ ...doc, map: next.value, structure: structure ?? doc.structure })
         }
         return true
       }
@@ -1239,6 +1273,31 @@ export const useEditor = create<EditorState>()((set, get) => {
       const { doc, selectedIds, enteredGroupId } = get()
       commitStructure(withoutGroups(doc.structure, selectedGroupIds(doc.structure.tree, selectedIds, enteredGroupId)))
     },
+    setGroupPivot: (id, pivot) => commitStructure(withGroupPivot(get().doc.structure, id, pivot)),
+    freezeGroupPivot: (id) => {
+      const s = get()
+      const group = findGroup(s.doc.structure.tree, id)
+      const unit = group === undefined ? undefined : unitOf(group, unitContext(s, (key) => shownTransform(s, key)))
+      if (unit !== undefined) {
+        commitStructure(withGroupPivot(s.doc.structure, id, { choice: "point", world: unit.pivot }))
+      }
+    },
+    setChain: (id, chain) => commitStructure(withChain(get().doc.structure, id, chain)),
+    chainSelection: () => {
+      const { doc, selectedIds, enteredGroupId } = get()
+      const { tree } = doc.structure
+      // selection order is link order: the first selected is the root
+      const nodes = selectedIds.map((key) => clickLevelOf(tree, key, enteredGroupId).nodeId)
+      const ids = [...new Set(nodes)]
+      if (ids.length === 0) return
+      const id = freshKey()
+      const grouped = ids.length === 1 && findGroup(tree, ids[0] ?? "") !== undefined
+        ? { structure: doc.structure, id: ids[0] ?? "" }
+        : { structure: withGroup(doc.structure, ids, id), id }
+      if (grouped.structure === undefined) return
+      commitStructure(withChain(grouped.structure, grouped.id, true))
+    },
+    reverseChain: (id) => commitStructure(withReversedChain(get().doc.structure, id)),
     moveNodes: (nodeIds, parentGroupId, index) =>
       commitStructure(withMovedNodes(get().doc.structure, nodeIds, parentGroupId, index)),
 
@@ -1314,6 +1373,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setTool: (tool) => set({ tool }),
     toggleGizmoSpace: () =>
       set((s) => (s.tool === "scale" ? s : { gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
+    togglePivotMode: () => set((s) => ({ pivotMode: s.pivotMode === "together" ? "each" : "together" })),
     // The required chooser stays on top of everything: what would open behind it (the Game link's) waits for a launch.
     openDialog: (dialog) =>
       set((s) =>
@@ -1562,7 +1622,13 @@ export const shownValidation = ({ doc, validation }: Pick<TabState, "doc" | "val
 
 /** A doc's map as the game gets it: its groups are the projection of the structure (docs/FORMAT.md § Groups). */
 export const gameMapOf = (doc: Doc, catalog: CatalogIndex | null): MapFile =>
-  withGameGroups(doc.map, doc.ids, doc.structure.tree, catalog)
+  withGameGroups(
+    doc.map,
+    doc.ids,
+    doc.structure.tree,
+    catalog,
+    (group) => group.prefab === undefined ? undefined : instanceOrigin(doc, group, group.prefab)
+  )
 
 const INVALID_TRANSFORM = "That transform isn't valid for the game (non-finite or zero rotation)."
 
@@ -1658,9 +1724,9 @@ export const shownGizmoSpace = (s: EditorState): GizmoSpace => s.tool === "scale
 export interface SelectionPivot {
   /** The active (last selected) item's transform. */
   readonly active: UeTransform
-  /** Where the selection turns and scales, and the gizmo sits. */
+  /** Where the selection turns and scales, and the gizmo sits: the active unit's pivot. */
   readonly pivot: Vec3
-  /** What the gizmo's local axes follow. */
+  /** What the gizmo's local axes follow: the active unit's. */
   readonly rotation: Quat4
   /** The active item's pivot point, which grid snapping lands on. */
   readonly activePivot: Vec3
@@ -1669,13 +1735,72 @@ export interface SelectionPivot {
    * at `pivot` with no turn and no scale of its own, so a value typed there is a change about the frame.
    */
   readonly unit: UeTransform
+  readonly selection: SelectionUnits
+}
+
+/** How the units are read, given how to read an item's transform: the document, or a live edit. */
+const unitContext = (s: EditorState, transformOf: (id: string) => UeTransform | undefined): UnitContext => ({
+  tree: s.doc.structure.tree,
+  transformOf,
+  localPivotOf: (id) => pivotOf(s, id).localPosition,
+  boxOf: (keys) =>
+    placedBoxOf(
+      keys.flatMap((id) => {
+        const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
+        const transform = transformOf(id)
+        return item === undefined || transform === undefined ? [] : [{ item, transform }]
+      }),
+      s.catalogIndex
+    ),
+  // An instance's origin is the document's, carried along by a live move of its items.
+  instanceOriginOf: (group) => {
+    if (group.prefab === undefined) return undefined
+    const origin = instanceOrigin(s.doc, group, group.prefab)
+    const key = treeKeys([group]).find((id) => transformOf(id) !== undefined)
+    const inDoc = key === undefined ? undefined : s.doc.map.items[indexOfKey(s.doc.ids, key)]
+    const now = key === undefined ? undefined : transformOf(key)
+    if (origin === undefined || inDoc === undefined || now === undefined) return origin
+    return vecAdd(origin, vecSub(now.translation, editTransform(inDoc).translation))
+  },
+  liveOffsetOf: (keys) => {
+    let offset: Vec3 | undefined
+    for (const id of keys) {
+      const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
+      const now = transformOf(id)
+      if (item === undefined || now === undefined) return undefined
+      const d = vecSub(now.translation, editTransform(item).translation)
+      if (offset === undefined) offset = d
+      else if (!sameVec(offset, d)) return undefined
+    }
+    return offset
+  }
+})
+
+/** The items an edit of the selection reaches (`reachableKeys`): inside an entered chain, the carried links too. */
+export const editedKeys = (s: EditorState): ReadonlyArray<string> =>
+  reachableKeys(s.doc.structure.tree, s.selectedIds, s.enteredGroupId)
+
+/** The selection as units (docs/design/pivot-modes-and-chains.md § Units), read through `transformOf`. */
+export const selectionUnits = (
+  s: EditorState,
+  transformOf: (id: string) => UeTransform | undefined
+): SelectionUnits | undefined => selectionUnitsOf(s.selectedIds, s.enteredGroupId, unitContext(s, transformOf))
+
+/** The pivot setting as it applies to this selection: Each needs two or more units. */
+export const shownPivotMode = (s: EditorState): PivotMode =>
+  effectivePivotMode(s.pivotMode, selectionUnits(s, (id) => shownTransform(s, id)))
+
+/** The pivot dots to draw for the selection as shown (`pivotDotsOf`). */
+export const shownPivotDots = (s: EditorState): ReadonlyArray<PivotDotSpec> => {
+  const transformOf = (id: string) => shownTransform(s, id)
+  const selection = selectionUnits(s, transformOf)
+  return selection === undefined ? [] : pivotDotsOf(selection, s.pivotMode, unitContext(s, transformOf).boxOf)
 }
 
 /**
- * Where a selection pivots, given how to read an item's transform: the active item's pivot point and axes, or for exactly
- * one whole group its frame with no turn. That's a prefab instance's origin, carried along by a live move, or else what
- * Ctrl+G makes, the centre of the group's bounds (docs/FORMAT.md § Groups). The editor keeps no frame, so the second is
- * worked out afresh: after a turn the game's stays put and turned, and this one is the new bounds'.
+ * Where a selection pivots, given how to read an item's transform: the active unit's pivot point and axes. For an item
+ * that is its own pivot; for a whole group its pivot choice, by default what Ctrl+G makes, the centre of the group's
+ * bounds (docs/FORMAT.md § Groups), with no turn; for a prefab instance its origin, carried along by a live move.
  */
 export const selectionPivot = (
   s: EditorState,
@@ -1683,29 +1808,17 @@ export const selectionPivot = (
 ): SelectionPivot | undefined => {
   const activeKey = s.selectedIds.findLast((id) => transformOf(id) !== undefined)
   const active = activeKey === undefined ? undefined : transformOf(activeKey)
-  if (activeKey === undefined || active === undefined) return undefined
-  const activePivot = localToWorld(active, pivotOf(s, activeKey).localPosition)
-  const own = { active, pivot: activePivot, rotation: active.rotation, activePivot, unit: active }
-  const group = soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId)
-  if (group === undefined) return own
-  const frame = (pivot: Vec3): SelectionPivot => {
-    const unit = identityTransform(pivot)
-    return { ...own, pivot, rotation: unit.rotation, unit }
+  const selection = selectionUnits(s, transformOf)
+  if (activeKey === undefined || active === undefined || selection === undefined) return undefined
+  const unit = pivotUnitOf(selection, s.pivotMode)
+  return {
+    active,
+    pivot: unit.pivot,
+    rotation: unit.transform.rotation,
+    activePivot: localToWorld(active, pivotOf(s, activeKey).localPosition),
+    unit: unit.transform,
+    selection
   }
-  const origin = group.prefab === undefined ? undefined : instanceOrigin(s.doc, group, group.prefab)
-  const inDoc = s.doc.map.items[indexOfKey(s.doc.ids, activeKey)]
-  if (origin !== undefined && inDoc !== undefined) {
-    return frame(vecAdd(origin, vecSub(active.translation, editTransform(inDoc).translation)))
-  }
-  const box = placedBoxOf(
-    s.selectedIds.flatMap((id) => {
-      const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
-      const transform = transformOf(id)
-      return item === undefined || transform === undefined ? [] : [{ item, transform }]
-    }),
-    s.catalogIndex
-  )
-  return box === undefined ? own : frame(boxCentreOf(box))
 }
 
 /**
@@ -1713,9 +1826,10 @@ export const selectionPivot = (
  * game's Location field shows for one piece (docs/qa/gizmo-scale.md). Undefined for a whole group, which has its frame.
  */
 export const shownPivotPoint = (s: EditorState): Vec3 | undefined => {
-  if (soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId) !== undefined) return undefined
   const target = selectionPivot(s, (id) => shownTransform(s, id))
-  return target === undefined || sameVec(target.activePivot, target.active.translation) ? undefined : target.activePivot
+  if (target === undefined) return undefined
+  if (soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId) !== undefined) return undefined
+  return sameVec(target.activePivot, target.active.translation) ? undefined : target.activePivot
 }
 
 /** Edit transforms as the game would take them, so a drag stops at a decal's limits as it happens. */

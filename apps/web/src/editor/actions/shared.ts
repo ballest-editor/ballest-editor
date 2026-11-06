@@ -87,7 +87,7 @@ export const loadMapFile = Effect.fn("loadMapFile")(function*(
         })
       )
     )
-  const loaded = load(map, hash, decoded)
+  const loaded = load(map, hash, decoded, useEditor.getState().catalogIndex)
   const { unmatched } = loaded
   if (unmatched > 0) {
     useEditor.getState().notify(

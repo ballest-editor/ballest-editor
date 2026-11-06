@@ -110,6 +110,21 @@ const commands = {
       await send("Input.dispatchMouseEvent", { type: "mousePressed", ...press })
       await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...press })
     }),
+  // A left-button drag from (x0, y0) to (x1, y1) in page pixels, in steps, so a gizmo handle under the start is dragged.
+  drag: (x0, y0, x1, y1) =>
+    withPage(async (send) => {
+      const [ax, ay, bx, by] = [x0, y0, x1, y1].map(Number)
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: ax, y: ay })
+      await send("Input.dispatchMouseEvent", { type: "mousePressed", x: ax, y: ay, button: "left", clickCount: 1 })
+      const steps = 12
+      for (let i = 1; i <= steps; i++) {
+        const x = ax + ((bx - ax) * i) / steps
+        const y = ay + ((by - ay) * i) / steps
+        await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y, button: "left", buttons: 1 })
+        await sleep(16)
+      }
+      await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: bx, y: by, button: "left", clickCount: 1 })
+    }),
   key: (key) =>
     withPage(async (send) => {
       await send("Input.dispatchKeyEvent", { type: "keyDown", key })

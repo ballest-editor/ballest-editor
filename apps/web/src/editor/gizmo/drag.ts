@@ -105,7 +105,11 @@ export const dragDelta = (
       const angle = rotationStep === undefined
         ? free
         : snapValue((free * 180) / Math.PI, rotationStep) * Math.PI / 180
-      return { kind: "rotate", rotation: worldAxisAngleToGameQuat(dir, angle) }
+      const rotation = worldAxisAngleToGameQuat(dir, angle)
+      // along a local axis, the turn is one every unit can take about its own (domain/units.ts)
+      return spec.kind === "rotateAxis" && start.space === "local"
+        ? { kind: "rotate", rotation, frame: start.frameRotation }
+        : { kind: "rotate", rotation }
     }
     case "scaleAxis": {
       // The handle is measured along its world direction, but each item scales its own axis.
@@ -145,5 +149,5 @@ const translateDelta = (
   if (!local && grid !== undefined) {
     for (const [axis] of moves) offset[axis] = snapValue(grid.pivot[axis] + offset[axis], grid.size) - grid.pivot[axis]
   }
-  return { kind: "translate", offset }
+  return local ? { kind: "translate", offset, frame: start.frameRotation } : { kind: "translate", offset }
 }

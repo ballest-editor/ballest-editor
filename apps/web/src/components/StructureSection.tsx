@@ -3,6 +3,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { type ReactNode, useMemo, useState } from "react"
 import type { UeTransform } from "../domain/coords"
+import { counted } from "../domain/groupSelection"
 import { formatBoxSize, placedBoxOf } from "../domain/itemBounds"
 import { itemCountOf } from "../domain/mapDiff"
 import type { Item } from "../domain/MapFile"
@@ -104,6 +105,41 @@ export function GroupSection({ group, items, transforms, actions, children }: {
       </LabelledField>
       <TagsField id="group-tags" owner={group.id} tags={group.tags} />
       {children}
+    </div>
+  )
+}
+
+/**
+ * A chain (docs/design/pivot-modes-and-chains.md § Chains): its links in outline order, each hanging off the one before,
+ * so a turn in Each runs down them. Here: how many links, and the chain actions the Outline's menu has.
+ */
+export function ChainSection({ group }: { readonly group: GroupNode }) {
+  const setChain = useEditor((s) => s.setChain)
+  const reverseChain = useEditor((s) => s.reverseChain)
+  const links = group.children.length
+  if (group.prefab !== undefined) return null
+  return (
+    <div className="flex flex-col gap-2">
+      <SectionTitle>Chain</SectionTitle>
+      <p className="text-body text-fg-tertiary">
+        {group.chain === true
+          ? `${
+            counted(links, "link")
+          } in outline order, each hanging off the one before: a turn in Each runs down them.`
+          : "A chain's children hang off one another in outline order, so a turn in Each runs down them."}
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {group.chain === true
+          ? (
+            <>
+              <Button variant="outline" size="sm" disabled={links < 2} onClick={() => reverseChain(group.id)}>
+                Reverse
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setChain(group.id, false)}>Unchain</Button>
+            </>
+          )
+          : <Button variant="outline" size="sm" onClick={() => setChain(group.id, true)}>Make chain</Button>}
+      </div>
     </div>
   )
 }

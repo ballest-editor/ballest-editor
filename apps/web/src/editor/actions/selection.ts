@@ -5,6 +5,7 @@ import { selectableKeys, soleGroupOf } from "../../domain/groupSelection"
 import {
   type Axis,
   type AxisEdit,
+  readField,
   selectionAxisEdit,
   type TransformField,
   writeFieldAbout
@@ -12,7 +13,8 @@ import {
 import type { PropertyChange } from "../../domain/itemProperties"
 import type { FlipAxis } from "../../domain/mirror"
 import { type PivotChoice, pivotFor } from "../../domain/pivot"
-import { fitTransforms, pivotOf, selectionPivot, type SlotPaint, useEditor } from "../store"
+import { applyUnitEdit, type Unit } from "../../domain/units"
+import { editedKeys, fitTransforms, pivotOf, selectionPivot, type SlotPaint, useEditor } from "../store"
 
 export const transformSelection = (transforms: ReadonlyMap<string, UeTransform>): boolean =>
   useEditor.getState().transformItems(transforms)
@@ -62,13 +64,37 @@ const withSelectionEdit = (
   )
 
 /**
- * An axis edit made from the document transforms, as a change to the selection's unit (the active item, or a whole
- * group's frame) about the selection's pivot, like the gizmo.
+ * An axis edit made from the document transforms: the change it makes to the active unit (the active item, or a whole
+ * group's frame), applied by the pivot setting like a gizmo drag. Together takes every item through it about the
+ * active unit's pivot; Each takes each unit through the same change about its own pivot and axes.
  */
 const withAxisEdit = (field: TransformField, axis: Axis, edit: AxisEdit) => {
-  const target = selectionPivot(useEditor.getState(), docTransform)
+  const s = useEditor.getState()
+  const target = selectionPivot(s, docTransform)
   if (target === undefined) return new Map()
-  return withSelectionEdit(selectionAxisEdit(target.unit, field, axis, edit, target.pivot))
+  const from = readField(target.unit, field)[axis]
+  const to = edit.kind === "set" ? edit.value : from + edit.by
+  // a scale is a ratio of the active unit's value, which every unit takes; a move or turn is the same change
+  const forUnit = (unit: Unit): AxisEdit =>
+    field === "scale3D" && from !== 0
+      ? { kind: "set", value: readField(unit.transform, field)[axis] * to / from }
+      : { kind: "offset", by: to - from }
+  // inside an entered chain the links after a selected one come along
+  const transforms = new Map(
+    editedKeys(s).flatMap((id) => {
+      const t = docTransform(id)
+      return t === undefined ? [] : [[id, t] as const]
+    })
+  )
+  return fitTransforms(
+    s,
+    applyUnitEdit(
+      target.selection,
+      s.pivotMode,
+      transforms,
+      (unit) => selectionAxisEdit(unit.transform, field, axis, forUnit(unit), unit.pivot)
+    )
+  )
 }
 
 /**
@@ -91,8 +117,8 @@ export const previewSelectionAxis = (field: TransformField, axis: Axis, edit: Ax
 
 /**
  * Sets the pivot `choice` on every selected item, measured on each one's own bounds (one
- * undo step). Items whose bounds are unknown keep their pivot. A whole group turns and scales
- * about its frame, so it takes no pivot, as in the game.
+ * undo step). Items whose bounds are unknown keep their pivot. A whole group has a pivot of
+ * its own (`setGroupPivot`), so its items keep theirs.
  */
 export const setSelectionPivot = (choice: PivotChoice): void => {
   const { doc, selectedIds, enteredGroupId, catalogIndex, setItemPivots } = useEditor.getState()

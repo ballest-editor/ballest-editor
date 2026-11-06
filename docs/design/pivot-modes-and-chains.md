@@ -1,6 +1,6 @@
 # Design: Together and Each, group pivots, and chains
 
-Written 2026-11-06, after PR #220 (`c9fb0853c`) made every scale follow the game's rule. Nothing here is built.
+Written 2026-11-06, after PR #220 (`c9fb0853c`) made every scale follow the game's rule, and built the same day in one PR. What is true now is in [DESKTOP.md § Pivot setting](../DESKTOP.md#pivot-setting-together-and-each) and [§ Group pivots and chains](../DESKTOP.md#group-pivots-and-chains); this is the reasoning and what was measured.
 
 The problem that started it: two pieces side by side can't be scaled up without closing the gap between them, because #220 scales every selection about one shared point, as the game does. The fix the user settled on is a setting for what a selection pivots about, Together or Each, across Move, Rotate and Scale, and pivots that can be put where the gap is. On top of that, a chain: a group whose outline order is a hierarchy, so a turn runs down it as 3ds Max's "Rotating Multiple Linked Objects" shows.
 
@@ -94,8 +94,6 @@ This changes behaviour for anyone who typed "90" to set every piece's yaw to 90.
 **What the rows show.** The unit's value, which is the active piece's, with a Mixed mark on the row when the other pieces differ on an axis. A blank Mixed field gave nothing to type a change from; the active piece's value does, and it is where the gizmo sits. The Pivot section's Position row (#225) shows the pivot point itself, the game's Location, and an edit there is the same move.
 
 **Groups and instances.** A whole group is one unit, so it has Transform rows of its own, over its frame: Location is the pivot, editable as a move; Rotation and Scale read 0 and 1, since a group holds neither, and a value typed there is a change about the pivot, the way the game's panel treats a joined set. With an Item pivot (below) the rows read that item's values. The group's items keep their editor under "Edit all N items", without Transform rows, since the group's rows already do that job, and a pasted row there is what sets every member to one value. On an instance that editor says that an edit in it changes the instance away from its definition, which the unit rows never do: every edit of theirs is about the instance's origin.
-
-These two paragraphs are done on this branch, ahead of the setting; the rest of this section waits for Each.
 
 ## Showing it
 
@@ -195,4 +193,4 @@ What the game does and the editor copies: Together's maths, the no-shear scale r
 4. **feat: configurable group pivot.** The sidecar field, the Inspector's choice with Set pivot here, the frame on encode, the Point on import, the instance exception. Done when a turned group's gizmo stays put with an Item or Point pivot, and the in-game gizmo sits where the editor's does.
 5. **feat: chains.** The sidecar flag, Outline rows and menu, rotation down the chain in Each, carry inside an entered chain, Reverse. Done when a five-link chain turned 10 degrees in Each reads 10, 20, 30, 40, 50 on its links and exports as one flat group.
 
-Issue 3's Together half is first, since it is done. Issues 2 and the rest of 3 could be one PR; 4 and 5 should not be, since 5 needs 4's Item pivot and the carry rule needs its own review. Issue 1 is small and unblocks 2. Issue 4 builds on #225's Pivot section and Position row.
+All five landed together in #227, on top of #225's Pivot section and Position row. Of the open questions, the carry inside a chain has no modifier: Unchain is the escape. An instance's axes stay identity.

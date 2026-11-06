@@ -29,6 +29,7 @@ node $B open-map .dev-project/maps/<file>
 node $B eval '__ballest.useEditor.getState().doc.map.items.length'
 node $B click '[aria-label="Settings"]'
 node $B key Escape
+node $B drag 640 400 700 400             # a left-button drag between page pixels, for a gizmo handle
 node $B shot /tmp/after.png
 node $B stop                             # always: idle software WebGL burns about 8 cores
 ```

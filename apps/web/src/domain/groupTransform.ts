@@ -19,13 +19,31 @@ import {
   vecSub
 } from "./ueMath"
 
-/** What a gizmo drag does, independent of how many items it applies to. */
+/**
+ * What a gizmo drag does, independent of how many items it applies to. A move or turn measured along the gizmo's local
+ * axes carries `frame`, the rotation those axes were: `forUnit` turns it into the same move or turn along another
+ * unit's own axes, which is what Each does (units.ts).
+ */
 export type GroupDelta =
-  | { readonly kind: "translate"; readonly offset: Vec3 }
+  | { readonly kind: "translate"; readonly offset: Vec3; readonly frame?: Quat4 }
   /** A rotation about the pivot (game-space unit quaternion). */
-  | { readonly kind: "rotate"; readonly rotation: Quat4 }
+  | { readonly kind: "rotate"; readonly rotation: Quat4; readonly frame?: Quat4 }
   /** Scale each item by `factor` about the pivot: along its own `axis`, or uniformly. */
   | { readonly kind: "scale"; readonly factor: number; readonly axis?: Axis }
+
+/**
+ * `delta` as a unit with axes `rotation` takes it: a move or turn given along the frame's axes becomes the same move or
+ * turn along the unit's own. A world-axes delta, or a scale, is the same for every unit.
+ */
+export const forUnit = (delta: GroupDelta, rotation: Quat4): GroupDelta => {
+  if (delta.kind === "scale" || delta.frame === undefined) return delta
+  const toLocal = quatConjugate(delta.frame)
+  if (delta.kind === "translate") {
+    return { kind: "translate", offset: rotateVec(rotation, rotateVec(toLocal, delta.offset)) }
+  }
+  const local = quatMul(quatMul(toLocal, delta.rotation), delta.frame)
+  return { kind: "rotate", rotation: quatNormalize(quatMul(quatMul(rotation, local), quatConjugate(rotation))) }
+}
 
 const MIN_SCALE = 1e-3
 
@@ -120,7 +138,7 @@ export type AxisEdit = { readonly kind: "set"; readonly value: number } | {
  * the active item's rotator round-tripped through the quaternion, so only the edited angle
  * changes even near gimbal lock, where the item's other rotator angles are ambiguous.
  */
-const rotatorOffset = (active: UeTransform, axis: Axis, by: number): GroupDelta => {
+export const rotatorOffset = (active: UeTransform, axis: Axis, by: number): GroupDelta => {
   const rotator = readField(active, "rotation")
   const from = writeField(active, "rotation", rotator).rotation
   const to = writeField(active, "rotation", { ...rotator, [axis]: rotator[axis] + by }).rotation

@@ -240,9 +240,9 @@ The load-time rules are under [Load-time validation](#load-time-validation). The
 - One game group per outermost tree group with at least one item anywhere under it. A nested group has no game group of its own.
 - `members` is every item index under it, flattened and sorted.
 - `name` is the group's name, or the prefab's for a prefab instance, reduced to letters and digits, at most 64 of them, or empty when none are left.
-- `frame` is what Ctrl+G makes (above), with each member's bounds being its pivot bounds (§ Pivots) under its transform (`domain/itemBounds.ts`). A member with no known bounds counts as its translation, and so does every member while the catalog hasn't loaded.
+- `frame` is where the tree group pivots ([PROJECTS.md § The files](PROJECTS.md#the-files)): by default what Ctrl+G makes (above), with each member's bounds being its pivot bounds (§ Pivots) under its transform (`domain/itemBounds.ts`); a face of that box, a member's own pivot, a frozen point, a chain's first link, or a prefab instance's origin when the group has one of those. Rotation identity and scale 1 either way. A member with no known bounds counts as its translation, and so does every member while the catalog hasn't loaded.
 
-Going the other way, a map with no sidecar gets one tree group per game group, where its first member is. An unnamed one is called `Group`, and a member the game would refuse is left out.
+Going the other way, a map with no sidecar gets one tree group per game group, where its first member is. An unnamed one is called `Group`, and a member the game would refuse is left out. A frame more than 1 cm from the centre of the members' box, measured with the catalog's bounds, becomes the group's `point` pivot, so a gizmo the game kept somewhere is kept here too.
 
 ## Prefab file
 

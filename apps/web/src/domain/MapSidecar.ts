@@ -35,6 +35,23 @@ export const PrefabLink = Schema.Struct({
 })
 export type PrefabLink = typeof PrefabLink.Type
 
+/** The faces of the box around a group's items that its pivot can sit on, named as the game names an item's. */
+export const GROUP_PIVOT_FACES = ["Bottom", "Top", "Left", "Right", "Back", "Front"] as const
+export type GroupPivotFace = (typeof GROUP_PIVOT_FACES)[number]
+
+const WorldPoint = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
+
+/**
+ * Where a group turns and scales, and where its gizmo sits, when that isn't the centre of its items' box (the game's
+ * Ctrl+G frame, and the default): a face of that box, one member's own pivot, or a world point the user froze.
+ */
+export const GroupPivot = Schema.Union([
+  Schema.Struct({ choice: Schema.Literals(GROUP_PIVOT_FACES) }),
+  Schema.Struct({ choice: Schema.Literal("item"), key: NodeId }),
+  Schema.Struct({ choice: Schema.Literal("point"), world: WorldPoint })
+])
+export type GroupPivot = typeof GroupPivot.Type
+
 export interface ItemNode {
   readonly kind: "item"
   readonly key: string
@@ -47,6 +64,9 @@ export interface GroupNode {
   readonly tags: ReadonlyArray<string>
   readonly children: ReadonlyArray<TreeNode>
   readonly prefab?: PrefabLink
+  readonly pivot?: GroupPivot
+  /** A chain: its children, in this order, are its links, each hanging off the one before (docs/DESKTOP.md § Chains). */
+  readonly chain?: true
 }
 
 export type TreeNode = ItemNode | GroupNode
@@ -59,7 +79,9 @@ const TreeNode: Schema.Codec<TreeNode> = Schema.Union([
     name: Schema.String,
     tags: Tags,
     children: Schema.Array(Schema.suspend((): Schema.Codec<TreeNode> => TreeNode)),
-    prefab: Schema.optionalKey(PrefabLink)
+    prefab: Schema.optionalKey(PrefabLink),
+    pivot: Schema.optionalKey(GroupPivot),
+    chain: Schema.optionalKey(Schema.Literal(true))
   })
 ])
 
