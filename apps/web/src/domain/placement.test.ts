@@ -3,6 +3,7 @@ import { Schema } from "effect"
 import fixture from "./bundledCatalog.json"
 import { Catalog } from "./Catalog"
 import {
+  clearOfBoxes,
   footprintOf,
   nextInRun,
   pieceFootprint,
@@ -15,7 +16,8 @@ import {
   type PlacementView,
   runPoint,
   startPlacementRun,
-  wouldLandOn
+  wouldLandOn,
+  wouldStandIn
 } from "./placement"
 import { rotatorToQuat } from "./ueMath"
 
@@ -194,5 +196,59 @@ describe("placement runs", () => {
     assert.isFalse(wouldLandOn({ ...start, y: -600 }, 100, box, down))
     assert.isTrue(wouldLandOn({ ...start, x: 9000 }, 100, box, level), "a level view can't see the depth")
     assert.isFalse(wouldLandOn({ ...start, z: 1100 }, 100, box, level))
+  })
+
+  it("stands in a box its footprint meets, within the box's height", () => {
+    const box = cubeAt(start)
+    assert.isTrue(wouldStandIn(start, 100, box))
+    assert.isTrue(wouldStandIn({ ...start, z: 1000 }, 100, box))
+    assert.isTrue(wouldStandIn({ ...start, x: 2540 }, 100, box), "its half width reaches the box")
+    assert.isFalse(wouldStandIn({ ...start, x: 2560 }, 100, box))
+    assert.isFalse(wouldStandIn({ ...start, y: -560 }, 100, box))
+    assert.isFalse(wouldStandIn({ ...start, z: 1001 }, 100, box), "above it")
+    assert.isFalse(wouldStandIn({ ...start, z: -1 }, 100, box), "under it")
+  })
+
+  describe("clearOfBoxes", () => {
+    const clear = (boxes: ReadonlyArray<ReturnType<typeof cubeAt>>, view = down) =>
+      runPoint(clearOfBoxes(startPlacementRun(start), boxes, 1000, view, 10), view)
+    const slots = (count: number) => steps(count - 1, down).map((run) => runPoint(run, down))
+
+    it("keeps a slot nothing stands in", () => {
+      assert.deepStrictEqual(clear([]), start)
+      assert.deepStrictEqual(clear([cubeAt({ ...start, x: 9000 })]), start)
+    })
+
+    it("steps once off a box on the first slot", () => {
+      assert.deepStrictEqual(clear([cubeAt(start)]), { ...start, y: 1100 })
+    })
+
+    it("goes on to the next free slot, wrapping to a new row", () => {
+      const row = slots(PLACEMENT_COLUMNS)
+      assert.deepStrictEqual(clear(row.slice(0, 2).map(cubeAt)), row[2])
+      assert.deepStrictEqual(clear(row.map(cubeAt)), { ...start, x: 3100 })
+    })
+
+    it("walks off a box wider than a row, a slot at a time", () => {
+      const wide = { min: { x: 1000, y: -4000, z: 0 }, max: { x: 3000, y: 4000, z: 1000 } }
+      assert.deepStrictEqual(clear([wide]), { ...start, x: 4200 })
+    })
+
+    it("leaves the piece on a platform under the spot, or below a box over it", () => {
+      const platform = { min: { x: -9000, y: -9000, z: -200 }, max: { x: 9000, y: 9000, z: -1 } }
+      const overhead = { min: { x: -9000, y: -9000, z: 500 }, max: { x: 9000, y: 9000, z: 900 } }
+      assert.deepStrictEqual(clear([platform, overhead]), start)
+    })
+
+    it("keeps the run's slot when no slot in reach is free", () => {
+      const huge = { min: { x: -1e6, y: -1e6, z: -100 }, max: { x: 1e6, y: 1e6, z: 100 } }
+      assert.deepStrictEqual(clear([huge]), start)
+    })
+
+    it("carries on from where the run has got to", () => {
+      const run = nextInRun(startPlacementRun(start), cubeAt(start), 1000, down, 10)
+      const blocked = cubeAt(runPoint(run, down))
+      assert.deepStrictEqual(runPoint(clearOfBoxes(run, [blocked], 1000, down, 10), down), { ...start, y: 2200 })
+    })
   })
 })
