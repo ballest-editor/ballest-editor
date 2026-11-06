@@ -14,9 +14,10 @@ export const SKY_DOME_RADIUS = 60_000
 
 /**
  * Where the sky fades in, on the dome, from below the grid's height to above it (cm): the far floor hazes into the
- * horizon instead of ending in a flat band of the clear colour. About 20° below and 3° above, seen from the floor.
+ * horizon instead of ending in a flat band of the clear colour. 3° above, seen from the floor, and about 20° below in
+ * light; 7° in dark, where a bright sky over a near-black floor would otherwise light up a third of the pane.
  */
-const SKY_HAZE_BELOW = SKY_DOME_RADIUS * 0.34
+export const SKY_HAZE_BELOW = { dark: SKY_DOME_RADIUS * 0.12, light: SKY_DOME_RADIUS * 0.34 } as const
 const SKY_HAZE_ABOVE = SKY_DOME_RADIUS * 0.05
 
 /** Exposure on the visible sky; the game's auto exposure has no counterpart here. */
@@ -41,6 +42,7 @@ uniform float uStars;
 uniform float uGain;
 uniform vec3 uGround;
 uniform float uClipY;
+uniform float uHazeBelow;
 varying vec3 vDir;
 
 float ballestHash( vec2 p ) {
@@ -69,7 +71,7 @@ void main() {
     // How far above the grid's height this direction meets the dome (from the exact
     // direction, not the faceted mesh); the sky fades in around there.
     float above = cameraPosition.y + d.y * ${SKY_DOME_RADIUS.toFixed(1)} - uClipY;
-    alpha = smoothstep( ${(-SKY_HAZE_BELOW).toFixed(1)}, ${SKY_HAZE_ABOVE.toFixed(1)}, above );
+    alpha = smoothstep( -uHazeBelow, ${SKY_HAZE_ABOVE.toFixed(1)}, above );
     if ( alpha <= 0.0 ) discard;
     color += uSun * clamp( 1.0 - abs( dot( d, uToSun ) - 1.0 ) / ${SUN_RADIUS.toFixed(6)}, 0.0, 1.0 );
   #endif
@@ -101,7 +103,8 @@ const skyUniforms = (kind: SkyKind) => ({
   uGain: { value: skyGain[kind] },
   uGround: { value: new THREE.Color() },
   /** World height (scene units) of the grid, which the visible dome's fade is measured from. */
-  uClipY: { value: -Infinity }
+  uClipY: { value: -Infinity },
+  uHazeBelow: { value: SKY_HAZE_BELOW.light }
 })
 
 /**

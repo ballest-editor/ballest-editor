@@ -31,7 +31,7 @@ import { OrthoGrid } from "./OrthoGrid"
 import { panePointer, perspectiveOnly } from "./paneCameras"
 import { drawEveryPane, PaneRenderer, useBeforePaneDraw } from "./PaneRenderer"
 import { droppedPrefab, isPrefabDrag } from "./prefabDrag"
-import { GROUP_BOX_COLORS, SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
+import { GROUP_BOX_COLORS, ORTHO_GROUND, SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
@@ -39,7 +39,7 @@ import { SKY_DOME_RADIUS } from "./sky"
 import { groupBoxOf, type SelectMode, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
 import { glbUrl, visualsOf } from "./visuals"
-import { waterTopMaterial, waterUnderMaterial } from "./water"
+import { setWaterTheme, waterTopMaterial, waterUnderMaterial } from "./water"
 
 const CLICK_SLOP_PX = 4
 
@@ -229,11 +229,11 @@ function SmoothResize() {
   return null
 }
 
-/** The clear colour follows the theme, as does the container behind the canvas (sceneBackgroundClass). */
+/** The clear colour follows the theme and the pane's projection, and the container behind the canvas the theme (sceneBackgroundClass). */
 function ViewportBackground() {
   const gl = useThree((s) => s.gl)
-  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
-  useEffect(() => gl.setClearColor(dark ? SCENE_COLORS.dark : SCENE_COLORS.light), [gl, dark])
+  const theme = useDarkTheme(useEditor((s) => s.settings.appearance.theme)) ? "dark" : "light"
+  useBeforePaneDraw(({ view }) => gl.setClearColor((view === undefined ? SCENE_COLORS : ORTHO_GROUND)[theme]))
   return null
 }
 
@@ -292,10 +292,12 @@ const WATER_POSITION = toTuple3(ueToThreeVector({ ...WATER.center, z: WATER.heig
 
 /** The level's water sheet (see water.ts). Not in the click raycast (that only walks the items). */
 function Water() {
-  const visible = useEditor((s) => s.settings.appearance.waterVisible)
+  const appearance = useEditor((s) => s.settings.appearance)
+  const dark = useDarkTheme(appearance.theme)
+  useEffect(() => setWaterTheme(dark ? "dark" : "light"), [dark])
   const geometry = useMemo(() => new THREE.PlaneGeometry(WATER.size, WATER.size), [])
   useEffect(() => () => geometry.dispose(), [geometry])
-  if (!visible) return null
+  if (!appearance.waterVisible) return null
   return (
     <group position={WATER_POSITION} rotation={[-Math.PI / 2, 0, 0]}>
       <mesh geometry={geometry} material={waterTopMaterial} renderOrder={1} />

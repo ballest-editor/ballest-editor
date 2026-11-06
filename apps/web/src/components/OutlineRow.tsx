@@ -9,7 +9,7 @@ import type { OutlineRow } from "../domain/outline"
 import { useEditor } from "../editor/store"
 import { Ordinal } from "./Ordinal"
 import { type Glyph, hasOwnGlyph, itemGlyphOf } from "./outlineGlyphs"
-import { PieceThumbnail } from "./PieceThumbnail"
+import { PieceThumbnail, THUMBNAIL_TILE } from "./PieceThumbnail"
 
 export const OUTLINE_ROW_HEIGHT = 24
 export const OUTLINE_INDENT = 12
@@ -83,7 +83,7 @@ function PieceIcon({ piece, glyph }: { readonly piece: CatalogPiece; readonly gl
       {!loaded && createElement(glyph, { className: cn("size-4", GLYPH_COLOUR) })}
       <PieceThumbnail
         piece={piece}
-        className={cn("absolute top-0 left-0 size-4 rounded-control object-cover", loaded && "bg-muted")}
+        className={cn("absolute top-0 left-0 size-4 rounded-control object-cover", loaded && THUMBNAIL_TILE)}
         placeholder={null}
       />
     </span>
