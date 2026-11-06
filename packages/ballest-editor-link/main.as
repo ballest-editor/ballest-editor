@@ -188,7 +188,8 @@ void TakeSnapshot()
     haveSnapshot = true;
 }
 
-// Where a piece stands, to the millimetre and the tenth of a degree: enough to tell a move from a reading.
+// Where a piece stands, to the millimetre, the tenth of a degree and a thousandth of its scale: enough to tell an edit
+// from a reading.
 string PlaceOf(int id)
 {
     double x, y, z, pitch, yaw, roll, sx, sy, sz;
@@ -197,7 +198,7 @@ string PlaceOf(int id)
     Editor::GetRotation(id, pitch, yaw, roll);
     Editor::GetScale(id, sx, sy, sz);
     return Round(x) + "," + Round(y) + "," + Round(z) + "|" + Round(pitch) + "," + Round(yaw) + "," + Round(roll)
-        + "|" + Round(sx) + "," + Round(sy) + "," + Round(sz);
+        + "|" + Round(sx * 100) + "," + Round(sy * 100) + "," + Round(sz * 100);
 }
 
 string Round(double v)
