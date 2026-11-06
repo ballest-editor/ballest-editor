@@ -15,7 +15,7 @@ import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { type MouseEvent, type ReactNode, useMemo, useState } from "react"
-import { type CatalogPiece, paletteSections, pieceIdOf, unavailableReasonOf, verificationOf } from "../domain/Catalog"
+import { type CatalogPiece, type PalettePiece, pieceIdOf, unavailableReasonOf, verificationOf } from "../domain/Catalog"
 import { placementTransform } from "../domain/factory"
 import { pieceDisplayName, pieceLabelOf, type PieceSize, pieceTitleOf } from "../domain/pieceName"
 import { pieceFootprint } from "../domain/placement"
@@ -40,7 +40,7 @@ const UNVERIFIED_NOTE =
 const PLACED_FLASH =
   "relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:bg-primary/40 after:opacity-0 after:transition-opacity after:duration-500 active:after:opacity-100 active:after:duration-0"
 
-const matches = (piece: CatalogPiece, terms: ReadonlyArray<string>) => {
+const matches = (piece: PalettePiece, terms: ReadonlyArray<string>) => {
   const haystack = `${pieceLabelOf(piece)} ${piece.displayName ?? ""} ${piece.className} ${piece.meshAssetPath ?? ""} ${
     piece.category ?? ""
   }`
@@ -96,7 +96,7 @@ function HeaderButton({ label, pressed, disabled, onClick, children }: {
 }
 
 function PieceButton({ piece, category, view, onPlace, onHover, unavailable, unverified }: {
-  readonly piece: CatalogPiece
+  readonly piece: PalettePiece
   /** The section it is listed under. */
   readonly category: string
   readonly view: PiecesView
@@ -203,14 +203,17 @@ export function Palette() {
   const terms = useMemo(() => query.toLowerCase().split(/\s+/).filter((t) => t.length > 0), [query])
   const sections = useMemo(
     () =>
-      paletteSections(catalog?.catalog.pieces ?? [])
+      (index?.sections ?? [])
         .map((section) => ({
           ...section,
           pieces: terms.length === 0 ? section.pieces : section.pieces.filter((p) => matches(p, terms))
         }))
         .filter((section) => section.pieces.length > 0),
-    [catalog, terms]
+    [index, terms]
   )
+  // Base UI measures a scroll area when its viewport resizes, not when its content does, so each height of results gets
+  // its own: an empty search after the whole list would otherwise keep the list's scrollbar.
+  const results = sections.map((section) => `${section.name}:${section.pieces.length}`).join()
 
   // Placement only on a real pointer click: keyboard activation (Space/Enter on a focused
   // button) produces a click with detail === 0 and is ignored. Focus then moves to the
@@ -278,7 +281,7 @@ export function Palette() {
         <div className="px-3 py-2 text-body text-fg-tertiary">The piece catalog couldn't be loaded.</div>
       )}
       {catalog === null && booting ? <PaletteSkeleton /> : (
-        <ScrollArea className="min-h-0 flex-1">
+        <ScrollArea key={results} className="min-h-0 flex-1">
           <div className="flex flex-col gap-1 px-2 pb-2">
             {sections.map((section) => {
               // Searching opens every section with matches; otherwise hidden starts collapsed.

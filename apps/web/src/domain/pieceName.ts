@@ -14,7 +14,12 @@ export interface PieceName {
   readonly size: PieceSize | undefined
 }
 
-type Named = Pick<CatalogPiece, "className" | "displayName">
+/** What tells a piece from the others in its palette section that read the same (`withOrdinals`). */
+export interface Ordinal {
+  readonly ordinal?: number
+}
+
+type Named = Pick<CatalogPiece, "className" | "displayName"> & Ordinal
 
 const SIZE_WORDS: Readonly<Record<PieceSize, string>> = { S: "Small", M: "Medium", L: "Large" }
 
@@ -115,10 +120,12 @@ const fromClassName = (className: string): PieceName => {
  * A piece's name in words and its size, for anywhere a piece is named: "Bevel_C Hump S" is "Bevel Corner Hump Shallow"
  * with no size, and "Curve1 S" is "Curve 1" sized S. Pure and deterministic; pass `{ className }` for a class the catalog
  * doesn't know. Show the size as a tag beside the name, or use `pieceLabelOf` where there is room for one string only.
- * The class name stays out of the name: show it in a tooltip.
+ * The class name stays out of the name: show it in a tooltip. A piece's ordinal ends the name, before the size.
  */
-export const pieceDisplayName = (piece: Named): PieceName =>
-  piece.displayName ? fromGameName(piece.displayName, piece.className) : fromClassName(piece.className)
+export const pieceDisplayName = (piece: Named): PieceName => {
+  const read = piece.displayName ? fromGameName(piece.displayName, piece.className) : fromClassName(piece.className)
+  return piece.ordinal === undefined ? read : { ...read, name: `${read.name} ${piece.ordinal}` }
+}
 
 const joined = (piece: Named, separator: string): string => {
   const { name, size } = pieceDisplayName(piece)
@@ -150,6 +157,27 @@ export const inSizeOrder = <P extends Named>(pieces: ReadonlyArray<P>): Readonly
     return (families.get(name) ?? [])
       .toSorted((a, b) => SIZE_RANKS[a.size] - SIZE_RANKS[b.size])
       .map((member) => member.piece)
+  })
+}
+
+/**
+ * Numbers the pieces in a list that read the same: classes the game doesn't name differ only by the hash the name drops,
+ * so seven read "Boolean Arena White". The first keeps the plain name, and the rest count from 2, past any number
+ * another piece's name already has.
+ */
+export const withOrdinals = <P extends Named>(pieces: ReadonlyArray<P>): ReadonlyArray<P> => {
+  const taken = new Set(pieces.map((piece) => pieceLabelOf(piece)))
+  const next = new Map<string, number>()
+  return pieces.map((piece) => {
+    const label = pieceLabelOf(piece)
+    let ordinal = next.get(label)
+    if (ordinal === undefined) {
+      next.set(label, 2)
+      return piece
+    }
+    while (taken.has(pieceLabelOf({ ...piece, ordinal }))) ordinal += 1
+    next.set(label, ordinal + 1)
+    return { ...piece, ordinal }
   })
 }
 

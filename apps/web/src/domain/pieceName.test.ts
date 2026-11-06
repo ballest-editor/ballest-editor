@@ -4,7 +4,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import { repoRoot } from "../test/samples"
 import { Catalog, paletteSections } from "./Catalog"
-import { inSizeOrder, pieceDisplayName, pieceLabelOf, pieceTitleOf } from "./pieceName"
+import { inSizeOrder, pieceDisplayName, pieceLabelOf, pieceTitleOf, withOrdinals } from "./pieceName"
 
 const game = (displayName: string, className: string) => pieceDisplayName({ displayName, className })
 
@@ -139,6 +139,47 @@ describe("inSizeOrder", () => {
   })
 })
 
+describe("withOrdinals", () => {
+  const labels = (...classNames: ReadonlyArray<string>) =>
+    withOrdinals(classNames.map((className) => ({ className }))).map(pieceLabelOf)
+
+  it("numbers the pieces that read the same from 2, and leaves the first and the rest alone", () => {
+    assert.deepStrictEqual(
+      labels(
+        "Boolean_04A2A514_MI_ArenaWhite",
+        "Box_005FE104",
+        "Boolean_1459EA0F_MI_ArenaWhite",
+        "Boolean_3024C8A1_MI_ArenaWhite"
+      ),
+      ["Boolean Arena White", "Box", "Boolean Arena White 2", "Boolean Arena White 3"]
+    )
+  })
+
+  it("skips a number another piece's name already has", () => {
+    assert.deepStrictEqual(labels("Box_005FE104", "Box_2", "Box_84A9059E"), ["Box", "Box 2", "Box 3"])
+  })
+
+  it("keeps the size out of the comparison's way: sizes of one name aren't duplicates, and the number comes before one", () => {
+    const pieces = [
+      { displayName: "Curve1 S", className: "BP_A" },
+      { displayName: "Curve1 M", className: "BP_B" },
+      { displayName: "Curve1 M", className: "BP_C" }
+    ]
+    assert.deepStrictEqual(withOrdinals(pieces).map(pieceTitleOf), [
+      "Curve 1 · Small",
+      "Curve 1 · Medium",
+      "Curve 1 2 · Medium"
+    ])
+  })
+
+  it("keeps the class, and hands back a piece that needs no number as it came", () => {
+    const pieces = [{ className: "Box_005FE104" }, { className: "Box_84A9059E" }]
+    const [first, second] = withOrdinals(pieces)
+    assert.strictEqual(first, pieces[0])
+    assert.strictEqual(second?.className, "Box_84A9059E")
+  })
+})
+
 // assets/catalog.json is git-tracked extractor output; the suite skips it if a checkout lacks it.
 const catalogPath = path.join(repoRoot, "assets", "catalog.json")
 
@@ -157,6 +198,13 @@ describe.skipIf(!fs.existsSync(catalogPath))("the real catalog", () => {
     const palette = pieces().filter((p) => p.inPalette !== false)
     const labels = palette.map((p) => `${p.category ?? ""}: ${pieceLabelOf(p)}`)
     assert.deepStrictEqual(labels.filter((label, i) => labels.indexOf(label) !== i), [])
+  })
+
+  it("tells every piece in a palette section apart, Hidden included", () => {
+    for (const section of paletteSections(pieces())) {
+      const labels = section.pieces.map(pieceLabelOf)
+      assert.deepStrictEqual(labels.filter((label, i) => labels.indexOf(label) !== i), [], section.name)
+    }
   })
 
   it("lists every family in the palette together, smallest first", () => {
