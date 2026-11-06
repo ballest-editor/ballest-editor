@@ -15,6 +15,7 @@ import {
   paneSplitDown,
   paneSplitRight,
   panesToDraw,
+  toolStripOf,
   ViewLayout,
   type ViewLayoutKind,
   viewLayoutKinds,
@@ -29,28 +30,42 @@ const layoutOf = (kind: ViewLayoutKind, splitX = 0.5, splitY = 0.5): ViewLayout 
 })
 
 describe("pane rectangles", () => {
-  it("gives one rectangle per pane, and together they tile the canvas", () => {
+  it("gives one rectangle per pane, and together they tile the canvas above the tool strip", () => {
     for (const kind of viewLayoutKinds) {
       const rects = paneRects(layoutOf(kind, 0.3, 0.7), 1001, 603)
       assert.strictEqual(rects.length, paneCountOf(kind))
       assert.deepStrictEqual(rects.map((r) => r.slot), rects.map((_, i) => i))
-      assert.strictEqual(rects.reduce((area, r) => area + r.width * r.height, 0), 1001 * 603)
+      assert.strictEqual(rects.reduce((area, r) => area + r.width * r.height, 0), 1001 * (603 - toolStripOf(kind)))
     }
   })
 
+  it("keeps a 44px strip under several panes, and none under one", () => {
+    assert.strictEqual(toolStripOf("single"), 0)
+    for (const kind of ["columns", "rows", "quad"] as const) {
+      assert.strictEqual(toolStripOf(kind), 44)
+      const lowest = Math.max(...paneRects(layoutOf(kind), 1000, 600).map((r) => r.y + r.height))
+      assert.strictEqual(lowest, 556)
+    }
+    assert.strictEqual(paneRects(layoutOf("single"), 1000, 600)[0]?.height, 600)
+  })
+
+  it("gives no pane a negative height on a canvas shorter than the strip", () => {
+    for (const { height } of paneRects(layoutOf("rows"), 1000, 30)) assert.strictEqual(height, 0)
+  })
+
   it("puts the dividers on whole pixels", () => {
-    const [left, right] = paneRects(layoutOf("columns", 0.333), 1000, 500)
+    const [left, right] = paneRects(layoutOf("columns", 0.333), 1000, 544)
     assert.deepStrictEqual(left, { slot: 0, x: 0, y: 0, width: 333, height: 500 })
     assert.deepStrictEqual(right, { slot: 1, x: 333, y: 0, width: 667, height: 500 })
   })
 
   it("reads four panes left to right, top to bottom", () => {
-    const rects = paneRects(layoutOf("quad", 0.25, 0.75), 400, 400)
+    const rects = paneRects(layoutOf("quad", 0.25, 0.75), 400, 444)
     assert.deepStrictEqual(rects.map((r) => [r.x, r.y]), [[0, 0], [100, 0], [0, 300], [100, 300]])
   })
 
   it("finds the pane under a point, and the nearest for a drag that left the canvas", () => {
-    const rects = paneRects(layoutOf("quad"), 400, 400)
+    const rects = paneRects(layoutOf("quad"), 400, 444)
     assert.strictEqual(paneRectAt(rects, 10, 10).slot, 0)
     assert.strictEqual(paneRectAt(rects, 200, 200).slot, 3) // a divider belongs to the pane after it
     assert.strictEqual(paneRectAt(rects, 399, 10).slot, 1)

@@ -100,11 +100,19 @@ const panesOf = (kind: ViewLayoutKind, width: number, height: number, x: number,
   }
 }
 
-/** The panes of `layout` on a canvas of this size; the dividers land on whole pixels. */
-export const paneRects = (layout: ViewLayout, width: number, height: number): Panes =>
-  panesOf(layout.kind, width, height, Math.round(width * layout.splitX), Math.round(height * layout.splitY))
+/** The strip kept under several panes (px): the tool bar sits in it, so no pane edge runs under the tool bar. */
+const TOOL_STRIP_HEIGHT = 44
 
-/** The panes of `layout` as shares of the viewport, for what's laid out over the canvas. */
+/** How much of the canvas's foot the panes leave to the tool bar: one pane has it floating over it instead. */
+export const toolStripOf = (kind: ViewLayoutKind): number => paneCountOf(kind) > 1 ? TOOL_STRIP_HEIGHT : 0
+
+/** The panes of `layout` on a canvas of this size, above its tool strip; the dividers land on whole pixels. */
+export const paneRects = (layout: ViewLayout, width: number, height: number): Panes => {
+  const area = Math.max(height - toolStripOf(layout.kind), 0)
+  return panesOf(layout.kind, width, area, Math.round(width * layout.splitX), Math.round(area * layout.splitY))
+}
+
+/** The panes of `layout` as shares of the area above the tool strip, for what's laid out over the canvas. */
 export const paneShares = (layout: ViewLayout): Panes => panesOf(layout.kind, 1, 1, layout.splitX, layout.splitY)
 
 /** The pane under a point on the canvas; one just past the edge (a captured drag) counts as the nearest. */

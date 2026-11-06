@@ -8,6 +8,7 @@ import { threeToUeVector, ueToThreeVector, type Vec3 } from "../domain/coords"
 import {
   clampCmPerPixel,
   distanceForScale,
+  mixFov,
   nearestOrthoView,
   ORTHO_AXES,
   orthoFraming,
@@ -16,6 +17,7 @@ import {
   zoomAtPointer
 } from "../domain/orthoView"
 import type { PlacementView } from "../domain/placement"
+import type { ScreenAxes } from "../domain/viewGizmo"
 import {
   isOrthoView,
   type OrthoView,
@@ -46,6 +48,10 @@ const ORTHO_STANDOFF = FAR / 2
 /** The pivot ahead of a perspective camera that has none in front of it. */
 const ORBIT_DISTANCE = 1500
 const FRAME_OFFSET = new THREE.Vector3(-1, 0.8, 1).normalize()
+/** How long a pane takes to change what it looks along (ms), before Settings › Appearance scales it. */
+export const VIEW_TWEEN_MS = 150
+/** The field of view an orthographic view eases to or from: narrow enough that the last frame's step can't be seen. */
+const FLAT_FOV = 5
 /** The least a focused pane shows (cm), so one small piece doesn't fill it. */
 export const FOCUS_SPAN = 300
 /** The same for a map with nothing in it, or nearly. */
@@ -62,10 +68,32 @@ export const onPaneScaleChange = (listener: () => void): () => void => {
   return () => void scaleListeners.delete(listener)
 }
 
+/** A view as the eye takes it: what it centres on, how it is turned, the size it shows that at, and how flat it is. */
+interface ViewPose {
+  readonly centre: THREE.Vector3
+  readonly quaternion: THREE.Quaternion
+  readonly cmPerPixel: number
+  readonly fov: number
+}
+
+const mixPoses = (from: ViewPose, to: ViewPose, t: number): ViewPose => ({
+  centre: from.centre.clone().lerp(to.centre, t),
+  quaternion: from.quaternion.clone().slerp(to.quaternion, t),
+  cmPerPixel: from.cmPerPixel * (to.cmPerPixel / from.cmPerPixel) ** t,
+  fov: mixFov(from.fov, to.fov, t)
+})
+
 /** One slot's view of a map: both its cameras, and which is in use. */
 export class PaneCamera {
   readonly perspective = new THREE.PerspectiveCamera(60, 1, NEAR, FAR)
   readonly orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR)
+  /**
+   * What draws the pane while it eases to a new view. The two above are already there, so picking and the gizmo never
+   * wait on the picture. It sees the map alone: the sky and both grids belong to where it started or where it's going.
+   */
+  private readonly tweenCamera = new THREE.PerspectiveCamera(60, 1, NEAR, FAR)
+  /** Where the picture is on its way to the view; `undefined` when it's there. */
+  private tween: { readonly from: ViewPose; shown: ViewPose; startedAt: number | undefined } | undefined
   /** The perspective camera's orbit pivot; what an orthographic view is centred on. */
   readonly target = new THREE.Vector3()
   projection: ViewProjection = "perspective"
@@ -90,6 +118,11 @@ export class PaneCamera {
     return isOrthoView(this.projection) ? this.projection : undefined
   }
 
+  /** What the pane draws with: `camera`, but for the moments it eases to a new view. */
+  get drawCamera(): THREE.PerspectiveCamera | THREE.OrthographicCamera {
+    return this.tween === undefined ? this.camera : this.tweenCamera
+  }
+
   /** Follows the pane's size and the FOV setting (a constant vertical FOV, so the width shows more or less). */
   resize(width: number, height: number, verticalFov: number): void {
     if (width === this.width && height === this.height && verticalFov === this.perspective.fov) return
@@ -101,9 +134,14 @@ export class PaneCamera {
     this.placeOrthographic()
   }
 
-  /** Changes what the pane looks along, keeping the point it looks at and the size it shows it at. */
+  /**
+   * Changes what the pane looks along, keeping the point it looks at and the size it shows it at. The cameras are there
+   * at once and the picture eases after them (`stepTween`), unless the pane hasn't been shown yet.
+   */
   setProjection(next: ViewProjection): void {
     if (next === this.projection) return
+    const from = this.tween?.shown ?? this.pose()
+    if (!this.needsFraming) this.tween = { from, shown: from, startedAt: undefined }
     const { perspective, orthographic } = this
     if (!isOrthoView(next)) {
       this.projection = next
@@ -116,6 +154,44 @@ export class PaneCamera {
     if (this.view === undefined) this.setScale(scaleForDistance(this.keepPivotAhead(), this.height, perspective.fov))
     this.projection = next
     this.placeOrthographic()
+  }
+
+  /**
+   * Moves the picture along its way to the view, `durationMs` from when it first steps; a change of view eases out like
+   * the chrome does (docs/design/ui-system.md § Motion). It heads for where the pane is now, so a drag or a wheel notch
+   * on the way isn't lost.
+   */
+  stepTween(now: number, durationMs: number): void {
+    const { tween } = this
+    if (tween === undefined) return
+    tween.startedAt ??= now
+    const t = durationMs > 0 ? (now - tween.startedAt) / durationMs : 1
+    if (t >= 1) {
+      this.tween = undefined
+      return
+    }
+    tween.shown = mixPoses(tween.from, this.pose(), 1 - (1 - t) ** 3)
+    const { centre, quaternion, cmPerPixel, fov } = tween.shown
+    const camera = this.tweenCamera
+    const distance = distanceForScale(cmPerPixel, this.height, fov)
+    camera.fov = fov
+    camera.aspect = this.width / Math.max(this.height, 1)
+    camera.far = FAR + distance // a flat view stands well back, however far out the pane is zoomed
+    camera.updateProjectionMatrix()
+    camera.quaternion.copy(quaternion)
+    camera.position.copy(centre).addScaledVector(new THREE.Vector3(0, 0, 1).applyQuaternion(quaternion), distance)
+  }
+
+  /** Which way the pane's picture runs in the game's axes, as it's drawn now. */
+  screenAxes(): ScreenAxes {
+    const { quaternion } = this.drawCamera
+    const axis = (x: number, y: number, z: number) => uePoint(new THREE.Vector3(x, y, z).applyQuaternion(quaternion))
+    return { right: axis(1, 0, 0), up: axis(0, 1, 0), toward: axis(0, 0, 1) }
+  }
+
+  /** Where the perspective camera stands (game space). */
+  eyePoint(): Vec3 {
+    return uePoint(this.perspective.position)
   }
 
   /** Puts the pivot ahead of the perspective camera if it's behind it, and answers how far along the view it is. */
@@ -214,6 +290,26 @@ export class PaneCamera {
         const { x, y, z } = toVector(ueToThreeVector(point)).project(camera)
         return { x, y, z }
       }
+    }
+  }
+
+  /** The view as it stands. */
+  private pose(): ViewPose {
+    const { perspective, orthographic, cmPerPixel } = this
+    if (this.view !== undefined) {
+      return {
+        centre: this.target.clone(),
+        quaternion: orthographic.quaternion.clone(),
+        cmPerPixel,
+        fov: FLAT_FOV
+      }
+    }
+    const ahead = this.keepPivotAhead()
+    return {
+      centre: perspective.position.clone().addScaledVector(perspective.getWorldDirection(new THREE.Vector3()), ahead),
+      quaternion: perspective.quaternion.clone(),
+      cmPerPixel: scaleForDistance(ahead, this.height, perspective.fov),
+      fov: perspective.fov
     }
   }
 

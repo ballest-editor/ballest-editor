@@ -21,8 +21,8 @@ import { useNow } from "../editor/useNow"
 import { SyncStatusChip } from "./SyncStatusChip"
 
 /**
- * Lifts the popover over the viewport's tool bar, 36px tall and 12px up from the status bar (`ToolBar`), so it never
- * hides it, wherever the dock's panels put the two.
+ * Lifts the popover over the viewport's tool bar, 36px tall and at most 12px up from the status bar (`ToolBar`), so it
+ * never hides it, wherever the dock's panels put the two.
  */
 const CLEARS_TOOL_BAR = 60
 

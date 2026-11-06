@@ -217,6 +217,133 @@ describe("what each camera sees", () => {
   })
 })
 
+describe("easing to a new view", () => {
+  const MS = 150
+
+  /** A framed perspective pane, three-quarters on to the origin. */
+  const shownPane = () => {
+    const pane = paneOn("perspective")
+    pane.needsFraming = false
+    pane.perspective.position.set(1500, 1200, 1500)
+    pane.perspective.lookAt(0, 0, 0)
+    pane.perspective.updateMatrixWorld()
+    return pane
+  }
+
+  it("starts from the picture the pane was showing", () => {
+    const pane = shownPane()
+    const { position, quaternion } = pane.perspective.clone()
+    pane.setProjection("right")
+    pane.stepTween(1000, MS)
+    assert.closeTo(pane.drawCamera.position.distanceTo(position), 0, 1e-6)
+    assert.closeTo(pane.drawCamera.quaternion.angleTo(quaternion), 0, 1e-6)
+  })
+
+  it("draws with the view's own camera after 150 ms", () => {
+    const pane = shownPane()
+    pane.setProjection("right")
+    pane.stepTween(1000, MS)
+    pane.stepTween(1149, MS)
+    assert.notStrictEqual(pane.drawCamera, pane.orthographic)
+    pane.stepTween(1150, MS)
+    assert.strictEqual(pane.drawCamera, pane.orthographic)
+  })
+
+  it("has the cameras there at once, for what picks and measures", () => {
+    const pane = shownPane()
+    pane.setProjection("top")
+    assert.strictEqual(pane.view, "top")
+    assert.strictEqual(pane.camera, pane.orthographic)
+  })
+
+  it("turns on the way, and most of the way early: it eases out", () => {
+    const pane = shownPane()
+    const start = pane.perspective.quaternion.clone()
+    pane.setProjection("top")
+    const end = pane.orthographic.quaternion
+    pane.stepTween(1000, MS)
+    pane.stepTween(1000 + MS / 2, MS)
+    const turned = pane.drawCamera.quaternion.angleTo(start) / end.angleTo(start)
+    assert.closeTo(turned, 0.875, 1e-6)
+  })
+
+  it("keeps the point it looks at the same size on the way", () => {
+    const pane = shownPane()
+    pane.setProjection("back")
+    pane.stepTween(1000, MS)
+    pane.stepTween(1060, MS)
+    const camera = pane.drawCamera
+    assert.instanceOf(camera, THREE.PerspectiveCamera)
+    if (!(camera instanceof THREE.PerspectiveCamera)) return
+    const shown = (2 * camera.position.distanceTo(pane.target) * Math.tan((camera.fov * Math.PI) / 360)) / HEIGHT
+    assert.closeTo(shown, pane.cmPerPixel, pane.cmPerPixel * 1e-6)
+  })
+
+  it("goes back to perspective the same way", () => {
+    const pane = shownPane()
+    pane.setProjection("top")
+    pane.stepTween(1000, MS)
+    pane.stepTween(2000, MS)
+    pane.setProjection("perspective")
+    pane.stepTween(3000, MS)
+    assert.notStrictEqual(pane.drawCamera, pane.perspective)
+    pane.stepTween(3200, MS)
+    assert.strictEqual(pane.drawCamera, pane.perspective)
+  })
+
+  it("picks up from where the picture is when the view changes again", () => {
+    const pane = shownPane()
+    pane.setProjection("top")
+    pane.stepTween(1000, MS)
+    pane.stepTween(1050, MS)
+    const shown = pane.drawCamera.quaternion.clone()
+    pane.setProjection("back")
+    pane.stepTween(1060, MS)
+    assert.closeTo(pane.drawCamera.quaternion.angleTo(shown), 0, 1e-6)
+  })
+
+  it("doesn't ease with animation off", () => {
+    const pane = shownPane()
+    pane.setProjection("right")
+    pane.stepTween(1000, 0)
+    assert.strictEqual(pane.drawCamera, pane.orthographic)
+  })
+
+  it("doesn't ease a pane that hasn't been shown yet", () => {
+    const pane = paneOn("top")
+    assert.strictEqual(pane.drawCamera, pane.orthographic)
+  })
+
+  it("sees the map alone, with neither the sky nor a grid", () => {
+    const pane = shownPane()
+    pane.setProjection("right")
+    pane.stepTween(1000, MS)
+    assert.isFalse(pane.drawCamera.layers.test(perspectiveOnly))
+    assert.isFalse(pane.drawCamera.layers.test(orthographicOnly))
+  })
+})
+
+describe("a pane's screen axes", () => {
+  it("say which way the game's axes run in an orthographic view", () => {
+    const { right, up, toward } = paneOn("top").screenAxes()
+    assert.closeTo(right.y, 1, 1e-9)
+    assert.closeTo(up.x, 1, 1e-9)
+    assert.closeTo(toward.z, 1, 1e-9)
+  })
+
+  it("match what the pane shows from any side", () => {
+    for (const view of orthoViews) {
+      const pane = paneOn(view)
+      const { right, up } = pane.screenAxes()
+      const centre = { x: WIDTH / 2, y: HEIGHT / 2 }
+      const step = (axis: Vec3) => ({ x: axis.x * 100, y: axis.y * 100, z: axis.z * 100 })
+      const scale = 100 / pane.cmPerPixel
+      assert.closeTo(apart(onScreen(pane, step(right)), { x: centre.x + scale, y: centre.y }), 0, 1e-3)
+      assert.closeTo(apart(onScreen(pane, step(up)), { x: centre.x, y: centre.y - scale }), 0, 1e-3)
+    }
+  })
+})
+
 describe("a tab's panes", () => {
   it("gives each tab its own cameras, and keeps them until the tab closes", () => {
     const first = paneCamerasOf("tab-a")
