@@ -7,7 +7,7 @@ import { type Difficulty, difficultyOf, withDifficulty } from "../../domain/mapT
 import { MapCodec } from "../../services/MapCodec"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { makeTestDisk, projectFile, TEST_PROJECT } from "../../test/desktopBridge"
-import { balledits, edit, fileNameOf, layerFor, noticesWhile, reset, s } from "../../test/editorActions"
+import { balledits, edit, fileNameOf, layerFor, noticesWhile, reset, s, twoMaps } from "../../test/editorActions"
 import { readSample } from "../../test/samples"
 import { followOpenMapEffect, freshMapEffect, openProjectMapFile, openStartingMap, patchProjectMapEffect } from "./maps"
 import { openProjectMap } from "./project"
@@ -94,16 +94,6 @@ describe("view layouts", () => {
 
 describe("map actions", () => {
   /** A project with the first two sample maps in it. */
-  const twoMaps = () => {
-    const first = fileNameOf(balledits[0]!)
-    const second = fileNameOf(balledits[1]!)
-    const disk = makeTestDisk({
-      [projectFile(first)]: readSample(balledits[0]!),
-      [projectFile(second)]: readSample(balledits[1]!)
-    })
-    return { first, second, disk }
-  }
-
   it.effect("opening a map gives it a tab of its own, or makes its tab active; an untouched fresh map gives way", () => {
     const { first, second, disk } = twoMaps()
     return Effect.gen(function*() {
@@ -192,7 +182,7 @@ describe("map actions", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("Project settings edits a map on disk through the save path, or in its tab when one has it open", () => {
+  it.effect("Project settings edits a map no tab has open through the save path", () => {
     const { first, second, disk } = twoMaps()
     return Effect.gen(function*() {
       yield* reset
@@ -202,7 +192,7 @@ describe("map actions", () => {
       const harder = (difficulty: Difficulty) => (map: MapFile) =>
         setLevelData(map, withDifficulty(map.worldSettings.levelData, difficulty))
       const saved = yield* patchProjectMapEffect(second, harder("expert"))
-      assert.strictEqual(saved?.fileName, second)
+      assert.strictEqual(saved.fileName, second)
       assert.notStrictEqual(disk.files.get(projectFile(second)), before)
       const patched = yield* MapCodec.use((codec) => codec.decode(disk.files.get(projectFile(second))!))
       assert.strictEqual(difficultyOf(patched.worldSettings.levelData), "expert")
@@ -211,29 +201,9 @@ describe("map actions", () => {
 
       // a rename moves the file, and the old one goes to the backups
       const renamed = yield* patchProjectMapEffect(second, (map) => setLevelNames(map, "Moved", "me"))
-      assert.strictEqual(renamed?.fileName, "Map_LevelEditorMain&Moved_me.balledit")
+      assert.strictEqual(renamed.fileName, "Map_LevelEditorMain&Moved_me.balledit")
       assert.isFalse(disk.files.has(projectFile(second)))
       assert.strictEqual(disk.backups[0]?.fileName, second)
-
-      // the map in the active tab: an undo step there, nothing written until it is saved
-      const was = disk.files.get(projectFile(first))
-      yield* patchProjectMapEffect(first, harder("baller"))
-      assert.strictEqual(difficultyOf(s().doc.map.worldSettings.levelData), "baller")
-      assert.isTrue(s().dirty)
-      assert.strictEqual(disk.files.get(projectFile(first)), was)
-      s().undo()
-      assert.notStrictEqual(difficultyOf(s().doc.map.worldSettings.levelData), "baller")
-
-      // a map open in another tab, edited meanwhile: the step lands in that tab's history
-      edit()
-      const firstTab = s().tabId
-      yield* openProjectMapFile(renamed!.fileName)
-      yield* patchProjectMapEffect(first, harder("medium"))
-      const other = s().parkedTabs.get(firstTab)!
-      assert.strictEqual(difficultyOf(other.doc.map.worldSettings.levelData), "medium")
-      assert.strictEqual(other.past.length, 2)
-      assert.strictEqual(disk.files.get(projectFile(first)), was)
-      assert.strictEqual(s().file?.name, renamed!.fileName)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 })

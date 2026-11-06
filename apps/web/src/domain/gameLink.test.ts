@@ -13,6 +13,7 @@ import {
   gameLinkRows,
   MUTABLE_KINDS,
   overriddenFolders,
+  pathCrumbs,
   playWithoutPluginNotice,
   PLUGIN_MANAGER_FOUND,
   PLUGIN_MANAGER_MISSING,
@@ -167,17 +168,46 @@ describe("Game link checklist", () => {
     })
   })
 
-  it("offers Install for a missing plugin and Update for an older one", () => {
+  it("offers Install with the version it installs for a missing plugin, and Update for an older one", () => {
     assert.deepInclude(byId(gameLinkRows(everything, plugin("missing"), isaac)).plugin, {
       state: "missing",
       title: "Not installed",
-      fixes: [{ _tag: "InstallPlugin", update: false }]
+      fixes: [{ _tag: "InstallPlugin", label: "Install 0.2.0" }]
     })
     assert.deepInclude(byId(gameLinkRows(everything, plugin("outdated", "0.1.0"), isaac)).plugin, {
       state: "missing",
       title: "Version 0.1.0 is installed",
-      fixes: [{ _tag: "InstallPlugin", update: true }]
+      fixes: [{ _tag: "InstallPlugin", label: "Update" }]
     })
+  })
+
+  it("writes a folder's path as a breadcrumb, from Steam when it is in a library", () => {
+    const prefix = "steamapps/compatdata/3339810/pfx/drive_c/users/steamuser/AppData/Local/Ballest/Saved"
+    assert.deepStrictEqual(pathCrumbs(`/home/player/.local/share/Steam/${prefix}/UserSavedMaps`), [
+      "Steam",
+      "compatdata",
+      "…",
+      "UserSavedMaps"
+    ])
+    assert.deepStrictEqual(pathCrumbs(`/mnt/games/SteamLibrary/${prefix}/UserSavedMaps`), [
+      "Steam",
+      "compatdata",
+      "…",
+      "UserSavedMaps"
+    ])
+    assert.deepStrictEqual(pathCrumbs("D:\\SteamLibrary\\steamapps\\common\\Ballest of Them All"), [
+      "Steam",
+      "common",
+      "Ballest of Them All"
+    ])
+    assert.deepStrictEqual(pathCrumbs("C:\\Users\\player\\AppData\\Local\\Ballest\\Saved\\UserSavedMaps"), [
+      "C:",
+      "Users",
+      "…",
+      "UserSavedMaps"
+    ])
+    assert.deepStrictEqual(pathCrumbs("/mnt/games/plugins"), ["mnt", "games", "plugins"])
+    assert.deepStrictEqual(pathCrumbs("/"), ["/"])
   })
 
   it("shows the creator in use and where it is from, and a name that can't be used", () => {

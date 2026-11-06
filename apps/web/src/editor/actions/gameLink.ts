@@ -2,7 +2,7 @@
  * The Game link (docs/DESKTOP.md § Renderer): the game's folders, the creator name, the plugin manager and the
  * editor's plugin, looked up at startup and on request; the notifications for what changed; Open game (Steam).
  */
-import { Effect, Option } from "effect"
+import { Duration, Effect, Equal, Option } from "effect"
 import { creatorOf } from "../../domain/creator"
 import {
   anythingMissing,
@@ -17,7 +17,7 @@ import {
 import { type GamePathKind, type GamePaths, Platform } from "../../services/Platform"
 import type { AppServices } from "../../services/runtime"
 import { useEditor } from "../store"
-import { run } from "./run"
+import { run, runUntilCleanup } from "./run"
 import { notifyNotice } from "./shared"
 
 /**
@@ -145,6 +145,35 @@ export const chooseGameLinkFolder = (which: GamePathKind) => run(chooseGameLinkF
 
 /** Check again on the Game link: the folders, the plugin and the creator, looked up afresh. */
 export const refreshGameLink = () => Promise.all([loadGamePaths(), findCreator()])
+
+/** How often Settings › Game looks again while it is open. */
+export const GAME_LINK_WATCH_INTERVAL = Duration.seconds(5)
+
+/**
+ * One look of the watch: what Check again looks up, through the same calls. It puts in the store only what changed, so
+ * a page where nothing did doesn't draw again, and it leaves a refused folder's reason on its row.
+ */
+const lookAtGameLink = Effect.gen(function*() {
+  const platform = yield* Platform
+  const paths = yield* platform.gamePaths
+  const plugin = yield* platform.pluginStatus
+  const creator = yield* platform.findCreator
+  const s = useEditor.getState()
+  if (!Equal.equals(s.gamePaths, paths)) s.setGamePaths(paths)
+  if (!Equal.equals(s.pluginStatus, plugin)) s.setPluginStatus(plugin)
+  if (!Equal.equals(s.foundCreator, creator)) s.setFoundCreator(creator)
+  yield* noteGameLink
+})
+
+/** Looks again every `GAME_LINK_WATCH_INTERVAL`, each look once the last is done; one that fails only waits for the next. */
+export const watchGameLinkEffect = Effect.sleep(GAME_LINK_WATCH_INTERVAL).pipe(
+  Effect.andThen(lookAtGameLink),
+  Effect.catch((error) => Effect.logWarning("Couldn't look at the Game link", error)),
+  Effect.forever
+)
+
+/** Keeps the Game link's rows live until the returned function is called. */
+export const watchGameLink = () => runUntilCleanup(watchGameLinkEffect, "Stopped watching the Game link")
 
 /** Goes back to the folders found through Steam, one after the other (each reset rewrites the desktop settings). */
 export const resetGamePaths = (kinds: ReadonlyArray<GamePathKind>) =>

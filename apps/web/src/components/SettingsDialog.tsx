@@ -37,7 +37,14 @@ import {
   wheelChordOf
 } from "../domain/Keybinds"
 import { CUSTOM_FOV_PRESET, defaultSettings, gridColorsOf, type Settings } from "../domain/Settings"
-import { refreshGameLink, resetGamePaths, resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
+import {
+  refreshGameLink,
+  resetGamePaths,
+  resetKeybinds,
+  saveKeybinds,
+  saveSettings,
+  watchGameLink
+} from "../editor/actions"
 import { type SettingsCategory, useCreator, useEditor } from "../editor/store"
 import { useDarkTheme } from "../editor/theme"
 import { creatorSettingsRow } from "./CreatorSetting"
@@ -302,6 +309,13 @@ export function SettingsDialog(props: {
   useEffect(() => {
     if (props.open && hasGame) void refreshGameLink()
   }, [props.open, hasGame])
+
+  // ...and keep looking while the Game page shows, so what the user fixes in another window flips its row by itself.
+  const onGamePage = props.open && hasGame && props.category === "game"
+  useEffect(() => {
+    if (!onGamePage) return
+    return watchGameLink()
+  }, [onGamePage])
 
   const update = <K extends keyof Settings>(section: K, patch: Partial<Settings[K]>) =>
     void saveSettings({ ...settings, [section]: { ...settings[section], ...patch } })

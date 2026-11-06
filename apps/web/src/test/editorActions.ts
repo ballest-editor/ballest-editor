@@ -10,7 +10,7 @@ import { MapCodec } from "../services/MapCodec"
 import { MapExporter } from "../services/MapExporter"
 import { MapPrefsStore } from "../services/MapPrefsStore"
 import { Platform } from "../services/Platform"
-import { makeTestDisk, testBridge, type TestDisk } from "../test/desktopBridge"
+import { makeTestDisk, projectFile, testBridge, type TestDisk } from "../test/desktopBridge"
 import { listSamples, readSample } from "../test/samples"
 
 export const s = () => useEditor.getState()
@@ -88,6 +88,17 @@ export const playSample = (published = false) => {
     label: mapLabelOf(name),
     text: published ? text.replace("\"levelPublishedFileId\": -1", "\"levelPublishedFileId\": 3561234567") : text
   }
+}
+
+/** A test disk whose project holds two sample maps, and their file names. */
+export const twoMaps = () => {
+  const first = fileNameOf(balledits[0]!)
+  const second = fileNameOf(balledits[1]!)
+  const disk = makeTestDisk({
+    [projectFile(first)]: readSample(balledits[0]!),
+    [projectFile(second)]: readSample(balledits[1]!)
+  })
+  return { first, second, disk }
 }
 
 /** A test disk holding `files`, with the editor's plugin installed in the game. */

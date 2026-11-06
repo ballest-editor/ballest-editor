@@ -219,13 +219,13 @@ A prefab is a reusable assembly, kept as a file in the game's format ([FORMAT.md
 
 ### Game link
 
-`components/GameLink.tsx`, with rows from `domain/gameLink.ts`, is the one place the app describes the game's install, its maps folder, the creator name (`useCreator()`), the plugin manager and the editor plugin. Settings › Game is its home: each row is a settings row with a state icon, its name, a one-line status ("Found", "Not found") and its buttons at the right of the name's line, and Check again is in the page's footer. `components/GameLinkDialog.tsx`, which opens by itself on the first launch or when Export's folders are missing, lists only the missing rows, each with what is wrong, and an Open Settings › Game button.
+`components/GameLink.tsx`, with rows from `domain/gameLink.ts`, is the one place the app describes the game's install, its maps folder, the creator name (`useCreator()`), the plugin manager and the editor plugin. Settings › Game is its home: each row is a settings row with a state icon, its name, a one-line status ("Found", "Not found"), its path as a breadcrumb under that ("Steam › compatdata › … › UserSavedMaps", `pathCrumbs`) and its buttons at the right of the name's line, and Check again is in the page's footer. While the page shows it looks everything up again every 5 seconds (`watchGameLink`), so a row flips by itself once the user fixes something in another window; the look updates only what changed and leaves a refused folder's reason on its row. `components/GameLinkDialog.tsx`, which opens by itself on the first launch or when Export's folders are missing, lists only the missing rows, each with what is wrong, and an Open Settings › Game button.
 
-The install, maps folder and plugin manager rows have Reveal, and a row's info icon holds how it was found and its full path, which the page shows nowhere else. A missing one carries its fix:
+A row with a path has Copy path, and the breadcrumb's tooltip holds the full path. The install, maps folder and plugin manager rows have Reveal, and a row's info icon says how it was found. A missing one carries its fix:
 
 - **The install:** Choose folder…, a folder dialog. A folder without the game's exe keeps the row marked missing with main's reason, and nothing is saved.
 - **The maps folder,** once the game is found: "Run the game once to create its maps folder" and Choose folder….
-- **The editor plugin:** Install or Update (§ Installing the plugin).
+- **The editor plugin:** Install with the version it installs ("Install 0.1.0"), or Update (§ Installing the plugin).
 - **The creator:** Set name… (Settings › General).
 
 A folder that is there has two icon buttons, each named by its tooltip: Reveal in file manager (a folder) and Choose folder… (a pencil). One chosen that way says "Chosen here", and its row's reset button (↺) looks it up again (`resetGamePaths`). An overridden folder marks the Game category and the row with the "modified" dot, and Reset game to defaults resets every chosen folder.
@@ -242,10 +242,14 @@ The dialog opens by itself when the startup check finds the game or its maps fol
 
 General has the project's name and its places:
 
-- The name is editable and goes into `ballest-project.json` through `renameProject` (IPC `ballest:project:rename`), and the folder keeps its name. In Untitled Project the field is empty, and typing a name names the project (`nameProject`), as the Save dialog does.
+- The name is editable, and Save puts it into `ballest-project.json` (IPC `ballest:project:rename`), and the folder keeps its name. In Untitled Project the field is empty, and saving a name names the project (`nameProjectEffect`), as the Save dialog does.
 - The places show their folder's name, with the path on hover, and a Reveal (`revealProject`, IPC `ballest:project:reveal` with `which`): the project folder, with Open another project… beside it; its `maps/`; its `.ballest/backups/`. In Untitled Project one row reads "Created when the project is named" in place of these. The game's maps folder, where exports go, has a Reveal too (`revealGamePath`).
 
-A map's Map page has the name, the file (its name, the path on hover, Reveal and Copy path) and Export on save. Its Workshop page has the difficulty and tags, and hovering a difficulty says how the game draws it. The Name field is how a map is renamed here, and it refuses a name the project has. The entry of a map open in a tab, active or not, edits that tab's document (undo steps there, saved when the tab is) and its prefs. A map not open anywhere is read from its file when its entry shows and edited on disk through the save path (`patchProjectMapEffect`: read, patch, `saveMap`, or `renameMap` when the name changed, so the old file goes to the backups), along with the prefs kept for it, and a rename carries the prefs and the entry to the new file.
+A map's Map page has the name, the file (its name, the path on hover, Reveal and Copy path) and Export on save. Its Workshop page has the difficulty, one slider with a stop per difficulty, and the tags, in groups that count what is chosen ("Gameplay · 3 of 16") with a Clear link. Hovering a stop says how the game draws that difficulty. The Name field is how a map is renamed here: a name it can't use, one the project has among them, goes back when the field is left.
+
+Edits wait in a buffer (`domain/settingsBuffer.ts`) until Save, and the footer has Revert and Save in place of Done. The buffer holds only what differs from what is saved, so an edit undone by hand leaves nothing to save. A page with unsaved edits has the dirty dot in the sidebar. A Workshop page shows only under the map showing, so another map's unsaved Workshop edits mark that map's entry. Revert drops every page's edits. Save writes them all and the dialog stays open; what fails is told and stays buffered. Leaving with unsaved edits (Escape, the close button, a click outside, Open another project…) asks first: Save, Don't save or Cancel. Closing the window doesn't ask, and the buffer goes with it.
+
+Save edits a map open in a tab, active or not, in that tab's document (one undo step there, saved when the tab is) and its prefs. A map not open anywhere is read from its file when its entry shows and written through the save path (`patchProjectMapEffect`: read, patch, `saveMap`, or `renameMap` when the name changed, so the old file goes to the backups), along with the prefs kept for it, and a rename carries the prefs and the entry to the new file.
 
 ### Status bar
 

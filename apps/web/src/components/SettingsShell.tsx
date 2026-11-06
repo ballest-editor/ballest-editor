@@ -25,6 +25,8 @@ export interface SettingsRow<C extends string> {
   readonly label: string
   /** One short line under the label; a string is searched too, a node needs `keywords` for that. */
   readonly description?: ReactNode
+  /** What goes under the description, on a line of its own (a folder's breadcrumb); put its text in `keywords`. */
+  readonly detail?: ReactNode
   /** The mechanics behind the short line, in the tooltip of an info icon beside the label; a string is searched too. */
   readonly info?: ReactNode
   /** A status icon before the label. The control then sits on the label's line, not centred on the row. */
@@ -53,6 +55,14 @@ export interface SettingsCategoryInfo<C extends string> {
   readonly icon: Icon
   /** A heading the nav shows above the first category of each section ("Maps"). */
   readonly section?: string
+}
+
+/** Settings that wait for Save: the footer has Revert and Save in place of Done, and a dot marks each page they touch. */
+export interface SettingsSave<C extends string> {
+  /** The pages with unsaved edits, each with a dot. Empty, Revert and Save are off. */
+  readonly unsaved: ReadonlySet<C>
+  readonly onSave: () => void
+  readonly onRevert: () => void
 }
 
 const isModified = (row: SettingsRow<string>): boolean => row.changes?.modified === true
@@ -127,6 +137,7 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
           {row.description}
         </span>
       )}
+      {row.detail}
     </div>
   )
   const trailing = row.action ?? (row.changes && <ResetButton {...row.changes} />)
@@ -185,7 +196,7 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
 
 /**
  * Desktop-style settings: category nav with search on the left, the category's rows on the
- * right, a footer with an optional "reset category" and Done. Changes apply as they are made.
+ * right, a footer with an optional "reset category" and Done. Changes apply as they are made, unless `save` holds them.
  */
 export function SettingsShell<C extends string>(props: {
   readonly open: boolean
@@ -206,6 +217,10 @@ export function SettingsShell<C extends string>(props: {
   readonly footerAction?: ReactNode
   /** Keeps the dialog open and Done disabled (e.g. while a keybind is being captured). */
   readonly busy?: boolean
+  /** Edits wait for Save, instead of applying as they are made. */
+  readonly save?: SettingsSave<C>
+  /** A dialog that opens over this one; inside its root, so Escape and a click outside it leave this one open. */
+  readonly children?: ReactNode
 }) {
   const [query, setQuery] = useState("")
   /** While searching, a category narrows the results; null shows every match. */
@@ -247,7 +262,8 @@ export function SettingsShell<C extends string>(props: {
   const trail = searching ? ["Search"] : props.crumbs ?? []
 
   const modifiedIn = (category: C) => props.rows.some((r) => r.category === category && isModified(r))
-  const { onResetCategory } = props
+  const { onResetCategory, save } = props
+  const unsaved = save !== undefined && save.unsaved.size > 0
 
   return (
     <Dialog open={props.open} onOpenChange={(next) => !next && props.busy !== true && props.onClose()}>
@@ -310,6 +326,8 @@ export function SettingsShell<C extends string>(props: {
                             {hits}
                           </span>
                         )
+                        : save?.unsaved.has(id) === true
+                        ? <span className="size-1.5 rounded-full bg-dirty" aria-label="Unsaved changes" />
                         : modifiedIn(id) && (
                           <span className="size-1.5 rounded-full bg-fg-tertiary" aria-label="Has changed settings" />
                         )}
@@ -374,10 +392,20 @@ export function SettingsShell<C extends string>(props: {
             )}
             <div className="ml-auto flex items-center gap-2">
               {!searching && props.footerAction}
-              <Button onClick={props.onClose} disabled={props.busy === true}>Done</Button>
+              {save === undefined
+                ? <Button onClick={props.onClose} disabled={props.busy === true}>Done</Button>
+                : (
+                  <>
+                    <Button variant="secondary" onClick={save.onRevert} disabled={!unsaved || props.busy === true}>
+                      Revert
+                    </Button>
+                    <Button onClick={save.onSave} disabled={!unsaved || props.busy === true}>Save</Button>
+                  </>
+                )}
             </div>
           </div>
         </div>
+        {props.children}
       </DialogContent>
     </Dialog>
   )

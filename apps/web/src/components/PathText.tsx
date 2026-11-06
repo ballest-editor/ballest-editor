@@ -1,7 +1,9 @@
-import type { Icon } from "@tabler/icons-react"
+import { type Icon, IconCheck, IconCopy } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
+import { useEffect, useState } from "react"
+import { copyText } from "../editor/actions"
 
 /**
  * A file path or file name, wherever one is shown: small, on one line. Too long for its room, it is cut at
@@ -57,5 +59,22 @@ export function PathAction({ label, icon: ActionIcon, onClick, disabled = false,
       </TooltipTrigger>
       <TooltipContent side="bottom">{label}</TooltipContent>
     </Tooltip>
+  )
+}
+
+/** Copies a path; the icon says it worked for a moment. */
+export function CopyPathAction({ path }: { readonly path: string }) {
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(false), 1500)
+    return () => clearTimeout(timer)
+  }, [copied])
+  return (
+    <PathAction
+      label={copied ? "Copied" : "Copy path"}
+      icon={copied ? IconCheck : IconCopy}
+      onClick={() => void copyText(path).then((done) => setCopied(done === true))}
+    />
   )
 }
