@@ -244,6 +244,8 @@ function NameInput(
     <Input
       className="w-56"
       value={value}
+      spellCheck={false}
+      autoComplete="off"
       aria-label="Map name"
       aria-invalid={problem !== null}
       title={problem ?? undefined}
@@ -494,6 +496,8 @@ function ProjectNameField(
       className="w-56"
       value={value}
       placeholder={saved === null ? "Untitled Project" : undefined}
+      spellCheck={false}
+      autoComplete="off"
       aria-label="Project name"
       aria-invalid={!valid}
       title={valid ? undefined : "Letters, digits, spaces, - and _ only."}

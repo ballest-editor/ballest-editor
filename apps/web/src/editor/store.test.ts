@@ -24,6 +24,7 @@ import {
   pivotOf,
   shownLighting,
   shownTransform,
+  shownValidation,
   useEditor
 } from "./store"
 
@@ -1458,5 +1459,54 @@ describe("view panes", () => {
     state().loadMap(initialMap(), null)
     assert.strictEqual(state().frameAllRequest, frameAllRequest + 1)
     assert.strictEqual(state().mapShownRequest, mapShownRequest + 1)
+  })
+})
+
+describe("the Validate result", () => {
+  const validated = () => {
+    mapWithCubes(0, 100)
+    state().validateDoc()
+    assert.isDefined(shownValidation(state()))
+  }
+
+  it("is there only once Validate has run", () => {
+    mapWithCubes(0)
+    assert.isUndefined(shownValidation(state()))
+  })
+
+  it("outlasts a selection change, which edits nothing", () => {
+    validated()
+    state().select([state().doc.ids[0]!])
+    state().deselect()
+    assert.isDefined(shownValidation(state()))
+  })
+
+  it("goes with the next edit, and undo is an edit of its own", () => {
+    validated()
+    moveItem(state().doc.ids[1]!, { x: 5, y: 0, z: 0 })
+    assert.isUndefined(shownValidation(state()))
+    state().undo()
+    assert.isDefined(shownValidation(state()), "the document it was run on, as it was")
+    moveItem(state().doc.ids[1]!, { x: 9, y: 0, z: 0 })
+    state().validateDoc()
+    state().undo()
+    assert.isUndefined(shownValidation(state()))
+  })
+
+  it("outlasts a Save, which edits nothing", () => {
+    validated()
+    const { doc } = state()
+    state().markSaved(state().tabId, doc, { ...doc.map }, { name: "saved.balledit", path: null })
+    assert.notStrictEqual(state().doc, doc)
+    assert.isDefined(shownValidation(state()))
+  })
+
+  it("stays with its tab", () => {
+    validated()
+    const { tabId } = state()
+    state().loadMap(startOnlyMap(), { name: "b.balledit", path: null }, undefined, { into: "newTab" })
+    assert.isUndefined(shownValidation(state()))
+    state().activateTab(tabId)
+    assert.isDefined(shownValidation(state()))
   })
 })

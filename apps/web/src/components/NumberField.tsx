@@ -227,6 +227,8 @@ export function NumberField(props: {
         id={id}
         aria-label={props.handle === false ? props.label : undefined}
         inputMode="decimal"
+        spellCheck={false}
+        autoComplete="off"
         className={cn(
           "h-full min-w-0 rounded-none border-0 bg-transparent px-1 py-0 text-right font-mono tabular-nums leading-none focus-visible:outline-none md:leading-none dark:bg-transparent",
           scrubbable && "cursor-ew-resize focus:cursor-text"

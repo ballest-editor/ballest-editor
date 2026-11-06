@@ -96,6 +96,7 @@ import {
 } from "../domain/structure"
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import type { Surfaces } from "../domain/surface"
+import { type MapValidation, validateMap } from "../domain/validateMap"
 import {
   clampSplit,
   defaultViewLayout,
@@ -143,6 +144,12 @@ export type {
 type DocStructure = Pick<LoadedStructure, "ids" | "structure">
 
 /** Copied items, and what the document held of them beyond the map: their keys (one per item) and structure. */
+export interface DocValidation {
+  /** The document it was run on: the result holds for that step of the history and no other. */
+  readonly doc: Doc
+  readonly result: MapValidation
+}
+
 export interface DocClip extends Clip {
   readonly keys: ReadonlyArray<string>
   readonly structure: Structure
@@ -342,6 +349,8 @@ export interface TabState {
   readonly viewLayout: ViewLayout
   /** The slot of the active pane: what the fly keys, Focus selection and Frame all act on. */
   readonly activePane: number
+  /** The last Validate. Only the tab's, as the document it was run on is; see `shownValidation`. */
+  readonly validation: DocValidation | null
 }
 
 /**
@@ -594,6 +603,8 @@ export interface EditorState extends TabState {
   readonly enterGroup: (groupId: string | null) => void
   /** Steps out of the entered group, selecting it; with none entered, clears the selection. */
   readonly deselect: () => void
+  /** Checks the document against the game's format; `shownValidation` has the result until the next edit. */
+  readonly validateDoc: () => void
   readonly setGroupCollapsed: (groupId: string, collapsed: boolean) => void
   readonly expandGroups: (groupIds: ReadonlyArray<string>) => void
   readonly setTool: (tool: Tool) => void
@@ -673,7 +684,8 @@ const freshTabState = (
     enteredGroupId: null,
     collapsedGroups: new Set(),
     viewLayout: options?.viewLayout ?? defaultViewLayout,
-    activePane: options?.viewLayout === undefined ? 0 : maximisedSlotOf(options.viewLayout) ?? 0
+    activePane: options?.viewLayout === undefined ? 0 : maximisedSlotOf(options.viewLayout) ?? 0,
+    validation: null
   }
 }
 
@@ -694,7 +706,8 @@ const activeTabOf = (s: EditorState): TabState => ({
   enteredGroupId: s.enteredGroupId,
   collapsedGroups: s.collapsedGroups,
   viewLayout: s.viewLayout,
-  activePane: s.activePane
+  activePane: s.activePane,
+  validation: s.validation
 })
 
 /** A step of history on top of `past`, away from `doc` and `selectedIds` to `otherSelectedIds`; it clears the redo stack. */
@@ -942,7 +955,9 @@ export const useEditor = create<EditorState>()((set, get) => {
         // edited while it saved: the file holds `from`, a step of the history by now
         if (tab.doc !== from) return { savedDoc: from, file }
         const doc = { ...from, map }
-        return { doc, savedDoc: doc, dirty: false, file }
+        // Save isn't an edit: a result for the document that was saved holds for what it left
+        const validation = tab.validation?.doc === from ? { ...tab.validation, doc } : tab.validation
+        return { doc, savedDoc: doc, dirty: false, file, validation }
       }),
     markPrefabSaved: (tabId, from, document, file) =>
       updateTab(tabId, (tab) => ({ document, savedDoc: from, dirty: tab.doc !== from, file })),
@@ -1240,6 +1255,10 @@ export const useEditor = create<EditorState>()((set, get) => {
       select(nodeKeys(tree, enteredGroupId))
       set({ enteredGroupId: groupPathOf(tree, enteredGroupId).at(-1) ?? null })
     },
+    validateDoc: () =>
+      set(({ doc, catalogIndex }) => ({
+        validation: { doc, result: validateMap(gameMapOf(doc, catalogIndex), catalogIndex) }
+      })),
     setGroupCollapsed: (groupId, collapsed) =>
       set((s) => {
         if (s.collapsedGroups.has(groupId) === collapsed) return s
@@ -1470,6 +1489,10 @@ const keptEnteredGroup = (doc: Doc, id: string | null): string | null =>
   id !== null && findGroup(doc.structure.tree, id) !== undefined ? id : null
 
 /** A doc's map as the game gets it: its groups are the projection of the structure (docs/FORMAT.md § Groups). */
+/** The Validate result for the document as it stands; undefined until Validate runs, and again after an edit. */
+export const shownValidation = ({ doc, validation }: Pick<TabState, "doc" | "validation">) =>
+  validation?.doc === doc ? validation.result : undefined
+
 export const gameMapOf = (doc: Doc, catalog: CatalogIndex | null): MapFile =>
   withGameGroups(doc.map, doc.ids, doc.structure.tree, catalog)
 

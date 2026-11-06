@@ -32,7 +32,7 @@ import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/M
 import { assetNameOf } from "../domain/Materials"
 import { pieceNameOf } from "../domain/structure"
 import { createdAtIso, formatAgo, formatDate, formatDateTime } from "../domain/time"
-import { type MapValidation, validateMap } from "../domain/validateMap"
+import type { MapValidation } from "../domain/validateMap"
 import {
   deleteSelection,
   duplicateSelection,
@@ -42,7 +42,7 @@ import {
   setSelectionField
 } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
-import { type Doc, gameMapOf, selectedIndices, useCreator, useEditor, useOpenPrefab } from "../editor/store"
+import { selectedIndices, shownValidation, useCreator, useEditor, useOpenPrefab } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { Disclosure } from "./Disclosure"
@@ -199,18 +199,14 @@ function ValidationList({ errors, warnings }: MapValidation) {
 }
 
 /**
- * The map against the game's format, on request. The result holds for the document it was run on, so any edit puts the
- * button back.
+ * The map against the game's format, on request. The store keeps the result with the document it was run on, so a
+ * selection that swaps the inspector's sections leaves it, and any edit puts the button back.
  */
 function StatusFact({ validated }: { readonly validated: boolean }) {
-  const doc = useEditor((s) => s.doc)
-  const [checked, setChecked] = useState<{ readonly doc: Doc; readonly result: MapValidation } | null>(null)
+  const result = useEditor(shownValidation)
+  const validate = useEditor((s) => s.validateDoc)
   const hint = <InfoHint>{validated ? VALIDATED_HINT : NOT_VALIDATED_HINT}</InfoHint>
-  if (checked?.doc !== doc) {
-    const validate = () => {
-      const { catalogIndex } = useEditor.getState()
-      setChecked({ doc, result: validateMap(gameMapOf(doc, catalogIndex), catalogIndex) })
-    }
+  if (result === undefined) {
     return (
       <Fact label="Status">
         <Button variant="secondary" size="sm" onClick={validate}>Validate</Button>
@@ -218,7 +214,6 @@ function StatusFact({ validated }: { readonly validated: boolean }) {
       </Fact>
     )
   }
-  const { result } = checked
   const label = (
     <>
       <ValidationIcon {...result} />
@@ -271,7 +266,14 @@ function MapSettings() {
       </SectionHeader>
       <div className="flex flex-col gap-1">
         <Label htmlFor="map-name" className="text-fg-secondary">Name</Label>
-        <Input id="map-name" value={name} onChange={(e) => setDraft(e.target.value)} onBlur={commit} />
+        <Input
+          id="map-name"
+          value={name}
+          spellCheck={false}
+          autoComplete="off"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+        />
       </div>
       <Facts>
         <Fact label="Creator">
