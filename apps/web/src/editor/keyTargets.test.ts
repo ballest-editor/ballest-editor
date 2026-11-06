@@ -1,5 +1,5 @@
 import { assert, beforeEach, describe, it } from "@effect/vitest"
-import { elementOf, isEditorKeyEvent } from "./keyTargets"
+import { elementOf, isEditorKeyEvent, isMouseEvent } from "./keyTargets"
 import { useEditor } from "./store"
 
 /** Stands in for a DOM node, with none of this realm's prototypes: what a popped-out panel's elements look like here. */
@@ -15,6 +15,13 @@ describe("elementOf", () => {
     assert.isNull(elementOf(null))
     assert.isNull(elementOf(new EventTarget()))
     assert.isNull(elementOf(node({ nodeType: 3 })))
+  })
+})
+
+describe("isMouseEvent", () => {
+  it("knows a click from another window's realm, and that a key isn't one", () => {
+    assert.isTrue(isMouseEvent(Object.assign(new Event("click"), { button: 0 })))
+    assert.isFalse(isMouseEvent(new Event("keydown")))
   })
 })
 

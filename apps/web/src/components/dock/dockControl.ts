@@ -226,6 +226,15 @@ const fitBesideCentre = (api: DockviewApi, group: DockviewGroupPanel) => {
   if (axis !== null) group.api.setSize({ [axis]: axis === "width" ? SIDE_SIZES.right : SIDE_SIZES.bottom })
 }
 
+/**
+ * A panel rendered `always` that goes to another window leaves its overlay behind, empty, over the group it left and
+ * taking that group's clicks: dockview only takes the overlay down when a whole group moves, not one panel of several.
+ */
+const dropOverlayLeftBehind = (panel: IDockviewPanel, from: DockviewGroupPanel) => {
+  const left = from.model.renderContainer
+  if (left !== panel.group.model.renderContainer) left.detatch(panel)
+}
+
 /** Follows `api`: saves the layout as it changes, keeps the View menu in step, adopts popped-out windows. */
 const followDock = (api: DockviewApi): () => void => {
   const scheduleSave = () => {
@@ -249,7 +258,8 @@ const followDock = (api: DockviewApi): () => void => {
       notifyOpenPanels(api)
     }),
     api.onDidRemovePanel(() => notifyOpenPanels(api)),
-    api.onDidMovePanel(({ panel }) => {
+    api.onDidMovePanel(({ panel, from }) => {
+      dropOverlayLeftBehind(panel, from)
       expandGroup(panel.group)
       if (panel.group.size === 1) fitBesideCentre(api, panel.group)
     }),

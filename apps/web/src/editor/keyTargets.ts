@@ -9,6 +9,9 @@ const isElement = (target: EventTarget | null): target is Element =>
  */
 export const elementOf = (target: EventTarget | null): Element | null => isElement(target) ? target : null
 
+/** Whether `e` is a mouse or pointer event, in any window: not `instanceof`, as for `elementOf`. */
+export const isMouseEvent = (e: Event): e is MouseEvent => "button" in e
+
 const isTypingTarget = (target: EventTarget | null): boolean =>
   isElement(target) &&
   (("isContentEditable" in target && target.isContentEditable === true) ||

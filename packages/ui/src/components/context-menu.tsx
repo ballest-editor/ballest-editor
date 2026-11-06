@@ -1,5 +1,6 @@
 import { ContextMenu as ContextMenuPrimitive } from "@base-ui/react/context-menu"
 import { IconCheck, IconChevronRight } from "@tabler/icons-react"
+import { usePortalContainer } from "@workspace/ui/lib/portal-container"
 import { cn } from "cn"
 import * as React from "react"
 
@@ -39,7 +40,7 @@ function ContextMenuContent({
   >)
 {
   return (
-    <ContextMenuPrimitive.Portal>
+    <ContextMenuPrimitive.Portal container={usePortalContainer()}>
       <ContextMenuPrimitive.Positioner
         className="isolate z-50 outline-none"
         align={align}
