@@ -237,7 +237,7 @@ function ViewportBackground() {
 
 /**
  * The floor grid (1 m cells, 10 m sections) at the map's floor height, in the user's
- * colours or ones picked for what it's seen against (the theme, or the sky by day or night).
+ * colours or ones derived from the ground they sit on. It follows the camera, so it ends where its fade ends.
  */
 function ViewportGrid() {
   const appearance = useEditor((s) => s.settings.appearance)
