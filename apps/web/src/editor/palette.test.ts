@@ -54,11 +54,14 @@ const GRAPHIC = 3
 
 /** The steps' contrast on --card, as docs/design/ui-system.md gives them. */
 const STEPS = {
-  dark: { "fg-secondary": 11, "fg-tertiary": 7.3, "fg-disabled": 3.2 },
-  light: { "fg-secondary": 8.7, "fg-tertiary": 5.4, "fg-disabled": 2.3 }
+  dark: { "fg-secondary": 11, "fg-tertiary": 7.5, "fg-disabled": 3.2 },
+  light: { "fg-secondary": 10.7, "fg-tertiary": 6.3, "fg-disabled": 2.6 }
 }
 
 const PANELS = ["card", "popover"]
+const SURFACES = ["background", "card", "popover"]
+/** Past this a surface starts to read as blue: docs/design/ui-system.md § Colour. */
+const MAX_SURFACE_CHROMA = 0.012
 const STATUSES = ["status-ok", "status-warn", "status-neutral"]
 
 const pairsOf = (theme: "dark" | "light"): ReadonlyArray<readonly [string, string, number]> => [
@@ -67,8 +70,10 @@ const pairsOf = (theme: "dark" | "light"): ReadonlyArray<readonly [string, strin
     ["foreground", panel, TEXT] as const,
     ["fg-secondary", panel, TEXT] as const,
     ["fg-tertiary", panel, TEXT] as const,
-    // a line or a dot, never small text
-    ["primary", panel, GRAPHIC] as const,
+    // links and the active tab's text, as well as lines and dots
+    ["primary", panel, TEXT] as const,
+    ["destructive", panel, TEXT] as const,
+    ["dirty", panel, GRAPHIC] as const,
     // Settings › Game uses a status's text with no fill
     ...STATUSES.map((status) => [`${status}-foreground`, panel, TEXT] as const)
   ]),
@@ -79,7 +84,7 @@ const pairsOf = (theme: "dark" | "light"): ReadonlyArray<readonly [string, strin
   ...[1, 2, 3, 4, 5].map((level) => [`difficulty-${level}`, "popover", GRAPHIC] as const),
   ...["s", "m", "l"].flatMap((size) => [
     ["background", `size-${size}`, TEXT] as const,
-    [`size-${size}`, "card", GRAPHIC] as const
+    [`size-${size}`, "card", TEXT] as const
   ])
 ]
 
@@ -94,17 +99,38 @@ describe("the palette", () => {
       })
     }
 
-    // The menus' focus swaps bg-accent for bg-foreground/10 and keeps text-accent-foreground.
+    // A menu row's focus is bg-foreground/8 under text-accent-foreground, on the glass's own surface.
     it(`${theme}: a focused menu item can be read`, () => {
-      const row = over(color("foreground"), 0.1, color("popover"))
+      const row = over(color("foreground"), 0.08, color("popover"))
       assert.isAtLeast(contrast(color("accent-foreground"), row), TEXT)
     })
 
-    it(`${theme}: each surface rises above the last, none of them neutral`, () => {
-      const [background, card, popover] = ["background", "card", "popover"].map((name) => oklchOf(tokens, name))
+    // bg-primary/12: everything a selected row holds has to survive the wash.
+    for (const panel of PANELS) {
+      it(`${theme}: a selected row on --${panel} can be read`, () => {
+        const row = over(color("primary"), 0.12, color(panel))
+        for (const text of ["foreground", "fg-secondary", "fg-tertiary"]) {
+          assert.isAtLeast(contrast(color(text), row), TEXT)
+        }
+      })
+
+      // bg-destructive/12 text-destructive, and a tag's bg-size-s/15 text-size-s
+      it(`${theme}: a filled tint on --${panel} can be read`, () => {
+        for (
+          const [ink, alpha] of [["destructive", 0.12], ["size-s", 0.15], ["size-m", 0.15], ["size-l", 0.15]] as const
+        ) {
+          assert.isAtLeast(contrast(color(ink), over(color(ink), alpha, color(panel))), TEXT)
+        }
+      })
+    }
+
+    it(`${theme}: each surface rises above the last, with no hue to name`, () => {
+      const [background, card, popover] = SURFACES.map((name) => oklchOf(tokens, name))
       assert.isBelow(background?.[0] ?? 1, card?.[0] ?? 0)
       assert.isBelow(card?.[0] ?? 1, popover?.[0] ?? 0)
-      for (const surface of [background, card, popover]) assert.isAbove(surface?.[1] ?? 0, 0)
+      for (const name of [...SURFACES, "muted", "accent", "secondary"]) {
+        assert.isAtMost(oklchOf(tokens, name)[1], MAX_SURFACE_CHROMA)
+      }
     })
   }
 })
