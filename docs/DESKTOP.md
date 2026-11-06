@@ -102,7 +102,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 
 **Keys.** The rules are `isEditorKeyEvent`'s (`editor/keyTargets.ts`): a text field, a dialog or a menu keeps its keys, and everything else drives the editor. Chrome hands focus back after a click (`blurChromeAfterClick`), so the keys work again straight away. A dialog leaves the focus on the page when it closes, however it was closed and whatever opened it (`DialogContent`'s `finalFocus`).
 
-Dockview is themed in `components/dock/dock.css` with the tokens from `packages/ui`, so it follows light and dark and `--motion`. Its strips are `h-8`, like the document tabs. A drag shows a copy of the tab on a card, or of the whole strip when it's a group's (`dragImage.ts`), over dockview's image, which has no option for it. A dockview upgrade should be checked for this too.
+Dockview is themed in `components/dock/dock.css` with the tokens from `packages/ui`, so it follows light and dark and `--motion`. A panel strip is 28px and the document tabs and a popped-out strip 32px (`docs/design/ui-system.md`). A drag shows a copy of the tab on a card, or of the whole strip when it's a group's (`dragImage.ts`), over dockview's image, which has no option for it. A dockview upgrade should be checked for this too.
 
 ### View panes
 

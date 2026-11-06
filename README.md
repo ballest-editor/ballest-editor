@@ -54,6 +54,7 @@ The web review build is the same editor in a browser, without anything that need
 | [docs/PROJECTS.md](docs/PROJECTS.md)                                   | Projects, maps and exports: the model, the files on disk, the design to come  |
 | [docs/DESKTOP.md](docs/DESKTOP.md)                                     | How the desktop app behaves and why                                           |
 | [docs/DRIVER.md](docs/DRIVER.md)                                       | The game driver: its design and what was measured                             |
+| [docs/design/ui-system.md](docs/design/ui-system.md)                   | The UI's type, greys, radii and spacing: the one system every view follows    |
 | [docs/qa](docs/qa)                                                     | What was measured in the game, case by case                                   |
 | [apps/web/README.md](apps/web/README.md)                               | The editor itself: scene, gizmos, materials, keybinds, coordinates            |
 | [apps/desktop/README.md](apps/desktop/README.md)                       | The main process: developing it, IPC, the protocol handler, updates, security |
