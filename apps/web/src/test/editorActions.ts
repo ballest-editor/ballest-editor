@@ -1,5 +1,5 @@
 /** What the editor actions' tests share: the layers over a test disk, the store, samples and edits. */
-import { DateTime, Effect, Layer } from "effect"
+import { Effect, Layer } from "effect"
 import { mapLabelOf } from "../domain/factory"
 import { lightingOf } from "../domain/sunlight"
 import { freshMapEffect, newMapEffect } from "../editor/actions/maps"
@@ -22,7 +22,7 @@ export const layerFor = (disk: TestDisk) =>
   Layer.mergeAll(
     Platform.layerDesktop(testBridge(disk)),
     MapPrefsStore.layerTest,
-    MapExporter.layerNoDeps.pipe(Layer.provideMerge(Layer.mergeAll(MapCodec.layer, DateTime.layerCurrentZoneOffset(0))))
+    MapExporter.layerNoDeps.pipe(Layer.provideMerge(MapCodec.layer))
   )
 
 export const balledits = listSamples().filter((sample) => sample.kind === "balledit")

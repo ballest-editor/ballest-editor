@@ -1,4 +1,4 @@
-import { Context, DateTime, Effect, Layer } from "effect"
+import { Context, Effect, Layer } from "effect"
 import type { CatalogIndex } from "../domain/Catalog"
 import {
   currentCreatedAt,
@@ -31,7 +31,6 @@ export class MapExporter extends Context.Service<MapExporter, {
     MapExporter,
     Effect.gen(function*() {
       const codec = yield* MapCodec
-      const timeZone = yield* DateTime.CurrentTimeZone
 
       const prepare = Effect.fn("MapExporter.prepare")(function*(map: MapFile, catalog: CatalogIndex | null = null) {
         const levelData = map.worldSettings.levelData
@@ -45,7 +44,7 @@ export class MapExporter extends Context.Service<MapExporter, {
             message: `Map name and creator: ${NAME_RULE} (they become the file name).`
           })
         }
-        const createdAt = yield* currentCreatedAt.pipe(Effect.provideService(DateTime.CurrentTimeZone, timeZone))
+        const createdAt = yield* currentCreatedAt
         const out: MapFile = {
           ...map,
           worldSettings: {
@@ -85,6 +84,6 @@ export class MapExporter extends Context.Service<MapExporter, {
   )
 
   static readonly layer = this.layerNoDeps.pipe(
-    Layer.provide([MapCodec.layer, DateTime.layerCurrentZoneLocal])
+    Layer.provide(MapCodec.layer)
   )
 }

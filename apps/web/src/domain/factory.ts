@@ -34,10 +34,10 @@ export const formatCreatedAt = (parts: DateTime.DateTime.Parts): string => {
   return `${parts.year}.${p2(parts.month)}.${p2(parts.day)}-${p2(parts.hour)}.${p2(parts.minute)}.${p2(parts.second)}`
 }
 
-/** Local wall-clock time (the CurrentTimeZone service), formatted for `createdAt`. */
-export const currentCreatedAt: Effect.Effect<string, never, DateTime.CurrentTimeZone> = Effect.map(
-  DateTime.nowInCurrentZone,
-  (now) => formatCreatedAt(DateTime.toParts(now))
+/** The time now as `createdAt` holds it: in UTC, as the game writes it and `createdAtIso` reads it. */
+export const currentCreatedAt: Effect.Effect<string> = Effect.map(
+  DateTime.now,
+  (now) => formatCreatedAt(DateTime.toPartsUtc(now))
 )
 
 /** Map and creator names and the file name they make: the same rules main applies (`@ballest/contracts`). */

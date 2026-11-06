@@ -10,7 +10,7 @@ import { listSamples, readSample } from "../test/samples"
 import { MapCodec } from "./MapCodec"
 import { MapExporter } from "./MapExporter"
 
-// 2026-10-26 15:04:05 UTC, rendered in UTC+2
+// 2026-10-26 15:04:05 UTC, on a machine at UTC+2: `createdAt` is UTC whatever the local zone
 const NOW = Date.UTC(2026, 9, 26, 15, 4, 5)
 const TestLayer = MapExporter.layerNoDeps.pipe(
   Layer.provideMerge(Layer.mergeAll(MapCodec.layer, DateTime.layerCurrentZoneOffset(2 * 60 * 60 * 1000)))
@@ -106,7 +106,7 @@ describe("MapExporter", () => {
       const levelData = decoded.worldSettings.levelData
       assert.strictEqual(levelData.systemLevelName, "Map_LevelEditorMain")
       assert.strictEqual(levelData.userLevelName, "My Track_spig")
-      assert.strictEqual(levelData.createdAt, "2026.10.26-17.04.05")
+      assert.strictEqual(levelData.createdAt, "2026.10.26-15.04.05")
       assert.match(levelData.createdAt, /^\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}\.\d{2}$/)
       assert.isTrue(result.text.startsWith("{\r\n\t\"worldSettings\":\r\n\t{\r\n"))
       // the output decodes again and keeps exactly one player start
