@@ -665,7 +665,13 @@ export function Inspector() {
           : (
             // A group is one thing with a name, so it's summed up; its items stay a click away, edited all at once.
             <>
-              <GroupSection key={group.id} group={group} actions={<SelectionActions />}>
+              <GroupSection
+                key={group.id}
+                group={group}
+                items={items}
+                transforms={transforms}
+                actions={<SelectionActions />}
+              >
                 <PieceCounts items={items} />
               </GroupSection>
               {group.prefab !== undefined && <InstanceSection group={group} link={group.prefab} />}

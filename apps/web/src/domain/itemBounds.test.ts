@@ -3,7 +3,7 @@ import { Schema } from "effect"
 import { expectVec } from "../test/vec"
 import { Catalog, indexCatalog } from "./Catalog"
 import { identityTransform, playerStartItem } from "./factory"
-import { boxCentreOf, itemsBoxOf, placedBoxOf } from "./itemBounds"
+import { boxCentreOf, formatBoxSize, itemsBoxOf, placedBoxOf } from "./itemBounds"
 import type { Item } from "./MapFile"
 import { rotatorToQuat } from "./ueMath"
 
@@ -90,5 +90,12 @@ describe("placedBoxOf", () => {
       placedBoxOf([{ item, transform: identityTransform({ x: 5000, y: 0, z: 0 }) }], catalog)?.min.x,
       4900
     )
+  })
+})
+
+describe("formatBoxSize", () => {
+  it("gives a box's size in metres, to a decimal", () => {
+    const box = { min: { x: -620, y: 10, z: 0 }, max: { x: 620, y: 320, z: 200 } }
+    assert.strictEqual(formatBoxSize(box), "12.4 × 3.1 × 2.0 m")
   })
 })
