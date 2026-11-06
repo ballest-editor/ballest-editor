@@ -105,6 +105,8 @@ export interface PlatformCapabilities {
 export interface ExportOptions {
   readonly replacePublished: boolean
   readonly overwriteChanged: boolean
+  /** Open in game only: replace the map open in the in-game editor though its pieces changed since it opened. */
+  readonly force?: boolean
 }
 
 /** A map file the user picked to open (browser) or import (desktop). `path` is none in a browser, which never sees one. */
@@ -436,7 +438,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     pluginStatus: call("pluginStatus"),
     installPlugin: call("installPlugin"),
     play: (fileName, options) => call("play", { fileName, ...options }),
-    openInGame: (fileName, options) => call("openInGame", { fileName, ...options }),
+    openInGame: (fileName, { force = false, ...options }) => call("openInGame", { fileName, ...options, force }),
     playSessionEnds: pushed((listener) => bridge.onPlaySessionEnded(listener)),
     gameWriteProgress: pushed((listener) => bridge.onGameWriteProgress(listener)),
     loadNotifications: call("loadNotifications"),

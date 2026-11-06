@@ -129,12 +129,14 @@ export class GamePlay extends Context.Service<GamePlay, {
       if (exported._tag !== "Exported") return exported
 
       yield* reportGameWriteProgress(windows, { fileName, stage: "launch" })
-      const nonce = yield* link.requestEdit(fileName)
+      const nonce = yield* link.requestEdit(fileName, payload.force)
       const launch = yield* launchFor(fileName)
       // A game that is only starting answers once it is up, long after this call.
-      const outcome = launch === "running" ? yield* link.editOutcome(nonce) : "pending"
+      const { outcome, inGame } = launch === "running"
+        ? yield* link.editOutcome(nonce)
+        : { outcome: "pending" as const, inGame: null }
       if (outcome === "opened") yield* exports.markExportLoaded(fileName)
-      return { _tag: "Opening", plugin, launch, outcome } as const
+      return { _tag: "Opening", plugin, launch, outcome, inGame } as const
     })
 
     return GamePlay.of({ play, openInGame, sessionEnds: Stream.fromPubSub(ends) })

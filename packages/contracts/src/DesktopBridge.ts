@@ -606,15 +606,19 @@ export const PlayResult = Schema.TaggedUnion({
 })
 export type PlayResult = typeof PlayResult.Type
 
-/** `openInGame`: the project map to export and open, with the same permissions as `exportMap`. */
-export const OpenInGamePayload = Schema.Struct({ ...ExportMapPayload.fields })
+/**
+ * `openInGame`: the project map to export and open, with the same permissions as `exportMap`, and `force`: replace the
+ * map open in the in-game editor even though its pieces changed since it opened (the user said so).
+ */
+export const OpenInGamePayload = Schema.Struct({ ...ExportMapPayload.fields, force: Schema.Boolean })
 export type OpenInGamePayload = typeof OpenInGamePayload.Type
 
 /**
- * What the plugin did with an open request, when the game was up to answer it: `opened` it, `refused` because the
- * in-game editor was already open, or `pending` when there's no answer yet (the game is starting, or it was slow).
+ * What the plugin did with an open request, when the game was up to answer it: `opened` it (over the map the in-game
+ * editor had open, if any), `unsaved` when it refused because the in-game editor's pieces changed since its map
+ * opened and `force` wasn't set, or `pending` when there's no answer yet (the game is starting, or it was slow).
  */
-export const EditOutcome = Schema.Literals(["opened", "refused", "pending"])
+export const EditOutcome = Schema.Literals(["opened", "unsaved", "pending"])
 export type EditOutcome = typeof EditOutcome.Type
 
 /**
@@ -625,7 +629,13 @@ export type EditOutcome = typeof EditOutcome.Type
  * - `Published`, `ChangedInGame`: nothing written, an `ExportRefusal` as Export reports it.
  */
 export const OpenInGameResult = Schema.TaggedUnion({
-  Opening: { plugin: PluginStatus, launch: PlayLaunch, outcome: EditOutcome },
+  Opening: {
+    plugin: PluginStatus,
+    launch: PlayLaunch,
+    outcome: EditOutcome,
+    /** With `unsaved`: the name of the map the in-game editor has open, as its header shows it. */
+    inGame: Schema.NullOr(Schema.String)
+  },
   NeedsPlugin: { plugin: PluginStatus },
   ...exportRefusals
 })

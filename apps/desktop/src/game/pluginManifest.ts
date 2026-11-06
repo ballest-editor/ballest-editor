@@ -68,9 +68,14 @@ export const hostVersionIn = (log: string): string | null => /Ballest plugin hos
 export const loadedPluginVersionIn = (log: string): string | null =>
   [...log.matchAll(/\[ballest-editor-link\] loaded .* (\S+)\s*$/gm)].at(-1)?.[1] ?? null
 
-/** What a plugin's `Storage` file says of the open request `nonce`: the outcome, null before it has answered. */
-export const editOutcomeIn = (storage: string, nonce: number): string | null =>
-  new RegExp(`^edited=${nonce} (\\w+)\\s*$`, "m").exec(storage)?.[1] ?? null
+/**
+ * What a plugin's `Storage` file says of the open request `nonce`: the outcome word and what follows it (the name of
+ * the map the in-game editor has open, after `unsaved`), null before it has answered.
+ */
+export const editOutcomeIn = (storage: string, nonce: number): { outcome: string; detail: string } | null => {
+  const found = new RegExp(`^edited=${nonce} (\\w+) ?(.*?)\\s*$`, "m").exec(storage)
+  return found === null ? null : { outcome: found[1] ?? "", detail: found[2] ?? "" }
+}
 
 /** A dot-separated segment's number as C's `atol` reads it: its leading digits, or 0. */
 const segmentNumber = (segment: string) => Number(/^\s*[+-]?\d+/.exec(segment)?.[0] ?? 0)

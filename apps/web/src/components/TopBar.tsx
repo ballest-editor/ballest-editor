@@ -46,16 +46,25 @@ function GameButton({ children, onClick, tooltip, variant }: {
   )
 }
 
-/** Open in game: exports the open map and opens it in the in-game editor. */
+/**
+ * Open in game: exports the open map and opens it in the in-game editor. Once it is open there, Update in game:
+ * exports and reloads it, so the game shows the latest version. The tooltip says when the game's copy is older.
+ */
 function OpenInGameButton() {
+  const openedInGame = useEditor((s) => s.openedInGame !== null && s.openedInGame === s.file?.name)
+  const olderInGame = useEditor((s) =>
+    openedInGame && s.projectMaps.find((m) => m.fileName === s.file?.name)?.link?.exportedWhileRunning === true
+  )
   return (
     <GameButton
       variant="outline"
       onClick={() => void openInGame()}
-      tooltip="Export and open it in the in-game editor"
+      tooltip={openedInGame
+        ? `Export and reload it in the in-game editor.${olderInGame ? " The game shows an older version." : ""}`
+        : "Export and open it in the in-game editor"}
     >
       <IconEdit data-icon="inline-start" />
-      Open in game
+      {openedInGame ? "Update in game" : "Open in game"}
     </GameButton>
   )
 }

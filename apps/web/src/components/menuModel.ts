@@ -144,6 +144,8 @@ export interface MenuState {
   readonly untitled: boolean
   /** The open map's file when there's an export to take it from. */
   readonly reimportable: string | null
+  /** Whether the open map is the one Open in game put in the in-game editor, so the item is Update in game. */
+  readonly openedInGame: boolean
   readonly recent: ReadonlyArray<RecentProject>
   readonly openElsewhere: ReadonlyArray<string>
   readonly panels: ReadonlyArray<{ readonly id: string; readonly title: string; readonly open: boolean }>
@@ -338,7 +340,10 @@ const projectMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
         ),
         ...(canPlay || canLaunchGame ? [SEPARATOR] : []),
         ...(canPlay
-          ? [command("playMap", "Play", exportOff), item("Open in game", () => void openInGame(), exportOff)]
+          ? [
+            command("playMap", "Play", exportOff),
+            item(state.openedInGame ? "Update in game" : "Open in game", () => void openInGame(), exportOff)
+          ]
           : []),
         ...(canLaunchGame ? [item("Open game (Steam)", () => void launchGame())] : [])
       ]
@@ -389,6 +394,7 @@ export const useMenus = (): Menus => {
   // Re-import needs an export to take the map from
   const exportedFile = useOpenProjectMap()?.map
   const reimportable = exportedFile?.link?.export != null ? exportedFile.fileName : null
+  const openedInGame = useEditor((s) => s.openedInGame !== null && s.openedInGame === s.file?.name)
   const dockPanels = useViewMenuPanels()
   const openPanels = useOpenPanels()
   const { snapping, general } = useEditor((s) => s.settings)
@@ -410,6 +416,7 @@ export const useMenus = (): Menus => {
     noTabOff,
     untitled: project?.current === null,
     reimportable,
+    openedInGame,
     recent: project?.recent ?? [],
     openElsewhere: project?.openElsewhere ?? [],
     panels: dockPanels.map(({ id, title }) => ({ id, title, open: openPanels.has(id) })),

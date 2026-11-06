@@ -72,11 +72,18 @@ const notifyPlayed = (fileName: string, played: Extract<PlayResult, { readonly _
   }
 }
 
-/** Tells how Open in game went. A refused map was still exported: the in-game editor just kept what it has open. */
-const notifyOpening = (fileName: string, opening: Extract<OpenInGameResult, { readonly _tag: "Opening" }>) => {
-  const { notify, resolveNotifications } = useEditor.getState()
+/**
+ * Tells how Open in game went, and keeps which map the in-game editor now has (`openedInGame`). A map the in-game
+ * editor refused (`unsaved`) was still exported: the replaceInGame dialog asks whether to replace what's open there.
+ */
+const notifyOpening = (
+  fileName: string,
+  opening: Extract<OpenInGameResult, { readonly _tag: "Opening" }>,
+  options: ExportOptions
+) => {
+  const { notify, resolveNotifications, openedInGame, setOpenedInGame, openDialog } = useEditor.getState()
   const label = mapLabelOf(fileName)
-  const { launch, outcome } = opening
+  const { launch, outcome, inGame } = opening
   const kind = "openInGame"
   if (launch === "failed") {
     notify("error", `Exported ${label}, but couldn't ask Steam to start the game. Is Steam running?`, {
@@ -86,24 +93,23 @@ const notifyOpening = (fileName: string, opening: Extract<OpenInGameResult, { re
     return
   }
   for (const resolved of RESOLVED_BY_PLAY) resolveNotifications(resolved)
-  if (outcome === "refused") {
-    notify("error", `The in-game editor is already open, so ${label} didn't open`, {
-      kind,
-      body: "Opening it would replace what is open there. Save and leave the in-game editor, then try again."
-    })
-  } else if (launch === "launched") {
+  if (outcome === "unsaved") {
+    openDialog({ id: "replaceInGame", name: fileName, inGame, replacePublished: options.replacePublished })
+    return
+  }
+  const updating = openedInGame === fileName && launch === "running"
+  setOpenedInGame(fileName)
+  if (launch === "launched") {
     notify("info", `Starting the game to open ${label} in the in-game editor`, {
       kind,
       body: "It opens once the game and the plugin manager are up."
     })
+  } else if (outcome === "opened") {
+    notify("info", updating ? `Updated ${label} in the in-game editor` : `Opened ${label} in the in-game editor`, {
+      kind
+    })
   } else {
-    notify(
-      "info",
-      outcome === "opened" ? `Opened ${label} in the in-game editor` : `Opening ${label} in the in-game editor`,
-      {
-        kind
-      }
-    )
+    notify("info", `${updating ? "Updating" : "Opening"} ${label} in the in-game editor`, { kind })
   }
 }
 
@@ -159,7 +165,7 @@ export const writeToGame = Effect.fn("writeToGame")(
         return
       case "Opening":
         yield* refreshProject
-        notifyOpening(fileName, result)
+        notifyOpening(fileName, result, options)
         return
       case "NeedsPlugin":
         notifyNotice(openWithoutPluginNotice(mapLabelOf(fileName), result.plugin))
@@ -178,3 +184,20 @@ export const replacePublishedDraftEffect = Effect.suspend(() => {
 })
 
 export const replacePublishedDraft = () => run(replacePublishedDraftEffect)
+
+/**
+ * The replaceInGame dialog's Replace in game: Open in game again with `force`, so the plugin replaces the map open in
+ * the in-game editor, changed pieces and all. The export already happened: the same bytes go again, which asks nothing.
+ */
+export const replaceInGameEffect = Effect.suspend(() => {
+  const { dialog: unsaved, closeDialog } = useEditor.getState()
+  closeDialog()
+  if (unsaved?.id !== "replaceInGame") return Effect.void
+  return writeToGame("edit", unsaved.name, {
+    replacePublished: unsaved.replacePublished,
+    overwriteChanged: false,
+    force: true
+  })
+})
+
+export const replaceInGame = () => run(replaceInGameEffect)
