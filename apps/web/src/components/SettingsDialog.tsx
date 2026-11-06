@@ -13,7 +13,7 @@ import { Button } from "@workspace/ui/components/button"
 import { ColorPicker, ColorSwatch } from "@workspace/ui/components/color-picker"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
-import { Slider } from "@workspace/ui/components/slider"
+import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
 import { cn } from "@workspace/ui/lib/utils"
 import { Struct } from "effect"
@@ -72,10 +72,6 @@ const CATEGORIES: ReadonlyArray<SettingsCategoryInfo<SettingsCategory>> = [
 const GAME_CATEGORY: SettingsCategoryInfo<SettingsCategory> = { id: "game", label: "Game", icon: IconDeviceGamepad2 }
 
 type Row = SettingsRow<SettingsCategory>
-
-/** base-ui sliders report a number, or an array for range sliders. */
-const sliderValue = (value: number | ReadonlyArray<number>): number | undefined =>
-  typeof value === "number" ? value : value[0]
 
 /** A setting picked from a short list: `items` is each value's label, in order. */
 function Choice<V extends string>({ value, items, onChange, className = "w-40" }: {

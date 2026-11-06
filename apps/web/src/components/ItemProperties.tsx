@@ -5,7 +5,7 @@ import { Label } from "@workspace/ui/components/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Separator } from "@workspace/ui/components/separator"
-import { Slider } from "@workspace/ui/components/slider"
+import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
 import { Option } from "effect"
 import { type ReactNode, useId, useState } from "react"
@@ -45,9 +45,6 @@ const scrubStep = (reference: number): number => {
   const magnitude = Math.abs(reference)
   return magnitude === 0 ? 0.01 : Math.max(0.001, 10 ** (Math.floor(Math.log10(magnitude)) - 2))
 }
-
-const sliderValue = (value: number | ReadonlyArray<number>): number | undefined =>
-  typeof value === "number" ? value : value[0]
 
 /**
  * Decimals a ranged float shows: enough to tell its slider's positions apart (a density runs 0 to 0.01), few

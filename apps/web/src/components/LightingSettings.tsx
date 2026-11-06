@@ -1,5 +1,5 @@
 import { Label } from "@workspace/ui/components/label"
-import { Slider } from "@workspace/ui/components/slider"
+import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { useShallow } from "zustand/react/shallow"
 import { type Lighting, LIGHTING_RANGES, lightingOf } from "../domain/sunlight"
 import { shownLighting, useEditor } from "../editor/store"
@@ -17,9 +17,6 @@ const CONTROLS: ReadonlyArray<{
   { key: "brightness", label: "Sunlight", title: "The sun's brightness", step: 0.05, digits: 2 },
   { key: "angle", label: "Light rotation", title: "The sun's compass direction (yaw, degrees)", step: 1, digits: 1 }
 ]
-
-const sliderValue = (value: number | ReadonlyArray<number>): number | undefined =>
-  typeof value === "number" ? value : value[0]
 
 /**
  * The map's sun, edited like the game's World Settings panel: a slider over the game's

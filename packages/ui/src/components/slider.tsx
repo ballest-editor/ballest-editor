@@ -51,4 +51,8 @@ function Slider({
   )
 }
 
-export { Slider }
+/** A slider's value from its change events: base-ui reports a number, or an array for range sliders. */
+const sliderValue = (value: number | ReadonlyArray<number>): number | undefined =>
+  typeof value === "number" ? value : value[0]
+
+export { Slider, sliderValue }
