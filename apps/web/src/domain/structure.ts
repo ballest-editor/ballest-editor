@@ -4,7 +4,7 @@
  * undefined, so the store leaves no undo step for it. An item's key is its entry in the store's `ids`.
  */
 import type { CatalogIndex } from "./Catalog"
-import { classNameOf, type MapFile } from "./MapFile"
+import { classNameOf, type Item, type MapFile } from "./MapFile"
 import type { GroupNode, ItemNode, PrefabLink, TreeNode } from "./MapSidecar"
 import { pieceLabelOf } from "./pieceName"
 
@@ -324,6 +324,12 @@ const numbered = (names: ReadonlyArray<readonly [string, string]>): ReadonlyMap<
 export const numberedNameText = ({ name, ordinal }: NumberedName): string =>
   ordinal === undefined ? name : `${name} ${ordinal}`
 
+/** An item's piece as the Pieces panel names it; without a catalog entry, the class written out. */
+export const pieceNameOf = (item: Item, catalog: CatalogIndex | null): string => {
+  const piece = catalog?.pieceByClass.get(item.actorToSpawn)
+  return pieceLabelOf(piece ?? { className: classNameOf(item.actorToSpawn) })
+}
+
 /**
  * Every item's name, by key: the user's, else the catalog's for its class (without a catalog, the class written out).
  * Items with the same name are numbered among themselves in document order.
@@ -337,10 +343,7 @@ export const itemNames = (
   numbered(ids.flatMap((key, index) => {
     const item = map.items[index]
     if (item === undefined) return []
-    const label = pieceLabelOf(
-      catalog?.pieceByClass.get(item.actorToSpawn) ?? { className: classNameOf(item.actorToSpawn) }
-    )
-    return [[key, items.get(key)?.name ?? label] as const]
+    return [[key, items.get(key)?.name ?? pieceNameOf(item, catalog)] as const]
   }))
 
 /** Every group's name, by id, numbered among the groups with the same name in tree order. */

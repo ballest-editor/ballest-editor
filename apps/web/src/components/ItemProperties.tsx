@@ -145,7 +145,7 @@ function PropertyValue({ property, id, handleClassName }: {
     }
     default:
       // No sample or class has text/name/string properties, so their value shape is unknown: shown, not edited.
-      return <div className="truncate font-mono text-body text-fg-tertiary">{formatValue(value)}</div>
+      return <div className="truncate text-body text-fg-tertiary">{formatValue(value)}</div>
   }
 }
 
@@ -218,7 +218,7 @@ function Row(props: {
       <Label
         htmlFor={id}
         title={props.details.join("\n")}
-        className="min-w-0 text-body leading-tight break-words text-fg-tertiary"
+        className="min-w-0 text-body break-words text-fg-secondary"
       >
         {props.label}
       </Label>

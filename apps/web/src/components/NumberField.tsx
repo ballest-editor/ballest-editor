@@ -1,5 +1,6 @@
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import { cn } from "@workspace/ui/lib/utils"
 import { type MouseEvent, type PointerEvent, useEffect, useId, useRef, useState } from "react"
 import { snapValue } from "../domain/snap"
 
@@ -113,7 +114,8 @@ function useScrub(options: {
  * ten times finer) and commits once on release (`onScrubCommit`, else `onCommit`), so a
  * whole scrub is one undo step. With `snap`, a scrub lands on multiples of it (and moves
  * faster when the snap is coarse); typed values aren't snapped. A null `value` is mixed (several items that disagree): the
- * input is blank, typing sets them all, and a scrub starts from 0.
+ * input is blank, typing sets them all, and a scrub starts from 0. `format` and `parse` replace plain decimals, for a
+ * value that reads as something else (a time of day).
  */
 export function NumberField(props: {
   readonly label: string
@@ -132,8 +134,16 @@ export function NumberField(props: {
   readonly digits?: number
   /** Background class for the handle, e.g. an axis colour. */
   readonly handleClassName?: string
+  /** A letter on the handle, e.g. the axis; the handle widens to hold it. */
+  readonly handleText?: string
   /** Whether the coloured handle (the scrub grip) is drawn; without it the field is a plain input. */
   readonly handle?: boolean
+  /** Shown after the value, e.g. `°`. */
+  readonly unit?: string
+  /** The value as text; decimals to `digits` otherwise. */
+  readonly format?: (value: number) => string
+  /** What's typed as a value, null when it isn't one; a plain number otherwise. */
+  readonly parse?: (text: string) => number | null
 }) {
   const id = useId()
   const digits = props.digits ?? 3
@@ -141,10 +151,12 @@ export function NumberField(props: {
   // Text being typed; otherwise the field shows the current value.
   const [draft, setDraft] = useState<string | null>(null)
   const cancelling = useRef(false)
-  const text = draft ?? (props.value === null ? "" : round(props.value).toFixed(digits))
+  const shown = (value: number) => props.format?.(value) ?? round(value).toFixed(digits)
+  const text = draft ?? (props.value === null ? "" : shown(props.value))
+  const parse = props.parse ?? ((typed: string) => typed.trim() === "" ? null : Number(typed))
   const commit = () => {
-    const n = Number(draft)
-    const valid = draft !== null && draft.trim() !== "" && Number.isFinite(n)
+    const n = draft === null ? null : parse(draft)
+    const valid = n !== null && Number.isFinite(n)
     if (valid && !cancelling.current && n !== props.value) props.onCommit(n)
     cancelling.current = false
     setDraft(null)
@@ -164,11 +176,16 @@ export function NumberField(props: {
         <Label
           htmlFor={id}
           aria-label={props.label}
-          className={`w-2 shrink-0 ${props.handleClassName ?? "bg-muted"} ${
-            scrubbable ? "cursor-ew-resize hover:brightness-125" : ""
-          }`}
+          className={cn(
+            "w-2 shrink-0",
+            props.handleClassName ?? "bg-muted",
+            props.handleText !== undefined && "w-4 justify-center text-caption text-black select-none",
+            scrubbable && "cursor-ew-resize hover:brightness-125"
+          )}
           {...scrubHandlers}
-        />
+        >
+          {props.handleText}
+        </Label>
       )}
       <Input
         id={id}
@@ -187,6 +204,9 @@ export function NumberField(props: {
           }
         }}
       />
+      {props.unit !== undefined && (
+        <span className="flex shrink-0 items-center pr-1 text-caption text-fg-tertiary">{props.unit}</span>
+      )}
     </div>
   )
 }

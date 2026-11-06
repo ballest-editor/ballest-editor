@@ -10,7 +10,10 @@ import { lookupMaterial, NEUTRAL, parseMaterialsFile } from "./Materials"
 import {
   choiceOf,
   colorForFinish,
+  colorLabelOf,
   cssColor,
+  finishLabelOf,
+  materialLabelOf,
   offPanelSlotsOf,
   paintGroups,
   paintTargets,
@@ -113,6 +116,16 @@ describe("paint", () => {
     assert.strictEqual(choiceOf(picker, "/Game/Moved/MI_Env_Iron.MI_Env_Iron")?.color.color, "Iron")
     assert.isUndefined(choiceOf(picker, "/Game/Art/Stadium/Arena/MI_ArenaOrange2.MI_ArenaOrange2"))
     assert.isUndefined(choiceOf(picker, undefined))
+  })
+
+  it("names finishes, colours and off-picker materials as a person would", () => {
+    assert.strictEqual(finishLabelOf({ name: "smooth", colors: [] }), "Smooth")
+    assert.strictEqual(colorLabelOf({ color: "SkyBlue", material: "" }), "Sky Blue")
+    assert.strictEqual(
+      materialLabelOf("/Script/Engine.Material'/Game/Art/M_BaseSurface_Metal.M_BaseSurface_Metal'"),
+      "Base Surface Metal"
+    )
+    assert.strictEqual(materialLabelOf("/Game/Art/MI_Env_Dark.MI_Env_Dark"), "Env Dark")
   })
 
   it("keeps the colour across finishes, and takes an unpainted slot for Grey", () => {

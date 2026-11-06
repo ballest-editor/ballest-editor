@@ -123,3 +123,7 @@ export const pieceLabelOf = (piece: Named): string => {
   const { name, size } = pieceDisplayName(piece)
   return size === undefined ? name : `${name} ${SIZE_WORDS[size]}`
 }
+
+/** A class or asset name written out: "BP_SkyBlue_Metal" reads "Sky Blue Metal". For names that aren't pieces. */
+export const humanizedClass = (className: string): string =>
+  className.replace(/^(?:BP|MP)_/, "").replace(/_+/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").trim() || className

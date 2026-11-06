@@ -1,13 +1,16 @@
-import { Badge } from "@workspace/ui/components/badge"
+import { ColorSwatch } from "@workspace/ui/components/color-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { cn } from "@workspace/ui/lib/utils"
 import { useState } from "react"
-import { classNameOf, type Item } from "../domain/MapFile"
-import { assetNameOf, lookupMaterial } from "../domain/Materials"
+import type { Item } from "../domain/MapFile"
+import { lookupMaterial } from "../domain/Materials"
 import {
   choiceOf,
   colorForFinish,
+  colorLabelOf,
   cssColor,
+  finishLabelOf,
+  materialLabelOf,
   offPanelSlotsOf,
   type PaintColor,
   type PaintFinish,
@@ -15,8 +18,10 @@ import {
   paintTargets,
   swatchColor
 } from "../domain/Paint"
+import { pieceNameOf } from "../domain/structure"
 import { paintSlots } from "../editor/actions"
 import { useEditor } from "../editor/store"
+import { InfoHint } from "./InfoHint"
 
 export interface SelectedItem {
   readonly id: string
@@ -56,7 +61,7 @@ function Swatch(
   }
 ) {
   const table = useEditor((s) => s.materialTable)
-  const label = `${finish.name} ${color.color}`
+  const label = `${finishLabelOf(finish)} ${colorLabelOf(color)}`
   return (
     <button
       type="button"
@@ -76,15 +81,19 @@ function Swatch(
 /**
  * One material slot over a group, as in the game: pick a finish (smooth, rough, ...), then a
  * colour. Changing the finish keeps the colour when the new finish has it (`colorForFinish`);
- * otherwise it only shows that finish's colours until one is picked.
+ * otherwise it only shows that finish's colours until one is picked. The row reads as the
+ * material: its swatch, its colour's name and its finish. The asset's own name is in Details.
  */
 function SlotPaintRow(
-  { members, target }: {
+  { members, target, numbered }: {
     readonly members: ReadonlyArray<SelectedItem>
     readonly target: SlotTarget
+    /** Whether the slot says which it is, when its piece has more than one. */
+    readonly numbered: boolean
   }
 ) {
   const paint = useEditor((s) => s.paint)
+  const table = useEditor((s) => s.materialTable)
   // A finish browsed without picking a colour yet; otherwise the slot's own finish shows.
   const [browsing, setBrowsing] = useState<string | null>(null)
   const materials = members.map(({ item }) => materialAt(item, target))
@@ -110,28 +119,35 @@ function SlotPaintRow(
 
   // The game numbers its slots from 1.
   const slotName = `Slot ${target.slot + 1}`
-  const caption = current === null
+  const offPicker = current !== null && current !== undefined && choice === undefined
+  const name = current === null
     ? "Mixed"
     : current === undefined
     ? "No material"
     : choice === undefined
-    ? `${assetNameOf(current)} (not in the game's picker)`
-    : `${choice.color.color} · ${assetNameOf(current)}`
+    ? materialLabelOf(current)
+    : colorLabelOf(choice.color)
+  const swatch = current === null || current === undefined
+    ? null
+    : cssColor(swatchColor(lookupMaterial(table, current), choice?.color.displayColor))
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-body">{slotName}</span>
+      {numbered && <div className="text-body text-fg-secondary">{slotName}</div>}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <ColorSwatch color={swatch} className="size-5" />
+        <span className={cn("text-body", choice === undefined && "text-fg-tertiary")}>{name}</span>
+        {offPicker && <InfoHint>Not in the game's picker. It stays as it is until you paint this slot.</InfoHint>}
         <Select
           value={finish?.name ?? null}
-          items={Object.fromEntries(paint.map((f) => [f.name, f.name]))}
+          items={Object.fromEntries(paint.map((f) => [f.name, finishLabelOf(f)]))}
           onValueChange={changeFinish}
         >
-          <SelectTrigger className="w-28" aria-label={`${slotName} material`}>
-            <SelectValue placeholder="Material" />
+          <SelectTrigger className="ml-auto w-24 shrink-0" aria-label={`${slotName} material`}>
+            <SelectValue placeholder="Finish" />
           </SelectTrigger>
           <SelectContent>
-            {paint.map((f) => <SelectItem key={f.name} value={f.name}>{f.name}</SelectItem>)}
+            {paint.map((f) => <SelectItem key={f.name} value={f.name}>{finishLabelOf(f)}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -148,9 +164,6 @@ function SlotPaintRow(
           ))}
         </div>
       )}
-      <div className="truncate font-mono text-caption text-fg-tertiary" title={current ?? undefined}>
-        {caption}
-      </div>
     </div>
   )
 }
@@ -168,30 +181,30 @@ function PaintGroup(
   const catalogIndex = useEditor((s) => s.catalogIndex)
   const first = members[0]
   if (first === undefined) return null
-  const name = catalogIndex?.pieceByClass.get(first.item.actorToSpawn)?.displayName ??
-    classNameOf(first.item.actorToSpawn)
   const offPanel = offPanelSlotsOf(first.item, catalogIndex)
+  const slots = slotsOf(members, offPanel)
   return (
     <div className="flex flex-col gap-3">
       {showName && (
         <div className="text-body-strong">
-          {name}
+          {pieceNameOf(first.item, catalogIndex)}
           <span className="ml-1 text-body text-fg-tertiary">× {members.length}</span>
         </div>
       )}
       {offPanel !== undefined && (
         // Every slot listed for such a piece is off-panel, so it's said once for the group.
-        <div className="flex items-start gap-2 text-body leading-5 text-fg-tertiary">
-          <Badge variant="outline" title={OFF_PANEL_HINT}>Off-panel</Badge>
-          <span>Not in the game's panel, but paint set here draws.</span>
+        <div className="flex items-center gap-2 text-body text-fg-tertiary">
+          Not in the game's paint panel
+          <InfoHint>{OFF_PANEL_HINT}</InfoHint>
         </div>
       )}
-      {slotsOf(members, offPanel).map((target) => (
+      {slots.map((target) => (
         <SlotPaintRow
           // a different set of items starts with no finish being browsed
           key={`${members.map((m) => m.id).join(",")}:${target.component}:${target.slot}`}
           members={members}
           target={target}
+          numbered={slots.length > 1}
         />
       ))}
     </div>

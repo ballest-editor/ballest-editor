@@ -5,7 +5,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import type { ReactNode } from "react"
 
 /**
- * A file path or file name, wherever one is shown: monospace, small, on one line. Too long for its room, it is cut at
+ * A file path or file name, wherever one is shown: small, on one line. Too long for its room, it is cut at
  * the start, so the end (the file, the folder itself) stays readable, and the whole thing is the tooltip. Paths never
  * wrap: a path broken over three lines reads worse than a cut one with a tooltip.
  *
@@ -19,7 +19,7 @@ export function PathText({ children, className, block = false }: {
   return (
     <span
       className={cn(
-        "min-w-0 truncate text-left font-mono text-caption leading-none",
+        "min-w-0 truncate text-left text-caption leading-none",
         block ? "block py-0.5" : "inline-block max-w-full align-bottom",
         className
       )}
@@ -49,22 +49,20 @@ export function PathField({ path, missing = "Not found", icon: FieldIcon = IconF
       <FieldIcon className="size-3.5 shrink-0 text-fg-secondary" />
       {path === null
         ? <span className="min-w-0 flex-1 truncate text-body text-fg-tertiary italic">{missing}</span>
-        : (
-          // Geist Mono's ink sits a pixel above the line box's centre; a pixel down centres it on the icon
-          <PathText className="flex-1 translate-y-px text-foreground/90">{path}</PathText>
-        )}
+        : <PathText className="flex-1 text-foreground/90">{path}</PathText>}
       {actions !== undefined && <div className="flex shrink-0 items-center gap-0.5 border-l pl-1">{actions}</div>}
       {actions === undefined && <span className="w-1" />}
     </div>
   )
 }
 
-/** One of a `PathField`'s actions: an icon button, its name in the tooltip. */
-export function PathAction({ label, icon: ActionIcon, onClick, disabled = false }: {
+/** An icon button, its name in the tooltip: a `PathField`'s actions, and the Inspector's section headers. */
+export function PathAction({ label, icon: ActionIcon, onClick, disabled = false, className }: {
   readonly label: string
   readonly icon: Icon
   readonly onClick: () => void
   readonly disabled?: boolean
+  readonly className?: string
 }) {
   return (
     <Tooltip>
@@ -73,14 +71,14 @@ export function PathAction({ label, icon: ActionIcon, onClick, disabled = false 
           <Button
             variant="ghost"
             size="icon-sm"
-            className="text-fg-secondary"
+            className={cn("text-fg-secondary", className)}
             aria-label={label}
             disabled={disabled}
             onClick={onClick}
           />
         }
       >
-        <ActionIcon className="size-3.5" />
+        <ActionIcon />
       </TooltipTrigger>
       <TooltipContent side="bottom">{label}</TooltipContent>
     </Tooltip>

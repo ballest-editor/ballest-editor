@@ -1,7 +1,7 @@
-import { Label } from "@workspace/ui/components/label"
 import { Slider, sliderValue } from "@workspace/ui/components/slider"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { useShallow } from "zustand/react/shallow"
-import { type Lighting, LIGHTING_RANGES, lightingOf } from "../domain/sunlight"
+import { formatTimeOfDay, type Lighting, LIGHTING_RANGES, lightingOf, parseTimeOfDay } from "../domain/sunlight"
 import { shownLighting, useEditor } from "../editor/store"
 import { NumberField } from "./NumberField"
 
@@ -12,17 +12,29 @@ const CONTROLS: ReadonlyArray<{
   readonly title: string
   readonly step: number
   readonly digits: number
+  readonly unit?: string
+  readonly format?: (value: number) => string
+  readonly parse?: (text: string) => number | null
 }> = [
-  { key: "timeOfDay", label: "Time of day", title: "Hours, 0–24: sunrise at 6, noon overhead", step: 0.05, digits: 2 },
+  {
+    key: "timeOfDay",
+    label: "Time of day",
+    title: "24-hour clock: sunrise at 06:00, noon overhead",
+    step: 0.05,
+    digits: 2,
+    format: formatTimeOfDay,
+    parse: parseTimeOfDay
+  },
   { key: "brightness", label: "Sunlight", title: "The sun's brightness", step: 0.05, digits: 2 },
-  { key: "angle", label: "Light rotation", title: "The sun's compass direction (yaw, degrees)", step: 1, digits: 1 }
+  { key: "angle", label: "Light rotation", title: "The sun's compass direction", step: 1, digits: 1, unit: "°" }
 ]
 
 /**
  * The map's sun, edited like the game's World Settings panel: a slider over the game's
  * range plus a number input that takes any value (new maps save sunlight 12, above the
  * game's slider). Dragging a slider previews live in the viewport; each release, and each
- * typed value, is one undo step.
+ * typed value, is one undo step. Each setting is one row; where the slider would be left too
+ * short, it goes under its label and field.
  */
 export function LightingSettings() {
   const shown = useEditor(useShallow(shownLighting))
@@ -38,30 +50,29 @@ export function LightingSettings() {
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {CONTROLS.map(({ key, label, title, step, digits }) => {
+    <div className="flex @container flex-col gap-1">
+      {CONTROLS.map(({ key, label, title, step, digits, unit, format, parse }) => {
         const { min, max } = LIGHTING_RANGES[key]
         const value = shown[key]
         return (
-          <div key={key} className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <Label className="text-fg-secondary" title={title}>{label}</Label>
-              <div className="w-24">
-                <NumberField
-                  label={label}
-                  value={value}
-                  digits={digits}
-                  handle={false}
-                  onCommit={(v) => commit(key, v)}
-                />
-              </div>
-            </div>
+          <div
+            key={key}
+            className="grid grid-cols-[5.5rem_minmax(0,1fr)_4.25rem] items-center gap-2 @max-[15rem]:grid-cols-[minmax(0,1fr)_4.25rem]"
+          >
+            <Tooltip>
+              <TooltipTrigger render={<span className="truncate text-body text-fg-secondary" />}>
+                {label}
+              </TooltipTrigger>
+              <TooltipContent side="left">{title}</TooltipContent>
+            </Tooltip>
             <Slider
               aria-label={label}
+              className="@max-[15rem]:order-last @max-[15rem]:col-span-2"
               min={min}
               max={max}
               step={step}
-              value={Math.min(max, Math.max(min, value))}
+              // one thumb: the shared Slider draws a thumb per array entry, and a bare number as a range
+              value={[Math.min(max, Math.max(min, value))]}
               onValueChange={(v) => {
                 const next = sliderValue(v)
                 if (next !== undefined) preview(key, next)
@@ -71,11 +82,21 @@ export function LightingSettings() {
                 if (next !== undefined) commit(key, next)
               }}
             />
+            <NumberField
+              label={label}
+              value={value}
+              digits={digits}
+              handle={false}
+              onCommit={(v) => commit(key, v)}
+              {...(unit === undefined ? {} : { unit })}
+              {...(format === undefined ? {} : { format })}
+              {...(parse === undefined ? {} : { parse })}
+            />
           </div>
         )
       })}
       {!mapLighting && (
-        <p className="text-body text-fg-tertiary">
+        <p className="mt-1 text-body text-fg-tertiary">
           The viewport is using studio lights. Turn on View › Map lighting to see these.
         </p>
       )}
