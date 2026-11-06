@@ -7,16 +7,17 @@
  */
 import * as THREE from "three"
 import { SCENE_COLORS } from "../domain/sceneGround"
-import { SEA_EDGE_GLSL, SEA_SHOWN, SKY_DOME_RADIUS, SKY_HAZE_GLSL } from "./sky"
+import { SEA_EDGE_GLSL, SEA_RELIEF, SEA_SHADE_GLSL, SEA_SHOWN, SKY_DOME_RADIUS, SKY_HAZE_GLSL } from "./sky"
 
 /**
  * Per theme, because the water has to sit with the chrome as well as the map. These are what reaches the screen (the
  * water skips tone mapping, which would clip the red to 0 and leave it fully saturated). Dark is deep and muted, so the
- * pieces pop against it; light goes on thicker, so a pale piece's side faces stand off it.
+ * pieces pop against it; light goes on thicker, so a pale piece's side faces stand off it. `relief` is how strongly the
+ * surface shows (sky.ts), lower in light for the same reason.
  */
 export const WATER_LOOKS = {
-  dark: { color: "#0e4a64", opacity: 0.35 },
-  light: { color: "#006aac", opacity: 0.42 }
+  dark: { color: "#0e4a64", opacity: 0.35, relief: 0.56 },
+  light: { color: "#006aac", opacity: 0.42, relief: 0.33 }
 } as const
 
 /** From below: where the water starts to thin out (cm from the camera, along the surface) and where it has gone. */
@@ -27,14 +28,26 @@ export const THIN_INTO_SKY = `vec3 toWater = normalize(vWaterWorld - cameraPosit
     diffuseColor.a *= 1.0 - ballestSkyHaze(toWater);
     diffuseColor.a *= 1.0 - ballestSeaEdge(vWaterLocal);`
 
+/**
+ * The sea's surface, added once the colour is encoded, because that's what the canvas blends. The dome's sea is the same
+ * sum, and dividing by the opacity undoes the blend, so the two add up to one surface where the sheet gives out.
+ */
+export const SEA_SURFACE = `if (!isOrthographic) {
+    gl_FragColor.rgb += ballestSeaShade(vWaterWorld.xz) / opacity;
+  }`
+
 export const THIN_WITH_DISTANCE = `float away = distance(cameraPosition.xz, vWaterWorld.xz);
     diffuseColor.a *= 1.0 - smoothstep(${FADE_START.toFixed(1)}, ${FADE_END.toFixed(1)}, away);`
 
-/** `shader`'s output thinned by the GLSL `fade`; an orthographic pane has none. `extra` is GLSL run after, in any pane. */
+/**
+ * `shader`'s output thinned by the GLSL `fade`; an orthographic pane has none. `extra` is GLSL run after, in any pane, and
+ * `encoded` GLSL run on the finished colour.
+ */
 export const addFade = <S extends { readonly vertexShader: string; readonly fragmentShader: string }>(
   shader: S,
   fade: string,
-  extra = ""
+  extra = "",
+  encoded = ""
 ): S => ({
   ...shader,
   vertexShader: `varying vec3 vWaterWorld;\nvarying vec2 vWaterLocal;\n${shader.vertexShader}`.replace(
@@ -44,7 +57,7 @@ export const addFade = <S extends { readonly vertexShader: string; readonly frag
   vWaterLocal = transformed.xy;`
   ),
   fragmentShader:
-    `varying vec3 vWaterWorld;\nvarying vec2 vWaterLocal;\n${SKY_HAZE_GLSL}\n${SEA_EDGE_GLSL}\n${shader.fragmentShader}`
+    `varying vec3 vWaterWorld;\nvarying vec2 vWaterLocal;\n${SKY_HAZE_GLSL}\n${SEA_EDGE_GLSL}\n${SEA_SHADE_GLSL}\n${shader.fragmentShader}`
       .replace(
         "#include <opaque_fragment>",
         `if (!isOrthographic) {
@@ -53,11 +66,13 @@ export const addFade = <S extends { readonly vertexShader: string; readonly frag
   ${extra}
   #include <opaque_fragment>`
       )
+      .replace("#include <colorspace_fragment>", `#include <colorspace_fragment>\n  ${encoded}`)
 })
 
-const thinOut = (material: THREE.Material, fade: string, extra?: string): void => {
+const thinOut = (material: THREE.Material, fade: string, extra?: string, encoded?: string): void => {
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader, addFade(shader, fade, extra))
+    Object.assign(shader, addFade(shader, fade, extra, encoded))
+    Object.assign(shader.uniforms, { uSeaRelief: SEA_RELIEF })
   }
 }
 
@@ -70,7 +85,7 @@ export const waterTopMaterial = new THREE.MeshBasicMaterial({
   side: THREE.FrontSide,
   toneMapped: false
 })
-thinOut(waterTopMaterial, THIN_INTO_SKY)
+thinOut(waterTopMaterial, THIN_INTO_SKY, undefined, SEA_SURFACE)
 
 /** From below, looking straight up: the fraction of the full opacity left. */
 const UNDER_CLEAR = 0.08
@@ -102,13 +117,14 @@ const water = { theme: "dark" as keyof typeof WATER_LOOKS, light: 1, shown: true
 
 const updateWater = (change: Partial<typeof water>): void => {
   Object.assign(water, change)
-  const { color, opacity } = WATER_LOOKS[water.theme]
+  const { color, opacity, relief } = WATER_LOOKS[water.theme]
   const lit = new THREE.Color(color).multiplyScalar(water.light)
   for (const material of [waterTopMaterial, waterUnderMaterial]) material.color.copy(lit)
   waterTopMaterial.opacity = opacity
   // The canvas blends what is already encoded, so this is the sheet over the clear colour as it reaches the screen.
   const sea = encoded(new THREE.Color(SCENE_COLORS[water.theme])).lerp(encoded(lit), opacity).convertSRGBToLinear()
   SEA_SHOWN.value.set(sea.r, sea.g, sea.b, water.shown ? opacity : 0)
+  SEA_RELIEF.value = relief * water.light
 }
 
 /** Gives the water `theme`'s look, keeping the light it is under. */

@@ -1,9 +1,10 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
 import { SCENE_COLORS } from "../domain/sceneGround"
-import { SEA_SHOWN, SKY_HAZE_GLSL } from "./sky"
+import { SEA_RELIEF, SEA_SHADE_GLSL, SEA_SHOWN, SKY_HAZE_GLSL } from "./sky"
 import {
   addFade,
+  SEA_SURFACE,
   setWaterLight,
   setWaterShown,
   setWaterTheme,
@@ -52,6 +53,31 @@ describe("water", () => {
     const extra = shader.fragmentShader.indexOf("/* extra */")
     const output = shader.fragmentShader.indexOf("#include <opaque_fragment>")
     assert.isTrue(orthographic >= 0 && orthographic < fade && fade < extra && extra < output)
+  })
+
+  // The canvas blends encoded colours, so a sum made before encoding wouldn't match the dome's.
+  it("adds the sea's surface to the finished colour, by the same sum as the dome", () => {
+    const { fragmentShader, vertexShader } = THREE.ShaderLib.basic
+    const shader = addFade({ fragmentShader, vertexShader }, "", "", SEA_SURFACE)
+    assert.include(shader.fragmentShader, SEA_SHADE_GLSL)
+    assert.isAbove(
+      shader.fragmentShader.indexOf("ballestSeaShade(vWaterWorld.xz"),
+      shader.fragmentShader.indexOf("#include <colorspace_fragment>")
+    )
+    assert.include(SEA_SURFACE, "/ opacity")
+  })
+
+  // Measuring it from the sea's colour went the wrong way on a pale sea: the clear colour keeps that bright as the water dims.
+  it("dims the sea's surface with the light, in each theme's strength", () => {
+    for (const theme of ["light", "dark"] as const) {
+      setWaterTheme(theme)
+      setWaterLight(1)
+      assert.strictEqual(SEA_RELIEF.value, WATER_LOOKS[theme].relief)
+      setWaterLight(0.25)
+      assert.closeTo(SEA_RELIEF.value, WATER_LOOKS[theme].relief * 0.25, 1e-6)
+    }
+    setWaterLight(1)
+    setWaterTheme("dark")
   })
 
   // A curve that took the camera's height in covered the whole floor from high enough up.

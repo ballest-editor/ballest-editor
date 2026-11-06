@@ -26,3 +26,5 @@ These include the game's auto exposure, in a view that is mostly sky. A view wit
 ## What the editor does with it
 
 The editor doesn't draw the stadium, so the sky ends at the horizon and the sea carries on to meet it, from any height. Past the sheet the sky dome paints the sea itself (`editor/sky.ts`), in the colour the sheet shows over the clear colour, so the sheet's edge doesn't show.
+
+A flat colour shows nothing of how high the sea is, so the surface carries what the game's does: ripples and small glints that stay put on the water and shrink with distance. The game's water also pales towards the horizon, which the editor leaves out because it would read as haze. The editor's ripples are procedural, not the game's textures.

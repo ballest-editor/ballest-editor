@@ -39,8 +39,70 @@ float ballestSeaEdge( vec2 fromCentre ) {
 }
 `
 
+/** The widths of the sea's ripples (cm), so some are always in view: finer ones only show from nearer. */
+const SEA_RIPPLES = [400, 1_600, 6_400, 25_600]
+/** How far one set of ripples, and a glint, lift the sea's encoded colour at most. They only lift: the water has no red to take away. */
+const SEA_RIPPLE_LIFT = 0.09
+const SEA_GLINT_LIFT = 0.6
+/** A cell of the glints scattered on the sea (cm), how many hold one, and how wide one is. */
+const SEA_GLINT_CELL = 1_000
+const SEA_GLINT_SHARE = 0.25
+const SEA_GLINT_RADIUS = 18
+
+/**
+ * GLSL: what the surface adds to the sea's encoded colour at `world` (x, z on it), which is what shows how high the sea
+ * is: flat colour looks the same from any height. As in the game, ripples and glints stay put on the water and shrink
+ * with distance. Both go before the screen can no longer draw them. The sheet and the dome's sea both add this, each in
+ * its share, so they stay one surface.
+ */
+export const SEA_SHADE_GLSL = /* glsl */ `
+uniform float uSeaRelief;
+
+float ballestHash( vec2 p ) {
+  return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 );
+}
+
+float ballestNoise( vec2 p ) {
+  vec2 cell = floor( p );
+  vec2 f = fract( p );
+  f = f * f * ( 3.0 - 2.0 * f );
+  return mix(
+    mix( ballestHash( cell ), ballestHash( cell + vec2( 1.0, 0.0 ) ), f.x ),
+    mix( ballestHash( cell + vec2( 0.0, 1.0 ) ), ballestHash( cell + vec2( 1.0, 1.0 ) ), f.x ),
+    f.y
+  );
+}
+
+float ballestSeaShade( vec2 world ) {
+  float pixel = length( fwidth( world ) );
+  // Turned off the grid's axes, which the noise's cells would otherwise line up with.
+  vec2 turned = vec2( world.x * 0.8 + world.y * 0.6, world.y * 0.8 - world.x * 0.6 );
+  float ripples = 0.0;
+  ${
+  SEA_RIPPLES.map((width) =>
+    `ripples += pow( ballestNoise( turned / vec2( ${width.toFixed(1)}, ${(width / 3).toFixed(1)} ) ), 2.0 )
+    * ( 1.0 - smoothstep( 0.1, 0.4, pixel / ${width.toFixed(1)} ) );`
+  ).join("\n  ")
+}
+  vec2 cell = floor( world / ${SEA_GLINT_CELL.toFixed(1)} );
+  vec2 glintAt = ( cell + 0.15 + 0.7 * vec2( ballestHash( cell + 3.0 ), ballestHash( cell + 5.0 ) ) ) * ${
+  SEA_GLINT_CELL.toFixed(1)
+};
+  // A glint under a pixel stays a pixel wide and dims to match, so it doesn't flicker as the view moves.
+  float radius = max( ${SEA_GLINT_RADIUS.toFixed(1)}, pixel );
+  float glint = step( ballestHash( cell ), ${SEA_GLINT_SHARE.toFixed(2)} )
+    * ( 1.0 - smoothstep( 0.0, radius, distance( world, glintAt ) ) )
+    * ${SEA_GLINT_RADIUS.toFixed(1)} / radius
+    * ( 1.0 - smoothstep( 0.1, 0.3, pixel / ${SEA_GLINT_CELL.toFixed(1)} ) );
+  return ( ripples * ${SEA_RIPPLE_LIFT.toFixed(2)} + glint * ${SEA_GLINT_LIFT.toFixed(2)} ) * uSeaRelief;
+}
+`
+
 /** The sea past the sheet: what the sheet looks like over the clear colour, and in `w` its opacity, 0 with no sea. water.ts keeps it. */
 export const SEA_SHOWN = { value: new THREE.Vector4() }
+
+/** How strongly the surface shows, in the theme and the light the water is under. water.ts keeps it. */
+export const SEA_RELIEF = { value: 0 }
 
 const SEA_POSITION = ueToThreeVector({ ...WATER.center, z: WATER.height })
 const SEA_CENTRE_GLSL = `vec2( ${SEA_POSITION.x.toFixed(5)}, ${SEA_POSITION.z.toFixed(5)} )`
@@ -71,10 +133,7 @@ uniform vec4 uSea;
 varying vec3 vDir;
 ${SKY_HAZE_GLSL}
 ${SEA_EDGE_GLSL}
-float ballestHash( vec2 p ) {
-  return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 );
-}
-
+${SEA_SHADE_GLSL}
 // Sparse points on a latitude/longitude grid, in place of the game's star texture.
 float ballestStars( vec3 d ) {
   vec2 cell = vec2( atan( d.z, d.x ) * 300.0, asin( clamp( d.y, -1.0, 1.0 ) ) * 300.0 );
@@ -86,6 +145,7 @@ float ballestStars( vec3 d ) {
 
 void main() {
   vec3 d = normalize( vDir );
+  float seaShade = 0.0;
   float up = clamp( d.y, 0.0, 1.0 );
   float f = 1.0 - up <= 1e-7 ? 0.0 : clamp( pow( 1.0 - up, uFalloff ), 0.0, 1.0 );
   vec3 zenith = uZenith + uStars * 0.5 * ballestStars( d );
@@ -112,10 +172,13 @@ void main() {
     // The sky over the sea.
     float alpha = skyAlpha + seaAlpha * ( 1.0 - skyAlpha );
     if ( alpha <= 0.0 ) discard;
-    gl_FragColor = vec4( ( sky * skyAlpha + uSea.rgb * seaAlpha * ( 1.0 - skyAlpha ) ) / alpha, alpha );
+    float seaShare = seaAlpha * ( 1.0 - skyAlpha );
+    gl_FragColor = vec4( ( sky * skyAlpha + uSea.rgb * seaShare ) / alpha, alpha );
+    seaShade = ballestSeaShade( onSea + ${SEA_CENTRE_GLSL} ) * seaShare / alpha;
   #endif
   #include <colorspace_fragment>
   #ifndef BALLEST_CAPTURE
+    gl_FragColor.rgb += seaShade;
     // Triangular dither of about one 8-bit step on the colour and the fade, so the long, slow
     // gradients (the fade onto the background, the horizon) don't band.
     vec2 p = gl_FragCoord.xy;
@@ -146,7 +209,8 @@ const skyUniforms = (kind: SkyKind) => ({
   uStars: { value: 0 },
   uGain: { value: skyGain[kind] },
   uGround: { value: new THREE.Color() },
-  uSea: SEA_SHOWN
+  uSea: SEA_SHOWN,
+  uSeaRelief: SEA_RELIEF
 })
 
 /**
