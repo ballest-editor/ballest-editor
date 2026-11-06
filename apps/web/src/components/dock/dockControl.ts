@@ -57,15 +57,19 @@ const panelOptions = (panel: DockPanel) => ({
   minimumHeight: MIN_GROUP.height
 })
 
+/** A panel docked at `panel`'s location, which it would join. */
+const siblingOf = (api: DockviewApi, panel: DockPanel): IDockviewPanel | undefined =>
+  dockPanels
+    .filter((other) => other.location === panel.location && other.id !== panel.id)
+    .map((other) => api.getPanel(other.id))
+    .find((other) => other?.api.location.type === "grid")
+
 /** Adds `panel` where it belongs: with the panels of its location if any are docked, else beside the centre. */
 const addPanel = (api: DockviewApi, panel: DockPanel, inactive = false): IDockviewPanel | null => {
   const centre = centreGroupOf(api)
   if (centre === undefined) return null
   const { location } = panel
-  const sibling = dockPanels
-    .filter((other) => other.location === location && other.id !== panel.id)
-    .map((other) => api.getPanel(other.id))
-    .find((other) => other?.api.location.type === "grid")
+  const sibling = siblingOf(api, panel)
   if (sibling !== undefined) {
     return api.addPanel({ ...panelOptions(panel), inactive, position: { referencePanel: sibling } })
   }
@@ -243,7 +247,11 @@ const followDock = (api: DockviewApi): () => void => {
     if (state.dialog !== null && previous.dialog === null) window.focus()
   })
   const listeners = [
-    api.onDidLayoutChange(scheduleSave),
+    api.onDidLayoutChange(() => {
+      scheduleSave()
+      // a panel moved or popped out can change the strip a closed one shows in
+      notifyDock()
+    }),
     api.onDidAddPanel((panel) => {
       expandGroup(panel.group)
       notifyOpenPanels(api)
@@ -379,4 +387,20 @@ export const useViewMenuPanels = (): ReadonlyArray<DockPanel> =>
 export const useClosedPanels = (): ReadonlyArray<DockPanel> => {
   const open = useSyncExternalStore(followDockChanges, () => openPanels)
   return useViewMenuPanels().filter((panel) => !open.has(panel.id))
+}
+
+/** The strip closed `panel` shows in: the group it would come back to, or the centre's when that's gone or a rail. */
+const stripOf = (api: DockviewApi, panel: DockPanel): DockviewGroupPanel | undefined => {
+  const group = siblingOf(api, panel)?.group
+  return group === undefined || collapsed.get(group.id)?.axis === "width" ? centreGroupOf(api) : group
+}
+
+/** The closed panels whose icons `group`'s strip shows. Each closed panel is in one strip, and never a popped-out one. */
+export const closedPanelsIn = (group: DockviewGroupPanel): ReadonlyArray<DockPanel> =>
+  dockPanels.filter((panel) => !openPanels.has(panel.id) && dock !== null && stripOf(dock, panel) === group)
+
+/** `closedPanelsIn`, following it. It's compared by ids, so a layout change that leaves them alone renders nothing. */
+export const useClosedPanelsIn = (group: DockviewGroupPanel): ReadonlyArray<DockPanel> => {
+  useSyncExternalStore(followDockChanges, () => closedPanelsIn(group).map(({ id }) => id).join())
+  return closedPanelsIn(group)
 }

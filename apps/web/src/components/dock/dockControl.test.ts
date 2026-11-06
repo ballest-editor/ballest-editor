@@ -1,7 +1,7 @@
 import { assert, beforeEach, describe, it, vi } from "@effect/vitest"
 import type { DockviewApi } from "dockview-react"
 import { DOCK_STORAGE_KEY, type DockLayout, DOCUMENTS_PANEL } from "../../domain/dockLayout"
-import { attachDock, expandGroup, resetDockLayout, togglePanel } from "./dockControl"
+import { attachDock, closedPanelsIn, expandGroup, resetDockLayout, togglePanel } from "./dockControl"
 import type { DockPanel } from "./panels"
 
 const panel = (id: string, location: DockPanel["location"], rest: Partial<DockPanel> = {}): DockPanel => ({
@@ -27,21 +27,28 @@ interface OverlayEvent {
 }
 type OverlayListener = (event: OverlayEvent) => void
 
-/** Enough of a dock to follow: panels in groups, with what was asked of it in `calls`. */
-const fakeDock = ({ failLoad = false, loaded = [DOCUMENTS_PANEL] as ReadonlyArray<string> } = {}) => {
+interface GroupMember {
+  readonly id: string
+  readonly group: { readonly id: string }
+}
+
+/** Enough of a dock to follow: panels in groups (`side` in a second one), with what was asked of it in `calls`. */
+const fakeDock = (
+  { failLoad = false, loaded = [DOCUMENTS_PANEL] as ReadonlyArray<string>, side = [] as ReadonlyArray<string> } = {}
+) => {
   const calls: Array<string> = []
   const loads: Array<DockLayout> = []
   let overlay: OverlayListener = () => undefined
   const open = new Map<string, ReturnType<typeof fakePanel>>()
-  const group = {
-    id: "1",
+  const groupNamed = (id: string) => ({
+    id,
     width: 800,
     height: 600,
-    get panels() {
-      return [...open.values()]
+    get panels(): ReadonlyArray<GroupMember> {
+      return [...open.values()].filter((member) => member.group.id === id)
     },
-    get activePanel() {
-      return [...open.values()].at(-1)
+    get activePanel(): GroupMember | undefined {
+      return this.panels.at(-1)
     },
     element: {
       dataset: {},
@@ -55,10 +62,12 @@ const fakeDock = ({ failLoad = false, loaded = [DOCUMENTS_PANEL] as ReadonlyArra
       setConstraints: () => undefined,
       setHeaderPosition: () => undefined
     }
-  }
+  })
+  const group = groupNamed("1")
+  const sideGroup = groupNamed("2")
   const fakePanel = (id: string) => ({
     id,
-    group,
+    group: side.includes(id) ? sideGroup : group,
     api: {
       location: { type: "grid" },
       getWindow: () => ({ focus: () => calls.push(`focus ${id}`) }),
@@ -77,7 +86,7 @@ const fakeDock = ({ failLoad = false, loaded = [DOCUMENTS_PANEL] as ReadonlyArra
       return [...open.values()]
     },
     get groups() {
-      return [group]
+      return side.length === 0 ? [group] : [group, sideGroup]
     },
     getPanel: (id: string) => open.get(id),
     addPanel: ({ id, position }: { readonly id: string; readonly position?: { readonly direction?: string } }) => {
@@ -207,6 +216,31 @@ describe("the dock's layout on launch", () => {
     assert.strictEqual(group?.element.dataset["dockRail"], "")
     if (group !== undefined) expandGroup(group)
     assert.isUndefined(group?.element.dataset["dockRail"])
+  })
+
+  describe("a closed panel's icon", () => {
+    const closedIn = (api: DockviewApi) => api.groups.map((group) => closedPanelsIn(group).map(({ id }) => id))
+
+    it("is in the strip it would come back to, or the centre's when that group is gone", () => {
+      storage.set(DOCK_STORAGE_KEY, saved(panels.map(({ id }) => id)))
+      const { api } = fakeDock({ loaded: [DOCUMENTS_PANEL, "project"], side: ["project"] })
+      attachDock(api, panels)
+      assert.deepStrictEqual(closedIn(api), [["inspector"], ["pieces"]])
+    })
+
+    it("is in the centre's strip while its group is a rail, which has no room", () => {
+      storage.set(DOCK_STORAGE_KEY, saved(panels.map(({ id }) => id), { "2": { axis: "width", size: 260 } }))
+      const { api } = fakeDock({ loaded: [DOCUMENTS_PANEL, "project"], side: ["project"] })
+      attachDock(api, panels)
+      assert.deepStrictEqual(closedIn(api), [["pieces", "inspector"], []])
+    })
+
+    it("isn't anywhere while its panel is open", () => {
+      storage.set(DOCK_STORAGE_KEY, saved(panels.map(({ id }) => id)))
+      const { api } = fakeDock({ loaded: [DOCUMENTS_PANEL, ...panels.map(({ id }) => id)] })
+      attachDock(api, panels)
+      assert.deepStrictEqual(closedIn(api), [[]])
+    })
   })
 
   it("falls back to the default when dockview refuses the layout", () => {

@@ -7,8 +7,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@workspace/ui/components/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { type DragEvent, type MouseEvent, useEffect, useRef, useState } from "react"
+import { LINK_STATE_LABELS, type LinkedMap, linkStateOf } from "../domain/linkState"
 import { prefabTierLabel } from "../domain/prefab"
 import type { ViewLayoutKind } from "../domain/viewLayout"
 import {
@@ -35,6 +37,12 @@ export const closesOnMiddleClick = (close: () => void) => ({
   // a middle press would otherwise start autoscroll
   onMouseDown: (e: MouseEvent) => e.button === 1 && e.preventDefault()
 })
+
+/** What a tab's tooltip says of it: unsaved edits first, then how its project map stands against the export, if it has one. */
+export const tabStatusOf = (unsaved: boolean, map: LinkedMap | undefined): string => {
+  if (unsaved) return "Unsaved"
+  return map === undefined ? "Saved" : LINK_STATE_LABELS[linkStateOf(map)]
+}
 
 /**
  * The map tabs in the centre group's strip (docs/DESKTOP.md § Document tabs). A tab's dot marks unsaved edits and gives
@@ -92,7 +100,10 @@ function DocumentTab({ id, index, drag, onDrag }: {
   const last = useEditor((s) => s.tabIds.at(-1) === id)
   const activateTab = useEditor((s) => s.activateTab)
   const setViewLayoutKind = useEditor((s) => s.setViewLayoutKind)
-  const { label, unsaved, path, fileName, prefabTier } = useTabSummary(id)
+  const { label, unsaved, fileName, prefabTier } = useTabSummary(id)
+  const map = useEditor((s) => s.projectMaps.find((candidate) => candidate.fileName === fileName))
+  const [hinted, setHinted] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const menuButton = useRef<HTMLButtonElement>(null)
 
@@ -107,6 +118,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
   }
   const onContextMenu = (e: MouseEvent) => {
     e.preventDefault()
+    setHinted(false)
     menuButton.current?.click()
   }
   const onDragOverTab = (e: DragEvent<HTMLDivElement>) => {
@@ -132,31 +144,42 @@ function DocumentTab({ id, index, drag, onDrag }: {
         last && drag?.at === index + 1 &&
           "after:absolute after:inset-y-0 after:-right-px after:z-10 after:w-0.5 after:bg-primary"
       )}
-      title={path ?? "Not saved yet"}
       {...closesOnMiddleClick(() => void closeTab(id))}
       onContextMenu={onContextMenu}
       onDragStart={(e) => {
+        setHinted(false)
         e.dataTransfer.effectAllowed = "move"
         e.dataTransfer.setData("text/plain", label)
         onDrag({ id, at: index })
       }}
       onDragOver={onDragOverTab}
     >
-      <button
-        type="button"
-        role="tab"
-        aria-selected={active}
-        className="flex h-full min-w-0 cursor-[inherit] items-center outline-none"
-        onClick={() => activateTab(id)}
+      {/* Only under the pointer, and not over the tab's menu: focus coming back from one is no reason to show it. */}
+      <Tooltip
+        open={hinted}
+        onOpenChange={(open, { reason }) => setHinted(open && reason === "trigger-hover" && !menuOpen)}
       >
-        {prefabTier !== null && <IconBoxMultiple className="mr-1 size-4 shrink-0 text-fg-tertiary" />}
-        <span className="truncate">{label}</span>
-        {prefabTier !== null && (
-          <span className="ml-1 shrink-0 rounded-control bg-muted px-1 text-caption text-fg-secondary">
-            {prefabTierLabel(prefabTier, projects)}
-          </span>
-        )}
-      </button>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className="flex h-full min-w-0 cursor-[inherit] items-center outline-none"
+              onClick={() => activateTab(id)}
+            />
+          }
+        >
+          {prefabTier !== null && <IconBoxMultiple className="mr-1 size-4 shrink-0 text-fg-tertiary" />}
+          <span className="truncate">{label}</span>
+          {prefabTier !== null && (
+            <span className="ml-1 shrink-0 rounded-control bg-muted px-1 text-caption text-fg-secondary">
+              {prefabTierLabel(prefabTier, projects)}
+            </span>
+          )}
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{label} · {tabStatusOf(unsaved, map)}</TooltipContent>
+      </Tooltip>
       <span className="relative flex size-6 shrink-0 items-center justify-center">
         {unsaved && (
           <span
@@ -177,7 +200,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
           <IconX />
         </Button>
       </span>
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger
           ref={menuButton}
           render={<button type="button" className="sr-only" tabIndex={-1} aria-label={`More for ${label}`} />}

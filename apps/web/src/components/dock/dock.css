@@ -48,6 +48,10 @@
   box-shadow: none;
 }
 
+.dock-drag-image .dock-tab-close {
+  display: none;
+}
+
 /* A line under the whole strip, tabs or not, as the document tabs draw under themselves. */
 .dockview-theme-ballest .dv-tabs-and-actions-container {
   box-shadow: inset 0 -1px var(--border);
@@ -75,51 +79,60 @@
 }
 
 /*
- * A strip too narrow for its tabs' titles keeps the active tab's, and narrower still, only the icons. Each width is what
- * that many tabs need, the "…" and a hovered tab's × included. A rail's strip runs the other way, so it has no container.
+ * A strip too narrow for its tabs' titles keeps the active tab's, and narrower still, only the icons. A tab's × goes with
+ * its title. Each width is what that many tabs need, the "…" included. A closed panel's icon takes a tab's room, so a strip
+ * with any counts as a full one. A rail's strip runs the other way, so it has no container.
  */
 .dv-groupview:not([data-dock-rail]) > .dv-tabs-and-actions-container {
   container: dock-strip / inline-size;
 }
 
-@container dock-strip (width < 232px) {
-  .dv-tabs-container:has(> :nth-child(2)) .dv-inactive-tab .dock-tab-title {
+@container dock-strip (width < 248px) {
+  .dv-tabs-container:has(> :nth-child(2)) .dv-inactive-tab :is(.dock-tab-title, .dock-tab-close) {
     display: none;
   }
 }
 
-@container dock-strip (width < 312px) {
-  .dv-tabs-container:has(> :nth-child(3)) .dv-inactive-tab .dock-tab-title {
+@container dock-strip (width < 356px) {
+  .dv-tabs-container:has(> :nth-child(3)) .dv-inactive-tab :is(.dock-tab-title, .dock-tab-close) {
     display: none;
   }
 }
 
-@container dock-strip (width < 392px) {
-  .dv-tabs-container:has(> :nth-child(4)) .dv-inactive-tab .dock-tab-title {
+@container dock-strip (width < 464px) {
+  .dv-tabs-container:has(> :nth-child(4)) .dv-inactive-tab :is(.dock-tab-title, .dock-tab-close) {
+    display: none;
+  }
+
+  .dv-tabs-and-actions-container:has(.dock-closed-tab) .dv-inactive-tab :is(.dock-tab-title, .dock-tab-close) {
     display: none;
   }
 }
 
-@container dock-strip (width < 480px) {
-  .dv-tabs-container:has(> :nth-child(5)) .dv-inactive-tab .dock-tab-title {
+@container dock-strip (width < 572px) {
+  .dv-tabs-container:has(> :nth-child(5)) .dv-inactive-tab :is(.dock-tab-title, .dock-tab-close) {
     display: none;
   }
 }
 
 @container dock-strip (width < 216px) {
-  .dv-tabs-container:has(> :nth-child(3)) .dock-tab-title {
+  .dv-tabs-container:has(> :nth-child(3)) :is(.dock-tab-title, .dock-tab-close) {
     display: none;
   }
 }
 
 @container dock-strip (width < 248px) {
-  .dv-tabs-container:has(> :nth-child(4)) .dock-tab-title {
+  .dv-tabs-container:has(> :nth-child(4)) :is(.dock-tab-title, .dock-tab-close) {
+    display: none;
+  }
+
+  .dv-tabs-and-actions-container:has(.dock-closed-tab) :is(.dock-tab-title, .dock-tab-close) {
     display: none;
   }
 }
 
 @container dock-strip (width < 280px) {
-  .dv-tabs-container:has(> :nth-child(5)) .dock-tab-title {
+  .dv-tabs-container:has(> :nth-child(5)) :is(.dock-tab-title, .dock-tab-close) {
     display: none;
   }
 }
