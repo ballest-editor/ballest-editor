@@ -35,12 +35,13 @@ import { floorGridOnly, panePointer } from "./paneCameras"
 import { drawEveryPane, PaneRenderer, useBeforePaneDraw } from "./PaneRenderer"
 import { draggedPiece, isPieceDrag } from "./pieceDrag"
 import { droppedPrefab, isPrefabDrag } from "./prefabDrag"
+import { originLabelTexture, PrefabOrigin } from "./prefabOrigin"
 import { GROUP_BOX_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
-import { groupBoxOf, noTabOpen, type SelectMode, useEditor } from "./store"
+import { groupBoxOf, noTabOpen, type SelectMode, useEditor, useOpenPrefab } from "./store"
 import { useDarkTheme } from "./theme"
 import { isMesh } from "./threeGuards"
 import { glbUrl, visualsOf } from "./visuals"
@@ -395,6 +396,16 @@ function GroupBoxes() {
   return targets.map(({ id, keys, entered }) => <GroupBoxView key={id} keys={keys} entered={entered} />)
 }
 
+/** The prefab's (0, 0, 0), in a definition's tab alone (see prefabOrigin.ts). */
+function PrefabOriginMarker() {
+  const marker = useMemo(() => new PrefabOrigin(originLabelTexture()), [])
+  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
+  useEffect(() => marker.setDark(dark), [marker, dark])
+  useEffect(() => () => marker.dispose(), [marker])
+  useBeforePaneDraw((pane) => marker.fitTo(pane.worldPerPixelAt(marker.position)))
+  return <primitive object={marker} visible={useOpenPrefab() !== null} />
+}
+
 function Overlay() {
   const missing = useEditor((s) => s.missingGlbs)
   const speed = useEditor((s) => s.cameraSpeed)
@@ -460,6 +471,7 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
         <MapItems />
         <SelectedOutlines />
         <GroupBoxes />
+        <PrefabOriginMarker />
         <GizmoController />
         <ClickSelect />
         <FlyCamera />
