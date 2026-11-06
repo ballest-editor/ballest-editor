@@ -20,6 +20,14 @@ import { expectTag, withHandlers } from "./handlersHarness"
 // (requiring the real package from Node would download the binary).
 vi.mock("electron", () => ({}))
 
+/** The newest version main kept of a file it wrote over in the game's maps folder. */
+const exportBackupIn = (fake: Parameters<Parameters<typeof withHandlers>[0]>[0]["fake"]) =>
+  Effect.gen(function*() {
+    const backups = yield* fake.invokeAs(MapBackups, InvokeChannels.listBackups)
+    const { id, place } = backups.find((backup) => backup.place === "export")!
+    return yield* fake.invokeAs(MapBackupFile, InvokeChannels.readBackup, { place, id })
+  })
+
 describe("MapExports over IPC", () => {
   it.effect("a Re-import leaves the sidecar for the page to re-match, and the game's copies get the map's", () =>
     withHandlers(({ fake, steam }) =>
@@ -43,12 +51,7 @@ describe("MapExports over IPC", () => {
         yield* fake.invoke(InvokeChannels.saveMap, { fileName, text: "{\"v\":3}" })
         yield* fs.writeFileString(path.join(steam.maps, fileName), "{\"v\":4}")
         yield* fake.invoke(InvokeChannels.exportMap, { ...payload, overwriteChanged: true })
-        const backups = yield* fake.invokeAs(MapBackups, InvokeChannels.listBackups)
-        const { id, place } = backups.find((backup) => backup.place === "export")!
-        assert.deepInclude(yield* fake.invokeAs(MapBackupFile, InvokeChannels.readBackup, { place, id }), {
-          text: "{\"v\":4}",
-          sidecar: "sidecar"
-        })
+        assert.deepInclude(yield* exportBackupIn(fake), { text: "{\"v\":4}", sidecar: "sidecar" })
       })
     ))
 
@@ -176,6 +179,31 @@ describe("MapExports over IPC", () => {
           overwriteChanged: true
         })
         assert.strictEqual(again._tag, "Exported")
+      })
+    ))
+
+  it.effect("a Re-import given what to keep writes it to the project and over the game's copy, in sync", () =>
+    withHandlers(({ fake, project, steam }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const fileName = "Map_LevelEditorMain&Keep_me.balledit"
+        const inGame = path.join(steam.maps, fileName)
+        yield* fs.makeDirectory(steam.maps, { recursive: true })
+        yield* fake.invoke(InvokeChannels.createMap, { fileName, text: "{\"v\":1}" })
+        yield* fake.invoke(InvokeChannels.exportMap, { fileName, replacePublished: false, overwriteChanged: false })
+        yield* fs.writeFileString(inGame, "{\"v\":2}")
+        const kept = "{\"v\":2,\"editorState\":{}}"
+        const file = yield* fake.invokeAs(ProjectMapFile, InvokeChannels.reimportMap, { fileName, text: kept })
+        assert.strictEqual(file.text, kept)
+        assert.strictEqual(yield* fs.readFileString(path.join(project, "maps", fileName)), kept)
+        assert.strictEqual(yield* fs.readFileString(inGame), kept)
+        const hash = sha256(new TextEncoder().encode(kept))
+        assert.deepInclude(file, { hash })
+        assert.strictEqual(file.link?.export?.hash, hash)
+        assert.strictEqual(file.link?.lastSeenHash, hash)
+        // the game's own version is kept
+        assert.deepInclude(yield* exportBackupIn(fake), { text: "{\"v\":2}" })
       })
     ))
 

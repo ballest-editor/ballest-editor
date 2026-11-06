@@ -230,6 +230,12 @@ export type ProjectMapFile = typeof ProjectMapFile.Type
 
 const MapFileNamePayload = Schema.Struct({ fileName: MapFileName })
 
+/**
+ * `reimportMap`: the map, and `text` to take in place of the game's bytes: those bytes with what the game drops put back
+ * (docs/DESKTOP.md § Sync). It goes over the game's copy too, so the two stay in sync.
+ */
+const ReimportMapPayload = Schema.Struct({ fileName: MapFileName, text: Schema.optionalKey(FileText) })
+
 /** `rememberOpenMap`: the map now open in the project, or null for a map that isn't in it. */
 const OpenMapPayload = Schema.Struct({ fileName: Schema.NullOr(MapFileName) })
 
@@ -833,7 +839,7 @@ export const DesktopMethods = {
    * Re-import: replaces a project map with its export in the game's maps folder, byte for byte (the project's file goes
    * to the project's backups first), and records the export as in sync. Fails for a map that has no export.
    */
-  reimportMap: { payload: MapFileNamePayload, result: ProjectMapFile },
+  reimportMap: { payload: ReimportMapPayload, result: ProjectMapFile },
   /** The map's export as it is in the game's maps folder, with the project's sidecar. Writes nothing. */
   readExport: { payload: MapFileNamePayload, result: ProjectMapFile },
   /** The current project's backups and the exports' (docs/PROJECTS.md § The files), newest first. */

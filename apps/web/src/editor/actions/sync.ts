@@ -13,7 +13,7 @@ import { checkPrefabs } from "./prefabs"
 import { notifyFailure, run, runUntilCleanup } from "./run"
 import { withSavedOpenMap } from "./save"
 import { fileOf, loadProjectMapFile, refreshProject, showMap } from "./shared"
-import { askSyncConflict, gameDiffOf } from "./syncConflict"
+import { askSyncConflict, gameDiffOf, textKeepingPivots } from "./syncConflict"
 import { unlessCancelledFor } from "./unsaved"
 
 /** Tells that the game changed a map's export and the project's has moved on too, with the window that sorts it out. */
@@ -95,7 +95,7 @@ export const checkExports = () => run(checkExportsEffect)
 export const reimportMapEffect = (fileName: string) =>
   unlessCancelledFor(fileName, "reimport", (open) =>
     Effect.gen(function*() {
-      const file = yield* (yield* Platform).reimportMap(fileName)
+      const file = yield* (yield* Platform).reimportMap(fileName, yield* textKeepingPivots(fileName))
       yield* refreshProject
       const { loaded, map } = yield* loadProjectMapFile(file)
       if (open) yield* showMap(map, fileOf(file), { loaded })

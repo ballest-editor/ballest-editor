@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import { listSamples, readSample } from "../test/samples"
 import { defaultEditorState, identityTransform, newMapFile, playerStartItem } from "./factory"
-import { diffMaps, itemCountOf, mapDiffLabelOf, type MapVersion } from "./mapDiff"
+import { diffMaps, itemCountOf, mapDiffLabelOf, type MapVersion, withPivotsOf } from "./mapDiff"
 import { type Item, MapFile } from "./MapFile"
 
 const decodeMap = Schema.decodeUnknownSync(Schema.fromJsonString(MapFile))
@@ -71,6 +71,26 @@ describe("diffMaps", () => {
     const { editorState: _dropped, ...saved } = version.map
     assert.deepStrictEqual(diffMaps(withPivot, { ...version, map: saved }), { ...NOTHING, pivots: true })
     assert.deepStrictEqual(diffMaps(version, { ...version, map: saved }), NOTHING)
+  })
+
+  it("carries pivots to the items of the same key, wherever they are now, and leaves the rest behind", () => {
+    const pivotOn = (itemIndex: number) => ({
+      itemIndex,
+      pivot: { choice: "Center", localPosition: { x: 0, y: 0, z: 50 } }
+    })
+    const before = versionOf([at(0), at(100), at(200)], ["a", "b", "c"])
+    const from = {
+      ...before,
+      map: { ...before.map, editorState: { ...defaultEditorState(), pivots: [pivotOn(0), pivotOn(2)] } }
+    }
+    const { editorState: _dropped, ...saved } = versionOf([at(200), at(50)], ["c", "a"]).map
+    const carried = withPivotsOf(from, { map: saved, ids: ["c", "a"] })
+    assert.deepStrictEqual(carried.map.editorState?.pivots, [pivotOn(1), pivotOn(0)])
+    const gone = withPivotsOf(from, { map: saved, ids: ["c", "z"] })
+    assert.deepStrictEqual(gone.map.editorState?.pivots, [pivotOn(0)])
+    assert.isTrue(diffMaps(from, gone).pivots)
+    // nothing to carry
+    assert.strictEqual(withPivotsOf(before, before), before)
   })
 
   it("doesn't take the last digits a save moves in a rotation for a move", () => {

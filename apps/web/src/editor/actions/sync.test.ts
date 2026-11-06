@@ -1,7 +1,8 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, Fiber } from "effect"
+import { Effect, Fiber, Schema } from "effect"
 import { defaultEditorState } from "../../domain/factory"
 import { linkStateOf } from "../../domain/linkState"
+import { MapFile } from "../../domain/MapFile"
 import { useEditor } from "../../editor/store"
 import { projectFile, TEST_MAPS_FOLDER, type TestDisk } from "../../test/desktopBridge"
 import { diskWithPlugin, edit, layerFor, playSample, reset, s, untilTrue } from "../../test/editorActions"
@@ -166,22 +167,53 @@ describe("sync", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("asks before a save in the game drops the project's pivots, which live nowhere else", () => {
+  describe("pivots, which every save in the game drops", () => {
+    const pivot = { itemIndex: 0, pivot: { choice: "Center", localPosition: { x: 0, y: 0, z: 50 } } }
     const withPivot = JSON.stringify({
       ...JSON.parse(text),
-      editorState: {
-        ...defaultEditorState(),
-        pivots: [{ itemIndex: 0, pivot: { choice: "Center", localPosition: { x: 0, y: 0, z: 50 } } }]
-      }
+      editorState: { ...defaultEditorState(), pivots: [pivot] }
     })
-    const disk = diskWithPlugin({ [projectFile(name)]: withPivot })
-    return Effect.gen(function*() {
-      yield* exported(disk)
-      disk.files.set(inGame, text)
-      yield* checkExportsEffect
-      assert.strictEqual(s().dialog?.id, "syncConflict")
-      assert.strictEqual(disk.files.get(projectFile(name)), withPivot)
-    }).pipe(Effect.provide(layerFor(disk)))
+    const decodeMap = Schema.decodeUnknownSync(Schema.fromJsonString(MapFile))
+    const pivotsIn = (file: string | undefined) => decodeMap(file).editorState?.pivots
+    /** `saved` as the game writes it: every save there leaves `editorState` out. */
+    const withoutEditorState = (saved: string) => {
+      const { editorState: _dropped, ...map } = decodeMap(saved)
+      return JSON.stringify(map)
+    }
+    const { items } = decodeMap(text)
+
+    it.effect("come through a save in the game, into the project and back into the game's file", () => {
+      const disk = diskWithPlugin({ [projectFile(name)]: withPivot })
+      return Effect.gen(function*() {
+        yield* exported(disk)
+        disk.files.set(inGame, withoutEditorState(savedInGame(text, 3.5)))
+        yield* checkExportsEffect
+        assert.isNull(s().dialog)
+        assert.deepStrictEqual(pivotsIn(disk.files.get(projectFile(name))), [pivot])
+        assert.deepStrictEqual(pivotsIn(disk.files.get(inGame)), [pivot])
+        assert.deepStrictEqual(s().doc.map.editorState?.pivots, [pivot])
+        assert.strictEqual(s().doc.map.worldSettings.directionalLight.timeOfDay, 3.5)
+        assert.strictEqual(stateNow(), "inSync")
+
+        // and again: the map stays in sync, so a second save in the game comes across the same way
+        disk.files.set(inGame, withoutEditorState(savedInGame(text, 4.5)))
+        yield* checkExportsEffect
+        assert.isNull(s().dialog)
+        assert.strictEqual(s().doc.map.worldSettings.directionalLight.timeOfDay, 4.5)
+        assert.deepStrictEqual(pivotsIn(disk.files.get(projectFile(name))), [pivot])
+      }).pipe(Effect.provide(layerFor(disk)))
+    })
+
+    it.effect("ask first when one has no item left to go on", () => {
+      const disk = diskWithPlugin({ [projectFile(name)]: withPivot })
+      return Effect.gen(function*() {
+        yield* exported(disk)
+        disk.files.set(inGame, JSON.stringify({ ...JSON.parse(withoutEditorState(text)), items: items.slice(1) }))
+        yield* checkExportsEffect
+        assert.strictEqual(s().dialog?.id, "syncConflict")
+        assert.strictEqual(disk.files.get(projectFile(name)), withPivot)
+      }).pipe(Effect.provide(layerFor(disk)))
+    })
   })
 
   it.effect("a change that doesn't read is left alone, with a notification to resolve it later", () => {

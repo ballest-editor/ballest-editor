@@ -2,6 +2,7 @@
  * What changed between two versions of a map, in items (docs/DESKTOP.md § Backups). An item is the same item in both by
  * its stable key; what no key pairs, as in a map without a sidecar, is the same item by its class and position.
  */
+import { defaultEditorState } from "./factory"
 import { classNameOf, type Item, type MapFile } from "./MapFile"
 import { fingerprintOf } from "./sidecar"
 
@@ -111,6 +112,33 @@ export const diffMaps = (before: MapVersion, after: MapVersion): MapDiff => {
     edited: editedIn(paired),
     settings: settingsOf(before.map) !== settingsOf(after.map),
     pivots: pivotsOf(before.map) !== pivotsOf(after.map)
+  }
+}
+
+/** Where the item at `index` of `from` is in `to`: by its key, or for a map without a sidecar by its fingerprint. */
+const sameItemIn = (to: MapVersion, from: MapVersion, index: number) => {
+  const byKey = to.ids.indexOf(from.ids[index] ?? "")
+  const item = from.map.items[index]
+  if (byKey !== -1 || item === undefined) return byKey
+  const print = fingerprintOf(item)
+  return to.map.items.findIndex((other) => fingerprintOf(other) === print)
+}
+
+/**
+ * `to` with `from`'s pivots, on the items of the same stable key: what a version from the game needs, as every save there
+ * drops them. A pivot whose item isn't in `to` stays behind, and a version with pivots of its own keeps those.
+ */
+export const withPivotsOf = (from: MapVersion, to: MapVersion): MapVersion => {
+  const pivots = from.map.editorState?.pivots ?? []
+  if (pivots.length === 0 || (to.map.editorState?.pivots.length ?? 0) > 0) return to
+  const carried = pivots.flatMap((pivot) => {
+    const itemIndex = sameItemIn(to, from, pivot.itemIndex)
+    return itemIndex === -1 ? [] : [{ ...pivot, itemIndex }]
+  })
+  if (carried.length === 0) return to
+  return {
+    ...to,
+    map: { ...to.map, editorState: { ...(to.map.editorState ?? defaultEditorState()), pivots: carried } }
   }
 }
 

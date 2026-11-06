@@ -199,8 +199,11 @@ export class Platform extends Context.Service<Platform, {
    * game changed since the last look (each change once) and the ones gone (their export is dropped). None in a browser.
    */
   readonly checkExports: Effect.Effect<ExportChecks, PlatformError>
-  /** Re-import: replaces a project map with its export as the game has it (the project's file goes to backups). */
-  readonly reimportMap: (fileName: string) => Effect.Effect<ProjectMapFile, PlatformError>
+  /**
+   * Re-import: replaces a project map with its export as the game has it (the project's file goes to backups), or with
+   * `text`, that export with what the game drops put back, which goes over the game's copy too.
+   */
+  readonly reimportMap: (fileName: string, text?: string) => Effect.Effect<ProjectMapFile, PlatformError>
   /** The map's export as the game has it now, with the project's sidecar; nothing is written. */
   readonly readExport: (fileName: string) => Effect.Effect<ProjectMapFile, PlatformError>
   /**
@@ -403,7 +406,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     importMap: (payload) => call("importMap", payload),
     exportMap: (fileName, options) => call("exportMap", { fileName, ...options }),
     checkExports: call("checkExports"),
-    reimportMap: (fileName) => call("reimportMap", { fileName }),
+    reimportMap: (fileName, text) => call("reimportMap", { fileName, ...(text !== undefined && { text }) }),
     readExport: (fileName) => call("readExport", { fileName }),
     listBackups: call("listBackups"),
     readBackup: ({ place, id }) => call("readBackup", { place, id }),
