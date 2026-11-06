@@ -46,6 +46,7 @@ import {
 import { findNode, numberedNameText } from "../domain/structure"
 import { detachInstance, startSavePrefab, updateInstance } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
+import { elementOf } from "../editor/keyTargets"
 import { nextSelection, nodeNamesOf, useEditor } from "../editor/store"
 import { OUTLINE_INDENT, OUTLINE_ROW_HEIGHT, OutlineRowView } from "./OutlineRow"
 import { TagInput } from "./TagInput"
@@ -72,8 +73,8 @@ const isSubset = (keys: ReadonlyArray<string>, of: ReadonlyArray<string>) => {
 }
 
 const rowOf = (rows: ReadonlyArray<OutlineRow>, target: EventTarget): OutlineRow | undefined => {
-  const el = target instanceof Element ? target.closest<HTMLElement>("[data-row-index]") : null
-  return el === null ? undefined : rows[Number(el.dataset["rowIndex"])]
+  const index = elementOf(target)?.closest<HTMLElement>("[data-row-index]")?.dataset["rowIndex"]
+  return index === undefined ? undefined : rows[Number(index)]
 }
 
 /** Where a drop would land: a line between rows; "into" lights the group's row instead. */
