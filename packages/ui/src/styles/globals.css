@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/manrope";
 @import "@fontsource-variable/geist-mono";
 
 @custom-variant dark (&:is(.dark *));
@@ -10,113 +9,117 @@
 @source "../**/*.{ts,tsx}";
 
 /*
- * Colour: docs/design/ui-system.md § Colour says where each value comes from in the game and what each token is for.
- * Surfaces get lighter as they rise, in both themes: --background, --card, --popover.
+ * Colour: docs/design/ui-system.md § Colour says what each token is for. The chrome has no hue, only elevation: one cool
+ * neutral, lighter as it rises in both themes (--background, --card, --popover). --primary is the only colour that isn't
+ * a status, and it means "interactive". The game's colours live in the viewport.
  */
 :root {
-    /* Daylight: paper and sand, inked in the stadium's navy. */
-    --background: oklch(0.925 0.024 86);
-    --foreground: oklch(0.25 0.075 272);
-    --card: oklch(0.965 0.015 88);
-    --card-foreground: oklch(0.25 0.075 272);
-    --popover: oklch(0.995 0.005 90);
-    --popover-foreground: oklch(0.25 0.075 272);
-    --primary: oklch(0.64 0.137 72);
-    --primary-foreground: oklch(0.22 0.07 272);
-    --secondary: oklch(0.905 0.035 225);
-    --secondary-foreground: oklch(0.3 0.08 255);
-    --muted: oklch(0.915 0.024 86);
+    --background: oklch(0.968 0.003 250);
+    --foreground: oklch(0.225 0.01 250);
+    --card: oklch(0.992 0.0015 250);
+    --card-foreground: oklch(0.225 0.01 250);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.225 0.01 250);
+    --primary: oklch(0.52 0.095 210);
+    --primary-foreground: oklch(0.99 0.002 250);
+    --secondary: oklch(0.94 0.004 250);
+    --secondary-foreground: oklch(0.225 0.01 250);
+    --muted: oklch(0.948 0.004 250);
     /* Text below --foreground, one step each: docs/design/ui-system.md. */
-    --fg-secondary: oklch(0.39 0.06 272);
-    --fg-tertiary: oklch(0.5 0.05 272);
-    --fg-disabled: oklch(0.71 0.03 272);
-    --accent: oklch(0.64 0.09 210);
-    --accent-foreground: oklch(0.25 0.075 272);
-    --destructive: oklch(0.5 0.186 27);
-    --border: oklch(0.84 0.028 84);
-    --input: oklch(0.82 0.03 84);
-    --ring: oklch(0.54 0.102 226);
-    --chart-1: oklch(0.54 0.102 226);
-    --chart-2: oklch(0.36 0.115 273);
-    --chart-3: oklch(0.64 0.137 72);
-    --chart-4: oklch(0.5 0.186 27);
-    --chart-5: oklch(0.5 0.099 170);
-    --sidebar: oklch(0.965 0.015 88);
-    --sidebar-foreground: oklch(0.25 0.075 272);
-    --sidebar-primary: oklch(0.64 0.137 72);
-    --sidebar-primary-foreground: oklch(0.22 0.07 272);
-    --sidebar-accent: oklch(0.64 0.09 210);
-    --sidebar-accent-foreground: oklch(0.25 0.075 272);
-    --sidebar-border: oklch(0.84 0.028 84);
-    --sidebar-ring: oklch(0.54 0.102 226);
-    /* An opaque fill, and text that reads on that fill and on the bare surfaces too (Settings › Game has no fill). */
-    --status-ok: oklch(0.9 0.06 172);
-    --status-ok-foreground: oklch(0.43 0.083 172);
-    --status-warn: oklch(0.91 0.07 72);
-    --status-warn-foreground: oklch(0.47 0.125 50);
-    --status-neutral: oklch(0.89 0.03 240);
-    --status-neutral-foreground: oklch(0.42 0.06 262);
-    --difficulty-1: oklch(0.25 0.075 272);
-    --difficulty-2: oklch(0.56 0.138 155);
-    --difficulty-3: oklch(0.5 0.165 255);
-    --difficulty-4: oklch(0.54 0.21 25);
-    --difficulty-5: oklch(0.64 0.133 78);
-    --size-s: oklch(0.5 0.1 232);
-    --size-m: oklch(0.5 0.12 295);
-    --size-l: oklch(0.52 0.16 20);
-    --shadow-tint: oklch(0.36 0.09 273 / 18%);
+    --fg-secondary: oklch(0.355 0.012 250);
+    --fg-tertiary: oklch(0.48 0.012 250);
+    --fg-disabled: oklch(0.7 0.01 250);
+    --accent: oklch(0.952 0.004 250);
+    --accent-foreground: oklch(0.225 0.01 250);
+    --destructive: oklch(0.52 0.18 27);
+    /* The hairline, and the well a field sits in: both alpha, so they hold on every surface. */
+    --border: oklch(0.225 0.01 250 / 10%);
+    --input: oklch(0.225 0.01 250 / 3%);
+    --ring: oklch(0.52 0.095 210);
+    --dirty: oklch(0.64 0.135 80);
+    --chart-1: oklch(0.52 0.095 210);
+    --chart-2: oklch(0.42 0.085 165);
+    --chart-3: oklch(0.46 0.095 65);
+    --chart-4: oklch(0.52 0.18 27);
+    --chart-5: oklch(0.42 0.025 250);
+    --sidebar: oklch(0.98 0.0025 250);
+    --sidebar-foreground: oklch(0.225 0.01 250);
+    --sidebar-primary: oklch(0.52 0.095 210);
+    --sidebar-primary-foreground: oklch(0.99 0.002 250);
+    --sidebar-accent: oklch(0.952 0.004 250);
+    --sidebar-accent-foreground: oklch(0.225 0.01 250);
+    --sidebar-border: oklch(0.225 0.01 250 / 10%);
+    --sidebar-ring: oklch(0.52 0.095 210);
+    /* An opaque tint, and text that reads on that tint and on the bare surfaces too (Settings › Game has no fill). */
+    --status-ok: oklch(0.945 0.03 165);
+    --status-ok-foreground: oklch(0.42 0.085 165);
+    --status-warn: oklch(0.95 0.04 85);
+    --status-warn-foreground: oklch(0.46 0.095 65);
+    --status-neutral: oklch(0.94 0.008 250);
+    --status-neutral-foreground: oklch(0.42 0.025 250);
+    --difficulty-1: oklch(0.225 0.01 250);
+    --difficulty-2: oklch(0.55 0.12 155);
+    --difficulty-3: oklch(0.5 0.13 250);
+    --difficulty-4: oklch(0.54 0.18 25);
+    --difficulty-5: oklch(0.66 0.135 75);
+    --size-s: oklch(0.47 0.06 165);
+    --size-m: oklch(0.47 0.035 250);
+    --size-l: oklch(0.5 0.075 70);
+    --shadow-soft: oklch(0.225 0.01 250 / 5%);
+    --shadow-float: oklch(0.225 0.01 250 / 12%);
 }
 
 .dark {
-    /* Night at the stadium: the navy under the stands, the goal's yellow. */
-    --background: oklch(0.2 0.065 270);
-    --foreground: oklch(0.97 0.01 260);
-    --card: oklch(0.245 0.055 271);
-    --card-foreground: oklch(0.97 0.01 260);
-    --popover: oklch(0.29 0.058 272);
-    --popover-foreground: oklch(0.97 0.01 260);
-    --primary: oklch(0.86 0.17 90);
-    --primary-foreground: oklch(0.22 0.07 272);
-    --secondary: oklch(0.355 0.065 262);
-    --secondary-foreground: oklch(0.97 0.01 260);
-    --muted: oklch(0.32 0.058 270);
-    --fg-secondary: oklch(0.87 0.025 262);
-    --fg-tertiary: oklch(0.75 0.04 262);
-    --fg-disabled: oklch(0.54 0.045 266);
-    --accent: oklch(0.5 0.085 210);
-    --accent-foreground: oklch(0.985 0.006 210);
-    --destructive: oklch(0.72 0.17 25);
-    --border: oklch(0.75 0.07 262 / 16%);
-    --input: oklch(0.75 0.07 262 / 22%);
-    --ring: oklch(0.72 0.13 235);
-    --chart-1: oklch(0.72 0.13 235);
-    --chart-2: oklch(0.86 0.17 90);
-    --chart-3: oklch(0.8 0.12 172);
-    --chart-4: oklch(0.72 0.17 25);
-    --chart-5: oklch(0.66 0.12 290);
-    --sidebar: oklch(0.245 0.055 271);
-    --sidebar-foreground: oklch(0.97 0.01 260);
-    --sidebar-primary: oklch(0.86 0.17 90);
-    --sidebar-primary-foreground: oklch(0.22 0.07 272);
-    --sidebar-accent: oklch(0.5 0.085 210);
-    --sidebar-accent-foreground: oklch(0.985 0.006 210);
-    --sidebar-border: oklch(0.75 0.07 262 / 16%);
-    --sidebar-ring: oklch(0.72 0.13 235);
-    --status-ok: oklch(0.36 0.07 172);
-    --status-ok-foreground: oklch(0.86 0.12 172);
-    --status-warn: oklch(0.38 0.08 58);
-    --status-warn-foreground: oklch(0.86 0.112 72);
-    --status-neutral: oklch(0.37 0.05 255);
-    --status-neutral-foreground: oklch(0.86 0.04 250);
-    --difficulty-1: oklch(0.97 0.01 260);
-    --difficulty-2: oklch(0.72 0.16 155);
-    --difficulty-3: oklch(0.68 0.15 248);
-    --difficulty-4: oklch(0.66 0.22 24);
-    --difficulty-5: oklch(0.9 0.18 98);
-    --size-s: oklch(0.78 0.1 232);
-    --size-m: oklch(0.78 0.1 295);
-    --size-l: oklch(0.78 0.12 20);
-    --shadow-tint: oklch(0.1 0.05 272 / 55%);
+    --background: oklch(0.199 0.005 250);
+    --foreground: oklch(0.96 0.003 250);
+    --card: oklch(0.238 0.008 250);
+    --card-foreground: oklch(0.96 0.003 250);
+    --popover: oklch(0.275 0.01 250);
+    --popover-foreground: oklch(0.96 0.003 250);
+    --primary: oklch(0.64 0.105 210);
+    --primary-foreground: oklch(0.17 0.012 250);
+    --secondary: oklch(0.32 0.01 250);
+    --secondary-foreground: oklch(0.96 0.003 250);
+    --muted: oklch(0.31 0.01 250);
+    --fg-secondary: oklch(0.87 0.006 250);
+    --fg-tertiary: oklch(0.755 0.008 250);
+    --fg-disabled: oklch(0.54 0.01 250);
+    --accent: oklch(0.3 0.01 250);
+    --accent-foreground: oklch(0.96 0.003 250);
+    --destructive: oklch(0.72 0.15 25);
+    --border: oklch(1 0 0 / 6%);
+    --input: oklch(0 0 0 / 16%);
+    --ring: oklch(0.64 0.105 210);
+    --dirty: oklch(0.86 0.14 95);
+    --chart-1: oklch(0.64 0.105 210);
+    --chart-2: oklch(0.84 0.09 165);
+    --chart-3: oklch(0.86 0.09 80);
+    --chart-4: oklch(0.72 0.15 25);
+    --chart-5: oklch(0.82 0.015 250);
+    --sidebar: oklch(0.238 0.008 250);
+    --sidebar-foreground: oklch(0.96 0.003 250);
+    --sidebar-primary: oklch(0.64 0.105 210);
+    --sidebar-primary-foreground: oklch(0.17 0.012 250);
+    --sidebar-accent: oklch(0.3 0.01 250);
+    --sidebar-accent-foreground: oklch(0.96 0.003 250);
+    --sidebar-border: oklch(1 0 0 / 6%);
+    --sidebar-ring: oklch(0.64 0.105 210);
+    --status-ok: oklch(0.295 0.032 165);
+    --status-ok-foreground: oklch(0.84 0.09 165);
+    --status-warn: oklch(0.31 0.04 75);
+    --status-warn-foreground: oklch(0.86 0.09 80);
+    --status-neutral: oklch(0.3 0.012 250);
+    --status-neutral-foreground: oklch(0.82 0.015 250);
+    --difficulty-1: oklch(0.96 0.003 250);
+    --difficulty-2: oklch(0.72 0.12 155);
+    --difficulty-3: oklch(0.68 0.11 250);
+    --difficulty-4: oklch(0.68 0.16 25);
+    --difficulty-5: oklch(0.8 0.13 85);
+    --size-s: oklch(0.74 0.06 165);
+    --size-m: oklch(0.74 0.04 250);
+    --size-l: oklch(0.76 0.07 75);
+    --shadow-soft: oklch(0 0 0 / 5%);
+    --shadow-float: oklch(0 0 0 / 12%);
 }
 
 @theme inline {
@@ -139,6 +142,7 @@
     --color-destructive: var(--destructive);
     --color-border: var(--border);
     --color-input: var(--input);
+    --color-dirty: var(--dirty);
     --color-ring: var(--ring);
     --color-chart-1: var(--chart-1);
     --color-chart-2: var(--chart-2);
@@ -167,12 +171,13 @@
     --color-size-s: var(--size-s);
     --color-size-m: var(--size-m);
     --color-size-l: var(--size-l);
-    /* Elevation: the tint is the theme's, so a shadow on navy is deeper navy rather than grey. */
-    --shadow-sm: 0 1px 2px var(--shadow-tint);
-    --shadow-md: 0 4px 12px -2px var(--shadow-tint), 0 2px 4px -2px var(--shadow-tint);
-    --shadow-lg: 0 10px 24px -6px var(--shadow-tint), 0 4px 8px -4px var(--shadow-tint);
-    --shadow-2xl: 0 24px 56px -12px var(--shadow-tint);
-    --font-sans: 'Manrope Variable', sans-serif;
+    /* Depth: docs/design/ui-system.md § Depth. */
+    --shadow-sm: 0 1px 2px var(--shadow-soft);
+    --shadow-md: 0 4px 12px var(--shadow-float);
+    --shadow-lg: 0 12px 24px var(--shadow-float);
+    --shadow-2xl: 0 12px 24px var(--shadow-float);
+    --shadow-primary: inset 0 1px 0 oklch(1 0 0 / 16%), 0 1px 2px color-mix(in oklch, var(--primary) 24%, transparent);
+    --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, sans-serif;
     /* Bundled, so numbers sit the same on every machine (system mono fonts differ in their vertical metrics). */
     --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -185,39 +190,52 @@
     --text-caption: 0.6875rem;
     --text-caption--line-height: 1rem;
     --text-caption--font-weight: 500;
+    --text-label: 0.75rem;
+    --text-label--line-height: 1rem;
+    --text-label--font-weight: 500;
     --text-body: 0.8125rem;
     --text-body--line-height: 1.25rem;
     --text-body--font-weight: 400;
     --text-body-strong: 0.8125rem;
     --text-body-strong--line-height: 1.25rem;
-    --text-body-strong--font-weight: 600;
-    --text-title: 0.9375rem;
+    --text-body-strong--font-weight: 500;
+    --text-title: 0.875rem;
     --text-title--line-height: 1.25rem;
     --text-title--font-weight: 600;
+    --text-title--letter-spacing: -0.005em;
 
-    --radius-control: 0.25rem;
-    --radius-surface: 0.5rem;
-    /* Tailwind's own names land on the two above: the small ones are controls, the rest surfaces. */
+    --radius-control: 0.5rem;
+    --radius-surface: 0.625rem;
+    --radius-sheet: 0.75rem;
+    /* Tailwind's own names land on the three above: the small ones are controls, the large ones sheets. */
     --radius-xs: var(--radius-control);
     --radius-sm: var(--radius-control);
     --radius-md: var(--radius-control);
     --radius-lg: var(--radius-surface);
     --radius-xl: var(--radius-surface);
-    --radius-2xl: var(--radius-surface);
-    --radius-3xl: var(--radius-surface);
-    --radius-4xl: var(--radius-surface);
+    --radius-2xl: var(--radius-sheet);
+    --radius-3xl: var(--radius-sheet);
+    --radius-4xl: var(--radius-sheet);
 
     --spacing-dialog: 1rem;
 }
 
 @layer base {
+  /* A bare `border` is the hairline at 65%, felt rather than seen. `border-border` is the whole hairline. */
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border/65 outline-ring/50;
     }
   body {
-    @apply bg-background text-body text-foreground;
+    @apply bg-background text-body text-foreground tabular-nums;
     }
 }
+
+/* Whatever floats over content: the popover's surface over a blur, so what's behind shows as colour without detail. */
+@utility glass {
+  background-color: color-mix(in oklab, var(--popover) 80%, transparent);
+  backdrop-filter: blur(12px) saturate(1.2);
+}
+
 /*
  * Animation speed (the editor's Settings › Appearance): `--motion` on <html> scales every duration, 0 turns animation
  * off. It goes into the theme's default transition duration, the `duration-*` utilities (so a `duration-300` is 300ms
@@ -230,10 +248,11 @@
 
 @theme inline {
   --default-transition-duration: calc(150ms * var(--motion));
-  --animate-in: enter var(--tw-animation-duration, var(--tw-duration, calc(0.15s * var(--motion)))) var(--tw-ease, ease)
+  --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  --animate-in: enter var(--tw-animation-duration, var(--tw-duration, calc(0.15s * var(--motion)))) var(--tw-ease, cubic-bezier(0, 0, 0.2, 1))
     var(--tw-animation-delay, 0s) var(--tw-animation-iteration-count, 1) var(--tw-animation-direction, normal)
     var(--tw-animation-fill-mode, none);
-  --animate-out: exit var(--tw-animation-duration, var(--tw-duration, calc(0.15s * var(--motion)))) var(--tw-ease, ease)
+  --animate-out: exit var(--tw-animation-duration, var(--tw-duration, calc(0.15s * var(--motion)))) var(--tw-ease, cubic-bezier(0, 0, 0.2, 1))
     var(--tw-animation-delay, 0s) var(--tw-animation-iteration-count, 1) var(--tw-animation-direction, normal)
     var(--tw-animation-fill-mode, none);
 }
