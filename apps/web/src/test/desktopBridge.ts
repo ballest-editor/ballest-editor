@@ -1,6 +1,7 @@
 import type {
   BackupPlace,
   DesktopBridge,
+  EditOutcome,
   FoundCreator,
   GameLinkResult,
   GamePaths,
@@ -110,6 +111,9 @@ export interface TestDisk {
     plugin: PluginStatus
     pluginInstalls: number
     races: Array<string>
+    /** The maps Open in game asked the plugin to open, in order, and what the plugin answers a running game's. */
+    opens: Array<string>
+    editOutcome: EditOutcome
   }
   /** The updater: `push` sends a new state to the page, as main does. Downloads and installs are counted. */
   readonly updater: {
@@ -217,11 +221,16 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
     plugin: {
       status: "missing",
       bundledVersion: "0.2.0",
+      hostVersion: "0.34.2",
+      requiredHost: "0.34.0",
+      hostTooOld: false,
       installedVersion: null,
       folder: "/game/Ballest/Binaries/Win64/plugins/ballest-editor-link"
     },
     pluginInstalls: 0,
-    races: []
+    races: [],
+    opens: [],
+    editOutcome: "opened"
   },
   updater: makeTestUpdater()
 })
@@ -562,7 +571,12 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       backUp("export", path, text)
       disk.files.set(path, text)
       const exported = { path, hash: testHash(text), at: TIME }
-      const link = { ...(links.get(fileName) ?? emptyLink), export: exported, lastSeenHash: exported.hash }
+      const link = {
+        ...(links.get(fileName) ?? emptyLink),
+        export: exported,
+        lastSeenHash: exported.hash,
+        exportedWhileRunning: disk.game.running
+      }
       links.set(fileName, link)
       return Promise.resolve({ _tag: "Exported" } as const)
     },
@@ -592,8 +606,19 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       if (link.export === null || text === undefined) return fail(`${fileName} has no export to re-import.`)
       await write(fileName, text)
       const seen = { ...link.export, hash: testHash(text) }
-      linksOf(current()).set(fileName, { ...link, export: seen, lastSeenHash: seen.hash })
+      linksOf(current()).set(fileName, {
+        ...link,
+        export: seen,
+        lastSeenHash: seen.hash,
+        exportedWhileRunning: false
+      })
       return { ...mapOf(fileName), text, sidecar: sidecarOf(fileName) }
+    },
+    readExport: ({ fileName }) => {
+      const exported = linksOf(current()).get(fileName)?.export ?? null
+      const text = exported === null ? undefined : disk.files.get(exported.path)
+      if (text === undefined) return fail(`${fileName} has no export to read.`)
+      return Promise.resolve({ ...mapOf(fileName), text, sidecar: sidecarOf(fileName) })
     },
     listBackups: () =>
       Promise.resolve(disk.backups.map(({ hash: _hash, sidecar: _sidecar, text: _, ...backup }) => backup)),
@@ -680,6 +705,21 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       const launch = disk.game.running ? "running" : "launched"
       if (launch === "launched") disk.game.launches++
       return { _tag: "Played", plugin, sent, launch } as const
+    },
+    openInGame: async ({ fileName, replacePublished, overwriteChanged }) => {
+      const { plugin } = disk.game
+      if (plugin.status !== "current" || plugin.hostTooOld) return { _tag: "NeedsPlugin", plugin } as const
+      const exported = await bridge.exportMap({ fileName, replacePublished, overwriteChanged })
+      if (exported._tag !== "Exported") return exported
+      disk.game.opens.push(fileName)
+      const launch = disk.game.running ? "running" : "launched"
+      if (launch === "launched") disk.game.launches++
+      return {
+        _tag: "Opening",
+        plugin,
+        launch,
+        outcome: launch === "running" ? disk.game.editOutcome : "pending"
+      } as const
     },
     onPlaySessionEnded: (listener) => {
       disk.playSessions.listeners.add(listener)

@@ -3,9 +3,10 @@
 A plugin for the [Ballest plugin manager](https://anythinggoes-ballest.github.io/ballest-plugin-manager/), listed there
 as Ballest Editor link. When you press **Play** in Ballest Editor, it starts a race of the map you're editing in
 _Ballest of Them All_: pre-race menu, countdown, checkpoints and finish, as if it were a published track. Press Play
-again after an edit and the race restarts with the new version.
+again after an edit and the race restarts with the new version. **Open in game** opens the map in the in-game editor
+instead.
 
-It needs plugin manager 0.26.0 or later. It doesn't use the network or the console.
+It needs plugin manager 0.34.0 or later. It doesn't use the network or the console.
 
 ## Install
 
@@ -27,8 +28,13 @@ details):
 3. Starts the game through Steam if it isn't running.
 
 The plugin reads `play.json` from `Update(dt)` twice a second (the **Check every** setting changes that). When it sees a nonce it hasn't
-handled yet, it races the map with `Tracks::OpenLocal`. If the game is still starting up, it waits for the track list,
-then keeps trying every 2 s for 30 s before it gives up and logs the reason.
+handled yet, it races the map with `Tracks::OpenLocal`, or with `"mode": "edit"` opens it with `Together::OpenMap`. If
+the game is still starting up, it waits for the track list, then keeps trying every 2 s for 30 s before it gives up and
+logs the reason.
+
+An open request is refused while the in-game editor is open: opening a map replaces what is open there, and the host
+can't say whether that is saved. How a request went is kept in the plugin's `Storage` as `edited`: `<nonce> opened`, or
+`<nonce> refused`, which the editor reads to tell you. `<nonce> failed` means it gave up.
 
 The last nonce it handled is saved, so a `play.json` left over from your last session doesn't start a race when the
 game starts again.
@@ -43,13 +49,14 @@ Bump `version` in `info.toml` when `main.as` changes, so installed copies show *
 ## `play.json`
 
 ```json
-{ "map": "Map_LevelEditorMain&My Track_spigelli.balledit", "nonce": 1730332800123 }
+{ "map": "Map_LevelEditorMain&My Track_spigelli.balledit", "nonce": 1730332800123, "mode": "edit" }
 ```
 
 | Key     | Meaning                                                                                                                                                                                      |
 | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `map`   | The map's file name in the game's maps folder. No folders. `Map_LevelEditorMain&` and `.balledit` can be left out, as `Tracks::OpenLocal` allows.                                            |
 | `nonce` | A number or a string, different for every press of Play (the editor uses the time in milliseconds). Any value other than the last one handled starts a race, so it doesn't have to increase. |
+| `mode`  | `"edit"` opens the map in the in-game editor. Anything else, or no `mode`, races it. An `edit` request needs the map's full file name.                                                       |
 
 Write the file in one go (write a temporary file next to it, then rename it over `play.json`). The plugin ignores a
 file that isn't valid JSON yet and reads it again on its next check.

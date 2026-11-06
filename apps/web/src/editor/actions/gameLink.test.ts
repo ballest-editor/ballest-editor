@@ -126,6 +126,19 @@ describe("game link actions", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
+  it.effect("prompts at launch for an older plugin, and Update resolves it", () => {
+    const disk = makeTestDisk()
+    installed(disk)
+    disk.game.plugin = { ...disk.game.plugin, status: "outdated", installedVersion: "0.1.0" }
+    return Effect.gen(function*() {
+      yield* restart
+      yield* checkGameLinkEffect
+      assert.include(pinned(), "pluginUpdate")
+      yield* installPluginEffect
+      assert.notInclude(pinned(), "pluginUpdate")
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
   it.effect("a first launch opens the dialog for a missing row; a later one only for what Export needs", () => {
     const disk = makeTestDisk()
     installed(disk)

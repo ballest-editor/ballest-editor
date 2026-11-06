@@ -2,15 +2,14 @@
 import { Effect } from "effect"
 import { asNewMap, setLevelNames } from "../../domain/edits"
 import { mapLabelOf, nextFreeName } from "../../domain/factory"
-import { diffMaps, type MapDiff, type MapVersion } from "../../domain/mapDiff"
+import { diffMaps, type MapDiff } from "../../domain/mapDiff"
 import type { Item } from "../../domain/MapFile"
-import { loadStructure } from "../../domain/sidecar"
 import { MapCodec } from "../../services/MapCodec"
-import { type MapBackup, Platform, type PrefabBackup, type ProjectMapFile } from "../../services/Platform"
-import { backupTabLabels, fileTabOf, useEditor } from "../store"
+import { type MapBackup, Platform, type PrefabBackup } from "../../services/Platform"
+import { backupTabLabels, useEditor } from "../store"
 import { checkPrefabs } from "./prefabs"
 import { run } from "./run"
-import { fileOf, loadMapFile, refreshProject, showMap } from "./shared"
+import { currentVersionOf, fileOf, loadMapFile, refreshProject, showMap, versionOfFile } from "./shared"
 import { unlessCancelledFor } from "./unsaved"
 
 /** The versions main kept of the files it wrote over, newest first, for the Recover dialog (desktop). */
@@ -34,30 +33,6 @@ export const describeBackupEffect = Effect.fn("describeBackupEffect")(function*(
 }, Effect.catch((error) => Effect.succeed({ _tag: "Unreadable", message: error.message } satisfies BackupSummary)))
 
 export const describeBackup = (backup: MapBackup) => run(describeBackupEffect(backup))
-
-/** A file's map and each item's key, saying nothing about a sidecar that doesn't fit: the preview only looks. */
-const versionOfFile = Effect.fnUntraced(function*(file: Pick<ProjectMapFile, "text" | "hash" | "sidecar">) {
-  const codec = yield* MapCodec
-  const map = yield* codec.decode(file.text)
-  const sidecar = file.sidecar === null
-    ? null
-    : yield* codec.decodeSidecar(file.sidecar).pipe(Effect.orElseSucceed(() => null))
-  const { ids } = loadStructure(map, file.hash, sidecar)
-  return { map, ids } satisfies MapVersion
-})
-
-/**
- * The map `fileName` as it is now: in its tab with any unsaved edits, else its project file. Null when the project has
- * no such map any more, or its file can't be read.
- */
-const currentVersionOf = Effect.fnUntraced(function*(fileName: string) {
-  const tab = fileTabOf(useEditor.getState(), fileName)
-  if (tab !== undefined) return tab.doc satisfies MapVersion
-  return yield* (yield* Platform).readMap(fileName).pipe(
-    Effect.flatMap(versionOfFile),
-    Effect.orElseSucceed(() => null)
-  )
-})
 
 /** What the Recover dialog shows of the backup selected in it. */
 export type BackupPreview =

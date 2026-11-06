@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as Fs from "node:fs"
 import * as Path from "node:path"
-import { compareVersions, isPluginFileName, parseManifest } from "./pluginManifest"
+import { compareVersions, editOutcomeIn, hostVersionIn, isPluginFileName, parseManifest } from "./pluginManifest"
 
 describe("parseManifest", () => {
   it("reads the plugin the app ships", () => {
@@ -18,13 +18,40 @@ describe("parseManifest", () => {
     const manifest = parseManifest(
       "# a plugin\r\n[meta]\r\nname = \"A # not a comment\"\r\nversion = \"1.2.3\"  # bumped\r\n\r\n[script]\r\nfiles = [ \"a.as\", \"lib/b.as\", ]\r\n"
     )
-    assert.deepStrictEqual(manifest, { version: "1.2.3", files: ["a.as", "lib/b.as"] })
+    assert.deepStrictEqual(manifest, { version: "1.2.3", files: ["a.as", "lib/b.as"], minHost: "0.0.0" })
   })
 
   it("falls back to the plugin manager's defaults", () => {
-    assert.deepStrictEqual(parseManifest("[meta]\nname = \"x\"\n"), { version: "0.0.0", files: ["main.as"] })
+    assert.deepStrictEqual(parseManifest("[meta]\nname = \"x\"\n"), {
+      version: "0.0.0",
+      files: ["main.as"],
+      minHost: "0.0.0"
+    })
     // A version outside [meta] isn't the plugin's.
     assert.strictEqual(parseManifest("version = \"9.9.9\"\n").version, "0.0.0")
+  })
+
+  it("reads the oldest host a plugin runs on", () => {
+    assert.strictEqual(parseManifest("[meta]\nmin_host = \"0.34.0\"\n").minHost, "0.34.0")
+  })
+})
+
+describe("hostVersionIn", () => {
+  it("reads the version the host opens its log with", () => {
+    const log =
+      "[12:25:51.840] [info] [host] Ballest plugin host 0.33.2 starting\r\n[12:25:51.846] [info] [host] game build\r\n"
+    assert.strictEqual(hostVersionIn(log), "0.33.2")
+    assert.isNull(hostVersionIn(""))
+  })
+})
+
+describe("editOutcomeIn", () => {
+  const storage = "edited=1793992627797 refused\r\nnonce=1793992627797\r\n"
+
+  it("answers for the request asked about, and no other", () => {
+    assert.strictEqual(editOutcomeIn(storage, 1793992627797), "refused")
+    assert.isNull(editOutcomeIn(storage, 1793992627798))
+    assert.isNull(editOutcomeIn("", 1))
   })
 })
 

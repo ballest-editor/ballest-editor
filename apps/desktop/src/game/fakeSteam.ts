@@ -71,14 +71,18 @@ export const makeFakeSteam = Effect.fn("makeFakeSteam")(function*(root: string, 
 })
 
 /** The app's copy of the editor-link plugin, at `version`, in a fresh folder under `root`; returns its folder. */
-export const makeFakePluginBundle = Effect.fn("makeFakePluginBundle")(function*(root: string, version: string) {
+export const makeFakePluginBundle = Effect.fn("makeFakePluginBundle")(function*(
+  root: string,
+  version: string,
+  minHost = "0.34.0"
+) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const dir = path.join(root, "bundle", "ballest-editor-link")
   yield* fs.makeDirectory(dir, { recursive: true })
   yield* fs.writeFileString(
     path.join(dir, "info.toml"),
-    `[meta]\nname = "Ballest Editor link"\nversion = "${version}" # bumped per release\n\n[script]\nfiles = ["main.as"]\n`
+    `[meta]\nname = "Ballest Editor link"\nversion = "${version}" # bumped per release\nmin_host = "${minHost}"\n\n[script]\nfiles = ["main.as"]\n`
   )
   yield* fs.writeFileString(path.join(dir, "main.as"), `// ${version}\nvoid Main() {}\n`)
   return dir

@@ -22,6 +22,7 @@ import {
   exportToGame,
   launchGame,
   openExternalLink,
+  openInGame,
   openRecentInNewWindow,
   quitApp,
   reimportMap,
@@ -336,7 +337,9 @@ const projectMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
           exportOff ?? (reimportable === null ? EXPORT_FIRST : null)
         ),
         ...(canPlay || canLaunchGame ? [SEPARATOR] : []),
-        ...(canPlay ? [command("playMap", "Play", exportOff)] : []),
+        ...(canPlay
+          ? [command("playMap", "Play", exportOff), item("Open in game", () => void openInGame(), exportOff)]
+          : []),
         ...(canLaunchGame ? [item("Open game (Steam)", () => void launchGame())] : [])
       ]
       : []),

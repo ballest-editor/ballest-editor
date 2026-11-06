@@ -12,7 +12,7 @@ import { revealProject } from "./maps"
 import { detachEditedInstances, updateEditedInstances } from "./prefabs"
 import { openProjectMap } from "./project"
 import { run, runUntilCleanup } from "./run"
-import { reimportMap } from "./sync"
+import { reimportMap, resolveConflict } from "./sync"
 
 /** Runs a notification's button. */
 export const runNotificationCommand = (command: NotificationCommand): void => {
@@ -31,6 +31,9 @@ export const runNotificationCommand = (command: NotificationCommand): void => {
       return
     case "ReimportMap":
       void reimportMap(command.fileName)
+      return
+    case "ResolveConflict":
+      void resolveConflict(command.fileName)
       return
     case "UpdatePrefabInstances":
       void updateEditedInstances(command)

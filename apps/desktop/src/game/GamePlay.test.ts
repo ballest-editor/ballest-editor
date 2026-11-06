@@ -79,6 +79,13 @@ const setup = Effect.gen(function*() {
   const files = yield* MapFiles.pipe(Effect.provide(services))
   const link = yield* GameLink.pipe(Effect.provide(services))
   yield* files.create(name, mapText(-1))
+  const playJson = path.join(steam.plugins, "ballest-editor-link", "play.json")
+  /** Nothing reached the game: no export, no request for the plugin, no launch. */
+  const wroteNothing = Effect.gen(function*() {
+    assert.isFalse(yield* fs.exists(path.join(steam.maps, name)))
+    assert.isFalse(yield* fs.exists(playJson))
+    assert.strictEqual(game.launches, 0)
+  })
   return {
     fs,
     path,
@@ -91,7 +98,8 @@ const setup = Effect.gen(function*() {
     files,
     link,
     play,
-    playJson: path.join(steam.plugins, "ballest-editor-link", "play.json")
+    playJson,
+    wroteNothing
   }
 })
 
@@ -177,15 +185,13 @@ describe("GamePlay.play", () => {
 
   it.effect("refuses a published map, which the plugin manager won't race, and writes nothing", () =>
     runScoped(Effect.gen(function*() {
-      const { fs, path, steam, game, files, link, play, playJson } = yield* setup
+      const { files, link, play, wroteNothing } = yield* setup
       yield* link.installPlugin
       yield* files.save(name, mapText(3561234567))
       assert.deepStrictEqual(yield* play.play({ fileName: name, replacePublished: false, overwriteChanged: false }), {
         _tag: "PublishedMap"
       })
-      assert.isFalse(yield* fs.exists(path.join(steam.maps, name)))
-      assert.isFalse(yield* fs.exists(playJson))
-      assert.strictEqual(game.launches, 0)
+      yield* wroteNothing
     })))
 
   it.effect("refuses a file past the game's character limit with the reason, and writes nothing", () =>
@@ -219,6 +225,76 @@ describe("GamePlay.play", () => {
       assert.strictEqual(yield* fs.readFileString(draft), mapText(-1))
       // The game's copy it wrote over is in the backups.
       assert.lengthOf(yield* fs.readDirectory(path.join(dir, "userData", "backups")), 1)
+    })))
+})
+
+describe("GamePlay.openInGame", () => {
+  const payload = { fileName: name, replacePublished: false, overwriteChanged: false }
+  const answers = (fs: FileSystem.FileSystem, folder: string, outcome: string, nonce: number) =>
+    Effect.andThen(
+      fs.makeDirectory(folder, { recursive: true }),
+      fs.writeFileString(`${folder}/ballest-editor-link.txt`, `edited=${nonce} ${outcome}\r\n`)
+    )
+
+  it.effect("exports the map, writes an edit request for the plugin and starts the game", () =>
+    runScoped(Effect.gen(function*() {
+      const { fs, path, steam, game, link, play, playJson } = yield* setup
+      yield* link.installPlugin
+      assert.deepInclude(yield* play.openInGame(payload), { _tag: "Opening", launch: "launched", outcome: "pending" })
+      assert.strictEqual(yield* fs.readFileString(path.join(steam.maps, name)), mapText(-1))
+      assert.deepInclude(yield* readPlay(fs, playJson), { map: name, mode: "edit" })
+      assert.strictEqual(game.launches, 1)
+    })))
+
+  it.effect("writes nothing without a plugin that can open maps: an older one would race the map", () =>
+    runScoped(Effect.gen(function*() {
+      const { fs, path, play, playJson, wroteNothing } = yield* setup
+      yield* fs.makeDirectory(path.dirname(playJson), { recursive: true })
+      yield* fs.writeFileString(path.join(path.dirname(playJson), "info.toml"), "[meta]\nversion = \"0.1.0\"\n")
+      yield* fs.writeFileString(path.join(path.dirname(playJson), "main.as"), "// 0.1.0\n")
+      const result = yield* play.openInGame(payload)
+      assert.strictEqual(result._tag === "NeedsPlugin" && result.plugin.status, "outdated")
+      yield* wroteNothing
+    })))
+
+  it.effect("opens a published map's draft, which Play refuses", () =>
+    runScoped(Effect.gen(function*() {
+      const { link, play, files } = yield* setup
+      yield* link.installPlugin
+      const published = "Map_LevelEditorMain&Live_me.balledit"
+      yield* files.create(published, mapText(123))
+      assert.strictEqual((yield* play.openInGame({ ...payload, fileName: published }))._tag, "Opening")
+    })))
+
+  it.live("tells a running game's answer, and that an export it loaded is no older than its copy", () =>
+    runScoped(Effect.gen(function*() {
+      const { dir, fs, path, steam, game, link, play, playJson, files } = yield* setup
+      yield* link.installPlugin
+      game.running = true
+      // what MapExports looks at to know the game is up
+      yield* fs.makeDirectory(path.join(steam.host.procDir, "4242"), { recursive: true })
+      yield* fs.writeFileString(
+        path.join(steam.host.procDir, "4242", "cmdline"),
+        "wine\0Z:\\games\\Ballest\\Binaries\\Win64\\Ballest-Win64-Shipping.exe\0"
+      )
+      const storage = path.join(path.dirname(steam.maps), "PluginManager", "storage")
+      const answered = (outcome: string) =>
+        Effect.gen(function*() {
+          yield* fs.remove(playJson, { force: true })
+          const asked = yield* Effect.forkChild(play.openInGame(payload))
+          while (!(yield* fs.exists(playJson))) yield* Effect.sleep("5 millis")
+          const { nonce } = yield* readPlay(fs, playJson)
+          yield* answers(fs, storage, outcome, nonce)
+          return yield* Fiber.join(asked)
+        })
+      const stale = Effect.map(files.info(path.join(dir, "project"), name), (map) => map.link?.exportedWhileRunning)
+      assert.deepInclude(yield* answered("refused"), { outcome: "refused", launch: "running" })
+      assert.isTrue(yield* stale)
+      assert.deepInclude(yield* answered("opened"), { outcome: "opened", launch: "running" })
+      assert.isFalse(yield* stale)
+      // pressed again: the same bytes are no newer than what the game loaded
+      assert.deepInclude(yield* answered("refused"), { outcome: "refused" })
+      assert.isFalse(yield* stale)
     })))
 })
 

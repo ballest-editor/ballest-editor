@@ -42,7 +42,7 @@ maps and read them back. Headless, several at once, without touching the user's 
 - **The script API** (`src/host/api.cpp`, docs at the site's reference pages): `Editor::SpawnPieces(classes,
   transforms)`, `ReplacePieces`, `Select`, `GetLocation/SetLocation`, `GetRotation`, `GetScale`, `Pieces`,
   `PieceClass`, `ScreenPosition`, `Undo/Redo`, `Camera::Set(x, y, z, pitch, yaw, fov)`, `Camera::Project/Pick`,
-  `Hud::HideEditor`, `Tracks::OpenLocal` (what our `ballest-editor-link` plugin uses). No function opens the editor.
+  `Hud::HideEditor`, `Tracks::OpenLocal` and `Together::OpenMap` (what our `ballest-editor-link` plugin uses).
 - **Our earlier scripts.** `/tmp/ballest-probe/` (2026-10-26): `ui.sh` and `pad.sh` drove the user's own game window
   with xdotool and ydotool and screenshotted with spectacle. They worked, but against the real game, in the user's
   session, with hand-measured pixel positions. The `cdp.mjs` files around `/tmp` drive the Electron app, not the

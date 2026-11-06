@@ -7,14 +7,18 @@
 import { ExportRefusal } from "@ballest/contracts"
 import { Effect, Stream } from "effect"
 import { mapLabelOf } from "../../domain/factory"
-import { playWithoutPluginNotice, RESOLVED_BY_PLAY } from "../../domain/gameLink"
+import { openWithoutPluginNotice, playWithoutPluginNotice, RESOLVED_BY_PLAY } from "../../domain/gameLink"
 import type { GameWrite } from "../../domain/linkState"
-import { type ExportOptions, Platform, type PlayResult } from "../../services/Platform"
+import { type ExportOptions, type OpenInGameResult, Platform, type PlayResult } from "../../services/Platform"
 import { type PublishedDraft, useEditor } from "../store"
 import { run, runUntilCleanup } from "./run"
 import { notifyNotice, refreshProject, revealIn } from "./shared"
+import { askSyncConflict } from "./syncConflict"
 
-/** What a write into the game is for: Export to game, or Play (the export, then the plugin races the map). */
+/**
+ * What a write into the game is for: Export to game, Play (the export, then the plugin races the map), or Open in game
+ * (the export, then the plugin opens it in the in-game editor).
+ */
 export type ExportIntent = PublishedDraft["from"]
 
 /** Export and Play write over nothing they weren't told to: a published map's draft and a changed export ask first. */
@@ -55,7 +59,7 @@ const notifyPlayed = (fileName: string, played: Extract<PlayResult, { readonly _
     })
   } else if (sent) {
     for (const kind of RESOLVED_BY_PLAY) resolveNotifications(kind)
-    const outdated = plugin.status === "outdated"
+    const outdated = plugin.status === "outdated" && !plugin.hostTooOld
     notify("info", launch === "running" ? `Racing ${label} in the game` : `Starting the game to race ${label}`, {
       kind: "play",
       ...(launch === "launched" && { body: "The race starts once the game and the plugin manager are up." }),
@@ -68,36 +72,76 @@ const notifyPlayed = (fileName: string, played: Extract<PlayResult, { readonly _
   }
 }
 
+/** Tells how Open in game went. A refused map was still exported: the in-game editor just kept what it has open. */
+const notifyOpening = (fileName: string, opening: Extract<OpenInGameResult, { readonly _tag: "Opening" }>) => {
+  const { notify, resolveNotifications } = useEditor.getState()
+  const label = mapLabelOf(fileName)
+  const { launch, outcome } = opening
+  const kind = "openInGame"
+  if (launch === "failed") {
+    notify("error", `Exported ${label}, but couldn't ask Steam to start the game. Is Steam running?`, {
+      kind,
+      actions: [revealIn("game")]
+    })
+    return
+  }
+  for (const resolved of RESOLVED_BY_PLAY) resolveNotifications(resolved)
+  if (outcome === "refused") {
+    notify("error", `The in-game editor is already open, so ${label} didn't open`, {
+      kind,
+      body: "Opening it would replace what is open there. Save and leave the in-game editor, then try again."
+    })
+  } else if (launch === "launched") {
+    notify("info", `Starting the game to open ${label} in the in-game editor`, {
+      kind,
+      body: "It opens once the game and the plugin manager are up."
+    })
+  } else {
+    notify(
+      "info",
+      outcome === "opened" ? `Opened ${label} in the in-game editor` : `Opening ${label} in the in-game editor`,
+      {
+        kind
+      }
+    )
+  }
+}
+
 /** Opens the dialog that asks about what main wouldn't write over; its answer goes on with the same `intent`. */
 const askFirst = (intent: ExportIntent, refusal: ExportRefusal, options: ExportOptions) =>
   ExportRefusal.match(refusal, {
     Published: ({ file, publishedFileId }) =>
-      useEditor.getState().openDialog({ id: "replacePublished", name: file.name, publishedFileId, from: intent }),
-    ChangedInGame: ({ file }) =>
-      useEditor.getState().openDialog({
-        id: "overwriteChanged",
-        name: file.name,
-        from: intent,
-        replacePublished: options.replacePublished
-      })
+      Effect.sync(() =>
+        useEditor.getState().openDialog({ id: "replacePublished", name: file.name, publishedFileId, from: intent })
+      ),
+    ChangedInGame: ({ file }) => askSyncConflict(file.name, intent, options.replacePublished)
   })
 
+const writeFor = (platform: Platform["Service"], intent: ExportIntent, fileName: string, options: ExportOptions) => {
+  switch (intent) {
+    case "play":
+      return platform.play(fileName, options)
+    case "edit":
+      return platform.openInGame(fileName, options)
+    case "export":
+      return platform.exportMap(fileName, options)
+  }
+}
+
 /**
- * Copies a saved project map into the game's maps folder, and for Play has the plugin race it (the game starts if it
- * isn't running). A published map's draft there asks first, and so does an export the game changed since the last
- * export. The plugin manager only races maps never published, so Play of a published map offers to save a new draft
- * of it instead (the `newDraft` dialog). The chip follows it from the copy on (`showingGameWrite`).
+ * Copies a saved project map into the game's maps folder, and for Play has the plugin race it, or for Open in game open
+ * it in the in-game editor (the game starts if it isn't running). A published map's draft there asks first, and so does
+ * an export the game changed since the last export. The plugin manager only races maps never published, so Play of a
+ * published map offers to save a new draft of it instead (the `newDraft` dialog). The chip follows it from the copy on
+ * (`showingGameWrite`).
  */
 export const writeToGame = Effect.fn("writeToGame")(
   function*(intent: ExportIntent, fileName: string, options: ExportOptions) {
-    const platform = yield* Platform
-    const result = intent === "play"
-      ? yield* platform.play(fileName, options)
-      : yield* platform.exportMap(fileName, options)
+    const result = yield* writeFor(yield* Platform, intent, fileName, options)
     switch (result._tag) {
       case "Published":
       case "ChangedInGame":
-        askFirst(intent, result, options)
+        yield* askFirst(intent, result, options)
         return
       case "PublishedMap":
         useEditor.getState().openDialog({ id: "newDraft" })
@@ -112,6 +156,13 @@ export const writeToGame = Effect.fn("writeToGame")(
       case "Played":
         yield* refreshProject
         notifyPlayed(fileName, result)
+        return
+      case "Opening":
+        yield* refreshProject
+        notifyOpening(fileName, result)
+        return
+      case "NeedsPlugin":
+        notifyNotice(openWithoutPluginNotice(mapLabelOf(fileName), result.plugin))
     }
   },
   (effect, intent, fileName) => showingGameWrite({ intent, fileName, stage: "copy" })(effect)
@@ -127,17 +178,3 @@ export const replacePublishedDraftEffect = Effect.suspend(() => {
 })
 
 export const replacePublishedDraft = () => run(replacePublishedDraftEffect)
-
-/**
- * The overwriteChanged dialog's Back up and overwrite: Export (or Play) writes over the game's changed copy after all;
- * that copy goes to the backups, as everything Export writes over does.
- */
-export const overwriteChangedEffect = Effect.suspend(() => {
-  const { dialog: changed, closeDialog } = useEditor.getState()
-  closeDialog()
-  if (changed?.id !== "overwriteChanged") return Effect.void
-  const { from, name, replacePublished } = changed
-  return writeToGame(from, name, { replacePublished, overwriteChanged: true })
-})
-
-export const overwriteChangedExport = () => run(overwriteChangedEffect)

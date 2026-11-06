@@ -10,6 +10,8 @@ interface PluginManifest {
   readonly version: string
   /** `[script] files`, the scripts the host compiles; the host's default is main.as. */
   readonly files: ReadonlyArray<string>
+  /** `[meta] min_host`, the oldest host that runs it; none means any. */
+  readonly minHost: string
 }
 
 const unquote = (value: string) =>
@@ -51,11 +53,20 @@ export const parseManifest = (text: string): PluginManifest => {
   const toml = parseToml(text)
   const version = toml.get("meta.version")
   const files = toml.get("script.files")
+  const minHost = toml.get("meta.min_host")
   return {
     version: version === undefined ? "0.0.0" : unquote(version),
-    files: files === undefined ? ["main.as"] : stringList(files)
+    files: files === undefined ? ["main.as"] : stringList(files),
+    minHost: minHost === undefined ? "0.0.0" : unquote(minHost)
   }
 }
+
+/** The version in the line a host opens its log with; null when the log has none. */
+export const hostVersionIn = (log: string): string | null => /Ballest plugin host (\S+) starting/.exec(log)?.[1] ?? null
+
+/** What a plugin's `Storage` file says of the open request `nonce`: the outcome, null before it has answered. */
+export const editOutcomeIn = (storage: string, nonce: number): string | null =>
+  new RegExp(`^edited=${nonce} (\\w+)\\s*$`, "m").exec(storage)?.[1] ?? null
 
 /** A dot-separated segment's number as C's `atol` reads it: its leading digits, or 0. */
 const segmentNumber = (segment: string) => Number(/^\s*[+-]?\d+/.exec(segment)?.[0] ?? 0)

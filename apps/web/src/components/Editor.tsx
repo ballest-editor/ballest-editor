@@ -33,7 +33,6 @@ import { ImportClashDialog } from "./ImportClashDialog"
 import { KeybindCheatSheet } from "./KeybindCheatSheet"
 import { NameMapDialog } from "./NameMapDialog"
 import { NewProjectDialog } from "./NewProjectDialog"
-import { OverwriteChangedDialog } from "./OverwriteChangedDialog"
 import { DeletePrefabDialog, RenamePrefabDialog, SavePrefabDialog } from "./PrefabDialogs"
 import { ProjectChooser } from "./ProjectChooser"
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
@@ -42,6 +41,7 @@ import { RecoverUnsavedDialog } from "./RecoverUnsavedDialog"
 import { ReplacePublishedDialog } from "./ReplacePublishedDialog"
 import { SettingsDialog } from "./SettingsDialog"
 import { StatusBar } from "./StatusBar"
+import { SyncConflictDialog } from "./SyncConflictDialog"
 import { Toasts } from "./Toasts"
 import { TopBar } from "./TopBar"
 import { WhereToOpenDialog } from "./WhereToOpenDialog"
@@ -178,7 +178,7 @@ export function Editor() {
       <NewProjectDialog open={dialog === "newProject"} onClose={close} />
       <WhereToOpenDialog open={dialog === "whereToOpen"} onClose={close} />
       <ReplacePublishedDialog open={dialog === "replacePublished"} onClose={close} />
-      <OverwriteChangedDialog open={dialog === "overwriteChanged"} onClose={close} />
+      <SyncConflictDialog open={dialog === "syncConflict"} onClose={close} />
       <ImportClashDialog open={dialog === "importClash"} onClose={close} />
       <RecoverDialog open={dialog === "recover"} onClose={close} />
       <RecoverUnsavedDialog open={dialog === "recoverUnsaved"} onClose={close} />

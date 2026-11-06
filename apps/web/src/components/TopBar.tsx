@@ -1,8 +1,9 @@
-import { IconPlayerPlayFilled } from "@tabler/icons-react"
+import { IconEdit, IconPlayerPlayFilled } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import { playMap } from "../editor/actions"
+import type { ReactNode } from "react"
+import { openInGame, playMap } from "../editor/actions"
 import { exportProblemOf, projectTitleOf, projectUnsavedOf, useEditor } from "../editor/store"
 import { KeyChip } from "./KeyChip"
 import { Logo } from "./Logo"
@@ -12,25 +13,26 @@ import { MenuBar } from "./MenuBar"
 const NO_DRAG = "[-webkit-app-region:no-drag]"
 
 /**
- * Play (desktop): exports the open map and races it in the game. Its tooltip shows the keybind (F5). It opens along the
- * bar: Play sits over the inspector's tab strip, so anything below would cover the strip's tab and ⋯.
+ * A button that sends the open map to the game (desktop), off with the reason while the map can't be exported. Its
+ * tooltip opens along the bar: these sit over the inspector's tab strip, so anything below would cover the strip's tab
+ * and ⋯.
  */
-function PlayButton() {
+function GameButton({ children, onClick, tooltip, variant }: {
+  readonly children: ReactNode
+  readonly onClick: () => void
+  readonly tooltip: ReactNode
+  readonly variant?: "outline"
+}) {
   const canPlay = useEditor((s) => s.capabilities.play)
-  const keybinds = useEditor((s) => s.keybinds.playMap)
   const refused = useEditor(exportProblemOf)
   if (!canPlay) return null
-  const icon = <IconPlayerPlayFilled data-icon="inline-start" />
   if (refused !== null) {
     return (
       // keyed: switching tabs would otherwise reuse the enabled button's tooltip, which then never opens on the wrapper
       <Tooltip key="refused">
         {/* a disabled button gets no pointer events, so the tooltip lives on a wrapper */}
         <TooltipTrigger render={<span className={`cursor-not-allowed ${NO_DRAG}`} />}>
-          <Button disabled>
-            {icon}
-            Play
-          </Button>
+          <Button disabled variant={variant}>{children}</Button>
         </TooltipTrigger>
         <TooltipContent side="left">{refused}</TooltipContent>
       </Tooltip>
@@ -38,15 +40,42 @@ function PlayButton() {
   }
   return (
     <Tooltip>
-      <TooltipTrigger render={<Button onClick={() => void playMap()} />}>
-        {icon}
-        Play
-      </TooltipTrigger>
-      <TooltipContent side="left">
-        Export and race it in the game
-        {keybinds.map((binding) => <KeyChip key={binding} binding={binding} />)}
-      </TooltipContent>
+      <TooltipTrigger render={<Button variant={variant} onClick={onClick} />}>{children}</TooltipTrigger>
+      <TooltipContent side="left">{tooltip}</TooltipContent>
     </Tooltip>
+  )
+}
+
+/** Open in game: exports the open map and opens it in the in-game editor. */
+function OpenInGameButton() {
+  return (
+    <GameButton
+      variant="outline"
+      onClick={() => void openInGame()}
+      tooltip="Export and open it in the in-game editor"
+    >
+      <IconEdit data-icon="inline-start" />
+      Open in game
+    </GameButton>
+  )
+}
+
+/** Play: exports the open map and races it in the game. Its tooltip shows the keybind (F5). */
+function PlayButton() {
+  const keybinds = useEditor((s) => s.keybinds.playMap)
+  return (
+    <GameButton
+      onClick={() => void playMap()}
+      tooltip={
+        <>
+          Export and race it in the game
+          {keybinds.map((binding) => <KeyChip key={binding} binding={binding} />)}
+        </>
+      }
+    >
+      <IconPlayerPlayFilled data-icon="inline-start" />
+      Play
+    </GameButton>
   )
 }
 
@@ -98,6 +127,7 @@ export function TopBar() {
       <ProjectTitle />
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {catalog?.warning !== undefined && <Badge variant="warn" title={catalog.warning}>Fixture catalog</Badge>}
+        <OpenInGameButton />
         <PlayButton />
       </div>
     </header>

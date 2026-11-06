@@ -24,7 +24,14 @@ const setup = (options: Parameters<typeof makeFakeSteam>[1] & { readonly bundled
         yield* fs.writeFileString(path.join(folder, "main.as"), `// ${version}\n`)
         for (const [name, text] of Object.entries(files)) yield* fs.writeFileString(path.join(folder, name), text)
       })
-    return { fs, path, fake, bundle, link, folder, installByHand }
+    /** The log a host of `version` starts, beside the game's maps folder. */
+    const hostLog = (version: string) =>
+      Effect.gen(function*() {
+        const log = path.join(path.dirname(fake.maps), "PluginManager", "host.log")
+        yield* fs.makeDirectory(path.dirname(log), { recursive: true })
+        yield* fs.writeFileString(log, `[12:25:51.840] [info] [host] Ballest plugin host ${version} starting\r\n`)
+      })
+    return { fs, path, fake, bundle, link, folder, installByHand, hostLog }
   })
 
 describe("GameLink.pluginStatus", () => {
@@ -35,7 +42,10 @@ describe("GameLink.pluginStatus", () => {
         status: "noGame",
         bundledVersion: "0.2.0",
         installedVersion: null,
-        folder: null
+        folder: null,
+        hostVersion: null,
+        requiredHost: "0.34.0",
+        hostTooOld: false
       })
     })))
 
@@ -49,7 +59,10 @@ describe("GameLink.pluginStatus", () => {
         status: "noPluginManager",
         bundledVersion: "0.2.0",
         installedVersion: null,
-        folder: noDll.folder
+        folder: noDll.folder,
+        hostVersion: null,
+        requiredHost: "0.34.0",
+        hostTooOld: false
       })
     })))
 
@@ -77,6 +90,22 @@ describe("GameLink.pluginStatus", () => {
       assert.deepInclude(yield* link.pluginStatus, { status: "current", installedVersion: "0.11.0" })
     })))
 
+  it.effect("tells a plugin manager too old for the app's copy, and can't tell without its log", () =>
+    runScoped(Effect.gen(function*() {
+      const { link, hostLog, installByHand } = yield* setup({ game: "steam", pluginManager: true, ran: true })
+      yield* installByHand("0.1.0")
+      assert.deepInclude(yield* link.pluginStatus, { hostVersion: null, hostTooOld: false })
+      yield* hostLog("0.33.2")
+      assert.deepInclude(yield* link.pluginStatus, {
+        status: "outdated",
+        hostVersion: "0.33.2",
+        requiredHost: "0.34.0",
+        hostTooOld: true
+      })
+      yield* hostLog("0.34.2")
+      assert.deepInclude(yield* link.pluginStatus, { hostTooOld: false })
+    })))
+
   it.effect("fails when the app's copy is missing", () =>
     runScoped(Effect.gen(function*() {
       const { fs, path, bundle, link } = yield* setup({ game: "steam", pluginManager: true })
@@ -93,7 +122,15 @@ describe("GameLink.installPlugin", () => {
       yield* fs.makeDirectory(path.join(fake.plugins, "other-plugin"))
       const result = yield* link.installPlugin
       assert.deepStrictEqual(result, {
-        plugin: { status: "current", bundledVersion: "0.2.0", installedVersion: "0.2.0", folder },
+        plugin: {
+          status: "current",
+          bundledVersion: "0.2.0",
+          installedVersion: "0.2.0",
+          folder,
+          hostVersion: null,
+          requiredHost: "0.34.0",
+          hostTooOld: false
+        },
         restartGame: false
       })
       for (const file of ["info.toml", "main.as"]) {
@@ -130,6 +167,16 @@ describe("GameLink.installPlugin", () => {
       assert.isTrue((yield* link.installPlugin).restartGame)
     })))
 
+  it.effect("refuses on a plugin manager too old to run it, and writes nothing", () =>
+    runScoped(Effect.gen(function*() {
+      const { fs, link, folder, hostLog } = yield* setup({ game: "steam", pluginManager: true, ran: true })
+      yield* hostLog("0.33.2")
+      const error = yield* Effect.flip(link.installPlugin)
+      assert.strictEqual(error.reason, "hostTooOld")
+      assert.match(error.message, /needs plugin manager 0\.34\.0/)
+      assert.isFalse(yield* fs.exists(folder))
+    })))
+
   it.effect("refuses without the plugin manager, and writes nothing", () =>
     runScoped(Effect.gen(function*() {
       const { fs, fake, link } = yield* setup({ game: "steam", plugins: true })
@@ -139,5 +186,30 @@ describe("GameLink.installPlugin", () => {
       assert.deepStrictEqual(yield* fs.readDirectory(fake.plugins), [])
       const noGame = yield* setup({ game: "none" })
       assert.strictEqual((yield* Effect.flip(noGame.link.installPlugin)).reason, "noPluginManager")
+    })))
+})
+
+describe("GameLink.editOutcome", () => {
+  const answer = (text: string) =>
+    Effect.gen(function*() {
+      const { fs, path, fake, link } = yield* setup({ game: "steam", pluginManager: true, ran: true })
+      const storage = path.join(path.dirname(fake.maps), "PluginManager", "storage", "ballest-editor-link.txt")
+      yield* fs.makeDirectory(path.dirname(storage), { recursive: true })
+      yield* fs.writeFileString(storage, text)
+      return link
+    })
+
+  it.effect("reads what the plugin answered", () =>
+    runScoped(Effect.gen(function*() {
+      const opened = yield* answer("edited=7 opened\r\nnonce=7\r\n")
+      assert.strictEqual(yield* opened.editOutcome(7), "opened")
+      const refused = yield* answer("edited=8 refused\r\nnonce=8\r\n")
+      assert.strictEqual(yield* refused.editOutcome(8), "refused")
+    })))
+
+  it.live("gives up on an answer that doesn't come", () =>
+    runScoped(Effect.gen(function*() {
+      const link = yield* answer("edited=7 opened\r\n")
+      assert.strictEqual(yield* link.editOutcome(8), "pending")
     })))
 })

@@ -2,6 +2,7 @@ import {
   IconCheck,
   IconCircleCheck,
   IconCircleDashed,
+  IconEdit,
   IconFileExport,
   IconPencil,
   IconPlayerPlay,
@@ -34,7 +35,8 @@ const ICONS: Record<ChipStatus, ComponentType<{ readonly className?: string }>> 
 
 const WRITE_ICONS: Record<GameWrite["intent"], ComponentType<{ readonly className?: string }>> = {
   export: IconFileExport,
-  play: IconPlayerPlay
+  play: IconPlayerPlay,
+  edit: IconEdit
 }
 
 /** The hover a chip gets when it renders as a button: its tone's fill is `Badge`'s. */

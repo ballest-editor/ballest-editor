@@ -7,6 +7,7 @@ import { Effect } from "effect"
 import { mapLabelOf } from "../../domain/factory"
 import type { GameLinkNotice } from "../../domain/gameLink"
 import { floorHeightOf } from "../../domain/level"
+import type { MapVersion } from "../../domain/mapDiff"
 import type { MapFile } from "../../domain/MapFile"
 import { type MapPrefs, mapPrefsKeyOf } from "../../domain/MapPrefs"
 import { type LoadedStructure, loadStructure, sidecarOf } from "../../domain/sidecar"
@@ -14,7 +15,16 @@ import { isDefaultViewLayout } from "../../domain/viewLayout"
 import { MapCodec } from "../../services/MapCodec"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { type NotificationAction, Platform, type ProjectMap } from "../../services/Platform"
-import { type Doc, isBackupTab, type OpenFile, tabStateOf, type TabTarget, tabWithFile, useEditor } from "../store"
+import {
+  type Doc,
+  fileTabOf,
+  isBackupTab,
+  type OpenFile,
+  tabStateOf,
+  type TabTarget,
+  tabWithFile,
+  useEditor
+} from "../store"
 import { followDefinitionsIn } from "./prefabFollow"
 
 /** The project in use, the recent ones and its maps into the store (desktop). */
@@ -170,3 +180,27 @@ export const writeProjectMap = Effect.fn("writeProjectMap")(function*(fileName: 
 /** Records a Game link notice (or one of Play's, which share its kinds) in the notification centre. */
 export const notifyNotice = ({ level, title, kind, body, persistent, actions }: GameLinkNotice) =>
   useEditor.getState().notify(level, title, { kind, persistent, actions, ...(body !== undefined && { body }) })
+
+/** A file's map and each item's key, saying nothing about a sidecar that doesn't fit: the preview only looks. */
+export const versionOfFile = Effect.fnUntraced(function*(file: Pick<ProjectMapFile, "text" | "hash" | "sidecar">) {
+  const codec = yield* MapCodec
+  const map = yield* codec.decode(file.text)
+  const sidecar = file.sidecar === null
+    ? null
+    : yield* codec.decodeSidecar(file.sidecar).pipe(Effect.orElseSucceed(() => null))
+  const { ids } = loadStructure(map, file.hash, sidecar)
+  return { map, ids } satisfies MapVersion
+})
+
+/**
+ * The map `fileName` as it is now: in its tab with any unsaved edits, else its project file. Null when the project has
+ * no such map any more, or its file can't be read.
+ */
+export const currentVersionOf = Effect.fnUntraced(function*(fileName: string) {
+  const tab = fileTabOf(useEditor.getState(), fileName)
+  if (tab !== undefined) return tab.doc satisfies MapVersion
+  return yield* (yield* Platform).readMap(fileName).pipe(
+    Effect.flatMap(versionOfFile),
+    Effect.orElseSucceed(() => null)
+  )
+})

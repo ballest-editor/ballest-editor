@@ -12,6 +12,8 @@ import {
   gameLinkResultOf,
   gameLinkRows,
   PLUGIN_MISSING,
+  PLUGIN_UPDATE,
+  pluginUpdateNotice,
   sameGameLinkResult
 } from "../../domain/gameLink"
 import { type GamePathKind, type GamePaths, Platform } from "../../services/Platform"
@@ -95,6 +97,9 @@ export const checkGameLinkEffect = Effect.gen(function*() {
   const current = gameLinkResultOf(paths, plugin)
   reportGameLink(memory.last, current)
   yield* rememberGameLink(current)
+  const update = pluginUpdateNotice(plugin, "open maps in the in-game editor")
+  if (update === null) useEditor.getState().resolveNotifications(PLUGIN_UPDATE)
+  else notifyNotice(update)
   const { foundCreator, openDialog, settings } = useEditor.getState()
   const rows = gameLinkRows(paths, plugin, creatorOf(settings.general.creatorName, foundCreator))
   if (!exportReady(paths) || (memory.last === null && anythingMissing(rows))) openDialog({ id: "gameLink" })
@@ -186,6 +191,7 @@ export const installPluginEffect = Effect.gen(function*() {
   useEditor.getState().setPluginStatus(plugin)
   yield* noteGameLink
   useEditor.getState().resolveNotifications(PLUGIN_MISSING)
+  useEditor.getState().resolveNotifications(PLUGIN_UPDATE)
   const done = status === "outdated"
     ? `Updated the editor's plugin to ${plugin.bundledVersion}`
     : "Installed the editor's plugin"

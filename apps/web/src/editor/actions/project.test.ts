@@ -13,9 +13,9 @@ import {
 import { balledits, fileNameOf, layerFor, reset, s } from "../../test/editorActions"
 import { listSamples, readSample } from "../../test/samples"
 import { exportToGameEffect } from "./exportPlay"
-import { overwriteChangedEffect } from "./gameWrite"
 import { importAsCopyEffect, importMapFile, replaceOnImportEffect } from "./project"
 import { saveMapFile } from "./save"
+import { keepProjectVersionEffect } from "./sync"
 
 const ballmaps = listSamples().filter((sample) => sample.kind === "ballmap")
 
@@ -62,9 +62,9 @@ describe("import actions", () => {
         // the game changed it since: Export asks, and Back up and overwrite writes the project file over it
         disk.files.set(inGame, "changed in the game")
         yield* exportToGameEffect
-        assert.strictEqual(s().dialog?.id, "overwriteChanged")
+        assert.strictEqual(s().dialog?.id, "syncConflict")
         assert.strictEqual(disk.files.get(inGame), "changed in the game")
-        yield* overwriteChangedEffect
+        yield* keepProjectVersionEffect
         assert.isTrue(disk.files.get(inGame) === saved, "the export differs from the project file")
         assert.strictEqual(disk.links.get(TEST_PROJECT)?.get(name)?.export?.hash, testHash(saved))
       }).pipe(Effect.provide(layerFor(disk)))

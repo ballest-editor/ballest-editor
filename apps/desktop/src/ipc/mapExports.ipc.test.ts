@@ -10,7 +10,7 @@ import {
   ProjectMaps
 } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, FileSystem, Option, Path, Schema } from "effect"
+import { Effect, Fiber, FileSystem, Option, Path, Schema } from "effect"
 import { vi } from "vitest"
 import { sha256 } from "../project/files"
 import { LinkFile } from "../project/MapLinks"
@@ -178,6 +178,36 @@ describe("MapExports over IPC", () => {
         assert.strictEqual(again._tag, "Exported")
       })
     ))
+
+  it.live(
+    "never takes the app's own export for a change in the game",
+    () =>
+      withHandlers(({ fake }) =>
+        Effect.gen(function*() {
+          const name = "Map_LevelEditorMain&Race_me.balledit"
+          const check = fake.invokeAs(ExportChecks, InvokeChannels.checkExports)
+          const exportIt = fake.invokeAs(ExportMapResult, InvokeChannels.exportMap, {
+            fileName: name,
+            replacePublished: false,
+            overwriteChanged: false
+          })
+          yield* fake.invoke(InvokeChannels.createMap, { fileName: name, text: "{\"v\":0}" })
+          expectTag(yield* exportIt, "Exported")
+          // The window can take the focus at any moment of an Export, so a check runs at every one of them.
+          const reported: Array<string> = []
+          const checking = yield* Effect.forkChild(Effect.forever(
+            check.pipe(Effect.tap(({ changed }) => Effect.sync(() => reported.push(...changed))))
+          ))
+          for (let version = 1; version <= 40; version++) {
+            yield* fake.invoke(InvokeChannels.saveMap, { fileName: name, text: `{"v":${version}}` })
+            expectTag(yield* exportIt, "Exported")
+          }
+          yield* Fiber.interrupt(checking)
+          assert.deepStrictEqual(reported, [])
+        })
+      ),
+    30_000
+  )
 
   it.effect("reports an export the game changed once, asks before exporting over it, and re-imports it", () =>
     withHandlers(({ fake, project, steam }) =>

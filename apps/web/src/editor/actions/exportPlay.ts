@@ -51,11 +51,22 @@ export const playEffect = writeOpenMapToGame("play")
 
 export const playMap = () => run(playEffect)
 
+/**
+ * Open in game: Export to game, then the plugin opens the map in the in-game editor, which starts if it isn't running.
+ * Nothing about a published map stops it: the in-game editor opens those too.
+ */
+export const openInGameEffect = writeOpenMapToGame("edit")
+
+export const openInGame = () => run(openInGameEffect)
+
 /** The Project panel's Export to game on a map: opened first, then exported as the open map is. */
 export const exportProjectMapFromPanel = (fileName: string) => withProjectMapOpen(fileName, exportToGameEffect)
 
 /** The Project panel's Play on a map: opened first, then played as the open map is. */
 export const playProjectMapFromPanel = (fileName: string) => withProjectMapOpen(fileName, playEffect)
+
+/** The Project panel's Open in game on a map: opened first, then sent as the open map is. */
+export const openProjectMapInGameFromPanel = (fileName: string) => withProjectMapOpen(fileName, openInGameEffect)
 
 /** The newDraft dialog's answer: a copy of the map that was never published, under a new name; then Play races it. */
 export const playAsNewDraft = (displayName: string, creatorName: string, replace: boolean) =>
