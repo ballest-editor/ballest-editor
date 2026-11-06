@@ -19,7 +19,7 @@ import { closesOnMiddleClick, DocumentTabs } from "../DocumentTabs"
 import { EditorSkeletonPanels } from "../EditorSkeleton"
 import { ViewportControls } from "../ViewControls"
 import "./dock.css"
-import { attachDock, expandGroup, isCentreGroup, useGroupFold } from "./dockControl"
+import { attachDock, expandGroup, isCentreGroup, togglePanel, useClosedPanelsIn, useGroupFold } from "./dockControl"
 import { followDockDrags } from "./dragImage"
 import { GroupMenu } from "./GroupMenu"
 import { dockPanels } from "./panels"
@@ -70,8 +70,9 @@ const dockComponents = {
 }
 
 /**
- * A panel's tab: its icon, its title while the strip has room for it (dock.css), and a × under the pointer. The tooltip
- * stands in for a title the strip has hidden, and a rail keeps the title alone.
+ * A panel's tab: its icon, and while the strip has room for its title (dock.css), the title and a place for the × that
+ * shows under the pointer, so hovering moves nothing. A tab down to its icon has no ×: the icon is all there is to click
+ * to pick the tab. The tooltip stands in for a title the strip has hidden, and a rail keeps the title alone.
  */
 function DockTab({ api, containerApi }: IDockviewPanelHeaderProps) {
   const { portalContainer } = useDockWindow(api)
@@ -99,7 +100,7 @@ function DockTab({ api, containerApi }: IDockviewPanelHeaderProps) {
           <Button
             variant="ghost"
             size="icon-sm"
-            className="dock-tab-close -mr-1.5 hidden [.group:hover_&]:inline-flex"
+            className="dock-tab-close -mr-1.5 opacity-0 focus-visible:opacity-100 [.group:hover_&]:opacity-100"
             aria-label={`Close ${api.title}`}
             // dockview would make the tab active first, and a click on the tab unfolds its group
             onPointerDown={(e) => e.preventDefault()}
@@ -127,6 +128,31 @@ function CentreTabs({ group }: IDockviewHeaderActionsProps) {
   return isCentreGroup(group) ? <DocumentTabs /> : null
 }
 
+/** The panels that are closed and would come back in `group`, dimmed. One click reopens each. */
+function ClosedPanels({ group }: Pick<IDockviewHeaderActionsProps, "group">) {
+  const closed = useClosedPanelsIn(group)
+  if (closed.length === 0) return null
+  return (
+    <div className="flex h-full items-center gap-2 px-1">
+      {closed.map(({ id, title, icon: Icon }) => (
+        <StripButton
+          key={id}
+          label={`Open ${title}`}
+          className="dock-closed-tab text-fg-disabled"
+          onClick={() => togglePanel(id)}
+        >
+          <Icon />
+        </StripButton>
+      ))}
+    </div>
+  )
+}
+
+/** After a panel strip's tabs: its closed panels, where the tabs left them. The centre's go at its end (`GroupActions`). */
+function TabsEnd({ group }: IDockviewHeaderActionsProps) {
+  return isCentreGroup(group) ? null : <ClosedPanels group={group} />
+}
+
 /** The end of a group's strip: its "…", or in a popped-out window the way back. A rail has neither. */
 function GroupActions({ group, activePanel, location }: IDockviewHeaderActionsProps) {
   const fold = useGroupFold(group)
@@ -134,14 +160,17 @@ function GroupActions({ group, activePanel, location }: IDockviewHeaderActionsPr
   if (fold === "width") return null
   return (
     <PortalContainerContext value={portalContainer}>
-      <div className="flex h-full items-center px-1">
-        {location?.type === "popout"
-          ? (
-            <StripButton label="Back to the main window" onClick={() => group.api.getWindow().close()}>
-              <IconArrowsMinimize />
-            </StripButton>
-          )
-          : <GroupMenu group={group} activePanel={activePanel} />}
+      <div className="flex h-full">
+        {isCentreGroup(group) && <ClosedPanels group={group} />}
+        <div className="flex items-center px-1">
+          {location?.type === "popout"
+            ? (
+              <StripButton label="Back to the main window" onClick={() => group.api.getWindow().close()}>
+                <IconArrowsMinimize />
+              </StripButton>
+            )
+            : <GroupMenu group={group} activePanel={activePanel} />}
+        </div>
       </div>
     </PortalContainerContext>
   )
@@ -156,7 +185,8 @@ export function Dock() {
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => followDockDrags(document), [])
   return (
-    <div ref={box} className="relative min-h-0 flex-1">
+    // `isolate` keeps dockview's z-indexes in here: its sashes (99) would otherwise take clicks from a menu over them (50)
+    <div ref={box} className="relative isolate min-h-0 flex-1">
       <DockviewReact
         className="h-full"
         theme={dockTheme}
@@ -164,6 +194,7 @@ export function Dock() {
         tabComponents={dockTabComponents}
         defaultTabComponent={DockTab}
         prefixHeaderActionsComponent={CentreTabs}
+        leftHeaderActionsComponent={TabsEnd}
         rightHeaderActionsComponent={GroupActions}
         disableFloatingGroups
         disableTabsOverflowList
