@@ -20,9 +20,11 @@ const contrast = (a: string, b: string) => {
 /** WCAG's bar for graphics. */
 const READABLE = 3
 
-/** The bars for the grid: sections are read at a glance, cells only have to show. */
-const GRID_SECTION = 3
-const GRID_CELL = 1.5
+/**
+ * The bars for the grid: sections are read at a glance, cells only have to show. Light's are lower: it also has to read
+ * on the water, a mid blue, and there the dark theme's bars make the grid the loudest thing on screen.
+ */
+const GRID_BARS = { dark: { section: 3, cell: 1.5 }, light: { section: 2, cell: 1.3 } } as const
 
 /** The water as it reaches the screen, past the renderer's tone mapping (measured in the app). */
 const WATER_ON_SCREEN = "#00669e"
@@ -41,15 +43,15 @@ describe("what's drawn over the scene", () => {
   it("draws the grid in the light theme so it reads on the ground and on the water over it", () => {
     const ground = SCENE_COLORS.light
     for (const floor of [ground, shadeOf(ground, WATER_ON_SCREEN, waterTopMaterial.opacity)]) {
-      assert.isAtLeast(contrast(AUTO_GRID_COLORS.light.cell, floor), GRID_CELL, `cell on ${floor}`)
-      assert.isAtLeast(contrast(AUTO_GRID_COLORS.light.section, floor), GRID_SECTION, `section on ${floor}`)
+      assert.isAtLeast(contrast(AUTO_GRID_COLORS.light.cell, floor), GRID_BARS.light.cell, `cell on ${floor}`)
+      assert.isAtLeast(contrast(AUTO_GRID_COLORS.light.section, floor), GRID_BARS.light.section, `section on ${floor}`)
     }
   })
 
   it("draws the grid in the dark theme so it reads on the ground", () => {
     const ground = SCENE_COLORS.dark
-    assert.isAtLeast(contrast(AUTO_GRID_COLORS.dark.cell, ground), GRID_CELL)
-    assert.isAtLeast(contrast(AUTO_GRID_COLORS.dark.section, ground), GRID_SECTION)
+    assert.isAtLeast(contrast(AUTO_GRID_COLORS.dark.cell, ground), GRID_BARS.dark.cell)
+    assert.isAtLeast(contrast(AUTO_GRID_COLORS.dark.section, ground), GRID_BARS.dark.section)
   })
 
   it("spells the ground out for Tailwind as it is", () => {

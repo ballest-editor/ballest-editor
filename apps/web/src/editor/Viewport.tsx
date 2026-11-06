@@ -9,6 +9,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState
@@ -20,6 +21,7 @@ import { isBound, mouseChordOf } from "../domain/Keybinds"
 import { WATER } from "../domain/level"
 import { gridColorsOf } from "../domain/Settings"
 import { placePrefab } from "./actions"
+import { fadeFineLines } from "./floorGrid"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { GroupBox } from "./groupBox"
@@ -240,11 +242,24 @@ function ViewportBackground() {
  * colours or ones derived from the ground they sit on. It follows the camera, so it ends where its fade ends.
  */
 function ViewportGrid() {
+  const visible = useEditor((s) => s.settings.appearance.gridVisible)
+  return visible ? <FloorGrid /> : null
+}
+
+function FloorGrid() {
   const appearance = useEditor((s) => s.settings.appearance)
   const floorHeight = useEditor((s) => s.floorHeight)
   const dark = useDarkTheme(appearance.theme)
   const colors = gridColorsOf(appearance, dark)
   const grid = useRef<THREE.Mesh>(null)
+  useLayoutEffect(() => {
+    const material = grid.current?.material
+    if (!(material instanceof THREE.ShaderMaterial)) return
+    material.onBeforeCompile = (shader) => {
+      shader.fragmentShader = fadeFineLines(shader.fragmentShader)
+    }
+    material.needsUpdate = true
+  }, [])
   // drei fades the grid from R3F's camera, and each pane has its own.
   useBeforePaneDraw(({ perspective: { position } }) => {
     const material = grid.current?.material
@@ -253,7 +268,6 @@ function ViewportGrid() {
     if (fadeFrom instanceof THREE.Vector3) fadeFrom.set(position.x, floorHeight, position.z)
     material.uniformsNeedUpdate = true
   })
-  if (!appearance.gridVisible) return null
   return (
     <Grid
       ref={grid}
