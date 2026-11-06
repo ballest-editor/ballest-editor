@@ -172,6 +172,19 @@ game:  "boolProperties": [{ "currentValue": false, "propertyName": "bMirror", ..
 
 **12. Unknown JSON fields are dropped.** I put extra fields at the file root, in `worldSettings`, `levelData`, an item, `itemTransform`, a mesh component and `editorState`. All three files loaded with every piece, and none of the fields survived a save. The app keeps them on export, which does no harm. This is about JSON keys. An unknown item _property_ is a different matter, and FORMAT.md records that the game rejects it. I didn't retest that.
 
+## What a save with no edits rewrites
+
+Measured on 2026-11-06 with plugin manager 0.34.2: a map opened through `Together::OpenMap` and saved at once, with no edits. These change every time, so a difference in them says nothing about what the player did (`REWRITTEN_ON_SAVE` in `domain/mapDiff.ts`):
+
+- `createdAt`, set to the time the map was opened.
+- `metaData`, emptied.
+- `levelData.mapTags`, worked out from the pieces (`UGCTypes.Map`, a mood per time of day, one per kind of prop).
+- `medalTimesByIndex`, emptied.
+- `directionalLightAngle`, as above, and the last digits of `timeOfDay` (24 became 24.000001907348633).
+- The last digits of a quaternion, and `editorState`, dropped whole.
+
+The order of `items` doesn't change, which is what `loadGameStructure` in `domain/sidecar.ts` relies on. A race or a practice run of the same map left its file alone: the same hash and modified time.
+
 ## What I could not verify
 
 - **Whether the sandbox causes difference 3.** Every save here ran in a sandboxed slot. I can't test the player's real game, and shouldn't. The evidence against the sandbox is thin but real: `new pieces probe`, the one real 0.4.1 save we have, also has no `editorState`, but I don't know whether any pivot was set in it. One in-game test would settle it: set a pivot in the real game, save, and read the file.
