@@ -15,7 +15,7 @@ import {
   wheelChordOf
 } from "../domain/Keybinds"
 import { wheelZoomFactor } from "../domain/orthoView"
-import { placeDistanceFor, placementPoint } from "../domain/placement"
+import { placementPoint } from "../domain/placement"
 import { spreadPlacement } from "./actions/placement"
 import { isEditorKeyEvent } from "./keyTargets"
 import {
@@ -76,13 +76,11 @@ export function FlyCamera() {
       const centre = pane.orthographicPlacement(floorHeight)
       if (centre !== undefined) return centre
       const camera = pane.perspective
-      const vertical = THREE.MathUtils.degToRad(camera.fov)
-      const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * camera.aspect)
       return placementPoint(
         threeToUeVector(camera.position),
         threeToUeVector(camera.getWorldDirection(new THREE.Vector3())),
         floorHeight,
-        placeDistanceFor(footprint, Math.min(vertical, horizontal), settings.editor.placeDistance)
+        pane.placeDistance(footprint, settings.editor.placeDistance)
       )
     }
     sceneRegistry.placementPoint = (footprint, height) => {

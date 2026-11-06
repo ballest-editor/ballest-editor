@@ -4,7 +4,7 @@
  * transparent background so it sits on whatever panel shows it. The game's renders have its dark
  * backdrop baked in, unevenly enough that it can't be keyed out cleanly, so they are only the
  * fallback (components/PieceThumbnail.tsx). The lights here are fixed, so a thumbnail looks the
- * same in both themes and is cached once per piece, as a PNG data URL. Renders run one at a time
+ * same in both themes and is cached once per piece and fill, as a PNG data URL. Renders run one at a time
  * off a queue so a long list never stalls the UI. A whole map's items go through the same stage, seen from straight
  * above (`mapThumbnailFor`).
  *
@@ -61,14 +61,20 @@ export interface Framing {
 /**
  * Where a perspective camera (`fov` vertical degrees, `aspect`) stands, looking down
  * `direction` at the box's centre, so the box's bounding sphere fills `FILL` of the frame's
- * tighter dimension.
+ * tighter dimension, or `fill` of that for a piece drawn smaller than the frame allows.
  */
-export const frameBox = (min: Tuple3, max: Tuple3, aspect: number, direction: Tuple3 = VIEW_DIRECTION): Framing => {
+export const frameBox = (
+  min: Tuple3,
+  max: Tuple3,
+  aspect: number,
+  direction: Tuple3 = VIEW_DIRECTION,
+  fill = 1
+): Framing => {
   const center: Tuple3 = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2]
   const radius = Math.max(1, Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2)
   const vertical = THREE.MathUtils.degToRad(FOV) / 2
   const horizontal = Math.atan(Math.tan(vertical) * aspect)
-  const distance = radius / (Math.sin(Math.min(vertical, horizontal)) * FILL)
+  const distance = radius / (Math.sin(Math.min(vertical, horizontal)) * FILL * fill)
   const dir = new THREE.Vector3(...direction).normalize()
   const position = new THREE.Vector3(...center).addScaledVector(dir, distance)
   return {
@@ -309,10 +315,13 @@ const shoot = async (
   return url
 }
 
-/** `object` framed whole from the three-quarter view, as a PNG data URL; undefined when there is nothing to draw. */
-const photograph = (object: THREE.Group | undefined) =>
+/**
+ * `object` framed whole from the three-quarter view, drawn at `fill` of the size that frame allows, as a PNG data URL;
+ * undefined when there is nothing to draw.
+ */
+const photograph = (object: THREE.Group | undefined, fill = 1) =>
   shoot(object, THUMBNAIL_SIZE, (box, { camera }) => {
-    const framing = frameBox(box.min.toArray(), box.max.toArray(), camera.aspect)
+    const framing = frameBox(box.min.toArray(), box.max.toArray(), camera.aspect, VIEW_DIRECTION, fill)
     camera.position.set(...framing.position)
     camera.near = framing.near
     camera.far = framing.far
@@ -321,8 +330,8 @@ const photograph = (object: THREE.Group | undefined) =>
     return camera
   })
 
-const render = async (piece: CatalogPiece, index: CatalogIndex, table: MaterialTable) =>
-  photograph(await buildPiece(piece, index, table))
+const render = async (piece: CatalogPiece, index: CatalogIndex, table: MaterialTable, fill: number) =>
+  photograph(await buildPiece(piece, index, table), fill)
 
 /** A map's items from straight above, with X up the picture and Y to the right, like the Top pane. */
 const renderMap = async (
@@ -364,14 +373,16 @@ const renderedOnce = (
 }
 
 /**
- * A rendered thumbnail (PNG data URL) for `piece`, or undefined when it has nothing to draw
- * or rendering failed. Rendered once per piece, in request order, one at a time.
+ * A rendered thumbnail (PNG data URL) for `piece`, filling `fill` of the frame (`sizeScalesOf`), or undefined when it has
+ * nothing to draw or rendering failed. Rendered once per piece and fill, in request order, one at a time.
  */
 export const thumbnailFor = (
   piece: CatalogPiece,
   index: CatalogIndex,
-  table: MaterialTable
-): Promise<string | undefined> => renderedOnce(pieceIdOf(piece), piece.className, () => render(piece, index, table))
+  table: MaterialTable,
+  fill = 1
+): Promise<string | undefined> =>
+  renderedOnce(`${pieceIdOf(piece)}|${fill}`, piece.className, () => render(piece, index, table, fill))
 
 /** One version of a definition's file, which is what its picture is of. */
 const definitionCacheKey = ({ hash, name, tier }: PrefabRef & { readonly hash: string }) =>

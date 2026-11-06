@@ -16,7 +16,7 @@ import {
   scaleForDistance,
   zoomAtPointer
 } from "../domain/orthoView"
-import type { PlacementView } from "../domain/placement"
+import { placeDistanceFor, type PlacementView } from "../domain/placement"
 import type { ScreenAxes } from "../domain/viewGizmo"
 import {
   isOrthoView,
@@ -271,10 +271,21 @@ export class PaneCamera {
       : gameDirToWorld(ORTHO_AXES[view].forward).negate()
   }
 
-  /** Where a palette piece goes (game space), `undefined` in perspective, which aims along its centre ray. */
-  orthographicPlacement(floor: number): Vec3 | undefined {
+  /**
+   * Where a palette piece goes (game space) for a point in the view, by default its centre; `undefined` in perspective,
+   * which aims along a ray.
+   */
+  orthographicPlacement(floor: number, at: THREE.Vector3 = this.target): Vec3 | undefined {
     const { view } = this
-    return view === undefined ? undefined : orthoPlacementPoint(uePoint(this.target), view, floor)
+    return view === undefined ? undefined : orthoPlacementPoint(uePoint(at), view, floor)
+  }
+
+  /** How far from the perspective camera a piece with this footprint may land: `base`, or further to fit a big one. */
+  placeDistance(footprint: number, base: number): number {
+    const { aspect, fov } = this.perspective
+    const vertical = THREE.MathUtils.degToRad(fov)
+    const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * aspect)
+    return placeDistanceFor(footprint, Math.min(vertical, horizontal), base)
   }
 
   /** Where this pane looks from and how it is turned, for laying out placements. */

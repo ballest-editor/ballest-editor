@@ -160,6 +160,27 @@ export const inSizeOrder = <P extends Named>(pieces: ReadonlyArray<P>): Readonly
   })
 }
 
+/** How much less of a thumbnail's frame each size down from the family's largest fills. */
+const SIZE_SCALE_STEP = 0.2
+
+/**
+ * How much of a thumbnail's frame each piece fills, so one shape's sizes differ at a glance: the family's largest fills it
+ * all, and each size below takes 20% off, so S, M and L are 60%, 80% and 100%. A family is the pieces sharing a name, as in
+ * `inSizeOrder`; a piece with no size fills the frame.
+ */
+export const sizeScalesOf = <P extends Named>(pieces: ReadonlyArray<P>): ReadonlyMap<P, number> => {
+  const largest = new Map<string, number>()
+  for (const piece of pieces) {
+    const { name, size } = pieceDisplayName(piece)
+    if (size !== undefined) largest.set(name, Math.max(largest.get(name) ?? 0, SIZE_RANKS[size]))
+  }
+  return new Map(pieces.map((piece) => {
+    const { name, size } = pieceDisplayName(piece)
+    const steps = size === undefined ? 0 : (largest.get(name) ?? 0) - SIZE_RANKS[size]
+    return [piece, 1 - SIZE_SCALE_STEP * steps]
+  }))
+}
+
 /**
  * Numbers the pieces in a list that read the same: classes the game doesn't name differ only by the hash the name drops,
  * so seven read "Boolean Arena White". The first keeps the plain name, and the rest count from 2, past any number

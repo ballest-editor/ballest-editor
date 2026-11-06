@@ -4,7 +4,7 @@ import { parseMaterialsFile } from "../domain/Materials"
 import { materialsFile, OUTLINE, PIPE, primitive, WIND } from "../test/materials"
 import { applySlotMaterials, materialFor, shaderPatchOf } from "./materials"
 import { isTexture } from "./threeGuards"
-import { frameBox, frameTopDown, SerialQueue, texturesOf, whenTexturesReady } from "./thumbnails"
+import { frameBox, frameTopDown, type Framing, SerialQueue, texturesOf, whenTexturesReady } from "./thumbnails"
 
 describe("top-down framing", () => {
   it("stands over the box's plan and sees all of it, by its longer side", () => {
@@ -47,6 +47,14 @@ describe("thumbnail framing", () => {
     assert.isTrue(fits([-262, 0, -250], [262, 145, 250], aspect)) // Curve1 S
     assert.isTrue(fits([-1000, -5, -20], [1000, 5, 20], aspect)) // a plank
     assert.isTrue(fits([0, 0, 0], [0, 0, 0], aspect)) // degenerate: still a finite camera
+  })
+
+  it("stands further back by the share of the frame a piece fills", () => {
+    const min = [-250, 0, -250] as const, max = [250, 145, 250] as const
+    const distance = ({ position, target }: Framing) => Math.hypot(...position.map((c, i) => c - target[i]!))
+    const full = frameBox(min, max, 1), small = frameBox(min, max, 1, [1, 0.8, 1], 0.6)
+    assert.closeTo(distance(small), distance(full) / 0.6, 1e-6)
+    assert.deepStrictEqual(small.target, full.target)
   })
 
   it("looks at the box centre from the front-right, above", () => {

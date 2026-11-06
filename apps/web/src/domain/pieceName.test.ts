@@ -4,7 +4,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import { repoRoot } from "../test/samples"
 import { Catalog, paletteSections } from "./Catalog"
-import { inSizeOrder, pieceDisplayName, pieceLabelOf, pieceTitleOf, withOrdinals } from "./pieceName"
+import { inSizeOrder, pieceDisplayName, pieceLabelOf, pieceTitleOf, sizeScalesOf, withOrdinals } from "./pieceName"
 
 const game = (displayName: string, className: string) => pieceDisplayName({ displayName, className })
 
@@ -218,5 +218,28 @@ describe.skipIf(!fs.existsSync(catalogPath))("the real catalog", () => {
         assert.isAtMost("SML".indexOf(previous.size ?? ""), "SML".indexOf(piece.size ?? ""), piece.name)
       })
     }
+  })
+})
+
+describe("sizeScalesOf", () => {
+  const piece = (displayName: string) => ({ className: "BP_Test", displayName })
+  const scales = (...names: ReadonlyArray<string>) => {
+    const pieces = names.map(piece)
+    const of = sizeScalesOf(pieces)
+    return pieces.map((p) => of.get(p))
+  }
+
+  it("draws a family of three at 60%, 80% and 100%, in any order", () => {
+    assert.deepStrictEqual(scales("Curve1 S", "Curve1 M", "Curve1 L"), [0.6, 0.8, 1])
+    assert.deepStrictEqual(scales("Curve2 M", "Curve2 S", "Curve2 L"), [0.8, 0.6, 1])
+  })
+
+  it("measures from the family's largest, so a family without an L tops out at its M", () => {
+    assert.deepStrictEqual(scales("Track S", "Track M"), [0.8, 1])
+    assert.deepStrictEqual(scales("Track S", "Track L"), [0.6, 1])
+  })
+
+  it("keeps families apart, and fills the frame with a piece on its own or with no size", () => {
+    assert.deepStrictEqual(scales("Curve1 S", "Track L", "Ramp M", "Kicker"), [1, 1, 1, 1])
   })
 })

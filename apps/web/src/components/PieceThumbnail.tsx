@@ -32,6 +32,8 @@ interface ThumbnailProps {
   readonly piece: CatalogPiece
   readonly className: string
   readonly placeholder: ReactNode
+  /** How much of the frame the piece fills (`sizeScalesOf`), for a list that sets one shape's sizes side by side. */
+  readonly fill?: number
 }
 
 /**
@@ -40,7 +42,7 @@ interface ThumbnailProps {
  * keeps `placeholder`. The waiting image is transparent and out of the flow, not `display: none`, which never fires its
  * load.
  */
-function RenderedThumbnail({ piece, className, placeholder }: ThumbnailProps) {
+function RenderedThumbnail({ piece, className, placeholder, fill }: ThumbnailProps) {
   const index = useEditor((s) => s.catalogIndex)
   const table = useEditor((s) => s.materialTable)
   const { ref, seen } = useSeen()
@@ -50,13 +52,13 @@ function RenderedThumbnail({ piece, className, placeholder }: ThumbnailProps) {
   useEffect(() => {
     if (!seen || index === null || table === null) return
     let cancelled = false
-    void thumbnailFor(piece, index, table).then((url) => {
+    void thumbnailFor(piece, index, table, fill).then((url) => {
       if (!cancelled) setRendered(url ?? shipped)
     })
     return () => {
       cancelled = true
     }
-  }, [piece, shipped, seen, index, table])
+  }, [piece, shipped, seen, index, table, fill])
   const showing = rendered !== undefined && rendered === loaded
   return (
     <span ref={ref} className="relative flex shrink-0">
@@ -65,6 +67,7 @@ function RenderedThumbnail({ piece, className, placeholder }: ThumbnailProps) {
         <img
           src={rendered}
           alt=""
+          draggable={false} // a drag from a row is the row's, not the picture's
           className={cn(className, !showing && "absolute inset-0 opacity-0")}
           onLoad={() => setLoaded(rendered)}
         />
