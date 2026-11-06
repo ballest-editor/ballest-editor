@@ -26,7 +26,7 @@ import { sceneRegistry } from "../editor/sceneRegistry"
 import { useEditor } from "../editor/store"
 import { focusViewport } from "../editor/Viewport"
 import { PaletteSkeleton } from "./EditorSkeleton"
-import { PieceThumbnail } from "./PieceThumbnail"
+import { PieceThumbnail, THUMBNAIL_TILE } from "./PieceThumbnail"
 
 type PiecesView = Settings["panels"]["piecesView"]
 
@@ -114,7 +114,8 @@ function PieceButton({ piece, category, view, onPlace, onHover, unavailable, unv
   const placeholder = (
     <span
       className={cn(
-        "grid shrink-0 place-items-center rounded-control bg-muted",
+        "grid shrink-0 place-items-center rounded-control",
+        THUMBNAIL_TILE,
         disabled ? "text-fg-disabled" : "text-fg-tertiary",
         thumbnailSize
       )}
@@ -126,7 +127,7 @@ function PieceButton({ piece, category, view, onPlace, onHover, unavailable, unv
     ? (
       <PieceThumbnail
         piece={piece}
-        className={cn("shrink-0 rounded-control bg-muted object-contain", thumbnailSize)}
+        className={cn("shrink-0 rounded-control object-contain", THUMBNAIL_TILE, thumbnailSize)}
         placeholder={placeholder}
       />
     )

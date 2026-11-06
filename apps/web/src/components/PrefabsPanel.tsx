@@ -18,7 +18,7 @@ import { copyPrefabToTier, duplicatePrefab, openPrefab, placePrefab, revealPrefa
 import { startPrefabDrag } from "../editor/prefabDrag"
 import { useEditor, useOpenPrefab } from "../editor/store"
 import { focusViewport } from "../editor/Viewport"
-import { PieceThumbnail } from "./PieceThumbnail"
+import { PieceThumbnail, THUMBNAIL_TILE } from "./PieceThumbnail"
 import { SectionTitle } from "./SectionTitle"
 
 /** The first piece's picture, else a glyph: a prefab has no picture of its own. */
@@ -29,7 +29,8 @@ function PrefabThumbnail({ prefab }: { readonly prefab: PrefabInfo }) {
   const glyph = (
     <span
       className={cn(
-        "grid size-6 shrink-0 place-items-center rounded-control bg-muted",
+        "grid size-6 shrink-0 place-items-center rounded-control",
+        THUMBNAIL_TILE,
         prefab.itemCount === null ? "text-fg-disabled" : "text-fg-secondary"
       )}
     >
@@ -41,7 +42,7 @@ function PrefabThumbnail({ prefab }: { readonly prefab: PrefabInfo }) {
     : (
       <PieceThumbnail
         piece={piece}
-        className="size-6 shrink-0 rounded-control bg-muted object-fill"
+        className={cn("size-6 shrink-0 rounded-control object-fill", THUMBNAIL_TILE)}
         placeholder={glyph}
       />
     )

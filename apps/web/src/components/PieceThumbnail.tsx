@@ -5,6 +5,12 @@ import { assetUrl } from "../editor/assetUrl"
 import { useEditor } from "../editor/store"
 import { keepsShippedThumbnail, thumbnailFor } from "../editor/thumbnails"
 
+/**
+ * The tile under a thumbnail and its placeholder: a step off the panel in both themes, stronger than `--muted`, so a
+ * white piece reads in light and a near-black one in dark. Alpha, so it stays neutral on whatever panel it sits on.
+ */
+export const THUMBNAIL_TILE = "bg-foreground/14"
+
 /** True from the first time the element comes into view, so a long list only renders what gets looked at. */
 const useSeen = () => {
   const ref = useRef<HTMLSpanElement>(null)
