@@ -25,7 +25,7 @@ export const viewProjectionLabels: Readonly<Record<ViewProjection, string>> = {
 export const viewLayoutKinds = ["single", "columns", "rows", "quad"] as const
 export type ViewLayoutKind = (typeof viewLayoutKinds)[number]
 
-export const viewLayoutLabels: Readonly<Record<ViewLayoutKind, string>> = {
+const viewLayoutLabels: Readonly<Record<ViewLayoutKind, string>> = {
   single: "One pane",
   columns: "Side by side",
   rows: "Stacked",
@@ -82,6 +82,12 @@ export const maximisedSlotOf = ({ kind, maximised }: ViewLayout): PaneSlot | und
 /** How the viewport looks divided right now: a maximised pane is one pane, whatever the layout goes back to. */
 export const shownKindOf = (layout: ViewLayout): ViewLayoutKind =>
   maximisedSlotOf(layout) === undefined ? layout.kind : "single"
+
+/** The layouts by name, as `layout` sees them: the one a maximised pane goes back to says so. */
+export const viewLayoutLabelsOf = (layout: ViewLayout): Readonly<Record<ViewLayoutKind, string>> =>
+  maximisedSlotOf(layout) === undefined
+    ? viewLayoutLabels
+    : { ...viewLayoutLabels, [layout.kind]: `${viewLayoutLabels[layout.kind]} (maximised)` }
 
 /** `layout` showing all its panes again. */
 export const withoutMaximised = ({ maximised: _maximised, ...layout }: ViewLayout): ViewLayout => layout

@@ -23,9 +23,8 @@ import { type KeybindAction, PROJECTION_ACTIONS } from "../domain/Keybinds"
 import { formatGridSize, GRID_SIZES } from "../domain/snap"
 import { updateCheckBlockedBy } from "../domain/updates"
 import {
-  shownKindOf,
   viewLayoutKinds,
-  viewLayoutLabels,
+  viewLayoutLabelsOf,
   type ViewProjection,
   viewProjectionLabels,
   viewProjections
@@ -215,7 +214,7 @@ function MenuSection({ title, children }: { readonly title: string; readonly chi
 
 /** How the view divides into panes, and what the active pane looks along (docs/DESKTOP.md § View panes). */
 function PaneMenus() {
-  const kind = useEditor((s) => shownKindOf(s.viewLayout))
+  const layout = useEditor((s) => s.viewLayout)
   const projection = useEditor((s) => s.viewLayout.projections[s.activePane] ?? "perspective")
   const setViewLayoutKind = useEditor((s) => s.setViewLayoutKind)
   const lookAlong = (next: ViewProjection) => {
@@ -227,11 +226,11 @@ function PaneMenus() {
       <RadioMenu
         title="Layout"
         description="Split the viewport, one camera per pane."
-        value={kind}
+        value={layout.kind}
         options={viewLayoutKinds}
         onPick={setViewLayoutKind}
       >
-        {(layout) => viewLayoutLabels[layout]}
+        {(kind) => viewLayoutLabelsOf(layout)[kind]}
       </RadioMenu>
       <RadioMenu
         title="Active pane"

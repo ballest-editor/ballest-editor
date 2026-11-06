@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { isMovementChord, sharedKeysFlyFreely } from "../domain/flyKeys"
 import { actionsFor, chordOf, releasesBinding } from "../domain/Keybinds"
+import { maximisedSlotOf } from "../domain/viewLayout"
 import { commandFor, runsHere } from "./commands"
 import { isEditorKeyEvent } from "./keyTargets"
 import { sceneRegistry } from "./sceneRegistry"
@@ -12,15 +13,16 @@ const interactionActive = () => sceneRegistry.gizmoDragActive() || useEditor.get
  * One-shot actions, matched on the full chord. Ignored in text fields, dialogs and menus,
  * while a look drag is active (the fly keys own the keyboard then), and while a gizmo drag
  * or number-field scrub is in progress (it commits as one undo step on release; undo or
- * delete mid-interaction would be overwritten or orphan it). The cheat sheet is the one
- * held action here: it hides when a key of its binding is released or the window blurs.
+ * delete mid-interaction would be overwritten or orphan it). The deselect key restores a
+ * maximised pane first. The cheat sheet is the one held action here: it hides when a key of
+ * its binding is released or the window blurs.
  */
 export function useActionKeys() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!isEditorKeyEvent(e) || e.repeat || sceneRegistry.lookDragActive() || interactionActive()) return
       const chord = chordOf(e)
-      const { keybinds, settings } = useEditor.getState()
+      const { keybinds, settings, viewLayout, togglePaneMaximised } = useEditor.getState()
       // A movement key that is also a tool shortcut (W: forward + translate) joins an ongoing
       // flight instead of switching tool, unless no movement key needs look: then it does both.
       if (
@@ -28,6 +30,13 @@ export function useActionKeys() {
         && sceneRegistry.flyKeysActive()
         && !sharedKeysFlyFreely(settings.camera.movementNeedsLook)
       ) return
+      // A key only: Edit › Deselect still deselects. The selection stays, for the next press.
+      const maximised = maximisedSlotOf(viewLayout)
+      if (maximised !== undefined && keybinds.deselect.includes(chord)) {
+        e.preventDefault()
+        togglePaneMaximised(maximised)
+        return
+      }
       for (const action of actionsFor(keybinds, chord)) {
         const run = commandFor(action)
         if (run === undefined || !runsHere(action)) continue
