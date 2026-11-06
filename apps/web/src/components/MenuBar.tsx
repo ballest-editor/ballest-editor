@@ -101,20 +101,26 @@ function CommandItem({ action, children, ...item }: ItemProps & { readonly actio
   )
 }
 
+/** Gives the focus back to the page if it is on a menu or the menu bar. */
+const leaveMenus = () => {
+  const focused = document.activeElement
+  if (focused instanceof HTMLElement && focused.closest("[role=menu], [role=menubar]") !== null) focused.blur()
+}
+
 /**
  * One top-level menu. Closing it leaves focus on the page, however it closed, as a dialog does: on a title, Space and
- * the arrows would work the menu bar and not the editor. That includes a click on the title, which focuses it. Only a
- * move to the next menu (`sibling-open`) stays in the bar.
+ * the arrows would work the menu bar and not the editor. It leaves as the menu starts to close, since Base UI holds it
+ * in the popup until the exit animation ends, and the keys pressed until then would be lost. A click on the title
+ * focuses it after this, so it leaves again a frame later. Only a move to the next menu (`sibling-open`) stays in the
+ * bar.
  */
 function Menu({ title, children }: { readonly title: string; readonly children: ReactNode }) {
   return (
     <MenubarMenu
       onOpenChange={(open, { reason }) => {
         if (open || reason === "sibling-open") return
-        requestAnimationFrame(() => {
-          const focused = document.activeElement
-          if (focused instanceof HTMLElement && focused.closest("[role=menubar]") !== null) focused.blur()
-        })
+        leaveMenus()
+        requestAnimationFrame(leaveMenus)
       }}
     >
       <MenubarTrigger className="h-7 px-2.5">{title}</MenubarTrigger>
