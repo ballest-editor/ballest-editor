@@ -3,9 +3,9 @@ import * as THREE from "three"
 import { shadeOf } from "../domain/sceneGround"
 import { AUTO_GRID_COLORS } from "../domain/Settings"
 import { AXIS_BG_CLASSES, sceneAxisColors } from "./axisColors"
-import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
+import { ORTHO_GROUND, SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { OUTLINE_COLORS } from "./selectionOutline"
-import { waterTopMaterial } from "./water"
+import { WATER_LOOKS } from "./water"
 
 const luminance = (hex: string) => {
   const { r, g, b } = new THREE.Color(hex) // linear
@@ -21,13 +21,16 @@ const contrast = (a: string, b: string) => {
 const READABLE = 3
 
 /**
- * The bars for the grid: sections are read at a glance, cells only have to show. Light's are lower: it also has to read
- * on the water, a mid blue, and there the dark theme's bars make the grid the loudest thing on screen.
+ * The bars for the grid: sections are read at a glance, cells only have to show. Light's are lower: its water is a mid
+ * blue, and there the dark theme's bars make the grid the loudest thing on screen.
  */
 const GRID_BARS = { dark: { section: 3, cell: 1.5 }, light: { section: 2, cell: 1.3 } } as const
 
-/** The water as it reaches the screen, past the renderer's tone mapping (measured in the app). */
-const WATER_ON_SCREEN = "#00669e"
+/** The floors the grid's full colour is seen on: the ground, the water over it at full light, an orthographic pane's. */
+const floorsOf = (theme: "dark" | "light") => {
+  const { color, opacity } = WATER_LOOKS[theme]
+  return [SCENE_COLORS[theme], shadeOf(SCENE_COLORS[theme], color, opacity), ORTHO_GROUND[theme]]
+}
 
 describe("what's drawn over the scene", () => {
   for (const dark of [true, false]) {
@@ -36,22 +39,27 @@ describe("what's drawn over the scene", () => {
       const colors = [...Object.values(sceneAxisColors(dark)), ...Object.values(OUTLINE_COLORS[theme])]
       for (const color of colors) {
         assert.isAtLeast(contrast(color, SCENE_COLORS[theme]), READABLE, color)
+        assert.isAtLeast(contrast(color, ORTHO_GROUND[theme]), READABLE, `${color} in an orthographic pane`)
+      }
+    })
+
+    it(`draws the grid in the ${theme} theme so it reads on the ground and on the water over it`, () => {
+      for (const floor of floorsOf(theme)) {
+        assert.isAtLeast(contrast(AUTO_GRID_COLORS[theme].cell, floor), GRID_BARS[theme].cell, `cell on ${floor}`)
+        assert.isAtLeast(
+          contrast(AUTO_GRID_COLORS[theme].section, floor),
+          GRID_BARS[theme].section,
+          `section on ${floor}`
+        )
       }
     })
   }
 
-  it("draws the grid in the light theme so it reads on the ground and on the water over it", () => {
-    const ground = SCENE_COLORS.light
-    for (const floor of [ground, shadeOf(ground, WATER_ON_SCREEN, waterTopMaterial.opacity)]) {
-      assert.isAtLeast(contrast(AUTO_GRID_COLORS.light.cell, floor), GRID_BARS.light.cell, `cell on ${floor}`)
-      assert.isAtLeast(contrast(AUTO_GRID_COLORS.light.section, floor), GRID_BARS.light.section, `section on ${floor}`)
-    }
-  })
-
-  it("draws the grid in the dark theme so it reads on the ground", () => {
-    const ground = SCENE_COLORS.dark
-    assert.isAtLeast(contrast(AUTO_GRID_COLORS.dark.cell, ground), GRID_BARS.dark.cell)
-    assert.isAtLeast(contrast(AUTO_GRID_COLORS.dark.section, ground), GRID_BARS.dark.section)
+  it("keeps the light theme's orthographic ground between the clear colour and the water", () => {
+    const { color, opacity } = WATER_LOOKS.light
+    const water = shadeOf(SCENE_COLORS.light, color, opacity)
+    assert.isBelow(luminance(ORTHO_GROUND.light), luminance(SCENE_COLORS.light))
+    assert.isAbove(luminance(ORTHO_GROUND.light), luminance(water))
   })
 
   it("spells the axes out for Tailwind as they are", () => {

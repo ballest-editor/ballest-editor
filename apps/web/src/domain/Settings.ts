@@ -192,8 +192,8 @@ const migrate = (stored: unknown): unknown => {
  */
 export const AUTO_GRID_COLORS: Readonly<Record<"dark" | "light", { readonly cell: string; readonly section: string }>> =
   {
-    dark: { cell: shadeOf(SCENE_COLORS.dark, "#ffffff", 0.22), section: shadeOf(SCENE_COLORS.dark, "#ffffff", 0.38) },
-    light: { cell: shadeOf(SCENE_COLORS.light, "#000000", 0.32), section: shadeOf(SCENE_COLORS.light, "#000000", 0.46) }
+    dark: { cell: shadeOf(SCENE_COLORS.dark, "#ffffff", 0.22), section: shadeOf(SCENE_COLORS.dark, "#ffffff", 0.4) },
+    light: { cell: shadeOf(SCENE_COLORS.light, "#000000", 0.4), section: shadeOf(SCENE_COLORS.light, "#000000", 0.52) }
   }
 
 /** The grid colours to draw: the user's, else the theme's automatic ones. */

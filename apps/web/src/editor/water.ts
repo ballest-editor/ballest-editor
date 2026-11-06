@@ -8,7 +8,15 @@
 import * as THREE from "three"
 import { SKY_DOME_RADIUS } from "./sky"
 
-const WATER_COLOR = "#2f7fb8"
+/**
+ * Per theme, because the water has to sit with the chrome as well as the map. These are what reaches the screen (the
+ * water skips tone mapping, which would clip the red to 0 and leave it fully saturated). Dark is deep and muted, so the
+ * pieces pop against it; light goes on thicker, so a pale piece's side faces stand off it.
+ */
+export const WATER_LOOKS = {
+  dark: { color: "#0e4a64", opacity: 0.35 },
+  light: { color: "#006aac", opacity: 0.42 }
+} as const
 
 /** Where the water starts to thin out (cm from the camera, along the surface) and where it has gone, with the grid. */
 const FADE_START = 8_000
@@ -43,11 +51,12 @@ const fadeWithDistance = (material: THREE.Material, extra?: string): void => {
 
 /** From above: an even translucent sheet, so pieces below it show tinted. */
 export const waterTopMaterial = new THREE.MeshBasicMaterial({
-  color: WATER_COLOR,
+  color: WATER_LOOKS.dark.color,
   transparent: true,
-  opacity: 0.35,
+  opacity: WATER_LOOKS.dark.opacity,
   depthWrite: false,
-  side: THREE.FrontSide
+  side: THREE.FrontSide,
+  toneMapped: false
 })
 fadeWithDistance(waterTopMaterial)
 
@@ -60,11 +69,12 @@ const UNDER_CLEAR = 0.08
  * wash everything out.
  */
 export const waterUnderMaterial = new THREE.MeshBasicMaterial({
-  color: WATER_COLOR,
+  color: WATER_LOOKS.dark.color,
   transparent: true,
   opacity: 0.5,
   depthWrite: false,
-  side: THREE.BackSide
+  side: THREE.BackSide,
+  toneMapped: false
 })
 fadeWithDistance(
   waterUnderMaterial,
@@ -72,14 +82,28 @@ fadeWithDistance(
   diffuseColor.a *= mix(1.0, ${UNDER_CLEAR}, sqrt(facing));`
 )
 
-const waterColor = new THREE.Color(WATER_COLOR)
+const waterColor = new THREE.Color(WATER_LOOKS.dark.color)
+let waterLight = 1
+
+const applyWaterColor = (): void => {
+  for (const material of [waterTopMaterial, waterUnderMaterial]) {
+    material.color.copy(waterColor).multiplyScalar(waterLight)
+  }
+}
+
+/** Gives the water `theme`'s look, keeping the light it is under. */
+export const setWaterTheme = (theme: keyof typeof WATER_LOOKS): void => {
+  const { color, opacity } = WATER_LOOKS[theme]
+  waterColor.set(color)
+  waterTopMaterial.opacity = opacity
+  applyWaterColor()
+}
 
 /**
  * The water is unlit, so the scene's lights don't reach it. `level` (0-1) dims it the way
  * the lights dim an up-facing surface: 1 under the studio lights, less at dusk or night.
  */
 export const setWaterLight = (level: number): void => {
-  for (const material of [waterTopMaterial, waterUnderMaterial]) {
-    material.color.copy(waterColor).multiplyScalar(level)
-  }
+  waterLight = level
+  applyWaterColor()
 }
