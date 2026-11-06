@@ -81,8 +81,9 @@ const addPanel = (api: DockviewApi, panel: DockPanel, inactive = false): IDockvi
   return api.addPanel({ ...panelOptions(panel), ...size, position: { referenceGroup: centre, direction: location } })
 }
 
+/** Each location's panels in registry order, the first in front: the rest join its group behind it. */
 const addDefaultPanels = (api: DockviewApi) => {
-  for (const panel of dockPanels) addPanel(api, panel)
+  for (const panel of dockPanels) addPanel(api, panel, true)
   const documents = api.getPanel(DOCUMENTS_PANEL)
   if (documents !== undefined) documents.group.api.setActive()
 }

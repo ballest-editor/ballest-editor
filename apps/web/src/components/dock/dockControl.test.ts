@@ -38,6 +38,8 @@ const fakeDock = (
 ) => {
   const calls: Array<string> = []
   const loads: Array<DockLayout> = []
+  /** The panels added without coming to the front of their group. */
+  const behind: Array<string> = []
   let overlay: OverlayListener = () => undefined
   let willMutate: (event: { readonly kind: string }) => void = () => undefined
   let panelAdded: (panel: GroupMember) => void = () => undefined
@@ -100,11 +102,13 @@ const fakeDock = (
       return side.length === 0 ? [group] : [group, sideGroup]
     },
     getPanel: (id: string) => open.get(id),
-    addPanel: ({ id, position }: {
+    addPanel: ({ id, inactive, position }: {
       readonly id: string
+      readonly inactive?: boolean
       readonly position?: { readonly direction?: string; readonly index?: number }
     }) => {
       calls.push(position?.direction === undefined ? `add ${id}` : `add ${id} ${position.direction}`)
+      if (inactive === true) behind.push(id)
       const added = fakePanel(id)
       const members = [...open.values()]
       const before = members.filter((member) => member.group === added.group)[position?.index ?? members.length]
@@ -154,7 +158,7 @@ const fakeDock = (
     }
   }
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a stand-in for the part of the API the dock uses
-  return { api: api as unknown as DockviewApi, calls, loads, overlay: (event: OverlayEvent) => overlay(event) }
+  return { api: api as unknown as DockviewApi, behind, calls, loads, overlay: (event: OverlayEvent) => overlay(event) }
 }
 
 const savedLayout = {
@@ -183,6 +187,12 @@ describe("the dock's layout on launch", () => {
       "add pieces",
       "add inspector right"
     ])
+  })
+
+  it("starts with the first panel of a group in front: the rest join behind it", () => {
+    const { api, behind } = fakeDock({ loaded: [] })
+    attachDock(api, panels)
+    assert.deepStrictEqual(behind, ["pieces"])
   })
 
   it("restores a saved layout, and a panel the user closed stays closed", () => {
