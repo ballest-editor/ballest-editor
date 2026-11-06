@@ -18,7 +18,7 @@
 :root {
     --background: oklch(0.956 0.004 250);
     --foreground: oklch(0.225 0.01 250);
-    --card: oklch(1 0 0);
+    --card: oklch(0.988 0.0015 250);
     --card-foreground: oklch(0.225 0.01 250);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.225 0.01 250);
@@ -30,7 +30,7 @@
     /* Text below --foreground, one step each: docs/design/ui-system.md. */
     --fg-secondary: oklch(0.355 0.012 250);
     --fg-tertiary: oklch(0.48 0.012 250);
-    --fg-disabled: oklch(0.7 0.01 250);
+    --fg-disabled: oklch(0.65 0.012 250);
     --accent: oklch(0.94 0.004 250);
     --accent-foreground: oklch(0.225 0.01 250);
     --destructive: oklch(0.52 0.18 27);

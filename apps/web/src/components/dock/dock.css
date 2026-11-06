@@ -92,8 +92,17 @@
   outline-offset: -4px;
 }
 
-/* A strip scrolls, so it clips: its icon buttons have room for the ring only with its outer edge on their own. */
-.dockview-theme-ballest .dv-tabs-and-actions-container [data-slot="button"] {
+/* Two pixels lower, the ring's bottom lies on the active tab's underline, where -4px would stack them into one thick bar. */
+.dockview-theme-ballest .dv-tab.dv-active-tab:focus-visible::after,
+.dock-active-tab {
+  outline-offset: -2px;
+}
+
+/*
+ * A strip scrolls, so it clips: its icon buttons have room for the ring only with its outer edge on their own. By element,
+ * as a tooltip or menu trigger puts its own `data-slot` on the button.
+ */
+.dockview-theme-ballest .dv-tabs-and-actions-container button {
   outline-offset: -2px;
 }
 

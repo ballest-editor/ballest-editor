@@ -185,7 +185,7 @@ function ValidationList({ errors, warnings }: MapValidation) {
     ...warnings.map((text) => ({ text, icon: <WarningIcon /> }))
   ]
   return (
-    <ScrollArea className="rounded-surface bg-muted [&_[data-slot=scroll-area-viewport]]:max-h-48">
+    <ScrollArea className="rounded-surface bg-muted ring-edge not-dark:ring-1 [&_[data-slot=scroll-area-viewport]]:max-h-48">
       <ul className="flex flex-col gap-1 p-2 text-fg-secondary select-text">
         {rows.map(({ icon, text }) => (
           <li key={text} className="flex gap-1.5">

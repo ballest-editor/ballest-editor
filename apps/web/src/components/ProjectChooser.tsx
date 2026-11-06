@@ -31,8 +31,8 @@ import { HeroBand } from "./HeroBand"
 import { Logo } from "./Logo"
 import { SectionTitle } from "./SectionTitle"
 
-/** A card on the start screen. */
-const CARD = "rounded-surface border border-border bg-card"
+/** A card on the start screen. In light it floats, on the edge and shadow of what floats; in dark, on a hairline. */
+const CARD = "rounded-surface bg-card ring-edge not-dark:shadow-md not-dark:ring-1 dark:border dark:border-border"
 
 /** A recent project's "…": what a click on its row doesn't do. */
 function RecentMenu({ project, elsewhere }: { readonly project: RecentProject; readonly elsewhere: boolean }) {
