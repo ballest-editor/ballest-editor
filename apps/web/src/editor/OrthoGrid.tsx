@@ -3,7 +3,7 @@ import * as THREE from "three"
 import { threeToUeVector } from "../domain/coords"
 import { axisOf, dot, gridLevels, MAX_GRID_LEVELS, ORTHO_AXES } from "../domain/orthoView"
 import { gridColorsOf } from "../domain/Settings"
-import { AXIS_COLORS } from "./axisColors"
+import { sceneAxisColors } from "./axisColors"
 import { orthographicOnly } from "./paneCameras"
 import { useBeforePaneDraw } from "./PaneRenderer"
 import { useEditor } from "./store"
@@ -116,8 +116,9 @@ export function OrthoGrid() {
       const level = levels[i]
       slot.set(level?.size ?? 0, level?.opacity ?? 0, level?.section === true ? 1 : 0)
     })
-    uniforms.uAxisAcross.value.set(AXIS_COLORS[axisOf(right).axis])
-    uniforms.uAxisUp.value.set(AXIS_COLORS[axisOf(up).axis])
+    const axisColors = sceneAxisColors(dark)
+    uniforms.uAxisAcross.value.set(axisColors[axisOf(right).axis])
+    uniforms.uAxisUp.value.set(axisColors[axisOf(up).axis])
     material.uniformsNeedUpdate = true
   })
 

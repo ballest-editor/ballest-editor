@@ -32,7 +32,7 @@ import { droppedPrefab, isPrefabDrag } from "./prefabDrag"
 import { GROUP_BOX_COLORS, SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
-import { SelectionOutline } from "./selectionOutline"
+import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
 import { groupBoxOf, type SelectMode, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
@@ -293,7 +293,7 @@ function GameClock() {
   return null
 }
 
-/** Outline along a selected item's mesh edges (see selectionOutline.ts); the active item draws lighter. */
+/** Outline along a selected item's mesh edges (see selectionOutline.ts); the active item draws apart. */
 function SelectedOutline({ id, active }: { readonly id: string; readonly active: boolean }) {
   const outline = useMemo(() => new SelectionOutline(), [])
   useFrame(() => {
@@ -311,6 +311,8 @@ function SelectedOutline({ id, active }: { readonly id: string; readonly active:
 
 function SelectedOutlines() {
   const selectedIds = useEditor((s) => s.selectedIds)
+  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
+  useEffect(() => setOutlineTheme(dark), [dark])
   const active = selectedIds.at(-1)
   return selectedIds.map((id) => <SelectedOutline key={id} id={id} active={id === active} />)
 }

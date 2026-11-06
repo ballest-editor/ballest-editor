@@ -1,8 +1,16 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
 import { ueToThreeVector, type Vec3 } from "../domain/coords"
-import { type OrthoView, orthoViews } from "../domain/viewLayout"
-import { forgetClosedTabs, orthographicOnly, PaneCamera, paneCamerasOf, perspectiveOnly } from "./paneCameras"
+import { type OrthoView, orthoViews, paneClose, paneCloseColumn } from "../domain/viewLayout"
+import {
+  changePanes,
+  forgetClosedTabs,
+  orthographicOnly,
+  PaneCamera,
+  paneCamerasOf,
+  perspectiveOnly
+} from "./paneCameras"
+import { useEditor } from "./store"
 
 const WIDTH = 800
 const HEIGHT = 600
@@ -179,5 +187,25 @@ describe("a tab's panes", () => {
     assert.notStrictEqual(paneCamerasOf("tab-b")[0], first[0])
     forgetClosedTabs(["tab-b"])
     assert.notStrictEqual(paneCamerasOf("tab-a"), first)
+  })
+
+  it("keeps a pane's camera and its being active when the pane beside it closes", () => {
+    const { tabId, setViewLayoutKind, setActivePane } = useEditor.getState()
+    setViewLayoutKind("columns")
+    setActivePane(1)
+    const right = paneCamerasOf(tabId)[1]
+    changePanes(paneClose(0))
+    assert.strictEqual(paneCamerasOf(tabId)[0], right)
+    assert.strictEqual(useEditor.getState().viewLayout.kind, "single")
+    assert.strictEqual(useEditor.getState().activePane, 0)
+  })
+
+  it("makes the first pane left active when the active one closes", () => {
+    const { setViewLayoutKind, setActivePane } = useEditor.getState()
+    setViewLayoutKind("quad")
+    setActivePane(3)
+    changePanes(paneCloseColumn(3))
+    assert.strictEqual(useEditor.getState().viewLayout.kind, "rows")
+    assert.strictEqual(useEditor.getState().activePane, 0)
   })
 })

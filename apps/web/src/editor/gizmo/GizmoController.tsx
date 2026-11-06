@@ -6,11 +6,11 @@ import { applyGroupDelta } from "../../domain/groupTransform"
 import { chordOf } from "../../domain/Keybinds"
 import { localToWorld } from "../../domain/pivot"
 import { transformSelection } from "../actions"
-import { AXIS_COLORS } from "../axisColors"
 import { type PaneCamera, type PanePointer, panePointer } from "../paneCameras"
 import { useBeforePaneDraw } from "../PaneRenderer"
 import { sceneRegistry } from "../sceneRegistry"
 import { activeId, fitTransforms, pivotOf, shownTransform, useEditor } from "../store"
+import { useDarkTheme } from "../theme"
 import { dragAxisWorld, dragDelta, type DragStart, type PointerSample } from "./drag"
 import { GizmoObject, toolHandles } from "./handles"
 
@@ -104,6 +104,8 @@ export function GizmoController() {
   const gl = useThree((s) => s.gl)
   const tool = useEditor((s) => s.tool)
   const gizmo = useMemo(() => (tool === "select" ? null : new GizmoObject(toolHandles[tool])), [tool])
+  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
+  useEffect(() => gizmo?.setDark(dark), [gizmo, dark])
   const hovered = useRef<string | null>(null)
   /** The pane `hovered` is in. */
   const hoverSlot = useRef<number | null>(null)
@@ -234,7 +236,7 @@ export function GizmoController() {
       const axis = spec.kind === "translateAxis" || spec.kind === "scaleAxis" || spec.kind === "rotateAxis"
         ? dragAxisWorld(start)
         : undefined
-      gizmo.setGuide(originWorld, axis, spec.axis === undefined ? undefined : new THREE.Color(AXIS_COLORS[spec.axis]))
+      gizmo.setGuide(originWorld, axis, spec.axis)
     }
 
     const onPointerMove = (e: PointerEvent) => {

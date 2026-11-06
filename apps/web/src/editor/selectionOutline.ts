@@ -129,16 +129,27 @@ ${
 
 /**
  * Shared by every outline line; two small materials for the editor's lifetime. The active
- * item (the one the gizmo and inspector follow) draws lighter, as in Blender.
+ * item (the one the gizmo and inspector follow) stands further from the scene: lighter on a
+ * dark one, as in Blender, and darker on a pale one, where amber can't be read.
  */
-export const OUTLINE_COLORS = { selected: "#ffb020", active: "#ffe08a" } as const
+export const OUTLINE_COLORS = {
+  dark: { selected: "#ffb020", active: "#ffe08a" },
+  light: { selected: "#c2500a", active: "#7a2e05" }
+} as const
 const silhouetteMaterial = (color: string): THREE.LineBasicMaterial => {
   const material = new THREE.LineBasicMaterial({ color, toneMapped: false })
   material.onBeforeCompile = silhouetteShader
   return material
 }
-const outlineMaterial = silhouetteMaterial(OUTLINE_COLORS.selected)
-const activeOutlineMaterial = silhouetteMaterial(OUTLINE_COLORS.active)
+const outlineMaterial = silhouetteMaterial(OUTLINE_COLORS.dark.selected)
+const activeOutlineMaterial = silhouetteMaterial(OUTLINE_COLORS.dark.active)
+
+/** Recolours every outline for the theme. */
+export const setOutlineTheme = (dark: boolean): void => {
+  const colors = dark ? OUTLINE_COLORS.dark : OUTLINE_COLORS.light
+  outlineMaterial.color.set(colors.selected)
+  activeOutlineMaterial.color.set(colors.active)
+}
 
 const inverse = new THREE.Matrix4()
 
@@ -149,7 +160,7 @@ export class SelectionOutline extends THREE.Group {
   /**
    * Matches the lines to the meshes under `item` (the outline itself holds no meshes) and
    * places each in `item`'s local space. Cheap enough per frame: glbs load async, so the
-   * caller keeps it fresh. `active` picks the lighter colour.
+   * caller keeps it fresh. `active` picks the active item's colour.
    */
   update(item: THREE.Object3D, active = false): void {
     item.updateMatrixWorld(true)

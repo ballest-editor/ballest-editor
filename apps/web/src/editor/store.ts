@@ -93,10 +93,12 @@ import type { Surfaces } from "../domain/surface"
 import {
   clampSplit,
   defaultViewLayout,
+  type PaneChange,
   paneCountOf,
   type ViewLayout,
   type ViewLayoutKind,
-  type ViewProjection
+  type ViewProjection,
+  withPaneChange
 } from "../domain/viewLayout"
 import type { LoadedCatalog } from "../services/CatalogLoader"
 import type {
@@ -601,6 +603,8 @@ export interface EditorState extends TabState {
   readonly setViewLayoutKind: (kind: ViewLayoutKind) => void
   /** Moves the dividers, as shares of the viewport; each is held off the edges (`clampSplit`). */
   readonly setPaneSplit: (split: { readonly x?: number; readonly y?: number }) => void
+  /** Splits or closes panes. Their cameras move with them: use `changePanes` (editor/paneCameras). */
+  readonly applyPaneChange: (change: PaneChange) => void
   /** What the pane in `slot` looks along. */
   readonly setPaneProjection: (slot: number, projection: ViewProjection) => void
   readonly setActivePane: (slot: number) => void
@@ -1254,6 +1258,14 @@ export const useEditor = create<EditorState>()((set, get) => {
           splitY: y === undefined ? s.viewLayout.splitY : clampSplit(y)
         }
       })),
+    applyPaneChange: (change) =>
+      set((s) => {
+        const slot = change.order.findIndex((from) => from === s.activePane)
+        return {
+          viewLayout: withPaneChange(s.viewLayout, change),
+          activePane: slot < paneCountOf(change.kind) ? slot : 0
+        }
+      }),
     setPaneProjection: (slot, projection) =>
       set((s) => {
         const [a, b, c, d] = s.viewLayout.projections
