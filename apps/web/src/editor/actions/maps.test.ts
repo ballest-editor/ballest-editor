@@ -36,7 +36,9 @@ describe("view layouts", () => {
       assert.strictEqual(s().viewLayout.kind, "single")
       s().setViewLayoutKind("quad")
       s().setPaneProjection(0, "left")
-      s().setPaneSplit({ x: 0.3 })
+      s().setPaneSplit({ x: 0.3, y: 0.6 })
+      s().setPaneDisplay(1, "sky", true)
+      s().togglePaneMaximised(1)
       yield* saveTabPrefs()
       const left = s().viewLayout
 
@@ -47,6 +49,7 @@ describe("view layouts", () => {
       yield* reset
       yield* openProjectMapFile(first)
       assert.deepStrictEqual(s().viewLayout, left)
+      assert.strictEqual(s().activePane, 1)
     }).pipe(Effect.provide(layerFor(files)))
   })
 

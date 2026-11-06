@@ -18,6 +18,7 @@ import {
   initialMap,
   nextSelection,
   nodeNamesOf,
+  paneDisplayIn,
   pivotOf,
   shownLighting,
   shownTransform,
@@ -1329,6 +1330,58 @@ describe("view panes", () => {
     assert.strictEqual(state().activePane, 1)
     state().setViewLayoutKind("single")
     assert.strictEqual(state().activePane, 0)
+  })
+
+  it("makes a maximised pane the active one, and keeps it there going back", () => {
+    resetStore()
+    state().setViewLayoutKind("quad")
+    state().togglePaneMaximised(2)
+    assert.strictEqual(state().viewLayout.maximised, 2)
+    assert.strictEqual(state().activePane, 2)
+    state().togglePaneMaximised(2)
+    assert.isUndefined(state().viewLayout.maximised)
+    assert.strictEqual(state().viewLayout.kind, "quad")
+    assert.strictEqual(state().activePane, 2)
+  })
+
+  it("picking a layout ends a maximised pane", () => {
+    resetStore()
+    state().setViewLayoutKind("quad")
+    state().togglePaneMaximised(3)
+    state().setViewLayoutKind("columns")
+    assert.isUndefined(state().viewLayout.maximised)
+    assert.strictEqual(state().activePane, 1)
+  })
+
+  it("opens on the pane a map was left maximised on", () => {
+    resetStore()
+    const viewLayout = { ...defaultViewLayout, kind: "quad" as const, maximised: 3 as const }
+    state().loadMap(initialMap(), null, undefined, { viewLayout })
+    assert.strictEqual(state().activePane, 3)
+  })
+
+  it("resolves what a pane shows against the Display popover", () => {
+    resetStore()
+    state().setViewLayoutKind("quad")
+    state().setPaneDisplay(0, "sky", false)
+    state().setPaneDisplay(1, "sky", true)
+    assert.isFalse(paneDisplayIn(state(), 0).sky)
+    assert.isTrue(paneDisplayIn(state(), 1).sky)
+    assert.isTrue(paneDisplayIn(state(), 0).grid)
+    state().setPaneDisplay(0, "sky", true)
+    assert.deepStrictEqual(state().viewLayout.overrides, [{}, { sky: true }, {}, {}])
+  })
+
+  it("keeps a tab's dividers while another tab is in front", () => {
+    resetStore()
+    const { first, second } = twoTabs()
+    state().setViewLayoutKind("quad")
+    state().setPaneSplit({ x: 0.3, y: 0.7 })
+    state().activateTab(first)
+    assert.strictEqual(state().viewLayout.splitX, 0.5)
+    state().activateTab(second)
+    assert.strictEqual(state().viewLayout.splitX, 0.3)
+    assert.strictEqual(state().viewLayout.splitY, 0.7)
   })
 
   it("keeps what a hidden slot looks along", () => {
