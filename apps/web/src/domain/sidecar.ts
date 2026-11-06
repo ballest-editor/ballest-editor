@@ -233,13 +233,21 @@ export const loadStructure = (map: MapFile, mapHash: string, sidecar: MapSidecar
   }
 }
 
-/** Whether `map` holds the items `sidecar` was written for, in their order: the same class at every place. */
+const classOfPrint = (print: string | undefined) => print?.split("|")[0]
+
+/**
+ * Whether `map` holds the items `sidecar` was written for, in their order: the same class at every place, and no item
+ * that left its place showing up unchanged at another's, which is a delete and an add of that class and not a move.
+ */
 const sameItemsInOrder = (map: MapFile, sidecar: MapSidecar) => {
   const entries = Object.values(sidecar.items)
-  return entries.length === map.items.length && entries.every(({ fingerprint, index }) => {
-    const item = map.items[index]
-    return item !== undefined && fingerprintOf(item).split("|")[0] === fingerprint.split("|")[0]
-  })
+  if (entries.length !== map.items.length) return false
+  const prints = map.items.map(fingerprintOf)
+  const moved = entries.filter(({ fingerprint, index }) => prints[index] !== fingerprint)
+  const landed = new Set(moved.map(({ index }) => prints[index]))
+  return moved.every(({ fingerprint, index }) =>
+    classOfPrint(prints[index]) === classOfPrint(fingerprint) && !landed.has(fingerprint)
+  )
 }
 
 /**

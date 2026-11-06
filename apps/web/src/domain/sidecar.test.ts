@@ -140,6 +140,24 @@ describe("loadStructure", () => {
     assert.isNull(loadGameStructure(map, OTHER_HASH, null).structure.items.get("") ?? null)
   })
 
+  it("doesn't shift identities when a save deleted one item and added another of its class", () => {
+    const { keys, map, sidecar } = authored()
+    const [first, , third, fourth, fifth] = map.items
+    const loaded = loadGameStructure(mapOf([first!, third!, fourth!, fifth!, at(900)]), OTHER_HASH, sidecar)
+    assert.deepStrictEqual(loaded.ids.slice(0, 4), [keys.k0, keys.k2, keys.k3, keys.k4])
+    assert.notInclude(loaded.ids, keys.k1)
+    assert.isUndefined(loaded.structure.items.get(loaded.ids[4]!))
+    assert.deepStrictEqual(loaded.structure.items.get(keys.k2), { tags: ["tagged"] })
+    assert.strictEqual(loaded.unmatched, 1)
+  })
+
+  it("keeps twins apart when a save moved one of them", () => {
+    const map = mapOf([at(5), at(5)])
+    const { ids, structure } = structureOfMap(map)
+    const sidecar = sidecarOf(map, ids, structure, HASH)
+    assert.deepStrictEqual(loadGameStructure(mapOf([at(5000), at(5)]), OTHER_HASH, sidecar).ids, ids)
+  })
+
   it("gives each of two close entries its nearest item", () => {
     const map = mapOf([at(0), at(0.5)])
     const { ids, structure } = structureOfMap(map)
