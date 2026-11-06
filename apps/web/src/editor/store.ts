@@ -113,6 +113,7 @@ import {
 } from "../domain/structure"
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import type { Surfaces } from "../domain/surface"
+import { isSamePoint, trackedIn, trackedOn } from "../domain/trackedPoints"
 import { sameVec, vecAdd, vecSub } from "../domain/ueMath"
 import { type MapValidation, validateMap } from "../domain/validateMap"
 import {
@@ -796,7 +797,8 @@ export interface EditorState extends TabState {
   /** Gives the active tab its own snap settings. A map's are an unsaved change; a definition's go in the editor's prefs. */
   readonly setTabSnap: (snap: SnapConfig) => void
   /** Adds a point to the ones tracking keeps, the oldest going past the setting. */
-  readonly acquireTracked: (point: TrackedPoint) => void
+  /** Acquires `point`, which belongs to the item `item` when it was found on one. */
+  readonly acquireTracked: (point: TrackedPoint, item?: string) => void
   readonly clearTracked: () => void
   readonly setSnapFeedback: (feedback: SnapFeedback | null) => void
   readonly setSnapPopoverOpen: (open: boolean) => void
@@ -1163,7 +1165,9 @@ export const useEditor = create<EditorState>()((set, get) => {
       }
       set((s) => {
         if (into === "addedTab" && (interacting(s) || duplicateDragBase !== null)) return s
-        const shown = { ...tab, ...leftBehind, mapShownRequest: s.mapShownRequest + 1 }
+        // a re-import keeps its items' keys, so their points stay on them; another map's keys are all new
+        const tracked = s.tracked.filter(({ on }) => on !== undefined)
+        const shown = { ...tab, ...leftBehind, tracked, mapShownRequest: s.mapShownRequest + 1 }
         if (noTabOpen(s)) return { ...shown, tabIds: [s.tabId] }
         if (into === "newTab" ? isBlankTab(s) : into !== "addedTab") return shown
         const tabId = freshTabId()
@@ -1690,10 +1694,11 @@ export const useEditor = create<EditorState>()((set, get) => {
           dirty: s.document.kind === "map" && !isBlankTab(s) ? s.doc !== s.savedDoc || snap !== s.savedSnap : s.dirty
         }
       ),
-    acquireTracked: (point) =>
+    acquireTracked: (point, item) =>
       set((s) => {
-        if (s.tracked.some(({ at }) => sameVec(at, point.at))) return s
-        return { tracked: [...s.tracked, point].slice(-snapConfigOf(s).targets.tracking.keep) }
+        if (s.tracked.some(({ at }) => isSamePoint(at, point.at))) return s
+        const acquired = item === undefined ? point : trackedOn(s.doc, point, item)
+        return { tracked: [...s.tracked, acquired].slice(-snapConfigOf(s).targets.tracking.keep) }
       }),
     clearTracked: () => set({ tracked: [] }),
     setSnapFeedback: (snapFeedback) => set({ snapFeedback }),
@@ -1860,6 +1865,13 @@ export const tabLabelOf = (tab: TabState): string => {
 
 export const tabWithPrefab = (s: EditorState, ref: PrefabRef): string | undefined =>
   tabsWhere(s, ({ document }) => document.kind === "prefab" && isSamePrefab(document, ref))[0]
+
+// Every change to a document, from any path, ends here, and this hears of it first. A preview isn't such a change.
+useEditor.subscribe((s, before) => {
+  if (s.doc === before.doc) return
+  const tracked = trackedIn(s.doc, s.tracked)
+  if (tracked !== s.tracked) useEditor.setState({ tracked })
+})
 
 /** A document and the selection that goes with it. */
 interface DocState {

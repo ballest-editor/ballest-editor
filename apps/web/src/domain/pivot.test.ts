@@ -16,7 +16,8 @@ import {
   pivotBoundsOf,
   type PivotChoice,
   pivotFor,
-  pivotPointOnBounds
+  pivotPointOnBounds,
+  worldToLocal
 } from "./pivot"
 
 const isChoice = (c: string): c is PivotChoice => (PIVOT_CHOICES as ReadonlyArray<string>).includes(c)
@@ -42,6 +43,8 @@ describe("pivot points", () => {
     const yaw90 = { x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 } // game X turns to game Y
     const t = { translation: { x: 10, y: 20, z: 30 }, rotation: yaw90, scale3D: { x: 2, y: 1, z: 3 } }
     expectVec(localToWorld(t, { x: 5, y: 0, z: 1 }), { x: 10, y: 30, z: 33 })
+    expectVec(worldToLocal(t, { x: 10, y: 30, z: 33 }), { x: 5, y: 0, z: 1 })
+    expectVec(worldToLocal({ ...t, scale3D: { x: 0, y: 1, z: 3 } }, { x: 10, y: 30, z: 33 }), { x: 0, y: 0, z: 1 })
   })
 })
 

@@ -137,6 +137,95 @@ describe("tracked points", () => {
     s.clearTracked()
     assert.lengthOf(useEditor.getState().tracked, 0)
   })
+
+  const atOf = (index = 0) => useEditor.getState().tracked[index]?.at ?? ORIGIN
+
+  /** `b` acquired 100 cm along X from its origin, and a point on nothing. */
+  const acquired = () => {
+    const { a, b } = load()
+    const s = useEditor.getState()
+    s.acquireTracked({ at: { x: 600, y: 0, z: 0 }, label: "Corner" }, b)
+    s.acquireTracked({ at: { x: 7, y: 8, z: 9 }, label: "Crossing" })
+    return { a, b }
+  }
+
+  it("goes with its item, and leaves a point on nothing where it is", () => {
+    const { b } = acquired()
+    useEditor.getState().transformItems(new Map([[b, identityTransform({ x: 500, y: 300, z: 0 })]]))
+    assertVec(atOf(0), { x: 600, y: 300, z: 0 }, "the point")
+    assertVec(atOf(1), { x: 7, y: 8, z: 9 }, "the point")
+  })
+
+  it("turns and mirrors with its item", () => {
+    const { b } = acquired()
+    const turned = {
+      ...identityTransform({ x: 500, y: 0, z: 0 }),
+      rotation: rotatorToQuat({ pitch: 0, yaw: 90, roll: 0 }),
+      scale3D: { x: -2, y: 1, z: 1 }
+    }
+    useEditor.getState().transformItems(new Map([[b, turned]]))
+    assertVec(atOf(), { x: 500, y: -200, z: 0 }, "the point")
+  })
+
+  it("comes back with an undo, and goes again with the redo", () => {
+    const { b } = acquired()
+    useEditor.getState().transformItems(new Map([[b, identityTransform({ x: 500, y: 300, z: 0 })]]))
+    useEditor.getState().undo()
+    assertVec(atOf(), { x: 600, y: 0, z: 0 }, "the point")
+    useEditor.getState().redo()
+    assertVec(atOf(), { x: 600, y: 300, z: 0 }, "the point")
+  })
+
+  it("stays put through a preview, which isn't the document", () => {
+    const { b } = acquired()
+    useEditor.getState().setPreview(new Map([[b, identityTransform({ x: 500, y: 300, z: 0 })]]))
+    assertVec(atOf(), { x: 600, y: 0, z: 0 }, "the point")
+  })
+
+  it("stays the one point when it is hovered again where its item took it", () => {
+    const { b } = acquired()
+    const s = useEditor.getState()
+    s.transformItems(
+      new Map([[b, {
+        ...identityTransform({ x: 500, y: 0, z: 0 }),
+        rotation: rotatorToQuat({ pitch: 0, yaw: 33, roll: 0 })
+      }]])
+    )
+    const at = atOf()
+    s.acquireTracked({ at: { ...at, x: at.x + 1e-9 }, label: "Corner" }, b)
+    assert.lengthOf(useEditor.getState().tracked, 2)
+  })
+
+  it("goes when its item is deleted, and an undo doesn't bring it back", () => {
+    const { b } = acquired()
+    const s = useEditor.getState()
+    s.select([b])
+    s.deleteSelection()
+    assert.deepStrictEqual(useEditor.getState().tracked.map(({ label }) => label), ["Crossing"])
+    useEditor.getState().undo()
+    assert.deepStrictEqual(useEditor.getState().tracked.map(({ label }) => label), ["Crossing"])
+  })
+
+  it("goes when another map replaces the one it was on", () => {
+    acquired()
+    load()
+    assert.lengthOf(useEditor.getState().tracked, 0)
+  })
+
+  it("follows its item through a re-import, which keeps the item's key, and a point on nothing goes", () => {
+    const { b } = acquired()
+    const { doc } = useEditor.getState()
+    const items = doc.map.items.map((item, i) =>
+      doc.ids[i] === b
+        ? { ...item, itemTransform: { ...item.itemTransform, translation: { x: 500, y: 300, z: 0 } } }
+        : item
+    )
+    useEditor.getState().loadMap({ ...doc.map, items }, null, undefined, {
+      loaded: { ids: doc.ids, structure: doc.structure }
+    })
+    assert.lengthOf(useEditor.getState().tracked, 1)
+    assertVec(atOf(), { x: 600, y: 300, z: 0 }, "the point")
+  })
 })
 
 describe("construction and measurements", () => {

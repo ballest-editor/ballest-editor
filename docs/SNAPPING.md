@@ -73,7 +73,7 @@ The geometry of other items: their meshes or, cheaper, their bounds. This is the
 
 Parameters:
 
-- **Elements**, each its own toggle: bounds corners, bounds face centres, bounds faces, vertices, sharp edges, edge midpoints, face centres, faces. Bounds is on by default and costs nothing, since every catalog piece has bounds. The mesh elements are on by default too and come from the piece's mesh as the renderer has it.
+- **Elements**, each its own toggle: bounds corners, bounds face centres, bounds faces, vertices where sharp edges meet, sharp edges, edge midpoints, face centres, faces. Bounds is on by default and costs nothing, since every catalog piece has bounds. The mesh elements are on by default too and come from the piece's mesh as the renderer has it.
 - **Sharp edge angle**: an edge counts when its two faces meet at more than this angle. Default 30°. Below it, flat faces would offer their triangulation as edges, which is never wanted.
 - **Occlusion**: In front only (the default), or Through pieces. In front only means a target hidden behind a surface from the active pane's camera doesn't count, so a drag can't land on a vertex the user can't see.
 - **Rotate to face**: Keep rotation (the default), Upright on the face, or Align to the face's normal. Upright turns the item about Z only, so its +X faces out of the face and it stays standing: a lamp on a wall. Align is Unreal's "rotate to surface normal": its +Z leaves the face, and a decal or a light placed on a slope faces out of it.
@@ -89,7 +89,7 @@ They snap like geometry: the base lands on the plane or the axis, and an axis cr
 
 #### Tracking
 
-The CAD answer to "alignment guides, in 3D". Hovering a vertex, corner, face centre or connector end for a moment acquires it: a small plus mark appears on it, and it stays acquired until a few more are acquired after it (the default keeps 6) or the user clears them (Escape with nothing being dragged, or a button in the popover).
+The CAD answer to "alignment guides, in 3D". Hovering a vertex, corner, face centre or connector end for a moment acquires it: a small plus mark appears on it, and it stays acquired until a few more are acquired after it (the default keeps 6) or the user clears them (Escape with nothing being dragged, or a button in the popover). An acquired point belongs to its piece: it goes with the piece through a move, a turn, a mirror, an undo or a re-import from the game, and goes away when the piece is deleted or another map takes its place. During a drag it stays where the document has it until the drag lands.
 
 While dragging, lines through each acquired point along the world's X, Y and Z axes (or the grid's, when the grid is rotated) are targets: the base stops on one as it crosses it, and appears on it with the line drawn. Where two lines cross, the crossing is a point target. Near an acquired point on the pane's view direction, the line along that direction is offered too, which is how an ortho pane puts something straight above a point.
 

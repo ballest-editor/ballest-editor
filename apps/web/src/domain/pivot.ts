@@ -14,7 +14,7 @@ import { type Bounds, type CatalogIndex, type CatalogPiece, visibleExtras } from
 import type { UeTransform, Vec3 } from "./coords"
 import type { Item, ItemPivot, MapFile } from "./MapFile"
 import { mirrorScaleOf } from "./mirror"
-import { ORIGIN, rotateVec } from "./ueMath"
+import { ORIGIN, quatConjugate, rotateVec, vecSub } from "./ueMath"
 
 /** In the order the game's inspector lays them out. */
 export const PIVOT_CHOICES = ["Default", "Center", "Bottom", "Top", "Left", "Right", "Back", "Front"] as const
@@ -152,4 +152,12 @@ export const localToWorld = (t: UeTransform, local: Vec3): Vec3 => {
   const s = t.scale3D
   const r = rotateVec(t.rotation, { x: local.x * s.x, y: local.y * s.y, z: local.z * s.z })
   return { x: t.translation.x + r.x, y: t.translation.y + r.y, z: t.translation.z + r.z }
+}
+
+/** The local point `localToWorld` takes to `world`; an axis scaled to nothing has no depth, so the point is at 0 on it. */
+export const worldToLocal = (t: UeTransform, world: Vec3): Vec3 => {
+  const s = t.scale3D
+  const r = rotateVec(quatConjugate(t.rotation), vecSub(world, t.translation))
+  const unscaled = (value: number, scale: number) => scale === 0 ? 0 : value / scale
+  return { x: unscaled(r.x, s.x), y: unscaled(r.y, s.y), z: unscaled(r.z, s.z) }
 }
