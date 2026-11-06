@@ -1,11 +1,8 @@
 // The updater's state transitions, as plain functions of the state (see `UpdateState` in packages/contracts).
-import type { ReleaseNoteBlock, UpdateState } from "@ballest/contracts"
+import { type ReleaseNoteBlock, RELEASES_URL, type UpdateState } from "@ballest/contracts"
 import { Option, Predicate } from "effect"
 import type { UpdateInfo } from "../electron/ElectronUpdater"
 import { releaseNotesToBlocks } from "./releaseNotes"
-
-/** This repository's GitHub Releases, the feed the packaged app checks. */
-export const RELEASES_URL = "https://github.com/ballest-editor/ballest-editor/releases"
 
 /** A newer release, as the page shows it. */
 export interface Release {

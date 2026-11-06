@@ -22,9 +22,10 @@ import {
 } from "../editor/actions"
 import { warmCatalog } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
-import { type Dialog, projectTitleOf, useEditor, useOpenMapLabel } from "../editor/store"
+import { type Dialog, projectTitleOf, projectUnsavedOf, useEditor, useOpenMapLabel } from "../editor/store"
 import { watchResolvedTheme } from "../editor/theme"
 import { useActionKeys } from "../editor/useActionKeys"
+import { AboutDialog } from "./AboutDialog"
 import { Dock } from "./dock/Dock"
 import { blurChromeAfterClick } from "./dock/popoutWindow"
 import { GameLinkDialog } from "./GameLinkDialog"
@@ -68,17 +69,18 @@ const useMotion = () => {
 
 /**
  * The OS window's title. On desktop it is the project, as the top bar says, so the taskbar and alt-tab tell windows
- * apart. A browser, which has no project, shows the open map, marked while it has unsaved changes.
+ * apart. A browser, which has no project, shows the open map. Either is marked while it has unsaved changes.
  */
 const useDocumentTitle = () => {
   const label = useOpenMapLabel()
   const dirty = useEditor((s) => s.dirty)
   const project = useEditor(projectTitleOf)
+  const projectUnsaved = useEditor(projectUnsavedOf)
   useEffect(() => {
     document.title = project === null
       ? `${dirty ? "• " : ""}${label} — Ballest Editor`
-      : `${project} – Ballest Editor`
-  }, [label, dirty, project])
+      : `${projectUnsaved ? "• " : ""}${project} – Ballest Editor`
+  }, [label, dirty, project, projectUnsaved])
 }
 
 /**
@@ -170,6 +172,7 @@ export function Editor() {
         onClose={close}
       />
       <GameLinkDialog open={dialog === "gameLink"} onClose={close} />
+      <AboutDialog open={dialog === "about"} onClose={close} />
       <NewProjectDialog open={dialog === "newProject"} onClose={close} />
       <WhereToOpenDialog open={dialog === "whereToOpen"} onClose={close} />
       <ProjectChooser />

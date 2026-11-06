@@ -221,8 +221,9 @@ export interface ImportClash {
  *   (browser: Export). `afterSave` is what the unsaved-changes prompt's Save (or Export, Play) goes on to do once the
  *   map is saved: the dialog takes it before it closes itself to save, its Cancel drops it, and so does any other
  *   dialog opening in its place.
- * - `rename`, `duplicate` and `recover` are the Project panel's per-map items (desktop); `gameLink` is File › Game
- *   link….
+ * - `rename`, `duplicate` and `recover` are the Project panel's per-map items (desktop); `gameLink` opens by itself
+ *   when a folder Export needs is missing.
+ * - `keybinds` and `about` are the Help menu's: the cheat sheet, staying open, and the version.
  * - `settings` opens on `category`, or on the page it last showed (`settingsCategory`).
  * - `projectSettings` opens Project settings on the project's page, `mapSettings` on the open map's entry in it.
  * - `replacePublished`, `overwriteChanged` and `importClash` ask about what Export, Play or Import found.
@@ -237,6 +238,8 @@ export type DialogState =
       | "projectSettings"
       | "mapSettings"
       | "gameLink"
+      | "keybinds"
+      | "about"
       | "newProject"
       | "newDraft"
       | "recover"
@@ -1287,9 +1290,13 @@ export const isChooserRequired = (s: Pick<EditorState, "project">): boolean => s
 export const isModalOpen = (s: Pick<EditorState, "dialog" | "project">): boolean =>
   s.dialog !== null || isChooserRequired(s)
 
-/** The window's title on desktop: the project, starred while it is Untitled Project; null without a project state. */
+/** The window's title on desktop: the project; null without a project state. */
 export const projectTitleOf = (s: Pick<EditorState, "project">): string | null =>
-  s.project === null ? null : s.project.current?.name ?? "Untitled Project *"
+  s.project === null ? null : s.project.current?.name ?? "Untitled Project"
+
+/** Whether the window's title carries the unsaved dot: Untitled Project has nothing on disk, or a tab has edits. */
+export const projectUnsavedOf = (s: EditorState): boolean =>
+  s.project !== null && (s.project.current === null || dirtyTabs(s).length > 0)
 
 export const tabLabels = (s: EditorState): ReadonlyArray<string> =>
   s.tabIds.flatMap((id) => {

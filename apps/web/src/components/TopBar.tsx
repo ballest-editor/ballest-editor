@@ -1,13 +1,22 @@
 import { IconPlayerPlayFilled } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
-import { Kbd } from "@workspace/ui/components/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import { cn } from "@workspace/ui/lib/utils"
-import { formatBinding } from "../domain/Keybinds"
 import { playMap } from "../editor/actions"
-import { PREFAB_TAB_STAYS_HERE, projectTitleOf, useEditor, useOpenPrefab } from "../editor/store"
+import {
+  PREFAB_TAB_STAYS_HERE,
+  projectTitleOf,
+  projectUnsavedOf,
+  useEditor,
+  useOpenPrefab,
+  useOpenProjectMap
+} from "../editor/store"
+import { KeyChip } from "./KeyChip"
+import { LINK_STATE_HELP, LinkStateBadge } from "./LinkStateBadge"
 import { MenuBar } from "./MenuBar"
+
+/** Out of the title bar's drag region: a drag region takes the pointer, so a tooltip inside one never shows. */
+const NO_DRAG = "[-webkit-app-region:no-drag]"
 
 /** Play (desktop): exports the open map and races it in the game. Its tooltip shows the keybind (F5). */
 function PlayButton() {
@@ -15,29 +24,48 @@ function PlayButton() {
   const keybinds = useEditor((s) => s.keybinds.playMap)
   const prefab = useOpenPrefab()
   if (!canPlay) return null
+  const icon = <IconPlayerPlayFilled data-icon="inline-start" />
   if (prefab !== null) {
     return (
-      // a disabled button gets no pointer events, so the tooltip lives on a wrapper
-      <span className="cursor-not-allowed" title={PREFAB_TAB_STAYS_HERE}>
-        <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2" disabled>
-          <IconPlayerPlayFilled className="size-3.5" />
-          Play
-        </Button>
-      </span>
+      // keyed: switching tabs would otherwise reuse the enabled button's tooltip, which then never opens on the wrapper
+      <Tooltip key="prefab">
+        {/* a disabled button gets no pointer events, so the tooltip lives on a wrapper */}
+        <TooltipTrigger render={<span className={`cursor-not-allowed ${NO_DRAG}`} />}>
+          <Button disabled>
+            {icon}
+            Play
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{PREFAB_TAB_STAYS_HERE}</TooltipContent>
+      </Tooltip>
     )
   }
   return (
     <Tooltip>
-      <TooltipTrigger
-        render={<Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2" onClick={() => void playMap()} />}
-      >
-        <IconPlayerPlayFilled className="size-3.5 text-emerald-500" />
+      <TooltipTrigger render={<Button onClick={() => void playMap()} />}>
+        {icon}
         Play
       </TooltipTrigger>
-      <TooltipContent side="bottom" className="flex items-center gap-1.5">
+      <TooltipContent side="bottom">
         Export and race it in the game
-        {keybinds.map((binding) => <Kbd key={binding}>{formatBinding(binding)}</Kbd>)}
+        {keybinds.map((binding) => <KeyChip key={binding} binding={binding} />)}
       </TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** Where the open map stands with its export, which is what Play acts on. The status bar's popover has the details. */
+function SyncState() {
+  const open = useOpenProjectMap()
+  const canExport = useEditor((s) => s.capabilities.exportToGame)
+  const prefab = useOpenPrefab()
+  if (!canExport || prefab !== null || open === null) return null
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className={`text-fg-tertiary ${NO_DRAG}`} />}>
+        <LinkStateBadge state={open.state} />
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{LINK_STATE_HELP[open.state]}</TooltipContent>
     </Tooltip>
   )
 }
@@ -55,25 +83,25 @@ const TITLE_BAR_CLASSES = [
 ].join(" ")
 
 /**
- * The window's title: the project in use (desktop), centred like any document window's, its folder on hover. With
- * none it is Untitled Project, starred because nothing is on disk yet (docs/PROJECTS.md § Shell).
+ * The window's title: the project in use (desktop), centred like any document window's, its folder on hover. The dot
+ * is the document tab's: a tab has unsaved edits, or it is Untitled Project and nothing is on disk yet
+ * (docs/PROJECTS.md § Shell).
  */
 function ProjectTitle() {
   const state = useEditor((s) => s.project)
   const name = useEditor(projectTitleOf)
+  const unsaved = useEditor(projectUnsavedOf)
   if (state === null || name === null) return null
   const project = state.current
   return (
     // Centred in the bar at the name's own width. A box spanning the bar would inherit the bar's drag region and,
     // coming after the menus, cover their no-drag middle (pointer-events doesn't apply to drag regions).
     <span
-      className={cn(
-        "absolute inset-x-0 mx-auto w-fit max-w-[40vw] truncate text-body text-fg-secondary",
-        project === null && "italic"
-      )}
+      className="absolute inset-x-0 mx-auto flex w-fit max-w-[40vw] items-center gap-1.5 text-body text-fg-secondary"
       title={project?.path ?? "Not saved anywhere yet: Save the map to name the project."}
     >
-      {name}
+      <span className="truncate">{name}</span>
+      {unsaved && <span className="size-1.5 shrink-0 rounded-full bg-foreground/60" aria-label="unsaved" />}
     </span>
   )
 }
@@ -87,12 +115,13 @@ export function TopBar() {
       <MenuBar />
       <ProjectTitle />
       <div className="ml-auto flex shrink-0 items-center gap-2">
-        <PlayButton />
         {catalog?.warning !== undefined && (
           <Badge variant="outline" className="text-amber-500" title={catalog.warning}>
             Fixture catalog
           </Badge>
         )}
+        <SyncState />
+        <PlayButton />
       </div>
     </header>
   )
