@@ -85,7 +85,7 @@ describe("Export to game", () => {
       assert.strictEqual(stateNow(), "notExported")
       yield* exportToGameEffect
       assert.strictEqual(stateNow(), "inSync")
-      assert.deepInclude(s().notifications[0], {
+      assert.deepInclude(s().toasts[0], {
         kind: "mapExported",
         level: "info",
         actions: [{ label: "Reveal", command: { _tag: "RevealGamePath", which: "mapsFolder" } }]
@@ -96,7 +96,7 @@ describe("Export to game", () => {
       yield* saveMapFile
       assert.isFalse(s().dirty)
       assert.strictEqual(stateNow(), "editedSinceExport")
-      assert.strictEqual(s().notifications[0]?.kind, "mapSaved")
+      assert.strictEqual(s().toasts[0]?.kind, "mapSaved")
       yield* exportToGameEffect
       assert.strictEqual(stateNow(), "inSync")
     }).pipe(Effect.provide(layerFor(disk)))

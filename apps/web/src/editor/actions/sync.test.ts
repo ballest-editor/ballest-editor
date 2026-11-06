@@ -64,7 +64,7 @@ describe("sync", () => {
       assert.isFalse(s().dirty)
       assert.strictEqual(stateNow(), "inSync")
       assert.deepInclude(disk.backups[0], { place: "project", fileName: name, text })
-      assert.strictEqual(s().notifications[0]?.kind, "mapReimported")
+      assert.strictEqual(s().toasts[0]?.kind, "mapReimported")
       yield* checkExportsEffect
       assert.lengthOf(reported(), 1)
     }).pipe(Effect.provide(layerFor(disk)))

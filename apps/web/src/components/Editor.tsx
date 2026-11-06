@@ -1,4 +1,3 @@
-import { Toaster } from "@workspace/ui/components/sonner"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
 import { useEffect } from "react"
 import { MOTION_SCALE } from "../domain/Settings"
@@ -17,8 +16,7 @@ import {
   loadMaterials,
   loadPlatform,
   loadSettings,
-  setWindowTheme,
-  showToasts
+  setWindowTheme
 } from "../editor/actions"
 import { warmCatalog } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
@@ -40,6 +38,7 @@ import { RecoverDialog } from "./RecoverDialog"
 import { ReplacePublishedDialog } from "./ReplacePublishedDialog"
 import { SettingsDialog } from "./SettingsDialog"
 import { StatusBar } from "./StatusBar"
+import { Toasts } from "./Toasts"
 import { TopBar } from "./TopBar"
 import { WhereToOpenDialog } from "./WhereToOpenDialog"
 
@@ -137,7 +136,6 @@ export function Editor() {
   )
 
   // Before the startup loads, so a failing one is toasted and kept.
-  useEffect(() => showToasts(), [])
   useEffect(() => followNotifications(), [])
   useEffect(() => {
     // The viewport holds its first reveal until these have settled (see Viewport.tsx).
@@ -187,8 +185,7 @@ export function Editor() {
       <RenamePrefabDialog open={dialog === "renamePrefab"} onClose={close} />
       <DeletePrefabDialog open={dialog === "deletePrefab"} onClose={close} />
       <KeybindCheatSheet />
-      {/* clear of the status bar */}
-      <Toaster position="bottom-right" offset={{ bottom: 40 }} />
+      <Toasts />
     </TooltipProvider>
   )
 }

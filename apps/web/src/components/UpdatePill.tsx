@@ -52,7 +52,7 @@ function ProgressRing({ percent }: { readonly percent: number }) {
   const radius = 5.5
   const circumference = 2 * Math.PI * radius
   return (
-    <svg viewBox="0 0 14 14" className="size-3.5 -rotate-90" aria-hidden>
+    <svg viewBox="0 0 14 14" className="size-4 -rotate-90" aria-hidden>
       <circle cx="7" cy="7" r={radius} fill="none" strokeWidth="2" className="stroke-fg-tertiary/25" />
       <circle
         cx="7"
@@ -75,7 +75,7 @@ function PillFace({ offer, state }: { readonly offer: Offer; readonly state: Upd
       return (
         <>
           <span className="relative">
-            <IconArrowDown className="size-3.5" />
+            <IconArrowDown className="size-4" />
             <span className="absolute -top-px -right-px size-1.5 rounded-full bg-primary ring-2 ring-card" />
           </span>
           Update
@@ -84,7 +84,7 @@ function PillFace({ offer, state }: { readonly offer: Offer; readonly state: Upd
     case "failed":
       return (
         <>
-          <IconAlertTriangle className="size-3.5 text-destructive" />
+          <IconAlertTriangle className="size-4 text-destructive" />
           Update failed
         </>
       )
@@ -98,7 +98,7 @@ function PillFace({ offer, state }: { readonly offer: Offer; readonly state: Upd
     case "ready":
       return (
         <>
-          <IconRefresh className="size-3.5" />
+          <IconRefresh className="size-4" />
           Restart to update
         </>
       )
@@ -193,9 +193,9 @@ function Pill(
               render={
                 <Button
                   variant="ghost"
-                  size="xs"
+                  size="sm"
                   className={cn(
-                    "h-5 gap-1 px-1.5 text-body font-normal tabular-nums",
+                    "h-5 px-1.5 tabular-nums",
                     offer === "ready" &&
                       "bg-primary text-primary-foreground hover:bg-primary/85 hover:text-primary-foreground aria-expanded:bg-primary/85 aria-expanded:text-primary-foreground"
                   )}

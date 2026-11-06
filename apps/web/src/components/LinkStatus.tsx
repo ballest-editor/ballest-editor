@@ -1,24 +1,17 @@
 import { Button } from "@workspace/ui/components/button"
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger
-} from "@workspace/ui/components/popover"
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@workspace/ui/components/popover"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { LINK_STATE_LABELS } from "../domain/linkState"
 import { formatAgo, formatDateTime } from "../domain/time"
 import { exportToGame, playMap, reimportMap, revealGamePath } from "../editor/actions"
 import { useEditor, useOpenPrefab, useOpenProjectMap } from "../editor/store"
 import { useNow } from "../editor/useNow"
-import { LINK_STATE_HELP, LinkStateBadge } from "./LinkStateBadge"
-import { PathText } from "./PathText"
+import { LinkStateChip } from "./LinkStateChip"
 
 /**
- * The open map's link to its export (docs/PROJECTS.md § Sync), in the middle of the status bar: the state and when it
- * was last exported. Its popover has the export's path and time, Export to game, Play and Reveal, and Re-import once the
- * game has changed the export. Desktop only.
+ * The open map's link to its export (docs/PROJECTS.md § Sync), in the middle of the status bar: a chip with the state
+ * and when it was last exported. Its popover has that time, Export, Play and Reveal, and Re-import once the game has
+ * changed the export. Desktop only.
  */
 export function LinkStatus() {
   const open = useOpenProjectMap()
@@ -35,40 +28,32 @@ export function LinkStatus() {
   const changed = state === "changedInGame" || state === "bothChanged"
   return (
     <Popover>
-      <PopoverTrigger
-        render={<Button variant="ghost" size="xs" className="h-5 gap-1.5 px-1.5 text-body font-normal" />}
-      >
-        <LinkStateBadge state={state} />
+      <PopoverTrigger render={<LinkStateChip state={state} />}>
         {exported !== null && (
-          <span className="flex items-center gap-1.5 text-fg-tertiary">
+          <>
             <span aria-hidden>·</span>
-            exported {formatAgo(exported.at, now)}
-          </span>
+            <span>exported {formatAgo(exported.at, now)}</span>
+          </>
         )}
       </PopoverTrigger>
-      <PopoverContent side="top" className="w-96 gap-3">
-        <PopoverHeader>
+      <PopoverContent side="top" className="w-80 gap-3 p-3">
+        <div className="flex flex-col">
           <PopoverTitle>{LINK_STATE_LABELS[state]}</PopoverTitle>
-          <PopoverDescription>{LINK_STATE_HELP[state]}</PopoverDescription>
-        </PopoverHeader>
-        {exported !== null && (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-            <dt className="text-fg-secondary">Export</dt>
-            <dd className="min-w-0">
-              <PathText block>{exported.path}</PathText>
-            </dd>
-            <dt className="text-fg-secondary">Last export</dt>
-            <dd>
-              {formatDateTime(exported.at)} ({formatAgo(exported.at, now)})
-            </dd>
-          </dl>
-        )}
+          {exported !== null && (
+            <Tooltip>
+              <TooltipTrigger render={<p className="w-fit text-fg-tertiary" />}>
+                Last export {formatAgo(exported.at, now)}
+              </TooltipTrigger>
+              <TooltipContent side="top">{formatDateTime(exported.at)}</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
         <div className="flex justify-end gap-2">
           {exported !== null && (
             <Button variant="outline" onClick={() => void revealGamePath("mapsFolder")}>Reveal</Button>
           )}
           {changed && <Button variant="outline" onClick={() => void reimportMap(map.fileName)}>Re-import</Button>}
-          <Button variant={canPlay ? "outline" : "default"} onClick={() => void exportToGame()}>Export to game</Button>
+          <Button variant={canPlay ? "outline" : "default"} onClick={() => void exportToGame()}>Export</Button>
           {canPlay && <Button onClick={() => void playMap()}>Play</Button>}
         </div>
       </PopoverContent>
