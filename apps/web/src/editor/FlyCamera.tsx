@@ -6,13 +6,13 @@ import { flyingActions, formsChord, type MovementAction } from "../domain/flyKey
 import {
   type Bindings,
   chordOf,
+  dragChordOf,
   HeldKeys,
-  isBound,
   isBoundChord,
   isOneShotChord,
   type Keybinds,
   mouseChordOf,
-  wheelChordOf
+  wheelSpeedStep
 } from "../domain/Keybinds"
 import { wheelZoomFactor } from "../domain/orthoView"
 import { placementPoint } from "../domain/placement"
@@ -46,12 +46,12 @@ const flyingNow = (keybinds: Keybinds, keys: HeldKeys, looking: boolean, now: nu
     keybinds,
     useEditor.getState().settings.camera.movementNeedsLook,
     looking,
-    (binding) => keys.holds(binding, now)
+    (binding, atOnce) => keys.holds(binding, now, atOnce)
   )
 
 /**
  * Free-fly camera for the panes (docs/DESKTOP.md § View panes): drags and the wheel drive the pane under the pointer, the
- * keys the active pane, every binding from the keybind store. The wheel is camera speed by default, dolly when unbound.
+ * keys the active pane, every binding from the keybind store. The wheel is camera speed, or zoom in an orthographic pane.
  */
 export function FlyCamera() {
   const gl = useThree((s) => s.gl)
@@ -103,7 +103,7 @@ export function FlyCamera() {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditorKeyEvent(e)) {
-        pressed.current.press(e.code, performance.now(), formsChord(keybinds, chordOf(e)))
+        pressed.current.press(e.code, performance.now(), formsChord(keybinds, chordOf(e), drag.current !== null))
       }
     }
 
@@ -149,7 +149,8 @@ export function FlyCamera() {
       const chord = mouseChordOf(e)
       // Ctrl+click and the like: the held modifier is the click's, not "down".
       if (isBoundChord(keybinds, chord)) pressed.current.suppressModifiers()
-      const mode = dragModes.find(([bindings]) => bindings.includes(chord))?.[1]
+      const dragChord = dragChordOf(keybinds, e)
+      const mode = dragModes.find(([bindings]) => bindings.includes(dragChord))?.[1]
       if (mode === undefined) return
       drag.current = pane.view === undefined ? mode : "pan"
       dragPane.current = pane
@@ -212,16 +213,8 @@ export function FlyCamera() {
         pane.zoomOrthographic(wheelZoomFactor(e.deltaY), px)
         return
       }
-      const chord = wheelChordOf(e)
-      const speedStep = isBound(keybinds, "speedFaster", chord) ? 1 : isBound(keybinds, "speedSlower", chord) ? -1 : 0
-      if (speedStep !== 0) {
-        useEditor.getState().changeSpeed(speedStep)
-        return
-      }
-      const camera = pane.perspective
-      const forward = camera.getWorldDirection(new THREE.Vector3())
-      const step = -Math.sign(e.deltaY) * Math.max(50, camera.position.distanceTo(pane.target) * 0.1)
-      camera.position.addScaledVector(forward, step)
+      const speedStep = wheelSpeedStep(keybinds, e)
+      if (speedStep !== 0) useEditor.getState().changeSpeed(speedStep)
     }
 
     const listening = new AbortController()
@@ -270,7 +263,7 @@ export function FlyCamera() {
     // looking; movement keys follow the "movement keys need look" setting (see flyKeys).
     const looking = drag.current !== null
     const held = (bindings: Bindings) =>
-      bindings.some((binding) => keys.holds(binding, now) && (looking || !isOneShotChord(keybinds, binding)))
+      bindings.some((binding) => keys.holds(binding, now, looking) && (looking || !isOneShotChord(keybinds, binding)))
     const dt = Math.min(delta, 0.1)
     const pane = activePaneCamera()
     const camera = pane.perspective

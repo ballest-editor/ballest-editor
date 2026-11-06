@@ -17,7 +17,8 @@ const pieces = buildablePieces(
 const build = (items: number, seed = 1) => buildMap({ name: "Test", creator: "Seed", items, seed, pieces })
 
 describe("buildMap", () => {
-  it("makes a map the game would load, however large", () => {
+  // Validating 5000 items is CPU-bound: under a second alone, over 7s on a CI runner sharing it with every other suite.
+  it("makes a map the game would load, however large", { timeout: 30_000 }, () => {
     expect(pieces.length).toBeGreaterThan(0)
     for (const items of [0, 20, 5000]) expect(validateMap(build(items), index).errors).toEqual([])
   })

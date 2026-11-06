@@ -402,8 +402,40 @@ export const chordOf = (e: ModifierState & { readonly code: string }): string =>
 
 export const mouseChordOf = (e: ModifierState & { readonly button: number }): string =>
   withModifiers(e, `Mouse${e.button}`)
-export const wheelChordOf = (e: ModifierState & { readonly deltaY: number }): string =>
-  withModifiers(e, e.deltaY < 0 ? "WheelUp" : "WheelDown")
+
+/**
+ * The chord a press starts a camera drag with: its own, or the bare button when the modifiers make it mean nothing. Left
+ * Ctrl held to fly down mustn't stop right-click looking, and the bindings that do use a modifier keep it.
+ */
+export const dragChordOf = (keybinds: Keybinds, e: ModifierState & { readonly button: number }): string => {
+  const chord = mouseChordOf(e)
+  return actionsFor(keybinds, chord).length > 0 ? chord : `Mouse${e.button}`
+}
+
+interface WheelState extends ModifierState {
+  readonly deltaX: number
+  readonly deltaY: number
+}
+
+/** How far up or down a scroll went. Windows turns Shift+scroll sideways; any other sideways scroll is zero. */
+const wheelDelta = (e: WheelState): number => e.deltaY !== 0 ? e.deltaY : e.shiftKey ? e.deltaX : 0
+
+const wheelCodeOf = (e: WheelState): string => wheelDelta(e) < 0 ? "WheelUp" : "WheelDown"
+
+export const wheelChordOf = (e: WheelState): string => withModifiers(e, wheelCodeOf(e))
+
+/**
+ * The camera speed step a scroll asks for. Modifiers don't take the wheel away: Left Ctrl flies down, and
+ * the speed has to change on the way. A chord bound with the modifiers held wins over the plain wheel.
+ */
+export const wheelSpeedStep = (keybinds: Keybinds, e: WheelState): 1 | -1 | 0 => {
+  if (wheelDelta(e) === 0) return 0
+  for (const chord of [wheelChordOf(e), wheelCodeOf(e)]) {
+    if (isBound(keybinds, "speedFaster", chord)) return 1
+    if (isBound(keybinds, "speedSlower", chord)) return -1
+  }
+  return 0
+}
 
 /** The key code a binding waits for, ignoring modifiers (used for held movement keys). */
 export const baseCodeOf = (binding: string): string => binding.slice(binding.lastIndexOf("+") + 1)
@@ -421,8 +453,9 @@ export const MODIFIER_HOLD_MS = 120
 
 /**
  * Tracks held keys for continuous actions. A bare modifier (Ctrl/Shift/Alt) bound to a
- * held action only counts once it has been held for MODIFIER_HOLD_MS; pressing a key or
- * button that makes it a chord while it's down (Ctrl+Z, Ctrl+C, Ctrl+click with "down" on
+ * held action only counts once it has been held for MODIFIER_HOLD_MS, unless the caller
+ * says it counts at once (see `flyingActions`); pressing a key or button that makes it a
+ * chord while it's down (Ctrl+Z, Ctrl+C, Ctrl+click with "down" on
  * Left Ctrl) suppresses it until it's released. Movement keys (Ctrl+W flying down and
  * forward) don't. So chords take precedence over a modifier used as a movement key.
  */
@@ -465,14 +498,14 @@ export class HeldKeys {
     return bindings.some((binding) => this.holds(binding, now))
   }
 
-  /** Is the binding's key held, for a held action? (bare modifiers obey the chord rule) */
-  holds(binding: string, now: number): boolean {
+  /** Is the binding's key held, for a held action? (bare modifiers obey the chord rule; `atOnce` skips their wait) */
+  holds(binding: string, now: number, atOnce = false): boolean {
     if (binding.length === 0) return false
     const code = baseCodeOf(binding)
     const since = this.downAt.get(code)
     if (since === undefined) return false
     if (!MODIFIER_CODES.has(code)) return true
-    return !this.suppressed.has(code) && now - since >= MODIFIER_HOLD_MS
+    return !this.suppressed.has(code) && (atOnce || now - since >= MODIFIER_HOLD_MS)
   }
 }
 

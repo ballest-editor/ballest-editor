@@ -3,6 +3,7 @@ import {
   actionsFor,
   conflictingBindings,
   defaultKeybinds,
+  dragChordOf,
   formatBinding,
   formatBindings,
   HeldKeys,
@@ -17,7 +18,8 @@ import {
   mergeKeybinds,
   MODIFIER_HOLD_MS,
   PROJECTION_ACTIONS,
-  releasesBinding
+  releasesBinding,
+  wheelSpeedStep
 } from "./Keybinds"
 import { viewProjections } from "./viewLayout"
 
@@ -154,6 +156,14 @@ describe("HeldKeys: Left Ctrl = fly down vs Ctrl chords", () => {
     expect(keys.holds("ControlLeft", MODIFIER_HOLD_MS)).toBe(true)
   })
 
+  it("skips the hold when told to, but not a chord's suppression", () => {
+    const keys = new HeldKeys()
+    keys.press("ControlLeft", 0)
+    expect(keys.holds("ControlLeft", 0, true)).toBe(true)
+    keys.suppressModifiers()
+    expect(keys.holds("ControlLeft", 0, true)).toBe(false)
+  })
+
   it("a bound chord (Ctrl+Z) suppresses a modifier movement key until it's released", () => {
     const keys = new HeldKeys()
     keys.press("ControlLeft", 0)
@@ -197,6 +207,63 @@ const newConflicts = (keybinds: Keybinds) => {
   const baseline = conflictingBindings(defaultKeybinds)
   return [...conflictingBindings(keybinds)].filter((chord) => !baseline.has(chord))
 }
+
+describe("dragChordOf", () => {
+  const press = (button: number, modifiers: { ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean } = {}) => ({
+    button,
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    ...modifiers
+  })
+
+  it("drops modifiers bound to nothing with the button: Ctrl held for flying down, then right-click", () => {
+    expect(dragChordOf(defaultKeybinds, press(2, { ctrlKey: true }))).toBe("Mouse2")
+    expect(dragChordOf(defaultKeybinds, press(2, { shiftKey: true }))).toBe("Mouse2")
+    expect(dragChordOf(defaultKeybinds, press(1, { altKey: true }))).toBe("Mouse1")
+  })
+
+  it("keeps a chord that means something: orbit, and the selection clicks", () => {
+    expect(dragChordOf(defaultKeybinds, press(0, { altKey: true }))).toBe("Alt+Mouse0")
+    expect(dragChordOf(defaultKeybinds, press(0, { ctrlKey: true }))).toBe("Ctrl+Mouse0")
+    expect(dragChordOf(defaultKeybinds, press(0, { shiftKey: true }))).toBe("Shift+Mouse0")
+  })
+})
+
+describe("wheelSpeedStep", () => {
+  const scroll = (deltaY: number, modifiers: { ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean } = {}) => ({
+    deltaX: 0,
+    deltaY,
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    ...modifiers
+  })
+
+  it("changes speed whatever is held: Ctrl flies down, and the wheel still has to work", () => {
+    for (const modifier of [{}, { ctrlKey: true }, { altKey: true }, { shiftKey: true }]) {
+      expect(wheelSpeedStep(defaultKeybinds, scroll(-120, modifier))).toBe(1)
+      expect(wheelSpeedStep(defaultKeybinds, scroll(120, modifier))).toBe(-1)
+    }
+  })
+
+  it("lets a chord bound with a modifier win over the plain wheel", () => {
+    const keybinds: Keybinds = { ...defaultKeybinds, speedFaster: ["WheelDown"], speedSlower: ["Ctrl+WheelDown"] }
+    expect(wheelSpeedStep(keybinds, scroll(120))).toBe(1)
+    expect(wheelSpeedStep(keybinds, scroll(120, { ctrlKey: true }))).toBe(-1)
+  })
+
+  it("does nothing when the wheel isn't bound", () => {
+    expect(wheelSpeedStep({ ...defaultKeybinds, speedFaster: [], speedSlower: [] }, scroll(-120))).toBe(0)
+  })
+
+  it("takes Shift+scroll turned sideways as the scroll it was, and ignores any other sideways scroll", () => {
+    expect(wheelSpeedStep(defaultKeybinds, { ...scroll(0, { shiftKey: true }), deltaX: -120 })).toBe(1)
+    expect(wheelSpeedStep(defaultKeybinds, { ...scroll(0), deltaX: -120 })).toBe(0)
+  })
+})
 
 describe("conflictingBindings", () => {
   it("marks a chord two actions of a kind share, and not one shared across kinds", () => {

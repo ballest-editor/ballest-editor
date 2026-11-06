@@ -22,16 +22,21 @@ export const needsLook = (mode: MovementLookMode, action: MovementAction): boole
 /** Do movement keys that are also shortcuts fly any time (and fire their shortcut as well)? */
 export const sharedKeysFlyFreely = (mode: MovementLookMode): boolean => mode === "nothing"
 
-/** The movement actions that fly the camera, given which bindings are held. */
+/**
+ * The movement actions that fly the camera, given which bindings are held. `holds` hears `atOnce` for a key that only
+ * flies while looking, during a look: no hotkey fires in a camera drag, so a bare modifier has no chord to wait for.
+ */
 export const flyingActions = (
   keybinds: Keybinds,
   mode: MovementLookMode,
   looking: boolean,
-  holds: (binding: string) => boolean
+  holds: (binding: string, atOnce: boolean) => boolean
 ): ReadonlySet<MovementAction> => {
   const allowed = movementActions.filter((action) => looking || !needsLook(mode, action))
   const heldWhere = (action: MovementAction, shortcut: boolean): boolean =>
-    keybinds[action].some((binding) => holds(binding) && isOneShotChord(keybinds, binding) === shortcut)
+    keybinds[action].some((binding) =>
+      holds(binding, looking && needsLook(mode, action)) && isOneShotChord(keybinds, binding) === shortcut
+    )
   const plain = allowed.filter((action) =>
     heldWhere(action, false) || (sharedKeysFlyFreely(mode) && heldWhere(action, true))
   )
@@ -48,9 +53,9 @@ export const isMovementChord = (keybinds: Keybinds, chord: string): boolean =>
  * Does this key press (chordOf) make the held modifiers a chord rather than movement keys?
  * Bound shortcuts do (Ctrl+Z, Ctrl+D), and so does any other key that isn't a movement key
  * (the browser's own Ctrl+F, Ctrl+L...), so Ctrl as "down" never moves the camera under them.
- * Movement keys don't: Ctrl+W flies down and forward.
+ * Movement keys don't: Ctrl+W flies down and forward. Nor does anything during a camera drag, when no hotkey fires.
  */
-export const formsChord = (keybinds: Keybinds, chord: string): boolean =>
-  isBoundChord(keybinds, chord) ||
-  (chord.includes("+") &&
-    !movementActions.some((action) => keybinds[action].some((binding) => baseCodeOf(binding) === baseCodeOf(chord))))
+export const formsChord = (keybinds: Keybinds, chord: string, dragging = false): boolean =>
+  !dragging && (isBoundChord(keybinds, chord) ||
+    (chord.includes("+") &&
+      !movementActions.some((action) => keybinds[action].some((binding) => baseCodeOf(binding) === baseCodeOf(chord)))))
