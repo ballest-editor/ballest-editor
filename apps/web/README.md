@@ -46,7 +46,7 @@ If `assets/catalog.json` is missing, the app falls back to `src/domain/bundledCa
 
 ### Default bindings
 
-The defaults are the game's own, from its in-editor hotkey overlay and settings screen, plus editor-only actions (`defaultKeybinds` in `src/domain/Keybinds.ts`). Shift+/ held shows them in a cheat sheet.
+The defaults are the game's own, from its in-editor hotkey overlay and settings screen, plus editor-only actions (`defaultKeybinds` in `src/domain/Keybinds.ts`). Shift+/ held shows them over the editor; Help › Keyboard shortcuts keeps them open.
 
 | Action                                | Default                                                           |
 | ------------------------------------- | ----------------------------------------------------------------- |

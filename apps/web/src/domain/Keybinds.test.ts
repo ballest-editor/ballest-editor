@@ -28,11 +28,11 @@ describe("keybind table", () => {
     }
   })
 
-  it("uses the game's level-editor hotkeys and names", () => {
-    const editor = keybindSections.find((s) => s.name === "level editor")!
+  it("uses the in-game editor's hotkeys and names", () => {
+    const editor = keybindSections.find((s) => s.name === "editor")!
     expect(editor.actions.map((a) => [keybindActionLabels[a], defaultKeybinds[a]])).toEqual([
       ["select", ["KeyQ"]],
-      ["translate", ["KeyW"]],
+      ["move", ["KeyW"]],
       ["rotate", ["KeyE"]],
       ["scale", ["KeyR"]],
       ["local / world axes", ["KeyC"]],
@@ -56,8 +56,8 @@ describe("keybind table", () => {
   })
 
   it("uses the game's names and defaults for its free camera", () => {
-    const freeCam = keybindSections.find((s) => s.name === "mouse and keyboard free camera")!
-    expect(freeCam.actions.map((a) => [keybindActionLabels[a], defaultKeybinds[a]])).toEqual([
+    const camera = keybindSections.find((s) => s.name === "camera")!
+    expect(camera.actions.slice(0, 7).map((a) => [keybindActionLabels[a], defaultKeybinds[a]])).toEqual([
       ["forward", ["KeyW"]],
       ["reverse", ["KeyS"]],
       ["left", ["KeyA"]],

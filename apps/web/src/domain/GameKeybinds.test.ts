@@ -78,9 +78,8 @@ describe("GameKeybinds", () => {
     assert.include(fellBack, "look")
   })
 
-  it("names every action once, grouped by section with ours first", () => {
+  it("names every action once, in the table's sections, whatever section the file gives it", () => {
     const file = Schema.decodeSync(GameKeybindsFile)({
-      sections: [{ name: "racing" }],
       contexts: [{
         name: "IMC_FreeCam",
         mappings: [{ ...m("IA_Height", "SpaceBar"), label: "rise", section: "racing" }]
@@ -88,17 +87,19 @@ describe("GameKeybinds", () => {
     })
     const named = namedActions(deriveKeybinds(file))
     assert.strictEqual(new Set(named.map((n) => n.action)).size, named.length)
-    assert.deepStrictEqual(named.at(-1), { action: "moveUp", section: "racing", label: "rise" })
-    assert.deepStrictEqual(named[0], { action: "selectMode", section: "level editor", label: "select" })
-    const sections = named.map((n) => n.section)
-    assert.deepStrictEqual(sections, [...sections].sort((a, b) => sections.indexOf(a) - sections.indexOf(b)))
+    assert.deepStrictEqual(named.find((n) => n.action === "moveUp"), {
+      action: "moveUp",
+      section: "camera",
+      label: "rise"
+    })
+    assert.deepStrictEqual(named[0], { action: "selectMode", section: "editor", label: "select" })
   })
 
-  it("shows the camera's three sections as one on the cheat sheet, every action once", () => {
+  it("shows Settings' sections on the cheat sheet, every action once", () => {
     const named = namedActions(deriveKeybinds(Schema.decodeSync(GameKeybindsFile)({ contexts: [] })))
     const sections = cheatSheetSections(named)
     assert.deepStrictEqual(sections.map((s) => s.section), [
-      "level editor",
+      "editor",
       "edit",
       "camera",
       "view",
@@ -111,17 +112,14 @@ describe("GameKeybinds", () => {
     assert.includeMembers(camera ?? [], ["moveForward", "lookRight", "orbit"])
   })
 
-  it("takes labels and sections from the file when present", () => {
+  it("takes labels from the file when present", () => {
     const file = Schema.decodeSync(GameKeybindsFile)({
       contexts: [{
         name: "IMC_FreeCam",
         mappings: [{ ...m("IA_Height", "SpaceBar"), label: "up", section: "mouse and keyboard free camera" }]
       }]
     })
-    assert.deepStrictEqual(deriveKeybinds(file).naming.get("moveUp"), {
-      label: "up",
-      section: "mouse and keyboard free camera"
-    })
+    assert.strictEqual(deriveKeybinds(file).labels.get("moveUp"), "up")
     // arrow-key look in the racing context names our look actions (direction from modifiers)
     const look = Schema.decodeSync(GameKeybindsFile)({
       contexts: [{
@@ -133,10 +131,10 @@ describe("GameKeybinds", () => {
       }]
     })
     const named = deriveKeybinds(look)
-    assert.strictEqual(named.naming.get("lookUp")?.label, "look up")
-    assert.strictEqual(named.naming.get("lookLeft")?.label, "look left")
+    assert.strictEqual(named.labels.get("lookUp"), "look up")
+    assert.strictEqual(named.labels.get("lookLeft"), "look left")
     assert.deepStrictEqual(named.keybinds.lookUp, ["ArrowUp"]) // racing context doesn't rebind the editor
-    assert.strictEqual(deriveKeybinds(undefined).naming.size, 0)
+    assert.strictEqual(deriveKeybinds(undefined).labels.size, 0)
   })
 
   it("falls back for everything without a file, and maps UE key names", () => {
@@ -198,16 +196,13 @@ describe("GameKeybinds", () => {
     for (const action of ["moveForward", "moveUp", "moveDown", "speedFaster", "deselect"] as const) {
       assert.isTrue(fromGame.has(action), action)
     }
-    // the game's own names and sections, lower-cased
-    const { naming, sectionOrder, cameraPresets } = deriveKeybinds(file)
-    assert.deepStrictEqual(naming.get("moveForward"), { label: "forward", section: "mouse and keyboard free camera" })
-    assert.strictEqual(naming.get("moveBack")?.label, "reverse")
-    assert.strictEqual(naming.get("lookRight")?.label, "look right")
-    assert.strictEqual(naming.get("lookUp")?.label, "look up")
-    assert.isUndefined(naming.get("focusSelection")) // named by the level-editor overlay, not the camera
-    assert.include(sectionOrder, "mouse and keyboard free camera")
-    assert.notInclude(sectionOrder.join(), "gamepad")
-    for (const [, n] of naming) assert.notMatch(n.section ?? "", /gamepad/i)
+    // the game's own names, lower-cased
+    const { cameraPresets, labels } = deriveKeybinds(file)
+    assert.strictEqual(labels.get("moveForward"), "forward")
+    assert.strictEqual(labels.get("moveBack"), "reverse")
+    assert.strictEqual(labels.get("lookRight"), "look right")
+    assert.strictEqual(labels.get("lookUp"), "look up")
+    assert.isUndefined(labels.get("focusSelection")) // named by the in-game editor's overlay, not the camera
     assert.deepStrictEqual(cameraPresets.find((p) => p.label === "Wide Angle")?.fov, 110)
   })
 })

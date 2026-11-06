@@ -39,8 +39,8 @@ function KeybindColumns() {
 }
 
 /**
- * The keybinds two ways. Help › Keyboard shortcuts opens them as a dialog that stays until it's closed. While the "keybind
- * cheat sheet" binding is held (Shift+/ by default; useActionKeys shows and hides it) they sit over the editor,
+ * The keybinds two ways. Help › Keyboard shortcuts opens them as a dialog that stays until it's closed. While the "keyboard
+ * shortcuts" binding is held (Shift+/ by default; useActionKeys shows and hides it) they sit over the editor,
  * read-only and click-through.
  */
 export function KeybindCheatSheet() {
