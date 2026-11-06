@@ -2,85 +2,112 @@
 
 The rules every view follows. The tokens live in `packages/ui/src/styles/globals.css`; `cn` (`@workspace/ui/lib/utils`) knows their names, so import it from there, never from `cn` itself. A new token goes in both.
 
-## Text: four roles
+## Text: five roles
 
-| Class              | Size and weight | For                                                  |
-| ------------------ | --------------- | ---------------------------------------------------- |
-| `text-caption`     | 11/16, 500      | Eyebrows, shortcut hints, counts, badges             |
-| `text-body`        | 13/20, 400      | Labels, rows, menu items, values. The `body` default |
-| `text-body-strong` | 13/20, 600      | Row titles, selected object names                    |
-| `text-title`       | 15/20, 600      | Dialog titles, panel headers                         |
+| Class              | Size and weight | For                                                        |
+| ------------------ | --------------- | ---------------------------------------------------------- |
+| `text-caption`     | 11/16, 500      | Eyebrows, shortcut hints, counts, badges                   |
+| `text-label`       | 12/16, 500      | Field labels                                               |
+| `text-body`        | 13/20, 400      | Rows, menu items, values. The `body` default               |
+| `text-body-strong` | 13/20, 500      | Buttons, segments, tabs, row titles, selected object names |
+| `text-title`       | 14/20, 600      | Dialog titles, panel headers. Tracked -0.005em             |
 
-Each class sets size, line height and weight together, so don't add `font-*`, and don't use `text-xs`, `text-sm` or arbitrary sizes. An eyebrow is `text-caption uppercase tracking-wider`; `SectionTitle` is the shared one.
+Each class sets size, line height and weight together, so don't add `font-*`, and don't use `text-xs`, `text-sm` or arbitrary sizes. 500 is a label, 400 is a value, and 600 is for titles alone. An eyebrow is `text-caption uppercase tracking-wider`; `SectionTitle` is the shared one.
 
-`font-mono` is for numbers in editable fields, never sentences, file names or paths.
+The font is the system's (`--font-sans`), so the type is never where the personality comes from. `body` sets tabular numbers. `font-mono` is Geist Mono, bundled, and is for numbers in editable fields, never sentences, file names or paths.
 
 ## Greys: three steps below `text-foreground`
 
 | Class               | Dark contrast on `--card` | Light contrast on `--card` | For                                                          |
 | ------------------- | ------------------------- | -------------------------- | ------------------------------------------------------------ |
-| `text-fg-secondary` | 11:1                      | 8.7:1                      | Eyebrows, section labels, field labels, inactive tabs, icons |
-| `text-fg-tertiary`  | 7.3:1                     | 5.4:1                      | Placeholders, helper copy, statuses, shortcut hints, counts  |
-| `text-fg-disabled`  | 3.2:1                     | 2.3:1                      | Disabled text, and what's inside a disabled row but its name |
+| `text-fg-secondary` | 11:1                      | 10.7:1                     | Eyebrows, section labels, field labels, inactive tabs, icons |
+| `text-fg-tertiary`  | 7.5:1                     | 6.3:1                      | Placeholders, helper copy, statuses, shortcut hints, counts  |
+| `text-fg-disabled`  | 3.2:1                     | 2.6:1                      | Disabled text, and what's inside a disabled row but its name |
 
 The variables are `--fg-secondary`, `--fg-tertiary`, `--fg-disabled`. They aren't `text-secondary`: `secondary` is shadcn's surface colour. Disabled is a colour, not `opacity-50`, except on filled buttons and on graphics (a switch, a slider).
 
 ## Colour
 
-The dark theme is the stadium at night and the light theme is the game's cover art in daylight. Neither is the other inverted: dark is navy surfaces with yellow on them, light is warm paper inked in navy with a deeper gold. `apps/web/src/editor/palette.test.ts` holds every contrast below.
+The chrome has no hue, only elevation, and the colour on screen comes from the viewport. The game's colours stay there and in the hero band, and nothing else quotes them. Judge a change from a full-window screenshot at 100%, dark and light. If you can name any one colour in the chrome, there is too much of it. `apps/web/src/editor/palette.test.ts` holds every contrast here, and holds the surfaces under 0.012 of chroma.
 
-| Colour      | In the game                                             | Dark      | Light     | Tokens                                         |
-| ----------- | ------------------------------------------------------- | --------- | --------- | ---------------------------------------------- |
-| Goal yellow | `MI_GoalYellow` `#ffbe0d`, the ring in a race `#f9db3a` | `#fcca21` | `#be7c00` | `--primary`, the one accent colour             |
-| Stadium     | The band under the stands `#2c3779`                     | `#171e3a` | `#161d45` | Dark surfaces; light `--foreground` is its ink |
-| Paper       | The cover's white floor, the dawn horizon               | none      | `#f8f3e8` | Light surfaces                                 |
-| Track teal  | The seats `#38969e`, the track in a race `#508a92`      | `#06707e` | `#3c9baa` | `--accent`, the ball in `HeroBand`             |
-| Water       | The pool wall `#4c98d2`, the water `#067a9c`            | `#3fb1ea` | `#067a9c` | `--ring`, `--secondary`                        |
-| Crowd green | `MI_ArenaGreen` `#00a95b`                               | tints     | tints     | `--status-ok`, `--difficulty-2`                |
-| Orange      | `MI_ArenaOrange` `#ff6d00`                              | tints     | tints     | `--status-warn`                                |
-| Ball red    | The ball on the cover, `#b61f1e` to `#f03f3c`           | tints     | tints     | `--destructive`, `--difficulty-4`              |
-| Dawn        | The dawn sky, blue through mauve to the rim's coral     | tints     | tints     | `--size-s`, `--size-m`, `--size-l`             |
+| Surface        | Dark      | Light                  | For                                                                             |
+| -------------- | --------- | ---------------------- | ------------------------------------------------------------------------------- |
+| `--background` | `#141618` | `#f3f5f6`              | Behind everything: the start screen, the window's edges                         |
+| `--card`       | `#1c1f23` | `#fcfcfd`              | Panels, strips, bars                                                            |
+| `--popover`    | `#24282c` | `#ffffff`              | Dialogs, and what `glass` is made of                                            |
+| `--muted`      | one up    | one down               | The track of a segmented control, skeletons, a key chip                         |
+| `--secondary`  | one up    | one down               | Secondary buttons                                                               |
+| `--accent`     | one up    | one down               | shadcn's neutral hover surface, opaque. `--accent-foreground` is the foreground |
+| `--sidebar-*`  | `--card`  | a shade under `--card` | shadcn's sidebar                                                                |
 
-Components use the tokens, never a palette class (`emerald-500`) or a hex. The scene is the exception, because it draws the game's world and not the chrome: `sceneGround.ts`, `sceneColors.ts` and `axisColors.ts` keep their own colours, and the ground and theme sky lean to water so a pane doesn't read as a panel.
+Both themes are one cool neutral at hue 250, lighter as they rise: `--background`, `--card`, `--popover`. Separate things by that step first. A row or a group on a panel takes a tone, not a border.
 
-| Token                              | For                                                                                                                                                                       |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--background`                     | Behind everything: the start screen, the window's edges                                                                                                                   |
-| `--card`                           | Panels, strips, bars. Viewport chrome is this at 80%                                                                                                                      |
-| `--popover`                        | Dialogs and popovers. Menus are this at 70% over a blur                                                                                                                   |
-| `--muted`                          | Hovered rows, wells, skeletons                                                                                                                                            |
-| `--secondary`                      | Secondary buttons                                                                                                                                                         |
-| `--primary`                        | The main action, pressed toggles, selection, the active tab: fills, lines and dots                                                                                        |
-| `--accent`                         | The second colour. `bg-accent` is shadcn's menu focus, but the menus' `bg-foreground/10` replaces it and keeps `text-accent-foreground`, so that text has to read on both |
-| `--ring`                           | Keyboard focus, in water blue so it never reads as selected                                                                                                               |
-| `--border`, `--input`              | Edges of panels, and of fields                                                                                                                                            |
-| `--sidebar-*`                      | shadcn's sidebar, the same values as `--card`, `--primary` and `--accent`                                                                                                 |
-| `--size-s`, `--size-m`, `--size-l` | A piece's size tag and thumbnail outline; the tag's text is `text-background`                                                                                             |
+A hover on a row or a ghost control is `bg-foreground/6`, and on a menu row `bg-foreground/8`. That is a step on whatever sits under it. An opaque `--accent` is nearly the same tone as `--popover`, so it would vanish there and on glass.
 
-Surfaces get lighter as they rise, in both themes: `--background`, `--card`, `--popover`. Shadows take `--shadow-tint`, so a shadow on navy is deeper navy.
+**`--primary` is the one accent, and it means "interactive".** Dark `#1d9daf`, light `#007787`. It is for primary buttons, the active tab's underline, the active tool, selection, focus rings (`--ring` is the same value) and links, and nothing else. In dark, `--primary-foreground` is near-black, because white on it is 3.2:1. A chroma of 0.12 at this hue falls outside sRGB and clips to a harsher cyan, so the values stop near 0.1.
 
-`--primary` is 3:1 on a panel in the light theme, enough for a line or a dot and not for small text. Text on a pale `bg-primary/15` is `text-foreground`.
+| Class           | For                                                                          |
+| --------------- | ---------------------------------------------------------------------------- |
+| `bg-primary/12` | A selection wash: selected rows, a pressed toggle. Its text keeps its colour |
+| `text-primary`  | Links, and any accent text: it reads on `--card` and `--popover`             |
+| `bg-dirty`      | The dirty dot, and nothing else. It is the one yellow in the app             |
 
-Yellow and navy are complements, so a thin wash of `--primary` cancels to grey on the dark surfaces: 10% to 20% comes out with almost no colour. At 20%, where selected rows sit, it has crossed over to a warm bronze. For a large wash in the dark theme use `--accent`, which stays blue.
+`--destructive` is red, used as `text-destructive` on `bg-destructive/12`.
+
+Components use the tokens, never a palette class (`emerald-500`) or a hex. The scene is the exception, because it draws the game's world and not the chrome: `sceneGround.ts`, `sceneColors.ts` and `axisColors.ts` keep their own colours.
+
+## Borders
+
+`--border` is an alpha hairline: white at 6% in dark, the foreground at 10% in light. A bare `border` is that at 65% (the `@layer base` default), felt rather than seen, and `border-border` is the whole hairline, for where two panels meet and for outline buttons. Panels meet with one line, not two. Nothing else gets a 1px rectangle by default.
+
+`--input` is the well a field sits in: `bg-input` under `border-border/70`. It is alpha too (black at 16% in dark, the foreground at 3% in light), so it is 2% darker on any surface, and it isn't a border colour.
+
+## Depth
+
+| Class            | What                                                                      | For                                   |
+| ---------------- | ------------------------------------------------------------------------- | ------------------------------------- |
+| `shadow-primary` | A 1px inset highlight in white at 16%, and 1 to 2px in `--primary` at 24% | Filled primary controls               |
+| `shadow-sm`      | 1 to 2px at 5%                                                            | Outline and secondary buttons, thumbs |
+| `shadow-md`      | 12px at 12%                                                               | Popovers, menus, tooltips, toasts     |
+| `shadow-lg`      | 24px at 12%                                                               | Dialogs                               |
+
+A button pressed scales to 0.97 and drops its shadow, except one that opens a popup, which holds still under it.
+
+## Glass
+
+`glass` is whatever floats over content: menus, popovers, tooltips, the viewport's controls. It is `--popover` at 80% with `backdrop-filter: blur(12px) saturate(1.2)`, so what's behind shows as colour without detail. A dialog isn't glass: the overlay behind it has already blurred the page.
+
+Put it on the element itself. A blur on a `::before` can't see past its parent while the parent fades, so it would pop in at the end. Submenus are safe because base-ui portals them beside their parent.
+
+## Motion
+
+120 to 180ms, ease-out, everywhere: hover tints, press, the tab underline, the segmented pill, and a popup's fade and 4px rise. The default transition is 150ms and `cubic-bezier(0, 0, 0.2, 1)`, so a bare `transition-colors` needs nothing more. No bounce, and nothing at 300ms. Every duration goes through `--motion` (Settings › Appearance).
 
 ## Difficulty colours
 
-`--difficulty-1` to `--difficulty-5` (`bg-difficulty-1`, `text-difficulty-5`) are the five Workshop difficulties, easiest first: white, green, blue and red bars, as the game draws them, and Baller's yellow warning sign. The first is `--foreground`, so in the light theme it is navy, and the yellow deepens to gold to stay visible on paper. A difficulty mark uses these, never a palette class.
+`--difficulty-1` to `--difficulty-5` (`bg-difficulty-1`, `text-difficulty-5`) are the five Workshop difficulties, easiest first: white, green, blue and red bars, and an amber warning sign for Baller. They follow the game's order, quieted to sit on the chrome. The first is `--foreground`, so in the light theme it is dark. A difficulty mark uses these, never a palette class.
 
-## Radii: two
+## Size colours
 
-- `rounded-control` (4px): buttons, inputs, menu items, chips, badges, and everything floating over the viewport.
-- `rounded-surface` (8px): dialogs, popovers, menus, cards.
+`--size-s`, `--size-m`, `--size-l` are a piece's size: green, blue-grey and amber, all well under a named colour. A tag is a filled tint, `bg-size-s/15 text-size-s`, or solid under `text-background`; a thumbnail's outline is `ring-size-s`.
 
-`rounded-xs`, `-sm` and `-md` resolve to the control radius and `-lg` and up to the surface radius, but write the two names. Panels are square. `rounded-full` is for true dots, switches, scrollbars and progress bars only.
+## Radii: three, and the pill
 
-Viewport chrome is one shape, rounded rects at the control radius (`viewControlStyle.ts`): no circles, no stadiums. A group is 28px high on the card colour at 80%, which follows the theme, and is divided into segments that fill it: no padding and no outer container, so no second radius.
+- `rounded-control` (8px): buttons, inputs, menu items, the track of a segmented control.
+- `rounded-surface` (10px): cards and grouped rows on a panel.
+- `rounded-sheet` (12px): what floats or stands alone: dialogs, popovers, menus, tooltips, toasts.
+- `rounded-full`: anything small and self-contained: tags, chips, badges, counts, the viewport toolbar and the status chip. Dots, switches, sliders and scrollbars too.
+
+`rounded-xs`, `-sm` and `-md` resolve to the control radius, `-lg` and `-xl` to the surface radius and `-2xl` and up to the sheet radius, but write the names. Panels are square.
+
+A segmented control is `ToggleGroup`, one track with a pill inside that slides to the pressed item. `pill="primary"` is for the active tool, and the neutral default is for a setting. Add `rounded-full` to the group for a pill-shaped track, and the pill and items follow. A `multiple` group has no one place to slide to, so each pressed item takes a selection wash of its own.
 
 ## Spacing: 4px steps, 8px between groups
 
 | What               | Size                                                                  |
 | ------------------ | --------------------------------------------------------------------- |
 | Inputs, buttons    | 28px (`h-7`); menu items too                                          |
+| Segmented control  | 28px: 24px items in a track with 2px of padding                       |
 | Rows               | 24px dense (outline), 32px with a thumbnail or second line            |
 | Icon buttons       | 24px target, 16px icon: `Button size="icon-sm"`, no size classes      |
 | Panel tab strip    | 28px                                                                  |
@@ -88,9 +115,13 @@ Viewport chrome is one shape, rounded rects at the control radius (`viewControlS
 | Dialog padding     | `p-dialog` (16px) at every dialog size; `px-dialog` for split dialogs |
 | Tooltip delay      | 300ms, the default; don't set `delay`                                 |
 
+## Icons
+
+One stroke family, Tabler, at one weight: 16px in rows, 14px in chips, 20px in the toolbar. An icon takes the text colour of where it sits, never a hue of its own, except a status icon.
+
 ## Status colours
 
-A sync status (`syncStatusOf`, `domain/linkState.ts`) wears one of three pairs: an opaque fill and the text on it. The text also has to read with no fill, on `--card` and `--popover`, because Settings › Game uses it alone. `SyncStatusChip.tsx` is the one place that names them; don't use Tailwind's palette (`emerald-500`) for a status.
+Status is semantic and quiet: a filled tint with its own text, only on badges, chips and icons, never as a surface or as the accent. The resting state of anything is the neutral tint. A sync status (`syncStatusOf`, `domain/linkState.ts`) wears one of three pairs. The text also has to read with no fill, on `--card` and `--popover`, because Settings › Game uses it alone. `Badge` has them as `variant="ok"`, `"warn"` and `"neutral"`; `SyncStatusChip.tsx` is the one place that picks between them for a status.
 
 | Fill                | Text                             | For                           |
 | ------------------- | -------------------------------- | ----------------------------- |
@@ -98,4 +129,4 @@ A sync status (`syncStatusOf`, `domain/linkState.ts`) wears one of three pairs: 
 | `bg-status-warn`    | `text-status-warn-foreground`    | Unsaved, Changed since export |
 | `bg-status-neutral` | `text-status-neutral-foreground` | Not exported, Published draft |
 
-The variables are `--status-ok`, `--status-warn`, `--status-neutral`, and each with `-foreground`. A hover is the fill at 80%, which is why the fill has to be opaque.
+The variables are `--status-ok`, `--status-warn`, `--status-neutral`, and each with `-foreground`. Each is the tint already mixed with the surface, about 12%, and opaque: a hover is the fill at 80%, which an alpha fill couldn't take.
