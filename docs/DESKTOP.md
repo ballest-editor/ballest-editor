@@ -157,7 +157,7 @@ There is no Map or Game menu: the menus act on the active tab's map, and the gam
 - Its menu (⋮, or a right-click) holds Open, Rename…, Duplicate…, Backups…, Export to game, Play and Reveal in folder. The ones that act on the open map open it first (`withProjectMapOpen`). Reveal in folder shows the project's maps folder, not the file.
 - The header holds the project's name, with its folder on hover, or an Untitled chip in Untitled Project, then New map, Import map and Project settings. Import map is disabled in Untitled Project, and its tooltip says why.
 - Every tab whose map has no file yet (a fresh one, any in Untitled Project, what a switch of projects left open) is a row of its own with the dot, above the project's maps. A click makes that tab active.
-- A project with no maps has one line and a New map button under those rows. In Untitled Project the line says that saving a map creates a project.
+- A project with no maps has one line and a New map button, centred in the space under those rows. In Untitled Project the header's chip says on hover that saving a map creates the project.
 - No thumbnails yet.
 
 ### Outline
@@ -234,14 +234,14 @@ The dialog opens by itself when the startup check finds the game or its maps fol
 
 ### Project settings
 
-`components/ProjectSettingsDialog.tsx`, in `SettingsShell`'s shape, has _Project › General_ on the left, then _Maps_ with an entry per map. The map showing has a Workshop page under its entry. Project › Project settings… opens on the project, and the map's settings button in the Inspector (`openDialog({ id: "mapSettings" })`) opens on the open map's entry. The web review build has only the one map's entry.
+`components/ProjectSettingsDialog.tsx`, in `SettingsShell`'s shape, has _Project › General_ on the left, then _Maps_ with an entry per map. The map showing has a Workshop page, an indented entry under its own, and that page's heading names the map. Project › Project settings… opens on the project, and the map's settings button in the Inspector (`openDialog({ id: "mapSettings" })`) opens on the open map's entry. The web review build has only the one map's entry.
 
 General has the project's name and its places:
 
 - The name is editable and goes into `ballest-project.json` through `renameProject` (IPC `ballest:project:rename`), and the folder keeps its name. In Untitled Project the field is empty, and typing a name names the project (`nameProject`), as the Save dialog does.
 - The places show their folder's name, with the path on hover, and a Reveal (`revealProject`, IPC `ballest:project:reveal` with `which`): the project folder, with Open another project… beside it; its `maps/`; its `.ballest/backups/`. In Untitled Project one row reads "Created when the project is named" in place of these. The game's maps folder, where exports go, has a Reveal too (`revealGamePath`).
 
-A map's Map page has the name, the file (its name, the path on hover, Reveal and Copy path), grid height and Export on save. Its Workshop page has the difficulty and tags. Grid height is here and not in Settings because it is kept per map. The Name field is how a map is renamed here, and it refuses a name the project has. The entry of a map open in a tab, active or not, edits that tab's document (undo steps there, saved when the tab is) and its prefs. A map not open anywhere is read from its file when its entry shows and edited on disk through the save path (`patchProjectMapEffect`: read, patch, `saveMap`, or `renameMap` when the name changed, so the old file goes to the backups), along with the prefs kept for it, and a rename carries the prefs and the entry to the new file.
+A map's Map page has the name, the file (its name, the path on hover, Reveal and Copy path) and Export on save. Its Workshop page has the difficulty and tags, and hovering a difficulty says how the game draws it. The Name field is how a map is renamed here, and it refuses a name the project has. The entry of a map open in a tab, active or not, edits that tab's document (undo steps there, saved when the tab is) and its prefs. A map not open anywhere is read from its file when its entry shows and edited on disk through the save path (`patchProjectMapEffect`: read, patch, `saveMap`, or `renameMap` when the name changed, so the old file goes to the backups), along with the prefs kept for it, and a rename carries the prefs and the entry to the new file.
 
 ### Status bar
 

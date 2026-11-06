@@ -25,6 +25,10 @@ Each class sets size, line height and weight together, so don't add `font-*`, an
 
 The variables are `--fg-secondary`, `--fg-tertiary`, `--fg-disabled`. They aren't `text-secondary`: `secondary` is shadcn's surface colour. Disabled is a colour, not `opacity-50`, except on filled buttons and on graphics (a switch, a slider).
 
+## Difficulty colours
+
+`--difficulty-1` to `--difficulty-5` (`bg-difficulty-1`, `text-difficulty-5`) are the five Workshop difficulties, easiest first. A difficulty mark uses these, never a palette class.
+
 ## Radii: two
 
 - `rounded-control` (4px): buttons, inputs, menu items, chips, badges, and everything floating over the viewport.
