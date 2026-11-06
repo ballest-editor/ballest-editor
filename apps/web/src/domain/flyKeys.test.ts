@@ -30,6 +30,18 @@ describe("needsLook", () => {
 })
 
 describe("flyingActions", () => {
+  it("lets Ctrl fly down at once only where it needs the look button, during a look", () => {
+    const justPressed = (
+      mode: MovementLookMode,
+      looking: boolean
+    ) => [...flyingActions(defaultKeybinds, mode, looking, (b, atOnce) => b === "ControlLeft" && atOnce)]
+    expect(justPressed("all", true)).toEqual(["moveDown"])
+    expect(justPressed("upDown", true)).toEqual(["moveDown"])
+    expect(justPressed("all", false)).toEqual([])
+    expect(justPressed("conflicting", true)).toEqual([])
+    expect(justPressed("nothing", true)).toEqual([])
+  })
+
   it("nothing: every key flies any time, W included", () => {
     expect(flying("nothing", false, "KeyW")).toEqual(["moveForward"])
     expect(flying("nothing", false, "KeyA", "Space")).toEqual(["moveLeft", "moveUp"])

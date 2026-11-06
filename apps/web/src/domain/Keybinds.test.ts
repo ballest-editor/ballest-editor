@@ -155,6 +155,14 @@ describe("HeldKeys: Left Ctrl = fly down vs Ctrl chords", () => {
     expect(keys.holds("ControlLeft", MODIFIER_HOLD_MS)).toBe(true)
   })
 
+  it("skips the hold when told to, but not a chord's suppression", () => {
+    const keys = new HeldKeys()
+    keys.press("ControlLeft", 0)
+    expect(keys.holds("ControlLeft", 0, true)).toBe(true)
+    keys.suppressModifiers()
+    expect(keys.holds("ControlLeft", 0, true)).toBe(false)
+  })
+
   it("a bound chord (Ctrl+Z) suppresses a modifier movement key until it's released", () => {
     const keys = new HeldKeys()
     keys.press("ControlLeft", 0)

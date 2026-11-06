@@ -45,7 +45,7 @@ const flyingNow = (keybinds: Keybinds, keys: HeldKeys, looking: boolean, now: nu
     keybinds,
     useEditor.getState().settings.camera.movementNeedsLook,
     looking,
-    (binding) => keys.holds(binding, now)
+    (binding, atOnce) => keys.holds(binding, now, atOnce)
   )
 
 /**

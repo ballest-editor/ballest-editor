@@ -444,8 +444,9 @@ export const MODIFIER_HOLD_MS = 120
 
 /**
  * Tracks held keys for continuous actions. A bare modifier (Ctrl/Shift/Alt) bound to a
- * held action only counts once it has been held for MODIFIER_HOLD_MS; pressing a key or
- * button that makes it a chord while it's down (Ctrl+Z, Ctrl+C, Ctrl+click with "down" on
+ * held action only counts once it has been held for MODIFIER_HOLD_MS, unless the caller
+ * says it counts at once (see `flyingActions`); pressing a key or button that makes it a
+ * chord while it's down (Ctrl+Z, Ctrl+C, Ctrl+click with "down" on
  * Left Ctrl) suppresses it until it's released. Movement keys (Ctrl+W flying down and
  * forward) don't. So chords take precedence over a modifier used as a movement key.
  */
@@ -488,14 +489,14 @@ export class HeldKeys {
     return bindings.some((binding) => this.holds(binding, now))
   }
 
-  /** Is the binding's key held, for a held action? (bare modifiers obey the chord rule) */
-  holds(binding: string, now: number): boolean {
+  /** Is the binding's key held, for a held action? (bare modifiers obey the chord rule; `atOnce` skips their wait) */
+  holds(binding: string, now: number, atOnce = false): boolean {
     if (binding.length === 0) return false
     const code = baseCodeOf(binding)
     const since = this.downAt.get(code)
     if (since === undefined) return false
     if (!MODIFIER_CODES.has(code)) return true
-    return !this.suppressed.has(code) && now - since >= MODIFIER_HOLD_MS
+    return !this.suppressed.has(code) && (atOnce || now - since >= MODIFIER_HOLD_MS)
   }
 }
 
