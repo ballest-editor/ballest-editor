@@ -60,7 +60,7 @@ const GRAPHIC = 3
 
 /** The steps' contrast on --card, as docs/design/ui-system.md gives them. */
 const STEPS = {
-  dark: { foreground: 16, "fg-secondary": 11, "fg-tertiary": 7.5, "fg-disabled": 3.2 },
+  dark: { foreground: 16, "fg-secondary": 8.5, "fg-tertiary": 5.5, "fg-disabled": 3.2 },
   light: { "fg-secondary": 10.7, "fg-tertiary": 6.3, "fg-disabled": 2.6 }
 }
 

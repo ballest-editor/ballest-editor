@@ -20,8 +20,8 @@ The font is the system's (`--font-sans`), so the type is never where the persona
 
 | Class               | Dark contrast on `--card` | Light contrast on `--card` | For                                                          |
 | ------------------- | ------------------------- | -------------------------- | ------------------------------------------------------------ |
-| `text-fg-secondary` | 11.2:1                    | 10.7:1                     | Eyebrows, section labels, field labels, inactive tabs, icons |
-| `text-fg-tertiary`  | 7.6:1                     | 6.3:1                      | Placeholders, helper copy, statuses, shortcut hints, counts  |
+| `text-fg-secondary` | 9.0:1                     | 10.7:1                     | Eyebrows, section labels, field labels, inactive tabs, icons |
+| `text-fg-tertiary`  | 6.4:1                     | 6.3:1                      | Placeholders, helper copy, statuses, shortcut hints, counts  |
 | `text-fg-disabled`  | 3.2:1                     | 2.6:1                      | Disabled text, and what's inside a disabled row but its name |
 
 The variables are `--fg-secondary`, `--fg-tertiary`, `--fg-disabled`. They aren't `text-secondary`: `secondary` is shadcn's surface colour. Disabled is a colour, not `opacity-50`, except on filled buttons and on graphics (a switch, a slider).
