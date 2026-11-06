@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
 import { shadeOf } from "../domain/sceneGround"
 import { AUTO_GRID_COLORS } from "../domain/Settings"
-import { sceneAxisColors } from "./axisColors"
+import { AXIS_BG_CLASSES, sceneAxisColors } from "./axisColors"
 import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { OUTLINE_COLORS } from "./selectionOutline"
 import { waterTopMaterial } from "./water"
@@ -50,6 +50,12 @@ describe("what's drawn over the scene", () => {
     const ground = SCENE_COLORS.dark
     assert.isAtLeast(contrast(AUTO_GRID_COLORS.dark.cell, ground), GRID_CELL)
     assert.isAtLeast(contrast(AUTO_GRID_COLORS.dark.section, ground), GRID_SECTION)
+  })
+
+  it("spells the axes out for Tailwind as they are", () => {
+    for (const axis of ["x", "y", "z"] as const) {
+      assert.strictEqual(AXIS_BG_CLASSES[axis], `bg-[${sceneAxisColors(true)[axis]}]`)
+    }
   })
 
   it("spells the ground out for Tailwind as it is", () => {
