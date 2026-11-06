@@ -3,6 +3,7 @@
  * the Save map dialog's last step, Rename and Duplicate. A map with no file yet is named first, and whatever was to
  * follow the save (the unsaved-changes prompt's next step, Export, Play) waits for it: `saveOpenMapThen`.
  */
+import type { CreateProjectPayload } from "@ballest/contracts"
 import { Effect } from "effect"
 import { asNewDraft, setLevelNames } from "../../domain/edits"
 import { mapFileNameOf, mapLabelOf } from "../../domain/factory"
@@ -168,14 +169,15 @@ export const saveMapAsEffect = (afterSave: Effect.Effect<void, unknown> = Effect
 export const saveMapAs = (afterSave?: Effect.Effect<void, unknown>) => run(saveMapAsEffect(afterSave))
 
 /**
- * The `saveAs` dialog's last step in Untitled Project: names the project, then saves the open map into it. A name that
- * can't be used stops here with its own error, and the map stays open, unsaved.
+ * The `saveAs` dialog's last step in Untitled Project: makes the project, which this window then is, and saves the open
+ * map into it. The other tabs stay open and are named into it by their own first Save. A project that can't be made
+ * stops here with its own error, and the map stays open, unsaved.
  */
-export const saveMapInNewProjectEffect = (name: string, afterSave?: Effect.Effect<void, unknown>) =>
-  nameProjectEffect(name).pipe(Effect.andThen(saveMapAsEffect(afterSave)))
+export const saveMapInNewProjectEffect = (project: CreateProjectPayload, afterSave?: Effect.Effect<void, unknown>) =>
+  nameProjectEffect(project).pipe(Effect.andThen(saveMapAsEffect(afterSave)))
 
-export const saveMapInNewProject = (name: string, afterSave?: Effect.Effect<void, unknown>) =>
-  run(saveMapInNewProjectEffect(name, afterSave))
+export const saveMapInNewProject = (project: CreateProjectPayload, afterSave?: Effect.Effect<void, unknown>) =>
+  run(saveMapInNewProjectEffect(project, afterSave))
 
 /** Rename: new name and creator, then the file moves to match (the old one goes to backups). */
 export const renameOpenMap = (displayName: string, creatorName: string) => {

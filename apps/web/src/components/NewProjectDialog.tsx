@@ -66,9 +66,8 @@ export function NewProjectForm({ actions, onCreate }: {
 }
 
 /**
- * File › New project… (desktop): the folder's name is all it asks, and where it opens comes next (`newProject`). The
- * dialog stays up until that's settled, so a name main refuses can be changed. Open project… is the way to use a folder
- * elsewhere.
+ * File › New project… (desktop): the folder's name is all it asks, and where it opens comes next (`newProject`). A name
+ * main refuses leaves the dialog up, so it can be changed. Open project… is the way to use a folder elsewhere.
  */
 export function NewProjectDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   return (

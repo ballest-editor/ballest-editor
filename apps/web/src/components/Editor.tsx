@@ -22,7 +22,7 @@ import {
 } from "../editor/actions"
 import { warmCatalog } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
-import { type Dialog, useEditor, useOpenMapLabel } from "../editor/store"
+import { type Dialog, projectTitleOf, useEditor, useOpenMapLabel } from "../editor/store"
 import { watchResolvedTheme } from "../editor/theme"
 import { useActionKeys } from "../editor/useActionKeys"
 import { Dock } from "./dock/Dock"
@@ -31,7 +31,6 @@ import { GameLinkDialog } from "./GameLinkDialog"
 import { ImportClashDialog } from "./ImportClashDialog"
 import { KeybindCheatSheet } from "./KeybindCheatSheet"
 import { NameMapDialog } from "./NameMapDialog"
-import { NewMapDialog } from "./NewMapDialog"
 import { NewProjectDialog } from "./NewProjectDialog"
 import { OverwriteChangedDialog } from "./OverwriteChangedDialog"
 import { DeletePrefabDialog, RenamePrefabDialog, SavePrefabDialog } from "./PrefabDialogs"
@@ -67,13 +66,19 @@ const useMotion = () => {
   }, [motion])
 }
 
-/** The window title: the open map, marked while it has unsaved changes. */
+/**
+ * The OS window's title. On desktop it is the project, as the top bar says, so the taskbar and alt-tab tell windows
+ * apart. A browser, which has no project, shows the open map, marked while it has unsaved changes.
+ */
 const useDocumentTitle = () => {
   const label = useOpenMapLabel()
   const dirty = useEditor((s) => s.dirty)
+  const project = useEditor(projectTitleOf)
   useEffect(() => {
-    document.title = `${dirty ? "• " : ""}${label} — Ballest Editor`
-  }, [label, dirty])
+    document.title = project === null
+      ? `${dirty ? "• " : ""}${label} — Ballest Editor`
+      : `${project} – Ballest Editor`
+  }, [label, dirty, project])
 }
 
 /**
@@ -155,7 +160,6 @@ export function Editor() {
         <Dock />
         <StatusBar />
       </div>
-      <NewMapDialog open={dialog === "new"} onClose={close} />
       <NameMapDialog mode="saveAs" open={dialog === "saveAs"} onClose={close} />
       <NameMapDialog mode="rename" open={dialog === "rename"} onClose={close} />
       <NameMapDialog mode="duplicate" open={dialog === "duplicate"} onClose={close} />

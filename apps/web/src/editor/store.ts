@@ -246,7 +246,6 @@ export interface ImportClash {
 export type DialogState =
   | {
     readonly id:
-      | "new"
       | "rename"
       | "duplicate"
       | "projectSettings"
@@ -317,7 +316,7 @@ export interface TabState {
   /** The map's "Export on save" (desktop, off by default; kept with the map's prefs). */
   readonly exportOnSave: boolean
   readonly selectedIds: Selection
-  /** Opened as the fresh map the app starts on (or closing the last tab leaves): see `isBlankTab`. */
+  /** Opened as a fresh map: the one the app starts on, New map's, the one closing the last tab leaves. See `isBlankTab`. */
   readonly fresh: boolean
   /** The group a double-click entered: viewport clicks reach its children (docs/DESKTOP.md § Groups and selection). */
   readonly enteredGroupId: string | null
@@ -333,7 +332,7 @@ export interface TabState {
  * Where `loadMap` puts a map: over the active tab's, over another tab's (`tabId`), or in a new tab after the active
  * one (`newTab`), which takes the active tab's place instead while that is blank (`isBlankTab`).
  */
-export type TabTarget = "active" | "newTab" | { readonly tabId: string }
+export type TabTarget = "active" | "newTab" | "addedTab" | { readonly tabId: string }
 
 export interface EditorState extends TabState {
   /** The document tabs, in order. */
@@ -821,7 +820,8 @@ export const useEditor = create<EditorState>()((set, get) => {
         return
       }
       set((s) => {
-        const replace = into !== "newTab" || isBlankTab(s)
+        if (into === "addedTab" && (interacting(s) || duplicateDragBase !== null)) return s
+        const replace = into === "newTab" ? isBlankTab(s) : into !== "addedTab"
         if (replace) return { ...tab, ...leftBehind, mapShownRequest: s.mapShownRequest + 1 }
         const tabId = freshTabId()
         const at = s.tabIds.indexOf(s.tabId) + 1
@@ -1334,11 +1334,19 @@ export const tabsWithoutFile = (s: EditorState): ReadonlyArray<string> =>
   })
 
 /**
- * A tab nobody has used: the fresh map the app starts on (or closing the last tab leaves), never saved, with no edits
- * and no history. A map opened into a new tab takes its place.
+ * A tab nobody has used: a fresh map (the one the app starts on, New map's, the one closing the last tab leaves), never
+ * saved, with no edits and no history. It holds nothing to lose: closing it asks nothing, a map opened into a new tab
+ * takes its place, and a switch of projects drops it.
  */
 export const isBlankTab = (tab: TabState): boolean =>
   tab.fresh && tab.file === null && !tab.dirty && tab.past.length === 0
+
+/** The blank tabs (`isBlankTab`), in tab order. */
+export const blankTabs = (s: EditorState): ReadonlyArray<string> =>
+  s.tabIds.filter((id) => {
+    const tab = tabStateOf(s, id)
+    return tab !== undefined && isBlankTab(tab)
+  })
 
 /** Whether this window must pick a project before anything else (docs/DESKTOP.md § Other windows). */
 export const isChooserRequired = (s: Pick<EditorState, "project">): boolean => s.project?.chooserRequired === true
@@ -1347,12 +1355,16 @@ export const isChooserRequired = (s: Pick<EditorState, "project">): boolean => s
 export const isModalOpen = (s: Pick<EditorState, "dialog" | "project">): boolean =>
   s.dialog !== null || isChooserRequired(s)
 
-/**
- * Whether opening a project would take anything over here, so it asks where it opens. Untitled Project with only its
- * untouched map has nothing to lose, and neither has the required chooser, whose pick is always this window.
- */
-export const hasWindowToTakeOver = (s: EditorState): boolean =>
-  !isChooserRequired(s) && (s.project?.current != null || s.tabIds.length > 1 || !isBlankTab(s))
+/** The window's title on desktop: the project, starred while it is Untitled Project; null without a project state. */
+export const projectTitleOf = (s: Pick<EditorState, "project">): string | null =>
+  s.project === null ? null : s.project.current?.name ?? "Untitled Project *"
+
+/** What the open tabs are called, in tab order (`tabLabelOf`). */
+export const tabLabels = (s: EditorState): ReadonlyArray<string> =>
+  s.tabIds.flatMap((id) => {
+    const tab = tabStateOf(s, id)
+    return tab === undefined ? [] : [tabLabelOf(tab)]
+  })
 
 /** A map's name as its tab and the title bar show it: its file's, else the name inside it. */
 export const tabLabelOf = (tab: TabState): string => {

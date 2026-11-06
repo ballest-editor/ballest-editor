@@ -9,10 +9,12 @@ import {
   itemFromPiece,
   newMapFile,
   placementTransform,
-  qualifyMaterialPath
+  qualifyMaterialPath,
+  untitledNameOf
 } from "./factory"
 import { DEFAULT_GOAL, DEFAULT_PLAYER_START } from "./level"
 import { classNameOf, Item, MapFile, objectPathOf } from "./MapFile"
+import { defaultProjectNameOf } from "./project"
 
 const catalog = Schema.decodeUnknownSync(Catalog)(fixture)
 const cube = catalog.pieces.find((p) => p.className === "BP_Prim_Cube")!
@@ -113,6 +115,22 @@ describe("factory", () => {
     )
     assert.strictEqual(classNameOf(cube.classPath), "BP_Prim_Cube")
     assert.strictEqual(objectPathOf("/Script/Engine.Material'/Game/M.M'"), "/Game/M.M")
+  })
+})
+
+describe("names a new map or project goes by", () => {
+  it("Untitled, then the lowest number the open tabs leave free", () => {
+    assert.strictEqual(untitledNameOf(new Set()), "Untitled")
+    assert.strictEqual(untitledNameOf(new Set(["Big Loop"])), "Untitled")
+    assert.strictEqual(untitledNameOf(new Set(["Untitled"])), "Untitled 2")
+    assert.strictEqual(untitledNameOf(new Set(["Untitled", "Untitled 2", "Untitled 4"])), "Untitled 3")
+    assert.strictEqual(untitledNameOf(new Set(["Untitled 2"])), "Untitled")
+  })
+
+  it("My Maps, numbered past the recent projects, whatever their case", () => {
+    assert.strictEqual(defaultProjectNameOf([]), "My Maps")
+    assert.strictEqual(defaultProjectNameOf(["Season 3"]), "My Maps")
+    assert.strictEqual(defaultProjectNameOf(["my maps", "MY MAPS 2"]), "My Maps 3")
   })
 })
 

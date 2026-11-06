@@ -229,6 +229,7 @@ export function SettingsDialog(props: {
   const defaults = useEditor((s) => s.keybindDefaults)
   const [listening, setListening] = useState<Listening | null>(null)
   const hasGame = useEditor((s) => s.capabilities.exportToGame)
+  const projects = useEditor((s) => s.capabilities.projects)
   const overridden = overriddenFolders(useEditor((s) => s.gamePaths))
   const gameLinkSummary = useGameLinkSummary()
   const updateCheck = useUpdateCheck()
@@ -410,6 +411,32 @@ export function SettingsDialog(props: {
                 checked={settings.general.exportOnSave}
                 onCheckedChange={(v) => update("general", { exportOnSave: v })}
               />
+            )
+          } satisfies Row
+        ]
+        : []),
+      ...(projects
+        ? [
+          {
+            id: "projectOpensIn",
+            ...setting("general", "projectOpensIn"),
+            label: "Open projects in",
+            description: "Where New project, Open project and Recent projects open a project.",
+            control: (
+              <Select
+                value={settings.general.projectOpensIn}
+                items={{ ask: "Ask each time", thisWindow: "This window", newWindow: "A new window" }}
+                onValueChange={(v) => v !== null && update("general", { projectOpensIn: v })}
+              >
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ask">Ask each time</SelectItem>
+                  <SelectItem value="thisWindow">This window</SelectItem>
+                  <SelectItem value="newWindow">A new window</SelectItem>
+                </SelectContent>
+              </Select>
             )
           } satisfies Row
         ]

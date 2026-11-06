@@ -72,6 +72,19 @@ export const copyNameOf = (displayName: string, creatorName: string, taken: Read
   }
 }
 
+/** `base`, else `base 2`, `base 3`... whichever comes first that isn't taken. */
+export const nextFreeName = (base: string, isTaken: (name: string) => boolean): string => {
+  if (!isTaken(base)) return base
+  for (let n = 2;; n++) {
+    const name = `${base} ${n}`
+    if (!isTaken(name)) return name
+  }
+}
+
+/** The name a new map goes by until its first Save: Untitled, or the next number the open tabs (`taken`) leave free. */
+export const untitledNameOf = (taken: ReadonlySet<string>): string =>
+  nextFreeName("Untitled", (name) => taken.has(name))
+
 export const identityTransform = (translation = { x: 0, y: 0, z: 0 }): ItemTransform => ({
   rotation: { x: 0, y: 0, z: 0, w: 1 },
   translation,

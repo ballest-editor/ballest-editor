@@ -1,4 +1,5 @@
 import {
+  type CreateProjectPayload,
   isMapFileName,
   isProjectName,
   MAP_EXTENSIONS,
@@ -107,8 +108,8 @@ export const backupsFolderIn = (path: Path.Path, project: string) => path.join(p
  * Which project is in use (docs/PROJECTS.md). A window has one project, and a project one window: it starts where
  * `decideStart` says and keeps its project whatever another running copy does; with none the window is Untitled Project
  * and nothing is on disk until the first Save names a project (`createNew`), or it must choose one
- * (`ProjectState.chooserRequired`). A project exists on disk from `createNew`, or from the first New map or Import into
- * a chosen folder (`ensure`). A project is never the game's maps folder or inside it, nor one another window has open.
+ * (`ProjectState.chooserRequired`). A project exists on disk from `createNew`, or from the first Save or Import into a
+ * chosen folder (`ensure`). A project is never the game's maps folder or inside it, nor one another window has open.
  * Its maps are `MapFiles`', their exports `MapExports`'.
  */
 export class Projects extends Context.Service<Projects, {
@@ -128,8 +129,11 @@ export class Projects extends Context.Service<Projects, {
   readonly prepareWindow: (target: ProjectTarget) => Effect.Effect<string, ProjectError>
   /** Keeps which map is open in the current project (`ProjectState.lastOpenMap`); null forgets it. */
   readonly rememberOpenMap: (fileName: string | null) => Effect.Effect<void, ProjectError>
-  /** Makes `<projectsFolder>/<name>` a project (fails when it holds one already) and uses it. */
-  readonly createNew: (name: string) => Effect.Effect<ProjectState, ProjectError>
+  /**
+   * Makes a project called `name` and uses it: in `folder`, one `pick` took, or `<projectsFolder>/<name>` without one.
+   * Fails when the folder holds a project already.
+   */
+  readonly createNew: (project: CreateProjectPayload) => Effect.Effect<ProjectState, ProjectError>
   /** Renames the current project in its `ballest-project.json` (made first if it isn't on disk yet). */
   readonly setName: (name: string) => Effect.Effect<ProjectState, ProjectError>
   /** One of the current project's folders, when it exists: the project, its `maps/`, its backups. */
@@ -295,15 +299,18 @@ export class Projects extends Context.Service<Projects, {
       return yield* use(raw)
     })
 
-    /** Makes `project` on disk if it isn't yet: `maps/`, `.ballest/`, `ballest-project.json`, `.gitignore`. */
-    const ensureAt = Effect.fnUntraced(function*(project: string) {
+    /**
+     * Makes `project` on disk if it isn't yet: `maps/`, `.ballest/`, `ballest-project.json` (called `name`, by default
+     * after its folder) and `.gitignore`.
+     */
+    const ensureAt = Effect.fnUntraced(function*(project: string, name: string = path.basename(project)) {
       yield* outsideGame(project)
       const writeIfMissing = (file: string, write: Effect.Effect<void, unknown>) =>
         fs.exists(file).pipe(Effect.flatMap((exists) => exists ? Effect.void : write))
       yield* Effect.gen(function*() {
         yield* fs.makeDirectory(mapsFolderIn(path, project), { recursive: true })
         yield* fs.makeDirectory(path.join(project, ".ballest"), { recursive: true })
-        const file: ProjectFile = { formatVersion: 1, name: path.basename(project), exportTarget: "game" }
+        const file: ProjectFile = { formatVersion: 1, name, exportTarget: "game" }
         yield* writeIfMissing(path.join(project, PROJECT_FILE), writeJson(fs, path.join(project, PROJECT_FILE), file))
         yield* writeIfMissing(
           path.join(project, ".gitignore"),
@@ -313,7 +320,7 @@ export class Projects extends Context.Service<Projects, {
       return project
     })
 
-    const ensure = inUse.pipe(Effect.flatMap(ensureAt))
+    const ensure = inUse.pipe(Effect.flatMap((project) => ensureAt(project)))
 
     const setName = Effect.fn("Projects.setName")(function*(name: string) {
       const trimmed = name.trim()
@@ -346,11 +353,12 @@ export class Projects extends Context.Service<Projects, {
         }))
       )
 
-    /** The folder New project would make for `name`, refused when it can't; nothing is written. */
-    const newFolder = Effect.fnUntraced(function*(name: string) {
+    /** The folder New project would make, refused when it can't; nothing is written. */
+    const newFolder = Effect.fnUntraced(function*({ folder: chosen, name }: CreateProjectPayload) {
       const trimmed = name.trim()
       if (!isProjectName(trimmed)) return yield* projectError("projectName", name)()
-      const folder = path.join(projectsFolder, trimmed)
+      if (chosen !== undefined) yield* known(chosen)
+      const folder = chosen === undefined ? path.join(projectsFolder, trimmed) : path.resolve(chosen)
       const taken = yield* fs.exists(path.join(folder, PROJECT_FILE)).pipe(Effect.orElseSucceed(() => false))
       if (taken) return yield* projectError("projectExists", folder)()
       yield* outsideGame(folder)
@@ -358,15 +366,15 @@ export class Projects extends Context.Service<Projects, {
       return folder
     })
 
-    const createNew = Effect.fn("Projects.createNew")(function*(name: string) {
-      const folder = yield* newFolder(name)
-      yield* ensureAt(folder)
+    const createNew = Effect.fn("Projects.createNew")(function*(project: CreateProjectPayload) {
+      const folder = yield* newFolder(project)
+      yield* ensureAt(folder, project.name.trim())
       return yield* use(folder)
     })
 
     /** `target`'s folder, refused as opening it would be. */
     const folderOfTarget = Effect.fnUntraced(function*(target: ProjectTarget) {
-      if (target._tag === "New") return yield* newFolder(target.name)
+      if (target._tag === "New") return yield* newFolder(target)
       yield* known(target.path)
       yield* outsideGame(target.path)
       yield* free(target.path)
@@ -379,7 +387,7 @@ export class Projects extends Context.Service<Projects, {
 
     const prepareWindow = Effect.fn("Projects.prepareWindow")(function*(target: ProjectTarget) {
       const folder = yield* folderOfTarget(target)
-      return target._tag === "New" ? yield* ensureAt(folder) : folder
+      return target._tag === "New" ? yield* ensureAt(folder, target.name.trim()) : folder
     })
 
     return Projects.of({

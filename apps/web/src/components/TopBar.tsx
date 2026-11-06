@@ -4,10 +4,9 @@ import { Button } from "@workspace/ui/components/button"
 import { Kbd } from "@workspace/ui/components/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { useEffect } from "react"
 import { formatBinding } from "../domain/Keybinds"
 import { playMap } from "../editor/actions"
-import { PREFAB_TAB_STAYS_HERE, useEditor, useOpenPrefab } from "../editor/store"
+import { PREFAB_TAB_STAYS_HERE, projectTitleOf, useEditor, useOpenPrefab } from "../editor/store"
 import { MenuBar } from "./MenuBar"
 
 /** Play (desktop): exports the open map and races it in the game. Its tooltip shows the keybind (F5). */
@@ -61,11 +60,7 @@ const TITLE_BAR_CLASSES = [
  */
 function ProjectTitle() {
   const state = useEditor((s) => s.project)
-  const name = state === null ? null : state.current === null ? "Untitled Project *" : state.current.name
-  // the OS window title too, so the taskbar and alt-tab tell projects apart
-  useEffect(() => {
-    document.title = name === null ? "Ballest Editor" : `${name} – Ballest Editor`
-  }, [name])
+  const name = useEditor(projectTitleOf)
   if (state === null || name === null) return null
   const project = state.current
   return (

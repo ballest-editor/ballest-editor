@@ -17,7 +17,7 @@ import {
   type TestDisk,
   userPrefabFile
 } from "../../test/desktopBridge"
-import { layerFor, reset, s } from "../../test/editorActions"
+import { createNewMap, layerFor, reset, s } from "../../test/editorActions"
 import { objectAt, parseJson } from "../../test/json"
 import { changedPrefab, PREFAB_TEXT } from "../../test/prefabs"
 import { repoRoot } from "../../test/samples"
@@ -25,7 +25,7 @@ import { sceneRegistry } from "../sceneRegistry"
 import { tabStateOf, useEditor } from "../store"
 import { restorePrefabBackupEffect } from "./backups"
 import { exportToGameEffect, playEffect } from "./exportPlay"
-import { createNewMap, openProjectMapFile } from "./maps"
+import { openProjectMapFile } from "./maps"
 import {
   checkPrefabs,
   deletePrefabEffect,
@@ -288,7 +288,8 @@ describe("instances following their definition", () => {
         const parked = tabStateOf(s(), mapTab)!
         assert.strictEqual(instance(id, parked.doc)?.prefab?.hash, hashOf(USER))
         assert.isTrue(parked.dirty)
-        assert.lengthOf(parked.past.filter((step) => !step.selectionOnly), 2)
+        // its name, the placing and the update
+        assert.lengthOf(parked.past.filter((step) => !step.selectionOnly), 3)
       })
     ))
 

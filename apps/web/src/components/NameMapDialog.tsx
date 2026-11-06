@@ -1,16 +1,19 @@
-import { Input } from "@workspace/ui/components/input"
-import { Label } from "@workspace/ui/components/label"
 import { useMemo, useState } from "react"
 import { riskyClassesIn } from "../domain/Catalog"
 import { copyNameOf, isValidName, mapFileNameOf } from "../domain/factory"
 import { unconfirmedPropertiesIn } from "../domain/itemProperties"
 import { classNameOf } from "../domain/MapFile"
-import { pathInFolder } from "../domain/paths"
-import { isProjectName } from "../domain/project"
-import { duplicateMap, playAsNewDraft, renameOpenMap, saveMapAs, saveMapInNewProject } from "../editor/actions"
+import {
+  canMakeProject,
+  duplicateMap,
+  playAsNewDraft,
+  renameOpenMap,
+  saveMapAs,
+  saveMapInNewProject
+} from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { type MapCreator, MapNameDialog, useMapCreator } from "./MapNameDialog"
-import { PathText } from "./PathText"
+import { NewProjectFields, useNewProjectDraft } from "./NewProjectFields"
 
 /**
  * Names the open map before it is written: `saveAs` for a map that has no file yet (desktop: into the project) or for
@@ -36,12 +39,9 @@ export function NameMapDialog(
   const catalog = useEditor((s) => s.catalog)
   const projects = useEditor((s) => s.capabilities.projects)
   const project = useEditor((s) => s.project?.current ?? null)
-  const projectsFolder = useEditor((s) => s.project?.projectsFolder ?? "")
-  // Saving into Untitled Project names the project first (docs/PROJECTS.md § Shell)
+  // The first Save in Untitled Project makes the project too (docs/DESKTOP.md § Projects and maps)
   const namesProject = projects && mode === "saveAs" && project === null
-  const [projectDraft, setProjectDraft] = useState("")
-  const projectTrimmed = projectDraft.trim()
-  const projectOk = !namesProject || isProjectName(projectTrimmed)
+  const newProject = useNewProjectDraft()
   const projectMaps = useEditor((s) => s.projectMaps)
   const fileName = useEditor((s) => s.file?.name ?? null)
   // What the unsaved-changes prompt's Save (or Export, Play) goes on to do once the map is saved (close, a new map...):
@@ -72,6 +72,7 @@ export function NameMapDialog(
     if (open) {
       setName(startName())
       ownCreator.setDraft(mapCreator || settingsCreator.name)
+      newProject.reset()
     }
   }
 
@@ -80,6 +81,8 @@ export function NameMapDialog(
   // Duplicate may write over another map (it goes to the backups); Rename and Save never do.
   const replaces = clash && copies
   const submit = async () => {
+    // a project main refuses leaves the dialog up, so its name or folder can be changed
+    if (namesProject && (await canMakeProject(newProject.project)) !== true) return
     await creator.persist()
     onClose()
     if (mode === "duplicate") await duplicateMap(name, creator.name, replaces)
@@ -87,14 +90,18 @@ export function NameMapDialog(
     else if (mode === "rename") await renameOpenMap(name, creator.name)
     else {
       useEditor.getState().renameLevel(name, creator.name)
-      await (namesProject ? saveMapInNewProject(projectTrimmed, afterSave) : saveMapAs(afterSave))
+      await (namesProject ? saveMapInNewProject(newProject.project, afterSave) : saveMapAs(afterSave))
     }
   }
 
   const copy = {
     saveAs: projects
       ? namesProject
-        ? { title: "Save map", note: "Names the project it goes in and saves it there.", submit: "Save" }
+        ? {
+          title: "Save map",
+          note: "Makes a project and saves the map in it. This window becomes that project.",
+          submit: "Save"
+        }
         : { title: "Save map", note: `Saves it in ${project?.name ?? "the project"}.`, submit: "Save" }
       : {
         title: "Export map",
@@ -144,34 +151,11 @@ export function NameMapDialog(
       }
       submitLabel={replaces ? "Replace" : copy.submit}
       submitReplaces={replaces}
-      before={namesProject
-        ? (
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="saveAs-project">Project name</Label>
-            <Input
-              id="saveAs-project"
-              autoFocus
-              value={projectDraft}
-              placeholder="My tracks"
-              aria-invalid={projectTrimmed !== "" && !projectOk}
-              onChange={(e) => setProjectDraft(e.target.value)}
-            />
-            <div className="text-xs text-muted-foreground">
-              {projectTrimmed !== "" && !projectOk
-                ? "Letters, digits, spaces, - and _ only."
-                : (
-                  <PathText block>
-                    {projectTrimmed === "" ? projectsFolder : pathInFolder(projectsFolder, projectTrimmed)}
-                  </PathText>
-                )}
-            </div>
-          </div>
-        )
-        : undefined}
       canSubmit={isValidName(name) && isValidName(creator.name) && risky.rejected.length === 0 &&
-        (!clash || replaces) && projectOk}
+        (!clash || replaces) && (!namesProject || newProject.ok)}
       onSubmit={submit}
     >
+      {namesProject && <NewProjectFields draft={newProject} />}
       {mode === "newDraft" && (
         <p className="text-xs text-muted-foreground">
           {levelData.levelDisplayName} is the draft of a Workshop map (item{" "}
