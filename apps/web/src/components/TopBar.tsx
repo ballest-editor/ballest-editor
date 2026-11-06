@@ -11,7 +11,10 @@ import { MenuBar } from "./MenuBar"
 /** Out of the title bar's drag region: a drag region takes the pointer, so a tooltip inside one never shows. */
 const NO_DRAG = "[-webkit-app-region:no-drag]"
 
-/** Play (desktop): exports the open map and races it in the game. Its tooltip shows the keybind (F5). */
+/**
+ * Play (desktop): exports the open map and races it in the game. Its tooltip shows the keybind (F5). It opens along the
+ * bar: Play sits over the inspector's tab strip, so anything below would cover the strip's tab and ⋯.
+ */
 function PlayButton() {
   const canPlay = useEditor((s) => s.capabilities.play)
   const keybinds = useEditor((s) => s.keybinds.playMap)
@@ -29,7 +32,7 @@ function PlayButton() {
             Play
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="bottom">{PREFAB_TAB_STAYS_HERE}</TooltipContent>
+        <TooltipContent side="left">{PREFAB_TAB_STAYS_HERE}</TooltipContent>
       </Tooltip>
     )
   }
@@ -39,7 +42,7 @@ function PlayButton() {
         {icon}
         Play
       </TooltipTrigger>
-      <TooltipContent side="bottom">
+      <TooltipContent side="left">
         Export and race it in the game
         {keybinds.map((binding) => <KeyChip key={binding} binding={binding} />)}
       </TooltipContent>

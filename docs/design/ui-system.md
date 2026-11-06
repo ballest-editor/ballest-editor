@@ -121,6 +121,7 @@ A segmented control is `ToggleGroup`, one track with a pill inside that slides t
 | Document tab strip | 32px, as is a popped-out panel's strip (the window controls' height)                  |
 | Dialog padding     | `p-dialog` (16px) at every dialog size; `px-dialog` for split dialogs                 |
 | Tooltip delay      | 300ms, the default; don't set `delay`                                                 |
+| Tooltip side       | Down from top strips, up from the status bar; along the strip to clear a control      |
 
 ## Icons
 

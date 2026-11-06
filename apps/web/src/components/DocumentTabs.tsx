@@ -5,11 +5,13 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuShortcut,
   ContextMenuTrigger
 } from "@workspace/ui/components/context-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { type DragEvent, type MouseEvent, useEffect, useRef, useState } from "react"
+import type { KeybindAction } from "../domain/Keybinds"
 import { LINK_STATE_LABELS, type LinkedMap, linkStateOf } from "../domain/linkState"
 import { prefabTierLabel } from "../domain/prefab"
 import type { ViewLayoutKind } from "../domain/viewLayout"
@@ -23,6 +25,14 @@ import {
 } from "../editor/actions"
 import { useEditor, useTabSummary } from "../editor/store"
 import { StripButton } from "./dock/StripButton"
+import { KeyChip } from "./KeyChip"
+
+/**
+ * How far along the strip a tab's tooltip opens: past the tab's ×, and on the last tab past the + too. Along it, not
+ * under it: the pane's picker starts 12px below the strip, so a tooltip there lands on it wherever it's aligned.
+ */
+const TIP_PAST_CLOSE = 36
+const TIP_PAST_NEW_MAP = 68
 
 /** A tab being dragged along the strip, and the gap it would land in. */
 type TabDrag = { readonly id: string; readonly at: number } | null
@@ -89,6 +99,16 @@ export function DocumentTabs() {
         </StripButton>
       </div>
     </div>
+  )
+}
+
+/** A menu row's key. The keys act on the active tab, so another tab's menu leaves them out. */
+function TabShortcut({ action, active }: { readonly action: KeybindAction; readonly active: boolean }) {
+  const binding = useEditor((s) => s.keybinds[action][0])
+  return !active || binding === undefined ? null : (
+    <ContextMenuShortcut className="pl-6">
+      <KeyChip binding={binding} />
+    </ContextMenuShortcut>
   )
 }
 
@@ -160,7 +180,9 @@ function DocumentTab({ id, index, drag, onDrag }: {
         onDragOver={onDragOverTab}
       >
         {/* Only under the pointer, and not over the tab's menu: focus coming back from one is no reason to show it. */}
+        {/* Not hoverable: it lies over the next tabs, and the pointer has to reach them. */}
         <Tooltip
+          disableHoverablePopup
           open={hinted}
           onOpenChange={(open, { reason }) => setHinted(open && reason === "trigger-hover" && !menuOpen)}
         >
@@ -183,7 +205,9 @@ function DocumentTab({ id, index, drag, onDrag }: {
               </span>
             )}
           </TooltipTrigger>
-          <TooltipContent side="bottom">{label} · {tabStatusOf(unsaved, map, blank)}</TooltipContent>
+          <TooltipContent side="right" sideOffset={last ? TIP_PAST_NEW_MAP : TIP_PAST_CLOSE}>
+            {label} · {tabStatusOf(unsaved, map, blank)}
+          </TooltipContent>
         </Tooltip>
         <span className="relative flex size-6 shrink-0 items-center justify-center">
           {unsaved && (
@@ -208,7 +232,10 @@ function DocumentTab({ id, index, drag, onDrag }: {
       </ContextMenuTrigger>
       {/* Focus goes back to the page, as after a click on the tab: on the tab, Escape would light up its ring. */}
       <ContextMenuContent finalFocus={false}>
-        <ContextMenuItem onClick={() => void closeTab(id)}>Close</ContextMenuItem>
+        <ContextMenuItem onClick={() => void closeTab(id)}>
+          Close
+          <TabShortcut action="closeTab" active={active} />
+        </ContextMenuItem>
         <ContextMenuItem disabled={!several} onClick={() => void closeOtherTabs(id)}>Close others</ContextMenuItem>
         <ContextMenuItem disabled={last} onClick={() => void closeTabsToRight(id)}>Close to the right</ContextMenuItem>
         <ContextMenuSeparator />
@@ -228,6 +255,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
               onClick={() => fileName !== null && void nameProjectMap(fileName, "duplicate")}
             >
               Duplicate…
+              <TabShortcut action="saveMapAs" active={active} />
             </ContextMenuItem>
             <ContextMenuItem disabled={fileName === null} onClick={() => void revealProject()}>
               Reveal
