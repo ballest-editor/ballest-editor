@@ -3,7 +3,7 @@
  * Loading is per field: anything missing or invalid falls back to its default, so old
  * or hand-edited saves never break the editor.
  */
-import { Option, Predicate, Schema } from "effect"
+import { Equal, Option, Predicate, Schema, Struct } from "effect"
 import { movementLookModes } from "./flyKeys"
 import { PLACE_DISTANCE } from "./placement"
 import { SCENE_COLORS, shadeOf } from "./sceneGround"
@@ -102,6 +102,17 @@ export const PanelSettings = Schema.Struct({
   piecesView: Schema.Literals(["list", "grid"])
 })
 
+/** The axis gizmo's sizes, as the Display popover offers them. */
+export const gizmoSizes = ["s", "m", "l"] as const
+
+/** The viewport's axis gizmo, changed from the Display popover rather than the Settings dialog. */
+export const GizmoSettings = Schema.Struct({
+  /** How big it is drawn. `m` is its usual size. */
+  size: Schema.Literals(gizmoSizes),
+  /** Whether it shows while the selection is a group. */
+  showForGroups: Schema.Boolean
+})
+
 export const Settings = Schema.Struct({
   general: GeneralSettings,
   editor: EditorSettings,
@@ -109,7 +120,8 @@ export const Settings = Schema.Struct({
   appearance: AppearanceSettings,
   lighting: LightingSettings,
   snapping: SnappingSettings,
-  panels: PanelSettings
+  panels: PanelSettings,
+  gizmo: GizmoSettings
 })
 export type Settings = typeof Settings.Type
 
@@ -141,7 +153,8 @@ export const defaultSettings: Settings = {
     rotationEnabled: false,
     rotationStep: DEFAULT_ROTATION_STEP
   },
-  panels: { piecesView: "list" }
+  panels: { piecesView: "list" },
+  gizmo: { size: "m", showForGroups: true }
 }
 
 type Section = keyof Settings
@@ -153,7 +166,8 @@ const sections: ReadonlyArray<Section> = [
   "appearance",
   "lighting",
   "snapping",
-  "panels"
+  "panels",
+  "gizmo"
 ]
 
 /** The fixed grid colours older saves stored; they now mean "automatic". */
@@ -204,6 +218,19 @@ export const gridColorsOf = (
   const auto = AUTO_GRID_COLORS[dark ? "dark" : "light"]
   return { cell: appearance.gridCellColor ?? auto.cell, section: appearance.gridSectionColor ?? auto.section }
 }
+
+/** `settings` with all the Display popover shows put back to the defaults, and nothing else. */
+export const withDefaultDisplay = (settings: Settings): Settings => ({
+  ...settings,
+  appearance: {
+    ...settings.appearance,
+    ...Struct.pick(defaultSettings.appearance, ["gridVisible", "waterVisible", "gridCellColor", "gridSectionColor"])
+  },
+  lighting: defaultSettings.lighting,
+  gizmo: defaultSettings.gizmo
+})
+
+export const isDefaultDisplay = (settings: Settings): boolean => Equal.equals(withDefaultDisplay(settings), settings)
 
 /** Stored JSON -> Settings, field by field; invalid or missing fields keep their defaults. */
 export const mergeSettings = (raw: unknown, defaults: Settings = defaultSettings): Settings => {
