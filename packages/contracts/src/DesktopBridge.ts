@@ -352,6 +352,24 @@ export const MapBackupFile = Schema.Struct({
 })
 export type MapBackupFile = typeof MapBackupFile.Type
 
+/** A backup of a prefab, by its tier: the project's are in its `.ballest/backups/`, the game's in `<userData>/backups/`. */
+export const PrefabBackupRef = Schema.Struct({ tier: PrefabTier, id: BackupId })
+export type PrefabBackupRef = typeof PrefabBackupRef.Type
+
+/** A previous version of a prefab, which may be one that has since been deleted or renamed. */
+export const PrefabBackup = Schema.Struct({ ...PrefabBackupRef.fields, name: PrefabName, at: IsoTime })
+export type PrefabBackup = typeof PrefabBackup.Type
+
+export const PrefabBackups = Schema.Array(PrefabBackup)
+export type PrefabBackups = typeof PrefabBackups.Type
+
+/** What a prefab's backup holds, as a tier's list says it of a prefab. */
+export const PrefabBackupSummary = Schema.Struct({
+  itemCount: PrefabInfo.fields.itemCount,
+  firstClass: PrefabInfo.fields.firstClass
+})
+export type PrefabBackupSummary = typeof PrefabBackupSummary.Type
+
 export const WindowThemePayload = Schema.Struct({ dark: Schema.Boolean })
 export type WindowThemePayload = typeof WindowThemePayload.Type
 
@@ -732,6 +750,12 @@ export const DesktopMethods = {
   renamePrefab: { payload: RenamePrefabPayload, result: PrefabInfo },
   /** Shows a tier's folder in the file manager; false when it has none yet. */
   revealPrefabs: { payload: PrefabTierPayload, result: Schema.Boolean },
+  /** The prefabs' backups in both tiers, newest first. */
+  listPrefabBackups: { payload: noPayload, result: PrefabBackups },
+  /** What a backup `listPrefabBackups` listed holds; any other name is refused. */
+  describePrefabBackup: { payload: PrefabBackupRef, result: PrefabBackupSummary },
+  /** Writes a backup back as its prefab, keeping the file it replaces in the backups. */
+  restorePrefabBackup: { payload: PrefabBackupRef, result: PrefabInfo },
   /** The native open dialog for a map file anywhere; null when cancelled. The file may then be imported. */
   pickImport: { payload: noPayload, result: PickImportResult },
   /** Copies a picked file into the project and records where it came from (a map it replaces goes to backups). */

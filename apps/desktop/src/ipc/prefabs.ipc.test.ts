@@ -1,4 +1,11 @@
-import { InvokeChannels, PrefabInfo, PrefabInfos, PrefabRead } from "@ballest/contracts"
+import {
+  InvokeChannels,
+  PrefabBackups,
+  PrefabBackupSummary,
+  PrefabInfo,
+  PrefabInfos,
+  PrefabRead
+} from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, FileSystem, Path } from "effect"
 import { vi } from "vitest"
@@ -106,12 +113,112 @@ describe("prefabs over IPC", () => {
       })
     ))
 
-  it.effect("leaves prefab backups out of Recover's list", () =>
+  it.effect("keeps prefab backups out of the maps' list, and lists them by tier", () =>
     withHandlers(({ fake }) =>
       Effect.gen(function*() {
         yield* fake.invoke(InvokeChannels.writePrefab, { tier: "user", name: "u", text: prefabText(1), replace: false })
         yield* fake.invoke(InvokeChannels.deletePrefab, { tier: "user", name: "u" })
+        yield* fake.invoke(InvokeChannels.writePrefab, {
+          tier: "project",
+          name: "p",
+          text: prefabText(2),
+          replace: false
+        })
+        yield* fake.invoke(InvokeChannels.writePrefab, {
+          tier: "project",
+          name: "p",
+          text: prefabText(3),
+          replace: true
+        })
         assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.listBackups), [])
+        const kept = yield* fake.invokeAs(PrefabBackups, InvokeChannels.listPrefabBackups)
+        assert.sameDeepMembers(kept.map(({ name, tier }) => ({ name, tier })), [
+          { name: "u", tier: "user" },
+          { name: "p", tier: "project" }
+        ])
+        const ref = { id: kept.find((backup) => backup.name === "p")?.id, tier: "project" }
+        assert.deepStrictEqual(yield* fake.invokeAs(PrefabBackupSummary, InvokeChannels.describePrefabBackup, ref), {
+          itemCount: 3,
+          firstClass: "/Game/A.A_C"
+        })
+      })
+    ))
+
+  it.effect("restores a project prefab, keeping the file it replaces", () =>
+    withHandlers(({ fake, project }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const file = path.join(project, "prefabs", "p.json")
+        const write = (text: string, replace: boolean) =>
+          fake.invoke(InvokeChannels.writePrefab, { tier: "project", name: "p", text, replace })
+        yield* write(prefabText(1), false)
+        yield* write(prefabText(2), true)
+        const [first] = yield* fake.invokeAs(PrefabBackups, InvokeChannels.listPrefabBackups)
+
+        const restored = yield* fake.invokeAs(PrefabInfo, InvokeChannels.restorePrefabBackup, {
+          tier: "project",
+          id: first!.id
+        })
+        assert.deepInclude(restored, { name: "p", tier: "project", path: file, itemCount: 2 })
+        assert.strictEqual(yield* fs.readFileString(file), prefabText(1))
+
+        const after = yield* fake.invokeAs(PrefabBackups, InvokeChannels.listPrefabBackups)
+        assert.lengthOf(after, 2)
+        const kept = yield* fs.readFileString(path.join(project, ".ballest", "backups", after[0]!.id))
+        assert.strictEqual(kept, prefabText(2))
+      })
+    ))
+
+  it.effect("brings back a deleted prefab in the game's folder, byte for byte", () =>
+    withHandlers(({ fake, steam }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const file = path.join(yield* userFolder(steam.maps), "u.json")
+        const text = `\uFEFF${prefabText(1)}\r\n`
+        yield* fake.invoke(InvokeChannels.writePrefab, { tier: "user", name: "u", text, replace: false })
+        yield* fake.invoke(InvokeChannels.deletePrefab, { tier: "user", name: "u" })
+        assert.isFalse(yield* fs.exists(file))
+
+        const [kept] = yield* fake.invokeAs(PrefabBackups, InvokeChannels.listPrefabBackups)
+        yield* fake.invoke(InvokeChannels.restorePrefabBackup, { tier: "user", id: kept!.id })
+        assert.deepStrictEqual(yield* fs.readFile(file), bytes(text))
+        assert.deepStrictEqual(
+          (yield* fake.invokeAs(PrefabInfos, InvokeChannels.listPrefabs, { tier: "user" })).map((p) => p.name),
+          ["u"]
+        )
+      })
+    ))
+
+  it.effect("writes nothing when the prefab already holds the backup's bytes", () =>
+    withHandlers(({ fake }) =>
+      Effect.gen(function*() {
+        const write = (text: string) =>
+          fake.invoke(InvokeChannels.writePrefab, { tier: "project", name: "p", text, replace: true })
+        yield* write(prefabText(1))
+        yield* write(prefabText(2))
+        yield* write(prefabText(1))
+        const before = yield* fake.invokeAs(PrefabBackups, InvokeChannels.listPrefabBackups)
+        yield* fake.invoke(InvokeChannels.restorePrefabBackup, { tier: "project", id: before.at(-1)?.id })
+        assert.lengthOf(yield* fake.invokeAs(PrefabBackups, InvokeChannels.listPrefabBackups), before.length)
+      })
+    ))
+
+  it.effect("refuses a name it didn't write, a map's backup and a name that would leave the folder", () =>
+    withHandlers(({ fake }) =>
+      Effect.gen(function*() {
+        const ids = [
+          "notes.json",
+          "2026-10-31T12-00-00-000Z ../../up.json",
+          "2026-10-31T12-00-00-000Z Map_LevelEditorMain&Big Loop_Isaac.balledit"
+        ]
+        for (const id of ids) {
+          for (const channel of [InvokeChannels.describePrefabBackup, InvokeChannels.restorePrefabBackup]) {
+            const refused = yield* Effect.flip(fake.invoke(channel, { tier: "user", id }))
+            assert.match(String(refused.cause), /doesn't exist any more/)
+          }
+        }
       })
     ))
 

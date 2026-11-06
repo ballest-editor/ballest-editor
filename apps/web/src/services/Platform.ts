@@ -22,6 +22,9 @@ import type {
   PlayResult,
   PlaySessionEnded,
   PluginStatus,
+  PrefabBackupRef,
+  PrefabBackups,
+  PrefabBackupSummary,
   PrefabInfo,
   PrefabInfos,
   PrefabRead,
@@ -58,6 +61,7 @@ export type {
   PlayResult,
   PlaySessionEnded,
   PluginStatus,
+  PrefabBackup,
   PrefabInfo,
   PrefabRef,
   PrefabTier,
@@ -198,6 +202,11 @@ export class Platform extends Context.Service<Platform, {
    */
   readonly listBackups: Effect.Effect<MapBackups, PlatformError>
   readonly readBackup: (ref: BackupRef) => Effect.Effect<MapBackupFile, PlatformError>
+  /** The prefabs' backups in both tiers, newest first (desktop). */
+  readonly listPrefabBackups: Effect.Effect<PrefabBackups, PlatformError>
+  readonly describePrefabBackup: (ref: PrefabBackupRef) => Effect.Effect<PrefabBackupSummary, PlatformError>
+  /** Writes a backup back as its prefab; the file it replaces goes to the backups. */
+  readonly restorePrefabBackup: (ref: PrefabBackupRef) => Effect.Effect<PrefabInfo, PlatformError>
   readonly openExternal: (url: string) => Effect.Effect<void, PlatformError>
   /** Tells the desktop window the page's resolved theme (its window controls follow it); nothing in a browser. */
   readonly setWindowTheme: (dark: boolean) => Effect.Effect<void, PlatformError>
@@ -359,6 +368,9 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     reimportMap: (fileName) => call("reimportMap", { fileName }),
     listBackups: call("listBackups"),
     readBackup: ({ place, id }) => call("readBackup", { place, id }),
+    listPrefabBackups: call("listPrefabBackups"),
+    describePrefabBackup: ({ id, tier }) => call("describePrefabBackup", { id, tier }),
+    restorePrefabBackup: ({ id, tier }) => call("restorePrefabBackup", { id, tier }),
     setWindowTheme: (dark) => call("setWindowTheme", { dark }),
     confirmUnsaved: (action, map) => call("confirmUnsaved", unsavedPromptOf(action, map)),
     unloadRequests: pushed((listener) => bridge.onUnloadRequest(listener)),
@@ -520,6 +532,9 @@ const makeBrowser = (): Platform["Service"] => {
     reimportMap: () => desktopOnly,
     listBackups: Effect.succeed([]),
     readBackup: () => noProject,
+    listPrefabBackups: Effect.succeed([]),
+    describePrefabBackup: () => desktopOnly,
+    restorePrefabBackup: () => desktopOnly,
     setWindowTheme: () => Effect.void,
     confirmUnsaved: (action, map) =>
       Effect.sync(() => window.confirm(discardQuestionOf(action, map)) ? "discard" : "cancel"),
