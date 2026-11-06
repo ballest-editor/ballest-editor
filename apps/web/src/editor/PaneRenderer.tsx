@@ -1,12 +1,12 @@
 import { type RootState, useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useRef } from "react"
 import { editorVerticalFov } from "../domain/Settings"
-import { firstPaneTurns, paneRects, panesToDraw, type PaneTurns } from "../domain/viewLayout"
+import { firstPaneTurns, paneRects, type PaneSlot, panesToDraw, type PaneTurns } from "../domain/viewLayout"
 import { mapBox, type PaneCamera, paneCamerasOf } from "./paneCameras"
 import { sceneRegistry } from "./sceneRegistry"
-import { useEditor } from "./store"
+import { paneDisplayIn, useEditor } from "./store"
 
-type BeforePaneDraw = (pane: PaneCamera, slot: number) => void
+type BeforePaneDraw = (pane: PaneCamera, slot: PaneSlot) => void
 
 const beforeDraw = new Set<BeforePaneDraw>()
 
@@ -35,7 +35,8 @@ let turns: PaneTurns = firstPaneTurns
  * not drawn this frame keeps what it last showed (`panesToDraw` says which those are).
  */
 const drawPanes = ({ gl, scene, size }: Pick<RootState, "gl" | "scene" | "size">, everyPane: boolean): void => {
-  const { tabId, viewLayout, activePane, settings, keybindDefaults } = useEditor.getState()
+  const state = useEditor.getState()
+  const { tabId, viewLayout, activePane, settings, keybindDefaults } = state
   const rects = paneRects(viewLayout, size.width, size.height).filter((r) => r.width > 0 && r.height > 0)
   const panes = paneCamerasOf(tabId)
   const fov = editorVerticalFov(settings.camera, keybindDefaults.cameraPresets)
@@ -51,7 +52,12 @@ const drawPanes = ({ gl, scene, size }: Pick<RootState, "gl" | "scene" | "size">
   }
   sceneRegistry.camera = panes[activePane]?.camera ?? null
 
-  const key = JSON.stringify([tabId, rects, rects.map((r) => panes[r.slot]?.projection)])
+  const key = JSON.stringify([
+    tabId,
+    rects,
+    rects.map((r) => panes[r.slot]?.projection),
+    rects.map((r) => paneDisplayIn(state, r.slot))
+  ])
   const plan = panesToDraw(rects.map((r) => r.slot), activePane, performance.now(), turns, everyPane || key !== shown)
   shown = key
   turns = plan.turns
@@ -66,7 +72,7 @@ const drawPanes = ({ gl, scene, size }: Pick<RootState, "gl" | "scene" | "size">
     const bottom = size.height - rect.y - rect.height
     gl.setViewport(rect.x, bottom, rect.width, rect.height)
     gl.setScissor(rect.x, bottom, rect.width, rect.height)
-    for (const callback of beforeDraw) callback(pane, slot)
+    for (const callback of beforeDraw) callback(pane, rect.slot)
     gl.render(scene, pane.camera)
   }
   gl.setScissorTest(false)

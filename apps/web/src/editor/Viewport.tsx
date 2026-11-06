@@ -36,7 +36,7 @@ import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
-import { groupBoxOf, type SelectMode, useEditor } from "./store"
+import { groupBoxOf, paneDisplayIn, type SelectMode, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
 import { glbUrl, visualsOf } from "./visuals"
 import { setWaterFloor, setWaterTheme, waterTopMaterial, waterUnderMaterial } from "./water"
@@ -239,14 +239,10 @@ function ViewportBackground() {
 
 /**
  * The floor grid (1 m cells, 10 m sections) at the map's floor height, in the user's
- * colours or ones derived from the ground they sit on. It follows the camera, so it ends where its fade ends.
+ * colours or ones derived from the ground they sit on. It follows the camera, so it ends where its fade ends. Each pane
+ * says whether it shows it.
  */
 function ViewportGrid() {
-  const visible = useEditor((s) => s.settings.appearance.gridVisible)
-  return visible ? <FloorGrid /> : null
-}
-
-function FloorGrid() {
   const appearance = useEditor((s) => s.settings.appearance)
   const floorHeight = useEditor((s) => s.floorHeight)
   const dark = useDarkTheme(appearance.theme)
@@ -261,9 +257,10 @@ function FloorGrid() {
     material.needsUpdate = true
   }, [])
   // drei fades the grid from R3F's camera, and each pane has its own.
-  useBeforePaneDraw(({ perspective: { position } }) => {
+  useBeforePaneDraw(({ perspective: { position } }, slot) => {
     const material = grid.current?.material
-    if (!(material instanceof THREE.ShaderMaterial)) return
+    if (grid.current === null || !(material instanceof THREE.ShaderMaterial)) return
+    grid.current.visible = paneDisplayIn(useEditor.getState(), slot).grid
     const fadeFrom: unknown = material.uniforms["worldCamProjPosition"]?.value
     if (fadeFrom instanceof THREE.Vector3) fadeFrom.set(position.x, floorHeight, position.z)
     material.uniformsNeedUpdate = true

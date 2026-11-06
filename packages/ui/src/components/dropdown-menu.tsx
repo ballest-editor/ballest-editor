@@ -1,5 +1,6 @@
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 import { IconCheck, IconChevronRight } from "@tabler/icons-react"
+import { Switch } from "@workspace/ui/components/switch"
 import { usePortalContainer } from "@workspace/ui/lib/portal-container"
 import { cn } from "@workspace/ui/lib/utils"
 import * as React from "react"
@@ -184,6 +185,30 @@ function DropdownMenuCheckboxItem({
   )
 }
 
+/** A setting in a menu: its row toggles it and the menu stays open, so the switch is only what it looks like. */
+function DropdownMenuSwitchItem({
+  className,
+  children,
+  checked,
+  ...props
+}: MenuPrimitive.CheckboxItem.Props) {
+  return (
+    <MenuPrimitive.CheckboxItem
+      data-slot="dropdown-menu-switch-item"
+      closeOnClick={false}
+      className={cn(
+        "flex min-h-7 cursor-default items-center justify-between gap-4 rounded-control px-2 py-1 text-body outline-hidden select-none focus:bg-foreground/8 data-highlighted:bg-foreground/8 focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:text-fg-disabled!",
+        className
+      )}
+      checked={checked}
+      {...props}
+    >
+      {children}
+      <Switch aria-hidden checked={checked} tabIndex={-1} className="pointer-events-none" />
+    </MenuPrimitive.CheckboxItem>
+  )
+}
+
 function DropdownMenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
   return (
     <MenuPrimitive.RadioGroup
@@ -268,5 +293,6 @@ export {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
+  DropdownMenuSwitchItem,
   DropdownMenuTrigger
 }

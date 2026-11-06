@@ -1,4 +1,6 @@
 import {
+  IconArrowsMaximize,
+  IconArrowsMinimize,
   IconBoxAlignBottom,
   IconBoxAlignLeft,
   IconBoxAlignRight,
@@ -24,22 +26,39 @@ import {
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSwitchItem,
   DropdownMenuTrigger
 } from "@workspace/ui/components/dropdown-menu"
 import { cn } from "@workspace/ui/lib/utils"
-import { type PointerEvent, useSyncExternalStore } from "react"
+import {
+  type ComponentProps,
+  type PointerEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore
+} from "react"
+import { useShallow } from "zustand/react/shallow"
 import { type KeybindAction, PROJECTION_ACTIONS } from "../domain/Keybinds"
 import { axisOf, formatPaneScale, ORTHO_AXES } from "../domain/orthoView"
 import {
   isOrthoView,
+  maximisedSlotOf,
   type OrthoView,
   paneClose,
   paneCloseColumn,
   paneCloseRow,
   type PaneRect,
+  paneRectAt,
   paneShares,
+  type PaneSlot,
   paneSplitDown,
   paneSplitRight,
+  paneSwap,
+  shownKindOf,
   type ViewLayoutKind,
   viewLayoutKinds,
   viewLayoutLabels,
@@ -49,7 +68,7 @@ import {
 } from "../domain/viewLayout"
 import { sceneAxisColors } from "../editor/axisColors"
 import { changePanes, onPaneScaleChange, paneCameraAt } from "../editor/paneCameras"
-import { useEditor } from "../editor/store"
+import { paneDisplayIn, useEditor } from "../editor/store"
 import { useDarkTheme } from "../editor/theme"
 import { GROUP, noFocus, SEGMENT, SURFACE } from "./viewControlStyle"
 import { ViewTip } from "./ViewTip"
@@ -82,7 +101,21 @@ const paneBox = ({ x, y, width, height }: PaneRect) => ({
 })
 
 /** A menu in a group, with its value's icon on the button: what a pane looks along, and how the view divides. */
-function ViewPicker<V extends string>({ value, options, labels, icons, onPick, tip, action, word, strong, disabled }: {
+function ViewPicker<V extends string>({
+  value,
+  options,
+  labels,
+  icons,
+  onPick,
+  tip,
+  action,
+  word,
+  strong,
+  disabled,
+  root,
+  trigger,
+  children
+}: {
   readonly value: V
   readonly options: ReadonlyArray<V>
   readonly labels: Readonly<Record<V, string>>
@@ -95,16 +128,22 @@ function ViewPicker<V extends string>({ value, options, labels, icons, onPick, t
   /** Whether the word stands out, or stays quiet like the icon. */
   readonly strong: boolean
   readonly disabled: boolean
+  /** For a picker that opens its menu itself. */
+  readonly root?: ComponentProps<typeof DropdownMenu>
+  readonly trigger?: ComponentProps<typeof DropdownMenuTrigger>
+  /** What the menu holds after the options. */
+  readonly children?: ReactNode
 }) {
   const Icon: typeof IconSquare = icons[value]
   const title = `${tip}: ${labels[value]}`
   return (
-    <DropdownMenu>
+    <DropdownMenu {...root}>
       <ViewTip
         label={title}
         action={action}
         render={
           <DropdownMenuTrigger
+            {...trigger}
             disabled={disabled}
             render={<button type="button" aria-label={title} className={SEGMENT} {...noFocus} />}
           />
@@ -126,17 +165,37 @@ function ViewPicker<V extends string>({ value, options, labels, icons, onPick, t
             )
           })}
         </DropdownMenuRadioGroup>
+        {children}
       </DropdownMenuContent>
     </DropdownMenu>
   )
 }
 
-/** What a right click on a pane's label offers. The layouts are all there is (`PaneChange`), so it's only what they allow. */
-function PaneMenuItems({ slot, kind }: { readonly slot: number; readonly kind: ViewLayoutKind }) {
+/**
+ * What a right click on a pane's label offers. The layouts are all there is (`PaneChange`), so it's only what they allow.
+ * A maximised pane has one way to go.
+ */
+function PaneMenuItems({ slot, kind }: { readonly slot: PaneSlot; readonly kind: ViewLayoutKind }) {
+  const maximised = useEditor((s) => maximisedSlotOf(s.viewLayout) !== undefined)
+  const togglePaneMaximised = useEditor((s) => s.togglePaneMaximised)
   const right = paneSplitRight(kind)
   const down = paneSplitDown(kind)
+  if (maximised) {
+    return (
+      <ContextMenuItem onClick={() => togglePaneMaximised(slot)}>
+        <IconArrowsMinimize />
+        Restore panes
+      </ContextMenuItem>
+    )
+  }
   return (
     <>
+      {kind !== "single" && (
+        <ContextMenuItem onClick={() => togglePaneMaximised(slot)}>
+          <IconArrowsMaximize />
+          Maximise pane
+        </ContextMenuItem>
+      )}
       {right !== undefined && (
         <ContextMenuItem onClick={() => changePanes(right)}>
           <IconLayoutColumns />
@@ -178,18 +237,105 @@ function PaneMenuItems({ slot, kind }: { readonly slot: number; readonly kind: V
 const labelClearance = ({ x, y }: PaneRect) =>
   y > 0 ? undefined : x > 0 ? "@max-[38rem]:top-12" : "@max-[38rem]/viewport:top-12"
 
-/** The pane's name, which opens the list of views; a right click splits or closes the pane. */
-function PaneHeader({ pane, projection, disabled, active }: {
+/** What a pane shows, its own choice over the Display popover's. */
+function PaneDisplayItems({ slot }: { readonly slot: PaneSlot }) {
+  const { grid, sky } = useEditor(useShallow((s) => paneDisplayIn(s, slot)))
+  const setPaneDisplay = useEditor((s) => s.setPaneDisplay)
+  return (
+    <>
+      <DropdownMenuSeparator />
+      <DropdownMenuSwitchItem checked={grid} onCheckedChange={(on) => setPaneDisplay(slot, "grid", on)}>
+        Show grid
+      </DropdownMenuSwitchItem>
+      <DropdownMenuSwitchItem checked={sky} onCheckedChange={(on) => setPaneDisplay(slot, "sky", on)}>
+        Show sky
+      </DropdownMenuSwitchItem>
+    </>
+  )
+}
+
+/** How far a press on a pane's label moves before it's a drag and not a click. */
+const DRAG_START_PX = 4
+
+/** What a pane's label does to the pane that's being dragged. */
+interface PaneDragHandlers {
+  readonly dragging: boolean
+  readonly onMove: (slot: PaneSlot, e: PointerEvent) => void
+  readonly onDrop: () => void
+  readonly onCancel: () => void
+}
+
+/**
+ * The pane's name: a click opens the list of views, a drag swaps the pane with the one it's dropped on, a double click
+ * maximises it, and a right click splits or closes it. The menu opens on the click, not the press, or every drag would
+ * start with it. It isn't modal, so a double click's second press reaches the label: the two clicks open and close it.
+ */
+function PaneHeader({ pane, projection, disabled, active, drag }: {
   readonly pane: PaneRect
   readonly projection: ViewProjection
   readonly disabled: boolean
   readonly active: boolean
+  readonly drag: PaneDragHandlers
 }) {
-  const kind = useEditor((s) => s.viewLayout.kind)
+  const kind = useEditor((s) => shownKindOf(s.viewLayout))
   const setPaneProjection = useEditor((s) => s.setPaneProjection)
+  const togglePaneMaximised = useEditor((s) => s.togglePaneMaximised)
+  const [open, setOpen] = useState(false)
+  const press = useRef<{ readonly x: number; readonly y: number } | null>(null)
+  const moved = useRef(false)
+  const { dragging, onCancel } = drag
+  useEffect(() => {
+    if (!dragging) return
+    const cancel = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return
+      e.stopPropagation()
+      press.current = null
+      onCancel()
+    }
+    window.addEventListener("keydown", cancel, { capture: true })
+    return () => window.removeEventListener("keydown", cancel, { capture: true })
+  }, [dragging, onCancel])
+  const trigger: ComponentProps<typeof DropdownMenuTrigger> = {
+    style: dragging ? { cursor: "grabbing" } : {},
+    onMouseDown: (e) => e.preventBaseUIHandler(),
+    onPointerDown: (e) => {
+      moved.current = false
+      press.current = null
+      if (e.button !== 0 || kind === "single") return
+      press.current = { x: e.clientX, y: e.clientY }
+      // From the press: a quick drag is off the label before its first move.
+      e.currentTarget.setPointerCapture(e.pointerId)
+    },
+    onPointerMove: (e) => {
+      if (press.current === null) return
+      if (!moved.current) {
+        if (Math.hypot(e.clientX - press.current.x, e.clientY - press.current.y) < DRAG_START_PX) return
+        moved.current = true
+        setOpen(false)
+      }
+      drag.onMove(pane.slot, e)
+    },
+    onPointerUp: () => {
+      if (press.current !== null && moved.current) drag.onDrop()
+      press.current = null
+    },
+    onPointerCancel: () => {
+      press.current = null
+      onCancel()
+    },
+    onClick: () => {
+      if (!moved.current) setOpen(!open)
+    },
+    onDoubleClick: () => {
+      setOpen(false)
+      togglePaneMaximised(pane.slot)
+    }
+  }
   return (
     <ContextMenu disabled={disabled}>
-      <ContextMenuTrigger className={cn(GROUP, "absolute top-3 left-3", labelClearance(pane))}>
+      <ContextMenuTrigger
+        className={cn(GROUP, "absolute top-3 left-3", labelClearance(pane), dragging && "opacity-50")}
+      >
         <ViewPicker
           value={projection}
           options={viewProjections}
@@ -201,7 +347,11 @@ function PaneHeader({ pane, projection, disabled, active }: {
           word={viewProjectionLabels[projection]}
           strong={active}
           disabled={disabled}
-        />
+          root={{ open, onOpenChange: setOpen, modal: false }}
+          trigger={trigger}
+        >
+          <PaneDisplayItems slot={pane.slot} />
+        </ViewPicker>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <PaneMenuItems slot={pane.slot} kind={kind} />
@@ -306,6 +456,30 @@ function PaneDivider({ axis, at }: { readonly axis: "x" | "y"; readonly at: numb
   )
 }
 
+/** A pane's label on its way to another pane: the pane under it, and where it is in the viewport (px). */
+interface PaneDrag {
+  readonly from: PaneSlot
+  readonly over: PaneSlot
+  readonly x: number
+  readonly y: number
+}
+
+/** The label under the pointer while it's dragged, so it reads as the pane that's moving. */
+function DraggedLabel(
+  { x, y, projection }: { readonly x: number; readonly y: number; readonly projection: ViewProjection }
+) {
+  const Icon: typeof IconSquare = VIEW_ICONS[projection]
+  return (
+    <div
+      className={cn(GROUP, "pointer-events-none absolute -translate-1/2 gap-1.5 px-2.5 text-foreground shadow-md")}
+      style={{ left: x, top: y }}
+    >
+      <Icon className="size-4" />
+      {viewProjectionLabels[projection]}
+    </div>
+  )
+}
+
 /**
  * What's drawn over the one canvas for its panes (docs/DESKTOP.md § View panes). All click-through but the labels and
  * dividers: the canvas takes the pointer and sorts it by pane.
@@ -314,8 +488,29 @@ export function ViewPanes({ disabled }: { readonly disabled: boolean }) {
   const layout = useEditor((s) => s.viewLayout)
   const activePane = useEditor((s) => s.activePane)
   const panes = paneShares(layout)
+  const shownKind = shownKindOf(layout)
+  const overlay = useRef<HTMLDivElement>(null)
+  const [paneDrag, setPaneDrag] = useState<PaneDrag | null>(null)
+  const cancelPaneDrag = useCallback(() => setPaneDrag(null), [])
+  const dragHandlers = (slot: PaneSlot): PaneDragHandlers => ({
+    dragging: paneDrag?.from === slot,
+    onMove: (from, e) => {
+      const box = overlay.current?.getBoundingClientRect()
+      if (box === undefined) return
+      const x = e.clientX - box.left
+      const y = e.clientY - box.top
+      setPaneDrag({ from, over: paneRectAt(panes, x / box.width, y / box.height).slot, x, y })
+    },
+    onDrop: () => {
+      if (paneDrag !== null && paneDrag.over !== paneDrag.from) {
+        changePanes(paneSwap(layout.kind, paneDrag.from, paneDrag.over))
+      }
+      setPaneDrag(null)
+    },
+    onCancel: cancelPaneDrag
+  })
   return (
-    <div className="pointer-events-none absolute inset-0 @container/viewport">
+    <div ref={overlay} className="pointer-events-none absolute inset-0 @container/viewport">
       {panes.map((pane) => {
         const { slot } = pane
         const projection = layout.projections[slot]
@@ -325,20 +520,32 @@ export function ViewPanes({ disabled }: { readonly disabled: boolean }) {
             {panes.length > 1 && active && (
               <div className="absolute inset-0 ring-2 ring-ring ring-inset" data-active-pane />
             )}
-            <PaneHeader pane={pane} projection={projection} disabled={disabled} active={active} />
+            {paneDrag?.over === slot && paneDrag.from !== slot && (
+              <div className="absolute inset-0 bg-primary/12 ring-2 ring-ring ring-inset" data-pane-drop />
+            )}
+            <PaneHeader
+              pane={pane}
+              projection={projection}
+              disabled={disabled}
+              active={active}
+              drag={dragHandlers(slot)}
+            />
             {isOrthoView(projection) && <PaneCorner slot={slot} view={projection} />}
           </div>
         )
       })}
-      {(layout.kind === "columns" || layout.kind === "quad") && <PaneDivider axis="x" at={layout.splitX} />}
-      {(layout.kind === "rows" || layout.kind === "quad") && <PaneDivider axis="y" at={layout.splitY} />}
+      {(shownKind === "columns" || shownKind === "quad") && <PaneDivider axis="x" at={layout.splitX} />}
+      {(shownKind === "rows" || shownKind === "quad") && <PaneDivider axis="y" at={layout.splitY} />}
+      {paneDrag !== null && (
+        <DraggedLabel x={paneDrag.x} y={paneDrag.y} projection={layout.projections[paneDrag.from]} />
+      )}
     </div>
   )
 }
 
 /** Picks how the view divides into panes. */
 export function ViewLayoutControl({ disabled }: { readonly disabled: boolean }) {
-  const kind = useEditor((s) => s.viewLayout.kind)
+  const kind = useEditor((s) => shownKindOf(s.viewLayout))
   const setViewLayoutKind = useEditor((s) => s.setViewLayoutKind)
   return (
     <ViewPicker

@@ -40,6 +40,13 @@ export const clampSplit = (fraction: number): number => Math.min(1 - MIN_SPLIT, 
 const Split = Schema.Finite.check(Schema.isBetween({ minimum: MIN_SPLIT, maximum: 1 - MIN_SPLIT }))
 const Projection = Schema.Literals(viewProjections)
 
+/** What a pane shows whatever the Display popover says; a key left out follows it (`paneDisplayOf`). */
+const PaneOverride = Schema.Struct({
+  grid: Schema.optionalKey(Schema.Boolean),
+  sky: Schema.optionalKey(Schema.Boolean)
+})
+type PaneOverride = typeof PaneOverride.Type
+
 export const ViewLayout = Schema.Struct({
   kind: Schema.Literals(viewLayoutKinds),
   /** Where the vertical divider sits, as a share of the width (`columns`, `quad`). */
@@ -47,7 +54,11 @@ export const ViewLayout = Schema.Struct({
   /** Where the horizontal divider sits, as a share of the height (`rows`, `quad`). */
   splitY: Split,
   /** What each slot looks along. A slot keeps its view while a smaller layout hides it. */
-  projections: Schema.Tuple([Projection, Projection, Projection, Projection])
+  projections: Schema.Tuple([Projection, Projection, Projection, Projection]),
+  /** Each slot's overrides; absent: none has any. A slot keeps them while a smaller layout hides it. */
+  overrides: Schema.optionalKey(Schema.Tuple([PaneOverride, PaneOverride, PaneOverride, PaneOverride])),
+  /** The slot filling the viewport for now, with `kind` and the dividers kept to go back to; absent: none. */
+  maximised: Schema.optionalKey(Schema.Literals([0, 1, 2, 3]))
 })
 export type ViewLayout = typeof ViewLayout.Type
 
@@ -64,6 +75,23 @@ export const isDefaultViewLayout = (layout: ViewLayout): boolean => sameViewLayo
 /** The slots a layout shows: the first `n`, in reading order. */
 export const paneCountOf = (kind: ViewLayoutKind): number => kind === "single" ? 1 : kind === "quad" ? 4 : 2
 
+/** The slot `layout` has maximised, if it's one the layout has. */
+export const maximisedSlotOf = ({ kind, maximised }: ViewLayout): PaneSlot | undefined =>
+  maximised !== undefined && maximised < paneCountOf(kind) ? maximised : undefined
+
+/** How the viewport looks divided right now: a maximised pane is one pane, whatever the layout goes back to. */
+export const shownKindOf = (layout: ViewLayout): ViewLayoutKind =>
+  maximisedSlotOf(layout) === undefined ? layout.kind : "single"
+
+/** `layout` showing all its panes again. */
+export const withoutMaximised = ({ maximised: _maximised, ...layout }: ViewLayout): ViewLayout => layout
+
+/** Maximises `slot`, or goes back to the layout if a pane is maximised. One pane has nothing to fill. */
+export const withMaximisedToggled = (layout: ViewLayout, slot: PaneSlot): ViewLayout => {
+  if (maximisedSlotOf(layout) !== undefined) return withoutMaximised(layout)
+  return paneCountOf(layout.kind) > 1 ? { ...layout, maximised: slot } : layout
+}
+
 /** One pane on the canvas, in CSS pixels from its top left. */
 export interface PaneRect {
   readonly slot: 0 | 1 | 2 | 3
@@ -73,6 +101,7 @@ export interface PaneRect {
   readonly height: number
 }
 
+export type PaneSlot = PaneRect["slot"]
 type Panes = ReadonlyArray<PaneRect>
 
 /** The panes of a `kind` of layout over this area, in slot order, with the dividers at `x` and `y`. */
@@ -100,12 +129,18 @@ const panesOf = (kind: ViewLayoutKind, width: number, height: number, x: number,
   }
 }
 
+/** The panes `layout` shows over this area, with the dividers at `x` and `y`: a maximised pane has all of it. */
+const shownPanes = (layout: ViewLayout, width: number, height: number, x: number, y: number): Panes => {
+  const slot = maximisedSlotOf(layout)
+  return slot === undefined ? panesOf(layout.kind, width, height, x, y) : [{ slot, x: 0, y: 0, width, height }]
+}
+
 /** The panes of `layout` on a canvas of this size; the dividers land on whole pixels. */
 export const paneRects = (layout: ViewLayout, width: number, height: number): Panes =>
-  panesOf(layout.kind, width, height, Math.round(width * layout.splitX), Math.round(height * layout.splitY))
+  shownPanes(layout, width, height, Math.round(width * layout.splitX), Math.round(height * layout.splitY))
 
 /** The panes of `layout` as shares of the viewport, for what's laid out over the canvas. */
-export const paneShares = (layout: ViewLayout): Panes => panesOf(layout.kind, 1, 1, layout.splitX, layout.splitY)
+export const paneShares = (layout: ViewLayout): Panes => shownPanes(layout, 1, 1, layout.splitX, layout.splitY)
 
 /** The pane under a point on the canvas; one just past the edge (a captured drag) counts as the nearest. */
 export const paneRectAt = (rects: Panes, x: number, y: number): PaneRect => {
@@ -116,8 +151,6 @@ export const paneRectAt = (rects: Panes, x: number, y: number): PaneRect => {
   return rects.reduce((nearest, r) => distance(r) < distance(nearest) ? r : nearest)
 }
 
-type Slot = PaneRect["slot"]
-
 /**
  * A change to the panes that keeps what's left where it is on screen: the layout to show, and for each slot, the slot
  * whose view and camera it takes. There are only the four layouts, so splitting one of two panes splits its neighbour
@@ -125,7 +158,7 @@ type Slot = PaneRect["slot"]
  */
 export interface PaneChange {
   readonly kind: ViewLayoutKind
-  readonly order: readonly [Slot, Slot, Slot, Slot]
+  readonly order: readonly [PaneSlot, PaneSlot, PaneSlot, PaneSlot]
 }
 
 const SAME_SLOTS: PaneChange["order"] = [0, 1, 2, 3]
@@ -174,10 +207,61 @@ export const paneCloseColumn = (slot: number): PaneChange => ({
   order: slot % 2 === 0 ? [1, 3, 0, 2] : [0, 2, 1, 3]
 })
 
-/** `layout` after `change`. */
+/** Swaps two panes where they stand: each takes the other's place, view and camera. */
+export const paneSwap = (kind: ViewLayoutKind, a: PaneSlot, b: PaneSlot): PaneChange => {
+  const other = (slot: PaneSlot) => slot === a ? b : slot === b ? a : slot
+  return { kind, order: [other(0), other(1), other(2), other(3)] }
+}
+
+/** `layout` after `change`, with all its panes showing. */
 export const withPaneChange = (layout: ViewLayout, { kind, order: [a, b, c, d] }: PaneChange): ViewLayout => {
-  const { projections } = layout
-  return { ...layout, kind, projections: [projections[a], projections[b], projections[c], projections[d]] }
+  const { projections, overrides } = layout
+  return {
+    ...withoutMaximised(layout),
+    kind,
+    projections: [projections[a], projections[b], projections[c], projections[d]],
+    ...(overrides !== undefined && { overrides: [overrides[a], overrides[b], overrides[c], overrides[d]] })
+  }
+}
+
+/** What the Display popover sets for every pane. */
+export interface PaneDisplay {
+  readonly grid: boolean
+  readonly sky: boolean
+}
+
+/** What a pane shows unasked: the Display popover's choice, but no sky in an orthographic pane, whose grid wants the plain background. */
+const paneDefaults = (layout: ViewLayout, slot: PaneSlot, display: PaneDisplay): PaneDisplay => ({
+  grid: display.grid,
+  sky: display.sky && !isOrthoView(layout.projections[slot])
+})
+
+/** What the pane in `slot` shows, given the Display popover's `display`: its override wins. */
+export const paneDisplayOf = (layout: ViewLayout, slot: PaneSlot, display: PaneDisplay): PaneDisplay => ({
+  ...paneDefaults(layout, slot, display),
+  ...layout.overrides?.[slot]
+})
+
+/**
+ * Sets what the pane in `slot` shows. Setting it to what the pane would show anyway drops the override, so the pane
+ * follows the Display popover again, and a layout with no overrides left says nothing about them.
+ */
+export const withPaneDisplay = (
+  layout: ViewLayout,
+  slot: PaneSlot,
+  display: PaneDisplay,
+  part: keyof PaneDisplay,
+  on: boolean
+): ViewLayout => {
+  const { overrides, ...rest } = layout
+  const set = (own: PaneOverride): PaneOverride => {
+    const { [part]: _previous, ...others } = own
+    return on === paneDefaults(layout, slot, display)[part] ? others : { ...others, [part]: on }
+  }
+  const [a, b, c, d] = overrides ?? [{}, {}, {}, {}]
+  const at = (i: PaneSlot, own: PaneOverride) => i === slot ? set(own) : own
+  const next: NonNullable<ViewLayout["overrides"]> = [at(0, a), at(1, b), at(2, c), at(3, d)]
+  return next.every((own) => Object.keys(own).length === 0) ? rest : { ...rest, overrides: next }
 }
 
 /** How often, at most, a pane other than the active one is drawn: they take turns, one at a time. */
