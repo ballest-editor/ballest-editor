@@ -136,7 +136,8 @@ describe("names a new map or project goes by", () => {
 
 describe("palette sections", () => {
   it("groups by category in file order, then Other, then hidden pieces", async () => {
-    const { paletteSections, HIDDEN_SECTION, OTHER_SECTION, pieceLabelOf } = await import("./Catalog")
+    const { paletteSections, HIDDEN_SECTION, OTHER_SECTION } = await import("./Catalog")
+    const { pieceLabelOf } = await import("./pieceName")
     const base = Schema.encodeSync(Catalog)(catalog).pieces[0]!
     const piece = (className: string, extra: Record<string, unknown>) =>
       Schema.decodeSync(Catalog)({ pieces: [{ ...base, className, ...extra }] }).pieces[0]!

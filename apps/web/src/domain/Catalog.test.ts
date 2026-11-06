@@ -11,7 +11,6 @@ import { listSamples, readSample, repoRoot } from "../test/samples"
 import {
   Catalog,
   HIDDEN_SECTION,
-  humanizedClass,
   indexCatalog,
   paletteSections,
   riskyClassesIn,
@@ -244,19 +243,6 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
       .filter((m) => m.glb !== undefined && !fs.existsSync(path.join(repoRoot, "assets", m.glb)))
       .map((m) => m.glb)
     assert.deepStrictEqual(missing, [])
-  })
-})
-
-describe("humanizedClass", () => {
-  it("writes a class out as words", () => {
-    assert.strictEqual(humanizedClass("MP_PlayerStart"), "Player Start")
-    assert.strictEqual(humanizedClass("BP_Bevel_Full_Ring"), "Bevel Full Ring")
-    assert.strictEqual(humanizedClass("Bevel_Half_DeepScoop"), "Bevel Half Deep Scoop")
-  })
-
-  it("leaves a hash whole, and a class with nothing else in it as it is", () => {
-    assert.strictEqual(humanizedClass("Boolean_04A2A514_MI_ArenaOrange"), "Boolean 04A2A514 MI Arena Orange")
-    assert.strictEqual(humanizedClass("BP_"), "BP_")
   })
 })
 

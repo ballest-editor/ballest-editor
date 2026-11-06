@@ -259,7 +259,8 @@ export const visibleExtras = (piece: CatalogPiece | undefined): ReadonlyArray<Ex
 
 export const pieceIdOf = (piece: CatalogPiece): string => `${piece.classPath}|${piece.meshAssetPath ?? ""}`
 
-export const HIDDEN_SECTION = "Hidden (not in the in-game browser)"
+/** The pieces the in-game browser doesn't show. */
+export const HIDDEN_SECTION = "Hidden"
 export const OTHER_SECTION = "Other"
 
 export interface PaletteSection {
@@ -291,12 +292,6 @@ export const paletteSections = (pieces: ReadonlyArray<CatalogPiece>): ReadonlyAr
     ...(hidden.length > 0 ? [{ name: HIDDEN_SECTION, pieces: hidden, hidden: true }] : [])
   ]
 }
-
-/** A class with no name in the catalog, as a person would write it: "MP_PlayerStart" reads "Player Start". */
-export const humanizedClass = (className: string): string =>
-  className.replace(/^(?:BP|MP)_/, "").replace(/_+/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").trim() || className
-
-export const pieceLabelOf = (piece: CatalogPiece): string => piece.displayName || humanizedClass(piece.className)
 
 /**
  * Why a piece can't be placed, or undefined if it can: the extractor lists it as
