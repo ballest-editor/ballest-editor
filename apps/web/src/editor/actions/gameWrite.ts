@@ -5,12 +5,13 @@
  * save it first, are in `exportPlay`.
  */
 import { ExportRefusal } from "@ballest/contracts"
-import { Effect } from "effect"
+import { Effect, Stream } from "effect"
 import { mapLabelOf } from "../../domain/factory"
 import { playWithoutPluginNotice, RESOLVED_BY_PLAY } from "../../domain/gameLink"
+import type { GameWrite } from "../../domain/linkState"
 import { type ExportOptions, Platform, type PlayResult } from "../../services/Platform"
 import { type PublishedDraft, useEditor } from "../store"
-import { run } from "./run"
+import { run, runUntilCleanup } from "./run"
 import { notifyNotice, refreshProject, revealIn } from "./shared"
 
 /** What a write into the game is for: Export to game, or Play (the export, then the plugin races the map). */
@@ -18,6 +19,29 @@ export type ExportIntent = PublishedDraft["from"]
 
 /** Export and Play write over nothing they weren't told to: a published map's draft and a changed export ask first. */
 export const ASK_FIRST: ExportOptions = { replacePublished: false, overwriteChanged: false }
+
+/** `effect` with `write` in the store for the status bar's chip while it runs, whatever way it ends. */
+export const showingGameWrite = (write: GameWrite) => <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  Effect.sync(() => useEditor.getState().setGameWrite(write)).pipe(
+    Effect.andThen(effect),
+    Effect.ensuring(Effect.sync(() => useEditor.getState().setGameWrite(null)))
+  )
+
+/** Moves the write under way on to each stage main reports of it, until interrupted. Another window's are not ours. */
+export const followGameWritesEffect = Effect.gen(function*() {
+  yield* (yield* Platform).gameWriteProgress.pipe(
+    Stream.runForEach(({ fileName, stage }) =>
+      Effect.sync(() => {
+        const { gameWrite, setGameWrite } = useEditor.getState()
+        if (gameWrite?.fileName === fileName) setGameWrite({ ...gameWrite, stage })
+      })
+    )
+  )
+})
+
+/** Follows the stages main reports (`followGameWritesEffect`) until the returned function is called. */
+export const followGameWrites = () =>
+  runUntilCleanup(followGameWritesEffect, "Stopped following how far Export and Play have got")
 
 /** Tells how Play went: racing, starting the game to race, or exported only because the plugin can't be reached. */
 const notifyPlayed = (fileName: string, played: Extract<PlayResult, { readonly _tag: "Played" }>) => {
@@ -62,7 +86,7 @@ const askFirst = (intent: ExportIntent, refusal: ExportRefusal, options: ExportO
  * Copies a saved project map into the game's maps folder, and for Play has the plugin race it (the game starts if it
  * isn't running). A published map's draft there asks first, and so does an export the game changed since the last
  * export. The plugin manager only races maps never published, so Play of a published map offers to save a new draft
- * of it instead (the `newDraft` dialog).
+ * of it instead (the `newDraft` dialog). The chip follows it from the copy on (`showingGameWrite`).
  */
 export const writeToGame = Effect.fn("writeToGame")(
   function*(intent: ExportIntent, fileName: string, options: ExportOptions) {
@@ -89,7 +113,8 @@ export const writeToGame = Effect.fn("writeToGame")(
         yield* refreshProject
         notifyPlayed(fileName, result)
     }
-  }
+  },
+  (effect, intent, fileName) => showingGameWrite({ intent, fileName, stage: "copy" })(effect)
 )
 
 /** The replacePublished dialog's answer: replace the published map's draft after all, and go on with Export or Play. */

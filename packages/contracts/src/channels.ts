@@ -67,5 +67,6 @@ export const InvokeChannels = {
 export const PushChannels = {
   onUnloadRequest: "ballest:window:unloadRequest",
   onPlaySessionEnded: "ballest:game:playSessionEnded",
+  onGameWriteProgress: "ballest:game:writeProgress",
   onUpdateState: "ballest:update:state"
 } as const

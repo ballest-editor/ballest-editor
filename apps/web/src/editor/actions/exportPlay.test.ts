@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Fiber } from "effect"
 import { PLUGIN_MANAGER_MISSING, PLUGIN_MISSING } from "../../domain/gameLink"
-import { linkStateOf } from "../../domain/linkState"
+import { type GameWrite, linkStateOf } from "../../domain/linkState"
 import { lightingOf } from "../../domain/sunlight"
 import { useEditor } from "../../editor/store"
 import { MapCodec } from "../../services/MapCodec"
@@ -17,12 +17,13 @@ import {
   playSample,
   reset,
   s,
-  submitSaveMap
+  submitSaveMap,
+  untilTrue
 } from "../../test/editorActions"
 import { readSample } from "../../test/samples"
 import { exportToGameEffect, playEffect } from "./exportPlay"
 import { installPluginEffect } from "./gameLink"
-import { replacePublishedDraftEffect } from "./gameWrite"
+import { followGameWritesEffect, replacePublishedDraftEffect, showingGameWrite } from "./gameWrite"
 import { openProjectMapFile } from "./maps"
 import { duplicateMapEffect, saveMapFile } from "./save"
 
@@ -246,6 +247,99 @@ describe("Play", () => {
       const saved = yield* submitSaveMap("Big Loop")
       assert.isTrue(disk.files.has(projectFile(saved)))
       assert.strictEqual(disk.files.get(`${TEST_MAPS_FOLDER}/${saved}`), disk.files.get(projectFile(saved)))
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+})
+
+/** Every value the store's `gameWrite` takes while `effect` runs, as "stage file" and null. */
+const gameWritesDuring = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  Effect.gen(function*() {
+    const seen: Array<string | null> = []
+    const stop = useEditor.subscribe((state, previous) => {
+      if (state.gameWrite === previous.gameWrite) return
+      const { gameWrite } = state
+      seen.push(gameWrite === null ? null : `${gameWrite.intent} ${gameWrite.stage} ${gameWrite.fileName !== null}`)
+    })
+    yield* effect.pipe(Effect.exit, Effect.ensuring(Effect.sync(stop)))
+    return seen
+  })
+
+describe("Export and Play's progress", () => {
+  const sample = balledits[0]!
+  const name = fileNameOf(sample)
+
+  it.effect("goes from the save to the copy, and ends with the write; the save has no toast of its own", () => {
+    const disk = makeTestDisk({ [projectFile(name)]: readSample(sample) })
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(name)
+      s().setLighting({ ...lightingOf(s().doc.map.worldSettings), timeOfDay: 5 })
+      useEditor.setState({ toasts: [] })
+      const seen = yield* gameWritesDuring(exportToGameEffect)
+      assert.deepStrictEqual(seen.slice(0, 2), ["export save false", "export copy true"])
+      assert.isNull(seen.at(-1))
+      assert.isNull(s().gameWrite)
+      assert.isFalse(s().dirty)
+      assert.deepStrictEqual(s().toasts.map((toast) => toast.kind), ["mapExported"])
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("Play tells itself apart, and a plain Save still has its toast", () => {
+    const disk = diskWithPlugin({ [projectFile(name)]: readSample(sample) })
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(name)
+      const seen = yield* gameWritesDuring(playEffect)
+      assert.include(seen, "play copy true")
+      assert.isNull(s().gameWrite)
+
+      s().setLighting({ ...lightingOf(s().doc.map.worldSettings), timeOfDay: 6 })
+      assert.deepStrictEqual(yield* gameWritesDuring(saveMapFile), [])
+      assert.strictEqual(s().toasts[0]?.kind, "mapSaved")
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("stops for a dialog that asks first, and starts again from the copy on its answer", () => {
+    const published = JSON.stringify({ worldSettings: { levelData: { levelPublishedFileId: 3561234567 } } })
+    const disk = makeTestDisk({
+      [projectFile(name)]: readSample(sample),
+      [`${TEST_MAPS_FOLDER}/${name}`]: published
+    })
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(name)
+      yield* exportToGameEffect
+      assert.strictEqual(s().dialog?.id, "replacePublished")
+      assert.isNull(s().gameWrite)
+      const seen = yield* gameWritesDuring(replacePublishedDraftEffect)
+      assert.strictEqual(seen[0], "export copy true")
+      assert.isNull(s().gameWrite)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("ends when the write fails", () =>
+    Effect.gen(function*() {
+      const write: GameWrite = { intent: "export", fileName: name, stage: "copy" }
+      yield* Effect.flip(Effect.fail("refused").pipe(showingGameWrite(write)))
+      assert.isNull(s().gameWrite)
+    }))
+
+  it.effect("moves on to the stages main reports of this map, and to no other's", () => {
+    const disk = makeTestDisk({})
+    return Effect.gen(function*() {
+      yield* reset
+      const follower = yield* Effect.forkChild(followGameWritesEffect, { startImmediately: true })
+      yield* untilTrue(() => disk.gameWriteProgress.listeners.size > 0)
+
+      disk.gameWriteProgress.push({ fileName: name, stage: "verify" })
+      s().setGameWrite({ intent: "play", fileName: name, stage: "copy" })
+      disk.gameWriteProgress.push({ fileName: "Map_LevelEditorMain&Other_me.balledit", stage: "verify" })
+      disk.gameWriteProgress.push({ fileName: name, stage: "launch" })
+      yield* untilTrue(() => s().gameWrite?.stage === "launch")
+      assert.deepStrictEqual(s().gameWrite, { intent: "play", fileName: name, stage: "launch" })
+
+      s().setGameWrite(null)
+      yield* Fiber.interrupt(follower)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 })

@@ -131,10 +131,10 @@ One stroke family, Tabler, at one weight: 16px in rows, 14px in chips, 20px in t
 
 Status is semantic: a filled tint with its own text, only on badges, chips and icons, never as a surface or as the accent. The resting state of anything is the neutral tint. A sync status (`syncStatusOf`, `domain/linkState.ts`) wears one of three pairs. The text also has to read with no fill, on `--card` and `--popover`, because Settings › Game uses it alone. `Badge` has them as `variant="ok"`, `"warn"` and `"neutral"`; `SyncStatusChip.tsx` is the one place that picks between them for a status.
 
-| Fill                | Text                             | For                           |
-| ------------------- | -------------------------------- | ----------------------------- |
-| `bg-status-ok`      | `text-status-ok-foreground`      | In sync, Saved                |
-| `bg-status-warn`    | `text-status-warn-foreground`    | Unsaved, Changed since export |
-| `bg-status-neutral` | `text-status-neutral-foreground` | Not exported, Published draft |
+| Fill                | Text                             | For                                                          |
+| ------------------- | -------------------------------- | ------------------------------------------------------------ |
+| `bg-status-ok`      | `text-status-ok-foreground`      | In sync, Saved                                               |
+| `bg-status-warn`    | `text-status-warn-foreground`    | Unsaved, Changed since export                                |
+| `bg-status-neutral` | `text-status-neutral-foreground` | Not exported, Published draft, an Export or a Play under way |
 
 Not exported is every map's resting state, so it wears neutral, the quietest pair: colour means something needs a look or has just gone right. The variables are `--status-ok`, `--status-warn`, `--status-neutral`, and each with `-foreground`. Each is the tint already mixed with the surface, about 12% in light and 18% in dark, where the text is at full saturation, and opaque: a hover is the fill at 80%, which an alpha fill couldn't take.

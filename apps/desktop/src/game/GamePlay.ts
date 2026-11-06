@@ -10,13 +10,14 @@ import { Context, DateTime, Effect, Layer, Option, PubSub, Schema, Stream } from
 import { ElectronShell } from "../electron/ElectronShell"
 import { ElectronWindow } from "../electron/ElectronWindow"
 import type { BackupError } from "../project/Backups"
-import { MapExports, type MapRefusedError } from "../project/MapExports"
+import { type ExportUnverifiedError, MapExports, type MapRefusedError } from "../project/MapExports"
 import { MapFiles } from "../project/MapFiles"
 import type { MapLinkError } from "../project/MapLinks"
 import { type ProjectError, Projects } from "../project/Projects"
 import { GameLink, type GameLinkError } from "./GameLink"
 import type { GamePathError } from "./GamePaths"
 import { GameProcess } from "./GameProcess"
+import { reportGameWriteProgress } from "./gameWriteProgress"
 
 /** How often a Play's game session is looked at: is the game up yet, is it still running. */
 export const SESSION_POLL = "5 seconds"
@@ -25,7 +26,14 @@ export const SESSION_START_TIMEOUT = "5 minutes"
 
 const encodeEnded = Schema.encodeEffect(PlaySessionEnded)
 
-export type PlayError = MapRefusedError | ProjectError | MapLinkError | BackupError | GamePathError | GameLinkError
+export type PlayError =
+  | MapRefusedError
+  | ExportUnverifiedError
+  | ProjectError
+  | MapLinkError
+  | BackupError
+  | GamePathError
+  | GameLinkError
 
 /**
  * Play (docs/DESKTOP.md § Play): Export to game, then the handoff to the `ballest-editor-link` plugin, then the game
@@ -95,6 +103,7 @@ export class GamePlay extends Context.Service<GamePlay, {
       const exported = yield* exports.exportMap(payload)
       if (exported._tag !== "Exported") return exported
 
+      yield* reportGameWriteProgress(windows, { fileName, stage: "launch" })
       const { plugin, sent } = yield* link.requestRace(fileName)
       const launch: PlayLaunch = (yield* game.isRunning)
         ? "running"

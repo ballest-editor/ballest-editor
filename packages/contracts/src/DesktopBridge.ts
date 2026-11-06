@@ -587,6 +587,13 @@ export const PlaySessionEnded = Schema.Struct({ fileName: MapFileName, endedAt: 
 export type PlaySessionEnded = typeof PlaySessionEnded.Type
 
 /**
+ * Main → renderer: how far Export or Play has got with `fileName` (docs/DESKTOP.md § Status bar). `verify` once the copy
+ * is written, `launch` once Play goes on to the handoff. It goes to every window, so a page keeps only its own file's.
+ */
+export const GameWriteProgress = Schema.Struct({ fileName: MapFileName, stage: Schema.Literals(["verify", "launch"]) })
+export type GameWriteProgress = typeof GameWriteProgress.Type
+
+/**
  * Where the in-app updater is (docs/DESKTOP.md § Packaging and release). `idle` until a check finds a newer release
  * (`available`), then `downloading` once the user asks for it and `ready` once it is on disk; restarting installs it.
  * `error` is a failed check, retried by the next one. `disabled` never changes: dev, unpackaged, turned off with
@@ -837,6 +844,8 @@ const DesktopPushes = {
   onUnloadRequest: UnloadKind,
   /** Calls `listener` each time the game session a Play started or joined ends, until the returned function is called. */
   onPlaySessionEnded: PlaySessionEnded,
+  /** Calls `listener` each time an Export or a Play reaches a stage, until the returned function is called. */
+  onGameWriteProgress: GameWriteProgress,
   /** Calls `listener` with every later update state, until the returned function is called. */
   onUpdateState: UpdateState
 } as const satisfies {

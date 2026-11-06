@@ -6,6 +6,8 @@ import {
   type ChipStatus,
   chipStatusOf,
   type ChipView,
+  GAME_WRITE_HOLD_MS,
+  type GameWrite,
   nextSavedChip,
   restingChip,
   SAVED_CHIP_MS,
@@ -18,7 +20,7 @@ import { formatAgo, formatDateTime } from "../domain/time"
 import { exportToGame, playMap, reimportMap, revealGamePath, saveMap } from "../editor/actions"
 import { useEditor, useOpenPrefab, useOpenProjectMap, useTabSummary } from "../editor/store"
 import { useNow } from "../editor/useNow"
-import { SyncStatusChip } from "./SyncStatusChip"
+import { StatusBarChip } from "./SyncStatusChip"
 
 /**
  * Lifts the popover over the viewport's tool bar, 36px tall and 12px up from the status bar (`ToolBar`), so it never
@@ -47,24 +49,35 @@ const useChipStatus = (view: ChipView): ChipStatus => {
   return chipStatusOf(chip)
 }
 
+/** The Export or Play the chip shows: the one under way, and for `GAME_WRITE_HOLD_MS` after, the one that just ended. */
+const useShownGameWrite = (): GameWrite | null => {
+  const current = useEditor((s) => s.gameWrite)
+  const [last, setLast] = useState<GameWrite | null>(null)
+  if (current !== null && current !== last) setLast(current)
+  useEffect(() => {
+    if (current !== null || last === null) return
+    const end = setTimeout(() => setLast(null), GAME_WRITE_HOLD_MS)
+    return () => clearTimeout(end)
+  }, [current, last])
+  return current ?? last
+}
+
 /**
- * The status bar's chip, with `chipDetail` after its label, and its popover: the status, `lines`, then `actions`. `chip`
- * is what the chip says when that isn't the status; the popover goes on telling the status.
+ * The status bar's chip and its popover: the status, `lines`, then `actions`. `chip` is what the chip says when that
+ * isn't the status, and `write` the Export or Play it shows instead; the popover goes on telling the status.
  */
 function StatusPopover(
-  { status, chip = status, chipDetail, lines, actions, ...props }: ComponentProps<typeof Popover> & {
+  { status, chip = status, write, lines, actions, ...props }: ComponentProps<typeof Popover> & {
     readonly status: SyncStatus
     readonly chip?: ChipStatus
-    readonly chipDetail?: ReactNode
+    readonly write: GameWrite | null
     readonly lines: ReactNode
     readonly actions: ReactNode
   }
 ) {
   return (
     <Popover {...props}>
-      <PopoverTrigger render={<SyncStatusChip status={chip} render={<button type="button" />} />}>
-        {chip !== "saved" && chipDetail}
-      </PopoverTrigger>
+      <PopoverTrigger render={<StatusBarChip status={chip} write={write} render={<button type="button" />} />} />
       <PopoverContent side="top" sideOffset={CLEARS_TOOL_BAR} className="w-80 gap-3 p-3">
         <div className="flex flex-col">
           <PopoverTitle>{SYNC_STATUS_LABELS[status]}</PopoverTitle>
@@ -77,7 +90,9 @@ function StatusPopover(
 }
 
 /** A map that isn't in the project yet: Save opens the Save map dialog, so the popover closes rather than wait behind it. */
-function NeverSavedStatus({ chip }: { readonly chip: ChipStatus }) {
+function NeverSavedStatus(
+  { chip, write }: { readonly chip: ChipStatus; readonly write: GameWrite | null }
+) {
   const [open, setOpen] = useState(false)
   const save = () => {
     setOpen(false)
@@ -87,6 +102,7 @@ function NeverSavedStatus({ chip }: { readonly chip: ChipStatus }) {
     <StatusPopover
       status="unsaved"
       chip={chip}
+      write={write}
       open={open}
       onOpenChange={setOpen}
       lines={<p className="text-fg-tertiary">Not saved in the project yet</p>}
@@ -96,11 +112,11 @@ function NeverSavedStatus({ chip }: { readonly chip: ChipStatus }) {
 }
 
 /**
- * The open map's sync status (docs/PROJECTS.md § Sync), in the middle of the status bar: a chip with the status and when
- * it was last exported. Its popover adds the link state the status leaves out, and has that time, Export, Play and
- * Reveal, and Re-import once the game has changed the export. A map that isn't in the project yet is Unsaved, the same
- * chip as its row, and its popover has Save. For a moment after a save the chip says Saved, so a save is confirmed after
- * its toast has gone too. Desktop only.
+ * The open map's sync status (docs/PROJECTS.md § Sync), in the middle of the status bar: a chip with the status. Its
+ * popover adds the link state the status leaves out, and has when it was last exported, Export, Play and Reveal, and
+ * Re-import once the game has changed the export. A map that isn't in the project yet is Unsaved, the same chip as its
+ * row, and its popover has Save. For a moment after a save the chip says Saved, so a save is confirmed after its toast
+ * has gone too, and during an Export or a Play it shows how far that has got. Desktop only.
  */
 export function LinkStatus() {
   const open = useOpenProjectMap()
@@ -118,9 +134,10 @@ export function LinkStatus() {
   const unlisted = hasFile && !unsaved ? "notExported" : "unsaved"
   const status = open === null ? unlisted : syncStatusOf(open.state, unsaved)
   const chip = useChipStatus({ opened, savedDoc, status })
+  const write = useShownGameWrite()
   if (prefab !== null) return <span className="text-fg-tertiary">Prefab {prefab.name}</span>
   if (!canExport) return null
-  if (open === null) return blank ? null : <NeverSavedStatus chip={chip} /> // a blank map has nothing to save yet
+  if (open === null) return blank ? null : <NeverSavedStatus chip={chip} write={write} /> // a blank map has nothing to save yet
 
   const { state, map } = open
   const exported = map.link?.export ?? null
@@ -130,12 +147,7 @@ export function LinkStatus() {
     <StatusPopover
       status={status}
       chip={chip}
-      chipDetail={exported !== null && (
-        <>
-          <span aria-hidden>·</span>
-          <span>exported {formatAgo(exported.at, now)}</span>
-        </>
-      )}
+      write={write}
       lines={
         <>
           {detail !== null && <p className="text-fg-tertiary">{detail}</p>}
@@ -164,4 +176,16 @@ export function LinkStatus() {
       }
     />
   )
+}
+
+/**
+ * When the open map was last exported, beside the chip. It stays out of the chip, whose width doesn't change, and in a
+ * column of its own, so the chip stays centred however long it is.
+ */
+export function LastExportStatus() {
+  const exported = useOpenProjectMap()?.map.link?.export ?? null
+  const prefab = useOpenPrefab()
+  const now = useNow()
+  if (prefab !== null || exported === null) return null
+  return <span className="truncate text-fg-tertiary">exported {formatAgo(exported.at, now)}</span>
 }

@@ -3,7 +3,7 @@
  * item keys, so everything that acts on it works on groups unchanged (docs/DESKTOP.md § Groups and selection).
  */
 import type { TreeNode } from "./MapSidecar"
-import { findGroup, findNode, idOf, treeKeys, wholeNodes } from "./structure"
+import { findGroup, findNode, idOf, type NumberedName, treeKeys, wholeNodes } from "./structure"
 
 /** The groups a node is in, outermost first; empty at the root and for a node that isn't in the tree. */
 export const groupPathOf = (tree: ReadonlyArray<TreeNode>, id: string): ReadonlyArray<string> =>
@@ -64,6 +64,26 @@ export const selectedGroupIds = (
   selectedIds: ReadonlyArray<string>
 ): ReadonlyArray<string> =>
   wholeNodes(tree, new Set(selectedIds)).flatMap((node) => node.kind === "group" ? node.id : [])
+
+const counted = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`
+
+/**
+ * What the status bar says of a selection: a lone item's name from `names`, else how many items it has and how many
+ * groups they make up ("3 items · 1 group"). Null for an empty selection.
+ */
+export const selectionSummaryOf = (
+  tree: ReadonlyArray<TreeNode>,
+  selectedIds: ReadonlyArray<string>,
+  names: ReadonlyMap<string, NumberedName>
+): NumberedName | null => {
+  const [first] = selectedIds
+  if (first === undefined) return null
+  const groups = selectedGroupIds(tree, selectedIds).length
+  const lone = selectedIds.length === 1 && groups === 0 ? names.get(first) : undefined
+  if (lone !== undefined) return lone
+  const items = counted(selectedIds.length, "item")
+  return { name: groups === 0 ? items : `${items} · ${counted(groups, "group")}`, ordinal: undefined }
+}
 
 /** A group drawn as a box in the viewport. `entered` is the quiet one, standing for the group clicks are inside. */
 export interface GroupBoxTarget {
