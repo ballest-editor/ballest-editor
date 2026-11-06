@@ -53,9 +53,9 @@ export const isMovementChord = (keybinds: Keybinds, chord: string): boolean =>
  * Does this key press (chordOf) make the held modifiers a chord rather than movement keys?
  * Bound shortcuts do (Ctrl+Z, Ctrl+D), and so does any other key that isn't a movement key
  * (the browser's own Ctrl+F, Ctrl+L...), so Ctrl as "down" never moves the camera under them.
- * Movement keys don't: Ctrl+W flies down and forward.
+ * Movement keys don't: Ctrl+W flies down and forward. Nor does anything during a camera drag, when no hotkey fires.
  */
-export const formsChord = (keybinds: Keybinds, chord: string): boolean =>
-  isBoundChord(keybinds, chord) ||
-  (chord.includes("+") &&
-    !movementActions.some((action) => keybinds[action].some((binding) => baseCodeOf(binding) === baseCodeOf(chord))))
+export const formsChord = (keybinds: Keybinds, chord: string, dragging = false): boolean =>
+  !dragging && (isBoundChord(keybinds, chord) ||
+    (chord.includes("+") &&
+      !movementActions.some((action) => keybinds[action].some((binding) => baseCodeOf(binding) === baseCodeOf(chord)))))

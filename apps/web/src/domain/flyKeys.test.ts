@@ -83,4 +83,9 @@ describe("formsChord", () => {
     expect(formsChord(defaultKeybinds, "KeyC")).toBe(false)
     expect(formsChord(defaultKeybinds, "ShiftLeft")).toBe(false)
   })
+
+  it("forms none during a camera drag, when no hotkey can fire", () => {
+    expect(formsChord(defaultKeybinds, "Ctrl+KeyZ", true)).toBe(false)
+    expect(formsChord(defaultKeybinds, "Ctrl+KeyQ", true)).toBe(false)
+  })
 })

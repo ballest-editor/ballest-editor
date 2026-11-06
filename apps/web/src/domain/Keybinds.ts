@@ -403,6 +403,15 @@ export const chordOf = (e: ModifierState & { readonly code: string }): string =>
 export const mouseChordOf = (e: ModifierState & { readonly button: number }): string =>
   withModifiers(e, `Mouse${e.button}`)
 
+/**
+ * The chord a press starts a camera drag with: its own, or the bare button when the modifiers make it mean nothing. Left
+ * Ctrl held to fly down mustn't stop right-click looking, and the bindings that do use a modifier keep it.
+ */
+export const dragChordOf = (keybinds: Keybinds, e: ModifierState & { readonly button: number }): string => {
+  const chord = mouseChordOf(e)
+  return actionsFor(keybinds, chord).length > 0 ? chord : `Mouse${e.button}`
+}
+
 interface WheelState extends ModifierState {
   readonly deltaX: number
   readonly deltaY: number

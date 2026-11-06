@@ -6,6 +6,7 @@ import { flyingActions, formsChord, type MovementAction } from "../domain/flyKey
 import {
   type Bindings,
   chordOf,
+  dragChordOf,
   HeldKeys,
   isBoundChord,
   isOneShotChord,
@@ -102,7 +103,7 @@ export function FlyCamera() {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditorKeyEvent(e)) {
-        pressed.current.press(e.code, performance.now(), formsChord(keybinds, chordOf(e)))
+        pressed.current.press(e.code, performance.now(), formsChord(keybinds, chordOf(e), drag.current !== null))
       }
     }
 
@@ -148,7 +149,8 @@ export function FlyCamera() {
       const chord = mouseChordOf(e)
       // Ctrl+click and the like: the held modifier is the click's, not "down".
       if (isBoundChord(keybinds, chord)) pressed.current.suppressModifiers()
-      const mode = dragModes.find(([bindings]) => bindings.includes(chord))?.[1]
+      const dragChord = dragChordOf(keybinds, e)
+      const mode = dragModes.find(([bindings]) => bindings.includes(dragChord))?.[1]
       if (mode === undefined) return
       drag.current = pane.view === undefined ? mode : "pan"
       dragPane.current = pane
@@ -261,7 +263,7 @@ export function FlyCamera() {
     // looking; movement keys follow the "movement keys need look" setting (see flyKeys).
     const looking = drag.current !== null
     const held = (bindings: Bindings) =>
-      bindings.some((binding) => keys.holds(binding, now) && (looking || !isOneShotChord(keybinds, binding)))
+      bindings.some((binding) => keys.holds(binding, now, looking) && (looking || !isOneShotChord(keybinds, binding)))
     const dt = Math.min(delta, 0.1)
     const pane = activePaneCamera()
     const camera = pane.perspective

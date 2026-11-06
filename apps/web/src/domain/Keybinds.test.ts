@@ -3,6 +3,7 @@ import {
   actionsFor,
   conflictingBindings,
   defaultKeybinds,
+  dragChordOf,
   formatBinding,
   formatBindings,
   HeldKeys,
@@ -206,6 +207,29 @@ const newConflicts = (keybinds: Keybinds) => {
   const baseline = conflictingBindings(defaultKeybinds)
   return [...conflictingBindings(keybinds)].filter((chord) => !baseline.has(chord))
 }
+
+describe("dragChordOf", () => {
+  const press = (button: number, modifiers: { ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean } = {}) => ({
+    button,
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    ...modifiers
+  })
+
+  it("drops modifiers bound to nothing with the button: Ctrl held for flying down, then right-click", () => {
+    expect(dragChordOf(defaultKeybinds, press(2, { ctrlKey: true }))).toBe("Mouse2")
+    expect(dragChordOf(defaultKeybinds, press(2, { shiftKey: true }))).toBe("Mouse2")
+    expect(dragChordOf(defaultKeybinds, press(1, { altKey: true }))).toBe("Mouse1")
+  })
+
+  it("keeps a chord that means something: orbit, and the selection clicks", () => {
+    expect(dragChordOf(defaultKeybinds, press(0, { altKey: true }))).toBe("Alt+Mouse0")
+    expect(dragChordOf(defaultKeybinds, press(0, { ctrlKey: true }))).toBe("Ctrl+Mouse0")
+    expect(dragChordOf(defaultKeybinds, press(0, { shiftKey: true }))).toBe("Shift+Mouse0")
+  })
+})
 
 describe("wheelSpeedStep", () => {
   const scroll = (deltaY: number, modifiers: { ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean } = {}) => ({
