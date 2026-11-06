@@ -65,24 +65,52 @@ describe("spreadPlacement", () => {
     assert.deepStrictEqual(clicks(2)[1], { ...POINT, y: 1250 })
   })
 
-  it("starts over when the camera moves, or only turns", () => {
+  it("starts a new run along the view when the camera moves, or only turns", () => {
     click()
     const moved = { ...VIEW, position: { ...VIEW.position, x: 10 } }
-    assert.deepStrictEqual(click(POINT, moved), POINT)
+    assert.deepStrictEqual(click(POINT, moved), { ...POINT, y: STEP })
     const turned = { ...moved, right: { x: 1, y: 0, z: 0 } }
-    assert.deepStrictEqual(click(POINT, turned), POINT)
+    assert.deepStrictEqual(click(POINT, turned), { ...POINT, x: POINT.x + STEP })
   })
 
-  it("starts over when the selection is cleared or changes", () => {
-    click()
+  it("steps once off an item standing where the view puts the first piece", () => {
+    s().placePiece(cube, placementTransform(cube, POINT))
+    s().select([])
+    assert.deepStrictEqual(click(), { ...POINT, y: STEP })
+  })
+
+  it("leaves the spot alone for an item wholly below it", () => {
+    s().placePiece(cube, placementTransform(cube, { ...POINT, z: -5000 }))
     s().select([])
     assert.deepStrictEqual(click(), POINT)
+  })
+
+  it("passes over an earlier run's pieces, however that run ended", () => {
+    const earlier = clicks(PLACEMENT_COLUMNS)
+    s().select([])
+    assert.deepStrictEqual(click(), { ...POINT, x: POINT.x + STEP })
     const first = lastId()
-    click()
+    assert.deepStrictEqual(click(), { ...POINT, x: POINT.x + STEP, y: STEP })
     s().select([s().doc.ids[0]!])
-    assert.deepStrictEqual(click(), POINT)
-    click()
+    assert.deepStrictEqual(click(), { ...POINT, x: POINT.x + STEP, y: 2 * STEP })
     s().select([first, lastId()])
+    assert.deepStrictEqual(click(), { ...POINT, x: POINT.x + 2 * STEP })
+    assert.deepStrictEqual(earlier, [POINT, { ...POINT, y: STEP }, { ...POINT, y: 2 * STEP }])
+  })
+
+  it("keeps a run going past a crowded spot, each piece on a spot of its own", () => {
+    clicks(PLACEMENT_COLUMNS)
+    s().select([])
+    const spots = clicks(10 * PLACEMENT_COLUMNS).map(({ x, y }) => `${x} ${y}`)
+    assert.strictEqual(new Set(spots).size, spots.length)
+    assert.notInclude(spots, `${POINT.x} ${POINT.y}`)
+  })
+
+  it("takes a spot again once the piece on it has gone", () => {
+    click()
+    s().undo()
+    assert.deepStrictEqual(click(), POINT)
+    s().deleteSelection()
     assert.deepStrictEqual(click(), POINT)
   })
 
@@ -90,9 +118,9 @@ describe("spreadPlacement", () => {
     click()
     click()
     s().undo()
-    assert.deepStrictEqual(click(), POINT)
+    assert.deepStrictEqual(click(), { ...POINT, y: STEP })
     s().deleteSelection()
-    assert.deepStrictEqual(click(), POINT)
+    assert.deepStrictEqual(click(), { ...POINT, y: STEP })
   })
 
   it("leaves a placement that wouldn't land on the run alone", () => {

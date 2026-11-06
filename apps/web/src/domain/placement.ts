@@ -75,6 +75,12 @@ export const PLACEMENT_GAP = 100
 /** How many pieces a row of a run holds: three default cubes still fit a 16:9 view at the default distance. */
 export const PLACEMENT_COLUMNS = 3
 
+/**
+ * How many slots a placement tries for a free one: eight rows, by when a piece is well up the screen. A spot crowded past
+ * that takes the slot it started from, rather than a piece landing out of sight.
+ */
+const PLACEMENT_SLOTS = PLACEMENT_COLUMNS * 8
+
 /** A view whose up has less horizontal in it than this is level: there is no floor ahead to lay rows along. */
 const LEVEL_UP = 0.1
 
@@ -156,4 +162,37 @@ export const runPoint = ({ across, along, start }: PlacementRun, view: Placement
   const row = rowAxisOf(view)
   const at = (axis: "x" | "y" | "z") => cm(start[axis] + view.right[axis] * along + row[axis] * across)
   return { x: at("x"), y: at("y"), z: at("z") }
+}
+
+/**
+ * Whether a piece `width` across, placed at `point`, would stand in `box`: their footprints meet and `point` is within
+ * the box's height. A box wholly above or below leaves the spot free, so a piece can land on a platform or under one.
+ */
+export const wouldStandIn = (point: Vec3, width: number, { max, min }: Box): boolean =>
+  point.x >= min.x - width / 2 && point.x <= max.x + width / 2 &&
+  point.y >= min.y - width / 2 && point.y <= max.y + width / 2 &&
+  point.z >= min.z && point.z <= max.z
+
+/** A box of no size: to `nextInRun`, a step sized by the piece alone. */
+const NO_BOX: Box = { min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 0, z: 0 } }
+
+/**
+ * `run`, moved on from its latest slot to the first where a piece `width` across stands clear of `boxes`. Slots are
+ * sized by the piece, not by what's in the way, so a huge item can't throw it out of sight. With no free slot in reach,
+ * `run` as it was.
+ */
+export const clearOfBoxes = (
+  run: PlacementRun,
+  boxes: ReadonlyArray<Box>,
+  width: number,
+  view: PlacementView,
+  gridSize: number
+): PlacementRun => {
+  let slot = run
+  for (let tried = 0; tried < PLACEMENT_SLOTS; tried++) {
+    const point = runPoint(slot, view)
+    if (!boxes.some((box) => wouldStandIn(point, width, box))) return slot
+    slot = nextInRun(slot, NO_BOX, width, view, gridSize)
+  }
+  return run
 }

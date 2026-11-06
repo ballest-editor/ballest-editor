@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" class="dark overflow-hidden">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -14,7 +14,8 @@
       } catch (e) {}
     </script>
   </head>
-  <body class="overflow-hidden">
+  <!-- With <html> clipping the viewport, this overflow stays on <body>: `clip` can't scroll, even by script or focus. -->
+  <body class="relative h-svh overflow-clip">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
