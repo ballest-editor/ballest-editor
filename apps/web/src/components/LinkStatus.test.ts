@@ -49,8 +49,7 @@ describe("the status bar, on a map that was never saved", () => {
   })
 
   it("makes the chip a button that opens a popover", () => {
-    assert.match(markup, /^<button/)
-    assert.include(markup, "aria-haspopup=\"dialog\"")
+    assert.match(markup, /<button[^>]*aria-haspopup="dialog"/)
   })
 
   it("no longer says it in plain text", () => {

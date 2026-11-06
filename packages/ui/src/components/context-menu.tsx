@@ -1,5 +1,6 @@
 import { ContextMenu as ContextMenuPrimitive } from "@base-ui/react/context-menu"
 import { MENU_ITEM, MENU_POPUP } from "@workspace/ui/components/dropdown-menu"
+import { usePortalContainer } from "@workspace/ui/lib/portal-container"
 import { cn } from "@workspace/ui/lib/utils"
 import * as React from "react"
 
@@ -35,7 +36,7 @@ function ContextMenuContent({
   >)
 {
   return (
-    <ContextMenuPrimitive.Portal>
+    <ContextMenuPrimitive.Portal container={usePortalContainer()}>
       <ContextMenuPrimitive.Positioner
         className="isolate z-50 outline-none"
         align={align}

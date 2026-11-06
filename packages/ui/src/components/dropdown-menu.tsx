@@ -58,6 +58,11 @@ function DropdownMenuContent({
             "w-(--anchor-width) data-closed:overflow-hidden",
             className
           )}
+          // the popup is in a portal, but React still bubbles to a context menu's trigger around the dropdown
+          onContextMenu={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+          }}
           {...props}
         />
       </MenuPrimitive.Positioner>

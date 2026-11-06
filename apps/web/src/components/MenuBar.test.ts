@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { afterEach, assert, beforeEach, describe, it } from "@effect/vitest"
+import { assert, describe, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { act, createElement, Fragment } from "react"
-import { createRoot, type Root } from "react-dom/client"
 import { vi } from "vitest"
 import { type EditorState, useEditor } from "../editor/store"
+import { reactRootPerTest } from "../test/reactRoot"
 import { MenuBar } from "./MenuBar"
 import { MENU_TITLES, menuEntries, type Menus, useMenus } from "./menuModel"
 
@@ -25,29 +25,7 @@ const ModelProbe = () => {
   return null
 }
 
-let root: Root
-let host: HTMLElement
-
-beforeEach(() => {
-  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
-  // jsdom lays nothing out, and Base UI's positioner watches for that
-  vi.stubGlobal(
-    "ResizeObserver",
-    class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    }
-  )
-  host = document.body.appendChild(document.createElement("div"))
-  root = createRoot(host)
-})
-
-afterEach(() => {
-  act(() => root.unmount())
-  host.remove()
-  vi.unstubAllGlobals()
-})
+const dom = reactRootPerTest()
 
 const settle = Effect.promise(() => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20))))
 
@@ -101,7 +79,7 @@ const rowsOf = (popup: Element, path: ReadonlyArray<string>): Effect.Effect<Read
 const renderedRows = Effect.gen(function*() {
   const rows: Array<string> = []
   for (const title of MENU_TITLES) {
-    const trigger = [...host.querySelectorAll("[data-slot=menubar-trigger]")].find((t) => t.textContent === title)
+    const trigger = [...dom.host.querySelectorAll("[data-slot=menubar-trigger]")].find((t) => t.textContent === title)
     assert.isDefined(trigger, `the bar has ${title}`)
     yield* press(trigger, "ArrowDown")
     const popup = document.querySelector("[data-slot=menubar-content]")
@@ -116,7 +94,7 @@ const renderedRows = Effect.gen(function*() {
 const drawnAndModelled = (state: Partial<EditorState>) =>
   Effect.gen(function*() {
     useEditor.setState(state)
-    act(() => root.render(createElement(Fragment, null, createElement(ModelProbe), createElement(MenuBar))))
+    act(() => dom.root.render(createElement(Fragment, null, createElement(ModelProbe), createElement(MenuBar))))
     const drawn = yield* renderedRows
     const menus = onMenus.mock.lastCall?.[0]
     assert.isDefined(menus)
@@ -205,8 +183,8 @@ describe("Help's search", () => {
 
   const openHelp = Effect.gen(function*() {
     useEditor.setState({ capabilities: DESKTOP, project: projects([]), update: null, selectedIds: [], dialog: null })
-    act(() => root.render(createElement(MenuBar)))
-    const trigger = [...host.querySelectorAll("[data-slot=menubar-trigger]")].find((t) => t.textContent === "Help")
+    act(() => dom.root.render(createElement(MenuBar)))
+    const trigger = [...dom.host.querySelectorAll("[data-slot=menubar-trigger]")].find((t) => t.textContent === "Help")
     assert.isDefined(trigger)
     yield* press(trigger, "ArrowDown")
     return field()
