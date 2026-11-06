@@ -9,7 +9,7 @@ export const TITLE_BAR_HEIGHT = 40
  */
 export const titleBarOverlay = (dark: boolean): Electron.TitleBarOverlayOptions => ({
   color: "#01000000",
-  symbolColor: dark ? "#fafafa" : "#0b0d0f",
+  symbolColor: dark ? "#f5f7f9" : "#393d42",
   height: TITLE_BAR_HEIGHT
 })
 

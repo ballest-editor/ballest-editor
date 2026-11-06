@@ -50,7 +50,7 @@ describe("window chrome", () => {
   })
 
   it("draws the window controls in the page theme's foreground", () => {
-    expect(titleBarOverlay(true)).toEqual({ color: "#01000000", symbolColor: "#fafafa", height: 40 })
-    expect(titleBarOverlay(false).symbolColor).toBe("#09090b")
+    expect(titleBarOverlay(true)).toEqual({ color: "#01000000", symbolColor: "#f5f7f9", height: 40 })
+    expect(titleBarOverlay(false).symbolColor).toBe("#393d42")
   })
 })
