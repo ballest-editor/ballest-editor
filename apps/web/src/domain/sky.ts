@@ -91,6 +91,20 @@ const NIGHT = {
   stars: 25
 } as const
 
+/**
+ * The horizon as it reaches the screen, by the sun's height, linear RGB: the sky alone, sampled from the game at 5:00
+ * (#d18548), 6:00 (#d0884b), 7:18 (#cc9f8b) and from 9:00 to noon (#abbcce); docs/qa/sky-horizon.md has how. The curves'
+ * noon horizon is near white, and only the game's own tone mapping and exposure turn it blue-grey: the viewport's would
+ * show it as white haze.
+ */
+const SHOWN_HORIZON_CURVE: ColorCurve = [
+  [[-1 / 9, 0.638, 0, 0], [0, 0.631, 0, 0], [0.2166, 0.604, 0, 0], [0.5, 0.407, 0, 0]],
+  [[-1 / 9, 0.235, 0, 0], [0, 0.246, 0, 0], [0.2166, 0.347, 0, 0], [0.5, 0.503, 0, 0]],
+  [[-1 / 9, 0.065, 0, 0], [0, 0.07, 0, 0], [0.2166, 0.258, 0, 0], [0.5, 0.617, 0, 0]]
+]
+/** The same at night, #171b31. */
+const SHOWN_NIGHT_HORIZON: Tuple3 = [0.0086, 0.0109, 0.0307]
+
 /** The material's `Sun Radius`: the disc is where 1 - cos(angle to the sun) is below it (about 1.4°). */
 export const SUN_RADIUS = 0.0003
 /** The material scales its whole output by this. */
@@ -126,6 +140,8 @@ const colorAt = (curve: ColorCurve, time: number): Tuple3 => {
 export interface Sky {
   readonly zenith: Tuple3
   readonly horizon: Tuple3
+  /** `horizon` as the visible sky shows it, past tone mapping. */
+  readonly shownHorizon: Tuple3
   readonly horizonFalloff: number
   /** Multiplies the sun colour in the disc (0 at night). */
   readonly sunBrightness: number
@@ -144,6 +160,7 @@ export const skyOf = (sun: Sun, timeOfDay: number): Sky => {
     return {
       zenith: NIGHT.zenith,
       horizon: NIGHT.horizon,
+      shownHorizon: SHOWN_NIGHT_HORIZON,
       horizonFalloff: NIGHT.horizonFalloff,
       sunBrightness: 0,
       stars: NIGHT.stars * belowHorizon,
@@ -156,6 +173,7 @@ export const skyOf = (sun: Sun, timeOfDay: number): Sky => {
   return {
     zenith: colorAt(ZENITH_CURVE, height),
     horizon: colorAt(HORIZON_CURVE, height),
+    shownHorizon: colorAt(SHOWN_HORIZON_CURVE, height),
     horizonFalloff: 3 + 4 * Math.abs(height),
     sunBrightness: 20,
     stars: stars * belowHorizon,
