@@ -10,7 +10,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbSeparator } from 
 import { Button } from "@workspace/ui/components/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type ComponentType, Fragment, useState } from "react"
+import { type ComponentType, Fragment, type ReactNode, useState } from "react"
 import {
   anythingMissing,
   type GameFolderKind,
@@ -132,20 +132,27 @@ function PathCrumbs({ path }: { readonly path: string }) {
   )
 }
 
-/** Copy, Reveal and the row's fixes, in one line at the right of the row. */
+/** One of a row's action columns, an icon button wide even with nothing in it, so the rows' columns line up. */
+function ActionColumn({ children }: { readonly children: ReactNode }) {
+  return <div className="flex min-w-6 justify-end gap-2">{children}</div>
+}
+
+/** Copy, Reveal and the row's fixes, each in a column of its own at the right of the row. */
 function RowActions({ row }: { readonly row: GameLinkRow }) {
   const { path, reveal } = row
   return (
     <>
-      {path !== null && <CopyPathAction path={path} />}
-      {reveal !== null && (
-        <PathAction
-          label="Reveal in file manager"
-          icon={IconFolderOpen}
-          onClick={() => void revealGamePath(reveal)}
-        />
-      )}
-      {row.fixes.map((fix) => <FixButton key={fix._tag} fix={fix} state={row.state} />)}
+      <ActionColumn>{path !== null && <CopyPathAction path={path} />}</ActionColumn>
+      <ActionColumn>
+        {reveal !== null && (
+          <PathAction
+            label="Reveal in file manager"
+            icon={IconFolderOpen}
+            onClick={() => void revealGamePath(reveal)}
+          />
+        )}
+      </ActionColumn>
+      <ActionColumn>{row.fixes.map((fix) => <FixButton key={fix._tag} fix={fix} state={row.state} />)}</ActionColumn>
     </>
   )
 }

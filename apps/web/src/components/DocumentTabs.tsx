@@ -72,15 +72,14 @@ export function DocumentTabs() {
 
   return (
     <div
-      className="flex h-8 shrink-0 items-stretch bg-background text-body"
+      className="flex h-8 w-full items-stretch bg-background text-body"
       onDragOver={(e) => {
         const over = drag ?? (isMapDrag(e.dataTransfer) ? { id: null, at: tabIds.length } : null)
         if (over === null) return
         e.preventDefault()
         e.dataTransfer.dropEffect = over.id === null ? "copy" : "move"
-        // past every tab: the strip's empty end
-        const at = e.target === e.currentTarget ? tabIds.length : over.at
-        if (drag === null || at !== drag.at) setDrag({ ...over, at })
+        // a tab handles its own: this is the + or the strip's empty end, both past every tab
+        if (drag === null || drag.at !== tabIds.length) setDrag({ ...over, at: tabIds.length })
       }}
       // a map's row has no dragend here to end on, so it goes when it leaves; a tab keeps its place along the strip
       onDragLeave={(e) => {
@@ -173,7 +172,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
           drag?.at === index &&
             "before:absolute before:inset-y-0 before:-left-px before:z-10 before:w-0.5 before:bg-primary",
           last && drag?.at === index + 1 &&
-            "after:absolute after:inset-y-0 after:-right-px after:z-10 after:w-0.5 after:bg-primary"
+            "after:absolute after:inset-y-0 after:right-0 after:z-10 after:w-0.5 after:bg-primary"
         )}
         {...onMiddleClick(() => void closeTab(id))}
         onDragStart={(e) => {
@@ -197,13 +196,13 @@ function DocumentTab({ id, index, drag, onDrag }: {
                 type="button"
                 role="tab"
                 aria-selected={active}
-                className="flex h-full min-w-0 cursor-[inherit] items-center focus-visible:outline-none"
+                className="flex h-full min-w-0 flex-1 cursor-[inherit] items-center focus-visible:outline-none"
                 onClick={() => activateTab(id)}
               />
             }
           >
             {prefabTier !== null && <IconBoxMultiple className="mr-1 size-4 shrink-0 text-fg-tertiary" />}
-            <span className="truncate">{label}</span>
+            <span className="min-w-0 flex-1 truncate text-left">{label}</span>
             {prefabTier !== null && (
               <span className="ml-1 shrink-0 rounded-full bg-muted px-1.5 text-caption text-fg-secondary">
                 {prefabTierLabel(prefabTier, projects)}

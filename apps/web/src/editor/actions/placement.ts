@@ -6,14 +6,16 @@ import { type CatalogPiece, pieceIdOf } from "../../domain/Catalog"
 import type { Vec3 } from "../../domain/coords"
 import { itemFromPiece, placementTransform } from "../../domain/factory"
 import { type Box, itemsBoxOf } from "../../domain/itemBounds"
-import type { ItemTransform } from "../../domain/MapFile"
+import { isPlayerStart, type ItemTransform } from "../../domain/MapFile"
 import {
+  clearDrop,
   clearOfBoxes,
   frameStanding,
   nextInRun,
   pieceFootprint,
   type PlacementRun,
   type PlacementView,
+  roomOf,
   runPoint,
   startPlacementRun,
   wholeCm,
@@ -63,9 +65,9 @@ const continued = (s: EditorState, last: Placing, point: Vec3, width: number, vi
   return { run: nextInRun(last.run, box, width, view, s.settings.snapping.gridSize), first, stepped: last.stepped }
 }
 
-/** Every item's box, as the map has it now. */
-const itemBoxes = ({ catalogIndex, doc }: EditorState): ReadonlyArray<Box> =>
-  doc.map.items.flatMap((item) => itemsBoxOf([item], catalogIndex) ?? [])
+/** Every item's box, as the map has it now, but for the item `except`. */
+const itemBoxes = ({ catalogIndex, doc }: EditorState, except?: string): ReadonlyArray<Box> =>
+  doc.map.items.flatMap((item, index) => doc.ids[index] === except ? [] : itemsBoxOf([item], catalogIndex) ?? [])
 
 /**
  * Where a placement `width` across and `height` tall goes, given the `point` the view would put it at. The first of a run
@@ -102,15 +104,27 @@ const place = (piece: CatalogPiece, transform: ItemTransform) => {
 export const placeAtCamera = (piece: CatalogPiece) =>
   place(piece, placementTransform(piece, sceneRegistry.placementPoint(pieceFootprint(piece))))
 
+/** Whether a drop can stand on the item `id`. Not on the Player Start: a piece there hides where the map starts. */
+export const holdsDrop = (id: string): boolean => {
+  const { doc } = useEditor.getState()
+  const item = doc.map.items[doc.ids.indexOf(id)]
+  return item !== undefined && !isPlayerStart(item)
+}
+
 /**
- * A drop on the viewport: `piece` stands on `hit`, centred over it with its underside there. It isn't part of a run, so
- * the next click starts one at the view's centre.
+ * A drop on the viewport: `piece` stands on `hit`, centred over it with its underside there, or beside it when another
+ * item is in the way (`clearDrop`). `surface` is the item `hit` is on, which is never in the way. It isn't part of a run,
+ * so the next click starts one at the view's centre.
  */
-export const placeAt = (piece: CatalogPiece, hit: Vec3) => {
+export const placeAt = (piece: CatalogPiece, hit: Vec3, view: PlacementView, surface?: string) => {
+  const s = useEditor.getState()
   const origin = placementTransform(piece, { x: 0, y: 0, z: 0 })
-  const box = itemsBoxOf([itemFromPiece(piece, origin)], useEditor.getState().catalogIndex)
+  const box = itemsBoxOf([itemFromPiece(piece, origin)], s.catalogIndex)
   placing = undefined
-  place(piece, placementTransform(piece, wholeCm(box === undefined ? hit : frameStanding(box, hit))))
+  const frame = box === undefined
+    ? hit
+    : frameStanding(box, clearDrop(hit, itemBoxes(s, surface), roomOf(box), view, s.settings.snapping.gridSize))
+  place(piece, placementTransform(piece, wholeCm(frame)))
 }
 
 /** Stars `piece`, or takes its star off. */

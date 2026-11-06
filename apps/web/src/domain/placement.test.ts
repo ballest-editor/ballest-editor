@@ -3,6 +3,7 @@ import { Schema } from "effect"
 import fixture from "./bundledCatalog.json"
 import { Catalog } from "./Catalog"
 import {
+  clearDrop,
   clearOfBoxes,
   dropPoint,
   footprintOf,
@@ -147,6 +148,12 @@ describe("placement runs", () => {
     return runs
   }
 
+  /** Shows `reach` cm either way of the aim point, along the row and across it. */
+  const showing = (reach: number): PlacementView => ({
+    ...down,
+    project: ({ x, y }) => ({ x: y / reach, y: (x - start.x) / reach, z: 0 })
+  })
+
   it("starts on the point it was given", () => {
     assert.deepStrictEqual(runPoint(startPlacementRun(start), down), start)
   })
@@ -252,11 +259,6 @@ describe("placement runs", () => {
     })
 
     describe("in a view that ends", () => {
-      /** Shows `reach` cm either way of the aim point, along the row and across it. */
-      const showing = (reach: number): PlacementView => ({
-        ...down,
-        project: ({ x, y }) => ({ x: y / reach, y: (x - start.x) / reach, z: 0 })
-      })
       const STEP = 1100
 
       it("passes over a slot past the view's edge, as the first wide piece from the default camera would land", () => {
@@ -307,6 +309,43 @@ describe("placement runs", () => {
       const run = nextInRun(startPlacementRun(start), cubeAt(start), 1000, down, 10)
       const blocked = cubeAt(runPoint(run, down))
       assert.deepStrictEqual(runPoint(clearOfBoxes(run, [blocked], 1000, down, 10), down), { ...start, y: 2200 })
+    })
+  })
+
+  describe("clearDrop", () => {
+    const room = { width: 1000, height: 1000 }
+    const drop = (boxes: ReadonlyArray<ReturnType<typeof cubeAt>>, hit = start, view = down) =>
+      clearDrop(hit, boxes, room, view, 10)
+
+    it("keeps the hit point exactly when nothing is there, even at the view's edge", () => {
+      const hit = { x: 2000.4, y: 900.6, z: 12.5 }
+      assert.deepStrictEqual(drop([], hit, showing(1000)), hit)
+      assert.deepStrictEqual(drop([cubeAt({ x: 9000, y: 0, z: 0 })], hit), hit)
+    })
+
+    it("goes to the nearest free slot around an item in the way", () => {
+      assert.deepStrictEqual(drop([cubeAt(start)]), { ...start, x: start.x + 1050 })
+    })
+
+    it("lands closer than a click's slot beside a small item", () => {
+      const disk = { min: { x: 1900, y: -100, z: 0 }, max: { x: 2100, y: 100, z: 50 } }
+      assert.deepStrictEqual(drop([disk]), { ...start, x: start.x + 700 })
+    })
+
+    it("stays in view, taking a slot on the side the view shows", () => {
+      const view: PlacementView = { ...down, project: ({ x, y }) => ({ x: y / 5000, y: (x - start.x) / 500, z: 0 }) }
+      assert.deepStrictEqual(drop([cubeAt(start)], start, view), { ...start, y: -1050 })
+    })
+
+    it("stays on the hit point when no slot in view is free", () => {
+      assert.deepStrictEqual(drop([cubeAt(start)], start, showing(100)), start)
+    })
+
+    it("leaves a piece on an item's top, or just under it, as on a floor of tiles", () => {
+      const tile = cubeAt({ ...start, y: 900 })
+      assert.deepStrictEqual(drop([tile], { ...start, z: 1000 }), { ...start, z: 1000 })
+      assert.deepStrictEqual(drop([tile], { ...start, z: 997 }), { ...start, z: 997 })
+      assert.deepStrictEqual(drop([tile], { ...start, z: 900 }), { ...start, y: -350, z: 900 })
     })
   })
 

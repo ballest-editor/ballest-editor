@@ -215,6 +215,21 @@ export const wouldStandIn = (point: Vec3, width: number, { max, min }: Box, heig
 /** A box of no size: to `nextInRun`, a step sized by the piece alone. */
 const NO_BOX: Box = { min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 0, z: 0 } }
 
+/** Whether a piece `width` across and `height` tall, at a run's slot, stands clear of `boxes` and in view. */
+const freeSlotTest =
+  (boxes: ReadonlyArray<Box>, width: number, view: PlacementView, height: number) =>
+  (candidate: PlacementRun): boolean => {
+    const point = runPoint(candidate, view)
+    return inView(point, view) && !boxes.some((box) => wouldStandIn(point, width, box, height))
+  }
+
+/** The nearest slot around `aim` that `isFree` allows, on a lattice `step` cm apart, or else `aim` itself. */
+const nearestSlot = (aim: Vec3, isFree: (slot: PlacementRun) => boolean, step: number) => {
+  const start = startPlacementRun(aim)
+  return SLOTS_AROUND.map(({ column, row }) => ({ ...start, along: column * step, across: row * step })).find(isFree) ??
+    start
+}
+
 /**
  * `run`, moved on from its latest slot to the first where a piece `width` across and `height` tall stands clear of
  * `boxes` and in view, or else to the nearest such slot around the aim point (`run.start`). Slots are sized by the piece,
@@ -229,19 +244,34 @@ export const clearOfBoxes = (
   gridSize: number,
   height = 0
 ): PlacementRun => {
-  const isFree = (candidate: PlacementRun) => {
-    const point = runPoint(candidate, view)
-    return inView(point, view) && !boxes.some((box) => wouldStandIn(point, width, box, height))
-  }
+  const isFree = freeSlotTest(boxes, width, view, height)
   let slot = run
   for (let tried = 0; tried < PLACEMENT_SLOTS; tried++) {
     if (isFree(slot)) return slot
     slot = nextInRun(slot, NO_BOX, width, view, gridSize)
   }
-  const aim = startPlacementRun(run.start)
-  const step = stepOver(width, gridSize)
-  return SLOTS_AROUND.map(({ column, row }) => ({ ...aim, along: column * step, across: row * step })).find(isFree) ??
-    aim
+  return nearestSlot(run.start, isFree, stepOver(width, gridSize))
+}
+
+/** How far a drop's underside may sink into an item and still be on it, in cm: a mesh's top can sit under its box's. */
+const RESTING_SLACK = 5
+
+/**
+ * Where a drop on `hit` goes, for a piece with this `room`: on `hit` unless it would stand in one of `boxes`, then on the
+ * nearest free slot around it in view, or on `hit` when there is none. Slots are closer together than a click's, as the
+ * pointer said where the piece should be. A piece resting on a box's top isn't in it, so one dropped on a floor of tiles stays
+ * put whichever tiles it reaches over.
+ */
+export const clearDrop = (
+  hit: Vec3,
+  boxes: ReadonlyArray<Box>,
+  { height, width }: { readonly width: number; readonly height: number },
+  view: PlacementView,
+  gridSize: number
+): Vec3 => {
+  const solid = boxes.map(({ max, min }) => ({ min, max: { ...max, z: max.z - RESTING_SLACK } }))
+  if (!solid.some((box) => wouldStandIn(hit, width, box, height))) return hit
+  return runPoint(nearestSlot(hit, freeSlotTest(solid, width, view, height), stepOver(width / 4, gridSize)), view)
 }
 
 /** How much room a box takes on the floor. */

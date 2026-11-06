@@ -22,7 +22,7 @@ import { isBound, mouseChordOf } from "../domain/Keybinds"
 import { WATER } from "../domain/level"
 import { dropPoint, pieceFootprint } from "../domain/placement"
 import { gridColorsOf } from "../domain/Settings"
-import { placeAt, placePrefab } from "./actions"
+import { holdsDrop, placeAt, placePrefab } from "./actions"
 import { fadeFineLines } from "./floorGrid"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
@@ -200,7 +200,8 @@ const hitItemId = (hits: ReadonlyArray<THREE.Intersection>): string | null => {
 
 /**
  * Places `piece` under a pointer: on the item it is over, else on the floor it is over, or in an orthographic view on the
- * plane a click would place on. The raycast is here rather than on every drag event, for the same reason as a click's.
+ * plane a click would place on, keeping clear of any other item there. The raycast is here rather than on every drag
+ * event, for the same reason as a click's.
  */
 const dropPiece = (piece: CatalogPiece, canvas: HTMLElement, e: { clientX: number; clientY: number }) => {
   const { ndc, pane, slot } = panePointer(canvas, e)
@@ -210,8 +211,10 @@ const dropPiece = (piece: CatalogPiece, canvas: HTMLElement, e: { clientX: numbe
   raycaster.setFromCamera(ndc, pane.camera)
   const { ray } = raycaster
   const root = sceneRegistry.itemsRoot
-  const surface = (root === null ? [] : raycaster.intersectObject(root, true))
-    .find((hit) => isMesh(hit.object) && hitItemId([hit]) !== null)
+  const surface = (root === null ? [] : raycaster.intersectObject(root, true)).flatMap((hit) => {
+    const id = isMesh(hit.object) ? hitItemId([hit]) : null
+    return id !== null && holdsDrop(id) ? [{ id, point: hit.point }] : []
+  })[0]
   placeAt(
     piece,
     surface !== undefined
@@ -223,7 +226,9 @@ const dropPiece = (piece: CatalogPiece, canvas: HTMLElement, e: { clientX: numbe
           floorHeight,
           SKY_DOME_RADIUS,
           pane.placeDistance(pieceFootprint(piece), settings.editor.placeDistance)
-        )
+        ),
+    pane.placementView(),
+    surface?.id
   )
 }
 
