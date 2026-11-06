@@ -108,20 +108,18 @@ const writePrefab = Effect.fnUntraced(function*(ref: PrefabRef, prefab: PrefabFi
 
 const selectedItems = (s: EditorState) => selectedIndices(s).flatMap((index) => s.doc.map.items[index] ?? [])
 
-/** What Save selection as prefab… would refuse about the selection, as the game says it; undefined when it can go. */
-const selectionPrefabProblem = (): string | undefined => {
-  const items = selectedItems(useEditor.getState())
+/**
+ * What Save selection as prefab… would refuse about the selection, as the game says it; undefined when it can go. The
+ * menu items are off while there is one, and show it.
+ */
+export const selectionPrefabProblem = (s: EditorState): string | undefined => {
+  const items = selectedItems(s)
   if (items.length < PREFAB_ITEMS.min || items.length > PREFAB_ITEMS.max) return PREFAB_REFUSALS.selection
   return items.some(isPlayerStart) ? PREFAB_REFUSALS.playerStart : undefined
 }
 
-/** Edit › Save selection as prefab…: names it in a dialog, unless the game would refuse the selection whatever the name. */
-export const startSavePrefab = () => {
-  const { notify, openDialog } = useEditor.getState()
-  const problem = selectionPrefabProblem()
-  if (problem === undefined) openDialog({ id: "savePrefab" })
-  else notify("error", problem, { kind: "prefabRefused" })
-}
+/** Edit › Save selection as prefab…: names it in a dialog. */
+export const startSavePrefab = () => useEditor.getState().openDialog({ id: "savePrefab" })
 
 /**
  * Edit › Save selection as prefab…: a prefab of the selected items, in selection order, with the frame the game would
@@ -129,9 +127,9 @@ export const startSavePrefab = () => {
  */
 export const saveSelectionAsPrefabEffect = Effect.fn("saveSelectionAsPrefabEffect")(
   function*(ref: PrefabRef, replace: boolean) {
-    const problem = selectionPrefabProblem()
-    if (problem !== undefined) return yield* new PlatformError({ message: problem })
     const s = useEditor.getState()
+    const problem = selectionPrefabProblem(s)
+    if (problem !== undefined) return yield* new PlatformError({ message: problem })
     const group = exactSelectedGroup(s.doc.structure.tree, s.selectedIds, s.enteredGroupId)
     yield* writePrefab(ref, prefabOfItems(selectedItems(s), s.catalogIndex, group?.name), replace)
     yield* checkPrefabs
@@ -211,7 +209,7 @@ const copyPrefab = Effect.fnUntraced(function*(from: PrefabRef, to: PrefabRef) {
 export const duplicatePrefab = (ref: PrefabRef) =>
   run(copyPrefab(ref, { tier: ref.tier, name: copyNameOf(ref.name, ref.tier) }))
 
-/** Copy to project, Copy to user: the same name in the other tier, which fails when that has one. */
+/** Copy to project, Copy to game: the same name in the other tier, which fails when that has one. */
 export const copyPrefabToTier = (ref: PrefabRef, tier: PrefabTier) => run(copyPrefab(ref, { tier, name: ref.name }))
 
 /** Rename: the file moves, its tab goes with it, and so do the instances of it in the open maps. */

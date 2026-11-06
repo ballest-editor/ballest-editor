@@ -44,11 +44,12 @@ import {
   visibleRange
 } from "../domain/outline"
 import { findNode, numberedNameText } from "../domain/structure"
-import { detachInstance, startSavePrefab, updateInstance } from "../editor/actions"
+import { detachInstance, updateInstance } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { elementOf } from "../editor/keyTargets"
 import { nextSelection, nodeNamesOf, useEditor } from "../editor/store"
 import { OUTLINE_INDENT, OUTLINE_ROW_HEIGHT, OutlineRowView } from "./OutlineRow"
+import { SavePrefabItem } from "./SavePrefabItem"
 import { TagInput } from "./TagInput"
 
 const OVERSCAN = 10
@@ -421,9 +422,7 @@ export function Outline() {
         <ContextMenuContent className="w-max min-w-44" finalFocus={() => !keepFocus.current}>
           <MenuCommand action="groupSelection" disabled={!canGroup}>Group</MenuCommand>
           <MenuCommand action="ungroupSelection" disabled={!canUngroup}>Ungroup</MenuCommand>
-          <ContextMenuItem disabled={!hasSelection} onClick={startSavePrefab}>
-            Save selection as prefab…
-          </ContextMenuItem>
+          <SavePrefabItem item={ContextMenuItem} />
           {instance !== undefined && link !== undefined && (
             <>
               <ContextMenuItem onClick={() => void updateInstance(instance.id, link)}>

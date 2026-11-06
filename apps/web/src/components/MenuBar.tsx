@@ -34,13 +34,13 @@ import {
   quitApp,
   reimportMap,
   setExportOnSave,
-  startSavePrefab,
   switchProject,
   updateSettings
 } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { PREFAB_TAB_STAYS_HERE, useEditor, useOpenPrefab, useOpenProjectMap } from "../editor/store"
 import { resetDockLayout, usePanelCheck, useViewMenuPanels } from "./dock/dockControl"
+import { SavePrefabItem } from "./SavePrefabItem"
 
 /** The action's primary binding, as the menu shows it (nothing when unbound). */
 function Shortcut({ action }: { readonly action: KeybindAction }) {
@@ -292,7 +292,7 @@ export function MenuBar() {
         <CommandItem action="groupSelection" disabled={!canGroup}>Group</CommandItem>
         <CommandItem action="ungroupSelection" disabled={!canUngroup}>Ungroup</CommandItem>
         <MenubarSeparator />
-        <MenubarItem disabled={!hasSelection} onClick={startSavePrefab}>Save selection as prefab…</MenubarItem>
+        <SavePrefabItem item={MenubarItem} />
       </Menu>
       <Menu title="View">
         <CommandItem action="focusSelection" disabled={!hasSelection} inset>Focus selection</CommandItem>

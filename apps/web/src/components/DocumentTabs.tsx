@@ -8,6 +8,7 @@ import {
 } from "@workspace/ui/components/dropdown-menu"
 import { cn } from "@workspace/ui/lib/utils"
 import { type DragEvent, type MouseEvent, useEffect, useRef, useState } from "react"
+import { prefabTierLabel } from "../domain/prefab"
 import {
   closeOtherTabs,
   closeTab,
@@ -142,10 +143,12 @@ function DocumentTab({ id, index, drag, onDrag }: {
         className="flex h-full min-w-0 items-center outline-none"
         onClick={() => activateTab(id)}
       >
-        {prefabTier !== null && <IconBoxMultiple className="mr-1 size-3 shrink-0 text-fg-tertiary" />}
+        {prefabTier !== null && <IconBoxMultiple className="mr-1 size-4 shrink-0 text-fg-tertiary" />}
         <span className="truncate">{label}</span>
         {prefabTier !== null && (
-          <span className="ml-1 shrink-0 text-caption text-fg-tertiary">{projects ? prefabTier : "session"}</span>
+          <span className="ml-1 shrink-0 rounded-control bg-muted px-1 text-caption text-fg-secondary">
+            {prefabTierLabel(prefabTier, projects)}
+          </span>
         )}
       </button>
       <span className="relative flex size-4 shrink-0 items-center justify-center">

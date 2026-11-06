@@ -5,7 +5,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { type ReactNode, useState } from "react"
-import { isPrefabName, isSamePrefab, PREFAB_NAME_RULE } from "../domain/prefab"
+import { isPrefabName, isSamePrefab, PREFAB_NAME_RULE, PREFAB_NEEDS_PROJECT, prefabTierLabel } from "../domain/prefab"
 import { deletePrefab, renamePrefab, saveSelectionAsPrefab } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { TitledDialog } from "./TitledDialog"
@@ -56,7 +56,7 @@ function PrefabNameForm({ canSubmit, children, invalid, name, onChange, onClose,
   )
 }
 
-/** Edit › Save selection as prefab…: its name and tier. A name the tier has already replaces that prefab, and says so. */
+/** Edit › Save selection as prefab…: its name and where it is stored. A name the tier has already replaces that prefab, and says so. */
 export function SavePrefabDialog({ open, onClose }: DialogProps) {
   const projects = useEditor((s) => s.capabilities.projects)
   const hasProject = useEditor((s) => s.project?.current != null)
@@ -73,7 +73,7 @@ export function SavePrefabDialog({ open, onClose }: DialogProps) {
       onClose={onClose}
       title="Save selection as prefab"
       description={projects
-        ? "A project prefab stays with this project. A user prefab is the game's own: the in-game editor spawns it too."
+        ? "A Project prefab stays with this project. A Game prefab is the game's own: the in-game editor spawns it too."
         : "This build keeps prefabs in memory, until the page closes."}
     >
       <PrefabNameForm
@@ -90,7 +90,7 @@ export function SavePrefabDialog({ open, onClose }: DialogProps) {
       >
         {projects && (
           <div className="flex flex-col gap-1.5">
-            <Label>Tier</Label>
+            <Label>Stored in</Label>
             <ToggleGroup
               value={[tier]}
               variant="outline"
@@ -98,8 +98,14 @@ export function SavePrefabDialog({ open, onClose }: DialogProps) {
                 if (picked === "user" || picked === "project") setTier(picked)
               }}
             >
-              <ToggleGroupItem value="project" disabled={!hasProject}>Project</ToggleGroupItem>
-              <ToggleGroupItem value="user">User</ToggleGroupItem>
+              <ToggleGroupItem
+                value="project"
+                disabled={!hasProject}
+                title={hasProject ? undefined : PREFAB_NEEDS_PROJECT}
+              >
+                {prefabTierLabel("project", projects)}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="user">{prefabTierLabel("user", projects)}</ToggleGroupItem>
             </ToggleGroup>
           </div>
         )}

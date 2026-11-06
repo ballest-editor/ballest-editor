@@ -33,7 +33,8 @@ import {
   placePrefabEffect,
   renamePrefabEffect,
   savePrefabTab,
-  saveSelectionAsPrefabEffect
+  saveSelectionAsPrefabEffect,
+  selectionPrefabProblem
 } from "./prefabs"
 import { saveMapFile } from "./save"
 import { closeTabEffect } from "./unsaved"
@@ -507,10 +508,13 @@ describe("saving a selection as a prefab", () => {
         s().select(s().doc.ids.slice(-1))
         const lone = yield* Effect.flip(saveSelectionAsPrefabEffect({ tier: "user", name: "Pair" }, false))
         assert.include(lone.message, "Select 2 to 4096 items")
+        assert.strictEqual(selectionPrefabProblem(s()), lone.message)
         s().select(s().doc.ids.slice(0, 2))
         const start = yield* Effect.flip(saveSelectionAsPrefabEffect({ tier: "user", name: "Pair" }, false))
         assert.include(start.message, "MP_PlayerStart")
+        assert.strictEqual(selectionPrefabProblem(s()), start.message)
         s().select(s().doc.ids.slice(-2))
+        assert.isUndefined(selectionPrefabProblem(s()))
         const taken = yield* Effect.flip(saveSelectionAsPrefabEffect(USER, false))
         assert.include(taken.message, "already a prefab")
       })
