@@ -86,7 +86,7 @@ Keyboard focus is one ring: 2px of `--ring`, 2px off the element, only on `:focu
 | `focus-ring-row`       | A row whose focus is on its first child, a button. The row's other buttons ring themselves |
 | `focus-ring-row-inset` | The same for a document tab, which the strip would clip                                    |
 
-A dock tab takes the inset ring on dockview's own focus line (`dock.css`). A 24px icon button in a tab strip or the status bar has no room for the offset, so its ring sits at -2px, its outer edge on the button's. The viewport's toolbar has `focus-ring`, but it is no Tab stop: `noFocus` keeps the keys with the viewport. The Outline is one stop, the tree, because its rows aren't focusable.
+A dock tab takes the inset ring on dockview's own focus line (`dock.css`). On the active tab, dock or document, the ring sits at -2px, so its bottom lies on the underline and the two read as one 2px line. A 24px icon button in a tab strip or the status bar has no room for the offset, so its ring sits at -2px, its outer edge on the button's. The viewport's toolbar has `focus-ring`, but it is no Tab stop: `noFocus` keeps the keys with the viewport. The Outline is one stop, the tree, because its rows aren't focusable.
 
 ## Borders
 
