@@ -136,6 +136,8 @@ export interface SurfaceHit {
 export interface TrackedPoint {
   readonly at: Vec3
   readonly label: string
+  /** The item it was acquired on and where on it, in the item's local frame: `at` goes where the item goes. */
+  readonly on?: { readonly item: string; readonly local: Vec3 }
 }
 
 export interface SnapFrame {

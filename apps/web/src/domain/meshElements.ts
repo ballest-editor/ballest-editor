@@ -1,8 +1,8 @@
 /**
- * What a mesh offers the Mesh target (docs/SNAPPING.md § Mesh): its vertices, its sharp edges, the centres of its flat
- * faces, and those flat faces that are faces of the piece. Worked out from the triangles the renderer has, with a mesh's
- * repeated corners welded, since a corner is repeated once per normal it needs. No renderer here: the editor hands in
- * the arrays.
+ * What a mesh offers the Mesh target (docs/SNAPPING.md § Mesh): the vertices where its sharp edges meet, those edges,
+ * the centres of its flat faces, and those flat faces that are faces of the piece. Worked out from the triangles the
+ * renderer has, with a mesh's repeated corners welded, since a corner is repeated once per normal it needs. No renderer
+ * here: the editor hands in the arrays.
  */
 import type { Vec3 } from "./coords"
 import {
@@ -28,6 +28,7 @@ export interface MeshFace {
 }
 
 export interface MeshElements {
+  /** The ends of `edges`: a triangulated mesh's other vertices are in the middle of a face. */
   readonly vertices: ReadonlyArray<Vec3>
   /** Its sharp edges and the rim of any open surface. */
   readonly edges: ReadonlyArray<readonly [Vec3, Vec3]>
@@ -193,18 +194,21 @@ export const meshElementsOf = (
   const triangles = trianglesOf(vertices, welded, index)
   const faces = facesOfEdges(triangles)
   const sharp = Math.cos(sharpAngle * Math.PI / 180)
+  const ends = new Set<number>()
   const edges = [...faces.values()].flatMap(({ a, b, faces: around }) => {
     const [from, to] = [vertices[a], vertices[b]]
     if (from === undefined || to === undefined) return []
     const [p, q] = [triangles[around[0] ?? 0], triangles[around[1] ?? 0]]
     const isRim = around.length === 1
     const bends = p !== undefined && q !== undefined && vecDot(p.normal, q.normal) < sharp
-    return isRim || bends ? [[from, to] as const] : []
+    if (!isRim && !bends) return []
+    ends.add(a).add(b)
+    return [[from, to] as const]
   })
   const runs = flatRuns(triangles, faces)
   const least = areaOf(triangles) * FACE_SHARE
   return {
-    vertices,
+    vertices: vertices.filter((_, i) => ends.has(i)),
     edges,
     faceCentres: runs.map(centreOf),
     faces: runs.filter((run) => areaOf(run) >= least).map((run) => faceOf(run, vertices))

@@ -168,7 +168,7 @@ export function SnapInput() {
         const hit = hitUnder(now, pane, px, "anchor", new Set(drag === null ? [] : drag.startTransforms.keys()))
         // a point to go through, not a face, which is only ever under the pointer
         if (hit?.rank === 0) {
-          now.acquireTracked({ at: hit.landing, label: hit.label })
+          now.acquireTracked({ at: hit.landing, label: hit.label }, hit.item)
         }
       }, hoverMs)
     }
