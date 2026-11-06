@@ -39,10 +39,10 @@ const ICONS: Record<GameLinkRowState, ComponentType<{ readonly className?: strin
 
 /** The theme's status colours. Each falls back to a token that is always there, so a row never loses its icon. */
 const TONES: Record<GameLinkRowState, string> = {
-  ok: "text-[var(--status-ok,var(--foreground))]",
-  missing: "text-[var(--status-warn,var(--destructive))]",
-  optional: "text-[var(--status-neutral,var(--fg-tertiary))]",
-  waiting: "text-[var(--status-neutral,var(--fg-tertiary))]"
+  ok: "text-status-ok-foreground",
+  missing: "text-status-warn-foreground",
+  optional: "text-status-neutral-foreground",
+  waiting: "text-status-neutral-foreground"
 }
 
 /** On the label's line: the icon is 16px, the line 20px. */
