@@ -28,7 +28,7 @@ import {
 } from "@workspace/ui/components/dropdown-menu"
 import { cn } from "@workspace/ui/lib/utils"
 import { type PointerEvent, useSyncExternalStore } from "react"
-import type { KeybindAction } from "../domain/Keybinds"
+import { type KeybindAction, PROJECTION_ACTIONS } from "../domain/Keybinds"
 import { axisOf, formatPaneScale, ORTHO_AXES } from "../domain/orthoView"
 import {
   isOrthoView,
@@ -197,7 +197,7 @@ function PaneHeader({ pane, projection, disabled, active }: {
           icons={VIEW_ICONS}
           onPick={(next) => setPaneProjection(pane.slot, next)}
           tip="Pane view"
-          action="toggleOrthographic"
+          action={PROJECTION_ACTIONS[projection]}
           word={viewProjectionLabels[projection]}
           strong={active}
           disabled={disabled}

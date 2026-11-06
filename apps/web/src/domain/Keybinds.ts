@@ -6,6 +6,7 @@
  * unbound.
  */
 import { Schema } from "effect"
+import type { ViewProjection } from "./viewLayout"
 
 /**
  * The sections are the editor's own, the same in Settings and Keyboard shortcuts. The names
@@ -223,6 +224,17 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   playMap:
     "Export the map to the game and race it there through the plugin manager, starting the game if it isn't running. Desktop app only.",
   showKeybinds: "Hold to show every keybind over the viewport; release to hide it. Editor only."
+}
+
+/** The keybind that puts the active pane on each view; Perspective has only the toggle. */
+export const PROJECTION_ACTIONS: Readonly<Record<ViewProjection, KeybindAction>> = {
+  perspective: "toggleOrthographic",
+  top: "viewTop",
+  bottom: "viewBottom",
+  front: "viewFront",
+  back: "viewBack",
+  left: "viewLeft",
+  right: "viewRight"
 }
 
 /** Actions bound to a mouse click (with modifiers) on an item in the viewport. */

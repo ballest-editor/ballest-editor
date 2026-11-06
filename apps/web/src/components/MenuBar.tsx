@@ -19,7 +19,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { type ReactElement, type ReactNode, useMemo } from "react"
 import { canGroupSelection, selectedGroupIds } from "../domain/groupSelection"
-import type { KeybindAction } from "../domain/Keybinds"
+import { type KeybindAction, PROJECTION_ACTIONS } from "../domain/Keybinds"
 import { formatGridSize, GRID_SIZES } from "../domain/snap"
 import { updateCheckBlockedBy } from "../domain/updates"
 import {
@@ -210,17 +210,6 @@ function MenuSection({ title, children }: { readonly title: string; readonly chi
       {children}
     </MenubarGroup>
   )
-}
-
-/** The keybind that puts the active pane on each view; Perspective has only the toggle. */
-const PROJECTION_ACTIONS: Readonly<Record<ViewProjection, KeybindAction>> = {
-  perspective: "toggleOrthographic",
-  top: "viewTop",
-  bottom: "viewBottom",
-  front: "viewFront",
-  back: "viewBack",
-  left: "viewLeft",
-  right: "viewRight"
 }
 
 /** How the view divides into panes, and what the active pane looks along (docs/DESKTOP.md § View panes). */
