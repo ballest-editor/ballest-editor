@@ -134,6 +134,7 @@ const updatesLayer = Layer.succeed(
       releaseDate: null,
       releaseUrl: null,
       downloadPercent: null,
+      checkedAt: null,
       message: null
     }),
     run: Effect.die("unused"),

@@ -3,7 +3,13 @@
  * item's one identity: React keys, selection, the sidecar) and the map's structure (domain/structure). All edits go
  * through domain/edits and domain/structure.
  */
-import { NOTIFICATION_LIMIT, type PrefabInfos, type PrefabRef, type UpdateState } from "@ballest/contracts"
+import {
+  type DesktopVersions,
+  NOTIFICATION_LIMIT,
+  type PrefabInfos,
+  type PrefabRef,
+  type UpdateState
+} from "@ballest/contracts"
 import { type Effect, Option } from "effect"
 import { create } from "zustand"
 import { useShallow } from "zustand/react/shallow"
@@ -360,6 +366,8 @@ export interface EditorState extends TabState {
   readonly prefabs: PrefabInfos
   /** What the platform (browser or desktop app) offers; the browser's until the startup load says otherwise. */
   readonly capabilities: PlatformCapabilities
+  /** The desktop app's runtime, for Help › About; null in a browser. */
+  readonly runtimeVersions: DesktopVersions | null
   /** The game's folders as last looked up (desktop; null until the startup check or the Game link asks). */
   readonly gamePaths: GamePaths | null
   /** The creator name found on this machine (desktop: the Steam persona name), as last looked up; none until then. */
@@ -475,6 +483,7 @@ export interface EditorState extends TabState {
    */
   readonly detachFiles: () => void
   readonly setCapabilities: (capabilities: PlatformCapabilities) => void
+  readonly setRuntimeVersions: (runtimeVersions: DesktopVersions | null) => void
   readonly setGamePaths: (gamePaths: GamePaths) => void
   readonly setFoundCreator: (foundCreator: Option.Option<FoundCreator>) => void
   readonly setPluginStatus: (pluginStatus: PluginStatus) => void
@@ -774,6 +783,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     projectMaps: [],
     prefabs: [],
     capabilities: { projects: false, exportToGame: false, launchGame: false, play: false, updates: false },
+    runtimeVersions: null,
     gamePaths: null,
     foundCreator: Option.none(),
     pluginStatus: null,
@@ -906,6 +916,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         }
       }),
     setCapabilities: (capabilities) => set({ capabilities }),
+    setRuntimeVersions: (runtimeVersions) => set({ runtimeVersions }),
     setGamePaths: (gamePaths) => set({ gamePaths }),
     setFoundCreator: (foundCreator) => set({ foundCreator }),
     setPluginStatus: (pluginStatus) => set({ pluginStatus }),

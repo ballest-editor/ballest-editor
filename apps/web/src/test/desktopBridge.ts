@@ -150,6 +150,7 @@ const makeTestUpdater = (): TestDisk["updater"] => {
       releaseDate: null,
       releaseUrl: null,
       downloadPercent: null,
+      checkedAt: null,
       message: null
     },
     listeners: new Set(),

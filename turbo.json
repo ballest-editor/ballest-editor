@@ -30,6 +30,8 @@
         "$TURBO_ROOT$/assets/**",
         "$TURBO_ROOT$/web-assets/**"
       ],
+      // The commit About shows, where the checkout has no history (apps/web/build/buildFacts.ts).
+      "passThroughEnv": ["VERCEL_GIT_COMMIT_SHA"],
       "outputs": ["dist/**"]
     },
     // The desktop app packages the renderer build, the assets and the editor-link plugin, so it builds after them.

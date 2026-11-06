@@ -40,6 +40,7 @@ export const initialState = (currentVersion: string, disabled: Option.Option<str
   releaseDate: null,
   releaseUrl: null,
   downloadPercent: null,
+  checkedAt: null,
   message: Option.getOrNull(disabled)
 })
 
@@ -57,11 +58,17 @@ export const onCheckFailed = (state: UpdateState, message: string): UpdateState 
   message
 })
 
-export const onUpToDate = (state: UpdateState): UpdateState => ({ ...state, status: "idle", message: null })
+export const onUpToDate = (state: UpdateState, checkedAt: string): UpdateState => ({
+  ...state,
+  status: "idle",
+  checkedAt,
+  message: null
+})
 
-export const onAvailable = (state: UpdateState, release: Release): UpdateState => ({
+export const onAvailable = (state: UpdateState, release: Release, checkedAt: string): UpdateState => ({
   ...state,
   status: "available",
+  checkedAt,
   availableVersion: release.version,
   releaseNotes: release.notes,
   releaseDate: release.date,
