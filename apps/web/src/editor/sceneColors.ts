@@ -1,5 +1,4 @@
-/** The viewport's clear colour per theme. */
-export const SCENE_COLORS = { dark: "#1d2128", light: "#e9ecf1" } as const
+export { SCENE_COLORS } from "../domain/sceneGround"
 
 /** The box around a whole group: magenta, far from the selection's amber and the gizmo's axes, on any floor or sky. */
 export const GROUP_BOX_COLORS = { dark: "#ff3dc8", light: "#c2129a" } as const
@@ -11,4 +10,4 @@ export const THEME_SKY_COLORS = {
 } as const
 
 /** The same as Tailwind classes, spelled out so Tailwind picks them up: what shows before and around the canvas. */
-export const sceneBackgroundClass = "bg-[#e9ecf1] dark:bg-[#1d2128]"
+export const sceneBackgroundClass = "bg-[#c8dbe8] dark:bg-[#18242d]"

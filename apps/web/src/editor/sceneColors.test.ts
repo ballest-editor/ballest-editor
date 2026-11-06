@@ -1,8 +1,11 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
+import { shadeOf } from "../domain/sceneGround"
+import { AUTO_GRID_COLORS } from "../domain/Settings"
 import { sceneAxisColors } from "./axisColors"
-import { SCENE_COLORS } from "./sceneColors"
+import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { OUTLINE_COLORS } from "./selectionOutline"
+import { waterTopMaterial } from "./water"
 
 const luminance = (hex: string) => {
   const { r, g, b } = new THREE.Color(hex) // linear
@@ -17,6 +20,13 @@ const contrast = (a: string, b: string) => {
 /** WCAG's bar for graphics. */
 const READABLE = 3
 
+/** The bars for the grid: sections are read at a glance, cells only have to show. */
+const GRID_SECTION = 3
+const GRID_CELL = 1.5
+
+/** The water as it reaches the screen, past the renderer's tone mapping (measured in the app). */
+const WATER_ON_SCREEN = "#00669e"
+
 describe("what's drawn over the scene", () => {
   for (const dark of [true, false]) {
     const theme = dark ? "dark" : "light"
@@ -27,4 +37,17 @@ describe("what's drawn over the scene", () => {
       }
     })
   }
+
+  it("draws the grid in the light theme so it reads on the ground and on the water over it", () => {
+    const ground = SCENE_COLORS.light
+    for (const floor of [ground, shadeOf(ground, WATER_ON_SCREEN, waterTopMaterial.opacity)]) {
+      assert.isAtLeast(contrast(AUTO_GRID_COLORS.light.cell, floor), GRID_CELL, `cell on ${floor}`)
+      assert.isAtLeast(contrast(AUTO_GRID_COLORS.light.section, floor), GRID_SECTION, `section on ${floor}`)
+    }
+  })
+
+  it("spells the ground out for Tailwind as it is", () => {
+    assert.include(sceneBackgroundClass, `bg-[${SCENE_COLORS.light}]`)
+    assert.include(sceneBackgroundClass, `dark:bg-[${SCENE_COLORS.dark}]`)
+  })
 })
