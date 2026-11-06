@@ -32,6 +32,7 @@ import {
   selectionPivot,
   shownGizmoSpace,
   shownLighting,
+  shownPivotMode,
   shownTransform,
   shownValidation,
   tabStateOf,
@@ -1453,6 +1454,97 @@ describe("groups and the selection", () => {
     assert.deepStrictEqual(pivot()?.rotation, transformOf(b).rotation)
     state().select([])
     assert.isUndefined(pivot())
+  })
+
+  it("holds the pivot setting at Together until two units are selected, and toggles it", () => {
+    const { a, b, c, d } = nestedMap()
+    assert.strictEqual(state().pivotMode, "together")
+    state().togglePivotMode()
+    assert.strictEqual(state().pivotMode, "each")
+    state().select([a, b, c])
+    assert.strictEqual(shownPivotMode(state()), "together", "one whole group is one unit")
+    state().select([a, b, c, d])
+    assert.strictEqual(shownPivotMode(state()), "each")
+    // in Each the gizmo sits on the active unit, which is the group when its item is active
+    state().select([d, a, b, c])
+    assert.deepStrictEqual(selectionPivot(state(), transformOf)?.pivot, {
+      x: 100,
+      y: 0,
+      z: transformOf(a).translation.z
+    })
+    state().togglePivotMode()
+    assert.deepStrictEqual(selectionPivot(state(), transformOf)?.pivot, transformOf(c).translation)
+  })
+
+  it("sets, freezes and clears a group's pivot as undo steps, and carries a Point with a move", () => {
+    const { a, b, c, outer } = nestedMap()
+    const groupPivot = () => findGroup(state().doc.structure.tree, outer)?.pivot
+    state().select([a, b, c])
+    const steps = state().past.length
+    state().setGroupPivot(outer, { choice: "Top" })
+    assert.deepStrictEqual(groupPivot(), { choice: "Top" })
+    state().freezeGroupPivot(outer)
+    // frozen where the Top pivot was: the top of the members' box (no catalog, so each is its origin)
+    assert.deepStrictEqual(groupPivot(), { choice: "point", world: { x: 100, y: 0, z: transformOf(a).translation.z } })
+    assert.strictEqual(state().past.length, steps + 2, "two pivot edits")
+    // a move of the whole group takes the point along; a move of one member doesn't
+    state().transformItems(
+      new Map(
+        [a, b, c].map((id) => [id, { ...transformOf(id), translation: { ...transformOf(id).translation, y: 50 } }])
+      )
+    )
+    assert.deepStrictEqual(groupPivot(), { choice: "point", world: { x: 100, y: 50, z: transformOf(a).translation.z } })
+    moveItem(a, { ...transformOf(a).translation, y: 500 })
+    const kept = groupPivot()
+    assert.strictEqual(kept?.choice === "point" ? kept.world.y : undefined, 50)
+    state().setGroupPivot(outer, undefined)
+    assert.isUndefined(groupPivot())
+    state().undo()
+    assert.strictEqual(groupPivot()?.choice, "point")
+  })
+
+  it("shows a Point pivot carried by a live move, and left alone by a live turn or scale", () => {
+    const { a, b, c, outer } = nestedMap()
+    state().select([a, b, c])
+    state().setGroupPivot(outer, { choice: "point", world: { x: 0, y: 0, z: 0 } })
+    const shown = (edit: (t: UeTransform, i: number) => UeTransform) => {
+      const live = new Map([a, b, c].map((id, i) => [id, edit(transformOf(id), i)]))
+      return selectionPivot(state(), (id) => live.get(id) ?? transformOf(id))?.pivot
+    }
+    // offsets that differ only by floating-point noise still count as one move
+    const by = (t: UeTransform, i: number) => ({
+      ...t,
+      translation: { ...t.translation, x: t.translation.x + 0.1 + (i === 0 ? 0 : 1e-12) }
+    })
+    assert.closeTo(shown(by)?.x ?? NaN, 0.1, 1e-9)
+    const turned = { x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 }
+    assert.deepStrictEqual(shown((t) => ({ ...t, rotation: turned })), { x: 0, y: 0, z: 0 })
+    assert.deepStrictEqual(shown((t) => ({ ...t, scale3D: { x: 2, y: 1, z: 1 } })), { x: 0, y: 0, z: 0 })
+  })
+
+  it("makes, reverses and unmakes a chain, and groups a selection as one in selection order", () => {
+    mapWithCubes(0, 100, 200)
+    const [a = "", b = "", c = ""] = state().doc.ids.slice(1)
+    state().select([c, a, b])
+    state().chainSelection()
+    const chain = state().doc.structure.tree.find((n) => n.kind === "group")
+    assert.strictEqual(chain?.kind === "group" ? chain.chain : undefined, true)
+    assert.strictEqual(chain?.kind === "group" ? chain.name : undefined, "Chain", "a default name follows")
+    assert.deepStrictEqual(chain?.kind === "group" ? treeKeys(chain.children) : [], [c, a, b], "selection order")
+    const id = chain?.kind === "group" ? chain.id : ""
+    state().reverseChain(id)
+    assert.deepStrictEqual(treeKeys(findGroup(state().doc.structure.tree, id)!.children), [b, a, c])
+    state().setChain(id, false)
+    assert.isUndefined(findGroup(state().doc.structure.tree, id)?.chain)
+    assert.strictEqual(findGroup(state().doc.structure.tree, id)?.name, "Group", "and back")
+    state().undo()
+    assert.strictEqual(findGroup(state().doc.structure.tree, id)?.chain, true)
+    // a name the user gave stays either way
+    state().renameGroup(id, "Finger")
+    state().setChain(id, false)
+    assert.strictEqual(findGroup(state().doc.structure.tree, id)?.name, "Finger")
+    state().setChain(id, true)
+    assert.strictEqual(findGroup(state().doc.structure.tree, id)?.name, "Finger")
   })
 
   it("pivots a prefab instance on its origin, and follows a live move", () => {

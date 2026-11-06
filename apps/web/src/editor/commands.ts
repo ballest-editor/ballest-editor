@@ -51,6 +51,7 @@ export const actionCommands = {
   rotateMode: () => useEditor.getState().setTool("rotate"),
   scaleMode: () => useEditor.getState().setTool("scale"),
   toggleGizmoSpace: () => useEditor.getState().toggleGizmoSpace(),
+  togglePivotMode: () => useEditor.getState().togglePivotMode(),
   speedFaster: () => useEditor.getState().changeSpeed(1),
   speedSlower: () => useEditor.getState().changeSpeed(-1),
   viewTop: () => lookAlong("top"),

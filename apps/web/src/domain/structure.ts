@@ -5,7 +5,7 @@
  */
 import type { CatalogIndex } from "./Catalog"
 import { classNameOf, type Item, type MapFile } from "./MapFile"
-import type { GroupNode, ItemNode, PrefabLink, TreeNode } from "./MapSidecar"
+import type { GroupNode, GroupPivot, ItemNode, PrefabLink, TreeNode } from "./MapSidecar"
 import { pieceLabelOf } from "./pieceName"
 
 /** What an item has beyond the game's data. An item with neither has no entry. */
@@ -145,6 +145,52 @@ export const withPrefabLink = (
   return withGroupNode(structure, id, ({ prefab: _, ...node }) => link === undefined ? node : { ...node, prefab: link })
 }
 
+/** Sets where group `id` pivots; undefined is the centre of its items' box. A prefab instance pivots on its origin, so it takes none. */
+export const withGroupPivot = (
+  structure: Structure,
+  id: string,
+  pivot: GroupPivot | undefined
+): Structure | undefined => {
+  const group = findGroup(structure.tree, id)
+  if (group === undefined || group.prefab !== undefined || sameGroupPivot(group.pivot, pivot)) return undefined
+  return withGroupNode(structure, id, ({ pivot: _, ...node }) => pivot === undefined ? node : { ...node, pivot })
+}
+
+const sameGroupPivot = (a: GroupPivot | undefined, b: GroupPivot | undefined): boolean => {
+  if (a === undefined || b === undefined) return a === b
+  if (a.choice !== b.choice) return false
+  if (a.choice === "item" && b.choice === "item") return a.key === b.key
+  if (a.choice === "point" && b.choice === "point") {
+    return a.world.x === b.world.x && a.world.y === b.world.y && a.world.z === b.world.z
+  }
+  return true
+}
+
+/** What a chain is called until the user names it, as `DEFAULT_GROUP_NAME` for a group. */
+export const DEFAULT_CHAIN_NAME = "Chain"
+
+/**
+ * Makes group `id` a chain of its children in their order, or a plain group again. A chain pivots on its first link, so
+ * its own pivot goes. A group still called Group becomes Chain, and back; a name the user gave stays.
+ */
+export const withChain = (structure: Structure, id: string, chain: boolean): Structure | undefined => {
+  const group = findGroup(structure.tree, id)
+  if (group === undefined || group.prefab !== undefined || (group.chain === true) === chain) return undefined
+  const [was, becomes] = chain ? [DEFAULT_GROUP_NAME, DEFAULT_CHAIN_NAME] : [DEFAULT_CHAIN_NAME, DEFAULT_GROUP_NAME]
+  return withGroupNode(structure, id, ({ chain: _, pivot, ...node }) => ({
+    ...node,
+    name: node.name === was ? becomes : node.name,
+    ...(chain ? { chain: true } : pivot !== undefined && { pivot })
+  }))
+}
+
+/** Turns chain `id` round: its last link becomes the root. */
+export const withReversedChain = (structure: Structure, id: string): Structure | undefined => {
+  const group = findGroup(structure.tree, id)
+  if (group?.chain !== true || group.children.length < 2) return undefined
+  return withGroupNode(structure, id, (node) => ({ ...node, children: node.children.toReversed() }))
+}
+
 export const sameStrings = (a: ReadonlyArray<string>, b: ReadonlyArray<string>): boolean =>
   a.length === b.length && a.every((value, i) => value === b[i])
 
@@ -282,7 +328,17 @@ export const withPasted = (
   freshId: () => string = freshKey
 ): Structure => {
   const copyOf = (node: TreeNode): ReadonlyArray<TreeNode> => {
-    if (node.kind === "group") return [{ ...node, id: freshId(), children: node.children.flatMap(copyOf) }]
+    if (node.kind === "group") {
+      // an Item pivot names a member, which the copy has under a new key
+      const member = node.pivot?.choice === "item" ? keyOf.get(node.pivot.key) : undefined
+      const pivot = member === undefined ? node.pivot : { choice: "item" as const, key: member }
+      return [{
+        ...node,
+        id: freshId(),
+        children: node.children.flatMap(copyOf),
+        ...(pivot !== undefined && { pivot })
+      }]
+    }
     const key = keyOf.get(node.key)
     return key === undefined ? [] : [itemNode(key)]
   }

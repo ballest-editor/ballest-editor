@@ -31,6 +31,10 @@ export interface OutlineRow {
   readonly collapsed: boolean
   /** A group that is a prefab instance. */
   readonly instance: boolean
+  /** A group that is a chain of its children. */
+  readonly chain: boolean
+  /** Inside a chain, which link this is, from 1; undefined elsewhere. */
+  readonly link: number | undefined
 }
 
 export const itemClasses = (map: MapFile, ids: ReadonlyArray<string>): ReadonlyMap<string, string> =>
@@ -59,9 +63,9 @@ export const outlineRows = (
   const terms = termsOf(query)
   const filtering = terms.length > 0
   const rows: Array<OutlineRow> = []
-  const visit = (nodes: ReadonlyArray<TreeNode>, depth: number, parentId: string | null) => {
+  const visit = (nodes: ReadonlyArray<TreeNode>, depth: number, parentId: string | null, chained = false) => {
     for (const [index, node] of nodes.entries()) {
-      const place = { depth, parentId, index }
+      const place = { depth, parentId, index, link: chained ? index + 1 : undefined }
       if (node.kind === "item") {
         const actorClass = classes.get(node.key) ?? ""
         const row: OutlineRow = {
@@ -75,7 +79,8 @@ export const outlineRows = (
           childCount: 0,
           itemCount: 0,
           collapsed: false,
-          instance: false
+          instance: false,
+          chain: false
         }
         if (!filtering || rowMatches(row, terms)) rows.push(row)
         continue
@@ -92,11 +97,12 @@ export const outlineRows = (
         childCount: node.children.length,
         itemCount: treeKeys([node]).length,
         collapsed,
-        instance: node.prefab !== undefined
+        instance: node.prefab !== undefined,
+        chain: node.chain === true
       }
       const at = rows.length
       rows.push(row)
-      if (!collapsed) visit(node.children, depth + 1, node.id)
+      if (!collapsed) visit(node.children, depth + 1, node.id, node.chain === true)
       if (filtering && rows.length === at + 1 && !rowMatches(row, terms)) rows.pop()
     }
   }

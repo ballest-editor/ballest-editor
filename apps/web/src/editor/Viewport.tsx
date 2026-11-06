@@ -34,6 +34,7 @@ import { OrthoGrid } from "./OrthoGrid"
 import { floorGridOnly, panePointer } from "./paneCameras"
 import { drawEveryPane, PaneRenderer, useBeforePaneDraw } from "./PaneRenderer"
 import { draggedPiece, isPieceDrag } from "./pieceDrag"
+import { PivotDot } from "./pivotDot"
 import { droppedPrefab, isPrefabDrag } from "./prefabDrag"
 import { originLabelTexture, PrefabOrigin } from "./prefabOrigin"
 import { GROUP_BOX_COLORS, sceneBackgroundClass } from "./sceneColors"
@@ -41,7 +42,7 @@ import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
-import { groupBoxOf, noTabOpen, type SelectMode, useEditor, useOpenPrefab } from "./store"
+import { groupBoxOf, noTabOpen, type SelectMode, shownPivotDots, useEditor, useOpenPrefab } from "./store"
 import { useDarkTheme } from "./theme"
 import { isMesh } from "./threeGuards"
 import { glbUrl, visualsOf } from "./visuals"
@@ -388,6 +389,41 @@ function GroupBoxView({ keys, entered }: { readonly keys: ReadonlyArray<string>;
   return <primitive object={box} />
 }
 
+/**
+ * The dots at the selection's pivots (editor/pivotDot.ts): one in Together, one per unit in Each. Placed for each pane's
+ * camera just before it draws, like the gizmo, so they stay a steady size and face every pane.
+ */
+function PivotDots() {
+  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
+  const dots = useMemo(() => new THREE.Group(), [])
+  const pool = useRef<Array<PivotDot>>([])
+  useEffect(() => () => {
+    for (const dot of pool.current) dot.dispose()
+    pool.current = []
+  }, [])
+  useEffect(() => {
+    for (const dot of pool.current) dot.setDark(dark)
+  }, [dark])
+  useBeforePaneDraw((pane) => {
+    const specs = shownPivotDots(useEditor.getState())
+    while (pool.current.length < specs.length) {
+      const dot = new PivotDot()
+      dot.setDark(dark)
+      pool.current.push(dot)
+      dots.add(dot)
+    }
+    pool.current.forEach((dot, i) => {
+      const spec = specs[i]
+      dot.visible = spec !== undefined
+      if (spec === undefined) return
+      const w = ueToThreeVector(spec.pivot)
+      const origin = new THREE.Vector3(w.x, w.y, w.z)
+      dot.update(origin, pane.worldPerPixelAt(origin), pane.camera.quaternion, spec.inside)
+    })
+  })
+  return <primitive object={dots} />
+}
+
 function GroupBoxes() {
   const tree = useEditor((s) => s.doc.structure.tree)
   const selectedIds = useEditor((s) => s.selectedIds)
@@ -472,6 +508,7 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
         <SelectedOutlines />
         <GroupBoxes />
         <PrefabOriginMarker />
+        <PivotDots />
         <GizmoController />
         <ClickSelect />
         <FlyCamera />

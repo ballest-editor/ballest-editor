@@ -492,6 +492,33 @@ export function Outline() {
         >
           <MenuCommand action="groupSelection" disabled={!canGroup}>Group</MenuCommand>
           <MenuCommand action="ungroupSelection" disabled={!canUngroup}>Ungroup</MenuCommand>
+          {menuRow?.kind === "group" && !menuRow.instance
+            ? (
+              menuRow.chain
+                ? (
+                  <>
+                    <ContextMenuItem onClick={() => useEditor.getState().setChain(menuRow.id, false)}>
+                      Unchain
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      disabled={menuRow.childCount < 2}
+                      onClick={() => useEditor.getState().reverseChain(menuRow.id)}
+                    >
+                      Reverse chain
+                    </ContextMenuItem>
+                  </>
+                )
+                : (
+                  <ContextMenuItem onClick={() => useEditor.getState().setChain(menuRow.id, true)}>
+                    Convert to chain
+                  </ContextMenuItem>
+                )
+            )
+            : (
+              <ContextMenuItem disabled={!canGroup} onClick={() => useEditor.getState().chainSelection()}>
+                Group as chain
+              </ContextMenuItem>
+            )}
           <SavePrefabItem item={ContextMenuItem} />
           {instance !== undefined && link !== undefined && (
             <>

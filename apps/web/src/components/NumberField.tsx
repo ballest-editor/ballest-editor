@@ -127,9 +127,9 @@ function useScrub(options: {
  * moves faster when the snap is coarse); typed values aren't snapped. A field that scrubs also takes relative entry:
  * `+50`, `-20`, `*2` and `/2` typed over its text act on the value and land on `digits` like a scrub, and `=-20` sets a
  * negative value. Text edited in place is always a plain number, or changing -2790 to -2795 would subtract. A null `value`
- * is mixed (several items that disagree): the input is blank, typing sets them all, a scrub starts from 0, and `+` and `-`
- * go to `onMixedOffset`. `format` and `parse` replace plain decimals, for a value that reads as something else (a time of
- * day).
+ * is mixed (several items that disagree): the input is blank, typing sets them all, a scrub starts from 0, and a
+ * relative entry is refused. `format` and `parse` replace plain decimals, for a value that reads as something else (a
+ * time of day).
  */
 export function NumberField(props: {
   readonly label: string
@@ -142,8 +142,6 @@ export function NumberField(props: {
   readonly onScrub?: (value: number | null, from: number) => void
   /** The value a finished scrub ends on, and the one it started from; defaults to `onCommit`. */
   readonly onScrubCommit?: (value: number, from: number) => void
-  /** A `+` or `-` entry on a mixed field, which has no one value to work from; without this it's refused. */
-  readonly onMixedOffset?: (by: number) => void
   readonly step?: number
   /** Scrubs land on multiples of this. */
   readonly snap?: number | undefined
@@ -182,7 +180,6 @@ export function NumberField(props: {
     if (entry === null) return
     if (entry.kind === "set") commitValue(entry.value)
     else if (props.value !== null) commitValue(round(applyNumberEntry(entry, props.value)))
-    else if (entry.kind === "add") props.onMixedOffset?.(entry.by)
   }
   const commit = () => {
     if (draft !== null && !cancelling.current) {

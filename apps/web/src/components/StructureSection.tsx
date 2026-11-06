@@ -3,6 +3,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { type ReactNode, useMemo, useState } from "react"
 import type { UeTransform } from "../domain/coords"
+import { counted } from "../domain/groupSelection"
 import { formatBoxSize, placedBoxOf } from "../domain/itemBounds"
 import { itemCountOf } from "../domain/mapDiff"
 import type { Item } from "../domain/MapFile"
@@ -11,6 +12,7 @@ import { isSamePrefab } from "../domain/prefab"
 import { checkInstance } from "../domain/prefabInstance"
 import { detachInstance, openPrefab, updateInstance } from "../editor/actions"
 import { useEditor } from "../editor/store"
+import { InfoHint } from "./InfoHint"
 import { SectionHeader, SectionTitle } from "./SectionTitle"
 import { TagInput } from "./TagInput"
 
@@ -104,6 +106,52 @@ export function GroupSection({ group, items, transforms, actions, children }: {
       </LabelledField>
       <TagsField id="group-tags" owner={group.id} tags={group.tags} />
       {children}
+    </div>
+  )
+}
+
+/**
+ * A chain (docs/design/pivot-modes-and-chains.md § Chains): its links in outline order, each hanging off the one before,
+ * so a turn in Each runs down them. Here: how many links, and the chain actions the Outline's menu has.
+ */
+export function ChainSection({ group }: { readonly group: GroupNode }) {
+  const setChain = useEditor((s) => s.setChain)
+  const reverseChain = useEditor((s) => s.reverseChain)
+  const links = group.children.length
+  if (group.prefab !== undefined) return null
+  if (group.chain !== true) {
+    return (
+      <div className="flex items-center justify-center gap-1">
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full max-w-56"
+          onClick={() => setChain(group.id, true)}
+        >
+          Convert to chain
+        </Button>
+        <InfoHint>
+          A chain's children hang off one another in outline order, so a turn in Each runs down them, link by link.
+        </InfoHint>
+      </div>
+    )
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <SectionTitle>Chain</SectionTitle>
+        <InfoHint>
+          The links hang off one another in outline order: a turn in Each runs down them, a move carries the links after
+          the moved one, and a scale stays with its link.
+        </InfoHint>
+      </div>
+      <p className="text-body text-fg-tertiary">{counted(links, "link")} in outline order.</p>
+      <div className="flex flex-wrap gap-1">
+        <Button variant="outline" size="sm" disabled={links < 2} onClick={() => reverseChain(group.id)}>
+          Reverse
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setChain(group.id, false)}>Unchain</Button>
+      </div>
     </div>
   )
 }

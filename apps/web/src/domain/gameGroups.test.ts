@@ -125,6 +125,29 @@ describe("withGameGroups' groups", () => {
     assertValid(withGameGroups(map, ids, tree, null))
   })
 
+  it("puts the frame where the group pivots: a face of its box, a member's pivot, a frozen point, a chain's root", () => {
+    const spread = { ...map, items: [start, at(10, 100, -4), at(30, 0, 8)] }
+    const keys = ["k0", "k1", "k2"]
+    const frameOf = (extra: Partial<GroupNode>) =>
+      gameGroupsOf(spread, keys, [{ ...group("G", item("k1"), item("k2")), ...extra }], null)[0]?.frame
+    assert.deepStrictEqual(frameOf({ pivot: { choice: "Top" } }), identityTransform({ x: 20, y: 50, z: 8 }))
+    assert.deepStrictEqual(frameOf({ pivot: { choice: "Left" } }), identityTransform({ x: 20, y: 0, z: 2 }))
+    assert.deepStrictEqual(frameOf({ pivot: { choice: "item", key: "k2" } }), identityTransform({ x: 30, y: 0, z: 8 }))
+    assert.deepStrictEqual(
+      frameOf({ pivot: { choice: "point", world: { x: 1, y: 2, z: 3 } } }),
+      identityTransform({ x: 1, y: 2, z: 3 })
+    )
+    assert.deepStrictEqual(
+      gameGroupsOf(spread, keys, [{ ...group("G", item("k2"), item("k1")), chain: true }], null)[0]?.frame,
+      identityTransform({ x: 30, y: 0, z: 8 })
+    )
+    // an instance's frame is its origin, when the caller can say where that is
+    assert.deepStrictEqual(
+      gameGroupsOf(spread, keys, [group("G", item("k1"), item("k2"))], null, () => ({ x: 5, y: 6, z: 7 }))[0]?.frame,
+      identityTransform({ x: 5, y: 6, z: 7 })
+    )
+  })
+
   it("takes the frame's translation at the centre of the members' box", () => {
     const spread = { ...map, items: [start, at(10, 100, -4), at(30, 0, 8)] }
     assert.deepStrictEqual(
@@ -227,6 +250,30 @@ describe("structureFromGame", () => {
     const { tree } = structureFromGame(map, ids)
     assert.deepStrictEqual(shape(tree), ["k0", ["Group", ["k1", "k2"]], ["Group", ["k3"]], "k4"])
     assert.sameMembers([...treeKeys(tree)], ids)
+  })
+
+  it("brings a frame the game kept off the centre back as a Point pivot, given the catalog's bounds", () => {
+    const base = withGroups([{ members: [1, 2], name: "one" }])
+    const off = {
+      rotation: { x: 0, y: 0, z: 0, w: 1 },
+      translation: { x: 999, y: 0, z: 0 },
+      scale3D: { x: 1, y: 1, z: 1 }
+    }
+    const moved: MapFile = {
+      ...base,
+      editorState: { ...defaultEditorState(), groups: [{ members: [1, 2], name: "one", frame: off }] }
+    }
+    const pivotOf = (tree: ReadonlyArray<TreeNode>) => tree.find((n) => n.kind === "group")?.pivot
+    assert.isUndefined(pivotOf(structureFromGame(moved, ids).tree), "without a catalog every piece is its origin")
+    if (hasCatalog) {
+      const catalog = indexCatalog(readCatalog())
+      assert.deepStrictEqual(pivotOf(structureFromGame(moved, ids, catalog).tree), {
+        choice: "point",
+        world: { x: 999, y: 0, z: 0 }
+      })
+      // a frame at the centre, or none, gives no pivot
+      assert.isUndefined(pivotOf(structureFromGame(base, ids, catalog).tree))
+    }
   })
 
   it("comes back the same through the projection", () => {

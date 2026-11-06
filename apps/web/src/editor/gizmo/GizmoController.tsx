@@ -3,17 +3,19 @@ import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import { ueToScene, ueToThreeVector, type UeTransform, type Vec3 } from "../../domain/coords"
 import { selectedGroupIds } from "../../domain/groupSelection"
-import { applyGroupDelta } from "../../domain/groupTransform"
 import { chordOf } from "../../domain/Keybinds"
 import { gizmoScaleOf } from "../../domain/Settings"
+import { applyUnitEdit, deltaEdit, type PivotMode, type SelectionUnits } from "../../domain/units"
 import { transformSelection } from "../actions"
 import { type PaneCamera, type PanePointer, panePointer } from "../paneCameras"
 import { useBeforePaneDraw } from "../PaneRenderer"
 import { sceneRegistry } from "../sceneRegistry"
 import {
+  editedKeys,
   fitTransforms,
   type SelectionPivot,
   selectionPivot,
+  selectionUnits,
   shownGizmoSpace,
   shownTransform,
   useEditor
@@ -34,6 +36,9 @@ interface ActiveDrag {
   startTransforms: ReadonlyMap<string, UeTransform>
   readonly pivot: Vec3
   readonly activePivot: Vec3
+  /** The selection as units at drag start, which the pivot setting applies the delta by. */
+  selection: SelectionUnits
+  readonly pivotMode: PivotMode
   last: ReadonlyMap<string, UeTransform> | undefined
   /** "pending": an Alt+drag that copies the selection once it moves; "copied": it has. */
   duplicate: "pending" | "copied" | undefined
@@ -74,10 +79,13 @@ const currentTarget = (): GizmoTarget | undefined => {
   ) {
     return undefined
   }
-  const transforms = new Map(s.selectedIds.flatMap((id) => {
-    const t = shownTransform(s, id)
-    return t === undefined || !sceneRegistry.objects.has(id) ? [] : [[id, t] as const]
-  }))
+  // inside an entered chain the links after a selected one come along, so they are dragged too
+  const transforms = new Map(
+    editedKeys(s).flatMap((id) => {
+      const t = shownTransform(s, id)
+      return t === undefined || !sceneRegistry.objects.has(id) ? [] : [[id, t] as const]
+    })
+  )
   const target = selectionPivot(s, (id) => transforms.get(id))
   return target === undefined ? undefined : { ...target, transforms }
 }
@@ -237,6 +245,8 @@ export function GizmoController() {
         startTransforms: target.transforms,
         pivot: target.pivot,
         activePivot: target.activePivot,
+        selection: target.selection,
+        pivotMode: useEditor.getState().pivotMode,
         last: undefined,
         duplicate
       }
@@ -266,11 +276,15 @@ export function GizmoController() {
         // The copies start where the selection is; the selection itself stays put.
         const copies = useEditor.getState().beginDuplicateDrag()
         active.duplicate = copies === undefined ? undefined : "copied"
-        if (copies !== undefined) active.startTransforms = byCopy(copies, active.startTransforms)
+        if (copies !== undefined) {
+          active.startTransforms = byCopy(copies, active.startTransforms)
+          active.selection = selectionUnits(useEditor.getState(), (id) => active.startTransforms.get(id)) ??
+            active.selection
+        }
       }
       const next = fitTransforms(
         useEditor.getState(),
-        new Map([...active.startTransforms].map(([id, t]) => [id, applyGroupDelta(t, active.pivot, delta)]))
+        applyUnitEdit(active.selection, active.pivotMode, active.startTransforms, deltaEdit(delta))
       )
       active.last = next
       applyToObjects(next)

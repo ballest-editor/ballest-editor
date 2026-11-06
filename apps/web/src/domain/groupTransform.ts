@@ -9,7 +9,6 @@
 import type { Quat4, UeTransform, Vec3 } from "./coords"
 import { localToWorld } from "./pivot"
 import {
-  ORIGIN,
   quatConjugate,
   quatMul,
   quatNormalize,
@@ -20,13 +19,31 @@ import {
   vecSub
 } from "./ueMath"
 
-/** What a gizmo drag does, independent of how many items it applies to. */
+/**
+ * What a gizmo drag does, independent of how many items it applies to. A move or turn measured along the gizmo's local
+ * axes carries `frame`, the rotation those axes were: `forUnit` turns it into the same move or turn along another
+ * unit's own axes, which is what Each does (units.ts).
+ */
 export type GroupDelta =
-  | { readonly kind: "translate"; readonly offset: Vec3 }
+  | { readonly kind: "translate"; readonly offset: Vec3; readonly frame?: Quat4 }
   /** A rotation about the pivot (game-space unit quaternion). */
-  | { readonly kind: "rotate"; readonly rotation: Quat4 }
+  | { readonly kind: "rotate"; readonly rotation: Quat4; readonly frame?: Quat4 }
   /** Scale each item by `factor` about the pivot: along its own `axis`, or uniformly. */
   | { readonly kind: "scale"; readonly factor: number; readonly axis?: Axis }
+
+/**
+ * `delta` as a unit with axes `rotation` takes it: a move or turn given along the frame's axes becomes the same move or
+ * turn along the unit's own. A world-axes delta, or a scale, is the same for every unit.
+ */
+export const forUnit = (delta: GroupDelta, rotation: Quat4): GroupDelta => {
+  if (delta.kind === "scale" || delta.frame === undefined) return delta
+  const toLocal = quatConjugate(delta.frame)
+  if (delta.kind === "translate") {
+    return { kind: "translate", offset: rotateVec(rotation, rotateVec(toLocal, delta.offset)) }
+  }
+  const local = quatMul(quatMul(toLocal, delta.rotation), delta.frame)
+  return { kind: "rotate", rotation: quatNormalize(quatMul(quatMul(rotation, local), quatConjugate(rotation))) }
+}
 
 const MIN_SCALE = 1e-3
 
@@ -46,7 +63,7 @@ export const keepPoint = <T extends UeTransform>(before: UeTransform, after: T, 
  * `t` given `scale3D`, about `pivot` (world): its offset from the pivot changes along each of
  * its own axes by what that axis's scale did. An item on the pivot stays where it is.
  */
-const scaleAbout = (t: UeTransform, scale3D: Vec3, pivot: Vec3): UeTransform => {
+export const scaleAbout = (t: UeTransform, scale3D: Vec3, pivot: Vec3): UeTransform => {
   const offset = rotateVec(quatConjugate(t.rotation), vecSub(t.translation, pivot))
   const along = (axis: Axis) => (t.scale3D[axis] === 0 ? offset[axis] : offset[axis] * scale3D[axis] / t.scale3D[axis])
   return {
@@ -105,26 +122,23 @@ export const writeField = (t: UeTransform, field: TransformField, v: Vec3): UeTr
 
 /**
  * `writeField`, turning or scaling the item about its own `localPivot` (unscaled cm) rather
- * than its origin; a location is set as is.
+ * than its origin; a location is set as is. How a pasted row lands on each item.
  */
 export const writeFieldAbout = (t: UeTransform, field: TransformField, v: Vec3, localPivot: Vec3): UeTransform =>
   field === "translation" ? writeField(t, field, v) : keepPoint(t, writeField(t, field, v), localPivot)
 
-/** Set an axis to a value (typed into a field), or offset it (a scrub). */
+/** Take an axis to a value (typed into a field), or change it by an amount (a scrub, or a `+5` typed). */
 export type AxisEdit = { readonly kind: "set"; readonly value: number } | {
   readonly kind: "offset"
   readonly by: number
 }
-
-const setAxis = (t: UeTransform, field: TransformField, axis: Axis, value: number, localPivot: Vec3): UeTransform =>
-  writeFieldAbout(t, field, { ...readField(t, field), [axis]: value }, localPivot)
 
 /**
  * The gizmo delta that turns `active` by `by` degrees about one rotator axis. Measured on
  * the active item's rotator round-tripped through the quaternion, so only the edited angle
  * changes even near gimbal lock, where the item's other rotator angles are ambiguous.
  */
-const rotatorOffset = (active: UeTransform, axis: Axis, by: number): GroupDelta => {
+export const rotatorOffset = (active: UeTransform, axis: Axis, by: number): GroupDelta => {
   const rotator = readField(active, "rotation")
   const from = writeField(active, "rotation", rotator).rotation
   const to = writeField(active, "rotation", { ...rotator, [axis]: rotator[axis] + by }).rotation
@@ -133,15 +147,14 @@ const rotatorOffset = (active: UeTransform, axis: Axis, by: number): GroupDelta 
 
 /**
  * An inspector axis edit over a whole selection, as the change to make to each item's
- * transform (and its own pivot, local and unscaled) from before the edit. A scale, typed or
- * scrubbed, takes the active item's axis to the new value and every other item's by the same
- * ratio, about `pivot`, as a gizmo drag does: the game turns a panel of 1 made 2 into each item
- * doubling. A typed location or rotation sets that axis on every item, turning each about its
- * own pivot. An offset (a scrub) acts like a gizmo drag on the same selection: a location moves
- * every item by the same amount; a rotation turns the active item about the edited rotator
- * axis and the rest rigidly with it, about `pivot` (by default the active item's origin).
- * Always applied to the transforms from before the scrub, never to a live preview, so a
- * scrub's steps don't compound.
+ * transform from before the edit. Typed or scrubbed, an edit is what it takes the active
+ * item's axis from its value to the new one, and every item takes that change as a gizmo
+ * drag would, about `pivot` (by default the active item's origin): a location moves every
+ * item by the same amount; a rotation turns the active item about the edited rotator axis and
+ * the rest rigidly with it; a scale takes every item's axis by the same ratio, along its own
+ * axes. That is what the game's panel does with a typed value (docs/qa/joins-and-typed-rotation.md),
+ * so "set every item to 90" is a pasted row, not a typed one. Always applied to the transforms
+ * from before the scrub, never to a live preview, so a scrub's steps don't compound.
  */
 export const selectionAxisEdit = (
   active: UeTransform,
@@ -149,23 +162,21 @@ export const selectionAxisEdit = (
   axis: Axis,
   edit: AxisEdit,
   pivot: Vec3 = active.translation
-): (t: UeTransform, localPivot?: Vec3) => UeTransform => {
-  if (field === "scale3D") {
-    const from = active.scale3D[axis]
-    const to = edit.kind === "set" ? edit.value : from + edit.by
-    // an item level with the active one takes the value itself, not that value through a ratio's rounding
-    const scaled = (v: number) => (v === from || from === 0 ? to : v * to / from)
-    return (t) => scaleAbout(t, { ...t.scale3D, [axis]: clampScale(scaled(t.scale3D[axis])) }, pivot)
-  }
-  if (edit.kind === "set") return (t, localPivot = ORIGIN) => setAxis(t, field, axis, edit.value, localPivot)
-  const { by } = edit
+): (t: UeTransform) => UeTransform => {
+  const from = readField(active, field)[axis]
+  const to = edit.kind === "set" ? edit.value : from + edit.by
   switch (field) {
+    case "scale3D": {
+      // an item level with the active one takes the value itself, not that value through a ratio's rounding
+      const scaled = (v: number) => (v === from || from === 0 ? to : v * to / from)
+      return (t) => scaleAbout(t, { ...t.scale3D, [axis]: clampScale(scaled(t.scale3D[axis])) }, pivot)
+    }
     case "translation": {
-      const delta: GroupDelta = { kind: "translate", offset: { x: 0, y: 0, z: 0, [axis]: by } }
+      const delta: GroupDelta = { kind: "translate", offset: { x: 0, y: 0, z: 0, [axis]: to - from } }
       return (t) => applyGroupDelta(t, pivot, delta)
     }
     case "rotation": {
-      const delta = rotatorOffset(active, axis, by)
+      const delta = rotatorOffset(active, axis, to - from)
       return (t) => applyGroupDelta(t, pivot, delta)
     }
   }

@@ -3,16 +3,24 @@ import type { UeTransform, Vec3 } from "../../domain/coords"
 import { editTransform } from "../../domain/editTransform"
 import { selectableKeys, soleGroupOf } from "../../domain/groupSelection"
 import {
+  applyGroupDelta,
   type Axis,
   type AxisEdit,
+  clampScale,
+  type GroupDelta,
+  readField,
+  scaleAbout,
   selectionAxisEdit,
   type TransformField,
+  writeField,
   writeFieldAbout
 } from "../../domain/groupTransform"
 import type { PropertyChange } from "../../domain/itemProperties"
 import type { FlipAxis } from "../../domain/mirror"
 import { type PivotChoice, pivotFor } from "../../domain/pivot"
-import { fitTransforms, pivotOf, selectionPivot, type SlotPaint, useEditor } from "../store"
+import { quatConjugate, quatMul, quatNormalize, vecSub } from "../../domain/ueMath"
+import { applyUnitEdit, pivotUnitOf, type Unit, type UnitEdit } from "../../domain/units"
+import { editedKeys, fitTransforms, pivotOf, selectionPivot, type SlotPaint, useEditor } from "../store"
 
 export const transformSelection = (transforms: ReadonlyMap<string, UeTransform>): boolean =>
   useEditor.getState().transformItems(transforms)
@@ -61,18 +69,86 @@ const withSelectionEdit = (
     )
   )
 
-/** An axis edit made from the document transforms, about the selection's pivot like the gizmo. */
-const withAxisEdit = (field: TransformField, axis: Axis, edit: AxisEdit) => {
-  const target = selectionPivot(useEditor.getState(), docTransform)
+/**
+ * The document transforms through an edit of the selection's units, applied by the pivot setting like a gizmo drag:
+ * Together takes every item through the active unit's edit about its pivot; Each takes each unit through its own.
+ * `edit` gets the active unit (the active item, or a whole group's frame) to measure the change on.
+ */
+const withUnitEdit = (edit: (active: Unit) => UnitEdit): ReadonlyMap<string, UeTransform> => {
+  const s = useEditor.getState()
+  const target = selectionPivot(s, docTransform)
   if (target === undefined) return new Map()
-  return withSelectionEdit(selectionAxisEdit(target.active, field, axis, edit, target.pivot))
+  // inside an entered chain the links after a selected one come along
+  const transforms = new Map(
+    editedKeys(s).flatMap((id) => {
+      const t = docTransform(id)
+      return t === undefined ? [] : [[id, t] as const]
+    })
+  )
+  const active = pivotUnitOf(target.selection, s.pivotMode)
+  return fitTransforms(s, applyUnitEdit(target.selection, s.pivotMode, transforms, edit(active)))
 }
 
-/** Sets all three axes of `field` on every selected item (pasting a copied row), about each one's pivot. */
+/** An axis edit: the change it makes to the active unit's axis, which every unit then takes about its own pivot. */
+const withAxisEdit = (field: TransformField, axis: Axis, edit: AxisEdit) =>
+  withUnitEdit((active) => {
+    const from = readField(active.transform, field)[axis]
+    const to = edit.kind === "set" ? edit.value : from + edit.by
+    // a scale is a ratio of the active unit's value, which every unit takes; a move or turn is the same change
+    const forUnit = (unit: Unit): AxisEdit =>
+      field === "scale3D" && from !== 0
+        ? { kind: "set", value: readField(unit.transform, field)[axis] * to / from }
+        : { kind: "offset", by: to - from }
+    return (unit) => selectionAxisEdit(unit.transform, field, axis, forUnit(unit), unit.pivot)
+  })
+
+/**
+ * Takes the active unit's `field` to `value` on all three axes at once, every unit following by the same change
+ * about its own pivot (pasting a row onto a group): a move by the difference, the turn from the unit's rotation to
+ * the value's, or each axis scaled by its ratio.
+ */
+export const setSelectionUnitField = (field: TransformField, value: Vec3): boolean =>
+  transformSelection(withUnitEdit((active) => {
+    switch (field) {
+      case "translation": {
+        const delta: GroupDelta = { kind: "translate", offset: vecSub(value, active.transform.translation) }
+        return (unit) => (t) => applyGroupDelta(t, unit.pivot, delta)
+      }
+      case "rotation": {
+        const to = writeField(active.transform, "rotation", value).rotation
+        const delta: GroupDelta = {
+          kind: "rotate",
+          rotation: quatNormalize(quatMul(to, quatConjugate(active.transform.rotation)))
+        }
+        return (unit) => (t) => applyGroupDelta(t, unit.pivot, delta)
+      }
+      case "scale3D": {
+        const from = active.transform.scale3D
+        const ratio = (axis: Axis) => (from[axis] === 0 ? 1 : value[axis] / from[axis])
+        return (unit) => (t) =>
+          scaleAbout(t, {
+            x: clampScale(t.scale3D.x * ratio("x")),
+            y: clampScale(t.scale3D.y * ratio("y")),
+            z: clampScale(t.scale3D.z * ratio("z"))
+          }, unit.pivot)
+      }
+    }
+  }))
+
+/** Moves the selection by `offset` in the world (pasting a pivot's Position): one undo step. */
+export const moveSelectionBy = (offset: Vec3): boolean => {
+  const delta: GroupDelta = { kind: "translate", offset }
+  return transformSelection(withUnitEdit(() => (unit) => (t) => applyGroupDelta(t, unit.pivot, delta)))
+}
+
+/**
+ * Sets all three axes of `field` on every selected item (pasting a copied row), about each one's pivot: the one edit
+ * that sets items to a value rather than changing them together.
+ */
 export const setSelectionField = (field: TransformField, value: Vec3): boolean =>
   transformSelection(withSelectionEdit((t, localPivot) => writeFieldAbout(t, field, value, localPivot)))
 
-/** Applies an axis edit (an inspector field) to every selected item. */
+/** Applies an axis edit (an inspector field) to the selection. */
 export const editSelectionAxis = (field: TransformField, axis: Axis, edit: AxisEdit): boolean =>
   transformSelection(withAxisEdit(field, axis, edit))
 
@@ -85,8 +161,8 @@ export const previewSelectionAxis = (field: TransformField, axis: Axis, edit: Ax
 
 /**
  * Sets the pivot `choice` on every selected item, measured on each one's own bounds (one
- * undo step). Items whose bounds are unknown keep their pivot. A whole group turns and scales
- * about its frame, so it takes no pivot, as in the game.
+ * undo step). Items whose bounds are unknown keep their pivot. A whole group has a pivot of
+ * its own (`setGroupPivot`), so its items keep theirs.
  */
 export const setSelectionPivot = (choice: PivotChoice): void => {
   const { doc, selectedIds, enteredGroupId, catalogIndex, setItemPivots } = useEditor.getState()

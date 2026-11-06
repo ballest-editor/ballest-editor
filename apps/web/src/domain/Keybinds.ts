@@ -29,6 +29,7 @@ export const keybindSections = [
       "rotateMode",
       "scaleMode",
       "toggleGizmoSpace",
+      "togglePivotMode",
       "focusSelection",
       "addToSelection",
       "toggleSelection"
@@ -105,6 +106,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   rotateMode: "rotate",
   scaleMode: "scale",
   toggleGizmoSpace: "local / world axes",
+  togglePivotMode: "together / each pivot",
   focusSelection: "focus selection",
   addToSelection: "add to selection",
   toggleSelection: "toggle selection",
@@ -164,6 +166,8 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Scale: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the in-game editor.",
   toggleGizmoSpace:
     "Switch the move and rotate gizmos between the selected item's own axes (the last one picked, when several are selected) and the world axes. Scale always uses each item's own axes. C in the in-game editor.",
+  togglePivotMode:
+    "Switch what a selection of several pieces or groups pivots about: one point for all of them, the active one's pivot, as the game does (Together), or each about its own pivot and axes (Each). No equivalent in the in-game editor; Blender's pivot key.",
   focusSelection: "Frame the current selection in the viewport. F in the in-game editor.",
   addToSelection:
     "Click an item to add it to the selection (it becomes the active item). Shift+click, as in Unreal's editor; the game's key for this isn't recorded.",
@@ -274,6 +278,7 @@ export const defaultKeybinds: Keybinds = {
   rotateMode: ["KeyE"],
   scaleMode: ["KeyR"],
   toggleGizmoSpace: ["KeyC"],
+  togglePivotMode: ["Period"],
   focusSelection: ["KeyF"],
   addToSelection: ["Shift+Mouse0"],
   toggleSelection: ["Ctrl+Mouse0"],

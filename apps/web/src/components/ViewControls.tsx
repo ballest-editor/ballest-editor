@@ -1,6 +1,8 @@
 import {
   IconAngle,
   IconChevronDown,
+  IconCircleDot,
+  IconCircles,
   IconCube,
   IconGrid4x4,
   IconHaze,
@@ -14,11 +16,19 @@ import { Switch } from "@workspace/ui/components/switch"
 import { Toggle } from "@workspace/ui/components/toggle"
 import { cn } from "@workspace/ui/lib/utils"
 import type { ReactNode } from "react"
+import { soleGroupOf } from "../domain/groupSelection"
 import { floorHeightOf } from "../domain/level"
 import { AUTO_GRID_COLORS, isDefaultDisplay, type Settings, withDefaultDisplay } from "../domain/Settings"
 import { formatGridSize, formatRotationStep, GRID_SIZES, ROTATION_STEPS } from "../domain/snap"
 import { saveSettings, setGridHeight, updateSettings } from "../editor/actions"
-import { shownGizmoSpace, useEditor, useOpenPrefab } from "../editor/store"
+import {
+  selectionUnits,
+  shownGizmoSpace,
+  shownPivotMode,
+  shownTransform,
+  useEditor,
+  useOpenPrefab
+} from "../editor/store"
 import { useDarkTheme } from "../editor/theme"
 import { ColorSetting } from "./ColorSetting"
 import { NumberField } from "./NumberField"
@@ -52,6 +62,8 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
             <DisplayControl disabled={disabled} />
           </div>
           <div className={GROUP}>
+            <PivotToggle disabled={disabled} />
+            <span aria-hidden className={GROUP_DIVIDER} />
             <AxesToggle disabled={disabled} />
             <span aria-hidden className={GROUP_DIVIDER} />
             <SnapGroup
@@ -84,6 +96,47 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
       </ViewPanes>
       <ToolBar disabled={disabled} />
     </ViewTipBoundary>
+  )
+}
+
+/**
+ * What a selection pivots about: one point for all, the active one's pivot, as the game does (Together), or each unit
+ * its own (Each). Each needs two or more pieces or groups, so with fewer the toggle is held at Together and says why.
+ */
+function PivotToggle({ disabled }: { readonly disabled: boolean }) {
+  const each = useEditor((s) => shownPivotMode(s) === "each")
+  const units = useEditor((s) => selectionUnits(s, (id) => shownTransform(s, id))?.units.length ?? 0)
+  const soleGroup = useEditor((s) => soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId) !== undefined)
+  const worldMove = useEditor((s) => s.tool === "translate" && shownGizmoSpace(s) === "world")
+  const togglePivotMode = useEditor((s) => s.togglePivotMode)
+  const held = units < 2
+  const label = held
+    ? soleGroup
+      ? "One group is one piece to Each: enter it to work on its members"
+      : "Each needs two or more pieces or groups selected"
+    : each
+    ? `Each piece or group pivots on its own${worldMove ? " (same as Together for a move along world axes)" : ""}`
+    : `Everything pivots on the active piece, as the game does${
+      worldMove ? " (same as Each for a move along world axes)" : ""
+    }`
+  return (
+    <ViewTip
+      label={label}
+      action="togglePivotMode"
+      render={
+        <Toggle
+          pressed={each}
+          onPressedChange={togglePivotMode}
+          disabled={disabled || held}
+          aria-label={label}
+          className={cn(SEGMENT, "aria-pressed:bg-transparent aria-pressed:hover:bg-hover")}
+          {...noFocus}
+        />
+      }
+    >
+      {each ? <IconCircles /> : <IconCircleDot />}
+      <span className={cn("text-foreground", CONTROL_WORD)}>{each ? "Each" : "Together"}</span>
+    </ViewTip>
   )
 }
 
