@@ -33,12 +33,6 @@ export const WATER = {
 } as const
 
 /**
- * `BP_KillZone`: a 640 m square box 16 cm thick centred at this height, just under the
- * water. The ball respawns when it touches it.
- */
-export const KILL_ZONE_HEIGHT = 100
-
-/**
  * The height the editor builds at: the grid, and where palette pieces land. The level has no
  * floor above the water (the arena's stands are far off), so this is the player start's
  * height, the game's default for a new map.

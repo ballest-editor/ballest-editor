@@ -1,7 +1,5 @@
-"use client"
-
 import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area"
-import { cn } from "cn"
+import { cn } from "@workspace/ui/lib/utils"
 import type * as React from "react"
 
 function ScrollArea({
@@ -19,7 +17,7 @@ function ScrollArea({
       <ScrollAreaPrimitive.Viewport
         ref={viewportRef}
         data-slot="scroll-area-viewport"
-        className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1"
+        className="size-full rounded-[inherit] focus-ring-inset"
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
@@ -47,10 +45,10 @@ function ScrollBar({
     >
       <ScrollAreaPrimitive.Thumb
         data-slot="scroll-area-thumb"
-        className="relative flex-1 rounded-full bg-muted-foreground/30 transition-colors hover:bg-muted-foreground/50"
+        className="relative flex-1 rounded-full bg-fg-tertiary/30 transition-colors hover:bg-fg-tertiary/50"
       />
     </ScrollAreaPrimitive.Scrollbar>
   )
 }
 
-export { ScrollArea, ScrollBar }
+export { ScrollArea }

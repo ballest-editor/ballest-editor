@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import { listSamples, readSample } from "../test/samples"
 import { newMapFile } from "./factory"
-import { DEFAULT_GOAL, DEFAULT_PLAYER_START, floorHeightOf, KILL_ZONE_HEIGHT, WATER } from "./level"
+import { DEFAULT_GOAL, DEFAULT_PLAYER_START, floorHeightOf, WATER } from "./level"
 import { GOAL_CLASS, isPlayerStart, MapFile } from "./MapFile"
 
 const decodeSample = Schema.decodeSync(Schema.fromJsonString(MapFile))
@@ -27,12 +27,10 @@ describe("level", () => {
     }
   })
 
-  it("puts a new map's player start there, above the water and the kill zone", () => {
+  it("puts a new map's player start there, above the water", () => {
     const map = newMapFile({ displayName: "A", creatorName: "B", createdAt: "" })
     assert.deepStrictEqual(map.items.find(isPlayerStart)?.itemTransform.translation, DEFAULT_PLAYER_START)
     assert.strictEqual(floorHeightOf(map), DEFAULT_PLAYER_START.z)
-    assert.isAbove(KILL_ZONE_HEIGHT, 0)
-    assert.isAbove(WATER.height, KILL_ZONE_HEIGHT)
     assert.isAbove(DEFAULT_PLAYER_START.z, WATER.height)
   })
 

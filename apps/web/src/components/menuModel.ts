@@ -1,0 +1,493 @@
+/**
+ * The menu bar as data: what each row says, does and why it's off. `MenuBar` draws this, and Help's search lists it, so
+ * the two can't drift apart (docs/DESKTOP.md § Menus).
+ */
+import { type RecentProject, RELEASES_URL } from "@ballest/contracts"
+import type { KeybindAction } from "../domain/Keybinds"
+import { PROJECTION_ACTIONS } from "../domain/Keybinds"
+import { termsOf } from "../domain/outline"
+import { formatGridSize, GRID_SIZES } from "../domain/snap"
+import { updateCheckBlockedBy } from "../domain/updates"
+import {
+  type ViewLayout,
+  viewLayoutKinds,
+  viewLayoutLabelsOf,
+  type ViewProjection,
+  viewProjectionLabels,
+  viewProjections
+} from "../domain/viewLayout"
+import {
+  checkForUpdates,
+  chooseProject,
+  exportToGame,
+  launchGame,
+  openExternalLink,
+  openRecentInNewWindow,
+  quitApp,
+  reimportMap,
+  selectionPrefabProblem,
+  startSavePrefab,
+  switchProject,
+  updateSettings
+} from "../editor/actions"
+import { actionCommands, type CommandAction, lookAlong } from "../editor/commands"
+import {
+  type EditorState,
+  exportProblemOf,
+  NO_TAB_OPEN,
+  noTabOpen,
+  saveProblemOf,
+  useCanGroup,
+  useEditor,
+  useOpenProjectMap,
+  useUpdateState
+} from "../editor/store"
+import { resetDockLayout, togglePanel, useOpenPanels, useViewMenuPanels } from "./dock/dockControl"
+
+const NOTHING_SELECTED = "Select something first."
+const SAVE_PROJECT_FIRST = "Save first: Untitled Project has no folder to import into."
+const EXPORT_FIRST = "Export this map first: the game has no copy of it yet."
+const NO_RECENT_PROJECTS = "No recent projects yet."
+
+export const MENU_TITLES = ["File", "Edit", "View", "Project", "Help"] as const
+export type MenuTitle = (typeof MENU_TITLES)[number]
+
+/** What a row is told about how it was picked: Shift opens a recent project in a new window. */
+interface Pick {
+  readonly shiftKey: boolean
+}
+
+/** A row that runs something. */
+export interface MenuItem {
+  readonly kind: "item"
+  readonly label: string
+  readonly run: (pick: Pick) => void
+  /** Why the row is off; null when it's on. */
+  readonly reason: string | null
+  /** The action whose primary binding the row shows. */
+  readonly shortcut?: KeybindAction
+  /** What hovering the row says. */
+  readonly title?: string
+  /** A quiet word after the label. */
+  readonly note?: string
+}
+
+/** A row that turns something on or off. */
+export interface MenuCheck {
+  readonly kind: "check"
+  readonly label: string
+  readonly checked: boolean
+  readonly run: () => void
+}
+
+/** A named part of a menu whose rows are too different to read as one list. */
+export interface MenuSection {
+  readonly kind: "section"
+  readonly title: string
+  readonly children: ReadonlyArray<MenuNode>
+}
+
+/** A submenu of items. */
+export interface MenuSubmenu {
+  readonly kind: "submenu"
+  readonly title: string
+  /** The line heading the submenu. */
+  readonly description: string
+  /** Why the submenu is off; null when it's on. */
+  readonly reason: string | null
+  readonly children: ReadonlyArray<MenuItem>
+}
+
+export interface MenuOption {
+  readonly label: string
+  readonly checked: boolean
+  readonly run: () => void
+  readonly shortcut?: KeybindAction
+}
+
+/** A submenu picking one of `options`, under a line saying what it picks when it needs one. */
+export interface MenuChoice {
+  readonly kind: "choice"
+  readonly title: string
+  readonly description?: string
+  readonly options: ReadonlyArray<MenuOption>
+}
+
+export interface MenuSeparator {
+  readonly kind: "separator"
+}
+
+export type MenuNode = MenuItem | MenuCheck | MenuSection | MenuSubmenu | MenuChoice | MenuSeparator
+
+export type Menus = Readonly<Record<MenuTitle, ReadonlyArray<MenuNode>>>
+
+/** All the model needs to know. */
+export interface MenuState {
+  readonly capabilities: EditorState["capabilities"]
+  readonly canUndo: boolean
+  readonly canRedo: boolean
+  readonly hasSelection: boolean
+  readonly canGroup: boolean
+  readonly canUngroup: boolean
+  readonly canPaste: boolean
+  readonly canSelectAll: boolean
+  /** Why the selection can't be a prefab, whatever its name. */
+  readonly prefabProblem: string | undefined
+  /** Why nothing can be saved, else null: no tab open, a definition with too few items (`saveProblemOf`). */
+  readonly saveOff: string | null
+  /** Why nothing can be exported or played, else null: no tab open, a definition's tab (`exportProblemOf`). */
+  readonly exportOff: string | null
+  /** The reason every map command is off while no tab is open, else null. */
+  readonly noTabOff: string | null
+  /** Whether this is Untitled Project, which has no folder to import into yet. */
+  readonly untitled: boolean
+  /** The open map's file when there's an export to take it from. */
+  readonly reimportable: string | null
+  readonly recent: ReadonlyArray<RecentProject>
+  readonly openElsewhere: ReadonlyArray<string>
+  readonly panels: ReadonlyArray<{ readonly id: string; readonly title: string; readonly open: boolean }>
+  readonly snapping: EditorState["settings"]["snapping"]
+  readonly units: "cm" | "m"
+  readonly layout: ViewLayout
+  /** What the active pane looks along. */
+  readonly projection: ViewProjection
+  /** The updater's state; null in a browser, which has no updater. */
+  readonly update: EditorState["update"]
+}
+
+const SEPARATOR: MenuSeparator = { kind: "separator" }
+
+const item = (label: string, run: MenuItem["run"], reason: string | null = null): MenuItem => ({
+  kind: "item",
+  label,
+  run,
+  reason
+})
+
+/** A row that runs the same command as the action's keybind, and shows that keybind. */
+const command = (action: CommandAction, label: string, reason: string | null = null): MenuItem => ({
+  ...item(label, () => actionCommands[action](), reason),
+  shortcut: action
+})
+
+const openDialog: EditorState["openDialog"] = (dialog) => useEditor.getState().openDialog(dialog)
+
+const settingsItem = item("Settings…", () => openDialog({ id: "settings" }))
+
+/**
+ * Desktop only: the projects used before, by name (the folder is the hover text). A pick opens here (`switchProject`),
+ * Shift+click in a new window. One open in another window says so, and picking it still gets main's refusal, which says
+ * what to do.
+ */
+const recentProjects = ({ recent, openElsewhere }: MenuState): MenuSubmenu => ({
+  kind: "submenu",
+  title: "Recent projects",
+  description: "Shift+click opens in a new window",
+  reason: recent.length === 0 ? NO_RECENT_PROJECTS : null,
+  children: recent.map((project) => ({
+    ...item(
+      project.name,
+      ({ shiftKey }) => void (shiftKey ? openRecentInNewWindow(project) : switchProject(project.path))
+    ),
+    title: project.path,
+    ...(openElsewhere.includes(project.path) && { note: "Open in another window" })
+  }))
+})
+
+const fileMenu = (state: MenuState): ReadonlyArray<MenuNode> =>
+  state.capabilities.projects
+    ? [
+      command("newMap", "New map"),
+      item("New project…", () => openDialog({ id: "newProject" })),
+      item("Open project…", () => void chooseProject()),
+      recentProjects(state),
+      SEPARATOR,
+      command("saveMap", "Save", state.saveOff),
+      command("closeTab", "Close tab", state.noTabOff),
+      SEPARATOR,
+      settingsItem,
+      SEPARATOR,
+      item("Quit", () => void quitApp())
+    ]
+    : [
+      command("newMap", "New map"),
+      command("openMap", "Open…"),
+      SEPARATOR,
+      command("saveMap", "Save", state.saveOff),
+      command("saveMapAs", "Export…"),
+      command("closeTab", "Close tab"),
+      SEPARATOR,
+      settingsItem
+    ]
+
+const editMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
+  const selectionOff = state.hasSelection ? null : NOTHING_SELECTED
+  return [
+    command("undo", "Undo", state.canUndo ? null : "Nothing to undo."),
+    command("redo", "Redo", state.canRedo ? null : "Nothing to redo."),
+    SEPARATOR,
+    command("cutSelection", "Cut", selectionOff),
+    command("copySelection", "Copy", selectionOff),
+    command("paste", "Paste", state.noTabOff ?? (state.canPaste ? null : "Copy something first.")),
+    command("duplicateSelection", "Duplicate", selectionOff),
+    command("deleteSelection", "Delete", selectionOff),
+    command("selectAll", "Select all", state.canSelectAll ? null : "Nothing to select."),
+    command("deselect", "Deselect", selectionOff),
+    SEPARATOR,
+    command("groupSelection", "Group", state.canGroup ? null : "Select what to group first."),
+    command("ungroupSelection", "Ungroup", state.canUngroup ? null : "Select a group first."),
+    SEPARATOR,
+    item("Save selection as prefab…", startSavePrefab, state.prefabProblem ?? null)
+  ]
+}
+
+/** How the view divides into panes, and what the active pane looks along (docs/DESKTOP.md § View panes). */
+const paneMenus = ({ layout, projection }: MenuState): ReadonlyArray<MenuChoice> => {
+  const labels = viewLayoutLabelsOf(layout)
+  return [
+    {
+      kind: "choice",
+      title: "Layout",
+      description: "Split the viewport, one camera per pane.",
+      options: viewLayoutKinds.map((kind) => ({
+        label: labels[kind],
+        checked: kind === layout.kind,
+        run: () => useEditor.getState().setViewLayoutKind(kind)
+      }))
+    },
+    {
+      kind: "choice",
+      title: "Active pane",
+      description: "The view in the pane you last used.",
+      options: viewProjections.map((view) => ({
+        label: viewProjectionLabels[view],
+        checked: view === projection,
+        run: () => lookAlong(view),
+        shortcut: PROJECTION_ACTIONS[view]
+      }))
+    }
+  ]
+}
+
+const viewMenu = (state: MenuState): ReadonlyArray<MenuNode> => [
+  {
+    kind: "section",
+    title: "Camera",
+    children: [
+      command("focusSelection", "Focus selection", state.hasSelection ? null : NOTHING_SELECTED),
+      command("frameAll", "Frame all", state.noTabOff)
+    ]
+  },
+  SEPARATOR,
+  {
+    kind: "section",
+    title: "Panels",
+    children: [
+      ...state.panels.map(({ id, title, open }): MenuCheck => ({
+        kind: "check",
+        label: title,
+        checked: open,
+        run: () => togglePanel(id)
+      })),
+      item("Reset layout", resetDockLayout)
+    ]
+  },
+  SEPARATOR,
+  { kind: "section", title: "Panes", children: paneMenus(state) },
+  SEPARATOR,
+  {
+    kind: "section",
+    title: "Grid",
+    children: [
+      {
+        kind: "check",
+        label: "Snap to grid",
+        checked: state.snapping.enabled,
+        run: () => void updateSettings("snapping", { enabled: !state.snapping.enabled })
+      },
+      {
+        kind: "choice",
+        title: "Grid size",
+        options: GRID_SIZES.map((gridSize) => ({
+          label: formatGridSize(gridSize, state.units),
+          checked: gridSize === state.snapping.gridSize,
+          run: () => void updateSettings("snapping", { enabled: true, gridSize })
+        }))
+      }
+    ]
+  }
+]
+
+const projectMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
+  const { exportToGame: canExport, launchGame: canLaunchGame, play: canPlay, projects } = state.capabilities
+  const { exportOff } = state
+  if (!projects) return [item("Project settings…", () => openDialog({ id: "mapSettings" }), exportOff)]
+  const { reimportable } = state
+  return [
+    command("newMap", "New map"),
+    command("openMap", "Import map…", state.untitled ? SAVE_PROJECT_FIRST : null),
+    command("saveMapAs", "Duplicate map…", exportOff),
+    ...(canExport
+      ? [
+        item("Export to game", () => void exportToGame(), exportOff),
+        item(
+          "Re-import from game",
+          () => reimportable !== null && void reimportMap(reimportable),
+          exportOff ?? (reimportable === null ? EXPORT_FIRST : null)
+        ),
+        ...(canPlay || canLaunchGame ? [SEPARATOR] : []),
+        ...(canPlay ? [command("playMap", "Play", exportOff)] : []),
+        ...(canLaunchGame ? [item("Open game (Steam)", () => void launchGame())] : [])
+      ]
+      : []),
+    SEPARATOR,
+    item("Project settings…", () => openDialog({ id: "projectSettings" }))
+  ]
+}
+
+/** Help, in both builds; a browser has no updater, so no update rows. */
+const helpMenu = ({ update }: MenuState): ReadonlyArray<MenuNode> => [
+  // not the keybind's command: that one shows the sheet only while the key is held
+  { ...item("Keyboard shortcuts", () => openDialog({ id: "keybinds" })), shortcut: "showKeybinds" },
+  SEPARATOR,
+  ...(update === null ? [] : [
+    item("Check for updates", () => void checkForUpdates(), updateCheckBlockedBy(update)),
+    item("Release notes", () => void openExternalLink(RELEASES_URL))
+  ]),
+  item("About Ballest Editor", () => openDialog({ id: "about" }))
+]
+
+/** File, Edit, View, Project and Help. Every item calls the entry point its keybind or button uses. */
+export const menusOf = (state: MenuState): Menus => ({
+  File: fileMenu(state),
+  Edit: editMenu(state),
+  View: viewMenu(state),
+  Project: projectMenu(state),
+  Help: helpMenu(state)
+})
+
+/**
+ * The menus as they stand. Call it only from what's mounted while a menu is open: it looks through the selection on
+ * every change to it (`selectionPrefabProblem`).
+ */
+export const useMenus = (): Menus => {
+  const canUndo = useEditor((s) => s.past.length > 0 && s.preview === null)
+  const canRedo = useEditor((s) => s.future.length > 0 && s.preview === null)
+  const hasSelection = useEditor((s) => s.selectedIds.length > 0)
+  const { canGroup, canUngroup } = useCanGroup()
+  const canPaste = useEditor((s) => s.clipboard !== null)
+  const canSelectAll = useEditor((s) => s.doc.ids.length > 0)
+  const prefabProblem = useEditor(selectionPrefabProblem)
+  const capabilities = useEditor((s) => s.capabilities)
+  const saveOff = useEditor(saveProblemOf)
+  const exportOff = useEditor(exportProblemOf)
+  const noTabOff = useEditor(noTabOpen) ? NO_TAB_OPEN : null
+  const project = useEditor((s) => s.project)
+  // Re-import needs an export to take the map from
+  const exportedFile = useOpenProjectMap()?.map
+  const reimportable = exportedFile?.link?.export != null ? exportedFile.fileName : null
+  const dockPanels = useViewMenuPanels()
+  const openPanels = useOpenPanels()
+  const { snapping, general } = useEditor((s) => s.settings)
+  const layout = useEditor((s) => s.viewLayout)
+  const projection = useEditor((s) => s.viewLayout.projections[s.activePane] ?? "perspective")
+  const update = useUpdateState()
+  return menusOf({
+    canUndo,
+    canRedo,
+    hasSelection,
+    canGroup,
+    canUngroup,
+    canPaste,
+    canSelectAll,
+    prefabProblem,
+    capabilities,
+    saveOff,
+    exportOff,
+    noTabOff,
+    untitled: project?.current === null,
+    reimportable,
+    recent: project?.recent ?? [],
+    openElsewhere: project?.openElsewhere ?? [],
+    panels: dockPanels.map(({ id, title }) => ({ id, title, open: openPanels.has(id) })),
+    snapping,
+    units: general.units,
+    layout,
+    projection,
+    update
+  })
+}
+
+/** One row a search can find: the menus' leaves, whatever they are in the menu. */
+export interface MenuEntry {
+  readonly label: string
+  /** The menus and sections it's under, the top menu first. */
+  readonly path: ReadonlyArray<string>
+  readonly run: MenuItem["run"]
+  readonly reason: string | null
+  readonly shortcut?: KeybindAction
+  /** Whether it's on, for what can be. */
+  readonly checked?: boolean
+}
+
+const entriesOf = (nodes: ReadonlyArray<MenuNode>, path: ReadonlyArray<string>): ReadonlyArray<MenuEntry> =>
+  nodes.flatMap((node): ReadonlyArray<MenuEntry> => {
+    switch (node.kind) {
+      case "separator":
+        return []
+      case "item":
+        return [{
+          label: node.label,
+          path,
+          run: node.run,
+          reason: node.reason,
+          ...(node.shortcut !== undefined && { shortcut: node.shortcut })
+        }]
+      case "check":
+        return [{ label: node.label, path, run: node.run, reason: null, checked: node.checked }]
+      case "section":
+        return entriesOf(node.children, [...path, node.title])
+      case "submenu":
+        // a submenu that's off has no rows to list, so its title stands in, saying why
+        return node.reason === null
+          ? entriesOf(node.children, [...path, node.title])
+          : [{ label: node.title, path, run: () => {}, reason: node.reason }]
+      case "choice":
+        return node.options.map((option) => ({
+          label: option.label,
+          path: [...path, node.title],
+          run: option.run,
+          reason: null,
+          checked: option.checked,
+          ...(option.shortcut !== undefined && { shortcut: option.shortcut })
+        }))
+    }
+  })
+
+/** Every row of every menu, in menu order. */
+export const menuEntries = (menus: Menus): ReadonlyArray<MenuEntry> =>
+  MENU_TITLES.flatMap((title) => entriesOf(menus[title], [title]))
+
+/** How well `entry` answers the terms, best first: its label starts with them, holds them, or its path does. */
+const matchRank = (entry: MenuEntry, terms: ReadonlyArray<string>): number | null => {
+  const label = entry.label.toLowerCase()
+  const haystack = `${entry.path.join(" ")} ${label}`.toLowerCase()
+  if (!terms.every((term) => haystack.includes(term))) return null
+  if (label.startsWith(terms.join(" "))) return 0
+  return terms.every((term) => label.includes(term)) ? 1 : 2
+}
+
+/**
+ * The entries `query` finds, in menu order within each rank, those that can run first: Enter takes the top one, which
+ * is why a row that's off doesn't lead the list.
+ */
+export const searchMenus = (entries: ReadonlyArray<MenuEntry>, query: string): ReadonlyArray<MenuEntry> => {
+  const terms = termsOf(query)
+  return entries
+    .flatMap((entry) => {
+      const rank = matchRank(entry, terms)
+      return rank === null ? [] : [{ entry, rank: rank * 2 + (entry.reason === null ? 0 : 1) }]
+    })
+    .sort((a, b) => a.rank - b.rank)
+    .map(({ entry }) => entry)
+}

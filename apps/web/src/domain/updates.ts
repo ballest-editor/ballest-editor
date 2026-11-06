@@ -1,8 +1,23 @@
 /** What the page says about the updater outside the status bar, which only shows a release on offer. */
 import type { UpdateState } from "@ballest/contracts"
+import { formatAgo } from "./time"
 
-/** Whether a check can start: main ignores one while a check runs, or once a release is on offer. */
-export const canCheckForUpdates = (state: UpdateState): boolean => state.status === "idle" || state.status === "error"
+/** Why a check can't start, or null when it can: main ignores one while a check runs, or once a release is on offer. */
+export const updateCheckBlockedBy = (state: UpdateState): string | null => {
+  switch (state.status) {
+    case "idle":
+    case "error":
+      return null
+    case "disabled":
+      return state.message ?? "Updates are off."
+    case "checking":
+      return "Already checking for updates."
+    case "available":
+    case "downloading":
+    case "ready":
+      return `${state.availableVersion ?? "A new version"} is available: see the status bar.`
+  }
+}
 
 /** Beside the version in the status bar; null when there's nothing to say, or the update pill is saying it. */
 export const updateStatusOf = (state: UpdateState, checked: boolean): string | null => {
@@ -18,21 +33,16 @@ export const updateStatusOf = (state: UpdateState, checked: boolean): string | n
   }
 }
 
-/** The running version and where the updater is. `checked`: a check the user asked for has finished. */
-export const updateSummaryOf = (state: UpdateState, checked: boolean): string => {
-  const version = `Ballest Editor ${state.currentVersion}.`
+/** The line under About's Check for updates: where the updater stands, and how long ago it last heard from the feed. */
+export const updateCheckLine = (state: UpdateState, now: number): string => {
   switch (state.status) {
-    case "disabled":
-      return `${version} ${state.message ?? "Updates are off."}`
     case "idle":
-      return checked ? `${version} This is the latest version.` : version
+      return state.checkedAt === null ? "Not checked yet" : `Up to date · checked ${formatAgo(state.checkedAt, now)}`
     case "checking":
-      return `${version} Checking for updates…`
+      return "Checking for updates…"
     case "error":
-      return `${version} Couldn't check for updates. Check your connection and try again.`
-    case "available":
-    case "downloading":
-    case "ready":
-      return `${version} ${state.availableVersion ?? "A new version"} is available: see the status bar.`
+      return "Couldn't check for updates"
+    default:
+      return updateCheckBlockedBy(state) ?? ""
   }
 }

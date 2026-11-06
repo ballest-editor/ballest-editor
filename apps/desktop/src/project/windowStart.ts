@@ -1,7 +1,7 @@
 import type { WindowEntry } from "./WindowRegistry"
 
 /** Where a window starts: on `project` (null: Untitled Project), or, when `chooser`, nowhere until the user picks. */
-export interface WindowStart {
+interface WindowStart {
   readonly project: string | null
   readonly chooser: boolean
 }

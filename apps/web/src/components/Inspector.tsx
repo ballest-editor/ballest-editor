@@ -1,80 +1,217 @@
-import { prefabFileNameOf } from "@ballest/contracts"
 import {
-  type Icon,
-  IconArrowsMaximize,
-  IconArrowsMove,
+  IconAlertCircle,
+  IconAlertTriangle,
+  IconChevronRight,
+  IconCircleCheck,
   IconClipboard,
   IconCopy,
-  IconRefresh,
+  IconFolderOpen,
   IconSettings,
-  IconTrash
+  IconTrash,
+  IconUserCircle
 } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/ui/components/collapsible"
 import { Input } from "@workspace/ui/components/input"
-import { Label } from "@workspace/ui/components/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
-import { Separator } from "@workspace/ui/components/separator"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import { useMemo, useState } from "react"
+import { Fragment, type ReactNode, useMemo, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
 import type { UeTransform, Vec3 } from "../domain/coords"
+import { creatorChipText, mapCreatorLabel } from "../domain/creator"
 import { editTransform, isDecal } from "../domain/editTransform"
-import { exactSelectedGroup } from "../domain/groupSelection"
+import { mapLabelOf } from "../domain/factory"
+import { counted, exactSelectedGroup } from "../domain/groupSelection"
 import { type Axis, readField, type TransformField } from "../domain/groupTransform"
-import { selectionProperties } from "../domain/itemProperties"
+import { type PlacedItem, selectionProperties } from "../domain/itemProperties"
 import { formatBindings, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
 import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/MapFile"
-import { formatCreatedAt } from "../domain/time"
+import { assetNameOf } from "../domain/Materials"
+import { pieceNameOf } from "../domain/structure"
+import { createdAtIso, formatAgo, formatDate, formatDateTime } from "../domain/time"
+import type { MapValidation } from "../domain/validateMap"
 import {
   deleteSelection,
   duplicateSelection,
   editSelectionAxis,
   previewSelectionAxis,
+  revealProject,
   setSelectionField
 } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
-import { isMouseEvent } from "../editor/keyTargets"
-import { type PrefabDocument, selectedIndices, useEditor, useOpenPrefab } from "../editor/store"
+import { noTabOpen, selectedIndices, shownValidation, useCreator, useEditor, useOpenPrefab } from "../editor/store"
+import { useNow } from "../editor/useNow"
 import { glbUrl, visualsOf } from "../editor/visuals"
+import { Disclosure } from "./Disclosure"
+import { Fact, Facts } from "./Facts"
 import { FlipSection } from "./FlipSection"
-import { ItemProperties } from "./ItemProperties"
+import { HintBadge } from "./HintBadge"
+import { InfoHint } from "./InfoHint"
+import { ItemProperties, sharedValue } from "./ItemProperties"
+import { ShiftClick } from "./KeyChip"
 import { LightingSettings } from "./LightingSettings"
-import { ShiftClick } from "./MouseButtonIcon"
 import { NumberField } from "./NumberField"
 import { PaintSection } from "./PaintSection"
-import { PathText } from "./PathText"
+import { PathAction, PathText } from "./PathText"
 import { PivotSection } from "./PivotSection"
-import { SectionTitle } from "./SectionTitle"
-import { GroupSection, InstanceSection, ItemTags } from "./StructureSection"
+import { PrefabSettings } from "./PrefabSettings"
+import { Section, SectionHeader, SectionTitle } from "./SectionTitle"
+import { GroupSection, InstanceSection, ItemTags, LabelledField } from "./StructureSection"
 
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
 
-function Facts({ facts }: { readonly facts: ReadonlyArray<readonly [string, string]> }) {
+/** Text with more to say than fits a fact: the rest is in a tooltip. */
+function TipText({ tip, className, children }: {
+  readonly tip: ReactNode
+  readonly className: string
+  readonly children: ReactNode
+}) {
   return (
-    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-      {facts.map(([k, v]) => (
-        <div key={k} className="contents">
-          <dt className="text-muted-foreground">{k}</dt>
-          <dd className="min-w-0">{k === "File" ? <PathText block>{v}</PathText> : v}</dd>
-        </div>
-      ))}
-    </dl>
+    <Tooltip>
+      <TooltipTrigger render={<span className={className} />}>{children}</TooltipTrigger>
+      <TooltipContent side="left" className="flex-col items-start wrap-anywhere">{tip}</TooltipContent>
+    </Tooltip>
   )
 }
 
-/** A definition's tab with nothing selected: what it is. Its name and tier change in the Prefabs panel. */
-function PrefabSettings({ prefab }: { readonly prefab: PrefabDocument }) {
-  const itemCount = useEditor((s) => s.doc.map.items.length)
-  const path = useEditor((s) => s.file?.path ?? null)
+/** The day the map was made, with how long ago and the time of day in the tooltip. */
+function CreatedFact({ createdAt }: { readonly createdAt: string }) {
+  const now = useNow()
+  if (createdAt === "") {
+    return (
+      <Fact label="Created">
+        <span className="text-fg-tertiary">Set on first save</span>
+      </Fact>
+    )
+  }
+  const iso = createdAtIso(createdAt)
+  if (iso === null) return <Fact label="Created">{createdAt}</Fact>
+  const date = formatDate(iso)
+  const ago = formatAgo(iso, now)
   return (
-    <div className="flex flex-col gap-3">
-      <SectionTitle>Prefab {prefab.name}</SectionTitle>
-      <Facts
-        facts={[["Tier", prefab.tier], ["Items", String(itemCount)], ["File", path ?? prefabFileNameOf(prefab.name)]]}
-      />
-    </div>
+    <Fact label="Created">
+      <TipText
+        className="truncate"
+        tip={
+          <>
+            {/* Past a week `formatAgo` gives the date too. */}
+            {ago !== date && <span>Created {ago}</span>}
+            <span>{formatDateTime(iso)}</span>
+          </>
+        }
+      >
+        {date}
+      </TipText>
+    </Fact>
+  )
+}
+
+/** The creator in a pill: the whole name, and where it came from, in the tooltip. */
+function CreatorChip({ name }: { readonly name: string }) {
+  const creator = useCreator()
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={<Badge className="min-w-0 shrink justify-start pl-0.5 [&>svg]:size-4!" />}
+      >
+        <IconUserCircle />
+        <span className="min-w-0 truncate">{creatorChipText(name)}</span>
+      </TooltipTrigger>
+      {/* Above, not to the left, where it would cover the fact's label. */}
+      <TooltipContent className="flex-col items-start wrap-anywhere">
+        <span>{name}</span>
+        <span>{mapCreatorLabel(name, creator)}</span>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+const VALIDATED_HINT =
+  "Validate checks the file against the game's format. Separately, someone finished a validation run of this map in the in-game editor, which set its medal times."
+
+const NOT_VALIDATED_HINT =
+  "Validate checks the file against the game's format. It isn't a validation run, a race of the map in the in-game editor that sets its medal times, and nobody has finished one yet. Ballest Editor can't run one, so open the map in the game."
+
+/** The row's words for a check: the errors if there are any, as the map isn't valid then. */
+const validationLabel = ({ errors, warnings }: MapValidation): string => {
+  if (errors.length > 0) return counted(errors.length, "error")
+  return warnings.length > 0 ? `Valid · ${counted(warnings.length, "warning")}` : "Valid"
+}
+
+const ErrorIcon = () => <IconAlertCircle className="size-4 shrink-0 text-destructive" />
+const WarningIcon = () => <IconAlertTriangle className="size-4 shrink-0 text-status-warn-foreground" />
+
+function ValidationIcon({ errors, warnings }: MapValidation) {
+  if (errors.length > 0) return <ErrorIcon />
+  return warnings.length > 0
+    ? <WarningIcon />
+    : <IconCircleCheck className="size-4 shrink-0 text-status-ok-foreground" />
+}
+
+function ValidationList({ errors, warnings }: MapValidation) {
+  const rows = [
+    ...errors.map((text) => ({ text, icon: <ErrorIcon /> })),
+    ...warnings.map((text) => ({ text, icon: <WarningIcon /> }))
+  ]
+  return (
+    <ScrollArea className="rounded-surface bg-muted ring-edge not-dark:ring-1 [&_[data-slot=scroll-area-viewport]]:max-h-48">
+      <ul className="flex flex-col gap-1 p-2 text-fg-secondary select-text">
+        {rows.map(({ icon, text }) => (
+          <li key={text} className="flex gap-1.5">
+            <span className="flex h-5 items-center">{icon}</span>
+            <span className="min-w-0 wrap-anywhere">{text}</span>
+          </li>
+        ))}
+      </ul>
+    </ScrollArea>
+  )
+}
+
+/**
+ * The map against the game's format, on request. The store keeps the result with the document it was run on, so a
+ * selection that swaps the inspector's sections leaves it, and any edit puts the button back.
+ */
+function StatusFact({ validated }: { readonly validated: boolean }) {
+  const result = useEditor(shownValidation)
+  const validate = useEditor((s) => s.validateDoc)
+  const hint = <InfoHint>{validated ? VALIDATED_HINT : NOT_VALIDATED_HINT}</InfoHint>
+  if (result === undefined) {
+    return (
+      <Fact label="Status">
+        <Button variant="secondary" size="sm" onClick={validate}>Validate</Button>
+        {hint}
+      </Fact>
+    )
+  }
+  const label = (
+    <>
+      <ValidationIcon {...result} />
+      <span className="min-w-0 truncate">{validationLabel(result)}</span>
+    </>
+  )
+  if (result.errors.length + result.warnings.length === 0) {
+    return (
+      <Fact label="Status">
+        {label}
+        {hint}
+      </Fact>
+    )
+  }
+  return (
+    <Collapsible className="contents">
+      <Fact label="Status">
+        <CollapsibleTrigger className="group/status -ml-1 flex h-6 min-w-0 cursor-pointer items-center gap-1 rounded-control px-1 outline-none transition-colors hover:bg-foreground/6 focus-visible:ring-2 focus-visible:ring-ring">
+          {label}
+          <IconChevronRight className="size-4 shrink-0 text-fg-secondary transition-transform group-data-[panel-open]/status:rotate-90" />
+        </CollapsibleTrigger>
+        {hint}
+      </Fact>
+      <CollapsibleContent render={<dd />} className="col-span-2">
+        <ValidationList {...result} />
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
@@ -82,7 +219,8 @@ function MapSettings() {
   const levelData = useEditor((s) => s.doc.map.worldSettings.levelData)
   const itemCount = useEditor((s) => s.doc.map.items.length)
   const hasEditorState = useEditor((s) => s.doc.map.editorState !== undefined)
-  const fileName = useEditor((s) => s.file?.name ?? null)
+  const file = useEditor((s) => s.file)
+  const projects = useEditor((s) => s.capabilities.projects)
   const renameLevel = useEditor((s) => s.renameLevel)
   const openDialog = useEditor((s) => s.openDialog)
   // An edit in progress; otherwise the input shows the map's name.
@@ -92,81 +230,103 @@ function MapSettings() {
     if (name !== levelData.levelDisplayName) renameLevel(name, levelData.creatorName)
     setDraft(null)
   }
-  const facts: ReadonlyArray<readonly [string, string]> = [
-    ["Creator", levelData.creatorName || "set in Settings › General"],
-    ["Items", String(itemCount)],
-    ["Created", levelData.createdAt ? formatCreatedAt(levelData.createdAt) : "on export"],
-    ["Validated", levelData.bValidated ? "yes" : "no"],
-    ["File", fileName === null ? "not saved yet" : `${fileName}${hasEditorState ? "" : " (no editorState)"}`]
-  ]
   return (
     <div className="flex flex-col gap-3">
-      <div className="-my-1.5 flex items-center justify-between">
-        <SectionTitle>Map</SectionTitle>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground"
-                aria-label="Map settings"
-                onClick={() => openDialog({ id: "mapSettings" })}
-              />
-            }
-          >
-            <IconSettings />
-          </TooltipTrigger>
-          <TooltipContent side="left">Map settings</TooltipContent>
-        </Tooltip>
-      </div>
-      <div className="flex flex-col gap-1">
-        <Label htmlFor="map-name" className="text-muted-foreground">Name</Label>
-        <Input id="map-name" value={name} onChange={(e) => setDraft(e.target.value)} onBlur={commit} />
-      </div>
-      <Facts facts={facts} />
+      <SectionHeader title="Map">
+        <PathAction label="Map settings" icon={IconSettings} onClick={() => openDialog({ id: "mapSettings" })} />
+      </SectionHeader>
+      <LabelledField id="map-name" label="Name">
+        <Input
+          id="map-name"
+          value={name}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+        />
+      </LabelledField>
+      <Facts>
+        <Fact label="Creator">
+          {levelData.creatorName === ""
+            ? (
+              <>
+                <span className="text-fg-tertiary">Not set</span>
+                <InfoHint>Your creator name is set in Settings › General.</InfoHint>
+              </>
+            )
+            : <CreatorChip name={levelData.creatorName} />}
+        </Fact>
+        <Fact label="Items">{itemCount.toLocaleString()}</Fact>
+        <CreatedFact createdAt={levelData.createdAt} />
+        <StatusFact validated={levelData.bValidated} />
+        <Fact label="File">
+          {file === null ? <span className="text-fg-tertiary">Not saved yet</span> : (
+            <>
+              <TipText
+                className="min-w-0 truncate"
+                tip={
+                  <>
+                    <span>{file.path ?? file.name}</span>
+                    {!hasEditorState && <span>A published map: it holds no in-game editor state.</span>}
+                  </>
+                }
+              >
+                {mapLabelOf(file.name)}
+              </TipText>
+              {projects && file.path !== null && (
+                <PathAction
+                  label="Reveal in folder"
+                  icon={IconFolderOpen}
+                  onClick={() => void revealProject()}
+                  className="ml-auto"
+                />
+              )}
+            </>
+          )}
+        </Fact>
+      </Facts>
     </div>
   )
-}
-
-/** The value all items share, or null when they differ (shown as mixed). */
-const shared = (values: ReadonlyArray<number>): number | null => {
-  const first = values[0]
-  return first !== undefined && values.every((v) => v === first) ? first : null
 }
 
 /** One X/Y/Z row of the transform: which field, how it's labelled, and its display precision. */
 interface TransformRowSpec {
   readonly field: TransformField
-  readonly title: string
-  readonly icon: Icon
-  readonly labels: Readonly<Record<Axis, string>>
+  readonly label: string
+  readonly unit: string
+  /** What the row's values mean, in the label's tooltip. */
+  readonly help: string
+  /** Each field's accessible name; the field itself shows the axis. */
+  readonly axisLabels: Readonly<Record<Axis, string>>
   readonly step: number
   readonly digits: number
 }
 
+const AXIS_LABELS: Readonly<Record<Axis, string>> = { x: "X", y: "Y", z: "Z" }
+
 const transformRows = (units: "cm" | "m"): ReadonlyArray<TransformRowSpec> => [
   {
     field: "translation",
-    title: `Location (game ${units}, Z up)`,
-    icon: IconArrowsMove,
-    labels: { x: "X", y: "Y", z: "Z" },
+    label: "Location",
+    unit: units,
+    help: `In the game's ${units === "m" ? "metres" : "centimetres"}, Z up`,
+    axisLabels: AXIS_LABELS,
     step: units === "m" ? 0.01 : 1,
     digits: units === "m" ? 3 : 1
   },
   {
     field: "rotation",
-    title: "Rotation (degrees: roll, pitch, yaw)",
-    icon: IconRefresh,
-    labels: { x: "X roll", y: "Y pitch", z: "Z yaw" },
+    label: "Rotation",
+    unit: "°",
+    help: "Degrees: roll, pitch, yaw",
+    axisLabels: { x: "X roll", y: "Y pitch", z: "Z yaw" },
     step: 1,
     digits: 1
   },
   {
     field: "scale3D",
-    title: "Scale",
-    icon: IconArrowsMaximize,
-    labels: { x: "X", y: "Y", z: "Z" },
+    label: "Scale",
+    unit: "×",
+    help: "A factor of the piece's own size",
+    axisLabels: AXIS_LABELS,
     step: 0.01,
     digits: 2
   }
@@ -175,25 +335,26 @@ const transformRows = (units: "cm" | "m"): ReadonlyArray<TransformRowSpec> => [
 /** A decal's scale is its size (domain/editTransform.ts): cm, so a factor's step would crawl. */
 const DECAL_SIZE_ROW: TransformRowSpec = {
   field: "scale3D",
-  title: "Size (cm: height, width, depth)",
-  icon: IconArrowsMaximize,
-  labels: { x: "X", y: "Y", z: "Z" },
+  label: "Size",
+  unit: "cm",
+  help: "Centimetres: height, width, depth",
+  axisLabels: AXIS_LABELS,
   step: 1,
   digits: 1
 }
 
-const rowName = (
-  field: TransformField
-) => (field === "translation" ? "location" : field === "scale3D" ? "scale" : field)
+const FIELD_HELP =
+  "Drag a field to change it: Shift ×10, Alt ×0.1. Type +50, -20, *2 or /2 to change what's there, =-20 to set a negative."
 
 /** Copied rows in stored units (cm, degrees, factor), shared by every selection. */
 const copiedRows = new Map<TransformField, Vec3>()
 
 /**
- * One editable row over the whole selection: a label icon whose menu (or Shift+click
- * shortcuts) copies and pastes all three axes, then an X/Y/Z field each. A typed value sets
- * every selected item; a scrub moves or turns the selection together like the gizmo, so a
- * mixed selection keeps its spread; with snapping on, a scrub lands on the grid or rotation step
+ * One editable row over the whole selection: its name and unit, a button whose menu (or
+ * Shift+click shortcuts) copies and pastes all three axes, then an X/Y/Z field each, side by side
+ * while a big coordinate still fits. A typed value sets
+ * every selected item; a scrub, or a `+` or `-` typed into a mixed field, moves or turns the selection together like the
+ * gizmo, so a mixed selection keeps its spread; with snapping on, a scrub lands on the grid or rotation step
  * (a mixed selection moves in whole steps). `perUnit` converts display units to the stored value.
  */
 function TransformRow(props: {
@@ -215,196 +376,280 @@ function TransformRow(props: {
     ? snapping.rotationStep
     : undefined
   const [open, setOpen] = useState(false)
+  const rowName = row.label.toLowerCase()
   const copy = () => {
     copiedRows.set(field, readField(props.active, field))
-    notify("info", `Copied ${rowName(field)}.`)
+    notify("info", `Copied ${rowName}.`)
   }
   const paste = () => {
     const copied = copiedRows.get(field)
-    if (copied === undefined) notify("info", `Nothing copied for ${rowName(field)} yet.`)
+    if (copied === undefined) notify("info", `Nothing copied for ${rowName} yet.`)
     else setSelectionField(field, copied)
   }
   return (
-    <div className="contents">
-      <Popover
-        open={open}
-        onOpenChange={(next, details) => {
-          // Shift+click pastes instead of opening the menu
-          if (next && isMouseEvent(details.event) && details.event.shiftKey) return
-          setOpen(next)
-        }}
-      >
+    <div className="flex flex-col gap-0.5">
+      <div className="flex h-5 items-center justify-between gap-2">
         <Tooltip>
-          <TooltipTrigger
-            delay={500}
-            render={
-              <PopoverTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={row.title}
-                    onClick={(e) => {
-                      if (e.shiftKey) paste()
-                    }}
-                    onContextMenu={(e) => {
-                      if (!e.shiftKey) return
-                      e.preventDefault()
-                      copy()
-                    }}
-                  />
-                }
-              />
-            }
-          >
-            <row.icon />
+          <TooltipTrigger render={<span className="text-body text-fg-secondary" />}>
+            {row.label} <span className="text-caption text-fg-tertiary">{row.unit}</span>
           </TooltipTrigger>
-          <TooltipContent side="left" sideOffset={8} className="flex flex-col items-start py-2 pr-3 pl-2.5">
-            <div className="font-medium">{row.title}</div>
-            <div className="mt-1.5 grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-1 opacity-80">
-              <span>Copy</span>
-              <ShiftClick button="right" />
-              <span>Paste</span>
-              <ShiftClick button="left" />
-            </div>
+          <TooltipContent side="left" className="flex-col items-start">
+            <span>{row.help}</span>
+            <span>{FIELD_HELP}</span>
           </TooltipContent>
         </Tooltip>
-        <PopoverContent side="left" align="start" className="w-auto gap-1 p-1">
-          <div className="px-2 py-1 text-xs text-muted-foreground">{row.title}</div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="justify-between gap-4"
-            onClick={() => {
-              copy()
-              setOpen(false)
-            }}
-          >
-            <span className="flex items-center gap-2">
-              <IconCopy />Copy X, Y, Z
-            </span>
-            <ShiftClick button="right" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="justify-between gap-4"
-            disabled={copiedRows.get(field) === undefined}
-            onClick={() => {
-              paste()
-              setOpen(false)
-            }}
-          >
-            <span className="flex items-center gap-2">
-              <IconClipboard />Paste
-            </span>
-            <ShiftClick button="left" />
-          </Button>
-        </PopoverContent>
-      </Popover>
-      {axes.map((axis) => {
-        const value = shared(props.shown.map((t) => readField(t, field)[axis] / perUnit))
-        const offset = (v: number, from: number) => ({ kind: "offset", by: (v - from) * perUnit }) as const
-        return (
-          <NumberField
-            key={axis}
-            label={row.labels[axis]}
-            value={value}
-            onCommit={(v) => editSelectionAxis(field, axis, { kind: "set", value: v * perUnit })}
-            onScrub={(v, from) => previewSelectionAxis(field, axis, v === null ? null : offset(v, from))}
-            onScrubCommit={(v, from) => editSelectionAxis(field, axis, offset(v, from))}
-            step={row.step}
-            snap={snap}
-            digits={row.digits}
-            handleClassName={AXIS_BG_CLASSES[axis]}
-          />
-        )
-      })}
+        <Popover
+          open={open}
+          onOpenChange={(next, details) => {
+            // Shift+click pastes instead of opening the menu
+            if (next && details.event instanceof MouseEvent && details.event.shiftKey) return
+            setOpen(next)
+          }}
+        >
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <PopoverTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-fg-tertiary"
+                      aria-label={`Copy or paste ${rowName}`}
+                      onClick={(e) => {
+                        if (e.shiftKey) paste()
+                      }}
+                      onContextMenu={(e) => {
+                        if (!e.shiftKey) return
+                        e.preventDefault()
+                        copy()
+                      }}
+                    />
+                  }
+                />
+              }
+            >
+              <IconClipboard />
+            </TooltipTrigger>
+            <TooltipContent side="left" sideOffset={8} className="flex flex-col items-start py-2 pr-3 pl-2.5">
+              <div className="text-body-strong">Copy / paste axis values</div>
+              <div className="mt-1.5 grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-1 opacity-80">
+                <span>Copy</span>
+                <ShiftClick button="right" />
+                <span>Paste</span>
+                <ShiftClick button="left" />
+              </div>
+            </TooltipContent>
+          </Tooltip>
+          <PopoverContent side="left" align="start" className="w-auto gap-1 p-1">
+            <div className="px-2 py-1 text-body text-fg-secondary">{row.label}</div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="justify-between gap-4"
+              onClick={() => {
+                copy()
+                setOpen(false)
+              }}
+            >
+              <span className="flex items-center gap-2">
+                <IconCopy />Copy X, Y, Z
+              </span>
+              <ShiftClick button="right" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="justify-between gap-4"
+              disabled={copiedRows.get(field) === undefined}
+              onClick={() => {
+                paste()
+                setOpen(false)
+              }}
+            >
+              <span className="flex items-center gap-2">
+                <IconClipboard />Paste
+              </span>
+              <ShiftClick button="left" />
+            </Button>
+          </PopoverContent>
+        </Popover>
+      </div>
+      <div className="grid grid-cols-3 gap-1 @max-[16rem]:grid-cols-1">
+        {axes.map((axis) => {
+          const value = sharedValue(props.shown.map((t) => readField(t, field)[axis] / perUnit)) ?? null
+          const offset = (v: number, from: number) => ({ kind: "offset", by: (v - from) * perUnit }) as const
+          return (
+            <NumberField
+              key={axis}
+              label={row.axisLabels[axis]}
+              value={value}
+              onCommit={(v) => editSelectionAxis(field, axis, { kind: "set", value: v * perUnit })}
+              onScrub={(v, from) => previewSelectionAxis(field, axis, v === null ? null : offset(v, from))}
+              onScrubCommit={(v, from) => editSelectionAxis(field, axis, offset(v, from))}
+              onMixedOffset={(by) => editSelectionAxis(field, axis, offset(by, 0))}
+              step={row.step}
+              snap={snap}
+              digits={row.digits}
+              handleClassName={AXIS_BG_CLASSES[axis]}
+              handleText={AXIS_LABELS[axis]}
+            />
+          )
+        })}
+      </div>
     </div>
   )
 }
 
+/** Duplicate and Delete as icon buttons, for a section's header; both also have a shortcut and the context menu. */
 function SelectionActions() {
   const keybinds = useEditor((s) => s.keybinds)
   const shortcut = (action: KeybindAction) => `${keybindActionLabels[action]} (${formatBindings(keybinds[action])})`
   return (
-    <div className="flex gap-2">
-      <Button variant="outline" size="sm" title={shortcut("duplicateSelection")} onClick={duplicateSelection}>
-        <IconCopy />
-        Duplicate
-      </Button>
-      <Button variant="destructive" size="sm" title={shortcut("deleteSelection")} onClick={deleteSelection}>
-        <IconTrash />
-        Delete
-      </Button>
-    </div>
-  )
-}
-
-/** What's selected: one item's class (and index), or a count with the classes involved. */
-function SelectionHeader(
-  { items }: { readonly items: ReadonlyArray<{ readonly index: number; readonly item: Item }> }
-) {
-  const only = items.length === 1 ? items[0] : undefined
-  const counts = new Map<string, number>()
-  for (const { item } of items) {
-    const name = classNameOf(item.actorToSpawn)
-    counts.set(name, (counts.get(name) ?? 0) + 1)
-  }
-  return (
     <>
-      <SectionTitle>{only === undefined ? `${items.length} items selected` : `Item #${only.index}`}</SectionTitle>
-      {only === undefined
-        ? (
-          <ul className="flex flex-col gap-0.5 text-xs break-all">
-            {[...counts].map(([name, n]) => (
-              <li key={name}>
-                <span className="font-semibold">{name}</span>
-                <span className="ml-1 text-muted-foreground">× {n}</span>
-              </li>
-            ))}
-          </ul>
-        )
-        : (
-          <div className="text-sm font-semibold break-all" title={only.item.actorToSpawn}>
-            {classNameOf(only.item.actorToSpawn)}
-          </div>
-        )}
-      {items.some(({ item }) => isPlayerStart(item)) && <Badge variant="secondary">Player start (required)</Badge>}
+      <PathAction label={shortcut("duplicateSelection")} icon={IconCopy} onClick={duplicateSelection} />
+      <PathAction
+        label={shortcut("deleteSelection")}
+        icon={IconTrash}
+        onClick={deleteSelection}
+        className="hover:text-destructive"
+      />
     </>
   )
 }
 
-function Meshes({ item }: { readonly item: Item }) {
+/** The pieces in a selection, by name, with how many of each. */
+function PieceCounts({ items }: { readonly items: ReadonlyArray<Item> }) {
+  const catalogIndex = useEditor((s) => s.catalogIndex)
+  const counts = new Map<string, number>()
+  for (const item of items) {
+    const name = pieceNameOf(item, catalogIndex)
+    counts.set(name, (counts.get(name) ?? 0) + 1)
+  }
+  return (
+    <ul className="flex flex-col gap-0.5 text-body">
+      {[...counts].map(([name, n]) => (
+        <li key={name} className="break-words">
+          {name}
+          {n > 1 && <span className="ml-1 text-fg-tertiary">× {n}</span>}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Meshes the viewport couldn't load, for the top of the Inspector: it's the one thing here that needs acting on. */
+function MeshWarning({ item }: { readonly item: Item }) {
   const catalogIndex = useEditor((s) => s.catalogIndex)
   const missing = useEditor((s) => s.missingGlbs)
   const failed = visualsOf(item, catalogIndex).flatMap((v) => {
     const url = glbUrl(v.mesh?.glb)
-    return url !== undefined && missing.has(url)
-      ? [`${v.mesh?.meshAssetPath.split(".").at(-1)}: mesh failed to load`]
-      : []
+    return url !== undefined && missing.has(url) ? [assetNameOf(v.mesh?.meshAssetPath ?? "")] : []
   })
+  if (failed.length === 0) return null
+  return (
+    <Badge variant="destructive" title={failed.join("\n")}>
+      {failed.length === 1 ? "A mesh failed to load" : `${failed.length} meshes failed to load`}
+    </Badge>
+  )
+}
+
+const PLAYER_START_HINT =
+  "A map has exactly one player start. Copy, Cut and Duplicate leave it out, and if you delete it, Save and Export refuse the map until Undo brings it back."
+
+/** What's selected: one item's piece, under its category, or a count with the pieces involved. */
+function SelectionHeader(
+  { items, itemKey }: { readonly items: ReadonlyArray<Item>; readonly itemKey: string | undefined }
+) {
+  const catalogIndex = useEditor((s) => s.catalogIndex)
+  const ownName = useEditor((s) => itemKey === undefined ? undefined : s.doc.structure.items.get(itemKey)?.name)
+  const only = items.length === 1 ? items[0] : undefined
+  const category = only === undefined ? undefined : catalogIndex?.pieceByClass.get(only.actorToSpawn)?.category
   return (
     <>
-      {failed.map((w) => <Badge key={w} variant="destructive">{w}</Badge>)}
-      <SectionTitle>Meshes</SectionTitle>
-      {item.meshComponents.map((mesh, i) => (
-        // oxlint-disable-next-line react/no-array-index-key -- mesh components have no id; the slot index is their identity
-        <div key={i} className="flex flex-col gap-1 text-xs break-all">
-          <div className="font-mono" title={mesh.meshAssetPath}>
-            {mesh.meshAssetPath === undefined || mesh.meshAssetPath === ""
-              ? "(no main mesh)"
-              : mesh.meshAssetPath.split("/").at(-1)}
-          </div>
-          <ul className="flex flex-col gap-0.5 pl-2 font-mono text-muted-foreground">
+      <SectionHeader title={only === undefined ? `${items.length} items selected` : category || "Piece"}>
+        <SelectionActions />
+      </SectionHeader>
+      {only === undefined
+        ? <PieceCounts items={items} />
+        : <div className="text-body-strong break-words">{ownName ?? pieceNameOf(only, catalogIndex)}</div>}
+      {items.some(isPlayerStart) && <HintBadge label="Player start (required)">{PLAYER_START_HINT}</HintBadge>}
+      {only !== undefined && <MeshWarning item={only} />}
+    </>
+  )
+}
+
+/** The identifiers behind a single item, for when something needs looking up. Closed unless asked for. */
+function ItemDetails({ item, index }: { readonly item: Item; readonly index: number }) {
+  return (
+    <Disclosure title="Details">
+      <Facts>
+        <Fact label="Class">
+          <span className="min-w-0 break-all">{classNameOf(item.actorToSpawn)}</span>
+        </Fact>
+        <Fact label="Asset">
+          <PathText>{objectPathOf(item.actorToSpawn)}</PathText>
+        </Fact>
+        <Fact label="Index">{index}</Fact>
+        {item.meshComponents.map((mesh, i) => (
+          // oxlint-disable-next-line react/no-array-index-key -- mesh components have no id; the slot index is their identity
+          <Fragment key={i}>
+            <Fact label="Mesh">
+              {mesh.meshAssetPath === undefined || mesh.meshAssetPath === ""
+                ? <span className="text-fg-tertiary">No main mesh</span>
+                : (
+                  <span className="min-w-0 break-all" title={mesh.meshAssetPath}>
+                    {assetNameOf(mesh.meshAssetPath)}
+                  </span>
+                )}
+            </Fact>
             {mesh.materials.map((m) => (
-              <li key={m.materialIndex} title={m.material}>
-                {m.materialIndex}: {objectPathOf(m.material).split(".").at(-1)}
-              </li>
+              <Fact key={m.materialIndex} label={`Paint ${m.materialIndex + 1}`}>
+                <span className="min-w-0 break-all" title={m.material}>{assetNameOf(m.material)}</span>
+              </Fact>
             ))}
-          </ul>
+          </Fragment>
+        ))}
+      </Facts>
+    </Disclosure>
+  )
+}
+
+/** Everything that edits the selection's items, all of them at once. */
+function ItemEditor({ items, ids, transforms, placed }: {
+  readonly items: ReadonlyArray<Item>
+  readonly ids: ReadonlyArray<string>
+  readonly transforms: ReadonlyArray<UeTransform>
+  readonly placed: ReadonlyArray<PlacedItem>
+}) {
+  const units = useEditor((s) => s.settings.general.units)
+  // Display units only; the map always stores centimetres (rotation and scale don't convert).
+  const perUnit = units === "m" ? 100 : 1
+  const active = items.at(-1)
+  if (active === undefined) return null
+  return (
+    <>
+      <Section>
+        <SectionTitle>Transform</SectionTitle>
+        <div className="flex @container flex-col gap-2">
+          {transformRows(units).map((row) => (
+            <TransformRow
+              key={row.field}
+              row={row.field === "scale3D" && items.every(isDecal) ? DECAL_SIZE_ROW : row}
+              shown={transforms}
+              active={editTransform(active)}
+              perUnit={row.field === "translation" ? perUnit : 1}
+            />
+          ))}
+          <FlipSection items={placed} />
         </div>
-      ))}
+      </Section>
+      <PivotSection />
+      <Section>
+        <SectionTitle>Paint</SectionTitle>
+        <PaintSection selected={items.map((item, i) => ({ item, id: ids[i] ?? "" }))} />
+      </Section>
+      <ItemProperties properties={selectionProperties(placed)} />
     </>
   )
 }
@@ -427,7 +672,6 @@ export function Inspector() {
     () => items.map((item, i) => preview?.get(ids[i] ?? "") ?? editTransform(item)),
     [items, ids, preview]
   )
-  const units = useEditor((s) => s.settings.general.units)
   const catalogIndex = useEditor((s) => s.catalogIndex)
   const tree = useEditor((s) => s.doc.structure.tree)
   const selectedIds = useEditor((s) => s.selectedIds)
@@ -438,18 +682,23 @@ export function Inspector() {
   )
 
   const prefab = useOpenPrefab()
+  const noTab = useEditor(noTabOpen)
   const first = items[0]
+  if (noTab) {
+    return <div className="flex h-full items-center justify-center bg-card p-4 text-fg-tertiary">Nothing selected</div>
+  }
   if (first === undefined) {
     return (
       <ScrollArea className="h-full bg-card">
-        <div className="flex flex-col gap-3 p-3">
+        <div className="flex flex-col gap-5 p-3">
           {prefab === null
             ? (
               <>
                 <MapSettings />
-                <Separator />
-                <SectionTitle>Lighting</SectionTitle>
-                <LightingSettings />
+                <Section>
+                  <SectionTitle>Lighting</SectionTitle>
+                  <LightingSettings />
+                </Section>
               </>
             )
             : <PrefabSettings prefab={prefab} />}
@@ -458,56 +707,44 @@ export function Inspector() {
     )
   }
 
-  // Display units only; the map always stores centimetres (rotation and scale don't convert).
-  const perUnit = units === "m" ? 100 : 1
-  const active = items.at(-1) ?? first
   const placed = items.map((item) => ({ item, piece: catalogIndex?.pieceByClass.get(item.actorToSpawn) }))
+  const editor = <ItemEditor items={items} ids={ids} transforms={transforms} placed={placed} />
 
   return (
     <ScrollArea className="h-full bg-card">
-      <div className="flex flex-col gap-3 p-3">
-        {group !== undefined && (
-          <>
-            {group.prefab !== undefined && <InstanceSection group={group} link={group.prefab} />}
-            <GroupSection key={group.id} group={group} />
-            <Separator />
-          </>
-        )}
-        <SelectionHeader items={items.map((item, i) => ({ item, index: indices[i] ?? -1 }))} />
-        <SelectionActions />
-        {items.length === 1 && ids[0] !== undefined && <ItemTags itemKey={ids[0]} />}
-
-        <Separator />
-        <SectionTitle>Transform</SectionTitle>
-        <div className="flex flex-col gap-2">
-          <div className="grid grid-cols-[auto_1fr_1fr_1fr] items-center gap-1">
-            {transformRows(units).map((row) => (
-              <TransformRow
-                key={row.field}
-                row={row.field === "scale3D" && items.every(isDecal) ? DECAL_SIZE_ROW : row}
-                shown={transforms}
-                active={editTransform(active)}
-                perUnit={row.field === "translation" ? perUnit : 1}
-              />
-            ))}
-          </div>
-          <FlipSection items={placed} />
-        </div>
-
-        <Separator />
-        <PivotSection />
-
-        <Separator />
-        <SectionTitle>Paint</SectionTitle>
-        <PaintSection selected={items.map((item, i) => ({ item, id: ids[i] ?? "" }))} />
-        <ItemProperties properties={selectionProperties(placed)} />
-
-        {items.length === 1 && (
-          <>
-            <Separator />
-            <Meshes item={first} />
-          </>
-        )}
+      <div className="flex flex-col gap-5 p-3">
+        {group === undefined
+          ? (
+            <>
+              <Section>
+                <SelectionHeader items={items} itemKey={items.length === 1 ? ids[0] : undefined} />
+                {items.length === 1 && ids[0] !== undefined && <ItemTags itemKey={ids[0]} />}
+              </Section>
+              {editor}
+              {items.length === 1 && <ItemDetails item={first} index={indices[0] ?? -1} />}
+            </>
+          )
+          : (
+            // A group is one thing with a name, so it's summed up; its items stay a click away, edited all at once.
+            <>
+              <GroupSection
+                key={group.id}
+                group={group}
+                items={items}
+                transforms={transforms}
+                actions={<SelectionActions />}
+              >
+                <PieceCounts items={items} />
+              </GroupSection>
+              {group.prefab !== undefined && <InstanceSection group={group} link={group.prefab} />}
+              <Disclosure
+                key={`${group.id}/items`}
+                title={items.length === 1 ? "Edit its item" : `Edit all ${items.length} items`}
+              >
+                {editor}
+              </Disclosure>
+            </>
+          )}
       </div>
     </ScrollArea>
   )

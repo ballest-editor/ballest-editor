@@ -1,4 +1,4 @@
-import { type Icon, IconRestore, IconSearch } from "@tabler/icons-react"
+import { type Icon, IconInfoCircle, IconRestore, IconSearch } from "@tabler/icons-react"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -12,7 +12,23 @@ import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { Fragment, type ReactNode, useState } from "react"
+import { type ComponentProps, Fragment, type ReactNode, useState } from "react"
+import { termsOf } from "../domain/outline"
+
+/** The page or scope that's open in the sidebar: the selection's wash, which a hover doesn't change. */
+const SELECTED = "bg-selected text-foreground hover:bg-selected"
+
+/** A search box with its icon: `className` is for the box, `inputClassName` and the rest for the input. */
+export function SearchField({ className, inputClassName, ...input }: ComponentProps<typeof Input> & {
+  readonly inputClassName?: string
+}) {
+  return (
+    <div className={cn("relative", className)}>
+      <IconSearch className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-fg-secondary" />
+      <Input className={cn("pl-7", inputClassName)} {...input} />
+    </div>
+  )
+}
 
 /** One searchable setting. `group` is a sub-heading inside the category (keybind sections). */
 export interface SettingsRow<C extends string> {
@@ -20,13 +36,18 @@ export interface SettingsRow<C extends string> {
   readonly category: C
   readonly group?: string
   readonly label: string
-  /** Under the label; a string is searched too, a node (a path on its own line) needs `keywords` for that. */
+  /** One short line under the label; a string is searched too, a node needs `keywords` for that. */
   readonly description?: ReactNode
+  /** What goes under the description, on a line of its own (a folder's breadcrumb); put its text in `keywords`. */
+  readonly detail?: ReactNode
+  /** The mechanics behind the short line, in the tooltip of an info icon beside the label; a string is searched too. */
+  readonly info?: ReactNode
+  /** A status icon before the label. The control then sits on the label's line, not centred on the row. */
+  readonly icon?: ReactNode
   /** Description shown as a hover tooltip on the label instead of under it. */
   readonly tooltip?: boolean
   /** More text the search matches (e.g. the choices inside the control). */
   readonly keywords?: string
-  readonly disabled?: boolean
   /**
    * For settings with a default: whether it differs (a dot marks the row and its category)
    * and how to put it back. Rows without one (things the user writes, like a map's name)
@@ -48,6 +69,14 @@ export interface SettingsCategoryInfo<C extends string> {
   readonly section?: string
 }
 
+/** Settings that wait for Save: the footer has Revert and Save in place of Done, and a dot marks each page they touch. */
+interface SettingsSave<C extends string> {
+  /** The pages with unsaved edits, each with a dot. Empty, Revert and Save are off. */
+  readonly unsaved: ReadonlySet<C>
+  readonly onSave: () => void
+  readonly onRevert: () => void
+}
+
 const isModified = (row: SettingsRow<string>): boolean => row.changes?.modified === true
 
 function ResetButton({ modified, reset }: NonNullable<SettingsRow<string>["changes"]>) {
@@ -58,24 +87,41 @@ function ResetButton({ modified, reset }: NonNullable<SettingsRow<string>["chang
           <Button
             variant="ghost"
             size="icon-sm"
-            className={cn("size-6 text-muted-foreground", !modified && "invisible")}
+            className={cn("text-fg-secondary", !modified && "invisible")}
             onClick={reset}
             aria-label="Reset to default"
             tabIndex={modified ? 0 : -1}
           />
         }
       >
-        <IconRestore className="size-3.5" />
+        <IconRestore />
       </TooltipTrigger>
       <TooltipContent side="left">Reset to default</TooltipContent>
     </Tooltip>
   )
 }
 
+function InfoTip({ label, children }: { readonly label: string; readonly children: ReactNode }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" className="-my-0.5 text-fg-tertiary" aria-label={`About ${label}`} />
+        }
+      >
+        <IconInfoCircle />
+      </TooltipTrigger>
+      <TooltipContent side="right" className="max-w-xs">{children}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 function RowView({ row }: { readonly row: SettingsRow<string> }) {
-  const label = (
-    <span className={cn("text-xs font-medium", row.disabled && "text-muted-foreground")}>
-      {row.label}
+  const name = <span className="text-body-strong">{row.label}</span>
+  const label = row.info == null ? name : (
+    <span className="flex items-center gap-0.5">
+      {name}
+      <InfoTip label={row.label}>{row.info}</InfoTip>
     </span>
   )
   const text = (
@@ -85,7 +131,7 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
           <Tooltip>
             <TooltipTrigger
               render={
-                <span className="w-fit cursor-help underline decoration-dotted decoration-muted-foreground/50 underline-offset-4" />
+                <span className="w-fit cursor-help underline decoration-dotted decoration-fg-tertiary/50 underline-offset-4" />
               }
             >
               {label}
@@ -95,16 +141,15 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
         )
         : label}
       {!row.tooltip && row.description !== undefined && (
-        <span className={cn("text-[0.6875rem] text-muted-foreground", row.disabled && "opacity-60")}>
-          {row.description}
-        </span>
+        <span className="text-caption text-fg-tertiary">{row.description}</span>
       )}
+      {row.detail}
     </div>
   )
   const trailing = row.action ?? (row.changes && <ResetButton {...row.changes} />)
   return (
-    // The same padding above and below every row, so the dividers sit evenly between them; a wide control (a field, the
-    // tag chips) has an edge of its own, so it gets a little more room before the divider than text does.
+    // The same padding above and below every row, so they sit evenly in their group; a wide control (a field, the tag
+    // chips) has an edge of its own, so it gets a little more room below than text does.
     <div
       className={cn("group/row relative flex flex-col gap-2.5 py-3 pl-3", row.wide && row.control != null && "pb-4")}
     >
@@ -114,7 +159,7 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
             render={
               <span
                 className={cn(
-                  "absolute left-0 size-1.5 -translate-y-1/2 rounded-full bg-primary",
+                  "absolute left-1 size-1.5 -translate-y-1/2 rounded-full bg-fg-tertiary",
                   row.wide ? "top-[1.3rem]" : "top-1/2"
                 )}
                 aria-label="Changed from default"
@@ -138,8 +183,13 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
           </>
         )
         : (
-          <div className="flex min-h-7 items-center gap-6">
-            {text}
+          <div className={cn("flex min-h-7 gap-6", row.icon == null ? "items-center" : "items-start")}>
+            {row.icon == null ? text : (
+              <div className="flex min-w-0 flex-1 items-start gap-2">
+                {row.icon}
+                {text}
+              </div>
+            )}
             <div className="flex shrink-0 items-center gap-2">
               {row.control}
               {trailing}
@@ -152,36 +202,44 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
 
 /**
  * Desktop-style settings: category nav with search on the left, the category's rows on the
- * right, a footer with an optional "reset category" and Done. Changes apply as they are made.
+ * right, a footer with an optional "reset category" and Done. Changes apply as they are made, unless `save` holds them.
  */
 export function SettingsShell<C extends string>(props: {
   readonly open: boolean
   readonly onClose: () => void
   /** The dialog's name, the first breadcrumb ("Settings", "Project settings"). */
   readonly title: string
+  /** The breadcrumbs between the title and the page ("Harbor Loop"): the shell draws every separator. A search has its own. */
+  readonly crumbs?: ReadonlyArray<string>
   /** For screen readers: what these settings are. */
   readonly description: string
   readonly categories: ReadonlyArray<SettingsCategoryInfo<C>>
   readonly category: C
   readonly onCategoryChange: (category: C) => void
   readonly rows: ReadonlyArray<SettingsRow<C>>
-  /** Resets the shown category; without it the footer has no reset button. */
+  /** Resets the shown category; without it the footer has no reset button, and searching hides the button. */
   readonly onResetCategory?: (category: C) => void
+  /** What the shown category adds to the footer, before Done (Check again); searching shows no category, so not then. */
+  readonly footerAction?: ReactNode
   /** Keeps the dialog open and Done disabled (e.g. while a keybind is being captured). */
   readonly busy?: boolean
+  /** Edits wait for Save, instead of applying as they are made. */
+  readonly save?: SettingsSave<C>
+  /** A dialog that opens over this one; inside its root, so Escape and a click outside it leave this one open. */
+  readonly children?: ReactNode
 }) {
   const [query, setQuery] = useState("")
   /** While searching, a category narrows the results; null shows every match. */
   const [scope, setScope] = useState<C | null>(null)
   const labelOf = (category: C) => props.categories.find((c) => c.id === category)?.label ?? category
 
-  const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 0)
+  const terms = termsOf(query)
   const searching = terms.length > 0
   const matches = (r: SettingsRow<C>) =>
     terms.every((t) =>
-      `${r.label} ${typeof r.description === "string" ? r.description : ""} ${r.group ?? ""} ${r.keywords ?? ""} ${
-        labelOf(r.category)
-      }`
+      `${r.label} ${typeof r.description === "string" ? r.description : ""} ${
+        typeof r.info === "string" ? r.info : ""
+      } ${r.group ?? ""} ${r.keywords ?? ""} ${labelOf(r.category)}`
         .toLowerCase()
         .includes(t)
     )
@@ -203,37 +261,41 @@ export function SettingsShell<C extends string>(props: {
     else groups.push({ key: `${row.category}-${title ?? ""}`, title, rows: [row] })
   }
 
+  // What the right side is showing. Base UI measures a scroll area when its viewport resizes, not when its content does,
+  // so each page gets its own: a short page after a long one would otherwise keep the long one's scrollbar.
+  const page = searching ? `search:${scope ?? ""}:${query}` : `category:${props.category}`
+
+  const trail = searching ? ["Search"] : props.crumbs ?? []
+
   const modifiedIn = (category: C) => props.rows.some((r) => r.category === category && isModified(r))
-  const { onResetCategory } = props
+  const { onResetCategory, save } = props
+  const unsaved = save !== undefined && save.unsaved.size > 0
 
   return (
     <Dialog open={props.open} onOpenChange={(next) => !next && props.busy !== true && props.onClose()}>
-      <DialogContent className="flex h-[min(80vh,720px)] w-full gap-0 overflow-hidden p-0 sm:max-w-4xl" showCloseButton>
-        <nav className="flex w-56 shrink-0 flex-col border-r bg-muted/30 p-3">
-          <div className="relative mb-2">
-            <IconSearch className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-7"
-              placeholder="Search settings"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value)
-                setScope(null)
-              }}
-              aria-label="Search settings"
-            />
-          </div>
+      <DialogContent className="flex h-[min(80vh,720px)] w-full gap-0 overflow-hidden p-0 sm:max-w-4xl">
+        <nav className="flex w-56 shrink-0 flex-col bg-muted/30 p-3">
+          <SearchField
+            className="mb-2"
+            placeholder="Search settings"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setScope(null)
+            }}
+            aria-label="Search settings"
+          />
           {/* the search stays put; the categories scroll when there are more than fit (a project with many maps) */}
           <ScrollArea className="-mx-3 min-h-0 flex-1">
             <div className="flex flex-col gap-1 px-3 pb-px">
               {searching && (
                 <Button
-                  variant={scope === null ? "secondary" : "ghost"}
-                  className="justify-between"
+                  variant="ghost"
+                  className={cn("justify-between", scope === null && SELECTED)}
                   onClick={() => setScope(null)}
                 >
                   <span>All results</span>
-                  <span className="text-[0.625rem] text-muted-foreground tabular-nums">{matched.length}</span>
+                  <span className="text-caption text-fg-tertiary tabular-nums">{matched.length}</span>
                 </Button>
               )}
               {props.categories.map(({ id, label, icon: CategoryIcon, section }, i) => {
@@ -242,10 +304,14 @@ export function SettingsShell<C extends string>(props: {
                 const heading = section !== undefined && section !== props.categories[i - 1]?.section
                 return (
                   <Fragment key={id}>
-                    {heading && <div className="mt-2 px-2 pb-0.5 text-eyebrow text-muted-foreground">{section}</div>}
+                    {heading && (
+                      <div className="mt-2 px-2 pb-0.5 text-caption uppercase tracking-wider text-fg-secondary">
+                        {section}
+                      </div>
+                    )}
                     <Button
-                      variant={active ? "secondary" : "ghost"}
-                      className={cn("justify-start", searching && hits === 0 && "text-muted-foreground/50")}
+                      variant="ghost"
+                      className={cn("justify-start", active && SELECTED)}
                       disabled={searching && hits === 0}
                       onClick={() => {
                         if (searching) setScope(id)
@@ -257,12 +323,14 @@ export function SettingsShell<C extends string>(props: {
                       <span className="min-w-0 flex-1 truncate text-left">{label}</span>
                       {searching
                         ? hits > 0 && (
-                          <span className="rounded-full bg-primary/15 px-1.5 text-[0.625rem] text-primary tabular-nums">
+                          <span className="rounded-full bg-muted px-1.5 text-caption text-fg-secondary tabular-nums">
                             {hits}
                           </span>
                         )
+                        : save?.unsaved.has(id) === true
+                        ? <span className="size-1.5 rounded-full bg-dirty" aria-label="Unsaved changes" />
                         : modifiedIn(id) && (
-                          <span className="size-1.5 rounded-full bg-primary" aria-label="Has changed settings" />
+                          <span className="size-1.5 rounded-full bg-fg-tertiary" aria-label="Has changed settings" />
                         )}
                     </Button>
                   </Fragment>
@@ -272,21 +340,23 @@ export function SettingsShell<C extends string>(props: {
           </ScrollArea>
         </nav>
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="border-b px-5 py-3">
+          <div className="px-dialog py-3">
             <Breadcrumb>
-              <BreadcrumbList className="text-sm">
+              <BreadcrumbList className="text-title">
                 <BreadcrumbItem>
-                  <DialogTitle className="font-normal text-muted-foreground">{props.title}</DialogTitle>
+                  <DialogTitle className="text-fg-secondary">{props.title}</DialogTitle>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
-                {searching && (
-                  <>
-                    <BreadcrumbItem>Search</BreadcrumbItem>
+                {trail.map((crumb) => (
+                  <Fragment key={crumb}>
+                    <BreadcrumbItem className="min-w-0">
+                      <span className="truncate">{crumb}</span>
+                    </BreadcrumbItem>
                     <BreadcrumbSeparator />
-                  </>
-                )}
+                  </Fragment>
+                ))}
                 <BreadcrumbItem className="min-w-0">
-                  <BreadcrumbPage className="truncate font-medium">
+                  <BreadcrumbPage className="truncate">
                     {searching ? `“${query.trim()}”` : labelOf(props.category)}
                   </BreadcrumbPage>
                 </BreadcrumbItem>
@@ -294,36 +364,49 @@ export function SettingsShell<C extends string>(props: {
             </Breadcrumb>
             <DialogDescription className="sr-only">{props.description}</DialogDescription>
           </div>
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="flex flex-col gap-5 px-5 py-3">
+          <ScrollArea key={page} className="min-h-0 flex-1">
+            <div className="flex flex-col gap-5 px-dialog py-3">
               {groups.map((group) => (
                 <section key={group.key} className="flex flex-col">
                   {group.title !== undefined && group.title !== "" && (
-                    <h3 className="mb-1 text-eyebrow text-muted-foreground">{group.title}</h3>
+                    <h3 className="mb-1 text-caption uppercase tracking-wider text-fg-secondary">{group.title}</h3>
                   )}
-                  <div className="flex flex-col divide-y divide-border/50">
+                  <div className="flex flex-col rounded-surface bg-muted/40 pr-3 ring-edge not-dark:ring-1">
                     {group.rows.map((row) => <RowView key={row.id} row={row} />)}
                   </div>
                 </section>
               ))}
-              {groups.length === 0 && <p className="text-xs text-muted-foreground">No settings match.</p>}
+              {groups.length === 0 && <p className="text-body text-fg-tertiary">No settings match.</p>}
             </div>
           </ScrollArea>
-          <div
-            className={cn("flex border-t px-5 py-3", onResetCategory === undefined ? "justify-end" : "justify-between")}
-          >
-            {onResetCategory !== undefined && (
+          <div className="flex px-dialog py-3">
+            {/* Search results span every category, and a reset names one: it comes back with the page. */}
+            {onResetCategory !== undefined && !searching && (
               <Button
-                variant="outline"
+                variant="ghost"
+                className="text-fg-secondary"
                 onClick={() => onResetCategory(props.category)}
-                disabled={searching || !modifiedIn(props.category)}
+                disabled={!modifiedIn(props.category)}
               >
                 Reset {labelOf(props.category).toLowerCase()} to defaults
               </Button>
             )}
-            <Button onClick={props.onClose} disabled={props.busy === true}>Done</Button>
+            <div className="ml-auto flex items-center gap-2">
+              {!searching && props.footerAction}
+              {save === undefined
+                ? <Button onClick={props.onClose} disabled={props.busy === true}>Done</Button>
+                : (
+                  <>
+                    <Button variant="secondary" onClick={save.onRevert} disabled={!unsaved || props.busy === true}>
+                      Revert
+                    </Button>
+                    <Button onClick={save.onSave} disabled={!unsaved || props.busy === true}>Save</Button>
+                  </>
+                )}
+            </div>
           </div>
         </div>
+        {props.children}
       </DialogContent>
     </Dialog>
   )

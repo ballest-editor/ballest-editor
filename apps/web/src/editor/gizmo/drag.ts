@@ -49,13 +49,13 @@ export const dragAxisWorld = (start: DragStart): THREE.Vector3 | undefined =>
     : handleWorldDir(start.spec, start.frameRotation, start.space)
 
 /** Grid snapping for translate drags: the step in cm, and the pivot (game space) it applies to. */
-export interface DragGrid {
+interface DragGrid {
   readonly size: number
   readonly pivot: Vec3
 }
 
 /** Which snapping is on for a drag: the translation grid, and the rotation step in degrees. */
-export interface DragSnap {
+interface DragSnap {
   readonly grid?: DragGrid | undefined
   readonly rotationStep?: number | undefined
 }

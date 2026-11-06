@@ -10,13 +10,15 @@ import { listSamples, readSample } from "../test/samples"
 import { MapCodec } from "./MapCodec"
 import { MapExporter } from "./MapExporter"
 
-// 2026-10-26 15:04:05 UTC, rendered in UTC+2
+// 2026-10-26 15:04:05 UTC, on a machine at UTC+2: `createdAt` is UTC whatever the local zone
 const NOW = Date.UTC(2026, 9, 26, 15, 4, 5)
 const TestLayer = MapExporter.layerNoDeps.pipe(
   Layer.provideMerge(Layer.mergeAll(MapCodec.layer, DateTime.layerCurrentZoneOffset(2 * 60 * 60 * 1000)))
 )
 
-const fresh = () => newMapFile({ displayName: "My Track", creatorName: "spig", createdAt: "2000.01.01-00.00.00" })
+const CREATED_AT = "2000.01.01-00.00.00"
+const fresh = () => newMapFile({ displayName: "My Track", creatorName: "spig", createdAt: CREATED_AT })
+const undated = () => newMapFile({ displayName: "My Track", creatorName: "spig", createdAt: "" })
 
 describe("MapExporter", () => {
   it.effect("counts JSON values the way the written file does, for every sample", () =>
@@ -100,18 +102,32 @@ describe("MapExporter", () => {
     Effect.gen(function*() {
       yield* TestClock.setTime(NOW)
       const exporter = yield* MapExporter
-      const result = yield* exporter.prepare(fresh())
+      const result = yield* exporter.prepare(undated())
       assert.strictEqual(result.filename, "Map_LevelEditorMain&My Track_spig.balledit")
       const decoded = yield* Schema.decodeEffect(Schema.fromJsonString(MapFile))(result.text)
       const levelData = decoded.worldSettings.levelData
       assert.strictEqual(levelData.systemLevelName, "Map_LevelEditorMain")
       assert.strictEqual(levelData.userLevelName, "My Track_spig")
-      assert.strictEqual(levelData.createdAt, "2026.10.26-17.04.05")
+      assert.strictEqual(levelData.createdAt, "2026.10.26-15.04.05")
       assert.match(levelData.createdAt, /^\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}\.\d{2}$/)
       assert.isTrue(result.text.startsWith("{\r\n\t\"worldSettings\":\r\n\t{\r\n"))
       // the output decodes again and keeps exactly one player start
       assert.strictEqual(decoded.items.filter(isPlayerStart).length, 1)
       assert.isDefined(decoded.editorState)
+    }).pipe(Effect.provide(TestLayer)))
+
+  it.effect("keeps the date of a map that has one, however often it is written", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(NOW)
+      const exporter = yield* MapExporter
+      const first = yield* exporter.prepare(fresh())
+      assert.strictEqual(first.map.worldSettings.levelData.createdAt, CREATED_AT)
+
+      const stamped = yield* exporter.prepare(undated())
+      yield* TestClock.adjust("1 day")
+      const again = yield* exporter.prepare(stamped.map)
+      assert.strictEqual(again.map.worldSettings.levelData.createdAt, "2026.10.26-15.04.05")
+      assert.strictEqual(again.text, stamped.text)
     }).pipe(Effect.provide(TestLayer)))
 
   it.effect("adds editorState when exporting an imported .ballmap, keeping all but the published flag", () =>

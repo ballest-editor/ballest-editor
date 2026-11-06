@@ -3,7 +3,8 @@ import {
   GamePaths as GamePathsSchema,
   InvokeChannels,
   PlayResult,
-  PluginStatus
+  PluginStatus,
+  ProjectMaps
 } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, FileSystem, Option, Path, Schema } from "effect"
@@ -134,8 +135,11 @@ describe("the game over IPC", () => {
           "Played"
         )
         assert.deepInclude(result, { sent: true, launch: "launched" })
-        assert.deepStrictEqual(result.file, { path: path.join(steam.maps, name), name })
-        assert.strictEqual(result.link.export?.hash, sha256(new TextEncoder().encode(text)))
+        const maps = yield* fake.invokeAs(ProjectMaps, InvokeChannels.listMaps)
+        assert.deepInclude(maps.find((m) => m.fileName === name)?.link?.export, {
+          path: path.join(steam.maps, name),
+          hash: sha256(new TextEncoder().encode(text))
+        })
         assert.strictEqual(yield* fs.readFileString(path.join(steam.maps, name)), text)
         const play = yield* fs.readFileString(path.join(steam.plugins, "ballest-editor-link", "play.json")).pipe(
           Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(PlayFile)))

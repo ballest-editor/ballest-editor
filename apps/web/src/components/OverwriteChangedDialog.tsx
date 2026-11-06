@@ -1,15 +1,7 @@
-import { Button } from "@workspace/ui/components/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from "@workspace/ui/components/dialog"
 import { mapLabelOf } from "../domain/factory"
 import { overwriteChangedExport, reimportFirst } from "../editor/actions"
 import { useEditor } from "../editor/store"
+import { ConfirmDialog, HintedButton } from "./TitledDialog"
 
 /**
  * Export to game (or Play, which exports first) found that the game changed the map's export since the last export:
@@ -20,23 +12,30 @@ export function OverwriteChangedDialog({ open, onClose }: { readonly open: boole
   const changed = useEditor((s) => s.dialog?.id === "overwriteChanged" ? s.dialog : null)
   const label = changed === null ? "" : mapLabelOf(changed.name)
   return (
-    <Dialog open={open && changed !== null} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent showCloseButton={false}>
-        <DialogHeader>
-          <DialogTitle>{label} was changed in the game</DialogTitle>
-          <DialogDescription>
-            The game's copy of {label} changed since the last export, probably saved in the in-game editor.{" "}
-            {changed?.from === "play" ? "Play" : "Export"}{" "}
-            would write over it. Back up and overwrite keeps the game's version in the backups. Re-import first takes
-            the game's version into the project instead, and exports nothing.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" className="sm:mr-auto" onClick={() => void reimportFirst()}>Re-import first</Button>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button variant="destructive" onClick={() => void overwriteChangedExport()}>Back up and overwrite</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      open={open && changed !== null}
+      onClose={onClose}
+      title={`${label} was changed in the game`}
+      description={`${changed?.from === "play" ? "Play" : "Export"} would write over those changes.`}
+      alternative={
+        <HintedButton
+          hint="Takes the game's version into the project and exports nothing."
+          variant="outline"
+          className="sm:mr-auto"
+          onClick={() => void reimportFirst()}
+        >
+          Re-import first
+        </HintedButton>
+      }
+      confirm={
+        <HintedButton
+          hint="The game's version goes to the backups."
+          variant="destructive"
+          onClick={() => void overwriteChangedExport()}
+        >
+          Back up and overwrite
+        </HintedButton>
+      }
+    />
   )
 }

@@ -4,7 +4,6 @@ import {
   axisOf,
   clampCmPerPixel,
   distanceForScale,
-  formatPaneScale,
   gridLevels,
   MAX_GRID_LEVELS,
   nearestOrthoView,
@@ -181,14 +180,5 @@ describe("grid levels", () => {
       const on = gridLevels(step / 40, step).some((level) => Math.abs(snapped % level.size) < 1e-9)
       assert.isTrue(on)
     }
-  })
-})
-
-describe("a pane's scale", () => {
-  it("reads in two figures, in the editor's units", () => {
-    assert.strictEqual(formatPaneScale(2, "cm"), "1 px = 2 cm")
-    assert.strictEqual(formatPaneScale(0.5, "cm"), "1 px = 0.5 cm")
-    assert.strictEqual(formatPaneScale(132.77, "cm"), "1 px = 130 cm")
-    assert.strictEqual(formatPaneScale(132.77, "m"), "1 px = 1.3 m")
   })
 })

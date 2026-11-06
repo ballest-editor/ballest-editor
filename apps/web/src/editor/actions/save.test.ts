@@ -1,5 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Effect } from "effect"
+import { TestClock } from "effect/testing"
 import { lightingOf } from "../../domain/sunlight"
 import { MapCodec } from "../../services/MapCodec"
 import { makeTestDisk, projectFile, TEST_MAPS_FOLDER, TEST_PROJECTS_FOLDER } from "../../test/desktopBridge"
@@ -50,6 +51,25 @@ describe("save actions", () => {
 
       yield* openProjectMapFile(renamed)
       assert.strictEqual(s().doc.map.worldSettings.levelData.levelDisplayName, "Hairpin")
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("Save keeps the date a map was created; a Duplicate is created now", () => {
+    const disk = makeTestDisk()
+    const createdAt = () => s().doc.map.worldSettings.levelData.createdAt
+    return Effect.gen(function*() {
+      yield* TestClock.setTime(Date.UTC(2026, 10, 5, 12, 0, 0))
+      yield* reset
+      yield* createNewMap("Big Loop", "Isaac")
+      assert.strictEqual(createdAt(), "2026.11.05-12.00.00")
+
+      yield* TestClock.setTime(Date.UTC(2026, 10, 6, 9, 30, 0))
+      s().setLighting({ ...lightingOf(s().doc.map.worldSettings), timeOfDay: 3 })
+      yield* saveMapFile
+      assert.strictEqual(createdAt(), "2026.11.05-12.00.00")
+
+      yield* duplicateMapEffect("Big Loop 2", "Isaac")
+      assert.strictEqual(createdAt(), "2026.11.06-09.30.00")
     }).pipe(Effect.provide(layerFor(disk)))
   })
 

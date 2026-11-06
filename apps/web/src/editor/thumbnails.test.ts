@@ -4,7 +4,33 @@ import { parseMaterialsFile } from "../domain/Materials"
 import { materialsFile, OUTLINE, PIPE, primitive, WIND } from "../test/materials"
 import { applySlotMaterials, materialFor, shaderPatchOf } from "./materials"
 import { isTexture } from "./threeGuards"
-import { frameBox, SerialQueue, texturesOf, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH, whenTexturesReady } from "./thumbnails"
+import { frameBox, frameTopDown, type Framing, SerialQueue, texturesOf, whenTexturesReady } from "./thumbnails"
+
+describe("top-down framing", () => {
+  it("stands over the box's plan and sees all of it, by its longer side", () => {
+    const framing = frameTopDown([-100, 10, 200], [300, 60, 300])
+    assert.deepStrictEqual([framing.position[0], framing.position[2]], [100, 250])
+    assert.isAbove(framing.position[1], 60)
+    assert.isAtLeast(framing.halfSize, 200)
+    assert.isBelow(framing.halfSize, 250)
+  })
+
+  it("fits the longer side, whichever it is, and the height doesn't count", () => {
+    const wide = frameTopDown([0, 0, 0], [1000, 9000, 100])
+    const deep = frameTopDown([0, 0, 0], [100, 0, 1000])
+    assert.strictEqual(wide.halfSize, deep.halfSize)
+  })
+
+  it("keeps the whole height between the planes", () => {
+    const framing = frameTopDown([0, -500, 0], [10, 1500, 10])
+    assert.isAtLeast(framing.position[1] - framing.near, 1500)
+    assert.isAtMost(framing.position[1] - framing.far, -500)
+  })
+
+  it("has a size for an empty box", () => {
+    assert.isAbove(frameTopDown([5, 5, 5], [5, 5, 5]).halfSize, 0)
+  })
+})
 
 describe("thumbnail framing", () => {
   const fits = (min: readonly [number, number, number], max: readonly [number, number, number], aspect: number) => {
@@ -21,12 +47,20 @@ describe("thumbnail framing", () => {
     return corners.every(([x, y, z]) => frustum.containsPoint(new THREE.Vector3(x, y, z)))
   }
 
-  it("keeps every corner of the box in view, for cubes and long flat pieces, at the thumbnail aspect", () => {
-    const aspect = THUMBNAIL_WIDTH / THUMBNAIL_HEIGHT
+  it("keeps every corner of the box in view, for cubes and long flat pieces, in a square thumbnail", () => {
+    const aspect = 1
     assert.isTrue(fits([-50, -50, -50], [50, 50, 50], aspect))
     assert.isTrue(fits([-262, 0, -250], [262, 145, 250], aspect)) // Curve1 S
     assert.isTrue(fits([-1000, -5, -20], [1000, 5, 20], aspect)) // a plank
     assert.isTrue(fits([0, 0, 0], [0, 0, 0], aspect)) // degenerate: still a finite camera
+  })
+
+  it("stands further back by the share of the frame a piece fills", () => {
+    const min = [-250, 0, -250] as const, max = [250, 145, 250] as const
+    const distance = ({ position, target }: Framing) => Math.hypot(...position.map((c, i) => c - target[i]!))
+    const full = frameBox(min, max, 1), small = frameBox(min, max, 1, 0.6)
+    assert.closeTo(distance(small), distance(full) / 0.6, 1e-6)
+    assert.deepStrictEqual(small.target, full.target)
   })
 
   it("looks at the box centre from the front-right, above", () => {

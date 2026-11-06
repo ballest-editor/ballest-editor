@@ -1,14 +1,16 @@
+import { IconFoldDown, IconFoldUp } from "@tabler/icons-react"
+import { Button } from "@workspace/ui/components/button"
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
-  ContextMenuShortcut,
   ContextMenuTrigger
 } from "@workspace/ui/components/context-menu"
 import { Input } from "@workspace/ui/components/input"
 import { Popover, PopoverContent } from "@workspace/ui/components/popover"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import {
   type MouseEvent,
@@ -22,15 +24,14 @@ import {
 } from "react"
 import {
   activeNodeOf,
-  canGroupSelection,
+  enteredScopeOf,
   exactSelectedGroup,
   groupPathOf,
   groupSelectionStates,
   nodeKeys,
-  selectedGroupIds,
   selectionNodeIds
 } from "../domain/groupSelection"
-import { formatBinding, isBound, type KeybindAction, mouseChordOf } from "../domain/Keybinds"
+import { isBound, type KeybindAction, mouseChordOf } from "../domain/Keybinds"
 import {
   type DropTarget,
   dropTargetAt,
@@ -43,12 +44,15 @@ import {
   scrollToShow,
   visibleRange
 } from "../domain/outline"
-import { findNode, numberedNameText } from "../domain/structure"
-import { detachInstance, startSavePrefab, updateInstance } from "../editor/actions"
+import { findNode, groupNames, numberedNameText } from "../domain/structure"
+import { detachInstance, updateInstance } from "../editor/actions"
 import { actionCommands, type CommandAction } from "../editor/commands"
 import { elementOf } from "../editor/keyTargets"
-import { nextSelection, nodeNamesOf, useEditor } from "../editor/store"
+import { nextSelection, nodeNamesOf, noTabOpen, useCanGroup, useEditor } from "../editor/store"
+import { EnteredGroupBreadcrumb } from "./EnteredGroupStatus"
+import { MenuKey } from "./KeyChip"
 import { OUTLINE_INDENT, OUTLINE_ROW_HEIGHT, OutlineRowView } from "./OutlineRow"
+import { SavePrefabItem } from "./SavePrefabItem"
 import { TagInput } from "./TagInput"
 
 const OVERSCAN = 10
@@ -100,7 +104,7 @@ function MenuCommand({ action, disabled = false, children }: {
   return (
     <ContextMenuItem disabled={disabled} onClick={() => actionCommands[action]()}>
       {children}
-      {binding !== undefined && <ContextMenuShortcut>{formatBinding(binding)}</ContextMenuShortcut>}
+      {binding !== undefined && <MenuKey binding={binding} />}
     </ContextMenuItem>
   )
 }
@@ -127,11 +131,45 @@ function TagsPopover({ target, onClose }: {
           initialFocus={input}
           anchor={{ getBoundingClientRect: () => target.anchor }}
         >
-          <div className="truncate font-medium">Tags of {target.name}</div>
+          <div className="truncate text-body-strong">Tags of {target.name}</div>
           <TagInput inputRef={input} tags={tags ?? []} onChange={(next) => setTags(target.id, next)} />
         </PopoverContent>
       )}
     </Popover>
+  )
+}
+
+/** Folds every group, or opens them all once they're folded. Only there when the map has groups. */
+function CollapseAllButton({ groupIds, disabled }: {
+  readonly groupIds: ReadonlyArray<string>
+  readonly disabled: boolean
+}) {
+  const allCollapsed = useEditor((s) => groupIds.every((id) => s.collapsedGroups.has(id)))
+  if (groupIds.length === 0) return null
+  const label = allCollapsed ? "Expand all groups" : "Collapse all groups"
+  const toggleAll = () => {
+    const { expandGroups, setGroupCollapsed } = useEditor.getState()
+    if (allCollapsed) expandGroups(groupIds)
+    else for (const id of groupIds) setGroupCollapsed(id, true)
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-fg-secondary"
+            aria-label={label}
+            disabled={disabled}
+            onClick={toggleAll}
+          />
+        }
+      >
+        {allCollapsed ? <IconFoldDown /> : <IconFoldUp />}
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -150,14 +188,17 @@ export function Outline() {
 
   const [query, setQuery] = useState("")
   const filtering = query.trim().length > 0
+  const noTab = useEditor(noTabOpen)
   const names = useMemo(() => nodeNamesOf({ doc, catalogIndex }), [doc, catalogIndex])
   const classes = useMemo(() => itemClasses(map, ids), [map, ids])
   const rows = useMemo(
     () => outlineRows(structure, names, classes, collapsedGroups, query),
     [structure, names, classes, collapsedGroups, query]
   )
+  const groupIds = useMemo(() => [...groupNames(tree).keys()], [tree])
   const selected = useMemo(() => new Set(selectedIds), [selectedIds])
   const groupStates = useMemo(() => groupSelectionStates(tree, selected), [tree, selected])
+  const enteredScope = useMemo(() => enteredScopeOf(tree, enteredGroupId), [tree, enteredGroupId])
   const enteredRange = useMemo(() => {
     const start = rows.findIndex((row) => row.id === enteredGroupId)
     if (start < 0) return undefined
@@ -256,10 +297,8 @@ export function Outline() {
 
   const dragging = drag !== null
   useEffect(() => {
-    // the list's own window: the other one's frames may not run while this one has the focus
-    const view = scroller.current?.ownerDocument.defaultView
-    if (!dragging || view == null) return
-    let frame = view.requestAnimationFrame(function tick() {
+    if (!dragging) return
+    let frame = requestAnimationFrame(function tick() {
       const el = scroller.current
       if (el !== null) {
         const { top, bottom } = el.getBoundingClientRect()
@@ -273,9 +312,9 @@ export function Outline() {
           setDrag((current) => current === null ? null : aimed(current))
         }
       }
-      frame = view.requestAnimationFrame(tick)
+      frame = requestAnimationFrame(tick)
     })
-    return () => view.cancelAnimationFrame(frame)
+    return () => cancelAnimationFrame(frame)
   }, [dragging, aimed])
 
   const startDrag = (e: PointerEvent<HTMLDivElement>, row: OutlineRow) => {
@@ -285,7 +324,7 @@ export function Outline() {
     // a row outside the selection drags alone, and becomes the selection
     const held = isSubset(pressedKeys, s.selectedIds)
     if (!held) selectHere(pressedKeys)
-    const nodeIds = selectionNodeIds(current, held ? s.selectedIds : pressedKeys)
+    const nodeIds = selectionNodeIds(current, held ? s.selectedIds : pressedKeys, s.enteredGroupId)
     e.currentTarget.setPointerCapture(e.pointerId)
     dragged.current = true
     setDrag(aimed({ ids: nodeIds, set: new Set(nodeIds), target: undefined, rowIndex: 0 }))
@@ -323,30 +362,47 @@ export function Outline() {
   // The row the context menu was opened on, and what it opened from it.
   const [menuRow, setMenuRow] = useState<OutlineRow | null>(null)
   const [tagsTarget, setTagsTarget] = useState<Parameters<typeof TagsPopover>[0]["target"]>(null)
-  const canGroup = useMemo(() => canGroupSelection(tree, selectedIds), [tree, selectedIds])
-  const canUngroup = useMemo(() => selectedGroupIds(tree, selectedIds).length > 0, [tree, selectedIds])
+  const { canGroup, canUngroup } = useCanGroup()
   const hasSelection = selectedIds.length > 0
   const instance = useMemo(
     () => exactSelectedGroup(tree, selectedIds, enteredGroupId),
     [tree, selectedIds, enteredGroupId]
   )
   const link = instance?.prefab
+  // The group "Select all in group" means: the row's own, or the one the row is in.
+  const menuGroupId = menuRow === null ? null : menuRow.kind === "group" ? menuRow.id : menuRow.parentId
+  const enterRow = (id: string) => {
+    const s = useEditor.getState()
+    s.expandGroups([...groupPathOf(s.doc.structure.tree, id), id])
+    selectHere([])
+    s.enterGroup(id)
+  }
+  const selectAllIn = (id: string) => {
+    const s = useEditor.getState()
+    const { tree: current } = s.doc.structure
+    selectHere(nodeKeys(current, id))
+    const { enteredGroupId: entered } = s
+    if (entered !== null && entered !== id && !groupPathOf(current, id).includes(entered)) s.enterGroup(null)
+  }
   // Rename's field takes the focus, so the closing menu mustn't hand it back.
   const keepFocus = useRef(false)
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-card">
-      <div className="flex h-9 shrink-0 items-center px-2">
+      <div className="flex h-9 shrink-0 items-center gap-1 px-2">
         <Input
           aria-label="Filter the outline"
-          placeholder="Filter by name, class or tag"
+          placeholder="Filter"
+          className="flex-1"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Escape") setQuery("")
           }}
         />
+        <CollapseAllButton groupIds={groupIds} disabled={filtering} />
       </div>
+      <EnteredGroupBreadcrumb />
       <ContextMenu>
         <ContextMenuTrigger
           render={<ScrollArea className="min-h-0 flex-1" viewportRef={scroller} />}
@@ -365,7 +421,7 @@ export function Outline() {
             role="tree"
             aria-label="Outline"
             tabIndex={0}
-            className={cn("relative min-h-full outline-none", dragging && "cursor-grabbing")}
+            className={cn("relative min-h-full focus-ring-inset", dragging && "cursor-grabbing")}
             style={{ height: rows.length * OUTLINE_ROW_HEIGHT }}
             onClick={(e) => {
               if (dragged.current) return
@@ -398,7 +454,9 @@ export function Outline() {
                   key={row.id}
                   row={row}
                   rowIndex={rowIndex}
-                  selected={row.kind === "item" ? selected.has(row.id) : state === "all"}
+                  selected={row.kind === "item"
+                    ? selected.has(row.id)
+                    : state === "all" && !enteredScope.includes(row.id)}
                   partial={state === "some"}
                   entered={row.id === enteredGroupId}
                   dimmed={enteredRange !== undefined && (rowIndex < enteredRange.start || rowIndex >= enteredRange.end)}
@@ -412,20 +470,29 @@ export function Outline() {
             })}
             {drag !== null && <DropLine drag={drag} />}
             {rows.length === 0 && (
-              <div className="p-3 text-xs text-muted-foreground">
+              <div className="p-3 text-body text-fg-tertiary">
                 {filtering
                   ? "Nothing matches the filter."
+                  : noTab
+                  ? "No map open."
                   : "Nothing placed yet. Click a piece in Pieces to add it to the map."}
               </div>
             )}
           </div>
         </ContextMenuTrigger>
-        <ContextMenuContent className="w-max min-w-44" finalFocus={() => !keepFocus.current}>
+        <ContextMenuContent
+          className="w-max min-w-44"
+          finalFocus={(closeType) => {
+            if (keepFocus.current) return false
+            // from the keyboard the focus shows, and on the tree it would ring the whole panel
+            const index = rows.findIndex((row) => row.id === menuRow?.id)
+            const row = list.current?.querySelector<HTMLElement>(`[data-row-index="${index}"]`)
+            return closeType === "keyboard" && row != null ? row : true
+          }}
+        >
           <MenuCommand action="groupSelection" disabled={!canGroup}>Group</MenuCommand>
           <MenuCommand action="ungroupSelection" disabled={!canUngroup}>Ungroup</MenuCommand>
-          <ContextMenuItem disabled={!hasSelection} onClick={startSavePrefab}>
-            Save selection as prefab…
-          </ContextMenuItem>
+          <SavePrefabItem item={ContextMenuItem} />
           {instance !== undefined && link !== undefined && (
             <>
               <ContextMenuItem onClick={() => void updateInstance(instance.id, link)}>
@@ -436,6 +503,22 @@ export function Outline() {
           )}
           <ContextMenuSeparator />
           <ContextMenuItem
+            disabled={menuRow?.kind !== "group" || menuRow.id === enteredGroupId}
+            onClick={() => {
+              if (menuRow !== null) enterRow(menuRow.id)
+            }}
+          >
+            Enter group
+          </ContextMenuItem>
+          <ContextMenuItem
+            disabled={menuGroupId === null}
+            onClick={() => {
+              if (menuGroupId !== null) selectAllIn(menuGroupId)
+            }}
+          >
+            Select all in group
+          </ContextMenuItem>
+          <ContextMenuItem
             disabled={menuRow === null}
             onClick={() => {
               if (menuRow === null) return
@@ -444,7 +527,7 @@ export function Outline() {
             }}
           >
             Rename
-            <ContextMenuShortcut>F2</ContextMenuShortcut>
+            <MenuKey binding="F2" />
           </ContextMenuItem>
           <MenuCommand action="duplicateSelection" disabled={!hasSelection}>Duplicate</MenuCommand>
           <MenuCommand action="deleteSelection" disabled={!hasSelection}>Delete</MenuCommand>
@@ -455,12 +538,12 @@ export function Outline() {
             onClick={() => {
               if (menuRow === null) return
               const el = list.current?.querySelector(`[data-row-index="${rows.indexOf(menuRow)}"]`)
-              if (el === undefined || el === null) return
+              if (el == null) return
               keepFocus.current = true
               setTagsTarget({ id: menuRow.id, name: numberedNameText(menuRow), anchor: el.getBoundingClientRect() })
             }}
           >
-            Edit tags…
+            Edit tags
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>

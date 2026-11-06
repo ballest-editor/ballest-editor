@@ -5,9 +5,11 @@
  */
 import * as THREE from "three"
 import { threeToUeVector, ueToThreeVector, type Vec3 } from "../domain/coords"
+import { DEFAULT_PLAYER_START } from "../domain/level"
 import {
   clampCmPerPixel,
   distanceForScale,
+  mixFov,
   nearestOrthoView,
   ORTHO_AXES,
   orthoFraming,
@@ -15,7 +17,16 @@ import {
   scaleForDistance,
   zoomAtPointer
 } from "../domain/orthoView"
-import { isOrthoView, type OrthoView, paneRectAt, paneRects, type ViewProjection } from "../domain/viewLayout"
+import { placeDistanceFor, type PlacementView } from "../domain/placement"
+import type { ScreenAxes } from "../domain/viewGizmo"
+import {
+  isOrthoView,
+  type OrthoView,
+  type PaneChange,
+  paneRectAt,
+  paneRects,
+  type ViewProjection
+} from "../domain/viewLayout"
 import { gameDirToWorld, type Px, worldPerPixel } from "./gizmo/math"
 import { useEditor } from "./store"
 
@@ -25,11 +36,13 @@ const layerOf = (layer: number): THREE.Layers => {
   return layers
 }
 
-/** What only one kind of camera sees: the sky and floor grid, and the world grid. Layer 0 is everything else. */
+/** What only one kind of camera sees: the sky, the floor grid, and the world grid. Layer 0 is everything else. */
 const PERSPECTIVE_LAYER = 1
 const ORTHOGRAPHIC_LAYER = 2
+const FLOOR_GRID_LAYER = 3
 export const perspectiveOnly = layerOf(PERSPECTIVE_LAYER)
 export const orthographicOnly = layerOf(ORTHOGRAPHIC_LAYER)
+export const floorGridOnly = layerOf(FLOOR_GRID_LAYER)
 
 const NEAR = 5
 const FAR = 2_000_000
@@ -38,26 +51,49 @@ const ORTHO_STANDOFF = FAR / 2
 /** The pivot ahead of a perspective camera that has none in front of it. */
 const ORBIT_DISTANCE = 1500
 const FRAME_OFFSET = new THREE.Vector3(-1, 0.8, 1).normalize()
+/** How long a pane takes to change what it looks along (ms), before Settings › Appearance scales it. */
+export const VIEW_TWEEN_MS = 150
+/** The field of view an orthographic view eases to or from: narrow enough that the last frame's step can't be seen. */
+const FLAT_FOV = 5
 /** The least a focused pane shows (cm), so one small piece doesn't fill it. */
 export const FOCUS_SPAN = 300
 /** The same for a map with nothing in it, or nearly. */
 const MAP_SPAN = 2000
 
+/** Just short of straight up or down, where turning about the world's up would spin the picture. */
+export const clampPitch = (pitch: number): number =>
+  THREE.MathUtils.clamp(pitch, -Math.PI / 2 + 0.001, Math.PI / 2 - 0.001)
+
 const toVector = (v: Vec3) => new THREE.Vector3(v.x, v.y, v.z)
 const uePoint = (v: THREE.Vector3): Vec3 => threeToUeVector({ x: v.x, y: v.y, z: v.z })
 
-const scaleListeners = new Set<() => void>()
-
-/** Calls `listener` when any pane's zoom changes (the panes' labels show it). */
-export const onPaneScaleChange = (listener: () => void): () => void => {
-  scaleListeners.add(listener)
-  return () => void scaleListeners.delete(listener)
+/** A view as the eye takes it: what it centres on, how it is turned, the size it shows that at, and how flat it is. */
+interface ViewPose {
+  readonly centre: THREE.Vector3
+  readonly quaternion: THREE.Quaternion
+  readonly cmPerPixel: number
+  readonly fov: number
 }
+
+const mixPoses = (from: ViewPose, to: ViewPose, t: number): ViewPose => ({
+  centre: from.centre.clone().lerp(to.centre, t),
+  quaternion: from.quaternion.clone().slerp(to.quaternion, t),
+  cmPerPixel: from.cmPerPixel * (to.cmPerPixel / from.cmPerPixel) ** t,
+  fov: mixFov(from.fov, to.fov, t)
+})
 
 /** One slot's view of a map: both its cameras, and which is in use. */
 export class PaneCamera {
   readonly perspective = new THREE.PerspectiveCamera(60, 1, NEAR, FAR)
   readonly orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR)
+  /**
+   * What draws the pane while it eases to a new view. The two above are already there, so picking and the gizmo never
+   * wait on the picture. It sees the map and the grid of the view it's heading for, so the grid never drops out; the
+   * dome stands around the perspective camera, so it's left out.
+   */
+  private readonly tweenCamera = new THREE.PerspectiveCamera(60, 1, NEAR, FAR)
+  /** Where the picture is on its way to the view; `undefined` when it's there. */
+  private tween: { readonly from: ViewPose; shown: ViewPose; startedAt: number | undefined } | undefined
   /** The perspective camera's orbit pivot; what an orthographic view is centred on. */
   readonly target = new THREE.Vector3()
   projection: ViewProjection = "perspective"
@@ -71,6 +107,7 @@ export class PaneCamera {
   constructor() {
     this.perspective.position.set(1500, 1200, 1500)
     this.perspective.layers.enable(PERSPECTIVE_LAYER)
+    this.perspective.layers.enable(FLOOR_GRID_LAYER)
     this.orthographic.layers.enable(ORTHOGRAPHIC_LAYER)
   }
 
@@ -80,6 +117,16 @@ export class PaneCamera {
 
   get view(): OrthoView | undefined {
     return isOrthoView(this.projection) ? this.projection : undefined
+  }
+
+  /** What the pane draws with: `camera`, but for the moments it eases to a new view. */
+  get drawCamera(): THREE.PerspectiveCamera | THREE.OrthographicCamera {
+    return this.tween === undefined ? this.camera : this.tweenCamera
+  }
+
+  /** Whether the picture is still on its way to the view. */
+  get easing(): boolean {
+    return this.tween !== undefined
   }
 
   /** Follows the pane's size and the FOV setting (a constant vertical FOV, so the width shows more or less). */
@@ -93,10 +140,17 @@ export class PaneCamera {
     this.placeOrthographic()
   }
 
-  /** Changes what the pane looks along, keeping the point it looks at and the size it shows it at. */
-  setProjection(next: ViewProjection): void {
+  /**
+   * Changes what the pane looks along, keeping the point it looks at and the size it shows it at. The cameras are there
+   * at once and the picture eases after them (`stepTween`), unless the pane hasn't been shown yet or `ease` says not to.
+   */
+  setProjection(next: ViewProjection, ease = true): void {
     if (next === this.projection) return
-    const { perspective, orthographic } = this
+    const from = this.tween?.shown ?? this.pose()
+    if (ease && !this.needsFraming) this.tween = { from, shown: from, startedAt: undefined }
+    const { perspective, orthographic, tweenCamera } = this
+    tweenCamera.layers.set(0)
+    tweenCamera.layers.enable(isOrthoView(next) ? ORTHOGRAPHIC_LAYER : FLOOR_GRID_LAYER)
     if (!isOrthoView(next)) {
       this.projection = next
       perspective.quaternion.copy(orthographic.quaternion)
@@ -108,6 +162,66 @@ export class PaneCamera {
     if (this.view === undefined) this.setScale(scaleForDistance(this.keepPivotAhead(), this.height, perspective.fov))
     this.projection = next
     this.placeOrthographic()
+  }
+
+  /**
+   * Takes the store's view for the pane. Arriving at an orthographic view from perspective frames the map, as a pane
+   * first shown there does, because a perspective pane's zoom is only how far off its pivot happens to be. Between
+   * orthographic views the zoom stays. The picture eases to all of it.
+   */
+  followProjection(next: ViewProjection): void {
+    const framing = this.view === undefined && isOrthoView(next)
+    this.setProjection(next)
+    if (framing) this.frameMap(mapBox())
+  }
+
+  /**
+   * Moves the picture along its way to the view, `durationMs` from when it first steps; a change of view eases out like
+   * the chrome does (docs/design/ui-system.md § Motion). It heads for where the pane is now, so a drag or a wheel notch
+   * on the way isn't lost.
+   */
+  stepTween(now: number, durationMs: number): void {
+    const { tween } = this
+    if (tween === undefined) return
+    tween.startedAt ??= now
+    const t = durationMs > 0 ? (now - tween.startedAt) / durationMs : 1
+    if (t >= 1) {
+      this.tween = undefined
+      return
+    }
+    tween.shown = mixPoses(tween.from, this.pose(), 1 - (1 - t) ** 3)
+    const { centre, quaternion, cmPerPixel, fov } = tween.shown
+    const camera = this.tweenCamera
+    const distance = distanceForScale(cmPerPixel, this.height, fov)
+    camera.fov = fov
+    camera.aspect = this.width / Math.max(this.height, 1)
+    camera.far = FAR + distance // a flat view stands well back, however far out the pane is zoomed
+    camera.updateProjectionMatrix()
+    camera.quaternion.copy(quaternion)
+    camera.position.copy(centre).addScaledVector(new THREE.Vector3(0, 0, 1).applyQuaternion(quaternion), distance)
+  }
+
+  /**
+   * Turns the pane about its pivot by `yaw` around the world's up and `pitch` around the screen's right (radians), for a
+   * drag on the axis gizmo. An orthographic view opens into perspective where it stands, with no easing: the picture
+   * stays with the pointer. The pivot keeps its place in the picture, off centre or not, so a drag starts without a jump.
+   */
+  orbit(yaw: number, pitch: number): void {
+    if (this.view !== undefined) this.setProjection("perspective", false)
+    this.keepPivotAhead()
+    const { perspective: camera, target } = this
+    const before = camera.quaternion.clone()
+    const { x, y } = new THREE.Euler().setFromQuaternion(before, "YXZ")
+    camera.quaternion.setFromEuler(new THREE.Euler(clampPitch(x + pitch), y + yaw, 0, "YXZ"))
+    const turn = before.invert().premultiply(camera.quaternion)
+    camera.position.sub(target).applyQuaternion(turn).add(target)
+  }
+
+  /** Which way the pane's picture runs in the game's axes, as it's drawn now. */
+  screenAxes(): ScreenAxes {
+    const { quaternion } = this.drawCamera
+    const axis = (x: number, y: number, z: number) => uePoint(new THREE.Vector3(x, y, z).applyQuaternion(quaternion))
+    return { right: axis(1, 0, 0), up: axis(0, 1, 0), toward: axis(0, 0, 1) }
   }
 
   /** Puts the pivot ahead of the perspective camera if it's behind it, and answers how far along the view it is. */
@@ -187,17 +301,61 @@ export class PaneCamera {
       : gameDirToWorld(ORTHO_AXES[view].forward).negate()
   }
 
-  /** Where a palette piece goes (game space), `undefined` in perspective, which aims along its centre ray. */
-  orthographicPlacement(floor: number): Vec3 | undefined {
+  /**
+   * Where a palette piece goes (game space) for a point in the view, by default its centre; `undefined` in perspective,
+   * which aims along a ray.
+   */
+  orthographicPlacement(floor: number, at: THREE.Vector3 = this.target): Vec3 | undefined {
     const { view } = this
-    return view === undefined ? undefined : orthoPlacementPoint(uePoint(this.target), view, floor)
+    return view === undefined ? undefined : orthoPlacementPoint(uePoint(at), view, floor)
+  }
+
+  /** How far from the perspective camera a piece with this footprint may land: `base`, or further to fit a big one. */
+  placeDistance(footprint: number, base: number): number {
+    const { aspect, fov } = this.perspective
+    const vertical = THREE.MathUtils.degToRad(fov)
+    const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * aspect)
+    return placeDistanceFor(footprint, Math.min(vertical, horizontal), base)
+  }
+
+  /** Where this pane looks from and how it is turned, for laying out placements. */
+  placementView(): PlacementView {
+    const { camera } = this
+    camera.updateMatrixWorld()
+    const axis = (x: number, y: number) => uePoint(new THREE.Vector3(x, y, 0).applyQuaternion(camera.quaternion))
+    return {
+      position: uePoint(camera.position),
+      right: axis(1, 0),
+      up: axis(0, 1),
+      project: (point) => {
+        const { x, y, z } = toVector(ueToThreeVector(point)).project(camera)
+        return { x, y, z }
+      }
+    }
+  }
+
+  /** The view as it stands. */
+  private pose(): ViewPose {
+    const { perspective, orthographic, cmPerPixel } = this
+    if (this.view !== undefined) {
+      return {
+        centre: this.target.clone(),
+        quaternion: orthographic.quaternion.clone(),
+        cmPerPixel,
+        fov: FLAT_FOV
+      }
+    }
+    const ahead = this.keepPivotAhead()
+    return {
+      centre: perspective.position.clone().addScaledVector(perspective.getWorldDirection(new THREE.Vector3()), ahead),
+      quaternion: perspective.quaternion.clone(),
+      cmPerPixel: scaleForDistance(ahead, this.height, perspective.fov),
+      fov: perspective.fov
+    }
   }
 
   private setScale(cmPerPixel: number): void {
-    const next = clampCmPerPixel(cmPerPixel)
-    if (next === this.cmPerPixel) return
-    this.cmPerPixel = next
-    for (const listener of scaleListeners) listener()
+    this.cmPerPixel = clampCmPerPixel(cmPerPixel)
   }
 
   /** Stands the orthographic camera off its centre, looking along the view at the zoom's extent. */
@@ -228,6 +386,14 @@ export const paneCamerasOf = (tabId: string): ReadonlyArray<PaneCamera> => {
   return panes
 }
 
+/** Splits or closes panes in the current tab: each pane that stays keeps its camera as well as its view. */
+export const changePanes = (change: PaneChange): void => {
+  const { tabId, applyPaneChange } = useEditor.getState()
+  const panes = paneCamerasOf(tabId)
+  tabs.set(tabId, change.order.flatMap((slot) => panes[slot] ?? []))
+  applyPaneChange(change)
+}
+
 export const forgetClosedTabs = (open: ReadonlyArray<string>): void => {
   for (const tabId of tabs.keys()) if (!open.includes(tabId)) tabs.delete(tabId)
 }
@@ -241,12 +407,20 @@ export const paneCameraAt = (slot: number): PaneCamera => {
 /** The active pane's camera state: what the fly keys, Focus selection and Frame all act on. */
 export const activePaneCamera = (): PaneCamera => paneCameraAt(useEditor.getState().activePane)
 
-/** The whole map, from item translations so it works before meshes load; a stretch of floor when there are no items. */
+/**
+ * The whole map, from item translations so it works before meshes load. With no items, a stretch of floor at the default
+ * start, where a definition's frame is: what a new prefab's first pieces go down around.
+ */
 export const mapBox = (): THREE.Box3 => {
   const { doc, floorHeight } = useEditor.getState()
   const box = new THREE.Box3()
   for (const item of doc.map.items) box.expandByPoint(toVector(ueToThreeVector(item.itemTransform.translation)))
-  if (box.isEmpty()) box.set(new THREE.Vector3(-500, floorHeight, -500), new THREE.Vector3(500, floorHeight, 500))
+  if (box.isEmpty()) {
+    box.setFromCenterAndSize(
+      toVector(ueToThreeVector({ ...DEFAULT_PLAYER_START, z: floorHeight })),
+      new THREE.Vector3(1000, 0, 1000)
+    )
+  }
   return box
 }
 

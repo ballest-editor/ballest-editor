@@ -8,14 +8,16 @@ import {
   TEST_PROJECTS_FOLDER,
   type TestDisk
 } from "../../test/desktopBridge"
-import { balledits, createNewMap, edit, fileNameOf, layerFor, noticesWhile, reset, s } from "../../test/editorActions"
+import { balledits, edit, fileNameOf, layerFor, noticesWhile, reset, s } from "../../test/editorActions"
 import { readSample } from "../../test/samples"
-import { isChooserRequired, isModalOpen } from "../store"
+import { isChooserRequired, isModalOpen, windowTitleOf } from "../store"
 import {
   chooseProjectEffect,
+  forgetRecentProjectEffect,
   newProjectEffect,
   openInNewWindowEffect,
   openInThisWindowEffect,
+  openRecentInNewWindowEffect,
   switchProjectEffect
 } from "./project"
 
@@ -54,31 +56,71 @@ const chooserDisk = (files: Record<string, string> = {}) => {
 }
 
 describe("asking where a project opens", () => {
-  it.effect("a named project window asks", () => {
+  it.effect("a window with nothing unsaved doesn't ask: the project opens here", () => {
     const disk = makeTestDisk()
     return Effect.gen(function*() {
       yield* reset
-      yield* newProjectEffect("Season 3")
-      assert.deepInclude(asked(), { name: "Season 3", target: { _tag: "New", name: "Season 3" } })
-      assert.strictEqual(inUse(disk), TEST_PROJECT)
+      yield* noticesWhile(() => newProjectEffect("Season 3"))
+      assert.isNull(s().dialog)
+      assert.deepStrictEqual(disk.prompts, [])
+      assert.strictEqual(inUse(disk), SEASON)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("Untitled Project with only its untouched map asks too, and nothing changes until it is answered", () => {
+  it.effect("Untitled Project with only its untouched map doesn't ask either", () => {
     const disk = untitledDisk()
     return Effect.gen(function*() {
       yield* reset
-      yield* newProjectEffect("Season 3")
-      assert.deepInclude(asked(), { name: "Season 3", target: { _tag: "New", name: "Season 3" } })
-      assert.isNull(inUse(disk))
-      assert.deepStrictEqual(disk.project.recent, [])
+      yield* noticesWhile(() => newProjectEffect("Season 3"))
+      assert.isNull(s().dialog)
+      assert.strictEqual(inUse(disk), SEASON)
     }).pipe(Effect.provide(layerFor(disk)))
   })
+
+  it.effect("Open project… and a recent project open here too", () => {
+    const disk = makeTestDisk()
+    disk.project.recent = [OTHER]
+    return Effect.gen(function*() {
+      yield* reset
+      yield* noticesWhile(() => switchProjectEffect(OTHER))
+      assert.isNull(s().dialog)
+      assert.strictEqual(inUse(disk), OTHER)
+      disk.answers.push(`${TEST_PROJECTS_FOLDER}/Picked`)
+      yield* noticesWhile(() => chooseProjectEffect)
+      assert.isNull(s().dialog)
+      assert.strictEqual(inUse(disk), `${TEST_PROJECTS_FOLDER}/Picked`)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a new project goes in the folder picked for it", () => {
+    const disk = makeTestDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* noticesWhile(() => newProjectEffect("Season 3", `${TEST_PROJECTS_FOLDER}/Elsewhere`))
+      assert.strictEqual(inUse(disk), `${TEST_PROJECTS_FOLDER}/Elsewhere`)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  for (const [window, makeDisk] of [["A project window", makeTestDisk], ["Untitled Project", untitledDisk]] as const) {
+    it.effect(`${window} with unsaved changes asks, and nothing changes until they are answered`, () => {
+      const disk = makeDisk()
+      const before = inUse(disk)
+      return Effect.gen(function*() {
+        yield* reset
+        edit()
+        yield* newProjectEffect("Season 3")
+        assert.deepInclude(asked(), { name: "Season 3", target: { _tag: "New", name: "Season 3" } })
+        assert.strictEqual(inUse(disk), before)
+        assert.deepStrictEqual(disk.project.recent, [])
+      }).pipe(Effect.provide(layerFor(disk)))
+    })
+  }
 
   it.effect("Untitled Project's New window leaves this window untitled, its map and all", () => {
     const disk = untitledDisk()
     return Effect.gen(function*() {
       yield* reset
+      edit()
       const { tabId, tabIds } = s()
       yield* newProjectEffect("Season 3")
       yield* noticesWhile(() => openInNewWindowEffect)
@@ -90,33 +132,12 @@ describe("asking where a project opens", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("Untitled Project with edits asks", () => {
-    const disk = untitledDisk()
-    return Effect.gen(function*() {
-      yield* reset
-      edit()
-      yield* newProjectEffect("Season 3")
-      assert.deepInclude(asked(), { name: "Season 3", target: { _tag: "New", name: "Season 3" } })
-      assert.isNull(inUse(disk))
-    }).pipe(Effect.provide(layerFor(disk)))
-  })
-
-  it.effect("Untitled Project with a second map asks", () => {
-    const disk = untitledDisk()
-    return Effect.gen(function*() {
-      yield* reset
-      yield* createNewMap("Big Loop", "Isaac")
-      yield* createNewMap("Hairpin", "Isaac")
-      yield* newProjectEffect("Season 3")
-      assert.isNotNull(asked())
-    }).pipe(Effect.provide(layerFor(disk)))
-  })
-
   it.effect("Open project… and a recent project ask, after the folder is known", () => {
     const disk = makeTestDisk()
     disk.project.recent = [OTHER]
     return Effect.gen(function*() {
       yield* reset
+      edit()
       disk.answers.push(`${TEST_PROJECTS_FOLDER}/Picked`)
       yield* chooseProjectEffect
       assert.deepInclude(asked(), {
@@ -135,10 +156,66 @@ describe("asking where a project opens", () => {
     const disk = makeTestDisk()
     return Effect.gen(function*() {
       yield* reset
+      edit()
       disk.answers.push(null)
       yield* chooseProjectEffect
       yield* switchProjectEffect(TEST_PROJECT)
       assert.isNull(s().dialog)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+})
+
+describe("a recent project's menu", () => {
+  const other = { name: "Other", path: OTHER }
+
+  it.effect("Open in new window asks nothing, unsaved changes or not, and this window stays as it was", () => {
+    const disk = makeTestDisk()
+    disk.project.recent = [OTHER]
+    return Effect.gen(function*() {
+      yield* reset
+      edit()
+      const notices = yield* noticesWhile((seen) => openRecentInNewWindowEffect(other).pipe(Effect.as(seen)))
+      assert.deepStrictEqual(notices, ["Opening Other in a new window"])
+      assert.isNull(s().dialog)
+      assert.deepStrictEqual(disk.project.windows, [OTHER])
+      assert.deepStrictEqual(disk.prompts, [])
+      assert.strictEqual(inUse(disk), TEST_PROJECT)
+      assert.isTrue(s().dirty)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("Open in new window is refused for a project open elsewhere, and the list catches up", () => {
+    const disk = makeTestDisk()
+    disk.project.recent = [OTHER]
+    return Effect.gen(function*() {
+      yield* reset
+      disk.project.openElsewhere = [OTHER]
+      assert.match(String(yield* Effect.flip(openRecentInNewWindowEffect(other))), /is open in another window/)
+      assert.deepStrictEqual(disk.project.windows, [])
+      assert.deepStrictEqual(s().project?.openElsewhere, [OTHER])
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("from the start screen, Open in new window leaves this window choosing", () => {
+    const disk = chooserDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* noticesWhile(() => openRecentInNewWindowEffect(other))
+      assert.deepStrictEqual(disk.project.windows, [OTHER])
+      assert.isTrue(isChooserRequired(s()))
+      assert.isNull(inUse(disk))
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("Remove from recent takes it off the list, and only that", () => {
+    const disk = makeTestDisk()
+    disk.project.recent = [OTHER]
+    return Effect.gen(function*() {
+      yield* reset
+      yield* forgetRecentProjectEffect(OTHER)
+      assert.deepStrictEqual(disk.project.recent, [])
+      assert.deepStrictEqual(s().project?.recent, [])
+      assert.strictEqual(inUse(disk), TEST_PROJECT)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 })
@@ -203,6 +280,7 @@ describe("the answer", () => {
     disk.project.windowFailure = `Couldn't start a new window for ${OTHER}.`
     return Effect.gen(function*() {
       yield* reset
+      edit()
       yield* switchProjectEffect(OTHER)
       const error = yield* Effect.flip(openInNewWindowEffect)
       assert.match(String(error), /Couldn't start a new window/)
@@ -334,6 +412,16 @@ describe("the required chooser", () => {
       s().openDialog({ id: "gameLink" })
       assert.strictEqual(s().dialog?.id, "gameLink")
       assert.isTrue(isModalOpen(s()))
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("titles the window Ballest Editor: no project, and no dot even with edits behind it", () => {
+    const disk = chooserDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      assert.strictEqual(windowTitleOf(s()), "Ballest Editor")
+      edit()
+      assert.strictEqual(windowTitleOf(s()), "Ballest Editor")
     }).pipe(Effect.provide(layerFor(disk)))
   })
 

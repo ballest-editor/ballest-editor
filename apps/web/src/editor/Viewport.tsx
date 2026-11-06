@@ -9,35 +9,42 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState
 } from "react"
 import * as THREE from "three"
-import { toTuple3, ueToThreeVector } from "../domain/coords"
-import { groupBoxTargets } from "../domain/groupSelection"
+import type { CatalogPiece } from "../domain/Catalog"
+import { threeToUeVector, toTuple3, ueToThreeVector } from "../domain/coords"
+import { counted, groupBoxTargets } from "../domain/groupSelection"
 import { isBound, mouseChordOf } from "../domain/Keybinds"
 import { WATER } from "../domain/level"
+import { dropPoint, pieceFootprint } from "../domain/placement"
+import { ORTHO_GROUND, SCENE_COLORS } from "../domain/sceneGround"
 import { gridColorsOf } from "../domain/Settings"
-import { placePrefab } from "./actions"
+import { holdsDrop, placeAt, placePrefab } from "./actions"
+import { fadeFineLines } from "./floorGrid"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { GroupBox } from "./groupBox"
 import { ItemObject } from "./ItemObject"
 import { advanceGameTime } from "./materials"
 import { OrthoGrid } from "./OrthoGrid"
-import { panePointer, perspectiveOnly } from "./paneCameras"
+import { floorGridOnly, panePointer } from "./paneCameras"
 import { drawEveryPane, PaneRenderer, useBeforePaneDraw } from "./PaneRenderer"
+import { draggedPiece, isPieceDrag } from "./pieceDrag"
 import { droppedPrefab, isPrefabDrag } from "./prefabDrag"
-import { GROUP_BOX_COLORS, SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
+import { GROUP_BOX_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
-import { SelectionOutline } from "./selectionOutline"
+import { SelectionOutline, setOutlineTheme } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
-import { groupBoxOf, type SelectMode, useEditor } from "./store"
+import { groupBoxOf, noTabOpen, type SelectMode, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
+import { isMesh } from "./threeGuards"
 import { glbUrl, visualsOf } from "./visuals"
-import { waterTopMaterial, waterUnderMaterial } from "./water"
+import { setWaterFloor, setWaterTheme, waterTopMaterial, waterUnderMaterial } from "./water"
 
 const CLICK_SLOP_PX = 4
 
@@ -193,6 +200,40 @@ const hitItemId = (hits: ReadonlyArray<THREE.Intersection>): string | null => {
 }
 
 /**
+ * Places `piece` under a pointer: on the item it is over, else on the floor it is over, or in an orthographic view on the
+ * plane a click would place on, keeping clear of any other item there. The raycast is here rather than on every drag
+ * event, for the same reason as a click's.
+ */
+const dropPiece = (piece: CatalogPiece, canvas: HTMLElement, e: { clientX: number; clientY: number }) => {
+  const { ndc, pane, slot } = panePointer(canvas, e)
+  const { floorHeight, setActivePane, settings } = useEditor.getState()
+  setActivePane(slot)
+  const raycaster = new THREE.Raycaster()
+  raycaster.setFromCamera(ndc, pane.camera)
+  const { ray } = raycaster
+  const root = sceneRegistry.itemsRoot
+  const surface = (root === null ? [] : raycaster.intersectObject(root, true)).flatMap((hit) => {
+    const id = isMesh(hit.object) ? hitItemId([hit]) : null
+    return id !== null && holdsDrop(id) ? [{ id, point: hit.point }] : []
+  })[0]
+  placeAt(
+    piece,
+    surface !== undefined
+      ? threeToUeVector(surface.point)
+      : pane.orthographicPlacement(floorHeight, ray.closestPointToPoint(pane.target, new THREE.Vector3())) ??
+        dropPoint(
+          threeToUeVector(ray.origin),
+          threeToUeVector(ray.direction),
+          floorHeight,
+          SKY_DOME_RADIUS,
+          pane.placeDistance(pieceFootprint(piece), settings.editor.placeDistance)
+        ),
+    pane.placementView(),
+    surface?.id
+  )
+}
+
+/**
  * Smooth resizing. R3F learns the container size through React state, so the canvas keeps
  * its old pixel size (and is cleared when it finally changes) for a frame or more while the
  * window is dragged. Instead, watch the container ourselves: ResizeObserver callbacks run
@@ -227,17 +268,17 @@ function SmoothResize() {
   return null
 }
 
-/** The clear colour follows the theme, as does the container behind the canvas (sceneBackgroundClass). */
+/** The clear colour follows the theme and the pane's projection, and the container behind the canvas the theme (sceneBackgroundClass). */
 function ViewportBackground() {
   const gl = useThree((s) => s.gl)
-  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
-  useEffect(() => gl.setClearColor(dark ? SCENE_COLORS.dark : SCENE_COLORS.light), [gl, dark])
+  const theme = useDarkTheme(useEditor((s) => s.settings.appearance.theme)) ? "dark" : "light"
+  useBeforePaneDraw(({ view }) => gl.setClearColor((view === undefined ? SCENE_COLORS : ORTHO_GROUND)[theme]))
   return null
 }
 
 /**
  * The floor grid (1 m cells, 10 m sections) at the map's floor height, in the user's
- * colours or ones picked for what it's seen against (the theme, or the sky by day or night).
+ * colours or ones derived from the ground they sit on. It follows the camera, so it ends where its fade ends.
  */
 function ViewportGrid() {
   const appearance = useEditor((s) => s.settings.appearance)
@@ -245,6 +286,14 @@ function ViewportGrid() {
   const dark = useDarkTheme(appearance.theme)
   const colors = gridColorsOf(appearance, dark)
   const grid = useRef<THREE.Mesh>(null)
+  useLayoutEffect(() => {
+    const material = grid.current?.material
+    if (!(material instanceof THREE.ShaderMaterial)) return
+    material.onBeforeCompile = (shader) => {
+      shader.fragmentShader = fadeFineLines(shader.fragmentShader)
+    }
+    material.needsUpdate = true
+  }, [])
   // drei fades the grid from R3F's camera, and each pane has its own.
   useBeforePaneDraw(({ perspective: { position } }) => {
     const material = grid.current?.material
@@ -253,18 +302,21 @@ function ViewportGrid() {
     if (fadeFrom instanceof THREE.Vector3) fadeFrom.set(position.x, floorHeight, position.z)
     material.uniformsNeedUpdate = true
   })
-  if (!appearance.gridVisible) return null
   return (
     <Grid
       ref={grid}
-      layers={perspectiveOnly}
+      layers={floorGridOnly}
+      visible={appearance.gridVisible}
       position={[0, floorHeight, 0]}
       side={THREE.DoubleSide} // drei's default (BackSide) hides it from below
       infiniteGrid
+      followCamera // with the plane below, the grid has no edge to see: it ends where its fade does, wherever the camera is
+      args={[2, 2]} // drei scales this by the fade distance, and the 1 x 1 default stops at half of it, still visible
       cellSize={100}
       sectionSize={1000}
       fadeDistance={SKY_DOME_RADIUS}
       fadeStrength={2}
+      cellThickness={1} // drei's half-pixel default makes the 1 m lines unreadable in the light theme
       cellColor={colors.cell}
       sectionColor={colors.section}
     />
@@ -275,10 +327,14 @@ const WATER_POSITION = toTuple3(ueToThreeVector({ ...WATER.center, z: WATER.heig
 
 /** The level's water sheet (see water.ts). Not in the click raycast (that only walks the items). */
 function Water() {
-  const visible = useEditor((s) => s.settings.appearance.waterVisible)
+  const appearance = useEditor((s) => s.settings.appearance)
+  const dark = useDarkTheme(appearance.theme)
+  useEffect(() => setWaterTheme(dark ? "dark" : "light"), [dark])
+  const floorHeight = useEditor((s) => s.floorHeight)
+  useEffect(() => setWaterFloor(floorHeight), [floorHeight])
   const geometry = useMemo(() => new THREE.PlaneGeometry(WATER.size, WATER.size), [])
   useEffect(() => () => geometry.dispose(), [geometry])
-  if (!visible) return null
+  if (!appearance.waterVisible) return null
   return (
     <group position={WATER_POSITION} rotation={[-Math.PI / 2, 0, 0]}>
       <mesh geometry={geometry} material={waterTopMaterial} renderOrder={1} />
@@ -293,7 +349,7 @@ function GameClock() {
   return null
 }
 
-/** Outline along a selected item's mesh edges (see selectionOutline.ts); the active item draws lighter. */
+/** Outline along a selected item's mesh edges (see selectionOutline.ts); the active item draws apart. */
 function SelectedOutline({ id, active }: { readonly id: string; readonly active: boolean }) {
   const outline = useMemo(() => new SelectionOutline(), [])
   useFrame(() => {
@@ -311,6 +367,8 @@ function SelectedOutline({ id, active }: { readonly id: string; readonly active:
 
 function SelectedOutlines() {
   const selectedIds = useEditor((s) => s.selectedIds)
+  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
+  useEffect(() => setOutlineTheme(dark), [dark])
   const active = selectedIds.at(-1)
   return selectedIds.map((id) => <SelectedOutline key={id} id={id} active={id === active} />)
 }
@@ -341,13 +399,14 @@ function Overlay() {
   const missing = useEditor((s) => s.missingGlbs)
   const speed = useEditor((s) => s.cameraSpeed)
   return (
-    <div className="pointer-events-none absolute inset-x-2 top-10 bottom-2 flex flex-col items-start gap-1.5">
+    // under the pane picker and the instance banner (components/InstanceBanner.tsx)
+    <div className="pointer-events-none absolute inset-x-2 top-21 bottom-2 flex flex-col items-start gap-1.5">
       {missing.size > 0 && (
         <Badge variant="destructive" className="pointer-events-auto" title={[...missing].join("\n")}>
-          {missing.size} mesh file{missing.size === 1 ? "" : "s"} failed to load
+          {counted(missing.size, "mesh file")} failed to load
         </Badge>
       )}
-      {speed !== 1 && <Badge variant="secondary">Camera speed ×{speed}</Badge>}
+      {speed !== 1 && <Badge variant="neutral">Camera speed ×{speed}</Badge>}
     </div>
   )
 }
@@ -356,6 +415,7 @@ function Overlay() {
 export function Viewport({ controls: Controls }: { readonly controls: ComponentType<{ readonly disabled: boolean }> }) {
   const [revealed, setRevealed] = useState(false)
   const reveal = useCallback(() => setRevealed(true), [])
+  const hidden = useEditor(noTabOpen)
   return (
     <div
       // [&_canvas]: the canvas element always fills the container, even on frames where its
@@ -365,21 +425,25 @@ export function Viewport({ controls: Controls }: { readonly controls: ComponentT
       data-viewport
       onPointerDown={(e) => e.currentTarget.focus({ preventScroll: true })}
       onDragOver={(e) => {
-        if (!isPrefabDrag(e.dataTransfer)) return
+        if (!isPrefabDrag(e.dataTransfer) && !isPieceDrag(e.dataTransfer)) return
         e.preventDefault()
         e.dataTransfer.dropEffect = "copy"
       }}
       onDrop={(e) => {
         const prefab = droppedPrefab(e.dataTransfer)
-        if (prefab === undefined) return
+        const piece = isPieceDrag(e.dataTransfer) ? draggedPiece() : undefined
+        const canvas = e.currentTarget.querySelector("canvas")
+        if (prefab === undefined && (piece === undefined || canvas === null)) return
         e.preventDefault()
         e.currentTarget.focus({ preventScroll: true })
-        void placePrefab(prefab)
+        if (prefab !== undefined) void placePrefab(prefab)
+        else if (piece !== undefined && canvas !== null) dropPiece(piece, canvas, e)
       }}
     >
       <Canvas
+        frameloop={hidden ? "never" : "always"}
         // Hidden until the first scene is ready, then a quick fade up from translucent.
-        className={revealed ? "animate-in fade-in-30 duration-300 ease-out" : "opacity-0"}
+        className={revealed ? "animate-in fade-in-30 duration-150 ease-out" : "opacity-0"}
         // A pane that isn't drawn this frame keeps its pixels (see PaneRenderer).
         gl={{ antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: true }}
       >

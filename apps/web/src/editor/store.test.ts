@@ -9,22 +9,36 @@ import { nodeKeys } from "../domain/groupSelection"
 import { isPlayerStart } from "../domain/MapFile"
 import { withDifficulty } from "../domain/mapTags"
 import { mirrorFlagsOf } from "../domain/mirror"
+import { prefabOfItems } from "../domain/prefab"
 import { defaultSettings } from "../domain/Settings"
 import { loadStructure, sidecarOf, structureOfMap } from "../domain/sidecar"
-import { treeKeys } from "../domain/structure"
+import { findGroup, treeKeys } from "../domain/structure"
+import { lightingOf } from "../domain/sunlight"
 import { defaultViewLayout } from "../domain/viewLayout"
+import type { ProjectState } from "../services/Platform"
 import {
+  editedAtOf,
+  exportProblemOf,
   gameMapOf,
   initialMap,
   nextSelection,
+  NO_TAB_OPEN,
   nodeNamesOf,
+  noTabOpen,
   pivotOf,
+  PREFAB_TAB_STAYS_HERE,
+  saveProblemOf,
   shownLighting,
   shownTransform,
-  useEditor
+  shownValidation,
+  tabStateOf,
+  useEditor,
+  windowTitleOf
 } from "./store"
 
 const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!
+
+const emptyPrefab = prefabOfItems([], null)
 
 const state = () => useEditor.getState()
 /** A new map with only its player start, so these tests own every other item and index. */
@@ -154,6 +168,8 @@ describe("editor store", () => {
       return s().selectedIds[0]!
     }
     const translationOf = (id: string) => s().doc.map.items[s().doc.ids.indexOf(id)]!.itemTransform.translation
+    const withUndoSelection = (on: boolean) =>
+      s().setSettings({ ...defaultSettings, editor: { ...defaultSettings.editor, undoSelection: on } })
 
     it("puts every kind of edit on the stack, and loading a map clears it", () => {
       s().loadMap(startOnlyMap(), null)
@@ -168,6 +184,105 @@ describe("editor store", () => {
       assert.strictEqual(s().past.length, 0)
       assert.strictEqual(s().future.length, 0)
       assert.isFalse(s().dirty)
+    })
+
+    describe("dirty", () => {
+      const saved = { name: "saved.balledit", path: null }
+      const save = () => s().markSaved(s().tabId, s().doc, s().doc.map, saved)
+
+      it("clears when undo gets back to the map as it was opened", () => {
+        s().loadMap(startOnlyMap(), null)
+        place(0)
+        place(10)
+        assert.isTrue(s().dirty)
+        s().undo()
+        assert.isTrue(s().dirty)
+        s().undo()
+        assert.isFalse(s().dirty)
+        s().redo()
+        assert.isTrue(s().dirty)
+      })
+
+      it("clears when undo gets back to the last save", () => {
+        s().loadMap(startOnlyMap(), null)
+        place(0)
+        save()
+        assert.isFalse(s().dirty)
+        place(10)
+        assert.isTrue(s().dirty)
+        s().undo()
+        assert.isFalse(s().dirty)
+      })
+
+      it("comes back on undoing past the save, and clears on redoing to it", () => {
+        s().loadMap(startOnlyMap(), null)
+        place(0)
+        save()
+        s().undo()
+        assert.isTrue(s().dirty)
+        s().redo()
+        assert.isFalse(s().dirty)
+      })
+
+      it("stays once a new edit has replaced the step that was saved", () => {
+        s().loadMap(startOnlyMap(), null)
+        place(0)
+        save()
+        s().undo()
+        place(10)
+        s().undo()
+        assert.isTrue(s().dirty)
+      })
+
+      it("clears at the step that was saved, when the map was edited during the save", () => {
+        s().loadMap(startOnlyMap(), null)
+        place(0)
+        const from = s().doc
+        place(10)
+        s().markSaved(s().tabId, from, from.map, saved)
+        assert.isTrue(s().dirty)
+        s().undo()
+        assert.isFalse(s().dirty)
+      })
+
+      it("isn't changed by undoing a selection step", () => {
+        s().loadMap(startOnlyMap(), null)
+        withUndoSelection(true)
+        try {
+          const id = place(0)
+          s().select([])
+          s().undo()
+          assert.deepStrictEqual(s().selectedIds, [id])
+          assert.isTrue(s().dirty)
+        } finally {
+          withUndoSelection(false)
+        }
+      })
+
+      it("stays on a recovered map, which no step of the history is the file of", () => {
+        s().loadMap(startOnlyMap(), saved, undefined, { dirty: true })
+        place(0)
+        s().undo()
+        assert.isTrue(s().dirty)
+      })
+
+      it("stays on a map that lost its file", () => {
+        s().loadMap(startOnlyMap(), saved)
+        place(0)
+        s().detachFiles()
+        s().undo()
+        assert.isTrue(s().dirty)
+      })
+
+      it("follows each tab's own saved step", () => {
+        s().loadMap(startOnlyMap(), null)
+        const first = s().tabId
+        place(0)
+        s().loadMap(startOnlyMap(), saved, undefined, { into: "newTab" })
+        s().activateTab(first)
+        s().undo()
+        assert.isFalse(s().dirty)
+      })
     })
 
     it("leaves no step for edits that change nothing", () => {
@@ -228,9 +343,6 @@ describe("editor store", () => {
       s().undo()
       assert.deepStrictEqual(translationOf(id), { x: 0, y: 0, z: 0 })
     })
-
-    const withUndoSelection = (on: boolean) =>
-      s().setSettings({ ...defaultSettings, editor: { ...defaultSettings.editor, undoSelection: on } })
 
     it("doesn't record selection changes by default", () => {
       withUndoSelection(false)
@@ -631,16 +743,16 @@ describe("editor store", () => {
   it("records every notification, newest first; a persistent kind pins until resolved", () => {
     const s = () => useEditor.getState()
     s().clearNotifications()
-    s().notify("info", "Saved Big Loop", {
-      kind: "mapSaved",
+    s().notify("info", "Big Loop was changed in the game", {
+      kind: "changedInGame",
       actions: [{ label: "Reveal", command: { _tag: "RevealProject" } }]
     })
     s().notify("error", "The game wasn't found", { kind: "gameNotFound", persistent: true, body: "Choose its folder." })
-    s().notify("error", "Something failed")
+    s().notify("error", "Its editor data couldn't be read", { kind: "sidecarUnreadable" })
     assert.deepStrictEqual(s().notifications.map((n) => [n.kind, n.level, n.title]), [
-      ["error", "error", "Something failed"],
+      ["sidecarUnreadable", "error", "Its editor data couldn't be read"],
       ["gameNotFound", "error", "The game wasn't found"],
-      ["mapSaved", "info", "Saved Big Loop"]
+      ["changedInGame", "info", "Big Loop was changed in the game"]
     ])
     assert.deepInclude(s().notifications[1], { body: "Choose its folder.", persistent: true, resolvedAt: null })
     assert.deepStrictEqual(s().notifications[2]?.actions, [{ label: "Reveal", command: { _tag: "RevealProject" } }])
@@ -654,6 +766,25 @@ describe("editor store", () => {
     s().markNotificationsRead()
     s().clearNotifications()
     assert.deepStrictEqual(s().notifications, [])
+  })
+
+  it("sends each event to the inbox or a toast, never both", () => {
+    const s = () => useEditor.getState()
+    s().clearNotifications()
+    useEditor.setState({ toasts: [] })
+    s().notify("error", "Select 2 to 4096 items before saving a prefab.", { kind: "prefabRefused" })
+    s().notify("error", "Something failed")
+    s().notify("info", "Saved Big Loop", { kind: "mapSaved" })
+    assert.deepStrictEqual(s().toasts.map((n) => n.kind), ["mapSaved", "error", "prefabRefused"])
+    assert.deepStrictEqual(s().notifications, [])
+
+    useEditor.setState({ toasts: [] })
+    s().notify("info", "Big Loop was changed in the game", { kind: "changedInGame" })
+    s().notify("info", "Exported, but the plugin isn't there", { kind: "anything", persistent: true })
+    assert.deepStrictEqual(s().notifications.map((n) => n.kind), ["anything", "changedInGame"])
+    assert.deepStrictEqual(s().toasts, [])
+    s().resolveNotifications("anything")
+    s().clearNotifications()
   })
 })
 
@@ -678,6 +809,38 @@ describe("document tabs", () => {
     state().loadMap(named("C"), { name: "c.balledit", path: null }, undefined, { into: "newTab" })
     assert.deepStrictEqual(state().tabIds, [first, state().tabId, second])
     assert.strictEqual(state().file?.name, "c.balledit")
+  })
+
+  it("opens a map in a background tab after the active one, whatever is active, and leaves that active", () => {
+    oneTab()
+    const first = state().tabId
+    state().loadMap(named("A"), fileOf("a"), undefined, { into: "backgroundTab" })
+    assert.strictEqual(state().tabId, first)
+    assert.isNull(state().file)
+    assert.strictEqual(state().tabIds[0], first)
+    assert.strictEqual(state().tabIds.length, 2)
+    const behind = state().tabIds[1]!
+    assert.strictEqual(state().parkedTabs.get(behind)?.file?.name, "a.balledit")
+
+    state().activateTab(behind)
+    assert.strictEqual(state().file?.name, "a.balledit")
+    assert.strictEqual(state().doc.map.worldSettings.levelData.levelDisplayName, "A")
+  })
+
+  it("says a map was edited when a tab has its edits, and when its file changed otherwise", () => {
+    oneTab()
+    const modifiedAt = "2026-01-01T00:00:00.000Z"
+    state().loadMap(named("A"), fileOf("a"), undefined)
+    assert.strictEqual(editedAtOf(state(), "a.balledit", modifiedAt), modifiedAt)
+    assert.strictEqual(editedAtOf(state(), "other.balledit", modifiedAt), modifiedAt)
+
+    state().setLighting({ ...lightingOf(state().doc.map.worldSettings), timeOfDay: 3 })
+    const edited = editedAtOf(state(), "a.balledit", modifiedAt)
+    assert.isAbove(Date.parse(edited), Date.parse(modifiedAt))
+
+    // an undo back to what the file holds has no edits left to date
+    state().undo()
+    assert.strictEqual(editedAtOf(state(), "a.balledit", modifiedAt), modifiedAt)
   })
 
   it("keeps each tab's document, history, selection and file while another is active", () => {
@@ -717,6 +880,124 @@ describe("document tabs", () => {
     assert.strictEqual(state().parkedTabs.size, 0)
     state().closeTab(first)
     assert.deepStrictEqual(state().tabIds, [first])
+  })
+
+  describe("the last tab of a named project", () => {
+    const NAMED: ProjectState = {
+      current: { path: "/projects/Season 3", name: "Season 3", exists: true },
+      recent: [],
+      lastOpenMap: null,
+      chooserRequired: false,
+      openElsewhere: [],
+      projectsFolder: "/projects",
+      startRefused: null
+    }
+    /** A project's one tab, with its map; the project goes when the test does. */
+    const inProject = (test: () => void) => () => {
+      const { project } = state()
+      oneTab()
+      state().setProject(NAMED, [])
+      state().loadMap(named("A"), fileOf("a"))
+      try {
+        test()
+      } finally {
+        useEditor.setState({ project })
+        oneTab()
+      }
+    }
+    const closeTheTab = () => state().closeTab(state().tabId)
+
+    it(
+      "closes, leaving no tab and nothing of it behind",
+      inProject(() => {
+        const closed = state().tabId
+        closeTheTab()
+        assert.isTrue(noTabOpen(state()))
+        assert.deepStrictEqual(state().tabIds, [])
+        assert.notStrictEqual(state().tabId, closed)
+        assert.strictEqual(state().parkedTabs.size, 0)
+        assert.isNull(state().file)
+        assert.isFalse(state().dirty)
+        assert.deepStrictEqual(state().doc.ids, [])
+        assert.isUndefined(tabStateOf(state(), state().tabId))
+      })
+    )
+
+    it(
+      "keeps the window's title on the project, with no dot",
+      inProject(() => {
+        state().setLighting({ ...lightingOf(state().doc.map.worldSettings), timeOfDay: 3 })
+        assert.strictEqual(windowTitleOf(state()), "• Season 3 – Ballest Editor")
+        closeTheTab()
+        assert.strictEqual(windowTitleOf(state()), "Season 3 – Ballest Editor")
+      })
+    )
+
+    it(
+      "edits nothing while no tab is open",
+      inProject(() => {
+        closeTheTab()
+        const { doc } = state()
+        state().placePiece(cube, placementTransform(cube, { x: 0, y: 0, z: 0 }))
+        state().placeGroup([], "Bridge")
+        state().setLighting({ ...lightingOf(doc.map.worldSettings), timeOfDay: 3 })
+        state().renameLevel("Other", "me")
+        assert.strictEqual(state().doc, doc)
+        assert.isFalse(state().dirty)
+        assert.lengthOf(state().past, 0)
+      })
+    )
+
+    it(
+      "gives Save, Export and Play nothing to act on while no tab is open",
+      inProject(() => {
+        assert.isNull(saveProblemOf(state()))
+        assert.isNull(exportProblemOf(state()))
+        closeTheTab()
+        assert.strictEqual(saveProblemOf(state()), NO_TAB_OPEN)
+        assert.strictEqual(exportProblemOf(state()), NO_TAB_OPEN)
+      })
+    )
+
+    for (const into of ["active", "newTab", "addedTab", "backgroundTab"] as const) {
+      it(
+        `opens the first tab again, as the active one (${into})`,
+        inProject(() => {
+          closeTheTab()
+          const { mapShownRequest, tabId } = state()
+          state().loadMap(named("B"), fileOf("b"), undefined, { into })
+          assert.deepStrictEqual(state().tabIds, [tabId])
+          assert.strictEqual(state().tabId, tabId)
+          assert.strictEqual(state().file?.name, "b.balledit")
+          assert.strictEqual(state().mapShownRequest, mapShownRequest + 1)
+          assert.isFalse(noTabOpen(state()))
+        })
+      )
+    }
+
+    it(
+      "stays while a drag is under way",
+      inProject(() => {
+        const { tabId } = state()
+        state().setPreview(new Map())
+        closeTheTab()
+        state().setPreview(null)
+        assert.deepStrictEqual(state().tabIds, [tabId])
+      })
+    )
+
+    it(
+      "says a definition's tab isn't a map, and closes like one",
+      inProject(() => {
+        state().patchTab(state().tabId, {
+          document: { kind: "prefab", tier: "project", name: "Bridge", hash: "", file: emptyPrefab, sources: new Map() }
+        })
+        assert.strictEqual(exportProblemOf(state()), PREFAB_TAB_STAYS_HERE)
+        closeTheTab()
+        assert.strictEqual(state().document.kind, "map")
+        assert.isTrue(noTabOpen(state()))
+      })
+    )
   })
 
   it("marks the tab a save started from as saved, even when another is active by then", () => {
@@ -1044,18 +1325,32 @@ describe("groups and the selection", () => {
     assert.strictEqual(state().enteredGroupId, outer)
   })
 
-  it("leaves on a click on empty space or outside the group", () => {
+  it("stays on a click on empty space, and leaves on one outside the group", () => {
     const { a, d } = nestedMap()
     state().doubleClickItem(a)
+    const entered = state().enteredGroupId
+    assert.isNotNull(entered)
     state().clickItem(null, "add")
-    assert.isNotNull(state().enteredGroupId)
+    assert.strictEqual(state().enteredGroupId, entered)
     state().clickItem(null, "replace")
-    assert.isNull(state().enteredGroupId)
+    assert.strictEqual(state().enteredGroupId, entered)
     assert.deepStrictEqual(selected(), [])
-    state().doubleClickItem(a)
     state().clickItem(d, "replace")
     assert.isNull(state().enteredGroupId)
     assert.deepStrictEqual(selected(), [d])
+  })
+
+  it("takes all of the entered group as its members: Group nests them, Ungroup leaves it be", () => {
+    const { a, b, c, inner, outer } = nestedMap()
+    state().enterGroup(outer)
+    state().select([a, b, c])
+    state().ungroupSelection()
+    assert.isDefined(findGroup(state().doc.structure.tree, outer))
+    assert.isUndefined(findGroup(state().doc.structure.tree, inner))
+    state().groupSelection()
+    const group = findGroup(state().doc.structure.tree, outer)
+    assert.strictEqual(group?.children.length, 1)
+    assert.strictEqual(group?.children[0]?.kind, "group")
   })
 
   it("steps out one level on deselect, then clears", () => {
@@ -1076,7 +1371,7 @@ describe("groups and the selection", () => {
     const { a, inner } = nestedMap()
     state().select(nodeKeys(state().doc.structure.tree, inner))
     state().enterGroup(inner)
-    state().ungroupSelection()
+    state().deleteSelection()
     assert.isNull(state().enteredGroupId)
     state().enterGroup("gone")
     state().undo()
@@ -1214,6 +1509,46 @@ describe("view panes", () => {
     assert.strictEqual(state().activePane, 0)
   })
 
+  it("makes a maximised pane the active one, and keeps it there going back", () => {
+    resetStore()
+    state().setViewLayoutKind("quad")
+    state().togglePaneMaximised(2)
+    assert.strictEqual(state().viewLayout.maximised, 2)
+    assert.strictEqual(state().activePane, 2)
+    state().togglePaneMaximised(2)
+    assert.isUndefined(state().viewLayout.maximised)
+    assert.strictEqual(state().viewLayout.kind, "quad")
+    assert.strictEqual(state().activePane, 2)
+  })
+
+  it("picking a layout ends a maximised pane", () => {
+    resetStore()
+    state().setViewLayoutKind("quad")
+    state().togglePaneMaximised(3)
+    state().setViewLayoutKind("columns")
+    assert.isUndefined(state().viewLayout.maximised)
+    assert.strictEqual(state().activePane, 1)
+  })
+
+  it("opens on the pane a map was left maximised on", () => {
+    resetStore()
+    const viewLayout = { ...defaultViewLayout, kind: "quad" as const, maximised: 3 as const }
+    state().loadMap(initialMap(), null, undefined, { viewLayout })
+    assert.strictEqual(state().activePane, 3)
+  })
+
+  it("keeps a tab's dividers while another tab is in front", () => {
+    resetStore()
+    const { first, second } = twoTabs()
+    state().setViewLayoutKind("quad")
+    state().setPaneSplit({ x: 0.3, y: 0.7 })
+    state().activateTab(first)
+    assert.strictEqual(state().viewLayout.splitX, 0.5)
+    state().activateTab(second)
+    assert.strictEqual(state().viewLayout.splitX, 0.3)
+    assert.strictEqual(state().viewLayout.splitY, 0.7)
+  })
+
   it("keeps what a hidden slot looks along", () => {
     resetStore()
     state().setViewLayoutKind("quad")
@@ -1254,5 +1589,54 @@ describe("view panes", () => {
     state().loadMap(initialMap(), null)
     assert.strictEqual(state().frameAllRequest, frameAllRequest + 1)
     assert.strictEqual(state().mapShownRequest, mapShownRequest + 1)
+  })
+})
+
+describe("the Validate result", () => {
+  const validated = () => {
+    mapWithCubes(0, 100)
+    state().validateDoc()
+    assert.isDefined(shownValidation(state()))
+  }
+
+  it("is there only once Validate has run", () => {
+    mapWithCubes(0)
+    assert.isUndefined(shownValidation(state()))
+  })
+
+  it("outlasts a selection change, which edits nothing", () => {
+    validated()
+    state().select([state().doc.ids[0]!])
+    state().deselect()
+    assert.isDefined(shownValidation(state()))
+  })
+
+  it("goes with the next edit, and undo is an edit of its own", () => {
+    validated()
+    moveItem(state().doc.ids[1]!, { x: 5, y: 0, z: 0 })
+    assert.isUndefined(shownValidation(state()))
+    state().undo()
+    assert.isDefined(shownValidation(state()), "the document it was run on, as it was")
+    moveItem(state().doc.ids[1]!, { x: 9, y: 0, z: 0 })
+    state().validateDoc()
+    state().undo()
+    assert.isUndefined(shownValidation(state()))
+  })
+
+  it("outlasts a Save, which edits nothing", () => {
+    validated()
+    const { doc } = state()
+    state().markSaved(state().tabId, doc, { ...doc.map }, { name: "saved.balledit", path: null })
+    assert.notStrictEqual(state().doc, doc)
+    assert.isDefined(shownValidation(state()))
+  })
+
+  it("stays with its tab", () => {
+    validated()
+    const { tabId } = state()
+    state().loadMap(startOnlyMap(), { name: "b.balledit", path: null }, undefined, { into: "newTab" })
+    assert.isUndefined(shownValidation(state()))
+    state().activateTab(tabId)
+    assert.isDefined(shownValidation(state()))
   })
 })

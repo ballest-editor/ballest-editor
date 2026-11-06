@@ -39,7 +39,9 @@ export const itemClasses = (map: MapFile, ids: ReadonlyArray<string>): ReadonlyM
     return item === undefined ? [] : [[key, item.actorToSpawn] as const]
   }))
 
-const termsOf = (query: string): ReadonlyArray<string> => query.toLowerCase().split(/\s+/).filter((t) => t.length > 0)
+/** A search box's words, lower-cased: what a row has to hold all of. */
+export const termsOf = (query: string): ReadonlyArray<string> =>
+  query.toLowerCase().split(/\s+/).filter((t) => t.length > 0)
 
 const rowMatches = (row: OutlineRow, terms: ReadonlyArray<string>) => {
   const haystack = `${numberedNameText(row)} ${row.className} ${row.tags.join(" ")}`.toLowerCase()

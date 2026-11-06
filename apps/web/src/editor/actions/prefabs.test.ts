@@ -2,9 +2,12 @@ import { assert, describe, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 import * as fs from "node:fs"
 import * as path from "node:path"
+import { afterEach } from "vitest"
 import { Catalog, indexCatalog } from "../../domain/Catalog"
 import { placementTransform } from "../../domain/factory"
+import { type Box, boxCentreOf, itemsBoxOf } from "../../domain/itemBounds"
 import { MapSidecar } from "../../domain/MapSidecar"
+import { PREFAB_NEEDS_PROJECT } from "../../domain/prefab"
 import { findGroup, treeKeys } from "../../domain/structure"
 import { MapCodec } from "../../services/MapCodec"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
@@ -19,21 +22,40 @@ import {
 } from "../../test/desktopBridge"
 import { createNewMap, layerFor, reset, s } from "../../test/editorActions"
 import { objectAt, parseJson } from "../../test/json"
+import { VIEW_DOWN } from "../../test/placementView"
 import { changedPrefab, PREFAB_TEXT } from "../../test/prefabs"
 import { repoRoot } from "../../test/samples"
 import { sceneRegistry } from "../sceneRegistry"
-import { tabStateOf, useEditor } from "../store"
+import {
+  isBlankTab,
+  isUnsavedTab,
+  NO_TAB_OPEN,
+  noTabOpen,
+  saveProblemOf,
+  selectedIndices,
+  tabLabelOf,
+  tabStateOf,
+  useEditor
+} from "../store"
 import { restorePrefabBackupEffect } from "./backups"
 import { exportToGameEffect, playEffect } from "./exportPlay"
 import { openProjectMapFile } from "./maps"
+import { spreadPlacement } from "./placement"
 import {
   checkPrefabs,
   deletePrefabEffect,
+  newPrefabEffect,
+  newPrefabProblem,
   openPrefabEffect,
   placePrefabEffect,
+  projectMapsUsingPrefabEffect,
   renamePrefabEffect,
   savePrefabTab,
-  saveSelectionAsPrefabEffect
+  saveSelectionAsPrefabEffect,
+  selectInstances,
+  selectionPrefabProblem,
+  suggestPrefabName,
+  tabsUsingPrefab
 } from "./prefabs"
 import { saveMapFile } from "./save"
 import { closeTabEffect } from "./unsaved"
@@ -45,15 +67,19 @@ const cube = parsed.pieces.find((p) => p.className === "BP_Prim_Cube")!
 const USER = { tier: "user", name: "Bridge" } as const
 const MAP = "Map_LevelEditorMain&Big Loop_Isaac.balledit"
 
+/** Where the view puts a placement. */
+const AIM = { x: 3000, y: 0, z: 9000 }
+
 const decodeSidecar = Schema.decodeUnknownSync(Schema.fromJsonString(MapSidecar))
 const notices = (kind: string) => s().notifications.filter((n) => n.kind === kind)
+const toastsOf = (kind: string) => s().toasts.filter((n) => n.kind === kind)
 
 /** A saved map and the catalog, with the fixture in the game's prefabs folder. */
 const started = (disk: TestDisk) =>
   Effect.gen(function*() {
     yield* reset
-    useEditor.setState({ notifications: [], prefabs: [], catalogIndex: indexCatalog(parsed) })
-    sceneRegistry.viewRay = () => ({ origin: { x: 0, y: 0, z: 9000 }, direction: { x: 1, y: 0, z: 0 } })
+    useEditor.setState({ notifications: [], toasts: [], prefabs: [], catalogIndex: indexCatalog(parsed) })
+    sceneRegistry.placementPoint = (width, height) => spreadPlacement(AIM, width, VIEW_DOWN, height)
     disk.files.set(userPrefabFile("Bridge"), PREFAB_TEXT)
     yield* createNewMap("Big Loop", "Isaac")
     yield* checkPrefabs
@@ -69,6 +95,11 @@ const instanceId = () => {
   const node = s().doc.structure.tree.find((n) => n.kind === "group" && n.prefab !== undefined)
   return node?.kind === "group" ? node.id : ""
 }
+
+/** The box around what is selected, which after a placement is the instance. */
+const instanceBox = () => itemsBoxOf(selectedIndices(s()).map((index) => s().doc.map.items[index]!), s().catalogIndex)!
+const boxesMeet = (a: Box, b: Box) =>
+  (["x", "y", "z"] as const).every((axis) => a.min[axis] <= b.max[axis] && b.min[axis] <= a.max[axis])
 
 const instance = (id: string, doc = s().doc) => findGroup(doc.structure.tree, id)
 const xOf = (key: string) => s().doc.map.items[s().doc.ids.indexOf(key)]?.itemTransform.translation.x ?? NaN
@@ -109,6 +140,11 @@ const moveAll = (id: string, by: number) => {
     )
   )
 }
+
+const openDefinition = Effect.gen(function*() {
+  yield* openPrefabEffect(USER)
+  return s().tabId
+})
 
 const withDisk = (
   body: (disk: TestDisk) => Effect.Effect<void, unknown, Layer.Success<ReturnType<typeof layerFor>>>
@@ -183,6 +219,33 @@ describe("placing a prefab", () => {
         const text = disk.files.get(projectFile(MAP)) ?? ""
         const map = yield* MapCodec.use((codec) => codec.decode(text))
         assert.strictEqual(map.editorState?.groups[0]?.name, "Bridge")
+      })
+    ))
+
+  it.effect("stands the box around its items on the spot the view picks", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        yield* placed
+        const box = instanceBox()
+        assert.closeTo(boxCentreOf(box).x, AIM.x, 0.01)
+        assert.closeTo(boxCentreOf(box).y, AIM.y, 0.01)
+        assert.closeTo(box.min.z, AIM.z, 0.01)
+      })
+    ))
+
+  it.effect("keeps clear of an item on the spot, and of the instance placed before it", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        s().placePiece(cube, placementTransform(cube, AIM))
+        const item = itemsBoxOf([s().doc.map.items.at(-1)!], s().catalogIndex)!
+        yield* placed
+        const first = instanceBox()
+        assert.isFalse(boxesMeet(first, item))
+        yield* placePrefabEffect(USER)
+        assert.isFalse(boxesMeet(instanceBox(), first))
+        assert.isFalse(boxesMeet(instanceBox(), item))
       })
     ))
 
@@ -310,11 +373,6 @@ describe("instances following their definition", () => {
 })
 
 describe("a definition's tab", () => {
-  const openDefinition = Effect.gen(function*() {
-    yield* openPrefabEffect(USER)
-    return s().tabId
-  })
-
   it.effect("is a tab like a map's that knows what it holds", () =>
     withDisk((disk) =>
       Effect.gen(function*() {
@@ -392,6 +450,38 @@ describe("a definition's tab", () => {
       })
     ))
 
+  it.effect("says in one toast that Save updated the instances, and keeps them out of the notification centre", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        yield* placed
+        yield* placed
+        yield* placed
+        yield* openDefinition
+        moveItem(s().doc.ids[0] ?? "", 300)
+        yield* saveMapFile
+        const [toast, ...others] = toastsOf("prefabSaved")
+        assert.strictEqual(toast?.title, "3 instances updated")
+        assert.strictEqual(toast?.body, "Saved the prefab Bridge")
+        assert.lengthOf(others, 0)
+        assert.lengthOf(notices("prefabInstancesUpdated"), 0)
+      })
+    ))
+
+  it.effect("says it saved when no instance had to follow, and leaves an edited one to the notification centre", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        const { key } = yield* placedFirst
+        moveItem(key, 100)
+        yield* openDefinition
+        moveItem(s().doc.ids[0] ?? "", 300)
+        yield* saveMapFile
+        assert.strictEqual(toastsOf("prefabSaved")[0]?.title, "Saved the prefab Bridge")
+        assert.lengthOf(notices("prefabInstancesEdited"), 1)
+      })
+    ))
+
   it.effect("has its unsaved edits asked about like a map's, and Save goes to the file", () =>
     withDisk((disk) =>
       Effect.gen(function*() {
@@ -415,7 +505,7 @@ describe("a definition's tab", () => {
         s().select([s().doc.ids[0] ?? ""])
         s().deleteSelection()
         const error = yield* Effect.flip(savePrefabTab)
-        assert.include(error.message, "2 to 4096 items")
+        assert.include(error.message, "at least 2 items")
         assert.isTrue(s().dirty)
         assert.strictEqual(disk.files.get(userPrefabFile("Bridge")), PREFAB_TEXT)
       })
@@ -465,11 +555,213 @@ describe("a definition's tab", () => {
     ))
 })
 
+describe("a new prefab", () => {
+  /** `started`, in the desktop app, where the project tier is. */
+  const startedWithProjects = (disk: TestDisk) =>
+    Effect.gen(function*() {
+      yield* started(disk)
+      s().setCapabilities({ ...s().capabilities, projects: true })
+    })
+  afterEach(() => s().setCapabilities({ ...s().capabilities, projects: false }))
+  const placeTwoCubes = () => {
+    s().placePiece(cube, placementTransform(cube, { x: 0, y: 0, z: 9000 }))
+    s().placePiece(cube, placementTransform(cube, { x: 400, y: 0, z: 9000 }))
+  }
+
+  it.effect("opens an empty, blank tab in the project tier and writes nothing", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* startedWithProjects(disk)
+        yield* newPrefabEffect
+        assert.strictEqual(tabLabelOf(s()), "Untitled prefab")
+        assert.deepInclude(s().document, { kind: "prefab", tier: "project", name: "Untitled prefab" })
+        assert.lengthOf(s().doc.map.items, 0)
+        assert.lengthOf(s().tabIds, 2)
+        assert.isTrue(isBlankTab(s()))
+        assert.isFalse(isUnsavedTab(s()))
+        assert.isFalse([...disk.files.keys()].some((name) => name.includes("Untitled")))
+
+        yield* newPrefabEffect
+        assert.strictEqual(tabLabelOf(s()), "Untitled prefab 2")
+      })
+    ))
+
+  it.effect("holds Save back until it has 2 items, then writes it through the prefab save path", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* startedWithProjects(disk)
+        yield* newPrefabEffect
+        assert.include(saveProblemOf(s()), "at least 2 items")
+        s().placePiece(cube, placementTransform(cube, { x: 0, y: 0, z: 9000 }))
+        assert.isTrue(s().dirty)
+        const error = yield* Effect.flip(saveMapFile)
+        assert.include(error.message, "at least 2 items")
+        assert.isTrue(s().dirty)
+
+        s().placePiece(cube, placementTransform(cube, { x: 400, y: 0, z: 9000 }))
+        assert.isNull(saveProblemOf(s()))
+        yield* saveMapFile
+        assert.isFalse(s().dirty)
+        assert.isNotNull(s().file)
+        assert.deepInclude(s().document, { name: "Untitled_prefab" })
+        assert.isTrue(disk.files.has(projectPrefabFile("Untitled_prefab")))
+        assert.deepInclude(s().prefabs.find((p) => p.tier === "project"), { name: "Untitled_prefab", itemCount: 2 })
+      })
+    ))
+
+  it.effect("takes a free name at its first Save, and keeps it after that", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* startedWithProjects(disk)
+        disk.files.set(projectPrefabFile("Untitled_prefab"), PREFAB_TEXT)
+        yield* checkPrefabs
+        yield* newPrefabEffect
+        placeTwoCubes()
+        yield* saveMapFile
+        assert.deepInclude(s().document, { name: "Untitled_prefab_2" })
+        assert.strictEqual(disk.files.get(projectPrefabFile("Untitled_prefab")), PREFAB_TEXT)
+
+        s().placePiece(cube, placementTransform(cube, { x: 800, y: 0, z: 9000 }))
+        yield* saveMapFile
+        assert.deepInclude(s().document, { name: "Untitled_prefab_2" })
+        assert.deepInclude(s().prefabs.find((p) => p.name === "Untitled_prefab_2"), { itemCount: 3 })
+      })
+    ))
+
+  it.effect("needs a project: Untitled Project has no tier to put it in", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* startedWithProjects(disk)
+        assert.isUndefined(newPrefabProblem(s()))
+        const { project } = s()
+        useEditor.setState({ project: project === null ? null : { ...project, current: null } })
+        assert.strictEqual(newPrefabProblem(s()), PREFAB_NEEDS_PROJECT)
+        const tabs = s().tabIds
+        yield* newPrefabEffect
+        assert.deepStrictEqual(s().tabIds, tabs)
+        useEditor.setState({ project })
+      })
+    ))
+
+  it.effect("opens from the project overview, as the first tab", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* startedWithProjects(disk)
+        yield* closeTabEffect(s().tabId)
+        assert.isTrue(noTabOpen(s()))
+        yield* newPrefabEffect
+        assert.lengthOf(s().tabIds, 1)
+        assert.strictEqual(s().document.kind, "prefab")
+      })
+    ))
+})
+
+describe("with no tab open", () => {
+  it.effect("opens a definition as the first tab, and places nothing", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        yield* closeTabEffect(s().tabId)
+        const error = yield* Effect.flip(placePrefabEffect(USER))
+        assert.strictEqual(error.message, NO_TAB_OPEN)
+        assert.lengthOf(s().tabIds, 0)
+
+        yield* openPrefabEffect(USER)
+        assert.lengthOf(s().tabIds, 1)
+        assert.deepInclude(s().document, { kind: "prefab", name: "Bridge" })
+      })
+    ))
+
+  it.effect("has no map to Export or Play", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        yield* closeTabEffect(s().tabId)
+        for (const effect of [exportToGameEffect, playEffect]) {
+          const error = yield* Effect.flip(effect)
+          assert.include(String(error), NO_TAB_OPEN)
+        }
+        assert.deepStrictEqual(disk.game.races, [])
+      })
+    ))
+})
+
+describe("the instances of a definition", () => {
+  it.effect("selecting them takes in every instance, whatever is entered, and nothing else", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        const first = yield* placed
+        yield* placePrefabEffect(USER)
+        const second = s().doc.structure.tree.flatMap((n) => n.kind === "group" && n.id !== first ? [n.id] : [])[0] ??
+          ""
+        s().placePiece(cube, placementTransform(cube, { x: 1000, y: 0, z: 5000 }))
+        s().enterGroup(first)
+        selectInstances(USER)
+        assert.isNull(s().enteredGroupId)
+        assert.sameMembers([...s().selectedIds], [...treeKeys([instance(first)!, instance(second)!])])
+      })
+    ))
+
+  it.effect("are found in every open map, the ones behind other tabs too, and not in the definition's own tab", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        const mapTab = yield* started(disk)
+        assert.deepStrictEqual(tabsUsingPrefab(s(), USER), [])
+        yield* placed
+        assert.deepStrictEqual(tabsUsingPrefab(s(), USER), [mapTab])
+        yield* openDefinition
+        assert.deepStrictEqual(tabsUsingPrefab(s(), USER), [mapTab])
+        assert.deepStrictEqual(tabsUsingPrefab(s(), { tier: "project", name: "Bridge" }), [])
+      })
+    ))
+
+  it.effect("are found in the project's maps by their sidecars, leaving out what won't read", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        yield* placed
+        yield* saveMapFile
+        const [map] = s().projectMaps
+        assert.deepStrictEqual(yield* projectMapsUsingPrefabEffect(USER, s().projectMaps), [MAP])
+        const arch = { tier: "user", name: "Arch" } as const
+        assert.deepStrictEqual(yield* projectMapsUsingPrefabEffect(arch, s().projectMaps), [])
+        const gone = { ...map!, fileName: "Map_LevelEditorMain&Gone_Isaac.balledit" }
+        assert.deepStrictEqual(yield* projectMapsUsingPrefabEffect(USER, [gone]), [])
+      })
+    ))
+})
+
 describe("saving a selection as a prefab", () => {
   const placeCubes = () => {
     for (const x of [1000, 3000]) s().placePiece(cube, placementTransform(cube, { x, y: 0, z: 5000 }))
     s().select(s().doc.ids.slice(-2))
   }
+
+  it.effect("suggests what the pieces read as, within the rule and clear of the names in use", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        placeCubes()
+        const suggested = suggestPrefabName(s())
+        assert.match(suggested, /^[A-Za-z0-9_-]+_pair$/)
+        yield* saveSelectionAsPrefabEffect({ tier: "user", name: suggested }, false)
+        assert.strictEqual(suggestPrefabName(s()), `${suggested}_2`)
+      })
+    ))
+
+  it.effect("suggests the name of the group it is exactly, unless that was never given", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        placeCubes()
+        const unnamed = suggestPrefabName(s())
+        s().groupItems(s().selectedIds)
+        assert.strictEqual(suggestPrefabName(s()), unnamed)
+        s().renameGroup(s().doc.structure.tree.flatMap((n) => n.kind === "group" ? [n.id] : [])[0] ?? "", "Left pair")
+        assert.strictEqual(suggestPrefabName(s()), "Left_pair")
+      })
+    ))
 
   it.effect("writes the game's format to the tier asked, changing nothing in the map", () =>
     withDisk((disk) =>
@@ -507,10 +799,13 @@ describe("saving a selection as a prefab", () => {
         s().select(s().doc.ids.slice(-1))
         const lone = yield* Effect.flip(saveSelectionAsPrefabEffect({ tier: "user", name: "Pair" }, false))
         assert.include(lone.message, "Select 2 to 4096 items")
+        assert.strictEqual(selectionPrefabProblem(s()), lone.message)
         s().select(s().doc.ids.slice(0, 2))
         const start = yield* Effect.flip(saveSelectionAsPrefabEffect({ tier: "user", name: "Pair" }, false))
-        assert.include(start.message, "MP_PlayerStart")
+        assert.strictEqual(start.message, "Player Start can't go in a prefab.")
+        assert.strictEqual(selectionPrefabProblem(s()), start.message)
         s().select(s().doc.ids.slice(-2))
+        assert.isUndefined(selectionPrefabProblem(s()))
         const taken = yield* Effect.flip(saveSelectionAsPrefabEffect(USER, false))
         assert.include(taken.message, "already a prefab")
       })

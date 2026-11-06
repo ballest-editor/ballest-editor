@@ -1,5 +1,5 @@
 /** What the editor actions' tests share: the layers over a test disk, the store, samples and edits. */
-import { DateTime, Effect, Layer } from "effect"
+import { Effect, Layer } from "effect"
 import { mapLabelOf } from "../domain/factory"
 import { lightingOf } from "../domain/sunlight"
 import { freshMapEffect, newMapEffect } from "../editor/actions/maps"
@@ -10,7 +10,7 @@ import { MapCodec } from "../services/MapCodec"
 import { MapExporter } from "../services/MapExporter"
 import { MapPrefsStore } from "../services/MapPrefsStore"
 import { Platform } from "../services/Platform"
-import { makeTestDisk, testBridge, type TestDisk } from "../test/desktopBridge"
+import { makeTestDisk, projectFile, testBridge, type TestDisk } from "../test/desktopBridge"
 import { listSamples, readSample } from "../test/samples"
 
 export const s = () => useEditor.getState()
@@ -22,7 +22,7 @@ export const layerFor = (disk: TestDisk) =>
   Layer.mergeAll(
     Platform.layerDesktop(testBridge(disk)),
     MapPrefsStore.layerTest,
-    MapExporter.layerNoDeps.pipe(Layer.provideMerge(Layer.mergeAll(MapCodec.layer, DateTime.layerCurrentZoneOffset(0))))
+    MapExporter.layerNoDeps.pipe(Layer.provideMerge(MapCodec.layer))
   )
 
 export const balledits = listSamples().filter((sample) => sample.kind === "balledit")
@@ -65,7 +65,7 @@ export const submitSaveMap = (displayName: string) =>
     return s().file?.name ?? ""
   })
 
-/** Collects what the store would toast, for the rest of the effect. */
+/** Collects what is notified, toast or inbox, for the rest of the effect. */
 export const noticesWhile = <A, E, R>(body: (notices: Array<string>) => Effect.Effect<A, E, R>) =>
   Effect.acquireUseRelease(
     Effect.sync(() => {
@@ -88,6 +88,17 @@ export const playSample = (published = false) => {
     label: mapLabelOf(name),
     text: published ? text.replace("\"levelPublishedFileId\": -1", "\"levelPublishedFileId\": 3561234567") : text
   }
+}
+
+/** A test disk whose project holds two sample maps, and their file names. */
+export const twoMaps = () => {
+  const first = fileNameOf(balledits[0]!)
+  const second = fileNameOf(balledits[1]!)
+  const disk = makeTestDisk({
+    [projectFile(first)]: readSample(balledits[0]!),
+    [projectFile(second)]: readSample(balledits[1]!)
+  })
+  return { first, second, disk }
 }
 
 /** A test disk holding `files`, with the editor's plugin installed in the game. */

@@ -9,17 +9,19 @@ import { itemFromPiece, placementTransform } from "./factory"
 import { DEFAULT_PLAYER_START } from "./level"
 import { type Item, objectPathOf } from "./MapFile"
 import {
+  freePrefabName,
+  isPrefabName,
   itemOfPrefab,
   mapOfPrefab,
-  ORIGIN,
   prefabItemOf,
   prefabOfItems,
   prefabOfTab,
   prefabSourcesOf,
-  spawnFrameOf
+  prefabTierLabel,
+  selectionLabelOf
 } from "./prefab"
 import { PrefabFile } from "./PrefabFile"
-import { rotatorToQuat } from "./ueMath"
+import { ORIGIN, rotatorToQuat } from "./ueMath"
 
 const parsed = Schema.decodeUnknownSync(Catalog)(fixture)
 const catalog = indexCatalog(parsed)
@@ -29,6 +31,14 @@ const first = prefab.items[0]!
 const second = prefab.items[1]!
 
 const cubeAt = (x: number, y = 0, z = 0): Item => itemFromPiece(cube, placementTransform(cube, { x, y, z }))
+
+describe("a tier's name in the UI", () => {
+  it("says Game for the game's own folder, and Session where there are no projects", () => {
+    assert.strictEqual(prefabTierLabel("user", true), "Game")
+    assert.strictEqual(prefabTierLabel("project", true), "Project")
+    assert.strictEqual(prefabTierLabel("user", false), "Session")
+  })
+})
 
 describe("a prefab's items", () => {
   it("become map items at a frame", () => {
@@ -104,53 +114,6 @@ describe("a new prefab", () => {
   })
 })
 
-describe("where a spawn lands", () => {
-  // the rows of docs/qa/groups-prefabs.md § Spawning a prefab: two cubes 2000 cm apart, 1000 cm each way
-  const cubeSize = cube.bounds!.max[0] - cube.bounds!.min[0]
-  const halfWidth = 1000 + cubeSize / 2
-  const half = cubeSize / 2
-  const twoCubes = [
-    cubeAt(-1000, 0, -(cube.bounds!.min[2] + cube.bounds!.max[2]) / 2),
-    cubeAt(1000, 0, -(cube.bounds!.min[2] + cube.bounds!.max[2]) / 2)
-  ]
-  const camera = { x: -300, y: 0, z: 10000 }
-  const look = (pitch: number, yaw: number) => {
-    const [p, y] = [pitch * Math.PI / 180, yaw * Math.PI / 180]
-    return { x: Math.cos(p) * Math.cos(y), y: Math.cos(p) * Math.sin(y), z: Math.sin(p) }
-  }
-
-  it("is 500 cm plus the box's half width along the view", () => {
-    expectVec(
-      spawnFrameOf(twoCubes, { origin: camera, direction: look(0, 0) }, catalog),
-      { x: -300 + 500 + halfWidth, y: 0, z: 10000 }
-    )
-  })
-
-  it("uses the box's depth looking along its short side", () => {
-    expectVec(
-      spawnFrameOf(twoCubes, { origin: camera, direction: look(0, 90) }, catalog),
-      { x: -300, y: 500 + half, z: 10000 }
-    )
-  })
-
-  it("counts the nearest corner when the view pitches", () => {
-    const direction = look(-20, 0)
-    const pitch = 20 * Math.PI / 180
-    const along = 500 + halfWidth * Math.cos(pitch) + half * Math.sin(pitch)
-    expectVec(spawnFrameOf(twoCubes, { origin: camera, direction }, catalog), {
-      x: -300 + direction.x * along,
-      y: 0,
-      z: 10000 + direction.z * along
-    })
-  })
-
-  it("moves with the camera", () => {
-    const moved = spawnFrameOf(twoCubes, { origin: { ...camera, x: 700 }, direction: look(0, 0) }, catalog)
-    const before = spawnFrameOf(twoCubes, { origin: camera, direction: look(0, 0) }, catalog)
-    assert.closeTo(moved.x - before.x, 1000, 1e-9)
-  })
-})
-
 describe("a definition's tab", () => {
   const map = mapOfPrefab("Bridge", prefab, catalog)
   const keys = ["a", "b"]
@@ -200,5 +163,40 @@ describe("a definition's tab", () => {
 
   it("measures an item's transform as the editor edits it", () => {
     assert.deepStrictEqual(editTransform(map.items[0]!).scale3D, { x: 2, y: 1, z: 1 })
+  })
+})
+
+describe("the name a selection suggests", () => {
+  const kicker = { className: "BP_Ramp_Kicker1_Short", displayName: "Kicker1 S" }
+  const curve = { className: "BP_Ramp_Curve1", displayName: "Curve1 M" }
+
+  it("reads two of a piece as a pair of its family, and more as a count of the piece", () => {
+    assert.strictEqual(selectionLabelOf([kicker, kicker]), "Kicker pair")
+    assert.strictEqual(selectionLabelOf([curve, curve, curve]), "Curve 1 Medium x3")
+  })
+
+  it("reads a mix as a set of the first piece's family", () => {
+    assert.strictEqual(selectionLabelOf([kicker, curve, curve]), "Kicker set")
+  })
+
+  it("names a piece the catalog doesn't know from its class", () => {
+    assert.strictEqual(
+      selectionLabelOf([{ className: "BP_Odd_Thing" }, { className: "BP_Odd_Thing" }]),
+      "Odd Thing pair"
+    )
+  })
+
+  it("keeps saveprefab's rule, whatever the label holds", () => {
+    assert.strictEqual(freePrefabName("Curve 1 Medium x3", new Set()), "Curve_1_Medium_x3")
+    assert.strictEqual(freePrefabName(" Left (pair)! ", new Set()), "Left_pair")
+    assert.strictEqual(freePrefabName("×", new Set()), "Prefab")
+    assert.isTrue(isPrefabName(freePrefabName("x".repeat(80), new Set())))
+  })
+
+  it("steers clear of the names in use, and stays in the rule's length doing it", () => {
+    assert.strictEqual(freePrefabName("Kicker pair", new Set(["Kicker_pair"])), "Kicker_pair_2")
+    assert.strictEqual(freePrefabName("Kicker pair", new Set(["Kicker_pair", "Kicker_pair_2"])), "Kicker_pair_3")
+    const long = "x".repeat(60)
+    assert.isTrue(isPrefabName(freePrefabName(long, new Set([long]))))
   })
 })

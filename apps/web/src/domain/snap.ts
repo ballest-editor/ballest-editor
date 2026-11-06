@@ -25,6 +25,5 @@ export type RotationStep = (typeof ROTATION_STEPS)[number]
 
 export const DEFAULT_ROTATION_STEP: RotationStep = 15
 
-/** A rotation step the way the game's menu shows it: "15.0", "2.812". */
-export const formatRotationStep = (step: number): string =>
-  Number.isInteger(step) ? step.toFixed(1) : String(Math.trunc(step * 1000) / 1000)
+/** A rotation step for display: "15°", and "2.812°" as the game's menu cuts it short. */
+export const formatRotationStep = (step: number): string => `${Math.trunc(step * 1000) / 1000}°`

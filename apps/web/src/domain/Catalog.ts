@@ -9,6 +9,7 @@
  */
 import { Option, Schema } from "effect"
 import { PropertyList } from "./MapFile"
+import { inSizeOrder, type Ordinal, withOrdinals } from "./pieceName"
 import { open } from "./schema"
 
 const Vec3Tuple = Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite])
@@ -181,7 +182,10 @@ export const slotDefaultsOf = (slots: ReadonlyArray<CatalogMaterialSlot> | undef
 /** Lookups used when rendering items. */
 export interface CatalogIndex {
   readonly meshes: ReadonlyMap<string, MeshInfo>
-  readonly pieceByClass: ReadonlyMap<string, CatalogPiece>
+  /** Each piece as the palette has it, so a name read from here is the one the Pieces panel shows. */
+  readonly pieceByClass: ReadonlyMap<string, PalettePiece>
+  /** The palette, worked out once per catalog. */
+  readonly sections: ReadonlyArray<PaletteSection>
   /** Class path -> why the extractor couldn't resolve it (`catalog.unresolved`). */
   readonly unresolvedReasons: ReadonlyMap<string, string>
   /** Baked mirror mesh -> the mesh it mirrors. */
@@ -220,8 +224,11 @@ export const indexCatalog = (catalog: Catalog): CatalogIndex => {
     for (const extra of piece.extraMeshes ?? []) add(extra.meshAssetPath, extra.glb, extra.bounds, extra.materialSlots)
   }
   for (const mesh of catalog.meshes ?? []) add(mesh.meshAssetPath, mesh.glb, mesh.bounds, mesh.materialSlots)
-  const pieceByClass = new Map<string, CatalogPiece>()
-  for (const piece of catalog.pieces) if (!pieceByClass.has(piece.classPath)) pieceByClass.set(piece.classPath, piece)
+  const sections = paletteSections(catalog.pieces)
+  const pieceByClass = new Map<string, PalettePiece>()
+  for (const { pieces } of sections) {
+    for (const piece of pieces) if (!pieceByClass.has(piece.classPath)) pieceByClass.set(piece.classPath, piece)
+  }
   const unresolvedReasons = new Map<string, string>()
   for (const entry of catalog.unresolved ?? []) {
     const decoded = decodeUnresolved(entry)
@@ -241,6 +248,7 @@ export const indexCatalog = (catalog: Catalog): CatalogIndex => {
   return {
     meshes,
     pieceByClass,
+    sections,
     unresolvedReasons,
     mirrorSources,
     mirrorMeshes,
@@ -259,18 +267,23 @@ export const visibleExtras = (piece: CatalogPiece | undefined): ReadonlyArray<Ex
 
 export const pieceIdOf = (piece: CatalogPiece): string => `${piece.classPath}|${piece.meshAssetPath ?? ""}`
 
-export const HIDDEN_SECTION = "Hidden (not in the in-game browser)"
+/** The pieces the in-game browser doesn't show. */
+export const HIDDEN_SECTION = "Hidden"
 export const OTHER_SECTION = "Other"
+
+/** A piece as a palette section lists it: numbered if it would read the same as another there. */
+export type PalettePiece = CatalogPiece & Ordinal
 
 export interface PaletteSection {
   readonly name: string
-  readonly pieces: ReadonlyArray<CatalogPiece>
+  readonly pieces: ReadonlyArray<PalettePiece>
   readonly hidden: boolean
 }
 
 /**
  * Palette sections: in-game categories in file order, then "Other" (no category), then the
- * pieces the in-game browser doesn't show (`inPalette: false`). Piece order is file order.
+ * pieces the in-game browser doesn't show (`inPalette: false`). Piece order is file order, but for `inSizeOrder`.
+ * Pieces in a section that read the same are numbered (`withOrdinals`).
  */
 export const paletteSections = (pieces: ReadonlyArray<CatalogPiece>): ReadonlyArray<PaletteSection> => {
   const byCategory = new Map<string, Array<CatalogPiece>>()
@@ -285,39 +298,39 @@ export const paletteSections = (pieces: ReadonlyArray<CatalogPiece>): ReadonlyAr
       byCategory.set(piece.category, list)
     }
   }
+  const listed = (list: ReadonlyArray<CatalogPiece>): ReadonlyArray<PalettePiece> => withOrdinals(inSizeOrder(list))
   return [
-    ...[...byCategory].map(([name, list]) => ({ name, pieces: list, hidden: false })),
-    ...(other.length > 0 ? [{ name: OTHER_SECTION, pieces: other, hidden: false }] : []),
-    ...(hidden.length > 0 ? [{ name: HIDDEN_SECTION, pieces: hidden, hidden: true }] : [])
+    ...[...byCategory].map(([name, list]) => ({ name, pieces: listed(list), hidden: false })),
+    ...(other.length > 0 ? [{ name: OTHER_SECTION, pieces: listed(other), hidden: false }] : []),
+    ...(hidden.length > 0 ? [{ name: HIDDEN_SECTION, pieces: listed(hidden), hidden: true }] : [])
   ]
 }
 
-/** A class with no name in the catalog, as a person would write it: "MP_PlayerStart" reads "Player Start". */
-export const humanizedClass = (className: string): string =>
-  className.replace(/^(?:BP|MP)_/, "").replace(/_+/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").trim() || className
+const NO_MESH = "This piece has no mesh to show."
+const REJECTED = "The game can't load this piece; maps that use it open blank."
 
-export const pieceLabelOf = (piece: CatalogPiece): string => piece.displayName || humanizedClass(piece.className)
+/** The user's words for why the extractor couldn't resolve a class; its own reasons are notes for whoever runs it. */
+const unresolvedCopyOf = (reason: string): string => {
+  if (reason.startsWith("removed from the game")) {
+    return "This piece was removed from the game, so maps using it won't load."
+  }
+  return reason.startsWith("no StaticMeshComponent") ? NO_MESH : "Can't be placed from the editor."
+}
 
 /**
- * Why a piece can't be placed, or undefined if it can: the extractor lists it as
- * unresolved (base classes, runtime-generated geometry), or it has no mesh of any kind.
+ * Why a piece can't be placed, as the user reads it, or undefined if it can: the extractor lists it as unresolved (base
+ * classes, runtime-generated geometry, a class the game dropped), the in-game editor rejects it, or it has no mesh of
+ * any kind. Unresolved comes first, because it says more: a class the game dropped is rejected too.
  */
 export const unavailableReasonOf = (
   index: CatalogIndex,
   piece: CatalogPiece,
   verified: VerificationTable = NO_VERIFICATION
 ): string | undefined => {
-  if (verificationOf(piece, verified) === "rejected") {
-    return `The in-game editor rejects this piece${
-      verified[piece.className]?.note ? ` (${verified[piece.className]?.note})` : ""
-    }.`
-  }
   const unresolved = index.unresolvedReasons.get(piece.classPath)
-  if (unresolved !== undefined) return unresolved
-  if (piece.meshAssetPath === null && (piece.extraMeshes ?? []).length === 0) {
-    return "No mesh: this class has no geometry the editor can place."
-  }
-  return undefined
+  if (unresolved !== undefined) return unresolvedCopyOf(unresolved)
+  if (verificationOf(piece, verified) === "rejected") return REJECTED
+  return piece.meshAssetPath === null && (piece.extraMeshes ?? []).length === 0 ? NO_MESH : undefined
 }
 
 // ---------------------------------------------------------------------------
@@ -328,6 +341,7 @@ export const VerificationStatus = Schema.Literals(["ok", "rejected"])
 export const VerificationEntry = open({
   status: VerificationStatus,
   date: Schema.optionalKey(Schema.String),
+  /** What the probe found, for whoever reads the file. The user reads `unavailableReasonOf`. */
   note: Schema.optionalKey(Schema.String)
 })
 export const VerificationFile = open({ results: Schema.Record(Schema.String, VerificationEntry) })

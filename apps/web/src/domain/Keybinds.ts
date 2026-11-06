@@ -6,22 +6,23 @@
  * unbound.
  */
 import { Schema } from "effect"
+import type { ViewProjection } from "./viewLayout"
 
 /**
- * Sections and names follow the game: the level editor's own hotkey overlay ("focus
- * selection", "delete"...) and its settings screen ("mouse and keyboard free camera":
- * "forward", "reverse"...). The exceptions: the tools get plain "select", "translate",
- * "rotate", "scale" instead of the overlay's "select mode", "move mode"..., and the
- * overlay's edit commands (undo, copy, delete...) get their own "edit" section, in the
- * Edit menu's order. Game actions that mean nothing in the editor (replay controls,
- * nameplates) are omitted; editor-only actions get plain lower-case names in the same
- * style. keybinds.json `label`/`section` fields, when the extractor provides them,
- * override the camera names (see GameKeybinds); level-editor and edit names come from
- * the in-game overlay and are fixed here.
+ * The sections are the editor's own, the same in Settings and Keyboard shortcuts. The names
+ * follow the game: the in-game editor's hotkey overlay ("focus selection", "delete"...) and
+ * its settings screen ("forward", "reverse"...). The exceptions: the tools get plain
+ * "select", "move", "rotate", "scale" instead of the overlay's "select mode", "move
+ * mode"..., and the overlay's edit commands (undo, copy, delete...) get their own "edit"
+ * section, in the Edit menu's order. Game actions that mean nothing in the editor (replay
+ * controls, nameplates) are omitted; editor-only actions get plain lower-case names in the
+ * same style. keybinds.json `label` fields, when the extractor provides them, override the
+ * camera names (see GameKeybinds); editor and edit names come from the in-game overlay and
+ * are fixed here.
  */
 export const keybindSections = [
   {
-    name: "level editor",
+    name: "editor",
     actions: [
       "selectMode",
       "translateMode",
@@ -43,17 +44,33 @@ export const keybindSections = [
       "paste",
       "duplicateSelection",
       "deleteSelection",
+      "selectAll",
       "deselect",
       "groupSelection",
       "ungroupSelection"
     ]
   },
   {
-    name: "mouse and keyboard free camera",
-    actions: ["moveForward", "moveBack", "moveLeft", "moveRight", "look", "moveUp", "moveDown"]
+    name: "camera",
+    actions: [
+      "moveForward",
+      "moveBack",
+      "moveLeft",
+      "moveRight",
+      "look",
+      "moveUp",
+      "moveDown",
+      "lookRight",
+      "lookLeft",
+      "lookUp",
+      "lookDown",
+      "fastMove",
+      "speedFaster",
+      "speedSlower",
+      "orbit",
+      "pan"
+    ]
   },
-  { name: "mouse and keyboard bindings", actions: ["lookRight", "lookLeft", "lookUp", "lookDown"] },
-  { name: "editor camera", actions: ["fastMove", "speedFaster", "speedSlower", "orbit", "pan"] },
   {
     name: "view",
     actions: [
@@ -75,7 +92,7 @@ export const keybindSections = [
 export type KeybindAction = (typeof keybindSections)[number]["actions"][number]
 export const keybindActions: ReadonlyArray<KeybindAction> = keybindSections.flatMap((g) => g.actions)
 
-/** Actions named by the in-game level editor's hotkey overlay (keybinds.json naming doesn't apply). */
+/** Actions named by the in-game editor's hotkey overlay (keybinds.json naming doesn't apply). */
 export const editorOverlayActions: ReadonlySet<KeybindAction> = new Set([
   ...keybindSections[0].actions,
   ...keybindSections[1].actions
@@ -84,7 +101,7 @@ export const editorOverlayActions: ReadonlySet<KeybindAction> = new Set([
 /** The name shown in the settings (the game's wording where the action exists in-game). */
 export const keybindActionLabels: Record<KeybindAction, string> = {
   selectMode: "select",
-  translateMode: "translate",
+  translateMode: "move",
   rotateMode: "rotate",
   scaleMode: "scale",
   toggleGizmoSpace: "local / world axes",
@@ -98,6 +115,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   paste: "paste",
   undo: "undo",
   redo: "redo",
+  selectAll: "select all",
   deselect: "deselect",
   groupSelection: "group",
   ungroupSelection: "ungroup",
@@ -123,7 +141,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   viewBack: "back view",
   viewRight: "right view",
   viewLeft: "left view",
-  toggleOrthographic: "orthographic / perspective",
+  toggleOrthographic: "perspective view",
   frameAll: "frame all",
   newMap: "new map",
   openMap: "import map",
@@ -133,41 +151,41 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   nextTab: "next tab",
   previousTab: "previous tab",
   playMap: "play",
-  showKeybinds: "keybind cheat sheet"
+  showKeybinds: "keyboard shortcuts"
 }
 
 /** What each action does in the editor (binding tooltips). */
 export const keybindActionDescriptions: Record<KeybindAction, string> = {
-  selectMode: "Select: click to select, no gizmo. Q in the game's level editor.",
+  selectMode: "Select: click to select, no gizmo. Q in the in-game editor.",
   translateMode:
-    "Translate: drag the arrows or plane handles to move the selection. W in the game's level editor. When its key is also a movement key, the \"fly only while looking\" camera setting decides which it does.",
-  rotateMode: "Rotate: drag a ring to rotate the selection. E in the game's level editor.",
+    "Move: drag the arrows or plane handles to move the selection. W in the in-game editor. When its key is also a movement key, the \"fly only while looking\" camera setting decides which it does.",
+  rotateMode: "Rotate: drag a ring to rotate the selection. E in the in-game editor.",
   scaleMode:
-    "Scale: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the game's level editor.",
+    "Scale: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the in-game editor.",
   toggleGizmoSpace:
-    "Switch the translate, rotate and scale gizmos between the selected item's own axes (the last one picked, when several are selected) and the world axes. C in the game's level editor.",
-  focusSelection: "Frame the current selection in the viewport. F in the game's level editor.",
+    "Switch the move, rotate and scale gizmos between the selected item's own axes (the last one picked, when several are selected) and the world axes. C in the in-game editor.",
+  focusSelection: "Frame the current selection in the viewport. F in the in-game editor.",
   addToSelection:
     "Click an item to add it to the selection (it becomes the active item). Shift+click, as in Unreal's editor; the game's key for this isn't recorded.",
   toggleSelection:
-    "Click an item to add it to the selection, or to remove it if it's already selected. Ctrl+click, which the game's level editor uses to deselect.",
-  deleteSelection: "Delete the selected items. Backspace in the game's level editor; Delete also works.",
+    "Click an item to add it to the selection, or to remove it if it's already selected. Ctrl+click, which the in-game editor uses to deselect.",
+  deleteSelection: "Delete the selected items. Backspace in the in-game editor; Delete also works.",
   duplicateSelection:
-    "Copy the selected items in place and select the copies, ready to move. Ctrl+D, as in Unreal's editor; the game has no key for this and duplicates with Alt+drag on the translate gizmo (see General settings).",
+    "Copy the selected items in place and select the copies, ready to move. Ctrl+D, as in Unreal's editor; the game has no key for this and duplicates with Alt+drag on the move gizmo (see General settings).",
   copySelection:
-    "Copy the selected items, with their properties, so paste can add them again. Ctrl+C in the game's level editor.",
+    "Copy the selected items, with their properties, so paste can add them again. Ctrl+C in the in-game editor.",
   cutSelection:
     "Copy the selected items, then delete them (one undo step); paste puts them back where they were. Editor only: the game has copy and paste but no cut.",
   paste:
-    "Add the copied items where they were when copied, and select them. Ctrl+V in the game's level editor, which also pastes in place.",
-  undo:
-    "Undo the last change. Ctrl+Z in the game's level editor; a whole gizmo drag or number-field scrub is one step.",
-  redo: "Redo the last undone change. Ctrl+Y in the game's level editor; Ctrl+Shift+Z also works.",
+    "Add the copied items where they were when copied, and select them. Ctrl+V in the in-game editor, which also pastes in place.",
+  undo: "Undo the last change. Ctrl+Z in the in-game editor; a whole gizmo drag or number-field scrub is one step.",
+  redo: "Redo the last undone change. Ctrl+Y in the in-game editor; Ctrl+Shift+Z also works.",
+  selectAll: "Select every item in the map; inside an entered group, every item in that group.",
   deselect:
-    "Clear the selection. Inside an entered group it steps out of the group instead, and during a gizmo drag it cancels the drag. (The game uses Ctrl+click.)",
+    "Clear the selection. Inside an entered group it steps out of the group instead, with a pane maximised it restores the panes, and during a gizmo drag it cancels the drag. (The game uses Ctrl+click.)",
   groupSelection:
-    "Group the selection. Clicking any item of a group then selects the whole group. Ctrl+G in the game's level editor.",
-  ungroupSelection: "Dissolve the selected groups; their items stay selected. Shift+G in the game's level editor.",
+    "Group the selection. Clicking any item of a group then selects the whole group. Ctrl+G in the in-game editor.",
+  ungroupSelection: "Dissolve the selected groups; their items stay selected. Shift+G in the in-game editor.",
   moveForward: "Fly the camera forward while held.",
   moveBack: "Fly the camera backward while held.",
   moveLeft: "Fly the camera left while held.",
@@ -209,6 +227,17 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   playMap:
     "Export the map to the game and race it there through the plugin manager, starting the game if it isn't running. Desktop app only.",
   showKeybinds: "Hold to show every keybind over the viewport; release to hide it. Editor only."
+}
+
+/** The keybind that puts the active pane on each view; Perspective has only the toggle. */
+export const PROJECTION_ACTIONS: Readonly<Record<ViewProjection, KeybindAction>> = {
+  perspective: "toggleOrthographic",
+  top: "viewTop",
+  bottom: "viewBottom",
+  front: "viewFront",
+  back: "viewBack",
+  left: "viewLeft",
+  right: "viewRight"
 }
 
 /** Actions bound to a mouse click (with modifiers) on an item in the viewport. */
@@ -255,6 +284,7 @@ export const defaultKeybinds: Keybinds = {
   paste: ["Ctrl+KeyV"],
   undo: ["Ctrl+KeyZ"],
   redo: ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"],
+  selectAll: ["Ctrl+KeyA"],
   deselect: ["Escape"],
   groupSelection: ["Ctrl+KeyG"],
   ungroupSelection: ["Shift+KeyG"],
@@ -464,11 +494,18 @@ const SYMBOLS: Readonly<Record<string, string>> = {
   Equal: "="
 }
 
-/** Display form of one chord, e.g. "Ctrl + Z", "RMB", "←". */
-export const formatBinding = (binding: string): string =>
+/** Whether this is macOS. A browser global, read here and nowhere else. */
+const onMac = /^mac/i.test(navigator.platform)
+
+/**
+ * Display form of one chord, e.g. "Ctrl + Z", "RMB", "←". `chordOf` takes ⌘ and Ctrl alike, and macOS calls it ⌘. `mac`
+ * is for tests: the app shows this machine's.
+ */
+export const formatBinding = (binding: string, mac = onMac): string =>
   binding.length === 0 ? "Unbound" : binding
     .split("+")
     .map((part) => {
+      if (part === "Ctrl") return mac ? "⌘" : "Ctrl"
       if (part.startsWith("Key")) return part.slice(3)
       if (part.startsWith("Digit")) return part.slice(5)
       if (/^Numpad\d$/.test(part)) return `Num ${part.slice(6)}`
@@ -487,4 +524,26 @@ export const formatBinding = (binding: string): string =>
 
 /** Display form of an action's bindings ("Q / F", or "Unbound"). */
 export const formatBindings = (bindings: Bindings): string =>
-  bindings.length === 0 ? "Unbound" : bindings.map(formatBinding).join(" / ")
+  bindings.length === 0 ? "Unbound" : bindings.map((binding) => formatBinding(binding)).join(" / ")
+
+/**
+ * The chords two actions of the same kind share. A fly key doubling as a tool shortcut (W: forward + translate, as in the
+ * game) is fine: the "movement keys need the look button" setting decides which one it does. Mouse drags and selection
+ * clicks share a kind: a camera drag chord never reaches click selection.
+ */
+export const conflictingBindings = (keybinds: Keybinds): ReadonlySet<string> => {
+  const kinds = new Map<string, Set<string>>()
+  for (const action of keybindActions) {
+    const kind = heldActions.has(action)
+      ? "held"
+      : mouseDragActions.has(action) || mouseClickActions.has(action)
+      ? "mouse"
+      : "oneShot"
+    for (const binding of keybinds[action]) {
+      const set = kinds.get(`${kind}:${binding}`) ?? new Set<string>()
+      set.add(action)
+      kinds.set(`${kind}:${binding}`, set)
+    }
+  }
+  return new Set([...kinds].filter(([, actions]) => actions.size > 1).map(([key]) => key.slice(key.indexOf(":") + 1)))
+}

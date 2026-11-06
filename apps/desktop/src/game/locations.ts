@@ -11,7 +11,7 @@ export const DEFAULT_INSTALL_DIR = "Ballest of Them All"
 export const STEAM_LAUNCH_URL = `steam://rungameid/${APP_ID}`
 
 /** Only the path functions these rules use, so tests can pass `node:path`'s `win32` on any OS. */
-export type PathRules = Pick<Path.Path, "join" | "dirname" | "basename" | "normalize">
+type PathRules = Pick<Path.Path, "join" | "dirname" | "basename" | "normalize">
 
 /** What the rules need to know about the machine. */
 export interface HostInfo {

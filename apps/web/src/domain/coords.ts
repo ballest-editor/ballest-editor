@@ -38,10 +38,6 @@ export type Tuple4 = readonly [number, number, number, number]
 export const ueToThreeVector = (v: Vec3): Vec3 => ({ x: v.x, y: v.z, z: v.y })
 export const threeToUeVector = (v: Vec3): Vec3 => ({ x: v.x, y: v.z, z: v.y })
 
-/** Axis-aligned scale: diag(s) conjugated by a permutation is the permuted diagonal. */
-const ueToThreeScale = ueToThreeVector
-const threeToUeScale = threeToUeVector
-
 export const ueToThreeQuat = (q: Quat4): Quat4 => ({ x: -q.x, y: -q.z, z: -q.y, w: q.w })
 export const threeToUeQuat = (q: Quat4): Quat4 => ({ x: -q.x, y: -q.z, z: -q.y, w: q.w })
 
@@ -64,13 +60,8 @@ export interface UeTransform {
 export const ueToScene = (t: UeTransform): SceneTransform => ({
   position: toTuple3(ueToThreeVector(t.translation)),
   quaternion: toTuple4(ueToThreeQuat(t.rotation)),
-  scale: toTuple3(ueToThreeScale(t.scale3D))
-})
-
-export const sceneToUe = (t: SceneTransform): UeTransform => ({
-  translation: threeToUeVector(fromTuple3(t.position)),
-  rotation: threeToUeQuat({ x: t.quaternion[0], y: t.quaternion[1], z: t.quaternion[2], w: t.quaternion[3] }),
-  scale3D: threeToUeScale(fromTuple3(t.scale))
+  // axis-aligned scale: diag(s) conjugated by a permutation is the permuted diagonal
+  scale: toTuple3(ueToThreeVector(t.scale3D))
 })
 
 /** UE local-space AABB (cm) -> scene-space box size and centre. */

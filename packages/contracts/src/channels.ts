@@ -13,6 +13,8 @@ export const InvokeChannels = {
   switchProject: "ballest:project:switch",
   createProject: "ballest:project:create",
   revealProject: "ballest:project:reveal",
+  revealRecentProject: "ballest:project:revealRecent",
+  forgetRecentProject: "ballest:project:forgetRecent",
   renameProject: "ballest:project:rename",
   rememberOpenMap: "ballest:project:rememberOpenMap",
   listMaps: "ballest:project:listMaps",
@@ -21,6 +23,8 @@ export const InvokeChannels = {
   saveMap: "ballest:project:saveMap",
   renameMap: "ballest:project:renameMap",
   writeSidecar: "ballest:project:writeSidecar",
+  readMapThumbnail: "ballest:project:readMapThumbnail",
+  writeMapThumbnail: "ballest:project:writeMapThumbnail",
   pickImport: "ballest:project:pickImport",
   importMap: "ballest:project:importMap",
   exportMap: "ballest:project:exportMap",
@@ -65,5 +69,6 @@ export const InvokeChannels = {
 export const PushChannels = {
   onUnloadRequest: "ballest:window:unloadRequest",
   onPlaySessionEnded: "ballest:game:playSessionEnded",
+  onGameWriteProgress: "ballest:game:writeProgress",
   onUpdateState: "ballest:update:state"
 } as const

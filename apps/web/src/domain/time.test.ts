@@ -1,5 +1,8 @@
 import { assert, describe, it } from "@effect/vitest"
-import { dayLabel, formatAgo } from "./time"
+import { DateTime, Effect } from "effect"
+import { TestClock } from "effect/testing"
+import { currentCreatedAt } from "./factory"
+import { createdAtIso, dayLabel, formatAgo } from "./time"
 
 // Local times, so the tests pass in any time zone.
 const now = new Date(2026, 9, 31, 15, 0).getTime()
@@ -18,6 +21,19 @@ describe("time", () => {
     assert.strictEqual(formatAgo(at(31, 16), now), "just now")
     assert.strictEqual(formatAgo("not a time", now), "at an unknown time")
   })
+
+  it("reads the game's createdAt as UTC", () => {
+    assert.strictEqual(createdAtIso("2026.11.04-20.05.42"), "2026-11-04T20:05:42.000Z")
+    assert.isNull(createdAtIso("last Tuesday"))
+  })
+
+  it.effect("reads a createdAt the app just wrote as just now, in any local zone", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now)
+      const iso = createdAtIso(yield* currentCreatedAt) ?? ""
+      assert.strictEqual(iso, new Date(now).toISOString())
+      assert.strictEqual(formatAgo(iso, now), "just now")
+    }).pipe(Effect.provide(DateTime.layerCurrentZoneOffset(-5 * 60 * 60 * 1000))))
 
   it("groups by local day", () => {
     assert.strictEqual(dayLabel(at(31, 0, 1), now), "Today")

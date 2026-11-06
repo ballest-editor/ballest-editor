@@ -1,7 +1,9 @@
 import { IconX } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Input } from "@workspace/ui/components/input"
+import { cn } from "@workspace/ui/lib/utils"
 import { type Ref, useState } from "react"
+import { CHIP } from "./chipStyle"
 
 /**
  * An item's or a group's tags: free strings as chips with an input under them. Enter, a comma or leaving the field adds
@@ -24,12 +26,12 @@ export function TagInput({ id, inputRef, tags, onChange }: {
         <ul className="flex flex-wrap gap-1" aria-label="Tags">
           {tags.map((tag) => (
             <li key={tag}>
-              <Badge variant="secondary" className="max-w-full pr-0.5">
+              <Badge className={cn(CHIP, "max-w-full pr-0.5")}>
                 <span className="truncate">{tag}</span>
                 <button
                   type="button"
                   aria-label={`Remove tag ${tag}`}
-                  className="flex size-4 items-center justify-center rounded-full text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex size-4 items-center justify-center rounded-full text-fg-secondary transition-colors focus-ring hover:bg-hover hover:text-foreground active:bg-pressed"
                   onClick={() => onChange(tags.filter((t) => t !== tag))}
                 >
                   <IconX className="size-2.5" />

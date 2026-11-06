@@ -12,14 +12,21 @@ import {
   importMap,
   playMap,
   saveMap,
+  selectAll,
   startNewMap
 } from "./actions"
 import { sceneRegistry } from "./sceneRegistry"
-import { useEditor } from "./store"
+import { noTabOpen, useEditor } from "./store"
 
-const lookAlong = (projection: ViewProjection) => {
+/** Turns the active pane to `projection`. */
+export const lookAlong = (projection: ViewProjection) => {
   const { activePane, setPaneProjection } = useEditor.getState()
   setPaneProjection(activePane, projection)
+}
+
+/** A command that has nothing to act on with no tab open. */
+const onOpenTab = (command: () => void) => () => {
+  if (!noTabOpen(useEditor.getState())) command()
 }
 
 /**
@@ -35,6 +42,7 @@ export const actionCommands = {
   cutSelection: () => useEditor.getState().cutSelection(),
   paste: () => useEditor.getState().paste(),
   focusSelection: () => useEditor.getState().requestFocus(),
+  selectAll,
   deselect: () => useEditor.getState().deselect(),
   groupSelection: () => useEditor.getState().groupSelection(),
   ungroupSelection: () => useEditor.getState().ungroupSelection(),
@@ -52,17 +60,17 @@ export const actionCommands = {
   viewRight: () => lookAlong("right"),
   viewLeft: () => lookAlong("left"),
   toggleOrthographic: () => lookAlong(sceneRegistry.toggledProjection()),
-  frameAll: () => useEditor.getState().requestFrameAll(),
+  frameAll: onOpenTab(() => useEditor.getState().requestFrameAll()),
   newMap: () => void startNewMap(),
   /** Import… on desktop, Open… in a browser. */
   openMap: () => void importMap(),
-  saveMap: () => void saveMap(),
-  /** Duplicate… on desktop (Save as is gone: the location is the project), Export… (a download) in a browser. */
-  saveMapAs: () => {
+  saveMap: onOpenTab(() => void saveMap()),
+  /** Duplicate… on desktop, where a map's location is the project; Export… (a download) in a browser. */
+  saveMapAs: onOpenTab(() => {
     const { capabilities, document, openDialog } = useEditor.getState()
     // a definition's copies are the Prefabs panel's
     if (document.kind === "map") openDialog({ id: capabilities.projects ? "duplicate" : "saveAs" })
-  },
+  }),
   closeTab: () => void closeActiveTab(),
   nextTab: () => cycleTab(1),
   previousTab: () => cycleTab(-1),

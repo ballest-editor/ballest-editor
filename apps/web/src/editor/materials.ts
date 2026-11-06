@@ -76,7 +76,7 @@ const loadTexture = (path: string, colorSpace: THREE.ColorSpace, onError: () => 
 }
 
 /** The shader patch's inputs; `defines` (and `glsl`, per material) make the program cache key. */
-export interface Patch {
+interface Patch {
   readonly defines: Readonly<Record<string, number | string>>
   /** The material's own GLSL (an `approx.programs` function and its samplers), or "". */
   readonly glsl: string

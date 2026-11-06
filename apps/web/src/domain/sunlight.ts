@@ -52,6 +52,21 @@ export const lightingOf = (world: WorldSettings): Lighting => ({
   angle: world.directionalLightAngle ?? DEFAULT_LIGHT_ANGLE
 })
 
+/** A time of day in hours as a clock, `07:30`; past 24 or below 0, which a file can hold, it keeps counting. */
+export const formatTimeOfDay = (hours: number): string => {
+  const minutes = Math.round(Math.abs(hours) * 60)
+  const clock = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
+  return hours < 0 && minutes > 0 ? `-${clock}` : clock
+}
+
+/** What's typed for a time of day, as hours: a clock (`7:30`) or hours (`7.5`). Null when it's neither. */
+export const parseTimeOfDay = (text: string): number | null => {
+  const clock = /^\s*(\d{1,2}):([0-5]\d)\s*$/.exec(text)
+  if (clock !== null) return Number(clock[1]) + Number(clock[2]) / 60
+  const hours = Number(text)
+  return text.trim() === "" || !Number.isFinite(hours) ? null : hours
+}
+
 /** The light's pitch in degrees for a time of day (negative points down). */
 export const sunPitch = (timeOfDay: number): number => -(timeOfDay - 6) * 15
 

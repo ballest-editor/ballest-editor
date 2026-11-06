@@ -3,9 +3,10 @@
  * Loading is per field: anything missing or invalid falls back to its default, so old
  * or hand-edited saves never break the editor.
  */
-import { Option, Predicate, Schema } from "effect"
+import { Equal, Option, Predicate, Schema, Struct } from "effect"
 import { movementLookModes } from "./flyKeys"
 import { PLACE_DISTANCE } from "./placement"
+import { SCENE_COLORS, shadeOf } from "./sceneGround"
 import { DEFAULT_GRID_SIZE, DEFAULT_ROTATION_STEP, GRID_SIZES, ROTATION_STEPS } from "./snap"
 
 /** "Custom" uses CameraSettings.customFov instead of a preset's. */
@@ -23,7 +24,10 @@ export const GeneralSettings = Schema.Struct({
   altDragDuplicates: Schema.Boolean,
   /** Whether every Save also exports the map to the game (desktop), whatever the map's own Export on save says. */
   exportOnSave: Schema.Boolean,
-  /** Where a project opens (desktop): `ask` shows the whereToOpen dialog; its Always do this stores the answer here. */
+  /**
+   * Where a project opens (desktop). `ask`: in this window, with the whereToOpen dialog first while this window has
+   * unsaved changes; that dialog's Always do this stores the answer here.
+   */
   projectOpensIn: Schema.Literals(["ask", "thisWindow", "newWindow"])
 })
 
@@ -92,13 +96,44 @@ export const SnappingSettings = Schema.Struct({
   rotationStep: Schema.Literals(ROTATION_STEPS)
 })
 
+/** The Pieces panel's thumbnail sizes, as its header offers them. */
+export const piecesThumbnailSizes = ["s", "m", "l"] as const
+
+/** Changed from a panel's own header rather than the Settings dialog, but persisted with the rest. */
+export const PanelSettings = Schema.Struct({
+  /** How the Pieces panel lays out its pieces. */
+  piecesView: Schema.Literals(["list", "grid"]),
+  /** How big it draws their thumbnails, in either view. */
+  piecesThumbnailSize: Schema.Literals(piecesThumbnailSizes),
+  /** What the Pieces panel's Recent lists, as `pieceIdOf` gives them, newest first (see domain/recentPieces). */
+  recentPieces: Schema.Array(Schema.String),
+  /** What its Favourites lists, in the order they were starred. */
+  favouritePieces: Schema.Array(Schema.String)
+})
+
+/** The axis gizmo's sizes, as the Display popover offers them. */
+export const gizmoSizes = ["s", "m", "l"] as const
+
+/** How much bigger or smaller than medium each gizmo size draws, on screen. */
+export const gizmoScaleOf = (size: typeof gizmoSizes[number]): number => size === "s" ? 0.8 : size === "l" ? 1.25 : 1
+
+/** The viewport's axis gizmo, changed from the Display popover rather than the Settings dialog. */
+export const GizmoSettings = Schema.Struct({
+  /** How big it is drawn. `m` is its usual size. */
+  size: Schema.Literals(gizmoSizes),
+  /** Whether it shows while the selection is a group. */
+  showForGroups: Schema.Boolean
+})
+
 export const Settings = Schema.Struct({
   general: GeneralSettings,
   editor: EditorSettings,
   camera: CameraSettings,
   appearance: AppearanceSettings,
   lighting: LightingSettings,
-  snapping: SnappingSettings
+  snapping: SnappingSettings,
+  panels: PanelSettings,
+  gizmo: GizmoSettings
 })
 export type Settings = typeof Settings.Type
 
@@ -129,12 +164,10 @@ export const defaultSettings: Settings = {
     gridSize: DEFAULT_GRID_SIZE,
     rotationEnabled: false,
     rotationStep: DEFAULT_ROTATION_STEP
-  }
+  },
+  panels: { piecesView: "list", piecesThumbnailSize: "m", recentPieces: [], favouritePieces: [] },
+  gizmo: { size: "m", showForGroups: true }
 }
-
-type Section = keyof Settings
-
-const sections: ReadonlyArray<Section> = ["general", "editor", "camera", "appearance", "lighting", "snapping"]
 
 /** The fixed grid colours older saves stored; they now mean "automatic". */
 const LEGACY_GRID_COLORS = { gridCellColor: "#3a404a", gridSectionColor: "#58606e" } as const
@@ -166,14 +199,14 @@ const migrate = (stored: unknown): unknown => {
 }
 
 /**
- * Automatic grid colours per theme. The sky is cut off at the grid's height, so the grid is
- * always seen against the theme's background, or the water over it. Sections stand out more
- * than cells: lighter on the dark background, darker on the light one.
+ * Automatic grid colours per theme, shades of the ground so they follow its hue. The sky is cut
+ * off at the grid's height, so the grid is always seen against the ground, or the water over it.
+ * Sections stand out more than cells: lighter on the dark ground, darker on the light one.
  */
 export const AUTO_GRID_COLORS: Readonly<Record<"dark" | "light", { readonly cell: string; readonly section: string }>> =
   {
-    dark: { cell: "#474e5a", section: "#5f6877" },
-    light: { cell: "#a3b0bd", section: "#7a8a9b" }
+    dark: { cell: shadeOf(SCENE_COLORS.dark, "#ffffff", 0.22), section: shadeOf(SCENE_COLORS.dark, "#ffffff", 0.4) },
+    light: { cell: shadeOf(SCENE_COLORS.light, "#000000", 0.4), section: shadeOf(SCENE_COLORS.light, "#000000", 0.52) }
   }
 
 /** The grid colours to draw: the user's, else the theme's automatic ones. */
@@ -185,11 +218,24 @@ export const gridColorsOf = (
   return { cell: appearance.gridCellColor ?? auto.cell, section: appearance.gridSectionColor ?? auto.section }
 }
 
+/** `settings` with all the Display popover shows put back to the defaults, and nothing else. */
+export const withDefaultDisplay = (settings: Settings): Settings => ({
+  ...settings,
+  appearance: {
+    ...settings.appearance,
+    ...Struct.pick(defaultSettings.appearance, ["gridVisible", "waterVisible", "gridCellColor", "gridSectionColor"])
+  },
+  lighting: defaultSettings.lighting,
+  gizmo: defaultSettings.gizmo
+})
+
+export const isDefaultDisplay = (settings: Settings): boolean => Equal.equals(withDefaultDisplay(settings), settings)
+
 /** Stored JSON -> Settings, field by field; invalid or missing fields keep their defaults. */
 export const mergeSettings = (raw: unknown, defaults: Settings = defaultSettings): Settings => {
   const stored = migrate(raw)
   const out: Record<string, Record<string, unknown>> = {}
-  for (const section of sections) {
+  for (const section of Struct.keys(defaultSettings)) {
     const from = Predicate.isObject(stored) ? stored[section] : undefined
     let merged: Record<string, unknown> = { ...defaults[section] }
     if (Predicate.isObject(from)) {

@@ -5,37 +5,33 @@ import { isMapFileName, isPrefabName, PREFAB_NAME_RULE } from "./names"
 /** Runtime versions of the desktop app, for bug reports and the about dialog. */
 export const DesktopVersions = Schema.Struct({
   electron: Schema.String,
-  chrome: Schema.String,
-  node: Schema.String
+  chrome: Schema.String
 })
 export type DesktopVersions = typeof DesktopVersions.Type
 
 /** `ping`'s payload: anything the renderer wants echoed back, to check the IPC round trip. */
-export const PingPayload = Schema.Struct({
+const PingPayload = Schema.Struct({
   message: Schema.String.check(Schema.isMaxLength(1024))
 })
-export type PingPayload = typeof PingPayload.Type
 
-export const PingResult = Schema.Struct({
+const PingResult = Schema.Struct({
   message: Schema.String
 })
-export type PingResult = typeof PingResult.Type
 
 /** An absolute path on the user's machine. Only ever one main has handed out (a dialog's, or a recent file's). */
-export const FilePath = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(4096))
+const FilePath = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(4096))
 
 /**
  * A map's, a sidecar's or a prefab's text, exactly as written to disk: the page encodes and decodes it, main only moves
  * it. The game's own largest maps are a few MB.
  */
-export const FileText = Schema.String.check(Schema.isMaxLength(64 * 1024 * 1024))
+const FileText = Schema.String.check(Schema.isMaxLength(64 * 1024 * 1024))
 
 /** A map file on disk: where it is and its name (the path's last segment). */
-export const MapFileRef = Schema.Struct({
+const MapFileRef = Schema.Struct({
   path: FilePath,
   name: Schema.String
 })
-export type MapFileRef = typeof MapFileRef.Type
 
 /** A map file that was read, with its text. */
 export const OpenedMapFile = Schema.Struct({
@@ -46,7 +42,7 @@ export const OpenedMapFile = Schema.Struct({
 export type OpenedMapFile = typeof OpenedMapFile.Type
 
 /** `pickImport`'s result: null when the user cancelled the dialog. */
-export const PickImportResult = Schema.NullOr(OpenedMapFile)
+const PickImportResult = Schema.NullOr(OpenedMapFile)
 
 /**
  * A map's file name in a project's `maps/` folder, which is also its name in the game's maps folder
@@ -59,7 +55,7 @@ export const MapFileName = Schema.String.check(
 )
 
 /** An instant as ISO 8601 UTC text (`2026-10-31T12:00:00.000Z`). */
-export const IsoTime = Schema.String.check(Schema.isMaxLength(64))
+const IsoTime = Schema.String.check(Schema.isMaxLength(64))
 
 /** The SHA-256 of a file's bytes, as lowercase hex. */
 export const FileHash = Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/))
@@ -95,11 +91,8 @@ export const PrefabName = Schema.String.check(
   Schema.makeFilter((name: string) => isPrefabName(name) || `isn't a prefab name (${PREFAB_NAME_RULE})`)
 )
 
-/** How many items a prefab's text holds, and the first one's class; null for text that doesn't read as a prefab. */
-export const PrefabSummary = Schema.Struct({
-  itemCount: Schema.NullOr(Schema.Int),
-  firstClass: Schema.NullOr(Schema.String)
-})
+/** How many items a prefab's text holds; null for text that doesn't read as a prefab. */
+export const PrefabSummary = Schema.Struct({ itemCount: Schema.NullOr(Schema.Int) })
 export type PrefabSummary = typeof PrefabSummary.Type
 
 /** A prefab as a tier lists it. */
@@ -122,9 +115,7 @@ const PrefabSummaryJson = Schema.fromJsonString(Schema.Struct({
 
 export const prefabSummaryOf = (text: string): PrefabSummary => {
   const decoded = Schema.decodeOption(PrefabSummaryJson)(text.replace(/^\uFEFF/, ""))
-  return decoded._tag === "Some"
-    ? { itemCount: decoded.value.items.length, firstClass: decoded.value.items[0]?.class ?? null }
-    : { itemCount: null, firstClass: null }
+  return { itemCount: decoded._tag === "Some" ? decoded.value.items.length : null }
 }
 
 export const PrefabInfos = Schema.Array(PrefabInfo)
@@ -133,8 +124,7 @@ export type PrefabInfos = typeof PrefabInfos.Type
 export const PrefabRead = Schema.Struct({ ...PrefabInfo.fields, text: FileText })
 export type PrefabRead = typeof PrefabRead.Type
 
-export const PrefabTierPayload = Schema.Struct({ tier: PrefabTier })
-export type PrefabTierPayload = typeof PrefabTierPayload.Type
+const PrefabTierPayload = Schema.Struct({ tier: PrefabTier })
 
 export const PrefabRef = Schema.Struct({ tier: PrefabTier, name: PrefabName })
 export type PrefabRef = typeof PrefabRef.Type
@@ -157,13 +147,17 @@ export const ProjectInfo = Schema.Struct({
 })
 export type ProjectInfo = typeof ProjectInfo.Type
 
+/** A project used before: `lastOpened` is when this machine last opened it, null when that wasn't kept. */
+export const RecentProject = Schema.Struct({ ...ProjectInfo.fields, lastOpened: Schema.NullOr(IsoTime) })
+export type RecentProject = typeof RecentProject.Type
+
 /**
  * The project in use and the ones used before it, most recent first. `current` is null while there is none: the
  * window is then Untitled Project, nothing on disk, and the first Save names one (docs/PROJECTS.md § Shell).
  */
 export const ProjectState = Schema.Struct({
   current: Schema.NullOr(ProjectInfo),
-  recent: Schema.Array(ProjectInfo),
+  recent: Schema.Array(RecentProject),
   /** The map last open in the current project (its file name), for the next launch to open again; null when none was. */
   lastOpenMap: Schema.NullOr(MapFileName),
   /** Where New project makes its folders: `Documents/Ballest Editor`. */
@@ -180,8 +174,8 @@ export const ProjectState = Schema.Struct({
 })
 export type ProjectState = typeof ProjectState.Type
 
-/** `chooseProject`'s result: the folder picked, which nothing uses yet; null when the user cancelled the dialog. */
-export const ChooseProjectResult = Schema.NullOr(ProjectInfo)
+/** `chooseProject`'s result: the folder picked; null when the user cancelled the dialog. */
+const ChooseProjectResult = Schema.NullOr(ProjectInfo)
 
 /**
  * A new project: its name, and the folder it is made in: `folder`, one picked in a dialog (`chooseProject`), or
@@ -197,18 +191,15 @@ export const ProjectTarget = Schema.TaggedUnion({
 })
 export type ProjectTarget = typeof ProjectTarget.Type
 
-export const ProjectPathPayload = Schema.Struct({ path: FilePath })
-export type ProjectPathPayload = typeof ProjectPathPayload.Type
+const ProjectPathPayload = Schema.Struct({ path: FilePath })
 
 /** Project settings › General: the project's name in `ballest-project.json` (the folder keeps its name). */
-export const RenameProjectPayload = Schema.Struct({ name: Schema.String })
-export type RenameProjectPayload = typeof RenameProjectPayload.Type
+const RenameProjectPayload = Schema.Struct({ name: Schema.String })
 
 /** The project's folders the file manager can be asked to show: the project itself, its `maps/`, its backups. */
 export const ProjectFolder = Schema.Literals(["project", "maps", "backups"])
 export type ProjectFolder = typeof ProjectFolder.Type
-export const RevealProjectPayload = Schema.Struct({ which: ProjectFolder })
-export type RevealProjectPayload = typeof RevealProjectPayload.Type
+const RevealProjectPayload = Schema.Struct({ which: ProjectFolder })
 
 /**
  * A map in the project: its file in `maps/`, when that last changed, the SHA-256 of its bytes (compared with the last
@@ -232,24 +223,33 @@ export type ProjectMaps = typeof ProjectMaps.Type
 export const ProjectMapFile = Schema.Struct({ ...ProjectMap.fields, text: FileText, sidecar: Schema.NullOr(FileText) })
 export type ProjectMapFile = typeof ProjectMapFile.Type
 
-export const MapFileNamePayload = Schema.Struct({ fileName: MapFileName })
-export type MapFileNamePayload = typeof MapFileNamePayload.Type
+const MapFileNamePayload = Schema.Struct({ fileName: MapFileName })
 
 /** `rememberOpenMap`: the map now open in the project, or null for a map that isn't in it. */
-export const OpenMapPayload = Schema.Struct({ fileName: Schema.NullOr(MapFileName) })
-export type OpenMapPayload = typeof OpenMapPayload.Type
+const OpenMapPayload = Schema.Struct({ fileName: Schema.NullOr(MapFileName) })
 
 /** `createMap` and `saveMap`: the map's file name in the project and its text. */
-export const WriteMapPayload = Schema.Struct({ fileName: MapFileName, text: FileText })
-export type WriteMapPayload = typeof WriteMapPayload.Type
+const WriteMapPayload = Schema.Struct({ fileName: MapFileName, text: FileText })
+
+/** A map's thumbnail, a small PNG as a data URL: what the page renders and shows, and main keeps as a `.png`. */
+export const MapThumbnailPng = Schema.String.check(
+  Schema.isMaxLength(1024 * 1024),
+  Schema.isPattern(/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/)
+)
+export type MapThumbnailPng = typeof MapThumbnailPng.Type
+
+/** `readMapThumbnail`: thumbnails go by the hash of the map's file, so one for other bytes is never shown. */
+const MapThumbnailRef = Schema.Struct({ hash: FileHash })
+
+/** `writeMapThumbnail`: the hash of the file that was rendered, and its render. */
+export const WriteMapThumbnailPayload = Schema.Struct({ ...MapThumbnailRef.fields, png: MapThumbnailPng })
+export type WriteMapThumbnailPayload = typeof WriteMapThumbnailPayload.Type
 
 /** `writeSidecar`: the map the sidecar belongs to, and the sidecar's text. */
-export const WriteSidecarPayload = Schema.Struct({ fileName: MapFileName, text: FileText })
-export type WriteSidecarPayload = typeof WriteSidecarPayload.Type
+const WriteSidecarPayload = Schema.Struct({ fileName: MapFileName, text: FileText })
 
 /** `renameMap`: the file the map was in, the one it moves to (named after its new name), and its new text. */
-export const RenameMapPayload = Schema.Struct({ from: MapFileName, to: MapFileName, text: FileText })
-export type RenameMapPayload = typeof RenameMapPayload.Type
+const RenameMapPayload = Schema.Struct({ from: MapFileName, to: MapFileName, text: FileText })
 
 /** `importMap`: a file `pickImport` returned, the project file name it goes in under, and the text written there. */
 export const ImportMapPayload = Schema.Struct({
@@ -292,9 +292,9 @@ const exportRefusals = {
 export const ExportRefusal = Schema.TaggedUnion(exportRefusals)
 export type ExportRefusal = typeof ExportRefusal.Type
 
-/** `exportMap`'s result: `Exported` with the file written and the map's new link record, or an `ExportRefusal`. */
+/** `exportMap`'s result: `Exported`, or an `ExportRefusal`. */
 export const ExportMapResult = Schema.TaggedUnion({
-  Exported: { file: MapFileRef, link: MapLink },
+  Exported: {},
   ...exportRefusals
 })
 export type ExportMapResult = typeof ExportMapResult.Type
@@ -318,7 +318,7 @@ export const BackupPlace = Schema.Literals(["project", "export"])
 export type BackupPlace = typeof BackupPlace.Type
 
 /** A backup's name in its folder, `<time> <file name>`. Never a path: main only reads names it wrote itself. */
-export const BackupId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(512))
+const BackupId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(512))
 
 export const BackupRef = Schema.Struct({ place: BackupPlace, id: BackupId })
 export type BackupRef = typeof BackupRef.Type
@@ -358,8 +358,7 @@ export type PrefabBackup = typeof PrefabBackup.Type
 export const PrefabBackups = Schema.Array(PrefabBackup)
 export type PrefabBackups = typeof PrefabBackups.Type
 
-export const WindowThemePayload = Schema.Struct({ dark: Schema.Boolean })
-export type WindowThemePayload = typeof WindowThemePayload.Type
+const WindowThemePayload = Schema.Struct({ dark: Schema.Boolean })
 
 /** `confirmUnsaved`: the question and the line under it, worded by the page; main shows them with its three buttons. */
 export const UnsavedPrompt = Schema.Struct({
@@ -379,8 +378,7 @@ export type UnsavedChoice = typeof UnsavedChoice.Type
 export const UnloadKind = Schema.Literals(["close", "reload"])
 export type UnloadKind = typeof UnloadKind.Type
 
-export const OpenExternalPayload = Schema.Struct({ url: Schema.String.check(Schema.isMaxLength(8192)) })
-export type OpenExternalPayload = typeof OpenExternalPayload.Type
+const OpenExternalPayload = Schema.Struct({ url: Schema.String.check(Schema.isMaxLength(8192)) })
 
 /** The three game folders the desktop app looks up (docs/DESKTOP.md § Game paths). */
 export const GamePathKind = Schema.Literals(["install", "mapsFolder", "pluginsFolder"])
@@ -406,8 +404,7 @@ export const GamePaths = Schema.Struct({
 })
 export type GamePaths = typeof GamePaths.Type
 
-export const GamePathPayload = Schema.Struct({ which: GamePathKind })
-export type GamePathPayload = typeof GamePathPayload.Type
+const GamePathPayload = Schema.Struct({ which: GamePathKind })
 
 /** `chooseGamePath`'s result: null when the user cancelled the dialog. */
 export const ChooseGamePathResult = Schema.NullOr(GamePaths)
@@ -446,14 +443,14 @@ export const NotificationAction = Schema.Struct({
 })
 export type NotificationAction = typeof NotificationAction.Type
 
-/**
- * One notification, as the bell lists it and `notifications.json` keeps it. `kind` names what it is about (`mapSaved`,
- * `error`, ...; a later "don't show again" is per kind). A `persistent` one stays pinned to the top of the list until
- * `resolvedAt` is set, when its cause has gone away; notifying the same persistent kind again updates it in place.
- */
 /** What a notification is about (`mapSaved`, `gameNotFound`, ...); "Don't show again" mutes a kind. */
-export const NotificationKind = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(64))
+const NotificationKind = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(64))
 
+/**
+ * One notification, as the bell lists it and `notifications.json` keeps it. A `persistent` one stays pinned to the top
+ * of the list until `resolvedAt` is set, when its cause has gone away; notifying the same persistent kind again updates
+ * it in place.
+ */
 export const NotificationRecord = Schema.Struct({
   id: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(64)),
   kind: NotificationKind,
@@ -478,8 +475,7 @@ export type NotificationRecords = typeof NotificationRecords.Type
 export const MutedNotificationKinds = Schema.Array(NotificationKind).check(Schema.isMaxLength(64))
 export type MutedNotificationKinds = typeof MutedNotificationKinds.Type
 
-export const NotificationKindPayload = Schema.Struct({ kind: NotificationKind })
-export type NotificationKindPayload = typeof NotificationKindPayload.Type
+const NotificationKindPayload = Schema.Struct({ kind: NotificationKind })
 
 /**
  * What the Game link checklist (docs/PROJECTS.md § Shell) found: whether the game's install and the plugin manager
@@ -503,8 +499,7 @@ export type GameLinkMemory = typeof GameLinkMemory.Type
  * with (`steam`), or, without Steam's login file, the creator most of the maps in the game's maps folder name
  * (`mapsFolder`).
  */
-export const CreatorSource = Schema.Literals(["steam", "mapsFolder"])
-export type CreatorSource = typeof CreatorSource.Type
+const CreatorSource = Schema.Literals(["steam", "mapsFolder"])
 
 /** The creator name found on this machine. Not checked against the editor's name rule: the renderer says what's wrong. */
 export const FoundCreator = Schema.Struct({
@@ -514,7 +509,7 @@ export const FoundCreator = Schema.Struct({
 export type FoundCreator = typeof FoundCreator.Type
 
 /** `findCreator`'s result: null when neither Steam nor the maps folder names one. */
-export const FindCreatorResult = Schema.NullOr(FoundCreator)
+const FindCreatorResult = Schema.NullOr(FoundCreator)
 
 /**
  * The `ballest-editor-link` plugin Play needs (docs/DESKTOP.md § Play), compared with the copy the app ships:
@@ -524,8 +519,7 @@ export const FindCreatorResult = Schema.NullOr(FoundCreator)
  * - `outdated`: installed, but older than the app's copy.
  * - `current`: installed, as new as the app's copy or newer.
  */
-export const PluginState = Schema.Literals(["noGame", "noPluginManager", "missing", "outdated", "current"])
-export type PluginState = typeof PluginState.Type
+const PluginState = Schema.Literals(["noGame", "noPluginManager", "missing", "outdated", "current"])
 
 export const PluginStatus = Schema.Struct({
   status: PluginState,
@@ -562,16 +556,16 @@ export type PlayLaunch = typeof PlayLaunch.Type
 
 /**
  * `play`'s result (docs/DESKTOP.md § Play):
- * - `Played`: exported (`file`, the map's new `link`), then `sent` the race to the plugin through its `play.json` when
- *   the plugin is installed (`plugin` says how it stands otherwise), and started the game unless it was running.
+ * - `Played`: exported, then `sent` the race to the plugin through its `play.json` when the plugin is installed
+ *   (`plugin` says how it stands otherwise), and started the game unless it was running.
  * - `Published`, `ChangedInGame`: nothing written, an `ExportRefusal` as Export reports it.
  * - `PublishedMap`: nothing written: the project map itself is a published map's (`levelPublishedFileId` above -1),
  *   which the plugin manager won't race. A copy saved as a new draft can be.
  */
 export const PlayResult = Schema.TaggedUnion({
-  Played: { file: MapFileRef, link: MapLink, plugin: PluginStatus, sent: Schema.Boolean, launch: PlayLaunch },
+  Played: { plugin: PluginStatus, sent: Schema.Boolean, launch: PlayLaunch },
   ...exportRefusals,
-  PublishedMap: { fileName: MapFileName, publishedFileId: Schema.Finite }
+  PublishedMap: {}
 })
 export type PlayResult = typeof PlayResult.Type
 
@@ -579,8 +573,15 @@ export type PlayResult = typeof PlayResult.Type
  * Main → renderer: the game session a Play ran in has ended (the game's process exited). `fileName` is the map the
  * last Play of that session raced. The page checks the exports then (`checkExports`).
  */
-export const PlaySessionEnded = Schema.Struct({ fileName: MapFileName, endedAt: IsoTime })
+export const PlaySessionEnded = Schema.Struct({ fileName: MapFileName })
 export type PlaySessionEnded = typeof PlaySessionEnded.Type
+
+/**
+ * Main → renderer: how far Export or Play has got with `fileName` (docs/DESKTOP.md § Status bar). `verify` once the copy
+ * is written, `launch` once Play goes on to the handoff. It goes to every window, so a page keeps only its own file's.
+ */
+export const GameWriteProgress = Schema.Struct({ fileName: MapFileName, stage: Schema.Literals(["verify", "launch"]) })
+export type GameWriteProgress = typeof GameWriteProgress.Type
 
 /**
  * Where the in-app updater is (docs/DESKTOP.md § Packaging and release). `idle` until a check finds a newer release
@@ -645,6 +646,15 @@ export const ReleaseNoteBlock = Schema.Union([
 ])
 export type ReleaseNoteBlock = typeof ReleaseNoteBlock.Type
 
+/** This repository on GitHub. */
+export const REPOSITORY_URL = "https://github.com/ballest-editor/ballest-editor"
+
+/** This repository's GitHub Releases: the feed the packaged app checks, and Help › Release notes. */
+export const RELEASES_URL = `${REPOSITORY_URL}/releases`
+
+/** The licence, as Help › About links it. */
+export const LICENSE_URL = `${REPOSITORY_URL}/blob/main/LICENSE`
+
 export const UpdateState = Schema.Struct({
   status: UpdateStatus,
   /** The running app's version. */
@@ -659,6 +669,8 @@ export const UpdateState = Schema.Struct({
   releaseUrl: Schema.NullOr(Schema.String),
   /** 0 to 100 while `downloading`. */
   downloadPercent: Schema.NullOr(Schema.Finite),
+  /** When a check last got an answer from the feed, up to date or not; null until one has. */
+  checkedAt: Schema.NullOr(IsoTime),
   /**
    * Why updates are `disabled`, why the check failed (`error`), or why the last download (`available`) or install
    * (`ready`) failed; null otherwise.
@@ -692,8 +704,8 @@ export const DesktopMethods = {
   /** The project in use and the recent ones. */
   projectState: { payload: noPayload, result: ProjectState },
   /**
-   * A folder dialog: the folder picked, ready for `switchProject` or `openProjectWindow`; null when cancelled. Nothing
-   * uses it yet. The game's maps folder and a project open in another window are refused.
+   * A folder dialog: the folder picked, ready for `switchProject` or `openProjectWindow`; null when cancelled. The
+   * game's maps folder and a project open in another window are refused.
    */
   chooseProject: { payload: noPayload, result: ChooseProjectResult },
   /** Refuses what `switchProject`, `createProject` or `openProjectWindow` would, changing nothing: asked before asking the user. */
@@ -706,6 +718,10 @@ export const DesktopMethods = {
   createProject: { payload: CreateProjectPayload, result: ProjectState },
   /** Shows one of the project's folders in the file manager; false when it doesn't exist or fails to open. */
   revealProject: { payload: RevealProjectPayload, result: Schema.Boolean },
+  /** Shows a recent project's folder in the file manager; false when it isn't there. Any other folder is refused. */
+  revealRecentProject: { payload: ProjectPathPayload, result: Schema.Boolean },
+  /** Takes a project off the recent ones. Nothing on disk changes. */
+  forgetRecentProject: { payload: ProjectPathPayload, result: ProjectState },
   /** Renames the project in `ballest-project.json`; the folder keeps its name. */
   renameProject: { payload: RenameProjectPayload, result: ProjectState },
   /** Keeps which map is open in the project, so the next launch opens it again (`ProjectState.lastOpenMap`). */
@@ -727,6 +743,10 @@ export const DesktopMethods = {
    */
   renameMap: { payload: RenameMapPayload, result: ProjectMap },
   writeSidecar: { payload: WriteSidecarPayload, result: Schema.Void },
+  /** The thumbnail kept for a map's file; null when it has none. */
+  readMapThumbnail: { payload: MapThumbnailRef, result: Schema.NullOr(MapThumbnailPng) },
+  /** Keeps a map's thumbnail in `.ballest/thumbnails/`, unless no map has that hash any more, and drops the rest. */
+  writeMapThumbnail: { payload: WriteMapThumbnailPayload, result: Schema.Void },
   listPrefabs: { payload: PrefabTierPayload, result: PrefabInfos },
   readPrefab: { payload: PrefabRef, result: PrefabRead },
   writePrefab: { payload: WritePrefabPayload, result: PrefabInfo },
@@ -820,6 +840,8 @@ const DesktopPushes = {
   onUnloadRequest: UnloadKind,
   /** Calls `listener` each time the game session a Play started or joined ends, until the returned function is called. */
   onPlaySessionEnded: PlaySessionEnded,
+  /** Calls `listener` each time an Export or a Play reaches a stage, until the returned function is called. */
+  onGameWriteProgress: GameWriteProgress,
   /** Calls `listener` with every later update state, until the returned function is called. */
   onUpdateState: UpdateState
 } as const satisfies {
@@ -834,7 +856,7 @@ export type DesktopArgs<K extends DesktopMethodName> = [(typeof DesktopMethods)[
   : [payload: (typeof DesktopMethods)[K]["payload"]["Encoded"]]
 
 /** What a bridge method's promise resolves with: its result as main encoded it. */
-export type DesktopResult<K extends DesktopMethodName> = (typeof DesktopMethods)[K]["result"]["Encoded"]
+type DesktopResult<K extends DesktopMethodName> = (typeof DesktopMethods)[K]["result"]["Encoded"]
 
 /** The bridge's methods, one per `DesktopMethods` entry. */
 export type DesktopInvoke = {
@@ -842,7 +864,7 @@ export type DesktopInvoke = {
 }
 
 /** The bridge's subscriptions, one per `DesktopPushes` entry: each returns the function that unsubscribes. */
-export type DesktopSubscriptions = {
+type DesktopSubscriptions = {
   readonly [K in keyof typeof DesktopPushes]: (
     listener: (value: (typeof DesktopPushes)[K]["Encoded"]) => void
   ) => () => void

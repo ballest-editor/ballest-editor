@@ -10,8 +10,8 @@ import * as path from "node:path"
 import { listSamples, readSample, repoRoot } from "../test/samples"
 import {
   Catalog,
+  CatalogPiece,
   HIDDEN_SECTION,
-  humanizedClass,
   indexCatalog,
   paletteSections,
   riskyClassesIn,
@@ -25,10 +25,16 @@ import { defaultProperties, PROPERTY_LISTS } from "./itemProperties"
 import { gameLoadProblems } from "./limits"
 import { Item, MapFile, objectPathOf, type PropertyList } from "./MapFile"
 import { paintTargets } from "./Paint"
+import { pieceLabelOf } from "./pieceName"
 
 const catalogPath = path.join(repoRoot, "assets", "catalog.json")
 const hasCatalog = fs.existsSync(catalogPath)
 const load = () => Schema.decodeSync(Schema.fromJsonString(Catalog))(fs.readFileSync(catalogPath, "utf8"))
+
+const verificationResults = () =>
+  Schema.decodeSync(Schema.fromJsonString(VerificationFile))(
+    fs.readFileSync(path.join(repoRoot, "assets", "verified.json"), "utf8")
+  ).results
 
 const decodeSample = Schema.decodeSync(Schema.fromJsonString(MapFile))
 const sampleItems = () => listSamples().flatMap((s) => decodeSample(readSample(s)).items)
@@ -78,9 +84,7 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
   it("keeps the classes the game only reloads without mesh components out of placement, and writes them with none", () => {
     const catalog = load()
     const index = indexCatalog(catalog)
-    const { results } = Schema.decodeSync(Schema.fromJsonString(VerificationFile))(
-      fs.readFileSync(path.join(repoRoot, "assets", "verified.json"), "utf8")
-    )
+    const results = verificationResults()
     const pieces = catalog.pieces.filter((p) => /^(BP_TwoCube(One|Two)Color|MP_OrangeSign)$/.test(p.className))
     assert.strictEqual(pieces.length, 3)
     const items = pieces.map((piece) => ({
@@ -92,15 +96,20 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
       newMapFile({ displayName: "A", creatorName: "B", createdAt: "" })
     )
     assert.deepStrictEqual(gameLoadProblems(map, index), [])
-    assert.isTrue(pieces.every((p) => unavailableReasonOf(index, p, results)?.includes("opens blank")))
+    // verified.json's note on each is for this repo; the user reads the one line
+    for (const piece of pieces) {
+      assert.isDefined(results[piece.className]?.note)
+      assert.strictEqual(
+        unavailableReasonOf(index, piece, results),
+        "The game can't load this piece; maps that use it open blank."
+      )
+    }
     // the game's panel doesn't paint them, and with no component there is nothing to save paint in
     assert.deepStrictEqual(paintTargets(items, index).items, [])
   })
 
   it("doesn't warn about the player start, which isn't in the palette but is in every map", () => {
-    const { results } = Schema.decodeSync(Schema.fromJsonString(VerificationFile))(
-      fs.readFileSync(path.join(repoRoot, "assets", "verified.json"), "utf8")
-    )
+    const results = verificationResults()
     assert.deepStrictEqual(riskyClassesIn(["MP_PlayerStart"], load().pieces, results), { rejected: [], unverified: [] })
   })
 
@@ -236,6 +245,34 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
     expect(unavailableReasonOf(indexCatalog(catalog), paddle)).toMatch(/removed from the game/)
   })
 
+  it("tells the user why a piece can't be placed in the user's words, never the extractor's", () => {
+    const catalog = load()
+    const index = indexCatalog(catalog)
+    const results = verificationResults()
+    const reasons = catalog.pieces.flatMap((p) => unavailableReasonOf(index, p, results) ?? [])
+    assert.isAbove(reasons.length, 0)
+    for (const reason of reasons) assert.notMatch(reason, /StaticMeshComponent|extractor|\/Game\/|Blueprint/)
+    const spline = catalog.pieces.find((p) => p.className === "BaseSplineActor")!
+    assert.strictEqual(unavailableReasonOf(index, spline, results), "This piece has no mesh to show.")
+    // verified.json notes the paddle for this repo, with a path in the game's files; what the user reads is the removal
+    const paddle = catalog.pieces.find((p) => p.className === "MP_PinballPaddle")!
+    assert.match(unavailableReasonOf(index, paddle, results) ?? "", /^This piece was removed from the game/)
+  })
+
+  it("numbers the Hidden section's duplicates once, for the palette and for anything that names an item", () => {
+    const index = indexCatalog(load())
+    const hidden = index.sections.find((s) => s.hidden)!.pieces
+    const whites = hidden.filter((p) => /^Boolean_.*ArenaWhite/.test(p.className)).map(pieceLabelOf)
+    assert.strictEqual(whites.length, 7)
+    assert.deepStrictEqual(whites, [
+      "Boolean Arena White",
+      ...[2, 3, 4, 5, 6, 7].map((ordinal) => `Boolean Arena White ${ordinal}`)
+    ])
+    for (const piece of hidden) {
+      assert.strictEqual(pieceLabelOf(index.pieceByClass.get(piece.classPath)!), pieceLabelOf(piece))
+    }
+  })
+
   // assets/pieces/ is git-ignored extractor output (`nix run .#extract`); absent in CI.
   const hasPieces = fs.existsSync(path.join(repoRoot, "assets", "pieces"))
   it.skipIf(!hasPieces)("every glb referenced by the catalog index exists on disk", () => {
@@ -247,16 +284,42 @@ describe.skipIf(!hasCatalog)("assets/catalog.json", () => {
   })
 })
 
-describe("humanizedClass", () => {
-  it("writes a class out as words", () => {
-    assert.strictEqual(humanizedClass("MP_PlayerStart"), "Player Start")
-    assert.strictEqual(humanizedClass("BP_Bevel_Full_Ring"), "Bevel Full Ring")
-    assert.strictEqual(humanizedClass("Bevel_Half_DeepScoop"), "Bevel Half Deep Scoop")
+describe("unavailableReasonOf", () => {
+  const classPath = "/Game/A.A_C"
+  const piece = Schema.decodeSync(CatalogPiece)({
+    classPath,
+    className: "A",
+    meshAssetPath: null,
+    glb: null,
+    materialSlots: [],
+    bounds: null
+  })
+  const reasonFor = (unresolved: ReadonlyArray<unknown>) =>
+    unavailableReasonOf(indexCatalog(Schema.decodeSync(Catalog)({ pieces: [piece], unresolved })), piece)
+
+  it("reads the extractor's reasons into the user's words", () => {
+    assert.strictEqual(
+      reasonFor([{ classPath, reason: "no StaticMeshComponent with a mesh (light/volume)" }]),
+      "This piece has no mesh to show."
+    )
+    assert.match(
+      reasonFor([{ classPath, reason: "removed from the game: Blueprint gone" }]) ?? "",
+      /^This piece was removed/
+    )
   })
 
-  it("leaves a hash whole, and a class with nothing else in it as it is", () => {
-    assert.strictEqual(humanizedClass("Boolean_04A2A514_MI_ArenaOrange"), "Boolean 04A2A514 MI Arena Orange")
-    assert.strictEqual(humanizedClass("BP_"), "BP_")
+  it("has one line for a reason it doesn't know, or none at all", () => {
+    for (
+      const entry of [{ classPath, reason: "class: KeyNotFoundException" }, { classPath, reason: "not exported" }, {
+        classPath
+      }]
+    ) {
+      assert.strictEqual(reasonFor([entry]), "Can't be placed from the editor.")
+    }
+  })
+
+  it("says the same of a class with no mesh that the extractor doesn't list", () => {
+    assert.strictEqual(reasonFor([]), "This piece has no mesh to show.")
   })
 })
 

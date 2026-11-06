@@ -41,6 +41,3 @@ export const surfaceMaterialOf = (item: Item, surfaces: Surfaces): string | unde
   const value = surfaceOf(item)
   return value === 0 ? undefined : surfaces[value]?.material ?? undefined
 }
-
-/** `magnet` -> `Magnet`. */
-export const surfaceLabel = (name: string): string => name.charAt(0).toUpperCase() + name.slice(1)

@@ -2,15 +2,17 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import { type Quat4, ueToScene, ueToThreeVector, type UeTransform, type Vec3 } from "../../domain/coords"
+import { selectedGroupIds } from "../../domain/groupSelection"
 import { applyGroupDelta } from "../../domain/groupTransform"
 import { chordOf } from "../../domain/Keybinds"
 import { localToWorld } from "../../domain/pivot"
+import { gizmoScaleOf } from "../../domain/Settings"
 import { transformSelection } from "../actions"
-import { AXIS_COLORS } from "../axisColors"
 import { type PaneCamera, type PanePointer, panePointer } from "../paneCameras"
 import { useBeforePaneDraw } from "../PaneRenderer"
 import { sceneRegistry } from "../sceneRegistry"
 import { activeId, fitTransforms, pivotOf, shownTransform, useEditor } from "../store"
+import { useDarkTheme } from "../theme"
 import { dragAxisWorld, dragDelta, type DragStart, type PointerSample } from "./drag"
 import { GizmoObject, toolHandles } from "./handles"
 
@@ -66,6 +68,13 @@ interface GizmoTarget {
  */
 const currentTarget = (): GizmoTarget | undefined => {
   const s = useEditor.getState()
+  // Settings › Display can keep the gizmo off a whole group, which is moved from the outline instead.
+  if (
+    !s.settings.gizmo.showForGroups &&
+    selectedGroupIds(s.doc.structure.tree, s.selectedIds, s.enteredGroupId).length > 0
+  ) {
+    return undefined
+  }
   const transforms = new Map(s.selectedIds.flatMap((id) => {
     const t = shownTransform(s, id)
     return t === undefined || !sceneRegistry.objects.has(id) ? [] : [[id, t] as const]
@@ -104,6 +113,8 @@ export function GizmoController() {
   const gl = useThree((s) => s.gl)
   const tool = useEditor((s) => s.tool)
   const gizmo = useMemo(() => (tool === "select" ? null : new GizmoObject(toolHandles[tool])), [tool])
+  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
+  useEffect(() => gizmo?.setDark(dark), [gizmo, dark])
   const hovered = useRef<string | null>(null)
   /** The pane `hovered` is in. */
   const hoverSlot = useRef<number | null>(null)
@@ -143,7 +154,7 @@ export function GizmoController() {
     gizmo.update(
       {
         origin,
-        worldPerPixel: pane.worldPerPixelAt(origin),
+        worldPerPixel: pane.worldPerPixelAt(origin) * gizmoScaleOf(useEditor.getState().settings.gizmo.size),
         gameRotation: target.rotation,
         space: useEditor.getState().gizmoSpace,
         cameraQuaternion: pane.camera.quaternion,
@@ -234,7 +245,7 @@ export function GizmoController() {
       const axis = spec.kind === "translateAxis" || spec.kind === "scaleAxis" || spec.kind === "rotateAxis"
         ? dragAxisWorld(start)
         : undefined
-      gizmo.setGuide(originWorld, axis, spec.axis === undefined ? undefined : new THREE.Color(AXIS_COLORS[spec.axis]))
+      gizmo.setGuide(originWorld, axis, spec.axis)
     }
 
     const onPointerMove = (e: PointerEvent) => {

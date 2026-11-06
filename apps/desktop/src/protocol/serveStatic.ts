@@ -2,7 +2,7 @@ import { Effect, FileSystem, Option, Path } from "effect"
 import * as Mime from "effect/http/Mime"
 
 /** A directory served at a URL path prefix (`/` or `/assets/`). */
-export interface StaticMount {
+interface StaticMount {
   readonly prefix: string
   readonly directory: string
 }

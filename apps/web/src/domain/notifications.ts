@@ -1,7 +1,9 @@
 /**
- * The notification centre's list (docs/PROJECTS.md § Shell): newest first, at most `limit` kept. A persistent
+ * The notification centre's list (docs/DESKTOP.md § Notifications): newest first, at most `limit` kept. A persistent
  * notification is pinned to the top until it is resolved; notifying the same persistent kind again replaces it.
  */
+
+import { MUTABLE_KINDS } from "./gameLink"
 
 /** The fields the list works on (`NotificationRecord` in @ballest/contracts). */
 export interface Notice {
@@ -15,6 +17,27 @@ export interface Notice {
 
 /** Shown above the rest until its cause goes away. */
 export const isPinned = (notice: Notice): boolean => notice.persistent && notice.resolvedAt === null
+
+/** What happens without a click, or waits on the user's answer. Don't-show-again kinds too: the panel offers that. */
+const INBOX_KINDS: ReadonlySet<string> = new Set([
+  ...MUTABLE_KINDS,
+  "changedInGame",
+  "prefabChangedOnDisk",
+  "prefabInstancesEdited",
+  "prefabInstancesUpdated",
+  "projectRefused",
+  "sidecarUnmatched",
+  "sidecarUnreadable"
+])
+
+/**
+ * Where a `notify` goes, one or the other and never both. A notification (the inbox) is for what happened in the
+ * background or has to wait for the user: it lands in the notification centre silently and the bell counts it. A toast
+ * is immediate feedback on what the user just did, a refusal or a validation message included: it goes away by itself
+ * and isn't kept. So a kind is a toast unless it is pinned or listed above.
+ */
+export const belongsInInbox = (notice: Pick<Notice, "kind" | "persistent">): boolean =>
+  notice.persistent || INBOX_KINDS.has(notice.kind)
 
 /** At most `limit`, dropping the oldest unpinned ones first. */
 const capped = <N extends Notice>(log: ReadonlyArray<N>, limit: number): ReadonlyArray<N> => {

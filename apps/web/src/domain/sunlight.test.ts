@@ -2,13 +2,36 @@ import { assert, describe, it } from "@effect/vitest"
 import { Option } from "effect"
 import { setLighting } from "./edits"
 import { newMapFile } from "./factory"
-import { DEFAULT_LIGHT_ANGLE, lightingOf, skyLightIntensity, sunOf, sunPitch, viewLightOf } from "./sunlight"
+import {
+  DEFAULT_LIGHT_ANGLE,
+  formatTimeOfDay,
+  lightingOf,
+  parseTimeOfDay,
+  skyLightIntensity,
+  sunOf,
+  sunPitch,
+  viewLightOf
+} from "./sunlight"
 
 const EPSILON = 1e-4
 
 const map = newMapFile({ displayName: "A", creatorName: "B", createdAt: "" })
 
 describe("sunlight", () => {
+  it("shows a time of day as a clock and reads one back", () => {
+    assert.strictEqual(formatTimeOfDay(7.5), "07:30")
+    assert.strictEqual(formatTimeOfDay(7.2997), "07:18")
+    assert.strictEqual(formatTimeOfDay(23.999), "24:00")
+    assert.strictEqual(formatTimeOfDay(0), "00:00")
+    assert.strictEqual(formatTimeOfDay(-1.5), "-01:30")
+    assert.strictEqual(parseTimeOfDay("7:30"), 7.5)
+    assert.strictEqual(parseTimeOfDay(" 18:15 "), 18.25)
+    assert.strictEqual(parseTimeOfDay("7.5"), 7.5)
+    assert.isNull(parseTimeOfDay("7:75"))
+    assert.isNull(parseTimeOfDay(""))
+    assert.isNull(parseTimeOfDay("noon"))
+  })
+
   it("puts the sun where the editor map's light is for the default time", () => {
     // Map_LevelEditorMain's light: pitch -19.495638, yaw -20.647455, for timeOfDay 7.2997093
     assert.closeTo(sunPitch(lightingOf(map.worldSettings).timeOfDay), -19.495638, EPSILON)

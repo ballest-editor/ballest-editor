@@ -1,7 +1,8 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, Option } from "effect"
+import { Effect, Fiber, Option } from "effect"
+import { TestClock } from "effect/testing"
 import { creatorOf } from "../../domain/creator"
-import { allFound, GAME_NOT_FOUND, gameLinkRows, PLUGIN_MANAGER_MISSING } from "../../domain/gameLink"
+import { GAME_NOT_FOUND, gameLinkRows, PLUGIN_MANAGER_MISSING } from "../../domain/gameLink"
 import { defaultSettings } from "../../domain/Settings"
 import { useEditor } from "../../editor/store"
 import { GAME_EXE, makeTestDisk, type TestDisk } from "../../test/desktopBridge"
@@ -10,8 +11,10 @@ import {
   checkGameLinkEffect,
   chooseGameLinkFolderEffect,
   findCreatorEffect,
+  GAME_LINK_WATCH_INTERVAL,
   installPluginEffect,
-  launchGameEffect
+  launchGameEffect,
+  watchGameLinkEffect
 } from "./gameLink"
 import { muteNotificationKindEffect } from "./notifications"
 
@@ -93,7 +96,7 @@ describe("game link actions", () => {
     useEditor.setState({
       notifications: [],
       mutedNotificationKinds: new Set(),
-      gameLink: { firstRun: true, last: null },
+      lastGameLink: null,
       gamePathProblem: null,
       gamePaths: null,
       pluginStatus: null
@@ -102,25 +105,53 @@ describe("game link actions", () => {
   const kinds = () => s().notifications.map((n) => n.kind)
   const pinned = () => s().notifications.filter((n) => n.persistent && n.resolvedAt === null).map((n) => n.kind)
 
-  it.effect("the first launch opens the checklist and notifies nothing; the next one opens nothing", () => {
+  it.effect("a first launch that finds everything shows nothing, and neither does the next one", () => {
     const disk = makeTestDisk()
     installed(disk)
     s().setSettings({ ...defaultSettings, general: { ...defaultSettings.general, creatorName: "Isaac" } })
     return Effect.gen(function*() {
       yield* restart
+      assert.isNull(disk.gameLink.last)
       yield* checkGameLinkEffect
-      assert.isTrue(s().gameLink.firstRun)
-      assert.isTrue(allFound(gameLinkRows(s().gamePaths, s().pluginStatus, creatorOf("Isaac", Option.none()))))
+      const rows = gameLinkRows(s().gamePaths, s().pluginStatus, creatorOf("Isaac", Option.none()))
+      assert.isTrue(rows.every((row) => row.state === "ok"))
       assert.deepStrictEqual(kinds(), [])
       assert.deepStrictEqual(disk.gameLink.last, found)
-      // the checklist opens as a dialog on the first launch only, while everything Export needs is there
+      assert.isNull(s().dialog)
+
+      yield* restart
+      yield* checkGameLinkEffect
+      assert.deepStrictEqual(kinds(), [])
+      assert.isNull(s().dialog)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a first launch opens the dialog for a missing row; a later one only for what Export needs", () => {
+    const disk = makeTestDisk()
+    installed(disk)
+    disk.game.plugin = { ...disk.game.plugin, status: "missing", installedVersion: null }
+    s().setSettings({ ...defaultSettings, general: { ...defaultSettings.general, creatorName: "Isaac" } })
+    return Effect.gen(function*() {
+      yield* restart
+      yield* checkGameLinkEffect
       assert.strictEqual(s().dialog?.id, "gameLink")
       s().closeDialog()
 
       yield* restart
       yield* checkGameLinkEffect
-      assert.isFalse(s().gameLink.firstRun)
-      assert.deepStrictEqual(kinds(), [])
+      assert.isNull(s().dialog)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a first launch doesn't open the dialog for the optional plugin manager", () => {
+    const disk = makeTestDisk()
+    installed(disk)
+    disk.game.paths = { ...disk.game.paths, pluginsFolder: { status: "missing", path: null } }
+    disk.game.plugin = { ...disk.game.plugin, status: "noPluginManager", installedVersion: null }
+    s().setSettings({ ...defaultSettings, general: { ...defaultSettings.general, creatorName: "Isaac" } })
+    return Effect.gen(function*() {
+      yield* restart
+      yield* checkGameLinkEffect
       assert.isNull(s().dialog)
     }).pipe(Effect.provide(layerFor(disk)))
   })
@@ -205,6 +236,30 @@ describe("game link actions", () => {
       yield* chooseGameLinkFolderEffect("mapsFolder")
       assert.deepStrictEqual(pinned(), [])
       assert.deepStrictEqual(disk.gameLink.last, found)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("the watch flips a row by itself, and leaves a refused folder's reason on its row", () => {
+    const { disk, launch } = pluginManagerLost()
+    return Effect.gen(function*() {
+      yield* launch
+      s().setGamePathProblem({ which: "install", message: "Not the game's folder" })
+      const watch = yield* Effect.forkChild(watchGameLinkEffect)
+      yield* TestClock.adjust(GAME_LINK_WATCH_INTERVAL)
+      assert.strictEqual(s().pluginStatus?.status, "noPluginManager")
+      const shown = s().gamePaths
+
+      disk.game.plugin = { ...disk.game.plugin, status: "missing" }
+      yield* TestClock.adjust(GAME_LINK_WATCH_INTERVAL)
+      assert.strictEqual(s().pluginStatus?.status, "missing")
+      assert.deepStrictEqual(pinned(), [])
+      assert.strictEqual(s().gamePaths, shown, "the folders didn't change, so the store keeps them")
+      assert.strictEqual(s().gamePathProblem?.message, "Not the game's folder")
+
+      yield* Fiber.interrupt(watch)
+      disk.game.plugin = { ...disk.game.plugin, status: "current" }
+      yield* TestClock.adjust(GAME_LINK_WATCH_INTERVAL)
+      assert.strictEqual(s().pluginStatus?.status, "missing", "stopped with the page")
     }).pipe(Effect.provide(layerFor(disk)))
   })
 })

@@ -21,6 +21,18 @@ describe("commands", () => {
     s().setCapabilities(before)
   })
 
+  it("has nothing to Save or Frame with no tab open", () => {
+    const s = () => useEditor.getState()
+    const { frameAllRequest } = s()
+    useEditor.setState({ tabIds: [] })
+    commandFor("saveMap")?.()
+    commandFor("saveMapAs")?.()
+    commandFor("frameAll")?.()
+    assert.isNull(s().dialog)
+    assert.strictEqual(s().frameAllRequest, frameAllRequest)
+    useEditor.setState({ tabIds: [s().tabId] })
+  })
+
   it("runs the same store entry points as the keybinds", () => {
     const s = () => useEditor.getState()
     s().loadMap(initialMap(), null)
@@ -38,5 +50,20 @@ describe("commands", () => {
     s().select([s().doc.ids[0]!])
     commandFor("deselect")?.()
     assert.deepStrictEqual(s().selectedIds, [])
+  })
+
+  it("selects the whole map, or only the entered group", () => {
+    const s = () => useEditor.getState()
+    s().loadMap(initialMap(), null)
+    const [first] = s().doc.ids
+    assert.isAbove(s().doc.ids.length, 1)
+    commandFor("selectAll")?.()
+    assert.deepStrictEqual(s().selectedIds, s().doc.ids)
+    s().select([first!])
+    s().groupSelection()
+    const groupId = s().doc.structure.tree.find((node) => node.kind === "group")?.id ?? null
+    s().enterGroup(groupId)
+    commandFor("selectAll")?.()
+    assert.deepStrictEqual(s().selectedIds, [first!])
   })
 })

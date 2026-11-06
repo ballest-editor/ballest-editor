@@ -28,12 +28,12 @@ export class GameLinkError extends Schema.TaggedError<GameLinkError>()("GameLink
 }
 
 /** The file Play writes into the plugin's folder, and what is in it: the map to race and a nonce the plugin hasn't seen. */
-export const PLAY_FILE = "play.json"
+const PLAY_FILE = "play.json"
 export const PlayFile = Schema.Struct({ map: Schema.String, nonce: Schema.Finite })
 export type PlayFile = typeof PlayFile.Type
 
 /** What `requestRace` did: the plugin's status, and whether `play.json` was written. */
-export interface RaceRequest {
+interface RaceRequest {
   readonly plugin: PluginStatus
   readonly sent: boolean
 }

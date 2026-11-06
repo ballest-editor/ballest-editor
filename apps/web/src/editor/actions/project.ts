@@ -1,5 +1,5 @@
 /**
- * Opening, importing and switching (docs/PROJECTS.md § Import): another of the project's maps, a map file from
+ * Opening, importing and switching (docs/DESKTOP.md § Projects and maps): another of the project's maps, a map file from
  * anywhere, another project. Maps open in tabs of their own; what would replace a map's edits asks about them first.
  */
 import type { CreateProjectPayload } from "@ballest/contracts"
@@ -10,20 +10,35 @@ import { MapCodec } from "../../services/MapCodec"
 import { MapExporter } from "../../services/MapExporter"
 import { Platform, PlatformError, type ProjectState, type ProjectTarget } from "../../services/Platform"
 import type { AppServices } from "../../services/runtime"
-import { blankTabs, type ImportClash, isChooserRequired, useEditor } from "../store"
-import { openProjectMapFile, openStartingMap, readProjectMapIntoEditor } from "./maps"
+import { blankTabs, dirtyTabs, type ImportClash, isChooserRequired, useEditor } from "../store"
+import {
+  openProjectMapAtGap,
+  openProjectMapBehind,
+  openProjectMapFile,
+  openStartingMap,
+  readProjectMapIntoEditor
+} from "./maps"
 import { checkPrefabs } from "./prefabs"
 import { run } from "./run"
 import { hasProject, projectName, refreshProject, revealIn, showMap } from "./shared"
 import { unlessAnyCancelled, unlessCancelledFor } from "./unsaved"
 
+/** Runs an opening of a project map, then lists the maps again, whether it worked or not. */
+const runThenRefresh = <A, E>(opening: Effect.Effect<A, E, AppServices>) =>
+  run(opening.pipe(Effect.ensuring(Effect.ignore(refreshProject))))
+
 /** Opens one of the project's maps (`openProjectMapFile`): its tab if it has one, else a new tab. */
-export const openProjectMap = (fileName: string) =>
-  run(openProjectMapFile(fileName).pipe(Effect.ensuring(Effect.ignore(refreshProject))))
+export const openProjectMap = (fileName: string) => runThenRefresh(openProjectMapFile(fileName))
+
+/** A middle click on a map's row: `openProjectMapBehind`. */
+export const openProjectMapInBackground = (fileName: string) => runThenRefresh(openProjectMapBehind(fileName))
+
+/** A map's row dropped on the tab strip: `openProjectMapAtGap`. */
+export const openProjectMapAt = (fileName: string, at: number) => runThenRefresh(openProjectMapAtGap(fileName, at))
 
 /**
- * Rename…, Duplicate… or Recover previous version… for one of the project's maps from the Project panel or Project
- * settings: the dialogs act on the open map, so the map is opened first, then its dialog.
+ * Rename…, Duplicate… or Backups… for one of the project's maps from the Project panel: the dialogs act on the open
+ * map, so the map is opened first, then its dialog.
  */
 export const nameProjectMap = (fileName: string, mode: "rename" | "duplicate" | "recover") =>
   withProjectMapOpen(fileName, Effect.sync(() => useEditor.getState().openDialog({ id: mode })))
@@ -167,6 +182,12 @@ const openHere = (target: ProjectTarget) =>
     ? createProjectEffect(target)
     : changeProject((platform) => platform.switchProject(target.path))
 
+/** What main refuses about opening `target`; a refusal may mean the recent projects are out of date. */
+const checkProject = (target: ProjectTarget) =>
+  Effect.flatMap(Effect.service(Platform), (platform) => platform.checkProject(target)).pipe(
+    Effect.tapError(() => Effect.ignore(refreshProject))
+  )
+
 /** Another running copy takes the project, and nothing changes here. */
 const openInWindow = Effect.fnUntraced(function*(target: ProjectTarget, name: string) {
   yield* (yield* Platform).openProjectWindow(target)
@@ -175,20 +196,20 @@ const openInWindow = Effect.fnUntraced(function*(target: ProjectTarget, name: st
 
 /**
  * Opens a project the way an editor does: main refuses what it can't open (another window has it, the name is taken)
- * before anything is asked, then the whereToOpen dialog asks where it goes, whatever this window holds. Only the
- * required chooser never asks, its pick being this window's start, and an Always do this has answered already. Nothing
- * is written until that is settled.
+ * before anything is asked, then it opens in this window. The whereToOpen dialog asks first only while this window has
+ * unsaved changes, and an Always do this has answered that already. The required chooser never asks, its pick being
+ * this window's start. Nothing is written until that is settled.
  */
 const openProjectEffect = Effect.fn("openProjectEffect")(function*(target: ProjectTarget, name: string) {
-  yield* (yield* Platform).checkProject(target).pipe(Effect.tapError(() => Effect.ignore(refreshProject)))
+  yield* checkProject(target)
   const state = useEditor.getState()
   const opensIn = isChooserRequired(state) ? "thisWindow" : state.settings.general.projectOpensIn
-  if (opensIn === "ask") {
+  if (opensIn === "ask" && dirtyTabs(state).length > 0) {
     state.openDialog({ id: "whereToOpen", target, name })
     return
   }
   state.closeDialog()
-  yield* opensIn === "thisWindow" ? openHere(target) : openInWindow(target, name)
+  yield* opensIn === "newWindow" ? openInWindow(target, name) : openHere(target)
 })
 
 export const chooseProjectEffect = Effect.gen(function*() {
@@ -212,10 +233,33 @@ export const switchProjectEffect = (path: string) =>
 /** A recent project: where it opens, as with Open project…; the one in use already is left alone. */
 export const switchProject = (path: string) => run(switchProjectEffect(path))
 
-export const newProjectEffect = (name: string) => openProjectEffect({ _tag: "New", name }, name)
+/** `folder` is one picked in a dialog (`pickProjectFolder`); without it, `<projectsFolder>/<name>`. */
+export const newProjectEffect = (name: string, folder?: string) =>
+  openProjectEffect({ _tag: "New", name, ...(folder !== undefined && { folder }) }, name)
 
 /** File › New project…, once it has a name: where it opens, as with Open project…, and only then is the folder made. */
-export const newProject = (name: string) => run(newProjectEffect(name))
+export const newProject = (name: string, folder?: string) => run(newProjectEffect(name, folder))
+
+/** Open in new window for a recent project: whatever Settings says, and refused as any opening is. */
+export const openRecentInNewWindowEffect = ({ name, path }: { readonly name: string; readonly path: string }) => {
+  const target: ProjectTarget = { _tag: "Existing", path }
+  return checkProject(target).pipe(Effect.andThen(openInWindow(target, name)))
+}
+
+export const openRecentInNewWindow = (project: { readonly name: string; readonly path: string }) =>
+  run(openRecentInNewWindowEffect(project))
+
+/** Reveal for a recent project, which needn't be the one in use. */
+export const revealRecentProject = (path: string) =>
+  run(Effect.flatMap(Effect.service(Platform), (platform) => platform.revealRecentProject(path)))
+
+export const forgetRecentProjectEffect = (path: string) =>
+  Effect.flatMap(Effect.service(Platform), (platform) => platform.forgetRecentProject(path)).pipe(
+    Effect.andThen(refreshProject)
+  )
+
+/** Remove from recent: only the list changes, and the project's folder stays. */
+export const forgetRecentProject = (path: string) => run(forgetRecentProjectEffect(path))
 
 /** An answer to the whereToOpen dialog: it closes, and `open` goes on with its project. Nothing when it isn't open. */
 const answerWhereToOpen = <E, R>(open: (target: ProjectTarget, name: string) => Effect.Effect<void, E, R>) =>

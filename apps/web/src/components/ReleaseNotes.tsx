@@ -10,7 +10,7 @@ function ExternalLink({ href, children }: { readonly href: string; readonly chil
     <a
       href={href}
       title={href}
-      className="text-foreground underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground"
+      className="rounded-control text-foreground underline decoration-foreground/30 underline-offset-2 focus-ring hover:decoration-foreground"
       onClick={(e) => {
         e.preventDefault()
         void openExternalLink(href)
@@ -38,7 +38,7 @@ function Span({ span }: { readonly span: ReleaseNoteSpan }) {
   let node: ReactNode = span.href === null ? span.text : linkTextOf(span.text, span.href)
   if (span.code) node = <code className="rounded bg-muted px-1 py-px font-mono text-[0.9em]">{node}</code>
   if (span.emphasis) node = <em>{node}</em>
-  if (span.strong) node = <strong className="font-semibold text-foreground">{node}</strong>
+  if (span.strong) node = <strong className="text-body-strong text-foreground">{node}</strong>
   return span.href === null ? node : <ExternalLink href={span.href}>{node}</ExternalLink>
 }
 
@@ -51,7 +51,7 @@ function List({ list, nested = false }: { readonly list: ReleaseNoteList; readon
   return (
     <Tag
       className={cn(
-        "flex flex-col gap-1 pl-4 marker:text-muted-foreground",
+        "flex flex-col gap-1 pl-4 marker:text-fg-tertiary",
         list.ordered ? "list-decimal" : "list-disc",
         nested && "mt-1"
       )}
@@ -76,8 +76,8 @@ function Block({ block }: { readonly block: ReleaseNoteBlock }) {
       return (
         <Tag
           className={cn(
-            "font-semibold text-foreground not-first:mt-1",
-            block.level <= 2 ? "text-[0.8125rem]" : "text-xs"
+            "text-body-strong text-foreground not-first:mt-1",
+            block.level <= 2 ? "text-body" : "text-body"
           )}
         >
           <Spans spans={block.spans} />
@@ -94,7 +94,7 @@ function Block({ block }: { readonly block: ReleaseNoteBlock }) {
       return <List list={block} />
     case "Code":
       return (
-        <pre className="overflow-x-auto rounded-md bg-muted px-2 py-1.5 font-mono text-[0.6875rem] text-foreground">
+        <pre className="overflow-x-auto rounded-control bg-muted px-2 py-1.5 font-mono text-caption text-foreground">
           {block.text}
         </pre>
       )
@@ -107,7 +107,7 @@ function Block({ block }: { readonly block: ReleaseNoteBlock }) {
  */
 export function ReleaseNotes({ blocks }: { readonly blocks: ReadonlyArray<ReleaseNoteBlock> }) {
   return (
-    <div className="flex flex-col gap-2 leading-relaxed break-words text-muted-foreground">
+    <div className="flex flex-col gap-2 leading-relaxed break-words text-fg-secondary select-text">
       {keyed(blocks).map(([key, block]) => <Block key={key} block={block} />)}
     </div>
   )

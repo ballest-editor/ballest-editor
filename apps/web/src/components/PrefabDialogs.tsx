@@ -4,28 +4,42 @@ import { DialogFooter } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { type ReactNode, useState } from "react"
-import { isPrefabName, isSamePrefab, PREFAB_NAME_RULE } from "../domain/prefab"
-import { deletePrefab, renamePrefab, saveSelectionAsPrefab } from "../editor/actions"
+import {
+  isPrefabName,
+  isSamePrefab,
+  PREFAB_NAME_RULE,
+  PREFAB_NEEDS_PROJECT,
+  PREFAB_TIER_HINTS,
+  prefabTierLabel
+} from "../domain/prefab"
+import { deletePrefab, renamePrefab, saveSelectionAsPrefab, suggestPrefabName } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { TitledDialog } from "./TitledDialog"
+import { useOnOpen } from "./useOnOpen"
 
 interface DialogProps {
   readonly open: boolean
   readonly onClose: () => void
 }
 
-/** A prefab's name, and what goes with it: a name is its file's, so `saveprefab`'s rule applies as it is typed. */
-function PrefabNameForm({ canSubmit, children, invalid, name, onChange, onClose, onSubmit, submitLabel }: {
+/**
+ * A prefab's name, and what goes with it: a name is its file's, so `saveprefab`'s rule applies as it is typed. The rule
+ * shows only once it is broken, as in `NameMapDialog`.
+ */
+function PrefabNameForm({ canSubmit, children, name, nameProblem, onChange, onClose, onSubmit, submitLabel }: {
   readonly canSubmit: boolean
   readonly children?: ReactNode
-  readonly invalid: boolean
   readonly name: string
+  /** Under the field while the name keeps the rule: what is wrong with it otherwise. */
+  readonly nameProblem?: string | undefined
   readonly onChange: (name: string) => void
   readonly onClose: () => void
   readonly onSubmit: () => void
   readonly submitLabel: string
 }) {
+  const problem = name !== "" && !isPrefabName(name) ? `${PREFAB_NAME_RULE}.` : nameProblem
   return (
     <form
       className="contents"
@@ -41,11 +55,13 @@ function PrefabNameForm({ canSubmit, children, invalid, name, onChange, onClose,
         <Input
           id="prefab-name"
           autoFocus
+          // a name is usually replaced whole: the suggestion, or the one a rename starts on
+          onFocus={(e) => e.currentTarget.select()}
           value={name}
-          aria-invalid={invalid}
+          aria-invalid={problem !== undefined}
           onChange={(e) => onChange(e.target.value)}
         />
-        <span className="text-xs text-muted-foreground">{PREFAB_NAME_RULE}</span>
+        {problem !== undefined && <span className="text-body text-destructive">{problem}</span>}
       </div>
       {children}
       <DialogFooter>
@@ -56,12 +72,33 @@ function PrefabNameForm({ canSubmit, children, invalid, name, onChange, onClose,
   )
 }
 
-/** Edit › Save selection as prefab…: its name and tier. A name the tier has already replaces that prefab, and says so. */
+/** One tier in Stored in. A disabled segment takes no pointer events, so the tooltip is on a wrapper. */
+function TierSegment({ disabled, hint, label, tier }: {
+  readonly disabled?: boolean
+  readonly hint: string
+  readonly label: string
+  readonly tier: PrefabTier
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className="inline-flex" />}>
+        <ToggleGroupItem value={tier} disabled={disabled}>{label}</ToggleGroupItem>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{hint}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/**
+ * Edit › Save selection as prefab…: its name, which starts on what the selection reads as, and where it is stored. A name
+ * the tier has already replaces that prefab, and says so.
+ */
 export function SavePrefabDialog({ open, onClose }: DialogProps) {
   const projects = useEditor((s) => s.capabilities.projects)
   const hasProject = useEditor((s) => s.project?.current != null)
   const prefabs = useEditor((s) => s.prefabs)
   const [name, setName] = useState("")
+  useOnOpen(open, () => setName(suggestPrefabName(useEditor.getState())))
   const [chosenTier, setTier] = useState<PrefabTier>("project")
   // only a named project has a tier of its own
   const tier = projects && hasProject ? chosenTier : "user"
@@ -72,34 +109,33 @@ export function SavePrefabDialog({ open, onClose }: DialogProps) {
       open={open}
       onClose={onClose}
       title="Save selection as prefab"
-      description={projects
-        ? "A project prefab stays with this project. A user prefab is the game's own: the in-game editor spawns it too."
-        : "This build keeps prefabs in memory, until the page closes."}
+      // with no Stored in to say so
+      description={projects ? undefined : "This build keeps prefabs in memory, until the page closes."}
     >
       <PrefabNameForm
         name={name}
         onChange={setName}
-        invalid={name !== "" && !valid}
         canSubmit={valid}
         submitLabel={taken ? "Replace" : "Save"}
         onClose={onClose}
-        onSubmit={() => {
-          setName("")
-          void saveSelectionAsPrefab({ tier, name }, taken)
-        }}
+        onSubmit={() => void saveSelectionAsPrefab({ tier, name }, taken)}
       >
         {projects && (
           <div className="flex flex-col gap-1.5">
-            <Label>Tier</Label>
+            <Label>Stored in</Label>
             <ToggleGroup
               value={[tier]}
-              variant="outline"
               onValueChange={([picked]) => {
                 if (picked === "user" || picked === "project") setTier(picked)
               }}
             >
-              <ToggleGroupItem value="project" disabled={!hasProject}>Project</ToggleGroupItem>
-              <ToggleGroupItem value="user">User</ToggleGroupItem>
+              <TierSegment
+                tier="project"
+                label={prefabTierLabel("project", projects)}
+                disabled={!hasProject}
+                hint={hasProject ? PREFAB_TIER_HINTS.project : PREFAB_NEEDS_PROJECT}
+              />
+              <TierSegment tier="user" label={prefabTierLabel("user", projects)} hint={PREFAB_TIER_HINTS.user} />
             </ToggleGroup>
           </div>
         )}
@@ -122,16 +158,14 @@ function RenameForm({ from, onClose, tier }: {
     <PrefabNameForm
       name={name}
       onChange={setName}
-      invalid={!valid}
+      nameProblem={taken ? `There is already a prefab called ${name}.` : undefined}
       canSubmit={valid}
       submitLabel="Rename"
       onClose={onClose}
       onSubmit={() => {
         if (name !== from) void renamePrefab({ tier, name: from }, name)
       }}
-    >
-      {taken && <p className="text-xs text-destructive">There is already a prefab called {name}.</p>}
-    </PrefabNameForm>
+    />
   )
 }
 

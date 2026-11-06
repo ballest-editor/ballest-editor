@@ -1,170 +1,123 @@
+import { IconCheck } from "@tabler/icons-react"
 import {
   Menubar,
   MenubarCheckboxItem,
   MenubarContent,
+  MenubarEmpty,
+  MenubarFilterProvider,
+  MenubarGroup,
+  MenubarInput,
   MenubarItem,
+  MenubarLabel,
+  MenubarList,
   MenubarMenu,
   MenubarRadioGroup,
   MenubarRadioItem,
   MenubarSeparator,
-  MenubarShortcut,
   MenubarSub,
   MenubarSubContent,
   MenubarSubTrigger,
   MenubarTrigger
 } from "@workspace/ui/components/menubar"
-import { type ReactNode, useMemo } from "react"
-import { canGroupSelection, selectedGroupIds } from "../domain/groupSelection"
-import { formatBinding, type KeybindAction } from "../domain/Keybinds"
-import type { Settings } from "../domain/Settings"
-import { formatGridSize, GRID_SIZES } from "../domain/snap"
-import { canCheckForUpdates } from "../domain/updates"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
+import { type KeyboardEvent, type ReactElement, type ReactNode, useState } from "react"
+import type { KeybindAction } from "../domain/Keybinds"
+import { useEditor } from "../editor/store"
+import { MenuKey } from "./KeyChip"
 import {
-  viewLayoutKinds,
-  viewLayoutLabels,
-  type ViewProjection,
-  viewProjectionLabels,
-  viewProjections
-} from "../domain/viewLayout"
-import {
-  checkForUpdates,
-  chooseProject,
-  exportToGame,
-  launchGame,
-  quitApp,
-  reimportMap,
-  setExportOnSave,
-  startSavePrefab,
-  switchProject,
-  updateSettings
-} from "../editor/actions"
-import { actionCommands, type CommandAction } from "../editor/commands"
-import { PREFAB_TAB_STAYS_HERE, useEditor, useOpenPrefab, useOpenProjectMap } from "../editor/store"
-import { resetDockLayout, usePanelCheck, useViewMenuPanels } from "./dock/dockControl"
+  type MenuChoice,
+  menuEntries,
+  type MenuEntry,
+  type MenuItem,
+  type MenuNode,
+  type MenuSubmenu,
+  type MenuTitle,
+  searchMenus,
+  useMenus
+} from "./menuModel"
+import { SearchField } from "./SettingsShell"
 
 /** The action's primary binding, as the menu shows it (nothing when unbound). */
 function Shortcut({ action }: { readonly action: KeybindAction }) {
   const binding = useEditor((s) => s.keybinds[action][0])
-  return binding === undefined ? null : <MenubarShortcut className="pl-6">{formatBinding(binding)}</MenubarShortcut>
+  return binding === undefined ? null : <MenuKey binding={binding} />
 }
 
-/** A menu item that runs the same command as the action's keybind, and shows that keybind. */
-function CommandItem({ action, disabled = false, inset, children }: {
-  readonly action: CommandAction
-  readonly disabled?: boolean
-  /**
-   * Lines the label up with checkbox and radio items in the same menu. Absent otherwise:
-   * any `data-inset` attribute, even "false", draws the checkmark gutter.
-   */
+/** Says why a row is off. A disabled row gets no pointer events, so the tooltip lives on a wrapper. */
+function DisabledReason({ reason, children }: { readonly reason: string | null; readonly children: ReactElement }) {
+  if (reason === null) return children
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<div />}>{children}</TooltipTrigger>
+      <TooltipContent side="right">{reason}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** What lines a row's label up with the checkbox and radio items in its menu; absent otherwise. */
+interface Indent {
+  /** Any `data-inset` attribute, even "false", draws the checkmark gutter. */
   readonly inset?: boolean
-  readonly children: ReactNode
-}) {
+}
+
+function Item({ item, inset }: Indent & { readonly item: MenuItem }) {
   return (
-    <MenubarItem disabled={disabled} {...(inset && { inset })} onClick={() => actionCommands[action]()}>
-      {children}
-      <Shortcut action={action} />
-    </MenubarItem>
+    <DisabledReason reason={item.reason}>
+      <MenubarItem
+        disabled={item.reason !== null}
+        {...(inset && { inset })}
+        {...(item.title !== undefined && { title: item.title })}
+        onClick={item.run}
+      >
+        <span className="truncate">{item.label}</span>
+        {item.note !== undefined && <span className="shrink-0 pl-4 text-fg-tertiary">{item.note}</span>}
+        {item.shortcut !== undefined && <Shortcut action={item.shortcut} />}
+      </MenubarItem>
+    </DisabledReason>
   )
 }
 
-/**
- * One top-level menu. A keyboard close returns focus to the menu's title as usual. A
- * pointer close leaves it nowhere, so a later Space or Enter can't reopen the menu and
- * keybinds stay with the viewport; that includes a click on the title, which focuses it.
- */
-function Menu({ title, children }: { readonly title: string; readonly children: ReactNode }) {
+function SubmenuDescription({ text }: { readonly text: string }) {
   return (
-    <MenubarMenu
-      onOpenChange={(open, { reason, event }) => {
-        if (open || reason !== "trigger-press" || event instanceof KeyboardEvent) return
-        requestAnimationFrame(() => {
-          const focused = document.activeElement
-          if (focused instanceof HTMLElement && focused.closest("[role=menubar]") !== null) focused.blur()
-        })
-      }}
-    >
-      <MenubarTrigger className="h-7 px-2.5">{title}</MenubarTrigger>
-      {/* Sized to the longest row (label and shortcut on one line), not to the menu's title. */}
-      <MenubarContent className="w-max min-w-40" finalFocus={(closeType) => closeType === "keyboard"}>
-        {children}
-      </MenubarContent>
-    </MenubarMenu>
+    <MenubarGroup>
+      <MenubarLabel className="text-fg-tertiary">{text}</MenubarLabel>
+    </MenubarGroup>
   )
 }
 
-/**
- * Desktop only: the projects used before, by name (the folder is the tooltip). One open in another window says so, and
- * picking it still gets main's refusal, which says what to do.
- */
-function RecentProjectsMenu() {
-  const state = useEditor((s) => s.project)
-  const recent = state?.recent ?? []
-  const openElsewhere = state?.openElsewhere ?? []
+function Submenu({ submenu }: { readonly submenu: MenuSubmenu }) {
   return (
     <MenubarSub>
-      <MenubarSubTrigger disabled={recent.length === 0}>Recent projects</MenubarSubTrigger>
+      <DisabledReason reason={submenu.reason}>
+        {/* Unlike an item, a disabled submenu title keeps the pointer: it would light up and take focus. */}
+        <MenubarSubTrigger disabled={submenu.reason !== null} className="data-disabled:pointer-events-none">
+          {submenu.title}
+        </MenubarSubTrigger>
+      </DisabledReason>
       <MenubarSubContent className="w-max max-w-96">
-        {recent.map((project) => (
-          <MenubarItem
-            key={project.path}
-            title={project.path}
-            onClick={() => void switchProject(project.path)}
-          >
-            <span className="truncate">{project.name}</span>
-            {openElsewhere.includes(project.path) && (
-              <span className="shrink-0 pl-4 text-muted-foreground">Open in another window</span>
-            )}
-          </MenubarItem>
-        ))}
+        <SubmenuDescription text={submenu.description} />
+        <Rows nodes={submenu.children} />
       </MenubarSubContent>
     </MenubarSub>
   )
 }
 
-function PanelItem({ id, title }: { readonly id: string; readonly title: string }) {
-  return <MenubarCheckboxItem {...usePanelCheck(id)}>{title}</MenubarCheckboxItem>
-}
-
-type ViewSetting = "appearance" | "lighting" | "snapping"
-type FlagOf<S extends ViewSetting> = {
-  [K in keyof Settings[S]]: Settings[S][K] extends boolean ? K : never
-}[keyof Settings[S]]
-
-/** A check on a boolean setting. */
-function SettingCheck<S extends ViewSetting>({ section, flag, children }: {
-  readonly section: S
-  readonly flag: FlagOf<S>
-  readonly children: ReactNode
-}) {
-  const checked = useEditor((s) => s.settings[section][flag] === true)
-  return (
-    <MenubarCheckboxItem
-      closeOnClick
-      checked={checked}
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `FlagOf` says it's a boolean of `section`
-      onCheckedChange={(on) => void updateSettings(section, { [flag]: on } as Partial<Settings[S]>)}
-    >
-      {children}
-    </MenubarCheckboxItem>
-  )
-}
-
-/** A submenu picking one of `options`, each drawn by `children`. */
-function RadioMenu<V extends string | number>({ title, className, value, options, onPick, children }: {
-  readonly title: string
-  readonly className?: string
-  readonly value: V
-  readonly options: ReadonlyArray<V>
-  readonly onPick: (value: V) => void
-  readonly children: (option: V) => ReactNode
-}) {
+function Choice({ choice }: { readonly choice: MenuChoice }) {
+  const { title, description, options } = choice
   return (
     <MenubarSub>
       <MenubarSubTrigger inset>{title}</MenubarSubTrigger>
-      <MenubarSubContent {...(className !== undefined && { className })}>
-        <MenubarRadioGroup value={value} onValueChange={(next: V) => onPick(next)}>
-          {options.map((option) => (
-            <MenubarRadioItem closeOnClick key={option} value={option}>{children(option)}</MenubarRadioItem>
+      <MenubarSubContent className="w-max max-w-72">
+        {description !== undefined && <SubmenuDescription text={description} />}
+        <MenubarRadioGroup
+          value={options.findIndex((option) => option.checked)}
+          onValueChange={(index: number) => options[index]?.run()}
+        >
+          {options.map((option, index) => (
+            <MenubarRadioItem closeOnClick key={option.label} value={index}>
+              {option.label}
+              {option.shortcut !== undefined && <Shortcut action={option.shortcut} />}
+            </MenubarRadioItem>
           ))}
         </MenubarRadioGroup>
       </MenubarSubContent>
@@ -172,71 +125,160 @@ function RadioMenu<V extends string | number>({ title, className, value, options
   )
 }
 
-/** The keybind that puts the active pane on each view; Perspective has only the toggle. */
-const PROJECTION_ACTIONS: Readonly<Record<ViewProjection, KeybindAction>> = {
-  perspective: "toggleOrthographic",
-  top: "viewTop",
-  bottom: "viewBottom",
-  front: "viewFront",
-  back: "viewBack",
-  left: "viewLeft",
-  right: "viewRight"
+function Row({ node, inset }: Indent & { readonly node: MenuNode }) {
+  switch (node.kind) {
+    case "separator":
+      return <MenubarSeparator />
+    case "item":
+      return <Item item={node} {...(inset && { inset })} />
+    case "check":
+      return (
+        <MenubarCheckboxItem closeOnClick checked={node.checked} onCheckedChange={() => node.run()}>
+          {node.label}
+        </MenubarCheckboxItem>
+      )
+    case "section":
+      return (
+        <MenubarGroup>
+          <MenubarLabel inset className="uppercase tracking-wider">{node.title}</MenubarLabel>
+          <Rows nodes={node.children} inset />
+        </MenubarGroup>
+      )
+    case "submenu":
+      return <Submenu submenu={node} />
+    case "choice":
+      return <Choice choice={node} />
+  }
 }
 
-/** How the view divides into panes, and what the active pane looks along (docs/DESKTOP.md § View panes). */
-function PaneMenus() {
-  const kind = useEditor((s) => s.viewLayout.kind)
-  const projection = useEditor((s) => s.viewLayout.projections[s.activePane] ?? "perspective")
-  const setViewLayoutKind = useEditor((s) => s.setViewLayoutKind)
-  const lookAlong = (next: ViewProjection) => {
-    const { activePane, setPaneProjection } = useEditor.getState()
-    setPaneProjection(activePane, next)
+function Rows({ nodes, inset }: Indent & { readonly nodes: ReadonlyArray<MenuNode> }) {
+  return nodes.map((node, index) => (
+    // oxlint-disable-next-line react/no-array-index-key -- separators and same-named recent projects have nothing else, and rows don't reorder
+    <Row key={index} node={node} {...(inset && { inset })} />
+  ))
+}
+
+/** One menu's rows. Mounted only while that menu is open, so a closed menu bar follows nothing in the store. */
+function MenuRows({ title }: { readonly title: MenuTitle }) {
+  return <Rows nodes={useMenus()[title]} />
+}
+
+/** Where focus can be in the menus. Help's search field isn't in a `menu`: its list is, and the popup is a `dialog`. */
+const MENU_FOCUS = "[role=menu], [role=menubar], [data-slot=menubar-content]"
+
+/** Gives the focus back to the page if it is on a menu or the menu bar. */
+const leaveMenus = () => {
+  const focused = document.activeElement
+  if (focused instanceof HTMLElement && focused.closest(MENU_FOCUS) !== null) focused.blur()
+}
+
+/**
+ * One top-level menu. Closing it leaves focus on the page, however it closed, as a dialog does: on a title, Space and
+ * the arrows would work the menu bar and not the editor. It leaves as the menu starts to close, since Base UI holds it
+ * in the popup until the exit animation ends, and the keys pressed until then would be lost. A click on the title
+ * focuses it after this, so it leaves again a frame later. Only a move to the next menu (`sibling-open`) stays in the
+ * bar.
+ */
+function Menu({ title, width = "w-max min-w-40", onOpen, children }: {
+  readonly title: string
+  /** Sized to the longest row (label and shortcut on one line) unless given, not to the menu's title. */
+  readonly width?: string
+  readonly onOpen?: () => void
+  readonly children: ReactNode
+}) {
+  return (
+    <MenubarMenu
+      onOpenChange={(open, { reason }) => {
+        if (open) onOpen?.()
+        if (open || reason === "sibling-open") return
+        leaveMenus()
+        requestAnimationFrame(leaveMenus)
+      }}
+    >
+      <MenubarTrigger className="h-7 px-2.5">{title}</MenubarTrigger>
+      <MenubarContent className={width} finalFocus={false}>
+        {children}
+      </MenubarContent>
+    </MenubarMenu>
+  )
+}
+
+/**
+ * A row of Help's search: a real menu item, so the filter's arrows, Enter and pointer all work it. Its reason stays
+ * readable however dim the row is, as it's the only way to see why.
+ */
+function SearchResult({ entry }: { readonly entry: MenuEntry }) {
+  const { label, path, reason, shortcut, checked } = entry
+  return (
+    <MenubarItem
+      disabled={reason !== null}
+      onClick={entry.run}
+      className="items-start py-0.5 data-disabled:[&_[data-reason]]:text-fg-tertiary!"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5">
+          <span className="truncate">{label}</span>
+          {checked === true && <IconCheck aria-label="On" />}
+        </span>
+        <span className="block truncate text-caption text-fg-tertiary">{path.join(" › ")}</span>
+        {reason !== null && <span data-reason className="block text-caption">{reason}</span>}
+      </span>
+      {shortcut !== undefined && <Shortcut action={shortcut} />}
+    </MenubarItem>
+  )
+}
+
+/** Every menu's rows that `query` finds. Mounted only while Help is open, as `MenuRows` is. */
+function SearchResults({ query }: { readonly query: string }) {
+  return searchMenus(menuEntries(useMenus()), query).map((entry, index) => (
+    // oxlint-disable-next-line react/no-array-index-key -- a row's place in the results is all that tells two same-named recent projects apart
+    <SearchResult key={index} entry={entry} />
+  ))
+}
+
+/**
+ * Help, with a field over its rows that searches every menu, as macOS's Help does. The filter runs the keys and we
+ * draw the rows (`filter={null}`). It would empty the query as the popup starts to close, which would swap the results
+ * for Help's rows while they fade, so the query stays until the next open.
+ */
+function HelpMenu() {
+  const [query, setQuery] = useState("")
+  // Escape would close the menu: the first one only empties the field
+  const clearOnEscape = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Escape" || query === "") return
+    e.stopPropagation()
+    setQuery("")
   }
   return (
-    <>
-      <RadioMenu title="Panes" value={kind} options={viewLayoutKinds} onPick={setViewLayoutKind}>
-        {(layout) => viewLayoutLabels[layout]}
-      </RadioMenu>
-      <RadioMenu title="Active pane" className="w-max" value={projection} options={viewProjections} onPick={lookAlong}>
-        {(view) => (
-          <>
-            {viewProjectionLabels[view]}
-            <Shortcut action={PROJECTION_ACTIONS[view]} />
-          </>
-        )}
-      </RadioMenu>
-    </>
+    <MenubarFilterProvider
+      filter={null}
+      autoHighlight
+      value={query}
+      onValueChange={(next, { reason }) => {
+        if (reason !== "popup-close") setQuery(next)
+      }}
+    >
+      <Menu title="Help" width="w-80" onOpen={() => setQuery("")}>
+        <MenubarInput
+          aria-label="Search the menus"
+          placeholder="Search the menus"
+          render={<SearchField className="mb-1" inputClassName="focus-ring-inset" />}
+          onKeyDown={clearOnEscape}
+        />
+        {/* Out to the popup's edges, where a separator's negative margin reaches, or it would scroll sideways. */}
+        <MenubarList className="-mx-1 max-h-96 overflow-x-hidden overflow-y-auto px-1 dark:scheme-dark">
+          {query.trim() === "" ? <MenuRows title="Help" /> : <SearchResults query={query} />}
+          <MenubarEmpty>Nothing in the menus matches.</MenubarEmpty>
+        </MenubarList>
+      </Menu>
+    </MenubarFilterProvider>
   )
 }
 
-const THEMES = { dark: "Dark", light: "Light", system: "System" } as const
-const THEME_KEYS = ["dark", "light", "system"] as const
+const PLAIN_MENUS: ReadonlyArray<MenuTitle> = ["File", "Edit", "View", "Project"]
 
-/** File, Edit, View and Project (docs/DESKTOP.md § Menus). Every item calls the entry point its keybind or button uses. */
+/** File, Edit, View, Project and Help (docs/DESKTOP.md § Menus), drawn from `menuModel`. */
 export function MenuBar() {
-  const canUndo = useEditor((s) => s.past.length > 0 && s.preview === null)
-  const canCheck = useEditor((s) => s.update !== null && canCheckForUpdates(s.update))
-  const canRedo = useEditor((s) => s.future.length > 0 && s.preview === null)
-  const selectedIds = useEditor((s) => s.selectedIds)
-  const tree = useEditor((s) => s.doc.structure.tree)
-  const hasSelection = selectedIds.length > 0
-  const canGroup = useMemo(() => canGroupSelection(tree, selectedIds), [tree, selectedIds])
-  const canUngroup = useMemo(() => selectedGroupIds(tree, selectedIds).length > 0, [tree, selectedIds])
-  const canPaste = useEditor((s) => s.clipboard !== null)
-  const openDialog = useEditor((s) => s.openDialog)
-  const viewMenuPanels = useViewMenuPanels()
-  const { snapping, appearance, general } = useEditor((s) => s.settings)
-  const { projects, exportToGame: canExport, launchGame: canLaunchGame, play: canPlay } = useEditor((s) =>
-    s.capabilities
-  )
-  const exportOnSave = useEditor((s) => s.exportOnSave)
-  const inPrefab = useOpenPrefab() !== null
-  // Untitled Project has no folder to import into yet (the Project panel's Import is disabled the same way)
-  const untitled = useEditor((s) => s.project?.current === null)
-  // Re-import needs an export to take the map from
-  const exportedFile = useOpenProjectMap()?.map
-  const reimportable = exportedFile?.link?.export != null ? exportedFile.fileName : null
-
   return (
     <Menubar
       className="h-auto border-none p-0"
@@ -249,128 +291,12 @@ export function MenuBar() {
         if (e.key === "Escape" && onClosedTitle) target.blur()
       }}
     >
-      {projects
-        ? (
-          <Menu title="File">
-            <CommandItem action="newMap">New map</CommandItem>
-            <MenubarItem onClick={() => openDialog({ id: "newProject" })}>New project…</MenubarItem>
-            <MenubarItem onClick={() => void chooseProject()}>Open project…</MenubarItem>
-            <RecentProjectsMenu />
-            <MenubarSeparator />
-            <CommandItem action="saveMap">Save</CommandItem>
-            <CommandItem action="closeTab">Close tab</CommandItem>
-            <MenubarSeparator />
-            <MenubarItem onClick={() => openDialog({ id: "settings" })}>Settings…</MenubarItem>
-            <MenubarItem onClick={() => openDialog({ id: "gameLink" })}>Game link…</MenubarItem>
-            <MenubarItem disabled={!canCheck} onClick={() => void checkForUpdates()}>Check for updates</MenubarItem>
-            <MenubarItem onClick={() => void quitApp()}>Quit</MenubarItem>
-          </Menu>
-        )
-        : (
-          <Menu title="File">
-            <CommandItem action="newMap">New map</CommandItem>
-            <CommandItem action="openMap">Open…</CommandItem>
-            <MenubarSeparator />
-            <CommandItem action="saveMap">Save</CommandItem>
-            <CommandItem action="saveMapAs">Export…</CommandItem>
-            <CommandItem action="closeTab">Close tab</CommandItem>
-            <MenubarSeparator />
-            <MenubarItem onClick={() => openDialog({ id: "settings" })}>Settings…</MenubarItem>
-          </Menu>
-        )}
-      <Menu title="Edit">
-        <CommandItem action="undo" disabled={!canUndo}>Undo</CommandItem>
-        <CommandItem action="redo" disabled={!canRedo}>Redo</CommandItem>
-        <MenubarSeparator />
-        <CommandItem action="cutSelection" disabled={!hasSelection}>Cut</CommandItem>
-        <CommandItem action="copySelection" disabled={!hasSelection}>Copy</CommandItem>
-        <CommandItem action="paste" disabled={!canPaste}>Paste</CommandItem>
-        <CommandItem action="duplicateSelection" disabled={!hasSelection}>Duplicate</CommandItem>
-        <CommandItem action="deleteSelection" disabled={!hasSelection}>Delete</CommandItem>
-        <CommandItem action="deselect" disabled={!hasSelection}>Deselect</CommandItem>
-        <MenubarSeparator />
-        <CommandItem action="groupSelection" disabled={!canGroup}>Group</CommandItem>
-        <CommandItem action="ungroupSelection" disabled={!canUngroup}>Ungroup</CommandItem>
-        <MenubarSeparator />
-        <MenubarItem disabled={!hasSelection} onClick={startSavePrefab}>Save selection as prefab…</MenubarItem>
-      </Menu>
-      <Menu title="View">
-        <CommandItem action="focusSelection" disabled={!hasSelection} inset>Focus selection</CommandItem>
-        <CommandItem action="frameAll" inset>Frame all</CommandItem>
-        <PaneMenus />
-        <MenubarSeparator />
-        {viewMenuPanels.map(({ id, title }) => <PanelItem key={id} id={id} title={title} />)}
-        <MenubarItem inset onClick={resetDockLayout}>Reset layout</MenubarItem>
-        <MenubarSeparator />
-        <SettingCheck section="appearance" flag="gridVisible">Show grid</SettingCheck>
-        <SettingCheck section="snapping" flag="enabled">Snap to grid</SettingCheck>
-        <RadioMenu
-          title="Grid size"
-          value={snapping.gridSize}
-          options={GRID_SIZES}
-          onPick={(gridSize) => void updateSettings("snapping", { enabled: true, gridSize })}
-        >
-          {(size) => <span className="tabular-nums">{formatGridSize(size, general.units)}</span>}
-        </RadioMenu>
-        <MenubarSeparator />
-        <SettingCheck section="lighting" flag="mapLighting">Map lighting</SettingCheck>
-        <SettingCheck section="lighting" flag="skyVisible">Show sky</SettingCheck>
-        <SettingCheck section="appearance" flag="waterVisible">Show water</SettingCheck>
-        <RadioMenu
-          title="Theme"
-          value={appearance.theme}
-          options={THEME_KEYS}
-          onPick={(theme) => void updateSettings("appearance", { theme })}
-        >
-          {(theme) => THEMES[theme]}
-        </RadioMenu>
-      </Menu>
-      {projects
-        ? (
-          <Menu title="Project">
-            <CommandItem action="newMap" inset>New map</CommandItem>
-            <CommandItem action="openMap" inset disabled={untitled}>Import map…</CommandItem>
-            {canExport && (
-              <>
-                <MenubarSeparator />
-                <span title={inPrefab ? PREFAB_TAB_STAYS_HERE : undefined}>
-                  <MenubarItem inset disabled={inPrefab} onClick={() => void exportToGame()}>
-                    Export to game
-                  </MenubarItem>
-                </span>
-                <MenubarCheckboxItem
-                  closeOnClick
-                  checked={exportOnSave}
-                  onCheckedChange={(on) => void setExportOnSave(on)}
-                >
-                  Export on save
-                </MenubarCheckboxItem>
-                <MenubarItem
-                  inset
-                  disabled={reimportable === null}
-                  onClick={() => reimportable !== null && void reimportMap(reimportable)}
-                >
-                  Re-import from game
-                </MenubarItem>
-                {canPlay && (
-                  <span title={inPrefab ? PREFAB_TAB_STAYS_HERE : undefined}>
-                    <CommandItem action="playMap" inset disabled={inPrefab}>Play</CommandItem>
-                  </span>
-                )}
-                {canLaunchGame && <MenubarItem inset onClick={() => void launchGame()}>Launch game</MenubarItem>}
-              </>
-            )}
-            <MenubarSeparator />
-            <MenubarItem inset onClick={() => openDialog({ id: "projectSettings" })}>Project settings…</MenubarItem>
-          </Menu>
-        )
-        : (
-          <Menu title="Project">
-            <MenubarItem disabled={inPrefab} onClick={() => openDialog({ id: "mapSettings" })}>
-              Project settings…
-            </MenubarItem>
-          </Menu>
-        )}
+      {PLAIN_MENUS.map((title) => (
+        <Menu key={title} title={title}>
+          <MenuRows title={title} />
+        </Menu>
+      ))}
+      <HelpMenu />
     </Menubar>
   )
 }

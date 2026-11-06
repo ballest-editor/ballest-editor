@@ -15,16 +15,16 @@ describe("snap", () => {
     assert.strictEqual(formatGridSize(25, "m"), "0.25 m")
   })
 
-  it("offers the game's rotation steps, formatted like its menu", () => {
+  it("offers the game's rotation steps, with no decimal they don't need", () => {
     assert.deepStrictEqual([...ROTATION_STEPS].sort((a, b) => a - b), [...ROTATION_STEPS])
     assert.deepStrictEqual(ROTATION_STEPS.map(formatRotationStep), [
-      "2.812",
-      "5.0",
-      "10.0",
-      "15.0",
-      "30.0",
-      "45.0",
-      "90.0"
+      "2.812°",
+      "5°",
+      "10°",
+      "15°",
+      "30°",
+      "45°",
+      "90°"
     ])
   })
 })

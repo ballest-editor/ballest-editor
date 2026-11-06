@@ -1,4 +1,4 @@
-import { AXIS_COLORS } from "../axisColors"
+import { sceneAxisColors } from "../axisColors"
 /**
  * Blender-style gizmo handles as plain three.js objects (testable without WebGL).
  *
@@ -19,7 +19,7 @@ import type { Quat4 } from "../../domain/coords"
 import { isLine, isMesh } from "../threeGuards"
 import { type Axis, axisWorldDir } from "./math"
 
-export type HandleKind = "translateAxis" | "translatePlane" | "rotateAxis" | "rotateView" | "scaleAxis" | "scaleUniform"
+type HandleKind = "translateAxis" | "translatePlane" | "rotateAxis" | "rotateView" | "scaleAxis" | "scaleUniform"
 
 export interface HandleSpec {
   readonly id: string
@@ -28,7 +28,7 @@ export interface HandleSpec {
   readonly axis?: Axis
 }
 
-export type GizmoTool = "translate" | "rotate" | "scale"
+type GizmoTool = "translate" | "rotate" | "scale"
 
 /** Which axes the handles follow: the item's own (rotated) axes, or the world's. */
 export type GizmoSpace = "local" | "world"
@@ -42,8 +42,11 @@ export const toolHandles: Readonly<Record<GizmoTool, ReadonlyArray<HandleSpec>>>
   scale: [...axisSpecs("scaleAxis", "s"), { id: "s-uniform", kind: "scaleUniform" }]
 }
 
-const VIEW_COLOR = "#ffffff"
-const HOVER_TINT = new THREE.Color("#fff3c4")
+/** What isn't an axis's colour, against each theme's scene: the view ring, and what a hovered handle leans to. */
+const NEUTRAL_COLORS = {
+  dark: { view: "#ffffff", hover: "#fff3c4" },
+  light: { view: "#2b303a", hover: "#7a4a00" }
+} as const
 const RENDER_ORDER = 1000
 
 /** Sizes in screen pixels. */
@@ -78,6 +81,8 @@ export interface Handle {
   /** Parts shown only while the handle is being dragged, in the plain axis colour (own materials). */
   readonly activeParts: ReadonlyArray<ActivePart>
   readonly baseColor: THREE.Color
+  /** What the handle leans to under the pointer. */
+  readonly hoverColor: THREE.Color
   readonly materials: ReadonlyArray<THREE.MeshBasicMaterial>
 }
 
@@ -154,8 +159,11 @@ const buildVisual = (
   }
 }
 
-export const makeHandle = (spec: HandleSpec): Handle => {
-  const baseColor = new THREE.Color(spec.axis === undefined ? VIEW_COLOR : AXIS_COLORS[spec.axis])
+const handleColor = (spec: HandleSpec, dark: boolean): string =>
+  spec.axis === undefined ? NEUTRAL_COLORS[dark ? "dark" : "light"].view : sceneAxisColors(dark)[spec.axis]
+
+const makeHandle = (spec: HandleSpec): Handle => {
+  const baseColor = new THREE.Color(handleColor(spec, true))
   const material = visualMaterial(baseColor)
   const { activeParts = [], hits, parts } = buildVisual(spec, material)
   const root = new THREE.Group()
@@ -164,11 +172,19 @@ export const makeHandle = (spec: HandleSpec): Handle => {
     part.userData["handleId"] = spec.id
     root.add(part)
   }
-  return { spec, root, hits, activeParts, baseColor, materials: [material] }
+  return {
+    spec,
+    root,
+    hits,
+    activeParts,
+    baseColor,
+    hoverColor: new THREE.Color(NEUTRAL_COLORS.dark.hover),
+    materials: [material]
+  }
 }
 
 /** Everything a handle needs to place itself this frame. */
-export interface GizmoFrame {
+interface GizmoFrame {
   /** World position of the selection origin. */
   readonly origin: THREE.Vector3
   readonly worldPerPixel: number
@@ -196,7 +212,7 @@ const pairWorldDirs = (axis: Axis, frame: GizmoFrame): readonly [THREE.Vector3, 
   return [axisWorldDir(a, rotation), axisWorldDir(b, rotation)]
 }
 
-export const orientHandle = (handle: Handle, frame: GizmoFrame): void => {
+const orientHandle = (handle: Handle, frame: GizmoFrame): void => {
   const { spec, root } = handle
   switch (spec.kind) {
     case "translateAxis":
@@ -257,12 +273,12 @@ export const handleFacesCamera = (spec: HandleSpec, frame: GizmoFrame): boolean 
   }
 }
 
-export type HandleState = "idle" | "hover" | "active" | "dimmed"
+type HandleState = "idle" | "hover" | "active" | "dimmed"
 
-export const styleHandle = (handle: Handle, state: HandleState): void => {
+const styleHandle = (handle: Handle, state: HandleState): void => {
   for (const material of handle.materials) {
     material.color.copy(handle.baseColor)
-    if (state === "hover" || state === "active") material.color.lerp(HOVER_TINT, 0.7)
+    if (state === "hover" || state === "active") material.color.lerp(handle.hoverColor, 0.7)
     material.opacity = state === "dimmed" ? 0.25 : 1
   }
   for (const part of handle.activeParts) part.visible = state === "active"
@@ -277,6 +293,7 @@ export class GizmoObject extends THREE.Group {
   readonly body = new THREE.Group()
   readonly guide: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>
   private readonly guidePositions = new THREE.BufferAttribute(new Float32Array(6), 3)
+  private dark = true
 
   constructor(specs: ReadonlyArray<HandleSpec>) {
     super()
@@ -299,6 +316,15 @@ export class GizmoObject extends THREE.Group {
     this.guide.frustumCulled = false
     this.guide.visible = false
     this.add(this.guide)
+  }
+
+  /** Recolours the handles for the theme; `update` puts it on their materials. */
+  setDark(dark: boolean): void {
+    this.dark = dark
+    for (const h of this.handles) {
+      h.baseColor.set(handleColor(h.spec, dark))
+      h.hoverColor.set(NEUTRAL_COLORS[dark ? "dark" : "light"].hover)
+    }
   }
 
   /** What a pointer can grab in the pane last placed for: a raycast doesn't care about `visible`. */
@@ -326,8 +352,8 @@ export class GizmoObject extends THREE.Group {
     this.body.updateMatrixWorld(true)
   }
 
-  /** Shows a guide line through `origin` along `dir` (world), or hides it. */
-  setGuide(origin: THREE.Vector3 | undefined, dir: THREE.Vector3 | undefined, color?: THREE.Color): void {
+  /** Shows a guide line through `origin` along `dir` (world) in the colour of `axis`, or hides it. */
+  setGuide(origin: THREE.Vector3 | undefined, dir: THREE.Vector3 | undefined, axis?: Axis): void {
     if (origin === undefined || dir === undefined) {
       this.guide.visible = false
       return
@@ -337,7 +363,7 @@ export class GizmoObject extends THREE.Group {
     positions.setXYZ(0, origin.x - dir.x * far, origin.y - dir.y * far, origin.z - dir.z * far)
     positions.setXYZ(1, origin.x + dir.x * far, origin.y + dir.y * far, origin.z + dir.z * far)
     positions.needsUpdate = true
-    if (color !== undefined) this.guide.material.color.copy(color)
+    if (axis !== undefined) this.guide.material.color.set(sceneAxisColors(this.dark)[axis])
     this.guide.visible = true
   }
 

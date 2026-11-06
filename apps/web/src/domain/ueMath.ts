@@ -15,11 +15,15 @@ export const rotatorToQuat = (r: { readonly pitch: number; readonly yaw: number;
   }
 }
 
-// --- quaternions (Hamilton product on raw components) ---------------------------------
+export const ORIGIN: Vec3 = { x: 0, y: 0, z: 0 }
 
 export const vecAdd = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z })
 
 export const vecSub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z })
+
+export const sameVec = (a: Vec3, b: Vec3): boolean => a.x === b.x && a.y === b.y && a.z === b.z
+
+// --- quaternions (Hamilton product on raw components) ---------------------------------
 
 export const quatMul = (a: Quat4, b: Quat4): Quat4 => ({
   x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,

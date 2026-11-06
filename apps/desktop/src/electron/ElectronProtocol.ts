@@ -6,7 +6,7 @@ import { serveStatic, type StaticSite } from "../protocol/serveStatic"
 const HOST = "app"
 const SCHEMES = { production: "ballest", development: "ballest-dev" } as const
 
-export const desktopScheme = (isDevelopment: boolean) => isDevelopment ? SCHEMES.development : SCHEMES.production
+const desktopScheme = (isDevelopment: boolean) => isDevelopment ? SCHEMES.development : SCHEMES.production
 export const desktopUrl = (isDevelopment: boolean) => `${desktopScheme(isDevelopment)}://${HOST}/`
 
 /**
@@ -79,7 +79,7 @@ export type DesktopProtocolSource =
   | { readonly _tag: "Static"; readonly site: StaticSite }
   | { readonly _tag: "DevServer"; readonly origin: URL }
 
-export class ElectronProtocolRegistrationError extends Schema.TaggedError<ElectronProtocolRegistrationError>()(
+class ElectronProtocolRegistrationError extends Schema.TaggedError<ElectronProtocolRegistrationError>()(
   "ElectronProtocolRegistrationError",
   { scheme: Schema.String, cause: Schema.Defect() }
 ) {

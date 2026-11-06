@@ -130,7 +130,7 @@ game:  "userLevelName": "driver probe_spigipplespigipplespigipple",   "creatorNa
 
 The original stays beside it. The app defaults the creator to the Steam name (`creator.ts`), so this only bites a player who typed a different creator in Settings. They would end up with two files.
 
-**6. `createdAt` is the time the map was opened, in UTC.** The app writes local time at export. The game replaces it on open anyway. It matched `openmap` to the second, and two saves in one session kept the same value.
+**6. `createdAt` is the time the map was opened, in UTC.** The app wrote local time at export when this was measured (below). It now stamps UTC, once, on a map that has no date (and on a Duplicate), and keeps the date on every later save. The game replaces it on open anyway, so a map saved in the game comes back with the time it was last opened there. It matched `openmap` to the second, and two saves in one session kept the same value.
 
 ```json
 ours:  "createdAt": "2026.11.04-15.05.15"

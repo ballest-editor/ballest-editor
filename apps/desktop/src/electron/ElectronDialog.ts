@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
 import * as Electron from "electron"
 
-export class ElectronDialogError extends Schema.TaggedError<ElectronDialogError>()("ElectronDialogError", {
+class ElectronDialogError extends Schema.TaggedError<ElectronDialogError>()("ElectronDialogError", {
   kind: Schema.Literals(["open", "save", "folder", "message"]),
   cause: Schema.Defect()
 }) {

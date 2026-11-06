@@ -199,10 +199,6 @@ export const pasteItems = (map: MapFile, clip: Clip): MapFile => {
   return { ...map, items, editorState: { ...editorState, pivots: all } }
 }
 
-/** Appends copies of items (in the given order), pivots included: copy, then paste. */
-export const duplicateItems = (map: MapFile, indices: ReadonlyArray<number>): MapFile =>
-  pasteItems(map, copyItems(map, indices))
-
 /**
  * Sets the pivots of several items (by index; out-of-range indices are skipped). Default
  * drops the item's entry, as items without one are Default. A map without `editorState`
@@ -246,6 +242,9 @@ export { isNeverPublished } from "@ballest/contracts"
  */
 export const asNewDraft = (map: MapFile): MapFile =>
   setLevelData(map, { ...map.worldSettings.levelData, levelPublishedFileId: -1 })
+
+/** The map as one just made, for Duplicate: its first export stamps `createdAt`. */
+export const asNewMap = (map: MapFile): MapFile => setLevelData(map, { ...map.worldSettings.levelData, createdAt: "" })
 
 /** The display and creator names, and `userLevelName` (`<displayName>_<creator>`) kept in step with them. */
 export const withLevelNames = (levelData: LevelData, displayName: string, creatorName: string): LevelData => ({

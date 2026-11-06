@@ -44,7 +44,7 @@ export const normalAgreement = (geometry: THREE.BufferGeometry): number | undefi
 }
 
 /** Swaps the 2nd and 3rd vertex of every triangle (indices, or vertex data when non-indexed). */
-export const reverseWinding = (geometry: THREE.BufferGeometry): void => {
+const reverseWinding = (geometry: THREE.BufferGeometry): void => {
   const index = geometry.getIndex()
   if (index !== null) {
     for (let i = 0; i + 2 < index.count; i += 3) {

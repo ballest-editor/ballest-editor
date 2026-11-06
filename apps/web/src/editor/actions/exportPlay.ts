@@ -1,13 +1,13 @@
 /**
- * Export to game and Play on the open map (docs/PROJECTS.md § Export and Play, docs/DESKTOP.md § Play): both copy its
+ * Export to game and Play on the open map (docs/DESKTOP.md § Projects and maps, § Play): both copy its
  * project file, so unsaved edits are saved first and a map with no file yet is named first; then `writeToGame`.
  */
 import { Effect } from "effect"
 import { isNeverPublished } from "../../domain/edits"
 import { gameLoadProblems } from "../../domain/limits"
 import { ExportValidationError } from "../../services/errors"
-import { gameMapOf, PREFAB_TAB_STAYS_HERE, useEditor } from "../store"
-import { ASK_FIRST, type ExportIntent, writeToGame } from "./gameWrite"
+import { exportProblemOf, gameMapOf, useEditor } from "../store"
+import { ASK_FIRST, type ExportIntent, showingGameWrite, writeToGame } from "./gameWrite"
 import { withProjectMapOpen } from "./project"
 import { run } from "./run"
 import { duplicateMapEffect, withSavedOpenMap } from "./save"
@@ -21,13 +21,17 @@ import { duplicateMapEffect, withSavedOpenMap } from "./save"
  */
 const writeOpenMapToGame = (intent: ExportIntent) =>
   Effect.suspend(() => {
-    const { catalogIndex, doc, document, openDialog } = useEditor.getState()
-    if (document.kind === "prefab") return Effect.fail(new ExportValidationError({ message: PREFAB_TAB_STAYS_HERE }))
+    const s = useEditor.getState()
+    const { catalogIndex, doc, openDialog } = s
+    const refused = exportProblemOf(s)
+    if (refused !== null) return Effect.fail(new ExportValidationError({ message: refused }))
     const problems = gameLoadProblems(gameMapOf(doc, catalogIndex), catalogIndex)
     if (problems.length > 0) return Effect.fail(new ExportValidationError({ message: problems.slice(0, 3).join(" ") }))
     return intent === "play" && !isNeverPublished(doc.map.worldSettings.levelData.levelPublishedFileId)
       ? Effect.sync(() => openDialog({ id: "newDraft" }))
-      : withSavedOpenMap((fileName) => writeToGame(intent, fileName, ASK_FIRST))
+      : withSavedOpenMap((fileName) => writeToGame(intent, fileName, ASK_FIRST)).pipe(
+        showingGameWrite({ intent, fileName: null, stage: "save" })
+      )
   })
 
 /**
@@ -54,5 +58,5 @@ export const exportProjectMapFromPanel = (fileName: string) => withProjectMapOpe
 export const playProjectMapFromPanel = (fileName: string) => withProjectMapOpen(fileName, playEffect)
 
 /** The newDraft dialog's answer: a copy of the map that was never published, under a new name; then Play races it. */
-export const playAsNewDraft = (displayName: string, creatorName: string, replace = false) =>
+export const playAsNewDraft = (displayName: string, creatorName: string, replace: boolean) =>
   run(duplicateMapEffect(displayName, creatorName, replace, true).pipe(Effect.andThen(playEffect)))

@@ -1,22 +1,35 @@
 /**
  * The game's sky as a three.js material (see domain/sky for where each term comes from).
- * One material draws the visible dome, with the sun disc and stars, fading out just above the
- * grid (`uClipY`) so the theme's background shows under it; a second, `capture`,
- * draws the same sky without the sun, and with the arena below `ARENA_RIM`, for the environment
- * map the scene is lit by (the game's sky light is a real-time capture of this sky).
+ * `dome` draws the visible sky, with the sun disc and stars, hazing out over the far floor
+ * (`uClipY`) so the clear colour shows nearer in; `capture` draws the same sky without the sun, and with the arena below
+ * `ARENA_RIM`, for the environment map the scene is lit by (the game's sky light is a real-time
+ * capture of this sky).
  */
 import * as THREE from "three"
 import { type Tuple3, ueToThreeVector } from "../domain/coords"
 import { ARENA_RIM, type Sky, SKY_GAIN, SUN_RADIUS } from "../domain/sky"
 
-/**
- * The visible dome's radius (cm), which is also where the floor grid finishes fading out:
- * cut at the grid's height, the sky then starts where the grid ends.
- */
+/** The visible dome's radius (cm), which is also where the floor grid finishes fading out, with or without the sky. */
 export const SKY_DOME_RADIUS = 60_000
 
-/** How far above the grid's height (on the dome, cm) the sky fades in: about 8° of elevation, a soft edge without aliasing. */
-const SKY_FADE_HEIGHT = SKY_DOME_RADIUS * 0.14
+/**
+ * Where the sky fades in, on the dome, from below the grid's height to above it (cm): the far floor hazes into the
+ * horizon instead of ending in a flat band of the clear colour. 3° above, seen from the floor, and about 20° below in
+ * light; 7° in dark, where a bright sky over a dark floor would otherwise light up a third of the pane.
+ */
+export const SKY_HAZE_BELOW = { dark: SKY_DOME_RADIUS * 0.12, light: SKY_DOME_RADIUS * 0.34 } as const
+const SKY_HAZE_ABOVE = SKY_DOME_RADIUS * 0.05
+
+/**
+ * GLSL: how far the sky has faded in (0 to 1) along direction `d`, over a floor at `clipY`. It measures how far above the
+ * floor `d` meets the dome. The water thins out by the same curve, so the two cross over with nothing showing between.
+ */
+export const SKY_HAZE_GLSL = /* glsl */ `
+float ballestSkyHaze( vec3 d, float clipY, float below ) {
+  float above = cameraPosition.y + d.y * ${SKY_DOME_RADIUS.toFixed(1)} - clipY;
+  return smoothstep( -below, ${SKY_HAZE_ABOVE.toFixed(1)}, above );
+}
+`
 
 /** Exposure on the visible sky; the game's auto exposure has no counterpart here. */
 const SKY_EXPOSURE = 1.6
@@ -40,8 +53,9 @@ uniform float uStars;
 uniform float uGain;
 uniform vec3 uGround;
 uniform float uClipY;
+uniform float uHazeBelow;
 varying vec3 vDir;
-
+${SKY_HAZE_GLSL}
 float ballestHash( vec2 p ) {
   return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 );
 }
@@ -65,10 +79,8 @@ void main() {
     // The stands' top edge isn't a line in the distance: a soft step, and the normal maps don't break it into specks.
     color = mix( uGround, color, smoothstep( ${(ARENA_RIM * 0.8).toFixed(4)}, ${(ARENA_RIM * 1.2).toFixed(4)}, d.y ) );
   #else
-    // How far above the grid's height this direction meets the dome (from the exact
-    // direction, not the faceted mesh); the sky fades in over SKY_FADE_HEIGHT from there.
-    float above = cameraPosition.y + d.y * ${SKY_DOME_RADIUS.toFixed(1)} - uClipY;
-    alpha = smoothstep( 0.0, ${SKY_FADE_HEIGHT.toFixed(1)}, above );
+    // From the exact direction, not the faceted mesh.
+    alpha = ballestSkyHaze( d, uClipY, uHazeBelow );
     if ( alpha <= 0.0 ) discard;
     color += uSun * clamp( 1.0 - abs( dot( d, uToSun ) - 1.0 ) / ${SUN_RADIUS.toFixed(6)}, 0.0, 1.0 );
   #endif
@@ -86,17 +98,28 @@ void main() {
 }
 `
 
-const skyUniforms = (capture: boolean) => ({
+export type SkyKind = "dome" | "capture"
+
+const shownGain = SKY_GAIN * SKY_EXPOSURE
+const skyGain: Readonly<Record<SkyKind, number>> = { dome: shownGain, capture: SKY_GAIN }
+
+const SKY_DEFINES: Readonly<Record<SkyKind, Record<string, string>>> = {
+  dome: {},
+  capture: { BALLEST_CAPTURE: "" }
+}
+
+const skyUniforms = (kind: SkyKind) => ({
   uZenith: { value: new THREE.Color() },
   uHorizon: { value: new THREE.Color() },
   uFalloff: { value: 3 },
   uToSun: { value: new THREE.Vector3(0, 1, 0) },
   uSun: { value: new THREE.Color() },
   uStars: { value: 0 },
-  uGain: { value: capture ? SKY_GAIN : SKY_GAIN * SKY_EXPOSURE },
+  uGain: { value: skyGain[kind] },
   uGround: { value: new THREE.Color() },
-  /** World height (scene units) where the visible dome has faded out. */
-  uClipY: { value: -Infinity }
+  /** World height (scene units) of the grid, which the visible dome's fade is measured from. */
+  uClipY: { value: -Infinity },
+  uHazeBelow: { value: SKY_HAZE_BELOW.light }
 })
 
 /**
@@ -108,13 +131,14 @@ const skyUniforms = (capture: boolean) => ({
 export class SkyMaterial extends THREE.ShaderMaterial {
   readonly sky: ReturnType<typeof skyUniforms>
 
-  constructor(capture: boolean) {
-    const sky = skyUniforms(capture)
+  constructor(kind: SkyKind) {
+    const sky = skyUniforms(kind)
+    const capture = kind === "capture"
     super({
       uniforms: sky,
       vertexShader,
       fragmentShader,
-      defines: capture ? { BALLEST_CAPTURE: "" } : {},
+      defines: SKY_DEFINES[kind],
       side: THREE.BackSide,
       depthTest: false,
       depthWrite: false
@@ -127,7 +151,7 @@ export class SkyMaterial extends THREE.ShaderMaterial {
       this.blendSrcAlpha = THREE.ZeroFactor
       this.blendDstAlpha = THREE.OneFactor
     }
-    // three tone-maps the visible dome; the capture stays linear for lighting.
+    // three tone-maps the visible sky; the capture stays linear for lighting.
     this.toneMapped = !capture
   }
 }

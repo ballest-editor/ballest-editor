@@ -4,6 +4,7 @@ import type {
   FoundCreator,
   GameLinkResult,
   GamePaths,
+  GameWriteProgress,
   MapBackupFile,
   MapLink,
   NotificationRecords,
@@ -38,6 +39,8 @@ import { Option, Schema } from "effect"
  */
 export interface TestDisk {
   readonly files: Map<string, string>
+  /** The map thumbnails main keeps, by file hash. */
+  readonly thumbnails: Map<string, string>
   readonly answers: Array<string | null>
   readonly dialogs: Array<{ readonly kind: "import" | "project" | "folder" }>
   readonly external: Array<string>
@@ -53,6 +56,11 @@ export interface TestDisk {
   readonly playSessions: {
     readonly listeners: Set<(ended: PlaySessionEnded) => void>
     readonly push: (ended: PlaySessionEnded) => void
+  }
+  /** `push` reports, as main does, how far an Export or a Play has got. */
+  readonly gameWriteProgress: {
+    readonly listeners: Set<(progress: GameWriteProgress) => void>
+    readonly push: (progress: GameWriteProgress) => void
   }
   /** Link records by project, then by map file name, as main keeps them in `.ballest/link.json`. */
   readonly links: Map<string, Map<string, MapLink>>
@@ -150,6 +158,7 @@ const makeTestUpdater = (): TestDisk["updater"] => {
       releaseDate: null,
       releaseUrl: null,
       downloadPercent: null,
+      checkedAt: null,
       message: null
     },
     listeners: new Set(),
@@ -172,6 +181,7 @@ const makeTestPush = <A>() => {
 
 export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   files: new Map(Object.entries(files)),
+  thumbnails: new Map(),
   answers: [],
   dialogs: [],
   external: [],
@@ -179,6 +189,7 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   promptAnswers: [],
   unload: makeTestPush<UnloadKind>(),
   playSessions: makeTestPush<PlaySessionEnded>(),
+  gameWriteProgress: makeTestPush<GameWriteProgress>(),
   links: new Map(),
   backups: [],
   prefabBackups: [],
@@ -255,7 +266,10 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
   const NO_PROJECT = "There is no project yet: Save the map to name one, or open a project."
   const state = () => ({
     current: disk.project.current === null ? null : info(disk.project.current),
-    recent: disk.project.recent.filter((p) => p !== disk.project.current).map(info),
+    recent: disk.project.recent.filter((p) => p !== disk.project.current).map((p) => ({
+      ...info(p),
+      lastOpened: TIME
+    })),
     lastOpenMap: disk.project.lastOpenMap[current()] ?? null,
     projectsFolder: TEST_PROJECTS_FOLDER,
     chooserRequired: disk.project.chooserRequired,
@@ -355,7 +369,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     disk.prefabBackups.find((backup) => backup.id === id && backup.tier === tier)
 
   const bridge: DesktopBridge = {
-    versions: { electron: "test", chrome: "test", node: "test" },
+    versions: { electron: "test", chrome: "test" },
     ping: ({ message }) => Promise.resolve({ message }),
     projectState: () => Promise.resolve(state()),
     chooseProject: () => {
@@ -381,6 +395,15 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
         which === "project" ? project : which === "maps" ? `${project}/maps` : `${project}/.ballest/backups`
       )
       return Promise.resolve(true)
+    },
+    revealRecentProject: ({ path }) => {
+      if (!disk.project.recent.includes(path)) return fail(`${path} isn't a folder this window knows.`)
+      disk.external.push(path)
+      return Promise.resolve(true)
+    },
+    forgetRecentProject: ({ path }) => {
+      disk.project.recent = disk.project.recent.filter((p) => p !== path)
+      return Promise.resolve(state())
     },
     renameProject: ({ name }) => {
       const project = disk.project.current
@@ -433,6 +456,11 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     },
     writeSidecar: ({ fileName, text }) => {
       disk.files.set(sidecarFile(fileName, current()), text)
+      return Promise.resolve()
+    },
+    readMapThumbnail: ({ hash }) => Promise.resolve(disk.thumbnails.get(hash) ?? null),
+    writeMapThumbnail: ({ hash, png }) => {
+      disk.thumbnails.set(hash, png)
       return Promise.resolve()
     },
     listPrefabs: ({ tier }) => {
@@ -533,7 +561,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       const exported = { path, hash: testHash(text), at: TIME }
       const link = { ...(links.get(fileName) ?? emptyLink), export: exported, lastSeenHash: exported.hash }
       links.set(fileName, link)
-      return Promise.resolve({ _tag: "Exported", file: { path, name: fileName }, link } as const)
+      return Promise.resolve({ _tag: "Exported" } as const)
     },
     checkExports: () => {
       disk.exportChecks++
@@ -637,7 +665,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     },
     play: async ({ fileName, replacePublished, overwriteChanged }) => {
       const publishedFileId = publishedIdOf(disk.files.get(projectFile(fileName, current())) ?? "")
-      if (publishedFileId >= 0) return { _tag: "PublishedMap", fileName, publishedFileId } as const
+      if (publishedFileId >= 0) return { _tag: "PublishedMap" } as const
       const exported = await bridge.exportMap({ fileName, replacePublished, overwriteChanged })
       if (exported._tag !== "Exported") return exported
       const { plugin } = disk.game
@@ -645,11 +673,15 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       if (sent) disk.game.races.push(fileName)
       const launch = disk.game.running ? "running" : "launched"
       if (launch === "launched") disk.game.launches++
-      return { _tag: "Played", file: exported.file, link: exported.link, plugin, sent, launch } as const
+      return { _tag: "Played", plugin, sent, launch } as const
     },
     onPlaySessionEnded: (listener) => {
       disk.playSessions.listeners.add(listener)
       return () => void disk.playSessions.listeners.delete(listener)
+    },
+    onGameWriteProgress: (listener) => {
+      disk.gameWriteProgress.listeners.add(listener)
+      return () => void disk.gameWriteProgress.listeners.delete(listener)
     },
     loadNotifications: () => Promise.resolve(disk.notifications),
     saveNotifications: ({ records }) => {

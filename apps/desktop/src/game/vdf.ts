@@ -5,7 +5,7 @@ import { Option } from "effect"
  * each followed by a quoted string or a `{ … }` block, `//` comments. Keys are case-insensitive, so lookups go through
  * `vdfGet`.
  */
-export interface VdfObject {
+interface VdfObject {
   readonly [key: string]: string | VdfObject
 }
 
