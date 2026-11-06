@@ -16,7 +16,9 @@ const TestLayer = MapExporter.layerNoDeps.pipe(
   Layer.provideMerge(Layer.mergeAll(MapCodec.layer, DateTime.layerCurrentZoneOffset(2 * 60 * 60 * 1000)))
 )
 
-const fresh = () => newMapFile({ displayName: "My Track", creatorName: "spig", createdAt: "2000.01.01-00.00.00" })
+const CREATED_AT = "2000.01.01-00.00.00"
+const fresh = () => newMapFile({ displayName: "My Track", creatorName: "spig", createdAt: CREATED_AT })
+const undated = () => newMapFile({ displayName: "My Track", creatorName: "spig", createdAt: "" })
 
 describe("MapExporter", () => {
   it.effect("counts JSON values the way the written file does, for every sample", () =>
@@ -100,7 +102,7 @@ describe("MapExporter", () => {
     Effect.gen(function*() {
       yield* TestClock.setTime(NOW)
       const exporter = yield* MapExporter
-      const result = yield* exporter.prepare(fresh())
+      const result = yield* exporter.prepare(undated())
       assert.strictEqual(result.filename, "Map_LevelEditorMain&My Track_spig.balledit")
       const decoded = yield* Schema.decodeEffect(Schema.fromJsonString(MapFile))(result.text)
       const levelData = decoded.worldSettings.levelData
@@ -112,6 +114,20 @@ describe("MapExporter", () => {
       // the output decodes again and keeps exactly one player start
       assert.strictEqual(decoded.items.filter(isPlayerStart).length, 1)
       assert.isDefined(decoded.editorState)
+    }).pipe(Effect.provide(TestLayer)))
+
+  it.effect("keeps the date of a map that has one, however often it is written", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(NOW)
+      const exporter = yield* MapExporter
+      const first = yield* exporter.prepare(fresh())
+      assert.strictEqual(first.map.worldSettings.levelData.createdAt, CREATED_AT)
+
+      const stamped = yield* exporter.prepare(undated())
+      yield* TestClock.adjust("1 day")
+      const again = yield* exporter.prepare(stamped.map)
+      assert.strictEqual(again.map.worldSettings.levelData.createdAt, "2026.10.26-15.04.05")
+      assert.strictEqual(again.text, stamped.text)
     }).pipe(Effect.provide(TestLayer)))
 
   it.effect("adds editorState when exporting an imported .ballmap, keeping all but the published flag", () =>

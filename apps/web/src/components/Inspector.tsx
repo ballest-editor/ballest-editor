@@ -125,7 +125,7 @@ function CreatedFact({ createdAt }: { readonly createdAt: string }) {
   if (createdAt === "") {
     return (
       <Fact label="Created">
-        <span className="text-fg-tertiary">Set on export</span>
+        <span className="text-fg-tertiary">Set on first save</span>
       </Fact>
     )
   }

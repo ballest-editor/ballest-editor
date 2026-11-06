@@ -44,7 +44,8 @@ export class MapExporter extends Context.Service<MapExporter, {
             message: `Map name and creator: ${NAME_RULE} (they become the file name).`
           })
         }
-        const createdAt = yield* currentCreatedAt
+        // Stamped once: a save keeps the map's date, so Created stays the day it was made.
+        const createdAt = levelData.createdAt === "" ? yield* currentCreatedAt : levelData.createdAt
         const out: MapFile = {
           ...map,
           worldSettings: {

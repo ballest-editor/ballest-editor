@@ -247,6 +247,9 @@ export { isNeverPublished } from "@ballest/contracts"
 export const asNewDraft = (map: MapFile): MapFile =>
   setLevelData(map, { ...map.worldSettings.levelData, levelPublishedFileId: -1 })
 
+/** The map as one just made, for Duplicate: its first export stamps `createdAt`. */
+export const asNewMap = (map: MapFile): MapFile => setLevelData(map, { ...map.worldSettings.levelData, createdAt: "" })
+
 /** The display and creator names, and `userLevelName` (`<displayName>_<creator>`) kept in step with them. */
 export const withLevelNames = (levelData: LevelData, displayName: string, creatorName: string): LevelData => ({
   ...levelData,

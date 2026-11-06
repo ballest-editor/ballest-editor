@@ -5,7 +5,7 @@
  */
 import type { CreateProjectPayload } from "@ballest/contracts"
 import { Effect } from "effect"
-import { asNewDraft, setLevelNames } from "../../domain/edits"
+import { asNewDraft, asNewMap, setLevelNames } from "../../domain/edits"
 import { mapFileNameOf, mapLabelOf } from "../../domain/factory"
 import { MapExporter } from "../../services/MapExporter"
 import { Platform } from "../../services/Platform"
@@ -191,7 +191,7 @@ export const renameOpenMap = (displayName: string, creatorName: string) => {
 export const duplicateMapEffect = Effect.fn("duplicateMapEffect")(
   function*(displayName: string, creatorName: string, replace = false, newDraft = false) {
     const { catalogIndex, doc, file, tabId } = useEditor.getState()
-    const named = setLevelNames(gameMapOf(doc, catalogIndex), displayName, creatorName)
+    const named = asNewMap(setLevelNames(gameMapOf(doc, catalogIndex), displayName, creatorName))
     const result = yield* (yield* MapExporter).prepare(newDraft ? asNewDraft(named) : named, catalogIndex)
     const created = yield* createAsOpenMap({ doc, tabId, result }, replace)
     const from = file === null ? "" : ` from ${mapLabelOf(file.name)}`
