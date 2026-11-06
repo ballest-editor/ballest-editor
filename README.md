@@ -64,6 +64,7 @@ The web review build is the same editor in a browser, without anything that need
 | [tools/compress](tools/compress/README.md)                             | The asset pack                                                                |
 | [tools/release](tools/release/README.md)                               | Installers and releases                                                       |
 | [tools/driver](tools/driver/README.md)                                 | Running the game driver                                                       |
+| [tools/map](tools/map/README.md)                                       | Inspecting, validating, diffing and generating maps                           |
 
 ## Notice
 
