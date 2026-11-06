@@ -276,6 +276,16 @@ Same scale as round 1: out of 10 against a shipping professional tool. Deltas ar
 9. **About dialog.** Logo, version with copy, links to releases and the repo, licence.
 10. **Prefab empty states and Save-as-prefab helper text** to match the Save map dialog.
 
+## Round 3 will add a criterion: Theme
+
+From round 3 on, every view also gets scored on **theme**, weighted the same as everything above: colours, backgrounds, shading, spacing, icons and the overall feel should read as one aesthetically pleasing design that is loosely reminiscent of _Ballest of Them All_. The app today is overwhelmingly grey: near-black panels, one accent blue, no warmth, no texture, nothing of the game's palette or mood anywhere outside the viewport. That is what the new row will measure. Supporting arbitrary VS Code themes (the way T3 Code does) is a possible future, not in scope now. What I will look for:
+
+- A palette derived from the game (its yellows, teals, blues and the ball) used deliberately: one accent, one or two secondary tints, surfaces that are not pure neutral grey.
+- Surface hierarchy through colour and elevation, not only borders: panels, dialogs, popovers and the viewport chrome should sit on distinct but related tones.
+- Icons, badges and status colours drawn from the same palette, with the sync states and the difficulty colours as the first places it shows.
+- The start screen and the About dialog as the showcases: logo, colour, something of the game.
+- Light theme treated as a real second palette, not an inversion.
+
 ## Not reviewed
 
 - Native unsaved-changes prompt, Import clash, Overwrite changed, Replace published dialogs (need game-side state or native boxes).
