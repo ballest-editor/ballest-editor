@@ -85,16 +85,9 @@ export function FlyCamera() {
         placeDistanceFor(footprint, Math.min(vertical, horizontal), settings.editor.placeDistance)
       )
     }
-    sceneRegistry.placementPoint = (footprint) => {
+    sceneRegistry.placementPoint = (footprint, height) => {
       const pane = activePaneCamera()
-      return spreadPlacement(viewPlacement(pane, footprint), footprint, pane.placementView())
-    }
-    // What a prefab spawns in front of. An orthographic pane has no distance to speak of, so it looks from the view's centre.
-    sceneRegistry.viewRay = () => {
-      const pane = activePaneCamera()
-      const direction = threeToUeVector(pane.camera.getWorldDirection(new THREE.Vector3()))
-      const centre = pane.orthographicPlacement(useEditor.getState().floorHeight)
-      return { origin: centre ?? threeToUeVector(pane.perspective.position), direction }
+      return spreadPlacement(viewPlacement(pane, footprint), footprint, pane.placementView(), height)
     }
   }, [])
 

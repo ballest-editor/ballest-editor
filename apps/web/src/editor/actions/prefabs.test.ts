@@ -4,6 +4,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import { Catalog, indexCatalog } from "../../domain/Catalog"
 import { placementTransform } from "../../domain/factory"
+import { type Box, boxCentreOf, itemsBoxOf } from "../../domain/itemBounds"
 import { MapSidecar } from "../../domain/MapSidecar"
 import { findGroup, treeKeys } from "../../domain/structure"
 import { MapCodec } from "../../services/MapCodec"
@@ -19,13 +20,15 @@ import {
 } from "../../test/desktopBridge"
 import { createNewMap, layerFor, reset, s } from "../../test/editorActions"
 import { objectAt, parseJson } from "../../test/json"
+import { VIEW_DOWN } from "../../test/placementView"
 import { changedPrefab, PREFAB_TEXT } from "../../test/prefabs"
 import { repoRoot } from "../../test/samples"
 import { sceneRegistry } from "../sceneRegistry"
-import { tabStateOf, useEditor } from "../store"
+import { selectedIndices, tabStateOf, useEditor } from "../store"
 import { restorePrefabBackupEffect } from "./backups"
 import { exportToGameEffect, playEffect } from "./exportPlay"
 import { openProjectMapFile } from "./maps"
+import { spreadPlacement } from "./placement"
 import {
   checkPrefabs,
   deletePrefabEffect,
@@ -46,6 +49,9 @@ const cube = parsed.pieces.find((p) => p.className === "BP_Prim_Cube")!
 const USER = { tier: "user", name: "Bridge" } as const
 const MAP = "Map_LevelEditorMain&Big Loop_Isaac.balledit"
 
+/** Where the view puts a placement. */
+const AIM = { x: 3000, y: 0, z: 9000 }
+
 const decodeSidecar = Schema.decodeUnknownSync(Schema.fromJsonString(MapSidecar))
 const notices = (kind: string) => s().notifications.filter((n) => n.kind === kind)
 
@@ -54,7 +60,7 @@ const started = (disk: TestDisk) =>
   Effect.gen(function*() {
     yield* reset
     useEditor.setState({ notifications: [], prefabs: [], catalogIndex: indexCatalog(parsed) })
-    sceneRegistry.viewRay = () => ({ origin: { x: 0, y: 0, z: 9000 }, direction: { x: 1, y: 0, z: 0 } })
+    sceneRegistry.placementPoint = (width, height) => spreadPlacement(AIM, width, VIEW_DOWN, height)
     disk.files.set(userPrefabFile("Bridge"), PREFAB_TEXT)
     yield* createNewMap("Big Loop", "Isaac")
     yield* checkPrefabs
@@ -70,6 +76,11 @@ const instanceId = () => {
   const node = s().doc.structure.tree.find((n) => n.kind === "group" && n.prefab !== undefined)
   return node?.kind === "group" ? node.id : ""
 }
+
+/** The box around what is selected, which after a placement is the instance. */
+const instanceBox = () => itemsBoxOf(selectedIndices(s()).map((index) => s().doc.map.items[index]!), s().catalogIndex)!
+const boxesMeet = (a: Box, b: Box) =>
+  (["x", "y", "z"] as const).every((axis) => a.min[axis] <= b.max[axis] && b.min[axis] <= a.max[axis])
 
 const instance = (id: string, doc = s().doc) => findGroup(doc.structure.tree, id)
 const xOf = (key: string) => s().doc.map.items[s().doc.ids.indexOf(key)]?.itemTransform.translation.x ?? NaN
@@ -184,6 +195,33 @@ describe("placing a prefab", () => {
         const text = disk.files.get(projectFile(MAP)) ?? ""
         const map = yield* MapCodec.use((codec) => codec.decode(text))
         assert.strictEqual(map.editorState?.groups[0]?.name, "Bridge")
+      })
+    ))
+
+  it.effect("stands the box around its items on the spot the view picks", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        yield* placed
+        const box = instanceBox()
+        assert.closeTo(boxCentreOf(box).x, AIM.x, 0.01)
+        assert.closeTo(boxCentreOf(box).y, AIM.y, 0.01)
+        assert.closeTo(box.min.z, AIM.z, 0.01)
+      })
+    ))
+
+  it.effect("keeps clear of an item on the spot, and of the instance placed before it", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        s().placePiece(cube, placementTransform(cube, AIM))
+        const item = itemsBoxOf([s().doc.map.items.at(-1)!], s().catalogIndex)!
+        yield* placed
+        const first = instanceBox()
+        assert.isFalse(boxesMeet(first, item))
+        yield* placePrefabEffect(USER)
+        assert.isFalse(boxesMeet(instanceBox(), first))
+        assert.isFalse(boxesMeet(instanceBox(), item))
       })
     ))
 

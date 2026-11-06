@@ -5,6 +5,7 @@ import { Catalog } from "./Catalog"
 import {
   clearOfBoxes,
   footprintOf,
+  frameStanding,
   nextInRun,
   pieceFootprint,
   PLACE_DISTANCE,
@@ -14,6 +15,7 @@ import {
   placementPoint,
   type PlacementRun,
   type PlacementView,
+  roomOf,
   runPoint,
   startPlacementRun,
   wouldLandOn,
@@ -124,7 +126,8 @@ describe("placement runs", () => {
   const down: PlacementView = {
     position: { x: 0, y: 0, z: 2000 },
     right: { x: 0, y: 1, z: 0 },
-    up: { x: Math.SQRT1_2, y: 0, z: Math.SQRT1_2 }
+    up: { x: Math.SQRT1_2, y: 0, z: Math.SQRT1_2 },
+    project: () => ({ x: 0, y: 0, z: 0 })
   }
   /** Looking level along +X: up has nothing horizontal in it. */
   const level: PlacementView = { ...down, up: { x: 0, y: 0, z: 1 } }
@@ -240,15 +243,81 @@ describe("placement runs", () => {
       assert.deepStrictEqual(clear([platform, overhead]), start)
     })
 
-    it("keeps the run's slot when no slot in reach is free", () => {
+    it("takes the aim point when no slot in reach is free", () => {
       const huge = { min: { x: -1e6, y: -1e6, z: -100 }, max: { x: 1e6, y: 1e6, z: 100 } }
       assert.deepStrictEqual(clear([huge]), start)
+      const run = nextInRun(startPlacementRun(start), cubeAt(start), 1000, down, 10)
+      assert.deepStrictEqual(runPoint(clearOfBoxes(run, [huge], 1000, down, 10), down), start)
+    })
+
+    describe("in a view that ends", () => {
+      /** Shows `reach` cm either way of the aim point, along the row and across it. */
+      const showing = (reach: number): PlacementView => ({
+        ...down,
+        project: ({ x, y }) => ({ x: y / reach, y: (x - start.x) / reach, z: 0 })
+      })
+      const STEP = 1100
+
+      it("passes over a slot past the view's edge, as the first wide piece from the default camera would land", () => {
+        const view = showing(1500)
+        const blocked = [cubeAt(start), cubeAt({ ...start, y: STEP })]
+        assert.deepStrictEqual(clear(blocked, view), { ...start, x: start.x + STEP })
+      })
+
+      it("keeps clear of the view's edge, not just inside it", () => {
+        assert.deepStrictEqual(clear([cubeAt(start)], showing(STEP / 0.79)), { ...start, y: STEP })
+        assert.deepStrictEqual(clear([cubeAt(start)], showing(STEP / 0.9)), start)
+      })
+
+      it("looks left of and below the aim point for the nearest free slot", () => {
+        const view = showing(1500)
+        const above = [0, STEP].flatMap((y) => [cubeAt({ ...start, y }), cubeAt({ ...start, x: start.x + STEP, y })])
+        assert.deepStrictEqual(clear(above, view), { ...start, y: -STEP })
+      })
+
+      it("takes the aim point, overlap and all, when every slot in view is taken", () => {
+        const wide = { min: { x: 0, y: -3000, z: 0 }, max: { x: 4000, y: 3000, z: 1000 } }
+        assert.deepStrictEqual(clear([wide], showing(1500)), start)
+      })
+
+      it("comes back from a run that has left the view", () => {
+        const view = showing(1500)
+        const gone = { ...startPlacementRun(start), along: 5000, across: 5000 }
+        assert.deepStrictEqual(runPoint(clearOfBoxes(gone, [], 1000, view, 10), view), start)
+      })
+
+      it("won't take a slot behind the camera or past its depth", () => {
+        const behind: PlacementView = {
+          ...down,
+          project: ({ x }) => ({ x: 0, y: 0, z: x > start.x ? 0 : 1.5 })
+        }
+        assert.deepStrictEqual(clear([], behind), { ...start, x: start.x + STEP })
+      })
+    })
+
+    it("counts a tall piece's height against what stands over the spot", () => {
+      const overhead = { min: { x: 1000, y: -1000, z: 500 }, max: { x: 3000, y: 1000, z: 900 } }
+      assert.deepStrictEqual(clear([overhead]), start)
+      const tall = clearOfBoxes(startPlacementRun(start), [overhead], 1000, down, 10, 600)
+      assert.notDeepEqual(runPoint(tall, down), start)
     })
 
     it("carries on from where the run has got to", () => {
       const run = nextInRun(startPlacementRun(start), cubeAt(start), 1000, down, 10)
       const blocked = cubeAt(runPoint(run, down))
       assert.deepStrictEqual(runPoint(clearOfBoxes(run, [blocked], 1000, down, 10), down), { ...start, y: 2200 })
+    })
+  })
+
+  describe("a box as a placement", () => {
+    const box = { min: { x: -1000, y: 200, z: -300 }, max: { x: 3000, y: 800, z: 200 } }
+
+    it("takes its longer side and its height", () => {
+      assert.deepStrictEqual(roomOf(box), { width: 4000, height: 500 })
+    })
+
+    it("stands centred over the point with its underside there", () => {
+      assert.deepStrictEqual(frameStanding(box, { x: 5000, y: 5000, z: 8615 }), { x: 4000, y: 4500, z: 8915 })
     })
   })
 })

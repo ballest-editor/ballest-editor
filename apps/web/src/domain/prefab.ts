@@ -36,9 +36,6 @@ export const isSamePrefab = (a: PrefabRef, b: PrefabRef): boolean => a.tier === 
 
 export const ORIGIN: Vec3 = { x: 0, y: 0, z: 0 }
 
-/** How far ahead of the camera a spawn puts the nearest of its box, along the view (cm). */
-const SPAWN_DISTANCE = 500
-
 /** What each property list holds when the catalog doesn't say: how a value's type shows in a map. */
 const listOfValue = (value: PrefabPropertyValue): { readonly list: PropertyList; readonly type: string } => {
   if (typeof value === "boolean") return { list: "boolProperties", type: "Bool" }
@@ -149,29 +146,6 @@ export const prefabOfItems = (items: ReadonlyArray<Item>, catalog: CatalogIndex 
     group: { rotation: [0, 0, 0], scale: [1, 1, 1], ...(name.length > 0 && { name }) },
     items: items.map((item) => prefabItemOf(item, frame))
   }
-}
-
-export interface ViewRay {
-  readonly origin: Vec3
-  readonly direction: Vec3
-}
-
-/**
- * Where `spawnprefab` puts the frame of `items` (held relative to it): on the line through the camera along the view,
- * far enough along that their box is `SPAWN_DISTANCE` ahead at its nearest point along the view (docs/qa/groups-prefabs.md
- * § Spawning a prefab).
- */
-export const spawnFrameOf = (
-  items: ReadonlyArray<Item>,
-  { direction, origin }: ViewRay,
-  catalog: CatalogIndex | null
-): Vec3 => {
-  const length = Math.hypot(direction.x, direction.y, direction.z) || 1
-  const d = { x: direction.x / length, y: direction.y / length, z: direction.z / length }
-  const { max, min } = itemsBoxOf(items, catalog) ?? { min: ORIGIN, max: ORIGIN }
-  const nearest = (d.x < 0 ? max.x : min.x) * d.x + (d.y < 0 ? max.y : min.y) * d.y + (d.z < 0 ? max.z : min.z) * d.z
-  const along = SPAWN_DISTANCE - nearest
-  return { x: origin.x + d.x * along, y: origin.y + d.y * along, z: origin.z + d.z * along }
 }
 
 /**
