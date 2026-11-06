@@ -116,7 +116,7 @@ const useGizmoDrag = (slot: number, projection: ViewProjection, disabled: boolea
 /**
  * Which way the game's axes run across a pane, turning with its camera (docs/DESKTOP.md § View panes): a click on an end
  * snaps the pane to that view, a click on the centre goes back to perspective, and a drag anywhere on it orbits the pane.
- * The round gizmo is all that takes the pointer, in a card that doesn't.
+ * The round gizmo is all that takes the pointer.
  */
 export function ViewGizmo({ slot, projection, disabled }: {
   readonly slot: number
@@ -129,7 +129,7 @@ export function ViewGizmo({ slot, projection, disabled }: {
   const drag = useGizmoDrag(slot, projection, disabled)
   const ends = usePaneReading(slot, endsOf, sameGizmoEnds)
   const colors = sceneAxisColors(dark)
-  const scale = gizmoScaleOf(useEditor((s) => s.settings.gizmo.size))
+  const scale = gizmoScaleOf(useEditor((s) => s.settings.camera.axesSize))
   const pick = (view: ViewProjection) => {
     setActivePane(slot)
     setPaneProjection(slot, view)
@@ -140,7 +140,7 @@ export function ViewGizmo({ slot, projection, disabled }: {
         "pointer-events-auto relative rounded-full",
         !disabled && "cursor-grab transition-colors hover:bg-hover active:cursor-grabbing active:bg-pressed"
       )}
-      // `zoom`, not `scale`: the pane's card has to grow with it.
+      // `zoom`, not `scale`: the disc it sits on has to grow with it.
       style={{ width: SIZE, height: SIZE, zoom: scale }}
       data-view-gizmo
       {...drag}

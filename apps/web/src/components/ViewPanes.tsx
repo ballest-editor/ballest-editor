@@ -26,6 +26,7 @@ import {
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@workspace/ui/components/dropdown-menu"
 import { cn } from "@workspace/ui/lib/utils"
@@ -52,10 +53,12 @@ import {
   viewProjectionLabels,
   viewProjections
 } from "../domain/viewLayout"
+import { updateSettings } from "../editor/actions"
 import { changePanes } from "../editor/paneCameras"
 import { useEditor } from "../editor/store"
 import { InstanceBanner } from "./InstanceBanner"
 import { ChordText } from "./KeyChip"
+import { SizeToggle } from "./SizeToggle"
 import { CONTROL_WORD, GROUP, noFocus, SEGMENT, SURFACE } from "./viewControlStyle"
 import { ViewGizmo } from "./ViewGizmo"
 import { ViewTip } from "./ViewTip"
@@ -101,7 +104,8 @@ function ViewPicker<V extends string>({
   strong,
   disabled,
   root,
-  trigger
+  trigger,
+  footer
 }: {
   readonly value: V
   readonly options: ReadonlyArray<V>
@@ -120,6 +124,8 @@ function ViewPicker<V extends string>({
   /** For a picker that opens its menu itself. */
   readonly root?: ComponentProps<typeof DropdownMenu>
   readonly trigger?: ComponentProps<typeof DropdownMenuTrigger>
+  /** What the menu holds under its list. */
+  readonly footer?: ReactNode
 }) {
   const Icon: typeof IconSquare = icons[value]
   const title = `${tip}: ${labels[value]}`
@@ -152,6 +158,7 @@ function ViewPicker<V extends string>({
             )
           })}
         </DropdownMenuRadioGroup>
+        {footer}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -218,13 +225,32 @@ function PaneMenuItems({ slot, kind }: { readonly slot: PaneSlot; readonly kind:
 
 /**
  * When a pane's card gives way to the pane around it, the word first and then the axes; it never moves out of the way.
- * The view controls take more of the pane in its corner: they have gone to icons and stacked, and the card's width can't
- * sit beside the second pill. The label stays, so the pane keeps its name and its list of views.
+ * The view controls take more of the pane in its corner: they have gone to icons and stacked, and the axes at their
+ * largest can't sit beside the second pill, or the label's word beside the first. The label stays, so the pane keeps its
+ * name and its list of views.
  */
-const LABEL_WORD = "@max-[11rem]:hidden"
-const CORNER_LABEL_WORD = "@max-[21.5rem]:hidden"
-const AXES_ROOM = "[@container_(height<9rem)]:hidden @max-[6.5rem]:hidden"
-const CORNER_AXES_ROOM = "[@container_(height<9rem)]:hidden @max-[19rem]:hidden"
+const LABEL_WORD = "@max-[10rem]:hidden"
+const CORNER_LABEL_WORD = "@max-[16rem]:hidden"
+const AXES_ROOM = "[@container_(height<10rem)]:hidden @max-[7.5rem]:hidden"
+const CORNER_AXES_ROOM = "[@container_(height<10rem)]:hidden @max-[20rem]:hidden"
+
+/** The foot of a pane's menu: how big the axes are, the same setting as Settings › Camera, for every pane. */
+function AxesSizeRow() {
+  const size = useEditor((s) => s.settings.camera.axesSize)
+  return (
+    <>
+      <DropdownMenuSeparator />
+      <div className="flex h-8 items-center justify-between gap-4 px-2">
+        Axes size
+        <SizeToggle
+          label="Axes size"
+          value={size}
+          onChange={(axesSize) => void updateSettings("camera", { axesSize })}
+        />
+      </div>
+    </>
+  )
+}
 
 /** A maximised pane's way back, beside its card: a click, or the key it names (`useActionKeys`). */
 function RestoreChip({ slot, disabled }: { readonly slot: PaneSlot; readonly disabled: boolean }) {
@@ -270,11 +296,11 @@ interface PaneDragHandlers {
 }
 
 /**
- * A pane's card, in its top left: what it looks along, by name and by axes, on a card of its own so a busy map doesn't
- * swallow them. The name is the label: a click opens the list of views, a drag swaps the pane with the one it's dropped
- * on, a double click maximises it. A right click on either splits or closes the pane. The menu opens on the click, not
- * the press, or every drag would start with it. It isn't modal, so a double click's second press reaches the label: the
- * two clicks open and close it. The rest of the card lets the pointer through to the canvas.
+ * A pane's card, in its top left: what it looks along, by name on a pill and by axes on a disc under it, each the shape
+ * of what it holds, so a long name leaves no empty card. The name is the label: a click opens the list of views, a drag
+ * swaps the pane with the one it's dropped on, a double click maximises it. A right click on either splits or closes the
+ * pane. The menu opens on the click, not the press, or every drag would start with it. It isn't modal, so a double
+ * click's second press reaches the label: the two clicks open and close it.
  */
 function PaneCard({ pane, projection, disabled, active, inCorner, drag }: {
   readonly pane: PaneRect
@@ -343,8 +369,8 @@ function PaneCard({ pane, projection, disabled, active, inCorner, drag }: {
   return (
     <ContextMenu disabled={disabled}>
       <ContextMenuTrigger className={cn("flex items-start gap-2", dragging && "opacity-50")}>
-        <div className={cn("rounded-sheet p-0.5", SURFACE)} data-pane-card>
-          <div className="pointer-events-auto flex h-6.5 w-fit">
+        <div className="flex flex-col items-start gap-1" data-pane-card>
+          <div className={GROUP}>
             <ViewPicker
               value={projection}
               options={viewProjections}
@@ -364,9 +390,10 @@ function PaneCard({ pane, projection, disabled, active, inCorner, drag }: {
               disabled={disabled}
               root={{ open, onOpenChange: setOpen, modal: false }}
               trigger={trigger}
+              footer={<AxesSizeRow />}
             />
           </div>
-          <div className={cn("w-fit p-1", inCorner ? CORNER_AXES_ROOM : AXES_ROOM)}>
+          <div className={cn("rounded-full p-1", SURFACE, inCorner ? CORNER_AXES_ROOM : AXES_ROOM)}>
             <ViewGizmo slot={pane.slot} projection={projection} disabled={disabled} />
           </div>
         </div>

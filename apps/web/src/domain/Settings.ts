@@ -38,6 +38,9 @@ export const EditorSettings = Schema.Struct({
   undoSelection: Schema.Boolean
 })
 
+/** The sizes a gizmo comes in, as the Display popover and a pane's menu offer them. */
+export const gizmoSizes = ["s", "m", "l"] as const
+
 export const CameraSettings = Schema.Struct({
   /** Base fly speed in cm/s at camera speed x1. */
   flySpeed: Schema.Finite.check(Schema.isBetween({ minimum: 100, maximum: 20000 })),
@@ -55,7 +58,9 @@ export const CameraSettings = Schema.Struct({
    */
   lockPointer: Schema.Literals(["desktop", "always", "never"]),
   /** Which movement keys only fly while the look button is held (see flyKeys). */
-  movementNeedsLook: Schema.Literals(movementLookModes)
+  movementNeedsLook: Schema.Literals(movementLookModes),
+  /** How big a pane's axes are drawn, apart from the transform gizmo's `gizmo.size`. `m` is their usual size. */
+  axesSize: Schema.Literals(gizmoSizes)
 })
 
 /** The animation speeds, as Settings › Appearance offers them, and the factor each applies to every duration. */
@@ -111,9 +116,6 @@ export const PanelSettings = Schema.Struct({
   favouritePieces: Schema.Array(Schema.String)
 })
 
-/** The axis gizmo's sizes, as the Display popover offers them. */
-export const gizmoSizes = ["s", "m", "l"] as const
-
 /** How much bigger or smaller than medium each gizmo size draws, on screen. */
 export const gizmoScaleOf = (size: typeof gizmoSizes[number]): number => size === "s" ? 0.8 : size === "l" ? 1.25 : 1
 
@@ -148,7 +150,8 @@ export const defaultSettings: Settings = {
     invertLookX: false,
     invertLookY: false,
     lockPointer: "desktop",
-    movementNeedsLook: "all"
+    movementNeedsLook: "all",
+    axesSize: "m"
   },
   appearance: {
     theme: "dark",

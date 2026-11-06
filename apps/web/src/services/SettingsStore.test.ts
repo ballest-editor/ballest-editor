@@ -80,6 +80,14 @@ describe("Settings", () => {
     assert.strictEqual(mergeSettings({ gizmo: { size: "xl" } }).gizmo.size, "m")
   })
 
+  it("keeps a pane's axes size apart from the transform gizmo's", () => {
+    assert.strictEqual(mergeSettings({}).camera.axesSize, "m")
+    assert.strictEqual(mergeSettings({ camera: { axesSize: "xl" } }).camera.axesSize, "m")
+    const merged = mergeSettings({ camera: { axesSize: "l" }, gizmo: { size: "s" } })
+    assert.strictEqual(merged.camera.axesSize, "l")
+    assert.strictEqual(merged.gizmo.size, "s")
+  })
+
   it("resets what the Display popover shows and nothing else", () => {
     const changed = {
       ...defaultSettings,
