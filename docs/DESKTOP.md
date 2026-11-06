@@ -65,7 +65,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - The active tab's map is kept per project in `desktop-settings.json` (`project.lastOpenMap`, by project folder; `ProjectState.lastOpenMap`, IPC `ballest:project:rememberOpenMap`), written whenever the active tab's file changes after the startup load. The other tabs aren't reopened yet.
 - A tab shows the map's name without the creator (`mapLabelOf`), its tooltip is its name and status (Unsaved, else the map's link state, else Saved), and tabs can be dragged into another order.
 - A tab's ×, a middle click or Ctrl+F4 closes it after the unsaved-changes prompt (§ Window). Closing the last one shows a fresh map the same way.
-- A right-click opens the tab's menu: Close, Close others, Close to the right, Split right and Split down (the tab's view goes to two panes, § View panes), and on desktop Rename…, Duplicate… and Reveal, which are off until the map has a file.
+- A right-click opens the tab's menu at the pointer: Close, Close others, Close to the right, Split right and Split down (the tab's view goes to two panes, § View panes), and on desktop Rename…, Duplicate… and Reveal, which are off until the map has a file.
 - A tab can hold a prefab's definition instead of a map (§ Prefabs). `TabState.document` says which, and it is one tab model: Save, the prompts and the menus ask it.
 - Ctrl+Tab and Ctrl+Shift+Tab, or Ctrl+PageDown and PageUp, cycle the tabs.
 
@@ -105,7 +105,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 
 **Keys.** The rules are `isEditorKeyEvent`'s (`editor/keyTargets.ts`): a text field, a dialog or a menu keeps its keys, and everything else drives the editor. Chrome hands focus back after a click (`blurChromeAfterClick`), so the keys work again straight away. A dialog leaves the focus on the page when it closes, however it was closed and whatever opened it (`DialogContent`'s `finalFocus`).
 
-Dockview is themed in `components/dock/dock.css` with the tokens from `packages/ui`, so it follows light and dark and `--motion`. A panel strip is 28px and the document tabs and a popped-out strip 32px (`docs/design/ui-system.md`). A drag shows a copy of the tab on a card, or of the whole strip when it's a group's (`dragImage.ts`), over dockview's image, which has no option for it. A dockview upgrade should be checked for this too.
+Dockview is themed in `components/dock/dock.css` with the tokens from `packages/ui`, so it follows light and dark and `--motion`. A panel strip is 28px and the document tabs and a popped-out strip 32px (`docs/design/ui-system.md`). Strips are `--background` and panels `--card`, so tone separates them and nothing runs under a strip: the one hairline is dockview's separator, where two groups meet. The active tab rises to `--card`, and its `--primary` underline is one line per strip, a CSS anchor on the active tab that slides to the next. A rail's active tab keeps a line of its own instead. A drag shows a copy of the tab on a card, or of the whole strip when it's a group's (`dragImage.ts`), over dockview's image, which has no option for it. A dockview upgrade should be checked for this too.
 
 ### View panes
 
