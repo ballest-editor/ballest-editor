@@ -50,7 +50,7 @@ import {
   toolStripOf,
   type ViewLayoutKind,
   viewLayoutKinds,
-  viewLayoutLabels,
+  viewLayoutLabelsOf,
   type ViewProjection,
   viewProjectionLabels,
   viewProjections
@@ -58,8 +58,9 @@ import {
 import { changePanes } from "../editor/paneCameras"
 import { paneDisplayIn, useEditor } from "../editor/store"
 import { InstanceBanner } from "./InstanceBanner"
+import { ChordText } from "./KeyChip"
 import { PaneReadout } from "./PaneReadout"
-import { GROUP, noFocus, SEGMENT, SURFACE } from "./viewControlStyle"
+import { GROUP, GROUP_DIVIDER, noFocus, SEGMENT, SURFACE } from "./viewControlStyle"
 import { ViewGizmo } from "./ViewGizmo"
 import { ViewTip } from "./ViewTip"
 
@@ -114,7 +115,7 @@ function ViewPicker<V extends string>({
   readonly tip: string
   readonly action?: KeybindAction
   /** What the button says beside its icon. */
-  readonly word: string
+  readonly word: ReactNode
   /** Whether the word stands out, or stays quiet like the icon. */
   readonly strong: boolean
   readonly disabled: boolean
@@ -143,7 +144,7 @@ function ViewPicker<V extends string>({
         <span className={cn(strong && "text-foreground")}>{word}</span>
         <IconChevronDown className="size-3" />
       </ViewTip>
-      <DropdownMenuContent className="w-40">
+      <DropdownMenuContent className="w-max min-w-40">
         <DropdownMenuRadioGroup value={value} onValueChange={onPick}>
           {options.map((option) => {
             const OptionIcon: typeof IconSquare = icons[option]
@@ -224,8 +225,47 @@ function PaneMenuItems({ slot, kind }: { readonly slot: PaneSlot; readonly kind:
  * Where a pane's label goes when it would meet the view controls in the viewport's top right: beneath them. Only the top
  * row can, and a pane in the right column by its own width (it's a container), one in the left by the viewport's.
  */
-const labelClearance = ({ x, y }: PaneRect) =>
-  y > 0 ? undefined : x > 0 ? "@max-[38rem]:top-12" : "@max-[38rem]/viewport:top-12"
+const labelClearance = ({ x, y }: PaneRect, maximised: boolean) =>
+  maximised
+    ? "@max-[60rem]/viewport:top-12"
+    : y > 0
+    ? undefined
+    : x > 0
+    ? "@max-[38rem]:top-12"
+    : "@max-[38rem]/viewport:top-12"
+
+/** A maximised pane's way back, beside its label: a click, or the key it names (`useActionKeys`). */
+function RestoreChip({ slot, disabled }: { readonly slot: PaneSlot; readonly disabled: boolean }) {
+  const binding = useEditor((s) => s.keybinds.deselect[0])
+  const togglePaneMaximised = useEditor((s) => s.togglePaneMaximised)
+  return (
+    <>
+      <span aria-hidden className={GROUP_DIVIDER} />
+      <ViewTip
+        label="Restore panes"
+        render={
+          <button
+            type="button"
+            aria-label="Restore panes"
+            disabled={disabled}
+            className={SEGMENT}
+            onClick={() => togglePaneMaximised(slot)}
+            {...noFocus}
+          />
+        }
+      >
+        <IconArrowsMinimize className="size-4" />
+        <span className="text-caption @max-[38rem]/viewport:hidden">
+          {binding === undefined ? "Restore" : (
+            <>
+              {binding === "Escape" ? "Esc" : <ChordText binding={binding} />} to restore
+            </>
+          )}
+        </span>
+      </ViewTip>
+    </>
+  )
+}
 
 /** What a pane shows, its own choice over the Display popover's. */
 function PaneDisplayItems({ slot }: { readonly slot: PaneSlot }) {
@@ -268,6 +308,7 @@ function PaneHeader({ pane, projection, disabled, active, drag }: {
   readonly drag: PaneDragHandlers
 }) {
   const kind = useEditor((s) => shownKindOf(s.viewLayout))
+  const maximised = useEditor((s) => maximisedSlotOf(s.viewLayout) !== undefined)
   const setPaneProjection = useEditor((s) => s.setPaneProjection)
   const togglePaneMaximised = useEditor((s) => s.togglePaneMaximised)
   const [open, setOpen] = useState(false)
@@ -324,7 +365,7 @@ function PaneHeader({ pane, projection, disabled, active, drag }: {
   return (
     <ContextMenu disabled={disabled}>
       <ContextMenuTrigger
-        className={cn(GROUP, "absolute top-3 left-3", labelClearance(pane), dragging && "opacity-50")}
+        className={cn(GROUP, "absolute top-3 left-3", labelClearance(pane, maximised), dragging && "opacity-50")}
       >
         <ViewPicker
           value={projection}
@@ -334,7 +375,12 @@ function PaneHeader({ pane, projection, disabled, active, drag }: {
           onPick={(next) => setPaneProjection(pane.slot, next)}
           tip="Pane view"
           action={PROJECTION_ACTIONS[projection]}
-          word={viewProjectionLabels[projection]}
+          word={
+            <>
+              {viewProjectionLabels[projection]}
+              {maximised && <span className="@max-[38rem]/viewport:hidden">{" · Maximised"}</span>}
+            </>
+          }
           strong={active}
           disabled={disabled}
           root={{ open, onOpenChange: setOpen, modal: false }}
@@ -342,6 +388,7 @@ function PaneHeader({ pane, projection, disabled, active, drag }: {
         >
           <PaneDisplayItems slot={pane.slot} />
         </ViewPicker>
+        {maximised && <RestoreChip slot={pane.slot} disabled={disabled} />}
       </ContextMenuTrigger>
       <ContextMenuContent>
         <PaneMenuItems slot={pane.slot} kind={kind} />
@@ -502,19 +549,20 @@ export function ViewPanes({ disabled }: { readonly disabled: boolean }) {
   )
 }
 
-/** Picks how the view divides into panes. */
+/** Picks how the view divides into panes. While a pane is maximised it says which layout that pane goes back to. */
 export function ViewLayoutControl({ disabled }: { readonly disabled: boolean }) {
-  const kind = useEditor((s) => shownKindOf(s.viewLayout))
+  const layout = useEditor((s) => s.viewLayout)
   const setViewLayoutKind = useEditor((s) => s.setViewLayoutKind)
+  const labels = viewLayoutLabelsOf(layout)
   return (
     <ViewPicker
-      value={kind}
+      value={layout.kind}
       options={viewLayoutKinds}
-      labels={viewLayoutLabels}
+      labels={labels}
       icons={LAYOUT_ICONS}
       onPick={setViewLayoutKind}
       tip="Panes"
-      word="Panes"
+      word={maximisedSlotOf(layout) === undefined ? "Panes" : labels[layout.kind]}
       strong
       disabled={disabled}
     />

@@ -4,7 +4,9 @@ import { ueToThreeVector, type Vec3 } from "../domain/coords"
 import { type OrthoView, orthoViews, paneClose, paneCloseColumn, paneSwap } from "../domain/viewLayout"
 import {
   changePanes,
+  floorGridOnly,
   forgetClosedTabs,
+  mapBox,
   orthographicOnly,
   PaneCamera,
   paneCamerasOf,
@@ -196,6 +198,42 @@ describe("changing a pane's projection", () => {
     assert.strictEqual(pane.cmPerPixel, cmPerPixel)
   })
 
+  describe("following the store", () => {
+    const framedOn = (view: OrthoView) => {
+      const pane = paneOn(view)
+      pane.frameMap(mapBox())
+      return pane
+    }
+
+    it("frames the map on arriving from perspective, as a pane first shown there does", () => {
+      const pane = paneOn("perspective")
+      pane.needsFraming = false
+      pane.perspective.position.set(40, 30, 40)
+      pane.perspective.lookAt(0, 0, 0)
+      pane.perspective.updateMatrixWorld()
+      pane.followProjection("right")
+      const first = framedOn("right")
+      assert.closeTo(pane.cmPerPixel, first.cmPerPixel, 1e-9)
+      assert.deepStrictEqual(pane.target.toArray(), first.target.toArray())
+    })
+
+    it("keeps the zoom between orthographic views", () => {
+      const pane = framedOn("top")
+      pane.zoomOrthographic(0.5, { x: WIDTH / 2, y: HEIGHT / 2 })
+      const { cmPerPixel } = pane
+      pane.followProjection("right")
+      assert.strictEqual(pane.cmPerPixel, cmPerPixel)
+    })
+
+    it("does nothing while the view stays", () => {
+      const pane = framedOn("top")
+      pane.zoomOrthographic(0.5, { x: WIDTH / 2, y: HEIGHT / 2 })
+      const { cmPerPixel } = pane
+      pane.followProjection("top")
+      assert.strictEqual(pane.cmPerPixel, cmPerPixel)
+    })
+  })
+
   it("finds the nearest view from where it looks", () => {
     const pane = paneOn("perspective")
     pane.perspective.position.set(0, 1000, 10)
@@ -314,12 +352,18 @@ describe("easing to a new view", () => {
     assert.strictEqual(pane.drawCamera, pane.orthographic)
   })
 
-  it("sees the map alone, with neither the sky nor a grid", () => {
+  it("sees the grid of the view it's heading for, and no sky", () => {
     const pane = shownPane()
     pane.setProjection("right")
     pane.stepTween(1000, MS)
+    assert.isTrue(pane.drawCamera.layers.test(orthographicOnly))
+    assert.isFalse(pane.drawCamera.layers.test(floorGridOnly))
     assert.isFalse(pane.drawCamera.layers.test(perspectiveOnly))
+    pane.setProjection("perspective")
+    pane.stepTween(1010, MS)
+    assert.isTrue(pane.drawCamera.layers.test(floorGridOnly))
     assert.isFalse(pane.drawCamera.layers.test(orthographicOnly))
+    assert.isFalse(pane.drawCamera.layers.test(perspectiveOnly))
   })
 })
 

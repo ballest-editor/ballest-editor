@@ -35,11 +35,13 @@ const layerOf = (layer: number): THREE.Layers => {
   return layers
 }
 
-/** What only one kind of camera sees: the sky and floor grid, and the world grid. Layer 0 is everything else. */
+/** What only one kind of camera sees: the sky, the floor grid, and the world grid. Layer 0 is everything else. */
 const PERSPECTIVE_LAYER = 1
 const ORTHOGRAPHIC_LAYER = 2
+const FLOOR_GRID_LAYER = 3
 export const perspectiveOnly = layerOf(PERSPECTIVE_LAYER)
 export const orthographicOnly = layerOf(ORTHOGRAPHIC_LAYER)
+export const floorGridOnly = layerOf(FLOOR_GRID_LAYER)
 
 const NEAR = 5
 const FAR = 2_000_000
@@ -89,7 +91,8 @@ export class PaneCamera {
   readonly orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR)
   /**
    * What draws the pane while it eases to a new view. The two above are already there, so picking and the gizmo never
-   * wait on the picture. It sees the map alone: the sky and both grids belong to where it started or where it's going.
+   * wait on the picture. It sees the map and the grid of the view it's heading for, so the grid never drops out; the
+   * dome stands around the perspective camera, so it's left out.
    */
   private readonly tweenCamera = new THREE.PerspectiveCamera(60, 1, NEAR, FAR)
   /** Where the picture is on its way to the view; `undefined` when it's there. */
@@ -107,6 +110,7 @@ export class PaneCamera {
   constructor() {
     this.perspective.position.set(1500, 1200, 1500)
     this.perspective.layers.enable(PERSPECTIVE_LAYER)
+    this.perspective.layers.enable(FLOOR_GRID_LAYER)
     this.orthographic.layers.enable(ORTHOGRAPHIC_LAYER)
   }
 
@@ -142,7 +146,9 @@ export class PaneCamera {
     if (next === this.projection) return
     const from = this.tween?.shown ?? this.pose()
     if (!this.needsFraming) this.tween = { from, shown: from, startedAt: undefined }
-    const { perspective, orthographic } = this
+    const { perspective, orthographic, tweenCamera } = this
+    tweenCamera.layers.set(0)
+    tweenCamera.layers.enable(isOrthoView(next) ? ORTHOGRAPHIC_LAYER : FLOOR_GRID_LAYER)
     if (!isOrthoView(next)) {
       this.projection = next
       perspective.quaternion.copy(orthographic.quaternion)
@@ -154,6 +160,17 @@ export class PaneCamera {
     if (this.view === undefined) this.setScale(scaleForDistance(this.keepPivotAhead(), this.height, perspective.fov))
     this.projection = next
     this.placeOrthographic()
+  }
+
+  /**
+   * Takes the store's view for the pane. Arriving at an orthographic view from perspective frames the map, as a pane
+   * first shown there does, because a perspective pane's zoom is only how far off its pivot happens to be. Between
+   * orthographic views the zoom stays. The picture eases to all of it.
+   */
+  followProjection(next: ViewProjection): void {
+    const framing = this.view === undefined && isOrthoView(next)
+    this.setProjection(next)
+    if (framing) this.frameMap(mapBox())
   }
 
   /**

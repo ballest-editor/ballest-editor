@@ -182,7 +182,7 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   redo: "Redo the last undone change. Ctrl+Y in the in-game editor; Ctrl+Shift+Z also works.",
   selectAll: "Select every item in the map; inside an entered group, every item in that group.",
   deselect:
-    "Clear the selection. Inside an entered group it steps out of the group instead, and during a gizmo drag it cancels the drag. (The game uses Ctrl+click.)",
+    "Clear the selection. Inside an entered group it steps out of the group instead, with a pane maximised it restores the panes, and during a gizmo drag it cancels the drag. (The game uses Ctrl+click.)",
   groupSelection:
     "Group the selection. Clicking any item of a group then selects the whole group. Ctrl+G in the in-game editor.",
   ungroupSelection: "Dissolve the selected groups; their items stay selected. Shift+G in the in-game editor.",

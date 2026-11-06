@@ -24,6 +24,7 @@ import {
   ViewLayout,
   type ViewLayoutKind,
   viewLayoutKinds,
+  viewLayoutLabelsOf,
   withMaximisedToggled,
   withoutMaximised,
   withPaneChange,
@@ -236,6 +237,13 @@ describe("swapping panes", () => {
 })
 
 describe("a maximised pane", () => {
+  it("names the layout it goes back to", () => {
+    const labels = viewLayoutLabelsOf(withMaximisedToggled({ ...defaultViewLayout, kind: "quad" }, 2))
+    assert.strictEqual(labels.quad, "Four panes (maximised)")
+    assert.strictEqual(labels.single, "One pane")
+    assert.strictEqual(viewLayoutLabelsOf({ ...defaultViewLayout, kind: "quad" }).quad, "Four panes")
+  })
+
   const quad = layoutOf("quad", 0.3, 0.7)
   const maximised = withMaximisedToggled(quad, 2)
 

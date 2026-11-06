@@ -30,7 +30,7 @@ import { GroupBox } from "./groupBox"
 import { ItemObject } from "./ItemObject"
 import { advanceGameTime } from "./materials"
 import { OrthoGrid } from "./OrthoGrid"
-import { panePointer, perspectiveOnly } from "./paneCameras"
+import { floorGridOnly, panePointer } from "./paneCameras"
 import { drawEveryPane, PaneRenderer, useBeforePaneDraw } from "./PaneRenderer"
 import { draggedPiece, isPieceDrag } from "./pieceDrag"
 import { droppedPrefab, isPrefabDrag } from "./prefabDrag"
@@ -301,7 +301,7 @@ function ViewportGrid() {
   return (
     <Grid
       ref={grid}
-      layers={perspectiveOnly}
+      layers={floorGridOnly}
       position={[0, floorHeight, 0]}
       side={THREE.DoubleSide} // drei's default (BackSide) hides it from below
       infiniteGrid
