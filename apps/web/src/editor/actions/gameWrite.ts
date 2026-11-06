@@ -38,6 +38,8 @@ const notifyPlayed = (fileName: string, played: Extract<PlayResult, { readonly _
       ...(outdated && { actions: [{ label: "Update plugin", command: { _tag: "InstallPlugin" } }] })
     })
   } else {
+    // the pinned notice is the standing problem, in the inbox; the click still gets its answer
+    notify("info", `Exported ${label}, but Play can't race it. The notifications say why.`, { kind: "play" })
     notifyNotice(playWithoutPluginNotice(label, launch === "launched", plugin.status))
   }
 }

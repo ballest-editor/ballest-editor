@@ -50,7 +50,15 @@ import { isPlayerStart, type Item, type ItemTransform, type LevelData, type MapF
 import type { PrefabLink } from "../domain/MapSidecar"
 import type { MaterialTable } from "../domain/Materials"
 import { type FlipAxis, withMirrorMesh } from "../domain/mirror"
-import { addNotice, clearNotices, dropNotices, markRead, mergeNotices, resolveNotices } from "../domain/notifications"
+import {
+  addNotice,
+  belongsInInbox,
+  clearNotices,
+  dropNotices,
+  markRead,
+  mergeNotices,
+  resolveNotices
+} from "../domain/notifications"
 import type { PaintPicker } from "../domain/Paint"
 import { type Pivot, pivotAt } from "../domain/pivot"
 import { isSamePrefab, type PrefabSource } from "../domain/prefab"
@@ -262,7 +270,7 @@ export interface NotifyOptions {
    * later one of the same kind replaces it.
    */
   readonly persistent?: boolean
-  /** Its buttons, in the toast (the first) and in the notification centre (all, after a restart too). */
+  /** Its buttons: the first on a toast, all of them in the notification centre (after a restart too). */
   readonly actions?: ReadonlyArray<NotificationAction>
 }
 
@@ -362,8 +370,10 @@ export interface EditorState extends TabState {
   readonly update: UpdateState | null
   /** A check the user asked for has finished: what the app says "up to date" on. */
   readonly updateChecked: boolean
-  /** Every notification (each toast is one), newest first, at most `NOTIFICATION_LIMIT`. */
+  /** Every notification, newest first, at most `NOTIFICATION_LIMIT`. */
   readonly notifications: ReadonlyArray<NotificationRecord>
+  /** Immediate feedback waiting for `showToasts`, newest first, at most `NOTIFICATION_LIMIT`. Never kept. */
+  readonly toasts: ReadonlyArray<NotificationRecord>
   /** The kinds "Don't show again" muted: `notify` drops them. */
   readonly mutedNotificationKinds: ReadonlySet<string>
   readonly tool: Tool
@@ -757,6 +767,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     update: null,
     updateChecked: false,
     notifications: [],
+    toasts: [],
     mutedNotificationKinds: new Set(),
     tool: "translate",
     gizmoSpace: "world",
@@ -1199,7 +1210,11 @@ export const useEditor = create<EditorState>()((set, get) => {
         resolvedAt: null,
         actions: options.actions ?? []
       }
-      set((s) => ({ notifications: addNotice(s.notifications, record, NOTIFICATION_LIMIT) }))
+      set((s) =>
+        belongsInInbox(record)
+          ? { notifications: addNotice(s.notifications, record, NOTIFICATION_LIMIT) }
+          : { toasts: [record, ...s.toasts].slice(0, NOTIFICATION_LIMIT) }
+      )
     },
     resolveNotifications: (kind) =>
       set((s) => ({ notifications: resolveNotices(s.notifications, kind, new Date().toISOString()) })),

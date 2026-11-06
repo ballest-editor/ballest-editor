@@ -65,7 +65,7 @@ export const submitSaveMap = (displayName: string) =>
     return s().file?.name ?? ""
   })
 
-/** Collects what the store would toast, for the rest of the effect. */
+/** Collects what is notified, toast or inbox, for the rest of the effect. */
 export const noticesWhile = <A, E, R>(body: (notices: Array<string>) => Effect.Effect<A, E, R>) =>
   Effect.acquireUseRelease(
     Effect.sync(() => {

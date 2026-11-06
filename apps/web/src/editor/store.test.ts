@@ -631,16 +631,16 @@ describe("editor store", () => {
   it("records every notification, newest first; a persistent kind pins until resolved", () => {
     const s = () => useEditor.getState()
     s().clearNotifications()
-    s().notify("info", "Saved Big Loop", {
-      kind: "mapSaved",
+    s().notify("info", "Big Loop was changed in the game", {
+      kind: "changedInGame",
       actions: [{ label: "Reveal", command: { _tag: "RevealProject" } }]
     })
     s().notify("error", "The game wasn't found", { kind: "gameNotFound", persistent: true, body: "Choose its folder." })
-    s().notify("error", "Something failed")
+    s().notify("error", "Its editor data couldn't be read", { kind: "sidecarUnreadable" })
     assert.deepStrictEqual(s().notifications.map((n) => [n.kind, n.level, n.title]), [
-      ["error", "error", "Something failed"],
+      ["sidecarUnreadable", "error", "Its editor data couldn't be read"],
       ["gameNotFound", "error", "The game wasn't found"],
-      ["mapSaved", "info", "Saved Big Loop"]
+      ["changedInGame", "info", "Big Loop was changed in the game"]
     ])
     assert.deepInclude(s().notifications[1], { body: "Choose its folder.", persistent: true, resolvedAt: null })
     assert.deepStrictEqual(s().notifications[2]?.actions, [{ label: "Reveal", command: { _tag: "RevealProject" } }])
@@ -654,6 +654,25 @@ describe("editor store", () => {
     s().markNotificationsRead()
     s().clearNotifications()
     assert.deepStrictEqual(s().notifications, [])
+  })
+
+  it("sends each event to the inbox or a toast, never both", () => {
+    const s = () => useEditor.getState()
+    s().clearNotifications()
+    useEditor.setState({ toasts: [] })
+    s().notify("error", "Select 2 to 4096 items before saving a prefab.", { kind: "prefabRefused" })
+    s().notify("error", "Something failed")
+    s().notify("info", "Saved Big Loop", { kind: "mapSaved" })
+    assert.deepStrictEqual(s().toasts.map((n) => n.kind), ["mapSaved", "error", "prefabRefused"])
+    assert.deepStrictEqual(s().notifications, [])
+
+    useEditor.setState({ toasts: [] })
+    s().notify("info", "Big Loop was changed in the game", { kind: "changedInGame" })
+    s().notify("info", "Exported, but the plugin isn't there", { kind: "anything", persistent: true })
+    assert.deepStrictEqual(s().notifications.map((n) => n.kind), ["anything", "changedInGame"])
+    assert.deepStrictEqual(s().toasts, [])
+    s().resolveNotifications("anything")
+    s().clearNotifications()
   })
 })
 

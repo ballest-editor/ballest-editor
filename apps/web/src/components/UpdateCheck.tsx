@@ -3,18 +3,12 @@ import { canCheckForUpdates, updateStatusOf, updateSummaryOf } from "../domain/u
 import { checkForUpdates } from "../editor/actions"
 import { useEditor, useUpdateState } from "../editor/store"
 
-/** The status bar's left end: the running version, and what a check is doing. Empty in a browser, which has no updater. */
-export function VersionStatus() {
+/** The status bar's left end: what a check for updates is doing. Nothing in a browser, which has no updater. */
+export function UpdateStatus() {
   const state = useUpdateState()
   const checked = useEditor((s) => s.updateChecked)
-  if (state === null) return <div />
-  const status = updateStatusOf(state, checked)
-  return (
-    <div className="flex min-w-0 items-center gap-2 px-1 text-fg-tertiary">
-      <span className="tabular-nums">v{state.currentVersion}</span>
-      {status !== null && <span className="truncate">{status}</span>}
-    </div>
-  )
+  const status = state === null ? null : updateStatusOf(state, checked)
+  return status === null ? null : <span className="truncate px-1 text-fg-tertiary">{status}</span>
 }
 
 /** Settings › General's updates row: its text and its button. Null in a browser. */

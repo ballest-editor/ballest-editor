@@ -1,6 +1,5 @@
 /** Notifications (docs/DESKTOP.md § Renderer): their buttons, toasts, Don't show again, and the log kept across runs. */
 import { Effect, Queue, Stream } from "effect"
-import { toast } from "sonner"
 import {
   type NotificationAction,
   type NotificationCommand,
@@ -63,38 +62,20 @@ export const runNotificationAction = (notice: NotificationRecord, action: Notifi
   runNotificationCommand(action.command)
 }
 
-const toastNotification = (notice: NotificationRecord) => {
-  const [first] = notice.actions
-  const options = {
-    ...(notice.body !== null && { description: notice.body }),
-    ...(first !== undefined && {
-      action: { label: first.label, onClick: () => runNotificationAction(notice, first) }
-    })
-  }
-  if (notice.level === "error") toast.error(notice.title, options)
-  else toast(notice.title, options)
-}
-
-/** When this run of the editor began: a notification from before it was kept from an earlier run, not news. */
-const sessionStart = Date.now()
-
 /**
- * Toasts each new notification (its first button on the toast) until the returned function is called: a React effect's
- * cleanup. The toast goes away by itself; the notification stays in the notification centre.
+ * Hands each toast `notify` routed here (`belongsInInbox`) to `present`, the waiting ones first, oldest first so the
+ * newest is on top, until the returned function is called: a React effect's cleanup.
  */
-export const showToasts = (): () => void => {
-  const shown = new Set<string>()
-  const showNew = (log: ReadonlyArray<NotificationRecord>) => {
-    // oldest first, so the newest is on top
-    for (const notice of log.toReversed()) {
-      if (shown.has(notice.id) || Date.parse(notice.at) < sessionStart) continue
-      shown.add(notice.id)
-      toastNotification(notice)
-    }
+export const showToasts = (present: (notice: NotificationRecord) => void): () => void => {
+  const showWaiting = () => {
+    const { toasts } = useEditor.getState()
+    if (toasts.length === 0) return
+    useEditor.setState({ toasts: [] })
+    for (const notice of toasts.toReversed()) present(notice)
   }
-  showNew(useEditor.getState().notifications)
+  showWaiting()
   return useEditor.subscribe((state, previous) => {
-    if (state.notifications !== previous.notifications) showNew(state.notifications)
+    if (state.toasts !== previous.toasts) showWaiting()
   })
 }
 
