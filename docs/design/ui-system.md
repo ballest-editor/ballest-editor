@@ -32,7 +32,7 @@ The variables are `--fg-secondary`, `--fg-tertiary`, `--fg-disabled`. They aren'
 
 `rounded-xs`, `-sm` and `-md` resolve to the control radius and `-lg` and up to the surface radius, but write the two names. Panels are square. `rounded-full` is for true dots, switches, scrollbars and progress bars only.
 
-Viewport chrome is one shape, rounded rects at the control radius (`viewControlStyle.ts`): no circles, no stadiums.
+Viewport chrome is one shape, rounded rects at the control radius (`viewControlStyle.ts`): no circles, no stadiums. A group is 28px high on the card colour at 80%, which follows the theme, and is divided into segments that fill it: no padding and no outer container, so no second radius.
 
 ## Spacing: 4px steps, 8px between groups
 

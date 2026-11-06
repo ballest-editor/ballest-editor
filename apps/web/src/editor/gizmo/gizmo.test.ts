@@ -4,6 +4,7 @@ import { ueToScene, ueToThreeVector } from "../../domain/coords"
 import type { Quat4, UeTransform } from "../../domain/coords"
 import { applyGroupDelta } from "../../domain/groupTransform"
 import { rotateVec, rotatorToQuat } from "../../domain/ueMath"
+import { sceneAxisColors } from "../axisColors"
 import { dragDelta, type DragStart, type PointerSample } from "./drag"
 import { GizmoObject, type GizmoSpace, handleFacesCamera, pairOf, SIZE, toolHandles } from "./handles"
 import { axisParamFromRay, axisWorldDir, gameDirToWorld, planeHit, screenAngle } from "./math"
@@ -124,6 +125,20 @@ describe("gizmo handles", () => {
     expect(colors.filter((c, i) => c !== base[i])).toHaveLength(1)
     gizmo.update(frame, null, "s-y")
     expect(gizmo.handles.filter((h) => h.materials[0]!.opacity < 1)).toHaveLength(toolHandles.scale.length - 1)
+  })
+
+  it("recolours every handle for the theme, the guide too, and back", () => {
+    const gizmo = new GizmoObject(toolHandles.rotate)
+    const colors = () => gizmo.handles.map((h) => h.baseColor.getHexString())
+    const dark = colors()
+    gizmo.setDark(false)
+    colors().forEach((color, i) => expect(color).not.toBe(dark[i]))
+    gizmo.update(frame, null, null)
+    expect(gizmo.handles.map((h) => h.materials[0]!.color.getHexString())).toEqual(colors())
+    gizmo.setGuide(v3(0, 0, 0), v3(1, 0, 0), "x")
+    expect(`#${gizmo.guide.material.color.getHexString()}`).toBe(sceneAxisColors(false).x)
+    gizmo.setDark(true)
+    expect(colors()).toEqual(dark)
   })
 })
 

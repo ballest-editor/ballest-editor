@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as THREE from "three"
 import { UE_TO_THREE_MATRIX, ueToScene } from "../domain/coords"
-import { OUTLINE_COLORS, outlineOf, SelectionOutline } from "./selectionOutline"
+import { OUTLINE_COLORS, outlineOf, SelectionOutline, setOutlineTheme } from "./selectionOutline"
 import { isLine } from "./threeGuards"
 
 /** A wedge (ramp) in UE local space: 400 long in X, 100 wide in Y, rising 0..30 cm in Z. */
@@ -146,7 +146,7 @@ describe("selection outline", () => {
     expect(ray.intersectObject(outline, true)).toHaveLength(0)
   })
 
-  it("draws the active item lighter than the rest of the selection", () => {
+  it("draws the active item apart from the rest of the selection, in either theme", () => {
     const { item } = makeItem(wedge())
     const outline = new SelectionOutline()
     item.add(outline)
@@ -155,11 +155,15 @@ describe("selection outline", () => {
       const { material } = firstLine(outline)
       return material instanceof THREE.LineBasicMaterial ? `#${material.color.getHexString()}` : material
     }
-    expect(colorOf()).toBe(OUTLINE_COLORS.selected)
+    expect(colorOf()).toBe(OUTLINE_COLORS.dark.selected)
     outline.update(item, true)
-    expect(colorOf()).toBe(OUTLINE_COLORS.active)
+    expect(colorOf()).toBe(OUTLINE_COLORS.dark.active)
+    setOutlineTheme(false)
+    expect(colorOf()).toBe(OUTLINE_COLORS.light.active)
     outline.update(item, false)
-    expect(colorOf()).toBe(OUTLINE_COLORS.selected)
+    expect(colorOf()).toBe(OUTLINE_COLORS.light.selected)
+    setOutlineTheme(true)
+    expect(colorOf()).toBe(OUTLINE_COLORS.dark.selected)
   })
 
   it("caches edges per geometry and frees them with it", () => {

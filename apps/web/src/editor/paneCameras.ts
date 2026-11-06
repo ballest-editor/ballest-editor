@@ -15,7 +15,14 @@ import {
   scaleForDistance,
   zoomAtPointer
 } from "../domain/orthoView"
-import { isOrthoView, type OrthoView, paneRectAt, paneRects, type ViewProjection } from "../domain/viewLayout"
+import {
+  isOrthoView,
+  type OrthoView,
+  type PaneChange,
+  paneRectAt,
+  paneRects,
+  type ViewProjection
+} from "../domain/viewLayout"
 import { gameDirToWorld, type Px, worldPerPixel } from "./gizmo/math"
 import { useEditor } from "./store"
 
@@ -226,6 +233,14 @@ export const paneCamerasOf = (tabId: string): ReadonlyArray<PaneCamera> => {
   const panes = Array.from({ length: 4 }, () => new PaneCamera())
   tabs.set(tabId, panes)
   return panes
+}
+
+/** Splits or closes panes in the current tab: each pane that stays keeps its camera as well as its view. */
+export const changePanes = (change: PaneChange): void => {
+  const { tabId, applyPaneChange } = useEditor.getState()
+  const panes = paneCamerasOf(tabId)
+  tabs.set(tabId, change.order.flatMap((slot) => panes[slot] ?? []))
+  applyPaneChange(change)
 }
 
 export const forgetClosedTabs = (open: ReadonlyArray<string>): void => {

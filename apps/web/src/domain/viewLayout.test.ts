@@ -6,13 +6,19 @@ import {
   firstPaneTurns,
   IDLE_PANE_INTERVAL_MS,
   isDefaultViewLayout,
+  paneClose,
+  paneCloseColumn,
+  paneCloseRow,
   paneCountOf,
   paneRectAt,
   paneRects,
+  paneSplitDown,
+  paneSplitRight,
   panesToDraw,
   ViewLayout,
   type ViewLayoutKind,
-  viewLayoutKinds
+  viewLayoutKinds,
+  withPaneChange
 } from "./viewLayout"
 
 const layoutOf = (kind: ViewLayoutKind, splitX = 0.5, splitY = 0.5): ViewLayout => ({
@@ -125,5 +131,59 @@ describe("which panes draw", () => {
 
   it("has nobody else to draw in a single pane", () => {
     assert.deepStrictEqual(panesToDraw([0], 0, 1000, firstPaneTurns, false).slots, [0])
+  })
+})
+
+describe("splitting and closing panes", () => {
+  const views: ViewLayout["projections"] = ["perspective", "top", "front", "right"]
+  const layoutShowing = (kind: ViewLayoutKind): ViewLayout => ({ ...defaultViewLayout, kind, projections: views })
+
+  it("splits one pane either way", () => {
+    assert.strictEqual(paneSplitRight("single")?.kind, "columns")
+    assert.strictEqual(paneSplitDown("single")?.kind, "rows")
+  })
+
+  it("makes four of two panes across their line, and nothing along it", () => {
+    assert.strictEqual(paneSplitDown("columns")?.kind, "quad")
+    assert.strictEqual(paneSplitRight("rows")?.kind, "quad")
+    assert.strictEqual(paneSplitRight("columns"), undefined)
+    assert.strictEqual(paneSplitDown("rows"), undefined)
+    assert.strictEqual(paneSplitRight("quad"), undefined)
+    assert.strictEqual(paneSplitDown("quad"), undefined)
+  })
+
+  it("leaves a stacked lower pane where it is when it becomes one of four", () => {
+    const change = paneSplitRight("rows")
+    assert.isDefined(change)
+    const { projections } = withPaneChange(layoutShowing("rows"), change)
+    assert.strictEqual(projections[0], "perspective")
+    assert.strictEqual(projections[2], "top") // the lower left, under the pane it was under
+  })
+
+  it("keeps the other of two panes", () => {
+    const closing = (slot: number) => withPaneChange(layoutShowing("columns"), paneClose(slot))
+    assert.strictEqual(closing(1).kind, "single")
+    assert.strictEqual(closing(1).projections[0], "perspective")
+    assert.strictEqual(closing(0).projections[0], "top")
+  })
+
+  it("keeps the other row of four, side by side", () => {
+    const closing = (slot: number) => withPaneChange(layoutShowing("quad"), paneCloseRow(slot))
+    assert.strictEqual(closing(3).kind, "columns")
+    assert.deepStrictEqual(closing(3).projections.slice(0, 2), ["perspective", "top"])
+    assert.deepStrictEqual(closing(1).projections.slice(0, 2), ["front", "right"])
+  })
+
+  it("keeps the other column of four, stacked", () => {
+    const closing = (slot: number) => withPaneChange(layoutShowing("quad"), paneCloseColumn(slot))
+    assert.strictEqual(closing(1).kind, "rows")
+    assert.deepStrictEqual(closing(1).projections.slice(0, 2), ["perspective", "front"])
+    assert.deepStrictEqual(closing(2).projections.slice(0, 2), ["top", "right"])
+  })
+
+  it("loses no view, so a hidden pane comes back with what it had", () => {
+    for (const change of [paneClose(0), paneCloseRow(0), paneCloseColumn(0), paneCloseColumn(1)]) {
+      assert.sameMembers([...withPaneChange(layoutShowing("quad"), change).projections], [...views])
+    }
   })
 })

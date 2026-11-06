@@ -116,6 +116,70 @@ export const paneRectAt = (rects: Panes, x: number, y: number): PaneRect => {
   return rects.reduce((nearest, r) => distance(r) < distance(nearest) ? r : nearest)
 }
 
+type Slot = PaneRect["slot"]
+
+/**
+ * A change to the panes that keeps what's left where it is on screen: the layout to show, and for each slot, the slot
+ * whose view and camera it takes. There are only the four layouts, so splitting one of two panes splits its neighbour
+ * too, and closing one of four closes its row or column.
+ */
+export interface PaneChange {
+  readonly kind: ViewLayoutKind
+  readonly order: readonly [Slot, Slot, Slot, Slot]
+}
+
+const SAME_SLOTS: PaneChange["order"] = [0, 1, 2, 3]
+
+/** What "Split right" leads to from `kind`, if anything does. */
+export const paneSplitRight = (kind: ViewLayoutKind): PaneChange | undefined => {
+  switch (kind) {
+    case "single":
+      return { kind: "columns", order: SAME_SLOTS }
+    case "rows": // the lower pane is slot 1 stacked, slot 2 of four
+      return { kind: "quad", order: [0, 2, 1, 3] }
+    case "columns":
+    case "quad":
+      return undefined
+  }
+}
+
+/** What "Split down" leads to from `kind`, if anything does. */
+export const paneSplitDown = (kind: ViewLayoutKind): PaneChange | undefined => {
+  switch (kind) {
+    case "single":
+      return { kind: "rows", order: SAME_SLOTS }
+    case "columns":
+      return { kind: "quad", order: SAME_SLOTS }
+    case "rows":
+    case "quad":
+      return undefined
+  }
+}
+
+/** Closes one of two panes: the other fills the viewport. */
+export const paneClose = (slot: number): PaneChange => ({
+  kind: "single",
+  order: slot === 0 ? [1, 0, 2, 3] : SAME_SLOTS
+})
+
+/** Closes the row of four panes that `slot` is in: the other row lies side by side. */
+export const paneCloseRow = (slot: number): PaneChange => ({
+  kind: "columns",
+  order: slot < 2 ? [2, 3, 0, 1] : SAME_SLOTS
+})
+
+/** Closes the column of four panes that `slot` is in: the other column lies stacked. */
+export const paneCloseColumn = (slot: number): PaneChange => ({
+  kind: "rows",
+  order: slot % 2 === 0 ? [1, 3, 0, 2] : [0, 2, 1, 3]
+})
+
+/** `layout` after `change`. */
+export const withPaneChange = (layout: ViewLayout, { kind, order: [a, b, c, d] }: PaneChange): ViewLayout => {
+  const { projections } = layout
+  return { ...layout, kind, projections: [projections[a], projections[b], projections[c], projections[d]] }
+}
+
 /** How often, at most, a pane other than the active one is drawn: they take turns, one at a time. */
 export const IDLE_PANE_INTERVAL_MS = 80
 
