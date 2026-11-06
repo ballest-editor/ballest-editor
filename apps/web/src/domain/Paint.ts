@@ -106,6 +106,10 @@ export const choiceOf = (picker: PaintPicker, material: string | undefined): Pai
     all.find(({ color }) => assetNameOf(color.material) === name)
 }
 
+/** The finish a slot shows: the one it's on, else the library's first, which the game's panel opens a slot off the picker on. */
+export const shownFinishOf = (picker: PaintPicker, choice: PaintChoice | undefined): PaintFinish | undefined =>
+  choice?.finish ?? picker[0]
+
 /** A finish as a person would write it: "smooth" reads "Smooth". */
 export const finishLabelOf = (finish: PaintFinish): string =>
   `${finish.name.charAt(0).toUpperCase()}${finish.name.slice(1)}`

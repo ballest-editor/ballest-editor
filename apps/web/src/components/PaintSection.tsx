@@ -16,11 +16,13 @@ import {
   type PaintFinish,
   paintGroups,
   paintTargets,
+  shownFinishOf,
   swatchColor
 } from "../domain/Paint"
 import { pieceNameOf } from "../domain/structure"
 import { paintSlots } from "../editor/actions"
 import { useEditor } from "../editor/store"
+import { HintBadge } from "./HintBadge"
 import { InfoHint } from "./InfoHint"
 
 export interface SelectedItem {
@@ -78,18 +80,25 @@ function Swatch(
   )
 }
 
+const OFF_PANEL_HINT =
+  "The game's paint panel doesn't offer this slot, but it draws and keeps paint set here, and the map still validates."
+
 /**
  * One material slot over a group, as in the game: pick a finish (smooth, rough, ...), then a
- * colour. Changing the finish keeps the colour when the new finish has it (`colorForFinish`);
- * otherwise it only shows that finish's colours until one is picked. The row reads as the
- * material: its swatch, its colour's name and its finish. The asset's own name is in Details.
+ * colour. The finish and its colours always show, the first item's for a mixed selection and
+ * the default for a slot off the picker. Changing the finish keeps the colour when the new
+ * finish has it (`colorForFinish`); otherwise it only shows that finish's colours until one is
+ * picked. The row reads as the material: its swatch, its colour's name and its finish. The
+ * asset's own name is in Details.
  */
 function SlotPaintRow(
-  { members, target, numbered }: {
+  { members, target, numbered, offPanel }: {
     readonly members: ReadonlyArray<SelectedItem>
     readonly target: SlotTarget
     /** Whether the slot says which it is, when its piece has more than one. */
     readonly numbered: boolean
+    /** Whether the game's paint panel leaves this slot out. */
+    readonly offPanel: boolean
   }
 ) {
   const paint = useEditor((s) => s.paint)
@@ -100,7 +109,7 @@ function SlotPaintRow(
   const first = materials[0]
   const current = materials.every((m) => m === first) ? first : null
   const choice = current === null ? undefined : choiceOf(paint, current)
-  const finish = paint.find((f) => f.name === (browsing ?? choice?.finish.name))
+  const finish = paint.find((f) => f.name === browsing) ?? shownFinishOf(paint, choiceOf(paint, first))
 
   const apply = (material: string) => {
     setBrowsing(null)
@@ -133,7 +142,12 @@ function SlotPaintRow(
 
   return (
     <div className="flex flex-col gap-1.5">
-      {numbered && <div className="text-body text-fg-secondary">{slotName}</div>}
+      {(numbered || offPanel) && (
+        <div className="flex items-center justify-between gap-2">
+          {numbered && <span className="text-body text-fg-secondary">{slotName}</span>}
+          {offPanel && <HintBadge label="Off-panel">{OFF_PANEL_HINT}</HintBadge>}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <ColorSwatch color={swatch} className="size-5" />
         <span className={cn("text-body", choice === undefined && "text-fg-tertiary")}>{name}</span>
@@ -144,7 +158,7 @@ function SlotPaintRow(
           onValueChange={changeFinish}
         >
           <SelectTrigger className="ml-auto w-24 shrink-0" aria-label={`${slotName} material`}>
-            <SelectValue placeholder="Finish" />
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {paint.map((f) => <SelectItem key={f.name} value={f.name}>{finishLabelOf(f)}</SelectItem>)}
@@ -168,9 +182,6 @@ function SlotPaintRow(
   )
 }
 
-const OFF_PANEL_HINT =
-  "The game's paint panel doesn't offer this slot, but it draws and keeps paint set here, and the map still validates."
-
 function Note({ children }: { readonly children: string }) {
   return <div className="text-body text-fg-tertiary">{children}</div>
 }
@@ -188,14 +199,7 @@ function PaintGroup(
       {showName && (
         <div className="text-body-strong">
           {pieceNameOf(first.item, catalogIndex)}
-          <span className="ml-1 text-body text-fg-tertiary">× {members.length}</span>
-        </div>
-      )}
-      {offPanel !== undefined && (
-        // Every slot listed for such a piece is off-panel, so it's said once for the group.
-        <div className="flex items-center gap-2 text-body text-fg-tertiary">
-          Not in the game's paint panel
-          <InfoHint>{OFF_PANEL_HINT}</InfoHint>
+          {members.length > 1 && <span className="ml-1 text-body text-fg-tertiary">× {members.length}</span>}
         </div>
       )}
       {slots.map((target) => (
@@ -205,6 +209,7 @@ function PaintGroup(
           members={members}
           target={target}
           numbered={slots.length > 1}
+          offPanel={offPanel !== undefined}
         />
       ))}
     </div>

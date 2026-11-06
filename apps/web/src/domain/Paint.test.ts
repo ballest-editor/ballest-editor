@@ -18,6 +18,7 @@ import {
   paintGroups,
   paintTargets,
   parsePaint,
+  shownFinishOf,
   swatchColor
 } from "./Paint"
 import { SURFACE_PROPERTY } from "./surface"
@@ -137,6 +138,15 @@ describe("paint", () => {
     assert.isUndefined(colorForFinish(special, red))
     assert.strictEqual(colorForFinish(special, undefined)?.color, "Grey")
     assert.isUndefined(colorForFinish(glossy, undefined))
+  })
+
+  it("shows the slot's finish, else the library's first", () => {
+    const color = { color: "Red", material: "/Game/Red" }
+    const smooth = { name: "smooth", colors: [color] }
+    const rough = { name: "rough", colors: [color] }
+    assert.strictEqual(shownFinishOf([smooth, rough], undefined), smooth)
+    assert.strictEqual(shownFinishOf([smooth, rough], { finish: rough, color }), rough)
+    assert.isUndefined(shownFinishOf([], undefined))
   })
 
   it("colours swatches like the renderer, unless the game gives a colour", () => {

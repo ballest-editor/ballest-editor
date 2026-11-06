@@ -44,7 +44,7 @@ export const dayLabel = (iso: string, now: number): string => {
 export const formatClock = (iso: string): string =>
   new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
 
-/** The game's `createdAt` (`YYYY.MM.DD-HH.MM.SS`, UTC) as an ISO time, for `formatAgo` and `formatDateTime`; null when it isn't one. */
+/** The game's `createdAt` (`YYYY.MM.DD-HH.MM.SS`, UTC) as an ISO time, for the formatters here; null when it isn't one. */
 export const createdAtIso = (createdAt: string): string | null => {
   const m = /^(\d{4})\.(\d{2})\.(\d{2})-(\d{2})\.(\d{2})\.(\d{2})$/.exec(createdAt)
   if (m === null) return null
