@@ -203,6 +203,26 @@
     var(--tw-animation-fill-mode, none);
 }
 
+/*
+ * The five Workshop difficulties, easiest first: bars 1 to 4 and Baller's warning sign. The same in both themes, except
+ * that the first follows the text colour.
+ */
+:root {
+  --difficulty-1: var(--foreground);
+  --difficulty-2: oklch(76.5% 0.177 163.223);
+  --difficulty-3: oklch(54.6% 0.245 262.881);
+  --difficulty-4: oklch(57.7% 0.245 27.325);
+  --difficulty-5: oklch(85.2% 0.199 91.936);
+}
+
+@theme inline {
+  --color-difficulty-1: var(--difficulty-1);
+  --color-difficulty-2: var(--difficulty-2);
+  --color-difficulty-3: var(--difficulty-3);
+  --color-difficulty-4: var(--difficulty-4);
+  --color-difficulty-5: var(--difficulty-5);
+}
+
 @utility duration-* {
   --tw-duration: calc(--value(integer) * 1ms * var(--motion));
   transition-duration: calc(--value(integer) * 1ms * var(--motion));

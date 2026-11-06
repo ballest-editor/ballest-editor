@@ -6,6 +6,7 @@ import {
   IconFolderOpen,
   IconFolderSearch,
   IconMap,
+  type IconProps,
   IconWorld
 } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
@@ -21,7 +22,6 @@ import { useShallow } from "zustand/react/shallow"
 import { usableCreatorName } from "../domain/creator"
 import { setLevelData as setMapLevelData, withLevelNames } from "../domain/edits"
 import { isValidName, mapFileNameOf, mapLabelOf, NAME_RULE_SENTENCE } from "../domain/factory"
-import { floorHeightOf } from "../domain/level"
 import type { LevelData } from "../domain/MapFile"
 import type { MapPrefs } from "../domain/MapPrefs"
 import {
@@ -49,7 +49,6 @@ import {
   revealProject,
   saveProjectMapPrefs,
   setExportOnSave,
-  setGridHeight,
   setLevelData
 } from "../editor/actions"
 import {
@@ -61,14 +60,13 @@ import {
   useCreator,
   useEditor
 } from "../editor/store"
-import { NumberField } from "./NumberField"
 import { PathAction } from "./PathText"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
 /**
  * The dialog's pages (docs/PROJECTS.md § Shell): the project, then one entry per map. `map:<file name>` is a map in
  * the project; `map:open` the open map while it has no file yet; `map:tab:<tab id>` another tab's map while it has none.
- * The map whose rows are showing has a second page, `workshop:` in place of `map:`.
+ * The map whose rows are showing has a second page nested under it, `workshop:` in place of `map:`.
  */
 type Category = "project" | `map:${string}` | `workshop:${string}`
 type Row = SettingsRow<Category>
@@ -91,16 +89,19 @@ const TAG_DESCRIPTIONS: Readonly<Record<TagGroup, string>> = {
   Props: "Special pieces it uses."
 }
 
-/** The bar colour per difficulty (white, green, blue, red), as the game draws them; the fifth is a warning sign. */
+/** A Workshop page's icon, indented so its entry reads as a page of the map above it, not as one more map. */
+const WorkshopPageIcon = (props: IconProps) => <IconWorld {...props} className="ml-4" />
+
+/** The bar colour per difficulty, easiest first (the `--difficulty-*` tokens); the fifth is a warning sign. */
 const BAR_COLORS: Readonly<Record<Exclude<Difficulty, "baller">, string>> = {
-  beginner: "bg-foreground",
-  medium: "bg-emerald-400",
-  advanced: "bg-blue-600",
-  expert: "bg-red-600"
+  beginner: "bg-difficulty-1",
+  medium: "bg-difficulty-2",
+  advanced: "bg-difficulty-3",
+  expert: "bg-difficulty-4"
 }
 
 function DifficultyIcon({ difficulty }: { readonly difficulty: Difficulty }) {
-  if (difficulty === "baller") return <IconAlertTriangleFilled className="size-4 text-yellow-400" />
+  if (difficulty === "baller") return <IconAlertTriangleFilled className="size-4 text-difficulty-5" />
   const filled = DIFFICULTIES.findIndex((d) => d.tag === difficulty) + 1
   return (
     <span className="flex gap-px" aria-hidden>
@@ -112,6 +113,15 @@ function DifficultyIcon({ difficulty }: { readonly difficulty: Difficulty }) {
       ))}
     </span>
   )
+}
+
+/** What the game calls each difficulty and how it draws it, which the tokens above needn't match. */
+const DIFFICULTY_TIPS: Readonly<Record<Difficulty, string>> = {
+  beginner: "Beginner: 1 white bar in the game",
+  medium: "Medium: 2 green bars in the game",
+  advanced: "Advanced: 3 blue bars in the game",
+  expert: "Expert: 4 red bars in the game",
+  baller: "Baller: a yellow warning sign in the game"
 }
 
 /** The game's five difficulties, each with its icon and name; picking the chosen one again keeps it. */
@@ -128,15 +138,21 @@ function DifficultyPicker(
       spacing={1}
     >
       {DIFFICULTIES.map((d) => (
-        <ToggleGroupItem
-          key={d.tag}
-          value={d.tag}
-          variant="outline"
-          className="gap-1.5 aria-pressed:border-primary aria-pressed:bg-primary/15"
-        >
-          <DifficultyIcon difficulty={d.tag} />
-          {d.level}
-        </ToggleGroupItem>
+        <Tooltip key={d.tag}>
+          <TooltipTrigger
+            render={
+              <ToggleGroupItem
+                value={d.tag}
+                variant="outline"
+                className="gap-1.5 aria-pressed:border-primary aria-pressed:bg-primary/15"
+              />
+            }
+          >
+            <DifficultyIcon difficulty={d.tag} />
+            {d.level}
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{DIFFICULTY_TIPS[d.tag]}</TooltipContent>
+        </Tooltip>
       ))}
     </ToggleGroup>
   )
@@ -250,19 +266,14 @@ interface MapEntry {
   /** The map's file in the project; null for the open map while it has none yet. */
   readonly fileName: string | null
   readonly levelData: LevelData
-  readonly floorHeight: number
-  readonly startHeight: number
   readonly exportOnSave: boolean
   readonly setLevelData: (levelData: LevelData) => void
-  readonly setGridHeight: (height: number) => void
   readonly setExportOnSave: (on: boolean) => void
 }
 
 /** The open map, edited in the editor. */
 const useOpenMapEntry = (): MapEntry => {
   const levelData = useEditor((s) => s.doc.map.worldSettings.levelData)
-  const floorHeight = useEditor((s) => s.floorHeight)
-  const startHeight = useEditor((s) => floorHeightOf(s.doc.map))
   const exportOnSave = useEditor((s) => s.exportOnSave)
   const fileName = useEditor((s) => s.file?.name ?? null)
   return {
@@ -270,11 +281,8 @@ const useOpenMapEntry = (): MapEntry => {
     label: fileName === null ? unsavedLabelOf(levelData.levelDisplayName.trim() || "Untitled") : mapLabelOf(fileName),
     fileName,
     levelData,
-    floorHeight,
-    startHeight,
     exportOnSave,
     setLevelData: (next) => void setLevelData(next),
-    setGridHeight: (height) => void setGridHeight(height),
     setExportOnSave: (on) => void setExportOnSave(on)
   }
 }
@@ -289,11 +297,8 @@ const useTabMapEntry = (tabId: string | null): MapEntry | null => {
     label: file === null ? unsavedLabelOf(tabLabelOf(tab)) : mapLabelOf(file.name),
     fileName: file?.name ?? null,
     levelData: tab.doc.map.worldSettings.levelData,
-    floorHeight: tab.floorHeight,
-    startHeight: floorHeightOf(tab.doc.map),
     exportOnSave: tab.exportOnSave,
     setLevelData: (next) => void setLevelData(next, tabId),
-    setGridHeight: (height) => void setGridHeight(height, tabId),
     setExportOnSave: (on) => void setExportOnSave(on, tabId)
   }
 }
@@ -327,7 +332,6 @@ const useDiskMapEntry = (
   if (fileName === null || read?.fileName !== fileName) return null
   const { map, prefs } = read.settings
   const key = map.worldSettings.levelData.userLevelName
-  const startHeight = floorHeightOf(map)
   const savePrefs = (next: MapPrefs) => {
     setRead({ fileName, settings: { map, prefs: next } })
     void saveProjectMapPrefs(key, next)
@@ -337,8 +341,6 @@ const useDiskMapEntry = (
     label: mapLabelOf(fileName),
     fileName,
     levelData: map.worldSettings.levelData,
-    floorHeight: prefs.gridHeight ?? startHeight,
-    startHeight,
     exportOnSave: prefs.exportOnSave === true,
     setLevelData: (levelData) =>
       void patchProjectMap(fileName, (current) => setMapLevelData(current, levelData)).then((saved) => {
@@ -346,10 +348,6 @@ const useDiskMapEntry = (
         void saveProjectMapPrefs(levelData.userLevelName, prefs)
         onMoved(saved.fileName)
       }),
-    setGridHeight: (height) => {
-      const { gridHeight: _previous, ...rest } = prefs
-      savePrefs(height === startHeight ? rest : { ...rest, gridHeight: height })
-    },
     setExportOnSave: (on) => {
       const { exportOnSave: _previous, ...rest } = prefs
       savePrefs(on ? { ...rest, exportOnSave: true } : rest)
@@ -357,24 +355,19 @@ const useDiskMapEntry = (
   }
 }
 
-/**
- * The rows of one map's entry. Its Map page holds what is the map's in this editor, its Workshop page what publishing
- * shows. Grid height stays on the Map page: it is kept per map (its prefs), and Settings only has what is the app's.
- */
+/** The rows of one map's entry. Its Map page holds what is the map's in this editor, its Workshop page what publishing shows. */
 const mapRows = (
   entry: MapEntry,
   options: {
-    readonly units: "cm" | "m"
     readonly savedCreator: string
     readonly canExport: boolean
     readonly maps: ReadonlyArray<ProjectMap>
   }
 ): ReadonlyArray<Row> => {
   const { category, levelData } = entry
-  const { units, maps } = options
+  const { maps } = options
   // A map made before a creator was saved has none yet; it gets the saved one, as Export would.
   const creator = levelData.creatorName || options.savedCreator
-  const perUnit = units === "m" ? 100 : 1
   const difficulty = difficultyOf(levelData)
   const others = unknownTags(levelData)
   const path = maps.find((m) => m.fileName === entry.fileName)?.path
@@ -418,31 +411,6 @@ const mapRows = (
           </>
         )
     },
-    {
-      id: "gridHeight",
-      category,
-      label: `Grid height (${units})`,
-      description: "Where the grid sits and new pieces land.",
-      action: (
-        <Button
-          variant="outline"
-          disabled={entry.floorHeight === entry.startHeight}
-          onClick={() => entry.setGridHeight(entry.startHeight)}
-        >
-          Use player start
-        </Button>
-      ),
-      control: (
-        <div className="w-32">
-          <NumberField
-            label="Grid height"
-            value={entry.floorHeight / perUnit}
-            digits={units === "m" ? 3 : 1}
-            onCommit={(value) => entry.setGridHeight(value * perUnit)}
-          />
-        </div>
-      )
-    },
     ...(options.canExport
       ? [
         {
@@ -457,9 +425,9 @@ const mapRows = (
     {
       id: "difficulty",
       category: workshop,
-      group: entry.label,
       label: "Difficulty",
-      keywords: DIFFICULTIES.map((d) => d.level).join(" "),
+      description: "Easiest to hardest, with the game's icons.",
+      keywords: `${entry.label} ${DIFFICULTIES.map((d) => d.level).join(" ")}`,
       wide: true,
       control: (
         <DifficultyPicker
@@ -473,10 +441,9 @@ const mapRows = (
       return {
         id: `tags-${group.group}`,
         category: workshop,
-        group: entry.label,
         label: `${group.group} tags`,
         description: TAG_DESCRIPTIONS[group.group],
-        keywords: group.tags.join(" "),
+        keywords: `${entry.label} ${group.tags.join(" ")}`,
         wide: true,
         action: names.some((tag) => hasTag(levelData, tag)) && (
           <Button
@@ -495,10 +462,9 @@ const mapRows = (
       {
         id: "tags-other",
         category: workshop,
-        group: entry.label,
         label: "Other tags",
         description: "Tags this editor doesn't know, such as the old ungrouped ones. They are kept as they are.",
-        keywords: others.join(" "),
+        keywords: `${entry.label} ${others.join(" ")}`,
         wide: true,
         control: (
           <div className="flex flex-wrap gap-1">
@@ -544,8 +510,8 @@ function ProjectNameField({ name }: { readonly name: string | null }) {
 
 /**
  * Project settings (docs/PROJECTS.md § Shell), one dialog in IntelliJ's Project Structure shape: the project (name,
- * folders), then an entry per map (name, file, grid height, Export on save), and for the map showing a Workshop page
- * (difficulty, tags). Edits apply as they are made: the open map's as undo steps in the editor, any other map's to its
+ * folders), then an entry per map (name, file, Export on save), and for the map showing a Workshop page nested under
+ * it (difficulty, tags). Edits apply as they are made: the open map's as undo steps in the editor, any other map's to its
  * file. Project › Project settings… opens on the project (`page` "project"); the open map's settings open on its entry
  * ("openMap").
  */
@@ -561,7 +527,6 @@ export function ProjectSettingsDialog(
   const project = useEditor((s) => s.project?.current ?? null)
   const projectsFolder = useEditor((s) => s.project?.projectsFolder ?? "Documents/Ballest Editor")
   const maps = useEditor((s) => s.projectMaps)
-  const units = useEditor((s) => s.settings.general.units)
   const creator = useCreator()
   const gameMapsFolder = useEditor((s) => s.gamePaths?.mapsFolder.path ?? null)
   const savedCreator = usableCreatorName(creator)
@@ -627,7 +592,7 @@ export function ProjectSettingsDialog(
     // only the map showing lists its Workshop page, so a long project doesn't double its list
     ...mapCategories.flatMap((info) =>
       info.id === entry?.category
-        ? [info, { id: workshopPageOf(info.id), label: "Workshop", icon: IconWorld, section: "Maps" }]
+        ? [info, { id: workshopPageOf(info.id), label: "Workshop", icon: WorkshopPageIcon, section: "Maps" }]
         : [info]
     )
   ]
@@ -730,15 +695,18 @@ export function ProjectSettingsDialog(
   // the shown entry's rows (another map's are read from its file when its entry shows), after the project's
   const rows: ReadonlyArray<Row> = [
     ...projectRows,
-    ...(entry === null ? [] : mapRows(entry, { units, savedCreator, canExport, maps }))
+    ...(entry === null ? [] : mapRows(entry, { savedCreator, canExport, maps }))
   ]
+
+  // a Workshop page's nav entry only says Workshop, so the heading says whose
+  const onWorkshop = category.startsWith(WORKSHOP) && entry !== null
 
   return (
     <SettingsShell
       open={open}
       onClose={onClose}
-      title="Project settings"
-      description="The project's name and folders; then each map's name, file, grid height, difficulty and tags."
+      title={onWorkshop ? `Project settings › ${entry.label}` : "Project settings"}
+      description="The project's name and folders; then each map's name, file, difficulty and tags."
       categories={categories}
       category={category}
       onCategoryChange={setCategory}

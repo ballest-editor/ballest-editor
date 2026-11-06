@@ -270,7 +270,7 @@ export function ProjectPanel() {
           </HeaderButton>
         )}
       </div>
-      <ScrollArea className="min-h-0 flex-1">
+      <ScrollArea className={empty ? "min-h-0" : "min-h-0 flex-1"}>
         <ul className="flex flex-col gap-px px-2 pb-2">
           {unsavedTabs.map((tabId) => <UnsavedRow key={tabId} tabId={tabId} />)}
           {/* the tabs above aren't in the project; a rule keeps them from reading as its first maps */}
@@ -279,18 +279,16 @@ export function ProjectPanel() {
           )}
           {maps.map((map) => <MapRow key={map.fileName} map={map} now={now} />)}
         </ul>
-        {empty && (
-          <div className="flex flex-col items-start gap-2 px-4 pb-2">
-            <p className="text-body text-fg-tertiary">
-              {untitled ? "Saving a map creates the project." : projects ? "No maps yet." : "No map open."}
-            </p>
-            <Button variant="outline" onClick={() => void startNewMap()}>
-              <IconMapPlus data-icon="inline-start" />
-              New map
-            </Button>
-          </div>
-        )}
       </ScrollArea>
+      {empty && (
+        <div className="flex flex-1 shrink-0 flex-col items-center justify-center gap-2 p-4">
+          <p className="text-body text-fg-tertiary">{projects ? "No maps yet" : "No map open"}</p>
+          <Button variant="outline" onClick={() => void startNewMap()}>
+            <IconMapPlus data-icon="inline-start" />
+            New map
+          </Button>
+        </div>
+      )}
     </aside>
   )
 }

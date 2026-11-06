@@ -175,7 +175,11 @@ export const setLevelData = (levelData: LevelData, tabId = useEditor.getState().
   return run(saveTabPrefs(tabId))
 }
 
-/** Moves a tab's grid (and where pieces land; the active tab's by default); saved with the map's prefs, not in its history. */
+/**
+ * Moves a tab's grid (and where pieces land; the active tab's by default); saved with the map's prefs, not in its history.
+ *
+ * @public for the Display popover, which owns Grid height.
+ */
 export const setGridHeight = (gridHeight: number, tabId = useEditor.getState().tabId) => {
   useEditor.getState().patchTab(tabId, { floorHeight: gridHeight })
   return run(saveTabPrefs(tabId))
