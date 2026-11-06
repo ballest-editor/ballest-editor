@@ -1,15 +1,16 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as THREE from "three"
-import { SKY_HAZE_BELOW } from "./sky"
+import { SCENE_COLORS } from "../domain/sceneGround"
+import { SEA_RELIEF, SEA_SHADE_GLSL, SEA_SHOWN, SKY_HAZE_GLSL } from "./sky"
 import {
   addFade,
-  setWaterFloor,
+  SEA_SURFACE,
   setWaterLight,
+  setWaterShown,
   setWaterTheme,
   THIN_INTO_SKY,
   THIN_WITH_DISTANCE,
   WATER_LOOKS,
-  waterHaze,
   waterTopMaterial,
   waterUnderMaterial
 } from "./water"
@@ -54,15 +55,64 @@ describe("water", () => {
     assert.isTrue(orthographic >= 0 && orthographic < fade && fade < extra && extra < output)
   })
 
-  // Both go by the sky's own curve, so the water can't thin out before the haze has come in.
-  it("thins out from above by the sky's haze, for the floor and the theme", () => {
-    assert.include(THIN_INTO_SKY, "ballestSkyHaze(toWater, min(uClipY, cameraPosition.y), uHazeBelow)")
-    setWaterFloor(8615)
-    setWaterTheme("light")
-    assert.strictEqual(waterHaze.uClipY.value, 8615)
-    assert.strictEqual(waterHaze.uHazeBelow.value, SKY_HAZE_BELOW.light)
+  // The canvas blends encoded colours, so a sum made before encoding wouldn't match the dome's.
+  it("adds the sea's surface to the finished colour, by the same sum as the dome", () => {
+    const { fragmentShader, vertexShader } = THREE.ShaderLib.basic
+    const shader = addFade({ fragmentShader, vertexShader }, "", "", SEA_SURFACE)
+    assert.include(shader.fragmentShader, SEA_SHADE_GLSL)
+    assert.isAbove(
+      shader.fragmentShader.indexOf("ballestSeaShade(vWaterWorld.xz"),
+      shader.fragmentShader.indexOf("#include <colorspace_fragment>")
+    )
+    assert.include(SEA_SURFACE, "/ opacity")
+  })
+
+  // Measuring it from the sea's colour went the wrong way on a pale sea: the clear colour keeps that bright as the water dims.
+  it("dims the sea's surface with the light, in each theme's strength", () => {
+    for (const theme of ["light", "dark"] as const) {
+      setWaterTheme(theme)
+      setWaterLight(1)
+      assert.strictEqual(SEA_RELIEF.value, WATER_LOOKS[theme].relief)
+      setWaterLight(0.25)
+      assert.closeTo(SEA_RELIEF.value, WATER_LOOKS[theme].relief * 0.25, 1e-6)
+    }
+    setWaterLight(1)
     setWaterTheme("dark")
-    assert.strictEqual(waterHaze.uHazeBelow.value, SKY_HAZE_BELOW.dark)
+  })
+
+  // A curve that took the camera's height in covered the whole floor from high enough up.
+  it("thins out from above by the sky's curve, which goes by the direction alone", () => {
+    assert.include(THIN_INTO_SKY, "ballestSkyHaze(toWater)")
+    assert.notInclude(SKY_HAZE_GLSL, "cameraPosition")
+  })
+
+  it("gives the dome the sea as it reaches the screen: the water over the clear colour, in the light it is under", () => {
+    const encoded = (hex: string) => new THREE.Color(hex).convertLinearToSRGB()
+    for (const theme of ["light", "dark"] as const) {
+      setWaterTheme(theme)
+      const { color, opacity } = WATER_LOOKS[theme]
+      const sea = encoded(SCENE_COLORS[theme]).lerp(encoded(color), opacity).convertSRGBToLinear()
+      assert.closeTo(SEA_SHOWN.value.x, sea.r, 1e-6, theme)
+      assert.closeTo(SEA_SHOWN.value.y, sea.g, 1e-6, theme)
+      assert.closeTo(SEA_SHOWN.value.z, sea.b, 1e-6, theme)
+    }
+    const lit = SEA_SHOWN.value.y
+    setWaterLight(0.25)
+    assert.isBelow(SEA_SHOWN.value.y, lit)
+    setWaterLight(1)
+    setWaterTheme("dark")
+  })
+
+  // The dome makes up what the fading sheet leaves, which depends on how thick the sheet goes on.
+  it("tells the dome the sheet's opacity, and takes the sea out of it with the water", () => {
+    setWaterTheme("light")
+    assert.strictEqual(SEA_SHOWN.value.w, WATER_LOOKS.light.opacity)
+    setWaterShown(false)
+    assert.strictEqual(SEA_SHOWN.value.w, 0)
+    setWaterTheme("dark")
+    assert.strictEqual(SEA_SHOWN.value.w, 0)
+    setWaterShown(true)
+    assert.strictEqual(SEA_SHOWN.value.w, WATER_LOOKS.dark.opacity)
   })
 
   it("thins out from below by distance, because looking up is all haze", () => {
