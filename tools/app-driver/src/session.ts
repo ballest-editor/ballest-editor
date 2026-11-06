@@ -187,13 +187,16 @@ const findChromium = (): string => {
   return found
 }
 
+/** A cold CI runner took over 26 s to start Chromium while Vite bundled its dependencies. */
+const BROWSER_START_MS = 120_000
+
 /** Reads the debug port a browser picked for itself, from the file it writes into its profile. */
 const debuggerUrl = async (profile: string, child: ChildProcess, what: string): Promise<string> => {
   const file = path.join(profile, "DevToolsActivePort")
   await waitFor(what, () => {
     if (child.exitCode !== null) throw new Error(`${what} stopped: ${logTail(what)}`)
     return fs.existsSync(file) && fs.readFileSync(file, "utf8").includes("\n")
-  }, 30_000)
+  }, BROWSER_START_MS)
   const [port, wsPath] = fs.readFileSync(file, "utf8").trim().split("\n")
   return `ws://127.0.0.1:${port}${wsPath}`
 }
