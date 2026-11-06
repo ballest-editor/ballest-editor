@@ -6,6 +6,7 @@
 import { Option, Predicate, Schema } from "effect"
 import { movementLookModes } from "./flyKeys"
 import { PLACE_DISTANCE } from "./placement"
+import { SCENE_COLORS, shadeOf } from "./sceneGround"
 import { DEFAULT_GRID_SIZE, DEFAULT_ROTATION_STEP, GRID_SIZES, ROTATION_STEPS } from "./snap"
 
 /** "Custom" uses CameraSettings.customFov instead of a preset's. */
@@ -185,14 +186,14 @@ const migrate = (stored: unknown): unknown => {
 }
 
 /**
- * Automatic grid colours per theme. The sky is cut off at the grid's height, so the grid is
- * always seen against the theme's background, or the water over it. Sections stand out more
- * than cells: lighter on the dark background, darker on the light one.
+ * Automatic grid colours per theme, shades of the ground so they follow its hue. The sky is cut
+ * off at the grid's height, so the grid is always seen against the ground, or the water over it.
+ * Sections stand out more than cells: lighter on the dark ground, darker on the light one.
  */
 export const AUTO_GRID_COLORS: Readonly<Record<"dark" | "light", { readonly cell: string; readonly section: string }>> =
   {
-    dark: { cell: "#474e5a", section: "#5f6877" },
-    light: { cell: "#a3b0bd", section: "#7a8a9b" }
+    dark: { cell: shadeOf(SCENE_COLORS.dark, "#ffffff", 0.2), section: shadeOf(SCENE_COLORS.dark, "#ffffff", 0.32) },
+    light: { cell: shadeOf(SCENE_COLORS.light, "#000000", 0.42), section: shadeOf(SCENE_COLORS.light, "#000000", 0.66) }
   }
 
 /** The grid colours to draw: the user's, else the theme's automatic ones. */
