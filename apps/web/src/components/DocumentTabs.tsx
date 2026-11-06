@@ -134,8 +134,10 @@ function DocumentTab({ id, index, drag, onDrag }: {
       ref={ref}
       draggable
       className={cn(
-        "group relative flex h-full max-w-56 shrink-0 cursor-grab items-center gap-1 border-r pr-1 pl-2 transition-opacity active:cursor-grabbing",
-        active ? "bg-background text-foreground" : "text-fg-secondary hover:bg-muted/40 hover:text-foreground",
+        "group relative flex h-full max-w-56 shrink-0 cursor-grab items-center gap-1 pr-1 pl-2 transition-[opacity,background-color,color] duration-150 ease-out active:cursor-grabbing",
+        active
+          ? "bg-background text-foreground shadow-[inset_0_-2px_var(--primary)]"
+          : "text-fg-secondary hover:bg-accent hover:text-foreground",
         "has-[button:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring)]",
         drag?.id === id && "opacity-40",
         // where a dragged tab would land
@@ -173,7 +175,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
           {prefabTier !== null && <IconBoxMultiple className="mr-1 size-4 shrink-0 text-fg-tertiary" />}
           <span className="truncate">{label}</span>
           {prefabTier !== null && (
-            <span className="ml-1 shrink-0 rounded-control bg-muted px-1 text-caption text-fg-secondary">
+            <span className="ml-1 shrink-0 rounded-full bg-muted px-1.5 text-caption text-fg-secondary">
               {prefabTierLabel(prefabTier, projects)}
             </span>
           )}
@@ -183,7 +185,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
       <span className="relative flex size-6 shrink-0 items-center justify-center">
         {unsaved && (
           <span
-            className="size-1.5 rounded-full bg-primary group-has-[button:focus-visible]:invisible [.group:hover_&]:invisible"
+            className="size-1.5 rounded-full bg-dirty group-has-[button:focus-visible]:invisible [.group:hover_&]:invisible"
             aria-label="unsaved"
           />
         )}

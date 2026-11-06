@@ -78,7 +78,7 @@ function ProjectTitle() {
       title={project?.path ?? "Not saved anywhere yet: Save the map to name the project."}
     >
       <span className="truncate">{name}</span>
-      {unsaved && <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-label="unsaved" />}
+      {unsaved && <span className="size-1.5 shrink-0 rounded-full bg-dirty" aria-label="unsaved" />}
     </span>
   )
 }
@@ -96,7 +96,11 @@ export function TopBar() {
       <ProjectTitle />
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {catalog?.warning !== undefined && (
-          <Badge variant="outline" className="text-status-warn-foreground" title={catalog.warning}>
+          <Badge
+            variant="secondary"
+            className="rounded-full bg-status-warn text-status-warn-foreground"
+            title={catalog.warning}
+          >
             Fixture catalog
           </Badge>
         )}

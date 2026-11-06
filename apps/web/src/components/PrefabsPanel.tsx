@@ -71,7 +71,7 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
   }
   return (
     <li
-      className="group flex h-8 min-w-0 items-center gap-1 rounded-control pr-1 hover:bg-muted/60"
+      className="group flex h-8 min-w-0 items-center gap-1 rounded-control pr-1 transition-colors duration-150 ease-out hover:bg-accent"
       onContextMenu={onContextMenu}
     >
       <button

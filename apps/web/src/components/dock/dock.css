@@ -62,7 +62,7 @@
   padding: 0;
   box-shadow: inset 0 -2px transparent;
   cursor: grab;
-  transition: color calc(100ms * var(--motion));
+  transition: color calc(150ms * var(--motion)) ease-out;
 }
 
 .dockview-theme-ballest .dv-tab:active {
@@ -179,11 +179,11 @@
 .dockview-theme-ballest .dv-groupview[data-dock-rail] .dv-tabs-container .dv-tab {
   padding: 0.625rem 0;
   box-shadow: inset 2px 0 transparent;
-  transition: background-color calc(100ms * var(--motion)), color calc(100ms * var(--motion));
+  transition: background-color calc(150ms * var(--motion)) ease-out, color calc(150ms * var(--motion)) ease-out;
 }
 
 .dockview-theme-ballest .dv-groupview[data-dock-rail] .dv-tabs-container .dv-tab:hover {
-  background-color: var(--muted);
+  background-color: var(--accent);
   color: var(--foreground);
 }
 

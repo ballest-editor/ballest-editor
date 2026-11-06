@@ -39,13 +39,6 @@ const UNVERIFIED_NOTE =
 const PLACED_FLASH =
   "relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:bg-primary/40 after:opacity-0 after:transition-opacity after:duration-500 active:after:opacity-100 active:after:duration-0"
 
-/** A size's colour, so sizes scan down a grid: the tag's fill and the thumbnail's outline. */
-const SIZE_TINTS: Readonly<Record<PieceSize, { readonly tag: string; readonly outline: string }>> = {
-  S: { tag: "bg-size-s", outline: "ring-size-s" },
-  M: { tag: "bg-size-m", outline: "ring-size-m" },
-  L: { tag: "bg-size-l", outline: "ring-size-l" }
-}
-
 const matches = (piece: CatalogPiece, terms: ReadonlyArray<string>) => {
   const haystack = `${pieceLabelOf(piece)} ${piece.displayName ?? ""} ${piece.className} ${piece.meshAssetPath ?? ""} ${
     piece.category ?? ""
@@ -63,8 +56,8 @@ function SizeTag({ size, disabled, className }: {
   return (
     <span
       className={cn(
-        "flex size-4 shrink-0 items-center justify-center rounded-control text-caption",
-        disabled ? "bg-muted text-fg-disabled" : cn(SIZE_TINTS[size].tag, "text-background"),
+        "flex size-4 shrink-0 items-center justify-center rounded-full bg-muted text-caption",
+        disabled ? "text-fg-disabled" : "text-fg-secondary",
         className
       )}
     >
@@ -148,15 +141,10 @@ function PieceButton({ piece, category, view, onPlace, onHover, unavailable, unv
           {grid
             ? (
               <>
-                <span
-                  className={cn(
-                    "relative flex rounded-control",
-                    size !== undefined && !disabled && cn("ring-1", SIZE_TINTS[size].outline)
-                  )}
-                >
+                <span className="relative flex">
                   {thumbnail}
                   {size !== undefined && (
-                    <SizeTag size={size} disabled={disabled} className="absolute top-0.5 right-0.5" />
+                    <SizeTag size={size} disabled={disabled} className="absolute top-0.5 right-0.5 bg-card" />
                   )}
                   {unverified === true && (
                     <span className="absolute top-1 left-1 size-2 rounded-full bg-status-warn-foreground" />
@@ -172,7 +160,7 @@ function PieceButton({ piece, category, view, onPlace, onHover, unavailable, unv
                 {thumbnail}
                 <span className="min-w-0 flex-1 truncate">{name}</span>
                 {unverified === true && (
-                  <span className="shrink-0 rounded-control border border-status-warn-foreground/40 bg-status-warn px-1 text-caption text-status-warn-foreground">
+                  <span className="shrink-0 rounded-full bg-status-warn px-1.5 text-caption text-status-warn-foreground">
                     unverified
                   </span>
                 )}
@@ -294,7 +282,7 @@ export function Palette() {
                     <TooltipTrigger
                       render={
                         <CollapsibleTrigger
-                          className="group flex h-8 w-full items-center gap-1.5 rounded-control px-1.5 text-caption uppercase tracking-wider text-fg-secondary hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60 focus-visible:outline-none"
+                          className="group flex h-8 w-full items-center gap-1.5 rounded-control px-1.5 text-caption uppercase tracking-wider text-fg-secondary transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:outline-none"
                           onMouseDown={(e) => e.preventDefault()}
                         />
                       }
