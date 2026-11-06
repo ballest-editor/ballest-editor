@@ -1,6 +1,5 @@
 import { prefabFileNameOf } from "@ballest/contracts"
 import { IconFolderOpen } from "@tabler/icons-react"
-import { Button } from "@workspace/ui/components/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { useEffect, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
@@ -10,6 +9,7 @@ import { openProjectMap, projectMapsUsingPrefab, revealPrefabs, tabsUsingPrefab 
 import { type PrefabDocument, tabWithFile, useEditor, useTabSummary } from "../editor/store"
 import { PathAction } from "./PathText"
 import { SectionTitle } from "./SectionTitle"
+import { TextLink } from "./TextLink"
 
 /** The file's name, the whole path in its tooltip; a deleted definition has no path, so only the name. */
 function FileName({ name, path }: { readonly name: string; readonly path: string | null }) {
@@ -21,18 +21,10 @@ function FileName({ name, path }: { readonly name: string; readonly path: string
   )
 }
 
-function MapLink({ label, onClick }: { readonly label: string; readonly onClick: () => void }) {
-  return (
-    <Button variant="link" className="h-auto max-w-full justify-start truncate border-0 px-0" onClick={onClick}>
-      {label}
-    </Button>
-  )
-}
-
 function OpenMapLink({ tabId }: { readonly tabId: string }) {
   const { label } = useTabSummary(tabId)
   const activateTab = useEditor((s) => s.activateTab)
-  return <MapLink label={label} onClick={() => activateTab(tabId)} />
+  return <TextLink onClick={() => activateTab(tabId)}>{label}</TextLink>
 }
 
 /**
@@ -58,11 +50,9 @@ function UsedIn({ prefab: { name, tier } }: { readonly prefab: PrefabDocument })
     <div className="flex min-w-0 flex-col items-start">
       {open.map((tabId) => <OpenMapLink key={tabId} tabId={tabId} />)}
       {closed.map((fileName) => (
-        <MapLink
-          key={fileName}
-          label={mapLabelOf(fileName)}
-          onClick={() => void openProjectMap(fileName)}
-        />
+        <TextLink key={fileName} onClick={() => void openProjectMap(fileName)}>
+          {mapLabelOf(fileName)}
+        </TextLink>
       ))}
     </div>
   )

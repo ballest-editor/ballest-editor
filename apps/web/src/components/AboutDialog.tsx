@@ -11,6 +11,7 @@ import { useEditor, useUpdateState } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { HeroBand } from "./HeroBand"
 import { Logo } from "./Logo"
+import { TextLink } from "./TextLink"
 
 const ThirdPartyNotices = lazy(() => import("./ThirdPartyNotices"))
 
@@ -58,19 +59,6 @@ function UpdateRow({ state }: { readonly state: UpdateState }) {
         {updateCheckLine(state, now)}
       </span>
     </div>
-  )
-}
-
-/** A link in the dialog's text. */
-function TextLink({ children, onClick }: { readonly children: string; readonly onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      className="rounded-control underline underline-offset-3 focus-ring hover:text-foreground"
-      onClick={onClick}
-    >
-      {children}
-    </button>
   )
 }
 
