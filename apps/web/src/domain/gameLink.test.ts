@@ -11,13 +11,15 @@ import {
   type GameLinkRow,
   gameLinkRows,
   MUTABLE_KINDS,
+  openWithoutPluginNotice,
   overriddenFolders,
   pathCrumbs,
   playWithoutPluginNotice,
   PLUGIN_MANAGER_FOUND,
   PLUGIN_MANAGER_MISSING,
   PLUGIN_MISSING,
-  type PluginLookup
+  type PluginLookup,
+  pluginUpdateNotice
 } from "./gameLink"
 
 const PLUGINS = "/game/Ballest/Binaries/Win64/plugins"
@@ -32,7 +34,11 @@ const plugin = (status: PluginLookup["status"], installedVersion: string | null 
   status,
   bundledVersion: "0.2.0",
   installedVersion,
-  folder: `${PLUGINS}/ballest-editor-link`
+  folder: `${PLUGINS}/ballest-editor-link`,
+  hostVersion: "0.34.2",
+  requiredHost: "0.34.0",
+  hostTooOld: false,
+  runningOlder: false
 })
 
 const isaac = creatorOf(null, Option.some({ name: "Isaac", source: "steam" }))
@@ -164,6 +170,34 @@ describe("Game link checklist", () => {
       reset: "pluginsFolder",
       fixes: [{ _tag: "OpenPluginDocs" }]
     })
+  })
+
+  it("asks for the plugin manager first when it is too old to run the app's plugin", () => {
+    const old = { ...plugin("outdated", "0.1.0"), hostVersion: "0.33.2", hostTooOld: true }
+    const row = byId(gameLinkRows(everything, old, isaac)).plugin
+    assert.deepInclude(row, { state: "missing", title: "Plugin manager needs 0.34.0 (the game has 0.33.2)" })
+    assert.deepStrictEqual(row.fixes, [])
+  })
+
+  it("asks for a restart when the game still runs the plugin from before an update", () => {
+    const stale = { ...plugin("current", "0.2.0"), runningOlder: true }
+    assert.strictEqual(
+      openWithoutPluginNotice("Big Loop", stale).title,
+      "Restart the game to open Big Loop in the in-game editor"
+    )
+  })
+
+  it("prompts for what an update needs next, and for nothing when there is none", () => {
+    const wanted = "open maps in the in-game editor"
+    assert.isNull(pluginUpdateNotice(plugin("current", "0.2.0"), wanted))
+    assert.isNull(pluginUpdateNotice(plugin("missing"), wanted))
+    assert.isNull(pluginUpdateNotice({ ...plugin("noPluginManager"), hostTooOld: true }, wanted))
+    assert.deepInclude(pluginUpdateNotice(plugin("outdated", "0.1.0"), wanted), {
+      title: `Update the editor's plugin to ${wanted}`,
+      actions: [{ label: "Update plugin", command: { _tag: "InstallPlugin" } }]
+    })
+    const old = { ...plugin("outdated", "0.1.0"), hostVersion: "0.33.2", hostTooOld: true }
+    assert.strictEqual(pluginUpdateNotice(old, wanted)?.title, `Update the plugin manager to ${wanted}`)
   })
 
   it("offers Install with the version it installs for a missing plugin, and Update for an older one", () => {

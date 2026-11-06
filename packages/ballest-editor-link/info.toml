@@ -1,9 +1,9 @@
 [meta]
 name = "Ballest Editor link"
-version = "0.1.0"
+version = "0.2.0"
 author = "spigelli"
-description = "Races the map you're editing in the Ballest map editor when you press Play there."
-min_host = "0.26.0"
+description = "Races the map you're editing in the Ballest map editor when you press Play there, or opens it in the in-game editor."
+min_host = "0.34.0"
 
 [script]
 files = ["main.as"]

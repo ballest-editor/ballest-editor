@@ -117,11 +117,11 @@ Later, the Project panel lists the maps in `UserSavedMaps` that aren't in the pr
 
 ## Sync: edits made out of band
 
-The in-game editor can change an exported file at any time, and a save in the game rewrites the whole file, so an exported file rarely stays byte-identical. The link record makes this detectable: compare the game file's hash with the last export's hash, and with the last seen hash so that one change is reported once. [DESKTOP.md § Sync](DESKTOP.md#sync) describes what the app does with that. Re-import loads the game's version the way any changed file loads, so sidecar entries of unchanged pieces survive it and the rest are reported (§ The files).
+The in-game editor can change an exported file at any time, and a save in the game rewrites the whole file, so an exported file rarely stays byte-identical. The link record makes this detectable: compare the game file's hash with the last export's hash, and with the last seen hash so that one change is reported once. [DESKTOP.md § Sync](DESKTOP.md#sync) describes what the app does with that: the game's version comes across by itself when the project has nothing to lose, and the conflict window asks when it has. Re-import loads the game's version as any changed file loads (§ The files), with one difference: the game keeps items in their order, so a version with the same class at every place holds those same items, and each keeps its key, name, group and pivot however far it moved (`loadGameStructure`). A version that isn't reports what it can't match.
 
 Later:
 
-- Re-import gets a diff (#105), and "merge" becomes possible for edits that don't overlap. Not before git.
+- The conflict window gets a visual diff (#105), and "merge" becomes possible for edits that don't overlap. Not before git.
 - A third out-of-band case, the project file itself changing under the editor (git pull, another tool), reloads the map when it has no unsaved edits and reports the change otherwise. Deferred until git.
 
 ## Shell

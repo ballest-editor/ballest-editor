@@ -60,5 +60,9 @@ export const gameHandlers = {
   /** Export to game, then the plugin handoff and the game (docs/DESKTOP.md § Play). */
   play: Effect.fn("ipc.play")(function*(payload) {
     return yield* (yield* GamePlay).play(payload)
+  }),
+  /** Export to game, then the plugin opens it in the in-game editor (docs/DESKTOP.md § Play). */
+  openInGame: Effect.fn("ipc.openInGame")(function*(payload) {
+    return yield* (yield* GamePlay).openInGame(payload)
   })
 } satisfies Partial<DesktopIpcHandlers>

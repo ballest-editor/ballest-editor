@@ -22,6 +22,7 @@ import type {
   MutedNotificationKinds,
   NotificationRecords,
   OpenedMapFile,
+  OpenInGameResult,
   PlayResult,
   PlaySessionEnded,
   PluginStatus,
@@ -41,6 +42,7 @@ import type {
   ProjectState,
   ProjectTarget,
   RecoveryEntry,
+  ReimportMapPayload,
   RenamePrefabPayload,
   UnloadKind,
   UnsavedChoice,
@@ -63,6 +65,7 @@ export type {
   NotificationAction,
   NotificationCommand,
   NotificationRecord,
+  OpenInGameResult,
   PlayResult,
   PlaySessionEnded,
   PluginStatus,
@@ -197,8 +200,17 @@ export class Platform extends Context.Service<Platform, {
    * game changed since the last look (each change once) and the ones gone (their export is dropped). None in a browser.
    */
   readonly checkExports: Effect.Effect<ExportChecks, PlatformError>
-  /** Re-import: replaces a project map with its export as the game has it (the project's file goes to backups). */
-  readonly reimportMap: (fileName: string) => Effect.Effect<ProjectMapFile, PlatformError>
+  /**
+   * Re-import: replaces a project map with its export as the game has it (the project's file goes to backups), or with
+   * `kept`, that export with what the game drops put back, which goes over the game's copy too. It is refused when the
+   * game has saved since `kept` was made.
+   */
+  readonly reimportMap: (
+    fileName: string,
+    kept?: ReimportMapPayload["kept"]
+  ) => Effect.Effect<ProjectMapFile, PlatformError>
+  /** The map's export as the game has it now, with the project's sidecar; nothing is written. */
+  readonly readExport: (fileName: string) => Effect.Effect<ProjectMapFile, PlatformError>
   /**
    * Asks whether to save the open map's edits before `action`: the desktop's native Save / Don't save / Cancel box. A
    * browser's `confirm` has no Save: OK is Don't save.
@@ -256,6 +268,11 @@ export class Platform extends Context.Service<Platform, {
    * running (desktop). Without the plugin it still exports and starts the game; the result says so.
    */
   readonly play: (fileName: string, options: ExportOptions) => Effect.Effect<PlayResult, PlatformError>
+  /**
+   * Open in game: exports a project map as `exportMap` does, asks the plugin to open it in the in-game editor and starts
+   * the game if it isn't running (desktop). Nothing is written without a plugin that can (`NeedsPlugin`).
+   */
+  readonly openInGame: (fileName: string, options: ExportOptions) => Effect.Effect<OpenInGameResult, PlatformError>
   /** Each end of a game session a Play started or joined (desktop); a browser's ends at once. */
   readonly playSessionEnds: Stream.Stream<PlaySessionEnded, PlatformError>
   /** Each stage main reports of an Export or a Play under way, while the stream runs. */
@@ -394,7 +411,8 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     importMap: (payload) => call("importMap", payload),
     exportMap: (fileName, options) => call("exportMap", { fileName, ...options }),
     checkExports: call("checkExports"),
-    reimportMap: (fileName) => call("reimportMap", { fileName }),
+    reimportMap: (fileName, kept) => call("reimportMap", { fileName, ...(kept !== undefined && { kept }) }),
+    readExport: (fileName) => call("readExport", { fileName }),
     listBackups: call("listBackups"),
     readBackup: ({ place, id }) => call("readBackup", { place, id }),
     listPrefabBackups: call("listPrefabBackups"),
@@ -418,6 +436,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     pluginStatus: call("pluginStatus"),
     installPlugin: call("installPlugin"),
     play: (fileName, options) => call("play", { fileName, ...options }),
+    openInGame: (fileName, options) => call("openInGame", { fileName, ...options }),
     playSessionEnds: pushed((listener) => bridge.onPlaySessionEnded(listener)),
     gameWriteProgress: pushed((listener) => bridge.onGameWriteProgress(listener)),
     loadNotifications: call("loadNotifications"),
@@ -568,6 +587,7 @@ const makeBrowser = (): Platform["Service"] => {
     exportMap: () => desktopOnly,
     checkExports: Effect.succeed({ changed: [], missing: [] }),
     reimportMap: () => desktopOnly,
+    readExport: () => desktopOnly,
     listBackups: Effect.succeed([]),
     readBackup: () => noProject,
     listPrefabBackups: Effect.succeed([]),
@@ -592,6 +612,7 @@ const makeBrowser = (): Platform["Service"] => {
     pluginStatus: desktopOnly,
     installPlugin: desktopOnly,
     play: () => desktopOnly,
+    openInGame: () => desktopOnly,
     playSessionEnds: Stream.empty,
     gameWriteProgress: Stream.empty,
     loadNotifications: Effect.succeed([]),

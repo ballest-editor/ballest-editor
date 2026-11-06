@@ -23,6 +23,7 @@ import {
   nameProjectMap,
   openProjectMap,
   openProjectMapInBackground,
+  openProjectMapInGameFromPanel,
   playProjectMapFromPanel,
   revealProject,
   startNewMap
@@ -129,6 +130,11 @@ function MapMenuItems({ fileName }: { readonly fileName: string }) {
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => void exportProjectMapFromPanel(fileName)}>Export to game</DropdownMenuItem>
           {canPlay && <DropdownMenuItem onClick={() => void playProjectMapFromPanel(fileName)}>Play</DropdownMenuItem>}
+          {canPlay && (
+            <DropdownMenuItem onClick={() => void openProjectMapInGameFromPanel(fileName)}>
+              Open in game
+            </DropdownMenuItem>
+          )}
         </>
       )}
       <DropdownMenuSeparator />

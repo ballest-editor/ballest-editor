@@ -4,7 +4,7 @@ import { listSamples, readSample } from "../test/samples"
 import { defaultEditorState, identityTransform, newMapFile, playerStartItem } from "./factory"
 import { type Item, MapFile } from "./MapFile"
 import type { MapSidecar } from "./MapSidecar"
-import { fingerprintOf, loadStructure, sidecarOf, structureOfMap } from "./sidecar"
+import { fingerprintOf, loadGameStructure, loadStructure, sidecarOf, structureOfMap } from "./sidecar"
 import { type Structure, treeKeys, withGroup, withItemName, withTags } from "./structure"
 
 const decodeMap = Schema.decodeUnknownSync(Schema.fromJsonString(MapFile))
@@ -112,6 +112,50 @@ describe("loadStructure", () => {
     assert.deepStrictEqual(loaded.ids, Object.values(keys))
     assert.strictEqual(loaded.unmatched, 0)
     assert.isTrue(loaded.rematched)
+  })
+
+  it("keeps every item of a game save in the same order, however far it moved", () => {
+    const { keys, map, sidecar, structure } = authored()
+    const moved = mapOf(map.items.map((item, index) => index === 1 ? nudged(item, 5000) : item))
+    const loaded = loadGameStructure(moved, OTHER_HASH, sidecar)
+    assert.deepStrictEqual(loaded.ids, Object.values(keys))
+    assert.strictEqual(loaded.unmatched, 0)
+    assert.deepStrictEqual(loaded.structure.tree, structure.tree)
+    assert.deepStrictEqual(loaded.structure.items.get(keys.k1), { name: "Named" })
+  })
+
+  it("re-matches a game save without the same items in the same order, as any rewritten file", () => {
+    const { keys, map, sidecar } = authored()
+    const [first, , , fourth, fifth] = map.items
+    const loaded = loadGameStructure(mapOf([first!, fourth!, fifth!]), OTHER_HASH, sidecar)
+    assert.strictEqual(loaded.unmatched, 2)
+    assert.deepStrictEqual(loaded.ids, [keys.k0, keys.k3, keys.k4])
+    const other: Item = { ...at(100), actorToSpawn: "/Script/Engine.Blueprint'/Game/BP_Other.BP_Other_C'" }
+    const swapped = loadGameStructure(
+      mapOf(map.items.map((item, index) => index === 1 ? other : item)),
+      OTHER_HASH,
+      sidecar
+    )
+    assert.strictEqual(swapped.unmatched, 1)
+    assert.isNull(loadGameStructure(map, OTHER_HASH, null).structure.items.get("") ?? null)
+  })
+
+  it("doesn't shift identities when a save deleted one item and added another of its class", () => {
+    const { keys, map, sidecar } = authored()
+    const [first, , third, fourth, fifth] = map.items
+    const loaded = loadGameStructure(mapOf([first!, third!, fourth!, fifth!, at(900)]), OTHER_HASH, sidecar)
+    assert.deepStrictEqual(loaded.ids.slice(0, 4), [keys.k0, keys.k2, keys.k3, keys.k4])
+    assert.notInclude(loaded.ids, keys.k1)
+    assert.isUndefined(loaded.structure.items.get(loaded.ids[4]!))
+    assert.deepStrictEqual(loaded.structure.items.get(keys.k2), { tags: ["tagged"] })
+    assert.strictEqual(loaded.unmatched, 1)
+  })
+
+  it("keeps twins apart when a save moved one of them", () => {
+    const map = mapOf([at(5), at(5)])
+    const { ids, structure } = structureOfMap(map)
+    const sidecar = sidecarOf(map, ids, structure, HASH)
+    assert.deepStrictEqual(loadGameStructure(mapOf([at(5000), at(5)]), OTHER_HASH, sidecar).ids, ids)
   })
 
   it("gives each of two close entries its nearest item", () => {

@@ -2,7 +2,8 @@
  * What changed between two versions of a map, in items (docs/DESKTOP.md § Backups). An item is the same item in both by
  * its stable key; what no key pairs, as in a map without a sidecar, is the same item by its class and position.
  */
-import { classNameOf, type Item, type MapFile } from "./MapFile"
+import { defaultEditorState } from "./factory"
+import { classNameOf, type Item, type ItemPivot, type MapFile } from "./MapFile"
 import { fingerprintOf } from "./sidecar"
 
 /** A version of a map, with each item's stable key at its place. */
@@ -11,11 +12,18 @@ export interface MapVersion {
   readonly ids: ReadonlyArray<string>
 }
 
-/** `moved` is any change of transform: a turned or scaled item counts too. */
+/**
+ * `moved` is any change of transform: a turned or scaled item counts too. `edited` is any other change to an item (its
+ * paint, its properties), `settings` any change to the map's own settings, and `pivots` any change to the items' chosen
+ * pivots, which every save in the game drops (docs/qa/save-roundtrip.md) and which are kept nowhere else.
+ */
 export interface MapDiff {
   readonly added: number
   readonly removed: number
   readonly moved: number
+  readonly edited: number
+  readonly settings: boolean
+  readonly pivots: boolean
 }
 
 interface KeyedItem {
@@ -58,6 +66,79 @@ const placeOf = ({ print }: KeyedItem) => print.split("|").slice(0, 2).join("|")
 const movedIn = (pairs: ReadonlyArray<readonly [KeyedItem, KeyedItem]>) =>
   pairs.filter(([before, after]) => before.print !== after.print).length
 
+/** What an item holds besides its transform, which `print` says. */
+const contentOf = ({ item }: KeyedItem) => JSON.stringify({ ...item, itemTransform: null })
+
+const editedIn = (pairs: ReadonlyArray<readonly [KeyedItem, KeyedItem]>) =>
+  pairs.filter(([before, after]) => before.print === after.print && contentOf(before) !== contentOf(after)).length
+
+/**
+ * What the game rewrites in every save whether or not the player touched it (docs/qa/save-roundtrip.md), so a difference
+ * here says nothing: the time it was opened, the sun's yaw, the tags it works out from the pieces, and two fields the
+ * file doesn't need.
+ */
+const REWRITTEN_ON_SAVE: ReadonlySet<string> = new Set([
+  "createdAt",
+  "directionalLightAngle",
+  "mapTags",
+  "medalTimesByIndex",
+  "metaData"
+])
+
+/** A map's settings with what `REWRITTEN_ON_SAVE` names left out, and a float's last digits, which saving moves. */
+const settingsOf = (map: MapFile) =>
+  JSON.stringify(
+    map.worldSettings,
+    (key, value: unknown) =>
+      REWRITTEN_ON_SAVE.has(key) ? undefined : typeof value === "number" ? Number(value.toFixed(3)) : value
+  )
+
+/**
+ * Where each item of `from` is in `to`, one to one: by stable key, then for a map without a sidecar by fingerprint, in
+ * document order, so two items alike each keep their own.
+ */
+const itemsAcross = (from: MapVersion, to: MapVersion): ReadonlyMap<number, number> => {
+  const keys = new Map(to.ids.map((id, index) => [id, index]))
+  const across = new Map<number, number>()
+  from.ids.forEach((id, index) => {
+    const found = keys.get(id)
+    if (found !== undefined) across.set(index, found)
+  })
+  const taken = new Set(across.values())
+  const free = new Map<string, Array<number>>()
+  to.map.items.forEach((item, index) => {
+    if (taken.has(index)) return
+    const print = fingerprintOf(item)
+    free.set(print, [...(free.get(print) ?? []), index])
+  })
+  from.map.items.forEach((item, index) => {
+    const found = across.has(index) ? undefined : free.get(fingerprintOf(item))?.shift()
+    if (found !== undefined) across.set(index, found)
+  })
+  return across
+}
+
+/** `from`'s pivots on the same items in `to`; a pivot whose item isn't there stays behind. */
+const pivotsAcross = (from: MapVersion, to: MapVersion) => {
+  const pivots = from.map.editorState?.pivots ?? []
+  if (pivots.length === 0) return []
+  const across = itemsAcross(from, to)
+  return pivots.flatMap((pivot) => {
+    const itemIndex = across.get(pivot.itemIndex)
+    return itemIndex === undefined ? [] : [{ ...pivot, itemIndex }]
+  })
+}
+
+const sortedPivots = (pivots: ReadonlyArray<ItemPivot>) =>
+  JSON.stringify(pivots.toSorted((a, b) => a.itemIndex - b.itemIndex))
+
+/** Whether a pivot was lost or changed on the way from `before` to `after`; following its item to another index isn't. */
+const pivotsChanged = (before: MapVersion, after: MapVersion) => {
+  const across = pivotsAcross(before, after)
+  return across.length !== (before.map.editorState?.pivots.length ?? 0) ||
+    sortedPivots(across) !== sortedPivots(after.map.editorState?.pivots ?? [])
+}
+
 /**
  * The items `after` gained, lost and moved since `before`. A key whose item changed class is a new item. Without a key,
  * an item that left its place can't be told from one removed and another added, so it counts as those. Unchanged items
@@ -67,20 +148,39 @@ export const diffMaps = (before: MapVersion, after: MapVersion): MapDiff => {
   const byKey = pairBy(keyedItemsOf(before), keyedItemsOf(after), (item) => `${item.key}|${classOf(item)}`)
   const same = pairBy(byKey.before, byKey.after, ({ print }) => print)
   const byPlace = pairBy(same.before, same.after, placeOf)
+  const paired = [...byKey.pairs, ...same.pairs, ...byPlace.pairs]
   return {
     added: byPlace.after.length,
     removed: byPlace.before.length,
-    moved: movedIn(byKey.pairs) + movedIn(byPlace.pairs)
+    moved: movedIn(byKey.pairs) + movedIn(byPlace.pairs),
+    edited: editedIn(paired),
+    settings: settingsOf(before.map) !== settingsOf(after.map),
+    pivots: pivotsChanged(before, after)
   }
 }
+
+/** `to` with `from`'s pivots, for a version from the game: every save there drops them. One with pivots keeps those. */
+export const withPivotsOf = (from: MapVersion, to: MapVersion): MapVersion => {
+  if ((to.map.editorState?.pivots.length ?? 0) > 0) return to
+  const pivots = pivotsAcross(from, to)
+  if (pivots.length === 0) return to
+  return { ...to, map: { ...to.map, editorState: { ...(to.map.editorState ?? defaultEditorState()), pivots } } }
+}
+
+/** Whether a diff found nothing. */
+export const isNoDiff = ({ added, edited, moved, pivots, removed, settings }: MapDiff): boolean =>
+  added + removed + moved + edited === 0 && !settings && !pivots
 
 /** "12 items", "1 item". */
 export const itemCountOf = (count: number): string => `${count.toLocaleString()} ${count === 1 ? "item" : "items"}`
 
-/** "+2 items · −1 item · 3 moved", leaving out what didn't happen. */
-export const mapDiffLabelOf = ({ added, moved, removed }: MapDiff): string =>
+/** "+2 items · −1 item · 3 moved · 1 edited · Settings changed · Pivots changed", leaving out what didn't happen. */
+export const mapDiffLabelOf = ({ added, edited, moved, pivots, removed, settings }: MapDiff): string =>
   [
     ...(added > 0 ? [`+${itemCountOf(added)}`] : []),
     ...(removed > 0 ? [`−${itemCountOf(removed)}`] : []),
-    ...(moved > 0 ? [`${moved.toLocaleString()} moved`] : [])
-  ].join(" · ") || "No items added, removed or moved"
+    ...(moved > 0 ? [`${moved.toLocaleString()} moved`] : []),
+    ...(edited > 0 ? [`${edited.toLocaleString()} edited`] : []),
+    ...(settings ? ["Settings changed"] : []),
+    ...(pivots ? ["Pivots changed"] : [])
+  ].join(" · ") || "No items or settings changed"

@@ -147,14 +147,16 @@ describe("backup actions", () => {
         _tag: "Map",
         id: testHash(text),
         bytes: new TextEncoder().encode(text).length,
-        diff: { added: 1, removed: 0, moved: 0 }
+        diff: { added: 1, removed: 0, moved: 0, edited: 0, settings: false, pivots: false }
       })
       assert.strictEqual(disk.backups[0]!.fileName, name)
 
       // What isn't saved yet counts too.
       placeItem()
       const preview = yield* previewBackupEffect(backup!)
-      assert.deepInclude(preview, { diff: { added: 2, removed: 0, moved: 0 } })
+      assert.deepInclude(preview, {
+        diff: { added: 2, removed: 0, moved: 0, edited: 0, settings: false, pivots: false }
+      })
       assert.strictEqual(preview._tag === "Map" ? preview.items.length : -1, before)
     }).pipe(Effect.provide(layerFor(disk)))
   })
@@ -170,7 +172,9 @@ describe("backup actions", () => {
       const [backup] = yield* Effect.promise(() => testBridge(disk).listBackups())
       yield* createNewMap("Other", "Isaac")
       s().closeTab(s().tabIds[0]!)
-      assert.deepInclude(yield* previewBackupEffect(backup!), { diff: { added: 1, removed: 0, moved: 0 } })
+      assert.deepInclude(yield* previewBackupEffect(backup!), {
+        diff: { added: 1, removed: 0, moved: 0, edited: 0, settings: false, pivots: false }
+      })
       disk.files.delete(projectFile(name))
       assert.deepInclude(yield* previewBackupEffect(backup!), { diff: null })
     }).pipe(Effect.provide(layerFor(disk)))

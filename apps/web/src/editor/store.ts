@@ -54,6 +54,7 @@ import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
 import { LIMITS } from "../domain/limits"
 import { type GameWrite, type LinkState, linkStateOf } from "../domain/linkState"
+import type { MapDiff } from "../domain/mapDiff"
 import { isPlayerStart, type Item, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
 import type { PrefabLink } from "../domain/MapSidecar"
 import type { MaterialTable } from "../domain/Materials"
@@ -224,18 +225,20 @@ export const NO_TAB_OPEN = "Open a map first."
 export interface PublishedDraft {
   readonly name: string
   readonly publishedFileId: number
-  readonly from: "export" | "play"
+  readonly from: "export" | "play" | "edit"
 }
 
 /**
- * An export the game changed since the last export (the in-game editor saved it), found by Export or by Play's export
- * (`from`): the overwriteChanged dialog asks to back it up and overwrite it, or to re-import it first. `replacePublished`
- * is what the export that found it was already allowed to replace.
+ * A map whose project and game versions have both moved on (docs/DESKTOP.md § Sync), found by Export or by the export of
+ * Play or Open in game (`from`), or by a look at the exports (`check`): the syncConflict dialog asks which to keep.
+ * `replacePublished` is what the export that found it was already allowed to replace. `diff` is how the game's version
+ * differs from the project's, null when they can't be compared.
  */
-export interface ChangedExport {
+export interface SyncConflict {
   readonly name: string
-  readonly from: "export" | "play"
+  readonly from: PublishedDraft["from"] | "check"
   readonly replacePublished: boolean
+  readonly diff: MapDiff | null
 }
 
 /** An import whose file name the project already has: the clash dialog asks to replace that map or import a copy. */
@@ -260,7 +263,7 @@ export interface ImportClash {
  * - `keybinds` and `about` are the Help menu's: the cheat sheet, staying open, and the version.
  * - `settings` opens on `category`, or on the page it last showed (`settingsCategory`).
  * - `projectSettings` opens Project settings on the project's page, `mapSettings` on the open map's entry in it.
- * - `replacePublished`, `overwriteChanged` and `importClash` ask about what Export, Play or Import found.
+ * - `replacePublished`, `syncConflict` and `importClash` ask about what Export, Play or Import found.
  * - `whereToOpen` asks whether `target` (shown as `name`) takes over this window or opens in a new one.
  * - `savePrefab` names a prefab made from the selection; `renamePrefab` and `deletePrefab` are the Prefabs panel's.
  * - `recoverUnsaved` offers `tabs`, what the last session left unsaved (docs/DESKTOP.md § Recovery).
@@ -282,7 +285,7 @@ export type DialogState =
   | { readonly id: "saveAs"; readonly afterSave?: Effect.Effect<void, unknown> }
   | { readonly id: "settings"; readonly category?: SettingsCategory }
   | { readonly id: "replacePublished" } & PublishedDraft
-  | { readonly id: "overwriteChanged" } & ChangedExport
+  | { readonly id: "syncConflict" } & SyncConflict
   | { readonly id: "importClash" } & ImportClash
   | { readonly id: "whereToOpen"; readonly target: ProjectTarget; readonly name: string }
   | { readonly id: "savePrefab" }

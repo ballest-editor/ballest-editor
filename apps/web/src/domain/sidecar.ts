@@ -232,3 +232,29 @@ export const loadStructure = (map: MapFile, mapHash: string, sidecar: MapSidecar
     rematched: byIndex === undefined
   }
 }
+
+const classOfPrint = (print: string | undefined) => print?.split("|")[0]
+
+/**
+ * Whether `map` holds the items `sidecar` was written for, in their order: the same class at every place, and no item
+ * that left its place showing up unchanged at another's, which is a delete and an add of that class and not a move.
+ */
+const sameItemsInOrder = (map: MapFile, sidecar: MapSidecar) => {
+  const entries = Object.values(sidecar.items)
+  if (entries.length !== map.items.length) return false
+  const prints = map.items.map(fingerprintOf)
+  const moved = entries.filter(({ fingerprint, index }) => prints[index] !== fingerprint)
+  const landed = new Set(moved.map(({ index }) => prints[index]))
+  return moved.every(({ fingerprint, index }) =>
+    classOfPrint(prints[index]) === classOfPrint(fingerprint) && !landed.has(fingerprint)
+  )
+}
+
+/**
+ * `loadStructure` for a version the game saved. The game keeps items in their order, so the same items in the same order
+ * are those items wherever they moved to, and they keep their keys, names and groups. Otherwise it is any rewritten file.
+ */
+export const loadGameStructure = (map: MapFile, mapHash: string, sidecar: MapSidecar | null): LoadedStructure =>
+  sidecar !== null && sameItemsInOrder(map, sidecar)
+    ? { ...loadStructure(map, sidecar.mapHash, sidecar), rematched: true }
+    : loadStructure(map, mapHash, sidecar)

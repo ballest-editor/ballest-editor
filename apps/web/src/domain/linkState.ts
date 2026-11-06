@@ -2,6 +2,7 @@
  * How a project map stands against its export in the game's maps folder (docs/PROJECTS.md § Sync), and the one status
  * the status bar and the Project panel show for it.
  */
+import { isNoDiff, type MapDiff } from "./mapDiff"
 import { formatAgo, formatDateTime } from "./time"
 
 /** The file a link record points at (`LinkedFile` in @ballest/contracts): its path, its bytes' hash, and when. */
@@ -21,7 +22,14 @@ export interface LinkedMap {
    * Its link record: the last export, and the export's hash when the editor last looked at the game's copy (sync
    * detection keeps it up to date; docs/PROJECTS.md § Sync).
    */
-  readonly link: { readonly export: LinkedFile | null; readonly lastSeenHash: string | null } | null
+  readonly link:
+    | {
+      readonly export: LinkedFile | null
+      readonly lastSeenHash: string | null
+      /** The game was running when the export was written, and wasn't seen to load it. */
+      readonly exportedWhileRunning?: boolean
+    }
+    | null
 }
 
 /**
@@ -141,7 +149,7 @@ export const GAME_WRITE_STAGE_LABELS: Record<GameWriteStage, string> = {
 
 /** An Export or a Play under way. */
 export interface GameWrite {
-  readonly intent: "export" | "play"
+  readonly intent: "export" | "play" | "edit"
   /** The project file it copies; null while it saves, which may rename it. */
   readonly fileName: string | null
   readonly stage: GameWriteStage
@@ -149,7 +157,8 @@ export interface GameWrite {
 
 const GAME_WRITE_STAGES: Record<GameWrite["intent"], ReadonlyArray<GameWriteStage>> = {
   export: ["save", "copy", "verify"],
-  play: ["save", "copy", "verify", "launch"]
+  play: ["save", "copy", "verify", "launch"],
+  edit: ["save", "copy", "verify", "launch"]
 }
 
 /** How long the chip goes on showing a write that has ended, so one that took no time is still seen to happen. */
@@ -197,6 +206,16 @@ export const linkStateOf = (map: LinkedMap, check: LinkCheck = {}): LinkState =>
   if (map.publishedFileId > 0) return "publishedDraft"
   return edited ? "editedSinceExport" : "inSync"
 }
+
+/**
+ * Whether the game's version of `map` can replace the project's with nothing to ask (docs/DESKTOP.md § Sync): only the
+ * game changed it, and what the game saved grew from the last export. An export written under a running game may be
+ * newer than the copy the in-game editor saved, which would then silently undo it, unless the two hold the same
+ * (`diff`, the game's version against the project's). Pivots the game dropped would be lost with no copy elsewhere.
+ */
+export const syncsFromGame = (map: LinkedMap, diff: MapDiff, check: LinkCheck = {}): boolean =>
+  linkStateOf(map, check) === "changedInGame" && !diff.pivots &&
+  (isNoDiff(diff) || map.link?.exportedWhileRunning !== true)
 
 /** `state` in a line with when `map` was last exported, for a tooltip. */
 export const linkStateDetailOf = (map: LinkedMap, state: LinkState, now: number): string => {

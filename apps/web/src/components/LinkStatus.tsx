@@ -17,7 +17,7 @@ import {
   syncStatusOf
 } from "../domain/linkState"
 import { formatAgo, formatDateTime } from "../domain/time"
-import { exportToGame, playMap, reimportMap, revealGamePath, saveMap } from "../editor/actions"
+import { exportToGame, playMap, resolveConflict, revealGamePath, saveMap } from "../editor/actions"
 import { noTabOpen, useEditor, useOpenPrefab, useOpenProjectMap, useTabSummary } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { StatusBarChip } from "./SyncStatusChip"
@@ -170,7 +170,7 @@ export function LinkStatus() {
           {exported !== null && (
             <Button variant="outline" onClick={() => void revealGamePath("mapsFolder")}>Reveal</Button>
           )}
-          {changed && <Button variant="outline" onClick={() => void reimportMap(map.fileName)}>Re-import</Button>}
+          {changed && <Button variant="outline" onClick={() => void resolveConflict(map.fileName)}>Resolve</Button>}
           <Button variant={canPlay ? "outline" : "default"} onClick={() => void exportToGame()}>Export</Button>
           {canPlay && <Button onClick={() => void playMap()}>Play</Button>}
         </>

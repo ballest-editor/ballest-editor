@@ -1,5 +1,7 @@
 import {
   isNeverPublished,
+  type OpenInGamePayload,
+  type OpenInGameResult,
   type PlayLaunch,
   type PlayPayload,
   type PlayResult,
@@ -14,7 +16,7 @@ import { type ExportUnverifiedError, MapExports, type MapRefusedError } from "..
 import { MapFiles } from "../project/MapFiles"
 import type { MapLinkError } from "../project/MapLinks"
 import { type ProjectError, Projects } from "../project/Projects"
-import { GameLink, type GameLinkError } from "./GameLink"
+import { GameLink, type GameLinkError, opensMaps } from "./GameLink"
 import type { GamePathError } from "./GamePaths"
 import { GameProcess } from "./GameProcess"
 import { reportGameWriteProgress } from "./gameWriteProgress"
@@ -43,6 +45,8 @@ type PlayError =
  */
 export class GamePlay extends Context.Service<GamePlay, {
   readonly play: (payload: PlayPayload) => Effect.Effect<PlayResult, PlayError>
+  /** Export to game, then the handoff that opens the map in the in-game editor; nothing without a plugin that can. */
+  readonly openInGame: (payload: OpenInGamePayload) => Effect.Effect<OpenInGameResult, PlayError>
   /** Each end of a game session a Play started or joined, from when the stream is run. */
   readonly sessionEnds: Stream.Stream<PlaySessionEnded>
 }>()("ballest/desktop/game/GamePlay") {
@@ -91,6 +95,17 @@ export class GamePlay extends Context.Service<GamePlay, {
         return Effect.asVoid(Effect.forkIn(follow, scope))
       })
 
+    /** The game up, or asked to start through Steam, and its session followed: the last step of a handoff. */
+    const launchFor = Effect.fnUntraced(function*(fileName: string) {
+      const launch: PlayLaunch = (yield* game.isRunning)
+        ? "running"
+        : (yield* shell.launchGame)
+        ? "launched"
+        : "failed"
+      if (launch !== "failed") yield* followSession(fileName)
+      return launch
+    })
+
     const play = Effect.fn("GamePlay.play")(function*(payload: PlayPayload) {
       const { fileName } = payload
       // not `read`, which stops at its size cap: a file too long for the game is Export's to refuse, with the reason
@@ -102,16 +117,27 @@ export class GamePlay extends Context.Service<GamePlay, {
 
       yield* reportGameWriteProgress(windows, { fileName, stage: "launch" })
       const { plugin, sent } = yield* link.requestRace(fileName)
-      const launch: PlayLaunch = (yield* game.isRunning)
-        ? "running"
-        : (yield* shell.launchGame)
-        ? "launched"
-        : "failed"
-      if (launch !== "failed") yield* followSession(fileName)
-      return { _tag: "Played", plugin, sent, launch } as const
+      return { _tag: "Played", plugin, sent, launch: yield* launchFor(fileName) } as const
     })
 
-    return GamePlay.of({ play, sessionEnds: Stream.fromPubSub(ends) })
+    const openInGame = Effect.fn("GamePlay.openInGame")(function*(payload: OpenInGamePayload) {
+      const { fileName } = payload
+      const plugin = yield* link.pluginStatus
+      if (!opensMaps(plugin)) return { _tag: "NeedsPlugin", plugin } as const
+
+      const exported = yield* exports.exportMap(payload)
+      if (exported._tag !== "Exported") return exported
+
+      yield* reportGameWriteProgress(windows, { fileName, stage: "launch" })
+      const nonce = yield* link.requestEdit(fileName)
+      const launch = yield* launchFor(fileName)
+      // A game that is only starting answers once it is up, long after this call.
+      const outcome = launch === "running" ? yield* link.editOutcome(nonce) : "pending"
+      if (outcome === "opened") yield* exports.markExportLoaded(fileName)
+      return { _tag: "Opening", plugin, launch, outcome } as const
+    })
+
+    return GamePlay.of({ play, openInGame, sessionEnds: Stream.fromPubSub(ends) })
   })
 
   static readonly layer = Layer.effect(GamePlay, GamePlay.make)

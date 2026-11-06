@@ -75,7 +75,12 @@ export const MapLink = Schema.Struct({
   /** The last export (Export to game). A map imported from the game's maps folder is linked to that file from the start. */
   export: Schema.NullOr(LinkedFile),
   /** The exported file's hash when the editor last read it; null before the first export. */
-  lastSeenHash: Schema.NullOr(FileHash)
+  lastSeenHash: Schema.NullOr(FileHash),
+  /**
+   * The last export was written while the game was running and the game wasn't seen to load it, so the in-game editor
+   * may hold an older copy, and a save there would write that over it (docs/DESKTOP.md § Sync).
+   */
+  exportedWhileRunning: Schema.optionalKey(Schema.Boolean)
 })
 export type MapLink = typeof MapLink.Type
 
@@ -224,6 +229,17 @@ export const ProjectMapFile = Schema.Struct({ ...ProjectMap.fields, text: FileTe
 export type ProjectMapFile = typeof ProjectMapFile.Type
 
 const MapFileNamePayload = Schema.Struct({ fileName: MapFileName })
+
+/**
+ * `reimportMap`: the map, and `kept`: the text to take in place of the game's bytes, those bytes with what the game drops
+ * put back (docs/DESKTOP.md § Sync), and `gameHash`, the bytes it was made from. It goes over the game's copy too, so the
+ * two stay in sync, and it is refused when the game has saved since.
+ */
+const ReimportMapPayload = Schema.Struct({
+  fileName: MapFileName,
+  kept: Schema.optionalKey(Schema.Struct({ text: FileText, gameHash: FileHash }))
+})
+export type ReimportMapPayload = typeof ReimportMapPayload.Type
 
 /** `rememberOpenMap`: the map now open in the project, or null for a map that isn't in it. */
 const OpenMapPayload = Schema.Struct({ fileName: Schema.NullOr(MapFileName) })
@@ -435,6 +451,8 @@ export const NotificationCommand = Schema.TaggedUnion({
   OpenMap: { fileName: MapFileName },
   /** Replaces a project map with its export as the game changed it (Re-import). */
   ReimportMap: { fileName: MapFileName },
+  /** Asks which version to keep of a map changed in both places (the conflict window). */
+  ResolveConflict: { fileName: MapFileName },
   /** Replaces the edited instances of a prefab in the open maps with its definition. */
   UpdatePrefabInstances: PrefabRef.fields,
   /** Makes the edited instances of a prefab in the open maps plain groups. */
@@ -539,7 +557,15 @@ export const PluginStatus = Schema.Struct({
   /** The installed copy's version; null when it has no `info.toml`. */
   installedVersion: Schema.NullOr(Schema.String),
   /** `<plugins>/ballest-editor-link`, where it is or would go; null without the plugins folder's path. */
-  folder: Schema.NullOr(FilePath)
+  folder: Schema.NullOr(FilePath),
+  /** The plugin manager's version as the game last started it (`host.log`); null when it can't be told. */
+  hostVersion: Schema.NullOr(Schema.String),
+  /** The oldest plugin manager the app's copy runs on (`info.toml`'s `[meta] min_host`). */
+  requiredHost: Schema.String,
+  /** The plugin manager is older than `requiredHost`: it wouldn't run the app's copy, so Install is refused. */
+  hostTooOld: Schema.Boolean,
+  /** The game is running a copy older than the one in the folder: it loads a new one only when it starts. */
+  runningOlder: Schema.Boolean
 })
 export type PluginStatus = typeof PluginStatus.Type
 
@@ -579,6 +605,31 @@ export const PlayResult = Schema.TaggedUnion({
   PublishedMap: {}
 })
 export type PlayResult = typeof PlayResult.Type
+
+/** `openInGame`: the project map to export and open, with the same permissions as `exportMap`. */
+export const OpenInGamePayload = Schema.Struct({ ...ExportMapPayload.fields })
+export type OpenInGamePayload = typeof OpenInGamePayload.Type
+
+/**
+ * What the plugin did with an open request, when the game was up to answer it: `opened` it, `refused` because the
+ * in-game editor was already open, or `pending` when there's no answer yet (the game is starting, or it was slow).
+ */
+export const EditOutcome = Schema.Literals(["opened", "refused", "pending"])
+export type EditOutcome = typeof EditOutcome.Type
+
+/**
+ * `openInGame`'s result (docs/DESKTOP.md § Play):
+ * - `Opening`: exported, sent to the plugin, and started the game unless it was running.
+ * - `NeedsPlugin`: nothing written. Only a current plugin on a new enough plugin manager opens maps, and an older one,
+ *   or a game still running one, would race the map instead.
+ * - `Published`, `ChangedInGame`: nothing written, an `ExportRefusal` as Export reports it.
+ */
+export const OpenInGameResult = Schema.TaggedUnion({
+  Opening: { plugin: PluginStatus, launch: PlayLaunch, outcome: EditOutcome },
+  NeedsPlugin: { plugin: PluginStatus },
+  ...exportRefusals
+})
+export type OpenInGameResult = typeof OpenInGameResult.Type
 
 /**
  * Main → renderer: the game session a Play ran in has ended (the game's process exited). `fileName` is the map the
@@ -793,7 +844,9 @@ export const DesktopMethods = {
    * Re-import: replaces a project map with its export in the game's maps folder, byte for byte (the project's file goes
    * to the project's backups first), and records the export as in sync. Fails for a map that has no export.
    */
-  reimportMap: { payload: MapFileNamePayload, result: ProjectMapFile },
+  reimportMap: { payload: ReimportMapPayload, result: ProjectMapFile },
+  /** The map's export as it is in the game's maps folder, with the project's sidecar. Writes nothing. */
+  readExport: { payload: MapFileNamePayload, result: ProjectMapFile },
   /** The current project's backups and the exports' (docs/PROJECTS.md § The files), newest first. */
   listBackups: { payload: noPayload, result: MapBackups },
   /** Reads a backup `listBackups` named. */
@@ -831,6 +884,11 @@ export const DesktopMethods = {
    * Without the plugin it still exports and starts the game; `play.json` is only written into an installed plugin.
    */
   play: { payload: PlayPayload, result: PlayResult },
+  /**
+   * Open in the in-game editor: exports a project map like `exportMap`, writes `play.json` for the plugin to open it,
+   * and starts the game if it isn't running. Only through a current plugin; otherwise nothing is written.
+   */
+  openInGame: { payload: OpenInGamePayload, result: OpenInGameResult },
   /** The notifications kept in `<userData>/notifications.json`, newest first; empty when there are none yet. */
   loadNotifications: { payload: noPayload, result: NotificationRecords },
   /** Replaces the kept notifications (at most `NOTIFICATION_LIMIT`). */

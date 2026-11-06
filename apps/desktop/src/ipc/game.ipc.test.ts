@@ -92,7 +92,11 @@ describe("the game over IPC", () => {
           status: "noPluginManager",
           bundledVersion: "0.2.0",
           installedVersion: null,
-          folder
+          folder,
+          hostVersion: null,
+          requiredHost: "0.34.0",
+          hostTooOld: false,
+          runningOlder: false
         })
         assert.match(
           String((yield* Effect.flip(fake.invoke(InvokeChannels.installPlugin))).cause),
@@ -103,7 +107,16 @@ describe("the game over IPC", () => {
         yield* fs.writeFileString(path.join(path.dirname(steam.plugins), "version.dll"), "")
         assert.deepInclude(yield* fake.invoke(InvokeChannels.pluginStatus), { status: "missing" })
         assert.deepStrictEqual(yield* fake.invoke(InvokeChannels.installPlugin), {
-          plugin: { status: "current", bundledVersion: "0.2.0", installedVersion: "0.2.0", folder },
+          plugin: {
+            status: "current",
+            bundledVersion: "0.2.0",
+            installedVersion: "0.2.0",
+            folder,
+            hostVersion: null,
+            requiredHost: "0.34.0",
+            hostTooOld: false,
+            runningOlder: false
+          },
           restartGame: false
         })
         assert.match(

@@ -31,6 +31,10 @@ export interface PluginLookup {
   readonly bundledVersion: string
   readonly installedVersion: string | null
   readonly folder: string | null
+  readonly hostVersion: string | null
+  readonly requiredHost: string
+  readonly hostTooOld: boolean
+  readonly runningOlder: boolean
 }
 
 /** What a launch found, kept until the next one (`GameLinkResult` in @ballest/contracts). */
@@ -238,10 +242,26 @@ const pluginManagerRow = (paths: GameFolders | null, plugin: PluginLookup | null
   }
 }
 
+const PLUGIN_NOTE = "Play and Open in game reach the game through it."
+
+/** "needs 0.34.0 (the game has 0.33.2)": what is wrong with a plugin manager too old for the app's plugin. */
+const hostShortfallOf = ({ hostVersion, requiredHost }: PluginLookup) =>
+  `needs ${requiredHost}${hostVersion === null ? "" : ` (the game has ${hostVersion})`}`
+
+const UPDATE_HOST_STEPS = "Update it in the game, from the plugin manager's window, then restart the game."
+
 const pluginRow = (plugin: PluginLookup | null): GameLinkRow => {
   const label = "Editor plugin"
   const fields = ((): Parameters<typeof row>[2] => {
     if (plugin === null) return { state: "waiting", title: LOOKING }
+    if (plugin.hostTooOld && plugin.status !== "noGame" && plugin.status !== "noPluginManager") {
+      return {
+        state: "missing",
+        title: `Plugin manager ${hostShortfallOf(plugin)}`,
+        note: `This app's plugin won't run on it. ${UPDATE_HOST_STEPS}`,
+        path: plugin.folder
+      }
+    }
     switch (plugin.status) {
       case "noGame":
       case "noPluginManager":
@@ -250,7 +270,7 @@ const pluginRow = (plugin: PluginLookup | null): GameLinkRow => {
         return {
           state: "missing",
           title: plugin.installedVersion === null ? "Not installed" : "Some of its files are missing",
-          note: "Play races the open map in the game through it.",
+          note: PLUGIN_NOTE,
           path: plugin.folder,
           fixes: [{ _tag: "InstallPlugin", label: `Install ${plugin.bundledVersion}` }]
         }
@@ -267,7 +287,7 @@ const pluginRow = (plugin: PluginLookup | null): GameLinkRow => {
           state: "ok",
           title: `ballest-editor-link ${plugin.installedVersion}`,
           status: `Version ${plugin.installedVersion}`,
-          note: "Play races the open map in the game through it.",
+          note: PLUGIN_NOTE,
           path: plugin.folder
         }
     }
@@ -323,6 +343,8 @@ export const PLUGIN_MANAGER_FOUND = "pluginManagerFound"
  * the plugin, resolves it).
  */
 export const PLUGIN_MISSING = "pluginMissing"
+/** The plugin is older than the app's copy, or the plugin manager too old for it (persistent: Update resolves it). */
+export const PLUGIN_UPDATE = "pluginUpdate"
 
 /** The notification kinds whose notifications offer "Don't show again". */
 export const MUTABLE_KINDS: ReadonlySet<string> = new Set([
@@ -330,7 +352,8 @@ export const MUTABLE_KINDS: ReadonlySet<string> = new Set([
   GAME_FOUND,
   PLUGIN_MANAGER_MISSING,
   PLUGIN_MANAGER_FOUND,
-  PLUGIN_MISSING
+  PLUGIN_MISSING,
+  PLUGIN_UPDATE
 ])
 
 /** A notification's button (`NotificationCommand` in @ballest/contracts). */
@@ -439,6 +462,60 @@ export const playWithoutPluginNotice = (
         persistent: true,
         actions: [{ label: "Install plugin", command: { _tag: "InstallPlugin" } }]
       }
+  }
+}
+
+/**
+ * What the app says about a plugin that needs updating (docs/DESKTOP.md § Installing the plugin), first the plugin
+ * manager when it is too old to run the app's copy; null when nothing does. `wanted` says what the update is for.
+ */
+export const pluginUpdateNotice = (plugin: PluginLookup, wanted: string): GameLinkNotice | null => {
+  const notice = { kind: PLUGIN_UPDATE, level: "info", persistent: true } as const
+  if (plugin.status === "noGame" || plugin.status === "noPluginManager") return null
+  if (plugin.hostTooOld) {
+    return {
+      ...notice,
+      title: `Update the plugin manager to ${wanted}`,
+      body: `The editor's plugin ${hostShortfallOf(plugin)}. ${UPDATE_HOST_STEPS}`,
+      actions: [{ label: "Plugin manager", command: { _tag: "OpenExternal", url: PLUGIN_MANAGER_URL } }]
+    }
+  }
+  if (plugin.status !== "outdated") return null
+  return {
+    ...notice,
+    title: `Update the editor's plugin to ${wanted}`,
+    body: `Version ${plugin.bundledVersion} is ready. The game loads it the next time it starts.`,
+    actions: [{ label: "Update plugin", command: { _tag: "InstallPlugin" } }]
+  }
+}
+
+/** Why Open in game wrote nothing (`NeedsPlugin`), and what fixes it. */
+export const openWithoutPluginNotice = (label: string, plugin: PluginLookup): GameLinkNotice => {
+  const wanted = `open ${label} in the in-game editor`
+  switch (plugin.status) {
+    case "noGame":
+      return { ...gameLost, title: `Couldn't find Ballest of Them All to ${wanted}` }
+    case "noPluginManager":
+      return { ...pluginManagerLost, title: `The Ballest plugin manager is needed to ${wanted}` }
+    case "missing":
+      if (plugin.hostTooOld) break
+      return {
+        kind: PLUGIN_MISSING,
+        level: "info",
+        title: `Install the editor's plugin to ${wanted}`,
+        body: "The game loads the plugin the next time it starts.",
+        persistent: true,
+        actions: [{ label: "Install plugin", command: { _tag: "InstallPlugin" } }]
+      }
+    default:
+  }
+  const update = pluginUpdateNotice(plugin, wanted)
+  return update ?? {
+    kind: PLUGIN_UPDATE,
+    level: "info",
+    title: `Restart the game to ${wanted}`,
+    persistent: false,
+    actions: []
   }
 }
 
