@@ -145,7 +145,7 @@ function groupBy<T>(backups: ReadonlyArray<T>, keyOf: (backup: T) => string) {
 }
 
 /**
- * Project › Recover previous version… (desktop): the versions the app kept of a map file or a prefab before writing over
+ * Project › Backups… (desktop): the versions the app kept of a map file or a prefab before writing over
  * it, newest first, for the open map or any other. Opening a map's makes it the open map's unsaved edits, and Save keeps
  * it. Restoring a prefab's writes it back at once, since a definition has no unsaved state to hold it in.
  */
