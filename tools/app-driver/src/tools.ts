@@ -38,6 +38,7 @@ export const AppDriverToolkit = Toolkit.make(
       axes: Schema.optional(Schema.String),
       smoke: Schema.optional(Schema.Boolean),
       repeat: Schema.optional(Schema.Finite),
+      jobs: Schema.optional(Schema.Finite),
       since: Schema.optional(Schema.String),
       name: Schema.optional(Schema.String)
     },
@@ -74,12 +75,13 @@ export const AppDriverToolsLayer = AppDriverToolkit.toLayer(Effect.gen(function*
   const text = <E>(effect: Effect.Effect<string, E>) => effect.pipe(Effect.map((value) => ({ text: value })))
   return AppDriverToolkit.of({
     app_list: ({ uncovered, views }) => text(driver.list({ uncovered: uncovered === true, views: views === true })),
-    app_run: ({ axes, name, repeat, since, smoke, states, views }) =>
+    app_run: ({ axes, jobs, name, repeat, since, smoke, states, views }) =>
       driver.run({
         states: states ?? [],
         views: views ?? [],
         smoke: smoke === true,
         repeat: repeat ?? 1,
+        jobs: jobs ?? 1,
         ...(axes === undefined ? {} : { axes }),
         ...(name === undefined ? {} : { name }),
         ...(since === undefined ? {} : { since })

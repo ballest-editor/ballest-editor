@@ -12,6 +12,7 @@ pnpm app-driver run --smoke                           # every state at its defau
 pnpm app-driver run                                   # plus light twins and each state's listed axes
 pnpm app-driver run --view panel:outline --axes theme=*,window=*   # a cross product, on request
 pnpm app-driver run --repeat 2                        # finds states that differ between identical runs
+pnpm app-driver run --jobs 3                          # browser captures side by side; desktop ones stay one at a time
 pnpm app-driver run --name after --since before       # sheets hold only what changed
 pnpm app-driver compare before after                  # by name or folder
 pnpm app-driver review --state dialog/about           # a stateless model review; costs money, never in CI
@@ -65,6 +66,7 @@ export default states({
 - **`views`** names what the state shows, from `apps/web/src/components/viewIds.ts`. That list is made from the app's own registries, and `viewCoverage.test.ts` fails on a view with no state or a state naming a dead view.
 - **`reach`** uses `app.*` to get somewhere and `input.*` when the input is the subject. Prove the state happened with a check: an empty capture would otherwise pass.
 - **`anchor`** adds a light twin, and `axes` lists other values to run. Each runs alone, so the count stays near the number of states.
+- **`fixture`** costs time: software WebGL draws whatever map is open behind a dialog. Use `none` unless the map is the subject.
 - **`target: "desktop"`** runs in Electron under a private Xvfb, in a throwaway home. Use it for popped-out panels, native dialogs and what a browser lacks.
 - **`pending`** counts as coverage and shows its reason in every summary.
 

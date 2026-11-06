@@ -113,6 +113,9 @@ And after load:
 - **Shaders.** The hook pins the game time the glows and the air read.
 - **WebGL.** SwiftShader: slow, but the same on every machine and in CI. `--gpu` opts into the real GPU for `frames` only.
 - **Window.** The `window` axis through device metrics, at scale 1.
+- **Cost.** Software WebGL draws whatever is open, so states about a dialog, settings page or menu sit over the start
+  map, and only states about a map open one. Browser captures can run side by side with `--jobs`, each in its own
+  context; desktop captures stay one at a time.
 - **Assets.** The driver gets `web-assets/` first, so a fresh worktree shows the same meshes as an old one.
 
 **Settled** is judged from outside: fonts loaded, no request in flight for a moment, and two frames in a row the same. That covers meshes, thumbnails and late layout without the app reporting any of them, and the last frame is the capture. A page that never settles fails.
@@ -173,12 +176,13 @@ commit, which any worktree can produce in minutes. `run --name <name>` gives a r
 
 From T3: `render-metrics.ts` `run` and `compare <before> <after>` with two checkouts, exactly.
 
-### 10. CI runs the coverage check always, the sweep on request, and never a model
+### 10. CI runs the coverage check always, the sweep when app code changes, and never a model
 
 - `pnpm check:everything` gains the coverage test (§ 2) and the states' typecheck. Cheap, every PR.
-- A workflow job `app-driver` runs `run --smoke` (every state at default axes, SwiftShader under Xvfb, checks
-  graded, captures kept as a workflow artifact) on every PR. Images are an artifact, not a comment, until the
-  job is proven quiet; a failing check or an unsettled state fails the job.
+- `.github/workflows/app-driver.yml` runs `run --smoke --jobs 3` (every state at default axes on software WebGL, checks
+  graded, captures kept as a workflow artifact) when a PR or `main` touches `apps/`, `packages/`, the tool or the
+  lockfile. It has its own workflow so those paths can skip it, and it isn't a required check. Images are an artifact,
+  not a comment, until the job is proven quiet; a failing check or an unsettled state fails the job.
 - `compare` against `main` and the PR comment with a changed-states sheet come after the sweep has been stable
   for a few weeks.
 - `review` (§ 11) never runs in CI.

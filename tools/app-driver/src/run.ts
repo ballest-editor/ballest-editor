@@ -8,6 +8,7 @@ import { readFixture } from "./fixtures.ts"
 import { type AxisOverrides, checkFails, keyOf, type Metrics, variationsOf } from "./grade.ts"
 import { Page } from "./page.ts"
 import { samePicture } from "./png.ts"
+import { inPool } from "./pool.ts"
 import { renderSheets, renderSummary, type ResultRow, writeResults } from "./report.ts"
 import {
   buildDesktop,
@@ -32,6 +33,8 @@ export interface RunOptions {
   readonly since?: string
   readonly name?: string
   readonly gpu?: boolean
+  /** How many browser captures run at once. Frame times need 1: they would measure each other. */
+  readonly jobs?: number
 }
 
 export interface RunReport {
@@ -234,30 +237,31 @@ export const runStates = async (options: RunOptions): Promise<RunReport> => {
       open: (state, axes, scratch) =>
         state.target === "desktop" ? openDesktopPage(url, axes, scratch) : openWebPage(browser, url, axes)
     }
-    const rows: Array<ResultRow> = []
-    const pending: Array<{ readonly id: string; readonly reason: string }> = []
-    for (const state of picked) {
-      if (state.pending !== undefined) {
-        pending.push({ id: state.id, reason: state.pending })
-        continue
-      }
-      for (const axes of variationsOf(state, options)) {
-        const row = await runOne(state, axes, dir, target)
-        const repeats = Math.max(1, options.repeat ?? 1) - 1
-        let noisy = false
-        const shot = path.join(dir, row.shot)
-        const first = row.hash === undefined ? null : fs.readFileSync(shot)
-        if (first !== null) {
-          for (let i = 0; i < repeats; i++) {
-            const again = await runOne(state, axes, dir, target)
-            noisy = noisy || again.hash === undefined || !samePicture(first, fs.readFileSync(shot))
-            fs.writeFileSync(shot, first)
-          }
+    const pending = picked.flatMap(({ id, pending: reason }) => reason === undefined ? [] : [{ id, reason }])
+    const captures = picked.filter((state) => state.pending === undefined).flatMap((state) =>
+      variationsOf(state, options).map((axes) => ({ state, axes }))
+    )
+    const capture = async ({ axes, state }: (typeof captures)[number]): Promise<ResultRow> => {
+      const row = await runOne(state, axes, dir, target)
+      const repeats = Math.max(1, options.repeat ?? 1) - 1
+      let noisy = false
+      const shot = path.join(dir, row.shot)
+      const first = row.hash === undefined ? null : fs.readFileSync(shot)
+      if (first !== null) {
+        for (let i = 0; i < repeats; i++) {
+          const again = await runOne(state, axes, dir, target)
+          noisy = noisy || again.hash === undefined || !samePicture(first, fs.readFileSync(shot))
+          fs.writeFileSync(shot, first)
         }
-        rows.push(noisy ? { ...row, noisy } : row)
-        console.error(`${row.pass === true ? "ok  " : row.pass === false ? "FAIL" : "ERR "} ${row.key}`)
       }
+      console.error(`${row.pass === true ? "ok  " : row.pass === false ? "FAIL" : "ERR "} ${row.key}`)
+      return noisy ? { ...row, noisy } : row
     }
+    // Browser pages run side by side. Each desktop capture is a whole app with its own session entry, so one at a time.
+    const rows = [
+      ...await inPool(captures.filter(({ state }) => state.target !== "desktop"), options.jobs ?? 1, capture),
+      ...await inPool(captures.filter(({ state }) => state.target === "desktop"), 1, capture)
+    ]
     browser.close()
     removeScratch(path.join(dir, "scratch"))
     writeResults(dir, rows)

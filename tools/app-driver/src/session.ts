@@ -164,7 +164,7 @@ export const ensureServer = async (): Promise<string> => {
   const url = `http://127.0.0.1:${port}/`
   const child = launch("vite", path.join(repoRoot, "apps/web/node_modules/.bin/vite"), ["dev"], {
     cwd: path.join(repoRoot, "apps/web"),
-    env: { PORT: String(port), HOST: "127.0.0.1" }
+    env: { PORT: String(port), HOST: "127.0.0.1", BALLEST_PIN_BUILD_INFO: "1" }
   })
   const pid = pidOf(child)
   await waitFor("the dev server", async () => {
@@ -346,6 +346,16 @@ export const stopSession = async (): Promise<ReadonlyArray<string>> => {
 
 /** Whether a session was already up, so a command that had to start one knows to stop it. */
 export const sessionRunning = (): boolean => {
-  const session = readSession()
-  return session.server !== undefined && isOurs(session.server.pid)
+  const { browser, server } = readSession()
+  return [server, browser].some((process) => process !== undefined && isOurs(process.pid))
+}
+
+/** Runs `work`, and stops what it started unless a session was already up. */
+export const inSession = async <A>(work: () => Promise<A>): Promise<A> => {
+  const wasRunning = sessionRunning()
+  try {
+    return await work()
+  } finally {
+    if (!wasRunning) await stopSession()
+  }
 }

@@ -112,6 +112,8 @@ export class Page {
   async start(url: string | null, window: Axes["window"]) {
     await Promise.all([this.send("Page.enable"), this.send("Runtime.enable"), this.send("Network.enable")])
     await this.send("Page.addScriptToEvaluateOnNewDocument", { source: PIN_SCRIPT })
+    // Pages running side by side all keep painting, not just the one in front.
+    await this.send("Emulation.setFocusEmulationEnabled", { enabled: true })
     await this.resize(window)
     if (url !== null) await this.send("Page.navigate", { url })
   }

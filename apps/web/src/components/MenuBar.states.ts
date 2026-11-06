@@ -2,7 +2,7 @@ import { count, input, type State, states } from "@ballest/app-driver/state"
 
 const menu = (title: string, extra: Partial<State> = {}): State => ({
   views: [`menu:${title}`],
-  fixture: "map:simple",
+  fixture: "none",
   reach: [input.click(`text:${title}`)],
   measure: { items: count("[role=menu] [role^=menuitem]") },
   checks: [{ metric: "items", min: 1 }],

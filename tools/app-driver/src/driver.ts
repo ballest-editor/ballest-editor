@@ -7,7 +7,7 @@ import { parseAxes } from "./grade.ts"
 import { Page } from "./page.ts"
 import { reviewRun } from "./review.ts"
 import { type RunOptions, runStates } from "./run.ts"
-import { ensureBrowser, ensureServer, home, stopSession } from "./session.ts"
+import { ensureBrowser, ensureServer, home, inSession, stopSession } from "./session.ts"
 import { DEFAULT_AXES, type Step } from "./state.ts"
 import { loadStates } from "./states.ts"
 
@@ -89,13 +89,13 @@ export class AppDriver extends Context.Service<AppDriver, {
               return `${state.id}${marks}: ${state.views.join(", ")}`
             }).join("\n")
           }
-          const known = await liveViews()
+          const known = await inSession(liveViews)
           const named = new Set(states.flatMap((state) => state.views))
           return known.filter((view) => uncovered !== true || !named.has(view)).join("\n")
         }),
       run: ({ axes, ...options }) =>
         attempt(() => runStates({ ...options, ...(axes === undefined ? {} : { overrides: parseAxes(axes) }) })),
-      compare: (before, after) => attempt(() => compareWithSheets(before, after ?? latestRun())),
+      compare: (before, after) => attempt(() => inSession(() => compareWithSheets(before, after ?? latestRun()))),
       review: (run, keys) => attempt(() => reviewRun(run === undefined ? latestRun() : resolveRun(run), keys)),
       step: (step) =>
         attempt(async () => {

@@ -1,9 +1,12 @@
 import { app, count, type State, states, type Step } from "@ballest/app-driver/state"
 
-/** A dialog open over a map, and proof that it opened: an empty capture would otherwise pass. */
+/**
+ * A dialog open over the start map, and proof that it opened: an empty capture would otherwise pass. A real map behind
+ * it would only cost software WebGL time.
+ */
 const dialog = (id: string, open: Step = app.openDialog({ id }), extra: Partial<State> = {}): State => ({
   views: [`dialog:${id}`],
-  fixture: "map:simple",
+  fixture: "none",
   reach: [open],
   measure: { dialogs: count("[role=dialog], [role=alertdialog]") },
   checks: [{ metric: "dialogs", min: 1 }],

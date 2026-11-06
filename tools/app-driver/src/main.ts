@@ -64,9 +64,10 @@ const runCommand = Command.make(
     ),
     since: maybe("since", "a run to compare with; sheets then hold only what changed"),
     name: maybe("name", "this run's name (default: the time)"),
+    jobs: Flag.Int("jobs").pipe(Flag.withDescription("browser captures at once"), Flag.withDefault(1)),
     gpu: toggle("gpu", "the real GPU, for frame times; pictures aren't comparable")
   },
-  ({ axes, gpu, name, repeat, since, smoke, state, view }) =>
+  ({ axes, gpu, jobs, name, repeat, since, smoke, state, view }) =>
     Effect.gen(function*() {
       const driver = yield* AppDriver
       const report = yield* driver.run({
@@ -75,6 +76,7 @@ const runCommand = Command.make(
         smoke,
         repeat,
         gpu,
+        jobs,
         ...Option.match(axes, { onNone: () => ({}), onSome: (value) => ({ axes: value }) }),
         ...Option.match(since, { onNone: () => ({}), onSome: (value) => ({ since: value }) }),
         ...Option.match(name, { onNone: () => ({}), onSome: (value) => ({ name: value }) })

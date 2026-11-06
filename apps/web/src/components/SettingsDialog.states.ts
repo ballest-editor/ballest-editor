@@ -2,7 +2,7 @@ import { app, count, type State, states } from "@ballest/app-driver/state"
 
 const page = (category: string, extra: Partial<State> = {}): State => ({
   views: [`settings:${category}`, "dialog:settings"],
-  fixture: "map:simple",
+  fixture: "none",
   reach: [app.openSettings(category)],
   measure: { dialogs: count("[role=dialog]") },
   checks: [{ metric: "dialogs", equals: 1 }],
