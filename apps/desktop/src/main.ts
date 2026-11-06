@@ -62,8 +62,9 @@ const layerDesktopRuntime = Layer.mergeAll(
   DesktopUpdates.layer,
   WindowLauncher.layer,
   NotificationLog.layer,
-  GamePlay.layer.pipe(Layer.provideMerge(layerProjectsAndGame))
+  GamePlay.layer
 ).pipe(
+  Layer.provideMerge(layerProjectsAndGame),
   Layer.provideMerge(DesktopSettings.layer),
   Layer.provideMerge(DesktopEnvironment.layer(__dirname)),
   Layer.provideMerge(layerElectron),

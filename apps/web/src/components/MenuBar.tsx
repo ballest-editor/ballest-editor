@@ -31,6 +31,7 @@ import {
   chooseProject,
   exportToGame,
   launchGame,
+  openRecentInNewWindow,
   quitApp,
   reimportMap,
   setExportOnSave,
@@ -93,13 +94,15 @@ function Menu({ title, children }: { readonly title: string; readonly children: 
 }
 
 /**
- * Desktop only: the projects used before, by name (the folder is the tooltip). One open in another window says so, and
- * picking it still gets main's refusal, which says what to do.
+ * Desktop only: the projects used before, by name (the folder is the tooltip). A pick opens here (`switchProject`);
+ * Open in new window, at the end, is the other way. One open in another window says so, and picking it still gets
+ * main's refusal, which says what to do.
  */
 function RecentProjectsMenu() {
   const state = useEditor((s) => s.project)
   const recent = state?.recent ?? []
   const openElsewhere = state?.openElsewhere ?? []
+  const closed = recent.filter((project) => !openElsewhere.includes(project.path))
   return (
     <MenubarSub>
       <MenubarSubTrigger disabled={recent.length === 0}>Recent projects</MenubarSubTrigger>
@@ -116,6 +119,21 @@ function RecentProjectsMenu() {
             )}
           </MenubarItem>
         ))}
+        <MenubarSeparator />
+        <MenubarSub>
+          <MenubarSubTrigger disabled={closed.length === 0}>Open in new window</MenubarSubTrigger>
+          <MenubarSubContent className="w-max max-w-96">
+            {closed.map((project) => (
+              <MenubarItem
+                key={project.path}
+                title={project.path}
+                onClick={() => void openRecentInNewWindow(project)}
+              >
+                <span className="truncate">{project.name}</span>
+              </MenubarItem>
+            ))}
+          </MenubarSubContent>
+        </MenubarSub>
       </MenubarSubContent>
     </MenubarSub>
   )

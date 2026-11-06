@@ -108,7 +108,7 @@ The behaviour is in [DESKTOP.md § Renderer](DESKTOP.md#renderer). These are the
 - The Save map dialog keeps the read-only "Exports as `Map_LevelEditorMain&<name>_<creator>.balledit`" line, so the game's naming stays visible.
 - New map always adds a tab and asks nothing, as a new document does in any desktop app. A name up front had a cost: in an untitled window the second New map named the first map instead of adding one to flip through. So a map is named on its first Save.
 - The first Save in an untitled window makes the project, in one dialog with the map's name, the project's name and its folder. A project is only needed once something is written, and with one dialog Cancel leaves nothing on disk. The other tabs keep their own first Saves, because naming a map is that map's question.
-- Where a project opens is always asked, even in an untitled window with only a blank map. Skipping the question there turned that window into the project when the user meant to open a second window, and the app can't tell the two apart. Always do this is the way to stop being asked. The required chooser doesn't ask, because its window has nothing else to be.
+- A project opens in this window, and where it opens is asked only while this window has unsaved changes. Asking every time put a question in front of every switch, for an answer that is nearly always the same. A second window is a deliberate act instead: Open in new window on a recent project. Always do this stops the question for good. The required chooser doesn't ask, because its window has nothing else to be.
 - Leaving an untitled window never prompts about unsaved changes, because nothing is lost: its maps go with it ([DESKTOP.md § Window](DESKTOP.md#window)).
 
 Later, the Project panel lists the maps in `UserSavedMaps` that aren't in the project yet, with an Import button each (#103's first slice).
@@ -143,7 +143,7 @@ The wireframes in [mockups/](mockups/) are rough. Use [mockups/welcome.html](moc
 
 The rest of the design is still to come:
 
-- **Welcome window** ([mockups/welcome.html](mockups/welcome.html) § 1). The app's level: recent projects with a thumbnail each, New project, Open…. It shows from the second launch on and when the last project window closes. The required chooser ([DESKTOP.md § Other windows](DESKTOP.md#other-windows)) has its list and its buttons, but only a window that can't start on a project of its own shows it. **This window / New window** ([mockups/welcome.html](mockups/welcome.html) § 2) is built.
+- **Welcome window** ([mockups/welcome.html](mockups/welcome.html) § 1). The app's level: recent projects with a thumbnail each, New project, Open…. It shows from the second launch on and when the last project window closes. The required chooser ([DESKTOP.md § Other windows](DESKTOP.md#other-windows)) is that screen without the thumbnails, but only a window that can't start on a project of its own shows it. **This window / New window** ([mockups/welcome.html](mockups/welcome.html) § 2) is built.
 - **Close project** and **Save project…** in the File menu. Close project needs the Welcome window to go back to.
 - **Project settings** ([mockups/welcome.html](mockups/welcome.html) § 5), IntelliJ's Project Structure shape, gains a creator, a choice of export target, and git.
 - **Thumbnails.** An offscreen render of the map, written next to it on save, used by the Project panel and Welcome.

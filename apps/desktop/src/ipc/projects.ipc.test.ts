@@ -180,7 +180,7 @@ describe("Projects over IPC", () => {
             const used = yield* fake.invokeAs(ProjectState, InvokeChannels.switchProject, { path: other })
             assert.deepInclude(used, {
               current: { path: other, name: "Elsewhere", exists: false },
-              recent: [{ path: project, name: "My maps", exists: true }]
+              recent: [{ path: project, name: "My maps", exists: true, lastOpened: "1970-01-01T00:00:00.000Z" }]
             })
             // Only a recent project or a picked folder can be switched to by path.
             const error = yield* Effect.flip(

@@ -22,11 +22,12 @@ import {
 } from "../editor/actions"
 import { warmCatalog } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
-import { type Dialog, projectTitleOf, useEditor, useOpenMapLabel } from "../editor/store"
+import { type Dialog, isChooserRequired, projectTitleOf, useEditor, useOpenMapLabel } from "../editor/store"
 import { watchResolvedTheme } from "../editor/theme"
 import { useActionKeys } from "../editor/useActionKeys"
 import { Dock } from "./dock/Dock"
 import { blurChromeAfterClick } from "./dock/popoutWindow"
+import { ChooserSkeleton, startsOnChooser } from "./EditorSkeleton"
 import { GameLinkDialog } from "./GameLinkDialog"
 import { ImportClashDialog } from "./ImportClashDialog"
 import { KeybindCheatSheet } from "./KeybindCheatSheet"
@@ -120,6 +121,8 @@ export function Editor() {
   const settingsCategory = useEditor((s) => s.settingsCategory)
   const setSettingsCategory = useEditor((s) => s.setSettingsCategory)
   const close = useEditor((s) => s.closeDialog)
+  const choosing = useEditor(isChooserRequired)
+  const waitingToChoose = useEditor((s) => s.project === null) && startsOnChooser()
 
   useActionKeys()
   useDocumentTitle()
@@ -155,11 +158,17 @@ export function Editor() {
 
   return (
     <TooltipProvider>
-      <div className="flex h-svh flex-col bg-background text-foreground">
-        <TopBar />
-        <Dock />
-        <StatusBar />
-      </div>
+      {choosing ?
+        <ProjectChooser /> :
+        waitingToChoose ?
+        <ChooserSkeleton /> :
+        (
+          <div className="flex h-svh flex-col bg-background text-foreground">
+            <TopBar />
+            <Dock />
+            <StatusBar />
+          </div>
+        )}
       <NameMapDialog mode="saveAs" open={dialog === "saveAs"} onClose={close} />
       <NameMapDialog mode="rename" open={dialog === "rename"} onClose={close} />
       <NameMapDialog mode="duplicate" open={dialog === "duplicate"} onClose={close} />
@@ -172,7 +181,6 @@ export function Editor() {
       <GameLinkDialog open={dialog === "gameLink"} onClose={close} />
       <NewProjectDialog open={dialog === "newProject"} onClose={close} />
       <WhereToOpenDialog open={dialog === "whereToOpen"} onClose={close} />
-      <ProjectChooser />
       <ReplacePublishedDialog open={dialog === "replacePublished"} onClose={close} />
       <OverwriteChangedDialog open={dialog === "overwriteChanged"} onClose={close} />
       <ImportClashDialog open={dialog === "importClash"} onClose={close} />

@@ -136,6 +136,10 @@ export class Platform extends Context.Service<Platform, {
   readonly createProject: (project: CreateProjectPayload) => Effect.Effect<ProjectState, PlatformError>
   /** Shows one of the project's folders in the file manager. */
   readonly revealProject: (which: ProjectFolder) => Effect.Effect<void, PlatformError>
+  /** Shows a recent project's folder in the file manager. */
+  readonly revealRecentProject: (path: string) => Effect.Effect<void, PlatformError>
+  /** Takes a project off the recent ones; its folder stays as it is. */
+  readonly forgetRecentProject: (path: string) => Effect.Effect<ProjectState, PlatformError>
   /** Renames the project (its file's name; the folder keeps its name). */
   readonly renameProject: (name: string) => Effect.Effect<ProjectState, PlatformError>
   /** Keeps which map is open in the project (null: one that isn't in it), so the next launch opens it again. */
@@ -349,6 +353,9 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     createProject: (project) => call("createProject", project),
     revealProject: (which) =>
       bridgeCheck(call("revealProject", { which }), "The project doesn't have that folder yet."),
+    revealRecentProject: (path) =>
+      bridgeCheck(call("revealRecentProject", { path }), "That folder isn't there anymore."),
+    forgetRecentProject: (path) => call("forgetRecentProject", { path }),
     renameProject: (name) => call("renameProject", { name }),
     rememberOpenMap: (fileName) => call("rememberOpenMap", { fileName }),
     listMaps: call("listMaps"),
@@ -519,6 +526,8 @@ const makeBrowser = (): Platform["Service"] => {
     switchProject: () => noProject,
     createProject: () => noProject,
     revealProject: () => noProject,
+    revealRecentProject: () => noProject,
+    forgetRecentProject: () => noProject,
     renameProject: () => noProject,
     rememberOpenMap: () => Effect.void,
     listMaps: Effect.succeed([]),
