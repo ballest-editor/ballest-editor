@@ -15,7 +15,7 @@ import { useMemo } from "react"
 import { create } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Catalog"
-import type { UeTransform } from "../domain/coords"
+import type { Quat4, UeTransform, Vec3 } from "../domain/coords"
 import { type Creator, creatorOf, type FoundCreator } from "../domain/creator"
 import {
   addItem,
@@ -34,7 +34,7 @@ import {
   validateItem
 } from "../domain/edits"
 import { editTransform, fitEditTransform } from "../domain/editTransform"
-import { itemFromPiece, mapLabelOf, newMapFile } from "../domain/factory"
+import { identityTransform, itemFromPiece, mapLabelOf, newMapFile } from "../domain/factory"
 import { withGameGroups } from "../domain/gameGroups"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
 import type { GameLinkResult } from "../domain/gameLink"
@@ -45,9 +45,10 @@ import {
   groupPathOf,
   nodeKeys,
   selectedGroupIds,
-  selectionNodeIds
+  selectionNodeIds,
+  soleGroupOf
 } from "../domain/groupSelection"
-import { placedBoxOf } from "../domain/itemBounds"
+import { boxCentreOf, placedBoxOf } from "../domain/itemBounds"
 import { type PropertyChange, withFlip } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
@@ -67,10 +68,10 @@ import {
   resolveNotices
 } from "../domain/notifications"
 import type { PaintPicker } from "../domain/Paint"
-import { type Pivot, pivotAt } from "../domain/pivot"
+import { localToWorld, type Pivot, pivotAt } from "../domain/pivot"
 import { isSamePrefab, prefabSaveProblem, type PrefabSource } from "../domain/prefab"
 import type { PrefabFile } from "../domain/PrefabFile"
-import { type PrefabDefinition, withUpdatedInstance } from "../domain/prefabInstance"
+import { instanceOrigin, type PrefabDefinition, withUpdatedInstance } from "../domain/prefabInstance"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
 import {
@@ -97,7 +98,7 @@ import {
 } from "../domain/structure"
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import type { Surfaces } from "../domain/surface"
-import { sameVec } from "../domain/ueMath"
+import { sameVec, vecAdd, vecSub } from "../domain/ueMath"
 import { type MapValidation, validateMap } from "../domain/validateMap"
 import {
   clampSplit,
@@ -1287,7 +1288,8 @@ export const useEditor = create<EditorState>()((set, get) => {
         return { collapsedGroups: new Set([...s.collapsedGroups].filter((id) => !open.has(id))) }
       }),
     setTool: (tool) => set({ tool }),
-    toggleGizmoSpace: () => set((s) => ({ gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
+    toggleGizmoSpace: () =>
+      set((s) => (s.tool === "scale" ? s : { gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
     // The required chooser stays on top of everything: what would open behind it (the Game link's) waits for a launch.
     openDialog: (dialog) =>
       set((s) =>
@@ -1611,9 +1613,6 @@ export const nodeNamesOf = (s: Pick<EditorState, "doc" | "catalogIndex">): Reado
     ...groupNames(s.doc.structure.tree)
   ])
 
-/** The active (last selected) item's id, if any. */
-export const activeId = (s: EditorState): string | undefined => s.selectedIds.at(-1)
-
 /** The sun as shown: the live preview, else the document. */
 export const shownLighting = (s: EditorState): Lighting => s.lightingPreview ?? lightingOf(s.doc.map.worldSettings)
 
@@ -1626,6 +1625,54 @@ export const shownTransform = (s: EditorState, id: string): UeTransform | undefi
   if (preview !== undefined) return preview
   const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
   return item === undefined ? undefined : editTransform(item)
+}
+
+/** The axes the gizmo uses: a scale is always along the items' own, whatever the toggle holds for Move and Rotate. */
+export const shownGizmoSpace = (s: EditorState): GizmoSpace => s.tool === "scale" ? "local" : s.gizmoSpace
+
+export interface SelectionPivot {
+  /** The active (last selected) item's transform. */
+  readonly active: UeTransform
+  /** Where the selection turns and scales, and the gizmo sits. */
+  readonly pivot: Vec3
+  /** What the gizmo's local axes follow. */
+  readonly rotation: Quat4
+  /** The active item's pivot point, which grid snapping lands on. */
+  readonly activePivot: Vec3
+}
+
+/**
+ * Where a selection pivots, given how to read an item's transform: the active item's pivot point and axes, or for exactly
+ * one whole group its frame with no turn. That's a prefab instance's origin, carried along by a live move, or else what
+ * Ctrl+G makes, the centre of the group's bounds (docs/FORMAT.md § Groups). The editor keeps no frame, so the second is
+ * worked out afresh: after a turn the game's stays put and turned, and this one is the new bounds'.
+ */
+export const selectionPivot = (
+  s: EditorState,
+  transformOf: (id: string) => UeTransform | undefined
+): SelectionPivot | undefined => {
+  const activeKey = s.selectedIds.findLast((id) => transformOf(id) !== undefined)
+  const active = activeKey === undefined ? undefined : transformOf(activeKey)
+  if (activeKey === undefined || active === undefined) return undefined
+  const activePivot = localToWorld(active, pivotOf(s, activeKey).localPosition)
+  const own = { active, pivot: activePivot, rotation: active.rotation, activePivot }
+  const group = soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId)
+  if (group === undefined) return own
+  const frame = { ...own, rotation: identityTransform().rotation }
+  const origin = group.prefab === undefined ? undefined : instanceOrigin(s.doc, group, group.prefab)
+  const inDoc = s.doc.map.items[indexOfKey(s.doc.ids, activeKey)]
+  if (origin !== undefined && inDoc !== undefined) {
+    return { ...frame, pivot: vecAdd(origin, vecSub(active.translation, editTransform(inDoc).translation)) }
+  }
+  const box = placedBoxOf(
+    s.selectedIds.flatMap((id) => {
+      const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
+      const transform = transformOf(id)
+      return item === undefined || transform === undefined ? [] : [{ item, transform }]
+    }),
+    s.catalogIndex
+  )
+  return box === undefined ? own : { ...frame, pivot: boxCentreOf(box) }
 }
 
 /** Edit transforms as the game would take them, so a drag stops at a decal's limits as it happens. */

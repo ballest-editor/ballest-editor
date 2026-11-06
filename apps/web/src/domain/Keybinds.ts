@@ -163,7 +163,7 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   scaleMode:
     "Scale: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the in-game editor.",
   toggleGizmoSpace:
-    "Switch the move, rotate and scale gizmos between the selected item's own axes (the last one picked, when several are selected) and the world axes. C in the in-game editor.",
+    "Switch the move and rotate gizmos between the selected item's own axes (the last one picked, when several are selected) and the world axes. Scale always uses each item's own axes. C in the in-game editor.",
   focusSelection: "Frame the current selection in the viewport. F in the in-game editor.",
   addToSelection:
     "Click an item to add it to the selection (it becomes the active item). Shift+click, as in Unreal's editor; the game's key for this isn't recorded.",

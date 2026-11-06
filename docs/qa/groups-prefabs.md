@@ -46,7 +46,7 @@ Each transform below ran on a freshly opened map.
 
 So every edit is a change from the frame's current value, applied about its translation, and the frame moves with the group. Reselecting later shows the frame as it was left. The frame's rotation and scale change what the panel reads and nothing else. Case c and case a land the members in the same place.
 
-One detail for anyone copying the panel: scale 2, 1, 1 on a group whose frame has yaw 90 stretched the members along world X, exactly as an identity frame did. That was with the coordinate mode the map opens in. I didn't try the other mode.
+One detail for anyone copying the panel: scale 2, 1, 1 on a group whose frame has yaw 90 stretched the members along world X, exactly as an identity frame did. Each member goes by its own axes, whatever the frame or the coordinate mode: [gizmo-scale.md](gizmo-scale.md) § A scale of a group.
 
 ## The frame the game makes
 
@@ -189,10 +189,9 @@ Run on 2026-11-05, slot 1, against the same build. Each file went through `MapCo
 
 ## What I could not measure
 
-- **A gizmo drag with the mouse.** Every transform went through the panel's function. A drag may well behave the same, but I didn't see it.
+- **A gizmo drag with the mouse.** Every transform here went through the panel's function. [gizmo-scale.md](gizmo-scale.md) has real scale drags.
 - **Shift+G.** I can't say what key ungroups. Posted Shift+G, Ctrl+Shift+G, Alt+G and G all did nothing, while posted Ctrl+G grouped. I have no proof a posted Shift reaches the game, and there is no xdotool on this Wayland desktop to send a real one. `UngroupSelection` works and `UngroupSelectionShortcut` exists. The shortcut does nothing through `editor call`, with or without a modifier posted, and neither does `GroupSelectionShortcut`. The editor's hint panel lists no group key. One keypress in the real game would settle it.
 - **Removing one member behind the game's back.** The host's `ReplacePieces` takes a list of pieces to remove, but the driver plugin doesn't expose it, and no player can do this.
-- **The other coordinate mode** on a group.
 - **What the game would write for `frame`.** It still writes no groups, so this page reads the frame from the gizmo and panel, and the file shape stays the one the game accepts.
 - **Mirrored pieces in a prefab.** A text, name or string property wouldn't show up either, though no class in the catalog has one.
 - **Whether a real game's save keeps groups.** Same caveat as [save-roundtrip.md](save-roundtrip.md): every save here ran in a sandboxed slot.

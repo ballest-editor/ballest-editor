@@ -18,7 +18,7 @@ import { floorHeightOf } from "../domain/level"
 import { AUTO_GRID_COLORS, isDefaultDisplay, type Settings, withDefaultDisplay } from "../domain/Settings"
 import { formatGridSize, formatRotationStep, GRID_SIZES, ROTATION_STEPS } from "../domain/snap"
 import { saveSettings, setGridHeight, updateSettings } from "../editor/actions"
-import { useEditor, useOpenPrefab } from "../editor/store"
+import { shownGizmoSpace, useEditor, useOpenPrefab } from "../editor/store"
 import { useDarkTheme } from "../editor/theme"
 import { ColorSetting } from "./ColorSetting"
 import { NumberField } from "./NumberField"
@@ -87,11 +87,16 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
   )
 }
 
-/** The gizmo's axes: the piece's own (cube) or the world's (globe). */
+/** The gizmo's axes: the piece's own (cube) or the world's (globe). Scale is always the piece's, so it holds the toggle there. */
 function AxesToggle({ disabled }: { readonly disabled: boolean }) {
-  const local = useEditor((s) => s.gizmoSpace === "local")
+  const local = useEditor((s) => shownGizmoSpace(s) === "local")
+  const scaling = useEditor((s) => s.tool === "scale")
   const toggleGizmoSpace = useEditor((s) => s.toggleGizmoSpace)
-  const label = local ? "Gizmo follows the piece's axes" : "Gizmo follows the world's axes"
+  const label = scaling
+    ? "Scale always follows the piece's axes"
+    : local
+    ? "Gizmo follows the piece's axes"
+    : "Gizmo follows the world's axes"
   return (
     <ViewTip
       label={label}
@@ -100,7 +105,7 @@ function AxesToggle({ disabled }: { readonly disabled: boolean }) {
         <Toggle
           pressed={local}
           onPressedChange={toggleGizmoSpace}
-          disabled={disabled}
+          disabled={disabled || scaling}
           aria-label={label}
           className={cn(SEGMENT, "aria-pressed:bg-transparent aria-pressed:hover:bg-hover")}
           {...noFocus}

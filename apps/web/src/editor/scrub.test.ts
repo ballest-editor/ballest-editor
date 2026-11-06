@@ -158,13 +158,26 @@ describe("scrubbing with pivots (#51)", () => {
     }
   })
 
-  it("scales and sets rotation or scale about each item's own pivot", () => {
+  it("scales about the active item's pivot, which stays put", () => {
+    const { ids } = withPivots()
+    const activeId = ids.at(-1)!
+    for (
+      const edit of [
+        () => editSelectionAxis("scale3D", "z", { kind: "offset", by: 0.5 }),
+        () => editSelectionAxis("scale3D", "x", { kind: "set", value: 2 })
+      ]
+    ) {
+      const before = pivotPoint(activeId)
+      edit()
+      expectVec(pivotPoint(activeId), before, activeId)
+    }
+  })
+
+  it("sets rotation about each item's own pivot", () => {
     const { ids } = withPivots()
     const where = () => new Map(ids.map((id) => [id, pivotPoint(id)]))
     for (
       const edit of [
-        () => editSelectionAxis("scale3D", "z", { kind: "offset", by: 0.5 }),
-        () => editSelectionAxis("scale3D", "x", { kind: "set", value: 2 }),
         () => editSelectionAxis("rotation", "x", { kind: "set", value: 30 }),
         () => setSelectionField("rotation", { x: 10, y: 20, z: 30 })
       ]

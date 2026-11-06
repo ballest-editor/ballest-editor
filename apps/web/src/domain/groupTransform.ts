@@ -1,9 +1,10 @@
 /**
  * Transforming several items together, in game space (UE cm, Z up), the way the game's
- * editor does it. A gizmo drag measures one delta; a move or turn applies to every selected
- * item about the pivot (the active item's pivot point, see pivot.ts), so the selection moves
- * and turns as a rigid group. A scale is per item: each one scales along its own axes about
- * its own pivot point, which stays put (with a Default pivot, the item doesn't move).
+ * editor does it (docs/qa/gizmo-scale.md). A gizmo drag measures one delta, and every selected
+ * item takes it about one pivot: the active item's pivot point (see pivot.ts), or a whole
+ * group's frame. A move or turn is rigid. A scale is along each item's own axes, and so is the
+ * item's offset from the pivot, so a selection spreads out but no item ever needs a shear,
+ * which an item's rotation and `scale3D` couldn't hold.
  */
 import type { Quat4, UeTransform, Vec3 } from "./coords"
 import { localToWorld } from "./pivot"
@@ -24,7 +25,7 @@ export type GroupDelta =
   | { readonly kind: "translate"; readonly offset: Vec3 }
   /** A rotation about the pivot (game-space unit quaternion). */
   | { readonly kind: "rotate"; readonly rotation: Quat4 }
-  /** Scale each item in place by `factor`: along its own `axis`, or uniformly. */
+  /** Scale each item by `factor` about the pivot: along its own `axis`, or uniformly. */
   | { readonly kind: "scale"; readonly factor: number; readonly axis?: Axis }
 
 const MIN_SCALE = 1e-3
@@ -42,15 +43,21 @@ export const keepPoint = <T extends UeTransform>(before: UeTransform, after: T, 
 })
 
 /**
- * One item's transform after `delta`: a turn about `pivot` (world), a scale about the item's
- * own `localPivot` (its local frame, unscaled cm).
+ * `t` given `scale3D`, about `pivot` (world): its offset from the pivot changes along each of
+ * its own axes by what that axis's scale did. An item on the pivot stays where it is.
  */
-export const applyGroupDelta = (
-  t: UeTransform,
-  pivot: Vec3,
-  delta: GroupDelta,
-  localPivot: Vec3 = ORIGIN
-): UeTransform => {
+const scaleAbout = (t: UeTransform, scale3D: Vec3, pivot: Vec3): UeTransform => {
+  const offset = rotateVec(quatConjugate(t.rotation), vecSub(t.translation, pivot))
+  const along = (axis: Axis) => (t.scale3D[axis] === 0 ? offset[axis] : offset[axis] * scale3D[axis] / t.scale3D[axis])
+  return {
+    ...t,
+    scale3D,
+    translation: vecAdd(pivot, rotateVec(t.rotation, { x: along("x"), y: along("y"), z: along("z") }))
+  }
+}
+
+/** One item's transform after `delta`, about `pivot` (world). */
+export const applyGroupDelta = (t: UeTransform, pivot: Vec3, delta: GroupDelta): UeTransform => {
   switch (delta.kind) {
     case "translate":
       return { ...t, translation: vecAdd(t.translation, delta.offset) }
@@ -66,7 +73,7 @@ export const applyGroupDelta = (
       const scale3D = axis !== undefined
         ? { ...s, [axis]: clampScale(s[axis] * factor) }
         : { x: clampScale(s.x * factor), y: clampScale(s.y * factor), z: clampScale(s.z * factor) }
-      return keepPoint(t, { ...t, scale3D }, localPivot)
+      return scaleAbout(t, scale3D, pivot)
     }
   }
 }
@@ -126,13 +133,15 @@ const rotatorOffset = (active: UeTransform, axis: Axis, by: number): GroupDelta 
 
 /**
  * An inspector axis edit over a whole selection, as the change to make to each item's
- * transform (and its own pivot, local and unscaled) from before the edit. A typed value sets
- * that axis on every item, turning or scaling each about its own pivot. An offset (a scrub)
- * acts like a gizmo drag on the same selection: a location moves every item by the same
- * amount; a rotation turns the active item about the edited rotator axis and the rest rigidly
- * with it, about `pivot` (the active item's pivot point in the world, by default its origin);
- * a scale changes each item's own axis about its own pivot. Always applied to the transforms
- * from before the scrub, never to a live preview, so a scrub's steps don't compound.
+ * transform (and its own pivot, local and unscaled) from before the edit. A scale, typed or
+ * scrubbed, takes the active item's axis to the new value and every other item's by the same
+ * ratio, about `pivot`, as a gizmo drag does: the game turns a panel of 1 made 2 into each item
+ * doubling. A typed location or rotation sets that axis on every item, turning each about its
+ * own pivot. An offset (a scrub) acts like a gizmo drag on the same selection: a location moves
+ * every item by the same amount; a rotation turns the active item about the edited rotator
+ * axis and the rest rigidly with it, about `pivot` (by default the active item's origin).
+ * Always applied to the transforms from before the scrub, never to a live preview, so a
+ * scrub's steps don't compound.
  */
 export const selectionAxisEdit = (
   active: UeTransform,
@@ -141,6 +150,13 @@ export const selectionAxisEdit = (
   edit: AxisEdit,
   pivot: Vec3 = active.translation
 ): (t: UeTransform, localPivot?: Vec3) => UeTransform => {
+  if (field === "scale3D") {
+    const from = active.scale3D[axis]
+    const to = edit.kind === "set" ? edit.value : from + edit.by
+    // an item level with the active one takes the value itself, not that value through a ratio's rounding
+    const scaled = (v: number) => (v === from || from === 0 ? to : v * to / from)
+    return (t) => scaleAbout(t, { ...t.scale3D, [axis]: clampScale(scaled(t.scale3D[axis])) }, pivot)
+  }
   if (edit.kind === "set") return (t, localPivot = ORIGIN) => setAxis(t, field, axis, edit.value, localPivot)
   const { by } = edit
   switch (field) {
@@ -152,7 +168,5 @@ export const selectionAxisEdit = (
       const delta = rotatorOffset(active, axis, by)
       return (t) => applyGroupDelta(t, pivot, delta)
     }
-    case "scale3D":
-      return (t, localPivot = ORIGIN) => setAxis(t, field, axis, t.scale3D[axis] + by, localPivot)
   }
 }

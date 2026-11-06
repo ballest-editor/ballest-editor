@@ -11,8 +11,8 @@ import {
 } from "../../domain/groupTransform"
 import type { PropertyChange } from "../../domain/itemProperties"
 import type { FlipAxis } from "../../domain/mirror"
-import { localToWorld, type PivotChoice, pivotFor } from "../../domain/pivot"
-import { fitTransforms, pivotOf, type SlotPaint, useEditor } from "../store"
+import { type PivotChoice, pivotFor } from "../../domain/pivot"
+import { fitTransforms, pivotOf, selectionPivot, type SlotPaint, useEditor } from "../store"
 
 export const transformSelection = (transforms: ReadonlyMap<string, UeTransform>): boolean =>
   useEditor.getState().transformItems(transforms)
@@ -61,14 +61,11 @@ const withSelectionEdit = (
     )
   )
 
-/** An axis edit made from the document transforms, about the active item's pivot like the gizmo. */
+/** An axis edit made from the document transforms, about the selection's pivot like the gizmo. */
 const withAxisEdit = (field: TransformField, axis: Axis, edit: AxisEdit) => {
-  // the active item is the last selected one
-  const activeId = useEditor.getState().selectedIds.findLast((id) => docTransform(id) !== undefined)
-  const active = activeId === undefined ? undefined : docTransform(activeId)
-  if (activeId === undefined || active === undefined) return new Map()
-  const pivot = localToWorld(active, localPivotOf(activeId))
-  return withSelectionEdit(selectionAxisEdit(active, field, axis, edit, pivot))
+  const target = selectionPivot(useEditor.getState(), docTransform)
+  if (target === undefined) return new Map()
+  return withSelectionEdit(selectionAxisEdit(target.active, field, axis, edit, target.pivot))
 }
 
 /** Sets all three axes of `field` on every selected item (pasting a copied row), about each one's pivot. */

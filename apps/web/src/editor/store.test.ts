@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import fixture from "../domain/bundledCatalog.json"
-import { Catalog } from "../domain/Catalog"
+import { Catalog, indexCatalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { setLevelNames, withLevelNames } from "../domain/edits"
 import { placementTransform } from "../domain/factory"
@@ -10,6 +10,7 @@ import { isPlayerStart } from "../domain/MapFile"
 import { withDifficulty } from "../domain/mapTags"
 import { mirrorFlagsOf } from "../domain/mirror"
 import { prefabOfItems } from "../domain/prefab"
+import { definitionOf } from "../domain/prefabInstance"
 import { defaultSettings } from "../domain/Settings"
 import { loadStructure, sidecarOf, structureOfMap } from "../domain/sidecar"
 import { findGroup, treeKeys } from "../domain/structure"
@@ -28,6 +29,8 @@ import {
   pivotOf,
   PREFAB_TAB_STAYS_HERE,
   saveProblemOf,
+  selectionPivot,
+  shownGizmoSpace,
   shownLighting,
   shownTransform,
   shownValidation,
@@ -1272,6 +1275,34 @@ describe("document structure", () => {
   })
 })
 
+describe("the gizmo's axes", () => {
+  it("scales along the items' own axes, and gives the toggle's choice back after", () => {
+    state().loadMap(startOnlyMap(), null)
+    state().setTool("translate")
+    useEditor.setState({ gizmoSpace: "world" })
+    assert.strictEqual(shownGizmoSpace(state()), "world")
+    state().setTool("scale")
+    assert.strictEqual(shownGizmoSpace(state()), "local")
+    state().setTool("rotate")
+    assert.strictEqual(shownGizmoSpace(state()), "world")
+  })
+
+  it("holds the toggle under Scale, so nothing changes out of sight", () => {
+    state().loadMap(startOnlyMap(), null)
+    useEditor.setState({ gizmoSpace: "world" })
+    state().setTool("scale")
+    state().toggleGizmoSpace()
+    assert.strictEqual(state().gizmoSpace, "world")
+    state().setTool("translate")
+    state().toggleGizmoSpace()
+    assert.strictEqual(state().gizmoSpace, "local")
+    state().setTool("scale")
+    state().setTool("translate")
+    assert.strictEqual(shownGizmoSpace(state()), "local")
+    useEditor.setState({ gizmoSpace: "world" })
+  })
+})
+
 describe("groups and the selection", () => {
   /** A new map with four cubes: inner > (a, b) and outer > (inner, c), then d loose; nothing selected. */
   const nestedMap = () => {
@@ -1403,6 +1434,55 @@ describe("groups and the selection", () => {
     assert.isTrue(state().collapsedGroups.has(outer))
     state().expandGroups([outer])
     assert.isFalse(state().collapsedGroups.has(outer))
+  })
+
+  it("pivots a whole group on the centre of its members, and anything else on the active item", () => {
+    const { a, b, c, d } = nestedMap()
+    const pivot = () => selectionPivot(state(), transformOf)
+    const turned = { x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 }
+    transformItem(b, { ...transformOf(b), rotation: turned })
+    state().select([a, b, c])
+    // no catalog here, so each member counts as its origin: x 0 to 200
+    assert.deepStrictEqual(pivot()?.pivot, { x: 100, y: 0, z: transformOf(a).translation.z })
+    assert.deepStrictEqual(pivot()?.rotation, { x: 0, y: 0, z: 0, w: 1 })
+    assert.deepStrictEqual(pivot()?.activePivot, transformOf(c).translation)
+    // a group and a loose piece: the game goes back to the active item
+    state().select([a, b, c, d])
+    assert.deepStrictEqual(pivot()?.pivot, transformOf(d).translation)
+    state().select([d, a, c, b])
+    assert.deepStrictEqual(pivot()?.rotation, transformOf(b).rotation)
+    state().select([])
+    assert.isUndefined(pivot())
+  })
+
+  it("pivots a prefab instance on its origin, and follows a live move", () => {
+    mapWithCubes(0, 1000)
+    const [, a, b] = state().doc.ids
+    const pair = [a!, b!].map((key) => state().doc.map.items[state().doc.ids.indexOf(key)]!)
+    // saved with real bounds, a cube's origin being the middle of its base; this test's store has no catalog, so its
+    // own idea of the middle is off from the point the offsets count from
+    const made = prefabOfItems(pair, indexCatalog(Schema.decodeUnknownSync(Catalog)(fixture)))
+    const { items, link } = definitionOf(made, { tier: "user", name: "Pair", hash: "a".repeat(64) }, null)
+    const shifted = items.map((item) => ({
+      ...item,
+      itemTransform: {
+        ...item.itemTransform,
+        translation: { ...item.itemTransform.translation, x: item.itemTransform.translation.x + 5000 }
+      }
+    }))
+    state().placeGroup(shifted, "Pair", link)
+    const keys = [...state().selectedIds]
+    const origin = selectionPivot(state(), transformOf)?.pivot
+    assert.closeTo(origin?.x ?? 0, 5000, 0.01)
+    assert.closeTo(origin?.z ?? 1, 0, 0.01)
+    const live = (id: string) => {
+      const t = transformOf(id)
+      return { ...t, translation: { ...t.translation, x: t.translation.x + 300 } }
+    }
+    assert.closeTo(selectionPivot(state(), live)?.pivot.x ?? 0, 5300, 0.01)
+    // edited, it has no origin left, so it's any group
+    moveItem(keys[0]!, { ...transformOf(keys[0]!).translation, x: 9000 })
+    assert.isAbove(Math.abs(selectionPivot(state(), transformOf)?.pivot.z ?? 0), 1)
   })
 
   it("groups the selection, whole groups staying whole", () => {
