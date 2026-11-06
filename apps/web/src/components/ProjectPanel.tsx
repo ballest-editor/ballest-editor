@@ -1,4 +1,4 @@
-import { IconDotsVertical, IconDownload, IconMap, IconMapPlus, IconSettings } from "@tabler/icons-react"
+import { IconDots, IconDownload, IconMap, IconMapPlus, IconSettings } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import {
   DropdownMenu,
@@ -122,7 +122,7 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
             />
           }
         >
-          <IconDotsVertical />
+          <IconDots />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem disabled={isOpen} onClick={() => void openProjectMap(map.fileName)}>Open</DropdownMenuItem>
