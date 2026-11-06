@@ -114,6 +114,8 @@ export interface TestDisk {
     /** The maps Open in game asked the plugin to open, in order, and what the plugin answers a running game's. */
     opens: Array<string>
     editOutcome: EditOutcome
+    /** What the in-game editor has open, as it names it, when it refuses. */
+    inGame: string | null
   }
   /** The updater: `push` sends a new state to the page, as main does. Downloads and installs are counted. */
   readonly updater: {
@@ -231,7 +233,8 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
     pluginInstalls: 0,
     races: [],
     opens: [],
-    editOutcome: "opened"
+    editOutcome: "opened",
+    inGame: null
   },
   updater: makeTestUpdater()
 })
@@ -712,19 +715,26 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       if (launch === "launched") disk.game.launches++
       return { _tag: "Played", plugin, sent, launch } as const
     },
-    openInGame: async ({ fileName, replacePublished, overwriteChanged }) => {
+    openInGame: async ({ fileName, replacePublished, overwriteChanged, force }) => {
       const { plugin } = disk.game
       if (plugin.status !== "current" || plugin.hostTooOld) return { _tag: "NeedsPlugin", plugin } as const
       const exported = await bridge.exportMap({ fileName, replacePublished, overwriteChanged })
       if (exported._tag !== "Exported") return exported
-      disk.game.opens.push(fileName)
       const launch = disk.game.running ? "running" : "launched"
       if (launch === "launched") disk.game.launches++
+      // the plugin refuses to replace changed pieces unless told to
+      const outcome = launch !== "running"
+        ? "pending"
+        : disk.game.editOutcome === "unsaved" && force
+        ? "opened"
+        : disk.game.editOutcome
+      if (outcome !== "unsaved") disk.game.opens.push(fileName)
       return {
         _tag: "Opening",
         plugin,
         launch,
-        outcome: launch === "running" ? disk.game.editOutcome : "pending"
+        outcome,
+        inGame: outcome === "unsaved" ? disk.game.inGame : null
       } as const
     },
     onPlaySessionEnded: (listener) => {

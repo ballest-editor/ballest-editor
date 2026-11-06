@@ -57,6 +57,7 @@ Bump `version` in `info.toml` when `main.as` changes, so installed copies show *
 | `map`   | The map's file name in the game's maps folder. No folders. `Map_LevelEditorMain&` and `.balledit` can be left out, as `Tracks::OpenLocal` allows.                                            |
 | `nonce` | A number or a string, different for every press of Play (the editor uses the time in milliseconds). Any value other than the last one handled starts a race, so it doesn't have to increase. |
 | `mode`  | `"edit"` opens the map in the in-game editor. Anything else, or no `mode`, races it. An `edit` request needs the map's full file name.                                                       |
+| `force` | With `"edit"`: replace the map open in the in-game editor even though its pieces changed since it opened.                                                                                    |
 
 Write the file in one go (write a temporary file next to it, then rename it over `play.json`). The plugin ignores a
 file that isn't valid JSON yet and reads it again on its next check.

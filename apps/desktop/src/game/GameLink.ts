@@ -47,7 +47,8 @@ const PLAY_FILE = "play.json"
 export const PlayFile = Schema.Struct({
   map: Schema.String,
   nonce: Schema.Finite,
-  mode: Schema.optionalKey(Schema.Literal("edit"))
+  mode: Schema.optionalKey(Schema.Literal("edit")),
+  force: Schema.optionalKey(Schema.Boolean)
 })
 export type PlayFile = typeof PlayFile.Type
 
@@ -79,10 +80,16 @@ export class GameLink extends Context.Service<GameLink, {
    * seen. Only into an installed plugin (`current` or `outdated`); otherwise nothing is written and `sent` is false.
    */
   readonly requestRace: (fileName: string) => Effect.Effect<RaceRequest, GameLinkError>
-  /** Asks the plugin to open `fileName` in the in-game editor, as `requestRace` does; answers the request's nonce. */
-  readonly requestEdit: (fileName: string) => Effect.Effect<number, GameLinkError>
-  /** What the plugin did with the open request `nonce`, waiting a few seconds for its answer in its `Storage` file. */
-  readonly editOutcome: (nonce: number) => Effect.Effect<EditOutcome>
+  /**
+   * Asks the plugin to open `fileName` in the in-game editor, as `requestRace` does, over the map open there when
+   * `force` or when that map's pieces haven't changed since it opened; answers the request's nonce.
+   */
+  readonly requestEdit: (fileName: string, force: boolean) => Effect.Effect<number, GameLinkError>
+  /**
+   * What the plugin did with the open request `nonce`, waiting a few seconds for its answer in its `Storage` file:
+   * with `unsaved`, `inGame` names the map the in-game editor kept open.
+   */
+  readonly editOutcome: (nonce: number) => Effect.Effect<{ outcome: EditOutcome; inGame: string | null }>
 }>()("ballest/desktop/game/GameLink") {
   static readonly make = (bundleDir: string) =>
     Effect.gen(function*() {
@@ -221,23 +228,25 @@ export class GameLink extends Context.Service<GameLink, {
         return { plugin, sent: true } satisfies RaceRequest
       })
 
-      const requestEdit = Effect.fn("GameLink.requestEdit")(function*(fileName: string) {
+      const requestEdit = Effect.fn("GameLink.requestEdit")(function*(fileName: string, force: boolean) {
         const { folder } = yield* pluginStatus
         if (folder === null) return yield* new GameLinkError({ reason: "play", path: null })
-        return yield* writeRequest(folder, { map: fileName, mode: "edit" })
+        return yield* writeRequest(folder, { map: fileName, mode: "edit", force })
       })
 
       const editOutcome = Effect.fn("GameLink.editOutcome")(function*(nonce: number) {
+        const pending = { outcome: "pending" as const, inGame: null }
         const folder = yield* hostFolder.pipe(Effect.orElseSucceed(() => null))
-        if (folder === null) return "pending" as const
+        if (folder === null) return pending
         const storage = path.join(folder, "storage", `${PLUGIN_ID}.txt`)
         for (let tries = 0; tries < EDIT_ANSWER_TRIES; tries++) {
           const text = yield* fs.readFileString(storage).pipe(Effect.orElseSucceed(() => ""))
-          const outcome = editOutcomeIn(text, nonce)
-          if (outcome === "opened" || outcome === "refused") return outcome
+          const answer = editOutcomeIn(text, nonce)
+          if (answer?.outcome === "opened") return { outcome: "opened" as const, inGame: null }
+          if (answer?.outcome === "unsaved") return { outcome: "unsaved" as const, inGame: answer.detail || null }
           yield* Effect.sleep(EDIT_ANSWER_POLL)
         }
-        return "pending" as const
+        return pending
       })
 
       return GameLink.of({ pluginStatus, installPlugin, requestRace, requestEdit, editOutcome })

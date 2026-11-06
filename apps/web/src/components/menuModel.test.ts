@@ -22,6 +22,7 @@ const state = (over: Partial<MenuState> = {}): MenuState => ({
   noTabOff: null,
   untitled: false,
   reimportable: null,
+  openedInGame: false,
   recent: [],
   openElsewhere: [],
   panels: [{ id: "outline", title: "Outline", open: true }],

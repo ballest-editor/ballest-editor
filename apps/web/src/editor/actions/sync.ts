@@ -154,7 +154,11 @@ export const resolveConflict = (fileName: string) => run(askSyncConflict(fileNam
  * A game session Play started or joined has ended: the game may have changed the export (the in-game editor saves
  * over it) or a prefab (`saveprefab`), so both are checked.
  */
-const playSessionEnded = Effect.suspend(() => checkExportsEffect.pipe(Effect.andThen(checkPrefabs)))
+const playSessionEnded = Effect.suspend(() => {
+  // the game closed: nothing is open in its editor any more
+  useEditor.getState().setOpenedInGame(null)
+  return checkExportsEffect.pipe(Effect.andThen(checkPrefabs))
+})
 
 /** Runs `playSessionEnded` at the end of each game session Play started, until interrupted. */
 export const followPlaySessionsEffect = Effect.gen(function*() {

@@ -38,6 +38,7 @@ import { ProjectChooser } from "./ProjectChooser"
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog"
 import { RecoverDialog } from "./RecoverDialog"
 import { RecoverUnsavedDialog } from "./RecoverUnsavedDialog"
+import { ReplaceInGameDialog } from "./ReplaceInGameDialog"
 import { ReplacePublishedDialog } from "./ReplacePublishedDialog"
 import { SettingsDialog } from "./SettingsDialog"
 import { StatusBar } from "./StatusBar"
@@ -178,6 +179,7 @@ export function Editor() {
       <NewProjectDialog open={dialog === "newProject"} onClose={close} />
       <WhereToOpenDialog open={dialog === "whereToOpen"} onClose={close} />
       <ReplacePublishedDialog open={dialog === "replacePublished"} onClose={close} />
+      <ReplaceInGameDialog open={dialog === "replaceInGame"} onClose={close} />
       <SyncConflictDialog open={dialog === "syncConflict"} onClose={close} />
       <ImportClashDialog open={dialog === "importClash"} onClose={close} />
       <RecoverDialog open={dialog === "recover"} onClose={close} />

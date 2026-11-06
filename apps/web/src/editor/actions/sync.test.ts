@@ -7,6 +7,7 @@ import { useEditor } from "../../editor/store"
 import { projectFile, TEST_MAPS_FOLDER, type TestDisk } from "../../test/desktopBridge"
 import { diskWithPlugin, edit, layerFor, playSample, reset, s, untilTrue } from "../../test/editorActions"
 import { exportToGameEffect, openInGameEffect, playEffect } from "./exportPlay"
+import { replaceInGameEffect } from "./gameWrite"
 import { openProjectMapFile } from "./maps"
 import { saveMapFile } from "./save"
 import { checkExportsEffect, followPlaySessionsEffect, keepProjectVersionEffect, takeGameVersionEffect } from "./sync"
@@ -286,18 +287,51 @@ describe("sync", () => {
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("says when the in-game editor refused, and asks for the update an old plugin needs", () => {
+  it.effect("Open in game becomes Update in game, and asks before replacing changed pieces in the game", () => {
+    const disk = diskWithPlugin({ [projectFile(name)]: text })
+    return Effect.gen(function*() {
+      yield* exported(disk)
+      s().setOpenedInGame(null)
+      disk.game.running = true
+      yield* openInGameEffect
+      assert.strictEqual(s().openedInGame, name)
+      assert.match(s().toasts[0]?.title ?? "", /^Opened /)
+      assert.deepStrictEqual(disk.game.opens, [name])
+
+      // the player moved a piece in the game: the plugin refuses, and the dialog asks
+      disk.game.editOutcome = "unsaved"
+      disk.game.inGame = label
+      yield* openInGameEffect
+      assert.deepInclude(s().dialog, { id: "replaceInGame", name, inGame: label })
+      assert.deepStrictEqual(disk.game.opens, [name])
+      s().closeDialog()
+      assert.deepStrictEqual(disk.game.opens, [name])
+
+      yield* openInGameEffect
+      yield* replaceInGameEffect
+      assert.isNull(s().dialog)
+      assert.deepStrictEqual(disk.game.opens, [name, name])
+      assert.match(s().toasts[0]?.title ?? "", /^Updated /)
+
+      // the game closed: nothing is open there any more
+      disk.game.editOutcome = "opened"
+      disk.playSessions.push({ fileName: name })
+      const fiber = yield* Effect.forkChild(followPlaySessionsEffect)
+      yield* untilTrue(() => disk.playSessions.listeners.size > 0)
+      disk.playSessions.push({ fileName: name })
+      yield* untilTrue(() => s().openedInGame === null)
+      yield* Fiber.interrupt(fiber)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("asks for the update an old plugin needs", () => {
     const disk = diskWithPlugin({ [projectFile(name)]: text })
     return Effect.gen(function*() {
       yield* exported(disk)
       disk.game.running = true
-      disk.game.editOutcome = "refused"
-      yield* openInGameEffect
-      assert.match(s().toasts[0]?.title ?? "", /in-game editor is already open/)
-
       disk.game.plugin = { ...disk.game.plugin, status: "outdated", installedVersion: "0.1.0" }
       yield* openInGameEffect
-      assert.deepStrictEqual(disk.game.opens, [name])
+      assert.deepStrictEqual(disk.game.opens, [])
       const update = s().notifications.find((n) => n.kind === "pluginUpdate")
       assert.deepInclude(update?.actions[0], { label: "Update plugin" })
 

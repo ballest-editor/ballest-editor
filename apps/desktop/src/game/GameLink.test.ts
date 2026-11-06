@@ -205,14 +205,14 @@ describe("GameLink.editOutcome", () => {
   it.effect("reads what the plugin answered", () =>
     runScoped(Effect.gen(function*() {
       const opened = yield* answer("edited=7 opened\r\nnonce=7\r\n")
-      assert.strictEqual(yield* opened.editOutcome(7), "opened")
-      const refused = yield* answer("edited=8 refused\r\nnonce=8\r\n")
-      assert.strictEqual(yield* refused.editOutcome(8), "refused")
+      assert.deepStrictEqual(yield* opened.editOutcome(7), { outcome: "opened", inGame: null })
+      const unsaved = yield* answer("edited=8 unsaved Big Loop\r\nnonce=8\r\n")
+      assert.deepStrictEqual(yield* unsaved.editOutcome(8), { outcome: "unsaved", inGame: "Big Loop" })
     })))
 
   it.live("gives up on an answer that doesn't come", () =>
     runScoped(Effect.gen(function*() {
       const link = yield* answer("edited=7 opened\r\n")
-      assert.strictEqual(yield* link.editOutcome(8), "pending")
+      assert.deepStrictEqual(yield* link.editOutcome(8), { outcome: "pending", inGame: null })
     })))
 })

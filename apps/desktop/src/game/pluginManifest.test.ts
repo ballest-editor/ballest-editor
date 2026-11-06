@@ -63,10 +63,11 @@ describe("loadedPluginVersionIn", () => {
 })
 
 describe("editOutcomeIn", () => {
-  const storage = "edited=1793992627797 refused\r\nnonce=1793992627797\r\n"
+  const storage = "edited=1793992627797 unsaved Track Test 1\r\nnonce=1793992627797\r\n"
 
-  it("answers for the request asked about, and no other", () => {
-    assert.strictEqual(editOutcomeIn(storage, 1793992627797), "refused")
+  it("answers for the request asked about, and no other, with what follows the outcome", () => {
+    assert.deepStrictEqual(editOutcomeIn(storage, 1793992627797), { outcome: "unsaved", detail: "Track Test 1" })
+    assert.deepStrictEqual(editOutcomeIn("edited=5 opened\r\n", 5), { outcome: "opened", detail: "" })
     assert.isNull(editOutcomeIn(storage, 1793992627798))
     assert.isNull(editOutcomeIn("", 1))
   })

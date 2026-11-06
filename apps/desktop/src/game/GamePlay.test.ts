@@ -229,7 +229,7 @@ describe("GamePlay.play", () => {
 })
 
 describe("GamePlay.openInGame", () => {
-  const payload = { fileName: name, replacePublished: false, overwriteChanged: false }
+  const payload = { fileName: name, replacePublished: false, overwriteChanged: false, force: false }
   const answers = (fs: FileSystem.FileSystem, folder: string, outcome: string, nonce: number) =>
     Effect.andThen(
       fs.makeDirectory(folder, { recursive: true }),
@@ -242,8 +242,11 @@ describe("GamePlay.openInGame", () => {
       yield* link.installPlugin
       assert.deepInclude(yield* play.openInGame(payload), { _tag: "Opening", launch: "launched", outcome: "pending" })
       assert.strictEqual(yield* fs.readFileString(path.join(steam.maps, name)), mapText(-1))
-      assert.deepInclude(yield* readPlay(fs, playJson), { map: name, mode: "edit" })
+      assert.deepInclude(yield* readPlay(fs, playJson), { map: name, mode: "edit", force: false })
       assert.strictEqual(game.launches, 1)
+      // told to replace what the in-game editor holds: the plugin hears so
+      yield* play.openInGame({ ...payload, force: true })
+      assert.deepInclude(yield* readPlay(fs, playJson), { map: name, mode: "edit", force: true })
     })))
 
   it.effect("writes nothing without a plugin that can open maps: an older one would race the map", () =>
@@ -308,12 +311,16 @@ describe("GamePlay.openInGame", () => {
           return yield* Fiber.join(asked)
         })
       const stale = Effect.map(files.info(path.join(dir, "project"), name), (map) => map.link?.exportedWhileRunning)
-      assert.deepInclude(yield* answered("refused"), { outcome: "refused", launch: "running" })
+      assert.deepInclude(yield* answered("unsaved Big Loop"), {
+        outcome: "unsaved",
+        inGame: "Big Loop",
+        launch: "running"
+      })
       assert.isTrue(yield* stale)
-      assert.deepInclude(yield* answered("opened"), { outcome: "opened", launch: "running" })
+      assert.deepInclude(yield* answered("opened"), { outcome: "opened", inGame: null, launch: "running" })
       assert.isFalse(yield* stale)
       // pressed again: the same bytes are no newer than what the game loaded
-      assert.deepInclude(yield* answered("refused"), { outcome: "refused" })
+      assert.deepInclude(yield* answered("unsaved Big Loop"), { outcome: "unsaved" })
       assert.isFalse(yield* stale)
     })))
 })

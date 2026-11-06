@@ -234,6 +234,16 @@ export interface PublishedDraft {
  * `replacePublished` is what the export that found it was already allowed to replace. `diff` is how the game's version
  * differs from the project's, null when they can't be compared.
  */
+/**
+ * The in-game editor refused to replace the map it has open (`inGame`, as the game names it) with `name` because
+ * that map's pieces changed since it opened: the replaceInGame dialog asks whether to replace it after all.
+ */
+export interface UnsavedInGame {
+  readonly name: string
+  readonly inGame: string | null
+  readonly replacePublished: boolean
+}
+
 export interface SyncConflict {
   readonly name: string
   readonly from: PublishedDraft["from"] | "check"
@@ -286,6 +296,7 @@ export type DialogState =
   | { readonly id: "settings"; readonly category?: SettingsCategory }
   | { readonly id: "replacePublished" } & PublishedDraft
   | { readonly id: "syncConflict" } & SyncConflict
+  | { readonly id: "replaceInGame" } & UnsavedInGame
   | { readonly id: "importClash" } & ImportClash
   | { readonly id: "whereToOpen"; readonly target: ProjectTarget; readonly name: string }
   | { readonly id: "savePrefab" }
@@ -423,6 +434,11 @@ export interface EditorState extends TabState {
   readonly dialog: DialogState | null
   /** The Export or Play under way, for the status bar's chip; null when there is none. */
   readonly gameWrite: GameWrite | null
+  /**
+   * The project map Open in game last opened in the in-game editor, while the game session it opened in lasts: Open
+   * in game is Update in game for it (docs/DESKTOP.md § Play). Null when none is known to be open.
+   */
+  readonly openedInGame: string | null
   /** The Settings dialog's page, kept between openings. */
   readonly settingsCategory: SettingsCategory
   /** The keybind cheat sheet: shown while its binding is held. */
@@ -617,6 +633,7 @@ export interface EditorState extends TabState {
   readonly openDialog: (dialog: DialogState) => void
   readonly closeDialog: () => void
   readonly setGameWrite: (gameWrite: GameWrite | null) => void
+  readonly setOpenedInGame: (fileName: string | null) => void
   readonly setCheatSheet: (cheatSheet: boolean) => void
   readonly setSettingsCategory: (category: SettingsCategory) => void
   readonly setPreview: (preview: EditorState["preview"]) => void
@@ -874,6 +891,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     gizmoSpace: "world",
     dialog: null,
     gameWrite: null,
+    openedInGame: null,
     settingsCategory: "general",
     cheatSheet: false,
     catalog: null,
@@ -1307,6 +1325,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     // Drops the payload with the dialog: the saveAs dialog takes its `afterSave` before it closes itself to save.
     closeDialog: () => set({ dialog: null }),
     setGameWrite: (gameWrite) => set({ gameWrite }),
+    setOpenedInGame: (openedInGame) => set({ openedInGame }),
     setCheatSheet: (cheatSheet) => set({ cheatSheet }),
     setSettingsCategory: (settingsCategory) => set({ settingsCategory }),
     setPreview: (preview) => set({ preview }),
