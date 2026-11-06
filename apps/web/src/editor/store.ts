@@ -308,8 +308,10 @@ export interface TabState {
   readonly past: ReadonlyArray<Snapshot>
   /** Redo stack, next first; cleared by any new edit. */
   readonly future: ReadonlyArray<Snapshot>
-  /** Edited since it was opened or last saved. */
+  /** `doc` isn't what the file holds, or the file has none of it: undoing or redoing back to `savedDoc` clears this. */
   readonly dirty: boolean
+  /** The step of the history the file holds. Null when none does: a recovered map, or one that has lost its file. */
+  readonly savedDoc: Doc | null
   /** Null for a map that was never opened or saved. */
   readonly file: OpenFile | null
   /** The map's "Export on save" (desktop, off by default; kept with the map's prefs). */
@@ -460,7 +462,7 @@ export interface EditorState extends TabState {
   /**
    * Tab `tabId`'s map was saved as `map` (the export-time level fields applied to `from`) into `file`. When its
    * document is still `from`, `map` replaces it without an undo step and the tab is clean; when it was edited
-   * meanwhile, only the file is remembered.
+   * meanwhile, the tab stays dirty until the history is back at `from`.
    */
   readonly markSaved: (tabId: string, from: Doc, map: MapFile, file: OpenFile) => void
   /** Tab `tabId`'s definition was saved from `from`, as `document`: the tab is clean while its document is still `from`. */
@@ -616,22 +618,27 @@ const freshTabState = (
   file: OpenFile | null,
   floorHeight?: number,
   options?: TabOptions
-): TabState => ({
-  doc: docOf(map, options?.loaded),
-  document: options?.document ?? { kind: "map" },
-  floorHeight: floorHeight ?? floorHeightOf(map),
-  past: [],
-  future: [],
-  dirty: options?.dirty ?? false,
-  file,
-  exportOnSave: options?.exportOnSave ?? false,
-  selectedIds: [],
-  fresh: options?.fresh ?? false,
-  enteredGroupId: null,
-  collapsedGroups: new Set(),
-  viewLayout: options?.viewLayout ?? defaultViewLayout,
-  activePane: 0
-})
+): TabState => {
+  const doc = docOf(map, options?.loaded)
+  const dirty = options?.dirty ?? false
+  return {
+    doc,
+    document: options?.document ?? { kind: "map" },
+    floorHeight: floorHeight ?? floorHeightOf(map),
+    past: [],
+    future: [],
+    dirty,
+    savedDoc: dirty ? null : doc,
+    file,
+    exportOnSave: options?.exportOnSave ?? false,
+    selectedIds: [],
+    fresh: options?.fresh ?? false,
+    enteredGroupId: null,
+    collapsedGroups: new Set(),
+    viewLayout: options?.viewLayout ?? defaultViewLayout,
+    activePane: 0
+  }
+}
 
 /** The active tab's state, out of the store. */
 const activeTabOf = (s: EditorState): TabState => ({
@@ -641,6 +648,7 @@ const activeTabOf = (s: EditorState): TabState => ({
   past: s.past,
   future: s.future,
   dirty: s.dirty,
+  savedDoc: s.savedDoc,
   file: s.file,
   exportOnSave: s.exportOnSave,
   selectedIds: s.selectedIds,
@@ -725,7 +733,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     const existing = new Set(doc.ids)
     return {
       doc,
-      dirty: snapshot.selectionOnly ? s.dirty : true,
+      dirty: doc !== s.savedDoc,
       selectedIds: snapshot.selectedIds.filter((id) => existing.has(id)),
       enteredGroupId: keptEnteredGroup(doc, s.enteredGroupId),
       // the side being left, for the opposite stack
@@ -875,9 +883,14 @@ export const useEditor = create<EditorState>()((set, get) => {
     },
 
     markSaved: (tabId, from, map, file) =>
-      updateTab(tabId, (tab) => tab.doc === from ? { doc: { ...tab.doc, map }, dirty: false, file } : { file }),
+      updateTab(tabId, (tab) => {
+        // edited while it saved: the file holds `from`, a step of the history by now
+        if (tab.doc !== from) return { savedDoc: from, file }
+        const doc = { ...from, map }
+        return { doc, savedDoc: doc, dirty: false, file }
+      }),
     markPrefabSaved: (tabId, from, document, file) =>
-      updateTab(tabId, (tab) => tab.doc === from ? { document, dirty: false, file } : { document, file }),
+      updateTab(tabId, (tab) => ({ document, savedDoc: from, dirty: tab.doc !== from, file })),
     setPrefabs: (prefabs) => set({ prefabs }),
     setProject: (project, projectMaps) => set({ project, projectMaps }),
     detachFiles: () =>
@@ -886,7 +899,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         const detach = (tab: TabState): TabState =>
           tab.file === null || (tab.document.kind === "prefab" && tab.document.tier === "user")
             ? tab
-            : { ...tab, file: null, dirty: true }
+            : { ...tab, file: null, dirty: true, savedDoc: null }
         return {
           ...detach(activeTabOf(s)),
           parkedTabs: new Map([...s.parkedTabs].map(([id, tab]) => [id, detach(tab)]))

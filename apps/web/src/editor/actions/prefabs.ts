@@ -236,7 +236,7 @@ export const renamePrefab = (ref: PrefabRef, to: string) => run(renamePrefabEffe
 export const deletePrefabEffect = Effect.fn("deletePrefabEffect")(function*(ref: PrefabRef) {
   yield* (yield* Platform).deletePrefab(ref)
   const open = definitionTab(ref)
-  if (open !== undefined) useEditor.getState().patchTab(open.tabId, { file: null })
+  if (open !== undefined) useEditor.getState().patchTab(open.tabId, { file: null, savedDoc: null })
   yield* checkPrefabs
 })
 

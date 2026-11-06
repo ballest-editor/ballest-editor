@@ -154,6 +154,8 @@ describe("editor store", () => {
       return s().selectedIds[0]!
     }
     const translationOf = (id: string) => s().doc.map.items[s().doc.ids.indexOf(id)]!.itemTransform.translation
+    const withUndoSelection = (on: boolean) =>
+      s().setSettings({ ...defaultSettings, editor: { ...defaultSettings.editor, undoSelection: on } })
 
     it("puts every kind of edit on the stack, and loading a map clears it", () => {
       s().loadMap(startOnlyMap(), null)
@@ -168,6 +170,105 @@ describe("editor store", () => {
       assert.strictEqual(s().past.length, 0)
       assert.strictEqual(s().future.length, 0)
       assert.isFalse(s().dirty)
+    })
+
+    describe("dirty", () => {
+      const saved = { name: "saved.balledit", path: null }
+      const save = () => s().markSaved(s().tabId, s().doc, s().doc.map, saved)
+
+      it("clears when undo gets back to the map as it was opened", () => {
+        s().loadMap(startOnlyMap(), null)
+        place(0)
+        place(10)
+        assert.isTrue(s().dirty)
+        s().undo()
+        assert.isTrue(s().dirty)
+        s().undo()
+        assert.isFalse(s().dirty)
+        s().redo()
+        assert.isTrue(s().dirty)
+      })
+
+      it("clears when undo gets back to the last save", () => {
+        s().loadMap(startOnlyMap(), null)
+        place(0)
+        save()
+        assert.isFalse(s().dirty)
+        place(10)
+        assert.isTrue(s().dirty)
+        s().undo()
+        assert.isFalse(s().dirty)
+      })
+
+      it("comes back on undoing past the save, and clears on redoing to it", () => {
+        s().loadMap(startOnlyMap(), null)
+        place(0)
+        save()
+        s().undo()
+        assert.isTrue(s().dirty)
+        s().redo()
+        assert.isFalse(s().dirty)
+      })
+
+      it("stays once a new edit has replaced the step that was saved", () => {
+        s().loadMap(startOnlyMap(), null)
+        place(0)
+        save()
+        s().undo()
+        place(10)
+        s().undo()
+        assert.isTrue(s().dirty)
+      })
+
+      it("clears at the step that was saved, when the map was edited during the save", () => {
+        s().loadMap(startOnlyMap(), null)
+        place(0)
+        const from = s().doc
+        place(10)
+        s().markSaved(s().tabId, from, from.map, saved)
+        assert.isTrue(s().dirty)
+        s().undo()
+        assert.isFalse(s().dirty)
+      })
+
+      it("isn't changed by undoing a selection step", () => {
+        s().loadMap(startOnlyMap(), null)
+        withUndoSelection(true)
+        try {
+          const id = place(0)
+          s().select([])
+          s().undo()
+          assert.deepStrictEqual(s().selectedIds, [id])
+          assert.isTrue(s().dirty)
+        } finally {
+          withUndoSelection(false)
+        }
+      })
+
+      it("stays on a recovered map, which no step of the history is the file of", () => {
+        s().loadMap(startOnlyMap(), saved, undefined, { dirty: true })
+        place(0)
+        s().undo()
+        assert.isTrue(s().dirty)
+      })
+
+      it("stays on a map that lost its file", () => {
+        s().loadMap(startOnlyMap(), saved)
+        place(0)
+        s().detachFiles()
+        s().undo()
+        assert.isTrue(s().dirty)
+      })
+
+      it("follows each tab's own saved step", () => {
+        s().loadMap(startOnlyMap(), null)
+        const first = s().tabId
+        place(0)
+        s().loadMap(startOnlyMap(), saved, undefined, { into: "newTab" })
+        s().activateTab(first)
+        s().undo()
+        assert.isFalse(s().dirty)
+      })
     })
 
     it("leaves no step for edits that change nothing", () => {
@@ -228,9 +329,6 @@ describe("editor store", () => {
       s().undo()
       assert.deepStrictEqual(translationOf(id), { x: 0, y: 0, z: 0 })
     })
-
-    const withUndoSelection = (on: boolean) =>
-      s().setSettings({ ...defaultSettings, editor: { ...defaultSettings.editor, undoSelection: on } })
 
     it("doesn't record selection changes by default", () => {
       withUndoSelection(false)
