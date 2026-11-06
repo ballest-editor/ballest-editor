@@ -1,23 +1,26 @@
-import { IconAngle, IconCube, IconEye, IconGrid4x4, IconWorld } from "@tabler/icons-react"
+import { IconAngle, IconChevronDown, IconCube, IconGrid4x4, IconHaze, IconWorld } from "@tabler/icons-react"
+import { Button } from "@workspace/ui/components/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Switch } from "@workspace/ui/components/switch"
 import { Toggle } from "@workspace/ui/components/toggle"
 import { cn } from "@workspace/ui/lib/utils"
-import type { ReactNode } from "react"
+import { type ReactNode, useState } from "react"
+import { floorHeightOf } from "../domain/level"
 import type { Settings } from "../domain/Settings"
 import { formatGridSize, formatRotationStep, GRID_SIZES, ROTATION_STEPS } from "../domain/snap"
-import { updateSettings } from "../editor/actions"
-import { useEditor } from "../editor/store"
+import { setGridHeight, updateSettings } from "../editor/actions"
+import { useEditor, useOpenPrefab } from "../editor/store"
+import { NumberField } from "./NumberField"
 import { ToolBar } from "./ToolBar"
 import { GROUP, noFocus, releaseFocus, SEGMENT, SEGMENT_ON } from "./viewControlStyle"
-import { ActivePaneBox, ViewLayoutControl, ViewPanes } from "./ViewPanes"
+import { ViewLayoutControl, ViewPanes } from "./ViewPanes"
 import { ViewTip } from "./ViewTip"
 
 /**
- * Everything floating over the viewport: its panes' frames, the tool bar (bottom) and, in the active pane's top right
- * like the game's, how the view divides into panes, what it displays, the gizmo's axes, then grid and rotation snapping.
- * Pointer-only, so keybinds stay with the viewport.
+ * Everything floating over the viewport: its panes' frames, the tool bar (bottom) and, in the viewport's top right like
+ * the game's, over every pane since they all share them, how the view divides into panes, what it displays, the gizmo's
+ * axes, then grid and rotation snapping. Pointer-only, so keybinds stay with the viewport.
  */
 export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
   const settings = useEditor((s) => s.settings)
@@ -28,7 +31,7 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
   return (
     <>
       <ViewPanes disabled={disabled} />
-      <ActivePaneBox>
+      <div className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap justify-end gap-2">
         <ViewLayoutControl disabled={disabled} />
         <DisplayControl disabled={disabled} />
         <AxesToggle disabled={disabled} />
@@ -56,7 +59,7 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
           format={formatRotationStep}
           disabled={disabled}
         />
-      </ActivePaneBox>
+      </div>
       <ToolBar disabled={disabled} />
     </>
   )
@@ -78,7 +81,7 @@ function AxesToggle({ disabled }: { readonly disabled: boolean }) {
             onPressedChange={toggleGizmoSpace}
             disabled={disabled}
             aria-label={label}
-            className={cn(SEGMENT, "gap-1.5 aria-pressed:bg-transparent aria-pressed:hover:bg-muted")}
+            className={cn(SEGMENT, "aria-pressed:bg-transparent aria-pressed:hover:bg-muted")}
             {...noFocus}
           />
         }
@@ -103,40 +106,113 @@ function DisplayRow({ label, checked, onChange }: {
   )
 }
 
-/** What the viewport shows around the map; the same settings as Settings › Appearance and Lighting. */
-function DisplayControl({ disabled }: { readonly disabled: boolean }) {
+/**
+ * Where the open map's grid sits, kept with its prefs; a prefab tab has no such thing. It's in the popup so it only looks
+ * for the player start while that's open.
+ */
+function GridHeightRow() {
+  const units = useEditor((s) => s.settings.general.units)
+  const floorHeight = useEditor((s) => s.floorHeight)
+  const startHeight = useEditor((s) => floorHeightOf(s.doc.map))
+  const perUnit = units === "m" ? 100 : 1
+  return (
+    <div className="flex flex-col gap-1 border-t border-border py-2">
+      Grid height
+      <div className="flex gap-2">
+        <div className="min-w-0 flex-1">
+          <NumberField
+            label="Grid height"
+            value={floorHeight / perUnit}
+            digits={units === "m" ? 3 : 1}
+            handle={false}
+            unit={units}
+            onCommit={(value) => void setGridHeight(value * perUnit)}
+          />
+        </div>
+        <Button
+          variant="outline"
+          disabled={floorHeight === startHeight}
+          onClick={() => void setGridHeight(startHeight)}
+        >
+          Use player start
+        </Button>
+      </div>
+      <span className="text-fg-tertiary">Where the grid sits and new pieces land.</span>
+    </div>
+  )
+}
+
+/** The one home of what the viewport shows around the map, and of where its grid sits. */
+function DisplayRows({ onLeave }: {
+  /** Settings is opening over the popover. */
+  readonly onLeave: () => void
+}) {
+  const { gridVisible, waterVisible } = useEditor((s) => s.settings.appearance)
   const { mapLighting, skyVisible } = useEditor((s) => s.settings.lighting)
-  const waterVisible = useEditor((s) => s.settings.appearance.waterVisible)
+  const openDialog = useEditor((s) => s.openDialog)
+  const prefab = useOpenPrefab()
+  return (
+    <>
+      <div className="pb-1">
+        <DisplayRow
+          label="Show grid"
+          checked={gridVisible}
+          onChange={(on) => void updateSettings("appearance", { gridVisible: on })}
+        />
+        <DisplayRow
+          label="Show sky"
+          checked={skyVisible}
+          onChange={(on) => void updateSettings("lighting", { skyVisible: on })}
+        />
+        <DisplayRow
+          label="Show water"
+          checked={waterVisible}
+          onChange={(on) => void updateSettings("appearance", { waterVisible: on })}
+        />
+        <DisplayRow
+          label="Map lighting"
+          checked={mapLighting}
+          onChange={(on) => void updateSettings("lighting", { mapLighting: on })}
+        />
+      </div>
+      {prefab === null && <GridHeightRow />}
+      <div className="flex h-8 items-center gap-1 border-t border-border whitespace-nowrap text-fg-tertiary">
+        Grid colours are in
+        <Button
+          variant="link"
+          className="h-auto p-0 text-foreground underline"
+          onClick={() => {
+            onLeave()
+            openDialog({ id: "settings", category: "appearance" })
+          }}
+        >
+          Settings › Appearance
+        </Button>
+      </div>
+    </>
+  )
+}
+
+function DisplayControl({ disabled }: { readonly disabled: boolean }) {
+  const [open, setOpen] = useState(false)
   return (
     <div className={GROUP}>
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <ViewTip
-          label="Display"
+          label="Grid, sky, water and lighting"
           render={
             <PopoverTrigger
               disabled={disabled}
-              render={<button type="button" aria-label="Display" className={SEGMENT} {...noFocus} />}
+              render={<button type="button" className={SEGMENT} {...noFocus} />}
             />
           }
         >
-          <IconEye className="size-4" />
+          <IconHaze className="size-4" />
+          <span className="text-foreground">Display</span>
+          <IconChevronDown className="size-3" />
         </ViewTip>
-        <PopoverContent align="end" finalFocus={false} className="w-44 gap-0 px-3 py-1.5">
-          <DisplayRow
-            label="Map lighting"
-            checked={mapLighting}
-            onChange={(on) => void updateSettings("lighting", { mapLighting: on })}
-          />
-          <DisplayRow
-            label="Show sky"
-            checked={skyVisible}
-            onChange={(on) => void updateSettings("lighting", { skyVisible: on })}
-          />
-          <DisplayRow
-            label="Show water"
-            checked={waterVisible}
-            onChange={(on) => void updateSettings("appearance", { waterVisible: on })}
-          />
+        <PopoverContent align="end" initialFocus={false} finalFocus={false} className="w-72 gap-0 px-3 py-1">
+          <DisplayRows onLeave={() => setOpen(false)} />
         </PopoverContent>
       </Popover>
     </div>

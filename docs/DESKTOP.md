@@ -117,7 +117,9 @@ A layout is per tab (`TabState.viewLayout`), and remembered per map in `MapPrefs
 
 Changing projection keeps the point the pane looks at and its size on screen. Numpad 5 goes to the orthographic view nearest where the pane looks, or back to perspective from the same direction.
 
-**The active pane** is the last one hovered or clicked, outlined when there are several, and the view controls sit in its top right. It is what the fly keys, Focus selection, Frame all and the numpad keys act on, and where a palette piece lands. A pointer drag or the wheel acts on the pane under the pointer, and a drag stays with the pane it started in. Camera speed is global.
+**The view controls** sit in the viewport's top right, over every pane, because what they set is global: how the view divides, the Display popover, the gizmo's axes and snapping. A pane's label in the top row drops beneath them when the two would meet. The Display popover is the one home of Show grid, Show sky, Show water and Map lighting, and of the open map's grid height (`Use player start` puts it back).
+
+**The active pane** is the last one hovered or clicked, outlined when there are several. It is what the fly keys, Focus selection, Frame all and the numpad keys act on, and where a palette piece lands. A pointer drag or the wheel acts on the pane under the pointer, and a drag stays with the pane it started in. Camera speed is global.
 
 **Navigation in an orthographic pane.** The view has one way to look, so look, orbit and pan drags all pan, one to one with the pointer. The wheel zooms to the pointer, whatever it is bound to in perspective. The left, right, up and down keys slide the view, forward and reverse zoom it, and the arrow keys do nothing. Resizing a pane shows more or less of the map at the same zoom.
 

@@ -27,7 +27,7 @@ import {
   DropdownMenuTrigger
 } from "@workspace/ui/components/dropdown-menu"
 import { cn } from "@workspace/ui/lib/utils"
-import { type PointerEvent, type ReactNode, useSyncExternalStore } from "react"
+import { type PointerEvent, useSyncExternalStore } from "react"
 import type { KeybindAction } from "../domain/Keybinds"
 import { axisOf, formatPaneScale, ORTHO_AXES } from "../domain/orthoView"
 import {
@@ -82,7 +82,7 @@ const paneBox = ({ x, y, width, height }: PaneRect) => ({
 })
 
 /** A menu in a group, with its value's icon on the button: what a pane looks along, and how the view divides. */
-function ViewPicker<V extends string>({ value, options, labels, icons, onPick, tip, action, name, disabled }: {
+function ViewPicker<V extends string>({ value, options, labels, icons, onPick, tip, action, word, strong, disabled }: {
   readonly value: V
   readonly options: ReadonlyArray<V>
   readonly labels: Readonly<Record<V, string>>
@@ -90,25 +90,28 @@ function ViewPicker<V extends string>({ value, options, labels, icons, onPick, t
   readonly onPick: (value: V) => void
   readonly tip: string
   readonly action?: KeybindAction
-  /** The value's name beside its icon, where there's room, and how much it says. */
-  readonly name?: "strong" | "quiet"
+  /** What the button says beside its icon. */
+  readonly word: string
+  /** Whether the word stands out, or stays quiet like the icon. */
+  readonly strong: boolean
   readonly disabled: boolean
 }) {
   const Icon: typeof IconSquare = icons[value]
+  const title = `${tip}: ${labels[value]}`
   return (
     <DropdownMenu>
       <ViewTip
-        label={tip}
+        label={title}
         action={action}
         render={
           <DropdownMenuTrigger
             disabled={disabled}
-            render={<button type="button" aria-label={`${tip}: ${labels[value]}`} className={SEGMENT} {...noFocus} />}
+            render={<button type="button" aria-label={title} className={SEGMENT} {...noFocus} />}
           />
         }
       >
         <Icon className="size-4" />
-        {name !== undefined && <span className={cn(name === "strong" && "text-foreground")}>{labels[value]}</span>}
+        <span className={cn(strong && "text-foreground")}>{word}</span>
         <IconChevronDown className="size-3" />
       </ViewTip>
       <DropdownMenuContent className="w-40">
@@ -116,7 +119,7 @@ function ViewPicker<V extends string>({ value, options, labels, icons, onPick, t
           {options.map((option) => {
             const OptionIcon: typeof IconSquare = icons[option]
             return (
-              <DropdownMenuRadioItem key={option} value={option}>
+              <DropdownMenuRadioItem key={option} value={option} closeOnClick>
                 <OptionIcon className="size-4" />
                 {labels[option]}
               </DropdownMenuRadioItem>
@@ -169,11 +172,15 @@ function PaneMenuItems({ slot, kind }: { readonly slot: number; readonly kind: V
 }
 
 /**
- * The pane's name, which opens the list of views; a right click splits or closes the pane. The active pane has the view
- * controls, and puts its label beneath them when it's too narrow for both, by its own width: the pane is a container.
+ * Where a pane's label goes when it would meet the view controls in the viewport's top right: beneath them. Only the top
+ * row can, and a pane in the right column by its own width (it's a container), one in the left by the viewport's.
  */
-function PaneHeader({ slot, projection, disabled, active }: {
-  readonly slot: number
+const labelClearance = ({ x, y }: PaneRect) =>
+  y > 0 ? undefined : x > 0 ? "@max-[38rem]:top-12" : "@max-[38rem]/viewport:top-12"
+
+/** The pane's name, which opens the list of views; a right click splits or closes the pane. */
+function PaneHeader({ pane, projection, disabled, active }: {
+  readonly pane: PaneRect
   readonly projection: ViewProjection
   readonly disabled: boolean
   readonly active: boolean
@@ -182,23 +189,22 @@ function PaneHeader({ slot, projection, disabled, active }: {
   const setPaneProjection = useEditor((s) => s.setPaneProjection)
   return (
     <ContextMenu disabled={disabled}>
-      <ContextMenuTrigger
-        className={cn(GROUP, "absolute top-3 left-3", active && "@max-[34rem]:top-12")}
-      >
+      <ContextMenuTrigger className={cn(GROUP, "absolute top-3 left-3", labelClearance(pane))}>
         <ViewPicker
           value={projection}
           options={viewProjections}
           labels={viewProjectionLabels}
           icons={VIEW_ICONS}
-          onPick={(next) => setPaneProjection(slot, next)}
+          onPick={(next) => setPaneProjection(pane.slot, next)}
           tip="Pane view"
           action="toggleOrthographic"
-          name={active ? "strong" : "quiet"}
+          word={viewProjectionLabels[projection]}
+          strong={active}
           disabled={disabled}
         />
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <PaneMenuItems slot={slot} kind={kind} />
+        <PaneMenuItems slot={pane.slot} kind={kind} />
       </ContextMenuContent>
     </ContextMenu>
   )
@@ -264,7 +270,7 @@ function PaneCorner({ slot, view }: { readonly slot: number; readonly view: Orth
   )
 }
 
-/** A drag divider between panes. A double click puts it back in the middle. */
+/** A drag divider between panes: a line that brightens under the pointer. A double click puts it back in the middle. */
 function PaneDivider({ axis, at }: { readonly axis: "x" | "y"; readonly at: number }) {
   const setPaneSplit = useEditor((s) => s.setPaneSplit)
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
@@ -292,8 +298,8 @@ function PaneDivider({ axis, at }: { readonly axis: "x" | "y"; readonly at: numb
     >
       <div
         className={cn(
-          "bg-foreground/20 transition-colors group-hover:bg-primary group-active:bg-primary",
-          axis === "x" ? "h-full w-px group-hover:w-0.5" : "h-px w-full group-hover:h-0.5"
+          "bg-foreground/40 transition-colors group-hover:bg-foreground group-active:bg-foreground",
+          axis === "x" ? "h-full w-px" : "h-px w-full"
         )}
       />
     </div>
@@ -309,7 +315,7 @@ export function ViewPanes({ disabled }: { readonly disabled: boolean }) {
   const activePane = useEditor((s) => s.activePane)
   const panes = paneShares(layout)
   return (
-    <div className="pointer-events-none absolute inset-0">
+    <div className="pointer-events-none absolute inset-0 @container/viewport">
       {panes.map((pane) => {
         const { slot } = pane
         const projection = layout.projections[slot]
@@ -317,27 +323,15 @@ export function ViewPanes({ disabled }: { readonly disabled: boolean }) {
         return (
           <div key={slot} className="absolute @container" style={paneBox(pane)}>
             {panes.length > 1 && active && (
-              <div className="absolute inset-0 ring-1 ring-primary ring-inset dark:ring-blue-400" data-active-pane />
+              <div className="absolute inset-0 ring-2 ring-ring ring-inset" data-active-pane />
             )}
-            <PaneHeader slot={slot} projection={projection} disabled={disabled} active={active} />
+            <PaneHeader pane={pane} projection={projection} disabled={disabled} active={active} />
             {isOrthoView(projection) && <PaneCorner slot={slot} view={projection} />}
           </div>
         )
       })}
       {(layout.kind === "columns" || layout.kind === "quad") && <PaneDivider axis="x" at={layout.splitX} />}
       {(layout.kind === "rows" || layout.kind === "quad") && <PaneDivider axis="y" at={layout.splitY} />}
-    </div>
-  )
-}
-
-/** Holds `children` in the active pane's top right: they act on what's being done there, so they go where it's done. */
-export function ActivePaneBox({ children }: { readonly children: ReactNode }) {
-  const layout = useEditor((s) => s.viewLayout)
-  const activePane = useEditor((s) => s.activePane)
-  const pane = paneShares(layout).find(({ slot }) => slot === activePane)
-  return (
-    <div className="pointer-events-none absolute" style={pane === undefined ? undefined : paneBox(pane)}>
-      <div className="absolute top-3 right-3 flex w-max gap-2">{children}</div>
     </div>
   )
 }
@@ -355,6 +349,8 @@ export function ViewLayoutControl({ disabled }: { readonly disabled: boolean }) 
         icons={LAYOUT_ICONS}
         onPick={setViewLayoutKind}
         tip="Panes"
+        word="Panes"
+        strong
         disabled={disabled}
       />
     </div>
