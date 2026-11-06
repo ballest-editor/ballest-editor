@@ -92,13 +92,20 @@ export const SnappingSettings = Schema.Struct({
   rotationStep: Schema.Literals(ROTATION_STEPS)
 })
 
+/** Changed from a panel's own header rather than the Settings dialog, but persisted with the rest. */
+export const PanelSettings = Schema.Struct({
+  /** How the Pieces panel lays out its pieces. */
+  piecesView: Schema.Literals(["list", "grid"])
+})
+
 export const Settings = Schema.Struct({
   general: GeneralSettings,
   editor: EditorSettings,
   camera: CameraSettings,
   appearance: AppearanceSettings,
   lighting: LightingSettings,
-  snapping: SnappingSettings
+  snapping: SnappingSettings,
+  panels: PanelSettings
 })
 export type Settings = typeof Settings.Type
 
@@ -129,12 +136,21 @@ export const defaultSettings: Settings = {
     gridSize: DEFAULT_GRID_SIZE,
     rotationEnabled: false,
     rotationStep: DEFAULT_ROTATION_STEP
-  }
+  },
+  panels: { piecesView: "list" }
 }
 
 type Section = keyof Settings
 
-const sections: ReadonlyArray<Section> = ["general", "editor", "camera", "appearance", "lighting", "snapping"]
+const sections: ReadonlyArray<Section> = [
+  "general",
+  "editor",
+  "camera",
+  "appearance",
+  "lighting",
+  "snapping",
+  "panels"
+]
 
 /** The fixed grid colours older saves stored; they now mean "automatic". */
 const LEGACY_GRID_COLORS = { gridCellColor: "#3a404a", gridSectionColor: "#58606e" } as const

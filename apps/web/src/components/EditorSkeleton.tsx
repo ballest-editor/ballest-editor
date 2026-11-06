@@ -21,7 +21,7 @@ const LABEL_WIDTHS = ["45%", "38%", "52%", "41%", "60%", "35%", "48%", "56%", "4
 export function PaletteSkeleton() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2" aria-hidden>
-      <div className="flex items-center gap-1 px-1 py-1 text-caption uppercase tracking-wider">
+      <div className="flex h-8 items-center gap-1 px-1.5 text-caption uppercase tracking-wider">
         <span className="flex h-[1lh] items-center">
           <Skeleton className="h-2 w-16 rounded-control" />
         </span>
@@ -29,12 +29,12 @@ export function PaletteSkeleton() {
       </div>
       <div className="flex flex-col gap-0.5">
         {Array.from({ length: 48 }, (_, i) => (
-          // Same box as a palette entry: an inline-flex PieceButton inside a block <li>.
+          // Same box as a palette entry.
           <div key={i}>
             <div
-              className={buttonVariants({ variant: "ghost", className: "h-auto w-full justify-start gap-2 px-2 py-1" })}
+              className={buttonVariants({ variant: "ghost", className: "flex h-8 w-full justify-start gap-2 px-1" })}
             >
-              <Skeleton className="size-8 shrink-0 rounded-control" />
+              <Skeleton className="size-6 shrink-0 rounded-control" />
               <Skeleton className="h-2.5 rounded-control" style={{ width: LABEL_WIDTHS[i % LABEL_WIDTHS.length] }} />
             </div>
           </div>
