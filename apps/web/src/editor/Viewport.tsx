@@ -264,7 +264,8 @@ function ViewportGrid() {
       cellSize={100}
       sectionSize={1000}
       fadeDistance={SKY_DOME_RADIUS}
-      fadeStrength={2}
+      fadeStrength={3} // a stronger fade keeps the far grid from hardening into a band at the horizon
+      cellThickness={1} // drei's half-pixel default makes the 1 m lines unreadable in the light theme
       cellColor={colors.cell}
       sectionColor={colors.section}
     />
