@@ -86,25 +86,21 @@ export function NotificationCenter() {
       <PopoverContent side="top" align="end" className="w-96 gap-1 p-2">
         <div className="flex items-center gap-1 px-2 pt-1 pb-1">
           <PopoverTitle className="flex-1">Notifications</PopoverTitle>
-          <Button variant="ghost" size="sm" disabled={unread === 0} onClick={() => markRead()}>Mark all read</Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={notifications.length === pinned.length}
-            onClick={clear}
-          >
-            Clear
-          </Button>
+          {notifications.length > 0 && (
+            <>
+              <Button variant="ghost" size="sm" disabled={unread === 0} onClick={() => markRead()}>
+                Mark all read
+              </Button>
+              <Button variant="ghost" size="sm" disabled={notifications.length === pinned.length} onClick={clear}>
+                Clear
+              </Button>
+            </>
+          )}
         </div>
         {/* the cap goes on the viewport: it is what scrolls */}
         <ScrollArea className="[&_[data-slot=scroll-area-viewport]]:max-h-[min(60vh,32rem)]">
           <div className="flex flex-col gap-3 py-1 pr-3 pl-1">
-            {notifications.length === 0 && (
-              <div className="flex flex-col items-center gap-1 px-2 py-6 text-center">
-                <p className="text-body-strong">No notifications</p>
-                <p className="text-fg-tertiary">Changes made in the game and problems with the game link land here.</p>
-              </div>
-            )}
+            {notifications.length === 0 && <p className="px-2 py-6 text-center text-fg-tertiary">Nothing yet.</p>}
             {pinned.length > 0 && <Section title="Pinned" pinned notices={pinned} />}
             {days.map(({ day, notices }) => <Section key={day} title={day} notices={notices} />)}
           </div>
