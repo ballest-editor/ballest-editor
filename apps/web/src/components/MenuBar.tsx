@@ -102,15 +102,15 @@ function CommandItem({ action, children, ...item }: ItemProps & { readonly actio
 }
 
 /**
- * One top-level menu. A keyboard close returns focus to the menu's title as usual. A
- * pointer close leaves it nowhere, so a later Space or Enter can't reopen the menu and
- * keybinds stay with the viewport; that includes a click on the title, which focuses it.
+ * One top-level menu. Closing it leaves focus on the page, however it closed, as a dialog does: on a title, Space and
+ * the arrows would work the menu bar and not the editor. That includes a click on the title, which focuses it. Only a
+ * move to the next menu (`sibling-open`) stays in the bar.
  */
 function Menu({ title, children }: { readonly title: string; readonly children: ReactNode }) {
   return (
     <MenubarMenu
-      onOpenChange={(open, { reason, event }) => {
-        if (open || reason !== "trigger-press" || event instanceof KeyboardEvent) return
+      onOpenChange={(open, { reason }) => {
+        if (open || reason === "sibling-open") return
         requestAnimationFrame(() => {
           const focused = document.activeElement
           if (focused instanceof HTMLElement && focused.closest("[role=menubar]") !== null) focused.blur()
@@ -119,7 +119,7 @@ function Menu({ title, children }: { readonly title: string; readonly children: 
     >
       <MenubarTrigger className="h-7 px-2.5">{title}</MenubarTrigger>
       {/* Sized to the longest row (label and shortcut on one line), not to the menu's title. */}
-      <MenubarContent className="w-max min-w-40" finalFocus={(closeType) => closeType === "keyboard"}>
+      <MenubarContent className="w-max min-w-40" finalFocus={false}>
         {children}
       </MenubarContent>
     </MenubarMenu>
@@ -138,7 +138,10 @@ function RecentProjectsMenu() {
   return (
     <MenubarSub>
       <DisabledReason reason={recent.length === 0 ? "No recent projects yet." : null}>
-        <MenubarSubTrigger disabled={recent.length === 0}>Recent projects</MenubarSubTrigger>
+        {/* Unlike an item, a disabled submenu title keeps the pointer: it would light up and take focus. */}
+        <MenubarSubTrigger disabled={recent.length === 0} className="data-disabled:pointer-events-none">
+          Recent projects
+        </MenubarSubTrigger>
       </DisabledReason>
       <MenubarSubContent className="w-max max-w-96">
         <MenubarGroup>
