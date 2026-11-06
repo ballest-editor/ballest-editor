@@ -259,7 +259,7 @@ The link states are Not exported, In sync, Edited since export, Changed in game,
 
 The sync status (`syncStatusOf` in `domain/linkState.ts`) is what the chip, its popover and the Project panel's rows show: a link state with the unsaved edits folded in. Unsaved is any map whose tab has unsaved edits, whatever its link state. Otherwise it's Not exported, In sync, Changed since export (Edited since export, Changed in game and Both changed) or Published draft. [ui-system.md § Status colours](design/ui-system.md#status-colours) has their colours.
 
-For 2 seconds after a save the chip says Saved in place of the status, so a save is confirmed after its toast has gone (`chipStatusOf`). It goes by the map's `modifiedAt`, so nothing new is stored and any write to the map's file counts. The popover goes on telling the status, and an edit brings Unsaved back at once.
+For 2 seconds after a save the chip says Saved in place of the status, so a save is confirmed after its toast has gone (`nextSavedChip`). The 2 seconds start when the chip first sees a `modifiedAt` that is new and under 2 seconds old, so nothing new is stored and any write to the map's file counts. A save clears the tab's unsaved edits before the project's list has the new time, so until then the chip goes on saying Unsaved, for 2 seconds at most, and a re-save goes straight from Unsaved to Saved. The popover goes on telling the status, and an edit brings Unsaved back at once.
 
 ### Notifications
 
