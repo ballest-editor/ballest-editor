@@ -1,61 +1,62 @@
-import {
-  IconAlertTriangle,
-  IconCircleCheck,
-  IconCircleDashed,
-  IconPencil,
-  IconRefreshAlert,
-  IconWorldUpload
-} from "@tabler/icons-react"
+import { IconCircleCheck, IconCircleDashed, IconPencil, IconRefreshAlert, IconWorldUpload } from "@tabler/icons-react"
+import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 import type { ComponentProps, ComponentType } from "react"
-import { LINK_STATE_LABELS, type LinkState } from "../domain/linkState"
+import { SYNC_STATUS_LABELS, SYNC_STATUS_TONES, type SyncStatus, type SyncTone } from "../domain/linkState"
 
-const ICONS: Record<LinkState, ComponentType<{ readonly className?: string }>> = {
+const ICONS: Record<SyncStatus, ComponentType<{ readonly className?: string }>> = {
+  unsaved: IconPencil,
   notExported: IconCircleDashed,
   inSync: IconCircleCheck,
-  editedSinceExport: IconPencil,
-  changedInGame: IconRefreshAlert,
-  bothChanged: IconAlertTriangle,
+  changedSinceExport: IconRefreshAlert,
   publishedDraft: IconWorldUpload
 }
 
-/** `chip` is the fill and `text` sits on a span inside, so the button's hover colour leaves it alone. */
-const NEUTRAL = {
-  chip: "bg-muted hover:bg-input aria-expanded:bg-input dark:hover:bg-input",
-  text: "text-foreground"
-}
-const GREEN = {
-  chip: "bg-emerald-500/15 hover:bg-emerald-500/25 aria-expanded:bg-emerald-500/25 dark:hover:bg-emerald-500/25",
-  text: "text-emerald-800 dark:text-emerald-300"
-}
-const AMBER = {
-  chip: "bg-amber-500/15 hover:bg-amber-500/25 aria-expanded:bg-amber-500/25 dark:hover:bg-amber-500/25",
-  text: "text-amber-800 dark:text-amber-300"
-}
-
-const TONES: Record<LinkState, typeof NEUTRAL> = {
-  notExported: NEUTRAL,
-  inSync: GREEN,
-  editedSinceExport: AMBER,
-  changedInGame: AMBER,
-  bothChanged: AMBER,
-  publishedDraft: NEUTRAL
+/** `fill` and `text` are a badge's colours; a chip adds `hover`, with `text` on a span so the button's hover leaves it alone. */
+const TONES: Record<SyncTone, { readonly fill: string; readonly hover: string; readonly text: string }> = {
+  neutral: {
+    fill: "bg-muted",
+    hover: "hover:bg-input aria-expanded:bg-input dark:hover:bg-input",
+    text: "text-foreground"
+  },
+  green: {
+    fill: "bg-emerald-500/15",
+    hover: "hover:bg-emerald-500/25 aria-expanded:bg-emerald-500/25 dark:hover:bg-emerald-500/25",
+    text: "text-emerald-800 dark:text-emerald-300"
+  },
+  amber: {
+    fill: "bg-amber-500/15",
+    hover: "hover:bg-amber-500/25 aria-expanded:bg-amber-500/25 dark:hover:bg-amber-500/25",
+    text: "text-amber-800 dark:text-amber-300"
+  }
 }
 
-/** A link state as a button: its colour, icon and label, then `children`. */
-export function LinkStateChip(
-  { state, className, children, ...props }: ComponentProps<typeof Button> & { readonly state: LinkState }
+/** A sync status as a button: its colour, icon and label, then `children`. */
+export function SyncStatusChip(
+  { status, className, children, ...props }: ComponentProps<typeof Button> & { readonly status: SyncStatus }
 ) {
-  const Icon = ICONS[state]
-  const tone = TONES[state]
+  const Icon = ICONS[status]
+  const tone = TONES[SYNC_STATUS_TONES[status]]
   return (
-    <Button variant="ghost" size="sm" className={cn("h-5 px-1.5", tone.chip, className)} {...props}>
+    <Button variant="ghost" size="sm" className={cn("h-5 px-1.5", tone.fill, tone.hover, className)} {...props}>
       <span className={cn("inline-flex items-center gap-1 whitespace-nowrap", tone.text)}>
         <Icon className="size-4" />
-        {LINK_STATE_LABELS[state]}
+        {SYNC_STATUS_LABELS[status]}
         {children}
       </span>
     </Button>
+  )
+}
+
+/** A sync status as a badge, in the chip's colours and words, for a row. */
+export function SyncStatusBadge(
+  { status, className, ...props }: ComponentProps<typeof Badge> & { readonly status: SyncStatus }
+) {
+  const tone = TONES[SYNC_STATUS_TONES[status]]
+  return (
+    <Badge variant="secondary" className={cn(tone.fill, tone.text, className)} {...props}>
+      {SYNC_STATUS_LABELS[status]}
+    </Badge>
   )
 }

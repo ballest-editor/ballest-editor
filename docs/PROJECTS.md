@@ -133,7 +133,7 @@ Later:
 │               │                                              │                 │
 │               │               viewport                       │                 │
 ├───────────────┴──────────────────────────────────────────────┴─────────────────┤
-│               Changed in game · Exported 4 min ago              update  bell 3 │
+│               Changed since export · exported 4 min ago         update  bell 3 │
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
 

@@ -1,5 +1,16 @@
 import { assert, describe, it } from "@effect/vitest"
-import { LINK_STATE_LABELS, type LinkedMap, linkStateDetailOf, linkStateOf } from "./linkState"
+import {
+  LINK_STATE_LABELS,
+  type LinkedMap,
+  type LinkState,
+  linkStateDetailOf,
+  linkStateOf,
+  SYNC_STATUS_LABELS,
+  SYNC_STATUS_TONES,
+  syncDetailOf,
+  type SyncStatus,
+  syncStatusOf
+} from "./linkState"
 
 const exported = { path: "/game/UserSavedMaps/a.balledit", hash: "a".repeat(64), at: "2026-10-31T12:00:00.000Z" }
 const map = (
@@ -48,6 +59,76 @@ describe("linkStateOf", () => {
       "Both changed",
       "Published draft"
     ])
+  })
+})
+
+describe("syncStatusOf", () => {
+  const states: ReadonlyArray<LinkState> = [
+    "notExported",
+    "inSync",
+    "editedSinceExport",
+    "changedInGame",
+    "bothChanged",
+    "publishedDraft"
+  ]
+
+  it("says Unsaved for a map with unsaved edits, whatever its link state", () => {
+    for (const state of states) assert.strictEqual(syncStatusOf(state, true), "unsaved")
+  })
+
+  it("folds the three changed states into one and keeps the others", () => {
+    assert.deepStrictEqual(states.map((state) => syncStatusOf(state, false)), [
+      "notExported",
+      "inSync",
+      "changedSinceExport",
+      "changedSinceExport",
+      "changedSinceExport",
+      "publishedDraft"
+    ])
+  })
+
+  it("tells a dirty map from a clean one that was never exported", () => {
+    const neverExported = map("a".repeat(64), -1, null)
+    const label = (unsaved: boolean) =>
+      SYNC_STATUS_LABELS[syncStatusOf(linkStateOf(neverExported, { unsaved }), unsaved)]
+    assert.strictEqual(label(true), "Unsaved")
+    assert.strictEqual(label(false), "Not exported")
+  })
+
+  it("has a label and a colour for every status", () => {
+    const statuses: ReadonlyArray<SyncStatus> = [
+      "unsaved",
+      "notExported",
+      "inSync",
+      "changedSinceExport",
+      "publishedDraft"
+    ]
+    assert.deepStrictEqual(statuses.map((status) => [SYNC_STATUS_LABELS[status], SYNC_STATUS_TONES[status]]), [
+      ["Unsaved", "amber"],
+      ["Not exported", "neutral"],
+      ["In sync", "green"],
+      ["Changed since export", "amber"],
+      ["Published draft", "neutral"]
+    ])
+  })
+})
+
+describe("syncDetailOf", () => {
+  it("says which side changed under Changed since export", () => {
+    assert.strictEqual(syncDetailOf("editedSinceExport", "changedSinceExport"), "Edited since export")
+    assert.strictEqual(syncDetailOf("changedInGame", "changedSinceExport"), "Changed in game")
+    assert.strictEqual(syncDetailOf("bothChanged", "changedSinceExport"), "Both changed")
+  })
+
+  it("keeps the link state that Unsaved hides", () => {
+    assert.strictEqual(syncDetailOf("bothChanged", "unsaved"), "Both changed")
+    assert.strictEqual(syncDetailOf("notExported", "unsaved"), "Not exported")
+  })
+
+  it("has nothing to add when the status already says it", () => {
+    assert.isNull(syncDetailOf("notExported", "notExported"))
+    assert.isNull(syncDetailOf("inSync", "inSync"))
+    assert.isNull(syncDetailOf("publishedDraft", "publishedDraft"))
   })
 })
 
