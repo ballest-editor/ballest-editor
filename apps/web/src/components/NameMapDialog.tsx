@@ -30,7 +30,7 @@ import { useOnOpen } from "./useOnOpen"
 export type NameMapMode = "saveAs" | "rename" | "duplicate" | "newDraft"
 
 const ERROR = "text-body text-destructive"
-const WARNING = "text-body text-amber-700 dark:text-amber-300"
+const WARNING = "text-body text-status-warn-foreground"
 
 export function NameMapDialog(
   { mode, open, onClose }: { readonly mode: NameMapMode; readonly open: boolean; readonly onClose: () => void }

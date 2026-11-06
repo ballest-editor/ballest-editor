@@ -293,7 +293,7 @@ export function SettingsShell<C extends string>(props: {
                       <span className="min-w-0 flex-1 truncate text-left">{label}</span>
                       {searching
                         ? hits > 0 && (
-                          <span className="rounded-control bg-primary/15 px-1.5 text-caption text-primary tabular-nums">
+                          <span className="rounded-control bg-primary/15 px-1.5 text-caption text-foreground tabular-nums">
                             {hits}
                           </span>
                         )

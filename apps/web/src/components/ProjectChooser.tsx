@@ -32,7 +32,7 @@ import { Logo } from "./Logo"
 import { SectionTitle } from "./SectionTitle"
 
 /** A card on the start screen: the surface, tinted with the theme's colour. */
-const TINTED_CARD = "rounded-surface border border-primary/20 bg-card bg-linear-to-b from-primary/10 to-primary/5"
+const TINTED_CARD = "rounded-surface border border-primary/20 bg-card bg-linear-to-b from-accent/15 to-accent/5"
 
 /** A recent project's "…": what a click on its row doesn't do. */
 function RecentMenu({ project, elsewhere }: { readonly project: RecentProject; readonly elsewhere: boolean }) {
@@ -251,7 +251,7 @@ export function ProjectChooser() {
   const [naming, setNaming] = useState(false)
   const showForm = naming || noRecent
   return (
-    <div className="flex h-svh flex-col bg-background bg-linear-to-b from-primary/10 to-transparent to-60% text-foreground">
+    <div className="flex h-svh flex-col bg-background bg-linear-to-b from-accent/15 to-transparent to-60% text-foreground">
       <div className="h-10 shrink-0 [-webkit-app-region:drag]" />
       <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-10">
         {/* `m-auto`, not `justify-center`: a list too long for the window scrolls from its top, where centring would clip it */}

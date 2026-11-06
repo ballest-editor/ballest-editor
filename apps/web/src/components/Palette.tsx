@@ -158,7 +158,9 @@ function PieceButton({ piece, category, view, onPlace, onHover, unavailable, unv
                   {size !== undefined && (
                     <SizeTag size={size} disabled={disabled} className="absolute top-0.5 right-0.5" />
                   )}
-                  {unverified === true && <span className="absolute top-1 left-1 size-2 rounded-full bg-amber-500" />}
+                  {unverified === true && (
+                    <span className="absolute top-1 left-1 size-2 rounded-full bg-status-warn-foreground" />
+                  )}
                 </span>
                 <span className="line-clamp-3 w-full text-center text-caption leading-3.5 whitespace-normal">
                   {name}
@@ -170,7 +172,7 @@ function PieceButton({ piece, category, view, onPlace, onHover, unavailable, unv
                 {thumbnail}
                 <span className="min-w-0 flex-1 truncate">{name}</span>
                 {unverified === true && (
-                  <span className="shrink-0 rounded-control border border-amber-500/40 bg-amber-500/15 px-1 text-caption text-amber-700 dark:text-amber-300">
+                  <span className="shrink-0 rounded-control border border-status-warn-foreground/40 bg-status-warn px-1 text-caption text-status-warn-foreground">
                     unverified
                   </span>
                 )}

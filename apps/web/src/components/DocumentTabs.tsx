@@ -183,7 +183,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
       <span className="relative flex size-6 shrink-0 items-center justify-center">
         {unsaved && (
           <span
-            className="size-1.5 rounded-full bg-foreground/60 group-has-[button:focus-visible]:invisible [.group:hover_&]:invisible"
+            className="size-1.5 rounded-full bg-primary group-has-[button:focus-visible]:invisible [.group:hover_&]:invisible"
             aria-label="unsaved"
           />
         )}
