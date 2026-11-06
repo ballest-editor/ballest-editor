@@ -20,8 +20,8 @@ The font is the system's (`--font-sans`), so the type is never where the persona
 
 | Class               | Dark contrast on `--card` | Light contrast on `--card` | For                                                          |
 | ------------------- | ------------------------- | -------------------------- | ------------------------------------------------------------ |
-| `text-fg-secondary` | 11:1                      | 10.7:1                     | Eyebrows, section labels, field labels, inactive tabs, icons |
-| `text-fg-tertiary`  | 7.5:1                     | 6.3:1                      | Placeholders, helper copy, statuses, shortcut hints, counts  |
+| `text-fg-secondary` | 11.2:1                    | 10.7:1                     | Eyebrows, section labels, field labels, inactive tabs, icons |
+| `text-fg-tertiary`  | 7.6:1                     | 6.3:1                      | Placeholders, helper copy, statuses, shortcut hints, counts  |
 | `text-fg-disabled`  | 3.2:1                     | 2.6:1                      | Disabled text, and what's inside a disabled row but its name |
 
 The variables are `--fg-secondary`, `--fg-tertiary`, `--fg-disabled`. They aren't `text-secondary`: `secondary` is shadcn's surface colour. Disabled is a colour, not `opacity-50`, except on filled buttons and on graphics (a switch, a slider).
@@ -32,23 +32,23 @@ The chrome has no hue, only elevation, and the colour on screen comes from the v
 
 | Surface        | Dark      | Light                  | For                                                                             |
 | -------------- | --------- | ---------------------- | ------------------------------------------------------------------------------- |
-| `--background` | `#141618` | `#f3f5f6`              | Behind everything: the start screen, the window's edges                         |
-| `--card`       | `#1c1f23` | `#fcfcfd`              | Panels, strips, bars                                                            |
-| `--popover`    | `#24282c` | `#ffffff`              | Dialogs, and what `glass` is made of                                            |
+| `--background` | `#0b0d0f` | `#f3f5f6`              | Behind everything: the start screen, the window's edges                         |
+| `--card`       | `#16191c` | `#fcfcfd`              | Panels, strips, bars                                                            |
+| `--popover`    | `#1e2226` | `#ffffff`              | Dialogs, and what `glass` is made of                                            |
 | `--muted`      | one up    | one down               | The track of a segmented control, skeletons, a key chip                         |
 | `--secondary`  | one up    | one down               | Secondary buttons                                                               |
 | `--accent`     | one up    | one down               | shadcn's neutral hover surface, opaque. `--accent-foreground` is the foreground |
 | `--sidebar-*`  | `--card`  | a shade under `--card` | shadcn's sidebar                                                                |
 
-Both themes are one cool neutral at hue 250, lighter as they rise: `--background`, `--card`, `--popover`. Separate things by that step first. A row or a group on a panel takes a tone, not a border.
+Both themes are one cool neutral at hue 250, lighter as they rise: `--background`, `--card`, `--popover`. Separate things by that step first. A row or a group on a panel takes a tone, not a border. Dark is near-black, so the window reads as black with the chrome lifting off it, and each step is 8 to 11 points. `--muted`, `--accent` and `--secondary` sit above `--popover` there, because a track or a key chip also sits on a dialog or a menu.
 
 Components use the tokens, never a palette class (`emerald-500`) or a hex. The scene is the exception, because it draws the game's world and not the chrome: `sceneGround.ts`, `sceneColors.ts` and `axisColors.ts` keep their own colours. The clear colour sits near the chrome base, so the map's sky and water are the only real colour in the viewport: a near-neutral charcoal in dark, and in light a very pale cool grey-blue, so the orthographic panes belong with the water. The water thins out with distance into whatever is behind it (`water.ts`), and the floor grid's lines fade before they get too fine to draw (`floorGrid.ts`).
 
 A piece's thumbnail is rendered in the app on a transparent background (`editor/thumbnails.ts`), so it sits on the panel in both themes; the game's own renders are the fallback. A light has no body worth a picture, so it shows its own glyph in `text-fg-secondary` wherever a thumbnail goes (`components/outlineGlyphs.ts`).
 
-A hover on a row or a ghost control is `bg-foreground/6`, and on a menu row `bg-foreground/8`. That is a step on whatever sits under it. An opaque `--accent` is nearly the same tone as `--popover`, so it would vanish there and on glass.
+A hover on a row or a ghost control is `bg-foreground/6`, and on a menu row `bg-foreground/8`. That is a step on whatever sits under it, and in dark more than the surfaces step: 13 points on `--card`, 17 on `--popover`. An opaque `--accent` is nearly the same tone as `--popover`, so it would vanish there and on glass.
 
-**`--primary` is the one accent, and it means "interactive".** Dark `#1d9daf`, light `#007787`. It is for primary buttons, the active tab's underline, the active tool, selection, focus rings (`--ring` is the same value), links and the hero band's track and ball, and nothing else. In dark, `--primary-foreground` is near-black, because white on it is 3.2:1. A chroma of 0.12 at this hue falls outside sRGB and clips to a harsher cyan, so the values stop near 0.1.
+**`--primary` is the one accent, and it means "interactive".** Dark `#05b9cf`, light `#007787`. It is for primary buttons, the active tab's underline, the active tool, selection, focus rings (`--ring` is the same value), links and the hero band's track and ball, and nothing else. In dark, `--primary-foreground` is near-black, because white on it is 2.4:1. Past sRGB this hue clips to a harsher cyan, so dark's chroma of 0.124 is the most L 0.72 holds at hue 210.
 
 | Class           | For                                                                            |
 | --------------- | ------------------------------------------------------------------------------ |
@@ -63,9 +63,9 @@ Components use the tokens, never a palette class (`emerald-500`) or a hex. The s
 
 ## Borders
 
-`--border` is an alpha hairline: white at 6% in dark, the foreground at 10% in light. A bare `border` is that at 65% (the `@layer base` default), felt rather than seen, and `border-border` is the whole hairline, for where two panels meet and for outline buttons. Panels meet with one line, not two. Nothing else gets a 1px rectangle by default.
+`--border` is an alpha hairline: white at 11% in dark, the foreground at 10% in light. A bare `border` is that at 65% (the `@layer base` default), felt rather than seen, and `border-border` is the whole hairline, for where two panels meet and for outline buttons. Panels meet with one line, not two. Nothing else gets a 1px rectangle by default.
 
-`--input` is the well a field sits in: `bg-input` under `border-border/70`. It is alpha too (black at 16% in dark, the foreground at 3% in light), so it is 2% darker on any surface, and it isn't a border colour.
+`--input` is the well a field sits in: `bg-input` under `border-border/70`. It is alpha too (black at 24% in dark, the foreground at 3% in light), so it is a touch darker on any surface, and it isn't a border colour.
 
 ## Depth
 
@@ -73,8 +73,8 @@ Components use the tokens, never a palette class (`emerald-500`) or a hex. The s
 | ---------------- | ------------------------------------------------------------------------- | ------------------------------------- |
 | `shadow-primary` | A 1px inset highlight in white at 16%, and 1 to 2px in `--primary` at 24% | Filled primary controls               |
 | `shadow-sm`      | 1 to 2px at 5%                                                            | Outline and secondary buttons, thumbs |
-| `shadow-md`      | 12px at 12%                                                               | Popovers, menus, tooltips, toasts     |
-| `shadow-lg`      | 24px at 12%                                                               | Dialogs                               |
+| `shadow-md`      | 12px at 12%, 20% in dark                                                  | Popovers, menus, tooltips, toasts     |
+| `shadow-lg`      | 24px at 12%, 20% in dark                                                  | Dialogs                               |
 
 A button pressed scales to 0.97 and drops its shadow, except one that opens a popup, which holds still under it.
 
@@ -128,7 +128,7 @@ One stroke family, Tabler, at one weight: 16px in rows, 14px in chips, 20px in t
 
 ## Status colours
 
-Status is semantic and quiet: a filled tint with its own text, only on badges, chips and icons, never as a surface or as the accent. The resting state of anything is the neutral tint. A sync status (`syncStatusOf`, `domain/linkState.ts`) wears one of three pairs. The text also has to read with no fill, on `--card` and `--popover`, because Settings › Game uses it alone. `Badge` has them as `variant="ok"`, `"warn"` and `"neutral"`; `SyncStatusChip.tsx` is the one place that picks between them for a status.
+Status is semantic: a filled tint with its own text, only on badges, chips and icons, never as a surface or as the accent. The resting state of anything is the neutral tint. A sync status (`syncStatusOf`, `domain/linkState.ts`) wears one of three pairs. The text also has to read with no fill, on `--card` and `--popover`, because Settings › Game uses it alone. `Badge` has them as `variant="ok"`, `"warn"` and `"neutral"`; `SyncStatusChip.tsx` is the one place that picks between them for a status.
 
 | Fill                | Text                             | For                           |
 | ------------------- | -------------------------------- | ----------------------------- |
@@ -136,4 +136,4 @@ Status is semantic and quiet: a filled tint with its own text, only on badges, c
 | `bg-status-warn`    | `text-status-warn-foreground`    | Unsaved, Changed since export |
 | `bg-status-neutral` | `text-status-neutral-foreground` | Not exported, Published draft |
 
-Not exported is every map's resting state, so it wears neutral, the quietest pair: colour means something needs a look or has just gone right. The variables are `--status-ok`, `--status-warn`, `--status-neutral`, and each with `-foreground`. Each is the tint already mixed with the surface, about 12%, and opaque: a hover is the fill at 80%, which an alpha fill couldn't take.
+Not exported is every map's resting state, so it wears neutral, the quietest pair: colour means something needs a look or has just gone right. The variables are `--status-ok`, `--status-warn`, `--status-neutral`, and each with `-foreground`. Each is the tint already mixed with the surface, about 12% in light and 18% in dark, where the text is at full saturation, and opaque: a hover is the fill at 80%, which an alpha fill couldn't take.
