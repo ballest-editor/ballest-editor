@@ -6,6 +6,8 @@ dist/
 dist-electron/
 # apps/desktop's dev profile (scripts/dev-electron.ts)
 .dev-user-data/
+# `pnpm map seed`
+.dev-project/
 result
 .direnv/
 *.log

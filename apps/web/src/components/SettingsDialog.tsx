@@ -390,6 +390,20 @@ export function SettingsDialog(props: {
         control: <Switch checked={c.invertLookY} onCheckedChange={(v) => update("camera", { invertLookY: v })} />
       },
       {
+        id: "axesSize",
+        ...setting("camera", "axesSize"),
+        label: "Axes size",
+        description: "The axes under each pane's label. Its menu has this too.",
+        keywords: "view gizmo orientation",
+        control: (
+          <Choice
+            value={c.axesSize}
+            items={{ s: "Small", m: "Medium", l: "Large" }}
+            onChange={(axesSize) => update("camera", { axesSize })}
+          />
+        )
+      },
+      {
         id: "lockPointer",
         ...setting("camera", "lockPointer"),
         label: "Lock pointer while looking",

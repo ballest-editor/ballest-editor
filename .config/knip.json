@@ -9,7 +9,8 @@
   "workspaces": {
     ".": {
       "entry": [
-        "tools/compress/*.mjs"
+        "tools/compress/*.mjs",
+        ".claude/skills/*/scripts/*.mjs"
       ],
       "ignoreDependencies": [
         "@effect/language-service"
@@ -32,6 +33,10 @@
     },
     "tools/release": {},
     "tools/driver": {},
+    "tools/map": {
+      // Imported by path; the dependency is what makes turbo rebuild this tool's hash when the domain code changes.
+      "ignoreDependencies": ["@ballest/web"]
+    },
     "packages/ballest-driver": {}
   }
 }

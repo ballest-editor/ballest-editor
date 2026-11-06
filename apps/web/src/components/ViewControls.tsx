@@ -12,11 +12,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Switch } from "@workspace/ui/components/switch"
 import { Toggle } from "@workspace/ui/components/toggle"
-import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { cn } from "@workspace/ui/lib/utils"
 import type { ReactNode } from "react"
 import { floorHeightOf } from "../domain/level"
-import { AUTO_GRID_COLORS, gizmoSizes, isDefaultDisplay, type Settings, withDefaultDisplay } from "../domain/Settings"
+import { AUTO_GRID_COLORS, isDefaultDisplay, type Settings, withDefaultDisplay } from "../domain/Settings"
 import { formatGridSize, formatRotationStep, GRID_SIZES, ROTATION_STEPS } from "../domain/snap"
 import { saveSettings, setGridHeight, updateSettings } from "../editor/actions"
 import { shownGizmoSpace, useEditor, useOpenPrefab } from "../editor/store"
@@ -24,6 +23,7 @@ import { useDarkTheme } from "../editor/theme"
 import { ColorSetting } from "./ColorSetting"
 import { NumberField } from "./NumberField"
 import { SectionTitle } from "./SectionTitle"
+import { SizeToggle } from "./SizeToggle"
 import { ToolBar } from "./ToolBar"
 import { CONTROL_WORD, GROUP, GROUP_DIVIDER, noFocus, releaseFocus, SEGMENT } from "./viewControlStyle"
 import { ViewLayoutControl, ViewPanes } from "./ViewPanes"
@@ -208,7 +208,7 @@ function GridColorsRow() {
   )
 }
 
-/** The axis gizmo's size and when it shows. */
+/** The transform gizmo's size and when it shows. */
 function GizmoRows() {
   const { size, showForGroups } = useEditor((s) => s.settings.gizmo)
   return (
@@ -216,18 +216,7 @@ function GizmoRows() {
       <SectionTitle>Gizmo</SectionTitle>
       <div className="flex h-7 items-center justify-between gap-4">
         Size
-        <ToggleGroup
-          aria-label="Gizmo size"
-          value={[size]}
-          onValueChange={(value) => {
-            const next = gizmoSizes.find((choice) => value.includes(choice))
-            if (next !== undefined) void updateSettings("gizmo", { size: next }) // clicking the pressed size keeps it
-          }}
-        >
-          {gizmoSizes.map((choice) => (
-            <ToggleGroupItem key={choice} value={choice} className="min-w-8 uppercase">{choice}</ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        <SizeToggle label="Gizmo size" value={size} onChange={(next) => void updateSettings("gizmo", { size: next })} />
       </div>
       <DisplayRow
         label="Show for groups"

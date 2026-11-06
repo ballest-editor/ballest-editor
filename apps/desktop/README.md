@@ -31,6 +31,7 @@ Installers (`pnpm dist:desktop:win`, `pnpm dist:desktop:linux`) and releases are
 - **The bundles.** Main and preload are bundled to CJS with `electron` as the only external, as t3-code does. `vite build --watch` writes them, and once both are written it spawns `scripts/dev-electron.ts` over an IPC channel, so that script exits with it. It starts Electron once the bundles and the Vite port exist, and restarts it when `main.cjs` or `preload.cjs` change.
 - **The profile.** `dev-electron.ts` keeps the dev profile in `apps/desktop/.dev-user-data/`, through `BALLEST_USER_DATA_DIR`, which main applies before `ready`. So worktrees don't share Chromium's storage lock.
 - **`ELECTRON_RUN_AS_NODE`.** Both launchers drop it. Electron-based terminals (T3 Code, VS Code) export it, and it turns the binary into plain Node.
+- **NixOS.** Electron runs through `nix-ld`, whose default libraries have no `libEGL.so.1` or `libGL.so.1`, so its GPU process exits and the page has no WebGL. When the system doesn't provide `libEGL.so.1`, both launchers build the flake's `libglvnd` and add it to `LD_LIBRARY_PATH` (`scripts/nixGl.ts`). If that fails they warn; adding `libglvnd` to `programs.nix-ld.libraries` fixes it instead.
 - **DevTools.** `BALLEST_REMOTE_DEBUGGING_PORT=9222 pnpm dev:desktop` lets Chrome DevTools or a CDP script attach on that port. `pnpm --filter @ballest/desktop start` doesn't read that variable; it passes its arguments through to Electron instead, so give it `--remote-debugging-port=9222`.
 
 ### Running without a GPU

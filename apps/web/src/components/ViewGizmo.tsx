@@ -39,7 +39,7 @@ function AxisEnd({ end, color, onPick, disabled }: {
     <ViewTip
       label={label}
       action={PROJECTION_ACTIONS[view]}
-      side="top"
+      side="right"
       render={
         <button
           type="button"
@@ -116,7 +116,7 @@ const useGizmoDrag = (slot: number, projection: ViewProjection, disabled: boolea
 /**
  * Which way the game's axes run across a pane, turning with its camera (docs/DESKTOP.md § View panes): a click on an end
  * snaps the pane to that view, a click on the centre goes back to perspective, and a drag anywhere on it orbits the pane.
- * The round gizmo is all that takes the pointer, in a card that doesn't.
+ * The round gizmo is all that takes the pointer.
  */
 export function ViewGizmo({ slot, projection, disabled }: {
   readonly slot: number
@@ -129,7 +129,7 @@ export function ViewGizmo({ slot, projection, disabled }: {
   const drag = useGizmoDrag(slot, projection, disabled)
   const ends = usePaneReading(slot, endsOf, sameGizmoEnds)
   const colors = sceneAxisColors(dark)
-  const scale = gizmoScaleOf(useEditor((s) => s.settings.gizmo.size))
+  const scale = gizmoScaleOf(useEditor((s) => s.settings.camera.axesSize))
   const pick = (view: ViewProjection) => {
     setActivePane(slot)
     setPaneProjection(slot, view)
@@ -137,10 +137,11 @@ export function ViewGizmo({ slot, projection, disabled }: {
   return (
     <div
       className={cn(
-        "pointer-events-auto relative origin-bottom-left rounded-full",
+        "pointer-events-auto relative rounded-full",
         !disabled && "cursor-grab transition-colors hover:bg-hover active:cursor-grabbing active:bg-pressed"
       )}
-      style={{ width: SIZE, height: SIZE, scale }}
+      // `zoom`, not `scale`: the disc it sits on has to grow with it.
+      style={{ width: SIZE, height: SIZE, zoom: scale }}
       data-view-gizmo
       {...drag}
     >
@@ -173,7 +174,7 @@ export function ViewGizmo({ slot, projection, disabled }: {
       <ViewTip
         label={viewProjectionLabels.perspective}
         action={PROJECTION_ACTIONS.perspective}
-        side="top"
+        side="right"
         render={
           <button
             type="button"

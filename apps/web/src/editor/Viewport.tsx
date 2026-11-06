@@ -399,14 +399,17 @@ function Overlay() {
   const missing = useEditor((s) => s.missingGlbs)
   const speed = useEditor((s) => s.cameraSpeed)
   return (
-    // under the pane picker and the instance banner (components/InstanceBanner.tsx)
-    <div className="pointer-events-none absolute inset-x-2 top-21 bottom-2 flex flex-col items-start gap-1.5">
-      {missing.size > 0 && (
-        <Badge variant="destructive" className="pointer-events-auto" title={[...missing].join("\n")}>
-          {counted(missing.size, "mesh file")} failed to load
-        </Badge>
-      )}
-      {speed !== 1 && <Badge variant="neutral">Camera speed ×{speed}</Badge>}
+    // The viewport's bottom left, which nothing else uses: neither of these belongs to a pane. Over the tool bar's height
+    // in a viewport too narrow to hold them beside it.
+    <div className="pointer-events-none absolute inset-0 @container">
+      <div className="absolute bottom-3 left-3 flex flex-col items-start gap-1.5 @max-[35rem]:bottom-14">
+        {missing.size > 0 && (
+          <Badge variant="destructive" className="pointer-events-auto" title={[...missing].join("\n")}>
+            {counted(missing.size, "mesh file")} failed to load
+          </Badge>
+        )}
+        {speed !== 1 && <Badge variant="neutral">Camera speed ×{speed}</Badge>}
+      </div>
     </div>
   )
 }

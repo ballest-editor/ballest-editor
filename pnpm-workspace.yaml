@@ -5,6 +5,7 @@ packages:
   - "tools/dev"
   - "tools/release"
   - "tools/driver"
+  - "tools/map"
 
 allowBuilds:
   esbuild: true

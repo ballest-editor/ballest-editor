@@ -1,6 +1,9 @@
 // What start-electron.ts and dev-electron.ts share: where the Electron binary is and the environment to run it in.
+import { execFileSync } from "node:child_process"
+import * as fs from "node:fs"
 import { createRequire } from "node:module"
 import * as path from "node:path"
+import { nixGlEnv } from "./nixGl.ts"
 
 export const desktopDir = path.join(import.meta.dirname, "..")
 
@@ -14,12 +17,23 @@ const resolveElectronPath = (): string => {
 /** The first require downloads the binary (~100 MB, cached in ~/.cache/electron). */
 export const electronPath = resolveElectronPath()
 
+/** The flake's libglvnd, from its pinned nixpkgs. */
+const buildLibglvnd = () =>
+  execFileSync("nix", ["build", "--no-link", "--print-out-paths", ".#libglvnd"], {
+    cwd: path.join(desktopDir, "../.."),
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"]
+  }).trim()
+
+/** Worked out once: dev-electron.ts asks again at every restart. */
+const glEnv = fs.existsSync("/etc/NIXOS") ? nixGlEnv(process.env, buildLibglvnd) : {}
+
 /**
  * The parent's environment without ELECTRON_RUN_AS_NODE. Electron-based terminals and editors (T3 Code, VS Code)
  * export it, and it makes the binary a plain Node, where `require("electron")` returns a path instead of the API.
  */
 export const electronEnv = (extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv => {
-  const env = { ...process.env, ...extra }
+  const env = { ...process.env, ...glEnv, ...extra }
   delete env["ELECTRON_RUN_AS_NODE"]
   return env
 }
