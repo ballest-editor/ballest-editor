@@ -1,15 +1,9 @@
-import { Context, Effect, Layer } from "effect"
+import { Context, Effect, Layer, Option } from "effect"
 import type { CatalogIndex } from "../domain/Catalog"
-import {
-  currentCreatedAt,
-  defaultEditorState,
-  isValidName,
-  mapFileNameOf,
-  NAME_RULE,
-  userLevelNameOf
-} from "../domain/factory"
+import { currentCreatedAt, defaultEditorState, mapFileNameOf, userLevelNameOf } from "../domain/factory"
 import { fileTextProblems, gameLoadProblems } from "../domain/limits"
 import { type MapFile, SYSTEM_LEVEL_NAME } from "../domain/MapFile"
+import { mapNameProblem } from "../domain/validateMap"
 import { ExportValidationError, type MapEncodeError } from "./errors"
 import { MapCodec } from "./MapCodec"
 
@@ -36,14 +30,8 @@ export class MapExporter extends Context.Service<MapExporter, {
         const levelData = map.worldSettings.levelData
         const displayName = levelData.levelDisplayName.trim()
         const creatorName = levelData.creatorName.trim()
-        if (displayName.length === 0 || creatorName.length === 0) {
-          return yield* new ExportValidationError({ message: "Map name and creator are required." })
-        }
-        if (!isValidName(displayName) || !isValidName(creatorName)) {
-          return yield* new ExportValidationError({
-            message: `Map name and creator: ${NAME_RULE} (they become the file name).`
-          })
-        }
+        const nameProblem = mapNameProblem(displayName, creatorName)
+        if (Option.isSome(nameProblem)) return yield* new ExportValidationError({ message: nameProblem.value })
         // Stamped once: a save keeps the map's date, so Created stays the day it was made.
         const createdAt = levelData.createdAt === "" ? yield* currentCreatedAt : levelData.createdAt
         const out: MapFile = {
