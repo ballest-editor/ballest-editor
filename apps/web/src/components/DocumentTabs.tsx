@@ -1,12 +1,12 @@
 import { IconBoxMultiple, IconPlus, IconX } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from "@workspace/ui/components/dropdown-menu"
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger
+} from "@workspace/ui/components/context-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { type DragEvent, type MouseEvent, useEffect, useRef, useState } from "react"
@@ -61,7 +61,7 @@ export function DocumentTabs() {
 
   return (
     <div
-      className="flex h-8 shrink-0 items-stretch bg-card text-body shadow-[inset_0_-1px_var(--border)]"
+      className="flex h-8 shrink-0 items-stretch bg-background text-body"
       onDragOver={(e) => {
         if (drag === null) return
         e.preventDefault()
@@ -75,7 +75,7 @@ export function DocumentTabs() {
       <div
         role="tablist"
         aria-label="Documents"
-        className="flex min-w-0 items-stretch overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
+        className="dock-tabs relative flex min-w-0 items-stretch overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
       >
         {tabIds.map((id, index) => <DocumentTab key={id} id={id} index={index} drag={drag} onDrag={setDrag} />)}
       </div>
@@ -105,7 +105,6 @@ function DocumentTab({ id, index, drag, onDrag }: {
   const [hinted, setHinted] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-  const menuButton = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (active) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" })
@@ -116,11 +115,6 @@ function DocumentTab({ id, index, drag, onDrag }: {
     activateTab(id)
     setViewLayoutKind(kind)
   }
-  const onContextMenu = (e: MouseEvent) => {
-    e.preventDefault()
-    setHinted(false)
-    menuButton.current?.click()
-  }
   const onDragOverTab = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
@@ -130,112 +124,113 @@ function DocumentTab({ id, index, drag, onDrag }: {
   }
 
   return (
-    <div
-      ref={ref}
-      draggable
-      className={cn(
-        "group relative flex h-full max-w-56 shrink-0 cursor-grab items-center gap-1 border-r pr-1 pl-2 transition-opacity active:cursor-grabbing",
-        active ? "bg-background text-foreground" : "text-fg-secondary hover:bg-muted/40 hover:text-foreground",
-        "has-[button:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring)]",
-        drag?.id === id && "opacity-40",
-        // where a dragged tab would land
-        drag?.at === index &&
-          "before:absolute before:inset-y-0 before:-left-px before:z-10 before:w-0.5 before:bg-primary",
-        last && drag?.at === index + 1 &&
-          "after:absolute after:inset-y-0 after:-right-px after:z-10 after:w-0.5 after:bg-primary"
-      )}
-      {...closesOnMiddleClick(() => void closeTab(id))}
-      onContextMenu={onContextMenu}
-      onDragStart={(e) => {
-        setHinted(false)
-        e.dataTransfer.effectAllowed = "move"
-        e.dataTransfer.setData("text/plain", label)
-        onDrag({ id, at: index })
+    <ContextMenu
+      onOpenChange={(open) => {
+        setMenuOpen(open)
+        if (open) setHinted(false)
       }}
-      onDragOver={onDragOverTab}
     >
-      {/* Only under the pointer, and not over the tab's menu: focus coming back from one is no reason to show it. */}
-      <Tooltip
-        open={hinted}
-        onOpenChange={(open, { reason }) => setHinted(open && reason === "trigger-hover" && !menuOpen)}
-      >
-        <TooltipTrigger
-          render={
-            <button
-              type="button"
-              role="tab"
-              aria-selected={active}
-              className="flex h-full min-w-0 cursor-[inherit] items-center outline-none"
-              onClick={() => activateTab(id)}
-            />
-          }
-        >
-          {prefabTier !== null && <IconBoxMultiple className="mr-1 size-4 shrink-0 text-fg-tertiary" />}
-          <span className="truncate">{label}</span>
-          {prefabTier !== null && (
-            <span className="ml-1 shrink-0 rounded-control bg-muted px-1 text-caption text-fg-secondary">
-              {prefabTierLabel(prefabTier, projects)}
-            </span>
-          )}
-        </TooltipTrigger>
-        <TooltipContent side="bottom">{label} · {tabStatusOf(unsaved, map)}</TooltipContent>
-      </Tooltip>
-      <span className="relative flex size-6 shrink-0 items-center justify-center">
-        {unsaved && (
-          <span
-            className="size-1.5 rounded-full bg-primary group-has-[button:focus-visible]:invisible [.group:hover_&]:invisible"
-            aria-label="unsaved"
-          />
+      <ContextMenuTrigger
+        ref={ref}
+        draggable
+        className={cn(
+          "group relative flex h-full max-w-56 shrink-0 cursor-grab items-center gap-1 rounded-t-control pr-1 pl-2 transition-[background-color,color,opacity] active:cursor-grabbing",
+          active
+            ? "dock-active-tab bg-card text-foreground"
+            : "text-fg-secondary hover:bg-accent hover:text-accent-foreground",
+          "has-[button:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring)]",
+          drag?.id === id && "opacity-40",
+          // where a dragged tab would land
+          drag?.at === index &&
+            "before:absolute before:inset-y-0 before:-left-px before:z-10 before:w-0.5 before:bg-primary",
+          last && drag?.at === index + 1 &&
+            "after:absolute after:inset-y-0 after:-right-px after:z-10 after:w-0.5 after:bg-primary"
         )}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={`Close ${label}`}
-          className={cn(
-            "absolute inset-0 opacity-0 focus-visible:opacity-100 [.group:hover_&]:opacity-100",
-            active && !unsaved && "opacity-100"
-          )}
-          onClick={() => void closeTab(id)}
+        {...closesOnMiddleClick(() => void closeTab(id))}
+        onDragStart={(e) => {
+          setHinted(false)
+          e.dataTransfer.effectAllowed = "move"
+          e.dataTransfer.setData("text/plain", label)
+          onDrag({ id, at: index })
+        }}
+        onDragOver={onDragOverTab}
+      >
+        {/* Only under the pointer, and not over the tab's menu: focus coming back from one is no reason to show it. */}
+        <Tooltip
+          open={hinted}
+          onOpenChange={(open, { reason }) => setHinted(open && reason === "trigger-hover" && !menuOpen)}
         >
-          <IconX />
-        </Button>
-      </span>
-      <DropdownMenu onOpenChange={setMenuOpen}>
-        <DropdownMenuTrigger
-          ref={menuButton}
-          render={<button type="button" className="sr-only" tabIndex={-1} aria-label={`More for ${label}`} />}
-        />
-        <DropdownMenuContent align="start">
-          <DropdownMenuItem onClick={() => void closeTab(id)}>Close</DropdownMenuItem>
-          <DropdownMenuItem disabled={!several} onClick={() => void closeOtherTabs(id)}>Close others</DropdownMenuItem>
-          <DropdownMenuItem disabled={last} onClick={() => void closeTabsToRight(id)}>
-            Close to the right
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => split("columns")}>Split right</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => split("rows")}>Split down</DropdownMenuItem>
-          {projects && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                disabled={fileName === null}
-                onClick={() => fileName !== null && void nameProjectMap(fileName, "rename")}
-              >
-                Rename…
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={fileName === null}
-                onClick={() => fileName !== null && void nameProjectMap(fileName, "duplicate")}
-              >
-                Duplicate…
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled={fileName === null} onClick={() => void revealProject()}>
-                Reveal
-              </DropdownMenuItem>
-            </>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className="flex h-full min-w-0 cursor-[inherit] items-center outline-none"
+                onClick={() => activateTab(id)}
+              />
+            }
+          >
+            {prefabTier !== null && <IconBoxMultiple className="mr-1 size-4 shrink-0 text-fg-tertiary" />}
+            <span className="truncate">{label}</span>
+            {prefabTier !== null && (
+              <span className="ml-1 shrink-0 rounded-full bg-muted px-1.5 text-caption text-fg-secondary">
+                {prefabTierLabel(prefabTier, projects)}
+              </span>
+            )}
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{label} · {tabStatusOf(unsaved, map)}</TooltipContent>
+        </Tooltip>
+        <span className="relative flex size-6 shrink-0 items-center justify-center">
+          {unsaved && (
+            <span
+              className="size-1.5 rounded-full bg-dirty group-has-[button:focus-visible]:invisible [.group:hover_&]:invisible"
+              aria-label="unsaved"
+            />
           )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Close ${label}`}
+            className={cn(
+              "absolute inset-0 opacity-0 focus-visible:opacity-100 [.group:hover_&]:opacity-100",
+              active && !unsaved && "opacity-100"
+            )}
+            onClick={() => void closeTab(id)}
+          >
+            <IconX />
+          </Button>
+        </span>
+      </ContextMenuTrigger>
+      {/* Focus goes back to the page, as after a click on the tab: on the tab, Escape would light up its ring. */}
+      <ContextMenuContent finalFocus={false}>
+        <ContextMenuItem onClick={() => void closeTab(id)}>Close</ContextMenuItem>
+        <ContextMenuItem disabled={!several} onClick={() => void closeOtherTabs(id)}>Close others</ContextMenuItem>
+        <ContextMenuItem disabled={last} onClick={() => void closeTabsToRight(id)}>Close to the right</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={() => split("columns")}>Split right</ContextMenuItem>
+        <ContextMenuItem onClick={() => split("rows")}>Split down</ContextMenuItem>
+        {projects && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              disabled={fileName === null}
+              onClick={() => fileName !== null && void nameProjectMap(fileName, "rename")}
+            >
+              Rename…
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={fileName === null}
+              onClick={() => fileName !== null && void nameProjectMap(fileName, "duplicate")}
+            >
+              Duplicate…
+            </ContextMenuItem>
+            <ContextMenuItem disabled={fileName === null} onClick={() => void revealProject()}>
+              Reveal
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }

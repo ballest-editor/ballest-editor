@@ -65,7 +65,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - The active tab's map is kept per project in `desktop-settings.json` (`project.lastOpenMap`, by project folder; `ProjectState.lastOpenMap`, IPC `ballest:project:rememberOpenMap`), written whenever the active tab's file changes after the startup load. The other tabs aren't reopened yet.
 - A tab shows the map's name without the creator (`mapLabelOf`), its tooltip is its name and status (Unsaved, else the map's link state, else Saved), and tabs can be dragged into another order.
 - A tab's ×, a middle click or Ctrl+F4 closes it after the unsaved-changes prompt (§ Window). Closing the last one shows a fresh map the same way.
-- A right-click opens the tab's menu: Close, Close others, Close to the right, Split right and Split down (the tab's view goes to two panes, § View panes), and on desktop Rename…, Duplicate… and Reveal, which are off until the map has a file.
+- A right-click opens the tab's menu at the pointer: Close, Close others, Close to the right, Split right and Split down (the tab's view goes to two panes, § View panes), and on desktop Rename…, Duplicate… and Reveal, which are off until the map has a file.
 - A tab can hold a prefab's definition instead of a map (§ Prefabs). `TabState.document` says which, and it is one tab model: Save, the prompts and the menus ask it.
 - Ctrl+Tab and Ctrl+Shift+Tab, or Ctrl+PageDown and PageUp, cycle the tabs.
 
@@ -80,6 +80,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - **Project**, **Pieces**, **Prefabs** and **Outline** start stacked on the left, with Outline in front, and **Inspector** on the right. A panel `always` rendered (Pieces) stays in the page behind another tab, so a long list keeps its scroll position.
 - View lists every panel, checked while it's open, and Reset layout. Reset closes everything around the centre group and lays out the default again, and the viewport stays mounted.
 - **A panel's tab** shows its icon and title. A strip too narrow for every title keeps the active tab's, and narrower still only the icons (`dock.css`); a hidden title is the tab's tooltip. A tab with a title keeps a place for its ×, which shows under the pointer, so hovering moves nothing. A tab down to its icon has no ×, as the icon is what picks it. A middle click closes any tab.
+- **A closed panel** comes back in the slot it left, in front (`panelSlots.ts`). A slot counts the group's other closed panels, so several come back as they were in any order. If the panel would join a different group, or its group has gone, it lands at the end of the strip. Reset layout forgets the slots.
 - **A closed panel's icon** stays in a strip, dimmed, and a click reopens the panel (`closedPanelsIn`). It follows the tabs of the group the panel would come back to. With that group gone, or folded to a rail, it sits at the end of the centre group's strip, before the "…".
 - **Each group's "…"** (`GroupMenu.tsx`), at the end of its strip, holds Pop out, Collapse and Close panel for the panel in front, Panels › with the closed panels (when there are any), and Reset layout. The centre group has only the last two. The list of every panel is in the View menu.
 - **Collapse** folds a group: a column by the viewport to a rail, a group in a stack to its header. A group can't fold if its neighbours have nothing left to give, so Collapse is off there. A panel arriving unfolds it, and so does a click on a tab, with that panel in front.
@@ -87,7 +88,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 
 **Sizes.** A window resize goes to the viewport and the panels keep theirs, like closing a group: dockview would even out the group's neighbours. Neither has an option in dockview, so `dockControl.ts` sets the centre group's `priority` and wraps `gridview.remove`. A dockview upgrade should be checked for these.
 
-**The layout** is saved in `localStorage` under `ballest-editor.dock.v1`, a moment after each change and when the page goes away: dockview's `toJSON`, the panel ids it was saved with (`known`), the room around the centre (`hint`) and the collapsed groups' sizes. `domain/dockLayout.ts` holds the rules for reading it back.
+**The layout** is saved in `localStorage` under `ballest-editor.dock.v1`, a moment after each change and when the page goes away: dockview's `toJSON`, the panel ids it was saved with (`known`), the room around the centre (`hint`), the collapsed groups' sizes and the closed panels' slots. `domain/dockLayout.ts` holds the rules for reading it back.
 
 - A panel in `known` but not in the layout was closed by the user, and stays closed. One not in `known` is new and gets its default place.
 - A panel in the layout that the app no longer has is dropped (`onlyPanels`), and a group left empty gives its room to the viewport.
@@ -104,7 +105,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 
 **Keys.** The rules are `isEditorKeyEvent`'s (`editor/keyTargets.ts`): a text field, a dialog or a menu keeps its keys, and everything else drives the editor. Chrome hands focus back after a click (`blurChromeAfterClick`), so the keys work again straight away. A dialog leaves the focus on the page when it closes, however it was closed and whatever opened it (`DialogContent`'s `finalFocus`).
 
-Dockview is themed in `components/dock/dock.css` with the tokens from `packages/ui`, so it follows light and dark and `--motion`. A panel strip is 28px and the document tabs and a popped-out strip 32px (`docs/design/ui-system.md`). A drag shows a copy of the tab on a card, or of the whole strip when it's a group's (`dragImage.ts`), over dockview's image, which has no option for it. A dockview upgrade should be checked for this too.
+Dockview is themed in `components/dock/dock.css` with the tokens from `packages/ui`, so it follows light and dark and `--motion`. A panel strip is 28px and the document tabs and a popped-out strip 32px (`docs/design/ui-system.md`). Strips are `--background` and panels `--card`, so tone separates them and nothing runs under a strip: the one hairline is dockview's separator, where two groups meet. The active tab rises to `--card`, and its `--primary` underline is one line per strip, a CSS anchor on the active tab that slides to the next. A rail's active tab keeps a line of its own instead. A drag shows a copy of the tab on a card, or of the whole strip when it's a group's (`dragImage.ts`), over dockview's image, which has no option for it. A dockview upgrade should be checked for this too.
 
 ### View panes
 
