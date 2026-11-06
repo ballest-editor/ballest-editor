@@ -221,13 +221,6 @@ const render = async (piece: CatalogPiece, index: CatalogIndex, table: MaterialT
   return url
 }
 
-/**
- * Lights have no body worth a picture: their meshes are stand-ins, and the glow reads as nothing on a light panel. The
- * game's own icons say what they are, and have no dark backdrop to lose.
- */
-export const keepsShippedThumbnail = (piece: Pick<CatalogPiece, "category" | "thumbnail">): boolean =>
-  piece.category === "Lights" && typeof piece.thumbnail === "string"
-
 const queue = new SerialQueue()
 const cache = new Map<string, Promise<string | undefined>>()
 

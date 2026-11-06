@@ -4,7 +4,7 @@ import { parseMaterialsFile } from "../domain/Materials"
 import { materialsFile, OUTLINE, PIPE, primitive, WIND } from "../test/materials"
 import { applySlotMaterials, materialFor, shaderPatchOf } from "./materials"
 import { isTexture } from "./threeGuards"
-import { frameBox, keepsShippedThumbnail, SerialQueue, texturesOf, whenTexturesReady } from "./thumbnails"
+import { frameBox, SerialQueue, texturesOf, whenTexturesReady } from "./thumbnails"
 
 describe("thumbnail framing", () => {
   const fits = (min: readonly [number, number, number], max: readonly [number, number, number], aspect: number) => {
@@ -34,14 +34,6 @@ describe("thumbnail framing", () => {
     assert.deepStrictEqual(framing.target, [50, 50, 50])
     assert.isTrue(framing.position.every((c, i) => c > framing.target[i]!))
     assert.isTrue(framing.near > 0 && framing.far > framing.near)
-  })
-})
-
-describe("shipped thumbnails", () => {
-  it("keeps the game's icon for a light that has one, and renders everything else", () => {
-    assert.isTrue(keepsShippedThumbnail({ category: "Lights", thumbnail: "thumbs/T_Spotlight.png" }))
-    assert.isFalse(keepsShippedThumbnail({ category: "Lights", thumbnail: null }))
-    assert.isFalse(keepsShippedThumbnail({ category: "Ramps", thumbnail: "thumbs/T_Track_Long1.png" }))
   })
 })
 

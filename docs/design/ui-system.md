@@ -44,7 +44,7 @@ Both themes are one cool neutral at hue 250, lighter as they rise: `--background
 
 Components use the tokens, never a palette class (`emerald-500`) or a hex. The scene is the exception, because it draws the game's world and not the chrome: `sceneGround.ts`, `sceneColors.ts` and `axisColors.ts` keep their own colours. The clear colour sits near the chrome base, so the map's sky and water are the only real colour in the viewport: a near-neutral charcoal in dark, and in light a very pale cool grey-blue, so the orthographic panes belong with the water. The water thins out with distance into whatever is behind it (`water.ts`), and the floor grid's lines fade before they get too fine to draw (`floorGrid.ts`).
 
-A piece's thumbnail is rendered in the app on a transparent background (`editor/thumbnails.ts`), so it sits on the panel in both themes; the game's own renders are the fallback, and what lights show.
+A piece's thumbnail is rendered in the app on a transparent background (`editor/thumbnails.ts`), so it sits on the panel in both themes; the game's own renders are the fallback. A light has no body worth a picture, so it shows its own glyph in `text-fg-secondary` wherever a thumbnail goes (`components/outlineGlyphs.ts`).
 
 A hover on a row or a ghost control is `bg-foreground/6`, and on a menu row `bg-foreground/8`. That is a step on whatever sits under it. An opaque `--accent` is nearly the same tone as `--popover`, so it would vanish there and on glass.
 

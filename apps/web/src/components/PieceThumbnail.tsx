@@ -1,9 +1,10 @@
 import { cn } from "@workspace/ui/lib/utils"
-import { type ReactNode, useEffect, useRef, useState } from "react"
+import { createElement, type ReactNode, useEffect, useRef, useState } from "react"
 import type { CatalogPiece } from "../domain/Catalog"
 import { assetUrl } from "../editor/assetUrl"
 import { useEditor } from "../editor/store"
-import { keepsShippedThumbnail, thumbnailFor } from "../editor/thumbnails"
+import { thumbnailFor } from "../editor/thumbnails"
+import { lightGlyphOf } from "./outlineGlyphs"
 
 /** True from the first time the element comes into view, so a long list only renders what gets looked at. */
 const useSeen = () => {
@@ -21,26 +22,27 @@ const useSeen = () => {
   return { ref, seen }
 }
 
-/**
- * A piece's picture, rendered here from its meshes on a transparent background (see editor/thumbnails.ts), with
- * `placeholder` until the image has loaded. A light, or a piece that doesn't render, shows the in-game render when the
- * catalog has one; without one it keeps `placeholder`. The waiting image is transparent and out of the flow, not
- * `display: none`, which never fires its load.
- */
-export function PieceThumbnail({ piece, className, placeholder }: {
+interface ThumbnailProps {
   readonly piece: CatalogPiece
   readonly className: string
   readonly placeholder: ReactNode
-}) {
+}
+
+/**
+ * A piece rendered here from its meshes on a transparent background (see editor/thumbnails.ts), with `placeholder` until
+ * the image has loaded. A piece that doesn't render shows the in-game render when the catalog has one; without one it
+ * keeps `placeholder`. The waiting image is transparent and out of the flow, not `display: none`, which never fires its
+ * load.
+ */
+function RenderedThumbnail({ piece, className, placeholder }: ThumbnailProps) {
   const index = useEditor((s) => s.catalogIndex)
   const table = useEditor((s) => s.materialTable)
   const { ref, seen } = useSeen()
   const [rendered, setRendered] = useState<string | undefined>(undefined)
   const [loaded, setLoaded] = useState<string | undefined>(undefined)
   const shipped = piece.thumbnail == null ? undefined : assetUrl(piece.thumbnail)
-  const keepShipped = keepsShippedThumbnail(piece)
   useEffect(() => {
-    if (keepShipped || !seen || index === null || table === null) return
+    if (!seen || index === null || table === null) return
     let cancelled = false
     void thumbnailFor(piece, index, table).then((url) => {
       if (!cancelled) setRendered(url ?? shipped)
@@ -48,20 +50,34 @@ export function PieceThumbnail({ piece, className, placeholder }: {
     return () => {
       cancelled = true
     }
-  }, [piece, shipped, keepShipped, seen, index, table])
-  const src = keepShipped ? shipped : rendered
-  const showing = src !== undefined && src === loaded
+  }, [piece, shipped, seen, index, table])
+  const showing = rendered !== undefined && rendered === loaded
   return (
     <span ref={ref} className="relative flex shrink-0">
       {!showing && placeholder}
-      {src !== undefined && (
+      {rendered !== undefined && (
         <img
-          src={src}
+          src={rendered}
           alt=""
           className={cn(className, !showing && "absolute inset-0 opacity-0")}
-          onLoad={() => setLoaded(src)}
+          onLoad={() => setLoaded(rendered)}
         />
       )}
     </span>
   )
+}
+
+/**
+ * A piece's picture in the tile `className` draws. A light has no body worth one, its meshes being stand-ins, so the tile
+ * holds its glyph instead.
+ */
+export function PieceThumbnail(props: ThumbnailProps) {
+  const glyph = lightGlyphOf(props.piece)
+  return glyph === undefined
+    ? <RenderedThumbnail {...props} />
+    : (
+      <span className={cn("grid place-items-center text-fg-secondary", props.className)}>
+        {createElement(glyph, { className: "size-4" })}
+      </span>
+    )
 }
