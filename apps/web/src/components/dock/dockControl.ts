@@ -16,6 +16,7 @@ import {
 } from "../../domain/dockLayout"
 import { useEditor } from "../../editor/store"
 import type { DockPanel } from "./panels"
+import { type PanelSlot, parseSavedSlots, reopenIndex, slotAt } from "./panelSlots"
 import { adoptPopoutWindow } from "./popoutWindow"
 
 /** A column by the viewport folds to the rail dock.css draws, a group in a stack to its strip (dock.css). */
@@ -34,6 +35,8 @@ let dockPanels: ReadonlyArray<DockPanel> = []
 let stopFollowing = () => {}
 /** Folded groups by id. Saved with the layout: dockview keeps their size and header position, not what they were. */
 const collapsed = new Map<string, CollapsedGroup>()
+/** Closed panels' places by panel id, saved with the layout. A group that goes takes its slots with it. */
+const slots = new Map<string, PanelSlot>()
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 
 let openPanels: ReadonlySet<string> = new Set()
@@ -71,7 +74,8 @@ const addPanel = (api: DockviewApi, panel: DockPanel, inactive = false): IDockvi
   const { location } = panel
   const sibling = siblingOf(api, panel)
   if (sibling !== undefined) {
-    return api.addPanel({ ...panelOptions(panel), inactive, position: { referencePanel: sibling } })
+    const index = reopenIndex(slots, panel.id, sibling.group.id, sibling.group.panels.length)
+    return api.addPanel({ ...panelOptions(panel), inactive, position: { referencePanel: sibling, index } })
   }
   const size = location === "bottom" ? { initialHeight: SIDE_SIZES.bottom } : { initialWidth: SIDE_SIZES[location] }
   return api.addPanel({ ...panelOptions(panel), ...size, position: { referenceGroup: centre, direction: location } })
@@ -86,6 +90,7 @@ const addDefaultPanels = (api: DockviewApi) => {
 const defaultLayout = (api: DockviewApi) => {
   api.clear()
   collapsed.clear()
+  slots.clear()
   const documents = api.addPanel({
     id: DOCUMENTS_PANEL,
     component: DOCUMENTS_PANEL,
@@ -109,7 +114,8 @@ const readSaved = (): string | null => {
 
 /** The saved layout onto `api`. False when there is none, or it doesn't hold together: `api` then needs the default. */
 const restoreSaved = (api: DockviewApi): boolean => {
-  const saved = parseSavedDock(readSaved())
+  const text = readSaved()
+  const saved = parseSavedDock(text)
   if (saved === null) return false
   const { layout, loose } = dockedPopouts(unfoldedLayout(saved.layout, saved.collapsed))
   const current = onlyPanels(layout, [DOCUMENTS_PANEL, ...dockPanels.map((panel) => panel.id)])
@@ -127,6 +133,10 @@ const restoreSaved = (api: DockviewApi): boolean => {
   for (const [id, { axis }] of Object.entries(saved.collapsed)) {
     const group = api.groups.find((candidate) => candidate.id === id)
     if (group !== undefined) fold(group, axis)
+  }
+  slots.clear()
+  for (const [id, slot] of parseSavedSlots(text)) {
+    if (api.getPanel(id) === undefined && api.groups.some((group) => group.id === slot.group)) slots.set(id, slot)
   }
   const lost = dockPanels.filter((panel) => loose.includes(panel.id))
   const added = dockPanels.filter((panel) => !saved.known.includes(panel.id))
@@ -156,7 +166,8 @@ const save = (api: DockviewApi) => {
         layout: api.toJSON(),
         known: dockPanels.map((panel) => panel.id),
         hint: hintOf(centre),
-        collapsed: Object.fromEntries(collapsed)
+        collapsed: Object.fromEntries(collapsed),
+        slots: Object.fromEntries(slots)
       })
     )
   } catch (error) {
@@ -237,6 +248,8 @@ const followDock = (api: DockviewApi): () => void => {
     saveTimer = setTimeout(() => save(api), SAVE_DELAY_MS)
   }
   const popouts = new Map<string, () => void>()
+  /** Each strip before a panel closes. Dockview only says a panel went once it has, and by then its place is gone. */
+  let strips: ReadonlyArray<{ readonly group: string; readonly panels: ReadonlyArray<string> }> = []
   const flush = () => {
     clearTimeout(saveTimer)
     save(api)
@@ -252,16 +265,31 @@ const followDock = (api: DockviewApi): () => void => {
       // a panel moved or popped out can change the strip a closed one shows in
       notifyDock()
     }),
+    api.onWillMutateLayout(({ kind }) => {
+      strips = kind === "remove"
+        ? api.groups.map(({ id, panels }) => ({ group: id, panels: panels.map((panel) => panel.id) }))
+        : []
+    }),
     api.onDidAddPanel((panel) => {
+      slots.delete(panel.id)
       expandGroup(panel.group)
       notifyOpenPanels(api)
     }),
-    api.onDidRemovePanel(() => notifyOpenPanels(api)),
+    api.onDidRemovePanel(({ id }) => {
+      const strip = strips.find(({ panels }) => panels.includes(id))
+      if (strip !== undefined) {
+        slots.set(id, { group: strip.group, index: slotAt(slots, strip.group, strip.panels.indexOf(id)) })
+      }
+      notifyOpenPanels(api)
+    }),
     api.onDidMovePanel(({ panel }) => {
       expandGroup(panel.group)
       if (panel.group.size === 1) fitBesideCentre(api, panel.group)
     }),
-    api.onDidRemoveGroup((group) => collapsed.delete(group.id)),
+    api.onDidRemoveGroup((group) => {
+      collapsed.delete(group.id)
+      for (const [id, slot] of slots) if (slot.group === group.id) slots.delete(id)
+    }),
     api.onDidAddPopoutGroup(({ id, group, window: popout }) => {
       popouts.set(id, adoptPopoutWindow(popout, group.activePanel?.title ?? "Ballest Editor"))
     }),
@@ -312,10 +340,11 @@ export const resetDockLayout = (): void => {
   if (dock === null) return
   for (const panel of dock.panels.filter(({ id }) => id !== DOCUMENTS_PANEL)) dock.removePanel(panel)
   collapsed.clear()
+  slots.clear()
   addDefaultPanels(dock)
 }
 
-/** The View menu's check: closes an open panel, reopens a closed one in front. */
+/** The View menu's check: closes an open panel, reopens a closed one in front, in the slot it left. */
 export const togglePanel = (id: string): void => {
   if (dock === null) return
   const open = dock.getPanel(id)

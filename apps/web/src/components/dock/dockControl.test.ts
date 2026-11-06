@@ -39,7 +39,18 @@ const fakeDock = (
   const calls: Array<string> = []
   const loads: Array<DockLayout> = []
   let overlay: OverlayListener = () => undefined
+  let willMutate: (event: { readonly kind: string }) => void = () => undefined
+  let panelAdded: (panel: GroupMember) => void = () => undefined
+  let panelRemoved: (panel: GroupMember) => void = () => undefined
   const open = new Map<string, ReturnType<typeof fakePanel>>()
+  /** Takes `id` out as dockview does: the layout is about to change, and only then it has. */
+  const remove = (id: string) => {
+    const leaving = open.get(id)
+    if (leaving === undefined) return
+    willMutate({ kind: "remove" })
+    open.delete(id)
+    panelRemoved(leaving)
+  }
   const groupNamed = (id: string) => ({
     id,
     width: 800,
@@ -74,7 +85,7 @@ const fakeDock = (
       setActive: () => calls.push(`active ${id}`),
       close: () => {
         calls.push(`close ${id}`)
-        open.delete(id)
+        remove(id)
       }
     }
   })
@@ -89,15 +100,23 @@ const fakeDock = (
       return side.length === 0 ? [group] : [group, sideGroup]
     },
     getPanel: (id: string) => open.get(id),
-    addPanel: ({ id, position }: { readonly id: string; readonly position?: { readonly direction?: string } }) => {
+    addPanel: ({ id, position }: {
+      readonly id: string
+      readonly position?: { readonly direction?: string; readonly index?: number }
+    }) => {
       calls.push(position?.direction === undefined ? `add ${id}` : `add ${id} ${position.direction}`)
       const added = fakePanel(id)
-      open.set(id, added)
+      const members = [...open.values()]
+      const before = members.filter((member) => member.group === added.group)[position?.index ?? members.length]
+      members.splice(before === undefined ? members.length : members.indexOf(before), 0, added)
+      open.clear()
+      for (const member of members) open.set(member.id, member)
+      panelAdded(added)
       return added
     },
     removePanel: ({ id }: { readonly id: string }) => {
       calls.push(`remove ${id}`)
-      open.delete(id)
+      remove(id)
     },
     clear: () => {
       calls.push("clear")
@@ -110,8 +129,18 @@ const fakeDock = (
     },
     toJSON: () => ({ grid: { root: { type: "branch", data: [], size: 0 } } }),
     onDidLayoutChange: quiet,
-    onDidAddPanel: quiet,
-    onDidRemovePanel: quiet,
+    onWillMutateLayout: (listener: typeof willMutate) => {
+      willMutate = listener
+      return quiet()
+    },
+    onDidAddPanel: (listener: typeof panelAdded) => {
+      panelAdded = listener
+      return quiet()
+    },
+    onDidRemovePanel: (listener: typeof panelRemoved) => {
+      panelRemoved = listener
+      return quiet()
+    },
     onDidMovePanel: quiet,
     onDidRemoveGroup: quiet,
     onDidActivePanelChange: quiet,
@@ -132,8 +161,8 @@ const savedLayout = {
   grid: { root: { type: "branch", data: [], size: 600 }, orientation: "HORIZONTAL", width: 1280, height: 720 },
   panels: {}
 }
-const saved = (known: ReadonlyArray<string>, collapsed = {}) =>
-  JSON.stringify({ layout: savedLayout, known, hint: { left: 0, right: 0, bottom: 0 }, collapsed })
+const saved = (known: ReadonlyArray<string>, collapsed = {}, slots = {}) =>
+  JSON.stringify({ layout: savedLayout, known, hint: { left: 0, right: 0, bottom: 0 }, collapsed, slots })
 
 describe("the dock's layout on launch", () => {
   const storage = new Map<string, string>()
@@ -243,6 +272,18 @@ describe("the dock's layout on launch", () => {
     })
   })
 
+  it("reopens a panel closed before the last launch in its slot", () => {
+    const leftPanels = ["project", "pieces", "outline"].map((id) => panel(id, "left"))
+    storage.set(DOCK_STORAGE_KEY, saved(leftPanels.map(({ id }) => id), {}, { pieces: { group: "2", index: 1 } }))
+    const { api } = fakeDock({
+      loaded: [DOCUMENTS_PANEL, "project", "outline"],
+      side: ["project", "pieces", "outline"]
+    })
+    attachDock(api, leftPanels)
+    togglePanel("pieces")
+    assert.deepStrictEqual(api.panels.map(({ id }) => id), [DOCUMENTS_PANEL, "project", "pieces", "outline"])
+  })
+
   it("falls back to the default when dockview refuses the layout", () => {
     storage.set(DOCK_STORAGE_KEY, saved(panels.map(({ id }) => id)))
     const { api, calls } = fakeDock({ failLoad: true, loaded: [] })
@@ -290,6 +331,60 @@ describe("the dock's panels", () => {
     calls.length = 0
     togglePanel("inspector")
     assert.deepStrictEqual(calls.slice(0, 1), ["add inspector right"])
+  })
+
+  describe("reopening a panel", () => {
+    const left = ["project", "pieces", "prefabs", "outline"]
+    const leftPanels = left.map((id) => panel(id, "left"))
+    const strip = (api: DockviewApi) => api.panels.map(({ id }) => id).filter((id) => id !== DOCUMENTS_PANEL)
+    const leftDock = () => {
+      const made = fakeDock({ loaded: [] })
+      attachDock(made.api, leftPanels)
+      return made
+    }
+
+    it("puts it back in the slot it closed from, not last", () => {
+      const { api } = leftDock()
+      togglePanel("prefabs")
+      assert.deepStrictEqual(strip(api), ["project", "pieces", "outline"])
+      togglePanel("prefabs")
+      assert.deepStrictEqual(strip(api), left)
+    })
+
+    it("puts two back as they were, however they closed", () => {
+      const { api } = leftDock()
+      togglePanel("pieces")
+      togglePanel("prefabs")
+      togglePanel("pieces")
+      togglePanel("prefabs")
+      assert.deepStrictEqual(strip(api), left)
+    })
+
+    it("goes by the panel's own close too, the tab's × and the menus", () => {
+      const { api } = leftDock()
+      api.getPanel("project")?.api.close()
+      togglePanel("project")
+      assert.deepStrictEqual(strip(api), left)
+    })
+
+    it("uses the slot once: a panel closed from elsewhere gets a new one", () => {
+      const { api } = leftDock()
+      togglePanel("project")
+      togglePanel("project")
+      togglePanel("outline")
+      togglePanel("outline")
+      assert.deepStrictEqual(strip(api), left)
+    })
+
+    it("forgets the slots on Reset layout, which lays out the default", () => {
+      const { api } = leftDock()
+      togglePanel("project")
+      resetDockLayout()
+      assert.deepStrictEqual(strip(api), left)
+      togglePanel("outline")
+      togglePanel("outline")
+      assert.deepStrictEqual(strip(api), left)
+    })
   })
 
   it("takes a panel on the centre's sides, never as a tab", () => {
