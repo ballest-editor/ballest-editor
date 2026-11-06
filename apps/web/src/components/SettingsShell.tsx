@@ -195,7 +195,7 @@ export function SettingsShell<C extends string>(props: {
   readonly category: C
   readonly onCategoryChange: (category: C) => void
   readonly rows: ReadonlyArray<SettingsRow<C>>
-  /** Resets the shown category; without it the footer has no reset button. */
+  /** Resets the shown category; without it the footer has no reset button, and searching hides the button. */
   readonly onResetCategory?: (category: C) => void
   /** What the shown category adds to the footer, before Done (Check again); searching shows no category, so not then. */
   readonly footerAction?: ReactNode
@@ -345,23 +345,19 @@ export function SettingsShell<C extends string>(props: {
               {groups.length === 0 && <p className="text-body text-fg-tertiary">No settings match.</p>}
             </div>
           </ScrollArea>
-          <div
-            className={cn(
-              "flex border-t px-dialog py-3",
-              onResetCategory === undefined ? "justify-end" : "justify-between"
-            )}
-          >
-            {onResetCategory !== undefined && (
+          <div className="flex border-t px-dialog py-3">
+            {/* Search results span every category, and a reset names one: it comes back with the page. */}
+            {onResetCategory !== undefined && !searching && (
               <Button
                 variant="ghost"
                 className="text-fg-secondary"
                 onClick={() => onResetCategory(props.category)}
-                disabled={searching || !modifiedIn(props.category)}
+                disabled={!modifiedIn(props.category)}
               >
                 Reset {labelOf(props.category).toLowerCase()} to defaults
               </Button>
             )}
-            <div className="flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-2">
               {!searching && props.footerAction}
               <Button onClick={props.onClose} disabled={props.busy === true}>Done</Button>
             </div>

@@ -41,8 +41,7 @@ If `assets/catalog.json` is missing, the app falls back to `src/domain/bundledCa
   - **Editor:** placement distance, and whether a selection change is its own undo step.
   - **Camera:** the game's camera presets (from `keybinds.json` `cameraPresets`, plus Custom with its own FOV), fly speed, look sensitivity, invert look on each axis, when to lock the pointer, and which movement keys need the look button. The game's FOV is horizontal, converted to three.js's vertical FOV at a fixed 16:9 reference, so resizing the window shows more at the sides instead of zooming.
   - **Keybinds:** the game's own section names ("mouse and keyboard free camera": forward, reverse, left, right, look, up, down; "mouse and keyboard bindings": look right, left, up, down) among the editor's ("level editor", "edit", "editor camera", "file", "game", "help"). Game labels come from `keybinds.json` when present. Every row has a tooltip describing what it does in the editor. Click a binding and press a key, mouse button or wheel; Esc cancels. Overrides persist in `ballest-editor.keybinds.v4`.
-  - **Appearance:** theme (dark, light, system), animation speed, grid visibility and colours, water.
-  - **Lighting:** the map's sun and sky light or fixed studio lights, and whether the sky is drawn.
+  - **Appearance:** theme (dark, light, system), animation speed and grid colours. What the viewport shows (grid, sky, water, map lighting) is in its Display popover.
   - **Game** (desktop): the Game link.
 
 ### Default bindings
