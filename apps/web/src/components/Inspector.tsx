@@ -285,6 +285,9 @@ const DECAL_SIZE_ROW: TransformRowSpec = {
   digits: 1
 }
 
+const FIELD_HELP =
+  "Drag a field to change it: Shift ×10, Alt ×0.1. Type +50, -20, *2 or /2 to change what's there, =-20 to set a negative."
+
 /** Copied rows in stored units (cm, degrees, factor), shared by every selection. */
 const copiedRows = new Map<TransformField, Vec3>()
 
@@ -292,8 +295,8 @@ const copiedRows = new Map<TransformField, Vec3>()
  * One editable row over the whole selection: its name and unit, a button whose menu (or
  * Shift+click shortcuts) copies and pastes all three axes, then an X/Y/Z field each, side by side
  * while a big coordinate still fits. A typed value sets
- * every selected item; a scrub moves or turns the selection together like the gizmo, so a
- * mixed selection keeps its spread; with snapping on, a scrub lands on the grid or rotation step
+ * every selected item; a scrub, or a `+` or `-` typed into a mixed field, moves or turns the selection together like the
+ * gizmo, so a mixed selection keeps its spread; with snapping on, a scrub lands on the grid or rotation step
  * (a mixed selection moves in whole steps). `perUnit` converts display units to the stored value.
  */
 function TransformRow(props: {
@@ -332,7 +335,10 @@ function TransformRow(props: {
           <TooltipTrigger render={<span className="text-body text-fg-secondary" />}>
             {row.label} <span className="text-caption text-fg-tertiary">{row.unit}</span>
           </TooltipTrigger>
-          <TooltipContent side="left">{row.help}</TooltipContent>
+          <TooltipContent side="left" className="flex-col items-start">
+            <span>{row.help}</span>
+            <span>{FIELD_HELP}</span>
+          </TooltipContent>
         </Tooltip>
         <Popover
           open={open}
@@ -423,6 +429,7 @@ function TransformRow(props: {
               onCommit={(v) => editSelectionAxis(field, axis, { kind: "set", value: v * perUnit })}
               onScrub={(v, from) => previewSelectionAxis(field, axis, v === null ? null : offset(v, from))}
               onScrubCommit={(v, from) => editSelectionAxis(field, axis, offset(v, from))}
+              onMixedOffset={(by) => editSelectionAxis(field, axis, offset(by, 0))}
               step={row.step}
               snap={snap}
               digits={row.digits}
