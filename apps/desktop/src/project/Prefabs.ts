@@ -1,5 +1,9 @@
 import {
   isPrefabName,
+  type PrefabBackup,
+  type PrefabBackupRef,
+  type PrefabBackups,
+  type PrefabBackupSummary,
   prefabFileNameOf,
   type PrefabInfo,
   type PrefabInfos,
@@ -14,7 +18,7 @@ import {
 import { Context, Effect, FileSystem, Option, Path } from "effect"
 import { type GamePathError, GamePaths } from "../game/GamePaths"
 import { prefabsFolderBeside } from "../game/locations"
-import { type BackupError, Backups } from "./Backups"
+import { type BackupError, Backups, parseBackupId } from "./Backups"
 import { MAX_MAP_BYTES, sha256 } from "./files"
 import { backupsFolderIn, type ProjectError, projectError, Projects } from "./Projects"
 
@@ -27,8 +31,8 @@ type PrefabsEffect<A> = Effect.Effect<A, ProjectError | GamePathError | BackupEr
  * The prefabs of each tier (docs/DESKTOP.md § Prefabs), named by name, never by path: `user` is the game's own prefabs
  * folder, the one place in the game's files this writes, and `project` is the project's `prefabs/`. The page encodes and
  * decodes them, and main moves bytes. Every write over or away from a prefab goes through `Backups`, into the project's
- * backups for its own and `<userData>/backups/` for the game's. What a file's bytes say is read again only when its time
- * or size changes.
+ * backups for its own and `<userData>/backups/` for the game's, and Recover restores from those. What a file's bytes say
+ * is read again only when its time or size changes.
  */
 export class Prefabs extends Context.Service<Prefabs, {
   /** A tier's prefabs by name; none while it has no folder (no project, the game never ran). */
@@ -42,6 +46,12 @@ export class Prefabs extends Context.Service<Prefabs, {
   readonly rename: (payload: RenamePrefabPayload) => PrefabsEffect<PrefabInfo>
   /** A tier's folder, for the file manager; none when it isn't there. */
   readonly folderOf: (tier: PrefabTier) => Effect.Effect<Option.Option<string>>
+  /** Both tiers' backups, newest first. */
+  readonly backups: Effect.Effect<PrefabBackups>
+  /** What a backup `backups` listed holds; any other name is refused. */
+  readonly describeBackup: (ref: PrefabBackupRef) => Effect.Effect<PrefabBackupSummary, ProjectError>
+  /** Writes a backup's bytes back as its prefab, keeping the file they replace; any other name is refused. */
+  readonly restoreBackup: (ref: PrefabBackupRef) => PrefabsEffect<PrefabInfo>
 }>()("ballest/desktop/project/Prefabs") {
   /** `userBackups` keeps what was written over in the game's prefabs folder. */
   static readonly make = Effect.fn("Prefabs.make")(function*(userBackups: string) {
@@ -153,6 +163,64 @@ export class Prefabs extends Context.Service<Prefabs, {
         Effect.orElseSucceed(() => Option.none<string>())
       )
 
-    return Prefabs.of({ list, read, write, remove, rename, folderOf })
+    /** Where `tier`'s backups are for reading: none for the project's while there is no project. */
+    const keptToRead = Effect.fnUntraced(function*(tier: PrefabTier) {
+      return tier === "user"
+        ? Option.some(userBackups)
+        : Option.map(yield* projects.current, (project) => backupsFolderIn(path, project))
+    })
+
+    const backupsIn = Effect.fnUntraced(function*(tier: PrefabTier) {
+      const kept = yield* keptToRead(tier)
+      if (Option.isNone(kept)) return []
+      return (yield* backups.list(kept.value)).flatMap(({ at, fileName, id }): ReadonlyArray<PrefabBackup> => {
+        const name = prefabNameOfFile(fileName)
+        return name === undefined ? [] : [{ tier, id, name, at }]
+      })
+    })
+
+    const listBackups = Effect.gen(function*() {
+      const [user, project] = [yield* backupsIn("user"), yield* backupsIn("project")]
+      return [...user, ...project].sort((a, b) => b.at.localeCompare(a.at))
+    }).pipe(Effect.withSpan("Prefabs.backups"))
+
+    /** The bytes of a backup of a prefab, and which prefab. A name this didn't write could be a way out of the folder. */
+    const readKept = Effect.fnUntraced(function*({ id, tier }: PrefabBackupRef) {
+      const kept = yield* keptToRead(tier)
+      const backup = parseBackupId(id)
+      const name = Option.isSome(backup) ? prefabNameOfFile(backup.value.fileName) : undefined
+      if (Option.isNone(kept) || name === undefined) return yield* projectError("notFound", id)()
+      const file = path.join(kept.value, id)
+      const bytes = yield* fs.readFile(file).pipe(
+        Effect.mapError((cause) => projectError(cause.reason._tag === "NotFound" ? "notFound" : "read", file)(cause))
+      )
+      return { bytes, name }
+    })
+
+    const describeBackup = Effect.fn("Prefabs.describeBackup")(function*(ref: PrefabBackupRef) {
+      const { bytes } = yield* readKept(ref)
+      return prefabSummaryOf(new TextDecoder().decode(bytes))
+    })
+
+    const restoreBackup = Effect.fn("Prefabs.restoreBackup")(function*(ref: PrefabBackupRef) {
+      const { bytes, name } = yield* readKept(ref)
+      const { folder, kept } = yield* folderToWrite(ref.tier)
+      const file = yield* fileIn(folder, name)
+      yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.mapError(projectError("write", folder)))
+      yield* backups.overwrite(kept, file, bytes)
+      return yield* infoAt(ref.tier, name, file)
+    })
+
+    return Prefabs.of({
+      list,
+      read,
+      write,
+      remove,
+      rename,
+      folderOf,
+      backups: listBackups,
+      describeBackup,
+      restoreBackup
+    })
   })
 }

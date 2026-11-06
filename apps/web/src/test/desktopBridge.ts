@@ -10,6 +10,8 @@ import type {
   OpenedMapFile,
   PlaySessionEnded,
   PluginStatus,
+  PrefabBackup,
+  PrefabBackupRef,
   PrefabInfo,
   PrefabTier,
   ProjectInfo,
@@ -60,7 +62,7 @@ export interface TestDisk {
    */
   readonly backups: Array<MapBackupFile>
   /** What main kept of the prefabs it wrote over, renamed or deleted, oldest first. */
-  readonly prefabBackups: Array<{ readonly name: string; readonly text: string }>
+  readonly prefabBackups: Array<PrefabBackup & { readonly text: string }>
   /** How many times the page asked main to check the exports (`checkExports`). */
   exportChecks: number
   /** What `notifications.json` holds. */
@@ -344,10 +346,13 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     return path === null || text === undefined ? undefined : { path, text }
   }
   /** What is written over goes to the backups, like main. */
-  const keepPrefab = (name: string, path: string) => {
+  const keepPrefab = (tier: PrefabTier, name: string, path: string) => {
     const text = disk.files.get(path)
-    if (text !== undefined) disk.prefabBackups.push({ name, text })
+    const id = `${disk.prefabBackups.length} ${prefabFileNameOf(name)}`
+    if (text !== undefined) disk.prefabBackups.unshift({ tier, id, name, at: TIME, text })
   }
+  const prefabBackupOf = ({ id, tier }: PrefabBackupRef) =>
+    disk.prefabBackups.find((backup) => backup.id === id && backup.tier === tier)
 
   const bridge: DesktopBridge = {
     versions: { electron: "test", chrome: "test", node: "test" },
@@ -450,14 +455,14 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       const path = prefabPath(tier, name)
       if (path === null) return fail(NO_PROJECT)
       if (!replace && disk.files.has(path)) return fail(`There is already a prefab called ${name}.`)
-      if (disk.files.get(path) !== text) keepPrefab(name, path)
+      if (disk.files.get(path) !== text) keepPrefab(tier, name, path)
       disk.files.set(path, text)
       return Promise.resolve(prefabInfo(tier, name, path, text))
     },
     deletePrefab: ({ name, tier }) => {
       const path = prefabPath(tier, name)
       if (path !== null) {
-        keepPrefab(name, path)
+        keepPrefab(tier, name, path)
         disk.files.delete(path)
       }
       return Promise.resolve()
@@ -467,7 +472,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       const next = prefabPath(tier, to)
       if (file === undefined || next === null) return fail(`${from} doesn't exist any more.`)
       if (disk.files.has(next)) return fail(`There is already a prefab called ${to}.`)
-      keepPrefab(from, file.path)
+      keepPrefab(tier, from, file.path)
       disk.files.delete(file.path)
       disk.files.set(next, file.text)
       return Promise.resolve(prefabInfo(tier, to, next, file.text))
@@ -564,6 +569,21 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     readBackup: ({ place, id }) => {
       const backup = disk.backups.find((b) => b.place === place && b.id === id)
       return backup === undefined ? fail(`${id} doesn't exist any more.`) : Promise.resolve(backup)
+    },
+    listPrefabBackups: () => Promise.resolve(disk.prefabBackups.map(({ text: _, ...backup }) => backup)),
+    describePrefabBackup: (ref) => {
+      const backup = prefabBackupOf(ref)
+      return backup === undefined
+        ? fail(`${ref.id} doesn't exist any more.`)
+        : Promise.resolve(prefabSummaryOf(backup.text))
+    },
+    restorePrefabBackup: (ref) => {
+      const backup = prefabBackupOf(ref)
+      const path = backup === undefined ? null : prefabPath(ref.tier, backup.name)
+      if (backup === undefined || path === null) return fail(`${ref.id} doesn't exist any more.`)
+      if (disk.files.get(path) !== backup.text) keepPrefab(ref.tier, backup.name, path)
+      disk.files.set(path, backup.text)
+      return Promise.resolve(prefabInfo(ref.tier, backup.name, path, backup.text))
     },
     setWindowTheme: () => Promise.resolve(),
     confirmUnsaved: (prompt) => {

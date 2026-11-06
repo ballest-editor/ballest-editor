@@ -102,6 +102,15 @@ export const projectHandlers = {
   revealPrefabs: Effect.fn("ipc.revealPrefabs")(function*({ tier }) {
     return yield* reveal(yield* (yield* Prefabs).folderOf(tier))
   }),
+  listPrefabBackups: Effect.fn("ipc.listPrefabBackups")(function*() {
+    return yield* (yield* Prefabs).backups
+  }),
+  describePrefabBackup: Effect.fn("ipc.describePrefabBackup")(function*(ref) {
+    return yield* (yield* Prefabs).describeBackup(ref)
+  }),
+  restorePrefabBackup: Effect.fn("ipc.restorePrefabBackup")(function*(ref) {
+    return yield* (yield* Prefabs).restoreBackup(ref)
+  }),
   /** The open dialog, starting in the game's maps folder when it is found. */
   pickImport: Effect.fn("ipc.pickImport")(function*(_, event) {
     const { mapsFolder } = yield* (yield* GamePaths).get

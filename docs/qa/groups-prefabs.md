@@ -56,9 +56,11 @@ One detail for anyone copying the panel: scale 2, 1, 1 on a group whose frame ha
 | --------------------------------------------------------------------------------------------------------------- | ----------------------- | ----------------------------- |
 | The three cubes above                                                                                           | (400, 300, 5200)        | (500, 450, 5800)              |
 | The same, turned yaw 30, 60, 0 and scaled 2,2,2; 1,1,1; 1,3,1                                                   | (400, 300, 5200)        | (158.494, 516.987, 6000)      |
-| Cube (yaw 30, scale 2,1,1), air vent, ramp (yaw −90) at (100, 200, 5000), (3100, 200, 5100), (1100, 2200, 6000) | (1433.3, 866.7, 5366.7) | (1079.956, 864.873, 5572.327) |
+| Cube (yaw 30, scale 2,1,1), air vent, ramp (yaw −90) at (100, 200, 5000), (3100, 200, 5100), (1100, 2200, 6000) | (1433.3, 866.7, 5366.7) | (1092.612, 864.873, 5572.327) |
 
-The box uses each member's turned bounds, so a turned cube counts its corners. The third row checks exactly: x −1016.03 (the cube) to 3175.94 (the vent), y −733.01 (the cube) to 2462.76 (the ramp), z 5000 to 6144.65. The vent's bounds here match its pivot bounds (`FORMAT.md` § Pivots). Selecting in reverse order made the same frame.
+The box uses each member's turned bounds, so a turned cube counts its corners. The third row checks exactly: x −1016.03 (the cube) to 3201.25 (the vent), y −733.01 (the cube) to 2462.76 (the ramp), z 5000 to 6144.65. The vent's bounds here match its pivot bounds (`FORMAT.md` § Pivots). That row was run again on 2026-11-05 and matched the catalog's box to every digit. Its first run recorded x 1079.956 and a box to 3175.94, and nothing here explains why, so that number shouldn't be relied on.
+
+A flipped member counts its flipped bounds. `piece_measure` on `Bevel_Full_ShortUScoop_R` at the origin gave x −909.81 to 863.81 and y −1122.03 to 594.03; Flip Y negated y, Flip X negated x, and both negated both. Selecting in reverse order made the same frame.
 
 For comparison, a selection of several pieces with no group puts the gizmo on the piece picked last, with that piece's rotation and scale in the panel and the origins' centroid as the panel's location. Grouping them moves the gizmo.
 
@@ -122,7 +124,7 @@ The file's shape is in [FORMAT.md](../FORMAT.md) § Prefab file. What the transf
 | One whole group            | Its frame's translation, with world axes                   | The frame's rotation and scale, the name if it has one |
 | A group plus a loose piece | The bounds centre of all of them                           | Rotation 0, scale 1, no name                           |
 
-Evidence for the first row: the cube, vent and ramp above saved `location` values that all subtract to (1079.956, 864.873, 5572.327), the same point `GroupSelection` gave for those pieces. For the second row, the case e group saved its first cube as (−5400, −1300, −1200): the world offset from the frame, not turned by the frame's yaw and not divided by its scale. `rotation` and `scale` stay the item's world values in every case.
+Evidence for the first row: the cube, vent and ramp above saved `location` values that all subtract to the point `GroupSelection` gave for those pieces in that run (1079.956, 864.873, 5572.327; see the note on that row). For the second row, the case e group saved its first cube as (−5400, −1300, −1200): the world offset from the frame, not turned by the frame's yaw and not divided by its scale. `rotation` and `scale` stay the item's world values in every case.
 
 Saving changes nothing in the level. After the mixed save, the group still selected with its own frame and name, as the game's help text says it should. Items keep their selection order in the file. Joins are not saved: a joined pair saved no parent key, and spawned with no parent.
 

@@ -1,18 +1,16 @@
-/** Backups and Recover (docs/DESKTOP.md § Backups): the versions main kept of the map files it wrote over. */
+/** Backups and Recover (docs/DESKTOP.md § Backups): the versions main kept of the map files and prefabs it wrote over. */
 import { Effect } from "effect"
 import { mapLabelOf } from "../../domain/factory"
 import { MapCodec } from "../../services/MapCodec"
-import { type MapBackup, Platform } from "../../services/Platform"
+import { type MapBackup, Platform, type PrefabBackup } from "../../services/Platform"
 import { useEditor } from "../store"
+import { checkPrefabs } from "./prefabs"
 import { run } from "./run"
 import { fileOf, loadMapFile, refreshProject, showMap } from "./shared"
 import { unlessCancelledFor } from "./unsaved"
 
 /** The versions main kept of the files it wrote over, newest first, for the Recover dialog (desktop). */
-export const listBackups = () =>
-  run(Effect.gen(function*() {
-    return yield* (yield* Platform).listBackups
-  }))
+export const listBackups = () => run(Effect.flatMap(Effect.service(Platform), (platform) => platform.listBackups))
 
 /** What a backup holds, decoded the way Open would: its map's names and item count, or why it can't be opened. */
 export type BackupSummary =
@@ -60,3 +58,30 @@ export const recoverBackupEffect = Effect.fn("recoverBackupEffect")(function*(ba
 
 export const recoverBackup = (backup: MapBackup) =>
   run(unlessCancelledFor(backup.fileName, "recover", (open) => recoverBackupEffect(backup, open)))
+
+/** The versions main kept of the prefabs of both tiers, newest first, for the Recover dialog (desktop). */
+export const listPrefabBackups = () =>
+  run(Effect.flatMap(Effect.service(Platform), (platform) => platform.listPrefabBackups))
+
+/** What a prefab's backup holds; a file that has gone or can't be read holds no prefab, as one that isn't a prefab. */
+export const describePrefabBackup = (backup: PrefabBackup) =>
+  run(
+    Effect.gen(function*() {
+      return yield* (yield* Platform).describePrefabBackup(backup)
+    }).pipe(Effect.orElseSucceed(() => ({ itemCount: null, firstClass: null })))
+  )
+
+/**
+ * Recover for a prefab: main writes the version back, the file it replaces going to the backups, and everything that
+ * follows a definition takes it up as it would any change to the file (docs/DESKTOP.md § Prefabs).
+ */
+export const restorePrefabBackupEffect = Effect.fn("restorePrefabBackupEffect")(function*(backup: PrefabBackup) {
+  yield* (yield* Platform).restorePrefabBackup(backup)
+  yield* checkPrefabs
+  useEditor.getState().notify(
+    "info",
+    `Restored a previous version of ${backup.name}. The file it replaced, if there was one, went to the backups.`
+  )
+})
+
+export const restorePrefabBackup = (backup: PrefabBackup) => run(restorePrefabBackupEffect(backup))

@@ -984,7 +984,7 @@ describe("document structure", () => {
     const { a, b } = threeCubes()
     state().groupItems([a, b], "G 1")
     const { doc } = state()
-    assert.deepStrictEqual(gameMapOf(doc).editorState?.groups.map((g) => [g.members, g.name]), [[[1, 2], "G1"]])
+    assert.deepStrictEqual(gameMapOf(doc, null).editorState?.groups.map((g) => [g.members, g.name]), [[[1, 2], "G1"]])
     assert.deepStrictEqual(doc.map.editorState?.groups, [])
   })
 })

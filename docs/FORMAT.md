@@ -240,7 +240,7 @@ The load-time rules are under [Load-time validation](#load-time-validation). The
 - One game group per outermost tree group with at least one item anywhere under it. A nested group has no game group of its own.
 - `members` is every item index under it, flattened and sorted.
 - `name` is the group's name, or the prefab's for a prefab instance, reduced to letters and digits, at most 64 of them, or empty when none are left.
-- `frame` has identity rotation and scale, with its translation at the centre of the box around the members' `itemTransform.translation`. The game's own Ctrl+G centres it on the members' mesh bounds instead (above), so the editor's gizmo for a group made here sits a little off the game's; using the catalog's bounds is a follow-up.
+- `frame` is what Ctrl+G makes (above), with each member's bounds being its pivot bounds (§ Pivots) under its transform (`domain/itemBounds.ts`). A member with no known bounds counts as its translation, and so does every member while the catalog hasn't loaded.
 
 Going the other way, a map with no sidecar gets one tree group per game group, where its first member is. An unnamed one is called `Group`, and a member the game would refuse is left out.
 
@@ -285,6 +285,8 @@ The bounds are the Main mesh's, measured through the game's own gizmo, with thes
 | `MP_LaserTerminal`                                       | X −4.6541 to 113, reaching along the beam, whatever blocks it. Measured at scale 1: at other scales the game's box doesn't follow the item's scale (scale 2: Back 213, Top 18.71). |
 | `BP_Elevator`                                            | Z −8.9917 to 8.9602, taller than the Main mesh, whatever its travel height.                                                                                                        |
 | `BP_Checkpoint`                                          | Moves as the goal animates (Center drifts about 20 cm in X), so no value is exact; the editor keeps the ring's box.                                                                |
+
+Flip X and Flip Y flip these bounds with the mesh, along the same axes (`mirrorScaleOf`).
 
 The game accepts a file's `localPosition` for all of these and puts the gizmo there.
 

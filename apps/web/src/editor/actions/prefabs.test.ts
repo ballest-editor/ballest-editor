@@ -23,6 +23,7 @@ import { changedPrefab, PREFAB_TEXT } from "../../test/prefabs"
 import { repoRoot } from "../../test/samples"
 import { sceneRegistry } from "../sceneRegistry"
 import { tabStateOf, useEditor } from "../store"
+import { restorePrefabBackupEffect } from "./backups"
 import { exportToGameEffect, playEffect } from "./exportPlay"
 import { createNewMap, openProjectMapFile } from "./maps"
 import {
@@ -70,8 +71,16 @@ const instanceId = () => {
 }
 
 const instance = (id: string, doc = s().doc) => findGroup(doc.structure.tree, id)
-const hashOf = (ref: { readonly name: string }) => s().prefabs.find((p) => p.name === ref.name)?.hash
 const xOf = (key: string) => s().doc.map.items[s().doc.ids.indexOf(key)]?.itemTransform.translation.x ?? NaN
+
+/** A placed instance, its first item and where that stands. */
+const placedFirst = Effect.gen(function*() {
+  const id = yield* placed
+  const [key = ""] = treeKeys([instance(id)!])
+  return { id, key, was: xOf(key) }
+})
+
+const hashOf = (ref: { readonly name: string }) => s().prefabs.find((p) => p.name === ref.name)?.hash
 
 /** The definition's file with its first item's location changed, as the game or a text editor would write it. */
 const edited = (x: number) => changedPrefab((json) => void (json.items[0]!.transform.location = [x, 0, -250.5]))
@@ -220,9 +229,7 @@ describe("instances following their definition", () => {
     withDisk((disk) =>
       Effect.gen(function*() {
         yield* started(disk)
-        const id = yield* placed
-        const [key = ""] = treeKeys([instance(id)!])
-        const was = xOf(key)
+        const { key, was } = yield* placedFirst
         disk.files.set(userPrefabFile("Bridge"), edited(-1500))
         yield* checkPrefabs
         s().undo()
@@ -319,6 +326,35 @@ describe("a definition's tab", () => {
         yield* openDefinition
         assert.strictEqual(s().tabId, tabId)
         assert.lengthOf(s().tabIds, 2)
+      })
+    ))
+
+  it.effect("restoring a version writes it back, keeps the file it replaces, and instances follow", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        const { key, was } = yield* placedFirst
+        const platform = yield* Platform
+        yield* platform.writePrefab({ ...USER, text: edited(400), replace: true })
+        yield* checkPrefabs
+        assert.notStrictEqual(xOf(key), was)
+        assert.lengthOf(disk.prefabBackups, 1)
+
+        yield* restorePrefabBackupEffect(disk.prefabBackups[0]!)
+        assert.strictEqual(disk.files.get(userPrefabFile("Bridge")), PREFAB_TEXT)
+        assert.strictEqual(xOf(key), was)
+        assert.deepStrictEqual(disk.prefabBackups.map((b) => b.text), [edited(400), PREFAB_TEXT])
+      })
+    ))
+
+  it.effect("restoring a deleted prefab lists it again", () =>
+    withDisk((disk) =>
+      Effect.gen(function*() {
+        yield* started(disk)
+        yield* deletePrefabEffect(USER)
+        assert.isUndefined(hashOf(USER))
+        yield* restorePrefabBackupEffect(disk.prefabBackups[0]!)
+        assert.isDefined(hashOf(USER))
       })
     ))
 

@@ -1,15 +1,19 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
-import { listSamples, readSample } from "../test/samples"
+import { hasCatalog, listSamples, readCatalog, readSample } from "../test/samples"
+import { expectVec } from "../test/vec"
+import { indexCatalog } from "./Catalog"
 import { defaultEditorState, identityTransform, newMapFile, playerStartItem } from "./factory"
 import { gameGroupNameOf, gameGroupsOf, structureFromGame, withGameGroups } from "./gameGroups"
 import { gameLoadProblems } from "./limits"
-import { type Item, MapFile } from "./MapFile"
+import { type Item, ItemTransform, MapFile } from "./MapFile"
 import type { GroupNode, TreeNode } from "./MapSidecar"
 import { structureOfMap } from "./sidecar"
 import { flatStructure, freshKeys, treeKeys, withGroup } from "./structure"
+import { rotatorToQuat } from "./ueMath"
 
 const decodeMap = Schema.decodeUnknownSync(Schema.fromJsonString(MapFile))
+const decodeFrame = Schema.decodeUnknownSync(ItemTransform)
 
 const item = (key: string): TreeNode => ({ kind: "item", key })
 const group = (name: string, ...children: ReadonlyArray<TreeNode>): GroupNode => ({
@@ -44,6 +48,61 @@ describe("gameGroupNameOf", () => {
   })
 })
 
+// The frames `GroupSelection` made (docs/qa/groups-prefabs.md § The frame the game makes).
+describe.skipIf(!hasCatalog)("a group's frame against the game", () => {
+  const parsed = readCatalog()
+  const catalog = indexCatalog(parsed)
+  const piece = (
+    className: string,
+    translation: { readonly x: number; readonly y: number; readonly z: number },
+    yaw = 0,
+    [x, y, z]: readonly [number, number, number] = [1, 1, 1]
+  ): Item => ({
+    ...start,
+    actorToSpawn: parsed.pieces.find((p) => p.className === className)!.classPath,
+    meshComponents: [],
+    itemTransform: {
+      rotation: { ...rotatorToQuat({ pitch: 0, yaw, roll: 0 }) },
+      translation,
+      scale3D: { x, y, z }
+    }
+  })
+  const frameOf = (...items: ReadonlyArray<Item>) => {
+    const keys = items.map((_, n) => `k${n}`)
+    const map = { ...mapWith(), items }
+    return decodeFrame(gameGroupsOf(map, keys, [group("G", ...keys.map(item))], catalog)[0]?.frame)
+  }
+  const cubes = [{ x: 0, y: 0, z: 5000 }, { x: 1000, y: 0, z: 5000 }, { x: 200, y: 900, z: 5600 }]
+
+  it("centres three cubes on their bounds, not on their origins", () => {
+    const frame = frameOf(...cubes.map((origin) => piece("BP_Prim_Cube", origin)))
+    assert.deepStrictEqual(frame, identityTransform({ x: 500, y: 450, z: 5800 }))
+  })
+
+  it("counts the corners of turned and scaled cubes", () => {
+    const frame = frameOf(
+      piece("BP_Prim_Cube", cubes[0]!, 30, [2, 2, 2]),
+      piece("BP_Prim_Cube", cubes[1]!, 60),
+      piece("BP_Prim_Cube", cubes[2]!, 0, [1, 3, 1])
+    )
+    expectVec(frame.translation, { x: 158.494, y: 516.987, z: 6000 }, 3)
+  })
+
+  it("takes a piece with no Main mesh by its visible components", () => {
+    const frame = frameOf(
+      piece("BP_Prim_Cube", { x: 100, y: 200, z: 5000 }, 30, [2, 1, 1]),
+      piece("MP_AirVent", { x: 3100, y: 200, z: 5100 }),
+      piece("BP_Ramp_Curve_Short1", { x: 1100, y: 2200, z: 6000 }, -90)
+    )
+    expectVec(frame.translation, { x: 1092.612, y: 864.873, z: 5572.327 }, 3)
+  })
+
+  it("falls back to a piece's translation when the catalog doesn't know it", () => {
+    const lost = { ...piece("BP_Prim_Cube", { x: 40, y: 0, z: 0 }), actorToSpawn: "/Game/Test/Gone.Gone_C" }
+    assert.deepStrictEqual(frameOf(lost).translation, { x: 40, y: 0, z: 0 })
+  })
+})
+
 describe("gameGroupsOf", () => {
   const ids = ["k0", "k1", "k2", "k3", "k4"]
   const map = mapWith(10, 20, 30, 50)
@@ -54,41 +113,41 @@ describe("gameGroupsOf", () => {
       group("Outer one", group("Inner", item("k3"), group("Deep", item("k1"))), item("k2")),
       item("k4")
     ]
-    const groups = gameGroupsOf(map, ids, tree)
+    const groups = gameGroupsOf(map, ids, tree, null)
     assert.deepStrictEqual(groups, [{
       members: [1, 2, 3],
       name: "Outerone",
       frame: identityTransform({ x: 20, y: 0, z: 0 })
     }])
-    assertValid(withGameGroups(map, ids, tree))
+    assertValid(withGameGroups(map, ids, tree, null))
   })
 
   it("takes the frame's translation at the centre of the members' box", () => {
     const spread = { ...map, items: [start, at(10, 100, -4), at(30, 0, 8)] }
     assert.deepStrictEqual(
-      gameGroupsOf(spread, ["k0", "k1", "k2"], [group("G", item("k1"), item("k2"))])[0]?.frame,
+      gameGroupsOf(spread, ["k0", "k1", "k2"], [group("G", item("k1"), item("k2"))], null)[0]?.frame,
       identityTransform({ x: 20, y: 50, z: 2 })
     )
   })
 
   it("leaves out a group with no item anywhere under it", () => {
     const tree = [group("Empty"), group("Nested empty", group("Inner")), group("Full", item("k1"))]
-    assert.deepStrictEqual(gameGroupsOf(map, ids, tree).map((g) => g.name), ["Full"])
-    assertValid(withGameGroups(map, ids, tree))
+    assert.deepStrictEqual(gameGroupsOf(map, ids, tree, null).map((g) => g.name), ["Full"])
+    assertValid(withGameGroups(map, ids, tree, null))
   })
 
   it("gives a name with no letters or digits an empty one", () => {
-    assert.deepStrictEqual(gameGroupsOf(map, ids, [group("!!!", item("k1"))]).map((g) => g.name), [""])
+    assert.deepStrictEqual(gameGroupsOf(map, ids, [group("!!!", item("k1"))], null).map((g) => g.name), [""])
   })
 
   it("keeps a map with no groups as it is, and adds an editorState only for groups", () => {
     const flat = flatStructure(ids).tree
-    assert.strictEqual(withGameGroups(map, ids, flat), map)
+    assert.strictEqual(withGameGroups(map, ids, flat, null), map)
     const { editorState: _none, ...bare } = map
-    assert.isUndefined(withGameGroups(bare, ids, flat).editorState)
-    assert.isDefined(withGameGroups(bare, ids, [group("G", item("k1"))]).editorState)
+    assert.isUndefined(withGameGroups(bare, ids, flat, null).editorState)
+    assert.isDefined(withGameGroups(bare, ids, [group("G", item("k1"))], null).editorState)
     const old = { ...map, editorState: { ...defaultEditorState(), groups: [{ members: [1] }] } }
-    assert.deepStrictEqual(withGameGroups(old, ids, flat).editorState?.groups, [])
+    assert.deepStrictEqual(withGameGroups(old, ids, flat, null).editorState?.groups, [])
   })
 
   // Every shape of nesting, from a fixed seed: what comes out is always a list the game loads.
@@ -110,7 +169,7 @@ describe("gameGroupsOf", () => {
         }).flat()
       const tree = nodes(0)
       const rest = keys.slice(n).map(item)
-      const projected = withGameGroups(big, keys, [...tree, ...rest])
+      const projected = withGameGroups(big, keys, [...tree, ...rest], null)
       assertValid(projected)
       const under = tree.flatMap((node) => node.kind === "group" ? treeKeys(node.children) : [])
       assert.strictEqual(projected.editorState?.groups.flatMap((g) => g.members).length ?? 0, under.length)
@@ -126,7 +185,7 @@ describe("gameGroupsOf", () => {
       const half = Math.floor(keys.length / 2)
       const inner = withGroup(structure, keys.slice(0, half), "inner", "Inner half")
       const outer = inner === undefined ? structure : withGroup(inner, keys.slice(half, half + 1), "outer") ?? inner
-      const projected = withGameGroups(sampleMap, keys, outer.tree)
+      const projected = withGameGroups(sampleMap, keys, outer.tree, null)
       assertValid(projected)
       const members = projected.editorState?.groups.flatMap((g) => g.members) ?? []
       assert.isAtMost(members.length, sampleMap.items.length)
@@ -169,7 +228,7 @@ describe("structureFromGame", () => {
 
   it("comes back the same through the projection", () => {
     const map = withGroups([{ members: [1, 2], name: "one" }, { members: [4], name: "two" }])
-    const projected = gameGroupsOf(map, ids, structureFromGame(map, ids).tree)
+    const projected = gameGroupsOf(map, ids, structureFromGame(map, ids).tree, null)
     assert.deepStrictEqual(projected.map((g) => [g.members, g.name]), [[[1, 2], "one"], [[4], "two"]])
   })
 })

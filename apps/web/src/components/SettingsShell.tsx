@@ -211,8 +211,6 @@ export function SettingsShell<C extends string>(props: {
       <DialogContent
         className="flex h-[min(80vh,720px)] w-full gap-0 overflow-hidden p-0 sm:max-w-4xl"
         showCloseButton
-        // Back on the menu bar, where they open from, the editor's keys wouldn't work (`isEditorKeyEvent`).
-        finalFocus={false}
       >
         <nav className="flex w-56 shrink-0 flex-col border-r bg-muted/30 p-3">
           <div className="relative mb-2">
