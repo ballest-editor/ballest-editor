@@ -1301,12 +1301,14 @@ export const tabsWithoutFile = (s: EditorState): ReadonlyArray<string> =>
   tabsWhere(s, (tab) => tab.file === null && tab.document.kind === "map")
 
 /**
- * A tab nobody has used: a fresh map (the one the app starts on, New map's, the one closing the last tab leaves), never
- * saved, with no edits and no history. It holds nothing to lose: closing it asks nothing, a map opened into a new tab
- * takes its place, and a switch of projects drops it.
+ * A tab nobody has edited: a fresh map (the one the app starts on, New map's, the one closing the last tab leaves), never
+ * saved, with no edits. Selecting in it isn't an edit. It holds nothing to lose: closing it asks nothing, a map opened
+ * into a new tab takes its place, and a switch of projects drops it.
  */
-export const isBlankTab = (tab: TabState): boolean =>
-  tab.fresh && tab.file === null && !tab.dirty && tab.past.length === 0
+export const isBlankTab = (tab: TabState): boolean => tab.fresh && tab.file === null && !tab.dirty
+
+/** Whether a tab shows as unsaved: it has edits, or a map with no file that isn't blank (what a project switch left). */
+export const isUnsavedTab = (tab: TabState): boolean => tab.dirty || (tab.file === null && !isBlankTab(tab))
 
 export const blankTabs = (s: EditorState): ReadonlyArray<string> => tabsWhere(s, isBlankTab)
 
@@ -1321,9 +1323,22 @@ export const isModalOpen = (s: Pick<EditorState, "dialog" | "project">): boolean
 export const projectTitleOf = (s: Pick<EditorState, "project">): string | null =>
   s.project === null ? null : s.project.current?.name ?? "Untitled Project"
 
-/** Whether the window's title carries the unsaved dot: Untitled Project has nothing on disk, or a tab has edits. */
-export const projectUnsavedOf = (s: EditorState): boolean =>
-  s.project !== null && (s.project.current === null || dirtyTabs(s).length > 0)
+/** Whether the window's title carries the unsaved dot: a tab has edits. */
+export const projectUnsavedOf = (s: EditorState): boolean => s.project !== null && dirtyTabs(s).length > 0
+
+/** The OS window's title with nothing open in it: the start screen's, and the page's until it knows better. */
+export const APP_TITLE = "Ballest Editor"
+
+/**
+ * The OS window's title (docs/DESKTOP.md § Status bar): the project on desktop, so the taskbar and alt-tab tell windows
+ * apart, the open map in a browser, which has no project, and marked while there are edits to save. The start screen
+ * has neither.
+ */
+export const windowTitleOf = (s: EditorState): string => {
+  if (isChooserRequired(s)) return APP_TITLE
+  const unsaved = s.project === null ? s.dirty : projectUnsavedOf(s)
+  return `${unsaved ? "• " : ""}${projectTitleOf(s) ?? tabLabelOf(s)} – ${APP_TITLE}`
+}
 
 export const tabLabels = (s: EditorState): ReadonlyArray<string> =>
   s.tabIds.flatMap((id) => {
@@ -1497,16 +1512,14 @@ export const useOpenProjectMap = (): { readonly map: ProjectMap; readonly state:
   return map === undefined ? null : { map, state: linkStateOf(map, { unsaved: dirty }) }
 }
 
-/** The open map's name as its tab and the title bar show it. */
-export const useOpenMapLabel = (): string => useEditor((s) => tabLabelOf(s))
-
-/** Tab `tabId`'s name, whether it has unsaved edits (or was never saved) and its file (name and path), for its tab. */
+/** Tab `tabId`'s name, whether it shows as unsaved or is blank, and its file (name and path), for its tab. */
 export const useTabSummary = (tabId: string) =>
   useEditor(useShallow((s) => {
     const tab = tabStateOf(s, tabId)
     return {
       label: tab === undefined ? "" : tabLabelOf(tab),
-      unsaved: tab !== undefined && (tab.dirty || tab.file === null),
+      unsaved: tab !== undefined && isUnsavedTab(tab),
+      blank: tab !== undefined && isBlankTab(tab),
       path: tab?.file?.path ?? null,
       // the name of a map's file, which the tab's menu acts on; a definition's is the Prefabs panel's
       fileName: tab?.document.kind === "map" ? tab.file?.name ?? null : null,

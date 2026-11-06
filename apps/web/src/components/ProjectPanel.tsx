@@ -150,11 +150,11 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
 }
 
 /**
- * A tab whose map has no file yet (`tabsWithoutFile`): a row of its own, badged Unsaved, whichever tab is active. A click
- * makes it the active tab.
+ * A tab whose map has no file yet (`tabsWithoutFile`): a row of its own, whichever tab is active, badged Unsaved unless
+ * it is blank. A click makes it the active tab.
  */
 function UnsavedRow({ tabId }: { readonly tabId: string }) {
-  const { label } = useTabSummary(tabId)
+  const { label, unsaved } = useTabSummary(tabId)
   const isActive = useEditor((s) => s.tabId === tabId)
   const activateTab = useEditor((s) => s.activateTab)
   return (
@@ -176,7 +176,7 @@ function UnsavedRow({ tabId }: { readonly tabId: string }) {
           <RowDetails name={label} unsaved="Not saved yet" edited={null} />
         </TooltipContent>
       </Tooltip>
-      <SyncStatusChip status="unsaved" icon={false} className="mr-7.5" />
+      {unsaved && <SyncStatusChip status="unsaved" icon={false} className="mr-7.5" />}
     </li>
   )
 }

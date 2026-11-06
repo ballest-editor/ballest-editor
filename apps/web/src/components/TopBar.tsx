@@ -61,8 +61,7 @@ const TITLE_BAR_CLASSES = [
 
 /**
  * The window's title: the project in use (desktop), centred like any document window's, its folder on hover. The dot
- * is the document tab's: a tab has unsaved edits, or it is Untitled Project and nothing is on disk yet
- * (docs/PROJECTS.md § Shell).
+ * is the document tab's: a tab has unsaved edits.
  */
 function ProjectTitle() {
   const state = useEditor((s) => s.project)

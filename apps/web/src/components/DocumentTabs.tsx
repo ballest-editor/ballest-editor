@@ -38,9 +38,13 @@ export const closesOnMiddleClick = (close: () => void) => ({
   onMouseDown: (e: MouseEvent) => e.button === 1 && e.preventDefault()
 })
 
-/** What a tab's tooltip says of it: unsaved edits first, then how its project map stands against the export, if it has one. */
-export const tabStatusOf = (unsaved: boolean, map: LinkedMap | undefined): string => {
+/**
+ * What a tab's tooltip says of it: unsaved edits first, then a blank tab, which has nothing to save, then how its
+ * project map stands against the export, if it has one.
+ */
+export const tabStatusOf = (unsaved: boolean, map: LinkedMap | undefined, blank = false): string => {
   if (unsaved) return "Unsaved"
+  if (blank) return "New map"
   return map === undefined ? "Saved" : LINK_STATE_LABELS[linkStateOf(map)]
 }
 
@@ -100,7 +104,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
   const last = useEditor((s) => s.tabIds.at(-1) === id)
   const activateTab = useEditor((s) => s.activateTab)
   const setViewLayoutKind = useEditor((s) => s.setViewLayoutKind)
-  const { label, unsaved, fileName, prefabTier } = useTabSummary(id)
+  const { label, unsaved, blank, fileName, prefabTier } = useTabSummary(id)
   const map = useEditor((s) => s.projectMaps.find((candidate) => candidate.fileName === fileName))
   const [hinted, setHinted] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -179,7 +183,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
               </span>
             )}
           </TooltipTrigger>
-          <TooltipContent side="bottom">{label} · {tabStatusOf(unsaved, map)}</TooltipContent>
+          <TooltipContent side="bottom">{label} · {tabStatusOf(unsaved, map, blank)}</TooltipContent>
         </Tooltip>
         <span className="relative flex size-6 shrink-0 items-center justify-center">
           {unsaved && (

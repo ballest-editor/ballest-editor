@@ -10,7 +10,7 @@ import {
 } from "../../test/desktopBridge"
 import { balledits, edit, fileNameOf, layerFor, noticesWhile, reset, s } from "../../test/editorActions"
 import { readSample } from "../../test/samples"
-import { isChooserRequired, isModalOpen } from "../store"
+import { isChooserRequired, isModalOpen, windowTitleOf } from "../store"
 import {
   chooseProjectEffect,
   forgetRecentProjectEffect,
@@ -412,6 +412,16 @@ describe("the required chooser", () => {
       s().openDialog({ id: "gameLink" })
       assert.strictEqual(s().dialog?.id, "gameLink")
       assert.isTrue(isModalOpen(s()))
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("titles the window Ballest Editor: no project, and no dot even with edits behind it", () => {
+    const disk = chooserDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      assert.strictEqual(windowTitleOf(s()), "Ballest Editor")
+      edit()
+      assert.strictEqual(windowTitleOf(s()), "Ballest Editor")
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
