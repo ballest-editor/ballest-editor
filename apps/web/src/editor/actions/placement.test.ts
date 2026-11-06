@@ -5,11 +5,12 @@ import { Catalog, indexCatalog, pieceIdOf } from "../../domain/Catalog"
 import type { Vec3 } from "../../domain/coords"
 import { placementTransform } from "../../domain/factory"
 import { itemsBoxOf } from "../../domain/itemBounds"
+import { isPlayerStart } from "../../domain/MapFile"
 import { pieceFootprint, PLACEMENT_COLUMNS, PLACEMENT_GAP } from "../../domain/placement"
 import { defaultSettings } from "../../domain/Settings"
 import { VIEW_DOWN } from "../../test/placementView"
 import { initialMap, useEditor } from "../store"
-import { placeAt, placeAtCamera, spreadPlacement, toggleFavouritePiece } from "./placement"
+import { holdsDrop, placeAt, placeAtCamera, spreadPlacement, toggleFavouritePiece } from "./placement"
 
 const catalog = Schema.decodeUnknownSync(Catalog)(fixture)
 const pieceOf = (className: string) => catalog.pieces.find((p) => p.className === className)!
@@ -169,7 +170,8 @@ describe("placeAt", () => {
       mainRelativeTransform: { ...track.mainRelativeTransform!, location: [100, 0, -50] as const }
     }
     for (const piece of [cube, offCentre]) {
-      placeAt(piece, { x: 1200, y: -300, z: 40 })
+      s().loadMap(initialMap(), null)
+      placeAt(piece, { x: 1200, y: -300, z: 40 }, VIEW_DOWN)
       const { max, min } = box()
       assert.closeTo((min.x + max.x) / 2, 1200, 1)
       assert.closeTo((min.y + max.y) / 2, -300, 1)
@@ -179,7 +181,7 @@ describe("placeAt", () => {
 
   it("selects what it placed, as one undo step", () => {
     const before = s().doc.ids.length
-    placeAt(cube, POINT)
+    placeAt(cube, POINT, VIEW_DOWN)
     assert.deepStrictEqual(s().selectedIds, [lastId()])
     s().undo()
     assert.strictEqual(s().doc.ids.length, before)
@@ -187,8 +189,44 @@ describe("placeAt", () => {
 
   it("lets the next click start a run of its own", () => {
     click()
-    placeAt(cube, { x: 9000, y: 9000, z: 0 })
+    placeAt(cube, { x: 9000, y: 9000, z: 0 }, VIEW_DOWN)
     assert.deepStrictEqual(click(), { ...POINT, y: STEP })
+  })
+
+  describe("with an item at the hit point", () => {
+    const centreX = () => (box().min.x + box().max.x) / 2
+
+    it("goes beside it, clear of its box", () => {
+      const player = itemsBoxOf(s().doc.map.items.filter(isPlayerStart), s().catalogIndex)!
+      placeAt(cube, s().doc.map.items.find(isPlayerStart)!.itemTransform.translation, VIEW_DOWN)
+      const { max, min } = box()
+      assert.isTrue(min.x > player.max.x || max.x < player.min.x || min.y > player.max.y || max.y < player.min.y)
+    })
+
+    it("stands on the item the pointer is over, wherever on it the pointer is", () => {
+      placeAt(cube, POINT, VIEW_DOWN)
+      const under = lastId()
+      const hit = { ...POINT, z: (box().min.z + box().max.z) / 2 }
+      placeAt(cube, hit, VIEW_DOWN, under)
+      assert.closeTo(centreX(), hit.x, 1)
+      assert.closeTo(box().min.z, hit.z, 1)
+    })
+
+    it("keeps clear of the others beside the item it stands on", () => {
+      placeAt(cube, POINT, VIEW_DOWN)
+      const under = lastId()
+      const hit = { x: POINT.x + 50, y: POINT.y, z: (box().min.z + box().max.z) / 2 }
+      placeAt(cube, { ...POINT, x: POINT.x + width + 10 }, VIEW_DOWN)
+      placeAt(cube, hit, VIEW_DOWN, under)
+      assert.isAbove(Math.abs(centreX() - hit.x) + Math.abs((box().min.y + box().max.y) / 2 - hit.y), 100)
+    })
+  })
+
+  it("won't stand on the Player Start, so a ray goes on to what's under it", () => {
+    const [player, goal] = s().doc.ids
+    assert.isFalse(holdsDrop(player!))
+    assert.isTrue(holdsDrop(goal!))
+    assert.isFalse(holdsDrop("gone"))
   })
 })
 
@@ -202,7 +240,7 @@ describe("Recent and Favourites", () => {
 
   it("lists what a click or a drop placed, newest first", () => {
     placeAtCamera(cube)
-    placeAt(track, POINT)
+    placeAt(track, POINT, VIEW_DOWN)
     assert.deepStrictEqual(recent(), [pieceIdOf(track), pieceIdOf(cube)])
   })
 
