@@ -353,6 +353,9 @@ export const togglePanel = (id: string): void => {
   else if (spec !== undefined) addPanel(dock, spec)
 }
 
+/** The live dock, for the app driver's hook. */
+export const dockApi = (): DockviewApi | null => dock
+
 export const popOutPanel = (panel: IDockviewPanel): void => {
   expandGroup(panel.group)
   const { left, top, width, height } = panel.group.element.getBoundingClientRect()

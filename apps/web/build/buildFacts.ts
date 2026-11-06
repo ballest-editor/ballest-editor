@@ -22,9 +22,12 @@ const moduleText = (value: unknown, name: string) => `export const ${name} = ${J
  * `virtual:third-party-notices`, which the app loads when the list opens, so its text stays out of the first load.
  */
 export const buildFacts = (repoRoot: string): Plugin => {
-  const builtAt = new Date().toISOString()
+  // The app driver's captures have to match across commits and servers, so these can't vary under it.
+  const pinned = process.env["BALLEST_PIN_BUILD_INFO"] !== undefined
+  const builtAt = pinned ? "2026-01-01T12:00:00.000Z" : new Date().toISOString()
   const modules: Readonly<Record<string, () => string>> = {
-    "virtual:build-info": () => moduleText({ commit: currentCommit(repoRoot), builtAt }, "buildInfo"),
+    "virtual:build-info": () =>
+      moduleText({ commit: pinned ? "0000000" : currentCommit(repoRoot), builtAt }, "buildInfo"),
     "virtual:third-party-notices": () => moduleText(readThirdPartyNotices(repoRoot), "notices")
   }
   const resolved = (id: string) => `\0${id}`
