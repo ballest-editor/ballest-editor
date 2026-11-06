@@ -152,7 +152,7 @@ function ColorSetting(props: {
     <Popover>
       <PopoverTrigger
         aria-label={`${props.label}: ${props.value ?? `automatic (${props.auto})`}`}
-        className="flex h-7 w-40 cursor-pointer items-center gap-2 rounded-control border border-input px-2 text-body transition-colors hover:border-ring/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+        className="flex h-7 w-40 cursor-pointer items-center gap-2 rounded-control border border-input px-2 text-body transition-colors duration-150 ease-out hover:border-ring/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
       >
         <ColorSwatch color={shown} />
         <span className={cn("tabular-nums", props.value === null && "text-fg-tertiary")}>{shown}</span>
@@ -181,7 +181,7 @@ interface Listening {
 
 /**
  * An action's bindings as key caps (hover or focus one to reveal its ×, which slides in), then a
- * dashed + cap to add one, after the word Unbound when there are none, and a capture cap while
+ * + cap to add one, after the word Unbound when there are none, and a capture cap while
  * listening. Caps bound to more than one action of the same kind are marked red.
  */
 function KeybindControl(props: {
@@ -202,14 +202,14 @@ function KeybindControl(props: {
             <span
               key={binding}
               className={cn(
-                "group/cap inline-flex h-6 items-stretch overflow-hidden rounded-control border bg-muted text-caption leading-none text-foreground tabular-nums",
-                props.conflicts.has(binding) ? "border-destructive text-destructive" : "border-border"
+                "group/cap inline-flex h-6 items-stretch overflow-hidden rounded-full text-caption leading-none tabular-nums",
+                props.conflicts.has(binding) ? "bg-destructive/15 text-destructive" : "bg-muted text-foreground"
               )}
               title={props.conflicts.has(binding) ? "Also bound to another action" : undefined}
             >
               <button
                 type="button"
-                className="flex cursor-pointer items-center justify-center px-2 hover:bg-foreground/5"
+                className="flex cursor-pointer items-center justify-center px-2.5 transition-colors duration-150 ease-out hover:bg-foreground/10"
                 onClick={() => props.onListen(index)}
                 aria-label={`Rebind ${label} (${formatBinding(binding)})`}
               >
@@ -217,7 +217,7 @@ function KeybindControl(props: {
               </button>
               <button
                 type="button"
-                className="flex w-0 items-center justify-center overflow-hidden text-fg-secondary transition-[width] duration-150 group-focus-within/cap:w-5 group-focus-within/cap:border-l group-focus-within/cap:border-border group-hover/cap:w-5 group-hover/cap:border-l group-hover/cap:border-border hover:bg-destructive/15 hover:text-destructive"
+                className="flex w-0 items-center justify-center overflow-hidden text-fg-secondary transition-[width,background-color,color] duration-150 ease-out group-focus-within/cap:w-5 group-hover/cap:w-5 hover:bg-destructive/15 hover:text-destructive"
                 onClick={() => props.onRemove(index)}
                 aria-label={`Unbind ${formatBinding(binding)} from ${label}`}
               >
@@ -233,7 +233,7 @@ function KeybindControl(props: {
             {props.bindings.length === 0 && <span className="px-1 text-caption text-fg-tertiary">Unbound</span>}
             <button
               type="button"
-              className="inline-flex size-6 items-center justify-center rounded-control border border-dashed border-border text-fg-secondary hover:border-foreground/40 hover:text-foreground"
+              className="inline-flex size-6 items-center justify-center rounded-full bg-muted text-fg-secondary transition-colors duration-150 ease-out hover:bg-foreground/10 hover:text-foreground"
               onClick={() => props.onListen(props.bindings.length)}
               aria-label={props.bindings.length === 0 ? `Bind ${label}` : `Add a binding for ${label}`}
             >
@@ -248,10 +248,10 @@ function KeybindControl(props: {
 /** Trims the line box to the glyphs' cap height (Chrome 133+); older engines fall back to leading-none. */
 const CAP_TEXT = "leading-none [text-box:trim-both_cap_alphabetic]"
 
-/** Shown in place of the cap being (re)bound: same shape, primary ring, blinking caret. */
+/** Shown in place of the cap being (re)bound: same shape, the selection's wash, blinking caret. */
 function CaptureCap() {
   return (
-    <span className="inline-flex h-6 items-center gap-1.5 rounded-control border border-primary/40 bg-primary/15 px-2 text-caption text-[color-mix(in_oklch,var(--primary),var(--foreground)_45%)]">
+    <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-primary/12 px-2.5 text-caption text-foreground">
       <span className="size-1.5 animate-pulse rounded-full bg-primary" aria-hidden />
       <span className={CAP_TEXT}>Press a key</span>
     </span>

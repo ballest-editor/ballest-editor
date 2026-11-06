@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import { cn } from "@workspace/ui/lib/utils"
 import { type ReactNode, useEffect, useMemo, useState } from "react"
 import { mapLabelOf } from "../domain/factory"
 import {
@@ -18,6 +17,7 @@ import {
   restorePrefabBackup
 } from "../editor/actions"
 import { useEditor } from "../editor/store"
+import { CHIP } from "./chipStyle"
 import { SectionTitle } from "./SectionTitle"
 import { HintedButton } from "./TitledDialog"
 import { useOnOpen } from "./useOnOpen"
@@ -33,9 +33,6 @@ const TIERS: ReadonlyArray<{ readonly tier: PrefabTier; readonly title: string }
   { tier: "user", title: "User prefabs" },
   { tier: "project", title: "Project prefabs" }
 ]
-
-/** The segment not picked steps back, as an inactive tab does. */
-const SEGMENT = "text-fg-secondary aria-pressed:text-foreground"
 
 /** What the dialog shows the versions of. */
 type Shown =
@@ -90,7 +87,7 @@ function VersionRow({ backup, onClose }: { readonly backup: MapBackup; readonly 
       at={backup.at}
       badge={
         <Tooltip>
-          <TooltipTrigger render={<Badge variant="outline" />}>{place.label}</TooltipTrigger>
+          <TooltipTrigger render={<Badge variant="secondary" className={CHIP} />}>{place.label}</TooltipTrigger>
           <TooltipContent side="bottom">{place.title}</TooltipContent>
         </Tooltip>
       }
@@ -210,12 +207,12 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
       <div className="px-3 pt-3 pb-1">
         <SectionTitle>{title}</SectionTitle>
       </div>
-      <ul className="divide-y">
+      <ul>
         {rows.map(({ label, list, name, shows }) => (
           <li key={name}>
             <button
               type="button"
-              className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors outline-none hover:bg-muted focus-visible:bg-muted"
+              className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-150 ease-out outline-none hover:bg-accent focus-visible:bg-accent"
               onClick={() => {
                 setShown(shows)
                 setAll(false)
@@ -252,16 +249,14 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
           <ToggleGroup
             className="max-w-full"
             value={[all ? "all" : "shown"]}
-            variant="outline"
-            spacing={0}
             onValueChange={([picked]) => {
               if (picked !== undefined) setAll(picked === "all")
             }}
           >
-            <ToggleGroupItem value="shown" className={cn(SEGMENT, "min-w-0 shrink")}>
+            <ToggleGroupItem value="shown" className="min-w-0 shrink">
               <span className="truncate">{shown.kind === "map" ? mapLabelOf(shown.fileName) : shown.name}</span>
             </ToggleGroupItem>
-            <ToggleGroupItem value="all" className={SEGMENT}>All backups</ToggleGroupItem>
+            <ToggleGroupItem value="all">All backups</ToggleGroupItem>
           </ToggleGroup>
         )}
         {backups === null
@@ -269,8 +264,8 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
           : empty
           ? <p className="text-body text-fg-tertiary">No backups yet.</p>
           : (
-            <ScrollArea className="flex min-h-0 flex-col rounded-control border [&_[data-slot=scroll-area-viewport]]:max-h-72 [&_[data-slot=scroll-area-viewport]]:min-h-0">
-              {all ? everything : <ul className="divide-y">{versions}</ul>}
+            <ScrollArea className="flex min-h-0 flex-col rounded-surface bg-muted/40 [&_[data-slot=scroll-area-viewport]]:max-h-72 [&_[data-slot=scroll-area-viewport]]:min-h-0">
+              {all ? everything : <ul>{versions}</ul>}
             </ScrollArea>
           )}
         <DialogFooter>

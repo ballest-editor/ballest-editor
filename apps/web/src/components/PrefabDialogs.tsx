@@ -115,7 +115,6 @@ export function SavePrefabDialog({ open, onClose }: DialogProps) {
             <Label>Stored in</Label>
             <ToggleGroup
               value={[tier]}
-              variant="outline"
               onValueChange={([picked]) => {
                 if (picked === "user" || picked === "project") setTier(picked)
               }}
