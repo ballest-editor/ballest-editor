@@ -6,9 +6,11 @@ import {
   IconPencil,
   IconRefresh
 } from "@tabler/icons-react"
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbSeparator } from "@workspace/ui/components/breadcrumb"
 import { Button } from "@workspace/ui/components/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type ComponentType, useState } from "react"
+import { type ComponentType, Fragment, useState } from "react"
 import {
   anythingMissing,
   type GameFolderKind,
@@ -16,6 +18,7 @@ import {
   type GameLinkRow,
   gameLinkRows,
   type GameLinkRowState,
+  pathCrumbs,
   PLUGIN_MANAGER_URL
 } from "../domain/gameLink"
 import {
@@ -27,7 +30,7 @@ import {
   revealGamePath
 } from "../editor/actions"
 import { type SettingsCategory, useCreator, useEditor } from "../editor/store"
-import { PathAction } from "./PathText"
+import { CopyPathAction, PathAction } from "./PathText"
 import type { SettingsRow } from "./SettingsShell"
 
 const ICONS: Record<GameLinkRowState, ComponentType<{ readonly className?: string }>> = {
@@ -88,7 +91,7 @@ function FixButton({ fix, state }: { readonly fix: GameLinkFix; readonly state: 
             void installPlugin().finally(() => setBusy(false))
           }}
         >
-          {fix.update ? "Update" : "Install"}
+          {fix.label}
         </Button>
       )
     case "EditCreator": {
@@ -106,21 +109,35 @@ const chosenFolder = (row: GameLinkRow): GameFolderKind | null => {
   return null
 }
 
-/** The note and the full path: the only place a row spells either out. */
-function RowInfo({ row }: { readonly row: GameLinkRow }) {
+/** A row's folder as a trail of its names, the whole path in the tooltip. */
+function PathCrumbs({ path }: { readonly path: string }) {
+  const crumbs = pathCrumbs(path)
   return (
-    <span className="flex min-w-0 flex-col gap-1">
-      {row.note !== null && <span>{row.note}</span>}
-      {row.path !== null && <span className="break-all">{row.path}</span>}
-    </span>
+    <Tooltip>
+      <TooltipTrigger render={<Breadcrumb className="w-fit max-w-full min-w-0" aria-label={path} />}>
+        <BreadcrumbList className="flex-nowrap gap-1 text-caption text-fg-tertiary">
+          {crumbs.map((crumb, index) => (
+            // the trail so far, because a path can name a folder twice
+            <Fragment key={crumbs.slice(0, index + 1).join("/")}>
+              {index > 0 && <BreadcrumbSeparator>›</BreadcrumbSeparator>}
+              <BreadcrumbItem className="min-w-0">
+                <span className="truncate">{crumb}</span>
+              </BreadcrumbItem>
+            </Fragment>
+          ))}
+        </BreadcrumbList>
+      </TooltipTrigger>
+      <TooltipContent className="break-all">{path}</TooltipContent>
+    </Tooltip>
   )
 }
 
-/** Reveal and the row's fixes, in one line at the right of the row. */
+/** Copy, Reveal and the row's fixes, in one line at the right of the row. */
 function RowActions({ row }: { readonly row: GameLinkRow }) {
-  const { reveal } = row
+  const { path, reveal } = row
   return (
     <>
+      {path !== null && <CopyPathAction path={path} />}
       {reveal !== null && (
         <PathAction
           label="Reveal in file manager"
@@ -155,15 +172,15 @@ const KEYWORDS =
 
 /**
  * Settings › Game (docs/DESKTOP.md § Game link), the Game link's home: the game's install, its maps folder, the creator
- * name, the plugin manager and the editor plugin, each a settings row with its state, its status in one line, and
- * Reveal and its fix at the right. The full path is in the row's info. A folder chosen here has the row's reset, which
+ * name, the plugin manager and the editor plugin, each a settings row with its state, its status in one line, its path
+ * as a breadcrumb under that, and Copy, Reveal and its fix at the right. A folder chosen here has the row's reset, which
  * looks up the one Steam knows about.
  */
 export function useGameLinkSettings(): ReadonlyArray<SettingsRow<SettingsCategory>> {
   const rows = useGameLinkRows()
   const pathProblem = useEditor((s) => s.gamePathProblem)
   return rows.map((row) => {
-    const { reset } = row
+    const { note, path, reset } = row
     const problem = pathProblem !== null && pathProblem.which === chosenFolder(row) ? pathProblem.message : null
     return {
       id: `game-${row.id}`,
@@ -171,8 +188,9 @@ export function useGameLinkSettings(): ReadonlyArray<SettingsRow<SettingsCategor
       icon: <StateIcon state={problem === null ? row.state : "missing"} />,
       label: row.label,
       description: problem === null ? row.status : <span className="text-destructive">{problem}</span>,
-      info: row.note === null && row.path === null ? undefined : <RowInfo row={row} />,
-      keywords: `${KEYWORDS} ${row.title} ${row.note ?? ""} ${row.path ?? ""}`,
+      ...(note !== null && { info: note }),
+      ...(path !== null && { detail: <PathCrumbs path={path} /> }),
+      keywords: `${KEYWORDS} ${row.title} ${path ?? ""}`,
       changes: {
         modified: reset !== null,
         reset: () => {

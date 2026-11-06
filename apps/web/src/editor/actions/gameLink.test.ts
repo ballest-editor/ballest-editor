@@ -1,5 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, Option } from "effect"
+import { Effect, Fiber, Option } from "effect"
+import { TestClock } from "effect/testing"
 import { creatorOf } from "../../domain/creator"
 import { allFound, GAME_NOT_FOUND, gameLinkRows, PLUGIN_MANAGER_MISSING } from "../../domain/gameLink"
 import { defaultSettings } from "../../domain/Settings"
@@ -10,8 +11,10 @@ import {
   checkGameLinkEffect,
   chooseGameLinkFolderEffect,
   findCreatorEffect,
+  GAME_LINK_WATCH_INTERVAL,
   installPluginEffect,
-  launchGameEffect
+  launchGameEffect,
+  watchGameLinkEffect
 } from "./gameLink"
 import { muteNotificationKindEffect } from "./notifications"
 
@@ -233,6 +236,30 @@ describe("game link actions", () => {
       yield* chooseGameLinkFolderEffect("mapsFolder")
       assert.deepStrictEqual(pinned(), [])
       assert.deepStrictEqual(disk.gameLink.last, found)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("the watch flips a row by itself, and leaves a refused folder's reason on its row", () => {
+    const { disk, launch } = pluginManagerLost()
+    return Effect.gen(function*() {
+      yield* launch
+      s().setGamePathProblem({ which: "install", message: "Not the game's folder" })
+      const watch = yield* Effect.forkChild(watchGameLinkEffect)
+      yield* TestClock.adjust(GAME_LINK_WATCH_INTERVAL)
+      assert.strictEqual(s().pluginStatus?.status, "noPluginManager")
+      const shown = s().gamePaths
+
+      disk.game.plugin = { ...disk.game.plugin, status: "missing" }
+      yield* TestClock.adjust(GAME_LINK_WATCH_INTERVAL)
+      assert.strictEqual(s().pluginStatus?.status, "missing")
+      assert.deepStrictEqual(pinned(), [])
+      assert.strictEqual(s().gamePaths, shown, "the folders didn't change, so the store keeps them")
+      assert.strictEqual(s().gamePathProblem?.message, "Not the game's folder")
+
+      yield* Fiber.interrupt(watch)
+      disk.game.plugin = { ...disk.game.plugin, status: "current" }
+      yield* TestClock.adjust(GAME_LINK_WATCH_INTERVAL)
+      assert.strictEqual(s().pluginStatus?.status, "missing", "stopped with the page")
     }).pipe(Effect.provide(layerFor(disk)))
   })
 })

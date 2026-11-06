@@ -53,7 +53,7 @@ export const PLUGIN_MANAGER_URL = "https://github.com/AnythingGoes-ballest/balle
 export type GameLinkFix =
   | { readonly _tag: "ChooseFolder"; readonly which: GameFolderKind }
   | { readonly _tag: "OpenPluginDocs" }
-  | { readonly _tag: "InstallPlugin"; readonly update: boolean }
+  | { readonly _tag: "InstallPlugin"; readonly label: string }
   | { readonly _tag: "EditCreator" }
 
 /**
@@ -257,7 +257,7 @@ const pluginRow = (plugin: PluginLookup | null): GameLinkRow => {
           title: plugin.installedVersion === null ? "Not installed" : "Some of its files are missing",
           note: "Play races the open map in the game through it.",
           path: plugin.folder,
-          fixes: [{ _tag: "InstallPlugin", update: false }]
+          fixes: [{ _tag: "InstallPlugin", label: `Install ${plugin.bundledVersion}` }]
         }
       case "outdated":
         return {
@@ -265,7 +265,7 @@ const pluginRow = (plugin: PluginLookup | null): GameLinkRow => {
           title: `Version ${plugin.installedVersion} is installed`,
           note: `This app comes with ${plugin.bundledVersion}.`,
           path: plugin.folder,
-          fixes: [{ _tag: "InstallPlugin", update: true }]
+          fixes: [{ _tag: "InstallPlugin", label: "Update" }]
         }
       case "current":
         return {
@@ -292,6 +292,21 @@ export const gameLinkRows = (
   pluginManagerRow(paths, plugin),
   pluginRow(plugin)
 ]
+
+/** The most a path shows: the two folders it starts from, and the one it ends in with `…` for those between. */
+const MAX_CRUMBS = 4
+
+/**
+ * A folder's path as a row shows it. A Steam library's path starts at Steam, wherever the library is and whatever it is
+ * called, and leaves out `steamapps`, which every path in it has: "Steam › compatdata › … › UserSavedMaps".
+ */
+export const pathCrumbs = (path: string): ReadonlyArray<string> => {
+  const segments = path.split(/[\\/]/).filter((segment) => segment !== "")
+  const library = segments.findLastIndex((segment) => segment.toLowerCase() === "steamapps")
+  const crumbs = library < 0 ? segments : ["Steam", ...segments.slice(library + 1)]
+  if (crumbs.length === 0) return [path]
+  return crumbs.length <= MAX_CRUMBS ? crumbs : [...crumbs.slice(0, 2), "…", ...crumbs.slice(-1)]
+}
 
 /** Whether everything is there, the optional plugin manager included. */
 export const allFound = (rows: ReadonlyArray<GameLinkRow>): boolean => rows.every((r) => r.state === "ok")
