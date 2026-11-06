@@ -1,20 +1,22 @@
 /**
- * The Game link (docs/DESKTOP.md § Renderer): the game's folders, the creator name, the plugin manager and the
- * editor's plugin, looked up at startup and on request; the notifications for what changed; Launch game.
+ * The Game link (docs/DESKTOP.md § Game link): the game's folders, the creator name, the plugin manager and the
+ * editor's plugin, looked up at startup and on request; the notifications for what changed; Open game (Steam).
  */
-import { Effect, Option } from "effect"
+import { Duration, Effect, Equal, Option } from "effect"
+import { creatorOf } from "../../domain/creator"
 import {
+  anythingMissing,
   exportReady,
   gameLinkChanges,
   type GameLinkResult,
   gameLinkResultOf,
+  gameLinkRows,
   PLUGIN_MISSING,
   sameGameLinkResult
 } from "../../domain/gameLink"
 import { type GamePathKind, type GamePaths, Platform } from "../../services/Platform"
-import type { AppServices } from "../../services/runtime"
 import { useEditor } from "../store"
-import { run } from "./run"
+import { run, runUntilCleanup } from "./run"
 import { notifyNotice } from "./shared"
 
 /**
@@ -46,13 +48,11 @@ const refreshPluginStatus = Effect.gen(function*() {
   useEditor.getState().setPluginStatus(yield* (yield* Platform).pluginStatus)
 })
 
-// --- the Game link (docs/PROJECTS.md § Shell) ---------------------------------------------
-
 /** Keeps `current` for the next launch to compare with, unless it is what was kept already; a failure is only logged. */
 const rememberGameLink = (current: GameLinkResult) =>
   Effect.gen(function*() {
-    if (sameGameLinkResult(useEditor.getState().gameLink.last, current)) return
-    useEditor.getState().setGameLink({ last: current })
+    if (sameGameLinkResult(useEditor.getState().lastGameLink, current)) return
+    useEditor.getState().setLastGameLink(current)
     yield* (yield* Platform).rememberGameLink(current)
   }).pipe(Effect.catch((error) => Effect.logWarning("Couldn't keep the Game link's result", error)))
 
@@ -78,16 +78,16 @@ const noteGameLink = Effect.gen(function*() {
 
 /**
  * The startup check behind the Game link (desktop): looks up the game's folders and the plugin, and notifies only
- * what changed since the last launch (none on the first, when the checklist itself is in front of the user).
- * Persistent notices (game not found, plugin manager missing) stay pinned until their cause goes away. The Game link
- * dialog opens by itself on the first launch, and whenever a folder Export needs is missing; the plugin manager, which
- * only Play needs, never opens it.
+ * what changed since the last launch (none on the first). Persistent notices (game not found, plugin manager missing)
+ * stay pinned until their cause goes away. The Game link dialog opens by itself whenever a folder Export needs is
+ * missing, and on the first launch if anything else is; with everything found nothing shows, and the plugin manager,
+ * which only Play needs, never opens it.
  */
 export const checkGameLinkEffect = Effect.gen(function*() {
   const platform = yield* Platform
   const memory = yield* platform.gameLinkMemory
   useEditor.getState().muteNotifications(memory.muted)
-  useEditor.getState().setGameLink({ firstRun: memory.last === null, last: memory.last })
+  useEditor.getState().setLastGameLink(memory.last)
   const paths = yield* platform.gamePaths
   useEditor.getState().setGamePaths(paths)
   const plugin = yield* platform.pluginStatus
@@ -95,7 +95,9 @@ export const checkGameLinkEffect = Effect.gen(function*() {
   const current = gameLinkResultOf(paths, plugin)
   reportGameLink(memory.last, current)
   yield* rememberGameLink(current)
-  if (memory.last === null || !exportReady(paths)) useEditor.getState().openDialog({ id: "gameLink" })
+  const { foundCreator, openDialog, settings } = useEditor.getState()
+  const rows = gameLinkRows(paths, plugin, creatorOf(settings.general.creatorName, foundCreator))
+  if (!exportReady(paths) || (memory.last === null && anythingMissing(rows))) openDialog({ id: "gameLink" })
 }).pipe(Effect.catch((error) => Effect.logWarning("Couldn't check the Game link", error)))
 
 /** Runs a lookup that may return the game's folders (none: the user cancelled) and shows them, and the plugin. */
@@ -111,15 +113,11 @@ const gamePathsShown = <E, R>(
     yield* noteGameLink
   })
 
-const showGamePaths = <E>(
-  lookup: (platform: Platform["Service"]) => Effect.Effect<Option.Option<GamePaths>, E, AppServices>
-) => run(gamePathsShown(lookup))
-
 /** Looks the game's folders up again, and the plugin with them. */
-export const loadGamePaths = () => showGamePaths((platform) => Effect.asSome(platform.gamePaths))
+export const loadGamePaths = () => run(gamePathsShown((platform) => Effect.asSome(platform.gamePaths)))
 
 /** A folder dialog; the chosen folder replaces the one found for `which`. */
-export const chooseGamePath = (which: GamePathKind) => showGamePaths((platform) => platform.chooseGamePath(which))
+export const chooseGamePath = (which: GamePathKind) => run(gamePathsShown((platform) => platform.chooseGamePath(which)))
 
 /**
  * Choose folder… in the Game link: `chooseGamePath`, but a folder main refuses (not the game's) is shown on the
@@ -141,10 +139,41 @@ export const chooseGameLinkFolder = (which: GamePathKind) => run(chooseGameLinkF
 /** Check again on the Game link: the folders, the plugin and the creator, looked up afresh. */
 export const refreshGameLink = () => Promise.all([loadGamePaths(), findCreator()])
 
+/** How often Settings › Game looks again while it is open. */
+export const GAME_LINK_WATCH_INTERVAL = Duration.seconds(5)
+
+/**
+ * One look of the watch: what Check again looks up, through the same calls. It puts in the store only what changed, so
+ * a page where nothing did doesn't draw again, and it leaves a refused folder's reason on its row.
+ */
+const lookAtGameLink = Effect.gen(function*() {
+  const platform = yield* Platform
+  const paths = yield* platform.gamePaths
+  const plugin = yield* platform.pluginStatus
+  const creator = yield* platform.findCreator
+  const s = useEditor.getState()
+  if (!Equal.equals(s.gamePaths, paths)) s.setGamePaths(paths)
+  if (!Equal.equals(s.pluginStatus, plugin)) s.setPluginStatus(plugin)
+  if (!Equal.equals(s.foundCreator, creator)) s.setFoundCreator(creator)
+  yield* noteGameLink
+})
+
+/** Looks again every `GAME_LINK_WATCH_INTERVAL`, each look once the last is done; one that fails only waits for the next. */
+export const watchGameLinkEffect = Effect.sleep(GAME_LINK_WATCH_INTERVAL).pipe(
+  Effect.andThen(lookAtGameLink),
+  Effect.catch((error) => Effect.logWarning("Couldn't look at the Game link", error)),
+  Effect.forever
+)
+
+/** Keeps the Game link's rows live until the returned function is called. */
+export const watchGameLink = () => runUntilCleanup(watchGameLinkEffect, "Stopped watching the Game link")
+
 /** Goes back to the folders found through Steam, one after the other (each reset rewrites the desktop settings). */
 export const resetGamePaths = (kinds: ReadonlyArray<GamePathKind>) =>
-  showGamePaths((platform) =>
-    Effect.forEach(kinds, platform.resetGamePath).pipe(Effect.andThen(Effect.asSome(platform.gamePaths)))
+  run(
+    gamePathsShown((platform) =>
+      Effect.forEach(kinds, platform.resetGamePath).pipe(Effect.andThen(Effect.asSome(platform.gamePaths)))
+    )
   )
 
 /**
@@ -169,15 +198,7 @@ export const installPlugin = () => run(installPluginEffect)
 
 /** Opens a web page in the browser (the desktop app's default browser). */
 export const openExternalLink = (url: string) =>
-  run(
-    Effect.gen(function*() {
-      yield* (yield* Platform).openExternal(url)
-    })
-  )
+  run(Effect.flatMap(Effect.service(Platform), (platform) => platform.openExternal(url)))
 
 export const revealGamePath = (which: GamePathKind) =>
-  run(
-    Effect.gen(function*() {
-      yield* (yield* Platform).revealGamePath(which)
-    })
-  )
+  run(Effect.flatMap(Effect.service(Platform), (platform) => platform.revealGamePath(which)))

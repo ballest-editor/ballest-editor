@@ -1,11 +1,8 @@
 // The updater's state transitions, as plain functions of the state (see `UpdateState` in packages/contracts).
-import type { ReleaseNoteBlock, UpdateState } from "@ballest/contracts"
+import { type ReleaseNoteBlock, RELEASES_URL, type UpdateState } from "@ballest/contracts"
 import { Option, Predicate } from "effect"
 import type { UpdateInfo } from "../electron/ElectronUpdater"
 import { releaseNotesToBlocks } from "./releaseNotes"
-
-/** This repository's GitHub Releases, the feed the packaged app checks. */
-export const RELEASES_URL = "https://github.com/ballest-editor/ballest-editor/releases"
 
 /** A newer release, as the page shows it. */
 export interface Release {
@@ -43,6 +40,7 @@ export const initialState = (currentVersion: string, disabled: Option.Option<str
   releaseDate: null,
   releaseUrl: null,
   downloadPercent: null,
+  checkedAt: null,
   message: Option.getOrNull(disabled)
 })
 
@@ -60,11 +58,17 @@ export const onCheckFailed = (state: UpdateState, message: string): UpdateState 
   message
 })
 
-export const onUpToDate = (state: UpdateState): UpdateState => ({ ...state, status: "idle", message: null })
+export const onUpToDate = (state: UpdateState, checkedAt: string): UpdateState => ({
+  ...state,
+  status: "idle",
+  checkedAt,
+  message: null
+})
 
-export const onAvailable = (state: UpdateState, release: Release): UpdateState => ({
+export const onAvailable = (state: UpdateState, release: Release, checkedAt: string): UpdateState => ({
   ...state,
   status: "available",
+  checkedAt,
   availableVersion: release.version,
   releaseNotes: release.notes,
   releaseDate: release.date,
@@ -120,7 +124,7 @@ export const releaseNotesOf = (raw: unknown, version: string): ReadonlyArray<Rel
 }
 
 /** The release's page: the release workflow tags every version `v<version>`. */
-export const releaseUrlOf = (version: string): string => `${RELEASES_URL}/tag/v${encodeURIComponent(version)}`
+const releaseUrlOf = (version: string): string => `${RELEASES_URL}/tag/v${encodeURIComponent(version)}`
 
 /** What the page shows of the release a check found. */
 export const releaseOf = (info: UpdateInfo): Release => ({

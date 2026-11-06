@@ -44,14 +44,13 @@ export const dayLabel = (iso: string, now: number): string => {
 export const formatClock = (iso: string): string =>
   new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
 
-/** The game's `createdAt` (`YYYY.MM.DD-HH.MM.SS`, local time) as a date and time; the raw text when it isn't one. */
-export const formatCreatedAt = (createdAt: string): string => {
+/** The game's `createdAt` (`YYYY.MM.DD-HH.MM.SS`, UTC) as an ISO time, for the formatters here; null when it isn't one. */
+export const createdAtIso = (createdAt: string): string | null => {
   const m = /^(\d{4})\.(\d{2})\.(\d{2})-(\d{2})\.(\d{2})\.(\d{2})$/.exec(createdAt)
-  if (m === null) return createdAt
+  if (m === null) return null
   const [y, mo, d, h, mi, s] = m.slice(1).map(Number)
-  if (y === undefined || mo === undefined || d === undefined) return createdAt
-  const date = new Date(y, mo - 1, d, h, mi, s)
-  return Number.isNaN(date.getTime()) ? createdAt : formatDateTime(date.toISOString())
+  if (y === undefined || mo === undefined || d === undefined) return null
+  return new Date(Date.UTC(y, mo - 1, d, h, mi, s)).toISOString()
 }
 
 /** The date and time in full, for a tooltip. */

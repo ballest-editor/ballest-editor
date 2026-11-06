@@ -1,17 +1,18 @@
 /**
- * Save (docs/PROJECTS.md § Save, rename, duplicate): the open map into its project file, or a download in a browser,
+ * Save (docs/DESKTOP.md § Projects and maps): the open map into its project file, or a download in a browser,
  * the Save map dialog's last step, Rename and Duplicate. A map with no file yet is named first, and whatever was to
  * follow the save (the unsaved-changes prompt's next step, Export, Play) waits for it: `saveOpenMapThen`.
  */
 import type { CreateProjectPayload } from "@ballest/contracts"
 import { Effect } from "effect"
-import { asNewDraft, setLevelNames } from "../../domain/edits"
+import { asNewDraft, asNewMap, setLevelNames } from "../../domain/edits"
 import { mapFileNameOf, mapLabelOf } from "../../domain/factory"
 import { MapExporter } from "../../services/MapExporter"
 import { Platform } from "../../services/Platform"
 import { type Doc, gameMapOf, type OpenFile, type ProjectMap, tabStateOf, useEditor } from "../store"
 import { ASK_FIRST, writeToGame } from "./gameWrite"
 import { nameProjectEffect } from "./maps"
+import { cacheMapThumbnail } from "./mapThumbnails"
 import { savePrefabTab } from "./prefabs"
 import { run } from "./run"
 import { fileOf, projectName, refreshProject, revealIn, saveTabPrefs, writeProjectMap, writeSidecarOf } from "./shared"
@@ -28,12 +29,16 @@ const exportOpenMap = Effect.gen(function*() {
 
 type ExportedOpenMap = Effect.Success<typeof exportOpenMap>
 
-/** Tab `tabId` has the map `written` open, with its sidecar and prefs under the name it went to. */
+/**
+ * Tab `tabId` has the map `written` open, with its sidecar and prefs under the name it went to. Its thumbnail follows
+ * in the background: a save doesn't wait for a render.
+ */
 const afterWrite = Effect.fnUntraced(function*({ doc, result, tabId }: ExportedOpenMap, written: ProjectMap) {
   useEditor.getState().markSaved(tabId, doc, result.map, fileOf(written))
   yield* writeSidecarOf(doc, written.fileName, written.hash)
   yield* saveTabPrefs(tabId)
   yield* refreshProject
+  yield* Effect.forkDetach(cacheMapThumbnail(doc, written.hash))
 })
 
 /**
@@ -57,26 +62,34 @@ const createFromOpenMap = Effect.gen(function*() {
   })
 })
 
+/** `stepOfGameWrite`: Export or Play is saving first, so the chip tells the save, and no Export on save follows it. */
+interface SaveOptions {
+  readonly stepOfGameWrite: boolean
+}
+
 /**
  * Writes the open map over its project file. When its name or creator changed since (Rename, Map settings), the file
  * moves to the new name first and the old one goes to the project's backups: the game loads only a file named after
  * the map inside it. Export on save then exports it too.
  */
-const writeOpenMap = Effect.fn("writeOpenMap")(function*(file: OpenFile, options: { readonly exportAfter: boolean }) {
+const writeOpenMap = Effect.fn("writeOpenMap")(function*(file: OpenFile, options: SaveOptions) {
   const opened = yield* exportOpenMap
   const { result, tabId } = opened
   const saved = yield* writeProjectMap(file.name, result.filename, result.text)
   yield* afterWrite(opened, saved)
   const label = mapLabelOf(saved.fileName)
-  useEditor.getState().notify(
-    "info",
-    saved.fileName === file.name ? `Saved ${label}` : `Renamed ${mapLabelOf(file.name)} to ${label}`,
-    { kind: saved.fileName === file.name ? "mapSaved" : "mapRenamed", actions: [revealIn("project")] }
-  )
+  const renamed = saved.fileName !== file.name
+  if (renamed || !options.stepOfGameWrite) {
+    useEditor.getState().notify(
+      "info",
+      renamed ? `Renamed ${mapLabelOf(file.name)} to ${label}` : `Saved ${label}`,
+      { kind: renamed ? "mapRenamed" : "mapSaved", actions: [revealIn("project")] }
+    )
+  }
   // the map's own Export on save, or Settings › General's for every map
   const state = useEditor.getState()
   const exportOnSave = state.settings.general.exportOnSave || tabStateOf(state, tabId)?.exportOnSave === true
-  if (options.exportAfter && exportOnSave) yield* writeToGame("export", saved.fileName, ASK_FIRST)
+  if (!options.stepOfGameWrite && exportOnSave) yield* writeToGame("export", saved.fileName, ASK_FIRST)
   return saved
 })
 
@@ -111,9 +124,12 @@ const nameFirst = <E, R>(then: Effect.Effect<void, E, R>) =>
 /**
  * Save, then `then`: on desktop, writes the project file and asks nothing (a map that has no file yet is named first,
  * in the `saveAs` dialog, and `then` waits for it). In a browser, downloads it, asking for the name first unless it
- * is the file's. Export on save exports what was written unless `exportAfter` is off.
+ * is the file's. Export on save exports what was written, unless the save is `stepOfGameWrite`.
  */
-export const saveOpenMapThen = <E, R>(then: Effect.Effect<void, E, R>, options = { exportAfter: true }) =>
+export const saveOpenMapThen = <E, R>(
+  then: Effect.Effect<void, E, R>,
+  options: SaveOptions = { stepOfGameWrite: false }
+) =>
   Effect.gen(function*() {
     const platform = yield* Platform
     const { doc, document, file } = useEditor.getState()
@@ -133,7 +149,7 @@ export const saveOpenMapThen = <E, R>(then: Effect.Effect<void, E, R>, options =
 
 /**
  * Runs `then` with the open map's project file name, for Export and Play, which copy that file: unsaved edits, or a
- * file named for an old name, are saved first (`saveOpenMapThen`, without Export on save: they export it themselves).
+ * file named for an old name, are saved first (`saveOpenMapThen`, as their step: no toast or Export on save of its own).
  * A map with no file yet is named first, and `then` runs once the Save map dialog has saved it.
  */
 export const withSavedOpenMap = <E, R>(then: (fileName: string) => Effect.Effect<void, E, R>) =>
@@ -144,7 +160,7 @@ export const withSavedOpenMap = <E, R>(then: (fileName: string) => Effect.Effect
       const saved = tabStateOf(useEditor.getState(), tabId)?.file ?? null
       return saved === null ? Effect.void : then(saved.name)
     })
-    yield* saveOpenMapThen(withSaved, { exportAfter: false })
+    yield* saveOpenMapThen(withSaved, { stepOfGameWrite: true })
   })
 
 export const saveMapFile = saveOpenMapThen(Effect.void)
@@ -160,7 +176,7 @@ export const saveMapAsEffect = (afterSave: Effect.Effect<void, unknown> = Effect
     const platform = yield* Platform
     const { file } = useEditor.getState()
     if (!platform.capabilities.projects) yield* downloadOpenMap
-    else yield* file === null ? createFromOpenMap : writeOpenMap(file, { exportAfter: true }).pipe(Effect.asVoid)
+    else yield* file === null ? createFromOpenMap : writeOpenMap(file, { stepOfGameWrite: false }).pipe(Effect.asVoid)
     yield* afterSave
   })
 
@@ -191,7 +207,7 @@ export const renameOpenMap = (displayName: string, creatorName: string) => {
 export const duplicateMapEffect = Effect.fn("duplicateMapEffect")(
   function*(displayName: string, creatorName: string, replace = false, newDraft = false) {
     const { catalogIndex, doc, file, tabId } = useEditor.getState()
-    const named = setLevelNames(gameMapOf(doc, catalogIndex), displayName, creatorName)
+    const named = asNewMap(setLevelNames(gameMapOf(doc, catalogIndex), displayName, creatorName))
     const result = yield* (yield* MapExporter).prepare(newDraft ? asNewDraft(named) : named, catalogIndex)
     const created = yield* createAsOpenMap({ doc, tabId, result }, replace)
     const from = file === null ? "" : ` from ${mapLabelOf(file.name)}`
@@ -204,5 +220,5 @@ export const duplicateMapEffect = Effect.fn("duplicateMapEffect")(
   }
 )
 
-export const duplicateMap = (displayName: string, creatorName: string, replace = false) =>
+export const duplicateMap = (displayName: string, creatorName: string, replace: boolean) =>
   run(duplicateMapEffect(displayName, creatorName, replace))

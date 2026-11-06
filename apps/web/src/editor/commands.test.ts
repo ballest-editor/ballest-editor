@@ -39,4 +39,19 @@ describe("commands", () => {
     commandFor("deselect")?.()
     assert.deepStrictEqual(s().selectedIds, [])
   })
+
+  it("selects the whole map, or only the entered group", () => {
+    const s = () => useEditor.getState()
+    s().loadMap(initialMap(), null)
+    const [first] = s().doc.ids
+    assert.isAbove(s().doc.ids.length, 1)
+    commandFor("selectAll")?.()
+    assert.deepStrictEqual(s().selectedIds, s().doc.ids)
+    s().select([first!])
+    s().groupSelection()
+    const groupId = s().doc.structure.tree.find((node) => node.kind === "group")?.id ?? null
+    s().enterGroup(groupId)
+    commandFor("selectAll")?.()
+    assert.deepStrictEqual(s().selectedIds, [first!])
+  })
 })

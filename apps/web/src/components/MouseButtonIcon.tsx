@@ -1,6 +1,3 @@
-import { IconArrowBigUp } from "@tabler/icons-react"
-import { Kbd } from "@workspace/ui/components/kbd"
-
 /** A mouse with its left or right button filled, sized like a Tabler icon (stroke = currentColor). */
 export function MouseButtonIcon(props: { readonly button: "left" | "right"; readonly className?: string }) {
   return (
@@ -26,11 +23,3 @@ export function MouseButtonIcon(props: { readonly button: "left" | "right"; read
     </svg>
   )
 }
-
-/** The Shift + mouse-button chord shown next to a shortcut. */
-export const ShiftClick = ({ button }: { readonly button: "left" | "right" }) => (
-  <Kbd className="justify-self-end gap-0.5">
-    <IconArrowBigUp className="size-3.5" />
-    <MouseButtonIcon button={button} className="size-3.5" />
-  </Kbd>
-)

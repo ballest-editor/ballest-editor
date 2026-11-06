@@ -42,10 +42,9 @@ describe("prefabs over IPC", () => {
           tier: "user",
           path: path.join(user, "b.json"),
           hash: sha256(bytes(prefabText(2))),
-          itemCount: 3,
-          firstClass: "/Game/A.A_C"
+          itemCount: 3
         })
-        assert.deepInclude(inUser[0], { itemCount: null, firstClass: null })
+        assert.deepInclude(inUser[0], { itemCount: null })
         const inProject = yield* fake.invokeAs(PrefabInfos, InvokeChannels.listPrefabs, { tier: "project" })
         assert.deepStrictEqual(inProject.map((p) => p.path), [path.join(project, "prefabs", "c.json")])
       })
@@ -131,8 +130,7 @@ describe("prefabs over IPC", () => {
         ])
         const ref = { id: kept.find((backup) => backup.name === "p")?.id, tier: "project" }
         assert.deepStrictEqual(yield* fake.invokeAs(PrefabSummary, InvokeChannels.describePrefabBackup, ref), {
-          itemCount: 3,
-          firstClass: "/Game/A.A_C"
+          itemCount: 3
         })
       })
     ))

@@ -156,7 +156,7 @@ A sandboxed preload can `require` only `electron` and a few built-ins (`electron
 
 ## Updates
 
-An installed app updates itself from this repository's GitHub Releases. `DesktopUpdates` (`src/updates/`) checks 15 s after start and every 4 minutes until it finds a newer release, then waits for the user: the page's status bar offers it, downloads it on Download and installs it on Restart. The status bar's left end shows the running version. File › Check for updates and the button in Settings › General run a check now, and both places say what it found; a check nobody asked for only speaks up when it finds a release. `electron-updater` does the work through `ElectronUpdater`; electron-builder wrote the feed into `resources/app-update.yml`.
+An installed app updates itself from this repository's GitHub Releases. `DesktopUpdates` (`src/updates/`) checks 15 s after start and every 4 minutes until it finds a newer release, then waits for the user: the page's status bar offers it, downloads it on Download and installs it on Restart. The status bar's left end shows the running version. Help › Check for updates runs a check now, and the status bar says what it found; a check nobody asked for only speaks up when it finds a release. `electron-updater` does the work through `ElectronUpdater`; electron-builder wrote the feed into `resources/app-update.yml`.
 
 | State         | When                                            | The page shows                                                                         |
 | ------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -180,7 +180,7 @@ Every change goes to the page on `ballest:update:state`; the page asks for the c
 | `BALLEST_MOCK_UPDATES=1`          | checks `http://127.0.0.1:4848/` (`pnpm release:mock-server`) instead |
 | `BALLEST_MOCK_UPDATE_SERVER_PORT` | that port                                                            |
 
-On Linux, `electron-updater` deletes the running AppImage and moves the update to the same path only when the file's name has no version (or already matches the download); otherwise the update lands beside it under the download's name, and anything pointing at the old path stops working. So every release's AppImage is `Ballest-Editor-x86_64.AppImage`, and an update replaces it in place, under whatever name the user gave it, as long as that name has no version. A copy saved with a versioned name (0.1.0-rc.1, rc.2) is renamed once more, to `Ballest-Editor-x86_64.AppImage`, on its next update; after that it stays put.
+On Linux an update replaces the AppImage in place, under whatever name the user gave it, as long as that name has no version ([tools/release](../../tools/release/README.md) says why). A copy saved with a versioned name (0.1.0-rc.1, rc.2) is renamed once more, to `Ballest-Editor-x86_64.AppImage`, on its next update; after that it stays put.
 
 Trying it without a release is [tools/release](../../tools/release/README.md#trying-updates)'s job.
 

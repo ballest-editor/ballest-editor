@@ -10,8 +10,10 @@ import {
   groupSelectionStates,
   groupTrail,
   nodeKeys,
+  selectableKeys,
   selectedGroupIds,
-  selectionNodeIds
+  selectionNodeIds,
+  selectionSummaryOf
 } from "./groupSelection"
 import type { TreeNode } from "./MapSidecar"
 
@@ -79,21 +81,98 @@ describe("enteredLevelOf", () => {
 
 describe("what a selection makes up", () => {
   it("keeps whole groups whole, in tree order", () => {
-    assert.deepStrictEqual(selectionNodeIds(tree, ["d", "c", "b", "a"]), ["outer", "d"])
-    assert.deepStrictEqual(selectionNodeIds(tree, ["d", "a"]), ["a", "d"])
-    assert.deepStrictEqual(selectionNodeIds(tree, ["b", "a"]), ["inner"])
+    assert.deepStrictEqual(selectionNodeIds(tree, ["d", "c", "b", "a"], null), ["outer", "d"])
+    assert.deepStrictEqual(selectionNodeIds(tree, ["d", "a"], null), ["a", "d"])
+    assert.deepStrictEqual(selectionNodeIds(tree, ["b", "a"], null), ["inner"])
   })
 
   it("finds the groups Ungroup dissolves", () => {
-    assert.deepStrictEqual(selectedGroupIds(tree, ["a", "b", "d"]), ["inner"])
-    assert.deepStrictEqual(selectedGroupIds(tree, ["a", "d"]), [])
+    assert.deepStrictEqual(selectedGroupIds(tree, ["a", "b", "d"], null), ["inner"])
+    assert.deepStrictEqual(selectedGroupIds(tree, ["a", "d"], null), [])
+  })
+
+  it("sees everything in the entered group as its members, down through the groups around it", () => {
+    assert.deepStrictEqual(selectionNodeIds(tree, ["a", "b", "c"], "outer"), ["inner", "c"])
+    assert.deepStrictEqual(selectionNodeIds(tree, ["a", "b", "c"], "inner"), ["a", "b", "c"])
+    assert.deepStrictEqual(selectionNodeIds(tree, ["e"], "only"), ["e"])
+    assert.deepStrictEqual(selectedGroupIds(tree, ["a", "b", "c"], "outer"), ["inner"])
+    assert.deepStrictEqual(selectedGroupIds(tree, ["e"], "only"), [])
+    assert.isTrue(canGroupSelection(tree, ["a", "b", "c"], "outer"))
   })
 
   it("can group anything but one whole group", () => {
-    assert.isTrue(canGroupSelection(tree, ["d"]))
-    assert.isTrue(canGroupSelection(tree, ["a", "b", "d"]))
-    assert.isFalse(canGroupSelection(tree, ["a", "b"]))
-    assert.isFalse(canGroupSelection(tree, []))
+    assert.isTrue(canGroupSelection(tree, ["d"], null))
+    assert.isTrue(canGroupSelection(tree, ["a", "b", "d"], null))
+    assert.isFalse(canGroupSelection(tree, ["a", "b"], null))
+    assert.isFalse(canGroupSelection(tree, [], null))
+  })
+})
+
+describe("selectableKeys", () => {
+  it("is every item in the map, in or out of a group", () => {
+    assert.deepStrictEqual(selectableKeys(tree, null), ["a", "b", "c", "d", "e"])
+  })
+
+  it("is the entered group's items, nested ones too", () => {
+    assert.deepStrictEqual(selectableKeys(tree, "outer"), ["a", "b", "c"])
+    assert.deepStrictEqual(selectableKeys(tree, "inner"), ["a", "b"])
+  })
+})
+
+describe("selectionSummaryOf", () => {
+  const nested = [
+    item("loose"),
+    group("outer", item("a"), group("inner", item("b"), item("c"))),
+    group("one", item("d"))
+  ]
+  const names = new Map([
+    ["loose", { name: "Goal", ordinal: undefined }],
+    ["a", { name: "Cube", ordinal: 2 }],
+    ["outer", { name: "Group", ordinal: undefined }],
+    ["inner", { name: "Group", ordinal: 2 }],
+    ["one", { name: "Left ramp", ordinal: undefined }]
+  ])
+  const summary = (selected: ReadonlyArray<string>, entered: string | null = null) =>
+    selectionSummaryOf(nested, selected, entered, names)
+
+  it("is nothing for an empty selection", () => {
+    assert.isNull(summary([]))
+  })
+
+  it("names a lone item, ordinal and all", () => {
+    assert.deepStrictEqual(summary(["loose"]), { name: "Goal", ordinal: undefined })
+    assert.deepStrictEqual(summary(["a"]), { name: "Cube", ordinal: 2 })
+  })
+
+  it("counts items that make up no group", () => {
+    assert.strictEqual(summary(["loose", "a"])?.name, "2 items")
+    assert.strictEqual(summary(["a", "b"])?.name, "2 items")
+  })
+
+  it("names one whole group, the outermost one for nested groups", () => {
+    assert.deepStrictEqual(summary(["a", "b", "c"]), { name: "Group", ordinal: undefined })
+    assert.deepStrictEqual(summary(["b", "c"]), { name: "Group", ordinal: 2 })
+    assert.deepStrictEqual(summary(["d"]), { name: "Left ramp", ordinal: undefined })
+  })
+
+  it("counts several whole groups", () => {
+    assert.deepStrictEqual(summary(["b", "c", "d"]), { name: "2 groups", ordinal: undefined })
+  })
+
+  it("counts items and groups when a selection mixes them", () => {
+    assert.strictEqual(summary(["loose", "a", "b", "c"])?.name, "4 items · 1 group")
+    assert.strictEqual(summary(["loose", "d"])?.name, "2 items · 1 group")
+    assert.strictEqual(summary(["a", "d"])?.name, "2 items · 1 group")
+  })
+
+  it("counts an entered group's members, all selected, rather than naming it", () => {
+    assert.strictEqual(summary(["a", "b", "c"], "outer")?.name, "3 items · 1 group")
+    assert.strictEqual(summary(["b", "c"], "inner")?.name, "2 items")
+    assert.deepStrictEqual(summary(["d"], "one"), { name: "1 item", ordinal: undefined })
+  })
+
+  it("counts a lone item without a name rather than showing nothing", () => {
+    assert.strictEqual(summary(["b"])?.name, "1 item")
   })
 })
 
@@ -116,9 +195,10 @@ describe("groupBoxTargets", () => {
     ])
   })
 
-  it("draws one box for an entered group that's selected whole", () => {
+  it("keeps the box quiet with everything in the entered group selected: that is its members, not the group", () => {
     assert.deepStrictEqual(groupBoxTargets(tree, ["a", "b", "c"], "outer"), [
-      { id: "outer", keys: ["a", "b", "c"], entered: false }
+      { id: "inner", keys: ["a", "b"], entered: false },
+      { id: "outer", keys: ["a", "b", "c"], entered: true }
     ])
   })
 })

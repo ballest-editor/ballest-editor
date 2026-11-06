@@ -34,10 +34,10 @@ export const formatCreatedAt = (parts: DateTime.DateTime.Parts): string => {
   return `${parts.year}.${p2(parts.month)}.${p2(parts.day)}-${p2(parts.hour)}.${p2(parts.minute)}.${p2(parts.second)}`
 }
 
-/** Local wall-clock time (the CurrentTimeZone service), formatted for `createdAt`. */
-export const currentCreatedAt: Effect.Effect<string, never, DateTime.CurrentTimeZone> = Effect.map(
-  DateTime.nowInCurrentZone,
-  (now) => formatCreatedAt(DateTime.toParts(now))
+/** The time now as `createdAt` holds it: in UTC, as the game writes it and `createdAtIso` reads it. */
+export const currentCreatedAt: Effect.Effect<string> = Effect.map(
+  DateTime.now,
+  (now) => formatCreatedAt(DateTime.toPartsUtc(now))
 )
 
 /** Map and creator names and the file name they make: the same rules main applies (`@ballest/contracts`). */
@@ -62,6 +62,9 @@ export const mapLabelOf = (fileName: string): string => {
   const at = full.lastIndexOf("_")
   return at > 0 ? full.slice(0, at) : full
 }
+
+/** `name` with what `NAME_RULE` doesn't allow taken out: `asdf (v2)` is saved as `asdf v2`. */
+export const savableNameOf = (name: string): string => name.replace(/[^\p{L}\p{N} ]/gu, "").replace(/ +/g, " ").trim()
 
 /** The first of `<base><separator>2`, `<base><separator>3`, ... that isn't taken. */
 export const nextNumberedName = (base: string, separator: string, isTaken: (name: string) => boolean): string => {

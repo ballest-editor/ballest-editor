@@ -1,16 +1,4 @@
-import {
-  IconAlertTriangle,
-  IconCircleCheck,
-  IconCircleDashed,
-  IconDotsVertical,
-  IconFileImport,
-  IconMap,
-  IconPencil,
-  IconPlus,
-  IconRefreshAlert,
-  IconSettings,
-  IconWorldUpload
-} from "@tabler/icons-react"
+import { IconDots, IconDownload, IconMap, IconMapPlus, IconSettings } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import {
   DropdownMenu,
@@ -22,129 +10,154 @@ import {
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type ComponentType, type MouseEvent, useRef } from "react"
+import { type MouseEvent, type ReactNode, useEffect, useRef } from "react"
 import { useShallow } from "zustand/react/shallow"
 import { mapLabelOf } from "../domain/factory"
-import { LINK_STATE_LABELS, type LinkState, linkStateOf } from "../domain/linkState"
+import { linkStateDetailOf, linkStateOf, syncStatusOf } from "../domain/linkState"
 import { formatAgo, formatDateTime } from "../domain/time"
 import {
   exportProjectMapFromPanel,
   importMap,
+  loadMapThumbnail,
   nameProjectMap,
   openProjectMap,
+  openProjectMapInBackground,
   playProjectMapFromPanel,
   revealProject,
   startNewMap
 } from "../editor/actions"
-import { type ProjectMap, tabsWithoutFile, useEditor, useHasUnsavedEdits, useTabSummary } from "../editor/store"
+import { startMapDrag } from "../editor/mapDrag"
+import {
+  type ProjectMap,
+  tabsWithoutFile,
+  useEditedAt,
+  useEditor,
+  useHasUnsavedEdits,
+  useTabSummary
+} from "../editor/store"
 import { useNow } from "../editor/useNow"
-import { PathText } from "./PathText"
+import { HeaderButton } from "./HeaderButton"
+import { onMiddleClick } from "./middleClick"
+import { NameChip } from "./NameChip"
+import { PathName } from "./PathText"
+import { THUMBNAIL_TILE } from "./PieceThumbnail"
+import { StatusChip, SyncStatusChip } from "./SyncStatusChip"
 
-const STATE_ICONS: Record<LinkState, ComponentType<{ readonly className?: string }>> = {
-  notExported: IconCircleDashed,
-  inSync: IconCircleCheck,
-  editedSinceExport: IconPencil,
-  changedInGame: IconRefreshAlert,
-  bothChanged: IconAlertTriangle,
-  publishedDraft: IconWorldUpload
+/**
+ * A row is a grid: its tile, then the name and the chip on the first line, and under them a second line as wide as both.
+ * Its button is the name alone, but its `after` covers the row, so a click anywhere opens it (`ROW_BUTTON_CLASSES`);
+ * what has a click or a tooltip of its own sits above that (`ROW_CHIP_CLASSES`, the ⋮ button).
+ */
+const ROW_CLASSES =
+  "group relative grid h-10 min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] grid-rows-[1.25rem_1rem] content-center gap-x-2 rounded-control px-2 text-body transition-colors focus-ring-row hover:bg-hover active:bg-pressed"
+
+const ROW_BUTTON_CLASSES = "min-w-0 truncate text-left outline-none after:absolute after:inset-0"
+
+const ROW_CHIP_CLASSES = "relative z-10 self-center"
+
+/** Past the row's second line: the name and the chip are on its first, and their tooltips open below the row. */
+const ROW_TIP_OFFSET = 24
+
+/** The map in the active tab: tinted, with a bar at its left, so it reads at a glance. */
+const ACTIVE_ROW_CLASSES =
+  "bg-selected text-foreground shadow-[inset_2px_0_0_0] shadow-primary hover:lift-selected active:press-selected"
+
+/** What a row leads with: the map's top-down render, or the glyph until a Save has made one. */
+function MapTile({ png }: { readonly png?: string | undefined }) {
+  return (
+    <span
+      className={cn(
+        "row-span-2 flex size-8 items-center justify-center self-center overflow-hidden rounded-control",
+        THUMBNAIL_TILE
+      )}
+    >
+      {png === undefined
+        ? <IconMap className="size-4 text-fg-secondary" />
+        : <img src={png} alt="" draggable={false} className="size-full" />}
+    </span>
+  )
 }
 
-const STATE_TONES: Partial<Record<LinkState, string>> = {
-  inSync: "text-emerald-600 dark:text-emerald-400",
-  changedInGame: "text-amber-600 dark:text-amber-400",
-  bothChanged: "text-amber-600 dark:text-amber-400"
-}
-
-/** A map's link state as one glyph, its name on hover; the row has no room for the words. */
-function StateGlyph({ state }: { readonly state: LinkState }) {
-  const Icon = STATE_ICONS[state]
+/** A row's name, which opens it. The tooltip has what the row has no room for: the full name, and how its map stands. */
+function RowName({ label, active, unsaved, edited, onClick }: {
+  readonly label: string
+  readonly active: boolean
+  readonly unsaved: string | null
+  readonly edited: string | null
+  readonly onClick: () => void
+}) {
   return (
     <Tooltip>
       <TooltipTrigger
         render={
-          <span className={cn("inline-flex shrink-0", STATE_TONES[state])} aria-label={LINK_STATE_LABELS[state]} />
+          <button type="button" className={cn(ROW_BUTTON_CLASSES, active && "text-body-strong")} onClick={onClick} />
         }
       >
-        <Icon className="size-3.5" />
+        {label}
       </TooltipTrigger>
-      <TooltipContent side="right">{LINK_STATE_LABELS[state]}</TooltipContent>
+      <TooltipContent side="bottom" align="start" sideOffset={ROW_TIP_OFFSET}>
+        <div className="flex max-w-xs flex-col gap-0.5">
+          <span className="text-body-strong">{label}</span>
+          {unsaved !== null && <span className="opacity-80">{unsaved}</span>}
+          {edited !== null && <span className="opacity-80">Edited {edited}</span>}
+        </div>
+      </TooltipContent>
     </Tooltip>
   )
 }
 
-/** The dot a map carries while it is open with unsaved edits, or isn't saved anywhere yet (the tab shows the same). */
-function UnsavedDot() {
-  return <span className="size-1.5 shrink-0 rounded-full bg-foreground/60" aria-label="unsaved" />
+/** A row's second line: what there is to say of its file. */
+function RowDetail({ children }: { readonly children: ReactNode }) {
+  return <span className="col-span-2 col-start-2 row-start-2 truncate text-caption text-fg-tertiary">{children}</span>
 }
-
-/** What the row has no room for: the full name, where the file is (or that it isn't saved), when it was edited. */
-function RowDetails(
-  { name, path, edited, unsaved }: {
-    readonly name: string
-    readonly path: string | null
-    readonly edited: string | null
-    readonly unsaved: boolean
-  }
-) {
-  return (
-    <div className="flex max-w-xs flex-col gap-0.5">
-      <span className="font-medium">{name}</span>
-      {path !== null && <PathText block className="opacity-80">{path}</PathText>}
-      {unsaved && <span className="opacity-80">{path === null ? "Not saved yet" : "Unsaved edits"}</span>}
-      {edited !== null && <span className="opacity-80">edited {edited}</span>}
-    </div>
-  )
-}
-
-const ROW_CLASSES =
-  "group flex h-7 min-w-0 items-center gap-1.5 rounded-sm pr-1 pl-2 text-xs hover:bg-muted/60 has-[button:focus-visible]:bg-muted/60"
-
-/** The map in the active tab: tinted, with a bar at its left, so it reads at a glance. */
-const ACTIVE_ROW_CLASSES = "bg-primary/15 text-foreground shadow-[inset_2px_0_0_0] shadow-primary hover:bg-primary/20"
 
 /**
- * One of the project's maps: a click opens it, its menu (also on right-click) holds what used to be the Project menu's
- * per-map items. The open map is highlighted and carries a dot while it has unsaved edits.
+ * One of the project's maps: a click opens it, a middle click opens it behind the active tab, and a drag onto the tab
+ * strip opens it there. Its menu (also on right-click) has what else can be done with it. The open map is highlighted,
+ * and the chip says what it has unsaved or left to export. The tooltips open below the row, so they never cover its
+ * chip or ⋮ button.
  */
 function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }) {
   const isOpen = useEditor((s) => s.file?.name === map.fileName)
   const unsaved = useHasUnsavedEdits(map.fileName)
+  const editedAt = useEditedAt(map.fileName, map.modifiedAt)
+  const png = useEditor((s) => s.mapThumbnails.get(map.hash))
   const canExport = useEditor((s) => s.capabilities.exportToGame)
   const canPlay = useEditor((s) => s.capabilities.play)
   const menuButton = useRef<HTMLButtonElement>(null)
   const label = mapLabelOf(map.fileName)
   const state = linkStateOf(map, { unsaved })
+  useEffect(() => loadMapThumbnail(map.hash), [map.hash])
   // right-click opens the same menu the ⋮ button does
   const onContextMenu = (e: MouseEvent) => {
     e.preventDefault()
     menuButton.current?.click()
   }
   return (
-    <li className={cn(ROW_CLASSES, isOpen && ACTIVE_ROW_CLASSES)} onContextMenu={onContextMenu}>
+    <li
+      draggable
+      className={cn(ROW_CLASSES, isOpen && ACTIVE_ROW_CLASSES)}
+      onContextMenu={onContextMenu}
+      onDragStart={(e) => startMapDrag(e.dataTransfer, map.fileName)}
+      {...onMiddleClick(() => void openProjectMapInBackground(map.fileName))}
+    >
+      <MapTile png={png} />
+      <RowName
+        label={label}
+        active={isOpen}
+        unsaved={unsaved ? "Unsaved edits" : null}
+        edited={formatDateTime(editedAt)}
+        onClick={() => void openProjectMap(map.fileName)}
+      />
       <Tooltip>
         <TooltipTrigger
-          render={
-            <button
-              type="button"
-              className="flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none"
-              onClick={() => void openProjectMap(map.fileName)}
-            />
-          }
-        >
-          <IconMap className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className={cn("truncate", isOpen && "font-medium")}>{label}</span>
-          {unsaved && <UnsavedDot />}
-        </TooltipTrigger>
-        <TooltipContent side="right" align="start">
-          <RowDetails
-            name={label}
-            path={map.path}
-            edited={`${formatAgo(map.modifiedAt, now)} (${formatDateTime(map.modifiedAt)})`}
-            unsaved={unsaved}
-          />
+          render={<SyncStatusChip status={syncStatusOf(state, unsaved)} icon={false} className={ROW_CHIP_CLASSES} />}
+        />
+        <TooltipContent side="bottom" align="end" sideOffset={ROW_TIP_OFFSET}>
+          {linkStateDetailOf(map, state, now)}
         </TooltipContent>
       </Tooltip>
-      <StateGlyph state={state} />
+      <RowDetail>Edited {formatAgo(editedAt, now)}</RowDetail>
       <DropdownMenu>
         <DropdownMenuTrigger
           ref={menuButton}
@@ -152,21 +165,19 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
             <Button
               variant="ghost"
               size="icon-sm"
-              className="size-6 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100"
+              className="absolute right-1 bottom-0 z-10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100"
               aria-label={`More for ${label}`}
             />
           }
         >
-          <IconDotsVertical className="size-3.5" />
+          <IconDots />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem disabled={isOpen} onClick={() => void openProjectMap(map.fileName)}>Open</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => void nameProjectMap(map.fileName, "rename")}>Rename…</DropdownMenuItem>
           <DropdownMenuItem onClick={() => void nameProjectMap(map.fileName, "duplicate")}>Duplicate…</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => void nameProjectMap(map.fileName, "recover")}>
-            Recover previous version…
-          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => void nameProjectMap(map.fileName, "recover")}>Backups…</DropdownMenuItem>
           {canExport && (
             <>
               <DropdownMenuSeparator />
@@ -179,7 +190,7 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
             </>
           )}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => void revealProject()}>Reveal</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => void revealProject()}>Reveal in folder</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </li>
@@ -187,72 +198,52 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
 }
 
 /**
- * A tab whose map has no file yet (`tabsWithoutFile`): a row of its own, in italics, whichever tab is active. A click
- * makes it the active tab.
+ * A tab whose map has no file yet (`tabsWithoutFile`): a row of its own, whichever tab is active, chipped Unsaved unless
+ * it is blank. A click makes it the active tab.
  */
 function UnsavedRow({ tabId }: { readonly tabId: string }) {
-  const { label } = useTabSummary(tabId)
+  const { label, unsaved, backup } = useTabSummary(tabId)
   const isActive = useEditor((s) => s.tabId === tabId)
   const activateTab = useEditor((s) => s.activateTab)
   return (
     <li className={cn(ROW_CLASSES, isActive && ACTIVE_ROW_CLASSES)}>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <button
-              type="button"
-              className="flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none"
-              onClick={() => activateTab(tabId)}
-            />
-          }
-        >
-          <IconMap className="size-3.5 shrink-0 text-muted-foreground" />
-          {/* an italic's last letter leans past its box, and `truncate` would clip it without the padding */}
-          <span className={cn("truncate pr-0.5 italic", isActive && "font-medium")}>{label}</span>
-          <UnsavedDot />
-        </TooltipTrigger>
-        <TooltipContent side="right" align="start">
-          <RowDetails name={label} path={null} edited={null} unsaved />
-        </TooltipContent>
-      </Tooltip>
+      <MapTile />
+      <RowName
+        label={label}
+        active={isActive}
+        unsaved="Not saved yet"
+        edited={null}
+        onClick={() => activateTab(tabId)}
+      />
+      {unsaved && <SyncStatusChip status="unsaved" icon={false} className={ROW_CHIP_CLASSES} />}
+      {/* Under the name, not after it: beside the Unsaved chip it would cut the name at the panel's usual width. */}
+      <RowDetail>
+        {backup && <NameChip className="mr-1">backup</NameChip>}
+        Not saved yet
+      </RowDetail>
     </li>
   )
 }
 
-function HeaderButton(
-  { label, onClick, disabled, children }: {
-    readonly label: string
-    readonly onClick: () => void
-    readonly disabled?: boolean
-    readonly children: React.ReactNode
+/** What the header calls the project: its name, with its folder on hover, or a chip while it has none. */
+function ProjectName({ name, path }: { readonly name: string | null; readonly path: string | null }) {
+  if (name === null) {
+    return (
+      <span className="flex min-w-0 flex-1">
+        <Tooltip>
+          <TooltipTrigger render={<StatusChip tone="neutral" />}>Untitled</TooltipTrigger>
+          <TooltipContent side="bottom">Saving a map creates the project</TooltipContent>
+        </Tooltip>
+      </span>
+    )
   }
-) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="size-6 text-muted-foreground"
-            aria-label={label}
-            disabled={disabled}
-            onClick={onClick}
-          />
-        }
-      >
-        {children}
-      </TooltipTrigger>
-      <TooltipContent side="bottom">{label}</TooltipContent>
-    </Tooltip>
-  )
+  return <PathName name={name} path={path} className="min-w-0 flex-1 truncate text-body-strong" />
 }
 
 /**
- * The Project panel (docs/PROJECTS.md § Shell): the project and its maps as a tree, the way an editor's
- * file explorer shows a workspace. A click opens a map; the open one is highlighted, with a dot while it has unsaved
- * edits, and each row shows its link state. Every tab whose map has no file yet is a row too, above them. The header
- * holds New map, Import and Project settings. In a browser, which has no project, only those rows show.
+ * The Project panel (docs/PROJECTS.md § Shell): the project and its maps, the way an editor's file explorer shows a
+ * workspace. Every tab whose map has no file yet is a row too, above them. In a browser, which has no project, only
+ * those rows show.
  */
 export function ProjectPanel() {
   const projects = useEditor((s) => s.capabilities.projects)
@@ -262,36 +253,30 @@ export function ProjectPanel() {
   const openDialog = useEditor((s) => s.openDialog)
   const now = useNow()
   const untitled = projects && project === null
+  // nothing to list: a tab with no file is a row, so Untitled Project, which always has one, never gets here
+  const empty = maps.length === 0 && unsavedTabs.length === 0
   return (
     <aside className="flex h-full min-w-0 flex-col bg-card">
-      <div className="flex h-9 shrink-0 items-center gap-1 px-2">
-        <span
-          className={cn(
-            "min-w-0 flex-1 truncate px-1 text-xs font-medium",
-            untitled && "italic text-muted-foreground"
-          )}
-          title={project?.path ?? (untitled ? "Not saved anywhere yet: saving a map creates the project." : undefined)}
-        >
-          {projects ? project?.name ?? "Untitled Project *" : "This browser"}
-        </span>
+      {/* the name lines up with the rows' glyphs, and the last button with their ⋮ */}
+      <div className="flex h-8 shrink-0 items-center gap-1 pr-2 pl-4">
+        <ProjectName name={projects ? project?.name ?? null : "This browser"} path={project?.path ?? null} />
         <HeaderButton label="New map" onClick={() => void startNewMap()}>
-          <IconPlus className="size-3.5" />
+          <IconMapPlus />
         </HeaderButton>
-        <HeaderButton label={projects ? "Import map…" : "Open…"} disabled={untitled} onClick={() => void importMap()}>
-          <IconFileImport className="size-3.5" />
+        <HeaderButton
+          label={!projects ? "Open…" : untitled ? "Import map: save a map first" : "Import map"}
+          disabled={untitled}
+          onClick={() => void importMap()}
+        >
+          <IconDownload />
         </HeaderButton>
         {projects && (
-          <HeaderButton label="Project settings…" onClick={() => openDialog({ id: "projectSettings" })}>
-            <IconSettings className="size-3.5" />
+          <HeaderButton label="Project settings" onClick={() => openDialog({ id: "projectSettings" })}>
+            <IconSettings />
           </HeaderButton>
         )}
       </div>
-      <ScrollArea className="min-h-0 flex-1">
-        {untitled && (
-          <p className="px-3 pb-2 text-xs text-muted-foreground">
-            No project yet. Saving a map creates one, and these maps can then be saved in it.
-          </p>
-        )}
+      <ScrollArea className={empty ? "min-h-0" : "min-h-0 flex-1"}>
         <ul className="flex flex-col gap-px px-2 pb-2">
           {unsavedTabs.map((tabId) => <UnsavedRow key={tabId} tabId={tabId} />)}
           {/* the tabs above aren't in the project; a rule keeps them from reading as its first maps */}
@@ -300,13 +285,16 @@ export function ProjectPanel() {
           )}
           {maps.map((map) => <MapRow key={map.fileName} map={map} now={now} />)}
         </ul>
-        {!projects && unsavedTabs.length === 0 && (
-          <p className="px-3 py-2 text-[0.6875rem] text-muted-foreground">
-            This browser has no project: maps live in their tabs, and Save downloads the file. The desktop app keeps
-            them in a project folder.
-          </p>
-        )}
       </ScrollArea>
+      {empty && (
+        <div className="flex flex-1 shrink-0 flex-col items-center justify-center gap-2 p-4">
+          <p className="text-body text-fg-tertiary">{projects ? "No maps yet" : "No map open"}</p>
+          <Button variant="outline" onClick={() => void startNewMap()}>
+            <IconMapPlus data-icon="inline-start" />
+            New map
+          </Button>
+        </div>
+      )}
     </aside>
   )
 }

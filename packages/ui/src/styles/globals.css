@@ -1,91 +1,101 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/manrope";
-@import "@fontsource-variable/montserrat";
 @import "@fontsource-variable/geist-mono";
 
 @custom-variant dark (&:is(.dark *));
-@source "../../../apps/**/*.{ts,tsx}";
-@source "../../../components/**/*.{ts,tsx}";
+/* Tailwind's own `hover:` is off under `(hover: none)`, which a window with a mouse can report: nothing would lift but the dock's tabs. */
+@custom-variant hover (&:hover);
 @source "../**/*.{ts,tsx}";
 
+/* What each token is for: docs/design/ui-system.md § Colour. */
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.141 0.005 285.823);
-    /* Chrome (panels, strips, bars) sits a step below the page, as the dark theme's card does, so the shell reads as
-     * chrome around the content rather than one white sheet. Hovers are a step below that. */
-    --card: oklch(0.975 0.001 286.375);
-    --card-foreground: oklch(0.141 0.005 285.823);
+    --background: oklch(0.956 0.004 250);
+    --foreground: oklch(0.225 0.01 250);
+    --card: oklch(0.988 0.0015 250);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.141 0.005 285.823);
-    --primary: oklch(0.488 0.243 264.376);
-    --primary-foreground: oklch(0.97 0.014 254.604);
-    --secondary: oklch(0.945 0.002 286.375);
-    --secondary-foreground: oklch(0.21 0.006 285.885);
-    --muted: oklch(0.945 0.002 286.375);
-    --muted-foreground: oklch(0.552 0.016 285.938);
-    --accent: oklch(0.945 0.002 286.375);
-    --accent-foreground: oklch(0.21 0.006 285.885);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.9 0.004 286.32);
-    --input: oklch(0.92 0.004 286.32);
-    --ring: oklch(0.705 0.015 286.067);
-    --chart-1: oklch(0.809 0.105 251.813);
-    --chart-2: oklch(0.623 0.214 259.815);
-    --chart-3: oklch(0.546 0.245 262.881);
-    --chart-4: oklch(0.488 0.243 264.376);
-    --chart-5: oklch(0.424 0.199 265.638);
-    --radius: 0.45rem;
-    --sidebar: oklch(0.975 0.001 286.375);
-    --sidebar-foreground: oklch(0.141 0.005 285.823);
-    --sidebar-primary: oklch(0.546 0.245 262.881);
-    --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
-    --sidebar-accent: oklch(0.945 0.002 286.375);
-    --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-    --sidebar-border: oklch(0.9 0.004 286.32);
-    --sidebar-ring: oklch(0.705 0.015 286.067);
+    --popover-foreground: oklch(0.225 0.01 250);
+    --primary: oklch(0.52 0.095 210);
+    --primary-foreground: oklch(0.99 0.002 250);
+    --secondary: oklch(0.928 0.004 250);
+    --secondary-foreground: oklch(0.225 0.01 250);
+    --muted: oklch(0.936 0.004 250);
+    /* Text below --foreground, one step each: docs/design/ui-system.md. */
+    --fg-secondary: oklch(0.355 0.012 250);
+    --fg-tertiary: oklch(0.48 0.012 250);
+    --fg-disabled: oklch(0.63 0.012 250);
+    --accent: oklch(0.94 0.004 250);
+    --accent-foreground: oklch(0.225 0.01 250);
+    --destructive: oklch(0.52 0.18 27);
+    /* The hairline, and the well a field sits in: both alpha, so they hold on every surface. */
+    --border: oklch(0.225 0.01 250 / 10%);
+    --input: oklch(0.225 0.01 250 / 3%);
+    /* What a pointer does to anything it can act on: the foreground as a wash. docs/design/ui-system.md § Hover and press. */
+    --hover: oklch(0.225 0.01 250 / 10%);
+    --pressed: oklch(0.225 0.01 250 / 16%);
+    /* The 1px edge of what floats. */
+    --edge: oklch(0 0 0 / 8%);
+    --ring: oklch(0.52 0.095 210);
+    --dirty: oklch(0.535 0.105 85);
+    /* An opaque tint, and text that reads on that tint and on the bare surfaces too (Settings › Game has no fill). */
+    --status-ok: oklch(0.945 0.03 165);
+    --status-ok-foreground: oklch(0.42 0.085 165);
+    --status-warn: oklch(0.95 0.04 85);
+    --status-warn-foreground: oklch(0.46 0.095 65);
+    --status-neutral: oklch(0.87 0.008 250);
+    --status-neutral-foreground: oklch(0.4 0.025 250);
+    --difficulty-1: oklch(0.225 0.01 250);
+    --difficulty-2: oklch(0.55 0.12 155);
+    --difficulty-3: oklch(0.5 0.13 250);
+    --difficulty-4: oklch(0.54 0.18 25);
+    --difficulty-5: oklch(0.66 0.135 75);
+    --shadow-soft: oklch(0.225 0.01 250 / 5%);
+    --shadow-float: oklch(0.225 0.01 250 / 12%);
 }
 
 .dark {
-    --background: oklch(0.141 0.005 285.823);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.21 0.006 285.885);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.21 0.006 285.885);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.424 0.199 265.638);
-    --primary-foreground: oklch(0.97 0.014 254.604);
-    --secondary: oklch(0.274 0.006 286.033);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.274 0.006 286.033);
-    --muted-foreground: oklch(0.705 0.015 286.067);
-    --accent: oklch(0.274 0.006 286.033);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.552 0.016 285.938);
-    --chart-1: oklch(0.809 0.105 251.813);
-    --chart-2: oklch(0.623 0.214 259.815);
-    --chart-3: oklch(0.546 0.245 262.881);
-    --chart-4: oklch(0.488 0.243 264.376);
-    --chart-5: oklch(0.424 0.199 265.638);
-    --sidebar: oklch(0.21 0.006 285.885);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.623 0.214 259.815);
-    --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
-    --sidebar-accent: oklch(0.274 0.006 286.033);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.552 0.016 285.938);
+    --background: oklch(0.157 0.005 250);
+    --foreground: oklch(0.975 0.0035 250);
+    --card: oklch(0.212 0.0075 250);
+    --popover: oklch(0.25 0.0095 250);
+    --popover-foreground: oklch(0.975 0.0035 250);
+    --primary: oklch(0.72 0.124 210);
+    --primary-foreground: oklch(0.157 0.005 250);
+    --secondary: oklch(0.3 0.0105 250);
+    --secondary-foreground: oklch(0.975 0.0035 250);
+    --muted: oklch(0.292 0.0105 250);
+    --fg-secondary: oklch(0.785 0.009 250);
+    --fg-tertiary: oklch(0.69 0.011 250);
+    --fg-disabled: oklch(0.52 0.012 250);
+    --accent: oklch(0.285 0.0105 250);
+    --accent-foreground: oklch(0.975 0.0035 250);
+    --destructive: oklch(0.7 0.188 25);
+    --border: oklch(1 0 0 / 11%);
+    --input: oklch(0 0 0 / 24%);
+    --hover: oklch(0.975 0.0035 250 / 10%);
+    --pressed: oklch(0.975 0.0035 250 / 16%);
+    --edge: oklch(0.975 0.0035 250 / 8%);
+    --ring: oklch(0.72 0.124 210);
+    --dirty: oklch(0.86 0.175 95);
+    --status-ok: oklch(0.335 0.05 175);
+    --status-ok-foreground: oklch(0.84 0.175 165);
+    --status-warn: oklch(0.335 0.04 85);
+    --status-warn-foreground: oklch(0.82 0.16 80);
+    --status-neutral: oklch(0.347 0.0086 250);
+    --status-neutral-foreground: oklch(0.86 0.014 250);
+    --difficulty-1: oklch(0.975 0.0035 250);
+    --difficulty-2: oklch(0.72 0.12 155);
+    --difficulty-3: oklch(0.68 0.11 250);
+    --difficulty-4: oklch(0.68 0.16 25);
+    --difficulty-5: oklch(0.8 0.13 85);
+    --shadow-soft: oklch(0 0 0 / 5%);
+    --shadow-float: oklch(0 0 0 / 20%);
 }
 
 @theme inline {
     --color-background: var(--background);
     --color-foreground: var(--foreground);
     --color-card: var(--card);
-    --color-card-foreground: var(--card-foreground);
     --color-popover: var(--popover);
     --color-popover-foreground: var(--popover-foreground);
     --color-primary: var(--primary);
@@ -93,47 +103,140 @@
     --color-secondary: var(--secondary);
     --color-secondary-foreground: var(--secondary-foreground);
     --color-muted: var(--muted);
-    --color-muted-foreground: var(--muted-foreground);
+    --color-fg-secondary: var(--fg-secondary);
+    --color-fg-tertiary: var(--fg-tertiary);
+    --color-fg-disabled: var(--fg-disabled);
     --color-accent: var(--accent);
     --color-accent-foreground: var(--accent-foreground);
     --color-destructive: var(--destructive);
     --color-border: var(--border);
     --color-input: var(--input);
+    --color-hover: var(--hover);
+    --color-pressed: var(--pressed);
+    --color-edge: var(--edge);
+    /* `bg-primary/12` by a name, so `lift-selected` can take it. */
+    --color-selected: color-mix(in srgb, var(--primary) 12%, transparent);
+    --color-dirty: var(--dirty);
     --color-ring: var(--ring);
-    --color-chart-1: var(--chart-1);
-    --color-chart-2: var(--chart-2);
-    --color-chart-3: var(--chart-3);
-    --color-chart-4: var(--chart-4);
-    --color-chart-5: var(--chart-5);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
-    --color-sidebar: var(--sidebar);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-ring: var(--sidebar-ring);
-    --font-sans: 'Manrope Variable', sans-serif;
-    --font-heading: 'Montserrat Variable', sans-serif;
-    /* Bundled, so paths and numbers sit the same on every machine (system mono fonts differ in their vertical metrics). */
+    --color-status-ok: var(--status-ok);
+    --color-status-ok-foreground: var(--status-ok-foreground);
+    --color-status-warn: var(--status-warn);
+    --color-status-warn-foreground: var(--status-warn-foreground);
+    --color-status-neutral: var(--status-neutral);
+    --color-status-neutral-foreground: var(--status-neutral-foreground);
+    --color-difficulty-1: var(--difficulty-1);
+    --color-difficulty-2: var(--difficulty-2);
+    --color-difficulty-3: var(--difficulty-3);
+    --color-difficulty-4: var(--difficulty-4);
+    --color-difficulty-5: var(--difficulty-5);
+    /* Depth: docs/design/ui-system.md § Depth. */
+    --shadow-sm: 0 1px 2px var(--shadow-soft);
+    --shadow-md: 0 4px 12px var(--shadow-float);
+    --shadow-lg: 0 12px 24px var(--shadow-float);
+    --shadow-primary: inset 0 1px 0 oklch(1 0 0 / 16%), 0 1px 2px color-mix(in oklch, var(--primary) 24%, transparent);
+    --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, sans-serif;
+    /* Bundled, so numbers sit the same on every machine (system mono fonts differ in their vertical metrics). */
     --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/*
+ * The system's scales (docs/design/ui-system.md). `static`, so the variables exist for the CSS that doesn't go through
+ * Tailwind (dock.css). New names here go in `cn`'s table too (lib/utils.ts), or it drops them when it merges classes.
+ */
+@theme static {
+    --text-caption: 0.6875rem;
+    --text-caption--line-height: 1rem;
+    --text-caption--font-weight: 500;
+    --text-label: 0.75rem;
+    --text-label--line-height: 1rem;
+    --text-label--font-weight: 500;
+    --text-body: 0.8125rem;
+    --text-body--line-height: 1.25rem;
+    --text-body--font-weight: 400;
+    --text-body-strong: 0.8125rem;
+    --text-body-strong--line-height: 1.25rem;
+    --text-body-strong--font-weight: 500;
+    --text-title: 0.875rem;
+    --text-title--line-height: 1.25rem;
+    --text-title--font-weight: 600;
+    --text-title--letter-spacing: -0.005em;
+
+    --radius-control: 0.5rem;
+    --radius-surface: 0.625rem;
+    --radius-sheet: 0.75rem;
+
+    --spacing-dialog: 1rem;
+}
+
 @layer base {
+  /* A bare `border` is the hairline at 65%, felt rather than seen. `border-border` is the whole hairline. */
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border/65 outline-ring/50;
     }
+  /* The chrome isn't text to select: Ctrl+A or a stray drag would highlight it. What is text to copy says so itself. */
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-body text-foreground tabular-nums select-none;
+    }
+  input, textarea {
+    @apply select-text;
+    }
+  /* Selected text takes the accent as a wash, as a selected row does, and not the browser's blue. */
+  ::selection {
+    @apply bg-primary/30 text-foreground;
     }
 }
+
+/* docs/design/ui-system.md § Glass. */
+@utility glass {
+  background-color: color-mix(in oklab, var(--popover) 95%, transparent);
+  backdrop-filter: blur(12px) saturate(1.2);
+}
+
+/*
+ * `bg-hover` and `bg-pressed`, for what already has a fill of its own: the same wash, mixed into `--color-<name>` because
+ * a background has one colour. `hover:lift-primary active:press-primary`. The percentages are `--hover`'s and `--pressed`'s.
+ */
+@utility lift-* {
+  background-color: color-mix(in srgb, --value(--color-*), var(--foreground) 10%);
+}
+
+@utility press-* {
+  background-color: color-mix(in srgb, --value(--color-*), var(--foreground) 16%);
+}
+
+/* The one keyboard focus, each of these the same ring: docs/design/ui-system.md § Focus. */
+@utility focus-ring {
+  outline: 2px none var(--ring);
+  outline-offset: 2px;
+  &:focus-visible {
+    outline-style: solid;
+  }
+}
+
+@utility focus-ring-inset {
+  outline: 2px none var(--ring);
+  outline-offset: -4px;
+  &:focus-visible {
+    outline-style: solid;
+  }
+}
+
+@utility focus-ring-within {
+  outline: 2px none var(--ring);
+  outline-offset: 2px;
+  &:has(:focus-visible) {
+    outline-style: solid;
+  }
+}
+
+@utility focus-ring-row {
+  outline: 2px none var(--ring);
+  outline-offset: 2px;
+  &:has(> button:first-child:focus-visible) {
+    outline-style: solid;
+  }
+}
+
 /*
  * Animation speed (the editor's Settings › Appearance): `--motion` on <html> scales every duration, 0 turns animation
  * off. It goes into the theme's default transition duration, the `duration-*` utilities (so a `duration-300` is 300ms
@@ -145,11 +248,12 @@
 }
 
 @theme inline {
-  --default-transition-duration: calc(150ms * var(--motion));
-  --animate-in: enter var(--tw-animation-duration, var(--tw-duration, calc(0.15s * var(--motion)))) var(--tw-ease, ease)
+  --default-transition-duration: calc(120ms * var(--motion));
+  --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  --animate-in: enter var(--tw-animation-duration, var(--tw-duration, calc(0.15s * var(--motion)))) var(--tw-ease, cubic-bezier(0, 0, 0.2, 1))
     var(--tw-animation-delay, 0s) var(--tw-animation-iteration-count, 1) var(--tw-animation-direction, normal)
     var(--tw-animation-fill-mode, none);
-  --animate-out: exit var(--tw-animation-duration, var(--tw-duration, calc(0.15s * var(--motion)))) var(--tw-ease, ease)
+  --animate-out: exit var(--tw-animation-duration, var(--tw-duration, calc(0.15s * var(--motion)))) var(--tw-ease, cubic-bezier(0, 0, 0.2, 1))
     var(--tw-animation-delay, 0s) var(--tw-animation-iteration-count, 1) var(--tw-animation-direction, normal)
     var(--tw-animation-fill-mode, none);
 }
@@ -157,13 +261,4 @@
 @utility duration-* {
   --tw-duration: calc(--value(integer) * 1ms * var(--motion));
   transition-duration: calc(--value(integer) * 1ms * var(--motion));
-}
-
-/* The one small-caps label of the shell: section titles, panel tabs, group headings in lists and popovers. */
-@utility text-eyebrow {
-  font-size: 0.6875rem;
-  line-height: 1rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
 }

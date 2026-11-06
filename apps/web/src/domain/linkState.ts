@@ -1,7 +1,8 @@
 /**
- * How a project map stands against its export in the game's maps folder (docs/PROJECTS.md § Sync), shown in the status
- * bar and in the Project panel.
+ * How a project map stands against its export in the game's maps folder (docs/PROJECTS.md § Sync), and the one status
+ * the status bar and the Project panel show for it.
  */
+import { formatAgo, formatDateTime } from "./time"
 
 /** The file a link record points at (`LinkedFile` in @ballest/contracts): its path, its bytes' hash, and when. */
 export interface LinkedFile {
@@ -48,6 +49,129 @@ export const LINK_STATE_LABELS: Record<LinkState, string> = {
   publishedDraft: "Published draft"
 }
 
+/**
+ * What the status bar chip, its popover and a Project panel row say about a map: its link state, with the unsaved edits
+ * folded in and the three changed states as one.
+ */
+export type SyncStatus = "unsaved" | "notExported" | "inSync" | "changedSinceExport" | "publishedDraft"
+
+export const SYNC_STATUS_LABELS: Record<SyncStatus, string> = {
+  unsaved: "Unsaved",
+  notExported: "Not exported",
+  inSync: "In sync",
+  changedSinceExport: "Changed since export",
+  publishedDraft: "Published draft"
+}
+
+/** Which `--status-*` colours a status wears (docs/design/ui-system.md): neutral at rest, colour only when it says something. */
+export type SyncTone = "neutral" | "ok" | "warn"
+
+export const SYNC_STATUS_TONES: Record<SyncStatus, SyncTone> = {
+  unsaved: "warn",
+  notExported: "neutral",
+  inSync: "ok",
+  changedSinceExport: "warn",
+  publishedDraft: "neutral"
+}
+
+const LINK_SYNC_STATUS: Record<LinkState, SyncStatus> = {
+  notExported: "notExported",
+  inSync: "inSync",
+  editedSinceExport: "changedSinceExport",
+  changedInGame: "changedSinceExport",
+  bothChanged: "changedSinceExport",
+  publishedDraft: "publishedDraft"
+}
+
+/** What the status bar chip can say: a map's status, or for a moment after a save, that it was saved. */
+export type ChipStatus = SyncStatus | "saved"
+
+export const CHIP_STATUS_LABELS: Record<ChipStatus, string> = { ...SYNC_STATUS_LABELS, saved: "Saved" }
+
+export const CHIP_STATUS_TONES: Record<ChipStatus, SyncTone> = { ...SYNC_STATUS_TONES, saved: "ok" }
+
+/**
+ * The chip's longest label, whatever it says now: the status bar's chip is this wide in every state, so the bar doesn't
+ * shift as the state changes.
+ */
+export const WIDEST_CHIP_LABEL = Object.values(CHIP_STATUS_LABELS).reduce((a, b) => b.length > a.length ? b : a)
+
+/** How long the chip says Saved. */
+export const SAVED_CHIP_MS = 2_000
+
+/** What the chip is looking at. */
+export interface ChipView {
+  /** Which load of a map into which tab: loading over a tab gives it a new saved document with no save. */
+  readonly opened: string
+  /** The document the tab's file holds, by identity: a new one, in the same `opened`, is a save. */
+  readonly savedDoc: unknown
+  readonly status: SyncStatus
+}
+
+/** The chip from one look at its map to the next: whether it is in Saved's 2 seconds. */
+export interface SavedChip extends ChipView {
+  readonly justSaved: boolean
+}
+
+/** The chip on first looking at `view`: it has seen no save. */
+export const restingChip = (view: ChipView): SavedChip => ({ ...view, justSaved: false })
+
+/**
+ * The chip after a look at `view`. It says the status, except for Saved's 2 seconds after a save: a new saved document
+ * with no edits on top starts them, and an edit, or another map, ends them, as does `SAVED_CHIP_MS` going by.
+ */
+export const nextSavedChip = (chip: SavedChip, view: ChipView): SavedChip => {
+  const sameMap = view.opened === chip.opened
+  const saved = sameMap && view.savedDoc !== chip.savedDoc
+  return { ...view, justSaved: sameMap && view.status !== "unsaved" && (saved || chip.justSaved) }
+}
+
+/** What `chip` says. */
+export const chipStatusOf = (chip: SavedChip): ChipStatus => chip.justSaved ? "saved" : chip.status
+
+/** What an Export or a Play is doing: saving unsaved edits, writing the copy, reading it back, handing it to the game. */
+type GameWriteStage = "save" | "copy" | "verify" | "launch"
+
+export const GAME_WRITE_STAGE_LABELS: Record<GameWriteStage, string> = {
+  save: "Saving…",
+  copy: "Copying…",
+  verify: "Verifying…",
+  launch: "Launching…"
+}
+
+/** An Export or a Play under way. */
+export interface GameWrite {
+  readonly intent: "export" | "play"
+  /** The project file it copies; null while it saves, which may rename it. */
+  readonly fileName: string | null
+  readonly stage: GameWriteStage
+}
+
+const GAME_WRITE_STAGES: Record<GameWrite["intent"], ReadonlyArray<GameWriteStage>> = {
+  export: ["save", "copy", "verify"],
+  play: ["save", "copy", "verify", "launch"]
+}
+
+/** How long the chip goes on showing a write that has ended, so one that took no time is still seen to happen. */
+export const GAME_WRITE_HOLD_MS = 400
+
+/** How far along `write` is, as a percentage: each stage is an equal part, and being in one counts it. */
+export const gameWritePercentOf = ({ intent, stage }: GameWrite): number => {
+  const stages = GAME_WRITE_STAGES[intent]
+  return (stages.indexOf(stage) + 1) / stages.length * 100
+}
+
+/** The status of a map in `state`. `unsaved` (its tab has unsaved edits) outranks every link state. */
+export const syncStatusOf = (state: LinkState, unsaved: boolean): SyncStatus =>
+  unsaved ? "unsaved" : LINK_SYNC_STATUS[state]
+
+/**
+ * The link state that `status` leaves out: which side changed, or what stands behind Unsaved. Null when the status says
+ * the same, so a map changed in the game is still told apart under Unsaved or Changed since export.
+ */
+export const syncDetailOf = (state: LinkState, status: SyncStatus): string | null =>
+  LINK_STATE_LABELS[state] === SYNC_STATUS_LABELS[status] ? null : LINK_STATE_LABELS[state]
+
 export interface LinkCheck {
   /** The map is open with edits that aren't saved yet, so they aren't in the export either. */
   readonly unsaved?: boolean
@@ -72,4 +196,11 @@ export const linkStateOf = (map: LinkedMap, check: LinkCheck = {}): LinkState =>
   if (changedInGame(map)) return edited ? "bothChanged" : "changedInGame"
   if (map.publishedFileId > 0) return "publishedDraft"
   return edited ? "editedSinceExport" : "inSync"
+}
+
+/** `state` in a line with when `map` was last exported, for a tooltip. */
+export const linkStateDetailOf = (map: LinkedMap, state: LinkState, now: number): string => {
+  const exported = map.link?.export ?? null
+  if (exported === null) return "Not exported yet"
+  return `${LINK_STATE_LABELS[state]} · exported ${formatAgo(exported.at, now)} (${formatDateTime(exported.at)})`
 }

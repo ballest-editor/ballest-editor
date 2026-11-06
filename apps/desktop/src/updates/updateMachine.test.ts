@@ -47,15 +47,17 @@ describe("updateMachine", () => {
     assert.isFalse(Machine.canCheck(Machine.initialState("0.2.0", Option.some("off"))))
 
     const failed = Machine.onCheckFailed(Machine.onCheckStart(idle), "offline")
-    assert.deepInclude(failed, { status: "error", message: "offline" })
+    assert.deepInclude(failed, { status: "error", message: "offline", checkedAt: null })
     assert.isTrue(Machine.canCheck(failed))
 
     const available = Machine.onAvailable(
       Machine.onCheckStart(failed),
-      Machine.releaseOf({ version: "0.2.1", releaseNotes: "Fixes", releaseDate: "2026-10-31T12:00:00.000Z" })
+      Machine.releaseOf({ version: "0.2.1", releaseNotes: "Fixes", releaseDate: "2026-10-31T12:00:00.000Z" }),
+      "2026-11-01T09:00:00.000Z"
     )
     assert.deepInclude(available, {
       status: "available",
+      checkedAt: "2026-11-01T09:00:00.000Z",
       availableVersion: "0.2.1",
       releaseNotes: [{ _tag: "Paragraph", spans: [text("Fixes")] }],
       releaseDate: "2026-10-31T12:00:00.000Z",

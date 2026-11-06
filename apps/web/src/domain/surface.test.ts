@@ -4,14 +4,14 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import { listSamples, readSample, repoRoot } from "../test/samples"
 import { MapFile } from "./MapFile"
-import { parseSurfaces, surfaceLabel, surfaceMaterialOf, surfaceOf } from "./surface"
+import { parseSurfaces, surfaceMaterialOf, surfaceOf } from "./surface"
 
 const materialsPath = path.join(repoRoot, "assets", "materials.json")
 
 describe("item surfaces", () => {
   it.skipIf(!fs.existsSync(materialsPath))("reads the game's surfaces in the order they're saved", () => {
     const surfaces = parseSurfaces(JSON.parse(fs.readFileSync(materialsPath, "utf8")))
-    assert.deepStrictEqual(surfaces.map((s) => surfaceLabel(s.name)), ["None", "Magnet", "Ice", "Grippy"])
+    assert.deepStrictEqual(surfaces.map((s) => s.name), ["none", "magnet", "ice", "grippy"])
     assert.isNull(surfaces[0]!.material)
     assert.match(surfaces[2]!.material ?? "", /MI_Surface_Ice/)
   })

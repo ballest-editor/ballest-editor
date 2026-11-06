@@ -12,7 +12,7 @@ Ballest Editor is a desktop app for Windows and Linux.
 2. On Windows, download the `.exe` and run it. The installer isn't signed yet, so SmartScreen warns you; choose More info, then Run anyway.
 3. On Linux, download the `.AppImage`, make it executable with `chmod +x`, and run it. On NixOS, start it with `appimage-run`. An update replaces the file in place as long as its name has no version in it, so keep the name it downloads with, or another without a version.
 
-The app finds the game through Steam, and File › Game link… shows what it found. It opens by itself on the first launch. Exporting a map needs the game's maps folder, which the game creates the first time it runs. The Play button also needs the [Ballest plugin manager](https://anythinggoes-ballest.github.io/ballest-plugin-manager/) and the editor plugin, which Game link installs for you.
+The app finds the game through Steam, and Settings › Game shows what it found. If something is missing on the first launch, a dialog says what. Exporting a map needs the game's maps folder, which the game creates the first time it runs. The Play button also needs the [Ballest plugin manager](https://anythinggoes-ballest.github.io/ballest-plugin-manager/) and the editor plugin, which Settings › Game installs for you.
 
 Installed copies check for new releases and offer them in the status bar.
 
@@ -54,6 +54,7 @@ The web review build is the same editor in a browser, without anything that need
 | [docs/PROJECTS.md](docs/PROJECTS.md)                                   | Projects, maps and exports: the model, the files on disk, the design to come  |
 | [docs/DESKTOP.md](docs/DESKTOP.md)                                     | How the desktop app behaves and why                                           |
 | [docs/DRIVER.md](docs/DRIVER.md)                                       | The game driver: its design and what was measured                             |
+| [docs/design/ui-system.md](docs/design/ui-system.md)                   | The UI's type, greys, radii and spacing: the one system every view follows    |
 | [docs/qa](docs/qa)                                                     | What was measured in the game, case by case                                   |
 | [apps/web/README.md](apps/web/README.md)                               | The editor itself: scene, gizmos, materials, keybinds, coordinates            |
 | [apps/desktop/README.md](apps/desktop/README.md)                       | The main process: developing it, IPC, the protocol handler, updates, security |

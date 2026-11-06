@@ -1,7 +1,7 @@
 import type * as Electron from "electron"
 
 /** The page's top bar (`TopBar.tsx`, `h-10`): the window controls are drawn over its end. */
-export const TITLE_BAR_HEIGHT = 40
+const TITLE_BAR_HEIGHT = 40
 
 /**
  * The window controls Electron draws over the page's top bar, in the page theme's colours. The overlay itself is
@@ -9,7 +9,7 @@ export const TITLE_BAR_HEIGHT = 40
  */
 export const titleBarOverlay = (dark: boolean): Electron.TitleBarOverlayOptions => ({
   color: "#01000000",
-  symbolColor: dark ? "#fafafa" : "#09090b",
+  symbolColor: dark ? "#f5f7f9" : "#393d42",
   height: TITLE_BAR_HEIGHT
 })
 
@@ -51,7 +51,7 @@ export const popoutOverlay = (overlay: Electron.TitleBarOverlayOptions): Electro
 })
 
 /** The page's `--background`, so a resize never flashes the other theme's colour. */
-export const windowBackground = (dark: boolean): string => dark ? "#09090b" : "#ffffff"
+export const windowBackground = (dark: boolean): string => dark ? "#0b0d0f" : "#eef1f3"
 
 /**
  * The application menu of unpackaged builds, for its reload and DevTools keys. Nothing here may close the window:
@@ -65,7 +65,7 @@ export const devMenuTemplate: Array<Electron.MenuItemConstructorOptions> = [
  * The window shortcuts an application menu would have given. Neither build's menu has them (nothing may reload or
  * close the window behind the editor's back), so main handles these before the page sees the key.
  */
-export type WindowShortcut = "quit" | "toggleFullScreen"
+type WindowShortcut = "quit" | "toggleFullScreen"
 
 export const windowShortcutOf = (input: Electron.Input): WindowShortcut | undefined => {
   if (input.type !== "keyDown" || input.isAutoRepeat || input.alt || input.meta) return undefined

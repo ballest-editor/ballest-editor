@@ -28,8 +28,7 @@ const subscriptions = Object.fromEntries(
 
 const versions: DesktopBridge["versions"] = {
   electron: process.versions.electron,
-  chrome: process.versions.chrome,
-  node: process.versions.node
+  chrome: process.versions.chrome
 }
 
 contextBridge.exposeInMainWorld("ballest", { versions, ...methods, ...subscriptions })

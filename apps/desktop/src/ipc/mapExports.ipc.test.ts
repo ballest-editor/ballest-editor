@@ -114,7 +114,7 @@ describe("MapExports over IPC", () => {
         )
         assert.deepInclude(other.map.link, { export: null, lastSeenHash: null })
 
-        const exported = expectTag(
+        expectTag(
           yield* fake.invokeAs(ExportMapResult, InvokeChannels.exportMap, {
             fileName: name,
             replacePublished: false,
@@ -123,10 +123,11 @@ describe("MapExports over IPC", () => {
           "Exported"
         )
         const exportedHash = sha256(new TextEncoder().encode("{\"v\":2}"))
-        assert.deepStrictEqual(exported.file, { path: inGame, name })
-        assert.deepInclude(exported.link.export, { path: inGame, hash: exportedHash })
-        assert.strictEqual(exported.link.lastSeenHash, exportedHash)
-        assert.deepInclude(exported.link.origin, { path: inGame, hash })
+        const maps = yield* fake.invokeAs(ProjectMaps, InvokeChannels.listMaps)
+        const link = maps.find((m) => m.fileName === name)?.link
+        assert.deepInclude(link?.export, { path: inGame, hash: exportedHash })
+        assert.strictEqual(link?.lastSeenHash, exportedHash)
+        assert.deepInclude(link?.origin, { path: inGame, hash })
         assert.strictEqual(yield* fs.readFileString(inGame), "{\"v\":2}")
       })
     ))

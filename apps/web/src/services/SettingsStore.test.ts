@@ -2,7 +2,16 @@ import { assert, describe, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { KeyValueStore } from "effect/persistence"
 import { FALLBACK_CAMERA_PRESETS } from "../domain/GameKeybinds"
-import { AUTO_GRID_COLORS, defaultSettings, fovOf, gridColorsOf, mergeSettings, verticalFov } from "../domain/Settings"
+import {
+  AUTO_GRID_COLORS,
+  defaultSettings,
+  fovOf,
+  gridColorsOf,
+  isDefaultDisplay,
+  mergeSettings,
+  verticalFov,
+  withDefaultDisplay
+} from "../domain/Settings"
 import { SETTINGS_STORAGE_KEY, SettingsStore } from "./SettingsStore"
 
 describe("Settings", () => {
@@ -60,6 +69,39 @@ describe("Settings", () => {
     assert.strictEqual(fovOf(withPreset("Gone").camera, presets), 90)
     assert.closeTo(verticalFov(90, 1), 90, 1e-9)
     assert.closeTo(verticalFov(90, 16 / 9), 58.715507, 1e-5)
+  })
+
+  it("keeps the gizmo's settings, falling back per field", () => {
+    assert.deepStrictEqual(mergeSettings({}).gizmo, { size: "m", showForGroups: true })
+    assert.deepStrictEqual(mergeSettings({ gizmo: { size: "l", showForGroups: "no" } }).gizmo, {
+      size: "l",
+      showForGroups: true
+    })
+    assert.strictEqual(mergeSettings({ gizmo: { size: "xl" } }).gizmo.size, "m")
+  })
+
+  it("resets what the Display popover shows and nothing else", () => {
+    const changed = {
+      ...defaultSettings,
+      general: { ...defaultSettings.general, units: "m" as const },
+      appearance: {
+        ...defaultSettings.appearance,
+        theme: "light" as const,
+        gridVisible: false,
+        waterVisible: false,
+        gridCellColor: "#112233"
+      },
+      lighting: { mapLighting: false, skyVisible: false },
+      gizmo: { size: "s" as const, showForGroups: false }
+    }
+    assert.isFalse(isDefaultDisplay(changed))
+    const reset = withDefaultDisplay(changed)
+    assert.isTrue(isDefaultDisplay(reset))
+    assert.deepInclude(reset.appearance, { theme: "light", gridVisible: true, waterVisible: true, gridCellColor: null })
+    assert.deepStrictEqual(reset.lighting, defaultSettings.lighting)
+    assert.deepStrictEqual(reset.gizmo, defaultSettings.gizmo)
+    assert.strictEqual(reset.general.units, "m")
+    assert.isTrue(isDefaultDisplay(defaultSettings))
   })
 
   it.effect("persists, reloads and resets", () =>

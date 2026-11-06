@@ -16,10 +16,11 @@ import {
 } from "../../domain/dockLayout"
 import { useEditor } from "../../editor/store"
 import type { DockPanel } from "./panels"
+import { type PanelSlot, parseSavedSlots, reopenIndex, slotAt } from "./panelSlots"
 import { adoptPopoutWindow } from "./popoutWindow"
 
-/** A column by the viewport folds to the rail dock.css draws, a group in a stack to its strip (`h-8`, as the map tabs). */
-const FOLDED_SIZE = { width: 28, height: 32 }
+/** A column by the viewport folds to the rail dock.css draws, a group in a stack to its strip. */
+const FOLDED_SIZE = { width: 28, height: 28 }
 const SIDE_SIZES: Record<DockLocation, number> = { left: 260, right: 300, bottom: 240 }
 const MIN_VIEWPORT = { width: 320, height: 200 }
 const MIN_GROUP = { width: 180, height: 120 }
@@ -34,6 +35,8 @@ let dockPanels: ReadonlyArray<DockPanel> = []
 let stopFollowing = () => {}
 /** Folded groups by id. Saved with the layout: dockview keeps their size and header position, not what they were. */
 const collapsed = new Map<string, CollapsedGroup>()
+/** Closed panels' places by panel id, saved with the layout. A group that goes takes its slots with it. */
+const slots = new Map<string, PanelSlot>()
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 
 let openPanels: ReadonlySet<string> = new Set()
@@ -57,31 +60,37 @@ const panelOptions = (panel: DockPanel) => ({
   minimumHeight: MIN_GROUP.height
 })
 
+/** A panel docked at `panel`'s location, which it would join. */
+const siblingOf = (api: DockviewApi, panel: DockPanel): IDockviewPanel | undefined =>
+  dockPanels
+    .filter((other) => other.location === panel.location && other.id !== panel.id)
+    .map((other) => api.getPanel(other.id))
+    .find((other) => other?.api.location.type === "grid")
+
 /** Adds `panel` where it belongs: with the panels of its location if any are docked, else beside the centre. */
 const addPanel = (api: DockviewApi, panel: DockPanel, inactive = false): IDockviewPanel | null => {
   const centre = centreGroupOf(api)
   if (centre === undefined) return null
   const { location } = panel
-  const sibling = dockPanels
-    .filter((other) => other.location === location && other.id !== panel.id)
-    .map((other) => api.getPanel(other.id))
-    .find((other) => other?.api.location.type === "grid")
+  const sibling = siblingOf(api, panel)
   if (sibling !== undefined) {
-    return api.addPanel({ ...panelOptions(panel), inactive, position: { referencePanel: sibling } })
+    const index = reopenIndex(slots, panel.id, sibling.group.id, sibling.group.panels.length)
+    return api.addPanel({ ...panelOptions(panel), inactive, position: { referencePanel: sibling, index } })
   }
   const size = location === "bottom" ? { initialHeight: SIDE_SIZES.bottom } : { initialWidth: SIDE_SIZES[location] }
   return api.addPanel({ ...panelOptions(panel), ...size, position: { referenceGroup: centre, direction: location } })
 }
 
+/** Each location's panels in registry order, the first in front: the rest join its group behind it. */
 const addDefaultPanels = (api: DockviewApi) => {
-  for (const panel of dockPanels) addPanel(api, panel)
-  const documents = api.getPanel(DOCUMENTS_PANEL)
-  if (documents !== undefined) documents.group.api.setActive()
+  for (const panel of dockPanels) addPanel(api, panel, true)
+  centreGroupOf(api)?.api.setActive()
 }
 
 const defaultLayout = (api: DockviewApi) => {
   api.clear()
   collapsed.clear()
+  slots.clear()
   const documents = api.addPanel({
     id: DOCUMENTS_PANEL,
     component: DOCUMENTS_PANEL,
@@ -105,7 +114,8 @@ const readSaved = (): string | null => {
 
 /** The saved layout onto `api`. False when there is none, or it doesn't hold together: `api` then needs the default. */
 const restoreSaved = (api: DockviewApi): boolean => {
-  const saved = parseSavedDock(readSaved())
+  const text = readSaved()
+  const saved = parseSavedDock(text)
   if (saved === null) return false
   const { layout, loose } = dockedPopouts(unfoldedLayout(saved.layout, saved.collapsed))
   const current = onlyPanels(layout, [DOCUMENTS_PANEL, ...dockPanels.map((panel) => panel.id)])
@@ -123,6 +133,10 @@ const restoreSaved = (api: DockviewApi): boolean => {
   for (const [id, { axis }] of Object.entries(saved.collapsed)) {
     const group = api.groups.find((candidate) => candidate.id === id)
     if (group !== undefined) fold(group, axis)
+  }
+  slots.clear()
+  for (const [id, slot] of parseSavedSlots(text)) {
+    if (api.getPanel(id) === undefined && api.groups.some((group) => group.id === slot.group)) slots.set(id, slot)
   }
   const lost = dockPanels.filter((panel) => loose.includes(panel.id))
   const added = dockPanels.filter((panel) => !saved.known.includes(panel.id))
@@ -152,7 +166,8 @@ const save = (api: DockviewApi) => {
         layout: api.toJSON(),
         known: dockPanels.map((panel) => panel.id),
         hint: hintOf(centre),
-        collapsed: Object.fromEntries(collapsed)
+        collapsed: Object.fromEntries(collapsed),
+        slots: Object.fromEntries(slots)
       })
     )
   } catch (error) {
@@ -226,15 +241,6 @@ const fitBesideCentre = (api: DockviewApi, group: DockviewGroupPanel) => {
   if (axis !== null) group.api.setSize({ [axis]: axis === "width" ? SIDE_SIZES.right : SIDE_SIZES.bottom })
 }
 
-/**
- * A panel rendered `always` that goes to another window leaves its overlay behind, empty, over the group it left and
- * taking that group's clicks: dockview only takes the overlay down when a whole group moves, not one panel of several.
- */
-const dropOverlayLeftBehind = (panel: IDockviewPanel, from: DockviewGroupPanel) => {
-  const left = from.model.renderContainer
-  if (left !== panel.group.model.renderContainer) left.detatch(panel)
-}
-
 /** Follows `api`: saves the layout as it changes, keeps the View menu in step, adopts popped-out windows. */
 const followDock = (api: DockviewApi): () => void => {
   const scheduleSave = () => {
@@ -242,6 +248,8 @@ const followDock = (api: DockviewApi): () => void => {
     saveTimer = setTimeout(() => save(api), SAVE_DELAY_MS)
   }
   const popouts = new Map<string, () => void>()
+  /** Each strip before a panel closes. Dockview only says a panel went once it has, and by then its place is gone. */
+  let strips: ReadonlyArray<{ readonly group: string; readonly panels: ReadonlyArray<string> }> = []
   const flush = () => {
     clearTimeout(saveTimer)
     save(api)
@@ -252,18 +260,36 @@ const followDock = (api: DockviewApi): () => void => {
     if (state.dialog !== null && previous.dialog === null) window.focus()
   })
   const listeners = [
-    api.onDidLayoutChange(scheduleSave),
+    api.onDidLayoutChange(() => {
+      scheduleSave()
+      // a panel moved or popped out can change the strip a closed one shows in
+      notifyDock()
+    }),
+    api.onWillMutateLayout(({ kind }) => {
+      strips = kind === "remove"
+        ? api.groups.map(({ id, panels }) => ({ group: id, panels: panels.map((panel) => panel.id) }))
+        : []
+    }),
     api.onDidAddPanel((panel) => {
+      slots.delete(panel.id)
       expandGroup(panel.group)
       notifyOpenPanels(api)
     }),
-    api.onDidRemovePanel(() => notifyOpenPanels(api)),
-    api.onDidMovePanel(({ panel, from }) => {
-      dropOverlayLeftBehind(panel, from)
+    api.onDidRemovePanel(({ id }) => {
+      const strip = strips.find(({ panels }) => panels.includes(id))
+      if (strip !== undefined) {
+        slots.set(id, { group: strip.group, index: slotAt(slots, strip.group, strip.panels.indexOf(id)) })
+      }
+      notifyOpenPanels(api)
+    }),
+    api.onDidMovePanel(({ panel }) => {
       expandGroup(panel.group)
       if (panel.group.size === 1) fitBesideCentre(api, panel.group)
     }),
-    api.onDidRemoveGroup((group) => collapsed.delete(group.id)),
+    api.onDidRemoveGroup((group) => {
+      collapsed.delete(group.id)
+      for (const [id, slot] of slots) if (slot.group === group.id) slots.delete(id)
+    }),
     api.onDidAddPopoutGroup(({ id, group, window: popout }) => {
       popouts.set(id, adoptPopoutWindow(popout, group.activePanel?.title ?? "Ballest Editor"))
     }),
@@ -314,10 +340,11 @@ export const resetDockLayout = (): void => {
   if (dock === null) return
   for (const panel of dock.panels.filter(({ id }) => id !== DOCUMENTS_PANEL)) dock.removePanel(panel)
   collapsed.clear()
+  slots.clear()
   addDefaultPanels(dock)
 }
 
-/** The View menu's check: closes an open panel, reopens a closed one in front. */
+/** The View menu's check: closes an open panel, reopens a closed one in front, in the slot it left. */
 export const togglePanel = (id: string): void => {
   if (dock === null) return
   const open = dock.getPanel(id)
@@ -384,3 +411,25 @@ export const usePanelCheck = (id: string) => ({
 
 export const useViewMenuPanels = (): ReadonlyArray<DockPanel> =>
   useSyncExternalStore(followDockChanges, () => dockPanels)
+
+/** The panels a group's "…" can bring back: every one that's open nowhere in the dock. */
+export const useClosedPanels = (): ReadonlyArray<DockPanel> => {
+  const open = useSyncExternalStore(followDockChanges, () => openPanels)
+  return useViewMenuPanels().filter((panel) => !open.has(panel.id))
+}
+
+/** The strip closed `panel` shows in: the group it would come back to, or the centre's when that's gone or a rail. */
+const stripOf = (api: DockviewApi, panel: DockPanel): DockviewGroupPanel | undefined => {
+  const group = siblingOf(api, panel)?.group
+  return group === undefined || collapsed.get(group.id)?.axis === "width" ? centreGroupOf(api) : group
+}
+
+/** The closed panels whose icons `group`'s strip shows. Each closed panel is in one strip, and never a popped-out one. */
+export const closedPanelsIn = (group: DockviewGroupPanel): ReadonlyArray<DockPanel> =>
+  dockPanels.filter((panel) => !openPanels.has(panel.id) && dock !== null && stripOf(dock, panel) === group)
+
+/** `closedPanelsIn`, following it. It's compared by ids, so a layout change that leaves them alone renders nothing. */
+export const useClosedPanelsIn = (group: DockviewGroupPanel): ReadonlyArray<DockPanel> => {
+  useSyncExternalStore(followDockChanges, () => closedPanelsIn(group).map(({ id }) => id).join())
+  return closedPanelsIn(group)
+}

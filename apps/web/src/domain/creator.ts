@@ -39,6 +39,22 @@ const SOURCE_LABELS = { steam: "Steam", mapsFolder: "your maps" } as const
 /** "From Steam", "From your maps": where a found name came from, for the row that shows it. */
 export const foundCreatorLabel = (source: FoundCreator["source"]): string => `From ${SOURCE_LABELS[source]}`
 
+/** The most of a creator name a chip shows, the ellipsis included. */
+const CHIP_CHARACTERS = 18
+
+/** `name` as a chip shows it, cut by what a reader counts as characters, so a long name can't split an emoji. */
+export const creatorChipText = (name: string): string => {
+  const characters = Array.from(new Intl.Segmenter().segment(name), ({ segment }) => segment)
+  return characters.length <= CHIP_CHARACTERS ? name : `${characters.slice(0, CHIP_CHARACTERS - 1).join("")}…`
+}
+
+/**
+ * Where the creator name in a map came from. The game writes the Steam persona name into every map, so that is where
+ * one came from unless it is the name typed in Settings.
+ */
+export const mapCreatorLabel = (name: string, creator: Creator): string =>
+  creator.source === "user" && creator.name === name ? "From Settings" : foundCreatorLabel("steam")
+
 const FOUND_AS = { steam: "Your Steam name", mapsFolder: "The creator of your maps" } as const
 
 /** Why a found or typed name can't be used, for Settings to show instead of using it; none when it can. */

@@ -1,6 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Effect } from "effect"
-import { TestClock } from "effect/testing"
 import { defaultEditorState } from "../../domain/factory"
 import { MapCodec } from "../../services/MapCodec"
 import {
@@ -17,12 +16,6 @@ import { exportToGameEffect } from "./exportPlay"
 import { overwriteChangedEffect } from "./gameWrite"
 import { importAsCopyEffect, importMapFile, replaceOnImportEffect } from "./project"
 import { saveMapFile } from "./save"
-
-/** The time a save stamps into `createdAt` ("2026.10.06-17.49.47"), so a test can make it write the same one. */
-const createdAtTime = (createdAt: string) => {
-  const [y, mo, d, h, mi, sec] = createdAt.split(/[.-]/).map(Number)
-  return Date.UTC(y!, mo! - 1, d, h, mi, sec)
-}
 
 const ballmaps = listSamples().filter((sample) => sample.kind === "ballmap")
 
@@ -55,7 +48,6 @@ describe("import actions", () => {
         })
         assert.deepStrictEqual(s().projectMaps.map((m) => m.fileName), [name])
 
-        yield* TestClock.setTime(createdAtTime(s().doc.map.worldSettings.levelData.createdAt))
         yield* saveMapFile
         assert.deepStrictEqual(disk.dialogs.map((d) => d.kind), ["import"])
         // 0.4.1's saves have no editorState (docs/qa/save-roundtrip.md); the editor writes the empty one 0.4.0 did, and

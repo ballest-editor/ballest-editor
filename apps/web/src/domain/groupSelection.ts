@@ -3,7 +3,7 @@
  * item keys, so everything that acts on it works on groups unchanged (docs/DESKTOP.md § Groups and selection).
  */
 import type { TreeNode } from "./MapSidecar"
-import { findGroup, findNode, idOf, treeKeys, wholeNodes } from "./structure"
+import { findGroup, findNode, idOf, type NumberedName, treeKeys, wholeNodes } from "./structure"
 
 /** The groups a node is in, outermost first; empty at the root and for a node that isn't in the tree. */
 export const groupPathOf = (tree: ReadonlyArray<TreeNode>, id: string): ReadonlyArray<string> =>
@@ -14,6 +14,18 @@ export const nodeKeys = (tree: ReadonlyArray<TreeNode>, id: string): ReadonlyArr
   const node = findNode(tree, id)?.node
   return node === undefined ? [] : treeKeys([node])
 }
+
+/** The entered group and the groups around it: from inside, none of them is a thing to select. */
+export const enteredScopeOf = (
+  tree: ReadonlyArray<TreeNode>,
+  enteredGroupId: string | null
+): ReadonlyArray<string> => enteredGroupId === null ? [] : [...groupPathOf(tree, enteredGroupId), enteredGroupId]
+
+/** What Select all selects: every item in the tree, or in the entered group. */
+export const selectableKeys = (
+  tree: ReadonlyArray<TreeNode>,
+  enteredGroupId: string | null
+): ReadonlyArray<string> => enteredGroupId === null ? treeKeys(tree) : nodeKeys(tree, enteredGroupId)
 
 /** Where a click on an item lands. */
 export interface ClickLevel {
@@ -33,7 +45,7 @@ export const clickLevelOf = (
   enteredGroupId: string | null
 ): ClickLevel => {
   const path = groupPathOf(tree, key)
-  const scope = enteredGroupId === null ? [] : [...groupPathOf(tree, enteredGroupId), enteredGroupId]
+  const scope = enteredScopeOf(tree, enteredGroupId)
   let depth = 0
   while (depth < scope.length && path[depth] === scope[depth]) depth++
   return { nodeId: path[depth] ?? key, enteredGroupId: path[depth - 1] ?? null }
@@ -52,18 +64,59 @@ export const enteredLevelOf = (
   return nodeId === key ? undefined : clickLevelOf(tree, key, nodeId)
 }
 
-/** The nodes the selected items make up, in tree order: what grouping or dragging a selection moves. */
+/** The nodes the selected items make up, in tree order. Inside the entered group, all of it selected is its members. */
+const selectedNodes = (
+  tree: ReadonlyArray<TreeNode>,
+  selectedIds: ReadonlyArray<string>,
+  enteredGroupId: string | null
+): ReadonlyArray<TreeNode> => {
+  const scope = enteredScopeOf(tree, enteredGroupId)
+  const opened = (nodes: ReadonlyArray<TreeNode>): ReadonlyArray<TreeNode> =>
+    nodes.flatMap((node) => node.kind === "group" && scope.includes(node.id) ? opened(node.children) : [node])
+  return opened(wholeNodes(tree, new Set(selectedIds)))
+}
+
+/** What grouping or dragging a selection moves: the nodes it makes up. */
 export const selectionNodeIds = (
   tree: ReadonlyArray<TreeNode>,
-  selectedIds: ReadonlyArray<string>
-): ReadonlyArray<string> => wholeNodes(tree, new Set(selectedIds)).map(idOf)
+  selectedIds: ReadonlyArray<string>,
+  enteredGroupId: string | null
+): ReadonlyArray<string> => selectedNodes(tree, selectedIds, enteredGroupId).map(idOf)
 
 /** The groups among the nodes the selected items make up: what Ungroup dissolves. */
 export const selectedGroupIds = (
   tree: ReadonlyArray<TreeNode>,
-  selectedIds: ReadonlyArray<string>
+  selectedIds: ReadonlyArray<string>,
+  enteredGroupId: string | null
 ): ReadonlyArray<string> =>
-  wholeNodes(tree, new Set(selectedIds)).flatMap((node) => node.kind === "group" ? node.id : [])
+  selectedNodes(tree, selectedIds, enteredGroupId).flatMap((node) => node.kind === "group" ? node.id : [])
+
+/** "1 group", "2 groups". */
+export const counted = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" : "s"}`
+
+/**
+ * What the status bar says of a selection, null when it's empty. A lone item or whole group is named from `names`, which
+ * has the items' by key and the groups' by id; several whole groups are counted ("2 groups"); anything else says how many
+ * items it has and how many groups are among them ("3 items · 1 group").
+ */
+export const selectionSummaryOf = (
+  tree: ReadonlyArray<TreeNode>,
+  selectedIds: ReadonlyArray<string>,
+  enteredGroupId: string | null,
+  names: ReadonlyMap<string, NumberedName>
+): NumberedName | null => {
+  if (selectedIds.length === 0) return null
+  const nodes = selectedNodes(tree, selectedIds, enteredGroupId)
+  const groups = nodes.filter((node) => node.kind === "group")
+  const [only] = nodes
+  const lone = nodes.length !== 1 || only === undefined ? undefined : names.get(idOf(only))
+  if (lone !== undefined) return lone
+  if (groups.length > 0 && groups.length === nodes.length) {
+    return { name: counted(groups.length, "group"), ordinal: undefined }
+  }
+  const items = counted(selectedIds.length, "item")
+  return { name: groups.length === 0 ? items : `${items} · ${counted(groups.length, "group")}`, ordinal: undefined }
+}
 
 /** A group drawn as a box in the viewport. `entered` is the quiet one, standing for the group clicks are inside. */
 export interface GroupBoxTarget {
@@ -78,8 +131,8 @@ export const groupBoxTargets = (
   selectedIds: ReadonlyArray<string>,
   enteredGroupId: string | null
 ): ReadonlyArray<GroupBoxTarget> => {
-  const selected = selectedGroupIds(tree, selectedIds)
-  const quiet = enteredGroupId === null || selected.includes(enteredGroupId) ? [] : [enteredGroupId]
+  const selected = selectedGroupIds(tree, selectedIds, enteredGroupId)
+  const quiet = enteredGroupId === null ? [] : [enteredGroupId]
   return [
     ...selected.map((id) => ({ id, keys: nodeKeys(tree, id), entered: false })),
     ...quiet.map((id) => ({ id, keys: nodeKeys(tree, id), entered: true }))
@@ -89,9 +142,10 @@ export const groupBoxTargets = (
 /** Whether grouping the selection would change anything: one whole group is a group already. */
 export const canGroupSelection = (
   tree: ReadonlyArray<TreeNode>,
-  selectedIds: ReadonlyArray<string>
+  selectedIds: ReadonlyArray<string>,
+  enteredGroupId: string | null
 ): boolean => {
-  const [first, ...others] = wholeNodes(tree, new Set(selectedIds))
+  const [first, ...others] = selectedNodes(tree, selectedIds, enteredGroupId)
   return first !== undefined && (others.length > 0 || first.kind === "item")
 }
 

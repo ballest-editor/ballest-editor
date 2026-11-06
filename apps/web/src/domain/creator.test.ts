@@ -1,11 +1,24 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Option } from "effect"
-import { creatorOf, creatorProblem, usableCreatorName } from "./creator"
+import { creatorChipText, creatorOf, creatorProblem, mapCreatorLabel, usableCreatorName } from "./creator"
 import { defaultSettings, mergeSettings } from "./Settings"
 
 const steam = (name: string) => Option.some({ name, source: "steam" as const })
 
 describe("creator", () => {
+  it("cuts a chip's name to 18 characters, the ellipsis included", () => {
+    assert.strictEqual(creatorChipText("spigipplespigipple"), "spigipplespigipple")
+    assert.strictEqual(creatorChipText("spigipplespigipplespigipple"), "spigipplespigippl…")
+    assert.strictEqual(creatorChipText("😀".repeat(19)), `${"😀".repeat(17)}…`)
+  })
+
+  it("says a map's creator is from Steam unless it is the name typed in Settings", () => {
+    assert.strictEqual(mapCreatorLabel("Marble", creatorOf(null, steam("Marble"))), "From Steam")
+    assert.strictEqual(mapCreatorLabel("Marble", creatorOf(null, Option.none())), "From Steam")
+    assert.strictEqual(mapCreatorLabel("Someone", creatorOf("Marble", Option.none())), "From Steam")
+    assert.strictEqual(mapCreatorLabel("Marble", creatorOf("Marble", Option.none())), "From Settings")
+  })
+
   it("uses the name found until one is typed", () => {
     assert.deepStrictEqual(creatorOf(null, steam("Speedy Marble")), {
       name: "Speedy Marble",

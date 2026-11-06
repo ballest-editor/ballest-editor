@@ -2,13 +2,12 @@
  * Unsaved changes (docs/DESKTOP.md § Window): one prompt per map before anything that would lose its edits, and the
  * window's held closes and reloads, which ask about every tab with unsaved edits.
  */
-import { Effect, Fiber, Stream } from "effect"
+import { Effect, Stream } from "effect"
 import type { UnsavedAction } from "../../domain/unsaved"
 import { Platform, type UnloadKind } from "../../services/Platform"
-import { runtime } from "../../services/runtime"
 import { dirtyTabs, tabWithFile, useEditor } from "../store"
 import { freshMapEffect } from "./maps"
-import { notifyFailure, run } from "./run"
+import { notifyFailure, run, runUntilCleanup } from "./run"
 import { saveOpenMapThen } from "./save"
 
 /**
@@ -89,18 +88,17 @@ export const answerUnloadRequest = (kind: UnloadKind) =>
   )
 
 /** Answers the window's held closes and reloads (`answerUnloadRequest`) until the returned function is called. */
-export const followUnloadRequests = (): () => void => {
-  const fiber = runtime.runFork(
+export const followUnloadRequests = () =>
+  runUntilCleanup(
     Effect.gen(function*() {
       yield* (yield* Platform).unloadRequests.pipe(
         Stream.runForEach((kind) =>
           answerUnloadRequest(kind).pipe(Effect.catchCause((cause) => Effect.sync(() => notifyFailure(cause))))
         )
       )
-    }).pipe(Effect.catch((error) => Effect.logWarning("Stopped following the window's close requests", error)))
+    }),
+    "Stopped following the window's close requests"
   )
-  return () => void runtime.runFork(Fiber.interrupt(fiber))
-}
 
 /**
  * Closes a tab, asking about its unsaved edits first (it is made the active tab to ask). Closing the last tab shows a
@@ -126,32 +124,26 @@ export const closeTab = (tabId: string) => run(closeTabEffect(tabId))
 /** Closes the active tab (`closeTab`). */
 export const closeActiveTab = () => closeTab(useEditor.getState().tabId)
 
-/** Closes `tabIds` one after the other (`closeTabEffect` each); a Cancel stops there. */
-const closeTabsEffect = (tabIds: ReadonlyArray<string>) =>
-  Effect.gen(function*() {
-    for (const id of tabIds) {
-      const before = useEditor.getState().tabIds.length
-      yield* closeTabEffect(id)
-      if (useEditor.getState().tabIds.length === before) return
-    }
-  })
+/** Closes `tabIds` one after the other (`closeTabEffect` each), a Cancel stopping there; `keep` is left active. */
+const closeTabsBeside = (keep: string, tabIds: ReadonlyArray<string>) =>
+  run(
+    Effect.gen(function*() {
+      for (const id of tabIds) {
+        const before = useEditor.getState().tabIds.length
+        yield* closeTabEffect(id)
+        if (useEditor.getState().tabIds.length === before) return
+      }
+    }).pipe(Effect.ensuring(Effect.sync(() => useEditor.getState().activateTab(keep))))
+  )
 
 /** Closes every tab but `tabId`, asking about each one's unsaved edits in turn; `tabId` is left active. */
 export const closeOtherTabs = (tabId: string) =>
-  run(
-    closeTabsEffect(useEditor.getState().tabIds.filter((id) => id !== tabId)).pipe(
-      Effect.ensuring(Effect.sync(() => useEditor.getState().activateTab(tabId)))
-    )
-  )
+  closeTabsBeside(tabId, useEditor.getState().tabIds.filter((id) => id !== tabId))
 
 /** Closes the tabs after `tabId`, asking about each one's unsaved edits in turn; `tabId` is left active. */
 export const closeTabsToRight = (tabId: string) => {
   const { tabIds } = useEditor.getState()
-  return run(
-    closeTabsEffect(tabIds.slice(tabIds.indexOf(tabId) + 1)).pipe(
-      Effect.ensuring(Effect.sync(() => useEditor.getState().activateTab(tabId)))
-    )
-  )
+  return closeTabsBeside(tabId, tabIds.slice(tabIds.indexOf(tabId) + 1))
 }
 
 /** Makes the next tab active (`step` 1) or the previous one (-1), wrapping around. */

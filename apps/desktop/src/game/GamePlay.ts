@@ -6,26 +6,34 @@ import {
   PlaySessionEnded,
   PushChannels
 } from "@ballest/contracts"
-import { Context, DateTime, Effect, Layer, Option, PubSub, Schema, Stream } from "effect"
+import { Context, Effect, Layer, Option, PubSub, Schema, Stream } from "effect"
 import { ElectronShell } from "../electron/ElectronShell"
 import { ElectronWindow } from "../electron/ElectronWindow"
 import type { BackupError } from "../project/Backups"
-import { MapExports, type MapRefusedError } from "../project/MapExports"
+import { type ExportUnverifiedError, MapExports, type MapRefusedError } from "../project/MapExports"
 import { MapFiles } from "../project/MapFiles"
 import type { MapLinkError } from "../project/MapLinks"
 import { type ProjectError, Projects } from "../project/Projects"
 import { GameLink, type GameLinkError } from "./GameLink"
 import type { GamePathError } from "./GamePaths"
 import { GameProcess } from "./GameProcess"
+import { reportGameWriteProgress } from "./gameWriteProgress"
 
 /** How often a Play's game session is looked at: is the game up yet, is it still running. */
 export const SESSION_POLL = "5 seconds"
 /** How long a game Play started may take to show up; one that never does (Steam updating it, a closed prompt) is dropped. */
-export const SESSION_START_TIMEOUT = "5 minutes"
+const SESSION_START_TIMEOUT = "5 minutes"
 
 const encodeEnded = Schema.encodeEffect(PlaySessionEnded)
 
-export type PlayError = MapRefusedError | ProjectError | MapLinkError | BackupError | GamePathError | GameLinkError
+type PlayError =
+  | MapRefusedError
+  | ExportUnverifiedError
+  | ProjectError
+  | MapLinkError
+  | BackupError
+  | GamePathError
+  | GameLinkError
 
 /**
  * Play (docs/DESKTOP.md § Play): Export to game, then the handoff to the `ballest-editor-link` plugin, then the game
@@ -63,10 +71,7 @@ export class GamePlay extends Context.Service<GamePlay, {
       const started = yield* waitUntil(true).pipe(Effect.timeoutOption(SESSION_START_TIMEOUT))
       if (Option.isNone(started)) return
       yield* waitUntil(false)
-      const ended: PlaySessionEnded = {
-        fileName: session.fileName,
-        endedAt: DateTime.formatIso(yield* DateTime.now)
-      }
+      const ended: PlaySessionEnded = { fileName: session.fileName }
       yield* Effect.logInfo(`The game session racing ${ended.fileName} ended`)
       yield* PubSub.publish(ends, ended)
       yield* encodeEnded(ended).pipe(
@@ -90,11 +95,12 @@ export class GamePlay extends Context.Service<GamePlay, {
       const { fileName } = payload
       // not `read`, which stops at its size cap: a file too long for the game is Export's to refuse, with the reason
       const { publishedFileId } = yield* files.info(yield* projects.inUse, fileName)
-      if (!isNeverPublished(publishedFileId)) return { _tag: "PublishedMap", fileName, publishedFileId } as const
+      if (!isNeverPublished(publishedFileId)) return { _tag: "PublishedMap" } as const
 
       const exported = yield* exports.exportMap(payload)
       if (exported._tag !== "Exported") return exported
 
+      yield* reportGameWriteProgress(windows, { fileName, stage: "launch" })
       const { plugin, sent } = yield* link.requestRace(fileName)
       const launch: PlayLaunch = (yield* game.isRunning)
         ? "running"
@@ -102,7 +108,7 @@ export class GamePlay extends Context.Service<GamePlay, {
         ? "launched"
         : "failed"
       if (launch !== "failed") yield* followSession(fileName)
-      return { _tag: "Played", file: exported.file, link: exported.link, plugin, sent, launch } as const
+      return { _tag: "Played", plugin, sent, launch } as const
     })
 
     return GamePlay.of({ play, sessionEnds: Stream.fromPubSub(ends) })

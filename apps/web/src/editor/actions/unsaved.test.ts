@@ -4,9 +4,10 @@ import { lightingOf } from "../../domain/sunlight"
 import { MapCodec } from "../../services/MapCodec"
 import { Platform } from "../../services/Platform"
 import { makeTestDisk, projectFile, type TestDisk } from "../../test/desktopBridge"
-import { afterSaveOf, createNewMap, edit, layerFor, reset, s } from "../../test/editorActions"
-import { dirtyTabs } from "../store"
-import { newMapEffect } from "./maps"
+import { afterSaveOf, balledits, createNewMap, edit, fileNameOf, layerFor, reset, s } from "../../test/editorActions"
+import { readSample } from "../../test/samples"
+import { dirtyTabs, isBlankTab, isUnsavedTab, tabLabelOf } from "../store"
+import { newMapEffect, openProjectMapFile } from "./maps"
 import { saveMapAsEffect, saveMapFile } from "./save"
 import { answerUnloadRequest, closeTabEffect, holdsUnload, unlessCancelled } from "./unsaved"
 
@@ -22,6 +23,77 @@ const layerLeavingInto = (disk: TestDisk, left: Array<string>) =>
 
 /** What the prompt guards in these tests: the New map dialog, once the open map's edits are dealt with. */
 const thenNewProjectDialog = unlessCancelled("closeTab", Effect.sync(() => s().openDialog({ id: "newProject" })))
+
+describe("a map nobody has edited", () => {
+  it.effect("a new map is clean: nothing shows it as unsaved and nothing holds the window", () => {
+    const disk = makeTestDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* newMapEffect
+      assert.isFalse(s().dirty)
+      assert.isFalse(isUnsavedTab(s()))
+      assert.isTrue(isBlankTab(s()))
+      assert.deepStrictEqual(dirtyTabs(s()), [])
+      assert.isFalse(holdsUnload())
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("selecting isn't an edit; the first edit dirties it", () => {
+    const disk = makeTestDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      s().select([s().doc.ids[0]!])
+      assert.isFalse(s().dirty)
+      assert.isFalse(isUnsavedTab(s()))
+      assert.isTrue(isBlankTab(s()))
+
+      edit()
+      assert.isTrue(s().dirty)
+      assert.isTrue(isUnsavedTab(s()))
+      assert.isFalse(isBlankTab(s()))
+      assert.isTrue(holdsUnload())
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("closing the last tab leaves a clean Untitled, and that closes without asking", () => {
+    const disk = makeTestDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      edit()
+      disk.promptAnswers.push("discard")
+      yield* closeTabEffect(s().tabId)
+      assert.lengthOf(disk.prompts, 1)
+      assert.lengthOf(s().tabIds, 1)
+      assert.strictEqual(tabLabelOf(s()), "Untitled")
+      assert.isFalse(s().dirty)
+      assert.isFalse(isUnsavedTab(s()))
+
+      yield* closeTabEffect(s().tabId)
+      assert.lengthOf(disk.prompts, 1)
+      assert.isFalse(isUnsavedTab(s()))
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a saved map opened over it takes its place without asking; an edited one keeps its tab", () => {
+    const sample = balledits[0]!
+    const name = fileNameOf(sample)
+    const disk = makeTestDisk({ [projectFile(name)]: readSample(sample) })
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(name)
+      assert.deepStrictEqual(disk.prompts, [])
+      assert.lengthOf(s().tabIds, 1)
+      assert.strictEqual(s().file?.name, name)
+
+      yield* reset
+      edit()
+      yield* openProjectMapFile(name)
+      assert.deepStrictEqual(disk.prompts, [])
+      assert.lengthOf(s().tabIds, 2)
+      assert.deepStrictEqual(dirtyTabs(s()), [s().tabIds[0]!])
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+})
 
 describe("unsaved changes", () => {
   it.effect("New map asks nothing: the new map opens in a tab of its own and the edited one stays", () => {

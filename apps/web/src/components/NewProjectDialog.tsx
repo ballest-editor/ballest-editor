@@ -2,22 +2,16 @@ import { Button } from "@workspace/ui/components/button"
 import { DialogFooter } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import { type ReactNode, useState } from "react"
+import { useState } from "react"
 import { pathInFolder } from "../domain/paths"
-import { isProjectName } from "../domain/project"
+import { isProjectName, PROJECT_NAME_RULE } from "../domain/project"
 import { newProject } from "../editor/actions"
 import { useEditor } from "../editor/store"
-import { PathText } from "./PathText"
+import { FIELD_ERROR, ProjectFolderLine } from "./NewProjectFields"
 import { TitledDialog } from "./TitledDialog"
 
-/**
- * The name a new project goes by, and where that puts it under `projectsFolder` (`Documents/Ballest Editor`).
- * `onCreate` hears a usable name; `actions` holds what sits beside Create.
- */
-export function NewProjectForm({ actions, onCreate }: {
-  readonly actions: ReactNode
-  readonly onCreate: (name: string) => void
-}) {
+/** The name a new project goes by, and where that puts it under `projectsFolder` (`Documents/Ballest Editor`). */
+function NewProjectForm({ onCancel }: { readonly onCancel: () => void }) {
   const projectsFolder = useEditor((s) => s.project?.projectsFolder ?? "")
   const recent = useEditor((s) => s.project)
   const [name, setName] = useState("")
@@ -30,7 +24,7 @@ export function NewProjectForm({ actions, onCreate }: {
       className="contents"
       onSubmit={(e) => {
         e.preventDefault()
-        if (valid && !taken) onCreate(trimmed)
+        if (valid && !taken) void newProject(trimmed)
       }}
     >
       <div className="flex flex-col gap-1.5">
@@ -43,16 +37,12 @@ export function NewProjectForm({ actions, onCreate }: {
           aria-invalid={trimmed !== "" && (!valid || taken)}
           onChange={(e) => setName(e.target.value)}
         />
-        <div className="text-xs text-muted-foreground">
-          {taken
-            ? "A recent project has that name already."
-            : trimmed !== "" && !valid
-            ? "Letters, digits, spaces, - and _ only."
-            : <PathText block>{trimmed === "" ? projectsFolder : pathInFolder(projectsFolder, trimmed)}</PathText>}
-        </div>
+        {taken || (trimmed !== "" && !valid)
+          ? <span className={FIELD_ERROR}>{taken ? "A recent project has that name already." : PROJECT_NAME_RULE}</span>
+          : <ProjectFolderLine path={trimmed === "" ? projectsFolder : pathInFolder(projectsFolder, trimmed)} />}
       </div>
       <DialogFooter>
-        {actions}
+        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
         <Button type="submit" disabled={!valid || taken}>Create</Button>
       </DialogFooter>
     </form>
@@ -65,16 +55,8 @@ export function NewProjectForm({ actions, onCreate }: {
  */
 export function NewProjectDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   return (
-    <TitledDialog
-      open={open}
-      onClose={onClose}
-      title="New project"
-      description="A folder of maps, exported to the game one by one."
-    >
-      <NewProjectForm
-        actions={<Button type="button" variant="outline" onClick={onClose}>Cancel</Button>}
-        onCreate={(name) => void newProject(name)}
-      />
+    <TitledDialog open={open} onClose={onClose} title="New project">
+      <NewProjectForm onCancel={onClose} />
     </TitledDialog>
   )
 }

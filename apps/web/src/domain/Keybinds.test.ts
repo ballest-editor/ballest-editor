@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import {
   actionsFor,
+  conflictingBindings,
   defaultKeybinds,
   formatBinding,
   formatBindings,
@@ -11,13 +12,29 @@ import {
   keybindActionDescriptions,
   keybindActionLabels,
   keybindActions,
+  type Keybinds,
   keybindSections,
   mergeKeybinds,
   MODIFIER_HOLD_MS,
+  PROJECTION_ACTIONS,
   releasesBinding
 } from "./Keybinds"
+import { viewProjections } from "./viewLayout"
 
 describe("keybind table", () => {
+  it("has each pane view's own key, for its tooltip and the View menu", () => {
+    expect(Object.fromEntries(viewProjections.map((view) => [view, defaultKeybinds[PROJECTION_ACTIONS[view]]])))
+      .toEqual({
+        perspective: ["Numpad5"],
+        top: ["Numpad7"],
+        bottom: ["Ctrl+Numpad7"],
+        front: ["Numpad1"],
+        back: ["Ctrl+Numpad1"],
+        left: ["Ctrl+Numpad3"],
+        right: ["Numpad3"]
+      })
+  })
+
   it("lists every action exactly once, with a lower-case label, a description and a default", () => {
     const listed = keybindSections.flatMap((s) => s.actions)
     expect(new Set(listed).size).toBe(listed.length)
@@ -28,11 +45,11 @@ describe("keybind table", () => {
     }
   })
 
-  it("uses the game's level-editor hotkeys and names", () => {
-    const editor = keybindSections.find((s) => s.name === "level editor")!
+  it("uses the in-game editor's hotkeys and names", () => {
+    const editor = keybindSections.find((s) => s.name === "editor")!
     expect(editor.actions.map((a) => [keybindActionLabels[a], defaultKeybinds[a]])).toEqual([
       ["select", ["KeyQ"]],
-      ["translate", ["KeyW"]],
+      ["move", ["KeyW"]],
       ["rotate", ["KeyE"]],
       ["scale", ["KeyR"]],
       ["local / world axes", ["KeyC"]],
@@ -49,6 +66,7 @@ describe("keybind table", () => {
       ["paste", ["Ctrl+KeyV"]],
       ["duplicate", ["Ctrl+KeyD"]],
       ["delete", ["Backspace", "Delete"]],
+      ["select all", ["Ctrl+KeyA"]],
       ["deselect", ["Escape"]],
       ["group", ["Ctrl+KeyG"]],
       ["ungroup", ["Shift+KeyG"]]
@@ -56,8 +74,8 @@ describe("keybind table", () => {
   })
 
   it("uses the game's names and defaults for its free camera", () => {
-    const freeCam = keybindSections.find((s) => s.name === "mouse and keyboard free camera")!
-    expect(freeCam.actions.map((a) => [keybindActionLabels[a], defaultKeybinds[a]])).toEqual([
+    const camera = keybindSections.find((s) => s.name === "camera")!
+    expect(camera.actions.slice(0, 7).map((a) => [keybindActionLabels[a], defaultKeybinds[a]])).toEqual([
       ["forward", ["KeyW"]],
       ["reverse", ["KeyS"]],
       ["left", ["KeyA"]],
@@ -103,6 +121,7 @@ describe("keybind table", () => {
 
   it("formats bindings for display", () => {
     expect(formatBinding("Ctrl+KeyZ")).toBe("Ctrl + Z")
+    expect(formatBinding("Ctrl+Shift+KeyZ", true)).toBe("⌘ + Shift + Z")
     expect(formatBinding("Alt+Mouse0")).toBe("Alt + LMB")
     expect(formatBinding("Mouse3")).toBe("Mouse 4")
     expect(formatBinding("Numpad7")).toBe("Num 7")
@@ -170,5 +189,18 @@ describe("HeldKeys: Left Ctrl = fly down vs Ctrl chords", () => {
     expect(keys.holds("KeyW", 0)).toBe(true)
     expect(keys.holds("", 0)).toBe(false)
     expect(keys.holdsAny([], 0)).toBe(false)
+  })
+})
+
+/** What `keybinds` adds to the conflicts the defaults already have. */
+const newConflicts = (keybinds: Keybinds) => {
+  const baseline = conflictingBindings(defaultKeybinds)
+  return [...conflictingBindings(keybinds)].filter((chord) => !baseline.has(chord))
+}
+
+describe("conflictingBindings", () => {
+  it("marks a chord two actions of a kind share, and not one shared across kinds", () => {
+    expect(newConflicts({ ...defaultKeybinds, undo: ["Ctrl+KeyJ"], redo: ["Ctrl+KeyJ"] })).toEqual(["Ctrl+KeyJ"])
+    expect(newConflicts({ ...defaultKeybinds, moveForward: ["KeyJ"], translateMode: ["KeyJ"] })).toEqual([])
   })
 })

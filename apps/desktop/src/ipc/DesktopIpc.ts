@@ -2,7 +2,7 @@ import { type DesktopMethodName, DesktopMethods, InvokeChannels } from "@ballest
 import { Context, Effect, Layer, Schema, type Scope } from "effect"
 
 /** The part of an invoke event the handlers may look at. */
-export interface DesktopIpcInvokeEvent {
+interface DesktopIpcInvokeEvent {
   readonly sender: { readonly id: number }
 }
 
@@ -17,7 +17,7 @@ export interface DesktopIpcMain {
   removeHandler(channel: string): void
 }
 
-export class DesktopIpcRegistrationError extends Schema.TaggedError<DesktopIpcRegistrationError>()(
+class DesktopIpcRegistrationError extends Schema.TaggedError<DesktopIpcRegistrationError>()(
   "DesktopIpcRegistrationError",
   { channel: Schema.String, cause: Schema.Defect() }
 ) {
@@ -27,7 +27,7 @@ export class DesktopIpcRegistrationError extends Schema.TaggedError<DesktopIpcRe
 }
 
 /** One `ipcRenderer.invoke` channel: its raw payload in, its encoded result out. */
-export interface DesktopIpcMethod<E, R> {
+interface DesktopIpcMethod<E, R> {
   readonly channel: string
   readonly handler: (raw: unknown, event: DesktopIpcInvokeEvent) => Effect.Effect<unknown, E, R>
 }
@@ -68,7 +68,7 @@ type HandlerPayload<K extends DesktopMethodName> = (typeof DesktopMethods)[K]["p
 type HandlerResult<K extends DesktopMethodName> = (typeof DesktopMethods)[K]["result"]["Type"]
 
 /** The work behind bridge method `K`: its decoded payload and the sender in, its result out. */
-export type DesktopIpcHandler<K extends DesktopMethodName, E = unknown, R = unknown> = (
+type DesktopIpcHandler<K extends DesktopMethodName, E = unknown, R = unknown> = (
   payload: HandlerPayload<K>,
   event: DesktopIpcInvokeEvent
 ) => Effect.Effect<HandlerResult<K>, E, R>

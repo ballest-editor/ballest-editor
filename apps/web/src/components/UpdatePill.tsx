@@ -12,9 +12,18 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/component
 import { cn } from "@workspace/ui/lib/utils"
 import { useRef } from "react"
 import { formatDate } from "../domain/time"
+import { updateStatusOf } from "../domain/updates"
 import { downloadUpdate, installUpdate, openExternalLink } from "../editor/actions"
 import { dirtyTabs, useEditor, useUpdateState } from "../editor/store"
 import { ReleaseNotes } from "./ReleaseNotes"
+
+/** The status bar's left end: what a check for updates is doing. Nothing in a browser, which has no updater. */
+export function UpdateStatus() {
+  const state = useUpdateState()
+  const checked = useEditor((s) => s.updateChecked)
+  const status = state === null ? null : updateStatusOf(state, checked)
+  return status === null ? null : <span className="truncate px-1 text-fg-tertiary">{status}</span>
+}
 
 /** The states the pill shows; the others (no newer release, or updates off) show nothing. */
 type Offer = "available" | "failed" | "downloading" | "ready"
@@ -52,8 +61,8 @@ function ProgressRing({ percent }: { readonly percent: number }) {
   const radius = 5.5
   const circumference = 2 * Math.PI * radius
   return (
-    <svg viewBox="0 0 14 14" className="size-3.5 -rotate-90" aria-hidden>
-      <circle cx="7" cy="7" r={radius} fill="none" strokeWidth="2" className="stroke-muted-foreground/25" />
+    <svg viewBox="0 0 14 14" className="size-4 -rotate-90" aria-hidden>
+      <circle cx="7" cy="7" r={radius} fill="none" strokeWidth="2" className="stroke-fg-tertiary/25" />
       <circle
         cx="7"
         cy="7"
@@ -75,7 +84,7 @@ function PillFace({ offer, state }: { readonly offer: Offer; readonly state: Upd
       return (
         <>
           <span className="relative">
-            <IconArrowDown className="size-3.5" />
+            <IconArrowDown className="size-4" />
             <span className="absolute -top-px -right-px size-1.5 rounded-full bg-primary ring-2 ring-card" />
           </span>
           Update
@@ -84,7 +93,7 @@ function PillFace({ offer, state }: { readonly offer: Offer; readonly state: Upd
     case "failed":
       return (
         <>
-          <IconAlertTriangle className="size-3.5 text-destructive" />
+          <IconAlertTriangle className="size-4 text-destructive" />
           Update failed
         </>
       )
@@ -92,13 +101,13 @@ function PillFace({ offer, state }: { readonly offer: Offer; readonly state: Upd
       return (
         <>
           <ProgressRing percent={state.downloadPercent ?? 0} />
-          <span className="text-muted-foreground">{percentOf(state)}%</span>
+          <span className="text-fg-tertiary">{percentOf(state)}%</span>
         </>
       )
     case "ready":
       return (
         <>
-          <IconRefresh className="size-3.5" />
+          <IconRefresh className="size-4" />
           Restart to update
         </>
       )
@@ -118,7 +127,7 @@ function DownloadProgress({ percent }: { readonly percent: number }) {
       >
         <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${percent}%` }} />
       </div>
-      <span className="w-8 text-right text-muted-foreground tabular-nums">{Math.floor(percent)}%</span>
+      <span className="w-8 text-right text-fg-tertiary tabular-nums">{Math.floor(percent)}%</span>
     </div>
   )
 }
@@ -138,7 +147,7 @@ function Actions({ state, dirty }: { readonly state: UpdateState; readonly dirty
           <Button
             variant="ghost"
             size="sm"
-            className="mr-auto -ml-2 text-muted-foreground"
+            className="mr-auto -ml-2 text-fg-secondary"
             onClick={() => void openExternalLink(releaseUrl)}
           >
             View on GitHub
@@ -172,33 +181,26 @@ function Actions({ state, dirty }: { readonly state: UpdateState; readonly dirty
 export function UpdatePill() {
   const state = useUpdateState()
   const dirty = useEditor((s) => dirtyTabs(s).length > 0)
+  // Opening lands on the notes, so they scroll from the keyboard and no link inside them looks selected.
+  const notes = useRef<HTMLDivElement>(null)
   const offer = state === null ? null : offerOf(state)
   if (state === null || offer === null) return null
 
-  return <Pill state={state} offer={offer} dirty={dirty} />
-}
-
-function Pill(
-  { state, offer, dirty }: { readonly state: UpdateState; readonly offer: Offer; readonly dirty: boolean }
-) {
-  // Opening lands on the notes, so they scroll from the keyboard and no link inside them looks selected.
-  const notes = useRef<HTMLDivElement>(null)
   const released = state.releaseDate === null ? null : `Released ${formatDate(state.releaseDate)}`
   return (
     <Popover>
       <Tooltip>
         <TooltipTrigger
-          delay={500}
           render={
             <PopoverTrigger
               render={
                 <Button
                   variant="ghost"
-                  size="xs"
+                  size="sm"
                   className={cn(
-                    "h-5 gap-1 px-1.5 text-xs font-normal tabular-nums",
+                    "h-5 px-1.5 tabular-nums",
                     offer === "ready" &&
-                      "bg-primary text-primary-foreground hover:bg-primary/85 hover:text-primary-foreground aria-expanded:bg-primary/85 aria-expanded:text-primary-foreground"
+                      "bg-primary text-primary-foreground hover:lift-primary hover:text-primary-foreground active:press-primary aria-expanded:lift-primary aria-expanded:text-primary-foreground"
                   )}
                 />
               }
@@ -211,7 +213,7 @@ function Pill(
       </Tooltip>
       <PopoverContent side="top" align="end" initialFocus={notes} className="w-96 gap-0 p-0">
         <div className="flex flex-col gap-0.5 px-3 pt-3 pb-2.5">
-          <p className="text-eyebrow text-muted-foreground">What's new</p>
+          <p className="text-caption uppercase tracking-wider text-fg-secondary">What's new</p>
           <PopoverTitle>Ballest Editor {state.availableVersion}</PopoverTitle>
           <PopoverDescription>
             {released === null ? `You have ${state.currentVersion}` : `${released} · You have ${state.currentVersion}`}
@@ -221,10 +223,10 @@ function Pill(
           ref={notes}
           tabIndex={0}
           aria-label="Release notes"
-          className="max-h-[min(50vh,22rem)] overflow-y-auto border-t px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-inset dark:scheme-dark"
+          className="max-h-[min(50vh,22rem)] overflow-y-auto border-t px-3 py-2.5 focus-ring-inset dark:scheme-dark"
         >
           {state.releaseNotes === null
-            ? <p className="text-muted-foreground">This release has no notes.</p>
+            ? <p className="text-fg-tertiary">This release has no notes.</p>
             : <ReleaseNotes blocks={state.releaseNotes} />}
         </div>
         <Actions state={state} dirty={dirty} />

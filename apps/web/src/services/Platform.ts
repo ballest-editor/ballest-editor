@@ -5,6 +5,7 @@ import type {
   DesktopBridge,
   DesktopInvoke,
   DesktopMethodName,
+  DesktopVersions,
   ExportChecks,
   ExportMapResult,
   FoundCreator,
@@ -12,6 +13,7 @@ import type {
   GameLinkResult,
   GamePathKind,
   GamePaths,
+  GameWriteProgress,
   ImportMapPayload,
   ImportMapResult,
   InstallPluginResult,
@@ -42,6 +44,7 @@ import type {
   UnloadKind,
   UnsavedChoice,
   UpdateState,
+  WriteMapThumbnailPayload,
   WritePrefabPayload
 } from "@ballest/contracts"
 import { prefabSummaryOf } from "@ballest/contracts"
@@ -118,13 +121,15 @@ export class PlatformError extends Schema.TaggedError<PlatformError>()("Platform
  */
 export class Platform extends Context.Service<Platform, {
   readonly capabilities: PlatformCapabilities
+  /** The desktop app's runtime; null in a browser. */
+  readonly runtimeVersions: DesktopVersions | null
   /** Asks for a map file anywhere (the desktop's import dialog, the browser's file input); none when cancelled. */
   readonly pickMapFile: Effect.Effect<Option.Option<OpenedMap>, PlatformError>
   /** Downloads `text` as `name` (browser: its Export). */
   readonly download: (file: { readonly name: string; readonly text: string }) => Effect.Effect<void, PlatformError>
   /** The project in use and the recent ones (desktop). */
   readonly projectState: Effect.Effect<ProjectState, PlatformError>
-  /** Asks for a folder to open as a project, which nothing uses yet; none when the user cancels. */
+  /** Asks for a folder to open as a project (Open project…); none when the user cancels. */
   readonly chooseProject: Effect.Effect<Option.Option<ProjectInfo>, PlatformError>
   /** Fails as opening `target` would (open in another window, a name that's taken), changing nothing. */
   readonly checkProject: (target: ProjectTarget) => Effect.Effect<void, PlatformError>
@@ -136,6 +141,10 @@ export class Platform extends Context.Service<Platform, {
   readonly createProject: (project: CreateProjectPayload) => Effect.Effect<ProjectState, PlatformError>
   /** Shows one of the project's folders in the file manager. */
   readonly revealProject: (which: ProjectFolder) => Effect.Effect<void, PlatformError>
+  /** Shows a recent project's folder in the file manager. */
+  readonly revealRecentProject: (path: string) => Effect.Effect<void, PlatformError>
+  /** Takes a project off the recent ones; its folder stays as it is. */
+  readonly forgetRecentProject: (path: string) => Effect.Effect<ProjectState, PlatformError>
   /** Renames the project (its file's name; the folder keeps its name). */
   readonly renameProject: (name: string) => Effect.Effect<ProjectState, PlatformError>
   /** Keeps which map is open in the project (null: one that isn't in it), so the next launch opens it again. */
@@ -159,6 +168,10 @@ export class Platform extends Context.Service<Platform, {
   readonly writeSidecar: (
     file: { readonly fileName: string; readonly text: string }
   ) => Effect.Effect<void, PlatformError>
+  /** The thumbnail kept for the map file with this hash, as a PNG data URL; null when it has none, and in a browser. */
+  readonly readMapThumbnail: (hash: string) => Effect.Effect<string | null, PlatformError>
+  /** Keeps a map's thumbnail under the hash of the file it shows (a browser keeps none). */
+  readonly writeMapThumbnail: (thumbnail: WriteMapThumbnailPayload) => Effect.Effect<void, PlatformError>
   /** A tier's prefabs by name (docs/DESKTOP.md § Prefabs). A browser keeps its `user` tier in memory, and has no other. */
   readonly listPrefabs: (tier: PrefabTier) => Effect.Effect<PrefabInfos, PlatformError>
   readonly readPrefab: (ref: PrefabRef) => Effect.Effect<PrefabRead, PlatformError>
@@ -238,6 +251,8 @@ export class Platform extends Context.Service<Platform, {
   readonly play: (fileName: string, options: ExportOptions) => Effect.Effect<PlayResult, PlatformError>
   /** Each end of a game session a Play started or joined (desktop); a browser's ends at once. */
   readonly playSessionEnds: Stream.Stream<PlaySessionEnded, PlatformError>
+  /** Each stage main reports of an Export or a Play under way, while the stream runs. */
+  readonly gameWriteProgress: Stream.Stream<GameWriteProgress, PlatformError>
   /** The notifications kept from earlier runs, newest first (desktop: `notifications.json`); none in a browser. */
   readonly loadNotifications: Effect.Effect<NotificationRecords, PlatformError>
   /** Keeps `records` for the next run (desktop); a browser keeps them in memory only. */
@@ -339,6 +354,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
       play: true,
       updates: true
     },
+    runtimeVersions: bridge.versions,
     pickMapFile: call("pickImport").pipe(Effect.map((file) => Option.map(Option.fromNullOr(file), openedMap))),
     download: () => Effect.fail(new PlatformError({ message: "The desktop app saves into the project." })),
     projectState: call("projectState"),
@@ -349,6 +365,9 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     createProject: (project) => call("createProject", project),
     revealProject: (which) =>
       bridgeCheck(call("revealProject", { which }), "The project doesn't have that folder yet."),
+    revealRecentProject: (path) =>
+      bridgeCheck(call("revealRecentProject", { path }), "That folder isn't there anymore."),
+    forgetRecentProject: (path) => call("forgetRecentProject", { path }),
     renameProject: (name) => call("renameProject", { name }),
     rememberOpenMap: (fileName) => call("rememberOpenMap", { fileName }),
     listMaps: call("listMaps"),
@@ -357,6 +376,8 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     saveMap: (file) => call("saveMap", file),
     renameMap: (file) => call("renameMap", file),
     writeSidecar: (file) => call("writeSidecar", file),
+    readMapThumbnail: (hash) => call("readMapThumbnail", { hash }),
+    writeMapThumbnail: (thumbnail) => call("writeMapThumbnail", thumbnail),
     listPrefabs: (tier) => call("listPrefabs", { tier }),
     readPrefab: (ref) => call("readPrefab", ref),
     writePrefab: (payload) => call("writePrefab", payload),
@@ -388,6 +409,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     installPlugin: call("installPlugin"),
     play: (fileName, options) => call("play", { fileName, ...options }),
     playSessionEnds: pushed((listener) => bridge.onPlaySessionEnded(listener)),
+    gameWriteProgress: pushed((listener) => bridge.onGameWriteProgress(listener)),
     loadNotifications: call("loadNotifications"),
     saveNotifications: (records) => call("saveNotifications", { records }),
     muteNotifications: (kind) => call("muteNotifications", { kind }),
@@ -501,6 +523,7 @@ const makeBrowser = (): Platform["Service"] => {
   return Platform.of({
     ...makeMemoryPrefabs(),
     capabilities: browserCapabilities,
+    runtimeVersions: null,
     pickMapFile: pickFile(".balledit,.ballmap,.json").pipe(
       Effect.flatMap(Option.match({
         onNone: () => Effect.succeedNone,
@@ -519,6 +542,8 @@ const makeBrowser = (): Platform["Service"] => {
     switchProject: () => noProject,
     createProject: () => noProject,
     revealProject: () => noProject,
+    revealRecentProject: () => noProject,
+    forgetRecentProject: () => noProject,
     renameProject: () => noProject,
     rememberOpenMap: () => Effect.void,
     listMaps: Effect.succeed([]),
@@ -527,6 +552,8 @@ const makeBrowser = (): Platform["Service"] => {
     saveMap: () => noProject,
     renameMap: () => noProject,
     writeSidecar: () => noProject,
+    readMapThumbnail: () => Effect.succeed(null),
+    writeMapThumbnail: () => Effect.void,
     importMap: () => noProject,
     exportMap: () => desktopOnly,
     checkExports: Effect.succeed({ changed: [], missing: [] }),
@@ -553,6 +580,7 @@ const makeBrowser = (): Platform["Service"] => {
     installPlugin: desktopOnly,
     play: () => desktopOnly,
     playSessionEnds: Stream.empty,
+    gameWriteProgress: Stream.empty,
     loadNotifications: Effect.succeed([]),
     saveNotifications: () => Effect.void,
     muteNotifications: (kind) => Effect.sync(() => [...muted.add(kind)]),

@@ -25,6 +25,8 @@ export type GamePathOverrides = typeof GamePathOverrides.Type
 export const ProjectSettings = Schema.Struct({
   /** Project folders, the one in use first (at most 8). Empty: the default project. */
   recent: Schema.optional(Schema.Array(Schema.String)),
+  /** When each recent project was last opened (ISO 8601), by project folder. */
+  lastOpened: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   /** The map last open in each project (its file name), by project folder, for the next launch to open again. */
   lastOpenMap: Schema.optional(Schema.Record(Schema.String, Schema.String))
 })
@@ -40,12 +42,10 @@ export const BackupSettings = Schema.Struct({
 export type BackupSettings = typeof BackupSettings.Type
 
 /** The Game link checklist's last result (docs/PROJECTS.md § Shell), so a launch can tell what changed since. */
-export const GameLinkSettings = Schema.Struct({ last: Schema.optional(GameLinkResult) })
-export type GameLinkSettings = typeof GameLinkSettings.Type
+const GameLinkSettings = Schema.Struct({ last: Schema.optional(GameLinkResult) })
 
 /** The notification centre's "Don't show again", per notification kind. */
-export const NotificationSettings = Schema.Struct({ muted: Schema.optional(MutedNotificationKinds) })
-export type NotificationSettings = typeof NotificationSettings.Type
+const NotificationSettings = Schema.Struct({ muted: Schema.optional(MutedNotificationKinds) })
 
 /** `desktop-settings.json`: what the main process remembers between runs. The renderer's settings live in its own storage. */
 export const DesktopSettingsFile = Schema.Struct({

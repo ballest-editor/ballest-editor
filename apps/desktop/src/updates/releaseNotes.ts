@@ -6,7 +6,7 @@ import { Option } from "effect"
 import { parseExternalUrl } from "../electron/ElectronShell"
 
 /** The most text the notes keep; the rest is cut at a block and marked with an ellipsis. */
-export const MAX_NOTES_LENGTH = 4000
+const MAX_NOTES_LENGTH = 4000
 
 /** Lists nested deeper than this continue the deepest one. */
 const MAX_LIST_DEPTH = 4
@@ -163,7 +163,7 @@ const TOKEN = /<!--[\s\S]*?(?:-->|$)|<(\/?)([a-z][a-z\d-]*)((?:[^>"']|"[^"]*"|'[
  * script, style, iframe and the like are dropped with what is in them, as is every image. At most `MAX_NOTES_LENGTH`
  * characters of text.
  */
-export const htmlToBlocks = (html: string): ReadonlyArray<ReleaseNoteBlock> => {
+const htmlToBlocks = (html: string): ReadonlyArray<ReleaseNoteBlock> => {
   const blocks: Array<BlockBuilder> = []
   /** The open lists, outermost first. */
   const lists: Array<ListBuilder> = []
@@ -356,7 +356,7 @@ export const htmlToBlocks = (html: string): ReadonlyArray<ReleaseNoteBlock> => {
 }
 
 /** A body with no markup at all (a generic feed's notes): paragraphs at blank lines, its line breaks kept. */
-export const textToBlocks = (text: string): ReadonlyArray<ReleaseNoteBlock> => {
+const textToBlocks = (text: string): ReadonlyArray<ReleaseNoteBlock> => {
   const blocks: Array<ReleaseNoteBlock> = []
   let budget = MAX_NOTES_LENGTH
   for (const paragraph of text.split(/\n[ \t]*\n/)) {

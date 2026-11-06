@@ -1,7 +1,7 @@
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
-import { IconChevronRight, IconDots } from "@tabler/icons-react"
-import { cn } from "cn"
+import { IconChevronRight } from "@tabler/icons-react"
+import { cn } from "@workspace/ui/lib/utils"
 import * as React from "react"
 
 function Breadcrumb({ className, ...props }: React.ComponentProps<"nav">) {
@@ -20,7 +20,7 @@ function BreadcrumbList({ className, ...props }: React.ComponentProps<"ol">) {
     <ol
       data-slot="breadcrumb-list"
       className={cn(
-        "flex flex-wrap items-center gap-1.5 text-xs/relaxed wrap-break-word text-muted-foreground",
+        "flex flex-wrap items-center gap-1.5 text-body wrap-break-word text-fg-secondary",
         className
       )}
       {...props}
@@ -47,7 +47,7 @@ function BreadcrumbLink({
     defaultTagName: "a",
     props: mergeProps<"a">(
       {
-        className: cn("transition-colors hover:text-foreground", className)
+        className: cn("rounded-control transition-colors focus-ring hover:text-foreground", className)
       },
       props
     ),
@@ -65,7 +65,7 @@ function BreadcrumbPage({ className, ...props }: React.ComponentProps<"span">) {
       role="link"
       aria-disabled="true"
       aria-current="page"
-      className={cn("font-normal text-foreground", className)}
+      className={cn("text-foreground", className)}
       {...props}
     />
   )
@@ -89,33 +89,4 @@ function BreadcrumbSeparator({
   )
 }
 
-function BreadcrumbEllipsis({
-  className,
-  ...props
-}: React.ComponentProps<"span">) {
-  return (
-    <span
-      data-slot="breadcrumb-ellipsis"
-      role="presentation"
-      aria-hidden="true"
-      className={cn(
-        "flex size-4 items-center justify-center [&>svg]:size-3.5",
-        className
-      )}
-      {...props}
-    >
-      <IconDots />
-      <span className="sr-only">More</span>
-    </span>
-  )
-}
-
-export {
-  Breadcrumb,
-  BreadcrumbEllipsis,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator
-}
+export { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator }

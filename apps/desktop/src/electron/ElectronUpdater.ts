@@ -27,7 +27,7 @@ export class ElectronUpdaterError extends Schema.TaggedError<ElectronUpdaterErro
 }
 
 /** What `findRelease` needs of electron-updater's `autoUpdater`. */
-export interface ReleaseFeed {
+interface ReleaseFeed {
   /** Each check reads it: on, the newest tag of the running prerelease channel; off, GitHub's latest stable release. */
   allowPrerelease: boolean
   readonly currentVersion: { readonly prerelease: ReadonlyArray<string | number> }

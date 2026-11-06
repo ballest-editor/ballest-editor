@@ -12,6 +12,7 @@ import {
   importMap,
   playMap,
   saveMap,
+  selectAll,
   startNewMap
 } from "./actions"
 import { sceneRegistry } from "./sceneRegistry"
@@ -35,6 +36,7 @@ export const actionCommands = {
   cutSelection: () => useEditor.getState().cutSelection(),
   paste: () => useEditor.getState().paste(),
   focusSelection: () => useEditor.getState().requestFocus(),
+  selectAll,
   deselect: () => useEditor.getState().deselect(),
   groupSelection: () => useEditor.getState().groupSelection(),
   ungroupSelection: () => useEditor.getState().ungroupSelection(),
@@ -57,7 +59,7 @@ export const actionCommands = {
   /** Import… on desktop, Open… in a browser. */
   openMap: () => void importMap(),
   saveMap: () => void saveMap(),
-  /** Duplicate… on desktop (Save as is gone: the location is the project), Export… (a download) in a browser. */
+  /** Duplicate… on desktop, where a map's location is the project; Export… (a download) in a browser. */
   saveMapAs: () => {
     const { capabilities, document, openDialog } = useEditor.getState()
     // a definition's copies are the Prefabs panel's

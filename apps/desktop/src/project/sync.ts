@@ -7,7 +7,7 @@ import type { MapLink } from "@ballest/contracts"
 export type ExportReport = "changed" | "missing"
 
 /** A link after its export was looked at, and what to report about it (null: nothing new). */
-export interface SeenExport {
+interface SeenExport {
   readonly link: MapLink
   readonly report: ExportReport | null
 }

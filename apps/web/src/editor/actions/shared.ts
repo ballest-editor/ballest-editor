@@ -14,7 +14,7 @@ import { isDefaultViewLayout } from "../../domain/viewLayout"
 import { MapCodec } from "../../services/MapCodec"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { type NotificationAction, Platform, type ProjectMap } from "../../services/Platform"
-import { type Doc, type OpenFile, tabStateOf, type TabTarget, useEditor } from "../store"
+import { type Doc, isBackupTab, type OpenFile, tabStateOf, type TabTarget, tabWithFile, useEditor } from "../store"
 import { followDefinitionsIn } from "./prefabFollow"
 
 /** The project in use, the recent ones and its maps into the store (desktop). */
@@ -28,11 +28,11 @@ export const fileOf = (map: ProjectMap): OpenFile => ({ name: map.fileName, path
 
 /** A notification's Reveal: the project's maps folder, or the game's. */
 export const revealIn = (where: "project" | "game"): NotificationAction => ({
-  label: "Reveal",
+  label: "Reveal in folder",
   command: where === "project" ? { _tag: "RevealProject" } : { _tag: "RevealGamePath", which: "mapsFolder" }
 })
 
-/** The project's name; Untitled Project while there is none (docs/PROJECTS.md § Shell). */
+/** The project's name; Untitled Project while there is none (docs/DESKTOP.md § Projects and maps). */
 export const projectName = () => useEditor.getState().project?.current?.name ?? "Untitled Project"
 
 /** Whether there is a project to write maps into (desktop with one named; a browser has none and keeps maps in memory). */
@@ -114,22 +114,31 @@ export const prefsOf = (map: MapFile) =>
 
 /**
  * Puts a map into the editor, with the prefs saved for it, in the tab `into` says (the active one by default); `dirty`
- * opens it as unsaved edits of `file`. `loaded` is what its sidecar gave.
+ * opens it as unsaved edits of `file`, and `backup` marks it as a restored backup. `loaded` is what its sidecar gave.
  */
 export const showMap = Effect.fn("showMap")(function*(
   map: MapFile,
   file: OpenFile | null,
-  options?: { readonly dirty?: boolean; readonly into?: TabTarget; readonly loaded?: LoadedStructure }
+  options?: {
+    readonly dirty?: boolean
+    readonly backup?: boolean
+    readonly into?: TabTarget
+    readonly loaded?: LoadedStructure
+  }
 ) {
   const prefs = yield* prefsOf(map)
   useEditor.getState().loadMap(map, file, prefs.gridHeight, {
     exportOnSave: prefs.exportOnSave === true,
     viewLayout: prefs.viewLayout,
     dirty: options?.dirty === true,
+    backup: options?.backup === true,
     into: options?.into,
     loaded: options?.loaded
   })
-  yield* followDefinitionsIn(useEditor.getState().tabId)
+  const state = useEditor.getState()
+  // a background tab is the one just added, which has the file
+  const tabId = options?.into === "backgroundTab" && file !== null ? tabWithFile(state, file.name) : state.tabId
+  if (tabId !== undefined) yield* followDefinitionsIn(tabId)
 })
 
 /**
@@ -139,7 +148,8 @@ export const showMap = Effect.fn("showMap")(function*(
 export const saveTabPrefs = Effect.fn("saveTabPrefs")(function*(tabId?: string) {
   const s = useEditor.getState()
   const tab = tabStateOf(s, tabId ?? s.tabId)
-  if (tab === undefined) return
+  // a restored backup goes by the name of the map it came from, whose prefs these would write over
+  if (tab === undefined || isBackupTab(tab)) return
   const { doc, floorHeight, exportOnSave, viewLayout } = tab
   const prefs: MapPrefs = {
     ...(floorHeight !== floorHeightOf(doc.map) && { gridHeight: floorHeight }),

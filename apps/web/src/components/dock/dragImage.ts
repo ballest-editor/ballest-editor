@@ -1,9 +1,9 @@
 import { elementOf } from "../../editor/keyTargets"
 
 /** Where the pointer holds a whole strip's image: on its first tab. */
-const STRIP_GRIP = { x: 12, y: 16 }
+const STRIP_GRIP = { x: 12, y: 14 }
 const IMAGE_CLASS =
-  "dock-drag-image fixed -top-[9999px] left-0 flex h-8 w-max overflow-hidden rounded-[calc(var(--radius)*0.75)] border bg-card text-foreground"
+  "dock-drag-image fixed -top-[9999px] left-0 flex h-7 w-max overflow-hidden rounded-control border bg-card text-foreground"
 
 /**
  * A panel's drag shows a copy of its tab on the card it sits on, held where it was grabbed; a group's shows its whole

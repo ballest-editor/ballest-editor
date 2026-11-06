@@ -1,4 +1,4 @@
-import { DateTime, Layer, ManagedRuntime } from "effect"
+import { Layer, ManagedRuntime } from "effect"
 import { CatalogLoader } from "./CatalogLoader"
 import { KeybindStore } from "./KeybindStore"
 import { MapCodec } from "./MapCodec"
@@ -16,8 +16,7 @@ export const AppLayer = Layer.mergeAll(
   MapPrefsStore.layer,
   MaterialLibrary.layer,
   Platform.layer,
-  SettingsStore.layer,
-  DateTime.layerCurrentZoneLocal
+  SettingsStore.layer
 )
 
 /** The single bridge from React into Effect. */

@@ -8,7 +8,9 @@ import {
   type ProjectMapFile
 } from "@ballest/contracts"
 import { Context, DateTime, Effect, FileSystem, Option, Path, Schema, Semaphore } from "effect"
+import { ElectronWindow } from "../electron/ElectronWindow"
 import { type GamePathError, GamePaths } from "../game/GamePaths"
+import { reportGameWriteProgress } from "../game/gameWriteProgress"
 import { type BackupError, Backups } from "./Backups"
 import { isSamePath, sha256 } from "./files"
 import { MapFiles, PublishedId } from "./MapFiles"
@@ -21,6 +23,11 @@ export class MapRefusedError extends Schema.TaggedError<MapRefusedError>()("MapR
   message: Schema.String
 }) {}
 
+/** The game's maps folder doesn't hold the bytes Export just wrote there. `message` says so. */
+export class ExportUnverifiedError extends Schema.TaggedError<ExportUnverifiedError>()("ExportUnverifiedError", {
+  message: Schema.String
+}) {}
+
 /**
  * Export to game and sync (docs/PROJECTS.md § Sync): copies a project map into the game's maps folder, keeping the
  * game's old copy in `<userData>/backups/` (`exportBackups`), records each export in the map's link, and looks at the
@@ -30,11 +37,15 @@ export class MapExports extends Context.Service<MapExports, {
   /**
    * Copies a map byte for byte into the game's maps folder and records the export in its link. Refused
    * (`MapRefusedError`) past the game's character limit, measured on those bytes: the page's checks see the map it
-   * decoded, which isn't the file's text, and may be older than the file.
+   * decoded, which isn't the file's text, and may be older than the file. The copy is read back, and one that isn't
+   * those bytes is `ExportUnverifiedError`; one that can't be read just now says nothing about the write and passes.
    */
   readonly exportMap: (
     payload: ExportMapPayload
-  ) => Effect.Effect<ExportMapResult, MapRefusedError | ProjectError | MapLinkError | BackupError | GamePathError>
+  ) => Effect.Effect<
+    ExportMapResult,
+    MapRefusedError | ExportUnverifiedError | ProjectError | MapLinkError | BackupError | GamePathError
+  >
   /**
    * Sync detection (docs/PROJECTS.md § Sync): looks at every linked map's export in the game's maps folder, keeps what
    * it saw in the link, and reports what changed since the last look. One check at a time, so a change seen by one is
@@ -53,6 +64,7 @@ export class MapExports extends Context.Service<MapExports, {
     const links = yield* MapLinks
     const game = yield* GamePaths
     const backupStore = yield* Backups
+    const windows = yield* ElectronWindow
 
     const same = (a: string, b: string) => isSamePath(path, a, b, platform)
 
@@ -132,13 +144,19 @@ export class MapExports extends Context.Service<MapExports, {
       }
 
       yield* backupStore.overwrite(exportBackups, file, bytes)
-      const exported = { path: file, hash: sha256(bytes), at: DateTime.formatIso(yield* DateTime.now) }
-      const link = yield* links.modify(project, fileName, (previous) => ({
+      const hash = sha256(bytes)
+      yield* reportGameWriteProgress(windows, { fileName, stage: "verify" })
+      const written = yield* fs.readFile(file).pipe(Effect.map(sha256), Effect.option)
+      if (Option.isSome(written) && written.value !== hash) {
+        return yield* new ExportUnverifiedError({ message: `The game's copy of ${fileName} isn't what was written.` })
+      }
+      const exported = { path: file, hash, at: DateTime.formatIso(yield* DateTime.now) }
+      yield* links.modify(project, fileName, (previous) => ({
         ...(previous ?? emptyLink),
         export: exported,
         lastSeenHash: exported.hash
       }))
-      return { _tag: "Exported", file: { path: file, name: fileName }, link: link ?? emptyLink } as const
+      return { _tag: "Exported" } as const
     })
 
     const checkLock = yield* Semaphore.make(1)

@@ -1,18 +1,19 @@
 /**
  * Between a prefab file and map items, the one place the two formats meet (docs/FORMAT.md § Prefab file): Euler degrees
  * and quaternions, bare and class-qualified paths, the flat `properties` map and the typed lists. Also the frame the game
- * measures a prefab against, and where a spawn puts it.
+ * measures a prefab against.
  */
-import type { PrefabRef } from "@ballest/contracts"
+import type { PrefabRef, PrefabTier } from "@ballest/contracts"
 import { Predicate } from "effect"
 import type { CatalogIndex, CatalogPiece } from "./Catalog"
 import type { Vec3 } from "./coords"
-import { meshComponentFor, newMapFile, qualifyMaterialPath } from "./factory"
+import { meshComponentFor, newMapFile, nextNumberedName, qualifyMaterialPath } from "./factory"
 import { gameGroupNameOf } from "./gameGroups"
 import { refusesMeshComponents } from "./gameRules"
 import { boxCentreOf, itemsBoxOf } from "./itemBounds"
 import { DEFAULT_PLAYER_START } from "./level"
 import { type Item, type MapFile, type MeshComponent, objectPathOf, PropertyList } from "./MapFile"
+import { type Named, pieceDisplayName, pieceLabelOf } from "./pieceName"
 import {
   PREFAB_FORMAT,
   PREFAB_VERSION,
@@ -21,16 +22,44 @@ import {
   type PrefabMesh,
   type PrefabPropertyValue
 } from "./PrefabFile"
-import { quatToRotator, rotatorToQuat } from "./ueMath"
+import { ORIGIN, quatToRotator, rotatorToQuat } from "./ueMath"
 
 export { isPrefabName, PREFAB_NAME_RULE } from "@ballest/contracts"
 
+/** A tier as the UI names it: `user` is the game's own folder. A browser's one tier lasts the session. */
+export const prefabTierLabel = (tier: PrefabTier, projects: boolean): string =>
+  !projects ? "Session" : tier === "user" ? "Game" : "Project"
+
+/** Where a tier keeps its prefabs, for its section in the Prefabs panel and its segment in Save selection as prefab. */
+export const PREFAB_TIER_HINTS: Readonly<Record<PrefabTier, string>> = {
+  project: "Kept with this project.",
+  user: "The game's own prefabs: the in-game editor lists them too."
+}
+
+/** Why the project tier is off in Untitled Project. */
+export const PREFAB_NEEDS_PROJECT = "Name the project first."
+
 export const isSamePrefab = (a: PrefabRef, b: PrefabRef): boolean => a.tier === b.tier && a.name === b.name
 
-export const ORIGIN: Vec3 = { x: 0, y: 0, z: 0 }
+/** A piece's name without its size or number: "Kicker" for Kicker 1 Small. */
+const familyOf = (piece: Named) => pieceDisplayName(piece).name.replace(/\s+\d+$/, "")
 
-/** How far ahead of the camera a spawn puts the nearest of its box, along the view (cm). */
-const SPAWN_DISTANCE = 500
+/** What a selection of `pieces` reads as: "Kicker pair", "Curve 1 Medium x3", "Kicker set" for a mix. */
+export const selectionLabelOf = (pieces: ReadonlyArray<Named>): string => {
+  const [first] = pieces
+  if (first === undefined) return "Prefab"
+  if (new Set(pieces.map(pieceLabelOf)).size > 1) return `${familyOf(first)} set`
+  return pieces.length === 2 ? `${familyOf(first)} pair` : `${pieceLabelOf(first)} x${pieces.length}`
+}
+
+/**
+ * `label` as a prefab may be called, and clear of the names in `taken`. A name is its file's, so `saveprefab`'s rule
+ * turns spaces into underscores, and room is left for the number a copy gets (`nextNumberedName`).
+ */
+export const freePrefabName = (label: string, taken: ReadonlySet<string>): string => {
+  const name = label.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "Prefab"
+  return taken.has(name) ? nextNumberedName(name, "_", (next) => taken.has(next)) : name
+}
 
 /** What each property list holds when the catalog doesn't say: how a value's type shows in a map. */
 const listOfValue = (value: PrefabPropertyValue): { readonly list: PropertyList; readonly type: string } => {
@@ -142,29 +171,6 @@ export const prefabOfItems = (items: ReadonlyArray<Item>, catalog: CatalogIndex 
     group: { rotation: [0, 0, 0], scale: [1, 1, 1], ...(name.length > 0 && { name }) },
     items: items.map((item) => prefabItemOf(item, frame))
   }
-}
-
-export interface ViewRay {
-  readonly origin: Vec3
-  readonly direction: Vec3
-}
-
-/**
- * Where `spawnprefab` puts the frame of `items` (held relative to it): on the line through the camera along the view,
- * far enough along that their box is `SPAWN_DISTANCE` ahead at its nearest point along the view (docs/qa/groups-prefabs.md
- * § Spawning a prefab).
- */
-export const spawnFrameOf = (
-  items: ReadonlyArray<Item>,
-  { direction, origin }: ViewRay,
-  catalog: CatalogIndex | null
-): Vec3 => {
-  const length = Math.hypot(direction.x, direction.y, direction.z) || 1
-  const d = { x: direction.x / length, y: direction.y / length, z: direction.z / length }
-  const { max, min } = itemsBoxOf(items, catalog) ?? { min: ORIGIN, max: ORIGIN }
-  const nearest = (d.x < 0 ? max.x : min.x) * d.x + (d.y < 0 ? max.y : min.y) * d.y + (d.z < 0 ? max.z : min.z) * d.z
-  const along = SPAWN_DISTANCE - nearest
-  return { x: origin.x + d.x * along, y: origin.y + d.y * along, z: origin.z + d.z * along }
 }
 
 /**

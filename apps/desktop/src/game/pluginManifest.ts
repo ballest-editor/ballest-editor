@@ -5,7 +5,7 @@
 export const PLUGIN_ID = "ballest-editor-link"
 export const MANIFEST = "info.toml"
 
-export interface PluginManifest {
+interface PluginManifest {
   /** `[meta] version`; the host's default is 0.0.0. */
   readonly version: string
   /** `[script] files`, the scripts the host compiles; the host's default is main.as. */

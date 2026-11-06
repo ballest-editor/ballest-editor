@@ -70,7 +70,7 @@ export const expectTag = <A extends { readonly _tag: string }, T extends A["_tag
  * Dialogs that answer from a queue (a path, or null for cancel; a message box, the button's index) and record what
  * they were asked.
  */
-export const fakeDialogs = () => {
+const fakeDialogs = () => {
   const answers: Array<string | null> = []
   const asked: Array<FileDialogOptions & { readonly kind: "open" | "save" | "folder" }> = []
   const buttons: Array<number> = []
@@ -134,6 +134,7 @@ const updatesLayer = Layer.succeed(
       releaseDate: null,
       releaseUrl: null,
       downloadPercent: null,
+      checkedAt: null,
       message: null
     }),
     run: Effect.die("unused"),

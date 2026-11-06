@@ -1,5 +1,5 @@
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-import { cn } from "cn"
+import { cn } from "@workspace/ui/lib/utils"
 import * as React from "react"
 
 import { IconX } from "@tabler/icons-react"
@@ -9,16 +9,8 @@ function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
 }
 
-function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
-}
-
 function DialogPortal({ ...props }: DialogPrimitive.Portal.Props) {
   return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
-}
-
-function DialogClose({ ...props }: DialogPrimitive.Close.Props) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
 }
 
 function DialogOverlay({
@@ -29,12 +21,27 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/40 duration-100 dark:bg-black/60 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 isolate z-50 bg-black/30 duration-150 dark:bg-black/50 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}
       {...props}
     />
   )
+}
+
+/**
+ * The popup's element, which lets go of the focus as the dialog starts to close. Base UI only moves it once the exit
+ * animation has ended, and until then the keys would go to a dialog that is already on its way out.
+ */
+function DialogPopupElement({ open, popup, ...props }: React.ComponentProps<"div"> & {
+  open: boolean
+  popup: React.RefObject<HTMLDivElement | null>
+}) {
+  React.useLayoutEffect(() => {
+    const focused = popup.current?.ownerDocument.activeElement
+    if (!open && focused instanceof HTMLElement && popup.current?.contains(focused)) focused.blur()
+  }, [open, popup])
+  return <div {...props} />
 }
 
 function DialogContent({
@@ -47,17 +54,20 @@ function DialogContent({
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
 }) {
+  const popup = React.useRef<HTMLDivElement>(null)
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full grid-cols-[minmax(0,1fr)] max-w-[calc(100%-2rem)] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:color-mix(in_oklch,var(--foreground)_25%,transparent)_transparent] [overflow-wrap:anywhere] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-xs/relaxed text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full grid-cols-[minmax(0,1fr)] max-w-[calc(100%-2rem)] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:color-mix(in_oklch,var(--foreground)_25%,transparent)_transparent] [overflow-wrap:anywhere] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-sheet bg-popover p-dialog text-body text-popover-foreground shadow-lg ring-1 ring-edge duration-150 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom-1 data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom-1",
           className
         )}
         finalFocus={finalFocus}
         {...props}
+        ref={popup}
+        render={(element, { open }) => <DialogPopupElement {...element} open={open} popup={popup} />}
       >
         {children}
         {showCloseButton && (
@@ -121,7 +131,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("font-heading text-sm font-medium", className)}
+      className={cn("text-title", className)}
       {...props}
     />
   )
@@ -135,7 +145,7 @@ function DialogDescription({
     <DialogPrimitive.Description
       data-slot="dialog-description"
       className={cn(
-        "text-xs/relaxed text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
+        "text-body text-fg-tertiary *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
         className
       )}
       {...props}
@@ -143,15 +153,4 @@ function DialogDescription({
   )
 }
 
-export {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogOverlay,
-  DialogPortal,
-  DialogTitle,
-  DialogTrigger
-}
+export { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle }

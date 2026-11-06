@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema, type Scope } from "effect"
 import * as Electron from "electron"
 
-export interface ElectronAppMetadata {
+interface ElectronAppMetadata {
   readonly appVersion: string
   readonly appPath: string
   readonly userData: string
@@ -11,7 +11,7 @@ export interface ElectronAppMetadata {
   readonly resourcesPath: string
 }
 
-export class ElectronAppReadyError extends Schema.TaggedError<ElectronAppReadyError>()("ElectronAppReadyError", {
+class ElectronAppReadyError extends Schema.TaggedError<ElectronAppReadyError>()("ElectronAppReadyError", {
   cause: Schema.Defect()
 }) {
   override get message(): string {

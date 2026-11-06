@@ -1,24 +1,27 @@
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import * as THREE from "three"
 import { threeToUeVector } from "../domain/coords"
 import { axisOf, dot, gridLevels, MAX_GRID_LEVELS, ORTHO_AXES } from "../domain/orthoView"
 import { gridColorsOf } from "../domain/Settings"
-import { AXIS_COLORS } from "./axisColors"
+import { sceneAxisColors } from "./axisColors"
 import { orthographicOnly } from "./paneCameras"
 import { useBeforePaneDraw } from "./PaneRenderer"
-import { useEditor } from "./store"
+import { paneDisplayIn, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
 
 /** Lines stay readable over the map's pieces without hiding them. */
 const GRID_OPACITY = 0.4
 /** Under the gizmo (1000) and over everything else. */
 const RENDER_ORDER = 900
+/** The depth, -1 to 1, that puts the grid behind what a pane draws: just this side of its far plane. */
+const BEHIND_THE_MAP = 0.9999
 
 const vertexShader = /* glsl */ `
 varying vec2 vScreen;
+uniform float uDepth;
 void main() {
   vScreen = position.xy;
-  gl_Position = vec4( position.xy, 0.0, 1.0 ); // the whole pane, whatever the camera
+  gl_Position = vec4( position.xy, uDepth, 1.0 ); // the whole pane, whatever the camera
 }
 `
 
@@ -68,6 +71,7 @@ void main() {
 `
 
 const uniforms = {
+  uDepth: { value: 0 },
   uCentre: { value: new THREE.Vector2() },
   uHalf: { value: new THREE.Vector2(1, 1) },
   uCmPerPixel: { value: 1 },
@@ -101,29 +105,36 @@ export function OrthoGrid() {
     uniforms.uSection.value.set(section)
   }, [cell, section])
 
-  useBeforePaneDraw((pane) => {
+  const mesh = useRef<THREE.Mesh>(null)
+  useBeforePaneDraw((pane, slot) => {
     const { view } = pane
-    if (view === undefined) return
+    if (view === undefined || mesh.current === null) return
+    const state = useEditor.getState()
+    mesh.current.visible = paneDisplayIn(state, slot).grid
+    // Square to the view, the lines belong over the pieces. On the way there the pieces are still turning under them.
+    material.depthTest = pane.easing
+    uniforms.uDepth.value = pane.easing ? BEHIND_THE_MAP : 0
     const { right, up } = ORTHO_AXES[view]
-    const { snapping } = useEditor.getState().settings
+    const { snapping } = state.settings
     const target = threeToUeVector(pane.target)
     const cmPerPixel = pane.cmPerPixel / window.devicePixelRatio
     const levels = gridLevels(cmPerPixel, snapping.enabled ? snapping.gridSize : undefined)
     uniforms.uCentre.value.set(dot(target, right), dot(target, up))
     uniforms.uHalf.value.set((pane.width / 2) * pane.cmPerPixel, (pane.height / 2) * pane.cmPerPixel)
     uniforms.uCmPerPixel.value = cmPerPixel
-    uniforms.uLevels.value.forEach((slot, i) => {
+    uniforms.uLevels.value.forEach((uniform, i) => {
       const level = levels[i]
-      slot.set(level?.size ?? 0, level?.opacity ?? 0, level?.section === true ? 1 : 0)
+      uniform.set(level?.size ?? 0, level?.opacity ?? 0, level?.section === true ? 1 : 0)
     })
-    uniforms.uAxisAcross.value.set(AXIS_COLORS[axisOf(right).axis])
-    uniforms.uAxisUp.value.set(AXIS_COLORS[axisOf(up).axis])
+    const axisColors = sceneAxisColors(dark)
+    uniforms.uAxisAcross.value.set(axisColors[axisOf(right).axis])
+    uniforms.uAxisUp.value.set(axisColors[axisOf(up).axis])
     material.uniformsNeedUpdate = true
   })
 
-  if (!appearance.gridVisible) return null
   return (
     <mesh
+      ref={mesh}
       layers={orthographicOnly}
       geometry={geometry}
       material={material}

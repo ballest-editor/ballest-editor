@@ -1,6 +1,7 @@
 /** Selection edits: each is one undo step, however many items it touches. */
 import type { UeTransform, Vec3 } from "../../domain/coords"
 import { editTransform } from "../../domain/editTransform"
+import { selectableKeys } from "../../domain/groupSelection"
 import {
   type Axis,
   type AxisEdit,
@@ -29,6 +30,12 @@ export const flipSelection = (axis: FlipAxis) => useEditor.getState().flipSelect
 export const deleteSelection = () => useEditor.getState().deleteSelection()
 
 export const duplicateSelection = () => useEditor.getState().duplicateSelection()
+
+/** Selects every item a click could reach from here: the map's, or the entered group's. */
+export const selectAll = () => {
+  const { doc, enteredGroupId, select } = useEditor.getState()
+  select(selectableKeys(doc.structure.tree, enteredGroupId))
+}
 
 /** An item's edit transform in the document: never the live preview. */
 const docTransform = (id: string): UeTransform | undefined => {

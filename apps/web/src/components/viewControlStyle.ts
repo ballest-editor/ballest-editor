@@ -1,16 +1,21 @@
-import type { KeyboardEvent, MouseEvent } from "react"
+import type { Tooltip } from "@workspace/ui/components/tooltip"
+import type { ComponentProps, KeyboardEvent, MouseEvent } from "react"
 
 /**
- * The one frosted surface every overlay over the viewport sits on: the control groups, the tool bar and the panes'
- * labels, so they read as one family against any scene.
+ * The one surface every overlay over the viewport sits on, so they read as one family against any scene: glass, the
+ * card's colour with what's behind it showing through as colour without detail.
  */
-export const FROSTED = "border border-border/60 bg-background/60 shadow-lg backdrop-blur-md"
+export const SURFACE = "border border-border bg-card/95 shadow-sm backdrop-blur-md backdrop-saturate-150"
 
-/** One frosted button group; each control gets its own, like the game's. */
-export const GROUP = `pointer-events-auto flex items-center gap-1 rounded-full p-1 ${FROSTED}`
+/** One control group: a 32px glass pill holding its segments, each a smaller pill of its own. */
+export const GROUP = `pointer-events-auto flex h-8 w-fit items-center gap-0.5 rounded-full p-0.5 ${SURFACE}`
 
-/** Popups clear a group's padding and border, plus the usual 4px: `button` from a 32px button, `size` from a 24px picker. */
-export const POPUP_OFFSET = { button: 9, size: 13 } as const
+/** A hairline between the parts of a group. */
+export const GROUP_DIVIDER = "mx-0.5 h-4 w-px shrink-0 bg-border"
+
+/** A button in a group. */
+export const SEGMENT =
+  "flex h-full min-w-7 items-center justify-center gap-1.5 rounded-full px-2 text-fg-secondary transition-colors focus-ring hover:bg-hover hover:text-foreground active:bg-pressed aria-expanded:bg-hover aria-expanded:text-foreground disabled:text-fg-disabled"
 
 /** Keeps keyboard focus with the viewport: no focus on mousedown, no Space/Enter activation. */
 export const noFocus = {
@@ -19,4 +24,14 @@ export const noFocus = {
   onKeyDown: (e: KeyboardEvent) => {
     if (e.key === " " || e.key === "Enter") e.preventDefault()
   }
+}
+
+/** For a tooltip's `onOpenChange`: only the pointer opens it, as focus coming back from a closed menu would too. */
+export const pointerOpensOnly: NonNullable<ComponentProps<typeof Tooltip>["onOpenChange"]> = (open, details) => {
+  if (open && details.reason === "trigger-focus") details.cancel()
+}
+
+/** For a popup's `onOpenChangeComplete`: hands focus back to the viewport, so Space doesn't reopen it. */
+export const releaseFocus = (open: boolean): void => {
+  if (!open && document.activeElement instanceof HTMLElement) document.activeElement.blur()
 }

@@ -1,28 +1,18 @@
-import { type Icon, IconFolder } from "@tabler/icons-react"
+import { type Icon, IconCheck, IconCopy } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import type { ReactNode } from "react"
+import { useEffect, useState } from "react"
+import { copyText } from "../editor/actions"
 
 /**
- * A file path or file name, wherever one is shown: monospace, small, on one line. Too long for its room, it is cut at
- * the start, so the end (the file, the folder itself) stays readable, and the whole thing is the tooltip. Paths never
- * wrap: a path broken over three lines reads worse than a cut one with a tooltip.
- *
- * `block` puts it on a line of its own, for prose that mentions a file ("Exports as" + the file name).
+ * A path, small, on one line. Too long for its room, it is cut at the start, so the end (the file, the folder itself)
+ * stays readable, and the whole thing is the tooltip: a path broken over three lines reads worse than a cut one.
  */
-export function PathText({ children, className, block = false }: {
-  readonly children: string
-  readonly className?: string
-  readonly block?: boolean
-}) {
+export function PathText({ children }: { readonly children: string }) {
   return (
     <span
-      className={cn(
-        "min-w-0 truncate text-left font-mono text-[0.6875rem] leading-none",
-        block ? "block py-0.5" : "inline-block max-w-full align-bottom",
-        className
-      )}
+      className="min-w-0 truncate text-left text-caption leading-none inline-block max-w-full align-bottom"
       dir="rtl"
       title={children}
     >
@@ -32,39 +22,27 @@ export function PathText({ children, className, block = false }: {
   )
 }
 
-/**
- * A location as a settings row shows it: a field-like box with a folder icon, the path (`PathText`) and its actions
- * (Reveal, Change…) docked at the right, so every location row lines up. `missing` is shown, muted, when there is no
- * path yet.
- */
-export function PathField({ path, missing = "Not found", icon: FieldIcon = IconFolder, actions }: {
+/** A name, the whole path in its tooltip; what has no path yet is the name alone. */
+export function PathName({ name, path, className }: {
+  readonly name: string
   readonly path: string | null
-  readonly missing?: string
-  /** A folder by default; `IconFile` for a file name. */
-  readonly icon?: Icon
-  readonly actions?: ReactNode
+  readonly className: string
 }) {
-  return (
-    <div className="flex h-8 w-full min-w-0 items-center gap-2 rounded-md border bg-muted/40 pr-1 pl-2.5">
-      <FieldIcon className="size-3.5 shrink-0 text-muted-foreground" />
-      {path === null
-        ? <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground italic">{missing}</span>
-        : (
-          // Geist Mono's ink sits a pixel above the line box's centre; a pixel down centres it on the icon
-          <PathText className="flex-1 translate-y-px text-foreground/90">{path}</PathText>
-        )}
-      {actions !== undefined && <div className="flex shrink-0 items-center gap-0.5 border-l pl-1">{actions}</div>}
-      {actions === undefined && <span className="w-1" />}
-    </div>
+  return path === null ? <span className={className}>{name}</span> : (
+    <Tooltip>
+      <TooltipTrigger render={<span className={className} />}>{name}</TooltipTrigger>
+      <TooltipContent side="bottom" className="break-all">{path}</TooltipContent>
+    </Tooltip>
   )
 }
 
-/** One of a `PathField`'s actions: an icon button, its name in the tooltip. */
-export function PathAction({ label, icon: ActionIcon, onClick, disabled = false }: {
+/** An icon button, its name in the tooltip: a location row's actions, and the Inspector's section headers. */
+export function PathAction({ label, icon: ActionIcon, onClick, disabled = false, className }: {
   readonly label: string
   readonly icon: Icon
   readonly onClick: () => void
   readonly disabled?: boolean
+  readonly className?: string
 }) {
   return (
     <Tooltip>
@@ -73,16 +51,33 @@ export function PathAction({ label, icon: ActionIcon, onClick, disabled = false 
           <Button
             variant="ghost"
             size="icon-sm"
-            className="size-6 text-muted-foreground"
+            className={cn("text-fg-secondary", className)}
             aria-label={label}
             disabled={disabled}
             onClick={onClick}
           />
         }
       >
-        <ActionIcon className="size-3.5" />
+        <ActionIcon />
       </TooltipTrigger>
       <TooltipContent side="bottom">{label}</TooltipContent>
     </Tooltip>
+  )
+}
+
+/** Copies a path; the icon says it worked for a moment. */
+export function CopyPathAction({ path }: { readonly path: string }) {
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(false), 1500)
+    return () => clearTimeout(timer)
+  }, [copied])
+  return (
+    <PathAction
+      label={copied ? "Copied" : "Copy path"}
+      icon={copied ? IconCheck : IconCopy}
+      onClick={() => void copyText(path).then((done) => setCopied(done === true))}
+    />
   )
 }

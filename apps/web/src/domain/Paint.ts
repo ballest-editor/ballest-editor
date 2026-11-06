@@ -10,6 +10,7 @@ import { Option, Schema } from "effect"
 import type { CatalogIndex } from "./Catalog"
 import { type Item, objectPathOf } from "./MapFile"
 import { assetNameOf, type MaterialSpec, NEUTRAL } from "./Materials"
+import { humanizedClass } from "./pieceName"
 import { open } from "./schema"
 import { surfaceOf } from "./surface"
 
@@ -104,6 +105,21 @@ export const choiceOf = (picker: PaintPicker, material: string | undefined): Pai
   return all.find(({ color }) => objectPathOf(color.material) === path) ??
     all.find(({ color }) => assetNameOf(color.material) === name)
 }
+
+/** The finish a slot shows: the one it's on, else the library's first, which the game's panel opens a slot off the picker on. */
+export const shownFinishOf = (picker: PaintPicker, choice: PaintChoice | undefined): PaintFinish | undefined =>
+  choice?.finish ?? picker[0]
+
+/** A finish as a person would write it: "smooth" reads "Smooth". */
+export const finishLabelOf = (finish: PaintFinish): string =>
+  `${finish.name.charAt(0).toUpperCase()}${finish.name.slice(1)}`
+
+/** A colour as a person would write it: "SkyBlue" reads "Sky Blue". */
+export const colorLabelOf = (color: PaintColor): string => humanizedClass(color.color)
+
+/** A material the picker doesn't offer, by its asset's name: "M_BaseSurface_Metal" reads "Base Surface Metal". */
+export const materialLabelOf = (material: string): string =>
+  humanizedClass(assetNameOf(material).replace(/^MI?C?_/, ""))
 
 /** The panel's colour for a slot that isn't on a picker choice: EBallestMaterialColors' first value. */
 const UNSET_COLOR = "Grey"

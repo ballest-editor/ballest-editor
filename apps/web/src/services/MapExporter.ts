@@ -1,15 +1,9 @@
-import { Context, DateTime, Effect, Layer } from "effect"
+import { Context, Effect, Layer, Option } from "effect"
 import type { CatalogIndex } from "../domain/Catalog"
-import {
-  currentCreatedAt,
-  defaultEditorState,
-  isValidName,
-  mapFileNameOf,
-  NAME_RULE,
-  userLevelNameOf
-} from "../domain/factory"
+import { currentCreatedAt, defaultEditorState, mapFileNameOf, userLevelNameOf } from "../domain/factory"
 import { fileTextProblems, gameLoadProblems } from "../domain/limits"
 import { type MapFile, SYSTEM_LEVEL_NAME } from "../domain/MapFile"
+import { mapNameProblem } from "../domain/validateMap"
 import { ExportValidationError, type MapEncodeError } from "./errors"
 import { MapCodec } from "./MapCodec"
 
@@ -31,21 +25,15 @@ export class MapExporter extends Context.Service<MapExporter, {
     MapExporter,
     Effect.gen(function*() {
       const codec = yield* MapCodec
-      const timeZone = yield* DateTime.CurrentTimeZone
 
       const prepare = Effect.fn("MapExporter.prepare")(function*(map: MapFile, catalog: CatalogIndex | null = null) {
         const levelData = map.worldSettings.levelData
         const displayName = levelData.levelDisplayName.trim()
         const creatorName = levelData.creatorName.trim()
-        if (displayName.length === 0 || creatorName.length === 0) {
-          return yield* new ExportValidationError({ message: "Map name and creator are required." })
-        }
-        if (!isValidName(displayName) || !isValidName(creatorName)) {
-          return yield* new ExportValidationError({
-            message: `Map name and creator: ${NAME_RULE} (they become the file name).`
-          })
-        }
-        const createdAt = yield* currentCreatedAt.pipe(Effect.provideService(DateTime.CurrentTimeZone, timeZone))
+        const nameProblem = mapNameProblem(displayName, creatorName)
+        if (Option.isSome(nameProblem)) return yield* new ExportValidationError({ message: nameProblem.value })
+        // Stamped once: a save keeps the map's date, so Created stays the day it was made.
+        const createdAt = levelData.createdAt === "" ? yield* currentCreatedAt : levelData.createdAt
         const out: MapFile = {
           ...map,
           worldSettings: {
@@ -85,6 +73,6 @@ export class MapExporter extends Context.Service<MapExporter, {
   )
 
   static readonly layer = this.layerNoDeps.pipe(
-    Layer.provide([MapCodec.layer, DateTime.layerCurrentZoneLocal])
+    Layer.provide(MapCodec.layer)
   )
 }

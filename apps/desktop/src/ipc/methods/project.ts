@@ -48,6 +48,10 @@ export const projectHandlers = {
   createProject: (project) => Effect.flatMap(Effect.service(Projects), (projects) => projects.createNew(project)),
   revealProject: ({ which }) =>
     Effect.flatMap(Effect.service(Projects), (projects) => projects.folderOf(which)).pipe(Effect.flatMap(reveal)),
+  /** The start screen's and Recent projects' Reveal: the project needn't be the one in use. */
+  revealRecentProject: ({ path }) =>
+    Effect.flatMap(Effect.service(Projects), (projects) => projects.knownFolder(path)).pipe(Effect.flatMap(reveal)),
+  forgetRecentProject: ({ path }) => Effect.flatMap(Effect.service(Projects), (projects) => projects.forget(path)),
   /** Project settings › General: the project's name. */
   renameProject: ({ name }) => Effect.flatMap(Effect.service(Projects), (projects) => projects.setName(name)),
   /** Keeps which map is open in the project, so the next launch opens it again. */
@@ -60,6 +64,9 @@ export const projectHandlers = {
   renameMap: ({ from, to, text }) => Effect.flatMap(Effect.service(MapFiles), (files) => files.rename(from, to, text)),
   writeSidecar: ({ fileName, text }) =>
     Effect.flatMap(Effect.service(MapFiles), (files) => files.writeSidecar(fileName, text)),
+  readMapThumbnail: ({ hash }) => Effect.flatMap(Effect.service(MapFiles), (files) => files.readThumbnail(hash)),
+  writeMapThumbnail: (thumbnail) =>
+    Effect.flatMap(Effect.service(MapFiles), (files) => files.writeThumbnail(thumbnail)),
   listPrefabs: ({ tier }) => Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.list(tier)),
   readPrefab: (ref) => Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.read(ref)),
   writePrefab: (payload) => Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.write(payload)),

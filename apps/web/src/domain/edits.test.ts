@@ -4,7 +4,6 @@ import {
   addItem,
   asNewDraft,
   copyItems,
-  duplicateItems,
   isNeverPublished,
   pasteItems,
   removeItems,
@@ -78,20 +77,6 @@ describe("edits", () => {
     assert.deepStrictEqual(next.items.map((i) => i.itemTransform.translation.x), [0, 10, 20])
     const bad = { ...at(30), translation: { x: Number.NaN, y: 0, z: 0 } }
     assert.isTrue(Option.isNone(setTransforms(map, [[1, at(10)], [2, bad]])))
-  })
-
-  it("duplicates items and their pivots", () => {
-    const map = withItems(5)
-    const next = duplicateItems(map, [3, 2])
-    assert.deepStrictEqual(next.items.map((i) => i.itemTransform.translation.x), [0, 1, 2, 3, 4, 3, 2])
-    // item 3 had a pivot: its copy (index 5) gets one too; item 2 had none
-    assert.deepStrictEqual(next.editorState!.pivots.map((p) => [p.itemIndex, p.pivot.localPosition.x]), [
-      [1, 1],
-      [3, 3],
-      [4, 4],
-      [5, 3]
-    ])
-    assert.strictEqual(duplicateItems(map, []), map)
   })
 
   it("sets material slots and keeps materialAssetPaths in step", () => {

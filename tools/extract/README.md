@@ -4,7 +4,7 @@ This pipeline reads the game's IoStore containers, resolves the level-editor pie
 
 - `assets/pieces/**.glb`: one file per StaticMesh (LOD0). The path mirrors the UE package path without `/Game/`, so `/Game/Maps/_GENERATED/PC/SM_500.SM_500` becomes `pieces/Maps/_GENERATED/PC/SM_500.glb`, and `/Engine/...` becomes `pieces/_Engine/...`.
 - `assets/catalog.json`: one entry per level-editor item class: the 237 the recipe registry references, plus `MP_PinballPaddle`, which a sample uses but 0.4.1 removed from the game. Together they cover all 107 classes seen in `samples/`. Every exported mesh is listed too, apart from the game's baked mirror meshes (see Mirrors below).
-- `assets/thumbs/*.png`: the content-browser icons, at most 256 px and about 3 MB. They are committable.
+- `assets/thumbs/*.png`: the content-browser icons, at most 256 px and about 3 MB. They are committable. The app renders its own thumbnails, and shows these only for lights and pieces it can't render (`apps/web/src/editor/thumbnails.ts`).
 - `assets/keybinds.json`: the default Enhanced Input bindings, with in-game labels, settings sections and camera presets.
 - `assets/strings.json`: the English locres strings.
 - `assets/registry.json`: the item class hierarchy, the in-game palette, and recipe-registry references (which pieces exist).

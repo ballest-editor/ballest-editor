@@ -14,7 +14,7 @@ export class WindowLaunchError extends Schema.TaggedError<WindowLaunchError>()("
 }
 
 /** A program to run and its arguments. */
-export interface LaunchCommand {
+interface LaunchCommand {
   readonly command: string
   readonly args: ReadonlyArray<string>
 }

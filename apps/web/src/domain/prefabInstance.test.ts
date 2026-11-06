@@ -10,7 +10,7 @@ import { newMapFile } from "./factory"
 import { applyGroupDelta, type GroupDelta } from "./groupTransform"
 import { itemOfPrefab } from "./prefab"
 import { PrefabFile } from "./PrefabFile"
-import { checkInstance, definitionOf, instancesIn, withUpdatedInstance } from "./prefabInstance"
+import { checkInstance, definitionOf, instancesIn, instancesOfPrefab, withUpdatedInstance } from "./prefabInstance"
 import {
   type Doc,
   findGroup,
@@ -232,6 +232,13 @@ describe("updating an instance", () => {
 })
 
 describe("finding instances", () => {
+  it("finds the instances of one definition, by its tier and name", () => {
+    const { tree } = placedDoc().structure
+    assert.deepStrictEqual(instancesOfPrefab(tree, { tier: "user", name: "Bridge" }).map(({ id }) => id), [GROUP])
+    assert.lengthOf(instancesOfPrefab(tree, { tier: "project", name: "Bridge" }), 0)
+    assert.lengthOf(instancesOfPrefab(tree, { tier: "user", name: "Arch" }), 0)
+  })
+
   it("looks inside other groups", () => {
     const doc = placedDoc()
     const nested = withGroup(doc.structure, [GROUP], "outer", "Outer")!

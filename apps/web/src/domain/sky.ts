@@ -16,8 +16,9 @@
  * Its clouds and star field are textures (not served yet); the renderer leaves the clouds out
  * and draws procedural stars.
  */
+import { linearToHex } from "./color"
 import type { Tuple3, Vec3 } from "./coords"
-import type { Sun } from "./sunlight"
+import { type Sun, sunOf } from "./sunlight"
 
 /** One curve key: time, value, arrive and leave tangents (UE `FRichCurveKey`, cubic, auto tangents). */
 type Key = readonly [time: number, value: number, arrive: number, leave: number]
@@ -178,6 +179,13 @@ export const skyRadiance = (sky: Sky, d: Vec3): Tuple3 => {
   const channel = (i: 0 | 1 | 2) => SKY_GAIN * (sky.zenith[i] + (sky.horizon[i] - sky.zenith[i]) * f)
   return [channel(0), channel(1), channel(2)]
 }
+
+/** Just above the stands, the lowest sky the arena shows and where most of its colour is. */
+const SWATCH_VIEW: Vec3 = { x: Math.sqrt(1 - ARENA_RIM ** 2), y: 0, z: ARENA_RIM }
+
+/** The sky at `timeOfDay` as one sRGB `#rrggbb`, for a swatch. The sky doesn't depend on the sun's brightness or yaw. */
+export const skyColorAt = (timeOfDay: number): string =>
+  linearToHex(skyRadiance(skyOf(sunOf({ timeOfDay, brightness: 0, angle: 0 }), timeOfDay), SWATCH_VIEW))
 
 /**
  * Light (as a luminance) reaching a surface facing `normal` from the sky above `rim` (the

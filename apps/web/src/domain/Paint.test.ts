@@ -10,11 +10,15 @@ import { lookupMaterial, NEUTRAL, parseMaterialsFile } from "./Materials"
 import {
   choiceOf,
   colorForFinish,
+  colorLabelOf,
   cssColor,
+  finishLabelOf,
+  materialLabelOf,
   offPanelSlotsOf,
   paintGroups,
   paintTargets,
   parsePaint,
+  shownFinishOf,
   swatchColor
 } from "./Paint"
 import { SURFACE_PROPERTY } from "./surface"
@@ -115,6 +119,16 @@ describe("paint", () => {
     assert.isUndefined(choiceOf(picker, undefined))
   })
 
+  it("names finishes, colours and off-picker materials as a person would", () => {
+    assert.strictEqual(finishLabelOf({ name: "smooth", colors: [] }), "Smooth")
+    assert.strictEqual(colorLabelOf({ color: "SkyBlue", material: "" }), "Sky Blue")
+    assert.strictEqual(
+      materialLabelOf("/Script/Engine.Material'/Game/Art/M_BaseSurface_Metal.M_BaseSurface_Metal'"),
+      "Base Surface Metal"
+    )
+    assert.strictEqual(materialLabelOf("/Game/Art/MI_Env_Dark.MI_Env_Dark"), "Env Dark")
+  })
+
   it("keeps the colour across finishes, and takes an unpainted slot for Grey", () => {
     const colors = (...names: ReadonlyArray<string>) => names.map((color) => ({ color, material: `/Game/${color}` }))
     const glossy = { name: "glossy", colors: colors("White", "Red") }
@@ -124,6 +138,15 @@ describe("paint", () => {
     assert.isUndefined(colorForFinish(special, red))
     assert.strictEqual(colorForFinish(special, undefined)?.color, "Grey")
     assert.isUndefined(colorForFinish(glossy, undefined))
+  })
+
+  it("shows the slot's finish, else the library's first", () => {
+    const color = { color: "Red", material: "/Game/Red" }
+    const smooth = { name: "smooth", colors: [color] }
+    const rough = { name: "rough", colors: [color] }
+    assert.strictEqual(shownFinishOf([smooth, rough], undefined), smooth)
+    assert.strictEqual(shownFinishOf([smooth, rough], { finish: rough, color }), rough)
+    assert.isUndefined(shownFinishOf([], undefined))
   })
 
   it("colours swatches like the renderer, unless the game gives a colour", () => {

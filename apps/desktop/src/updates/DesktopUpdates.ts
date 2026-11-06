@@ -1,5 +1,5 @@
 import { PushChannels, UpdateState } from "@ballest/contracts"
-import { Config, Context, Effect, Layer, Option, Ref, Schema, type Scope, Semaphore } from "effect"
+import { Config, Context, DateTime, Effect, Layer, Option, Ref, Schema, type Scope, Semaphore } from "effect"
 import { DesktopEnvironment } from "../app/DesktopEnvironment"
 import { ElectronUpdater } from "../electron/ElectronUpdater"
 import { ElectronWindow } from "../electron/ElectronWindow"
@@ -81,10 +81,11 @@ export class DesktopUpdates extends Context.Service<DesktopUpdates, {
         )
         const state = yield* Ref.get(ref)
         if (state.status !== "checking") return
+        const checkedAt = DateTime.formatIso(yield* DateTime.now)
         yield* Option.match(found, {
-          onNone: () => update(Machine.onUpToDate),
+          onNone: () => update((current) => Machine.onUpToDate(current, checkedAt)),
           onSome: (info) =>
-            update((current) => Machine.onAvailable(current, Machine.releaseOf(info))).pipe(
+            update((current) => Machine.onAvailable(current, Machine.releaseOf(info), checkedAt)).pipe(
               Effect.tap(() => Effect.logInfo(`Update ${info.version} available`))
             )
         })

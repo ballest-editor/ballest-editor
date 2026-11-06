@@ -101,8 +101,8 @@ export class Prefabs extends Context.Service<Prefabs, {
         )
       }
       stamps.set(file, read)
-      const { firstClass, hash, itemCount } = read
-      return { tier, name, path: file, modifiedAt, hash, itemCount, firstClass } satisfies PrefabInfo
+      const { hash, itemCount } = read
+      return { tier, name, path: file, modifiedAt, hash, itemCount } satisfies PrefabInfo
     })
 
     const folderOf = Effect.fnUntraced(function*(tier: PrefabTier) {

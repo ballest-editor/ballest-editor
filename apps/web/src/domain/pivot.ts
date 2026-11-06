@@ -14,7 +14,7 @@ import { type Bounds, type CatalogIndex, type CatalogPiece, visibleExtras } from
 import type { UeTransform, Vec3 } from "./coords"
 import type { Item, ItemPivot, MapFile } from "./MapFile"
 import { mirrorScaleOf } from "./mirror"
-import { rotateVec } from "./ueMath"
+import { ORIGIN, rotateVec } from "./ueMath"
 
 /** In the order the game's inspector lays them out. */
 export const PIVOT_CHOICES = ["Default", "Center", "Bottom", "Top", "Left", "Right", "Back", "Front"] as const
@@ -26,7 +26,6 @@ export interface Pivot {
   readonly localPosition: Vec3
 }
 
-const ORIGIN: Vec3 = { x: 0, y: 0, z: 0 }
 export const DEFAULT_PIVOT: Pivot = { choice: "Default", localPosition: ORIGIN }
 
 /** The point `choice` names on local `bounds` (cm, unscaled). */

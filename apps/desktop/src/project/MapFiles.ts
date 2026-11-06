@@ -8,18 +8,29 @@ import {
   type MapBackupFile,
   type MapBackups,
   type MapLink,
+  type MapThumbnailPng,
   type OpenedMapFile,
   type ProjectMap,
   type ProjectMapFile,
   type ProjectMaps,
-  sidecarFileNameOf
+  sidecarFileNameOf,
+  type WriteMapThumbnailPayload
 } from "@ballest/contracts"
 import { Context, DateTime, Effect, FileSystem, Option, Path, Schema } from "effect"
+import { Buffer } from "node:buffer"
 import { GamePaths } from "../game/GamePaths"
 import { type Backup, type BackupError, Backups, parseBackupId } from "./Backups"
 import { isSamePath, MAX_MAP_BYTES, sha256, writeAtomic } from "./files"
 import { emptyLink, type MapLinkError, MapLinks } from "./MapLinks"
-import { backupsFolderIn, mapsFolderIn, type ProjectError, projectError, Projects, readError } from "./Projects"
+import {
+  backupsFolderIn,
+  mapsFolderIn,
+  type ProjectError,
+  projectError,
+  Projects,
+  readError,
+  thumbnailsFolderIn
+} from "./Projects"
 
 /** Only the field Export looks at in a map file; everything else is ignored. */
 export const PublishedId = Schema.fromJsonString(Schema.Struct({
@@ -32,6 +43,11 @@ const publishedIdOf = (text: string): number =>
     Option.map((map) => map.worldSettings.levelData.levelPublishedFileId),
     Option.getOrElse(() => -1)
   )
+
+const PNG_DATA_URL = "data:image/png;base64,"
+
+/** A thumbnail's file: the hash of the map's bytes it shows. Nothing else in the folder is ours to remove. */
+const THUMBNAIL_FILE = /^[0-9a-f]{64}\.png$/
 
 /** What `listMaps` reports of a map's bytes. */
 interface MapContents {
@@ -59,6 +75,10 @@ export class MapFiles extends Context.Service<MapFiles, {
   readonly rename: (from: string, to: string, text: string) => MapFilesEffect<ProjectMap>
   /** Writes over a map's sidecar (or writes it); the old one goes to the project's backups. */
   readonly writeSidecar: (fileName: string, text: string) => MapFilesEffect<void>
+  /** The thumbnail kept for the map file with this hash; null when there is none, or no project. */
+  readonly readThumbnail: (hash: string) => Effect.Effect<MapThumbnailPng | null>
+  /** Keeps a thumbnail, unless no map has that hash any more, and drops those no map has. */
+  readonly writeThumbnail: (thumbnail: WriteMapThumbnailPayload) => Effect.Effect<void, ProjectError>
   /** The text of a map's sidecar in `project`; null when it has none, or that can't be read (it is logged). */
   readonly sidecarOf: (project: string, fileName: string) => Effect.Effect<string | null, ProjectError>
   /** Reads a file the user picked in the Import dialog; it may be imported from now on. */
@@ -231,6 +251,30 @@ export class MapFiles extends Context.Service<MapFiles, {
       yield* backupStore.overwrite(backupsFolderIn(path, project), yield* sidecarFileIn(project, fileName), text)
     })
 
+    const thumbnailFileIn = (project: string, hash: string) =>
+      path.join(thumbnailsFolderIn(path, project), `${hash}.png`)
+
+    const readThumbnail = Effect.fn("MapFiles.readThumbnail")(function*(hash: string) {
+      const project = Option.getOrNull(yield* projects.current)
+      if (project === null) return null
+      const bytes = yield* Effect.option(fs.readFile(thumbnailFileIn(project, hash)))
+      return Option.isNone(bytes) ? null : `${PNG_DATA_URL}${Buffer.from(bytes.value).toString("base64")}`
+    })
+
+    const writeThumbnail = Effect.fn("MapFiles.writeThumbnail")(function*({ hash, png }: WriteMapThumbnailPayload) {
+      const project = yield* projects.inUse
+      const dir = thumbnailsFolderIn(path, project)
+      const hashes = new Set((yield* list).map((map) => map.hash))
+      // a render outlasts a save: the map may have been saved again, or left this project, by the time it is done
+      if (hashes.has(hash)) {
+        yield* fs.makeDirectory(dir, { recursive: true }).pipe(Effect.mapError(projectError("write", dir)))
+        yield* write(thumbnailFileIn(project, hash), Buffer.from(png.slice(PNG_DATA_URL.length), "base64"))
+      }
+      const names = yield* fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => []))
+      const stale = names.filter((name) => THUMBNAIL_FILE.test(name) && !hashes.has(name.slice(0, -".png".length)))
+      yield* Effect.forEach(stale, (name) => Effect.ignore(fs.remove(path.join(dir, name), { force: true })))
+    })
+
     const pick = Effect.fn("MapFiles.pick")(function*(raw: string) {
       const file = path.resolve(raw)
       if (!MAP_EXTENSIONS.some((ext) => file.toLowerCase().endsWith(ext))) {
@@ -330,6 +374,8 @@ export class MapFiles extends Context.Service<MapFiles, {
       save,
       rename,
       writeSidecar,
+      readThumbnail,
+      writeThumbnail,
       sidecarOf,
       pick,
       importMap,

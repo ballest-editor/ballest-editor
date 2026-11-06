@@ -23,6 +23,7 @@ The link between a map and its export is specific to this machine and is never s
   .ballest/
     link.json                  per map: origin, last export (path, hash, time), last seen game hash
     backups/                   previous versions of overwritten files (#137)
+    thumbnails/                the Project panel's renders of the maps, by file hash
   .gitignore                   .ballest/
 ```
 
@@ -80,6 +81,7 @@ The code is in `apps/desktop/src/project/`. Main reads and writes only these, th
   - An export found gone sets both to null, and `origin` stays.
 
   The `MapLinks` service owns the file: one update at a time, atomic writes, and a file that doesn't decode reads as empty.
+- **`.ballest/thumbnails/<SHA-256 of the map's file>.png`** is the map's tile in the Project panel, 64px square, rendered by the page after a Save ([DESKTOP.md § Project panel](DESKTOP.md#project-panel)). Main refuses one for bytes no map has any more, which a slow render can be by the time it is done, and each write drops the ones no map has. It's a cache: deleting the folder costs only the tiles until each map's next Save.
 - **`.ballest/backups/<time> <file name>`** holds the project's copy of a map, sidecar or prefab before anything wrote over it, and the old file after a Rename. The game's copy before an export wrote over it goes to `<userData>/backups/` instead, since it belongs to this machine and not to the project. [DESKTOP.md § Backups](DESKTOP.md#backups) has the rules.
 
 `desktop-settings.json` keeps the recent projects under `project.recent`, at most 8, the last one used first. An empty list means Untitled Project. A window has one project, kept in memory, so another running copy changing the list doesn't move it. A project opens in one window at a time. [DESKTOP.md § Other windows](DESKTOP.md#other-windows) has where a window starts and how windows know about each other.
@@ -105,10 +107,10 @@ The behaviour is in [DESKTOP.md § Renderer](DESKTOP.md#renderer). These are the
 - Save writes the map in the project, so the location needs no dialog and Save as is gone. Rename and Duplicate cover what it did.
 - Open on an arbitrary file became Import, which copies it into the project. Nothing is edited in place outside a project. Importing from the game's maps folder links the map from the start, so Export knows where it goes and sync detection works.
 - Export to game replaced Save to game. Export on save exists for people who alternate quickly between the editor and the in-game editor.
-- The Save map dialog keeps the read-only "Exports as `Map_LevelEditorMain&<name>_<creator>.balledit`" line, so the game's naming stays visible.
+- The Save, Rename and Duplicate dialogs ask only the map's name. The game's file name and the creator aren't the user's question there: the creator lives in Settings › General, and the rule on names shows only once a name breaks it.
 - New map always adds a tab and asks nothing, as a new document does in any desktop app. A name up front had a cost: in an untitled window the second New map named the first map instead of adding one to flip through. So a map is named on its first Save.
-- The first Save in an untitled window makes the project, in one dialog with the map's name, the project's name and its folder. A project is only needed once something is written, and with one dialog Cancel leaves nothing on disk. The other tabs keep their own first Saves, because naming a map is that map's question.
-- Where a project opens is always asked, even in an untitled window with only a blank map. Skipping the question there turned that window into the project when the user meant to open a second window, and the app can't tell the two apart. Always do this is the way to stop being asked. The required chooser doesn't ask, because its window has nothing else to be.
+- The first Save in an untitled window makes the project, in one dialog with the map's name and the project's name, its folder shown by name with Change…. A project is only needed once something is written, and with one dialog Cancel leaves nothing on disk. The other tabs keep their own first Saves, because naming a map is that map's question.
+- A project opens in this window, and where it opens is asked only while this window has unsaved changes. Asking every time put a question in front of every switch, for an answer that is nearly always the same. A second window is a deliberate act instead: Shift+click on a recent project, or Open in new window on its start screen row. Always do this stops the question for good. The required chooser doesn't ask, because its window has nothing else to be.
 - Leaving an untitled window never prompts about unsaved changes, because nothing is lost: its maps go with it ([DESKTOP.md § Window](DESKTOP.md#window)).
 
 Later, the Project panel lists the maps in `UserSavedMaps` that aren't in the project yet, with an Import button each (#103's first slice).
@@ -133,25 +135,24 @@ Later:
 │               │                                              │                 │
 │               │               viewport                       │                 │
 ├───────────────┴──────────────────────────────────────────────┴─────────────────┤
-│               Changed in game · Exported 4 min ago              update  bell 3 │
+│               Changed since export · exported 4 min ago         update  bell 3 │
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Everything between the top bar and the status bar is the dock ([DESKTOP.md § Dock](DESKTOP.md#dock)): the panels can be moved around the map tabs and the viewport, stacked, split, collapsed, closed from View, or popped out into windows of their own.
+Everything between the top bar and the status bar is the dock ([DESKTOP.md § Dock](DESKTOP.md#dock)).
 
 The wireframes in [mockups/](mockups/) are rough. Use [mockups/welcome.html](mockups/welcome.html) for the Welcome window and Project settings below. Its Project home tab and its Map and Game menus were dropped, and so were the Start page and Start tab in `start-page.html` and `start-tab.html`.
 
 The rest of the design is still to come:
 
-- **Welcome window** ([mockups/welcome.html](mockups/welcome.html) § 1). The app's level: recent projects with a thumbnail each, New project, Open…. It shows from the second launch on and when the last project window closes. The required chooser ([DESKTOP.md § Other windows](DESKTOP.md#other-windows)) has its list and its buttons, but only a window that can't start on a project of its own shows it. **This window / New window** ([mockups/welcome.html](mockups/welcome.html) § 2) is built.
+- **Welcome window** ([mockups/welcome.html](mockups/welcome.html) § 1). The app's level: recent projects with a thumbnail each, New project, Open…. It shows from the second launch on and when the last project window closes. The required chooser ([DESKTOP.md § Other windows](DESKTOP.md#other-windows)) is that screen without the thumbnails, but only a window that can't start on a project of its own shows it. **This window / New window** ([mockups/welcome.html](mockups/welcome.html) § 2) is built.
 - **Close project** and **Save project…** in the File menu. Close project needs the Welcome window to go back to.
 - **Project settings** ([mockups/welcome.html](mockups/welcome.html) § 5), IntelliJ's Project Structure shape, gains a creator, a choice of export target, and git.
-- **Thumbnails.** An offscreen render of the map, written next to it on save, used by the Project panel and Welcome.
 - **The Project panel** gains folders, sub-assemblies and the rest of what a project can hold, beyond its flat list of maps.
 
 ## Phases
 
-The order settles where files live before anyone installs a release, because moving users' maps later is the one migration worth avoiding. Thumbnails, git, multi-map and diffs can follow at any time without touching saved projects.
+The order settles where files live before anyone installs a release, because moving users' maps later is the one migration worth avoiding. Git, multi-map and diffs can follow at any time without touching saved projects.
 
 | Phase | Milestone | State | Scope                                                                                                                                                                                                                       |
 | ----- | --------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -160,7 +161,7 @@ The order settles where files live before anyone installs a release, because mov
 | 3     | 0.2       | Built | Sync. Change detection on launch, focus and after Play; the Export confirm; Re-import; link states in the status bar and the Project panel.                                                                                 |
 | 4     | 0.3       | Open  | Public launch. No new flow work.                                                                                                                                                                                            |
 | 5     | 0.4       | Open  | Editor-only data. The sidecar (#112) with stable keys and re-matching on Re-import; hide, lock, layers (#81, #111); Map settings (#142).                                                                                    |
-| 6     | 0.5       | Open  | Projects proper. Thumbnails in the Project panel and Welcome; the maps folder and Workshop browser (#103); the rest of #143; git history and diff (#105); multi-map with shared bases (#104).                               |
+| 6     | 0.5       | Open  | Projects proper. Thumbnails in Welcome; the maps folder and Workshop browser (#103); the rest of #143; git history and diff (#105); multi-map with shared bases (#104).                                                     |
 | 7     | later     | Open  | Derived data. Generators, derived pieces and splines make the sidecar authoritative for the pieces they own; detached pieces.                                                                                               |
 
-What stays out of the public launch on purpose: a separate project-manager window in the Godot style, git, thumbnails in the Project panel, the Workshop browser, multi-map, and any merge. Phases 1 to 3 are small on disk (a folder, one JSON file, a hash) and large in how the app reads; that is the trade.
+What stays out of the public launch on purpose: a separate project-manager window in the Godot style, git, the Workshop browser, multi-map, and any merge. Phases 1 to 3 are small on disk (a folder, one JSON file, a hash) and large in how the app reads; that is the trade.

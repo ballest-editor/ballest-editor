@@ -50,6 +50,12 @@ export const placedBoxOf = (placed: ReadonlyArray<PlacedItem>, catalog: CatalogI
 export const itemsBoxOf = (items: ReadonlyArray<Item>, catalog: CatalogIndex | null): Box | undefined =>
   placedBoxOf(items.map((item) => ({ item, transform: editTransform(item) })), catalog)
 
+/** A box's size in metres, the way a group's card gives it: "12.4 × 3.1 × 2.0 m". */
+export const formatBoxSize = ({ max, min }: Box): string => {
+  const metres = (from: number, to: number) => ((to - from) / 100).toFixed(1)
+  return `${metres(min.x, max.x)} × ${metres(min.y, max.y)} × ${metres(min.z, max.z)} m`
+}
+
 export const boxCentreOf = ({ max, min }: Box): Vec3 => ({
   x: (min.x + max.x) / 2,
   y: (min.y + max.y) / 2,

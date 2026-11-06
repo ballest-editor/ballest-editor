@@ -2,7 +2,6 @@ import { assert, describe, it } from "@effect/vitest"
 import { Option } from "effect"
 import { creatorOf } from "./creator"
 import {
-  allFound,
   anythingMissing,
   GAME_FOUND,
   GAME_NOT_FOUND,
@@ -13,6 +12,7 @@ import {
   gameLinkRows,
   MUTABLE_KINDS,
   overriddenFolders,
+  pathCrumbs,
   playWithoutPluginNotice,
   PLUGIN_MANAGER_FOUND,
   PLUGIN_MANAGER_MISSING,
@@ -50,11 +50,12 @@ const byId = (rows: ReadonlyArray<GameLinkRow>) => {
 }
 
 describe("Game link checklist", () => {
-  it("finds everything: each row has its path, Reveal and Change…, and the summary names the creator", () => {
+  it("finds everything: each row has its path, Reveal and Choose folder…, and the creator's row names them", () => {
     const rows = gameLinkRows(everything, plugin("current", "0.2.0"), isaac)
-    assert.isTrue(allFound(rows))
-    assert.deepStrictEqual(rows.map((row) => row.short), ["game", "maps", "creator Isaac", "plugin manager", "plugin"])
-    const { install, mapsFolder, pluginManager, plugin: editorPlugin } = byId(rows)
+    assert.isTrue(rows.every((row) => row.state === "ok"))
+    assert.deepStrictEqual(rows.map((row) => row.id), ["install", "mapsFolder", "creator", "pluginManager", "plugin"])
+    const { creator, install, mapsFolder, pluginManager, plugin: editorPlugin } = byId(rows)
+    assert.strictEqual(creator.title, "Isaac")
     assert.deepInclude(install, {
       note: "Found through Steam.",
       path: "/game",
@@ -72,14 +73,14 @@ describe("Game link checklist", () => {
       reveal: "pluginsFolder",
       fixes: [{ _tag: "ChooseFolder", which: "pluginsFolder" }]
     })
-    assert.deepInclude(editorPlugin, { title: "ballest-editor-link 0.2.0", fixes: [] })
+    assert.deepInclude(editorPlugin, { title: "ballest-editor-link 0.2.0", status: "Version 0.2.0", fixes: [] })
+    assert.deepStrictEqual([install.status, mapsFolder.status, pluginManager.status], ["Found", "Found", "Found"])
     assert.deepStrictEqual(overriddenFolders(everything), [])
   })
 
   it("is looking until the lookups are in", () => {
     const rows = gameLinkRows(null, null, isaac)
     assert.deepStrictEqual(rows.map((row) => row.state), ["waiting", "waiting", "ok", "waiting", "waiting"])
-    assert.isFalse(allFound(rows))
   })
 
   it("without the game offers Choose folder…, and the rows that depend on it wait", () => {
@@ -94,11 +95,22 @@ describe("Game link checklist", () => {
     assert.deepInclude(install, {
       state: "missing",
       title: "Couldn't find Ballest of Them All",
+      status: "Not found",
       fixes: [{ _tag: "ChooseFolder", which: "install" }]
     })
     assert.deepInclude(mapsFolder, { state: "waiting", fixes: [] })
-    assert.deepInclude(pluginManager, { state: "waiting", fixes: [] })
+    assert.deepInclude(pluginManager, { state: "waiting", reset: null, fixes: [] })
     assert.deepInclude(editorPlugin, { state: "waiting", fixes: [] })
+  })
+
+  it("without the game can still reset a plugins folder chosen here", () => {
+    const paths: GameFolders = {
+      install: { status: "missing", path: null },
+      mapsFolder: { status: "missing", path: null },
+      pluginsFolder: { status: "overridden", path: PLUGINS }
+    }
+    const { pluginManager } = byId(gameLinkRows(paths, plugin("noGame"), isaac))
+    assert.deepInclude(pluginManager, { state: "waiting", reset: "pluginsFolder" })
   })
 
   it("with the game but no maps folder yet says to run the game once", () => {
@@ -106,6 +118,7 @@ describe("Game link checklist", () => {
     assert.deepInclude(byId(gameLinkRows(paths, plugin("current", "0.2.0"), isaac)).mapsFolder, {
       state: "missing",
       title: "Run the game once to create its maps folder",
+      status: "Run the game once to create its maps folder",
       reveal: null,
       fixes: [{ _tag: "ChooseFolder", which: "mapsFolder" }]
     })
@@ -140,7 +153,6 @@ describe("Game link checklist", () => {
       fixes: [{ _tag: "OpenPluginDocs" }, { _tag: "ChooseFolder", which: "pluginsFolder" }]
     })
     assert.isFalse(anythingMissing(gameLinkRows(paths, plugin("noPluginManager"), isaac)))
-    assert.isFalse(allFound(gameLinkRows(paths, plugin("noPluginManager"), isaac)))
     assert.deepInclude(editorPlugin, { state: "waiting", fixes: [] })
   })
 
@@ -154,17 +166,46 @@ describe("Game link checklist", () => {
     })
   })
 
-  it("offers Install for a missing plugin and Update for an older one", () => {
+  it("offers Install with the version it installs for a missing plugin, and Update for an older one", () => {
     assert.deepInclude(byId(gameLinkRows(everything, plugin("missing"), isaac)).plugin, {
       state: "missing",
       title: "Not installed",
-      fixes: [{ _tag: "InstallPlugin", update: false }]
+      fixes: [{ _tag: "InstallPlugin", label: "Install 0.2.0" }]
     })
     assert.deepInclude(byId(gameLinkRows(everything, plugin("outdated", "0.1.0"), isaac)).plugin, {
       state: "missing",
       title: "Version 0.1.0 is installed",
-      fixes: [{ _tag: "InstallPlugin", update: true }]
+      fixes: [{ _tag: "InstallPlugin", label: "Update" }]
     })
+  })
+
+  it("writes a folder's path as a breadcrumb, from Steam when it is in a library", () => {
+    const prefix = "steamapps/compatdata/3339810/pfx/drive_c/users/steamuser/AppData/Local/Ballest/Saved"
+    assert.deepStrictEqual(pathCrumbs(`/home/player/.local/share/Steam/${prefix}/UserSavedMaps`), [
+      "Steam",
+      "compatdata",
+      "…",
+      "UserSavedMaps"
+    ])
+    assert.deepStrictEqual(pathCrumbs(`/mnt/games/SteamLibrary/${prefix}/UserSavedMaps`), [
+      "Steam",
+      "compatdata",
+      "…",
+      "UserSavedMaps"
+    ])
+    assert.deepStrictEqual(pathCrumbs("D:\\SteamLibrary\\steamapps\\common\\Ballest of Them All"), [
+      "Steam",
+      "common",
+      "Ballest of Them All"
+    ])
+    assert.deepStrictEqual(pathCrumbs("C:\\Users\\player\\AppData\\Local\\Ballest\\Saved\\UserSavedMaps"), [
+      "C:",
+      "Users",
+      "…",
+      "UserSavedMaps"
+    ])
+    assert.deepStrictEqual(pathCrumbs("/mnt/games/plugins"), ["mnt", "games", "plugins"])
+    assert.deepStrictEqual(pathCrumbs("/"), ["/"])
   })
 
   it("shows the creator in use and where it is from, and a name that can't be used", () => {

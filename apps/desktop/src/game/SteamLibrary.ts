@@ -14,7 +14,7 @@ import * as probe from "./probe"
 import { installDirOf, libraryFoldersOf } from "./vdf"
 
 /** Where Steam has the game: the library it is in and its install folder. */
-export interface SteamGame {
+interface SteamGame {
   readonly library: string
   readonly install: string
 }

@@ -4,7 +4,6 @@ import { ColorPicker, ColorSwatch } from "@workspace/ui/components/color-picker"
 import { Label } from "@workspace/ui/components/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
-import { Separator } from "@workspace/ui/components/separator"
 import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
 import { Option } from "effect"
@@ -23,11 +22,12 @@ import {
   sliderStep
 } from "../domain/itemProperties"
 import { setSelectionProperties } from "../editor/actions"
+import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import { NumberField } from "./NumberField"
-import { SectionTitle } from "./SectionTitle"
+import { Section, SectionTitle } from "./SectionTitle"
 
 /** The value every selected item shares, or undefined when they differ (mixed). */
-const sharedValue = (values: ReadonlyArray<unknown>): unknown => {
+export function sharedValue<T>(values: ReadonlyArray<T>): T | undefined {
   const first = values[0]
   return values.every((v) => v === first) ? first : undefined
 }
@@ -95,7 +95,7 @@ function PropertyValue({ property, id, handleClassName }: {
       return (
         <div className="flex h-7 items-center gap-2">
           <Switch id={id} checked={value === true} onCheckedChange={(checked) => set(checked)} />
-          {value === undefined && <span className="text-xs text-muted-foreground">Mixed</span>}
+          {value === undefined && <span className="text-body text-fg-tertiary">Mixed</span>}
         </div>
       )
     case "intProperties":
@@ -115,7 +115,7 @@ function PropertyValue({ property, id, handleClassName }: {
           onScrubCommit={commit}
           step={integer ? 1 : scrubStep(reference)}
           digits={integer ? 0 : range === undefined ? 3 : displayDigits(range)}
-          {...(handleClassName === undefined ? {} : { handleClassName })}
+          handleClassName={handleClassName}
         />
       )
       if (range === undefined) return field
@@ -145,11 +145,12 @@ function PropertyValue({ property, id, handleClassName }: {
     }
     default:
       // No sample or class has text/name/string properties, so their value shape is unknown: shown, not edited.
-      return <div className="truncate font-mono text-xs text-muted-foreground">{formatValue(value)}</div>
+      return <div className="truncate text-body text-fg-tertiary">{formatValue(value)}</div>
   }
 }
 
-const CHANNEL_HANDLES = ["bg-red-500", "bg-green-500", "bg-blue-500"] as const
+/** Red, green and blue, in the axes' colours. */
+const CHANNEL_HANDLES = [AXIS_BG_CLASSES.x, AXIS_BG_CLASSES.y, AXIS_BG_CLASSES.z] as const
 
 const channelValues = (color: ColorProperty, pick: (channel: ItemProperty) => unknown): Rgb => {
   const [r, g, b] = color.channels.map((channel) => {
@@ -178,8 +179,8 @@ function ColorValue({ color, id }: { readonly color: ColorProperty; readonly id:
         id={id}
         title={mixed ? "Mixed" : hex}
         aria-label={mixed ? `${color.label}: mixed` : `${color.label}: ${hex}`}
-        className="flex h-7 w-full min-w-0 cursor-pointer items-center justify-center overflow-hidden rounded-md text-xs text-muted-foreground transition-shadow hover:ring-foreground/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        render={<ColorSwatch color={mixed ? null : hex} className="rounded-md" />}
+        className="flex h-7 w-full min-w-0 cursor-pointer items-center justify-center overflow-hidden rounded-control text-body text-fg-tertiary transition-shadow focus-ring hover:ring-foreground/40"
+        render={<ColorSwatch color={mixed ? null : hex} className="rounded-control" />}
       >
         {mixed && "Mixed"}
       </PopoverTrigger>
@@ -188,12 +189,12 @@ function ColorValue({ color, id }: { readonly color: ColorProperty; readonly id:
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1">
           {color.channels.map((channel, i) => (
             <div key={channel.name} className="contents">
-              <span title={channel.name} className="text-muted-foreground">{"RGB"[i]}</span>
+              <span title={channel.name} className="text-fg-secondary">{"RGB"[i]}</span>
               <PropertyValue property={channel} handleClassName={CHANNEL_HANDLES[i]} />
             </div>
           ))}
         </div>
-        <p className="text-muted-foreground">
+        <p className="text-fg-tertiary">
           Linear values, as the map file stores them.
           {linear.some((c) => c > 1) && " Above 1 is brighter than the swatch shows."}
         </p>
@@ -218,7 +219,7 @@ function Row(props: {
       <Label
         htmlFor={id}
         title={props.details.join("\n")}
-        className="min-w-0 text-xs leading-tight break-words text-muted-foreground"
+        className="min-w-0 text-body break-words text-fg-secondary"
       >
         {props.label}
       </Label>
@@ -291,8 +292,7 @@ function PropertyRowView({ row }: { readonly row: PropertyRow }) {
 export function ItemProperties({ properties }: { readonly properties: ReadonlyArray<ItemProperty> }) {
   if (properties.length === 0) return null
   return (
-    <>
-      <Separator />
+    <Section>
       <SectionTitle>Properties</SectionTitle>
       <div className="grid @container grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_1.5rem] items-center gap-x-2 gap-y-1">
         {propertyRows(properties).map((row) => {
@@ -300,6 +300,6 @@ export function ItemProperties({ properties }: { readonly properties: ReadonlyAr
           return <PropertyRowView key={`${first.list}/${first.name}`} row={row} />
         })}
       </div>
-    </>
+    </Section>
   )
 }

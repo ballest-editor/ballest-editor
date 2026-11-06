@@ -1,15 +1,15 @@
 import { IconDots } from "@tabler/icons-react"
-import { Button } from "@workspace/ui/components/button"
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from "@workspace/ui/components/dropdown-menu"
 import type { DockviewGroupPanel, IDockviewPanel } from "dockview-react"
-import type { ComponentProps } from "react"
 import { DOCUMENTS_PANEL } from "../../domain/dockLayout"
 import {
   canCollapseGroup,
@@ -17,48 +17,23 @@ import {
   expandGroup,
   popOutPanel,
   resetDockLayout,
-  useGroupFold,
-  usePanelCheck,
-  useViewMenuPanels
+  togglePanel,
+  useClosedPanels,
+  useGroupFold
 } from "./dockControl"
-
-/** An icon button in a group's strip, named by its tooltip. */
-export function StripButton({ label, ...props }: { readonly label: string } & ComponentProps<typeof Button>) {
-  return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      className="size-6 text-muted-foreground"
-      aria-label={label}
-      title={label}
-      {...props}
-    />
-  )
-}
-
-function PanelItem({ id, title }: { readonly id: string; readonly title: string }) {
-  return <DropdownMenuCheckboxItem {...usePanelCheck(id)}>{title}</DropdownMenuCheckboxItem>
-}
+import { StripButton } from "./StripButton"
 
 interface GroupMenuProps {
   readonly group: DockviewGroupPanel
   readonly activePanel: IDockviewPanel | undefined
 }
 
-/** Mounted only while the menu is open, so what it reads of the dock is current. */
-function GroupMenuItems({ group, activePanel }: GroupMenuProps) {
-  const panels = useViewMenuPanels()
+/** What can be done with the panel in front and its group. The centre group's panel has none of it. */
+function PanelActions({ group, panel }: { readonly group: DockviewGroupPanel; readonly panel: IDockviewPanel }) {
   const folded = useGroupFold(group) !== undefined
   return (
     <>
-      {panels.map(({ id, title }) => <PanelItem key={id} id={id} title={title} />)}
-      <DropdownMenuSeparator />
-      <DropdownMenuItem
-        disabled={activePanel === undefined || activePanel.id === DOCUMENTS_PANEL}
-        onClick={() => activePanel !== undefined && popOutPanel(activePanel)}
-      >
-        Pop out
-      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => popOutPanel(panel)}>Pop out</DropdownMenuItem>
       {folded
         ? <DropdownMenuItem onClick={() => expandGroup(group)}>Expand</DropdownMenuItem>
         : (
@@ -66,17 +41,41 @@ function GroupMenuItems({ group, activePanel }: GroupMenuProps) {
             Collapse
           </DropdownMenuItem>
         )}
+      <DropdownMenuItem onClick={() => panel.api.close()}>Close panel</DropdownMenuItem>
+      <DropdownMenuSeparator />
+    </>
+  )
+}
+
+/** Mounted only while the menu is open, so what it reads of the dock is current. */
+function GroupMenuItems({ group, activePanel }: GroupMenuProps) {
+  const closed = useClosedPanels()
+  return (
+    <>
+      {activePanel !== undefined && activePanel.id !== DOCUMENTS_PANEL && (
+        <PanelActions group={group} panel={activePanel} />
+      )}
+      {closed.length > 0 && (
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>Panels</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {closed.map(({ id, title }) => (
+              <DropdownMenuItem key={id} onClick={() => togglePanel(id)}>{title}</DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      )}
       <DropdownMenuItem onClick={resetDockLayout}>Reset layout</DropdownMenuItem>
     </>
   )
 }
 
-/** The "…" at the end of a group's tab strip: which panels are open, what to do with this group, and Reset layout. */
+/** The "…" at the end of a group's tab strip: what to do with this view, the panels that are closed, and Reset layout. */
 export function GroupMenu({ group, activePanel }: GroupMenuProps) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<StripButton label="Panels and layout" />}>
-        <IconDots className="size-3.5" />
+      <DropdownMenuTrigger render={<StripButton label="Panel actions" />}>
+        <IconDots />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-max min-w-40" finalFocus={(closeType) => closeType === "keyboard"}>
         <GroupMenuItems group={group} activePanel={activePanel} />

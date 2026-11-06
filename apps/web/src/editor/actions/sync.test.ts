@@ -64,7 +64,7 @@ describe("sync", () => {
       assert.isFalse(s().dirty)
       assert.strictEqual(stateNow(), "inSync")
       assert.deepInclude(disk.backups[0], { place: "project", fileName: name, text })
-      assert.strictEqual(s().notifications[0]?.kind, "mapReimported")
+      assert.strictEqual(s().toasts[0]?.kind, "mapReimported")
       yield* checkExportsEffect
       assert.lengthOf(reported(), 1)
     }).pipe(Effect.provide(layerFor(disk)))
@@ -122,7 +122,7 @@ describe("sync", () => {
       yield* untilTrue(() => disk.playSessions.listeners.size > 0)
       disk.files.set(inGame, savedInGame(text, 8))
       const before = disk.exportChecks
-      disk.playSessions.push({ fileName: name, endedAt: "2026-10-31T12:00:00.000Z" })
+      disk.playSessions.push({ fileName: name })
       yield* untilTrue(() => reported().length > 0)
       assert.strictEqual(disk.exportChecks, before + 1)
       assert.strictEqual(stateNow(), "changedInGame")

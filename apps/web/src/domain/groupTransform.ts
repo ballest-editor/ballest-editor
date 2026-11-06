@@ -7,7 +7,17 @@
  */
 import type { Quat4, UeTransform, Vec3 } from "./coords"
 import { localToWorld } from "./pivot"
-import { quatConjugate, quatMul, quatNormalize, quatToRotator, rotateVec, rotatorToQuat } from "./ueMath"
+import {
+  ORIGIN,
+  quatConjugate,
+  quatMul,
+  quatNormalize,
+  quatToRotator,
+  rotateVec,
+  rotatorToQuat,
+  vecAdd,
+  vecSub
+} from "./ueMath"
 
 /** What a gizmo drag does, independent of how many items it applies to. */
 export type GroupDelta =
@@ -22,18 +32,13 @@ const MIN_SCALE = 1e-3
 /** Keeps the sign (mirroring is allowed in-game) but never reaches zero. */
 export const clampScale = (v: number): number => (Math.abs(v) < MIN_SCALE ? (v < 0 ? -MIN_SCALE : MIN_SCALE) : v)
 
-const add = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z })
-const sub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z })
-
-const ORIGIN: Vec3 = { x: 0, y: 0, z: 0 }
-
 /**
  * `after`, moved so the item's local point `local` (unscaled cm) is where it was in `before`:
  * how a turn or scale about an item's own pivot comes out.
  */
 export const keepPoint = <T extends UeTransform>(before: UeTransform, after: T, local: Vec3): T => ({
   ...after,
-  translation: add(after.translation, sub(localToWorld(before, local), localToWorld(after, local)))
+  translation: vecAdd(after.translation, vecSub(localToWorld(before, local), localToWorld(after, local)))
 })
 
 /**
@@ -48,11 +53,11 @@ export const applyGroupDelta = (
 ): UeTransform => {
   switch (delta.kind) {
     case "translate":
-      return { ...t, translation: add(t.translation, delta.offset) }
+      return { ...t, translation: vecAdd(t.translation, delta.offset) }
     case "rotate":
       return {
         ...t,
-        translation: add(pivot, rotateVec(delta.rotation, sub(t.translation, pivot))),
+        translation: vecAdd(pivot, rotateVec(delta.rotation, vecSub(t.translation, pivot))),
         rotation: quatNormalize(quatMul(delta.rotation, t.rotation))
       }
     case "scale": {

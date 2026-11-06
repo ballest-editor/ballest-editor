@@ -15,7 +15,8 @@ import {
   wheelChordOf
 } from "../domain/Keybinds"
 import { wheelZoomFactor } from "../domain/orthoView"
-import { placeDistanceFor, placementPoint } from "../domain/placement"
+import { placementPoint } from "../domain/placement"
+import { spreadPlacement } from "./actions/placement"
 import { isEditorKeyEvent } from "./keyTargets"
 import {
   activePaneCamera,
@@ -70,27 +71,21 @@ export function FlyCamera() {
       return pane.view === undefined ? pane.nearestView() : "perspective"
     }
     // Placement point: an orthographic pane's centre; else on the screen-centre ray, at the floor or a cap that fits the piece.
-    sceneRegistry.placementPoint = (footprint) => {
+    const viewPlacement = (pane: PaneCamera, footprint: number) => {
       const { floorHeight, settings } = useEditor.getState()
-      const pane = activePaneCamera()
       const centre = pane.orthographicPlacement(floorHeight)
       if (centre !== undefined) return centre
       const camera = pane.perspective
-      const vertical = THREE.MathUtils.degToRad(camera.fov)
-      const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * camera.aspect)
       return placementPoint(
         threeToUeVector(camera.position),
         threeToUeVector(camera.getWorldDirection(new THREE.Vector3())),
         floorHeight,
-        placeDistanceFor(footprint, Math.min(vertical, horizontal), settings.editor.placeDistance)
+        pane.placeDistance(footprint, settings.editor.placeDistance)
       )
     }
-    // What a prefab spawns in front of. An orthographic pane has no distance to speak of, so it looks from the view's centre.
-    sceneRegistry.viewRay = () => {
+    sceneRegistry.placementPoint = (footprint, height) => {
       const pane = activePaneCamera()
-      const direction = threeToUeVector(pane.camera.getWorldDirection(new THREE.Vector3()))
-      const centre = pane.orthographicPlacement(useEditor.getState().floorHeight)
-      return { origin: centre ?? threeToUeVector(pane.perspective.position), direction }
+      return spreadPlacement(viewPlacement(pane, footprint), footprint, pane.placementView(), height)
     }
   }, [])
 

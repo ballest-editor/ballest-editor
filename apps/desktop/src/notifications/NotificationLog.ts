@@ -14,7 +14,7 @@ const NotificationFile = Schema.Struct({
 
 const decodeRecord = Schema.decodeUnknownOption(NotificationRecord)
 
-export class NotificationLogError extends Schema.TaggedError<NotificationLogError>()("NotificationLogError", {
+class NotificationLogError extends Schema.TaggedError<NotificationLogError>()("NotificationLogError", {
   path: Schema.String,
   cause: Schema.Defect()
 }) {

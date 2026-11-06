@@ -5,10 +5,11 @@ import { useShallow } from "zustand/react/shallow"
 import { toTuple3, type Tuple3, ueToThreeVector } from "../domain/coords"
 import { ARENA_COLOR, ARENA_RIM, luminance, type Sky, skyIrradiance, skyOf } from "../domain/sky"
 import { sunOf, viewLightOf } from "../domain/sunlight"
-import { perspectiveOnly } from "./paneCameras"
+import { orthographicOnly, perspectiveOnly } from "./paneCameras"
 import { useBeforePaneDraw } from "./PaneRenderer"
-import { setSky, SKY_DOME_RADIUS, SkyMaterial } from "./sky"
-import { shownLighting, useEditor } from "./store"
+import { setSky, SKY_DOME_RADIUS, SKY_HAZE_BELOW, SKY_PANE_TOP_FADE, type SkyKind, SkyMaterial } from "./sky"
+import { paneDisplayIn, shownLighting, useEditor } from "./store"
+import { useDarkTheme } from "./theme"
 import { setWaterLight } from "./water"
 
 /** The studio rig: fill lights and a fixed sun. */
@@ -32,20 +33,19 @@ const STUDIO_UPWARD_LIGHT = upwardLight(STUDIO_FILL, STUDIO_SUN_INTENSITY, STUDI
 
 /**
  * The viewport's sky and lights, each its own setting. The sky is the game's, drawn around
- * the camera with the sun disc in it, fading out at the grid's height (below it, and when the
- * sky is hidden, the theme's background shows). Map lighting
- * lights the scene the game's way: the sun as a directional light and the sky light as an
- * environment map captured from that sky (as the game's sky light is, whether or not the sky
- * is shown), so every material, the shader-patched game materials included, is lit and
- * reflects it through three's own light loop. Otherwise fixed studio lights. The unlit water
- * is dimmed to match.
+ * the camera with the sun disc in it, hazing out over the far floor; each pane says whether it
+ * shows it, and hidden, nothing takes its place and the pane shows the clear colour. Map lighting
+ * lights the scene the game's way: the
+ * sun as a directional light and the sky light as an environment map captured from that sky (as
+ * the game's sky light is, whether or not the sky is shown), so every material, the
+ * shader-patched game materials included, is lit and reflects it through three's own light
+ * loop. Otherwise fixed studio lights. The unlit water is dimmed to match.
  */
 export function SceneLights() {
   const mapLighting = useEditor((s) => s.settings.lighting.mapLighting)
-  const skyVisible = useEditor((s) => s.settings.lighting.skyVisible)
   return (
     <>
-      {skyVisible && <MapSky />}
+      <MapSky />
       {mapLighting ? <MapLights /> : <StudioLights />}
     </>
   )
@@ -62,7 +62,12 @@ const useMapSun = () => {
 function MapSky() {
   const { sky } = useMapSun()
   const floorHeight = useEditor((s) => s.floorHeight)
-  return <SkyDome sky={sky} clipBelow={floorHeight} />
+  return (
+    <>
+      <SkyDome sky={sky} clipBelow={floorHeight} />
+      <SkyBackdrop sky={sky} />
+    </>
+  )
 }
 
 function StudioLights() {
@@ -96,27 +101,44 @@ function MapLights() {
   )
 }
 
-/**
- * The visible sky: a sphere that travels with each pane's camera, drawn before everything else, and
- * fading out just above the grid's height so the theme's background shows under the grid.
- * (The sky light is captured separately, so the fade doesn't change how pieces are lit.)
- * An orthographic pane has none: a dome means nothing without perspective, and its grid wants the plain background.
- */
-function SkyDome({ sky, clipBelow }: { readonly sky: Sky; readonly clipBelow: number }) {
-  const mesh = useRef<THREE.Mesh>(null)
-  const material = useMemo(() => new SkyMaterial(false), [])
-  const geometry = useMemo(() => new THREE.SphereGeometry(SKY_DOME_RADIUS, 64, 32), [])
+const domeGeometry = () => new THREE.SphereGeometry(SKY_DOME_RADIUS, 64, 32)
+const backdropGeometry = () => new THREE.PlaneGeometry(2, 2)
+
+/** A material showing `sky` and the geometry to show it on, kept for as long as the component is. */
+const useShownSky = (kind: SkyKind, makeGeometry: () => THREE.BufferGeometry, sky: Sky) => {
+  const material = useMemo(() => new SkyMaterial(kind), [kind])
+  const geometry = useMemo(() => makeGeometry(), [makeGeometry])
   useEffect(() => () => {
     material.dispose()
     geometry.dispose()
   }, [material, geometry])
   useEffect(() => setSky(material, sky, [0, 0, 0]), [material, sky])
+  return { material, geometry }
+}
+
+/**
+ * The visible sky: a sphere that travels with each pane's camera, drawn before everything else, and
+ * hazing out over the far floor so the clear colour shows under the near grid.
+ * (The sky light is captured separately, so the fade doesn't change how pieces are lit.)
+ * An orthographic pane has none: a dome means nothing without perspective. `SkyBackdrop` is its sky.
+ */
+function SkyDome({ sky, clipBelow }: { readonly sky: Sky; readonly clipBelow: number }) {
+  const mesh = useRef<THREE.Mesh>(null)
+  const { material, geometry } = useShownSky("dome", domeGeometry, sky)
   useEffect(() => {
     material.sky.uClipY.value = clipBelow
   }, [material, clipBelow])
-  useBeforePaneDraw(({ perspective }) => {
-    mesh.current?.position.copy(perspective.position)
-    mesh.current?.updateMatrixWorld()
+  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
+  useEffect(() => {
+    const theme = dark ? "dark" : "light"
+    material.sky.uHazeBelow.value = SKY_HAZE_BELOW[theme]
+    material.sky.uPaneTopFade.value = SKY_PANE_TOP_FADE[theme]
+  }, [material, dark])
+  useBeforePaneDraw(({ perspective }, slot) => {
+    if (mesh.current === null) return
+    mesh.current.visible = paneDisplayIn(useEditor.getState(), slot).sky
+    mesh.current.position.copy(perspective.position)
+    mesh.current.updateMatrixWorld()
   })
   return (
     <mesh
@@ -130,6 +152,26 @@ function SkyDome({ sky, clipBelow }: { readonly sky: Sky; readonly clipBelow: nu
   )
 }
 
+/** What an orthographic pane that asks for the sky shows behind the map: the sky flat across the pane, drawn first. */
+function SkyBackdrop({ sky }: { readonly sky: Sky }) {
+  const mesh = useRef<THREE.Mesh>(null)
+  const { material, geometry } = useShownSky("backdrop", backdropGeometry, sky)
+  useBeforePaneDraw((_pane, slot) => {
+    if (mesh.current !== null) mesh.current.visible = paneDisplayIn(useEditor.getState(), slot).sky
+  })
+  return (
+    <mesh
+      ref={mesh}
+      layers={orthographicOnly}
+      geometry={geometry}
+      material={material}
+      renderOrder={-1000}
+      frustumCulled={false}
+      raycast={() => {}}
+    />
+  )
+}
+
 /**
  * The sky light: the sky (without the sun, which is the directional light) captured into a
  * prefiltered environment map, at `fill` on an up-facing surface whatever the sky's own colours.
@@ -138,7 +180,7 @@ function SkyLight({ sky, fill }: { readonly sky: Sky; readonly fill: number }) {
   const gl = useThree((s) => s.gl)
   const scene = useThree((s) => s.scene)
   const capture = useMemo(() => {
-    const material = new SkyMaterial(true)
+    const material = new SkyMaterial("capture")
     const geometry = new THREE.SphereGeometry(10, 32, 16)
     const captureScene = new THREE.Scene()
     captureScene.add(new THREE.Mesh(geometry, material))
