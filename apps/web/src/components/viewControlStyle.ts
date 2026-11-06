@@ -15,7 +15,7 @@ export const GROUP =
 
 /** A button in a group. */
 export const SEGMENT =
-  "flex h-full min-w-7 items-center justify-center gap-1 rounded-none px-1.5 text-fg-secondary outline-none transition-colors hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground disabled:text-fg-disabled"
+  "flex h-full min-w-7 items-center justify-center gap-1.5 rounded-none px-1.5 text-fg-secondary outline-none transition-colors hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground disabled:text-fg-disabled"
 
 /** A toggle segment that's on. */
 export const SEGMENT_ON =
