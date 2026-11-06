@@ -105,6 +105,9 @@ export const PanelSettings = Schema.Struct({
 /** The axis gizmo's sizes, as the Display popover offers them. */
 export const gizmoSizes = ["s", "m", "l"] as const
 
+/** How much bigger or smaller than medium each gizmo size draws, on screen. */
+export const gizmoScaleOf = (size: typeof gizmoSizes[number]): number => size === "s" ? 0.8 : size === "l" ? 1.25 : 1
+
 /** The viewport's axis gizmo, changed from the Display popover rather than the Settings dialog. */
 export const GizmoSettings = Schema.Struct({
   /** How big it is drawn. `m` is its usual size. */

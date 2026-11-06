@@ -2,9 +2,11 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
 import { type Quat4, ueToScene, ueToThreeVector, type UeTransform, type Vec3 } from "../../domain/coords"
+import { selectedGroupIds } from "../../domain/groupSelection"
 import { applyGroupDelta } from "../../domain/groupTransform"
 import { chordOf } from "../../domain/Keybinds"
 import { localToWorld } from "../../domain/pivot"
+import { gizmoScaleOf } from "../../domain/Settings"
 import { transformSelection } from "../actions"
 import { type PaneCamera, type PanePointer, panePointer } from "../paneCameras"
 import { useBeforePaneDraw } from "../PaneRenderer"
@@ -66,6 +68,10 @@ interface GizmoTarget {
  */
 const currentTarget = (): GizmoTarget | undefined => {
   const s = useEditor.getState()
+  // Settings › Display can keep the gizmo off a whole group, which is moved from the outline instead.
+  if (!s.settings.gizmo.showForGroups && selectedGroupIds(s.doc.structure.tree, s.selectedIds).length > 0) {
+    return undefined
+  }
   const transforms = new Map(s.selectedIds.flatMap((id) => {
     const t = shownTransform(s, id)
     return t === undefined || !sceneRegistry.objects.has(id) ? [] : [[id, t] as const]
@@ -145,7 +151,7 @@ export function GizmoController() {
     gizmo.update(
       {
         origin,
-        worldPerPixel: pane.worldPerPixelAt(origin),
+        worldPerPixel: pane.worldPerPixelAt(origin) * gizmoScaleOf(useEditor.getState().settings.gizmo.size),
         gameRotation: target.rotation,
         space: useEditor.getState().gizmoSpace,
         cameraQuaternion: pane.camera.quaternion,

@@ -1,5 +1,6 @@
 import { cn } from "@workspace/ui/lib/utils"
 import { PROJECTION_ACTIONS } from "../domain/Keybinds"
+import { gizmoScaleOf } from "../domain/Settings"
 import { type GizmoEnd, gizmoEnds, sameGizmoEnds } from "../domain/viewGizmo"
 import { isOrthoView, type ViewProjection, viewProjectionLabels } from "../domain/viewLayout"
 import { sceneAxisColors } from "../editor/axisColors"
@@ -80,12 +81,13 @@ export function ViewGizmo({ slot, projection, disabled }: {
   const setPaneProjection = useEditor((s) => s.setPaneProjection)
   const ends = usePaneReading(slot, endsOf, sameGizmoEnds)
   const colors = sceneAxisColors(dark)
+  const scale = gizmoScaleOf(useEditor((s) => s.settings.gizmo.size))
   const pick = (view: ViewProjection) => {
     setActivePane(slot)
     setPaneProjection(slot, view)
   }
   return (
-    <div className="relative" style={{ width: SIZE, height: SIZE }} data-view-gizmo>
+    <div className="relative origin-bottom-left" style={{ width: SIZE, height: SIZE, scale }} data-view-gizmo>
       <svg aria-hidden className="absolute inset-0" width={SIZE} height={SIZE}>
         {ends.filter((end) => end.positive).map((end) => {
           const { x, y } = toPixels(end)
