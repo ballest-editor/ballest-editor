@@ -4,6 +4,9 @@ import {
   CHIP_STATUS_TONES,
   chipStatusOf,
   type ChipView,
+  GAME_WRITE_STAGE_LABELS,
+  type GameWrite,
+  gameWritePercentOf,
   LINK_STATE_LABELS,
   type LinkedMap,
   type LinkState,
@@ -17,7 +20,8 @@ import {
   SYNC_STATUS_TONES,
   syncDetailOf,
   type SyncStatus,
-  syncStatusOf
+  syncStatusOf,
+  WIDEST_CHIP_LABEL
 } from "./linkState"
 
 const exported = { path: "/game/UserSavedMaps/a.balledit", hash: "a".repeat(64), at: "2026-10-31T12:00:00.000Z" }
@@ -222,5 +226,32 @@ describe("linkStateDetailOf", () => {
 
   it("has no time to give for a map with no export", () => {
     assert.strictEqual(linkStateDetailOf(map("a".repeat(64), -1, null), "notExported", now), "Not exported yet")
+  })
+})
+
+describe("the chip's width", () => {
+  it("comes from a label no other label outruns, the stages' included", () => {
+    for (const label of [...Object.values(CHIP_STATUS_LABELS), ...Object.values(GAME_WRITE_STAGE_LABELS)]) {
+      assert.isAtMost(label.length, WIDEST_CHIP_LABEL.length)
+    }
+    assert.strictEqual(WIDEST_CHIP_LABEL, "Changed since export")
+  })
+})
+
+describe("gameWritePercentOf", () => {
+  const at = (intent: GameWrite["intent"], stage: GameWrite["stage"]) =>
+    gameWritePercentOf({ intent, fileName: null, stage })
+
+  it("splits Play evenly over its four stages", () => {
+    assert.deepStrictEqual(
+      (["save", "copy", "verify", "launch"] as const).map((stage) => at("play", stage)),
+      [25, 50, 75, 100]
+    )
+  })
+
+  it("fills Export by the time it verifies: there is nothing to launch", () => {
+    assert.closeTo(at("export", "save"), 33.3, 0.1)
+    assert.closeTo(at("export", "copy"), 66.7, 0.1)
+    assert.strictEqual(at("export", "verify"), 100)
   })
 })

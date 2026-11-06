@@ -90,6 +90,12 @@ export const CHIP_STATUS_LABELS: Record<ChipStatus, string> = { ...SYNC_STATUS_L
 
 export const CHIP_STATUS_TONES: Record<ChipStatus, SyncTone> = { ...SYNC_STATUS_TONES, saved: "ok" }
 
+/**
+ * The chip's longest label, whatever it says now: the status bar's chip is this wide in every state, so the bar doesn't
+ * shift as the state changes.
+ */
+export const WIDEST_CHIP_LABEL = Object.values(CHIP_STATUS_LABELS).reduce((a, b) => b.length > a.length ? b : a)
+
 /** How long the chip says Saved. */
 export const SAVED_CHIP_MS = 2_000
 
@@ -122,6 +128,38 @@ export const nextSavedChip = (chip: SavedChip, view: ChipView): SavedChip => {
 
 /** What `chip` says. */
 export const chipStatusOf = (chip: SavedChip): ChipStatus => chip.justSaved ? "saved" : chip.status
+
+/** What an Export or a Play is doing: saving unsaved edits, writing the copy, reading it back, handing it to the game. */
+export type GameWriteStage = "save" | "copy" | "verify" | "launch"
+
+export const GAME_WRITE_STAGE_LABELS: Record<GameWriteStage, string> = {
+  save: "Saving…",
+  copy: "Copying…",
+  verify: "Verifying…",
+  launch: "Launching…"
+}
+
+/** An Export or a Play under way. */
+export interface GameWrite {
+  readonly intent: "export" | "play"
+  /** The project file it copies; null while it saves, which may rename it. */
+  readonly fileName: string | null
+  readonly stage: GameWriteStage
+}
+
+const GAME_WRITE_STAGES: Record<GameWrite["intent"], ReadonlyArray<GameWriteStage>> = {
+  export: ["save", "copy", "verify"],
+  play: ["save", "copy", "verify", "launch"]
+}
+
+/** How long the chip goes on showing a write that has ended, so one that took no time is still seen to happen. */
+export const GAME_WRITE_HOLD_MS = 400
+
+/** How far along `write` is, as a percentage: each stage is an equal part, and being in one counts it. */
+export const gameWritePercentOf = ({ intent, stage }: GameWrite): number => {
+  const stages = GAME_WRITE_STAGES[intent]
+  return (stages.indexOf(stage) + 1) / stages.length * 100
+}
 
 /** The status of a map in `state`. `unsaved` (its tab has unsaved edits) outranks every link state. */
 export const syncStatusOf = (state: LinkState, unsaved: boolean): SyncStatus =>

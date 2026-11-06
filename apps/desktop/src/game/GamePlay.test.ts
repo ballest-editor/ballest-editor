@@ -1,6 +1,6 @@
 import { CHARACTERS_PER_FILE, type PlayResult, PlaySessionEnded, PushChannels } from "@ballest/contracts"
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, Fiber, type FileSystem, Layer, Schema, Stream } from "effect"
+import { Effect, Fiber, FileSystem, Layer, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { vi } from "vitest"
 import { ElectronShell } from "../electron/ElectronShell"
@@ -25,13 +25,16 @@ const name = "Map_LevelEditorMain&Loop_me.balledit"
 
 /**
  * GamePlay over a fake Steam with the plugin manager, a project with `name` in it, a game whose process is `game.running`,
- * a shell that counts launches and a window that keeps what main sent.
+ * a shell that counts launches and a window that keeps what main sent, its progress reports apart. `reads.corrupt` makes
+ * what's in the game's maps folder read back as other bytes.
  */
 const setup = Effect.gen(function*() {
   const { dir, fs, path, steam } = yield* tempFakeSteam
   const bundle = yield* makeFakePluginBundle(dir, "0.2.0")
   const game = { running: false, launches: 0, steamAnswers: true }
   const sent: Array<readonly [string, unknown]> = []
+  const progress: Array<unknown> = []
+  const reads = { corrupt: false }
   const settings = path.join(dir, "desktop-settings.json")
   // the project in use is remembered in the settings; `dir` is where New project would make its siblings
   yield* fs.writeFileString(settings, JSON.stringify({ project: { recent: [path.join(dir, "project")] } }))
@@ -41,7 +44,13 @@ const setup = Effect.gen(function*() {
   ).pipe(
     Layer.provideMerge(layerFakeGamePaths(steam.host, settings)),
     Layer.provideMerge(Layer.effect(WindowRegistry, WindowRegistry.make(path.join(dir, "windows"), 1, () => true))),
-    Layer.provideMerge(Layer.effect(DesktopSettings, DesktopSettings.make(settings)))
+    Layer.provideMerge(Layer.effect(DesktopSettings, DesktopSettings.make(settings))),
+    Layer.provideMerge(ElectronWindow.layerTest({
+      sendAll: (channel, payload) =>
+        Effect.sync(() =>
+          void (channel === PushChannels.onGameWriteProgress ? progress.push(payload) : sent.push([channel, payload]))
+        )
+    }))
   )
   const fakes = Layer.mergeAll(
     Layer.succeed(GameProcess, GameProcess.of({ isRunning: Effect.sync(() => game.running) })),
@@ -55,12 +64,17 @@ const setup = Effect.gen(function*() {
         }),
         openFolder: () => Effect.succeed(false)
       })
-    ),
-    ElectronWindow.layerTest({ sendAll: (channel, payload) => Effect.sync(() => void sent.push([channel, payload])) })
+    )
   )
   const services = yield* Layer.build(
     // GamePlay sees the fake process; GameLink keeps the fake Steam's.
     Layer.effect(GamePlay, GamePlay.make).pipe(Layer.provide(fakes), Layer.provideMerge(base))
+  ).pipe(
+    Effect.provideService(FileSystem.FileSystem, {
+      ...fs,
+      readFile: (file) =>
+        reads.corrupt && file.startsWith(steam.maps) ? Effect.succeed(new Uint8Array([0])) : fs.readFile(file)
+    })
   )
   const play = yield* GamePlay.pipe(Effect.provide(services))
   const files = yield* MapFiles.pipe(Effect.provide(services))
@@ -73,6 +87,8 @@ const setup = Effect.gen(function*() {
     steam,
     game,
     sent,
+    progress,
+    reads,
     files,
     link,
     play,
@@ -118,6 +134,28 @@ describe("GamePlay.play", () => {
         "main.as",
         "play.json"
       ])
+    })))
+
+  it.effect("reports reading the copy back, then the handoff, and nothing for a Play that stops at a refusal", () =>
+    runScoped(Effect.gen(function*() {
+      const { fs, path, steam, progress, play } = yield* setup
+      const payload = { fileName: name, replacePublished: false, overwriteChanged: false }
+      yield* play.play(payload)
+      assert.deepStrictEqual(progress, [{ fileName: name, stage: "verify" }, { fileName: name, stage: "launch" }])
+
+      progress.length = 0
+      yield* fs.writeFileString(path.join(steam.maps, name), mapText(3561234567))
+      assert.strictEqual((yield* play.play(payload))._tag, "Published")
+      assert.deepStrictEqual(progress, [])
+    })))
+
+  it.effect("fails a Play whose copy doesn't read back as what was written, and records no export", () =>
+    runScoped(Effect.gen(function*() {
+      const { game, reads, play } = yield* setup
+      reads.corrupt = true
+      const failed = yield* Effect.flip(play.play({ fileName: name, replacePublished: false, overwriteChanged: false }))
+      assert.strictEqual(failed._tag, "ExportUnverifiedError")
+      assert.strictEqual(game.launches, 0)
     })))
 
   it.effect("without the plugin, exports and starts the game but writes nothing into the plugins folder", () =>

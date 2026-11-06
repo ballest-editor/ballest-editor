@@ -12,6 +12,7 @@ import type {
   GameLinkResult,
   GamePathKind,
   GamePaths,
+  GameWriteProgress,
   ImportMapPayload,
   ImportMapResult,
   InstallPluginResult,
@@ -242,6 +243,8 @@ export class Platform extends Context.Service<Platform, {
   readonly play: (fileName: string, options: ExportOptions) => Effect.Effect<PlayResult, PlatformError>
   /** Each end of a game session a Play started or joined (desktop); a browser's ends at once. */
   readonly playSessionEnds: Stream.Stream<PlaySessionEnded, PlatformError>
+  /** Each stage main reports of an Export or a Play under way, while the stream runs. */
+  readonly gameWriteProgress: Stream.Stream<GameWriteProgress, PlatformError>
   /** The notifications kept from earlier runs, newest first (desktop: `notifications.json`); none in a browser. */
   readonly loadNotifications: Effect.Effect<NotificationRecords, PlatformError>
   /** Keeps `records` for the next run (desktop); a browser keeps them in memory only. */
@@ -395,6 +398,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     installPlugin: call("installPlugin"),
     play: (fileName, options) => call("play", { fileName, ...options }),
     playSessionEnds: pushed((listener) => bridge.onPlaySessionEnded(listener)),
+    gameWriteProgress: pushed((listener) => bridge.onGameWriteProgress(listener)),
     loadNotifications: call("loadNotifications"),
     saveNotifications: (records) => call("saveNotifications", { records }),
     muteNotifications: (kind) => call("muteNotifications", { kind }),
@@ -562,6 +566,7 @@ const makeBrowser = (): Platform["Service"] => {
     installPlugin: desktopOnly,
     play: () => desktopOnly,
     playSessionEnds: Stream.empty,
+    gameWriteProgress: Stream.empty,
     loadNotifications: Effect.succeed([]),
     saveNotifications: () => Effect.void,
     muteNotifications: (kind) => Effect.sync(() => [...muted.add(kind)]),

@@ -4,6 +4,7 @@ import { MOTION_SCALE } from "../domain/Settings"
 import {
   checkExports,
   checkPrefabsNow,
+  followGameWrites,
   followNotifications,
   followOpenTabs,
   followPlaySessions,
@@ -146,6 +147,7 @@ export function Editor() {
   useEffect(() => followUpdates(), [])
   useEffect(() => followViewLayouts(), [])
   useEffect(() => followPlaySessions(), [])
+  useEffect(() => followGameWrites(), [])
   useCheckExportsOnFocus()
 
   return (

@@ -45,7 +45,7 @@ import { type PropertyChange, withFlip } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
 import { LIMITS } from "../domain/limits"
-import { type LinkState, linkStateOf } from "../domain/linkState"
+import { type GameWrite, type LinkState, linkStateOf } from "../domain/linkState"
 import { isPlayerStart, type Item, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
 import type { PrefabLink } from "../domain/MapSidecar"
 import type { MaterialTable } from "../domain/Materials"
@@ -388,6 +388,8 @@ export interface EditorState extends TabState {
   readonly gizmoSpace: GizmoSpace
   /** The open modal dialog; editor keybinds are suspended while one is open. */
   readonly dialog: DialogState | null
+  /** The Export or Play under way, for the status bar's chip; null when there is none. */
+  readonly gameWrite: GameWrite | null
   /** The Settings dialog's page, kept between openings. */
   readonly settingsCategory: SettingsCategory
   /** The keybind cheat sheet: shown while its binding is held. */
@@ -576,6 +578,7 @@ export interface EditorState extends TabState {
   /** Opens `dialog` in place of the open one (and its payload). */
   readonly openDialog: (dialog: DialogState) => void
   readonly closeDialog: () => void
+  readonly setGameWrite: (gameWrite: GameWrite | null) => void
   readonly setCheatSheet: (cheatSheet: boolean) => void
   readonly setSettingsCategory: (category: SettingsCategory) => void
   readonly setPreview: (preview: EditorState["preview"]) => void
@@ -787,6 +790,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     tool: "translate",
     gizmoSpace: "world",
     dialog: null,
+    gameWrite: null,
     settingsCategory: "general",
     cheatSheet: false,
     catalog: null,
@@ -1205,6 +1209,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       ),
     // Drops the payload with the dialog: the saveAs dialog takes its `afterSave` before it closes itself to save.
     closeDialog: () => set({ dialog: null }),
+    setGameWrite: (gameWrite) => set({ gameWrite }),
     setCheatSheet: (cheatSheet) => set({ cheatSheet }),
     setSettingsCategory: (settingsCategory) => set({ settingsCategory }),
     setPreview: (preview) => set({ preview }),

@@ -4,6 +4,7 @@ import type {
   FoundCreator,
   GameLinkResult,
   GamePaths,
+  GameWriteProgress,
   MapBackupFile,
   MapLink,
   NotificationRecords,
@@ -53,6 +54,11 @@ export interface TestDisk {
   readonly playSessions: {
     readonly listeners: Set<(ended: PlaySessionEnded) => void>
     readonly push: (ended: PlaySessionEnded) => void
+  }
+  /** `push` reports, as main does, how far an Export or a Play has got. */
+  readonly gameWriteProgress: {
+    readonly listeners: Set<(progress: GameWriteProgress) => void>
+    readonly push: (progress: GameWriteProgress) => void
   }
   /** Link records by project, then by map file name, as main keeps them in `.ballest/link.json`. */
   readonly links: Map<string, Map<string, MapLink>>
@@ -179,6 +185,7 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   promptAnswers: [],
   unload: makeTestPush<UnloadKind>(),
   playSessions: makeTestPush<PlaySessionEnded>(),
+  gameWriteProgress: makeTestPush<GameWriteProgress>(),
   links: new Map(),
   backups: [],
   prefabBackups: [],
@@ -662,6 +669,10 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     onPlaySessionEnded: (listener) => {
       disk.playSessions.listeners.add(listener)
       return () => void disk.playSessions.listeners.delete(listener)
+    },
+    onGameWriteProgress: (listener) => {
+      disk.gameWriteProgress.listeners.add(listener)
+      return () => void disk.gameWriteProgress.listeners.delete(listener)
     },
     loadNotifications: () => Promise.resolve(disk.notifications),
     saveNotifications: ({ records }) => {

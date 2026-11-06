@@ -11,7 +11,8 @@ import {
   groupTrail,
   nodeKeys,
   selectedGroupIds,
-  selectionNodeIds
+  selectionNodeIds,
+  selectionSummaryOf
 } from "./groupSelection"
 import type { TreeNode } from "./MapSidecar"
 
@@ -94,6 +95,48 @@ describe("what a selection makes up", () => {
     assert.isTrue(canGroupSelection(tree, ["a", "b", "d"]))
     assert.isFalse(canGroupSelection(tree, ["a", "b"]))
     assert.isFalse(canGroupSelection(tree, []))
+  })
+})
+
+describe("selectionSummaryOf", () => {
+  const nested = [
+    item("loose"),
+    group("outer", item("a"), group("inner", item("b"), item("c"))),
+    group("one", item("d"))
+  ]
+  const names = new Map([
+    ["loose", { name: "Goal", ordinal: undefined }],
+    ["a", { name: "Cube", ordinal: 2 }]
+  ])
+  const summary = (selected: ReadonlyArray<string>) => selectionSummaryOf(nested, selected, names)
+
+  it("is nothing for an empty selection", () => {
+    assert.isNull(summary([]))
+  })
+
+  it("names a lone item, ordinal and all", () => {
+    assert.deepStrictEqual(summary(["loose"]), { name: "Goal", ordinal: undefined })
+    assert.deepStrictEqual(summary(["a"]), { name: "Cube", ordinal: 2 })
+  })
+
+  it("counts items that make up no group", () => {
+    assert.strictEqual(summary(["loose", "a"])?.name, "2 items")
+    assert.strictEqual(summary(["a", "b"])?.name, "2 items")
+  })
+
+  it("counts a group's items and the group, the outermost one for nested groups", () => {
+    assert.strictEqual(summary(["b", "c"])?.name, "2 items · 1 group")
+    assert.strictEqual(summary(["a", "b", "c"])?.name, "3 items · 1 group")
+    assert.strictEqual(summary(["loose", "a", "b", "c"])?.name, "4 items · 1 group")
+  })
+
+  it("says one item and many groups as such", () => {
+    assert.strictEqual(summary(["d"])?.name, "1 item · 1 group")
+    assert.strictEqual(summary(["b", "c", "d"])?.name, "3 items · 2 groups")
+  })
+
+  it("counts a lone item without a name rather than showing nothing", () => {
+    assert.strictEqual(summary(["b"])?.name, "1 item")
   })
 })
 
