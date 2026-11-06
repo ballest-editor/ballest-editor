@@ -106,16 +106,16 @@ A segmented control is `ToggleGroup`, one track with a pill inside that slides t
 
 ## Spacing: 4px steps, 8px between groups
 
-| What               | Size                                                                  |
-| ------------------ | --------------------------------------------------------------------- |
-| Inputs, buttons    | 28px (`h-7`); menu items too                                          |
-| Segmented control  | 28px: 24px items in a track with 2px of padding                       |
-| Rows               | 24px dense (outline), 32px with a thumbnail or second line            |
-| Icon buttons       | 24px target, 16px icon: `Button size="icon-sm"`, no size classes      |
-| Panel tab strip    | 28px                                                                  |
-| Document tab strip | 32px, as is a popped-out panel's strip (the window controls' height)  |
-| Dialog padding     | `p-dialog` (16px) at every dialog size; `px-dialog` for split dialogs |
-| Tooltip delay      | 300ms, the default; don't set `delay`                                 |
+| What               | Size                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------- |
+| Inputs, buttons    | 28px (`h-7`); menu items too                                                          |
+| Segmented control  | 28px: 24px items in a track with 2px of padding                                       |
+| Rows               | 24px dense (outline, thumbnails at 16px), 32px with a larger thumbnail or second line |
+| Icon buttons       | 24px target, 16px icon: `Button size="icon-sm"`, no size classes                      |
+| Panel tab strip    | 28px                                                                                  |
+| Document tab strip | 32px, as is a popped-out panel's strip (the window controls' height)                  |
+| Dialog padding     | `p-dialog` (16px) at every dialog size; `px-dialog` for split dialogs                 |
+| Tooltip delay      | 300ms, the default; don't set `delay`                                                 |
 
 ## Icons
 

@@ -31,8 +31,8 @@ import { HeroBand } from "./HeroBand"
 import { Logo } from "./Logo"
 import { SectionTitle } from "./SectionTitle"
 
-/** A card on the start screen: the surface, tinted with the theme's colour. */
-const TINTED_CARD = "rounded-surface border border-primary/20 bg-card bg-linear-to-b from-accent/15 to-accent/5"
+/** A card on the start screen. */
+const CARD = "rounded-surface border border-border bg-card"
 
 /** A recent project's "…": what a click on its row doesn't do. */
 function RecentMenu({ project, elsewhere }: { readonly project: RecentProject; readonly elsewhere: boolean }) {
@@ -74,8 +74,8 @@ function RecentRow({ project, elsewhere, first, nameShared, now }: {
   return (
     <li
       className={cn(
-        "flex h-8 items-center gap-1 rounded-control pr-1 hover:bg-primary/15",
-        !resting && "has-[button:focus-visible]:bg-primary/15"
+        "flex h-8 items-center gap-1 rounded-control pr-1 hover:bg-muted",
+        !resting && "has-[button:focus-visible]:bg-muted"
       )}
     >
       <Tooltip
@@ -135,7 +135,7 @@ function RecentProjects() {
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <SectionTitle>Recent projects</SectionTitle>
-      <ul className={cn("flex flex-col gap-0.5 p-1", TINTED_CARD)}>
+      <ul className={cn("flex flex-col gap-0.5 p-1", CARD)}>
         {recent.map((project) => (
           <RecentRow
             key={project.path}
@@ -160,7 +160,7 @@ function WhatsNew() {
   return (
     <aside className="flex flex-col gap-2 self-start">
       <SectionTitle>What's new</SectionTitle>
-      <div className={cn("flex flex-col items-start gap-2 p-dialog", TINTED_CARD)}>
+      <div className={cn("flex flex-col items-start gap-2 p-dialog", CARD)}>
         {update !== null && <p className="text-body-strong tabular-nums">Version {update.currentVersion}</p>}
         <p className="text-fg-tertiary">Each release lists what it added and fixed.</p>
         <Button variant="outline" onClick={() => void openExternalLink(RELEASES_URL)}>
@@ -201,7 +201,7 @@ function NewProjectForm({ onBack }: { readonly onBack: (() => void) | null }) {
   }
   return (
     <form
-      className={cn("flex flex-col gap-4 p-dialog", TINTED_CARD)}
+      className={cn("flex flex-col gap-4 p-dialog", CARD)}
       onSubmit={(e) => {
         e.preventDefault()
         if (isProjectName(trimmed) && problem === null) void newProject(trimmed, chosen?.path)
@@ -251,12 +251,12 @@ export function ProjectChooser() {
   const [naming, setNaming] = useState(false)
   const showForm = naming || noRecent
   return (
-    <div className="flex h-svh flex-col bg-background bg-linear-to-b from-accent/15 to-transparent to-60% text-foreground">
+    <div className="flex h-svh flex-col bg-background bg-linear-to-b from-primary/6 to-transparent to-60% text-foreground">
       <div className="h-10 shrink-0 [-webkit-app-region:drag]" />
       <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-10">
         {/* `m-auto`, not `justify-center`: a list too long for the window scrolls from its top, where centring would clip it */}
         <div className="m-auto grid w-full max-w-4xl grid-cols-[minmax(0,1fr)_16rem] gap-x-8 gap-y-6">
-          <HeroBand className="col-span-2 rounded-surface border border-primary/20 p-6">
+          <HeroBand className={cn("col-span-2 p-6", CARD)}>
             <div className="flex items-center gap-3">
               <Logo className="size-12 shrink-0" />
               <div>
