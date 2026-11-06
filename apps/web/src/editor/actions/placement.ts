@@ -56,12 +56,12 @@ const itemBoxes = ({ catalogIndex, doc }: EditorState): ReadonlyArray<Box> =>
   doc.map.items.flatMap((item) => itemsBoxOf([item], catalogIndex) ?? [])
 
 /**
- * Where a palette placement `width` across goes, given the `point` the view would put it at. The first of a run goes at
- * `point`. While the camera stays put and the last piece placed stays the selection, each piece that would land on the
- * run's first steps on from the last (`nextInRun`). Anything else starts a new run. Either way a slot that an item
- * already stands in is passed over for the next free one (`clearOfBoxes`).
+ * Where a placement `width` across and `height` tall goes, given the `point` the view would put it at. The first of a run
+ * goes at `point`. While the camera stays put and the last piece placed stays the selection, each piece that would land
+ * on the run's first steps on from the last (`nextInRun`). Anything else starts a new run. Either way a slot that an item
+ * already stands in, or that the view doesn't show, is passed over for the next free one (`clearOfBoxes`).
  */
-export const spreadPlacement = (point: Vec3, width: number, view: PlacementView): Vec3 => {
+export const spreadPlacement = (point: Vec3, width: number, view: PlacementView, height = 0): Vec3 => {
   const s = useEditor.getState()
   const next = placing === undefined ? undefined : continued(s, placing, point, width, view)
   const run = clearOfBoxes(
@@ -69,7 +69,8 @@ export const spreadPlacement = (point: Vec3, width: number, view: PlacementView)
     itemBoxes(s),
     width,
     view,
-    s.settings.snapping.gridSize
+    s.settings.snapping.gridSize,
+    height
   )
   const at = runPoint(run, view)
   placing = { run, view, itemCount: s.doc.ids.length, first: next?.first, stepped: next?.stepped ?? minus(at, point) }

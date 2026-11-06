@@ -4,8 +4,9 @@ import fixture from "../../domain/bundledCatalog.json"
 import { Catalog, indexCatalog } from "../../domain/Catalog"
 import type { Vec3 } from "../../domain/coords"
 import { placementTransform } from "../../domain/factory"
-import { pieceFootprint, PLACEMENT_COLUMNS, PLACEMENT_GAP, type PlacementView } from "../../domain/placement"
+import { pieceFootprint, PLACEMENT_COLUMNS, PLACEMENT_GAP } from "../../domain/placement"
 import { defaultSettings } from "../../domain/Settings"
+import { VIEW_DOWN } from "../../test/placementView"
 import { initialMap, useEditor } from "../store"
 import { spreadPlacement } from "./placement"
 
@@ -14,18 +15,12 @@ const cube = catalog.pieces.find((p) => p.className === "BP_Prim_Cube")!
 const width = pieceFootprint(cube)
 const STEP = width + PLACEMENT_GAP
 
-/** Straight down at the floor, with +X up the screen. */
-const VIEW: PlacementView = {
-  position: { x: 2000, y: 0, z: 3000 },
-  right: { x: 0, y: 1, z: 0 },
-  up: { x: 1, y: 0, z: 0 }
-}
 const POINT = { x: 2000, y: 0, z: 0 }
 
 const s = () => useEditor.getState()
 
 /** A click in the Pieces panel: where the piece went. */
-const click = (point: Vec3 = POINT, view = VIEW) => {
+const click = (point: Vec3 = POINT, view = VIEW_DOWN) => {
   const at = spreadPlacement(point, width, view)
   s().placePiece(cube, placementTransform(cube, at))
   return at
@@ -67,7 +62,7 @@ describe("spreadPlacement", () => {
 
   it("starts a new run along the view when the camera moves, or only turns", () => {
     click()
-    const moved = { ...VIEW, position: { ...VIEW.position, x: 10 } }
+    const moved = { ...VIEW_DOWN, position: { ...VIEW_DOWN.position, x: 10 } }
     assert.deepStrictEqual(click(POINT, moved), { ...POINT, y: STEP })
     const turned = { ...moved, right: { x: 1, y: 0, z: 0 } }
     assert.deepStrictEqual(click(POINT, turned), { ...POINT, x: POINT.x + STEP })
@@ -104,6 +99,17 @@ describe("spreadPlacement", () => {
     const spots = clicks(10 * PLACEMENT_COLUMNS).map(({ x, y }) => `${x} ${y}`)
     assert.strictEqual(new Set(spots).size, spots.length)
     assert.notInclude(spots, `${POINT.x} ${POINT.y}`)
+  })
+
+  it("keeps a run in view, going round the aim point once it reaches the edge", () => {
+    const narrow = {
+      ...VIEW_DOWN,
+      project: ({ x, y }: Vec3) => ({ x: y / (2 * STEP), y: (x - POINT.x) / (2 * STEP), z: 0 })
+    }
+    const spots = Array.from({ length: 4 }, () => click(POINT, narrow))
+    assert.deepStrictEqual(spots.slice(0, 2), [POINT, { ...POINT, y: STEP }])
+    assert.isTrue(spots.every(({ x, y }) => Math.abs(y) <= STEP && Math.abs(x - POINT.x) <= STEP))
+    assert.strictEqual(new Set(spots.map(({ x, y }) => `${x} ${y}`)).size, spots.length)
   })
 
   it("takes a spot again once the piece on it has gone", () => {

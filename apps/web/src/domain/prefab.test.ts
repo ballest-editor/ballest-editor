@@ -16,8 +16,7 @@ import {
   prefabOfItems,
   prefabOfTab,
   prefabSourcesOf,
-  prefabTierLabel,
-  spawnFrameOf
+  prefabTierLabel
 } from "./prefab"
 import { PrefabFile } from "./PrefabFile"
 import { rotatorToQuat } from "./ueMath"
@@ -110,53 +109,6 @@ describe("a new prefab", () => {
     const items = [cubeAt(0), cubeAt(1000)]
     assert.strictEqual(prefabOfItems(items, catalog, "Left bridge!").group.name, "Leftbridge")
     assert.notProperty(prefabOfItems(items, catalog, "!!").group, "name")
-  })
-})
-
-describe("where a spawn lands", () => {
-  // the rows of docs/qa/groups-prefabs.md § Spawning a prefab: two cubes 2000 cm apart, 1000 cm each way
-  const cubeSize = cube.bounds!.max[0] - cube.bounds!.min[0]
-  const halfWidth = 1000 + cubeSize / 2
-  const half = cubeSize / 2
-  const twoCubes = [
-    cubeAt(-1000, 0, -(cube.bounds!.min[2] + cube.bounds!.max[2]) / 2),
-    cubeAt(1000, 0, -(cube.bounds!.min[2] + cube.bounds!.max[2]) / 2)
-  ]
-  const camera = { x: -300, y: 0, z: 10000 }
-  const look = (pitch: number, yaw: number) => {
-    const [p, y] = [pitch * Math.PI / 180, yaw * Math.PI / 180]
-    return { x: Math.cos(p) * Math.cos(y), y: Math.cos(p) * Math.sin(y), z: Math.sin(p) }
-  }
-
-  it("is 500 cm plus the box's half width along the view", () => {
-    expectVec(
-      spawnFrameOf(twoCubes, { origin: camera, direction: look(0, 0) }, catalog),
-      { x: -300 + 500 + halfWidth, y: 0, z: 10000 }
-    )
-  })
-
-  it("uses the box's depth looking along its short side", () => {
-    expectVec(
-      spawnFrameOf(twoCubes, { origin: camera, direction: look(0, 90) }, catalog),
-      { x: -300, y: 500 + half, z: 10000 }
-    )
-  })
-
-  it("counts the nearest corner when the view pitches", () => {
-    const direction = look(-20, 0)
-    const pitch = 20 * Math.PI / 180
-    const along = 500 + halfWidth * Math.cos(pitch) + half * Math.sin(pitch)
-    expectVec(spawnFrameOf(twoCubes, { origin: camera, direction }, catalog), {
-      x: -300 + direction.x * along,
-      y: 0,
-      z: 10000 + direction.z * along
-    })
-  })
-
-  it("moves with the camera", () => {
-    const moved = spawnFrameOf(twoCubes, { origin: { ...camera, x: 700 }, direction: look(0, 0) }, catalog)
-    const before = spawnFrameOf(twoCubes, { origin: camera, direction: look(0, 0) }, catalog)
-    assert.closeTo(moved.x - before.x, 1000, 1e-9)
   })
 })
 

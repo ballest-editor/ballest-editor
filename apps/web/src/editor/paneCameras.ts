@@ -203,9 +203,18 @@ export class PaneCamera {
 
   /** Where this pane looks from and how it is turned, for laying out placements. */
   placementView(): PlacementView {
-    const { position, quaternion } = this.camera
-    const axis = (x: number, y: number) => uePoint(new THREE.Vector3(x, y, 0).applyQuaternion(quaternion))
-    return { position: uePoint(position), right: axis(1, 0), up: axis(0, 1) }
+    const { camera } = this
+    camera.updateMatrixWorld()
+    const axis = (x: number, y: number) => uePoint(new THREE.Vector3(x, y, 0).applyQuaternion(camera.quaternion))
+    return {
+      position: uePoint(camera.position),
+      right: axis(1, 0),
+      up: axis(0, 1),
+      project: (point) => {
+        const { x, y, z } = toVector(ueToThreeVector(point)).project(camera)
+        return { x, y, z }
+      }
+    }
   }
 
   private setScale(cmPerPixel: number): void {

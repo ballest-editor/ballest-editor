@@ -75,11 +75,20 @@ export const PLACEMENT_GAP = 100
 /** How many pieces a row of a run holds: three default cubes still fit a 16:9 view at the default distance. */
 export const PLACEMENT_COLUMNS = 3
 
-/**
- * How many slots a placement tries for a free one: eight rows, by when a piece is well up the screen. A spot crowded past
- * that takes the slot it started from, rather than a piece landing out of sight.
- */
+/** How many of a run's slots a placement tries for a free one: eight rows, by when a piece is well up the screen. */
 const PLACEMENT_SLOTS = PLACEMENT_COLUMNS * 8
+
+/** How many grid steps from the aim point a placement looks, once the run's own slots are spent. */
+const PLACEMENT_RINGS = 8
+
+/** The slots around the aim point, nearest first, as grid steps along the view's right and up its rows. */
+const SLOTS_AROUND = Array.from({ length: (2 * PLACEMENT_RINGS + 1) ** 2 }, (_, i) => ({
+  column: i % (2 * PLACEMENT_RINGS + 1) - PLACEMENT_RINGS,
+  row: PLACEMENT_RINGS - Math.floor(i / (2 * PLACEMENT_RINGS + 1))
+})).sort((a, b) => Math.hypot(a.column, a.row) - Math.hypot(b.column, b.row))
+
+/** How far from the view's centre a slot may be, as a share of the way to its edge: clear of the pane's toolbars. */
+const VIEW_REACH = 0.8
 
 /** A view whose up has less horizontal in it than this is level: there is no floor ahead to lay rows along. */
 const LEVEL_UP = 0.1
@@ -89,6 +98,8 @@ export interface PlacementView {
   readonly position: Vec3
   readonly right: Vec3
   readonly up: Vec3
+  /** Where the pane shows `point`: x and y run -1 to 1 across the view, and z leaves -1 to 1 past its depth or behind it. */
+  readonly project: (point: Vec3) => Vec3
 }
 
 /**
@@ -113,6 +124,15 @@ const rowAxisOf = ({ up }: PlacementView): Vec3 => {
 }
 
 const dot = (a: Vec3, b: Vec3): number => a.x * b.x + a.y * b.y + a.z * b.z
+
+/** Whether `view` shows `point`, clear of its edges. */
+const inView = (point: Vec3, view: PlacementView): boolean => {
+  const { x, y, z } = view.project(point)
+  return Math.abs(x) <= VIEW_REACH && Math.abs(y) <= VIEW_REACH && Math.abs(z) <= 1
+}
+
+/** A step that clears `size` and the gap, rounded up to `gridSize` so it never closes the gap. */
+const stepOver = (size: number, gridSize: number): number => Math.ceil((size + PLACEMENT_GAP) / gridSize) * gridSize
 
 /** The stretch of `axis` that `box` covers. */
 const spanOf = ({ max, min }: Box, axis: Vec3): { readonly from: number; readonly to: number } => {
@@ -150,11 +170,11 @@ export const nextInRun = (
   view: PlacementView,
   gridSize: number
 ): PlacementRun => {
-  const step = (size: number) => Math.ceil((size + PLACEMENT_GAP) / gridSize) * gridSize
   const depth = Math.max(run.depth, lengthOf(last, rowAxisOf(view)), width)
+  const along = run.along + stepOver(Math.max(lengthOf(last, view.right), width), gridSize)
   return run.column + 1 < PLACEMENT_COLUMNS
-    ? { ...run, column: run.column + 1, along: run.along + step(Math.max(lengthOf(last, view.right), width)), depth }
-    : { ...run, column: 0, along: 0, across: run.across + step(depth), depth: 0 }
+    ? { ...run, column: run.column + 1, along, depth }
+    : { ...run, column: 0, along: 0, across: run.across + stepOver(depth, gridSize), depth: 0 }
 }
 
 /** Where the run's latest piece goes, in whole cm. */
@@ -165,34 +185,55 @@ export const runPoint = ({ across, along, start }: PlacementRun, view: Placement
 }
 
 /**
- * Whether a piece `width` across, placed at `point`, would stand in `box`: their footprints meet and `point` is within
- * the box's height. A box wholly above or below leaves the spot free, so a piece can land on a platform or under one.
+ * Whether a piece `width` across and `height` tall, standing on `point`, would stand in `box`: their footprints meet and
+ * their heights do. A box wholly above or below leaves the spot free, so a piece can land on a platform or under one.
  */
-export const wouldStandIn = (point: Vec3, width: number, { max, min }: Box): boolean =>
+export const wouldStandIn = (point: Vec3, width: number, { max, min }: Box, height = 0): boolean =>
   point.x >= min.x - width / 2 && point.x <= max.x + width / 2 &&
   point.y >= min.y - width / 2 && point.y <= max.y + width / 2 &&
-  point.z >= min.z && point.z <= max.z
+  point.z + height >= min.z && point.z <= max.z
 
 /** A box of no size: to `nextInRun`, a step sized by the piece alone. */
 const NO_BOX: Box = { min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 0, z: 0 } }
 
 /**
- * `run`, moved on from its latest slot to the first where a piece `width` across stands clear of `boxes`. Slots are
- * sized by the piece, not by what's in the way, so a huge item can't throw it out of sight. With no free slot in reach,
- * `run` as it was.
+ * `run`, moved on from its latest slot to the first where a piece `width` across and `height` tall stands clear of
+ * `boxes` and in view, or else to the nearest such slot around the aim point (`run.start`). Slots are sized by the piece,
+ * not by what's in the way, so a huge item can't throw it out of sight. With no such slot the piece goes on the aim
+ * point: an overlap beats a piece nobody can see.
  */
 export const clearOfBoxes = (
   run: PlacementRun,
   boxes: ReadonlyArray<Box>,
   width: number,
   view: PlacementView,
-  gridSize: number
+  gridSize: number,
+  height = 0
 ): PlacementRun => {
+  const isFree = (candidate: PlacementRun) => {
+    const point = runPoint(candidate, view)
+    return inView(point, view) && !boxes.some((box) => wouldStandIn(point, width, box, height))
+  }
   let slot = run
   for (let tried = 0; tried < PLACEMENT_SLOTS; tried++) {
-    const point = runPoint(slot, view)
-    if (!boxes.some((box) => wouldStandIn(point, width, box))) return slot
+    if (isFree(slot)) return slot
     slot = nextInRun(slot, NO_BOX, width, view, gridSize)
   }
-  return run
+  const aim = startPlacementRun(run.start)
+  const step = stepOver(width, gridSize)
+  return SLOTS_AROUND.map(({ column, row }) => ({ ...aim, along: column * step, across: row * step })).find(isFree) ??
+    aim
 }
+
+/** How much room a box takes on the floor. */
+export const roomOf = ({ max, min }: Box): { readonly width: number; readonly height: number } => ({
+  width: Math.max(max.x - min.x, max.y - min.y),
+  height: max.z - min.z
+})
+
+/** The frame that stands `box`, held relative to its frame, on `point`: centred over it, with its underside there. */
+export const frameStanding = ({ max, min }: Box, point: Vec3): Vec3 => ({
+  x: point.x - (min.x + max.x) / 2,
+  y: point.y - (min.y + max.y) / 2,
+  z: point.z - min.z
+})

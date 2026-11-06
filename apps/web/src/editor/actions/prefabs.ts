@@ -7,15 +7,17 @@ import { Effect } from "effect"
 import { nextNumberedName } from "../../domain/factory"
 import { PREFAB_ITEMS, PREFAB_REFUSALS } from "../../domain/gameRules"
 import { exactSelectedGroup } from "../../domain/groupSelection"
+import { itemsBoxOf } from "../../domain/itemBounds"
 import { isPlayerStart } from "../../domain/MapFile"
+import { frameStanding, roomOf } from "../../domain/placement"
 import {
   isSamePrefab,
   itemOfPrefab,
   mapOfPrefab,
+  ORIGIN,
   prefabOfItems,
   prefabOfTab,
-  prefabSourcesOf,
-  spawnFrameOf
+  prefabSourcesOf
 } from "../../domain/prefab"
 import type { PrefabFile } from "../../domain/PrefabFile"
 import { definitionOf } from "../../domain/prefabInstance"
@@ -86,14 +88,17 @@ const needsCatalog = Effect.suspend(() => {
 })
 
 /**
- * Places a prefab the way `spawnprefab` does: in front of the active pane's camera, its items selected as one group. In
- * a map the group is an instance; a definition's tab has no place for a link, so there it is a plain group.
+ * Places a prefab where a palette piece would go, sized by the box around its items, so it lands in view and clear of
+ * what's there, its items selected as one group. In a map the group is an instance; a definition's tab has no place for
+ * a link, so there it is a plain group.
  */
 export const placePrefabEffect = Effect.fn("placePrefabEffect")(function*(ref: PrefabRef) {
   const catalog = yield* needsCatalog
   const { prefab, read } = yield* readPrefabFile(ref)
   const definition = definitionOf(prefab, read, catalog)
-  const frame = spawnFrameOf(definition.items, sceneRegistry.viewRay(), catalog)
+  const box = itemsBoxOf(definition.items, catalog) ?? { min: ORIGIN, max: ORIGIN }
+  const { height, width } = roomOf(box)
+  const frame = frameStanding(box, sceneRegistry.placementPoint(width, height))
   const s = useEditor.getState()
   const items = prefab.items.map((item) => itemOfPrefab(item, frame, catalog))
   s.placeGroup(items, ref.name, s.document.kind === "map" ? definition.link : undefined)
