@@ -19,6 +19,12 @@ const panels = [
 
 const quiet = () => ({ dispose: () => undefined })
 
+interface MoveEvent {
+  readonly panel: unknown
+  readonly from: unknown
+}
+type MoveListener = (event: MoveEvent) => void
+
 interface OverlayEvent {
   readonly group: unknown
   readonly position: string
@@ -31,6 +37,7 @@ const fakeDock = ({ failLoad = false, loaded = [DOCUMENTS_PANEL] as ReadonlyArra
   const calls: Array<string> = []
   const loads: Array<DockLayout> = []
   let overlay: OverlayListener = () => undefined
+  let moved: MoveListener = () => undefined
   const open = new Map<string, ReturnType<typeof fakePanel>>()
   const group = {
     id: "1",
@@ -102,7 +109,10 @@ const fakeDock = ({ failLoad = false, loaded = [DOCUMENTS_PANEL] as ReadonlyArra
     onDidLayoutChange: quiet,
     onDidAddPanel: quiet,
     onDidRemovePanel: quiet,
-    onDidMovePanel: quiet,
+    onDidMovePanel: (listener: MoveListener) => {
+      moved = listener
+      return quiet()
+    },
     onDidRemoveGroup: quiet,
     onDidActivePanelChange: quiet,
     onDidAddPopoutGroup: quiet,
@@ -114,8 +124,14 @@ const fakeDock = ({ failLoad = false, loaded = [DOCUMENTS_PANEL] as ReadonlyArra
       return quiet()
     }
   }
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a stand-in for the part of the API the dock uses
-  return { api: api as unknown as DockviewApi, calls, loads, overlay: (event: OverlayEvent) => overlay(event) }
+  return {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a stand-in for the part of the API the dock uses
+    api: api as unknown as DockviewApi,
+    calls,
+    loads,
+    overlay: (event: OverlayEvent) => overlay(event),
+    move: (event: MoveEvent) => moved(event)
+  }
 }
 
 const savedLayout = {
@@ -267,6 +283,18 @@ describe("the dock's panels", () => {
     }
     assert.isTrue(refused("center"))
     assert.isFalse(refused("left"))
+  })
+
+  it("takes down the overlay a panel leaves in the window it went from, and only then", () => {
+    const { calls, move } = dock()
+    const container = (name: string) => ({ detatch: () => calls.push(`detatch from ${name}`) })
+    const main = { model: { renderContainer: container("main") } }
+    const popout = { id: "2", size: 2, model: { renderContainer: container("popout") } }
+    move({ panel: { group: popout }, from: main })
+    assert.deepStrictEqual(calls, ["detatch from main"])
+    calls.length = 0
+    move({ panel: { group: popout }, from: popout })
+    assert.deepStrictEqual(calls, [])
   })
 
   it("resets around the centre: the viewport's panel is never touched", () => {

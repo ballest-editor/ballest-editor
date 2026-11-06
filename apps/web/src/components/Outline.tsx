@@ -256,8 +256,10 @@ export function Outline() {
 
   const dragging = drag !== null
   useEffect(() => {
-    if (!dragging) return
-    let frame = requestAnimationFrame(function tick() {
+    // the list's own window: the other one's frames may not run while this one has the focus
+    const view = scroller.current?.ownerDocument.defaultView
+    if (!dragging || view == null) return
+    let frame = view.requestAnimationFrame(function tick() {
       const el = scroller.current
       if (el !== null) {
         const { top, bottom } = el.getBoundingClientRect()
@@ -271,9 +273,9 @@ export function Outline() {
           setDrag((current) => current === null ? null : aimed(current))
         }
       }
-      frame = requestAnimationFrame(tick)
+      frame = view.requestAnimationFrame(tick)
     })
-    return () => cancelAnimationFrame(frame)
+    return () => view.cancelAnimationFrame(frame)
   }, [dragging, aimed])
 
   const startDrag = (e: PointerEvent<HTMLDivElement>, row: OutlineRow) => {

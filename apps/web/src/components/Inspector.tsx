@@ -35,6 +35,7 @@ import {
   setSelectionField
 } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
+import { isMouseEvent } from "../editor/keyTargets"
 import { type PrefabDocument, selectedIndices, useEditor, useOpenPrefab } from "../editor/store"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { FlipSection } from "./FlipSection"
@@ -229,7 +230,7 @@ function TransformRow(props: {
         open={open}
         onOpenChange={(next, details) => {
           // Shift+click pastes instead of opening the menu
-          if (next && details.event instanceof MouseEvent && details.event.shiftKey) return
+          if (next && isMouseEvent(details.event) && details.event.shiftKey) return
           setOpen(next)
         }}
       >
