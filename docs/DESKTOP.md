@@ -253,7 +253,7 @@ The status bar runs along the bottom. The project is the window's title, centred
 
 The link states are Not exported, In sync, Edited since export, Changed in game, Both changed and Published draft. A map's state comes from `listMaps`: each `ProjectMap` carries the SHA-256 of its file, compared with `link.export.hash`, and its `publishedFileId`, the project file's `levelPublishedFileId`, read once per file version (main caches them by time, size and inode). Changed in game comes from the link: its `lastSeenHash` differs from `export.hash`. It's Both changed when the project map was saved or has unsaved edits since the export. A change in the game outranks Published draft, which outranks the project side, so a published draft with edits never shows Edited since export. The popover adds Re-import in the two changed states.
 
-The sync status (`syncStatusOf` in `domain/linkState.ts`) is what the chip, its popover and the Project panel's rows show: a link state with the unsaved edits folded in. Unsaved (amber) is any map whose tab has unsaved edits, whatever its link state. Otherwise it's Not exported (neutral), In sync (green), Changed since export (amber: Edited since export, Changed in game and Both changed) or Published draft (neutral).
+The sync status (`syncStatusOf` in `domain/linkState.ts`) is what the chip, its popover and the Project panel's rows show: a link state with the unsaved edits folded in. Unsaved is any map whose tab has unsaved edits, whatever its link state. Otherwise it's Not exported, In sync, Changed since export (Edited since export, Changed in game and Both changed) or Published draft. [ui-system.md § Status colours](design/ui-system.md#status-colours) has their colours.
 
 ### Notifications
 

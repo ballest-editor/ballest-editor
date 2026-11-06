@@ -16,19 +16,19 @@ const ICONS: Record<SyncStatus, ComponentType<{ readonly className?: string }>> 
 /** `fill` and `text` are a badge's colours; a chip adds `hover`, with `text` on a span so the button's hover leaves it alone. */
 const TONES: Record<SyncTone, { readonly fill: string; readonly hover: string; readonly text: string }> = {
   neutral: {
-    fill: "bg-muted",
-    hover: "hover:bg-input aria-expanded:bg-input dark:hover:bg-input",
-    text: "text-foreground"
+    fill: "bg-status-neutral",
+    hover: "hover:bg-status-neutral/80 aria-expanded:bg-status-neutral/80 dark:hover:bg-status-neutral/80",
+    text: "text-status-neutral-foreground"
   },
-  green: {
-    fill: "bg-emerald-500/15",
-    hover: "hover:bg-emerald-500/25 aria-expanded:bg-emerald-500/25 dark:hover:bg-emerald-500/25",
-    text: "text-emerald-800 dark:text-emerald-300"
+  ok: {
+    fill: "bg-status-ok",
+    hover: "hover:bg-status-ok/80 aria-expanded:bg-status-ok/80 dark:hover:bg-status-ok/80",
+    text: "text-status-ok-foreground"
   },
-  amber: {
-    fill: "bg-amber-500/15",
-    hover: "hover:bg-amber-500/25 aria-expanded:bg-amber-500/25 dark:hover:bg-amber-500/25",
-    text: "text-amber-800 dark:text-amber-300"
+  warn: {
+    fill: "bg-status-warn",
+    hover: "hover:bg-status-warn/80 aria-expanded:bg-status-warn/80 dark:hover:bg-status-warn/80",
+    text: "text-status-warn-foreground"
   }
 }
 

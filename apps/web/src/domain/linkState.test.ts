@@ -104,10 +104,10 @@ describe("syncStatusOf", () => {
       "publishedDraft"
     ]
     assert.deepStrictEqual(statuses.map((status) => [SYNC_STATUS_LABELS[status], SYNC_STATUS_TONES[status]]), [
-      ["Unsaved", "amber"],
+      ["Unsaved", "warn"],
       ["Not exported", "neutral"],
-      ["In sync", "green"],
-      ["Changed since export", "amber"],
+      ["In sync", "ok"],
+      ["Changed since export", "warn"],
       ["Published draft", "neutral"]
     ])
   })

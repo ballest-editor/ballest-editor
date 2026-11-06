@@ -8,6 +8,12 @@ describe("cn", () => {
     }
   })
 
+  it("keeps a status colour beside a text role, and over a badge's own fill", () => {
+    expect(cn("text-caption", "text-status-ok-foreground")).toBe("text-caption text-status-ok-foreground")
+    expect(cn("bg-secondary text-secondary-foreground", "bg-status-warn text-status-warn-foreground"))
+      .toBe("bg-status-warn text-status-warn-foreground")
+  })
+
   it("lets a later text role, radius or padding replace an earlier one", () => {
     expect(cn("text-body", "text-body")).toBe("text-body")
     expect(cn("text-caption", "text-title")).toBe("text-title")
