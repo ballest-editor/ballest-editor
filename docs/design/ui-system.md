@@ -116,6 +116,7 @@ A segmented control is `ToggleGroup`, one track with a pill inside that slides t
 | Inputs, buttons    | 28px (`h-7`); menu items too                                                          |
 | Segmented control  | 28px: 24px items in a track with 2px of padding                                       |
 | Rows               | 24px dense (outline, thumbnails at 16px), 32px with a larger thumbnail or second line |
+| Rows with a tile   | 40px: a 32px thumbnail beside two lines (the Project panel)                           |
 | Icon buttons       | 24px target, 16px icon: `Button size="icon-sm"`, no size classes                      |
 | Panel tab strip    | 28px                                                                                  |
 | Document tab strip | 32px, as is a popped-out panel's strip (the window controls' height)                  |

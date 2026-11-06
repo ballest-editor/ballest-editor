@@ -64,6 +64,9 @@ export const projectHandlers = {
   renameMap: ({ from, to, text }) => Effect.flatMap(Effect.service(MapFiles), (files) => files.rename(from, to, text)),
   writeSidecar: ({ fileName, text }) =>
     Effect.flatMap(Effect.service(MapFiles), (files) => files.writeSidecar(fileName, text)),
+  readMapThumbnail: ({ hash }) => Effect.flatMap(Effect.service(MapFiles), (files) => files.readThumbnail(hash)),
+  writeMapThumbnail: (thumbnail) =>
+    Effect.flatMap(Effect.service(MapFiles), (files) => files.writeThumbnail(thumbnail)),
   listPrefabs: ({ tier }) => Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.list(tier)),
   readPrefab: (ref) => Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.read(ref)),
   writePrefab: (payload) => Effect.flatMap(Effect.service(Prefabs), (prefabs) => prefabs.write(payload)),

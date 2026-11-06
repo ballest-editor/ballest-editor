@@ -15,8 +15,9 @@ import "dockview-react/dist/styles/dockview.css"
 import { type ComponentType, type ReactNode, useEffect, useRef, useState } from "react"
 import { DOCUMENTS_PANEL } from "../../domain/dockLayout"
 import { Viewport } from "../../editor/Viewport"
-import { closesOnMiddleClick, DocumentTabs } from "../DocumentTabs"
+import { DocumentTabs } from "../DocumentTabs"
 import { EditorSkeletonPanels } from "../EditorSkeleton"
+import { onMiddleClick } from "../middleClick"
 import { ViewportControls } from "../ViewControls"
 import "./dock.css"
 import { attachDock, expandGroup, isCentreGroup, togglePanel, useClosedPanelsIn, useGroupFold } from "./dockControl"
@@ -91,7 +92,7 @@ function DockTab({ api, containerApi }: IDockviewPanelHeaderProps) {
             <div
               className="dock-tab group flex h-full min-w-0 items-center gap-1 px-2 text-body"
               onClick={expand}
-              {...closesOnMiddleClick(() => api.close())}
+              {...onMiddleClick(() => api.close())}
             />
           }
         >

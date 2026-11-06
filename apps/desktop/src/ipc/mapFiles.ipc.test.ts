@@ -133,6 +133,63 @@ describe("sidecars over IPC", () => {
     ))
 })
 
+describe("map thumbnails over IPC", () => {
+  const map = "Map_LevelEditorMain&Track_me.balledit"
+  const png = (bytes: string) => `data:image/png;base64,${btoa(bytes)}`
+  const hashOf = (text: string) => sha256(new TextEncoder().encode(text))
+
+  it.effect("keeps a thumbnail under its map's hash, and drops the one a later save left behind", () =>
+    withHandlers(({ fake, project }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const folder = path.join(project, ".ballest", "thumbnails")
+        const one = hashOf("{\"v\":1}")
+        const two = hashOf("{\"v\":2}")
+        yield* fake.invoke(InvokeChannels.createMap, { fileName: map, text: "{\"v\":1}" })
+        assert.isNull(yield* fake.invoke(InvokeChannels.readMapThumbnail, { hash: one }))
+
+        yield* fake.invoke(InvokeChannels.writeMapThumbnail, { hash: one, png: png("first") })
+        assert.strictEqual(yield* fs.readFileString(path.join(folder, `${one}.png`)), "first")
+        assert.strictEqual(yield* fake.invoke(InvokeChannels.readMapThumbnail, { hash: one }), png("first"))
+
+        yield* fake.invoke(InvokeChannels.saveMap, { fileName: map, text: "{\"v\":2}" })
+        yield* fake.invoke(InvokeChannels.writeMapThumbnail, { hash: two, png: png("second") })
+        assert.deepStrictEqual(yield* fs.readDirectory(folder), [`${two}.png`])
+        assert.isNull(yield* fake.invoke(InvokeChannels.readMapThumbnail, { hash: one }))
+      })
+    ))
+
+  it.effect("keeps nothing for a file no map has any more: the render outlasted the next save", () =>
+    withHandlers(({ fake, project }) =>
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        yield* fake.invoke(InvokeChannels.createMap, { fileName: map, text: "{\"v\":1}" })
+        yield* fake.invoke(InvokeChannels.writeMapThumbnail, { hash: hashOf("{\"v\":0}"), png: png("late") })
+        assert.isFalse(yield* fs.exists(path.join(project, ".ballest", "thumbnails")))
+      })
+    ))
+
+  it.effect("refuses a hash that could leave the folder, and anything but a PNG", () =>
+    withHandlers(({ fake }) =>
+      Effect.gen(function*() {
+        const hash = hashOf("{\"v\":1}")
+        yield* fake.invoke(InvokeChannels.createMap, { fileName: map, text: "{\"v\":1}" })
+        const refused = [
+          { hash: "../../outside", png: png("x") },
+          { hash, png: "data:text/html;base64,PGI+" },
+          { hash, png: "not a data url" }
+        ]
+        for (const payload of refused) {
+          const error = yield* Effect.flip(fake.invoke(InvokeChannels.writeMapThumbnail, payload))
+          assert.match(String(error.cause), /Expected|Invalid|does not match/i)
+        }
+        yield* Effect.flip(fake.invoke(InvokeChannels.readMapThumbnail, { hash: "../../outside" }))
+      })
+    ))
+})
+
 describe("MapFiles over IPC", () => {
   it.effect("New map makes the project on disk, and New map, Save, Rename and list keep to its maps folder", () =>
     withHandlers(({ fake, project }) =>

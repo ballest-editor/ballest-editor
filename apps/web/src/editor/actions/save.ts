@@ -12,6 +12,7 @@ import { Platform } from "../../services/Platform"
 import { type Doc, gameMapOf, type OpenFile, type ProjectMap, tabStateOf, useEditor } from "../store"
 import { ASK_FIRST, writeToGame } from "./gameWrite"
 import { nameProjectEffect } from "./maps"
+import { cacheMapThumbnail } from "./mapThumbnails"
 import { savePrefabTab } from "./prefabs"
 import { run } from "./run"
 import { fileOf, projectName, refreshProject, revealIn, saveTabPrefs, writeProjectMap, writeSidecarOf } from "./shared"
@@ -28,12 +29,16 @@ const exportOpenMap = Effect.gen(function*() {
 
 type ExportedOpenMap = Effect.Success<typeof exportOpenMap>
 
-/** Tab `tabId` has the map `written` open, with its sidecar and prefs under the name it went to. */
+/**
+ * Tab `tabId` has the map `written` open, with its sidecar and prefs under the name it went to. Its thumbnail follows
+ * in the background: a save doesn't wait for a render.
+ */
 const afterWrite = Effect.fnUntraced(function*({ doc, result, tabId }: ExportedOpenMap, written: ProjectMap) {
   useEditor.getState().markSaved(tabId, doc, result.map, fileOf(written))
   yield* writeSidecarOf(doc, written.fileName, written.hash)
   yield* saveTabPrefs(tabId)
   yield* refreshProject
+  yield* Effect.forkDetach(cacheMapThumbnail(doc, written.hash))
 })
 
 /**

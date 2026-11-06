@@ -58,7 +58,7 @@ Until one is used, the window is **Untitled Project**: `ProjectState.current` is
 
 `components/DocumentTabs.tsx` puts a tab over the viewport for each open map, each with its own history, selection, grid height and camera view. The web review build has tabs too, for maps in memory.
 
-- Opening a map (the Project panel, a notification's Open) makes its tab active, or opens it in a new tab after the active one. Import and Recover of a map that isn't open do the same. New map always adds a tab after the active one. Opening a map shows no toast.
+- Opening a map (the Project panel, a notification's Open) makes its tab active, or opens it in a new tab after the active one. Import and Recover of a map that isn't open do the same. New map always adds a tab after the active one. Opening a map shows no toast. A map's row from the Project panel dropped on the strip opens it the same way, in the gap the line shows, and a map already open has its tab moved there.
 - A **blank tab** is a fresh map nobody has edited: what the app starts on, what New map adds, what closing the last tab leaves (`isBlankTab`). Selecting in it isn't an edit. It holds nothing to lose, so it has no dot and no Unsaved badge until the first edit, closing it asks nothing, a map opened while it is the active tab takes its place, and a switch of projects drops it (§ Window). New map is the one thing that never reuses it.
 - The store keeps the active tab's state where every edit works and parks the others (`TabState`, `parkedTabs`). A save lands in the tab it started from.
 - There is always a map, never a Start tab or an empty editor. The required chooser (§ Other windows) holds the fresh map too, though it shows no editor. On launch the app opens the map that was open when it last ran, else the project's most recently edited map, else a fresh unsaved map (what New map starts, named Untitled, nothing written; its first Save names it into the project).
@@ -156,13 +156,13 @@ There is no Map or Game menu: the menus act on the active tab's map, and the gam
 
 `components/ProjectPanel.tsx` is the Project panel (§ Dock). It lists the project and its maps, the way an editor's file explorer shows a workspace.
 
-- Each row shows the map and its sync status (§ Status bar) as a badge, in the status bar's words and colours. Hovering the badge gives the link state and when the map was last exported, and hovering the name when it was last edited. Both tooltips open below the row, clear of the badge and the ⋮ button.
-- A click opens the map.
+- Each row is 40px: a 32px tile, then the map's name and its sync status (§ Status bar) as a badge, in the status bar's words and colours, and under them "Edited 3 min ago". That time is the last edit in the map's tab while it has unsaved edits, else the file's. Hovering the badge gives the link state and when the map was last exported, and hovering the name the date and time it was last edited. Both tooltips open below the row, clear of the second line and the ⋮ button.
+- The tile is a top-down render of the map (`editor/mapThumbnails.ts`), the Top pane's way up, on a transparent background and framed to the items, less the outermost 2% across the ground, so one item far from the rest doesn't shrink them to a speck. Save renders it after the write, in the background, and main keeps it under the file's hash (`writeMapThumbnail`, [PROJECTS.md § The files](PROJECTS.md#the-files)), so it shows only for those bytes. Until then, and once anything else changes the file (Import, Re-import), the tile holds the map glyph. A map with nothing to draw keeps the glyph too.
+- A click opens the map. A middle click opens it behind the active tab, which stays active (`openProjectMapBehind`), and does nothing to a map already open. Dragging the row onto the tab strip opens it there (§ Document tabs).
 - Its menu (⋮, or a right-click) holds Open, Rename…, Duplicate…, Backups…, Export to game, Play and Reveal in folder. The ones that act on the open map open it first (`withProjectMapOpen`). Reveal in folder shows the project's maps folder, not the file.
 - The header holds the project's name, with its folder on hover, or an Untitled chip in Untitled Project, then New map, Import map and Project settings. Import map is disabled in Untitled Project, and its tooltip says why.
-- Every tab whose map has no file yet (a fresh one, any in Untitled Project, what a switch of projects left open) is a row of its own above the project's maps, badged Unsaved unless it is blank. A click makes that tab active.
+- Every tab whose map has no file yet (a fresh one, any in Untitled Project, what a switch of projects left open) is a row of its own above the project's maps, with the glyph and "Not saved yet", badged Unsaved unless it is blank. A click makes that tab active.
 - A project with no maps has one line and a New map button, centred in the space under those rows. In Untitled Project the header's chip says on hover that saving a map creates the project.
-- No thumbnails yet.
 
 ### Outline
 

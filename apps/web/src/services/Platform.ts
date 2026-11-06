@@ -42,6 +42,7 @@ import type {
   UnloadKind,
   UnsavedChoice,
   UpdateState,
+  WriteMapThumbnailPayload,
   WritePrefabPayload
 } from "@ballest/contracts"
 import { prefabSummaryOf } from "@ballest/contracts"
@@ -163,6 +164,10 @@ export class Platform extends Context.Service<Platform, {
   readonly writeSidecar: (
     file: { readonly fileName: string; readonly text: string }
   ) => Effect.Effect<void, PlatformError>
+  /** The thumbnail kept for the map file with this hash, as a PNG data URL; null when it has none, and in a browser. */
+  readonly readMapThumbnail: (hash: string) => Effect.Effect<string | null, PlatformError>
+  /** Keeps a map's thumbnail under the hash of the file it shows (a browser keeps none). */
+  readonly writeMapThumbnail: (thumbnail: WriteMapThumbnailPayload) => Effect.Effect<void, PlatformError>
   /** A tier's prefabs by name (docs/DESKTOP.md § Prefabs). A browser keeps its `user` tier in memory, and has no other. */
   readonly listPrefabs: (tier: PrefabTier) => Effect.Effect<PrefabInfos, PlatformError>
   readonly readPrefab: (ref: PrefabRef) => Effect.Effect<PrefabRead, PlatformError>
@@ -364,6 +369,8 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     saveMap: (file) => call("saveMap", file),
     renameMap: (file) => call("renameMap", file),
     writeSidecar: (file) => call("writeSidecar", file),
+    readMapThumbnail: (hash) => call("readMapThumbnail", { hash }),
+    writeMapThumbnail: (thumbnail) => call("writeMapThumbnail", thumbnail),
     listPrefabs: (tier) => call("listPrefabs", { tier }),
     readPrefab: (ref) => call("readPrefab", ref),
     writePrefab: (payload) => call("writePrefab", payload),
@@ -536,6 +543,8 @@ const makeBrowser = (): Platform["Service"] => {
     saveMap: () => noProject,
     renameMap: () => noProject,
     writeSidecar: () => noProject,
+    readMapThumbnail: () => Effect.succeed(null),
+    writeMapThumbnail: () => Effect.void,
     importMap: () => noProject,
     exportMap: () => desktopOnly,
     checkExports: Effect.succeed({ changed: [], missing: [] }),

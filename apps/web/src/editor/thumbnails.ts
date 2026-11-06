@@ -8,14 +8,19 @@
  * off a queue so a long list never stalls the UI.
  *
  * `frameBox`, `SerialQueue`, `texturesOf` and `whenTexturesReady` are unit-tested; the WebGL part is a thin wrapper.
+ * A map's thumbnail (`mapThumbnails.ts`) is drawn on the same stage, off the same queue.
  */
 import * as THREE from "three"
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { type CatalogIndex, type CatalogPiece, pieceIdOf } from "../domain/Catalog"
-import { type Tuple3, UE_TO_THREE_MATRIX, ueToScene } from "../domain/coords"
+import { fromTuple3, toTuple3, type Tuple3, UE_TO_THREE_MATRIX, ueToScene, ueToThreeVector } from "../domain/coords"
+import { DECAL_VISUAL_SCALE, editTransform, isDecal } from "../domain/editTransform"
 import { itemFromPiece, placementTransform } from "../domain/factory"
+import type { Item } from "../domain/MapFile"
 import type { MaterialTable } from "../domain/Materials"
+import { mirrorScaleOf } from "../domain/mirror"
+import type { Surfaces } from "../domain/surface"
 import { applySlotMaterials, shaderPatchOf, textureLoaded } from "./materials"
 import { isMesh, isTexture } from "./threeGuards"
 import { glbUrl, visualsOf } from "./visuals"
@@ -29,7 +34,7 @@ const VIEW_DIRECTION: Tuple3 = [1, 0.8, 1]
 /** Fraction of the frame the piece's bounding sphere may fill. */
 const FILL = 0.92
 /** How long to wait for a piece's textures before rendering it as is. */
-const TEXTURE_WAIT_MS = 3000
+export const TEXTURE_WAIT_MS = 3000
 
 export interface Framing {
   readonly position: Tuple3
@@ -90,19 +95,30 @@ const loadGlb = (url: string): Promise<THREE.Group> => {
 
 const ueToThree = new THREE.Matrix4().set(...UE_TO_THREE_MATRIX)
 
-/** The piece as the viewport would draw it when freshly placed at the origin; undefined if it has no mesh. */
-const buildPiece = async (
-  piece: CatalogPiece,
+/** What `ItemObject` scales an item's meshes by, inside its own transform: its mirroring, and a decal's unit size. */
+const visualScaleOf = (item: Item, index: CatalogIndex): Tuple3 => {
+  const mirror = mirrorScaleOf(item, index)
+  const [x, y, z] = mirror === undefined ? [1, 1, 1] : toTuple3(ueToThreeVector(fromTuple3(mirror)))
+  const decal = isDecal(item) ? DECAL_VISUAL_SCALE : 1
+  return [x * decal, y * decal, z * decal]
+}
+
+/** The item as the viewport draws it, where it is; undefined if none of its meshes loaded. */
+export const buildItem = async (
+  item: Item,
   index: CatalogIndex,
-  table: MaterialTable
+  table: MaterialTable | null,
+  surfaces: Surfaces = []
 ): Promise<THREE.Group | undefined> => {
-  const item = itemFromPiece(piece, placementTransform(piece, { x: 0, y: 0, z: 0 }))
   const root = new THREE.Group()
-  const transform = ueToScene(item.itemTransform)
+  const transform = ueToScene(editTransform(item))
   root.position.set(...transform.position)
   root.quaternion.set(...transform.quaternion)
   root.scale.set(...transform.scale)
-  const visuals = visualsOf(item, index)
+  const meshes = new THREE.Group()
+  meshes.scale.set(...visualScaleOf(item, index))
+  root.add(meshes)
+  const visuals = visualsOf(item, index, surfaces)
   // A failed glb just leaves that part out, like the viewport's warning box would.
   const scenes = await Promise.all(visuals.map((visual) => {
     const url = glbUrl(visual.mesh?.glb)
@@ -117,17 +133,17 @@ const buildPiece = async (
     holder.add(scene.clone(true))
     applySlotMaterials(holder, table, visual.slotMaterials)
     if (visual.relative === undefined) {
-      root.add(holder)
+      meshes.add(holder)
     } else {
       const placed = new THREE.Group()
       placed.position.set(...visual.relative.position)
       placed.quaternion.set(...visual.relative.quaternion)
       placed.scale.set(...visual.relative.scale)
       placed.add(holder)
-      root.add(placed)
+      meshes.add(placed)
     }
   })
-  return root.children.length === 0 ? undefined : root
+  return meshes.children.length === 0 ? undefined : root
 }
 
 /**
@@ -201,12 +217,33 @@ const stageOf = (): Stage => {
   return stage
 }
 
+/**
+ * `object` as `camera` sees it on the shared stage, `size` px square, as a PNG data URL. Its shaders compile first, off
+ * the page's thread: left to the render, a map's many materials would hold the page up for as long as they take.
+ */
+export const snapshot = async (
+  object: THREE.Object3D,
+  camera: THREE.Camera,
+  size = THUMBNAIL_SIZE
+): Promise<string> => {
+  const { renderer, scene } = stageOf()
+  renderer.setSize(size, size, false)
+  scene.add(object)
+  try {
+    await renderer.compileAsync(scene, camera)
+    renderer.render(scene, camera)
+    return renderer.domElement.toDataURL("image/png")
+  } finally {
+    scene.remove(object)
+  }
+}
+
 const render = async (piece: CatalogPiece, index: CatalogIndex, table: MaterialTable): Promise<string | undefined> => {
-  const object = await buildPiece(piece, index, table)
+  const item = itemFromPiece(piece, placementTransform(piece, { x: 0, y: 0, z: 0 }))
+  const object = await buildItem(item, index, table)
   if (object === undefined) return undefined
   await whenTexturesReady(texturesOf(object), TEXTURE_WAIT_MS)
-  const { camera, renderer, scene } = stageOf()
-  scene.add(object)
+  const { camera } = stageOf()
   object.updateMatrixWorld(true)
   const box = new THREE.Box3().setFromObject(object)
   const framing = frameBox(box.min.toArray(), box.max.toArray(), camera.aspect)
@@ -215,13 +252,11 @@ const render = async (piece: CatalogPiece, index: CatalogIndex, table: MaterialT
   camera.far = framing.far
   camera.lookAt(...framing.target)
   camera.updateProjectionMatrix()
-  renderer.render(scene, camera)
-  const url = renderer.domElement.toDataURL("image/png")
-  scene.remove(object)
-  return url
+  return snapshot(object, camera)
 }
 
-const queue = new SerialQueue()
+/** One render at a time on the stage. */
+export const stageQueue = new SerialQueue()
 const cache = new Map<string, Promise<string | undefined>>()
 
 /**
@@ -236,7 +271,7 @@ export const thumbnailFor = (
   const id = pieceIdOf(piece)
   const cached = cache.get(id)
   if (cached !== undefined) return cached
-  const promise = queue.run(() => render(piece, index, table)).catch((error: unknown) => {
+  const promise = stageQueue.run(() => render(piece, index, table)).catch((error: unknown) => {
     console.warn(`Couldn't render a thumbnail for ${piece.className}.`, error)
     return undefined
   })

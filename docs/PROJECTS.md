@@ -23,6 +23,7 @@ The link between a map and its export is specific to this machine and is never s
   .ballest/
     link.json                  per map: origin, last export (path, hash, time), last seen game hash
     backups/                   previous versions of overwritten files (#137)
+    thumbnails/                the Project panel's renders of the maps, by file hash
   .gitignore                   .ballest/
 ```
 
@@ -80,6 +81,7 @@ The code is in `apps/desktop/src/project/`. Main reads and writes only these, th
   - An export found gone sets both to null, and `origin` stays.
 
   The `MapLinks` service owns the file: one update at a time, atomic writes, and a file that doesn't decode reads as empty.
+- **`.ballest/thumbnails/<SHA-256 of the map's file>.png`** is the map's tile in the Project panel, 64px square, rendered by the page after a Save ([DESKTOP.md § Project panel](DESKTOP.md#project-panel)). Main refuses one for bytes no map has any more, which a slow render can be by the time it is done, and each write drops the ones no map has. It's a cache: deleting the folder costs only the tiles until each map's next Save.
 - **`.ballest/backups/<time> <file name>`** holds the project's copy of a map, sidecar or prefab before anything wrote over it, and the old file after a Rename. The game's copy before an export wrote over it goes to `<userData>/backups/` instead, since it belongs to this machine and not to the project. [DESKTOP.md § Backups](DESKTOP.md#backups) has the rules.
 
 `desktop-settings.json` keeps the recent projects under `project.recent`, at most 8, the last one used first. An empty list means Untitled Project. A window has one project, kept in memory, so another running copy changing the list doesn't move it. A project opens in one window at a time. [DESKTOP.md § Other windows](DESKTOP.md#other-windows) has where a window starts and how windows know about each other.
@@ -163,4 +165,4 @@ The order settles where files live before anyone installs a release, because mov
 | 6     | 0.5       | Open  | Projects proper. Thumbnails in the Project panel and Welcome; the maps folder and Workshop browser (#103); the rest of #143; git history and diff (#105); multi-map with shared bases (#104).                               |
 | 7     | later     | Open  | Derived data. Generators, derived pieces and splines make the sidecar authoritative for the pieces they own; detached pieces.                                                                                               |
 
-What stays out of the public launch on purpose: a separate project-manager window in the Godot style, git, thumbnails in the Project panel, the Workshop browser, multi-map, and any merge. Phases 1 to 3 are small on disk (a folder, one JSON file, a hash) and large in how the app reads; that is the trade.
+What stays out of the public launch on purpose: a separate project-manager window in the Godot style, git, the Workshop browser, multi-map, and any merge. Phases 1 to 3 are small on disk (a folder, one JSON file, a hash) and large in how the app reads; that is the trade.

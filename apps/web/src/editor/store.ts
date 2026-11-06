@@ -310,6 +310,8 @@ export interface TabState {
   readonly future: ReadonlyArray<Snapshot>
   /** `doc` isn't what the file holds, or the file has none of it: undoing or redoing back to `savedDoc` clears this. */
   readonly dirty: boolean
+  /** When the map was last edited in this tab; null until it is. A saved map's time is its file's. */
+  readonly editedAt: string | null
   /** The step of the history the file holds. Null when none does: a recovered map, or one that has lost its file. */
   readonly savedDoc: Doc | null
   /** Null for a map that was never opened or saved. */
@@ -331,9 +333,10 @@ export interface TabState {
 
 /**
  * Where `loadMap` puts a map: over the active tab's, over another tab's (`tabId`), or in a new tab after the active
- * one (`newTab`), which takes the active tab's place instead while that is blank (`isBlankTab`).
+ * one (`newTab`), which takes the active tab's place instead while that is blank (`isBlankTab`). `backgroundTab` is a
+ * new tab there too, always, and the active tab stays active.
  */
-export type TabTarget = "active" | "newTab" | "addedTab" | { readonly tabId: string }
+export type TabTarget = "active" | "newTab" | "addedTab" | "backgroundTab" | { readonly tabId: string }
 
 /** How a tab opens: what it holds beside its map, and what it starts on other than the defaults. */
 interface TabOptions {
@@ -356,6 +359,8 @@ export interface EditorState extends TabState {
   readonly project: ProjectState | null
   /** The project's maps, most recently changed first (desktop). */
   readonly projectMaps: ReadonlyArray<ProjectMap>
+  /** The project maps' thumbnails seen so far, as PNG data URLs, by the hash of the file each shows. */
+  readonly mapThumbnails: ReadonlyMap<string, string>
   /** Every prefab of both tiers, as last listed. */
   readonly prefabs: PrefabInfos
   /** What the platform (browser or desktop app) offers; the browser's until the startup load says otherwise. */
@@ -469,6 +474,8 @@ export interface EditorState extends TabState {
   readonly markPrefabSaved: (tabId: string, from: Doc, document: PrefabDocument, file: OpenFile) => void
   readonly setPrefabs: (prefabs: PrefabInfos) => void
   readonly setProject: (project: ProjectState, maps: ReadonlyArray<ProjectMap>) => void
+  /** Keeps a thumbnail, and lets go of those no project map has any more. */
+  readonly setMapThumbnail: (hash: string, png: string) => void
   /**
    * The open maps no longer have files: they stay open with their edits as unsaved, and the next Save names each into
    * the project in use (after switching to another project).
@@ -628,6 +635,7 @@ const freshTabState = (
     past: [],
     future: [],
     dirty,
+    editedAt: null,
     savedDoc: dirty ? null : doc,
     file,
     exportOnSave: options?.exportOnSave ?? false,
@@ -648,6 +656,7 @@ const activeTabOf = (s: EditorState): TabState => ({
   past: s.past,
   future: s.future,
   dirty: s.dirty,
+  editedAt: s.editedAt,
   savedDoc: s.savedDoc,
   file: s.file,
   exportOnSave: s.exportOnSave,
@@ -678,7 +687,8 @@ export const useEditor = create<EditorState>()((set, get) => {
       doc,
       enteredGroupId: keptEnteredGroup(doc, s.enteredGroupId),
       ...stepFrom(s.past, before ?? s, extra.selectedIds ?? s.selectedIds),
-      dirty: true
+      dirty: true,
+      editedAt: new Date().toISOString()
     }))
 
   /**
@@ -734,6 +744,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     return {
       doc,
       dirty: doc !== s.savedDoc,
+      editedAt: snapshot.selectionOnly ? s.editedAt : new Date().toISOString(),
       selectedIds: snapshot.selectedIds.filter((id) => existing.has(id)),
       enteredGroupId: keptEnteredGroup(doc, s.enteredGroupId),
       // the side being left, for the opposite stack
@@ -772,6 +783,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     parkedTabs: new Map(),
     project: null,
     projectMaps: [],
+    mapThumbnails: new Map(),
     prefabs: [],
     capabilities: { projects: false, exportToGame: false, launchGame: false, play: false, updates: false },
     gamePaths: null,
@@ -812,6 +824,17 @@ export const useEditor = create<EditorState>()((set, get) => {
       const into = options?.into ?? "active"
       if (typeof into === "object" && into.tabId !== get().tabId) {
         updateTab(into.tabId, () => tab)
+        return
+      }
+      if (into === "backgroundTab") {
+        set((s) => {
+          const tabId = freshTabId()
+          const at = s.tabIds.indexOf(s.tabId) + 1
+          return {
+            tabIds: [...s.tabIds.slice(0, at), tabId, ...s.tabIds.slice(at)],
+            parkedTabs: new Map(s.parkedTabs).set(tabId, tab)
+          }
+        })
         return
       }
       set((s) => {
@@ -863,7 +886,8 @@ export const useEditor = create<EditorState>()((set, get) => {
           selectedIds,
           enteredGroupId: keptEnteredGroup(doc, tab.enteredGroupId),
           ...stepFrom(tab.past, tab, selectedIds),
-          dirty: true
+          dirty: true,
+          editedAt: new Date().toISOString()
         }
       }),
     patchTab: (tabId, patch) => updateTab(tabId, () => patch),
@@ -893,6 +917,11 @@ export const useEditor = create<EditorState>()((set, get) => {
       updateTab(tabId, (tab) => ({ document, savedDoc: from, dirty: tab.doc !== from, file })),
     setPrefabs: (prefabs) => set({ prefabs }),
     setProject: (project, projectMaps) => set({ project, projectMaps }),
+    setMapThumbnail: (hash, png) =>
+      set((s) => {
+        const kept = new Set(s.projectMaps.map((map) => map.hash))
+        return { mapThumbnails: new Map([...s.mapThumbnails].filter(([key]) => kept.has(key))).set(hash, png) }
+      }),
     detachFiles: () =>
       set((s) => {
         // a user prefab belongs to the game, whichever project is in use
@@ -1543,6 +1572,19 @@ export const useTabSummary = (tabId: string) =>
 /** The definition in the active tab, if that's what it holds: what Export and Play are off for. */
 export const useOpenPrefab = (): PrefabDocument | null =>
   useEditor((s) => s.document.kind === "prefab" ? s.document : null)
+
+/**
+ * When the project map `fileName` was last edited, as the Project panel says it: `modifiedAt`, its file's time, unless
+ * a tab holds edits the file doesn't have.
+ */
+export const editedAtOf = (s: EditorState, fileName: string, modifiedAt: string): string => {
+  const tabId = tabWithFile(s, fileName)
+  const tab = tabId === undefined ? undefined : tabStateOf(s, tabId)
+  return tab?.dirty === true ? tab.editedAt ?? modifiedAt : modifiedAt
+}
+
+export const useEditedAt = (fileName: string, modifiedAt: string): string =>
+  useEditor((s) => editedAtOf(s, fileName, modifiedAt))
 
 /** Whether the project map `fileName` is open in a tab with unsaved edits. */
 export const useHasUnsavedEdits = (fileName: string): boolean =>
