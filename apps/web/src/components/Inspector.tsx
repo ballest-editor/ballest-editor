@@ -27,7 +27,7 @@ import { formatBindings, type KeybindAction, keybindActionLabels } from "../doma
 import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/MapFile"
 import { assetNameOf } from "../domain/Materials"
 import { pieceNameOf } from "../domain/structure"
-import { createdAtIso, formatAgo, formatDateTime } from "../domain/time"
+import { createdAtIso, formatAgo, formatDate, formatDateTime } from "../domain/time"
 import {
   deleteSelection,
   duplicateSelection,
@@ -42,6 +42,7 @@ import { useNow } from "../editor/useNow"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { Disclosure } from "./Disclosure"
 import { FlipSection } from "./FlipSection"
+import { HintBadge } from "./HintBadge"
 import { InfoHint } from "./InfoHint"
 import { ItemProperties } from "./ItemProperties"
 import { ShiftClick } from "./KeyChip"
@@ -97,7 +98,7 @@ function FileFact({ name, tip, onReveal }: {
   )
 }
 
-/** When the map was made, as long ago as it was, with the date in the tooltip. */
+/** The day the map was made, with how long ago and the time of day in the tooltip. */
 function CreatedFact({ createdAt }: { readonly createdAt: string }) {
   const now = useNow()
   if (createdAt === "") {
@@ -109,12 +110,30 @@ function CreatedFact({ createdAt }: { readonly createdAt: string }) {
   }
   const iso = createdAtIso(createdAt)
   if (iso === null) return <Fact label="Created">{createdAt}</Fact>
+  const date = formatDate(iso)
+  const ago = formatAgo(iso, now)
   return (
     <Fact label="Created">
-      <TipText tip={formatDateTime(iso)} className="truncate">{formatAgo(iso, now)}</TipText>
+      <TipText
+        className="truncate"
+        tip={
+          <>
+            {/* Past a week `formatAgo` gives the date too. */}
+            {ago !== date && <span>Created {ago}</span>}
+            <span>{formatDateTime(iso)}</span>
+          </>
+        }
+      >
+        {date}
+      </TipText>
     </Fact>
   )
 }
+
+const VALIDATED_HINT = "Someone finished a validation run of this map in the in-game editor, which set its medal times."
+
+const NOT_VALIDATED_HINT =
+  "A validation run is a race of the map in the in-game editor. Finishing one validates the map and sets its medal times. Ballest Editor can't run one, so open the map in the game."
 
 function MapSettings() {
   const levelData = useEditor((s) => s.doc.map.worldSettings.levelData)
@@ -149,22 +168,16 @@ function MapSettings() {
                 <InfoHint>Your creator name is set in Settings › General.</InfoHint>
               </>
             )
-            : <span className="truncate">{levelData.creatorName}</span>}
+            : <TipText tip={levelData.creatorName} className="min-w-0 truncate">{levelData.creatorName}</TipText>}
         </Fact>
         <Fact label="Items">{itemCount.toLocaleString()}</Fact>
         <CreatedFact createdAt={levelData.createdAt} />
         <Fact label="Status">
-          <TipText
-            className="flex items-center gap-1"
-            tip={levelData.bValidated
-              ? "You've finished this map's validation run in the game."
-              : "Finish a validation run of this map in the in-game editor to validate it."}
-          >
-            {levelData.bValidated
-              ? <IconCircleCheck className="size-4 shrink-0 text-fg-secondary" />
-              : <IconCircleDashed className="size-4 shrink-0 text-fg-tertiary" />}
-            {levelData.bValidated ? "Validated" : "Not validated"}
-          </TipText>
+          {levelData.bValidated
+            ? <IconCircleCheck className="size-4 shrink-0 text-fg-secondary" />
+            : <IconCircleDashed className="size-4 shrink-0 text-fg-tertiary" />}
+          {levelData.bValidated ? "Validated" : "Not validated"}
+          <InfoHint>{levelData.bValidated ? VALIDATED_HINT : NOT_VALIDATED_HINT}</InfoHint>
         </Fact>
         {file === null
           ? (
@@ -432,7 +445,7 @@ function PieceCounts({ items }: { readonly items: ReadonlyArray<Item> }) {
       {[...counts].map(([name, n]) => (
         <li key={name} className="break-words">
           {name}
-          <span className="ml-1 text-fg-tertiary">× {n}</span>
+          {n > 1 && <span className="ml-1 text-fg-tertiary">× {n}</span>}
         </li>
       ))}
     </ul>
@@ -455,6 +468,9 @@ function MeshWarning({ item }: { readonly item: Item }) {
   )
 }
 
+const PLAYER_START_HINT =
+  "A map has exactly one player start. Copy, Cut and Duplicate leave it out, and if you delete it, Save and Export refuse the map until Undo brings it back."
+
 /** What's selected: one item's piece, under its category, or a count with the pieces involved. */
 function SelectionHeader(
   { items, itemKey }: { readonly items: ReadonlyArray<Item>; readonly itemKey: string | undefined }
@@ -471,7 +487,7 @@ function SelectionHeader(
       {only === undefined
         ? <PieceCounts items={items} />
         : <div className="text-body-strong break-words">{ownName ?? pieceNameOf(only, catalogIndex)}</div>}
-      {items.some(isPlayerStart) && <Badge variant="secondary">Player start (required)</Badge>}
+      {items.some(isPlayerStart) && <HintBadge label="Player start (required)">{PLAYER_START_HINT}</HintBadge>}
       {only !== undefined && <MeshWarning item={only} />}
     </>
   )

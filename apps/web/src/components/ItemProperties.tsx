@@ -23,6 +23,7 @@ import {
   sliderStep
 } from "../domain/itemProperties"
 import { setSelectionProperties } from "../editor/actions"
+import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import { NumberField } from "./NumberField"
 import { SectionTitle } from "./SectionTitle"
 
@@ -149,7 +150,8 @@ function PropertyValue({ property, id, handleClassName }: {
   }
 }
 
-const CHANNEL_HANDLES = ["bg-red-500", "bg-green-500", "bg-blue-500"] as const
+/** Red, green and blue, in the axes' colours. */
+const CHANNEL_HANDLES = [AXIS_BG_CLASSES.x, AXIS_BG_CLASSES.y, AXIS_BG_CLASSES.z] as const
 
 const channelValues = (color: ColorProperty, pick: (channel: ItemProperty) => unknown): Rgb => {
   const [r, g, b] = color.channels.map((channel) => {
