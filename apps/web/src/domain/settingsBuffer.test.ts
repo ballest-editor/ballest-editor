@@ -66,6 +66,28 @@ describe("the settings buffer", () => {
     assert.isFalse(hasUnsaved(withMapEdit(EMPTY_BUFFER, entry, values, { workshop: workshopOf(back) })))
   })
 
+  describe("on a map with no tags, where the first tag on adds the map type tag", () => {
+    const untagged = newMapFile({ displayName: "Bare", creatorName: "me", createdAt: "2026-11-06" })
+      .worldSettings.levelData
+    const values = { levelData: untagged, exportOnSave: false }
+    const on = withTag(untagged, speed, true)
+
+    it("has nothing to save once that tag is off again", () => {
+      const buffer = withMapEdit(EMPTY_BUFFER, entry, values, { workshop: workshopOf(on) })
+      assert.isTrue(hasUnsaved(buffer))
+      const off = withTag(on, speed, false)
+      assert.notDeepEqual(off.mapTags, untagged.mapTags)
+      assert.isFalse(hasUnsaved(withMapEdit(buffer, entry, values, { workshop: workshopOf(off) })))
+    })
+
+    it("has nothing to save after Clear takes off a group's tags", () => {
+      const both = withTag(on, flow, true)
+      const buffer = withMapEdit(EMPTY_BUFFER, entry, values, { workshop: workshopOf(both) })
+      const cleared = [speed, flow].reduce((level, tag) => withTag(level, tag, false), both)
+      assert.isFalse(hasUnsaved(withMapEdit(buffer, entry, values, { workshop: workshopOf(cleared) })))
+    })
+  })
+
   it("ignores levelDifficulty, which a published map keeps at Beginner whatever its tag says", () => {
     const published = { ...withDifficulty(levelData, "expert"), levelDifficulty: "Beginner" as const }
     const values = { levelData: published, exportOnSave: false }

@@ -5,6 +5,7 @@
  */
 import { withLevelNames } from "./edits"
 import type { LevelData } from "./MapFile"
+import { MAP_TYPE_TAG } from "./mapTags"
 
 /**
  * A map's entry in the dialog: `map:<file name>` is a map in the project, `map:open` the open map while it has no file
@@ -56,11 +57,14 @@ export const EMPTY_BUFFER: SettingsBuffer = { maps: new Map() }
 export const hasUnsaved = (buffer: SettingsBuffer): boolean => buffer.projectName !== undefined || buffer.maps.size > 0
 
 const tagSetOf = ({ mapTags }: Workshop): ReadonlySet<string> =>
-  new Set(mapTags.gameplayTags.map((t) => t.tagName.toLowerCase()))
+  new Set(
+    mapTags.gameplayTags.map((t) => t.tagName.toLowerCase()).filter((name) => name !== MAP_TYPE_TAG.toLowerCase())
+  )
 
 /**
  * Whether two Workshop pages show the same: the same tags, in any order, because turning a tag off and on again moves
- * it. `levelDifficulty` doesn't count: published maps keep it at "Beginner" whatever their tag says.
+ * it. The map type tag doesn't count: the first tag on an untagged map adds it, taking that tag off leaves it, and the
+ * page has no control for it. Nor does `levelDifficulty`: published maps keep it at "Beginner" whatever their tag says.
  */
 const sameWorkshop = (a: Workshop, b: Workshop): boolean => {
   const [tags, others] = [tagSetOf(a), tagSetOf(b)]
