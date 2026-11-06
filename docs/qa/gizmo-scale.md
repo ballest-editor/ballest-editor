@@ -137,12 +137,30 @@ What does change is how a handle sits against the piece, which may be what was s
 
 The pivot stayed put in both.
 
+## What the panel's Location shows
+
+Measured with `GetSelectionTransformPropertyValue` on two cubes, the panel's value against the piece's own location. The panel doesn't show the piece's origin unless the pivot is there.
+
+| Selection                          | Piece's location | Panel's Location  | Gizmo             |
+| ---------------------------------- | ---------------- | ----------------- | ----------------- |
+| One cube, Left pivot               | (0, 0, 5000)     | (0, −500, 5500)   | The panel's point |
+| After Scale Y typed as 2           | (0, 500, 5000)   | (0, −500, 5500)   | The panel's point |
+| After X typed as 100 in the panel  | (100, 500, 5000) | (100, −500, 5500) | The panel's point |
+| One cube at yaw 90, Top pivot      | (3000, 0, 5000)  | (3000, 0, 6000)   | The panel's point |
+| After Scale Z typed as 3           | (3000, 0, 3000)  | (3000, 0, 6000)   | The panel's point |
+| Both, loose, the first cube active | Those two        | (1550, 250, 4000) | (100, −500, 5500) |
+| Both, grouped                      | Those two        | (1550, 500, 4500) | The panel's point |
+
+So for one piece the field is the pivot point: a scale leaves it alone while the piece's location moves, and typing into it moves the piece by what the pivot moved. For a group it's the frame. For several loose items it's the mean of their locations, which is the one case it isn't where the gizmo sits.
+
 ## What this means for the editor
 
 - One rule for a loose selection, a group and an inspector edit: `applyGroupDelta` and `selectionAxisEdit` in `apps/web/src/domain/groupTransform.ts`.
 - Scale always uses the piece's axes, so the toggle shows Local and is held while Scale is the tool. Unlike the game, Move and Rotate get back the mode they had: staying in Relative is what leaves the game's icon wrong, and a press the player can't see shouldn't change a later tool.
 - The toggle works with any selection, unlike the game's (#32 chose that).
 - A prefab instance pivots on the point its offsets count from, which is where the game's frame is ([groups-prefabs.md](groups-prefabs.md) § Spawning a prefab). It has to: a scale along one axis, about any other point, moves differently turned members in a way no single placement of the definition can give, so the instance would read as modified and stop following its prefab. Scaled along one axis as part of something larger (an outer group, or with a loose piece), it does read as modified, since that scale really has a different pivot.
+- The Transform section's Location is the piece's origin, the value the map stores, so unlike the game's it moves under a scale. The Pivot section's Position is the game's field: the pivot point, shown once it's off the origin, and a typed value moves the selection so the pivot lands there. With several loose items it follows the gizmo rather than the mean of their locations.
+- A whole group takes no pivot, as `CanSetSelectionPivot` says. The Pivot section is off for one.
 - The editor doesn't keep any other group's frame ([FORMAT.md](../FORMAT.md) § The editor's projection). Its gizmo sits on the centre of the bounds with no turn, as Ctrl+G makes, and that is worked out again after each edit. So after a turn it isn't where the game's would be: that one stays put and turned.
 
 ## What I could not measure

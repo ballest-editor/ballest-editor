@@ -1678,6 +1678,16 @@ export const selectionPivot = (
   return box === undefined ? own : { ...frame, pivot: boxCentreOf(box) }
 }
 
+/**
+ * The point the selection turns and scales about, live, when that's a pivot away from the active item's origin: what the
+ * game's Location field shows for one piece (docs/qa/gizmo-scale.md). Undefined for a whole group, which has its frame.
+ */
+export const shownPivotPoint = (s: EditorState): Vec3 | undefined => {
+  if (soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId) !== undefined) return undefined
+  const target = selectionPivot(s, (id) => shownTransform(s, id))
+  return target === undefined || sameVec(target.activePivot, target.active.translation) ? undefined : target.activePivot
+}
+
 /** Edit transforms as the game would take them, so a drag stops at a decal's limits as it happens. */
 export const fitTransforms = (
   s: EditorState,

@@ -1,16 +1,17 @@
-import { assert, describe, it } from "@effect/vitest"
+import { assert, beforeAll, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import fixture from "../domain/bundledCatalog.json"
-import { Catalog } from "../domain/Catalog"
+import { Catalog, indexCatalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { placementTransform } from "../domain/factory"
 import { applyGroupDelta, type Axis, readField, selectionAxisEdit, type TransformField } from "../domain/groupTransform"
 import { localToWorld } from "../domain/pivot"
 import { quatConjugate, quatMul, rotateVec, rotatorToQuat } from "../domain/ueMath"
-import { editSelectionAxis, previewSelectionAxis, setSelectionField } from "./actions"
-import { initialMap, pivotOf, shownTransform, useEditor } from "./store"
+import { editSelectionAxis, previewSelectionAxis, setSelectionField, setSelectionPivot } from "./actions"
+import { initialMap, pivotOf, shownPivotPoint, shownTransform, useEditor } from "./store"
 
-const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!
+const catalog = Schema.decodeUnknownSync(Catalog)(fixture)
+const cube = catalog.pieces.find((p) => p.className === "BP_Prim_Cube")!
 const s = () => useEditor.getState()
 const docTransform = (id: string) => s().doc.map.items[s().doc.ids.indexOf(id)]!.itemTransform
 
@@ -189,5 +190,61 @@ describe("scrubbing with pivots (#51)", () => {
     // a typed location still sets the origin
     editSelectionAxis("translation", "z", { kind: "set", value: 70 })
     for (const id of ids) assert.strictEqual(docTransform(id).translation.z, 70)
+  })
+})
+
+describe("a pivot on the piece, as measured in the game (docs/qa/gizmo-scale.md)", () => {
+  beforeAll(() => useEditor.setState({ catalogIndex: indexCatalog(catalog) }))
+
+  /** A lone cube at `translation`, selected, with `choice` for its pivot. */
+  const cubeAt = (translation: Vec3, yaw: number, choice: "Left" | "Top") => {
+    s().loadMap(initialMap(), null)
+    s().placePiece(cube, {
+      ...placementTransform(cube, translation),
+      translation: { ...translation },
+      rotation: { ...rotatorToQuat({ roll: 0, pitch: 0, yaw }) }
+    })
+    setSelectionPivot(choice)
+    return s().selectedIds[0]!
+  }
+
+  it("keeps the left face where it is and grows to the right", () => {
+    const id = cubeAt({ x: 0, y: 0, z: 5000 }, 0, "Left")
+    editSelectionAxis("scale3D", "y", { kind: "set", value: 2 })
+    expectVec(docTransform(id).translation, { x: 0, y: 500, z: 5000 }, "origin")
+    expectVec(shownPivotPoint(s())!, { x: 0, y: -500, z: 5500 }, "pivot")
+  })
+
+  it("keeps the top where it is and grows downwards, on a turned piece too", () => {
+    const id = cubeAt({ x: 3000, y: 0, z: 5000 }, 90, "Top")
+    editSelectionAxis("scale3D", "z", { kind: "set", value: 3 })
+    expectVec(docTransform(id).translation, { x: 3000, y: 0, z: 3000 }, "origin")
+    expectVec(shownPivotPoint(s())!, { x: 3000, y: 0, z: 6000 }, "pivot")
+  })
+
+  it("moves the piece by what its pivot moves, which is what the game's Location field does", () => {
+    const id = cubeAt({ x: 0, y: 0, z: 5000 }, 0, "Left")
+    editSelectionAxis("scale3D", "y", { kind: "set", value: 2 })
+    editSelectionAxis("translation", "x", { kind: "offset", by: 100 })
+    expectVec(docTransform(id).translation, { x: 100, y: 500, z: 5000 }, "origin")
+    expectVec(shownPivotPoint(s())!, { x: 100, y: -500, z: 5500 }, "pivot")
+  })
+
+  it("has no pivot point of its own to show on Default, or on a whole group", () => {
+    const { ids } = setup()
+    s().select(ids.slice(0, 1))
+    assert.strictEqual(shownPivotPoint(s()), undefined)
+    s().select(ids)
+    setSelectionPivot("Left")
+    assert.isDefined(shownPivotPoint(s()))
+    s().groupSelection()
+    assert.strictEqual(shownPivotPoint(s()), undefined)
+  })
+
+  it("refuses a pivot on a whole group, whose gizmo sits on its frame, as the game does", () => {
+    const { ids } = setup()
+    s().groupSelection()
+    setSelectionPivot("Left")
+    for (const id of ids) assert.strictEqual(pivotOf(s(), id).choice, "Default")
   })
 })
