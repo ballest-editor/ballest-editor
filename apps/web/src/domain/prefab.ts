@@ -181,12 +181,12 @@ export const prefabOfItems = (items: ReadonlyArray<Item>, catalog: CatalogIndex 
  * Where a definition's tab holds the prefab's frame: the default start, so it sits in the sky and above the water as a
  * map does, rather than under the water at the world's origin.
  */
-const TAB_FRAME: Vec3 = DEFAULT_PLAYER_START
+export const PREFAB_TAB_FRAME: Vec3 = DEFAULT_PLAYER_START
 
 /** A definition as a tab holds it: a map-like document with the prefab's items and nothing else. */
 export const mapOfPrefab = (name: string, prefab: PrefabFile, catalog: CatalogIndex | null): MapFile => ({
   ...newMapFile({ displayName: name, creatorName: "", createdAt: "" }),
-  items: prefab.items.map((item) => itemOfPrefab(item, TAB_FRAME, catalog))
+  items: prefab.items.map((item) => itemOfPrefab(item, PREFAB_TAB_FRAME, catalog))
 })
 
 /** What a definition's tab read of an item: the map's form and the file's, to write it back as it came. */
@@ -203,10 +203,10 @@ const sameMaterials = (a: PrefabItem, b: PrefabItem) =>
  * the editor doesn't model. Its `paint` stays only while its materials do: the game would let `paint` win over a repaint.
  */
 const prefabItemOfTab = (item: Item, source: PrefabSource | undefined): PrefabItem => {
-  if (source === undefined) return prefabItemOf(item, TAB_FRAME)
+  if (source === undefined) return prefabItemOf(item, PREFAB_TAB_FRAME)
   if (source.item === item) return source.prefab
   const { paint, ...kept } = source.prefab
-  const edited = { ...kept, ...prefabItemOf(item, TAB_FRAME) }
+  const edited = { ...kept, ...prefabItemOf(item, PREFAB_TAB_FRAME) }
   return paint !== undefined && sameMaterials(edited, source.prefab) ? { ...edited, paint } : edited
 }
 
