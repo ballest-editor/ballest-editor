@@ -5,6 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/component
 import { playMap } from "../editor/actions"
 import { PREFAB_TAB_STAYS_HERE, projectTitleOf, projectUnsavedOf, useEditor, useOpenPrefab } from "../editor/store"
 import { KeyChip } from "./KeyChip"
+import { Logo } from "./Logo"
 import { MenuBar } from "./MenuBar"
 
 /** Out of the title bar's drag region: a drag region takes the pointer, so a tooltip inside one never shows. */
@@ -87,7 +88,10 @@ export function TopBar() {
 
   return (
     <header className={`relative flex h-10 shrink-0 items-center gap-1 border-b bg-card ${TITLE_BAR_CLASSES}`}>
-      <span className="mr-2 px-1 text-body-strong">Ballest Editor</span>
+      <span className="mr-2 flex shrink-0 items-center gap-2 px-1 text-body-strong">
+        <Logo className="size-4" />
+        Ballest Editor
+      </span>
       <MenuBar />
       <ProjectTitle />
       <div className="ml-auto flex shrink-0 items-center gap-2">

@@ -1,5 +1,5 @@
-import type { ProjectInfo, RecentProject } from "@ballest/contracts"
-import { IconDots, IconFolder, IconFolderOpen, IconPlus } from "@tabler/icons-react"
+import { type ProjectInfo, type RecentProject, RELEASES_URL } from "@ballest/contracts"
+import { IconDots, IconExternalLink, IconFolder, IconFolderOpen, IconPlus } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import {
   DropdownMenu,
@@ -14,19 +14,25 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/component
 import { cn } from "@workspace/ui/lib/utils"
 import { useState } from "react"
 import { parentFolderName, pathInFolder, shortFolderName } from "../domain/paths"
-import { isProjectName } from "../domain/project"
-import { formatAgo } from "../domain/time"
+import { isProjectName, sharedProjectNames } from "../domain/project"
+import { formatAgo, formatDateTime } from "../domain/time"
 import {
   chooseProject,
   forgetRecentProject,
   newProject,
+  openExternalLink,
   openRecentInNewWindow,
   pickProjectFolder,
   revealRecentProject,
   switchProject
 } from "../editor/actions"
-import { useEditor } from "../editor/store"
+import { useEditor, useUpdateState } from "../editor/store"
+import { HeroBand } from "./HeroBand"
+import { Logo } from "./Logo"
 import { SectionTitle } from "./SectionTitle"
+
+/** A card on the start screen: the surface, tinted with the theme's colour. */
+const TINTED_CARD = "rounded-surface border border-primary/20 bg-card bg-linear-to-b from-primary/10 to-primary/5"
 
 /** A recent project's "…": what a click on its row doesn't do. */
 function RecentMenu({ project, elsewhere }: { readonly project: RecentProject; readonly elsewhere: boolean }) {
@@ -50,19 +56,28 @@ function RecentMenu({ project, elsewhere }: { readonly project: RecentProject; r
 }
 
 /**
- * One recent project: its name, the folder it's in and when it was last opened, the whole path on hover. A click opens
- * it here. One open in another window can't be picked, and says so where the time would be.
+ * One recent project: its name and when it was last opened, the whole path and the exact time on hover. Its parent
+ * folder shows only when another recent project has the same name. A click opens it here. One open in another window
+ * can't be picked, and says so where the time would be.
  */
-function RecentRow({ project, elsewhere, first, now }: {
+function RecentRow({ project, elsewhere, first, nameShared, now }: {
   readonly project: RecentProject
   readonly elsewhere: boolean
   /** The row Enter opens: it takes the focus. */
   readonly first: boolean
+  readonly nameShared: boolean
   readonly now: number
 }) {
   const { lastOpened, name, path } = project
+  // Chromium counts autofocus as :focus-visible, so the first row would look hovered until the focus leaves it once.
+  const [resting, setResting] = useState(first)
   return (
-    <li className="flex h-8 items-center gap-1 rounded-control pr-1 focus-within:bg-muted hover:bg-muted">
+    <li
+      className={cn(
+        "flex h-8 items-center gap-1 rounded-control pr-1 hover:bg-primary/15",
+        !resting && "has-[button:focus-visible]:bg-primary/15"
+      )}
+    >
       <Tooltip
         // the first row has the focus from the start, and its path shouldn't sit over the rows below until it's asked for
         onOpenChange={(open, details) => {
@@ -83,61 +98,77 @@ function RecentRow({ project, elsewhere, first, now }: {
                   elsewhere && "cursor-default"
                 )}
                 onClick={elsewhere ? undefined : () => void switchProject(path)}
+                // the window losing the focus leaves the row the active element, and it isn't the focus moving on
+                onBlur={(e) => {
+                  if (document.activeElement !== e.currentTarget) setResting(false)
+                }}
               />
 
           }
         >
-          <span className={cn("max-w-1/2 shrink-0 truncate text-body-strong", elsewhere && "text-fg-disabled")}>
+          <span className={cn("max-w-1/2 shrink-0 truncate text-body-strong", elsewhere && "text-fg-secondary")}>
             {name}
           </span>
-          <span className={cn("min-w-0 flex-1 truncate", elsewhere ? "text-fg-disabled" : "text-fg-tertiary")}>
-            {parentFolderName(path)}
-          </span>
-          <span className="shrink-0 text-fg-tertiary">
-            {elsewhere ? "Open in another window" : lastOpened === null ? null : formatAgo(lastOpened, now)}
-          </span>
+          <span className="min-w-0 flex-1 truncate text-fg-tertiary">{nameShared && parentFolderName(path)}</span>
+          {elsewhere
+            ? <span className="shrink-0 text-fg-disabled">Open in another window</span>
+            : lastOpened !== null && <span className="shrink-0 text-fg-tertiary">{formatAgo(lastOpened, now)}</span>}
         </TooltipTrigger>
-        <TooltipContent side="bottom" align="start">{path}</TooltipContent>
+        <TooltipContent side="bottom" align="start">
+          <div>{path}</div>
+          {lastOpened !== null && <div>Last opened {formatDateTime(lastOpened)}</div>}
+        </TooltipContent>
       </Tooltip>
       <RecentMenu project={project} elsewhere={elsewhere} />
     </li>
   )
 }
 
-/** The recent projects, and the two ways to anything else. */
-function StartScreen({ onNew }: { readonly onNew: () => void }) {
+/** The projects used before, the one Enter opens first. */
+function RecentProjects() {
   const state = useEditor((s) => s.project)
   const recent = state?.recent ?? []
   const openElsewhere = state?.openElsewhere ?? []
   const [now] = useState(Date.now)
   const firstPickable = recent.find(({ path }) => !openElsewhere.includes(path))?.path
+  const sharedNames = sharedProjectNames(recent)
   return (
-    <>
-      <div className="flex items-center gap-2">
-        <div className="mr-auto">
-          <SectionTitle>Recent projects</SectionTitle>
-        </div>
-        <Button variant="outline" onClick={() => void chooseProject()}>
-          <IconFolderOpen data-icon="inline-start" />
-          Open project…
-        </Button>
-        <Button onClick={onNew}>
-          <IconPlus data-icon="inline-start" />
-          New project
-        </Button>
-      </div>
-      <ul className="flex flex-col gap-0.5 rounded-surface border bg-card p-1">
+    <div className="flex min-w-0 flex-col gap-2">
+      <SectionTitle>Recent projects</SectionTitle>
+      <ul className={cn("flex flex-col gap-0.5 p-1", TINTED_CARD)}>
         {recent.map((project) => (
           <RecentRow
             key={project.path}
             project={project}
             elsewhere={openElsewhere.includes(project.path)}
             first={project.path === firstPickable}
+            nameShared={sharedNames.has(project.name.toLowerCase())}
             now={now}
           />
         ))}
       </ul>
-    </>
+    </div>
+  )
+}
+
+/**
+ * The start screen's right column. A project's maps would belong here, but `listMaps` answers for the project in use,
+ * and this screen has none. The version comes from the updater, which a browser doesn't have.
+ */
+function WhatsNew() {
+  const update = useUpdateState()
+  return (
+    <aside className="flex flex-col gap-2 self-start">
+      <SectionTitle>What's new</SectionTitle>
+      <div className={cn("flex flex-col items-start gap-2 p-dialog", TINTED_CARD)}>
+        {update !== null && <p className="text-body-strong tabular-nums">Version {update.currentVersion}</p>}
+        <p className="text-fg-tertiary">Each release lists what it added and fixed.</p>
+        <Button variant="outline" onClick={() => void openExternalLink(RELEASES_URL)}>
+          <IconExternalLink data-icon="inline-start" />
+          Release notes
+        </Button>
+      </div>
+    </aside>
   )
 }
 
@@ -170,7 +201,7 @@ function NewProjectForm({ onBack }: { readonly onBack: (() => void) | null }) {
   }
   return (
     <form
-      className="flex flex-col gap-4 rounded-surface border bg-card p-dialog"
+      className={cn("flex flex-col gap-4 p-dialog", TINTED_CARD)}
       onSubmit={(e) => {
         e.preventDefault()
         if (isProjectName(trimmed) && problem === null) void newProject(trimmed, chosen?.path)
@@ -218,18 +249,40 @@ function NewProjectForm({ onBack }: { readonly onBack: (() => void) | null }) {
 export function ProjectChooser() {
   const noRecent = useEditor((s) => (s.project?.recent ?? []).length === 0)
   const [naming, setNaming] = useState(false)
+  const showForm = naming || noRecent
   return (
-    <div className="flex h-svh flex-col bg-background text-foreground">
+    <div className="flex h-svh flex-col bg-background bg-linear-to-b from-primary/10 to-transparent to-60% text-foreground">
       <div className="h-10 shrink-0 [-webkit-app-region:drag]" />
-      <main className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 pb-10">
-        <div className="flex w-full max-w-xl flex-col gap-4 pt-[10vh]">
-          <div className="flex items-center gap-2">
-            <img src="/favicon.svg" alt="" className="size-8" />
-            <h1 className="text-title">Ballest Editor</h1>
-          </div>
-          {naming || noRecent
-            ? <NewProjectForm onBack={noRecent ? null : () => setNaming(false)} />
-            : <StartScreen onNew={() => setNaming(true)} />}
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-10">
+        {/* `m-auto`, not `justify-center`: a list too long for the window scrolls from its top, where centring would clip it */}
+        <div className="m-auto grid w-full max-w-4xl grid-cols-[minmax(0,1fr)_16rem] gap-x-8 gap-y-6">
+          <HeroBand className="col-span-2 rounded-surface border border-primary/20 p-6">
+            <div className="flex items-center gap-3">
+              <Logo className="size-12 shrink-0" />
+              <div>
+                <h1 className="text-title">Ballest Editor</h1>
+                <p className="text-fg-secondary">A map editor for Ballest of Them All.</p>
+              </div>
+            </div>
+            {!showForm && (
+              <div className="mt-4 flex items-center gap-2">
+                <Button onClick={() => setNaming(true)}>
+                  <IconPlus data-icon="inline-start" />
+                  New project
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    void chooseProject()}
+                >
+                  <IconFolderOpen data-icon="inline-start" />
+                  Open project…
+                </Button>
+              </div>
+            )}
+          </HeroBand>
+          {showForm ? <NewProjectForm onBack={noRecent ? null : () => setNaming(false)} /> : <RecentProjects />}
+          <WhatsNew />
         </div>
       </main>
     </div>
