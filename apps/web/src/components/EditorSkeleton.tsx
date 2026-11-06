@@ -59,7 +59,7 @@ export function EditorSkeletonPanels({ className }: { readonly className?: strin
         className="shrink-0 overflow-hidden bg-card shadow-[inset_-1px_0_0_var(--border)]"
         style={{ width: dockSide("left", 260) }}
       >
-        <div className="h-7 border-b" />
+        <div className="h-7 bg-background" />
         <div className="flex h-full flex-col">
           <div className="flex h-9 shrink-0 items-center px-2">
             <Input type="search" placeholder="Search pieces…" disabled />
@@ -68,7 +68,7 @@ export function EditorSkeletonPanels({ className }: { readonly className?: strin
         </div>
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="h-8 shrink-0 border-b bg-card" />
+        <div className="h-8 shrink-0 bg-background" />
         <div className={`relative min-h-0 flex-1 ${sceneBackgroundClass}`}>
           <ViewportControls disabled />
         </div>
