@@ -3,6 +3,7 @@ import { Button } from "@workspace/ui/components/button"
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@workspace/ui/components/popover"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { cn } from "@workspace/ui/lib/utils"
+import { useState } from "react"
 import { MUTABLE_KINDS } from "../domain/gameLink"
 import { panelSections, unreadCount } from "../domain/notifications"
 import { dayLabel } from "../domain/time"
@@ -54,32 +55,41 @@ function Section(
 /**
  * The bell at the right of the status bar and its panel (docs/DESKTOP.md § Notifications): every notification, newest
  * first and grouped by day, the pinned ones (persistent, until resolved) on top. Their buttons still work, after a
- * restart too. The bell counts the unread ones.
+ * restart too. The bell counts the unread ones. Opening the panel clears the count, and closing it marks them read: until
+ * then the list still shows which ones are new.
  */
 export function NotificationCenter() {
   const notifications = useEditor((s) => s.notifications)
   const markRead = useEditor((s) => s.markNotificationsRead)
   const clear = useEditor((s) => s.clearNotifications)
   const now = useNow(60_000)
+  const [open, setOpen] = useState(false)
   const unread = unreadCount(notifications)
+  const badge = open ? 0 : unread
   const { pinned, days } = panelSections(notifications, (notice) => dayLabel(notice.at, now))
 
   return (
-    <Popover>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (!next) markRead()
+      }}
+    >
       <PopoverTrigger
         render={
           <Button
             variant="ghost"
             size="icon-sm"
             className="relative"
-            aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+            aria-label={badge > 0 ? `Notifications, ${badge} unread` : "Notifications"}
           />
         }
       >
         <IconBell />
-        {unread > 0 && (
+        {badge > 0 && (
           <span className="absolute top-0 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-status-neutral px-1 text-caption text-status-neutral-foreground tabular-nums">
-            {unread}
+            {badge}
           </span>
         )}
       </PopoverTrigger>
