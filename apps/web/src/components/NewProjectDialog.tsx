@@ -4,10 +4,10 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { type ReactNode, useState } from "react"
 import { pathInFolder } from "../domain/paths"
-import { isProjectName } from "../domain/project"
+import { isProjectName, PROJECT_NAME_RULE } from "../domain/project"
 import { newProject } from "../editor/actions"
 import { useEditor } from "../editor/store"
-import { PathText } from "./PathText"
+import { ProjectFolderLine } from "./NewProjectFields"
 import { TitledDialog } from "./TitledDialog"
 
 /**
@@ -43,13 +43,13 @@ export function NewProjectForm({ actions, onCreate }: {
           aria-invalid={trimmed !== "" && (!valid || taken)}
           onChange={(e) => setName(e.target.value)}
         />
-        <div className="text-body text-fg-tertiary">
-          {taken
-            ? "A recent project has that name already."
-            : trimmed !== "" && !valid
-            ? "Letters, digits, spaces, - and _ only."
-            : <PathText block>{trimmed === "" ? projectsFolder : pathInFolder(projectsFolder, trimmed)}</PathText>}
-        </div>
+        {taken || (trimmed !== "" && !valid)
+          ? (
+            <span className="text-body text-destructive">
+              {taken ? "A recent project has that name already." : PROJECT_NAME_RULE}
+            </span>
+          )
+          : <ProjectFolderLine path={trimmed === "" ? projectsFolder : pathInFolder(projectsFolder, trimmed)} />}
       </div>
       <DialogFooter>
         {actions}
@@ -69,7 +69,6 @@ export function NewProjectDialog({ open, onClose }: { readonly open: boolean; re
       open={open}
       onClose={onClose}
       title="New project"
-      description="A folder of maps, exported to the game one by one."
     >
       <NewProjectForm
         actions={<Button type="button" variant="outline" onClick={onClose}>Cancel</Button>}

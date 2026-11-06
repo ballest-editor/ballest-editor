@@ -1,4 +1,3 @@
-import { IconFile } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -10,57 +9,25 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import { type ReactNode, useState } from "react"
-import { usableCreatorName } from "../domain/creator"
-import { isValidName, mapFileNameOf, NAME_RULE_SENTENCE } from "../domain/factory"
-import { updateSettings } from "../editor/actions"
-import { useCreator } from "../editor/store"
-import { PathField } from "./PathText"
-
-export interface MapCreator {
-  /**
-   * The creator in use: typed in Settings › General, else the one found (the Steam name). "" when there is none a map
-   * can use, and the dialog asks.
-   */
-  readonly saved: string
-  readonly draft: string
-  readonly setDraft: (draft: string) => void
-  /** The saved creator, else what was typed here. */
-  readonly name: string
-  /** Saves a typed creator to Settings › General (no-op when there already is one). */
-  readonly persist: () => Promise<void>
-}
-
-export const useMapCreator = (): MapCreator => {
-  const saved = usableCreatorName(useCreator())
-  const [draft, setDraft] = useState("")
-  const name = saved || draft.trim()
-  const persist = async () => {
-    if (saved === "") await updateSettings("general", { creatorName: name })
-  }
-  return { saved, draft, setDraft, name, persist }
-}
+import type { ReactNode } from "react"
+import { isValidName, NAME_RULE_SENTENCE } from "../domain/factory"
 
 /**
- * The name + creator form shared by Save, Rename, Duplicate and Export. Both names go into the file name
- * (`mapFileNameOf`), which the game checks against the names inside the file.
+ * The one-field form shared by Save, Rename, Duplicate and Export. The file name comes from this name and the creator
+ * (`mapFileNameOf`), but it is the game's business, so the form doesn't show it. The rule shows only once it is broken.
  */
 export function MapNameDialog(props: {
   readonly open: boolean
   readonly onClose: () => void
-  /** Prefix for the input ids. */
+  /** Prefix for the input's id. */
   readonly id: string
   readonly title: string
-  /** Text before and after the file name in the description. */
-  readonly fileNameLead: string
-  readonly fileNameNote: ReactNode
+  /** One line under the title, for a dialog that needs it. */
+  readonly description?: string
   readonly name: string
   readonly onNameChange: (name: string) => void
-  readonly creator: MapCreator
-  /** Shown instead of the creator input when a creator is saved. */
-  readonly savedCreator?: ReactNode
-  /** Under the creator input; by default, that what is typed is saved to Settings › General. */
-  readonly creatorHint?: string
+  /** Under the field while the name keeps the rule: what is wrong with it otherwise. */
+  readonly nameNote?: ReactNode
   /** Extra content above the buttons. */
   readonly children?: ReactNode
   readonly submitLabel: string
@@ -69,9 +36,8 @@ export function MapNameDialog(props: {
   readonly canSubmit: boolean
   readonly onSubmit: () => Promise<void>
 }) {
-  const { creator } = props
-  const fileName = mapFileNameOf(props.name || "name", creator.name || "creator")
-  const help = "text-body text-fg-tertiary"
+  const trimmed = props.name.trim()
+  const breaksRule = trimmed !== "" && !isValidName(trimmed)
   return (
     <Dialog open={props.open} onOpenChange={(next) => !next && props.onClose()}>
       <DialogContent>
@@ -84,7 +50,7 @@ export function MapNameDialog(props: {
         >
           <DialogHeader>
             <DialogTitle>{props.title}</DialogTitle>
-            <DialogDescription>{props.fileNameNote}</DialogDescription>
+            {props.description !== undefined && <DialogDescription>{props.description}</DialogDescription>}
           </DialogHeader>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={`${props.id}-name`}>Map name</Label>
@@ -95,28 +61,9 @@ export function MapNameDialog(props: {
               onFocus={(e) => e.currentTarget.select()}
               value={props.name}
               onChange={(e) => props.onNameChange(e.target.value)}
-              aria-invalid={props.name !== "" && !isValidName(props.name)}
+              aria-invalid={breaksRule}
             />
-            <span className={help}>{NAME_RULE_SENTENCE}.</span>
-          </div>
-          {creator.saved === ""
-            ? (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={`${props.id}-creator`}>Creator (your in-game name)</Label>
-                <Input
-                  id={`${props.id}-creator`}
-                  value={creator.draft}
-                  onChange={(e) => creator.setDraft(e.target.value)}
-                  aria-invalid={creator.draft !== "" && !isValidName(creator.name)}
-                />
-                <span className={help}>{props.creatorHint ?? "Saved to Settings › General."}</span>
-              </div>
-            )
-            : props.savedCreator}
-          {/* what the names above make: after them, where a preview reads as one */}
-          <div className="flex flex-col gap-1.5">
-            <span className={help}>{props.fileNameLead}</span>
-            <PathField path={fileName} icon={IconFile} />
+            {breaksRule ? <span className="text-body text-destructive">{NAME_RULE_SENTENCE}.</span> : props.nameNote}
           </div>
           {props.children}
           <DialogFooter>
