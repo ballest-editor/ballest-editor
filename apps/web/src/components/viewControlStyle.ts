@@ -1,25 +1,24 @@
 import type { KeyboardEvent, MouseEvent } from "react"
 
 /**
- * The one surface every overlay over the viewport sits on, so they read as one family against any scene: the card's
- * colour, translucent, which follows the theme.
+ * The one surface every overlay over the viewport sits on, so they read as one family against any scene: glass, the
+ * card's colour with what's behind it showing through as colour without detail.
  */
-export const SURFACE = "border border-border bg-card/80 shadow-sm backdrop-blur-md"
+export const SURFACE = "border border-border bg-card/80 shadow-sm backdrop-blur-md backdrop-saturate-150"
 
-/**
- * One control group, like the game's: a 28px rounded rect at the control radius, divided into segments that fill it.
- * The group is the only shape, with no padding and no container around it, so there's no second radius in the viewport.
- */
-export const GROUP =
-  `pointer-events-auto flex h-7 w-fit items-stretch divide-x divide-border overflow-hidden rounded-control ${SURFACE}`
+/** One control group: a 32px glass pill holding its segments, each a smaller pill of its own. */
+export const GROUP = `pointer-events-auto flex h-8 w-fit items-center gap-0.5 rounded-full p-0.5 ${SURFACE}`
+
+/** A hairline between the parts of a group. */
+export const GROUP_DIVIDER = "mx-0.5 h-4 w-px shrink-0 bg-border"
 
 /** A button in a group. */
 export const SEGMENT =
-  "flex h-full min-w-7 items-center justify-center gap-1.5 rounded-none px-1.5 text-fg-secondary outline-none transition-colors hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground disabled:text-fg-disabled"
+  "flex h-full min-w-7 items-center justify-center gap-1.5 rounded-full px-2 text-fg-secondary outline-none transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground disabled:text-fg-disabled"
 
 /** A toggle segment that's on. */
 export const SEGMENT_ON =
-  "data-[pressed]:bg-primary data-[pressed]:text-primary-foreground data-[pressed]:hover:bg-primary/85 data-[pressed]:hover:text-primary-foreground"
+  "aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/85 aria-pressed:hover:text-primary-foreground"
 
 /** Keeps keyboard focus with the viewport: no focus on mousedown, no Space/Enter activation. */
 export const noFocus = {

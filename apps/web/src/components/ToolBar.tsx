@@ -32,9 +32,8 @@ export function ToolBar({ disabled }: { readonly disabled: boolean }) {
           const next = TOOLS.find((t) => value.includes(t.tool))
           if (next !== undefined) setTool(next.tool) // clicking the active tool keeps it
         }}
-        spacing={0}
         disabled={disabled}
-        className={GROUP}
+        className={cn(GROUP, "h-9")}
       >
         {TOOLS.map(({ tool: t, label, action, icon: Icon }) => (
           <ViewTip
@@ -43,10 +42,15 @@ export function ToolBar({ disabled }: { readonly disabled: boolean }) {
             action={action}
             side="top"
             render={
-              <ToggleGroupItem value={t} aria-label={label} className={cn(SEGMENT, SEGMENT_ON, "w-7")} {...noFocus} />
+              <ToggleGroupItem
+                value={t}
+                aria-label={label}
+                className={cn(SEGMENT, SEGMENT_ON, "aspect-square px-0")}
+                {...noFocus}
+              />
             }
           >
-            <Icon />
+            <Icon className="size-5" />
           </ViewTip>
         ))}
       </ToggleGroup>

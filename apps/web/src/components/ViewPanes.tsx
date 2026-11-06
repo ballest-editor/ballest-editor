@@ -260,7 +260,7 @@ function PaneCorner({ slot, view }: { readonly slot: number; readonly view: Orth
   const upward = axisOf(up)
   const colors = sceneAxisColors(dark)
   return (
-    <div className={cn("pointer-events-none absolute bottom-12 left-3 rounded-control p-1", SURFACE)}>
+    <div className={cn("pointer-events-none absolute bottom-12 left-3 rounded-sheet p-1.5", SURFACE)}>
       <svg aria-hidden width={SIZE + 8} height={SIZE} viewBox={`0 0 ${SIZE + 8} ${SIZE}`}>
         <AxisArrow direction={across} across color={colors[across.axis]} />
         <AxisArrow direction={upward} across={false} color={colors[upward.axis]} />
@@ -341,18 +341,16 @@ export function ViewLayoutControl({ disabled }: { readonly disabled: boolean }) 
   const kind = useEditor((s) => s.viewLayout.kind)
   const setViewLayoutKind = useEditor((s) => s.setViewLayoutKind)
   return (
-    <div className={GROUP}>
-      <ViewPicker
-        value={kind}
-        options={viewLayoutKinds}
-        labels={viewLayoutLabels}
-        icons={LAYOUT_ICONS}
-        onPick={setViewLayoutKind}
-        tip="Panes"
-        word="Panes"
-        strong
-        disabled={disabled}
-      />
-    </div>
+    <ViewPicker
+      value={kind}
+      options={viewLayoutKinds}
+      labels={viewLayoutLabels}
+      icons={LAYOUT_ICONS}
+      onPick={setViewLayoutKind}
+      tip="Panes"
+      word="Panes"
+      strong
+      disabled={disabled}
+    />
   )
 }
