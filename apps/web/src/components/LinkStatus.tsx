@@ -1,27 +1,54 @@
 import { Button } from "@workspace/ui/components/button"
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import { type ComponentProps, type ReactNode, useState } from "react"
-import { SYNC_STATUS_LABELS, syncDetailOf, type SyncStatus, syncStatusOf } from "../domain/linkState"
+import { type ComponentProps, type ReactNode, useEffect, useState } from "react"
+import {
+  chipStatusOf,
+  savedChipMsLeft,
+  SYNC_STATUS_LABELS,
+  syncDetailOf,
+  type SyncStatus,
+  syncStatusOf
+} from "../domain/linkState"
 import { formatAgo, formatDateTime } from "../domain/time"
 import { exportToGame, playMap, reimportMap, revealGamePath, saveMap } from "../editor/actions"
 import { useEditor, useOpenPrefab, useOpenProjectMap, useTabSummary } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { SyncStatusChip } from "./SyncStatusChip"
 
-/** The status bar's chip, with `chipDetail` after its label, and its popover: the status, `lines`, then `actions`. */
+/** Whether a map last saved at `savedAt` was saved a moment ago (`savedChipMsLeft`), turning false when that is over. */
+const useJustSaved = (savedAt: string | null): boolean => {
+  const [justSaved, setJustSaved] = useState(false)
+  useEffect(() => {
+    const left = savedAt === null ? 0 : savedChipMsLeft(savedAt, Date.now())
+    const begin = setTimeout(() => setJustSaved(left > 0))
+    const end = setTimeout(() => setJustSaved(false), left)
+    return () => {
+      clearTimeout(begin)
+      clearTimeout(end)
+    }
+  }, [savedAt])
+  return justSaved
+}
+
+/**
+ * The status bar's chip, with `chipDetail` after its label, and its popover: the status, `lines`, then `actions`. `saved`
+ * has the chip say Saved for now; the popover goes on telling the status.
+ */
 function StatusPopover(
-  { status, chipDetail, lines, actions, ...props }: ComponentProps<typeof Popover> & {
+  { status, saved = false, chipDetail, lines, actions, ...props }: ComponentProps<typeof Popover> & {
     readonly status: SyncStatus
+    readonly saved?: boolean
     readonly chipDetail?: ReactNode
     readonly lines: ReactNode
     readonly actions: ReactNode
   }
 ) {
+  const chip = chipStatusOf(status, saved)
   return (
     <Popover {...props}>
-      <PopoverTrigger render={<SyncStatusChip status={status} render={<button type="button" />} />}>
-        {chipDetail}
+      <PopoverTrigger render={<SyncStatusChip status={chip} render={<button type="button" />} />}>
+        {chip !== "saved" && chipDetail}
       </PopoverTrigger>
       <PopoverContent side="top" className="w-80 gap-3 p-3">
         <div className="flex flex-col">
@@ -56,7 +83,8 @@ function NeverSavedStatus() {
  * The open map's sync status (docs/PROJECTS.md § Sync), in the middle of the status bar: a chip with the status and when
  * it was last exported. Its popover adds the link state the status leaves out, and has that time, Export, Play and
  * Reveal, and Re-import once the game has changed the export. A map that isn't in the project yet is Unsaved, the same
- * chip as its row, and its popover has Save. Desktop only.
+ * chip as its row, and its popover has Save. For a moment after a save the chip says Saved, so a save is confirmed after
+ * its toast has gone too. Desktop only.
  */
 export function LinkStatus() {
   const open = useOpenProjectMap()
@@ -67,6 +95,7 @@ export function LinkStatus() {
   const tabId = useEditor((s) => s.tabId)
   const { blank } = useTabSummary(tabId)
   const now = useNow()
+  const justSaved = useJustSaved(open?.map.modifiedAt ?? null)
   if (prefab !== null) return <span className="text-fg-tertiary">Prefab {prefab.name}</span>
   if (!canExport) return null
   if (open === null) return blank ? null : <NeverSavedStatus /> // a blank map has nothing to save yet
@@ -79,6 +108,7 @@ export function LinkStatus() {
   return (
     <StatusPopover
       status={status}
+      saved={justSaved}
       chipDetail={exported !== null && (
         <>
           <span aria-hidden>·</span>

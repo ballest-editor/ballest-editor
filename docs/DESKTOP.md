@@ -259,6 +259,8 @@ The link states are Not exported, In sync, Edited since export, Changed in game,
 
 The sync status (`syncStatusOf` in `domain/linkState.ts`) is what the chip, its popover and the Project panel's rows show: a link state with the unsaved edits folded in. Unsaved is any map whose tab has unsaved edits, whatever its link state. Otherwise it's Not exported, In sync, Changed since export (Edited since export, Changed in game and Both changed) or Published draft. [ui-system.md § Status colours](design/ui-system.md#status-colours) has their colours.
 
+For 2 seconds after a save the chip says Saved in place of the status, so a save is confirmed after its toast has gone (`chipStatusOf`). It goes by the map's `modifiedAt`, so nothing new is stored and any write to the map's file counts. The popover goes on telling the status, and an edit brings Unsaved back at once.
+
 ### Notifications
 
 The store's `notify(level, title, { kind, body, persistent, actions })` makes a `NotificationRecord` (`@ballest/contracts`) and sends it to one of two places, never both (`belongsInInbox` in `domain/notifications.ts`):
@@ -269,7 +271,7 @@ The store's `notify(level, title, { kind, body, persistent, actions })` makes a 
 Both show a message through one row (`components/NoticeRow.tsx`): icon, text, time, and Reveal as an icon button.
 
 - Actions are data (`NotificationCommand`: `RevealProject`, `RevealGamePath`, `ChooseGamePath`, `OpenMap`, `OpenExternal`, `InstallPlugin`, `ReimportMap`, `UpdatePrefabInstances`, `DetachPrefabInstances`, `Dismiss`), so they still work after a restart. `runNotificationCommand` runs them.
-- The bell lists them newest first, grouped by day, the unread ones counted. A `persistent` one is pinned to the top until `resolveNotifications(kind)`, and a newer one of its kind replaces it. Mark all read; Clear keeps only the pinned.
+- The bell lists them newest first, grouped by day, the unread ones counted. Opening the list clears the count and closing it marks them read, so the unread ones stay marked while it's open. A `persistent` one is pinned to the top until `resolveNotifications(kind)`, and a newer one of its kind replaces it. Mark all read; Clear keeps only the pinned.
 - The last 100 are kept in `<userData>/notifications.json` (`NotificationLog` in main, `loadNotifications` / `saveNotifications` over IPC). One entry that doesn't decode is dropped, not the file. A browser keeps them in memory.
 
 **Game link notifications.** At startup the page looks up the folders and the plugin (`checkGameLinkEffect`) and compares whether the game and the plugin manager are found with what the last launch found, kept in `desktop-settings.json` (`gameLink.last`, IPC `ballest:gameLink:memory` / `ballest:gameLink:remember`). Only a change is notified: the game lost (`gameNotFound`, persistent, Choose folder…) or found again (`gameFound`), and while the game stays, the plugin manager gone (`pluginManagerMissing`, persistent, Install steps) or back (`pluginManagerFound`). Play reports a missing game or plugin manager under the same two kinds (§ Play).

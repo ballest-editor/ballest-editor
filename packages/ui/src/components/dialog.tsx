@@ -37,6 +37,21 @@ function DialogOverlay({
   )
 }
 
+/**
+ * The popup's element, which lets go of the focus as the dialog starts to close. Base UI only moves it once the exit
+ * animation has ended, and until then the keys would go to a dialog that is already on its way out.
+ */
+function DialogPopupElement({ open, popup, ...props }: React.ComponentProps<"div"> & {
+  open: boolean
+  popup: React.RefObject<HTMLDivElement | null>
+}) {
+  React.useLayoutEffect(() => {
+    const focused = popup.current?.ownerDocument.activeElement
+    if (!open && focused instanceof HTMLElement && popup.current?.contains(focused)) focused.blur()
+  }, [open, popup])
+  return <div {...props} />
+}
+
 function DialogContent({
   className,
   children,
@@ -47,6 +62,7 @@ function DialogContent({
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
 }) {
+  const popup = React.useRef<HTMLDivElement>(null)
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -58,6 +74,8 @@ function DialogContent({
         )}
         finalFocus={finalFocus}
         {...props}
+        ref={popup}
+        render={(element, { open }) => <DialogPopupElement {...element} open={open} popup={popup} />}
       >
         {children}
         {showCloseButton && (
