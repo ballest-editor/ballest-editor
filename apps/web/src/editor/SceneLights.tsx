@@ -7,7 +7,7 @@ import { ARENA_COLOR, ARENA_RIM, luminance, type Sky, skyIrradiance, skyOf } fro
 import { sunOf, viewLightOf } from "../domain/sunlight"
 import { perspectiveOnly } from "./paneCameras"
 import { useBeforePaneDraw } from "./PaneRenderer"
-import { setSky, SKY_DOME_RADIUS, SKY_HAZE_BELOW, SkyMaterial } from "./sky"
+import { setSky, SKY_DOME_RADIUS, SKY_HAZE_BELOW, SKY_PANE_TOP_FADE, SkyMaterial } from "./sky"
 import { shownLighting, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
 import { setWaterLight } from "./water"
@@ -116,7 +116,9 @@ function SkyDome({ sky, clipBelow }: { readonly sky: Sky; readonly clipBelow: nu
   }, [material, clipBelow])
   const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
   useEffect(() => {
-    material.sky.uHazeBelow.value = SKY_HAZE_BELOW[dark ? "dark" : "light"]
+    const theme = dark ? "dark" : "light"
+    material.sky.uHazeBelow.value = SKY_HAZE_BELOW[theme]
+    material.sky.uPaneTopFade.value = SKY_PANE_TOP_FADE[theme]
   }, [material, dark])
   useBeforePaneDraw(({ perspective }) => {
     mesh.current?.position.copy(perspective.position)
