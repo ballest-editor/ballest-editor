@@ -45,3 +45,15 @@ Viewport chrome is one shape, rounded rects at the control radius (`viewControlS
 | Document tab strip | 32px, as is a popped-out panel's strip (the window controls' height)  |
 | Dialog padding     | `p-dialog` (16px) at every dialog size; `px-dialog` for split dialogs |
 | Tooltip delay      | 300ms, the default; don't set `delay`                                 |
+
+## Status colours
+
+A sync status (`syncStatusOf`, `domain/linkState.ts`) wears one of three pairs: an opaque fill and the text on it. `SyncStatusChip.tsx` is the one place that names them; don't use Tailwind's palette (`emerald-500`) for a status.
+
+| Fill                | Text                             | For                           |
+| ------------------- | -------------------------------- | ----------------------------- |
+| `bg-status-ok`      | `text-status-ok-foreground`      | In sync                       |
+| `bg-status-warn`    | `text-status-warn-foreground`    | Unsaved, Changed since export |
+| `bg-status-neutral` | `text-status-neutral-foreground` | Not exported, Published draft |
+
+The variables are `--status-ok`, `--status-warn`, `--status-neutral`, and each with `-foreground`. A hover is the fill at 80%, which is why the fill has to be opaque.

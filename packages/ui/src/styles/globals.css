@@ -46,6 +46,13 @@
     --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
     --sidebar-border: oklch(0.9 0.004 286.32);
     --sidebar-ring: oklch(0.705 0.015 286.067);
+    /* Sync status badges: an opaque fill and the text on it (docs/design/ui-system.md). Placeholders for the palette. */
+    --status-ok: oklch(0.92 0.05 165);
+    --status-ok-foreground: oklch(0.432 0.095 166.913);
+    --status-warn: oklch(0.93 0.06 85);
+    --status-warn-foreground: oklch(0.473 0.137 46.201);
+    --status-neutral: var(--muted);
+    --status-neutral-foreground: var(--foreground);
 }
 
 .dark {
@@ -82,6 +89,12 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.552 0.016 285.938);
+    --status-ok: oklch(0.3 0.05 165);
+    --status-ok-foreground: oklch(0.845 0.143 164.978);
+    --status-warn: oklch(0.31 0.05 75);
+    --status-warn-foreground: oklch(0.879 0.169 91.605);
+    --status-neutral: var(--muted);
+    --status-neutral-foreground: var(--foreground);
 }
 
 @theme inline {
@@ -118,6 +131,12 @@
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
+    --color-status-ok: var(--status-ok);
+    --color-status-ok-foreground: var(--status-ok-foreground);
+    --color-status-warn: var(--status-warn);
+    --color-status-warn-foreground: var(--status-warn-foreground);
+    --color-status-neutral: var(--status-neutral);
+    --color-status-neutral-foreground: var(--status-neutral-foreground);
     --font-sans: 'Manrope Variable', sans-serif;
     /* Bundled, so numbers sit the same on every machine (system mono fonts differ in their vertical metrics). */
     --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

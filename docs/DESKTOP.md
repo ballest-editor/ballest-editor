@@ -152,11 +152,11 @@ There is no Map or Game menu: the menus act on the active tab's map, and the gam
 
 `components/ProjectPanel.tsx` is the Project panel (§ Dock). It lists the project and its maps, the way an editor's file explorer shows a workspace.
 
-- Each row shows the map, a dot after its name while it is open in a tab with unsaved edits, and its link state as a chip: the status bar's words, with Edited for Edited since export. Hovering the chip says when the map was last exported, and hovering the name when it was last edited.
+- Each row shows the map and its sync status (§ Status bar) as a badge, in the status bar's words and colours. Hovering the badge gives the link state and when the map was last exported, and hovering the name when it was last edited. Both tooltips open below the row, clear of the badge and the ⋮ button.
 - A click opens the map.
 - Its menu (⋮, or a right-click) holds Open, Rename…, Duplicate…, Backups…, Export to game, Play and Reveal in folder. The ones that act on the open map open it first (`withProjectMapOpen`). Reveal in folder shows the project's maps folder, not the file.
 - The header holds the project's name, with its folder on hover, or an Untitled chip in Untitled Project, then New map, Import map and Project settings. Import map is disabled in Untitled Project, and its tooltip says why.
-- Every tab whose map has no file yet (a fresh one, any in Untitled Project, what a switch of projects left open) is a row of its own with the dot, above the project's maps. A click makes that tab active.
+- Every tab whose map has no file yet (a fresh one, any in Untitled Project, what a switch of projects left open) is a row of its own badged Unsaved, above the project's maps. A click makes that tab active.
 - A project with no maps has one line and a New map button under those rows. In Untitled Project the line says that saving a map creates a project.
 - No thumbnails yet.
 
@@ -248,10 +248,12 @@ A map's Map page has the name, the file (its name, the path on hover, Reveal and
 The status bar runs along the bottom. The project is the window's title, centred in the top bar, with the document tab's dot while a tab has unsaved edits or the project is Untitled Project. The top bar's right end has the open map's link state and Play.
 
 - On the left: what a check for updates is doing, and the entered group.
-- In the middle: the open map's link state (`domain/linkState.ts`) and when it was last exported, as a chip coloured by state: neutral when not exported, amber when either side has changed, green in sync. Its popover has the last export's time, Reveal, Export and Play. A map with no file shows "Not saved in the project yet".
+- In the middle: the open map's sync status and when it was last exported, as a coloured chip. Its popover's title is the status, then the link state when that adds something (which side changed, or what stands behind Unsaved), the last export's time, Reveal, Export and Play. A map with no file shows "Not saved in the project yet".
 - On the right: the update pill and the notification bell.
 
 The link states are Not exported, In sync, Edited since export, Changed in game, Both changed and Published draft. A map's state comes from `listMaps`: each `ProjectMap` carries the SHA-256 of its file, compared with `link.export.hash`, and its `publishedFileId`, the project file's `levelPublishedFileId`, read once per file version (main caches them by time, size and inode). Changed in game comes from the link: its `lastSeenHash` differs from `export.hash`. It's Both changed when the project map was saved or has unsaved edits since the export. A change in the game outranks Published draft, which outranks the project side, so a published draft with edits never shows Edited since export. The popover adds Re-import in the two changed states.
+
+The sync status (`syncStatusOf` in `domain/linkState.ts`) is what the chip, its popover and the Project panel's rows show: a link state with the unsaved edits folded in. Unsaved is any map whose tab has unsaved edits, whatever its link state. Otherwise it's Not exported, In sync, Changed since export (Edited since export, Changed in game and Both changed) or Published draft. [ui-system.md § Status colours](design/ui-system.md#status-colours) has their colours.
 
 ### Notifications
 

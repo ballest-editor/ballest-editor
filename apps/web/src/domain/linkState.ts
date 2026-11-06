@@ -1,6 +1,6 @@
 /**
- * How a project map stands against its export in the game's maps folder (docs/PROJECTS.md § Sync), shown in the status
- * bar and in the Project panel.
+ * How a project map stands against its export in the game's maps folder (docs/PROJECTS.md § Sync), and the one status
+ * the status bar and the Project panel show for it.
  */
 import { formatAgo, formatDateTime } from "./time"
 
@@ -48,6 +48,51 @@ export const LINK_STATE_LABELS: Record<LinkState, string> = {
   bothChanged: "Both changed",
   publishedDraft: "Published draft"
 }
+
+/**
+ * What the status bar chip, its popover and a Project panel row say about a map: its link state, with the unsaved edits
+ * folded in and the three changed states as one.
+ */
+export type SyncStatus = "unsaved" | "notExported" | "inSync" | "changedSinceExport" | "publishedDraft"
+
+export const SYNC_STATUS_LABELS: Record<SyncStatus, string> = {
+  unsaved: "Unsaved",
+  notExported: "Not exported",
+  inSync: "In sync",
+  changedSinceExport: "Changed since export",
+  publishedDraft: "Published draft"
+}
+
+/** Which `--status-*` colours a status wears (docs/design/ui-system.md). */
+export type SyncTone = "neutral" | "ok" | "warn"
+
+export const SYNC_STATUS_TONES: Record<SyncStatus, SyncTone> = {
+  unsaved: "warn",
+  notExported: "neutral",
+  inSync: "ok",
+  changedSinceExport: "warn",
+  publishedDraft: "neutral"
+}
+
+const LINK_SYNC_STATUS: Record<LinkState, SyncStatus> = {
+  notExported: "notExported",
+  inSync: "inSync",
+  editedSinceExport: "changedSinceExport",
+  changedInGame: "changedSinceExport",
+  bothChanged: "changedSinceExport",
+  publishedDraft: "publishedDraft"
+}
+
+/** The status of a map in `state`. `unsaved` (its tab has unsaved edits) outranks every link state. */
+export const syncStatusOf = (state: LinkState, unsaved: boolean): SyncStatus =>
+  unsaved ? "unsaved" : LINK_SYNC_STATUS[state]
+
+/**
+ * The link state that `status` leaves out: which side changed, or what stands behind Unsaved. Null when the status says
+ * the same, so a map changed in the game is still told apart under Unsaved or Changed since export.
+ */
+export const syncDetailOf = (state: LinkState, status: SyncStatus): string | null =>
+  LINK_STATE_LABELS[state] === SYNC_STATUS_LABELS[status] ? null : LINK_STATE_LABELS[state]
 
 export interface LinkCheck {
   /** The map is open with edits that aren't saved yet, so they aren't in the export either. */

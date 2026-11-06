@@ -14,7 +14,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { type MouseEvent, type ReactNode, useRef } from "react"
 import { useShallow } from "zustand/react/shallow"
 import { mapLabelOf } from "../domain/factory"
-import { LINK_STATE_LABELS, type LinkState, linkStateDetailOf, linkStateOf } from "../domain/linkState"
+import { type LinkState, linkStateDetailOf, linkStateOf, syncStatusOf } from "../domain/linkState"
 import { formatAgo, formatDateTime } from "../domain/time"
 import {
   exportProjectMapFromPanel,
@@ -27,33 +27,23 @@ import {
 } from "../editor/actions"
 import { type ProjectMap, tabsWithoutFile, useEditor, useHasUnsavedEdits, useTabSummary } from "../editor/store"
 import { useNow } from "../editor/useNow"
+import { SyncStatusBadge } from "./SyncStatusChip"
 
-/** The status bar's words, cut to what fits beside a map's name; the tooltip has the rest. */
-const CHIP_LABELS: Record<LinkState, string> = { ...LINK_STATE_LABELS, editedSinceExport: "Edited" }
-
-const CHIP_TONES: Partial<Record<LinkState, string>> = {
-  inSync: "text-emerald-600 dark:text-emerald-400",
-  changedInGame: "text-amber-600 dark:text-amber-400",
-  bothChanged: "text-amber-600 dark:text-amber-400"
-}
-
-/** A map's link state as a chip, with when it was last exported on hover. */
-function StateChip(
-  { map, state, now }: { readonly map: ProjectMap; readonly state: LinkState; readonly now: number }
+/** A map's sync status, with its link state and when it was last exported on hover. */
+function RowStatus(
+  { map, state, unsaved, now }: {
+    readonly map: ProjectMap
+    readonly state: LinkState
+    readonly unsaved: boolean
+    readonly now: number
+  }
 ) {
   return (
     <Tooltip>
-      <TooltipTrigger render={<Badge variant="outline" className={cn("text-fg-tertiary", CHIP_TONES[state])} />}>
-        {CHIP_LABELS[state]}
-      </TooltipTrigger>
-      <TooltipContent side="right">{linkStateDetailOf(map, state, now)}</TooltipContent>
+      <TooltipTrigger render={<SyncStatusBadge status={syncStatusOf(state, unsaved)} />} />
+      <TooltipContent side="bottom" align="end">{linkStateDetailOf(map, state, now)}</TooltipContent>
     </Tooltip>
   )
-}
-
-/** The dot a map carries while it is open with unsaved edits, or isn't saved anywhere yet (the tab shows the same). */
-function UnsavedDot() {
-  return <span className="size-1.5 shrink-0 rounded-full bg-foreground/60" aria-label="unsaved" />
 }
 
 /** What the row has no room for: the full name, whether it has unsaved edits, when it was edited. */
@@ -81,7 +71,8 @@ const ACTIVE_ROW_CLASSES = "bg-primary/15 text-foreground shadow-[inset_2px_0_0_
 
 /**
  * One of the project's maps: a click opens it, its menu (also on right-click) holds what used to be the Project menu's
- * per-map items. The open map is highlighted, and a map with unsaved edits has a dot after its name.
+ * per-map items. The open map is highlighted, and the badge says what it has unsaved or left to export. The tooltips
+ * open below the row, so they never cover its badge or ⋮ button.
  */
 function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }) {
   const isOpen = useEditor((s) => s.file?.name === map.fileName)
@@ -110,9 +101,8 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
         >
           <IconMap className="size-4 shrink-0 text-fg-secondary" />
           <span className={cn("truncate", isOpen && "text-body-strong")}>{label}</span>
-          {unsaved && <UnsavedDot />}
         </TooltipTrigger>
-        <TooltipContent side="right" align="start">
+        <TooltipContent side="bottom" align="start">
           <RowDetails
             name={label}
             unsaved={unsaved ? "Unsaved edits" : null}
@@ -120,7 +110,7 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
           />
         </TooltipContent>
       </Tooltip>
-      <StateChip map={map} state={state} now={now} />
+      <RowStatus map={map} state={state} unsaved={unsaved} now={now} />
       <DropdownMenu>
         <DropdownMenuTrigger
           ref={menuButton}
@@ -161,8 +151,8 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
 }
 
 /**
- * A tab whose map has no file yet (`tabsWithoutFile`): a row of its own, with the unsaved dot, whichever tab is active.
- * A click makes it the active tab.
+ * A tab whose map has no file yet (`tabsWithoutFile`): a row of its own, badged Unsaved, whichever tab is active. A click
+ * makes it the active tab.
  */
 function UnsavedRow({ tabId }: { readonly tabId: string }) {
   const { label } = useTabSummary(tabId)
@@ -182,12 +172,12 @@ function UnsavedRow({ tabId }: { readonly tabId: string }) {
         >
           <IconMap className="size-4 shrink-0 text-fg-secondary" />
           <span className={cn("truncate", isActive && "text-body-strong")}>{label}</span>
-          <UnsavedDot />
         </TooltipTrigger>
-        <TooltipContent side="right" align="start">
+        <TooltipContent side="bottom" align="start">
           <RowDetails name={label} unsaved="Not saved yet" edited={null} />
         </TooltipContent>
       </Tooltip>
+      <SyncStatusBadge status="unsaved" className="mr-7.5" />
     </li>
   )
 }
@@ -245,8 +235,8 @@ function ProjectName({ name, path }: { readonly name: string | null; readonly pa
 
 /**
  * The Project panel (docs/PROJECTS.md § Shell): the project and its maps as a tree, the way an editor's
- * file explorer shows a workspace. A click opens a map; the open one is highlighted, with a dot while it has unsaved
- * edits, and each row shows its link state. Every tab whose map has no file yet is a row too, above them. The header
+ * file explorer shows a workspace. A click opens a map; the open one is highlighted, and each row shows its sync
+ * status. Every tab whose map has no file yet is a row too, above them. The header
  * holds New map, Import map and Project settings. In a browser, which has no project, only those rows show.
  */
 export function ProjectPanel() {

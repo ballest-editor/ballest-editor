@@ -1,20 +1,21 @@
 import { Button } from "@workspace/ui/components/button"
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import { LINK_STATE_LABELS } from "../domain/linkState"
+import { SYNC_STATUS_LABELS, syncDetailOf, syncStatusOf } from "../domain/linkState"
 import { formatAgo, formatDateTime } from "../domain/time"
 import { exportToGame, playMap, reimportMap, revealGamePath } from "../editor/actions"
 import { useEditor, useOpenPrefab, useOpenProjectMap } from "../editor/store"
 import { useNow } from "../editor/useNow"
-import { LinkStateChip } from "./LinkStateChip"
+import { SyncStatusChip } from "./SyncStatusChip"
 
 /**
- * The open map's link to its export (docs/PROJECTS.md § Sync), in the middle of the status bar: a chip with the state
- * and when it was last exported. Its popover has that time, Export, Play and Reveal, and Re-import once the game has
- * changed the export. Desktop only.
+ * The open map's sync status (docs/PROJECTS.md § Sync), in the middle of the status bar: a chip with the status and when
+ * it was last exported. Its popover adds the link state the status leaves out, and has that time, Export, Play and
+ * Reveal, and Re-import once the game has changed the export. Desktop only.
  */
 export function LinkStatus() {
   const open = useOpenProjectMap()
+  const unsaved = useEditor((s) => s.dirty)
   const canExport = useEditor((s) => s.capabilities.exportToGame)
   const canPlay = useEditor((s) => s.capabilities.play)
   const prefab = useOpenPrefab()
@@ -26,9 +27,11 @@ export function LinkStatus() {
   const { state, map } = open
   const exported = map.link?.export ?? null
   const changed = state === "changedInGame" || state === "bothChanged"
+  const status = syncStatusOf(state, unsaved)
+  const detail = syncDetailOf(state, status)
   return (
     <Popover>
-      <PopoverTrigger render={<LinkStateChip state={state} />}>
+      <PopoverTrigger render={<SyncStatusChip status={status} />}>
         {exported !== null && (
           <>
             <span aria-hidden>·</span>
@@ -38,7 +41,8 @@ export function LinkStatus() {
       </PopoverTrigger>
       <PopoverContent side="top" className="w-80 gap-3 p-3">
         <div className="flex flex-col">
-          <PopoverTitle>{LINK_STATE_LABELS[state]}</PopoverTitle>
+          <PopoverTitle>{SYNC_STATUS_LABELS[status]}</PopoverTitle>
+          {detail !== null && <p className="text-fg-tertiary">{detail}</p>}
           {exported !== null && (
             <Tooltip>
               <TooltipTrigger render={<p className="w-fit text-fg-tertiary" />}>
