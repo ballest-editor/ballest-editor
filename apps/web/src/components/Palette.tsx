@@ -16,7 +16,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { type MouseEvent, type ReactNode, useMemo, useState } from "react"
 import { type CatalogPiece, paletteSections, pieceIdOf, unavailableReasonOf, verificationOf } from "../domain/Catalog"
 import { placementTransform } from "../domain/factory"
-import { pieceDisplayName, pieceLabelOf, type PieceSize } from "../domain/pieceName"
+import { pieceDisplayName, pieceLabelOf, type PieceSize, pieceTitleOf } from "../domain/pieceName"
 import { pieceFootprint } from "../domain/placement"
 import type { Settings } from "../domain/Settings"
 import { updateSettings } from "../editor/actions"
@@ -39,6 +39,13 @@ const UNVERIFIED_NOTE =
 const PLACED_FLASH =
   "relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:bg-primary/40 after:opacity-0 after:transition-opacity after:duration-500 active:after:opacity-100 active:after:duration-0"
 
+/** A size's colour, so sizes scan down a grid: the tag's fill and the thumbnail's outline. */
+const SIZE_TINTS: Readonly<Record<PieceSize, { readonly tag: string; readonly outline: string }>> = {
+  S: { tag: "bg-size-s", outline: "ring-size-s" },
+  M: { tag: "bg-size-m", outline: "ring-size-m" },
+  L: { tag: "bg-size-l", outline: "ring-size-l" }
+}
+
 const matches = (piece: CatalogPiece, terms: ReadonlyArray<string>) => {
   const haystack = `${pieceLabelOf(piece)} ${piece.displayName ?? ""} ${piece.className} ${piece.meshAssetPath ?? ""} ${
     piece.category ?? ""
@@ -47,11 +54,17 @@ const matches = (piece: CatalogPiece, terms: ReadonlyArray<string>) => {
   return terms.every((t) => haystack.includes(t))
 }
 
-function SizeTag({ size, className }: { readonly size: PieceSize; readonly className?: string }) {
+function SizeTag({ size, disabled, className }: {
+  readonly size: PieceSize
+  /** In a disabled row, where it takes the row's grey. */
+  readonly disabled: boolean
+  readonly className?: string
+}) {
   return (
     <span
       className={cn(
-        "flex size-4 shrink-0 items-center justify-center rounded-control bg-muted text-caption text-fg-secondary",
+        "flex size-4 shrink-0 items-center justify-center rounded-control text-caption",
+        disabled ? "bg-muted text-fg-disabled" : cn(SIZE_TINTS[size].tag, "text-background"),
         className
       )}
     >
@@ -114,13 +127,14 @@ function PieceButton({ piece, category, view, onPlace, onHover, unavailable, unv
     )
     : placeholder
   const note = unavailable ?? (unverified === true ? UNVERIFIED_NOTE : undefined)
+  const disabled = unavailable !== undefined
   return (
     <Tooltip>
       {/* A disabled button takes no pointer events, so the tooltip is on a wrapper. */}
       <TooltipTrigger render={<span className={cn("block", unavailable !== undefined && "cursor-not-allowed")} />}>
         <Button
           variant="ghost"
-          disabled={unavailable !== undefined}
+          disabled={disabled}
           className={cn(
             PLACED_FLASH,
             grid ? "flex h-auto w-full flex-col gap-1 p-1" : "flex h-8 w-full justify-start gap-2 px-1 text-left"
@@ -134,12 +148,21 @@ function PieceButton({ piece, category, view, onPlace, onHover, unavailable, unv
           {grid
             ? (
               <>
-                <span className="relative">
+                <span
+                  className={cn(
+                    "relative flex rounded-control",
+                    size !== undefined && !disabled && cn("ring-1", SIZE_TINTS[size].outline)
+                  )}
+                >
                   {thumbnail}
-                  {size !== undefined && <SizeTag size={size} className="absolute top-0.5 right-0.5" />}
+                  {size !== undefined && (
+                    <SizeTag size={size} disabled={disabled} className="absolute top-0.5 right-0.5" />
+                  )}
                   {unverified === true && <span className="absolute top-1 left-1 size-2 rounded-full bg-amber-500" />}
                 </span>
-                <span className="line-clamp-2 h-8 w-full text-center text-caption whitespace-normal">{name}</span>
+                <span className="line-clamp-3 w-full text-center text-caption leading-3.5 whitespace-normal">
+                  {name}
+                </span>
               </>
             )
             : (
@@ -151,16 +174,16 @@ function PieceButton({ piece, category, view, onPlace, onHover, unavailable, unv
                     unverified
                   </span>
                 )}
-                {size !== undefined && <SizeTag size={size} />}
+                {size !== undefined && <SizeTag size={size} disabled={disabled} />}
               </>
             )}
         </Button>
       </TooltipTrigger>
       <TooltipContent side="right" className="flex-col items-start gap-0">
-        {grid && <span>{pieceLabelOf(piece)}</span>}
-        <span>{piece.className}</span>
+        <span className="text-body-strong">{pieceTitleOf(piece)}</span>
         <span className="text-caption">{category}</span>
         {note !== undefined && <span className="mt-1 text-caption">{note}</span>}
+        <span className="text-caption text-fg-tertiary">{piece.className}</span>
       </TooltipContent>
     </Tooltip>
   )
