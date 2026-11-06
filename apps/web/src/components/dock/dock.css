@@ -194,10 +194,15 @@
   --dv-tabs-and-actions-container-height: 2rem;
 }
 
+/* The map tabs have the strip to its end, so all of it takes a drop; a panel can't join the centre, so the void has no use. */
 .dv-groupview:has([data-dock-hidden-tab]) .dv-pre-actions-container {
   min-width: 0;
-  flex: 0 1 auto;
+  flex: 1 1 0;
   overflow: hidden;
+}
+
+.dv-groupview:has([data-dock-hidden-tab]) .dv-void-container {
+  flex-grow: 0;
 }
 
 .dv-groupview:has([data-dock-hidden-tab]) .dv-scrollable {
