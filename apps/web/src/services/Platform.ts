@@ -1,5 +1,6 @@
 import type {
   BackupRef,
+  CreateProjectPayload,
   DesktopArgs,
   DesktopBridge,
   DesktopInvoke,
@@ -76,7 +77,7 @@ export type {
 /** What this platform can do; the menus hide what it can't. */
 export interface PlatformCapabilities {
   /**
-   * A project folder on disk (docs/PROJECTS.md): New map saves into it, Save writes there, Import copies a file in. A
+   * A project folder on disk (docs/PROJECTS.md): Save writes there, Import copies a file in. A
    * browser has none: one map in memory, Open is the file input and Export is a download.
    */
   readonly projects: boolean
@@ -131,8 +132,8 @@ export class Platform extends Context.Service<Platform, {
   readonly openProjectWindow: (target: ProjectTarget) => Effect.Effect<void, PlatformError>
   /** Uses a recent project, or the folder `chooseProject` gave. */
   readonly switchProject: (path: string) => Effect.Effect<ProjectState, PlatformError>
-  /** Makes `<projectsFolder>/<name>` a project and uses it. */
-  readonly createProject: (name: string) => Effect.Effect<ProjectState, PlatformError>
+  /** Makes a project of the folder picked, or `<projectsFolder>/<name>`, and uses it. */
+  readonly createProject: (project: CreateProjectPayload) => Effect.Effect<ProjectState, PlatformError>
   /** Shows one of the project's folders in the file manager. */
   readonly revealProject: (which: ProjectFolder) => Effect.Effect<void, PlatformError>
   /** Renames the project (its file's name; the folder keeps its name). */
@@ -345,7 +346,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
     checkProject: (target) => call("checkProject", target),
     openProjectWindow: (target) => call("openProjectWindow", target),
     switchProject: (path) => call("switchProject", { path }),
-    createProject: (name) => call("createProject", { name }),
+    createProject: (project) => call("createProject", project),
     revealProject: (which) =>
       bridgeCheck(call("revealProject", { which }), "The project doesn't have that folder yet."),
     renameProject: (name) => call("renameProject", { name }),

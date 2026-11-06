@@ -3,13 +3,13 @@ import { Effect } from "effect"
 import { lightingOf } from "../../domain/sunlight"
 import { MapCodec } from "../../services/MapCodec"
 import { makeTestDisk, projectFile, TEST_MAPS_FOLDER, TEST_PROJECTS_FOLDER } from "../../test/desktopBridge"
-import { layerFor, reset, s } from "../../test/editorActions"
-import { createNewMap, nameProjectEffect, openProjectMapFile } from "./maps"
+import { createNewMap, layerFor, reset, s } from "../../test/editorActions"
+import { nameProjectEffect, openProjectMapFile } from "./maps"
 import { importMapFile } from "./project"
 import { duplicateMapEffect, saveMapAsEffect, saveMapFile } from "./save"
 
 describe("save actions", () => {
-  it.effect("New map saves into the project at once; Save, Rename and Duplicate ask nothing more", () => {
+  it.effect("A map's first Save puts it in the project; Save, Rename and Duplicate ask nothing more", () => {
     const disk = makeTestDisk()
     return Effect.gen(function*() {
       yield* reset
@@ -45,7 +45,7 @@ describe("save actions", () => {
       // A name the project has is refused, and nothing is overwritten.
       const before = disk.files.get(projectFile(renamed))
       const error = yield* Effect.flip(createNewMap("Hairpin", "Isaac"))
-      assert.match(error.message, /already has a map called/)
+      assert.match(String(error), /already has a map called/)
       assert.strictEqual(disk.files.get(projectFile(renamed)), before)
 
       yield* openProjectMapFile(renamed)
@@ -59,7 +59,7 @@ describe("save actions", () => {
     return Effect.gen(function*() {
       yield* reset
       assert.isNull(s().project?.current)
-      // New map stays in memory, and there is nothing to import into
+      // a new map stays in memory, and there is nothing to import into
       yield* createNewMap("Big Loop", "Isaac")
       assert.isNull(s().file)
       assert.strictEqual(disk.files.size, 0)
@@ -68,7 +68,7 @@ describe("save actions", () => {
       assert.deepStrictEqual(disk.dialogs, [])
 
       // The Save dialog's project name makes the folder, then the map is written into it
-      yield* nameProjectEffect("My tracks")
+      yield* nameProjectEffect({ name: "My tracks" })
       const project = `${TEST_PROJECTS_FOLDER}/My tracks`
       assert.deepInclude(s().project?.current, { path: project, name: "My tracks" })
       assert.isNull(s().file)

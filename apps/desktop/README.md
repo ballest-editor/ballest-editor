@@ -189,7 +189,7 @@ Trying it without a release is [tools/release](../../tools/release/README.md#try
 - `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`. The page and the preload run in separate JavaScript worlds, with no Node in either.
 - Navigation to anything but the app's own URL goes to the system browser, and so does every `window.open`, which only lets http(s) through. No other page can load inside the window and pick up `window.ballest`.
 - Main decodes every IPC payload with its schema before a handler runs.
-- Map files are named by file name, never by path: a `.balledit` name with no separators, joined to the current project's `maps/` folder (New map, Save, Rename, Import) or to the game's maps folder (Export to game). The project folder is one main made under `Documents/Ballest Editor`, or one the user picked in a folder dialog (the recent projects); `ballest:project:switch`, `ballest:project:check` and `ballest:project:openWindow` with any other folder are refused. Import reads only a file the user picked in its open dialog this session, so a compromised page can't read the disk.
+- Map files are named by file name, never by path: a `.balledit` name with no separators, joined to the current project's `maps/` folder (Save, Rename, Import) or to the game's maps folder (Export to game). The project folder is one main made under `Documents/Ballest Editor`, or one the user picked in a folder dialog (the recent projects); `ballest:project:switch`, `ballest:project:create`, `ballest:project:check` and `ballest:project:openWindow` with any other folder are refused. Import reads only a file the user picked in its open dialog this session, so a compromised page can't read the disk.
 - The game folders are only ever chosen in a dialog, never typed by the page. Reveal opens only those folders, the project folder, its `maps/` or its `.ballest/backups/`. The only writes into the game's install are the editor plugin's own folder and `play.json`.
 - CSP allows scripts from the app's own origin only. `'unsafe-inline'` is still on for the inline script in `index.html` that lays out the loading skeleton; moving that script out would let us drop it.
 
@@ -228,7 +228,7 @@ scripts/
 
 `pnpm --filter @ballest/desktop test` runs the tests. They cover:
 
-- the IPC methods against a fake `ipcMain` and fake dialogs: ping, the project (New map, Save, Rename, Import from the game and elsewhere, Export to game and the published-draft check, choosing and switching projects, a project open in another window, New window), external links, the window theme, the game folders, launch
+- the IPC methods against a fake `ipcMain` and fake dialogs: ping, the project (Save, Rename, Import from the game and elsewhere, Export to game and the published-draft check, choosing and switching projects, a project open in another window, New window), external links, the window theme, the game folders, launch
 - the game lookups: vdf and manifest fixtures in `src/game/fixtures/`, Windows path rules through `node:path`'s `win32`, and a fake Steam tree and `/proc` in a temp folder
 - the editor plugin's status and install, Play and the game session, the creator lookup
 - backups, `link.json` and sync

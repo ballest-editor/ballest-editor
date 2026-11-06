@@ -283,7 +283,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
   const newProjectPath = (name: string) => `${TEST_PROJECTS_FOLDER}/${name.trim()}`
   /** Refuses `target` as main does; the folder it means otherwise. */
   const folderOf = (target: ProjectTarget) => {
-    const path = target._tag === "New" ? newProjectPath(target.name) : target.path
+    const path = target._tag === "New" ? target.folder ?? newProjectPath(target.name) : target.path
     const refusal = target._tag === "New" && info(path).exists ? `${path} already holds a project.` : refusalOf(path)
     return refusal === null ? Promise.resolve(path) : fail(refusal)
   }
@@ -373,7 +373,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       disk.project.windows.push(path)
     },
     switchProject: ({ path }) => select(path),
-    createProject: async ({ name }) => select(await folderOf({ _tag: "New", name })),
+    createProject: async (project) => select(await folderOf({ _tag: "New", ...project })),
     revealProject: ({ which }) => {
       const project = disk.project.current
       if (project === null || !info(project).exists) return Promise.resolve(false)

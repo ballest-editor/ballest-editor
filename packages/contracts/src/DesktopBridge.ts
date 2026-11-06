@@ -151,7 +151,7 @@ export type WritePrefabPayload = typeof WritePrefabPayload.Type
 export const RenamePrefabPayload = Schema.Struct({ tier: PrefabTier, from: PrefabName, to: PrefabName })
 export type RenamePrefabPayload = typeof RenamePrefabPayload.Type
 
-/** The folder the user works in (docs/PROJECTS.md). It is made on disk by the first New map or Import. */
+/** The folder the user works in (docs/PROJECTS.md). It is made on disk by New project, or a first write into it. */
 export const ProjectInfo = Schema.Struct({
   path: FilePath,
   /** `ballest-project.json`'s name; the folder's name until that file exists. */
@@ -187,19 +187,22 @@ export type ProjectState = typeof ProjectState.Type
 /** `chooseProject`'s result: the folder picked, which nothing uses yet; null when the user cancelled the dialog. */
 export const ChooseProjectResult = Schema.NullOr(ProjectInfo)
 
-/** A project about to be opened: a folder main already knows (recent, or picked in a dialog), or a new one by name. */
+/**
+ * A new project: its name, and the folder it is made in: `folder`, one picked in a dialog (`chooseProject`), or
+ * `<projectsFolder>/<name>` when not given.
+ */
+export const CreateProjectPayload = Schema.Struct({ name: Schema.String, folder: Schema.optionalKey(FilePath) })
+export type CreateProjectPayload = typeof CreateProjectPayload.Type
+
+/** A project about to be opened: a folder main already knows (recent, or picked in a dialog), or a new one. */
 export const ProjectTarget = Schema.TaggedUnion({
   Existing: { path: FilePath },
-  New: { name: Schema.String }
+  New: CreateProjectPayload.fields
 })
 export type ProjectTarget = typeof ProjectTarget.Type
 
 export const ProjectPathPayload = Schema.Struct({ path: FilePath })
 export type ProjectPathPayload = typeof ProjectPathPayload.Type
-
-/** New project: the folder's name under `ProjectState.projectsFolder`. */
-export const CreateProjectPayload = Schema.Struct({ name: Schema.String })
-export type CreateProjectPayload = typeof CreateProjectPayload.Type
 
 /** Project settings › General: the project's name in `ballest-project.json` (the folder keeps its name). */
 export const RenameProjectPayload = Schema.Struct({ name: Schema.String })
@@ -714,7 +717,7 @@ export const DesktopMethods = {
   openProjectWindow: { payload: ProjectTarget, result: Schema.Void },
   /** Uses a recent project, or the folder `chooseProject` picked; refused while another window has it open. */
   switchProject: { payload: ProjectPathPayload, result: ProjectState },
-  /** Makes `<projectsFolder>/<name>` a project and uses it; refused when that folder already holds one. */
+  /** Makes a project of `folder`, or `<projectsFolder>/<name>`, and uses it; refused when the folder already holds one. */
   createProject: { payload: CreateProjectPayload, result: ProjectState },
   /** Shows one of the project's folders in the file manager; false when it doesn't exist or fails to open. */
   revealProject: { payload: RevealProjectPayload, result: Schema.Boolean },

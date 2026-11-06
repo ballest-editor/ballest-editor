@@ -170,7 +170,7 @@ describe("a project open in another window", () => {
       // a folder another window uses but hasn't made yet is refused before New project writes anything in it
       const unmade = at("New one")
       yield* second.use(unmade)
-      assert.match(yield* refusalOf(first.createNew("New one")), /is open in another window/)
+      assert.match(yield* refusalOf(first.createNew({ name: "New one" })), /is open in another window/)
       assert.isFalse(yield* fs.exists(path.join(unmade, "ballest-project.json")))
     })))
 
@@ -245,6 +245,46 @@ describe("a window started with --project", () => {
       const state = yield* (yield* open(2, Option.some(at("one")))).state
       assert.isTrue(state.chooserRequired)
       assert.isNull(state.current)
+    })))
+})
+
+describe("a new project in a folder the user chose", () => {
+  it.effect("is made there under the name given, and used; the folder keeps its own name", () =>
+    runScoped(Effect.gen(function*() {
+      const { at, fs, open, path } = yield* machine(["one"])
+      const window = yield* open(1)
+      const folder = at("elsewhere/Season 3")
+      yield* fs.makeDirectory(folder, { recursive: true })
+      yield* window.pick(folder)
+
+      yield* window.check({ _tag: "New", name: "My Maps", folder })
+      assert.isFalse(yield* fs.exists(path.join(folder, "ballest-project.json")))
+
+      const state = yield* window.createNew({ name: " My Maps ", folder })
+      assert.deepInclude(state.current, { path: folder, name: "My Maps", exists: true })
+      assert.isTrue(yield* fs.exists(path.join(folder, "maps")))
+      assert.isTrue(yield* fs.exists(path.join(folder, ".ballest")))
+    })))
+
+  it.effect("must be a folder picked in a dialog: the page can't name any other", () =>
+    runScoped(Effect.gen(function*() {
+      const { at, fs, open, path } = yield* machine(["one"])
+      const window = yield* open(1)
+      const folder = at("random")
+      assert.match(yield* refusalOf(window.createNew({ name: "My Maps", folder })), /picked/)
+      assert.isFalse(yield* fs.exists(path.join(folder, "ballest-project.json")))
+    })))
+
+  it.effect("is refused where a project is already, and nothing changes", () =>
+    runScoped(Effect.gen(function*() {
+      const { at, open } = yield* machine(["one"])
+      const window = yield* open(1)
+      const folder = at("taken")
+      yield* window.pick(folder)
+      yield* window.createNew({ name: "Taken", folder })
+      const before = yield* window.state
+      assert.match(yield* refusalOf(window.createNew({ name: "Again", folder })), /already holds a project/)
+      assert.deepStrictEqual((yield* window.state).current, before.current)
     })))
 })
 

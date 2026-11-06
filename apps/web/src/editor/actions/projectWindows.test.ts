@@ -8,10 +8,9 @@ import {
   TEST_PROJECTS_FOLDER,
   type TestDisk
 } from "../../test/desktopBridge"
-import { balledits, edit, fileNameOf, layerFor, noticesWhile, reset, s } from "../../test/editorActions"
+import { balledits, createNewMap, edit, fileNameOf, layerFor, noticesWhile, reset, s } from "../../test/editorActions"
 import { readSample } from "../../test/samples"
-import { hasWindowToTakeOver, isChooserRequired, isModalOpen } from "../store"
-import { createNewMap } from "./maps"
+import { isChooserRequired, isModalOpen } from "../store"
 import {
   chooseProjectEffect,
   newProjectEffect,
@@ -55,22 +54,39 @@ const chooserDisk = (files: Record<string, string> = {}) => {
 }
 
 describe("asking where a project opens", () => {
-  it.effect("a named project window has something to take over", () => {
+  it.effect("a named project window asks", () => {
     const disk = makeTestDisk()
     return Effect.gen(function*() {
       yield* reset
-      assert.isTrue(hasWindowToTakeOver(s()))
+      yield* newProjectEffect("Season 3")
+      assert.deepInclude(asked(), { name: "Season 3", target: { _tag: "New", name: "Season 3" } })
+      assert.strictEqual(inUse(disk), TEST_PROJECT)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
-  it.effect("Untitled Project with only its untouched map doesn't ask: it just becomes the project", () => {
+  it.effect("Untitled Project with only its untouched map asks too, and nothing changes until it is answered", () => {
     const disk = untitledDisk()
     return Effect.gen(function*() {
       yield* reset
-      assert.isFalse(hasWindowToTakeOver(s()))
-      yield* noticesWhile(() => newProjectEffect("Season 3"))
-      assert.isNull(s().dialog)
-      assert.strictEqual(inUse(disk), SEASON)
+      yield* newProjectEffect("Season 3")
+      assert.deepInclude(asked(), { name: "Season 3", target: { _tag: "New", name: "Season 3" } })
+      assert.isNull(inUse(disk))
+      assert.deepStrictEqual(disk.project.recent, [])
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("Untitled Project's New window leaves this window untitled, its map and all", () => {
+    const disk = untitledDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      const { tabId, tabIds } = s()
+      yield* newProjectEffect("Season 3")
+      yield* noticesWhile(() => openInNewWindowEffect)
+      assert.deepStrictEqual(disk.project.windows, [SEASON])
+      assert.isNull(inUse(disk))
+      assert.isNull(s().project?.current)
+      assert.strictEqual(s().tabId, tabId)
+      assert.deepStrictEqual(s().tabIds, tabIds)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
@@ -91,7 +107,8 @@ describe("asking where a project opens", () => {
       yield* reset
       yield* createNewMap("Big Loop", "Isaac")
       yield* createNewMap("Hairpin", "Isaac")
-      assert.isTrue(hasWindowToTakeOver(s()))
+      yield* newProjectEffect("Season 3")
+      assert.isNotNull(asked())
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
@@ -191,6 +208,56 @@ describe("the answer", () => {
       assert.match(String(error), /Couldn't start a new window/)
       assert.strictEqual(inUse(disk), TEST_PROJECT)
     }).pipe(Effect.provide(layerFor(disk)))
+  })
+})
+
+describe("Always do this", () => {
+  const always = (projectOpensIn: "thisWindow" | "newWindow") => {
+    const { settings, setSettings } = s()
+    setSettings({ ...settings, general: { ...settings.general, projectOpensIn } })
+  }
+  const askAgain = Effect.sync(() => {
+    const { settings, setSettings } = s()
+    setSettings({ ...settings, general: { ...settings.general, projectOpensIn: "ask" } })
+  })
+
+  it.effect("This window: nothing asks where, and a named project's edits are still asked about", () => {
+    const disk = makeTestDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      always("thisWindow")
+      edit()
+      disk.promptAnswers.push("discard")
+      yield* noticesWhile(() => newProjectEffect("Season 3"))
+      assert.isNull(s().dialog)
+      assert.lengthOf(disk.prompts, 1)
+      assert.strictEqual(inUse(disk), SEASON)
+    }).pipe(Effect.ensuring(askAgain), Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("New window: nothing asks where, and this window stays as it was", () => {
+    const disk = makeTestDisk()
+    disk.project.recent = [OTHER]
+    return Effect.gen(function*() {
+      yield* reset
+      always("newWindow")
+      yield* noticesWhile(() => switchProjectEffect(OTHER))
+      assert.isNull(s().dialog)
+      assert.deepStrictEqual(disk.project.windows, [OTHER])
+      assert.strictEqual(inUse(disk), TEST_PROJECT)
+    }).pipe(Effect.ensuring(askAgain), Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("a refused project is still refused, and the required chooser's pick is still this window", () => {
+    const disk = chooserDisk()
+    return Effect.gen(function*() {
+      yield* reset
+      always("newWindow")
+      assert.match(String(yield* Effect.flip(switchProjectEffect(TEST_PROJECT))), /is open in another window/)
+      yield* noticesWhile(() => switchProjectEffect(OTHER))
+      assert.deepStrictEqual(disk.project.windows, [])
+      assert.strictEqual(inUse(disk), OTHER)
+    }).pipe(Effect.ensuring(askAgain), Effect.provide(layerFor(disk)))
   })
 })
 

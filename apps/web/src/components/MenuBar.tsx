@@ -229,6 +229,7 @@ export function MenuBar() {
       {projects
         ? (
           <Menu title="File">
+            <CommandItem action="newMap">New map</CommandItem>
             <MenubarItem onClick={() => openDialog({ id: "newProject" })}>New project…</MenubarItem>
             <MenubarItem onClick={() => void chooseProject()}>Open project…</MenubarItem>
             <RecentProjectsMenu />
@@ -244,7 +245,7 @@ export function MenuBar() {
         )
         : (
           <Menu title="File">
-            <CommandItem action="newMap">New map…</CommandItem>
+            <CommandItem action="newMap">New map</CommandItem>
             <CommandItem action="openMap">Open…</CommandItem>
             <MenubarSeparator />
             <CommandItem action="saveMap">Save</CommandItem>
@@ -346,7 +347,7 @@ export function MenuBar() {
       {projects
         ? (
           <Menu title="Project">
-            <CommandItem action="newMap" inset>New map…</CommandItem>
+            <CommandItem action="newMap" inset>New map</CommandItem>
             <CommandItem action="openMap" inset disabled={untitled}>Import map…</CommandItem>
             {canExport && (
               <>

@@ -1,4 +1,4 @@
-import { IconBoxMultiple, IconX } from "@tabler/icons-react"
+import { IconBoxMultiple, IconPlus, IconX } from "@tabler/icons-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,7 +8,14 @@ import {
 } from "@workspace/ui/components/dropdown-menu"
 import { cn } from "@workspace/ui/lib/utils"
 import { type DragEvent, type MouseEvent, useEffect, useRef, useState } from "react"
-import { closeOtherTabs, closeTab, closeTabsToRight, nameProjectMap, revealProject } from "../editor/actions"
+import {
+  closeOtherTabs,
+  closeTab,
+  closeTabsToRight,
+  nameProjectMap,
+  revealProject,
+  startNewMap
+} from "../editor/actions"
 import { useEditor, useTabSummary } from "../editor/store"
 
 /** A tab being dragged along the strip, and where it would land (an index into the strip's gaps). */
@@ -21,7 +28,8 @@ interface Drag {
  * The document tabs over the viewport (docs/PROJECTS.md § Shell): one per open map, in the order they were opened
  * or dragged into. A click makes a tab active; its × (or a middle click) closes it, asking about unsaved edits first;
  * a right-click opens its menu. Closing the last tab leaves a fresh map in its place: there is always a map. The dot
- * marks a map with unsaved edits, or one not saved anywhere yet; it gives way to the × while the tab is hovered.
+ * marks a map with unsaved edits, or one not saved anywhere yet; it gives way to the × while the tab is hovered. The +
+ * after the last tab is New map; it stays in view while the tabs scroll.
  */
 export function DocumentTabs() {
   const tabIds = useEditor((s) => s.tabIds)
@@ -35,9 +43,7 @@ export function DocumentTabs() {
 
   return (
     <div
-      role="tablist"
-      aria-label="Documents"
-      className="flex h-8 shrink-0 items-stretch overflow-x-auto overflow-y-hidden bg-card text-xs shadow-[inset_0_-1px_var(--border)] [scrollbar-width:none]"
+      className="flex h-8 shrink-0 items-stretch bg-card text-xs shadow-[inset_0_-1px_var(--border)]"
       onDragOver={(e) => {
         if (drag === null) return
         e.preventDefault()
@@ -48,18 +54,33 @@ export function DocumentTabs() {
       onDrop={drop}
       onDragEnd={() => setDrag(null)}
     >
-      {tabIds.map((id, index) => (
-        <DocumentTab
-          key={id}
-          id={id}
-          index={index}
-          dragging={drag?.id === id}
-          dropBefore={drag !== null && drag.at === index}
-          dropAfter={drag !== null && index === tabIds.length - 1 && drag.at === tabIds.length}
-          onDragStart={() => setDrag({ id, at: index })}
-          onDragOver={(at) => drag !== null && drag.at !== at && setDrag({ ...drag, at })}
-        />
-      ))}
+      <div
+        role="tablist"
+        aria-label="Documents"
+        className="flex min-w-0 items-stretch overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
+      >
+        {tabIds.map((id, index) => (
+          <DocumentTab
+            key={id}
+            id={id}
+            index={index}
+            dragging={drag?.id === id}
+            dropBefore={drag !== null && drag.at === index}
+            dropAfter={drag !== null && index === tabIds.length - 1 && drag.at === tabIds.length}
+            onDragStart={() => setDrag({ id, at: index })}
+            onDragOver={(at) => drag !== null && drag.at !== at && setDrag({ ...drag, at })}
+          />
+        ))}
+      </div>
+      <button
+        type="button"
+        aria-label="New map"
+        title="New map"
+        className="flex w-8 shrink-0 items-center justify-center text-muted-foreground outline-none hover:bg-muted/40 hover:text-foreground focus-visible:shadow-[inset_0_0_0_2px_var(--ring)]"
+        onClick={() => void startNewMap()}
+      >
+        <IconPlus className="size-3.5" />
+      </button>
     </div>
   )
 }

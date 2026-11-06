@@ -18,10 +18,10 @@ import {
   type TestDisk,
   testHash
 } from "../../test/desktopBridge"
-import { diskWithPlugin, edit, layerFor, playSample, reset, s } from "../../test/editorActions"
+import { createNewMap, diskWithPlugin, edit, layerFor, playSample, reset, s } from "../../test/editorActions"
 import { recoverBackupEffect } from "./backups"
 import { exportToGameEffect, playEffect } from "./exportPlay"
-import { createNewMap, openProjectMapFile } from "./maps"
+import { openProjectMapFile } from "./maps"
 import { importMapFile, replaceOnImportEffect } from "./project"
 import { duplicateMapEffect, saveMapAsEffect, saveMapFile } from "./save"
 import { checkExportsEffect, reimportMapEffect } from "./sync"

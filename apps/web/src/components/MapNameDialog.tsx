@@ -42,7 +42,7 @@ export const useMapCreator = (): MapCreator => {
 }
 
 /**
- * The name + creator form shared by New map, Save, Rename, Duplicate and Export. Both names go into the file name
+ * The name + creator form shared by Save, Rename, Duplicate and Export. Both names go into the file name
  * (`mapFileNameOf`), which the game checks against the names inside the file.
  */
 export function MapNameDialog(props: {
@@ -61,8 +61,6 @@ export function MapNameDialog(props: {
   readonly savedCreator?: ReactNode
   /** Under the creator input; by default, that what is typed is saved to Settings › General. */
   readonly creatorHint?: string
-  /** A field before the map's name, which then takes the focus (Save map's project name). */
-  readonly before?: ReactNode
   /** Extra content above the buttons. */
   readonly children?: ReactNode
   readonly submitLabel: string
@@ -88,12 +86,13 @@ export function MapNameDialog(props: {
             <DialogTitle>{props.title}</DialogTitle>
             <DialogDescription>{props.fileNameNote}</DialogDescription>
           </DialogHeader>
-          {props.before}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={`${props.id}-name`}>Map name</Label>
             <Input
               id={`${props.id}-name`}
-              autoFocus={props.before === undefined}
+              autoFocus
+              // a name is usually replaced whole: Untitled 2, or a copy's
+              onFocus={(e) => e.currentTarget.select()}
               value={props.name}
               onChange={(e) => props.onNameChange(e.target.value)}
               aria-invalid={props.name !== "" && !isValidName(props.name)}

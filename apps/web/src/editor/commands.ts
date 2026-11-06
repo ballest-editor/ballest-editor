@@ -53,7 +53,7 @@ export const actionCommands = {
   viewLeft: () => lookAlong("left"),
   toggleOrthographic: () => lookAlong(sceneRegistry.toggledProjection()),
   frameAll: () => useEditor.getState().requestFrameAll(),
-  newMap: startNewMap,
+  newMap: () => void startNewMap(),
   /** Import… on desktop, Open… in a browser. */
   openMap: () => void importMap(),
   saveMap: () => void saveMap(),

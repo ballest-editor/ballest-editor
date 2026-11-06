@@ -3,57 +3,20 @@
  * Project settings' per-map edits and prefs, and the project's own name and folders. Opening, Import and switching
  * projects are in `project`.
  */
-import type { ProjectFolder } from "@ballest/contracts"
-import { Effect } from "effect"
+import type { CreateProjectPayload, ProjectFolder } from "@ballest/contracts"
+import { Effect, Option } from "effect"
 import { creatorOf, usableCreatorName } from "../../domain/creator"
 import { setLevelData as setMapLevelData } from "../../domain/edits"
-import { currentCreatedAt, mapLabelOf, newMapFile } from "../../domain/factory"
+import { currentCreatedAt, newMapFile, untitledNameOf } from "../../domain/factory"
 import { type LevelData, type MapFile, PLAYER_START_CLASS } from "../../domain/MapFile"
 import { type MapPrefs, mapPrefsKeyOf } from "../../domain/MapPrefs"
 import { MapCodec } from "../../services/MapCodec"
 import { MapExporter } from "../../services/MapExporter"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { Platform } from "../../services/Platform"
-import { type TabTarget, tabWithFile, useEditor } from "../store"
+import { tabLabels, type TabTarget, tabWithFile, useEditor } from "../store"
 import { notifyFailure, run } from "./run"
-import {
-  fileOf,
-  hasProject,
-  loadProjectMapFile,
-  projectName,
-  refreshProject,
-  revealIn,
-  saveTabPrefs,
-  showMap
-} from "./shared"
-
-/**
- * New map: starts it the way the in-game editor does and, on desktop, saves it into the project at once (making the
- * project the first time). A browser keeps it in memory.
- */
-export const createNewMap = Effect.fn("createNewMap")(function*(displayName: string, creatorName: string) {
-  const platform = yield* Platform
-  const createdAt = yield* currentCreatedAt
-  const catalog = useEditor.getState().catalog?.catalog
-  const playerStartPiece = catalog?.pieces.find((p) => p.classPath === PLAYER_START_CLASS)
-  const map = newMapFile({ displayName, creatorName, createdAt, playerStartPiece })
-  // a browser keeps it in memory; so does Untitled Project, until the first Save names a project. It has a name someone
-  // gave it and no file to fall back on, so closing it asks, unlike the blank map the app starts on.
-  if (!platform.capabilities.projects || !hasProject()) {
-    useEditor.getState().loadMap(map, null, undefined, { into: "newTab", dirty: true })
-    return
-  }
-  const result = yield* (yield* MapExporter).prepare(map)
-  const created = yield* platform.createMap({ fileName: result.filename, text: result.text })
-  yield* showMap(result.map, fileOf(created), { into: "newTab" })
-  yield* refreshProject
-  useEditor.getState().notify("info", `Created ${mapLabelOf(created.fileName)} in ${projectName()}`, {
-    kind: "mapCreated",
-    actions: [revealIn("project")]
-  })
-})
-
-export const newMap = (displayName: string, creatorName: string) => run(createNewMap(displayName, creatorName))
+import { fileOf, loadProjectMapFile, refreshProject, saveTabPrefs, showMap } from "./shared"
 
 /** Reads one of the project's maps into the editor, in the tab `into` says. */
 export const readProjectMapIntoEditor = Effect.fn("readProjectMapIntoEditor")(
@@ -75,18 +38,32 @@ export const openProjectMapFile = Effect.fn("openProjectMapFile")(function*(file
 })
 
 /**
- * A fresh, unsaved map in the editor, the way New map starts one (the player start and the goal ring where the game
- * puts them, the creator in use) but with a default name and nothing written: what the tab shows when there is no map
- * to open. Its first Save names it into the project.
+ * A new map the way the in-game editor starts one: the player start and the goal ring where the game puts them, and the
+ * creator in use (none yet: the first Save asks). Nothing is written.
  */
-export const freshMapEffect = Effect.gen(function*() {
+const untitledMap = Effect.fnUntraced(function*(displayName: string) {
   const { catalog, settings, foundCreator } = useEditor.getState()
   const playerStartPiece = catalog?.catalog.pieces.find((p) => p.classPath === PLAYER_START_CLASS)
   const creatorName = usableCreatorName(creatorOf(settings.general.creatorName, foundCreator))
   const createdAt = yield* currentCreatedAt
-  const map = newMapFile({ displayName: "Untitled", creatorName, createdAt, playerStartPiece })
-  useEditor.getState().loadMap(map, null, undefined, { fresh: true })
+  return newMapFile({ displayName, creatorName, createdAt, playerStartPiece })
 })
+
+/** A fresh map in the active tab, for when there is no map to open: the first Save names it. */
+export const freshMapEffect = Effect.gen(function*() {
+  useEditor.getState().loadMap(yield* untitledMap("Untitled"), null, undefined, { fresh: true })
+})
+
+/**
+ * New map: a tab of its own, whatever is open, in any window. It asks nothing and writes nothing: it goes by the next
+ * free Untitled name until its first Save names it.
+ */
+export const newMapEffect = Effect.gen(function*() {
+  const map = yield* untitledMap(untitledNameOf(new Set(tabLabels(useEditor.getState()))))
+  useEditor.getState().loadMap(map, null, undefined, { fresh: true, into: "addedTab" })
+})
+
+export const startNewMap = () => run(newMapEffect)
 
 /**
  * The map the desktop app starts on (docs/PROJECTS.md § Shell): the one open when it last ran, else the project's
@@ -215,15 +192,32 @@ export const setGridHeight = (gridHeight: number, tabId = useEditor.getState().t
 }
 
 /**
- * The first Save's project name (docs/PROJECTS.md § Shell): Untitled Project becomes `<projectsFolder>/<name>` and
- * the open map stays open, unsaved, for the save that follows. No unsaved-changes prompt: nothing is left behind.
+ * Untitled Project becomes a project (the first Save, Project settings): the folder picked, or
+ * `<projectsFolder>/<name>`. The open maps stay open, unsaved, and nothing is asked: nothing is left behind.
  */
-export const nameProjectEffect = Effect.fn("nameProjectEffect")(function*(name: string) {
-  yield* (yield* Platform).createProject(name)
+export const nameProjectEffect = Effect.fn("nameProjectEffect")(function*(project: CreateProjectPayload) {
+  yield* (yield* Platform).createProject(project)
   yield* refreshProject
 })
 
-export const nameProject = (name: string) => run(nameProjectEffect(name))
+export const nameProject = (name: string) => run(nameProjectEffect({ name }))
+
+/** Refuses a project the first Save would make, with the reason; true when it can be made. Nothing is written. */
+export const canMakeProject = (project: CreateProjectPayload) =>
+  run(
+    Effect.gen(function*() {
+      yield* (yield* Platform).checkProject({ _tag: "New", ...project })
+      return true
+    })
+  )
+
+/** The Save map dialog's Choose…: a folder for the new project, refused as Open project… refuses it; null on Cancel. */
+export const pickProjectFolder = () =>
+  run(
+    Effect.gen(function*() {
+      return Option.getOrNull(yield* (yield* Platform).chooseProject)
+    })
+  )
 
 /** Shows one of the project's folders in the file manager: its `maps/` unless asked otherwise. */
 export const revealProject = (which: ProjectFolder = "maps") =>

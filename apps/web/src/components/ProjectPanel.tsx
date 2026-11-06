@@ -270,11 +270,11 @@ export function ProjectPanel() {
             "min-w-0 flex-1 truncate px-1 text-xs font-medium",
             untitled && "italic text-muted-foreground"
           )}
-          title={project?.path ?? (untitled ? "Not saved anywhere yet: Save the map to name the project." : undefined)}
+          title={project?.path ?? (untitled ? "Not saved anywhere yet: saving a map creates the project." : undefined)}
         >
           {projects ? project?.name ?? "Untitled Project *" : "This browser"}
         </span>
-        <HeaderButton label="New map…" onClick={startNewMap}>
+        <HeaderButton label="New map" onClick={() => void startNewMap()}>
           <IconPlus className="size-3.5" />
         </HeaderButton>
         <HeaderButton label={projects ? "Import map…" : "Open…"} disabled={untitled} onClick={() => void importMap()}>
@@ -287,6 +287,11 @@ export function ProjectPanel() {
         )}
       </div>
       <ScrollArea className="min-h-0 flex-1">
+        {untitled && (
+          <p className="px-3 pb-2 text-xs text-muted-foreground">
+            No project yet. Saving a map creates one, and these maps can then be saved in it.
+          </p>
+        )}
         <ul className="flex flex-col gap-px px-2 pb-2">
           {unsavedTabs.map((tabId) => <UnsavedRow key={tabId} tabId={tabId} />)}
           {/* the tabs above aren't in the project; a rule keeps them from reading as its first maps */}
@@ -295,11 +300,6 @@ export function ProjectPanel() {
           )}
           {maps.map((map) => <MapRow key={map.fileName} map={map} now={now} />)}
         </ul>
-        {untitled && (
-          <p className="px-3 py-2 text-[0.6875rem] text-muted-foreground">
-            Save the map to name the project; it is kept in Documents/Ballest Editor from then on.
-          </p>
-        )}
         {!projects && unsavedTabs.length === 0 && (
           <p className="px-3 py-2 text-[0.6875rem] text-muted-foreground">
             This browser has no project: maps live in their tabs, and Save downloads the file. The desktop app keeps

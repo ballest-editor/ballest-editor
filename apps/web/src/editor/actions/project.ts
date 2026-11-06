@@ -2,6 +2,7 @@
  * Opening, importing and switching (docs/PROJECTS.md § Import): another of the project's maps, a map file from
  * anywhere, another project. Maps open in tabs of their own; what would replace a map's edits asks about them first.
  */
+import type { CreateProjectPayload } from "@ballest/contracts"
 import { Effect, Option } from "effect"
 import { setLevelNames } from "../../domain/edits"
 import { copyNameOf, mapFileNameOf, mapLabelOf } from "../../domain/factory"
@@ -9,7 +10,7 @@ import { MapCodec } from "../../services/MapCodec"
 import { MapExporter } from "../../services/MapExporter"
 import { Platform, PlatformError, type ProjectState, type ProjectTarget } from "../../services/Platform"
 import type { AppServices } from "../../services/runtime"
-import { hasWindowToTakeOver, type ImportClash, isChooserRequired, useEditor } from "../store"
+import { blankTabs, type ImportClash, isChooserRequired, useEditor } from "../store"
 import { openProjectMapFile, openStartingMap, readProjectMapIntoEditor } from "./maps"
 import { checkPrefabs } from "./prefabs"
 import { run } from "./run"
@@ -125,16 +126,28 @@ export const importAsCopyEffect = Effect.gen(function*() {
 export const importAsCopy = () => run(importAsCopyEffect)
 
 /**
- * Uses another project from now on, asking about each tab's unsaved edits first (Save writes them into the project
- * being left). The open maps stay open; they belonged to the old project, so they are unsaved here. Untitled Project
- * asks nothing: no map is left behind, and Save there would name a project of its own beside the one being chosen. The
- * required chooser has only the blank map behind it, so a pick there is this window's start: it opens the project's map.
+ * After a switch of projects, blank tabs have nothing to carry over: they go, without a word. With nothing else open the
+ * window starts on the project the way a launch does, in the blank tab's place, which is also how a pick in the required
+ * chooser ends.
+ */
+const dropBlankTabs = Effect.gen(function*() {
+  const s = useEditor.getState()
+  const blank = blankTabs(s)
+  const onlyBlank = blank.length === s.tabIds.length
+  for (const id of blank) if (!onlyBlank || id !== s.tabId) s.closeTab(id)
+  if (onlyBlank) yield* openStartingMap
+})
+
+/**
+ * Uses another project from now on, asking what docs/DESKTOP.md § Window says: Untitled Project asks nothing, because no
+ * map is left behind and Save there would name a project of its own beside the one being chosen; a named project asks
+ * about each tab's unsaved edits (Save writes them into the project being left). The open maps stay open, and those
+ * that belonged to the old project are unsaved here.
  */
 const changeProject = (
   change: (platform: Platform["Service"]) => Effect.Effect<Option.Option<ProjectState>, PlatformError>
 ) => {
   const use = Effect.gen(function*() {
-    const starting = isChooserRequired(useEditor.getState())
     const before = useEditor.getState().project?.current?.path ?? null
     const next = yield* change(yield* Platform)
     if (Option.isNone(next)) return
@@ -142,7 +155,7 @@ const changeProject = (
     if (after === null || after.path !== before) useEditor.getState().detachFiles()
     yield* refreshProject
     yield* checkPrefabs
-    if (starting) yield* openStartingMap
+    yield* dropBlankTabs
     useEditor.getState().notify("info", `Using the project ${after?.name ?? "Untitled Project"}`, {
       kind: "projectChanged",
       actions: [revealIn("project")]
@@ -151,30 +164,38 @@ const changeProject = (
   return Effect.suspend(() => hasProject() ? unlessAnyCancelled("switchProject", use) : use)
 }
 
-/** New project… in this window: `<projectsFolder>/<name>` is made, once any unsaved edits are answered, and becomes the project. */
-export const createProjectEffect = (name: string) =>
-  changeProject((platform) => Effect.asSome(platform.createProject(name)))
+/** New project… in this window: its folder is made, once any unsaved edits are answered, and becomes the project. */
+export const createProjectEffect = (project: CreateProjectPayload) =>
+  changeProject((platform) => Effect.asSome(platform.createProject(project)))
 
 const openHere = (target: ProjectTarget) =>
   target._tag === "New"
-    ? createProjectEffect(target.name)
+    ? createProjectEffect(target)
     : changeProject((platform) => Effect.asSome(platform.switchProject(target.path)))
+
+/** Another running copy takes the project, and nothing changes here. */
+const openInWindow = Effect.fnUntraced(function*(target: ProjectTarget, name: string) {
+  yield* (yield* Platform).openProjectWindow(target)
+  useEditor.getState().notify("info", `Opening ${name} in a new window`, { kind: "projectWindowOpened" })
+})
 
 /**
  * Opens a project the way an editor does: main refuses what it can't open (another window has it, the name is taken)
- * before anything is asked, then the whereToOpen dialog asks where it goes, unless this window has nothing to take
- * over. Nothing is written until that is answered.
+ * before anything is asked, then the whereToOpen dialog asks where it goes, whatever this window holds. Only the
+ * required chooser never asks, its pick being this window's start, and an Always do this has answered already. Nothing
+ * is written until that is settled.
  */
 const openProjectEffect = (target: ProjectTarget, name: string) =>
   Effect.gen(function*() {
     yield* (yield* Platform).checkProject(target).pipe(Effect.tapError(() => Effect.ignore(refreshProject)))
     const state = useEditor.getState()
-    if (hasWindowToTakeOver(state)) {
+    const opensIn = isChooserRequired(state) ? "thisWindow" : state.settings.general.projectOpensIn
+    if (opensIn === "ask") {
       state.openDialog({ id: "whereToOpen", target, name })
       return
     }
     state.closeDialog()
-    yield* openHere(target)
+    yield* opensIn === "thisWindow" ? openHere(target) : openInWindow(target, name)
   })
 
 export const chooseProjectEffect = Effect.gen(function*() {
@@ -200,7 +221,7 @@ export const switchProject = (path: string) => run(switchProjectEffect(path))
 
 export const newProjectEffect = (name: string) => openProjectEffect({ _tag: "New", name }, name)
 
-/** File › New project…, once it has a name: where it opens, and only then is the folder made. */
+/** File › New project…, once it has a name: where it opens, as with Open project…, and only then is the folder made. */
 export const newProject = (name: string) => run(newProjectEffect(name))
 
 /** The open whereToOpen dialog's project, once the dialog is closed; none when it isn't open. */
@@ -211,20 +232,19 @@ const takeWhereToOpen = () => {
   return Option.some(dialog)
 }
 
-/** The whereToOpen dialog's This window: leaves this project, as switching always has. */
+/** The whereToOpen dialog's This window: `changeProject`. */
 export const openInThisWindowEffect = Effect.suspend(() =>
   Option.match(takeWhereToOpen(), { onNone: () => Effect.void, onSome: ({ target }) => openHere(target) })
 )
 
 export const openInThisWindow = () => run(openInThisWindowEffect)
 
-/** The whereToOpen dialog's New window: another running copy takes the project, and nothing changes here. */
-export const openInNewWindowEffect = Effect.gen(function*() {
-  const asked = takeWhereToOpen()
-  if (Option.isNone(asked)) return
-  const { name, target } = asked.value
-  yield* (yield* Platform).openProjectWindow(target)
-  useEditor.getState().notify("info", `Opening ${name} in a new window`, { kind: "projectWindowOpened" })
-})
+/** The whereToOpen dialog's New window. */
+export const openInNewWindowEffect = Effect.suspend(() =>
+  Option.match(takeWhereToOpen(), {
+    onNone: () => Effect.void,
+    onSome: ({ name, target }) => openInWindow(target, name)
+  })
+)
 
 export const openInNewWindow = () => run(openInNewWindowEffect)

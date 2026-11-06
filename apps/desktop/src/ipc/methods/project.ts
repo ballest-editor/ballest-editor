@@ -51,9 +51,9 @@ export const projectHandlers = {
   switchProject: Effect.fn("ipc.switchProject")(function*({ path }) {
     return yield* (yield* Projects).switchTo(path)
   }),
-  /** New project: `<projectsFolder>/<name>`, made and used. */
-  createProject: Effect.fn("ipc.createProject")(function*({ name }) {
-    return yield* (yield* Projects).createNew(name)
+  /** New project: the folder picked, or `<projectsFolder>/<name>`, made and used. */
+  createProject: Effect.fn("ipc.createProject")(function*(project) {
+    return yield* (yield* Projects).createNew(project)
   }),
   revealProject: Effect.fn("ipc.revealProject")(function*({ which }) {
     return yield* reveal(yield* (yield* Projects).folderOf(which))

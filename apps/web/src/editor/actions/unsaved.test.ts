@@ -4,11 +4,11 @@ import { lightingOf } from "../../domain/sunlight"
 import { MapCodec } from "../../services/MapCodec"
 import { Platform } from "../../services/Platform"
 import { makeTestDisk, projectFile, type TestDisk } from "../../test/desktopBridge"
-import { afterSaveOf, edit, layerFor, reset, s } from "../../test/editorActions"
+import { afterSaveOf, createNewMap, edit, layerFor, reset, s } from "../../test/editorActions"
 import { dirtyTabs } from "../store"
-import { createNewMap } from "./maps"
+import { newMapEffect } from "./maps"
 import { saveMapAsEffect, saveMapFile } from "./save"
-import { answerUnloadRequest, closeTabEffect, holdsUnload, startNewMap, unlessCancelled } from "./unsaved"
+import { answerUnloadRequest, closeTabEffect, holdsUnload, unlessCancelled } from "./unsaved"
 
 /** `layerFor`, with the page's close and reload recorded in `left` instead of done. */
 const layerLeavingInto = (disk: TestDisk, left: Array<string>) =>
@@ -21,7 +21,7 @@ const layerLeavingInto = (disk: TestDisk, left: Array<string>) =>
   ).pipe(Layer.provideMerge(layerFor(disk)))
 
 /** What the prompt guards in these tests: the New map dialog, once the open map's edits are dealt with. */
-const startNewMapEffect = unlessCancelled("closeTab", Effect.sync(startNewMap))
+const thenNewProjectDialog = unlessCancelled("closeTab", Effect.sync(() => s().openDialog({ id: "newProject" })))
 
 describe("unsaved changes", () => {
   it.effect("New map asks nothing: the new map opens in a tab of its own and the edited one stays", () => {
@@ -30,10 +30,10 @@ describe("unsaved changes", () => {
       yield* reset
       edit()
       s().renameLevel("Big Loop", "Isaac")
-      startNewMap()
-      assert.strictEqual(s().dialog?.id, "new")
-      s().closeDialog()
-      yield* createNewMap("Second", "Isaac")
+      yield* newMapEffect
+      assert.isNull(s().dialog)
+      s().renameLevel("Second", "Isaac")
+      yield* saveMapAsEffect()
       assert.deepStrictEqual(disk.prompts, [])
       assert.strictEqual(s().tabIds.length, 2)
       assert.strictEqual(s().file?.name, "Map_LevelEditorMain&Second_Isaac.balledit")
@@ -97,9 +97,9 @@ describe("unsaved changes", () => {
       yield* reset
       edit()
       disk.promptAnswers.push("save", "save")
-      yield* startNewMapEffect
+      yield* thenNewProjectDialog
       assert.strictEqual(s().dialog?.id, "saveAs")
-      // the saveAs dialog's Cancel: a later save doesn't go on to the New map dialog
+      // the saveAs dialog's Cancel: a later save doesn't go on to what was next
       s().closeDialog()
       yield* saveMapFile
       const later = afterSaveOf(s().dialog)
@@ -111,7 +111,7 @@ describe("unsaved changes", () => {
 
       yield* reset
       edit()
-      yield* startNewMapEffect
+      yield* thenNewProjectDialog
       // the dialog takes what comes next and closes itself, then saves
       const next = afterSaveOf(s().dialog)
       assert.isDefined(next)
@@ -119,7 +119,7 @@ describe("unsaved changes", () => {
       s().renameLevel("Fresh 2", "Isaac")
       yield* saveMapAsEffect(next)
       assert.isTrue(disk.files.has(projectFile("Map_LevelEditorMain&Fresh 2_Isaac.balledit")))
-      assert.strictEqual(s().dialog?.id, "new")
+      assert.strictEqual(s().dialog?.id, "newProject")
     }).pipe(Effect.provide(layerFor(disk)))
   })
 
@@ -129,7 +129,7 @@ describe("unsaved changes", () => {
       yield* reset
       edit()
       disk.promptAnswers.push("save")
-      yield* startNewMapEffect
+      yield* thenNewProjectDialog
       assert.isDefined(afterSaveOf(s().dialog))
       s().openDialog({ id: "gameLink" })
       assert.isUndefined(afterSaveOf(s().dialog))
