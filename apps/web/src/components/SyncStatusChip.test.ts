@@ -54,11 +54,13 @@ describe("the status bar's chip", () => {
     "publishedDraft"
   ]
 
-  it("holds the room of the widest label in every state, so it keeps one width", () => {
+  it("fits its label in every state, in the room of the widest, so the bar around it stays put", () => {
     for (const status of statuses) {
       const markup = barChip({ status, write: null })
-      assert.include(markup, `aria-hidden="true">${WIDEST_CHIP_LABEL}</span>`)
-      assert.include(markup, `>${CHIP_STATUS_LABELS[status]}</span>`)
+      assert.include(markup, `${WIDEST_CHIP_LABEL}</span>`)
+      assert.match(markup, /aria-hidden="true"/)
+      assert.include(markup, `</svg>${CHIP_STATUS_LABELS[status]}</span>`)
+      assert.notInclude(markup, "w-full")
     }
   })
 
@@ -74,6 +76,6 @@ describe("the status bar's chip", () => {
     assert.include(markup, "aria-valuenow=\"100\"")
     assert.include(markup, "bg-status-neutral")
     assert.notInclude(markup, "bg-status-warn")
-    assert.include(markup, `aria-hidden="true">${WIDEST_CHIP_LABEL}</span>`)
+    assert.include(markup, "w-full")
   })
 })

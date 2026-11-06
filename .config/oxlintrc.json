@@ -525,6 +525,42 @@
       }
     },
     {
+      "files": ["**/apps/web/src/components/**/*.test.ts"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["electron", "electron/*", "@ballest/desktop", "@ballest/desktop/*"],
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
+              {
+                "regex": "^(\\.\\./)+(apps/)?desktop(/|$)",
+                "message": "apps/web also runs in a browser: reach the desktop through window.ballest (DesktopBridge in @ballest/contracts)."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)services(/|$)",
+                "message": "components/ is React UI: reach services through editor/actions and keep three.js in editor/."
+              },
+              {
+                "regex": "^(@/|(\\.\\.?/)+([\\w.-]+/)*)routes(/|$)",
+                "message": "components/ is React UI: reach services through editor/actions and keep three.js in editor/."
+              },
+              {
+                "group": ["three", "three/*", "@react-three/*"],
+                "message": "components/ is React UI: reach services through editor/actions and keep three.js in editor/."
+              },
+              {
+                "regex": "(^|/)repos/",
+                "message": "repos/ is vendored reference material; import the npm package instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["**/apps/web/src/routes/**", "**/apps/web/src/main.tsx"],
       "rules": {
         "eslint/no-restricted-imports": [

@@ -82,8 +82,9 @@ export function SyncStatusChip(
 }
 
 /**
- * The status bar's chip: `SyncStatusChip` at one width whatever it says (`WIDEST_CHIP_LABEL` holds the room), with its
- * icon and label in the same place. While `write` runs it says the stage, with the bar filling behind the label.
+ * The status bar's chip: `SyncStatusChip`, as wide as its label, in the room of the widest (`WIDEST_CHIP_LABEL`), so the
+ * bar around it stays put whatever it says. While `write` runs it fills that room and says the stage, with the bar
+ * filling behind the label.
  */
 export function StatusBarChip(
   { status, write, ...props }: Omit<ComponentProps<typeof Badge>, "children"> & {
@@ -94,20 +95,27 @@ export function StatusBarChip(
   const Icon = write === null ? ICONS[status] : WRITE_ICONS[write.intent]
   const label = write === null ? CHIP_STATUS_LABELS[status] : GAME_WRITE_STAGE_LABELS[write.stage]
   return (
-    <StatusChip tone={write === null ? CHIP_STATUS_TONES[status] : "neutral"} {...props} className="relative isolate">
-      {write !== null && (
-        <Progress
-          value={gameWritePercentOf(write)}
-          aria-label={label}
-          className="absolute inset-0 -z-10 h-auto rounded-none bg-transparent"
-          barClassName="bg-current opacity-20"
-        />
-      )}
-      <Icon />
-      <span className="grid text-left">
-        <span className="invisible col-start-1 row-start-1" aria-hidden>{WIDEST_CHIP_LABEL}</span>
-        <span className="col-start-1 row-start-1">{label}</span>
-      </span>
-    </StatusChip>
+    <span className="grid justify-items-center">
+      <StatusChip tone="neutral" className="invisible col-start-1 row-start-1" aria-hidden>
+        <Icon />
+        {WIDEST_CHIP_LABEL}
+      </StatusChip>
+      <StatusChip
+        tone={write === null ? CHIP_STATUS_TONES[status] : "neutral"}
+        {...props}
+        className={cn("relative isolate col-start-1 row-start-1", write !== null && "w-full")}
+      >
+        {write !== null && (
+          <Progress
+            value={gameWritePercentOf(write)}
+            aria-label={label}
+            className="absolute inset-0 -z-10 h-auto rounded-none bg-transparent"
+            barClassName="bg-current opacity-20"
+          />
+        )}
+        <Icon />
+        {label}
+      </StatusChip>
+    </span>
   )
 }

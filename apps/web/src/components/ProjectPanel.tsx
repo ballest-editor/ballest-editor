@@ -1,5 +1,6 @@
 import { IconDots, IconDownload, IconMap, IconMapPlus, IconSettings } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@workspace/ui/components/context-menu"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +11,7 @@ import {
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type MouseEvent, type ReactNode, useEffect, useRef } from "react"
+import { type ReactNode, useEffect } from "react"
 import { useShallow } from "zustand/react/shallow"
 import { mapLabelOf } from "../domain/factory"
 import { linkStateDetailOf, linkStateOf, syncStatusOf } from "../domain/linkState"
@@ -111,6 +112,31 @@ function RowDetail({ children }: { readonly children: ReactNode }) {
   return <span className="col-span-2 col-start-2 row-start-2 truncate text-caption text-fg-tertiary">{children}</span>
 }
 
+/** A map's menu, the same from its ⋮ and from a right-click. Mounted only while one of them is open. */
+function MapMenuItems({ fileName }: { readonly fileName: string }) {
+  const isOpen = useEditor((s) => s.file?.name === fileName)
+  const canExport = useEditor((s) => s.capabilities.exportToGame)
+  const canPlay = useEditor((s) => s.capabilities.play)
+  return (
+    <>
+      <DropdownMenuItem disabled={isOpen} onClick={() => void openProjectMap(fileName)}>Open</DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onClick={() => void nameProjectMap(fileName, "rename")}>Rename…</DropdownMenuItem>
+      <DropdownMenuItem onClick={() => void nameProjectMap(fileName, "duplicate")}>Duplicate…</DropdownMenuItem>
+      <DropdownMenuItem onClick={() => void nameProjectMap(fileName, "recover")}>Backups…</DropdownMenuItem>
+      {canExport && (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => void exportProjectMapFromPanel(fileName)}>Export to game</DropdownMenuItem>
+          {canPlay && <DropdownMenuItem onClick={() => void playProjectMapFromPanel(fileName)}>Play</DropdownMenuItem>}
+        </>
+      )}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onClick={() => void revealProject()}>Reveal in folder</DropdownMenuItem>
+    </>
+  )
+}
+
 /**
  * One of the project's maps: a click opens it, a middle click opens it behind the active tab, and a drag onto the tab
  * strip opens it there. Its menu (also on right-click) has what else can be done with it. The open map is highlighted,
@@ -122,78 +148,57 @@ export function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: n
   const unsaved = useHasUnsavedEdits(map.fileName)
   const editedAt = useEditedAt(map.fileName, map.modifiedAt)
   const png = useEditor((s) => s.mapThumbnails.get(map.hash))
-  const canExport = useEditor((s) => s.capabilities.exportToGame)
-  const canPlay = useEditor((s) => s.capabilities.play)
-  const menuButton = useRef<HTMLButtonElement>(null)
   const label = mapLabelOf(map.fileName)
   const state = linkStateOf(map, { unsaved })
   useEffect(() => loadMapThumbnail(map.hash), [map.hash])
-  // right-click opens the same menu the ⋮ button does
-  const onContextMenu = (e: MouseEvent) => {
-    e.preventDefault()
-    menuButton.current?.click()
-  }
   return (
-    <li
-      draggable
-      className={cn(ROW_CLASSES, isOpen && ACTIVE_ROW_CLASSES)}
-      onContextMenu={onContextMenu}
-      onDragStart={(e) => startMapDrag(e.dataTransfer, map.fileName)}
-      {...onMiddleClick(() => void openProjectMapInBackground(map.fileName))}
-    >
-      <MapTile png={png} />
-      <RowName
-        label={label}
-        active={isOpen}
-        unsaved={unsaved ? "Unsaved edits" : null}
-        edited={formatDateTime(editedAt)}
-        onClick={() => void openProjectMap(map.fileName)}
-      />
-      <Tooltip>
-        <TooltipTrigger
-          render={<SyncStatusChip status={syncStatusOf(state, unsaved)} icon={false} className={ROW_CHIP_CLASSES} />}
+    <ContextMenu>
+      <ContextMenuTrigger
+        render={<li />}
+        draggable
+        className={cn(ROW_CLASSES, isOpen ? ACTIVE_ROW_CLASSES : "data-popup-open:bg-hover")}
+        onDragStart={(e) => startMapDrag(e.dataTransfer, map.fileName)}
+        {...onMiddleClick(() => void openProjectMapInBackground(map.fileName))}
+      >
+        <MapTile png={png} />
+        <RowName
+          label={label}
+          active={isOpen}
+          unsaved={unsaved ? "Unsaved edits" : null}
+          edited={formatDateTime(editedAt)}
+          onClick={() => void openProjectMap(map.fileName)}
         />
-        <TooltipContent side="bottom" align="end" sideOffset={ROW_TIP_OFFSET}>
-          {linkStateDetailOf(map, state, now)}
-        </TooltipContent>
-      </Tooltip>
-      <RowDetail>Edited {formatAgo(editedAt, now)}</RowDetail>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          ref={menuButton}
-          render={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="absolute right-1 bottom-0 z-10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100"
-              aria-label={`More for ${label}`}
-            />
-          }
-        >
-          <IconDots />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem disabled={isOpen} onClick={() => void openProjectMap(map.fileName)}>Open</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => void nameProjectMap(map.fileName, "rename")}>Rename…</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => void nameProjectMap(map.fileName, "duplicate")}>Duplicate…</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => void nameProjectMap(map.fileName, "recover")}>Backups…</DropdownMenuItem>
-          {canExport && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => void exportProjectMapFromPanel(map.fileName)}>
-                Export to game
-              </DropdownMenuItem>
-              {canPlay && (
-                <DropdownMenuItem onClick={() => void playProjectMapFromPanel(map.fileName)}>Play</DropdownMenuItem>
-              )}
-            </>
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => void revealProject()}>Reveal in folder</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </li>
+        <Tooltip>
+          <TooltipTrigger
+            render={<SyncStatusChip status={syncStatusOf(state, unsaved)} icon={false} className={ROW_CHIP_CLASSES} />}
+          />
+          <TooltipContent side="bottom" align="end" sideOffset={ROW_TIP_OFFSET}>
+            {linkStateDetailOf(map, state, now)}
+          </TooltipContent>
+        </Tooltip>
+        <RowDetail>Edited {formatAgo(editedAt, now)}</RowDetail>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="absolute right-1 bottom-0 z-10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100"
+                aria-label={`More for ${label}`}
+              />
+            }
+          >
+            <IconDots />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <MapMenuItems fileName={map.fileName} />
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <MapMenuItems fileName={map.fileName} />
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
 
