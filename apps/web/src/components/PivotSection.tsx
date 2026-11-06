@@ -9,11 +9,13 @@ import type { Axis } from "../domain/groupTransform"
 import { GROUP_PIVOT_FACES, type GroupNode, type GroupPivot } from "../domain/MapSidecar"
 import { PIVOT_CHOICES, pivotBoundsOf } from "../domain/pivot"
 import { pieceNameOf, treeKeys } from "../domain/structure"
-import { editSelectionAxis, previewSelectionAxis, setSelectionPivot } from "../editor/actions"
+import { vecSub } from "../domain/ueMath"
+import { editSelectionAxis, moveSelectionBy, previewSelectionAxis, setSelectionPivot } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import { pivotOf, shownPivotPoint, useEditor } from "../editor/store"
 import { InfoHint } from "./InfoHint"
 import { NumberField } from "./NumberField"
+import { RowClipboard } from "./RowClipboard"
 import { SectionTitle } from "./SectionTitle"
 
 /** A toggle that's on for only part of a mixed selection (`data-in-use`): a step lighter than its track, short of pressed. */
@@ -35,13 +37,20 @@ function PivotPosition({ point }: { readonly point: Vec3 }) {
   const offset = (v: number, from: number) => ({ kind: "offset", by: (v - from) * perUnit }) as const
   return (
     <div className="flex @container flex-col gap-0.5">
-      <div className="flex h-5 items-center">
+      <div className="flex h-5 items-center justify-between gap-2">
         <Tooltip>
           <TooltipTrigger render={<span className="text-body text-fg-secondary" />}>
             Position <span className="text-caption text-fg-tertiary">{units}</span>
           </TooltipTrigger>
           <TooltipContent side="left">Where the pivot is: the gizmo's point, and the game's Location</TooltipContent>
         </Tooltip>
+        {/* a pasted position moves the selection so the pivot lands there */}
+        <RowClipboard
+          clipKey="pivot"
+          label="Position"
+          value={point}
+          onPaste={(v) => moveSelectionBy(vecSub(v, point))}
+        />
       </div>
       <div className="grid grid-cols-3 gap-1 @max-[16rem]:grid-cols-1">
         {AXES.map((axis) => {

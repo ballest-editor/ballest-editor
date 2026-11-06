@@ -8,7 +8,14 @@ import { applyGroupDelta, type Axis, readField, selectionAxisEdit, type Transfor
 import { localToWorld } from "../domain/pivot"
 import { quatConjugate, quatMul, rotateVec, rotatorToQuat, vecAdd } from "../domain/ueMath"
 import { assertVec } from "../test/vec"
-import { editSelectionAxis, previewSelectionAxis, setSelectionField, setSelectionPivot } from "./actions"
+import {
+  editSelectionAxis,
+  moveSelectionBy,
+  previewSelectionAxis,
+  setSelectionField,
+  setSelectionPivot,
+  setSelectionUnitField
+} from "./actions"
 import { initialMap, pivotOf, selectionPivot, shownPivotPoint, shownTransform, useEditor } from "./store"
 
 const catalog = Schema.decodeUnknownSync(Catalog)(fixture)
@@ -294,6 +301,25 @@ describe("a whole group's Transform rows, over its frame", () => {
       )
     }
     expectVec(readField(unit(), "rotation"), { x: 0, y: 0, z: 0 }, "rotation")
+  })
+
+  it("takes a pasted row as the group's new values: a turn to the pasted yaw, a scale by the ratio, a move there", () => {
+    const { ids, before, unit } = grouped()
+    const pivot = unit().translation
+    setSelectionUnitField("rotation", { x: 0, y: 0, z: 90 })
+    expectQuarterTurnAbout(before, pivot)
+    const turned = new Map(ids.map((id) => [id, docTransform(id)]))
+    setSelectionUnitField("scale3D", { x: 1, y: 2, z: 1 })
+    for (const id of ids) {
+      sameTransform(
+        docTransform(id),
+        applyGroupDelta(turned.get(id)!, pivot, { kind: "scale", factor: 2, axis: "y" }),
+        id
+      )
+    }
+    const moved = new Map(ids.map((id) => [id, docTransform(id)]))
+    moveSelectionBy({ x: 5, y: 0, z: 0 })
+    for (const id of ids) assert.strictEqual(docTransform(id).translation.x, moved.get(id)!.translation.x + 5)
   })
 
   it("scales every item by a typed factor about the pivot, along its own axes, and the row reads 1 again", () => {

@@ -63,7 +63,7 @@ export const keepPoint = <T extends UeTransform>(before: UeTransform, after: T, 
  * `t` given `scale3D`, about `pivot` (world): its offset from the pivot changes along each of
  * its own axes by what that axis's scale did. An item on the pivot stays where it is.
  */
-const scaleAbout = (t: UeTransform, scale3D: Vec3, pivot: Vec3): UeTransform => {
+export const scaleAbout = (t: UeTransform, scale3D: Vec3, pivot: Vec3): UeTransform => {
   const offset = rotateVec(quatConjugate(t.rotation), vecSub(t.translation, pivot))
   const along = (axis: Axis) => (t.scale3D[axis] === 0 ? offset[axis] : offset[axis] * scale3D[axis] / t.scale3D[axis])
   return {

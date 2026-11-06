@@ -3,7 +3,6 @@ import {
   IconAlertTriangle,
   IconChevronRight,
   IconCircleCheck,
-  IconClipboard,
   IconCopy,
   IconFolderOpen,
   IconSettings,
@@ -14,7 +13,6 @@ import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/ui/components/collapsible"
 import { Input } from "@workspace/ui/components/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { Fragment, type ReactNode, useMemo, useState } from "react"
@@ -38,7 +36,8 @@ import {
   editSelectionAxis,
   previewSelectionAxis,
   revealProject,
-  setSelectionField
+  setSelectionField,
+  setSelectionUnitField
 } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import {
@@ -59,13 +58,13 @@ import { FlipSection } from "./FlipSection"
 import { HintBadge } from "./HintBadge"
 import { InfoHint } from "./InfoHint"
 import { ItemProperties } from "./ItemProperties"
-import { ShiftClick } from "./KeyChip"
 import { LightingSettings } from "./LightingSettings"
 import { NumberField } from "./NumberField"
 import { PaintSection } from "./PaintSection"
 import { PathAction, PathText } from "./PathText"
 import { PivotSection } from "./PivotSection"
 import { PrefabSettings } from "./PrefabSettings"
+import { RowClipboard } from "./RowClipboard"
 import { Section, SectionHeader, SectionTitle } from "./SectionTitle"
 import { ChainSection, GroupSection, InstanceSection, ItemTags, LabelledField } from "./StructureSection"
 
@@ -366,17 +365,13 @@ const DECAL_SIZE_ROW: TransformRowSpec = {
 const FIELD_HELP =
   "Drag a field to change it: Shift ×10, Alt ×0.1. Type +50, -20, *2 or /2 to change what's there, =-20 to set a negative."
 
-/** Copied rows in stored units (cm, degrees, factor), shared by every selection. */
-const copiedRows = new Map<TransformField, Vec3>()
-
 /**
- * One editable row over the whole selection: its name and unit, a button whose menu (or
- * Shift+click shortcuts) copies and pastes all three axes, then an X/Y/Z field each, side by side
- * while a big coordinate still fits. The fields show the selection's unit: the active item, or a whole group's frame.
- * A typed value takes the unit's axis there and the rest of the selection follows by the same change, as a scrub
- * does and as the game's panel does, so a selection keeps its spread; items that differ from the unit are marked
- * Mixed. Paste is the one edit that sets every item to a value. With snapping on, a scrub lands on the grid or
- * rotation step. `perUnit` converts display units to the stored value.
+ * One editable row over the whole selection: its name and unit, its clipboard button (`RowClipboard`), then an X/Y/Z
+ * field each, side by side while a big coordinate still fits. The fields show the selection's unit: the active item,
+ * or a whole group's frame. A typed value takes the unit's axis there and the rest of the selection follows by the
+ * same change, as a scrub does and as the game's panel does, so a selection keeps its spread; items that differ from
+ * the unit are marked Mixed. A paste is the row's `onPaste`. With snapping on, a scrub lands on the grid or rotation
+ * step. `perUnit` converts display units to the stored value.
  */
 function TransformRow(props: {
   readonly row: TransformRowSpec
@@ -384,11 +379,12 @@ function TransformRow(props: {
   readonly unit: UeTransform
   /** The axes on which the selection's items differ from the unit. */
   readonly mixed: ReadonlySet<Axis>
-  /** The active item's document transform, which a copy reads; a group's frame has nothing worth copying. */
-  readonly active?: UeTransform | undefined
+  /** What a copy of the row reads, in stored units. */
+  readonly copyValue: Vec3
+  /** What a paste of three values does to the selection. */
+  readonly onPaste: (value: Vec3) => void
   readonly perUnit: number
 }) {
-  const notify = useEditor((s) => s.notify)
   const snapping = useEditor((s) => s.settings.snapping)
   const { row, perUnit } = props
   const { field } = row
@@ -398,19 +394,6 @@ function TransformRow(props: {
     : field === "rotation" && snapping.rotationEnabled
     ? snapping.rotationStep
     : undefined
-  const [open, setOpen] = useState(false)
-  const rowName = row.label.toLowerCase()
-  const { active } = props
-  const copy = () => {
-    if (active === undefined) return
-    copiedRows.set(field, readField(active, field))
-    notify("info", `Copied ${rowName}.`)
-  }
-  const paste = () => {
-    const copied = copiedRows.get(field)
-    if (copied === undefined) notify("info", `Nothing copied for ${rowName} yet.`)
-    else setSelectionField(field, copied)
-  }
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex h-5 items-center justify-between gap-2">
@@ -433,84 +416,7 @@ function TransformRow(props: {
             </TooltipContent>
           </Tooltip>
         )}
-        {active !== undefined && (
-          <Popover
-            open={open}
-            onOpenChange={(next, details) => {
-              // Shift+click pastes instead of opening the menu
-              if (next && details.event instanceof MouseEvent && details.event.shiftKey) return
-              setOpen(next)
-            }}
-          >
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <PopoverTrigger
-                    render={
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-fg-tertiary"
-                        aria-label={`Copy or paste ${rowName}`}
-                        onClick={(e) => {
-                          if (e.shiftKey) paste()
-                        }}
-                        onContextMenu={(e) => {
-                          if (!e.shiftKey) return
-                          e.preventDefault()
-                          copy()
-                        }}
-                      />
-                    }
-                  />
-                }
-              >
-                <IconClipboard />
-              </TooltipTrigger>
-              <TooltipContent side="left" sideOffset={8} className="flex flex-col items-start py-2 pr-3 pl-2.5">
-                <div className="text-body-strong">Copy / paste axis values</div>
-                <div className="mt-1.5 grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-1 opacity-80">
-                  <span>Copy</span>
-                  <ShiftClick button="right" />
-                  <span>Paste</span>
-                  <ShiftClick button="left" />
-                </div>
-              </TooltipContent>
-            </Tooltip>
-            <PopoverContent side="left" align="start" className="w-auto gap-1 p-1">
-              <div className="px-2 py-1 text-body text-fg-secondary">{row.label}</div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="justify-between gap-4"
-                onClick={() => {
-                  copy()
-                  setOpen(false)
-                }}
-              >
-                <span className="flex items-center gap-2">
-                  <IconCopy />Copy X, Y, Z
-                </span>
-                <ShiftClick button="right" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="justify-between gap-4"
-                disabled={copiedRows.get(field) === undefined}
-                onClick={() => {
-                  paste()
-                  setOpen(false)
-                }}
-              >
-                <span className="flex items-center gap-2">
-                  <IconClipboard />Paste
-                </span>
-                <ShiftClick button="left" />
-              </Button>
-            </PopoverContent>
-          </Popover>
-        )}
+        <RowClipboard clipKey={field} label={row.label} value={props.copyValue} onPaste={props.onPaste} />
       </div>
       <div className="grid grid-cols-3 gap-1 @max-[16rem]:grid-cols-1">
         {axes.map((axis) => {
@@ -666,7 +572,7 @@ function TransformSection({ of, unit, transforms, active, decals = false, childr
   readonly of: "item" | "group"
   readonly unit: UeTransform
   readonly transforms: ReadonlyArray<UeTransform>
-  /** The active item's document transform, for Copy; none for a group. */
+  /** The active item's document transform, which a copy reads; a group's copy reads the unit as shown. */
   readonly active?: UeTransform | undefined
   /** Whether every item is a decal, whose scale is a size. */
   readonly decals?: boolean
@@ -685,7 +591,10 @@ function TransformSection({ of, unit, transforms, active, decals = false, childr
             row={row.field === "scale3D" && decals ? DECAL_SIZE_ROW : row}
             unit={unit}
             mixed={of === "item" ? mixedAxes(unit, transforms, row.field) : EMPTY_AXES}
-            active={active}
+            copyValue={readField(active ?? unit, row.field)}
+            // a piece's paste sets every item; a group's takes the group there, as typing the three values would
+            onPaste={(value) =>
+              of === "item" ? setSelectionField(row.field, value) : setSelectionUnitField(row.field, value)}
             perUnit={row.field === "translation" ? perUnit : 1}
           />
         ))}
