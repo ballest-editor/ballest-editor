@@ -72,7 +72,7 @@ function Swatch(
       aria-pressed={active}
       onClick={onPick}
       className={cn(
-        "size-5 rounded-control ring-1 ring-foreground/20 transition-shadow outline-none hover:ring-2 hover:ring-foreground/60 focus-visible:ring-2 focus-visible:ring-ring",
+        "size-5 rounded-full ring-1 ring-foreground/20 transition-shadow duration-150 ease-out outline-none hover:ring-2 hover:ring-foreground/60 focus-visible:ring-2 focus-visible:ring-ring",
         active && "ring-2 ring-primary ring-offset-1 ring-offset-card hover:ring-primary"
       )}
       style={{ background: cssColor(swatchColor(lookupMaterial(table, color.material), color.displayColor)) }}
@@ -149,7 +149,7 @@ function SlotPaintRow(
         </div>
       )}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <ColorSwatch color={swatch} className="size-5" />
+        <ColorSwatch color={swatch} className="size-5 rounded-full" />
         <span className={cn("text-body", choice === undefined && "text-fg-tertiary")}>{name}</span>
         {offPicker && <InfoHint>Not in the game's picker. It stays as it is until you paint this slot.</InfoHint>}
         <Select

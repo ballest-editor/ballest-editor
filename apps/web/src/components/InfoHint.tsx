@@ -6,7 +6,7 @@ export const InfoHint = ({ children }: { readonly children: string }) => (
   <Tooltip>
     <TooltipTrigger
       aria-label={children}
-      className="flex shrink-0 cursor-help items-center rounded-control text-fg-tertiary outline-none hover:text-fg-secondary focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex shrink-0 cursor-help items-center rounded-control text-fg-tertiary outline-none transition-colors duration-150 ease-out hover:text-fg-secondary focus-visible:ring-2 focus-visible:ring-ring"
     >
       <IconInfoCircle className="size-4" />
     </TooltipTrigger>

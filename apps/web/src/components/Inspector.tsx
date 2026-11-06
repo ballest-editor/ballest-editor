@@ -13,7 +13,6 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
-import { Separator } from "@workspace/ui/components/separator"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { Fragment, type ReactNode, useMemo, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
@@ -52,7 +51,7 @@ import { PaintSection } from "./PaintSection"
 import { PathAction, PathText } from "./PathText"
 import { PivotSection } from "./PivotSection"
 import { PrefabSettings } from "./PrefabSettings"
-import { SectionHeader, SectionTitle } from "./SectionTitle"
+import { Section, SectionHeader, SectionTitle } from "./SectionTitle"
 import { GroupSection, InstanceSection, ItemTags } from "./StructureSection"
 
 const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
@@ -462,7 +461,7 @@ function MeshWarning({ item }: { readonly item: Item }) {
   })
   if (failed.length === 0) return null
   return (
-    <Badge variant="destructive" title={failed.join("\n")}>
+    <Badge variant="destructive" className="rounded-full" title={failed.join("\n")}>
       {failed.length === 1 ? "A mesh failed to load" : `${failed.length} meshes failed to load`}
     </Badge>
   )
@@ -543,26 +542,26 @@ function ItemEditor({ items, ids, transforms, placed }: {
   if (active === undefined) return null
   return (
     <>
-      <SectionTitle>Transform</SectionTitle>
-      <div className="flex @container flex-col gap-2">
-        {transformRows(units).map((row) => (
-          <TransformRow
-            key={row.field}
-            row={row.field === "scale3D" && items.every(isDecal) ? DECAL_SIZE_ROW : row}
-            shown={transforms}
-            active={editTransform(active)}
-            perUnit={row.field === "translation" ? perUnit : 1}
-          />
-        ))}
-        <FlipSection items={placed} />
-      </div>
-
-      <Separator />
+      <Section>
+        <SectionTitle>Transform</SectionTitle>
+        <div className="flex @container flex-col gap-2">
+          {transformRows(units).map((row) => (
+            <TransformRow
+              key={row.field}
+              row={row.field === "scale3D" && items.every(isDecal) ? DECAL_SIZE_ROW : row}
+              shown={transforms}
+              active={editTransform(active)}
+              perUnit={row.field === "translation" ? perUnit : 1}
+            />
+          ))}
+          <FlipSection items={placed} />
+        </div>
+      </Section>
       <PivotSection />
-
-      <Separator />
-      <SectionTitle>Paint</SectionTitle>
-      <PaintSection selected={items.map((item, i) => ({ item, id: ids[i] ?? "" }))} />
+      <Section>
+        <SectionTitle>Paint</SectionTitle>
+        <PaintSection selected={items.map((item, i) => ({ item, id: ids[i] ?? "" }))} />
+      </Section>
       <ItemProperties properties={selectionProperties(placed)} />
     </>
   )
@@ -600,14 +599,15 @@ export function Inspector() {
   if (first === undefined) {
     return (
       <ScrollArea className="h-full bg-card">
-        <div className="flex flex-col gap-3 p-3">
+        <div className="flex flex-col gap-5 p-3">
           {prefab === null
             ? (
               <>
                 <MapSettings />
-                <Separator />
-                <SectionTitle>Lighting</SectionTitle>
-                <LightingSettings />
+                <Section>
+                  <SectionTitle>Lighting</SectionTitle>
+                  <LightingSettings />
+                </Section>
               </>
             )
             : <PrefabSettings prefab={prefab} />}
@@ -621,20 +621,16 @@ export function Inspector() {
 
   return (
     <ScrollArea className="h-full bg-card">
-      <div className="flex flex-col gap-3 p-3">
+      <div className="flex flex-col gap-5 p-3">
         {group === undefined
           ? (
             <>
-              <SelectionHeader items={items} itemKey={items.length === 1 ? ids[0] : undefined} />
-              {items.length === 1 && ids[0] !== undefined && <ItemTags itemKey={ids[0]} />}
-              <Separator />
+              <Section>
+                <SelectionHeader items={items} itemKey={items.length === 1 ? ids[0] : undefined} />
+                {items.length === 1 && ids[0] !== undefined && <ItemTags itemKey={ids[0]} />}
+              </Section>
               {editor}
-              {items.length === 1 && (
-                <>
-                  <Separator />
-                  <ItemDetails item={first} index={indices[0] ?? -1} />
-                </>
-              )}
+              {items.length === 1 && <ItemDetails item={first} index={indices[0] ?? -1} />}
             </>
           )
           : (
@@ -643,13 +639,7 @@ export function Inspector() {
               <GroupSection key={group.id} group={group} actions={<SelectionActions />}>
                 <PieceCounts items={items} />
               </GroupSection>
-              {group.prefab !== undefined && (
-                <>
-                  <Separator />
-                  <InstanceSection group={group} link={group.prefab} />
-                </>
-              )}
-              <Separator />
+              {group.prefab !== undefined && <InstanceSection group={group} link={group.prefab} />}
               <Disclosure
                 key={`${group.id}/items`}
                 title={items.length === 1 ? "Edit its item" : `Edit all ${items.length} items`}

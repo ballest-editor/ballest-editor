@@ -4,7 +4,6 @@ import { ColorPicker, ColorSwatch } from "@workspace/ui/components/color-picker"
 import { Label } from "@workspace/ui/components/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
-import { Separator } from "@workspace/ui/components/separator"
 import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
 import { Option } from "effect"
@@ -25,7 +24,7 @@ import {
 import { setSelectionProperties } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
 import { NumberField } from "./NumberField"
-import { SectionTitle } from "./SectionTitle"
+import { Section, SectionTitle } from "./SectionTitle"
 
 /** The value every selected item shares, or undefined when they differ (mixed). */
 const sharedValue = (values: ReadonlyArray<unknown>): unknown => {
@@ -180,7 +179,7 @@ function ColorValue({ color, id }: { readonly color: ColorProperty; readonly id:
         id={id}
         title={mixed ? "Mixed" : hex}
         aria-label={mixed ? `${color.label}: mixed` : `${color.label}: ${hex}`}
-        className="flex h-7 w-full min-w-0 cursor-pointer items-center justify-center overflow-hidden rounded-control text-body text-fg-tertiary transition-shadow hover:ring-foreground/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className="flex h-7 w-full min-w-0 cursor-pointer items-center justify-center overflow-hidden rounded-control text-body text-fg-tertiary transition-shadow duration-150 ease-out hover:ring-foreground/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         render={<ColorSwatch color={mixed ? null : hex} className="rounded-control" />}
       >
         {mixed && "Mixed"}
@@ -293,8 +292,7 @@ function PropertyRowView({ row }: { readonly row: PropertyRow }) {
 export function ItemProperties({ properties }: { readonly properties: ReadonlyArray<ItemProperty> }) {
   if (properties.length === 0) return null
   return (
-    <>
-      <Separator />
+    <Section>
       <SectionTitle>Properties</SectionTitle>
       <div className="grid @container grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_1.5rem] items-center gap-x-2 gap-y-1">
         {propertyRows(properties).map((row) => {
@@ -302,6 +300,6 @@ export function ItemProperties({ properties }: { readonly properties: ReadonlyAr
           return <PropertyRowView key={`${first.list}/${first.name}`} row={row} />
         })}
       </div>
-    </>
+    </Section>
   )
 }
