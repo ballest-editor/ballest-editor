@@ -4,7 +4,7 @@ import { parseMaterialsFile } from "../domain/Materials"
 import { materialsFile, OUTLINE, PIPE, primitive, WIND } from "../test/materials"
 import { applySlotMaterials, materialFor, shaderPatchOf } from "./materials"
 import { isTexture } from "./threeGuards"
-import { frameBox, SerialQueue, texturesOf, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH, whenTexturesReady } from "./thumbnails"
+import { frameBox, keepsShippedThumbnail, SerialQueue, texturesOf, whenTexturesReady } from "./thumbnails"
 
 describe("thumbnail framing", () => {
   const fits = (min: readonly [number, number, number], max: readonly [number, number, number], aspect: number) => {
@@ -21,8 +21,8 @@ describe("thumbnail framing", () => {
     return corners.every(([x, y, z]) => frustum.containsPoint(new THREE.Vector3(x, y, z)))
   }
 
-  it("keeps every corner of the box in view, for cubes and long flat pieces, at the thumbnail aspect", () => {
-    const aspect = THUMBNAIL_WIDTH / THUMBNAIL_HEIGHT
+  it("keeps every corner of the box in view, for cubes and long flat pieces, in a square thumbnail", () => {
+    const aspect = 1
     assert.isTrue(fits([-50, -50, -50], [50, 50, 50], aspect))
     assert.isTrue(fits([-262, 0, -250], [262, 145, 250], aspect)) // Curve1 S
     assert.isTrue(fits([-1000, -5, -20], [1000, 5, 20], aspect)) // a plank
@@ -34,6 +34,14 @@ describe("thumbnail framing", () => {
     assert.deepStrictEqual(framing.target, [50, 50, 50])
     assert.isTrue(framing.position.every((c, i) => c > framing.target[i]!))
     assert.isTrue(framing.near > 0 && framing.far > framing.near)
+  })
+})
+
+describe("shipped thumbnails", () => {
+  it("keeps the game's icon for a light that has one, and renders everything else", () => {
+    assert.isTrue(keepsShippedThumbnail({ category: "Lights", thumbnail: "thumbs/T_Spotlight.png" }))
+    assert.isFalse(keepsShippedThumbnail({ category: "Lights", thumbnail: null }))
+    assert.isFalse(keepsShippedThumbnail({ category: "Ramps", thumbnail: "thumbs/T_Track_Long1.png" }))
   })
 })
 

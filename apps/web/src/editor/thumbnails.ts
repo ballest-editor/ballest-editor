@@ -1,9 +1,11 @@
 /**
- * Palette thumbnails for pieces the game ships none for (the hidden section). Each is rendered
- * once, on demand, from the same glbs and materials the viewport draws, in the style of the
- * game's own renders (dark grey backdrop, three-quarter view from above-front), then cached
- * per piece as a PNG data URL. Renders run one at a time off a queue so an expanded section
- * with a hundred pieces never stalls the UI.
+ * Every piece's thumbnail. Each is rendered once, on demand, from the same glbs and materials
+ * the viewport draws, three-quarter view from above-front like the game's own renders, on a
+ * transparent background so it sits on whatever panel shows it. The game's renders have its dark
+ * backdrop baked in, unevenly enough that it can't be keyed out cleanly, so they are only the
+ * fallback (components/PieceThumbnail.tsx). The lights here are fixed, so a thumbnail looks the
+ * same in both themes and is cached once per piece, as a PNG data URL. Renders run one at a time
+ * off a queue so a long list never stalls the UI.
  *
  * `frameBox`, `SerialQueue`, `texturesOf` and `whenTexturesReady` are unit-tested; the WebGL part is a thin wrapper.
  */
@@ -19,11 +21,8 @@ import { isMesh, isTexture } from "./threeGuards"
 import { glbUrl, visualsOf } from "./visuals"
 import { fixSceneWinding } from "./winding"
 
-/** The game's palette renders are 256 px wide and about 16:9; ours match so the palette treats both alike. */
-export const THUMBNAIL_WIDTH = 256
-export const THUMBNAIL_HEIGHT = 144
-/** The game's backdrop (sampled from its renders: RGB 47, 47, 47). */
-export const THUMBNAIL_BACKGROUND = "#2f2f2f"
+/** Every slot a thumbnail shows in is square, at most 64 px: this is that at twice the pixel density. */
+const THUMBNAIL_SIZE = 128
 const FOV = 35
 /** From the front-right and above (scene frame, y up), like the game's renders. */
 const VIEW_DIRECTION: Tuple3 = [1, 0.8, 1]
@@ -187,9 +186,9 @@ let stage: Stage | undefined
 const stageOf = (): Stage => {
   if (stage !== undefined) return stage
   const canvas = document.createElement("canvas")
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
-  renderer.setSize(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT, false)
-  renderer.setClearColor(THUMBNAIL_BACKGROUND)
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true })
+  renderer.setSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, false)
+  renderer.setClearColor(0x000000, 0)
   const scene = new THREE.Scene()
   // The viewport's lights, so a thumbnail matches what gets placed.
   scene.add(new THREE.AmbientLight(0xffffff, 0.6))
@@ -197,7 +196,7 @@ const stageOf = (): Stage => {
   const sun = new THREE.DirectionalLight(0xffffff, 1.6)
   sun.position.set(3000, 8000, 2000)
   scene.add(sun)
-  const camera = new THREE.PerspectiveCamera(FOV, THUMBNAIL_WIDTH / THUMBNAIL_HEIGHT)
+  const camera = new THREE.PerspectiveCamera(FOV, 1)
   stage = { renderer, scene, camera }
   return stage
 }
@@ -221,6 +220,13 @@ const render = async (piece: CatalogPiece, index: CatalogIndex, table: MaterialT
   scene.remove(object)
   return url
 }
+
+/**
+ * Lights have no body worth a picture: their meshes are stand-ins, and the glow reads as nothing on a light panel. The
+ * game's own icons say what they are, and have no dark backdrop to lose.
+ */
+export const keepsShippedThumbnail = (piece: Pick<CatalogPiece, "category" | "thumbnail">): boolean =>
+  piece.category === "Lights" && typeof piece.thumbnail === "string"
 
 const queue = new SerialQueue()
 const cache = new Map<string, Promise<string | undefined>>()

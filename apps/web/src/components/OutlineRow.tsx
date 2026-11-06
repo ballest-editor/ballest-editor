@@ -73,7 +73,7 @@ const GLYPH_COLOUR = "text-fg-secondary"
 
 /**
  * A piece's thumbnail, laid over its glyph until it has loaded, and the glyph for good if it never does. The glyph then
- * goes rather than sitting behind it: some of the game's renders are see-through. An image's load reaches this span
+ * goes rather than sitting behind it: thumbnails are see-through. An image's load reaches this span
  * through React's tree, though the DOM's event doesn't bubble.
  */
 function PieceIcon({ piece, glyph }: { readonly piece: CatalogPiece; readonly glyph: Glyph }) {

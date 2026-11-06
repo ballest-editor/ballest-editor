@@ -1,13 +1,31 @@
 import { cn } from "@workspace/ui/lib/utils"
-import { type ReactNode, useEffect, useState } from "react"
+import { type ReactNode, useEffect, useRef, useState } from "react"
 import type { CatalogPiece } from "../domain/Catalog"
+import { assetUrl } from "../editor/assetUrl"
 import { useEditor } from "../editor/store"
-import { thumbnailFor } from "../editor/thumbnails"
+import { keepsShippedThumbnail, thumbnailFor } from "../editor/thumbnails"
+
+/** True from the first time the element comes into view, so a long list only renders what gets looked at. */
+const useSeen = () => {
+  const ref = useRef<HTMLSpanElement>(null)
+  const [seen, setSeen] = useState(false)
+  useEffect(() => {
+    const element = ref.current
+    if (element === null || seen) return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) setSeen(true)
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [seen])
+  return { ref, seen }
+}
 
 /**
- * The in-game render when the catalog has one; otherwise one rendered here from the piece's meshes (see
- * editor/thumbnails.ts), with `placeholder` until the image has loaded, or for good when there's nothing to draw or it
- * fails. The waiting image is transparent and out of the flow, not `display: none`, which a lazy image never loads from.
+ * A piece's picture, rendered here from its meshes on a transparent background (see editor/thumbnails.ts), with
+ * `placeholder` until the image has loaded. A light, or a piece that doesn't render, shows the in-game render when the
+ * catalog has one; without one it keeps `placeholder`. The waiting image is transparent and out of the flow, not
+ * `display: none`, which never fires its load.
  */
 export function PieceThumbnail({ piece, className, placeholder }: {
   readonly piece: CatalogPiece
@@ -16,30 +34,31 @@ export function PieceThumbnail({ piece, className, placeholder }: {
 }) {
   const index = useEditor((s) => s.catalogIndex)
   const table = useEditor((s) => s.materialTable)
+  const { ref, seen } = useSeen()
   const [rendered, setRendered] = useState<string | undefined>(undefined)
   const [loaded, setLoaded] = useState<string | undefined>(undefined)
-  const shipped = piece.thumbnail ?? undefined
+  const shipped = piece.thumbnail == null ? undefined : assetUrl(piece.thumbnail)
+  const keepShipped = keepsShippedThumbnail(piece)
   useEffect(() => {
-    if (shipped !== undefined || index === null || table === null) return
+    if (keepShipped || !seen || index === null || table === null) return
     let cancelled = false
     void thumbnailFor(piece, index, table).then((url) => {
-      if (!cancelled) setRendered(url)
+      if (!cancelled) setRendered(url ?? shipped)
     })
     return () => {
       cancelled = true
     }
-  }, [piece, shipped, index, table])
-  const src = shipped !== undefined ? `/assets/${shipped}` : rendered
+  }, [piece, shipped, keepShipped, seen, index, table])
+  const src = keepShipped ? shipped : rendered
   const showing = src !== undefined && src === loaded
   return (
-    <span className="relative flex shrink-0">
+    <span ref={ref} className="relative flex shrink-0">
       {!showing && placeholder}
       {src !== undefined && (
         <img
           src={src}
           alt=""
           className={cn(className, !showing && "absolute inset-0 opacity-0")}
-          loading="lazy"
           onLoad={() => setLoaded(src)}
         />
       )}
