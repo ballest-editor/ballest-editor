@@ -15,6 +15,7 @@ import {
   scaleForDistance,
   zoomAtPointer
 } from "../domain/orthoView"
+import type { PlacementView } from "../domain/placement"
 import {
   isOrthoView,
   type OrthoView,
@@ -198,6 +199,13 @@ export class PaneCamera {
   orthographicPlacement(floor: number): Vec3 | undefined {
     const { view } = this
     return view === undefined ? undefined : orthoPlacementPoint(uePoint(this.target), view, floor)
+  }
+
+  /** Where this pane looks from and how it is turned, for laying out placements. */
+  placementView(): PlacementView {
+    const { position, quaternion } = this.camera
+    const axis = (x: number, y: number) => uePoint(new THREE.Vector3(x, y, 0).applyQuaternion(quaternion))
+    return { position: uePoint(position), right: axis(1, 0), up: axis(0, 1) }
   }
 
   private setScale(cmPerPixel: number): void {

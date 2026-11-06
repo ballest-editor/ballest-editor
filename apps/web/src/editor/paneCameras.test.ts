@@ -123,6 +123,43 @@ describe("orthographic panes", () => {
   })
 })
 
+describe("a pane's placement view", () => {
+  const closeTo = (actual: Vec3, expected: Vec3) => {
+    for (const axis of ["x", "y", "z"] as const) assert.closeTo(actual[axis], expected[axis], 1e-9, axis)
+  }
+
+  it("has the screen's right and up in game axes, looking along +X", () => {
+    const pane = paneOn("perspective")
+    const eye = { x: 0, y: 0, z: 500 }
+    const { x, y, z } = ueToThreeVector(eye)
+    pane.perspective.position.set(x, y, z)
+    const ahead = ueToThreeVector({ x: 1000, y: 0, z: 500 })
+    pane.perspective.lookAt(ahead.x, ahead.y, ahead.z)
+    const view = pane.placementView()
+    assert.deepStrictEqual(view.position, eye)
+    closeTo(view.right, { x: 0, y: 1, z: 0 })
+    closeTo(view.up, { x: 0, y: 0, z: 1 })
+  })
+
+  it("matches where a step right lands on screen", () => {
+    const pane = paneOn("perspective")
+    pane.perspective.position.set(1000, 2000, 3000)
+    pane.perspective.lookAt(0, 0, 0)
+    const { right } = pane.placementView()
+    const scale = 100
+    const middle = onScreen(pane, { x: 0, y: 0, z: 0 })
+    const stepped = onScreen(pane, { x: right.x * scale, y: right.y * scale, z: right.z * scale })
+    assert.isAbove(stepped.x, middle.x)
+  })
+
+  it("is the orthographic camera's in an orthographic pane", () => {
+    const { right, up } = paneOn("top").placementView()
+    assert.closeTo(Math.hypot(right.x, right.y), 1, 1e-9)
+    assert.closeTo(Math.hypot(up.x, up.y), 1, 1e-9)
+    assert.closeTo(right.z, 0, 1e-9)
+  })
+})
+
 describe("changing a pane's projection", () => {
   it("keeps the point it looks at and its size, there and back", () => {
     const pane = paneOn("perspective")

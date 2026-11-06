@@ -16,6 +16,7 @@ import {
 } from "../domain/Keybinds"
 import { wheelZoomFactor } from "../domain/orthoView"
 import { placeDistanceFor, placementPoint } from "../domain/placement"
+import { spreadPlacement } from "./actions/placement"
 import { isEditorKeyEvent } from "./keyTargets"
 import {
   activePaneCamera,
@@ -70,9 +71,8 @@ export function FlyCamera() {
       return pane.view === undefined ? pane.nearestView() : "perspective"
     }
     // Placement point: an orthographic pane's centre; else on the screen-centre ray, at the floor or a cap that fits the piece.
-    sceneRegistry.placementPoint = (footprint) => {
+    const viewPlacement = (pane: PaneCamera, footprint: number) => {
       const { floorHeight, settings } = useEditor.getState()
-      const pane = activePaneCamera()
       const centre = pane.orthographicPlacement(floorHeight)
       if (centre !== undefined) return centre
       const camera = pane.perspective
@@ -84,6 +84,10 @@ export function FlyCamera() {
         floorHeight,
         placeDistanceFor(footprint, Math.min(vertical, horizontal), settings.editor.placeDistance)
       )
+    }
+    sceneRegistry.placementPoint = (footprint) => {
+      const pane = activePaneCamera()
+      return spreadPlacement(viewPlacement(pane, footprint), footprint, pane.placementView())
     }
     // What a prefab spawns in front of. An orthographic pane has no distance to speak of, so it looks from the view's centre.
     sceneRegistry.viewRay = () => {

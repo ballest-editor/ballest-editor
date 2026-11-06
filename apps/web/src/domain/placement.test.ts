@@ -2,7 +2,21 @@ import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import fixture from "./bundledCatalog.json"
 import { Catalog } from "./Catalog"
-import { footprintOf, pieceFootprint, PLACE_DISTANCE, placeDistanceFor, placementPoint } from "./placement"
+import {
+  footprintOf,
+  nextInRun,
+  pieceFootprint,
+  PLACE_DISTANCE,
+  placeDistanceFor,
+  PLACEMENT_COLUMNS,
+  PLACEMENT_GAP,
+  placementPoint,
+  type PlacementRun,
+  type PlacementView,
+  runPoint,
+  startPlacementRun,
+  wouldLandOn
+} from "./placement"
 import { rotatorToQuat } from "./ueMath"
 
 const catalog = Schema.decodeUnknownSync(Catalog)(fixture)
@@ -100,5 +114,85 @@ describe("placeDistanceFor", () => {
     assert.isAbove(d, PLACE_DISTANCE)
     assert.closeTo((2 * Math.atan(1774 / 2 / d)) / fov, 0.6, 0.05)
     assert.isAbove(placeDistanceFor(1774, fov / 2), d)
+  })
+})
+
+describe("placement runs", () => {
+  /** Looking along +X and down: right is +Y, and up leans towards +X. */
+  const down: PlacementView = {
+    position: { x: 0, y: 0, z: 2000 },
+    right: { x: 0, y: 1, z: 0 },
+    up: { x: Math.SQRT1_2, y: 0, z: Math.SQRT1_2 }
+  }
+  /** Looking level along +X: up has nothing horizontal in it. */
+  const level: PlacementView = { ...down, up: { x: 0, y: 0, z: 1 } }
+  const start = { x: 2000, y: 0, z: 0 }
+  /** A 1000 cm cube standing on `at`. */
+  const cubeAt = (at: { x: number; y: number; z: number }) => ({
+    min: { x: at.x - 500, y: at.y - 500, z: at.z },
+    max: { x: at.x + 500, y: at.y + 500, z: at.z + 1000 }
+  })
+  const steps = (count: number, view: PlacementView, gridSize = 10) => {
+    const runs: Array<PlacementRun> = [startPlacementRun(start)]
+    for (let i = 0; i < count; i++) {
+      const run = runs.at(-1)!
+      runs.push(nextInRun(run, cubeAt(runPoint(run, view)), 1000, view, gridSize))
+    }
+    return runs
+  }
+
+  it("starts on the point it was given", () => {
+    assert.deepStrictEqual(runPoint(startPlacementRun(start), down), start)
+  })
+
+  it("steps along the view's right by the width and the gap", () => {
+    const [, second, third] = steps(2, down).map((run) => runPoint(run, down))
+    assert.deepStrictEqual(second, { ...start, y: 1000 + PLACEMENT_GAP })
+    assert.deepStrictEqual(third, { ...start, y: 2 * (1000 + PLACEMENT_GAP) })
+  })
+
+  it("follows the view's right when the camera has turned", () => {
+    const turned = { ...down, right: { x: 0, y: -1, z: 0 }, up: { x: -Math.SQRT1_2, y: 0, z: Math.SQRT1_2 } }
+    assert.deepStrictEqual(runPoint(steps(1, turned)[1]!, turned), { ...start, y: -1100 })
+  })
+
+  it("rounds a step up to the grid size, so the gap never closes", () => {
+    assert.deepStrictEqual(runPoint(steps(1, down, 250)[1]!, down), { ...start, y: 1250 })
+    assert.deepStrictEqual(runPoint(steps(1, down, 1000)[1]!, down), { ...start, y: 2000 })
+  })
+
+  it("clears the wider of two pieces", () => {
+    const wide = { min: { x: 1000, y: -1000, z: 0 }, max: { x: 3000, y: 1000, z: 100 } }
+    assert.strictEqual(nextInRun(startPlacementRun(start), wide, 100, down, 10).along, 2100)
+    assert.strictEqual(nextInRun(startPlacementRun(start), cubeAt(start), 3000, down, 10).along, 3100)
+  })
+
+  it("wraps to a new row along the floor after a few", () => {
+    const points = steps(PLACEMENT_COLUMNS + 1, down).map((run) => runPoint(run, down))
+    assert.deepStrictEqual(points[PLACEMENT_COLUMNS], { x: 3100, y: 0, z: 0 })
+    assert.deepStrictEqual(points[PLACEMENT_COLUMNS + 1], { x: 3100, y: 1100, z: 0 })
+  })
+
+  it("wraps upward in a level view, where there is no floor ahead", () => {
+    const row = steps(PLACEMENT_COLUMNS, level).at(-1)!
+    assert.deepStrictEqual(runPoint(row, level), { ...start, z: 1100 })
+  })
+
+  it("stands a row off by the deepest piece before it", () => {
+    const deep = { min: { x: 1000, y: -50, z: 0 }, max: { x: 5000, y: 50, z: 100 } }
+    const last = { ...startPlacementRun(start), column: PLACEMENT_COLUMNS - 1, depth: 4000 }
+    assert.strictEqual(nextInRun(last, cubeAt(start), 1000, down, 10).across, 4100)
+    assert.strictEqual(nextInRun({ ...last, depth: 0 }, deep, 1000, down, 10).across, 4100)
+  })
+
+  it("lands on a box seen at the same spot on screen, at any depth or height", () => {
+    const box = cubeAt(start)
+    assert.isTrue(wouldLandOn(start, 100, box, down))
+    assert.isTrue(wouldLandOn({ ...start, z: 900 }, 100, box, down))
+    assert.isTrue(wouldLandOn({ ...start, x: 2540 }, 100, box, down), "its half width reaches the box")
+    assert.isFalse(wouldLandOn({ ...start, x: 2560 }, 100, box, down))
+    assert.isFalse(wouldLandOn({ ...start, y: -600 }, 100, box, down))
+    assert.isTrue(wouldLandOn({ ...start, x: 9000 }, 100, box, level), "a level view can't see the depth")
+    assert.isFalse(wouldLandOn({ ...start, z: 1100 }, 100, box, level))
   })
 })

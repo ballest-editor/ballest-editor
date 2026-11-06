@@ -1,6 +1,7 @@
 import { type Bounds, type CatalogPiece, DEFAULT_BOUNDS } from "./Catalog"
 import type { Quat4, Vec3 } from "./coords"
 import { placementTransform } from "./factory"
+import type { Box } from "./itemBounds"
 import { rotateVec } from "./ueMath"
 
 /**
@@ -66,4 +67,93 @@ export const placementPoint = (origin: Vec3, direction: Vec3, floor: number, max
     y: cm(origin.y + d.y * t),
     z: hit === t ? cm(floor) : cm(origin.z + d.z * t)
   }
+}
+
+/** The space a run of placements leaves between its pieces, in cm. */
+export const PLACEMENT_GAP = 100
+
+/** How many pieces a row of a run holds: three default cubes still fit a 16:9 view at the default distance. */
+export const PLACEMENT_COLUMNS = 3
+
+/** A view whose up has less horizontal in it than this is level: there is no floor ahead to lay rows along. */
+const LEVEL_UP = 0.1
+
+/** Where a pane looks from and how it is turned, in UE cm and unit axes. */
+export interface PlacementView {
+  readonly position: Vec3
+  readonly right: Vec3
+  readonly up: Vec3
+}
+
+/**
+ * Pieces placed one after another under one view, laid out from where the first went: rightward along the view, then in
+ * a new row further up the screen. `along` and `across` are the latest piece's distance from `start` in cm.
+ */
+export interface PlacementRun {
+  readonly start: Vec3
+  readonly column: number
+  readonly along: number
+  readonly across: number
+  /** The deepest piece so far in the current row, which sets how far the next row stands off. */
+  readonly depth: number
+}
+
+export const startPlacementRun = (start: Vec3): PlacementRun => ({ start, column: 0, along: 0, across: 0, depth: 0 })
+
+/** The way rows of a run advance: up the screen, kept on the floor unless the view is level. */
+const rowAxisOf = ({ up }: PlacementView): Vec3 => {
+  const flat = Math.hypot(up.x, up.y)
+  return flat < LEVEL_UP ? up : { x: up.x / flat, y: up.y / flat, z: 0 }
+}
+
+const dot = (a: Vec3, b: Vec3): number => a.x * b.x + a.y * b.y + a.z * b.z
+
+/** The stretch of `axis` that `box` covers. */
+const spanOf = ({ max, min }: Box, axis: Vec3): { readonly from: number; readonly to: number } => {
+  const ends = (["x", "y", "z"] as const).map((k) => [min[k] * axis[k], max[k] * axis[k]] as const)
+  return {
+    from: ends.reduce((sum, [lo, hi]) => sum + Math.min(lo, hi), 0),
+    to: ends.reduce((sum, [lo, hi]) => sum + Math.max(lo, hi), 0)
+  }
+}
+
+const lengthOf = (box: Box, axis: Vec3): number => {
+  const { from, to } = spanOf(box, axis)
+  return to - from
+}
+
+/**
+ * Whether a piece `width` across, placed at `point`, would land on `box` as `view` sees it. The view's depth is left out,
+ * so a piece that lands behind another at the same screen spot counts.
+ */
+export const wouldLandOn = (point: Vec3, width: number, box: Box, view: PlacementView): boolean =>
+  [view.right, rowAxisOf(view)].every((axis) => {
+    const { from, to } = spanOf(box, axis)
+    const at = dot(point, axis)
+    return at >= from - width / 2 && at <= to + width / 2
+  })
+
+/**
+ * The run with one more piece, `width` across, after the piece at `last`. A step clears the wider of the two whatever
+ * their pivots, plus the gap, and rounds up to `gridSize` so it never closes the gap.
+ */
+export const nextInRun = (
+  run: PlacementRun,
+  last: Box,
+  width: number,
+  view: PlacementView,
+  gridSize: number
+): PlacementRun => {
+  const step = (size: number) => Math.ceil((size + PLACEMENT_GAP) / gridSize) * gridSize
+  const depth = Math.max(run.depth, lengthOf(last, rowAxisOf(view)), width)
+  return run.column + 1 < PLACEMENT_COLUMNS
+    ? { ...run, column: run.column + 1, along: run.along + step(Math.max(lengthOf(last, view.right), width)), depth }
+    : { ...run, column: 0, along: 0, across: run.across + step(depth), depth: 0 }
+}
+
+/** Where the run's latest piece goes, in whole cm. */
+export const runPoint = ({ across, along, start }: PlacementRun, view: PlacementView): Vec3 => {
+  const row = rowAxisOf(view)
+  const at = (axis: "x" | "y" | "z") => cm(start[axis] + view.right[axis] * along + row[axis] * across)
+  return { x: at("x"), y: at("y"), z: at("z") }
 }
