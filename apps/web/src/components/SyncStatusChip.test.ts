@@ -25,6 +25,12 @@ describe("the sync status chip", () => {
     assert.include(saved, "tabler-icon-check")
   })
 
+  it("has no transition, so a colour can't trail the label it belongs to", () => {
+    const saved = chip({ status: "saved" })
+    assert.include(saved, "transition-none")
+    assert.notInclude(saved, "transition-all")
+  })
+
   it("is a span on a row, with no icon, and a button when told to be", () => {
     const row = chip({ status: "inSync", icon: false })
     assert.match(row, /^<span/)

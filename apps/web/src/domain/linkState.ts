@@ -90,60 +90,38 @@ export const CHIP_STATUS_LABELS: Record<ChipStatus, string> = { ...SYNC_STATUS_L
 
 export const CHIP_STATUS_TONES: Record<ChipStatus, SyncTone> = { ...SYNC_STATUS_TONES, saved: "ok" }
 
-/** How long the chip says Saved, and the longest it waits for a save to reach the project's list. */
+/** How long the chip says Saved. */
 export const SAVED_CHIP_MS = 2_000
 
-/** What the chip says for a map in `status`. Unsaved outranks Saved: an edit right after a save has to show. */
-export const chipStatusOf = (status: SyncStatus, justSaved: boolean): ChipStatus =>
-  justSaved && status !== "unsaved" ? "saved" : status
-
-/** The map the chip is looking at: `fileName` and `modifiedAt` are null while none in the project is open. */
+/** What the chip is looking at. */
 export interface ChipView {
-  readonly fileName: string | null
-  readonly modifiedAt: string | null
+  /** Which load of a map into which tab: loading over a tab gives it a new saved document with no save. */
+  readonly opened: string
+  /** The document the tab's file holds, by identity: a new one, in the same `opened`, is a save. */
+  readonly savedDoc: unknown
   readonly status: SyncStatus
 }
 
-/** The chip from one look at its map to the next: what it says, and until when it goes on saying Saved or Unsaved. */
+/** The chip from one look at its map to the next: whether it is in Saved's 2 seconds. */
 export interface SavedChip extends ChipView {
-  readonly shown: ChipStatus
-  readonly savedUntil: number
-  readonly heldUntil: number
+  readonly justSaved: boolean
 }
 
 /** The chip on first looking at `view`: it has seen no save. */
-export const restingChip = (view: ChipView): SavedChip => ({ ...view, shown: view.status, savedUntil: 0, heldUntil: 0 })
-
-/** Whether a file last written at `modifiedAt` was written a moment before `now`, so seeing it means a save. */
-const writtenJustNow = (modifiedAt: string, now: number): boolean => {
-  const age = now - Date.parse(modifiedAt)
-  return age >= 0 && age < SAVED_CHIP_MS
-}
+export const restingChip = (view: ChipView): SavedChip => ({ ...view, justSaved: false })
 
 /**
- * The chip after a look at `view` at `now`. A file time it hasn't seen, and only just written, starts Saved's 2 seconds,
- * timed from here and not from the file. A save clears a tab's unsaved edits before the project's list has the new file
- * time, so the chip goes on saying Unsaved until it does, instead of showing the status from before the save.
+ * The chip after a look at `view`. It says the status, except for Saved's 2 seconds after a save: a new saved document
+ * with no edits on top starts them, and an edit, or another map, ends them, as does `SAVED_CHIP_MS` going by.
  */
-export const nextSavedChip = (chip: SavedChip, view: ChipView, now: number): SavedChip => {
-  const sameMap = view.fileName === chip.fileName
-  const written = view.modifiedAt !== null && view.modifiedAt !== chip.modifiedAt &&
-    writtenJustNow(view.modifiedAt, now)
-  const savedUntil = written ? now + SAVED_CHIP_MS : sameMap ? chip.savedUntil : 0
-  const editsCleared = chip.status === "unsaved" && view.status !== "unsaved"
-  const heldUntil = !sameMap ? 0 : editsCleared ? now + SAVED_CHIP_MS : chip.heldUntil
-  const justSaved = now < savedUntil
-  return {
-    ...view,
-    shown: !justSaved && now < heldUntil ? "unsaved" : chipStatusOf(view.status, justSaved),
-    savedUntil,
-    heldUntil
-  }
+export const nextSavedChip = (chip: SavedChip, view: ChipView): SavedChip => {
+  const sameMap = view.opened === chip.opened
+  const saved = sameMap && view.savedDoc !== chip.savedDoc
+  return { ...view, justSaved: sameMap && view.status !== "unsaved" && (saved || chip.justSaved) }
 }
 
-/** How long until `chip` needs another look, to stop saying Saved or Unsaved. 0 when it has nothing to stop. */
-export const savedChipMsLeft = (chip: SavedChip, now: number): number =>
-  Math.max(chip.savedUntil - now, chip.heldUntil - now, 0)
+/** What `chip` says. */
+export const chipStatusOf = (chip: SavedChip): ChipStatus => chip.justSaved ? "saved" : chip.status
 
 /** The status of a map in `state`. `unsaved` (its tab has unsaved edits) outranks every link state. */
 export const syncStatusOf = (state: LinkState, unsaved: boolean): SyncStatus =>

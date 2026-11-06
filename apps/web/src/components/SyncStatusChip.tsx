@@ -29,14 +29,17 @@ const TONES: Record<SyncTone, string> = {
     "bg-status-warn text-status-warn-foreground [button]:hover:bg-status-warn/80 [button]:aria-expanded:bg-status-warn/80"
 }
 
-/** A pill in a status tone: a span, or whatever `render` gives it. */
+/**
+ * A pill in a status tone: a span, or whatever `render` gives it. It has no transition, so its colour changes in the
+ * frame its label does.
+ */
 export function StatusChip(
   { tone, className, ...props }: ComponentProps<typeof Badge> & { readonly tone: SyncTone }
 ) {
   return (
     <Badge
       variant="neutral"
-      className={cn("rounded-full outline-none [&>svg]:size-3.5!", TONES[tone], className)}
+      className={cn("rounded-full outline-none transition-none [&>svg]:size-3.5!", TONES[tone], className)}
       {...props}
     />
   )

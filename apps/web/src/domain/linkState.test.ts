@@ -3,6 +3,7 @@ import {
   CHIP_STATUS_LABELS,
   CHIP_STATUS_TONES,
   chipStatusOf,
+  type ChipView,
   LINK_STATE_LABELS,
   type LinkedMap,
   type LinkState,
@@ -11,7 +12,7 @@ import {
   nextSavedChip,
   restingChip,
   SAVED_CHIP_MS,
-  savedChipMsLeft,
+  type SavedChip,
   SYNC_STATUS_LABELS,
   SYNC_STATUS_TONES,
   syncDetailOf,
@@ -120,84 +121,70 @@ describe("syncStatusOf", () => {
   })
 })
 
-describe("the chip's Saved state", () => {
-  const fileName = "a.balledit"
-  const before = "2026-10-31T11:00:00.000Z"
-  const savedAt = "2026-10-31T12:00:00.000Z"
-  const saved = Date.parse(savedAt)
-  const view = (status: SyncStatus, modifiedAt: string | null = before, name: string | null = fileName) => ({
-    fileName: name,
-    modifiedAt,
-    status
-  })
-  /** The chip on a clean map it has been looking at for a while, saved long ago. */
+describe("the status chip", () => {
+  const onDisk = { name: "what the file holds" }
+  const resaved = { name: "what a save wrote" }
+  const view = (status: SyncStatus, savedDoc: unknown = onDisk, opened = "tab-1/1") => ({ opened, savedDoc, status })
+  /** What a chip says after looking at `views` in turn, from `chip`. */
+  const says = (chip: SavedChip, ...views: ReadonlyArray<ChipView>) => chipStatusOf(views.reduce(nextSavedChip, chip))
+  /** The chip on a clean map it has been looking at for a while. */
   const resting = restingChip(view("notExported"))
   /** The same with unsaved edits. */
-  const edited = nextSavedChip(resting, view("unsaved"), saved - 5_000)
+  const edited = nextSavedChip(resting, view("unsaved"))
 
-  it("lasts two seconds from when the chip sees the save, however old the file time is by then", () => {
-    assert.strictEqual(SAVED_CHIP_MS, 2_000)
-    const seen = saved + 1_500
-    const chip = nextSavedChip(edited, view("notExported", savedAt), seen)
-    assert.strictEqual(chip.shown, "saved")
-    assert.strictEqual(savedChipMsLeft(chip, seen), SAVED_CHIP_MS)
-    assert.strictEqual(nextSavedChip(chip, view("notExported", savedAt), seen + SAVED_CHIP_MS - 1).shown, "saved")
-    const after = nextSavedChip(chip, view("notExported", savedAt), seen + SAVED_CHIP_MS)
-    assert.strictEqual(after.shown, "notExported")
-    assert.strictEqual(savedChipMsLeft(after, seen + SAVED_CHIP_MS), 0)
+  it("shows the real state on launch, the moment a clean map opens over the blank tab", () => {
+    const blank = restingChip(view("unsaved", { name: "the blank map" }, "tab-1/0"))
+    assert.strictEqual(says(blank, view("inSync", onDisk, "tab-1/1")), "inSync")
+    assert.strictEqual(chipStatusOf(restingChip(view("notExported"))), "notExported")
   })
 
-  it("goes from Unsaved to Saved with nothing between, while the project's list catches up", () => {
-    // the tab is clean, and the list still has the file time from before the save
-    const clean = nextSavedChip(edited, view("notExported"), saved + 10)
-    assert.strictEqual(clean.shown, "unsaved")
-    assert.strictEqual(nextSavedChip(clean, view("notExported"), saved + 340).shown, "unsaved")
-    assert.strictEqual(nextSavedChip(clean, view("notExported", savedAt), saved + 340).shown, "saved")
-  })
-
-  it("gives up the wait when the new file time never comes", () => {
-    const clean = nextSavedChip(edited, view("inSync"), saved)
-    assert.strictEqual(savedChipMsLeft(clean, saved), SAVED_CHIP_MS)
-    assert.strictEqual(nextSavedChip(clean, view("inSync"), saved + SAVED_CHIP_MS).shown, "inSync")
-  })
-
-  it("starts over on a save during Saved, and shows an edit between the two at once", () => {
-    const first = nextSavedChip(edited, view("notExported", savedAt), saved)
-    assert.strictEqual(nextSavedChip(first, view("unsaved", savedAt), saved + 500).shown, "unsaved")
-    const again = "2026-10-31T12:00:01.000Z"
-    const second = nextSavedChip(first, view("notExported", again), saved + 1_000)
-    assert.strictEqual(second.shown, "saved")
-    assert.strictEqual(savedChipMsLeft(second, saved + 1_000), SAVED_CHIP_MS)
-  })
-
-  it("claims no save for a map whose file time it has seen, or one written long ago", () => {
-    assert.strictEqual(resting.shown, "notExported")
-    assert.strictEqual(nextSavedChip(resting, view("notExported"), saved).shown, "notExported")
-    assert.strictEqual(nextSavedChip(resting, view("inSync", before, "b.balledit"), saved).shown, "inSync")
-  })
-
-  it("holds nothing over from another map, when a tab with edits gives way to a clean one", () => {
-    const switched = nextSavedChip(edited, view("notExported", before, "b.balledit"), saved)
-    assert.strictEqual(switched.shown, "notExported")
-    assert.strictEqual(savedChipMsLeft(switched, saved), 0)
-  })
-
-  it("says Saved of a map's first save, when it appears in the project", () => {
-    const nameless = nextSavedChip(resting, view("unsaved", null, null), saved)
-    assert.strictEqual(nextSavedChip(nameless, view("notExported", savedAt), saved + 100).shown, "saved")
-  })
-
-  it("doesn't begin for a file time ahead of the clock", () => {
-    assert.strictEqual(nextSavedChip(resting, view("notExported", savedAt), saved - 1).shown, "notExported")
-  })
-
-  it("stands in for any status but Unsaved, and goes back to the status after", () => {
-    const statuses: ReadonlyArray<SyncStatus> = ["notExported", "inSync", "changedSinceExport", "publishedDraft"]
-    for (const status of statuses) {
-      assert.strictEqual(chipStatusOf(status, true), "saved")
-      assert.strictEqual(chipStatusOf(status, false), status)
+  it("follows an undo back to the saved document at once, with nothing to wait for", () => {
+    for (const status of ["notExported", "inSync", "changedSinceExport", "publishedDraft"] as const) {
+      assert.strictEqual(says(edited, view(status)), status)
     }
-    assert.strictEqual(chipStatusOf("unsaved", true), "unsaved")
+  })
+
+  it("shows an edit at once", () => {
+    assert.strictEqual(says(resting, view("unsaved")), "unsaved")
+  })
+
+  it("goes straight from Unsaved to Saved on a save", () => {
+    assert.strictEqual(SAVED_CHIP_MS, 2_000)
+    assert.strictEqual(says(edited, view("notExported", resaved)), "saved")
+  })
+
+  it("goes on saying Saved when the project's list catches up with a new status, then says that", () => {
+    const chip = nextSavedChip(nextSavedChip(edited, view("notExported", resaved)), view("changedSinceExport", resaved))
+    assert.strictEqual(chipStatusOf(chip), "saved")
+    assert.strictEqual(chipStatusOf({ ...chip, justSaved: false }), "changedSinceExport")
+  })
+
+  it("says Saved of a save with no edits", () => {
+    assert.strictEqual(says(resting, view("notExported", resaved)), "saved")
+  })
+
+  it("says Saved of a map's first save, before the project's list has it", () => {
+    assert.strictEqual(says(resting, view("unsaved", null), view("notExported", resaved)), "saved")
+  })
+
+  it("ends Saved on an edit, and an undo of that edit doesn't bring it back", () => {
+    const saved = view("notExported", resaved)
+    assert.strictEqual(says(edited, saved, view("unsaved", resaved)), "unsaved")
+    assert.strictEqual(says(edited, saved, view("unsaved", resaved), saved), "notExported")
+  })
+
+  it("stays Unsaved when edits landed while the save ran, and an undo of them isn't a save", () => {
+    assert.strictEqual(says(edited, view("unsaved", resaved)), "unsaved")
+    assert.strictEqual(says(edited, view("unsaved", resaved), view("notExported", resaved)), "notExported")
+  })
+
+  it("claims no save for another tab, or a map loaded over this one", () => {
+    assert.strictEqual(says(edited, view("notExported", resaved, "tab-2/1")), "notExported")
+    assert.strictEqual(says(resting, view("inSync", resaved, "tab-1/2")), "inSync")
+  })
+
+  it("carries Saved over to no other map", () => {
+    assert.strictEqual(says(edited, view("notExported", resaved), view("inSync", onDisk, "tab-2/1")), "inSync")
   })
 
   it("is labelled, and wears ok", () => {
