@@ -6,9 +6,18 @@ import { LinkStatus } from "./LinkStatus"
 
 // The server render reads a store's initial state, so the test gives it the state it means instead.
 let blank = false
+let file: { readonly name: string } | null = null
+let dirty = false
 vi.mock("../editor/store", () => ({
   useEditor: (selector: (s: unknown) => unknown) =>
-    selector({ dirty: false, tabId: "tab-1", capabilities: { exportToGame: true, play: true } }),
+    selector({
+      dirty,
+      file,
+      savedDoc: null,
+      tabId: "tab-1",
+      mapShownRequest: 0,
+      capabilities: { exportToGame: true, play: true }
+    }),
   useOpenPrefab: () => null,
   useOpenProjectMap: () => null,
   useTabSummary: () => ({ label: "Untitled", unsaved: !blank, blank, fileName: null, prefabTier: null })
@@ -40,6 +49,19 @@ describe("the status bar, on a map that was never saved", () => {
       assert.strictEqual(renderToStaticMarkup(createElement(LinkStatus)), "")
     } finally {
       blank = false
+    }
+  })
+
+  it("isn't Unsaved once a first save has given it a file, before the project's list has it", () => {
+    file = { name: "a.balledit" }
+    try {
+      const saved = renderToStaticMarkup(createElement(LinkStatus))
+      assert.notInclude(saved, "Unsaved")
+      dirty = true
+      assert.include(renderToStaticMarkup(createElement(LinkStatus)), "Unsaved")
+    } finally {
+      file = null
+      dirty = false
     }
   })
 })

@@ -4,10 +4,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/component
 import { type ComponentProps, type ReactNode, useEffect, useState } from "react"
 import {
   type ChipStatus,
+  chipStatusOf,
   type ChipView,
   nextSavedChip,
   restingChip,
-  savedChipMsLeft,
+  SAVED_CHIP_MS,
   SYNC_STATUS_LABELS,
   syncDetailOf,
   type SyncStatus,
@@ -26,29 +27,24 @@ import { SyncStatusChip } from "./SyncStatusChip"
 const CLEARS_TOOL_BAR = 60
 
 /**
- * What the chip says of the open map (`nextSavedChip`). It goes on saying what it said until it has looked, so no paint
- * has a status it should have held back, and looks again when it has something to stop saying.
+ * What the chip says of the open map (`nextSavedChip`). It looks while rendering, so the chip changes in the same commit
+ * as the title and the tab's dot, even when loading a map keeps the main thread busy straight after. Saved's 2 seconds
+ * run from when it appears, and over again for another save.
  */
 const useChipStatus = (view: ChipView): ChipStatus => {
   const [chip, setChip] = useState(() => restingChip(view))
-  const { fileName, modifiedAt, status } = view
+  const seen = chip.opened === view.opened && chip.savedDoc === view.savedDoc && chip.status === view.status
+  if (!seen) setChip(nextSavedChip(chip, view))
+  const { justSaved, savedDoc } = chip
   useEffect(() => {
-    const look = setTimeout(() => {
-      const now = Date.now()
-      setChip((last) => nextSavedChip(last, { fileName, modifiedAt, status }, now))
-    })
-    return () => clearTimeout(look)
-  }, [fileName, modifiedAt, status])
-  useEffect(() => {
-    const left = savedChipMsLeft(chip, Date.now())
-    if (left === 0) return
-    const look = setTimeout(() => {
-      const now = Date.now()
-      setChip((last) => nextSavedChip(last, last, now))
-    }, left)
-    return () => clearTimeout(look)
-  }, [chip])
-  return chip.shown
+    if (!justSaved) return
+    const end = setTimeout(
+      () => setChip((last) => last.savedDoc === savedDoc ? { ...last, justSaved: false } : last),
+      SAVED_CHIP_MS
+    )
+    return () => clearTimeout(end)
+  }, [justSaved, savedDoc])
+  return chipStatusOf(chip)
 }
 
 /**
@@ -81,7 +77,7 @@ function StatusPopover(
 }
 
 /** A map that isn't in the project yet: Save opens the Save map dialog, so the popover closes rather than wait behind it. */
-function NeverSavedStatus() {
+function NeverSavedStatus({ chip }: { readonly chip: ChipStatus }) {
   const [open, setOpen] = useState(false)
   const save = () => {
     setOpen(false)
@@ -90,6 +86,7 @@ function NeverSavedStatus() {
   return (
     <StatusPopover
       status="unsaved"
+      chip={chip}
       open={open}
       onOpenChange={setOpen}
       lines={<p className="text-fg-tertiary">Not saved in the project yet</p>}
@@ -108,17 +105,22 @@ function NeverSavedStatus() {
 export function LinkStatus() {
   const open = useOpenProjectMap()
   const unsaved = useEditor((s) => s.dirty)
+  const hasFile = useEditor((s) => s.file !== null)
+  const savedDoc = useEditor((s) => s.savedDoc)
+  const opened = useEditor((s) => `${s.tabId}/${s.mapShownRequest}`)
   const canExport = useEditor((s) => s.capabilities.exportToGame)
   const canPlay = useEditor((s) => s.capabilities.play)
   const prefab = useOpenPrefab()
   const tabId = useEditor((s) => s.tabId)
   const { blank } = useTabSummary(tabId)
   const now = useNow()
-  const status = open === null ? "unsaved" : syncStatusOf(open.state, unsaved)
-  const chip = useChipStatus({ fileName: open?.map.fileName ?? null, modifiedAt: open?.map.modifiedAt ?? null, status })
+  // a first save has a file before the project's list has the map, and nothing is unsaved by then
+  const unlisted = hasFile && !unsaved ? "notExported" : "unsaved"
+  const status = open === null ? unlisted : syncStatusOf(open.state, unsaved)
+  const chip = useChipStatus({ opened, savedDoc, status })
   if (prefab !== null) return <span className="text-fg-tertiary">Prefab {prefab.name}</span>
   if (!canExport) return null
-  if (open === null) return blank ? null : <NeverSavedStatus /> // a blank map has nothing to save yet
+  if (open === null) return blank ? null : <NeverSavedStatus chip={chip} /> // a blank map has nothing to save yet
 
   const { state, map } = open
   const exported = map.link?.export ?? null
