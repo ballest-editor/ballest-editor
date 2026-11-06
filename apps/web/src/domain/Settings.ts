@@ -192,7 +192,7 @@ const migrate = (stored: unknown): unknown => {
  */
 export const AUTO_GRID_COLORS: Readonly<Record<"dark" | "light", { readonly cell: string; readonly section: string }>> =
   {
-    dark: { cell: shadeOf(SCENE_COLORS.dark, "#ffffff", 0.2), section: shadeOf(SCENE_COLORS.dark, "#ffffff", 0.32) },
+    dark: { cell: shadeOf(SCENE_COLORS.dark, "#ffffff", 0.22), section: shadeOf(SCENE_COLORS.dark, "#ffffff", 0.38) },
     light: { cell: shadeOf(SCENE_COLORS.light, "#000000", 0.42), section: shadeOf(SCENE_COLORS.light, "#000000", 0.66) }
   }
 

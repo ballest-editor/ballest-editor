@@ -46,6 +46,12 @@ describe("what's drawn over the scene", () => {
     }
   })
 
+  it("draws the grid in the dark theme so it reads on the ground", () => {
+    const ground = SCENE_COLORS.dark
+    assert.isAtLeast(contrast(AUTO_GRID_COLORS.dark.cell, ground), GRID_CELL)
+    assert.isAtLeast(contrast(AUTO_GRID_COLORS.dark.section, ground), GRID_SECTION)
+  })
+
   it("spells the ground out for Tailwind as it is", () => {
     assert.include(sceneBackgroundClass, `bg-[${SCENE_COLORS.light}]`)
     assert.include(sceneBackgroundClass, `dark:bg-[${SCENE_COLORS.dark}]`)
