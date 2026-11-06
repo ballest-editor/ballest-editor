@@ -23,8 +23,9 @@ const AXES: ReadonlyArray<Axis> = ["x", "y", "z"]
 
 /**
  * Where the pivot is in the world, which is what the game's Location field shows: the Transform section's Location stays
- * the piece's origin, as the map stores it, so a scale moves that one and holds this one. An edit moves the selection by
- * what it takes to bring the pivot there, in one step like a scrubbed Location.
+ * the piece's origin, as the map stores it, so a scale moves that one and holds this one. A whole group has no origin,
+ * so this is its one position. An edit moves the selection by what it takes to bring the pivot there, in one step like
+ * a scrubbed Location.
  */
 function PivotPosition({ point }: { readonly point: Vec3 }) {
   const units = useEditor((s) => s.settings.general.units)
@@ -91,6 +92,7 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
       return [key, names.get(key)?.name ?? (item === undefined ? key : pieceNameOf(item, catalogIndex))]
     }))
   ))
+  const point = useEditor(useShallow(shownPivotPoint))
   const choice = groupChoiceOf(group.pivot)
   const pick = (next: GroupChoice) => {
     if (next === "Centre") setGroupPivot(group.id, undefined)
@@ -111,6 +113,7 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
             ? "An instance pivots on its definition's origin, so it stays a placement of its prefab."
             : "A chain pivots on its first link."}
         </p>
+        {point !== undefined && <PivotPosition point={point} />}
       </div>
     )
   }
@@ -154,11 +157,10 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
       )}
       {group.pivot?.choice === "point" && (
         <p className="text-caption text-fg-tertiary">
-          Frozen at{" "}
-          {[group.pivot.world.x, group.pivot.world.y, group.pivot.world.z].map((v) => v.toFixed(0)).join(", ")}{" "}
-          cm. It moves with the group and stays put through turns.
+          Frozen here. It moves with the group and stays put through turns.
         </p>
       )}
+      {point !== undefined && <PivotPosition point={point} />}
     </div>
   )
 }

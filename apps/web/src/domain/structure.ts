@@ -166,16 +166,22 @@ const sameGroupPivot = (a: GroupPivot | undefined, b: GroupPivot | undefined): b
   return true
 }
 
-/** Makes group `id` a chain of its children in their order, or a plain group again. A chain pivots on its first link, so its own pivot goes. */
+/** What a chain is called until the user names it, as `DEFAULT_GROUP_NAME` for a group. */
+export const DEFAULT_CHAIN_NAME = "Chain"
+
+/**
+ * Makes group `id` a chain of its children in their order, or a plain group again. A chain pivots on its first link, so
+ * its own pivot goes. A group still called Group becomes Chain, and back; a name the user gave stays.
+ */
 export const withChain = (structure: Structure, id: string, chain: boolean): Structure | undefined => {
   const group = findGroup(structure.tree, id)
   if (group === undefined || group.prefab !== undefined || (group.chain === true) === chain) return undefined
-  return withGroupNode(
-    structure,
-    id,
-    ({ chain: _, pivot, ...node }) =>
-      chain ? { ...node, chain: true } : { ...node, ...(pivot !== undefined && { pivot }) }
-  )
+  const [was, becomes] = chain ? [DEFAULT_GROUP_NAME, DEFAULT_CHAIN_NAME] : [DEFAULT_CHAIN_NAME, DEFAULT_GROUP_NAME]
+  return withGroupNode(structure, id, ({ chain: _, pivot, ...node }) => ({
+    ...node,
+    name: node.name === was ? becomes : node.name,
+    ...(chain ? { chain: true } : pivot !== undefined && { pivot })
+  }))
 }
 
 /** Turns chain `id` round: its last link becomes the root. */

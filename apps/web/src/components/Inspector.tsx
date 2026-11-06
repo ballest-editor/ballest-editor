@@ -311,21 +311,22 @@ interface TransformRowSpec {
 
 const AXIS_LABELS: Readonly<Record<Axis, string>> = { x: "X", y: "Y", z: "Z" }
 
-/** The rows for an item (its own transform) or a whole group (its frame: a point, with no turn or scale of its own). */
+/**
+ * The rows for an item (its own transform) or a whole group: a group has no stored origin, so its Location is its pivot
+ * and lives in the Pivot section as Position; here it has a turn and a scale to apply about that.
+ */
 const transformRows = (units: "cm" | "m", of: "item" | "group"): ReadonlyArray<TransformRowSpec> => {
-  const unitName = units === "m" ? "metres" : "centimetres"
+  const location: TransformRowSpec = {
+    field: "translation",
+    label: "Location",
+    unit: units,
+    help: `The piece's origin, as the map stores it, in ${units === "m" ? "metres" : "centimetres"}, Z up`,
+    axisLabels: AXIS_LABELS,
+    step: units === "m" ? 0.01 : 1,
+    digits: units === "m" ? 3 : 1
+  }
   return [
-    {
-      field: "translation",
-      label: "Location",
-      unit: units,
-      help: of === "item"
-        ? `The piece's origin, as the map stores it, in ${unitName}, Z up`
-        : `Where the group pivots, in ${unitName}, Z up: the centre of its items, or an instance's origin`,
-      axisLabels: AXIS_LABELS,
-      step: units === "m" ? 0.01 : 1,
-      digits: units === "m" ? 3 : 1
-    },
+    ...(of === "item" ? [location] : []),
     {
       field: "rotation",
       label: "Rotation",
@@ -829,13 +830,13 @@ export function Inspector() {
                 <PieceCounts items={items} />
               </GroupSection>
               {group.prefab !== undefined && <InstanceSection group={group} link={group.prefab} />}
-              <ChainSection group={group} />
               {frame !== undefined && (
                 <TransformSection of="group" unit={frame} transforms={transforms}>
                   <FlipSection items={placed} />
                 </TransformSection>
               )}
               <PivotSection />
+              <ChainSection group={group} />
               <Disclosure
                 key={`${group.id}/items`}
                 title={items.length === 1 ? "Edit its item" : `Edit all ${items.length} items`}

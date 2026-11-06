@@ -12,6 +12,7 @@ import { isSamePrefab } from "../domain/prefab"
 import { checkInstance } from "../domain/prefabInstance"
 import { detachInstance, openPrefab, updateInstance } from "../editor/actions"
 import { useEditor } from "../editor/store"
+import { InfoHint } from "./InfoHint"
 import { SectionHeader, SectionTitle } from "./SectionTitle"
 import { TagInput } from "./TagInput"
 
@@ -118,27 +119,38 @@ export function ChainSection({ group }: { readonly group: GroupNode }) {
   const reverseChain = useEditor((s) => s.reverseChain)
   const links = group.children.length
   if (group.prefab !== undefined) return null
+  if (group.chain !== true) {
+    return (
+      <div className="flex items-center justify-center gap-1">
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full max-w-56"
+          onClick={() => setChain(group.id, true)}
+        >
+          Convert to chain
+        </Button>
+        <InfoHint>
+          A chain's children hang off one another in outline order, so a turn in Each runs down them, link by link.
+        </InfoHint>
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col gap-2">
-      <SectionTitle>Chain</SectionTitle>
-      <p className="text-body text-fg-tertiary">
-        {group.chain === true
-          ? `${
-            counted(links, "link")
-          } in outline order, each hanging off the one before: a turn in Each runs down them.`
-          : "A chain's children hang off one another in outline order, so a turn in Each runs down them."}
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <SectionTitle>Chain</SectionTitle>
+        <InfoHint>
+          The links hang off one another in outline order: a turn in Each runs down them, a move carries the links after
+          the moved one, and a scale stays with its link.
+        </InfoHint>
+      </div>
+      <p className="text-body text-fg-tertiary">{counted(links, "link")} in outline order.</p>
       <div className="flex flex-wrap gap-1">
-        {group.chain === true
-          ? (
-            <>
-              <Button variant="outline" size="sm" disabled={links < 2} onClick={() => reverseChain(group.id)}>
-                Reverse
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setChain(group.id, false)}>Unchain</Button>
-            </>
-          )
-          : <Button variant="outline" size="sm" onClick={() => setChain(group.id, true)}>Make chain</Button>}
+        <Button variant="outline" size="sm" disabled={links < 2} onClick={() => reverseChain(group.id)}>
+          Reverse
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setChain(group.id, false)}>Unchain</Button>
       </div>
     </div>
   )

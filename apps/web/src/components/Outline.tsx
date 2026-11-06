@@ -510,7 +510,7 @@ export function Outline() {
                 )
                 : (
                   <ContextMenuItem onClick={() => useEditor.getState().setChain(menuRow.id, true)}>
-                    Make chain
+                    Convert to chain
                   </ContextMenuItem>
                 )
             )

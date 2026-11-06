@@ -1529,14 +1529,22 @@ describe("groups and the selection", () => {
     state().chainSelection()
     const chain = state().doc.structure.tree.find((n) => n.kind === "group")
     assert.strictEqual(chain?.kind === "group" ? chain.chain : undefined, true)
+    assert.strictEqual(chain?.kind === "group" ? chain.name : undefined, "Chain", "a default name follows")
     assert.deepStrictEqual(chain?.kind === "group" ? treeKeys(chain.children) : [], [c, a, b], "selection order")
     const id = chain?.kind === "group" ? chain.id : ""
     state().reverseChain(id)
     assert.deepStrictEqual(treeKeys(findGroup(state().doc.structure.tree, id)!.children), [b, a, c])
     state().setChain(id, false)
     assert.isUndefined(findGroup(state().doc.structure.tree, id)?.chain)
+    assert.strictEqual(findGroup(state().doc.structure.tree, id)?.name, "Group", "and back")
     state().undo()
     assert.strictEqual(findGroup(state().doc.structure.tree, id)?.chain, true)
+    // a name the user gave stays either way
+    state().renameGroup(id, "Finger")
+    state().setChain(id, false)
+    assert.strictEqual(findGroup(state().doc.structure.tree, id)?.name, "Finger")
+    state().setChain(id, true)
+    assert.strictEqual(findGroup(state().doc.structure.tree, id)?.name, "Finger")
   })
 
   it("pivots a prefab instance on its origin, and follows a live move", () => {

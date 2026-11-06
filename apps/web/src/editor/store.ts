@@ -1817,12 +1817,13 @@ export const selectionPivot = (
 
 /**
  * The point the selection turns and scales about, live, when that's a pivot away from the active item's origin: what the
- * game's Location field shows for one piece (docs/qa/gizmo-scale.md). Undefined for a whole group, which has its frame.
+ * game's Location field shows for one piece (docs/qa/gizmo-scale.md). A whole group's pivot, always.
  */
 export const shownPivotPoint = (s: EditorState): Vec3 | undefined => {
   const target = selectionPivot(s, (id) => shownTransform(s, id))
   if (target === undefined) return undefined
-  if (soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId) !== undefined) return undefined
+  // a whole group has no origin of its own, so its pivot is its one position and always shows
+  if (soleGroupOf(s.doc.structure.tree, s.selectedIds, s.enteredGroupId) !== undefined) return target.pivot
   return sameVec(target.activePivot, target.active.translation) ? undefined : target.activePivot
 }
 

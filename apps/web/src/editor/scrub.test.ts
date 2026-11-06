@@ -348,7 +348,7 @@ describe("a pivot on the piece, as measured in the game (docs/qa/gizmo-scale.md)
     expectVec(shownPivotPoint(s())!, { x: 100, y: -500, z: 5500 }, "pivot")
   })
 
-  it("has no pivot point of its own to show on Default, or on a whole group", () => {
+  it("has no pivot point of its own to show on Default; a whole group always shows its pivot", () => {
     const { ids } = setup()
     s().select(ids.slice(0, 1))
     assert.strictEqual(shownPivotPoint(s()), undefined)
@@ -356,7 +356,7 @@ describe("a pivot on the piece, as measured in the game (docs/qa/gizmo-scale.md)
     setSelectionPivot("Left")
     assert.isDefined(shownPivotPoint(s()))
     s().groupSelection()
-    assert.strictEqual(shownPivotPoint(s()), undefined)
+    expectVec(shownPivotPoint(s())!, selectionPivot(s(), (id) => shownTransform(s(), id))!.pivot, "the group's pivot")
   })
 
   it("refuses a pivot on a whole group, whose gizmo sits on its frame, as the game does", () => {
