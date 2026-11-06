@@ -1,5 +1,5 @@
 import type { PrefabInfo, PrefabTier } from "@ballest/contracts"
-import { IconBoxMultiple, IconDotsVertical } from "@tabler/icons-react"
+import { IconBoxMultiple, IconDots } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import {
   DropdownMenu,
@@ -116,7 +116,7 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
               />
             }
           >
-            <IconDotsVertical />
+            <IconDots />
           </TooltipTrigger>
           <TooltipContent side="bottom">More actions</TooltipContent>
         </Tooltip>

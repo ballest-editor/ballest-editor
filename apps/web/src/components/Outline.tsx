@@ -33,7 +33,7 @@ import {
   selectedGroupIds,
   selectionNodeIds
 } from "../domain/groupSelection"
-import { formatBinding, isBound, type KeybindAction, mouseChordOf } from "../domain/Keybinds"
+import { isBound, type KeybindAction, mouseChordOf } from "../domain/Keybinds"
 import {
   type DropTarget,
   dropTargetAt,
@@ -52,6 +52,7 @@ import { actionCommands, type CommandAction } from "../editor/commands"
 import { elementOf } from "../editor/keyTargets"
 import { nextSelection, nodeNamesOf, useEditor } from "../editor/store"
 import { EnteredGroupBreadcrumb } from "./EnteredGroupStatus"
+import { KeyChip } from "./KeyChip"
 import { OUTLINE_INDENT, OUTLINE_ROW_HEIGHT, OutlineRowView } from "./OutlineRow"
 import { SavePrefabItem } from "./SavePrefabItem"
 import { TagInput } from "./TagInput"
@@ -96,6 +97,12 @@ function DropLine({ drag }: { readonly drag: Drag }) {
   )
 }
 
+const MenuShortcut = ({ binding }: { readonly binding: string }) => (
+  <ContextMenuShortcut className="pl-6">
+    <KeyChip binding={binding} />
+  </ContextMenuShortcut>
+)
+
 function MenuCommand({ action, disabled = false, children }: {
   readonly action: CommandAction & KeybindAction
   readonly disabled?: boolean
@@ -105,7 +112,7 @@ function MenuCommand({ action, disabled = false, children }: {
   return (
     <ContextMenuItem disabled={disabled} onClick={() => actionCommands[action]()}>
       {children}
-      {binding !== undefined && <ContextMenuShortcut>{formatBinding(binding)}</ContextMenuShortcut>}
+      {binding !== undefined && <MenuShortcut binding={binding} />}
     </ContextMenuItem>
   )
 }
@@ -514,7 +521,7 @@ export function Outline() {
             }}
           >
             Rename
-            <ContextMenuShortcut>F2</ContextMenuShortcut>
+            <MenuShortcut binding="F2" />
           </ContextMenuItem>
           <MenuCommand action="duplicateSelection" disabled={!hasSelection}>Duplicate</MenuCommand>
           <MenuCommand action="deleteSelection" disabled={!hasSelection}>Delete</MenuCommand>
