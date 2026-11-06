@@ -14,13 +14,6 @@ export const DOCUMENTS_PANEL = "documents"
 /** The one side of the centre a panel starts on. */
 export type DockLocation = "left" | "right" | "bottom"
 
-/** What the layout rules need to know of a panel; `components/dock/panels.tsx` adds its component. */
-export interface DockPanelSpec {
-  readonly id: string
-  readonly title: string
-  readonly location: DockLocation
-}
-
 /** A group folded down to its tab strip along `axis`; `size` is what expanding it gives back. */
 export interface CollapsedGroup {
   readonly axis: "width" | "height"
@@ -67,12 +60,9 @@ const isGridNode = (value: unknown): value is GridNode => {
   return type === "leaf" && isObject(data) && typeof data["id"] === "string" && Array.isArray(data["views"])
 }
 
-const isLayout = (
-  layout: Readonly<Record<string, unknown>>
-): layout is Readonly<Record<string, unknown>> & DockLayout => {
+const isLayout = (layout: Readonly<Record<string, unknown>>): layout is typeof layout & DockLayout => {
   const { grid, panels } = layout
-  return isObject(panels) && isObject(grid) && isObject(grid["root"]) && grid["root"]["type"] === "branch" &&
-    isGridNode(grid["root"])
+  return isObject(panels) && isObject(grid) && isGridNode(grid["root"]) && grid["root"].type === "branch"
 }
 
 /** The saved dock, or null when there is none or it can't be read: the caller falls back to the default layout. */
@@ -83,10 +73,6 @@ export const parseSavedDock = (text: string | null): SavedDock | null => {
   const { layout } = decoded.value
   return isLayout(layout) ? { ...decoded.value, layout } : null
 }
-
-/** Panels to add to a saved layout on load: new since it was saved. */
-export const newPanels = <P extends DockPanelSpec>(panels: ReadonlyArray<P>, known: ReadonlyArray<string>): Array<P> =>
-  panels.filter((panel) => !known.includes(panel.id))
 
 type Orientation = "HORIZONTAL" | "VERTICAL"
 interface GridLeaf {
@@ -108,6 +94,8 @@ interface GridBranch {
 type GridNode = GridLeaf | GridBranch
 
 const crosswise = (orientation: Orientation): Orientation => orientation === "HORIZONTAL" ? "VERTICAL" : "HORIZONTAL"
+const axisAlong = (orientation: Orientation): CollapsedGroup["axis"] =>
+  orientation === "HORIZONTAL" ? "width" : "height"
 
 const parentOf = (
   branch: GridBranch,
@@ -139,16 +127,14 @@ export const collapseAxis = (
   const roomLeft = found.branch.data.some((node) =>
     node.type === "branch" || (node.data.id !== groupId && !collapsedIds.has(node.data.id))
   )
-  if (!roomLeft) return null
-  return found.orientation === "HORIZONTAL" ? "width" : "height"
+  return roomLeft ? axisAlong(found.orientation) : null
 }
 
 /** Which way group `groupId` lies against the centre group, if it's directly beside it. */
 export const axisBesideCentre = (grid: DockLayout["grid"], groupId: string): CollapsedGroup["axis"] | null => {
   const found = parentOf(grid.root, grid.orientation, groupId)
   const beside = found?.branch.data.some((node) => node.type === "leaf" && node.data.views.includes(DOCUMENTS_PANEL))
-  if (found === null || beside !== true) return null
-  return found.orientation === "HORIZONTAL" ? "width" : "height"
+  return found !== null && beside === true ? axisAlong(found.orientation) : null
 }
 
 const holdsDocuments = (node: GridNode): boolean =>
@@ -164,10 +150,7 @@ const growCentre = (branch: GridBranch, orientation: Orientation, width: number,
   })
 })
 
-/**
- * `layout` for a window of a different size: the viewport makes up the difference and the panels keep theirs, as when
- * the window is resized. `fromJSON` would give it to whichever view comes last.
- */
+/** `layout` for a window of a different size, the viewport taking the difference. `fromJSON` gives it to the last view. */
 export const fitToWindow = (layout: DockLayout, width: number, height: number): DockLayout => {
   const { grid } = layout
   if (width <= 0 || height <= 0) return layout
@@ -190,28 +173,26 @@ interface PopoutEntry {
 
 /** `branch` with `popout`'s panels back in the group they left; null when that group is gone. */
 const redock = (branch: GridBranch, popout: PopoutEntry): GridBranch | null => {
-  const index = branch.data.findIndex((node) => node.type === "leaf" && node.data.id === popout.gridReferenceGroup)
-  if (index === -1) {
-    for (const [at, node] of branch.data.entries()) {
-      const redocked = node.type === "branch" ? redock(node, popout) : null
-      if (redocked !== null) return { ...branch, data: branch.data.with(at, redocked) }
+  for (const [index, node] of branch.data.entries()) {
+    if (node.type === "branch") {
+      const redocked = redock(node, popout)
+      if (redocked !== null) return { ...branch, data: branch.data.with(index, redocked) }
+    } else if (node.data.id === popout.gridReferenceGroup) {
+      const { visible: _hidden, ...shown } = node
+      const docked: GridLeaf = {
+        ...shown,
+        data: {
+          ...node.data,
+          views: [...node.data.views, ...popout.data.views],
+          ...(popout.data.activeView !== undefined && { activeView: popout.data.activeView })
+        }
+      }
+      const data = branch.data.with(index, docked)
+      // A group that went hidden gave its room to its neighbours.
+      return { ...branch, data: node.visible === false ? takeRoom(data, index, node.size) : data }
     }
-    return null
   }
-  const leaf = branch.data[index]
-  if (leaf?.type !== "leaf") return null
-  const { visible: _hidden, ...shown } = leaf
-  const docked: GridLeaf = {
-    ...shown,
-    data: {
-      ...leaf.data,
-      views: [...leaf.data.views, ...popout.data.views],
-      ...(popout.data.activeView !== undefined && { activeView: popout.data.activeView })
-    }
-  }
-  const data = branch.data.with(index, docked)
-  // A group that went hidden gave its room to its neighbours.
-  return { ...branch, data: leaf.visible === false ? takeRoom(data, index, leaf.size) : data }
+  return null
 }
 
 const unfolded = (branch: GridBranch, collapsed: SavedDock["collapsed"]): GridBranch => {
@@ -269,10 +250,7 @@ const keptBranch = (branch: GridBranch, orientation: Orientation, keep: Readonly
   return orientation === "HORIZONTAL" ? growCentre(kept, orientation, room, 0) : growCentre(kept, orientation, 0, room)
 }
 
-/**
- * `layout` with only the panels in `keep`. A panel the app no longer has (Settings, once) can be anywhere in a saved
- * layout, and it goes without leaving a gap, so the rest of the layout survives it.
- */
+/** `layout` with only the panels in `keep`: one the app no longer has goes without leaving a gap. */
 export const onlyPanels = (layout: DockLayout, keep: ReadonlyArray<string>): DockLayout => {
   const kept = new Set(keep)
   const panels = Object.fromEntries(Object.entries(layout.panels).filter(([id]) => kept.has(id)))
@@ -280,18 +258,13 @@ export const onlyPanels = (layout: DockLayout, keep: ReadonlyArray<string>): Doc
   return { ...layout, grid: { ...layout.grid, root }, panels }
 }
 
-/** A saved layout with its panels' windows gone: `layout` has what went back in the grid, `loose` the rest. */
-export interface DockedLayout {
-  readonly layout: DockLayout
-  readonly loose: ReadonlyArray<string>
-}
-
 /**
- * A saved layout with no popouts in it. The windows don't come back on launch: a browser blocks a window nobody clicked
- * for, and dockview then loses the panels. A normal close docks them first, but a crash or a closed tab saves them
- * popped out. Each goes back to the group it left, and a panel whose group is gone is `loose`, for the caller to place.
+ * A saved layout with no popouts in it, as the windows don't come back on launch (docs/DESKTOP.md § Dock). Each goes back
+ * to the group it left, and a panel whose group is gone is `loose`, for the caller to place.
  */
-export const dockedPopouts = ({ popoutGroups, ...layout }: DockLayout): DockedLayout => {
+export const dockedPopouts = (
+  { popoutGroups, ...layout }: DockLayout
+): { readonly layout: DockLayout; readonly loose: ReadonlyArray<string> } => {
   let { root } = layout.grid
   const loose: Array<string> = []
   for (const popout of popoutGroups ?? []) {

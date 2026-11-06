@@ -12,8 +12,7 @@ import { axisOf, formatPaneScale, ORTHO_AXES } from "../domain/orthoView"
 import {
   isOrthoView,
   type OrthoView,
-  paneCountOf,
-  type ViewLayout,
+  paneShares,
   type ViewLayoutKind,
   viewLayoutKinds,
   viewLayoutLabels,
@@ -34,44 +33,22 @@ const LAYOUT_ICONS = {
   quad: IconLayoutGrid
 } as const
 
-const PANE_SLOTS = [0, 1, 2, 3] as const
-
-/** Where a pane sits in the viewport, as shares of it: the same split the renderer draws to. */
-const paneBox = (layout: ViewLayout, slot: number) => {
-  const { kind, splitX, splitY } = layout
-  const columns = kind === "columns" || kind === "quad"
-  const rows = kind === "rows" || kind === "quad"
-  const right = columns && (kind === "quad" ? slot % 2 === 1 : slot === 1)
-  const below = rows && (kind === "quad" ? slot >= 2 : slot === 1)
-  const percent = (share: number) => `${share * 100}%`
-  return {
-    left: percent(right ? splitX : 0),
-    top: percent(below ? splitY : 0),
-    width: percent(columns ? (right ? 1 - splitX : splitX) : 1),
-    height: percent(rows ? (below ? 1 - splitY : splitY) : 1)
-  }
-}
-
-/** Follows a pane's zoom, which isn't React state: it changes with every wheel notch. */
-const usePaneScale = (slot: number): number =>
-  useSyncExternalStore(onPaneScaleChange, () => paneCameraAt(slot).cmPerPixel)
+const percent = (share: number) => `${share * 100}%`
 
 /**
- * The pane's name and scale, which opens the list of views. The pane under the view controls (the top right one of a
- * split) puts its label beneath them when it is too narrow for both (`underControls`); the pane is a container, so
- * that follows its own width.
+ * The pane's name and scale, which opens the list of views. A pane under the view controls puts its label beneath them
+ * when it's too narrow for both (`underControls`), by its own width: the pane is a container.
  */
-function PaneHeader(
-  { slot, projection, disabled, underControls }: {
-    readonly slot: number
-    readonly projection: ViewProjection
-    readonly disabled: boolean
-    readonly underControls: boolean
-  }
-) {
+function PaneHeader({ slot, projection, disabled, underControls }: {
+  readonly slot: number
+  readonly projection: ViewProjection
+  readonly disabled: boolean
+  readonly underControls: boolean
+}) {
   const units = useEditor((s) => s.settings.general.units)
   const setPaneProjection = useEditor((s) => s.setPaneProjection)
-  const scale = usePaneScale(slot)
+  // The zoom isn't React state: it changes with every wheel notch.
+  const scale = useSyncExternalStore(onPaneScaleChange, () => paneCameraAt(slot).cmPerPixel)
   const name = viewProjectionLabels[projection]
   const label = isOrthoView(projection) ? `${name} · ${formatPaneScale(scale, units)}` : name
   return (
@@ -113,9 +90,7 @@ const ORIGIN = 10
 const SIZE = ORIGIN + ARROW + 14
 
 /** One axis of `PaneAxes`: a line out from the corner, named with its sign ("-Y" when it runs that way). */
-function AxisArrow(
-  { direction, across }: { readonly direction: ReturnType<typeof axisOf>; readonly across: boolean }
-) {
+function AxisArrow({ direction, across }: { readonly direction: ReturnType<typeof axisOf>; readonly across: boolean }) {
   const color = AXIS_COLORS[direction.axis]
   const name = `${direction.positive ? "" : "−"}${direction.axis.toUpperCase()}`
   const y = SIZE - ORIGIN
@@ -172,9 +147,7 @@ function PaneDivider({ axis, at }: { readonly axis: "x" | "y"; readonly at: numb
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const box = e.currentTarget.parentElement?.getBoundingClientRect()
     if (box === undefined || !e.currentTarget.hasPointerCapture(e.pointerId)) return
-    setPaneSplit(
-      axis === "x" ? { x: (e.clientX - box.left) / box.width } : { y: (e.clientY - box.top) / box.height }
-    )
+    setPaneSplit({ [axis]: axis === "x" ? (e.clientX - box.left) / box.width : (e.clientY - box.top) / box.height })
   }
   return (
     <div
@@ -186,13 +159,13 @@ function PaneDivider({ axis, at }: { readonly axis: "x" | "y"; readonly at: numb
           ? "inset-y-0 w-2 -translate-x-1/2 cursor-col-resize"
           : "inset-x-0 h-2 -translate-y-1/2 cursor-row-resize"
       )}
-      style={axis === "x" ? { left: `${at * 100}%` } : { top: `${at * 100}%` }}
+      style={{ [axis === "x" ? "left" : "top"]: percent(at) }}
       onPointerDown={(e) => {
         e.preventDefault()
         e.currentTarget.setPointerCapture(e.pointerId)
       }}
       onPointerMove={onPointerMove}
-      onDoubleClick={() => setPaneSplit(axis === "x" ? { x: 0.5 } : { y: 0.5 })}
+      onDoubleClick={() => setPaneSplit({ [axis]: 0.5 })}
     >
       <div
         className={cn(
@@ -205,21 +178,21 @@ function PaneDivider({ axis, at }: { readonly axis: "x" | "y"; readonly at: numb
 }
 
 /**
- * The frames of the view's panes over the one canvas (docs/DESKTOP.md § View panes): each pane's name and scale, the
- * active pane's outline, an orthographic pane's axes, and the dividers. The pane's top right stays free for the view
- * cube (#79). All click-through but the labels and dividers: the canvas takes the pointer and sorts it by pane.
+ * What's drawn over the one canvas for its panes (docs/DESKTOP.md § View panes). A pane's top right stays free for the
+ * view cube (#79). All click-through but the labels and dividers: the canvas takes the pointer and sorts it by pane.
  */
 export function ViewPanes({ disabled }: { readonly disabled: boolean }) {
   const layout = useEditor((s) => s.viewLayout)
   const activePane = useEditor((s) => s.activePane)
-  const count = paneCountOf(layout.kind)
+  const panes = paneShares(layout)
   return (
     <div className="pointer-events-none absolute inset-0">
-      {PANE_SLOTS.slice(0, count).map((slot) => {
+      {panes.map(({ slot, x, y, width, height }) => {
         const projection = layout.projections[slot]
+        const box = { left: percent(x), top: percent(y), width: percent(width), height: percent(height) }
         return (
-          <div key={slot} className="absolute @container" style={paneBox(layout, slot)}>
-            {count > 1 && slot === activePane && (
+          <div key={slot} className="absolute @container" style={box}>
+            {panes.length > 1 && slot === activePane && (
               <div className="absolute inset-0 ring-1 ring-primary ring-inset" data-active-pane />
             )}
             <PaneHeader

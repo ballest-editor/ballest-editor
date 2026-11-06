@@ -208,10 +208,7 @@ export function SettingsShell<C extends string>(props: {
 
   return (
     <Dialog open={props.open} onOpenChange={(next) => !next && props.busy !== true && props.onClose()}>
-      <DialogContent
-        className="flex h-[min(80vh,720px)] w-full gap-0 overflow-hidden p-0 sm:max-w-4xl"
-        showCloseButton
-      >
+      <DialogContent className="flex h-[min(80vh,720px)] w-full gap-0 overflow-hidden p-0 sm:max-w-4xl" showCloseButton>
         <nav className="flex w-56 shrink-0 flex-col border-r bg-muted/30 p-3">
           <div className="relative mb-2">
             <IconSearch className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -245,11 +242,7 @@ export function SettingsShell<C extends string>(props: {
                 const heading = section !== undefined && section !== props.categories[i - 1]?.section
                 return (
                   <Fragment key={id}>
-                    {heading && (
-                      <div className="mt-2 px-2 pb-0.5 text-eyebrow text-muted-foreground">
-                        {section}
-                      </div>
-                    )}
+                    {heading && <div className="mt-2 px-2 pb-0.5 text-eyebrow text-muted-foreground">{section}</div>}
                     <Button
                       variant={active ? "secondary" : "ghost"}
                       className={cn("justify-start", searching && hits === 0 && "text-muted-foreground/50")}
@@ -306,9 +299,7 @@ export function SettingsShell<C extends string>(props: {
               {groups.map((group) => (
                 <section key={group.key} className="flex flex-col">
                   {group.title !== undefined && group.title !== "" && (
-                    <h3 className="mb-1 text-eyebrow text-muted-foreground">
-                      {group.title}
-                    </h3>
+                    <h3 className="mb-1 text-eyebrow text-muted-foreground">{group.title}</h3>
                   )}
                   <div className="flex flex-col divide-y divide-border/50">
                     {group.rows.map((row) => <RowView key={row.id} row={row} />)}

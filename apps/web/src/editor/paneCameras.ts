@@ -6,7 +6,6 @@
 import * as THREE from "three"
 import { threeToUeVector, ueToThreeVector, type Vec3 } from "../domain/coords"
 import {
-  type Bounds3,
   clampCmPerPixel,
   distanceForScale,
   nearestOrthoView,
@@ -37,7 +36,7 @@ const FAR = 2_000_000
 /** An orthographic camera stands this far back, so the whole map is in front of it whatever it is centred on. */
 const ORTHO_STANDOFF = FAR / 2
 /** The pivot ahead of a perspective camera that has none in front of it. */
-export const ORBIT_DISTANCE = 1500
+const ORBIT_DISTANCE = 1500
 const FRAME_OFFSET = new THREE.Vector3(-1, 0.8, 1).normalize()
 /** The least a focused pane shows (cm), so one small piece doesn't fill it. */
 export const FOCUS_SPAN = 300
@@ -46,7 +45,6 @@ const MAP_SPAN = 2000
 
 const toVector = (v: Vec3) => new THREE.Vector3(v.x, v.y, v.z)
 const uePoint = (v: THREE.Vector3): Vec3 => threeToUeVector({ x: v.x, y: v.y, z: v.z })
-const boundsOf = (box: THREE.Box3): Bounds3 => ({ min: uePoint(box.min), max: uePoint(box.max) })
 
 const scaleListeners = new Set<() => void>()
 
@@ -77,10 +75,9 @@ export class PaneCamera {
   }
 
   get camera(): THREE.PerspectiveCamera | THREE.OrthographicCamera {
-    return isOrthoView(this.projection) ? this.orthographic : this.perspective
+    return this.view === undefined ? this.perspective : this.orthographic
   }
 
-  /** The orthographic view in use, if any. */
   get view(): OrthoView | undefined {
     return isOrthoView(this.projection) ? this.projection : undefined
   }
@@ -108,27 +105,24 @@ export class PaneCamera {
       perspective.position.copy(this.target).addScaledVector(back, distance)
       return
     }
-    if (!isOrthoView(this.projection)) {
-      const forward = perspective.getWorldDirection(new THREE.Vector3())
-      if (this.target.clone().sub(perspective.position).dot(forward) <= 0) {
-        this.target.copy(perspective.position).addScaledVector(forward, ORBIT_DISTANCE)
-      }
-      const distance = this.target.clone().sub(perspective.position).dot(forward)
-      this.setScale(scaleForDistance(distance, this.height, perspective.fov))
-    }
+    if (this.view === undefined) this.setScale(scaleForDistance(this.keepPivotAhead(), this.height, perspective.fov))
     this.projection = next
     this.placeOrthographic()
   }
 
-  /** The orthographic view closest to where the pane looks now. */
+  /** Puts the pivot ahead of the perspective camera if it's behind it, and answers how far along the view it is. */
+  keepPivotAhead(): number {
+    const { position } = this.perspective
+    const forward = this.perspective.getWorldDirection(new THREE.Vector3())
+    const ahead = this.target.clone().sub(position).dot(forward)
+    if (ahead > 0) return ahead
+    this.target.copy(position).addScaledVector(forward, ORBIT_DISTANCE)
+    return ORBIT_DISTANCE
+  }
+
   nearestView(): OrthoView {
     const direction = this.camera.getWorldDirection(new THREE.Vector3())
     return nearestOrthoView(uePoint(direction))
-  }
-
-  /** Slides an orthographic view with a drag, the point under the pointer staying under it. */
-  dragOrthographic(movementX: number, movementY: number): void {
-    this.slide(-movementX * this.cmPerPixel, movementY * this.cmPerPixel)
   }
 
   /** Slides an orthographic view along the screen (cm). */
@@ -160,7 +154,8 @@ export class PaneCamera {
       )
       return
     }
-    const { center, cmPerPixel } = orthoFraming(boundsOf(box), view, this.width, this.height, minimumSpan)
+    const bounds = { min: uePoint(box.min), max: uePoint(box.max) }
+    const { center, cmPerPixel } = orthoFraming(bounds, view, this.width, this.height, minimumSpan)
     this.target.copy(toVector(ueToThreeVector(center)))
     this.setScale(cmPerPixel)
     this.placeOrthographic()
@@ -222,32 +217,26 @@ export class PaneCamera {
   }
 }
 
-const MAX_PANES = 4
-
 const tabs = new Map<string, ReadonlyArray<PaneCamera>>()
 
 /** Tab `tabId`'s cameras, by slot; a tab not seen yet gets fresh ones, which frame the map when they first show. */
 export const paneCamerasOf = (tabId: string): ReadonlyArray<PaneCamera> => {
   const known = tabs.get(tabId)
   if (known !== undefined) return known
-  const panes = Array.from({ length: MAX_PANES }, () => new PaneCamera())
+  const panes = Array.from({ length: 4 }, () => new PaneCamera())
   tabs.set(tabId, panes)
   return panes
 }
 
-/** Drops the cameras of tabs that have closed. */
 export const forgetClosedTabs = (open: ReadonlyArray<string>): void => {
   for (const tabId of tabs.keys()) if (!open.includes(tabId)) tabs.delete(tabId)
 }
 
-const paneOf = (tabId: string, slot: number): PaneCamera => {
-  const pane = paneCamerasOf(tabId)[slot]
+export const paneCameraAt = (slot: number): PaneCamera => {
+  const pane = paneCamerasOf(useEditor.getState().tabId)[slot]
   if (pane === undefined) throw new RangeError(`No pane in slot ${slot}`)
   return pane
 }
-
-/** The active tab's pane in `slot`. */
-export const paneCameraAt = (slot: number): PaneCamera => paneOf(useEditor.getState().tabId, slot)
 
 /** The active pane's camera state: what the fly keys, Focus selection and Frame all act on. */
 export const activePaneCamera = (): PaneCamera => paneCameraAt(useEditor.getState().activePane)

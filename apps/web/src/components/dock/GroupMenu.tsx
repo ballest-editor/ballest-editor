@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger
 } from "@workspace/ui/components/dropdown-menu"
 import type { DockviewGroupPanel, IDockviewPanel } from "dockview-react"
+import type { ComponentProps } from "react"
 import { DOCUMENTS_PANEL } from "../../domain/dockLayout"
 import {
   canCollapseGroup,
@@ -20,6 +21,20 @@ import {
   usePanelCheck,
   useViewMenuPanels
 } from "./dockControl"
+
+/** An icon button in a group's strip, named by its tooltip. */
+export function StripButton({ label, ...props }: { readonly label: string } & ComponentProps<typeof Button>) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      className="size-6 text-muted-foreground"
+      aria-label={label}
+      title={label}
+      {...props}
+    />
+  )
+}
 
 function PanelItem({ id, title }: { readonly id: string; readonly title: string }) {
   return <DropdownMenuCheckboxItem {...usePanelCheck(id)}>{title}</DropdownMenuCheckboxItem>
@@ -60,24 +75,10 @@ function GroupMenuItems({ group, activePanel }: GroupMenuProps) {
 export function GroupMenu({ group, activePanel }: GroupMenuProps) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="size-6 text-muted-foreground"
-            aria-label="Panels and layout"
-            title="Panels and layout"
-          />
-        }
-      >
+      <DropdownMenuTrigger render={<StripButton label="Panels and layout" />}>
         <IconDots className="size-3.5" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="w-max min-w-40"
-        finalFocus={(closeType) => closeType === "keyboard"}
-      >
+      <DropdownMenuContent align="end" className="w-max min-w-40" finalFocus={(closeType) => closeType === "keyboard"}>
         <GroupMenuItems group={group} activePanel={activePanel} />
       </DropdownMenuContent>
     </DropdownMenu>

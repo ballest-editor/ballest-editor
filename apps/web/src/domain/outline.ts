@@ -33,14 +33,12 @@ export interface OutlineRow {
   readonly instance: boolean
 }
 
-/** Each item's `actorToSpawn`, by key. */
 export const itemClasses = (map: MapFile, ids: ReadonlyArray<string>): ReadonlyMap<string, string> =>
   new Map(ids.flatMap((key, index) => {
     const item = map.items[index]
     return item === undefined ? [] : [[key, item.actorToSpawn] as const]
   }))
 
-/** The lower-case words of a filter. */
 const termsOf = (query: string): ReadonlyArray<string> => query.toLowerCase().split(/\s+/).filter((t) => t.length > 0)
 
 const rowMatches = (row: OutlineRow, terms: ReadonlyArray<string>) => {
@@ -48,11 +46,7 @@ const rowMatches = (row: OutlineRow, terms: ReadonlyArray<string>) => {
   return terms.every((term) => haystack.includes(term))
 }
 
-/**
- * The rows to show, in tree order. Without a filter a collapsed group hides what's under it. With one, the rows that
- * match (every word, in a name, a class or a tag) show with the groups around them, whatever is collapsed. `names` has
- * the items' names by key and the groups' by id.
- */
+/** The rows to show, in tree order (docs/DESKTOP.md § Outline). `names` has the items' by key and the groups' by id. */
 export const outlineRows = (
   structure: Structure,
   names: ReadonlyMap<string, NumberedName>,
@@ -108,27 +102,23 @@ export const outlineRows = (
   return rows
 }
 
-/**
- * The rows from `fromId` to `toId` inclusive, in shown order; just `toId` when `fromId` isn't shown. A selection range
- * by Shift.
- */
+/** The rows of a Shift range, in shown order: from `fromId` to `toId`, or just `toId` when `fromId` isn't shown. */
 export const rowRange = (
   rows: ReadonlyArray<OutlineRow>,
   fromId: string | null,
   toId: string
 ): ReadonlyArray<OutlineRow> => {
   const to = rows.findIndex((row) => row.id === toId)
-  const from = rows.findIndex((row) => row.id === fromId)
   if (to < 0) return []
-  const start = from < 0 ? to : Math.min(from, to)
-  return rows.slice(start, (from < 0 ? to : Math.max(from, to)) + 1)
+  const found = rows.findIndex((row) => row.id === fromId)
+  const from = found < 0 ? to : found
+  return rows.slice(Math.min(from, to), Math.max(from, to) + 1)
 }
 
 /** The item keys `rows` stand for, a group's being every item under it. */
 export const rowKeys = (tree: ReadonlyArray<TreeNode>, rows: ReadonlyArray<OutlineRow>): ReadonlyArray<string> =>
   rows.flatMap((row) => row.kind === "item" ? [row.id] : nodeKeys(tree, row.id))
 
-/** Where a drag would land. */
 export interface DropTarget {
   /** The row the indicator is drawn on; null below the last row. */
   readonly rowId: string | null
@@ -145,9 +135,8 @@ export interface DropTarget {
 const GROUP_EDGE = 0.25
 
 /**
- * The drop at `fraction` (0 top, 1 bottom) of row `rowIndex`, or past the rows. `dragged` are the nodes on the move: a
- * node can't land on itself or anything inside it, so that answers undefined. The gap just after an open group is its
- * first child's; below the last row is the end of the root.
+ * The drop at `fraction` (0 top, 1 bottom) of row `rowIndex`, or past the rows. A node can't land on itself or anything
+ * inside it, so a row under one of the `dragged` nodes answers undefined.
  */
 export const dropTargetAt = (
   rows: ReadonlyArray<OutlineRow>,

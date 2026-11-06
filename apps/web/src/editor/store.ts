@@ -1300,13 +1300,8 @@ export const useEditor = create<EditorState>()((set, get) => {
     setPaneProjection: (slot, projection) =>
       set((s) => {
         const [a, b, c, d] = s.viewLayout.projections
-        const next = [
-          slot === 0 ? projection : a,
-          slot === 1 ? projection : b,
-          slot === 2 ? projection : c,
-          slot === 3 ? projection : d
-        ] as const
-        return { viewLayout: { ...s.viewLayout, projections: next } }
+        const at = (i: number, current: ViewProjection) => i === slot ? projection : current
+        return { viewLayout: { ...s.viewLayout, projections: [at(0, a), at(1, b), at(2, c), at(3, d)] } }
       }),
     setActivePane: (slot) => set((s) => s.activePane === slot ? s : { activePane: slot })
   }

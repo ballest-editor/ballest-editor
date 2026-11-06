@@ -6,7 +6,6 @@ import {
   type DockLayout,
   DOCUMENTS_PANEL,
   fitToWindow,
-  newPanels,
   onlyPanels,
   parseSavedDock,
   unfoldedLayout
@@ -60,21 +59,6 @@ describe("parseSavedDock", () => {
   it("takes a layout with a size that went NaN for no saved dock", () => {
     const grid = { ...layout.grid, root: branch([leaf("1", ["pieces"], Number.NaN)], 600) }
     assert.isNull(parseSavedDock(saved({ layout: { ...layout, grid } })))
-  })
-})
-
-describe("newPanels", () => {
-  const panels = [
-    { id: "pieces", title: "Pieces", location: "left" },
-    { id: "outline", title: "Outline", location: "left" }
-  ] as const
-
-  it("adds a panel the saved layout has never heard of", () => {
-    assert.deepStrictEqual(newPanels(panels, ["pieces"]).map(({ id }) => id), ["outline"])
-  })
-
-  it("leaves a panel the user closed closed: it's known, and just not in the layout", () => {
-    assert.deepStrictEqual(newPanels(panels, ["pieces", "outline"]), [])
   })
 })
 

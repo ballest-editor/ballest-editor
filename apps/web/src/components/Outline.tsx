@@ -104,7 +104,6 @@ function MenuCommand({ action, disabled = false, children }: {
   )
 }
 
-/** The tags popover of Edit tags…, beside the row it was opened on. */
 function TagsPopover({ target, onClose }: {
   readonly target: { readonly id: string; readonly name: string; readonly anchor: DOMRect } | null
   readonly onClose: () => void
@@ -166,7 +165,6 @@ export function Outline() {
     return { start, end: after < 0 ? rows.length : after }
   }, [rows, enteredGroupId])
 
-  // The list's scroll position and height, for the rows to draw.
   const scroller = useRef<HTMLDivElement>(null)
   const list = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
@@ -189,11 +187,10 @@ export function Outline() {
   // change and only as far as it takes, so it never pulls against the user's own scrolling.
   const shownSelection = useRef(selectedIds)
   const pendingReveal = useRef<string | null>(null)
-  const selectHere = useCallback((next: ReadonlyArray<string>) => {
-    const { select } = useEditor.getState()
-    select(next)
+  const selectHere = (next: ReadonlyArray<string>) => {
+    useEditor.getState().select(next)
     shownSelection.current = useEditor.getState().selectedIds
-  }, [])
+  }
   useEffect(() => {
     if (selectedIds !== shownSelection.current) {
       shownSelection.current = selectedIds
@@ -212,7 +209,7 @@ export function Outline() {
 
   // Where a Shift range starts: the last row clicked without Shift.
   const anchor = useRef<string | null>(null)
-  const selectRow = useCallback((row: OutlineRow, e: MouseEvent) => {
+  const selectRow = (row: OutlineRow, e: MouseEvent) => {
     const s = useEditor.getState()
     const { tree: current } = s.doc.structure
     const chord = mouseChordOf(e)
@@ -228,7 +225,7 @@ export function Outline() {
     if (mode === "replace" && entered !== null && !groupPathOf(current, row.id).includes(entered)) {
       s.enterGroup(null)
     }
-  }, [rows, selectHere])
+  }
 
   const [renaming, setRenaming] = useState<string | null>(null)
   const onRenamed = useCallback((row: OutlineRow, value: string | null) => {
@@ -250,11 +247,10 @@ export function Outline() {
   const aimed = useCallback((current: Drag): Drag => {
     const el = scroller.current
     if (el === null) return current
-    const y = Math.max(0, pointerY.current - el.getBoundingClientRect().top + el.scrollTop)
-    const rowIndex = Math.min(Math.floor(y / OUTLINE_ROW_HEIGHT), rows.length)
-    const fraction = y / OUTLINE_ROW_HEIGHT - Math.floor(y / OUTLINE_ROW_HEIGHT)
+    const y = Math.max(0, pointerY.current - el.getBoundingClientRect().top + el.scrollTop) / OUTLINE_ROW_HEIGHT
+    const rowIndex = Math.min(Math.floor(y), rows.length)
     const { structure: live } = useEditor.getState().doc
-    return { ...current, rowIndex, target: dropTargetAt(rows, live.tree.length, rowIndex, fraction, current.set) }
+    return { ...current, rowIndex, target: dropTargetAt(rows, live.tree.length, rowIndex, y % 1, current.set) }
   }, [rows])
 
   const dragging = drag !== null

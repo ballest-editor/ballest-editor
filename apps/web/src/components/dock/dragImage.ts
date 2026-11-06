@@ -2,6 +2,8 @@ import { elementOf } from "../../editor/keyTargets"
 
 /** Where the pointer holds a whole strip's image: on its first tab. */
 const STRIP_GRIP = { x: 12, y: 16 }
+const IMAGE_CLASS =
+  "dock-drag-image fixed -top-[9999px] left-0 flex h-8 w-max overflow-hidden rounded-[calc(var(--radius)*0.75)] border bg-card text-foreground"
 
 /**
  * A panel's drag shows a copy of its tab on the card it sits on, held where it was grabbed; a group's shows its whole
@@ -19,7 +21,7 @@ export const followDockDrags = (document: Document): () => void => {
       (target.closest(".dv-void-container") === null ? null : group.querySelector(".dv-tabs-container"))
     if (source === null) return
     const image = document.createElement("div")
-    image.className = "dock-drag-image"
+    image.className = IMAGE_CLASS
     image.append(source.cloneNode(true))
     group.append(image)
     const { left, top } = source.getBoundingClientRect()

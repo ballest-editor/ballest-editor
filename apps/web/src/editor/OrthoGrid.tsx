@@ -1,7 +1,7 @@
-import { useEffect, useMemo } from "react"
+import { useEffect } from "react"
 import * as THREE from "three"
-import { threeToUeVector, type Vec3 } from "../domain/coords"
-import { axisOf, gridLevels, MAX_GRID_LEVELS, ORTHO_AXES } from "../domain/orthoView"
+import { threeToUeVector } from "../domain/coords"
+import { axisOf, dot, gridLevels, MAX_GRID_LEVELS, ORTHO_AXES } from "../domain/orthoView"
 import { gridColorsOf } from "../domain/Settings"
 import { AXIS_COLORS } from "./axisColors"
 import { orthographicOnly } from "./paneCameras"
@@ -67,7 +67,7 @@ void main() {
 }
 `
 
-const gridUniforms = () => ({
+const uniforms = {
   uCentre: { value: new THREE.Vector2() },
   uHalf: { value: new THREE.Vector2(1, 1) },
   uCmPerPixel: { value: 1 },
@@ -77,40 +77,29 @@ const gridUniforms = () => ({
   uAxisAcross: { value: new THREE.Color() },
   uAxisUp: { value: new THREE.Color() },
   uOpacity: { value: GRID_OPACITY }
+}
+
+/** One for the editor's lifetime: every pane draws it, and a shader over the pane needs no camera of its own. */
+const geometry = new THREE.PlaneGeometry(2, 2)
+const material = new THREE.ShaderMaterial({
+  vertexShader,
+  fragmentShader,
+  uniforms,
+  transparent: true,
+  depthTest: false,
+  depthWrite: false,
+  toneMapped: false
 })
 
-/**
- * The world grid of an orthographic pane, in cm: a shader over the whole pane, so the same object serves every pane and
- * every zoom. Lines sit on multiples of their size from the world's origin, which is what the snapping grid does, and the
- * axes are in the game's colours. It goes with the floor grid in Show grid.
- */
+/** The world grid of an orthographic pane (docs/DESKTOP.md § View panes): one shader for every pane and every zoom. */
 export function OrthoGrid() {
   const appearance = useEditor((s) => s.settings.appearance)
   const dark = useDarkTheme(appearance.theme)
   const { cell, section } = gridColorsOf(appearance, dark)
-  const uniforms = useMemo(() => gridUniforms(), [])
-  const geometry = useMemo(() => new THREE.PlaneGeometry(2, 2), [])
-  const material = useMemo(
-    () =>
-      new THREE.ShaderMaterial({
-        vertexShader,
-        fragmentShader,
-        uniforms,
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-        toneMapped: false
-      }),
-    [uniforms]
-  )
-  useEffect(() => () => {
-    geometry.dispose()
-    material.dispose()
-  }, [geometry, material])
   useEffect(() => {
     uniforms.uCell.value.set(cell)
     uniforms.uSection.value.set(section)
-  }, [uniforms, cell, section])
+  }, [cell, section])
 
   useBeforePaneDraw((pane) => {
     const { view } = pane
@@ -118,10 +107,9 @@ export function OrthoGrid() {
     const { right, up } = ORTHO_AXES[view]
     const { snapping } = useEditor.getState().settings
     const target = threeToUeVector(pane.target)
-    const along = (axis: Vec3) => target.x * axis.x + target.y * axis.y + target.z * axis.z
     const cmPerPixel = pane.cmPerPixel / window.devicePixelRatio
     const levels = gridLevels(cmPerPixel, snapping.enabled ? snapping.gridSize : undefined)
-    uniforms.uCentre.value.set(along(right), along(up))
+    uniforms.uCentre.value.set(dot(target, right), dot(target, up))
     uniforms.uHalf.value.set((pane.width / 2) * pane.cmPerPixel, (pane.height / 2) * pane.cmPerPixel)
     uniforms.uCmPerPixel.value = cmPerPixel
     uniforms.uLevels.value.forEach((slot, i) => {

@@ -169,14 +169,12 @@ function ClickSelect() {
       const key = itemAt(e)
       if (key !== null) useEditor.getState().doubleClickItem(key)
     }
-    el.addEventListener("pointerdown", onDown)
-    el.addEventListener("pointerup", onUp)
-    el.addEventListener("dblclick", onDoubleClick)
-    return () => {
-      el.removeEventListener("pointerdown", onDown)
-      el.removeEventListener("pointerup", onUp)
-      el.removeEventListener("dblclick", onDoubleClick)
-    }
+    const listening = new AbortController()
+    const { signal } = listening
+    el.addEventListener("pointerdown", onDown, { signal })
+    el.addEventListener("pointerup", onUp, { signal })
+    el.addEventListener("dblclick", onDoubleClick, { signal })
+    return () => listening.abort()
   }, [gl])
   return null
 }
@@ -229,23 +227,11 @@ function SmoothResize() {
   return null
 }
 
-/**
- * Clear colour follows the theme: dark slate, or a light grey in light mode. The container
- * behind the canvas has the same colour (sceneBackgroundClass).
- */
+/** The clear colour follows the theme, as does the container behind the canvas (sceneBackgroundClass). */
 function ViewportBackground() {
   const gl = useThree((s) => s.gl)
-  const theme = useEditor((s) => s.settings.appearance.theme)
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)")
-    const apply = () => {
-      const dark = theme === "dark" || (theme === "system" && media.matches)
-      gl.setClearColor(dark ? SCENE_COLORS.dark : SCENE_COLORS.light)
-    }
-    apply()
-    media.addEventListener("change", apply)
-    return () => media.removeEventListener("change", apply)
-  }, [gl, theme])
+  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
+  useEffect(() => gl.setClearColor(dark ? SCENE_COLORS.dark : SCENE_COLORS.light), [gl, dark])
   return null
 }
 
@@ -347,10 +333,7 @@ function GroupBoxes() {
   const tree = useEditor((s) => s.doc.structure.tree)
   const selectedIds = useEditor((s) => s.selectedIds)
   const enteredGroupId = useEditor((s) => s.enteredGroupId)
-  const targets = useMemo(
-    () => groupBoxTargets(tree, selectedIds, enteredGroupId),
-    [tree, selectedIds, enteredGroupId]
-  )
+  const targets = useMemo(() => groupBoxTargets(tree, selectedIds, enteredGroupId), [tree, selectedIds, enteredGroupId])
   return targets.map(({ id, keys, entered }) => <GroupBoxView key={id} keys={keys} entered={entered} />)
 }
 
@@ -370,9 +353,7 @@ function Overlay() {
 }
 
 /** `controls` (tool bar, view controls) floats over the scene; it is disabled until the first scene shows. */
-export function Viewport(
-  { controls: Controls }: { readonly controls?: ComponentType<{ readonly disabled?: boolean }> }
-) {
+export function Viewport({ controls: Controls }: { readonly controls: ComponentType<{ readonly disabled: boolean }> }) {
   const [revealed, setRevealed] = useState(false)
   const reveal = useCallback(() => setRevealed(true), [])
   return (
@@ -419,7 +400,7 @@ export function Viewport(
         {!revealed && <InitialMeshes onSettled={reveal} />}
       </Canvas>
       <Overlay />
-      {Controls && <Controls disabled={!revealed} />}
+      <Controls disabled={!revealed} />
     </div>
   )
 }

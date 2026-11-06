@@ -159,10 +159,7 @@
   transition-duration: calc(--value(integer) * 1ms * var(--motion));
 }
 
-/*
- * The one small-caps label of the shell: section titles, panel tabs, group headings in lists and popovers. One size and
- * one tracking everywhere, so a heading looks the same in the Pieces panel, the Inspector, Settings and the bell.
- */
+/* The one small-caps label of the shell: section titles, panel tabs, group headings in lists and popovers. */
 @utility text-eyebrow {
   font-size: 0.6875rem;
   line-height: 1rem;

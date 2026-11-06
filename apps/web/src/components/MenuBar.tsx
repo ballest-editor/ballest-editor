@@ -17,10 +17,9 @@ import { type ReactNode, useMemo } from "react"
 import { canGroupSelection, selectedGroupIds } from "../domain/groupSelection"
 import { formatBinding, type KeybindAction } from "../domain/Keybinds"
 import type { Settings } from "../domain/Settings"
-import { formatGridSize, GRID_SIZES, type GridSize } from "../domain/snap"
+import { formatGridSize, GRID_SIZES } from "../domain/snap"
 import { canCheckForUpdates } from "../domain/updates"
 import {
-  type ViewLayoutKind,
   viewLayoutKinds,
   viewLayoutLabels,
   type ViewProjection,
@@ -50,18 +49,16 @@ function Shortcut({ action }: { readonly action: KeybindAction }) {
 }
 
 /** A menu item that runs the same command as the action's keybind, and shows that keybind. */
-function CommandItem(
-  { action, disabled = false, inset, children }: {
-    readonly action: CommandAction
-    readonly disabled?: boolean
-    /**
-     * Lines the label up with checkbox and radio items in the same menu. Absent otherwise:
-     * any `data-inset` attribute, even "false", draws the checkmark gutter.
-     */
-    readonly inset?: boolean
-    readonly children: ReactNode
-  }
-) {
+function CommandItem({ action, disabled = false, inset, children }: {
+  readonly action: CommandAction
+  readonly disabled?: boolean
+  /**
+   * Lines the label up with checkbox and radio items in the same menu. Absent otherwise:
+   * any `data-inset` attribute, even "false", draws the checkmark gutter.
+   */
+  readonly inset?: boolean
+  readonly children: ReactNode
+}) {
   return (
     <MenubarItem disabled={disabled} {...(inset && { inset })} onClick={() => actionCommands[action]()}>
       {children}
@@ -128,6 +125,53 @@ function PanelItem({ id, title }: { readonly id: string; readonly title: string 
   return <MenubarCheckboxItem {...usePanelCheck(id)}>{title}</MenubarCheckboxItem>
 }
 
+type ViewSetting = "appearance" | "lighting" | "snapping"
+type FlagOf<S extends ViewSetting> = {
+  [K in keyof Settings[S]]: Settings[S][K] extends boolean ? K : never
+}[keyof Settings[S]]
+
+/** A check on a boolean setting. */
+function SettingCheck<S extends ViewSetting>({ section, flag, children }: {
+  readonly section: S
+  readonly flag: FlagOf<S>
+  readonly children: ReactNode
+}) {
+  const checked = useEditor((s) => s.settings[section][flag] === true)
+  return (
+    <MenubarCheckboxItem
+      closeOnClick
+      checked={checked}
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `FlagOf` says it's a boolean of `section`
+      onCheckedChange={(on) => void updateSettings(section, { [flag]: on } as Partial<Settings[S]>)}
+    >
+      {children}
+    </MenubarCheckboxItem>
+  )
+}
+
+/** A submenu picking one of `options`, each drawn by `children`. */
+function RadioMenu<V extends string | number>({ title, className, value, options, onPick, children }: {
+  readonly title: string
+  readonly className?: string
+  readonly value: V
+  readonly options: ReadonlyArray<V>
+  readonly onPick: (value: V) => void
+  readonly children: (option: V) => ReactNode
+}) {
+  return (
+    <MenubarSub>
+      <MenubarSubTrigger inset>{title}</MenubarSubTrigger>
+      <MenubarSubContent {...(className !== undefined && { className })}>
+        <MenubarRadioGroup value={value} onValueChange={(next: V) => onPick(next)}>
+          {options.map((option) => (
+            <MenubarRadioItem closeOnClick key={option} value={option}>{children(option)}</MenubarRadioItem>
+          ))}
+        </MenubarRadioGroup>
+      </MenubarSubContent>
+    </MenubarSub>
+  )
+}
+
 /** The keybind that puts the active pane on each view; Perspective has only the toggle. */
 const PROJECTION_ACTIONS: Readonly<Record<ViewProjection, KeybindAction>> = {
   perspective: "toggleOrthographic",
@@ -150,46 +194,25 @@ function PaneMenus() {
   }
   return (
     <>
-      <MenubarSub>
-        <MenubarSubTrigger inset>Panes</MenubarSubTrigger>
-        <MenubarSubContent>
-          <MenubarRadioGroup value={kind} onValueChange={(next: ViewLayoutKind) => setViewLayoutKind(next)}>
-            {viewLayoutKinds.map((layout) => (
-              <MenubarRadioItem closeOnClick key={layout} value={layout}>{viewLayoutLabels[layout]}</MenubarRadioItem>
-            ))}
-          </MenubarRadioGroup>
-        </MenubarSubContent>
-      </MenubarSub>
-      <MenubarSub>
-        <MenubarSubTrigger inset>Active pane</MenubarSubTrigger>
-        <MenubarSubContent className="w-max">
-          <MenubarRadioGroup value={projection} onValueChange={lookAlong}>
-            {viewProjections.map((view) => (
-              <MenubarRadioItem closeOnClick key={view} value={view}>
-                {viewProjectionLabels[view]}
-                <Shortcut action={PROJECTION_ACTIONS[view]} />
-              </MenubarRadioItem>
-            ))}
-          </MenubarRadioGroup>
-        </MenubarSubContent>
-      </MenubarSub>
+      <RadioMenu title="Panes" value={kind} options={viewLayoutKinds} onPick={setViewLayoutKind}>
+        {(layout) => viewLayoutLabels[layout]}
+      </RadioMenu>
+      <RadioMenu title="Active pane" className="w-max" value={projection} options={viewProjections} onPick={lookAlong}>
+        {(view) => (
+          <>
+            {viewProjectionLabels[view]}
+            <Shortcut action={PROJECTION_ACTIONS[view]} />
+          </>
+        )}
+      </RadioMenu>
     </>
   )
 }
 
-const THEMES: ReadonlyArray<{ readonly theme: Settings["appearance"]["theme"]; readonly label: string }> = [
-  { theme: "dark", label: "Dark" },
-  { theme: "light", label: "Light" },
-  { theme: "system", label: "System" }
-]
+const THEMES = { dark: "Dark", light: "Light", system: "System" } as const
+const THEME_KEYS = ["dark", "light", "system"] as const
 
-/**
- * File / Edit / View / Project (docs/PROJECTS.md § Shell). The menus use the three nouns of docs/PROJECTS.md: a
- * project holds maps, a map is exported to the game; a map is only ever the open one, and the game is the project's
- * export target, so there is no Map or Game menu. Every item calls the entry point its keybind or button uses
- * (`actionCommands`, the store, the settings), so the three never disagree. A browser, which has no project, gets
- * File = New map, Open, Save, Export (a download) and Project = Project settings (the one map's).
- */
+/** File, Edit, View and Project (docs/DESKTOP.md § Menus). Every item calls the entry point its keybind or button uses. */
 export function MenuBar() {
   const canUndo = useEditor((s) => s.past.length > 0 && s.preview === null)
   const canCheck = useEditor((s) => s.update !== null && canCheckForUpdates(s.update))
@@ -202,7 +225,7 @@ export function MenuBar() {
   const canPaste = useEditor((s) => s.clipboard !== null)
   const openDialog = useEditor((s) => s.openDialog)
   const viewMenuPanels = useViewMenuPanels()
-  const { snapping, appearance, lighting, general } = useEditor((s) => s.settings)
+  const { snapping, appearance, general } = useEditor((s) => s.settings)
   const { projects, exportToGame: canExport, launchGame: canLaunchGame, play: canPlay } = useEditor((s) =>
     s.capabilities
   )
@@ -279,70 +302,28 @@ export function MenuBar() {
         {viewMenuPanels.map(({ id, title }) => <PanelItem key={id} id={id} title={title} />)}
         <MenubarItem inset onClick={resetDockLayout}>Reset layout</MenubarItem>
         <MenubarSeparator />
-        <MenubarCheckboxItem
-          closeOnClick
-          checked={appearance.gridVisible}
-          onCheckedChange={(gridVisible) => void updateSettings("appearance", { gridVisible })}
+        <SettingCheck section="appearance" flag="gridVisible">Show grid</SettingCheck>
+        <SettingCheck section="snapping" flag="enabled">Snap to grid</SettingCheck>
+        <RadioMenu
+          title="Grid size"
+          value={snapping.gridSize}
+          options={GRID_SIZES}
+          onPick={(gridSize) => void updateSettings("snapping", { enabled: true, gridSize })}
         >
-          Show grid
-        </MenubarCheckboxItem>
-        <MenubarCheckboxItem
-          closeOnClick
-          checked={snapping.enabled}
-          onCheckedChange={(enabled) => void updateSettings("snapping", { enabled })}
-        >
-          Snap to grid
-        </MenubarCheckboxItem>
-        <MenubarSub>
-          <MenubarSubTrigger inset>Grid size</MenubarSubTrigger>
-          <MenubarSubContent>
-            <MenubarRadioGroup
-              value={snapping.gridSize}
-              onValueChange={(gridSize: GridSize) => void updateSettings("snapping", { enabled: true, gridSize })}
-            >
-              {GRID_SIZES.map((size) => (
-                <MenubarRadioItem closeOnClick key={size} value={size} className="tabular-nums">
-                  {formatGridSize(size, general.units)}
-                </MenubarRadioItem>
-              ))}
-            </MenubarRadioGroup>
-          </MenubarSubContent>
-        </MenubarSub>
+          {(size) => <span className="tabular-nums">{formatGridSize(size, general.units)}</span>}
+        </RadioMenu>
         <MenubarSeparator />
-        <MenubarCheckboxItem
-          closeOnClick
-          checked={lighting.mapLighting}
-          onCheckedChange={(mapLighting) => void updateSettings("lighting", { mapLighting })}
+        <SettingCheck section="lighting" flag="mapLighting">Map lighting</SettingCheck>
+        <SettingCheck section="lighting" flag="skyVisible">Show sky</SettingCheck>
+        <SettingCheck section="appearance" flag="waterVisible">Show water</SettingCheck>
+        <RadioMenu
+          title="Theme"
+          value={appearance.theme}
+          options={THEME_KEYS}
+          onPick={(theme) => void updateSettings("appearance", { theme })}
         >
-          Map lighting
-        </MenubarCheckboxItem>
-        <MenubarCheckboxItem
-          closeOnClick
-          checked={lighting.skyVisible}
-          onCheckedChange={(skyVisible) => void updateSettings("lighting", { skyVisible })}
-        >
-          Show sky
-        </MenubarCheckboxItem>
-        <MenubarCheckboxItem
-          closeOnClick
-          checked={appearance.waterVisible}
-          onCheckedChange={(waterVisible) => void updateSettings("appearance", { waterVisible })}
-        >
-          Show water
-        </MenubarCheckboxItem>
-        <MenubarSub>
-          <MenubarSubTrigger inset>Theme</MenubarSubTrigger>
-          <MenubarSubContent>
-            <MenubarRadioGroup
-              value={appearance.theme}
-              onValueChange={(theme: Settings["appearance"]["theme"]) => void updateSettings("appearance", { theme })}
-            >
-              {THEMES.map(({ theme, label }) => (
-                <MenubarRadioItem closeOnClick key={theme} value={theme}>{label}</MenubarRadioItem>
-              ))}
-            </MenubarRadioGroup>
-          </MenubarSubContent>
-        </MenubarSub>
+          {(theme) => THEMES[theme]}
+        </RadioMenu>
       </Menu>
       {projects
         ? (

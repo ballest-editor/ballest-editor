@@ -22,7 +22,6 @@ import {
   FOCUS_SPAN,
   forgetClosedTabs,
   mapBox,
-  ORBIT_DISTANCE,
   type PaneCamera,
   paneCamerasOf,
   panePointer
@@ -35,6 +34,8 @@ const LOOK_SENSITIVITY = 0.0025 // radians per pixel at sensitivity 1
 const KEY_LOOK_SPEED = 1.6 // radians per second for the arrow-key look actions
 const ORTHO_KEY_ZOOM = 1.5 // e-foldings per second for the forward and reverse keys in an orthographic pane
 const LOCK_SETTLE_MS = 50 // moves dropped after a pointer lock is asked for, taken or lost
+const CHORD_MODIFIERS = ["ControlLeft", "ControlRight", "MetaLeft", "MetaRight", "AltLeft", "AltRight"]
+const clampPitch = (pitch: number) => THREE.MathUtils.clamp(pitch, -Math.PI / 2 + 0.001, Math.PI / 2 - 0.001)
 
 type DragMode = "look" | "orbit" | "pan"
 
@@ -48,12 +49,8 @@ const flyingNow = (keybinds: Keybinds, keys: HeldKeys, looking: boolean, now: nu
   )
 
 /**
- * Free-fly camera for the panes: hold the look button and drag to look, movement keys to fly,
- * orbit and pan drags, and the wheel (camera speed by default, dolly when the wheel is unbound).
- * Every binding comes from the keybind store. A drag or the wheel drives the pane under the
- * pointer, the keys drive the active pane, and the pointer makes a pane active by moving over
- * it. An orthographic pane looks one way only: every drag pans it, the wheel zooms to the
- * pointer, the left, right, up and down keys slide it and forward and reverse zoom it.
+ * Free-fly camera for the panes (docs/DESKTOP.md § View panes): drags and the wheel drive the pane under the pointer, the
+ * keys the active pane, every binding from the keybind store. The wheel is camera speed by default, dolly when unbound.
  */
 export function FlyCamera() {
   const gl = useThree((s) => s.gl)
@@ -72,10 +69,7 @@ export function FlyCamera() {
       const pane = activePaneCamera()
       return pane.view === undefined ? pane.nearestView() : "perspective"
     }
-  }, [])
-
-  // Placement point: an orthographic pane's centre; else on the screen-centre ray, at the floor or a cap that fits the piece.
-  useEffect(() => {
+    // Placement point: an orthographic pane's centre; else on the screen-centre ray, at the floor or a cap that fits the piece.
     sceneRegistry.placementPoint = (footprint) => {
       const { floorHeight, settings } = useEditor.getState()
       const pane = activePaneCamera()
@@ -91,10 +85,7 @@ export function FlyCamera() {
         placeDistanceFor(footprint, Math.min(vertical, horizontal), settings.editor.placeDistance)
       )
     }
-  }, [])
-
-  // What a prefab spawns in front of. An orthographic pane has no distance to speak of, so it looks from the view's centre.
-  useEffect(() => {
+    // What a prefab spawns in front of. An orthographic pane has no distance to speak of, so it looks from the view's centre.
     sceneRegistry.viewRay = () => {
       const pane = activePaneCamera()
       const direction = threeToUeVector(pane.camera.getWorldDirection(new THREE.Vector3()))
@@ -120,8 +111,6 @@ export function FlyCamera() {
         pressed.current.press(e.code, performance.now(), formsChord(keybinds, chordOf(e)))
       }
     }
-    const onKeyUp = (e: KeyboardEvent) => pressed.current.release(e.code)
-    const onBlur = () => pressed.current.clear()
 
     // Pointer lock (the "lock pointer" setting) hides the cursor and keeps it in place while
     // dragging, so a long look never hits the edge of the screen. Locking releases the pointer
@@ -170,13 +159,7 @@ export function FlyCamera() {
       drag.current = pane.view === undefined ? mode : "pan"
       dragPane.current = pane
       const camera = pane.perspective
-      if (drag.current === "orbit") {
-        // keep the pivot if it's in front of us, otherwise orbit around a point ahead
-        const forward = camera.getWorldDirection(new THREE.Vector3())
-        if (pane.target.clone().sub(camera.position).dot(forward) <= 0) {
-          pane.target.copy(camera.position).addScaledVector(forward, ORBIT_DISTANCE)
-        }
-      }
+      if (drag.current === "orbit") pane.keepPivotAhead()
       dragPointer = e.pointerId
       el.setPointerCapture(e.pointerId)
       if (wantsLock()) lock()
@@ -191,7 +174,8 @@ export function FlyCamera() {
       }
       if (performance.now() < settleUntil) return
       if (pane.view !== undefined) {
-        pane.dragOrthographic(e.movementX, e.movementY)
+        // the point under the pointer stays under it
+        pane.slide(-e.movementX * pane.cmPerPixel, e.movementY * pane.cmPerPixel)
         return
       }
       const camera = pane.perspective
@@ -209,19 +193,13 @@ export function FlyCamera() {
       const { lookSensitivity, invertLookX, invertLookY } = useEditor.getState().settings.camera
       const k = LOOK_SENSITIVITY * lookSensitivity
       eul.y -= e.movementX * k * (invertLookX ? -1 : 1)
-      eul.x = THREE.MathUtils.clamp(
-        eul.x - e.movementY * k * (invertLookY ? -1 : 1),
-        -Math.PI / 2 + 0.001,
-        Math.PI / 2 - 0.001
-      )
+      eul.x = clampPitch(eul.x - e.movementY * k * (invertLookY ? -1 : 1))
       eul.z = 0
+      const distance = camera.position.distanceTo(target)
+      camera.quaternion.setFromEuler(eul)
       if (drag.current === "orbit") {
-        const distance = camera.position.distanceTo(target)
-        camera.quaternion.setFromEuler(eul)
         const back = new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion)
         camera.position.copy(target).addScaledVector(back, distance)
-      } else {
-        camera.quaternion.setFromEuler(eul)
       }
     }
     const onPointerUp = (e: PointerEvent) => {
@@ -232,7 +210,6 @@ export function FlyCamera() {
       if (locked()) document.exitPointerLock()
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
     }
-    const onContextMenu = (e: Event) => e.preventDefault()
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       const { pane, px } = panePointer(el, e)
@@ -241,13 +218,9 @@ export function FlyCamera() {
         return
       }
       const chord = wheelChordOf(e)
-      const state = useEditor.getState()
-      if (isBound(keybinds, "speedFaster", chord)) {
-        state.changeSpeed(1)
-        return
-      }
-      if (isBound(keybinds, "speedSlower", chord)) {
-        state.changeSpeed(-1)
+      const speedStep = isBound(keybinds, "speedFaster", chord) ? 1 : isBound(keybinds, "speedSlower", chord) ? -1 : 0
+      if (speedStep !== 0) {
+        useEditor.getState().changeSpeed(speedStep)
         return
       }
       const camera = pane.perspective
@@ -256,25 +229,19 @@ export function FlyCamera() {
       camera.position.addScaledVector(forward, step)
     }
 
-    window.addEventListener("keydown", onKeyDown)
-    window.addEventListener("keyup", onKeyUp)
-    window.addEventListener("blur", onBlur)
-    el.addEventListener("pointerdown", onPointerDown)
-    el.addEventListener("pointermove", onPointerMove)
-    el.addEventListener("pointerup", onPointerUp)
-    el.addEventListener("contextmenu", onContextMenu)
-    el.addEventListener("wheel", onWheel, { passive: false })
-    document.addEventListener("pointerlockchange", onLockChange)
+    const listening = new AbortController()
+    const { signal } = listening
+    window.addEventListener("keydown", onKeyDown, { signal })
+    window.addEventListener("keyup", (e) => pressed.current.release(e.code), { signal })
+    window.addEventListener("blur", () => pressed.current.clear(), { signal })
+    el.addEventListener("pointerdown", onPointerDown, { signal })
+    el.addEventListener("pointermove", onPointerMove, { signal })
+    el.addEventListener("pointerup", onPointerUp, { signal })
+    el.addEventListener("contextmenu", (e) => e.preventDefault(), { signal })
+    el.addEventListener("wheel", onWheel, { passive: false, signal })
+    document.addEventListener("pointerlockchange", onLockChange, { signal })
     return () => {
-      window.removeEventListener("keydown", onKeyDown)
-      window.removeEventListener("keyup", onKeyUp)
-      window.removeEventListener("blur", onBlur)
-      el.removeEventListener("pointerdown", onPointerDown)
-      el.removeEventListener("pointermove", onPointerMove)
-      el.removeEventListener("pointerup", onPointerUp)
-      el.removeEventListener("contextmenu", onContextMenu)
-      el.removeEventListener("wheel", onWheel)
-      document.removeEventListener("pointerlockchange", onLockChange)
+      listening.abort()
       if (locked()) document.exitPointerLock()
     }
   }, [gl, keybinds])
@@ -320,7 +287,7 @@ export function FlyCamera() {
       const eul = euler.current.setFromQuaternion(camera.quaternion, "YXZ")
       const rate = KEY_LOOK_SPEED * cameraSettings.lookSensitivity * dt
       eul.y += yaw * rate
-      eul.x = THREE.MathUtils.clamp(eul.x + pitch * rate, -Math.PI / 2 + 0.001, Math.PI / 2 - 0.001)
+      eul.x = clampPitch(eul.x + pitch * rate)
       eul.z = 0
       camera.quaternion.setFromEuler(eul)
     }
@@ -335,10 +302,7 @@ export function FlyCamera() {
     )
     if (move.lengthSq() === 0) return
     // Keys held together with Ctrl/Alt are chords (Ctrl+S...), not movement.
-    const chordModifier = keys.has("ControlLeft") || keys.has("ControlRight") || keys.has("MetaLeft") ||
-      keys.has("MetaRight") ||
-      keys.has("AltLeft") || keys.has("AltRight")
-    if (chordModifier && move.y === 0) return
+    if (CHORD_MODIFIERS.some((code) => keys.has(code)) && move.y === 0) return
     const { cameraSpeed } = useEditor.getState()
     const speed = cameraSettings.flySpeed * cameraSpeed * (held(keybinds.fastMove) ? FAST_MULTIPLIER : 1) * dt
     if (pane.view !== undefined) {
