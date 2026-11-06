@@ -247,8 +247,8 @@ function AxisArrow({ direction, across, color }: {
 }
 
 /**
- * The bottom left of an orthographic pane, clear of the tool bar: which way the game's axes run across it, in their
- * colours, and its zoom. On a chip of its own, so a busy map doesn't swallow them.
+ * The bottom left of an orthographic pane, 8px above the tool bar, which reaches into the right column's pane: which way
+ * the game's axes run across it, in their colours, and its zoom. On a chip of its own, so a busy map doesn't swallow them.
  */
 function PaneCorner({ slot, view }: { readonly slot: number; readonly view: OrthoView }) {
   const units = useEditor((s) => s.settings.general.units)
@@ -260,7 +260,7 @@ function PaneCorner({ slot, view }: { readonly slot: number; readonly view: Orth
   const upward = axisOf(up)
   const colors = sceneAxisColors(dark)
   return (
-    <div className={cn("pointer-events-none absolute bottom-12 left-3 rounded-sheet p-1.5", SURFACE)}>
+    <div className={cn("pointer-events-none absolute bottom-14 left-3 rounded-sheet p-1.5", SURFACE)}>
       <svg aria-hidden width={SIZE + 8} height={SIZE} viewBox={`0 0 ${SIZE + 8} ${SIZE}`}>
         <AxisArrow direction={across} across color={colors[across.axis]} />
         <AxisArrow direction={upward} across={false} color={colors[upward.axis]} />
