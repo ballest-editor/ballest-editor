@@ -679,6 +679,8 @@ export const UpdateState = Schema.Struct({
   releaseUrl: Schema.NullOr(Schema.String),
   /** 0 to 100 while `downloading`. */
   downloadPercent: Schema.NullOr(Schema.Finite),
+  /** When a check last got an answer from the feed, up to date or not; null until one has. */
+  checkedAt: Schema.NullOr(IsoTime),
   /**
    * Why updates are `disabled`, why the check failed (`error`), or why the last download (`available`) or install
    * (`ready`) failed; null otherwise.

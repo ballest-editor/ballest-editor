@@ -8,6 +8,7 @@ import {
   deriveKeybinds,
   GameKeybindsFile,
   mappingDirection,
+  matchingActions,
   namedActions,
   UE_KEY_TO_CODE
 } from "./GameKeybinds"
@@ -204,5 +205,19 @@ describe("GameKeybinds", () => {
     assert.strictEqual(labels.get("lookUp"), "look up")
     assert.isUndefined(labels.get("focusSelection")) // named by the in-game editor's overlay, not the camera
     assert.deepStrictEqual(cameraPresets.find((p) => p.label === "Wide Angle")?.fov, 110)
+  })
+
+  it("filters Keyboard shortcuts by action and key names", () => {
+    const derived = deriveKeybinds(undefined)
+    const found = (query: string) =>
+      matchingActions(namedActions(derived), derived.keybinds, query).map(({ action }) => action)
+    assert.deepStrictEqual(found("dup"), ["duplicateSelection", "saveMapAs"]) // "duplicate map"
+    assert.deepStrictEqual(found("DUP"), found("dup"))
+    assert.deepStrictEqual(found("ctrl+d"), ["duplicateSelection"])
+    assert.deepStrictEqual(found("ctrl d"), ["duplicateSelection"])
+    assert.includeMembers(found("ctrl"), ["undo", "saveMap"])
+    assert.deepStrictEqual(found("delete"), ["deleteSelection"])
+    assert.deepStrictEqual(found("nothing has this name"), [])
+    assert.strictEqual(found("  ").length, namedActions(derived).length)
   })
 })

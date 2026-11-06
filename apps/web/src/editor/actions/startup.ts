@@ -93,8 +93,9 @@ export const setWindowTheme = (dark: boolean) =>
 export const loadPlatform = () =>
   run(
     Effect.gen(function*() {
-      const { capabilities } = yield* Platform
+      const { capabilities, runtimeVersions } = yield* Platform
       useEditor.getState().setCapabilities(capabilities)
+      useEditor.getState().setRuntimeVersions(runtimeVersions)
       yield* refreshProject
       const startRefused = useEditor.getState().project?.startRefused ?? null
       if (startRefused !== null) useEditor.getState().notify("error", startRefused, { kind: "projectRefused" })

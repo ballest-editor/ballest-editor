@@ -4,6 +4,7 @@ import viteReact from "@vitejs/plugin-react"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { type Connect, defineConfig, type Plugin } from "vite"
+import { buildFacts } from "./build/buildFacts"
 
 const repoRoot = path.resolve(import.meta.dirname, "../..")
 /** The extractor's small committed files (catalog, materials, keybinds, thumbs, ...). */
@@ -96,6 +97,12 @@ export default defineConfig(() => {
     server: devServer(),
     preview: { port: 3000 },
     resolve: { tsconfigPaths: true },
-    plugins: [repoAssets(), tailwindcss(), tanstackRouter({ target: "react", autoCodeSplitting: true }), viteReact()]
+    plugins: [
+      repoAssets(),
+      buildFacts(repoRoot),
+      tailwindcss(),
+      tanstackRouter({ target: "react", autoCodeSplitting: true }),
+      viteReact()
+    ]
   }
 })

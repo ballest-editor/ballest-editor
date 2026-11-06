@@ -5,6 +5,7 @@ import type {
   DesktopBridge,
   DesktopInvoke,
   DesktopMethodName,
+  DesktopVersions,
   ExportChecks,
   ExportMapResult,
   FoundCreator,
@@ -119,6 +120,8 @@ export class PlatformError extends Schema.TaggedError<PlatformError>()("Platform
  */
 export class Platform extends Context.Service<Platform, {
   readonly capabilities: PlatformCapabilities
+  /** The desktop app's runtime; null in a browser. */
+  readonly runtimeVersions: DesktopVersions | null
   /** Asks for a map file anywhere (the desktop's import dialog, the browser's file input); none when cancelled. */
   readonly pickMapFile: Effect.Effect<Option.Option<OpenedMap>, PlatformError>
   /** Downloads `text` as `name` (browser: its Export). */
@@ -346,6 +349,7 @@ const makeDesktop = (bridge: DesktopBridge): Platform["Service"] => {
       play: true,
       updates: true
     },
+    runtimeVersions: bridge.versions,
     pickMapFile: call("pickImport").pipe(Effect.map((file) => Option.map(Option.fromNullOr(file), openedMap))),
     download: () => Effect.fail(new PlatformError({ message: "The desktop app saves into the project." })),
     projectState: call("projectState"),
@@ -512,6 +516,7 @@ const makeBrowser = (): Platform["Service"] => {
   return Platform.of({
     ...makeMemoryPrefabs(),
     capabilities: browserCapabilities,
+    runtimeVersions: null,
     pickMapFile: pickFile(".balledit,.ballmap,.json").pipe(
       Effect.flatMap(Option.match({
         onNone: () => Effect.succeedNone,

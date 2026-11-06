@@ -13,6 +13,7 @@ import {
   type Bindings,
   defaultKeybinds,
   editorOverlayActions,
+  formatBinding,
   heldActions,
   type KeybindAction,
   keybindActionLabels,
@@ -330,6 +331,26 @@ export const cheatSheetSections = (
     else actions.push(action)
   }
   return Array.from(sections, ([section, actions]) => ({ section, actions }))
+}
+
+/**
+ * The actions Keyboard shortcuts' filter leaves: every word of `query` is in the action's name, or starts a key of one of
+ * its chords as shown, so "dup" finds Duplicate by name and "ctrl+d" or "ctrl d" by key, but not Undo for the d in it.
+ */
+export const matchingActions = (
+  named: ReadonlyArray<NamedAction>,
+  keybinds: Keybinds,
+  query: string
+): ReadonlyArray<NamedAction> => {
+  const terms = query.toLowerCase().split(/[\s+]+/).filter((term) => term.length > 0)
+  return named.filter(({ action, label }) => {
+    const name = label.toLowerCase()
+    // An empty chord formats as Unbound, so an action with none is found by that word.
+    const bindings = keybinds[action].length === 0 ? [""] : keybinds[action]
+    const chords = bindings.map((binding) => formatBinding(binding).toLowerCase().split(" + "))
+    return terms.every((term) => name.includes(term))
+      || chords.some((keys) => terms.every((term) => keys.some((key) => key.startsWith(term))))
+  })
 }
 
 /** Every action, in table order, with its section and the label to show (keybinds.json's when present, else the table's). */

@@ -14,7 +14,7 @@ The rules every view follows. The tokens live in `packages/ui/src/styles/globals
 
 Each class sets size, line height and weight together, so don't add `font-*`, and don't use `text-xs`, `text-sm` or arbitrary sizes. 500 is a label, 400 is a value, and 600 is for titles alone. An eyebrow is `text-caption uppercase tracking-wider`; `SectionTitle` is the shared one. In dark, `SectionTitle` goes up to `text-foreground`, so a block's title stands above the field labels under it, which are `text-fg-secondary` too.
 
-The font is the system's (`--font-sans`), so the type is never where the personality comes from. `body` sets tabular numbers. `font-mono` is Geist Mono, bundled, and is for numbers in editable fields, never sentences, file names or paths.
+The font is the system's (`--font-sans`), so the type is never where the personality comes from. `body` sets tabular numbers. `font-mono` is Geist Mono, bundled, and is for numbers in editable fields and About's build info, never sentences, file names or paths.
 
 ## Greys: three steps below `text-foreground`
 

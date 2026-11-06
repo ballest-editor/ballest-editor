@@ -169,6 +169,7 @@ describe("DesktopUpdates", () => {
             releaseDate: "2026-10-31T12:00:00.000Z",
             releaseUrl: "https://github.com/ballest-editor/ballest-editor/releases/tag/v0.2.1",
             downloadPercent: null,
+            checkedAt: "1970-01-01T00:08:15.000Z",
             message: null
           })
           yield* TestClock.adjust("1 hour")

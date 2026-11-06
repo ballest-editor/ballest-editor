@@ -6,22 +6,24 @@ import { MouseButtonIcon } from "./MouseButtonIcon"
 
 const MOUSE_BUTTONS: Readonly<Record<string, "left" | "right">> = { Mouse0: "left", Mouse2: "right" }
 
-/**
- * One chord as the app shows it everywhere: a caption chip reading "Ctrl + S", the left and right mouse buttons as
- * icons. It's a hint, not a control, so it takes no pointer events; Settings › Keybinds wraps it in its own button.
- */
+/** A chord's text as the app shows it everywhere: "Ctrl + S", the left and right mouse buttons as icons. */
+export function ChordText({ binding }: { readonly binding: string }) {
+  return binding.split("+").map((part, index) => {
+    const button = MOUSE_BUTTONS[part]
+    return (
+      <Fragment key={part}>
+        {index > 0 && " + "}
+        {button === undefined ? formatBinding(part) : <MouseButtonIcon button={button} className="size-3.5" />}
+      </Fragment>
+    )
+  })
+}
+
+/** One chord as a caption chip. It's a hint, not a control, so it takes no pointer events; `KeybindControl` is the control. */
 export function KeyChip({ binding, className }: { readonly binding: string; readonly className?: string }) {
   return (
     <Kbd className={cn("rounded-full px-1.5 text-fg-tertiary", className)}>
-      {binding.split("+").map((part, index) => {
-        const button = MOUSE_BUTTONS[part]
-        return (
-          <Fragment key={part}>
-            {index > 0 && " + "}
-            {button === undefined ? formatBinding(part) : <MouseButtonIcon button={button} className="size-3.5" />}
-          </Fragment>
-        )
-      })}
+      <ChordText binding={binding} />
     </Kbd>
   )
 }

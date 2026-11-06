@@ -1,17 +1,29 @@
-import { IconAngle, IconChevronDown, IconCube, IconGrid4x4, IconHaze, IconWorld } from "@tabler/icons-react"
+import {
+  IconAngle,
+  IconChevronDown,
+  IconCube,
+  IconGrid4x4,
+  IconHaze,
+  IconRestore,
+  IconWorld
+} from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Switch } from "@workspace/ui/components/switch"
 import { Toggle } from "@workspace/ui/components/toggle"
+import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { cn } from "@workspace/ui/lib/utils"
-import { type ReactNode, useState } from "react"
+import type { ReactNode } from "react"
 import { floorHeightOf } from "../domain/level"
-import type { Settings } from "../domain/Settings"
+import { AUTO_GRID_COLORS, gizmoSizes, isDefaultDisplay, type Settings, withDefaultDisplay } from "../domain/Settings"
 import { formatGridSize, formatRotationStep, GRID_SIZES, ROTATION_STEPS } from "../domain/snap"
-import { setGridHeight, updateSettings } from "../editor/actions"
+import { saveSettings, setGridHeight, updateSettings } from "../editor/actions"
 import { useEditor, useOpenPrefab } from "../editor/store"
+import { useDarkTheme } from "../editor/theme"
+import { ColorSetting } from "./ColorSetting"
 import { NumberField } from "./NumberField"
+import { SectionTitle } from "./SectionTitle"
 import { ToolBar } from "./ToolBar"
 import { GROUP, GROUP_DIVIDER, noFocus, releaseFocus, SEGMENT } from "./viewControlStyle"
 import { ViewLayoutControl, ViewPanes } from "./ViewPanes"
@@ -147,15 +159,90 @@ function GridHeightRow() {
   )
 }
 
+/** The two grid colours, as Settings › Appearance has them, and one way back to automatic for both. */
+function GridColorsRow() {
+  const { theme, gridCellColor, gridSectionColor } = useEditor((s) => s.settings.appearance)
+  const auto = AUTO_GRID_COLORS[useDarkTheme(theme) ? "dark" : "light"]
+  const automatic = gridCellColor === null && gridSectionColor === null
+  return (
+    <div className="flex flex-col gap-1 pb-2">
+      <div className="flex h-6 items-center justify-between">
+        Grid colours
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Use automatic grid colours"
+          disabled={automatic}
+          onClick={() => void updateSettings("appearance", { gridCellColor: null, gridSectionColor: null })}
+        >
+          <IconRestore />
+        </Button>
+      </div>
+      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-caption text-fg-tertiary">
+        <span>1 m cells</span>
+        <span>10 m sections</span>
+        <ColorSetting
+          label="Grid colour (1 m cells)"
+          className="w-full"
+          value={gridCellColor}
+          auto={auto.cell}
+          onChange={(v) => void updateSettings("appearance", { gridCellColor: v })}
+        />
+        <ColorSetting
+          label="Grid colour (10 m sections)"
+          className="w-full"
+          value={gridSectionColor}
+          auto={auto.section}
+          onChange={(v) => void updateSettings("appearance", { gridSectionColor: v })}
+        />
+      </div>
+    </div>
+  )
+}
+
+/** The axis gizmo's size and when it shows. */
+function GizmoRows() {
+  const { size, showForGroups } = useEditor((s) => s.settings.gizmo)
+  return (
+    <div className="flex flex-col gap-1 pt-2">
+      <SectionTitle>Gizmo</SectionTitle>
+      <div className="flex h-7 items-center justify-between gap-4">
+        Size
+        <ToggleGroup
+          aria-label="Gizmo size"
+          value={[size]}
+          onValueChange={(value) => {
+            const next = gizmoSizes.find((choice) => value.includes(choice))
+            if (next !== undefined) void updateSettings("gizmo", { size: next }) // clicking the pressed size keeps it
+          }}
+        >
+          {gizmoSizes.map((choice) => (
+            <ToggleGroupItem key={choice} value={choice} className="min-w-8 uppercase">{choice}</ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
+      <DisplayRow
+        label="Show for groups"
+        checked={showForGroups}
+        onChange={(on) => void updateSettings("gizmo", { showForGroups: on })}
+      />
+    </div>
+  )
+}
+
 /** The one home of what the viewport shows around the map, and of where its grid sits. */
-function DisplayRows({ onLeave }: {
-  /** Settings is opening over the popover. */
-  readonly onLeave: () => void
-}) {
-  const { gridVisible, waterVisible } = useEditor((s) => s.settings.appearance)
-  const { mapLighting, skyVisible } = useEditor((s) => s.settings.lighting)
-  const openDialog = useEditor((s) => s.openDialog)
+function DisplayRows() {
+  const settings = useEditor((s) => s.settings)
+  const { gridVisible, waterVisible } = settings.appearance
+  const { mapLighting, skyVisible } = settings.lighting
   const prefab = useOpenPrefab()
+  const floorHeight = useEditor((s) => s.floorHeight)
+  const startHeight = useEditor((s) => floorHeightOf(s.doc.map))
+  const gridHeight = prefab === null ? startHeight : null
+  const reset = () => {
+    void saveSettings(withDefaultDisplay(settings))
+    if (gridHeight !== null) void setGridHeight(gridHeight)
+  }
   return (
     <>
       <div className="pb-1">
@@ -181,17 +268,15 @@ function DisplayRows({ onLeave }: {
         />
       </div>
       {prefab === null && <GridHeightRow />}
-      <div className="flex h-8 items-center gap-1 whitespace-nowrap text-fg-tertiary">
-        Grid colours are in
+      <GridColorsRow />
+      <GizmoRows />
+      <div className="flex justify-end py-2">
         <Button
-          variant="link"
-          className="h-auto p-0 text-foreground underline"
-          onClick={() => {
-            onLeave()
-            openDialog({ id: "settings", category: "appearance" })
-          }}
+          variant="outline"
+          disabled={isDefaultDisplay(settings) && (gridHeight === null || floorHeight === gridHeight)}
+          onClick={reset}
         >
-          Settings › Appearance
+          Reset to defaults
         </Button>
       </div>
     </>
@@ -199,9 +284,8 @@ function DisplayRows({ onLeave }: {
 }
 
 function DisplayControl({ disabled }: { readonly disabled: boolean }) {
-  const [open, setOpen] = useState(false)
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover>
       <ViewTip
         label="Grid, sky, water and lighting"
         render={
@@ -216,7 +300,7 @@ function DisplayControl({ disabled }: { readonly disabled: boolean }) {
         <IconChevronDown className="size-3" />
       </ViewTip>
       <PopoverContent align="end" initialFocus={false} finalFocus={false} className="w-72 gap-0 px-3 py-1">
-        <DisplayRows onLeave={() => setOpen(false)} />
+        <DisplayRows />
       </PopoverContent>
     </Popover>
   )
