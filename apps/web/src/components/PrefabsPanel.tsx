@@ -12,7 +12,7 @@ import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { type MouseEvent, useRef, useState } from "react"
+import { type MouseEvent, type ReactNode, useRef, useState } from "react"
 import { PREFAB_NEEDS_PROJECT, prefabTierLabel, qualifyClassPath } from "../domain/prefab"
 import { copyPrefabToTier, duplicatePrefab, openPrefab, placePrefab, revealPrefabs } from "../editor/actions"
 import { startPrefabDrag } from "../editor/prefabDrag"
@@ -94,7 +94,12 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
         </span>
       </button>
       <DropdownMenu>
-        <Tooltip>
+        <Tooltip
+          // the menu hands the focus back as it closes, and the tooltip would stay up with the pointer long gone
+          onOpenChange={(open, details) => {
+            if (open && details.reason === "trigger-focus") details.cancel()
+          }}
+        >
           <TooltipTrigger
             render={
               <DropdownMenuTrigger
@@ -150,22 +155,37 @@ function TierTitle({ children, hint }: { readonly children: string; readonly hin
   )
 }
 
-/** Untitled Project has no project tier: the line that says so names the project from here. */
-function NoProject() {
-  const openDialog = useEditor((s) => s.openDialog)
+/** A section with nothing to list: one line, centred, and what to do about it underneath if there is anything. */
+function EmptySection({ children, line }: { readonly children?: ReactNode; readonly line: string }) {
   return (
-    <p className="flex items-center gap-2 px-2 text-body text-fg-tertiary">
-      No project yet.
-      <Button variant="outline" size="sm" onClick={() => openDialog({ id: "projectSettings" })}>
-        Name it…
-      </Button>
-    </p>
+    <div className="flex flex-col items-center gap-2 px-2 py-1 text-center">
+      <p className="text-body text-fg-tertiary">{line}</p>
+      {children}
+    </div>
   )
 }
 
+/** Untitled Project has no project tier: its section names the project from here. */
+function NoProject() {
+  const openDialog = useEditor((s) => s.openDialog)
+  return (
+    <EmptySection line="No project yet.">
+      <Button variant="outline" size="sm" onClick={() => openDialog({ id: "projectSettings" })}>
+        Name it…
+      </Button>
+    </EmptySection>
+  )
+}
+
+/** Where a tier keeps its prefabs, for its section here and its segment in Save selection as prefab. */
+export const PREFAB_TIER_HINTS: Readonly<Record<PrefabTier, string>> = {
+  project: "Kept with this project.",
+  user: "The game's own prefabs: the in-game editor lists them too."
+}
+
 const DESKTOP_TIERS: ReadonlyArray<{ readonly tier: PrefabTier; readonly hint: string }> = [
-  { tier: "project", hint: "Kept with this project." },
-  { tier: "user", hint: "The game's own prefabs: the in-game editor lists them too." }
+  { tier: "project", hint: PREFAB_TIER_HINTS.project },
+  { tier: "user", hint: PREFAB_TIER_HINTS.user }
 ]
 
 const BROWSER_TIERS: typeof DESKTOP_TIERS = [{ tier: "user", hint: "Kept in memory until the page closes." }]
@@ -201,10 +221,10 @@ export function PrefabsPanel() {
               {inTier(tier).length > 0
                 ? <ul>{inTier(tier).map((prefab) => <PrefabRow key={prefab.name} prefab={prefab} />)}</ul>
                 : terms.length > 0
-                ? <p className="px-2 text-body text-fg-tertiary">Nothing matches the filter.</p>
+                ? <EmptySection line="Nothing matches the filter." />
                 : tier === "project" && !hasProject
                 ? <NoProject />
-                : <p className="px-2 text-body text-fg-tertiary">No prefabs yet.</p>}
+                : <EmptySection line="No prefabs yet." />}
             </section>
           ))}
         </div>

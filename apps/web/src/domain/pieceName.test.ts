@@ -4,9 +4,16 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import { repoRoot } from "../test/samples"
 import { Catalog } from "./Catalog"
-import { pieceDisplayName, pieceLabelOf } from "./pieceName"
+import { pieceDisplayName, pieceLabelOf, pieceTitleOf } from "./pieceName"
 
 const game = (displayName: string, className: string) => pieceDisplayName({ displayName, className })
+
+describe("pieceTitleOf", () => {
+  it("sets the size apart from the name, and leaves a piece with no size alone", () => {
+    assert.strictEqual(pieceTitleOf({ displayName: "Curve1 M", className: "BP_Ramp_Curve1" }), "Curve 1 · Medium")
+    assert.strictEqual(pieceTitleOf({ displayName: "Bevel_H Cap", className: "Bevel_Half_Cap" }), "Bevel Half Cap")
+  })
+})
 
 describe("pieceDisplayName", () => {
   it("takes a trailing size off the name", () => {

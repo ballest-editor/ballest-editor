@@ -118,11 +118,16 @@ const fromClassName = (className: string): PieceName => {
 export const pieceDisplayName = (piece: Named): PieceName =>
   piece.displayName ? fromGameName(piece.displayName, piece.className) : fromClassName(piece.className)
 
-/** The name as one string, the size written out ("Curve 1 Small"), for lists with no room for a tag. */
-export const pieceLabelOf = (piece: Named): string => {
+const joined = (piece: Named, separator: string): string => {
   const { name, size } = pieceDisplayName(piece)
-  return size === undefined ? name : `${name} ${SIZE_WORDS[size]}`
+  return size === undefined ? name : `${name}${separator}${SIZE_WORDS[size]}`
 }
+
+/** The name as one string, the size written out ("Curve 1 Small"), for lists with no room for a tag. */
+export const pieceLabelOf = (piece: Named): string => joined(piece, " ")
+
+/** The name with the size set apart ("Curve 1 · Medium"), for a tooltip's first line. */
+export const pieceTitleOf = (piece: Named): string => joined(piece, " · ")
 
 /** A class or asset name written out: "BP_SkyBlue_Metal" reads "Sky Blue Metal". For names that aren't pieces. */
 export const humanizedClass = (className: string): string =>
