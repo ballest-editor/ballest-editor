@@ -14,7 +14,7 @@ import { Label } from "@workspace/ui/components/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import { Fragment, type ReactNode, useMemo, useState } from "react"
+import { Fragment, type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { editTransform, isDecal } from "../domain/editTransform"
@@ -79,6 +79,28 @@ function TipText({ tip, className, children }: {
     <Tooltip>
       <TooltipTrigger render={<span className={className} />}>{children}</TooltipTrigger>
       <TooltipContent side="left" className="flex-col items-start wrap-anywhere">{tip}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** Text its width may cut off: the whole of it in a tooltip, and no tooltip when it all fits. Key it by its text. */
+function TruncatedText({ text }: { readonly text: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const [truncated, setTruncated] = useState(false)
+  useLayoutEffect(() => {
+    const element = ref.current
+    if (element === null) return
+    const measure = () => setTruncated(element.scrollWidth > element.clientWidth)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  return (
+    <Tooltip disabled={!truncated}>
+      <TooltipTrigger render={<span ref={ref} className="max-w-40 min-w-0 truncate" />}>{text}</TooltipTrigger>
+      {/* Above, not to the left, where it would cover the fact's label. */}
+      <TooltipContent className="wrap-anywhere">{text}</TooltipContent>
     </Tooltip>
   )
 }
@@ -167,11 +189,7 @@ function MapSettings() {
                 <InfoHint>Your creator name is set in Settings › General.</InfoHint>
               </>
             )
-            : (
-              <TipText tip={levelData.creatorName} className="max-w-40 min-w-0 truncate">
-                {levelData.creatorName}
-              </TipText>
-            )}
+            : <TruncatedText key={levelData.creatorName} text={levelData.creatorName} />}
         </Fact>
         <Fact label="Items">{itemCount.toLocaleString()}</Fact>
         <CreatedFact createdAt={levelData.createdAt} />
