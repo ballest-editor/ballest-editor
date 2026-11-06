@@ -72,7 +72,7 @@ function Swatch(
       aria-pressed={active}
       onClick={onPick}
       className={cn(
-        "size-5 rounded-full ring-1 ring-foreground/20 transition-shadow duration-150 ease-out outline-none hover:ring-2 hover:ring-foreground/60 focus-visible:ring-2 focus-visible:ring-ring",
+        "size-5 rounded-full ring-1 ring-foreground/35 transition-shadow duration-150 ease-out outline-none hover:ring-2 hover:ring-foreground/60 focus-visible:ring-2 focus-visible:ring-ring",
         active && "ring-2 ring-primary ring-offset-1 ring-offset-card hover:ring-primary"
       )}
       style={{ background: cssColor(swatchColor(lookupMaterial(table, color.material), color.displayColor)) }}
