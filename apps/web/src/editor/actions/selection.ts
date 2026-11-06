@@ -1,7 +1,7 @@
 /** Selection edits: each is one undo step, however many items it touches. */
 import type { UeTransform, Vec3 } from "../../domain/coords"
 import { editTransform } from "../../domain/editTransform"
-import { selectableKeys } from "../../domain/groupSelection"
+import { selectableKeys, soleGroupOf } from "../../domain/groupSelection"
 import {
   type Axis,
   type AxisEdit,
@@ -85,10 +85,12 @@ export const previewSelectionAxis = (field: TransformField, axis: Axis, edit: Ax
 
 /**
  * Sets the pivot `choice` on every selected item, measured on each one's own bounds (one
- * undo step). Items whose bounds are unknown keep their pivot.
+ * undo step). Items whose bounds are unknown keep their pivot. A whole group turns and scales
+ * about its frame, so it takes no pivot, as in the game.
  */
 export const setSelectionPivot = (choice: PivotChoice): void => {
-  const { doc, selectedIds, catalogIndex, setItemPivots } = useEditor.getState()
+  const { doc, selectedIds, enteredGroupId, catalogIndex, setItemPivots } = useEditor.getState()
+  if (soleGroupOf(doc.structure.tree, selectedIds, enteredGroupId) !== undefined) return
   setItemPivots(
     new Map(selectedIds.flatMap((id) => {
       const item = doc.map.items[doc.ids.indexOf(id)]

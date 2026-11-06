@@ -307,7 +307,7 @@ const transformRows = (units: "cm" | "m"): ReadonlyArray<TransformRowSpec> => [
     field: "translation",
     label: "Location",
     unit: units,
-    help: `In the game's ${units === "m" ? "metres" : "centimetres"}, Z up`,
+    help: `The piece's origin, as the map stores it, in ${units === "m" ? "metres" : "centimetres"}, Z up`,
     axisLabels: AXIS_LABELS,
     step: units === "m" ? 0.01 : 1,
     digits: units === "m" ? 3 : 1
