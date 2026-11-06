@@ -4,44 +4,25 @@ import {
   IconKeyboard,
   IconPalette,
   IconPencil,
-  IconPlus,
-  IconSettings,
-  IconX
+  IconSettings
 } from "@tabler/icons-react"
-import { Button } from "@workspace/ui/components/button"
-import { ColorPicker, ColorSwatch } from "@workspace/ui/components/color-picker"
-import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
-import { cn } from "@workspace/ui/lib/utils"
 import { String as Str, Struct } from "effect"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { movementLookModes } from "../domain/flyKeys"
 import { namedActions } from "../domain/GameKeybinds"
 import { overriddenFolders } from "../domain/gameLink"
-import {
-  type Bindings,
-  chordOf,
-  formatBinding,
-  heldActions,
-  isDefaultBinding,
-  type KeybindAction,
-  keybindActionDescriptions,
-  keybindActionLabels,
-  keybindActions,
-  mouseChordOf,
-  mouseClickActions,
-  mouseDragActions,
-  uniqueBindings,
-  wheelChordOf
-} from "../domain/Keybinds"
+import { isDefaultBinding, keybindActionDescriptions } from "../domain/Keybinds"
 import { CUSTOM_FOV_PRESET, defaultSettings, gridColorsOf, type Settings } from "../domain/Settings"
-import { refreshGameLink, resetGamePaths, resetKeybinds, saveKeybinds, saveSettings } from "../editor/actions"
+import { refreshGameLink, resetGamePaths, resetKeybinds, saveSettings } from "../editor/actions"
 import { type SettingsCategory, useCreator, useEditor } from "../editor/store"
 import { useDarkTheme } from "../editor/theme"
+import { ColorSetting } from "./ColorSetting"
 import { creatorSettingsRow } from "./CreatorSetting"
 import { CheckAgainButton, useGameLinkSettings } from "./GameLink"
+import { useKeybindCapture } from "./KeybindControl"
 import { NumberField } from "./NumberField"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
@@ -136,146 +117,11 @@ function SliderControl({ label, unit, digits = 0, scale = 1, value, onChange, ..
   )
 }
 
-/**
- * A colour setting that can be automatic (null): a swatch of the colour in use, opening the
- * same picker as the item colour properties, with a way back to automatic.
- */
-function ColorSetting(props: {
-  readonly label: string
-  readonly value: string | null
-  /** The colour automatic currently resolves to. */
-  readonly auto: string
-  readonly onChange: (value: string | null) => void
-}) {
-  const shown = props.value ?? props.auto
-  return (
-    <Popover>
-      <PopoverTrigger
-        aria-label={`${props.label}: ${props.value ?? `automatic (${props.auto})`}`}
-        className="flex h-7 w-40 cursor-pointer items-center gap-2 rounded-control border border-border/70 bg-input px-2 text-body transition-colors duration-150 ease-out hover:border-ring/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-      >
-        <ColorSwatch color={shown} />
-        <span className={cn("tabular-nums", props.value === null && "text-fg-tertiary")}>{shown}</span>
-      </PopoverTrigger>
-      <PopoverContent side="left" align="start" className="w-56 gap-2">
-        <ColorPicker value={shown} onCommit={props.onChange} />
-        <Button variant="outline" size="sm" disabled={props.value === null} onClick={() => props.onChange(null)}>
-          Use automatic
-        </Button>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
 /** A grid colour's line: the swatch shows what it resolves to, this says where that comes from. */
 const gridColorDescription = (value: string | null) => value === null ? "Automatic: follows the theme." : "Custom."
 
 /** The Appearance page's group for what the viewport draws. */
 const VIEWPORT = "Viewport"
-
-/** A binding being captured: a fresh slot (`index` = bindings.length) or a replacement. */
-interface Listening {
-  readonly action: KeybindAction
-  readonly index: number
-}
-
-/**
- * An action's bindings as key caps (hover or focus one to reveal its ×, which slides in), then a
- * + cap to add one, after the word Unbound when there are none, and a capture cap while
- * listening. Caps bound to more than one action of the same kind are marked red.
- */
-function KeybindControl(props: {
-  readonly action: KeybindAction
-  readonly bindings: Bindings
-  readonly conflicts: ReadonlySet<string>
-  readonly listening: number | null
-  readonly onListen: (index: number) => void
-  readonly onRemove: (index: number) => void
-}) {
-  const label = keybindActionLabels[props.action]
-  return (
-    <div className="flex min-h-7 flex-wrap items-center justify-end gap-1">
-      {props.bindings.map((binding, index) =>
-        props.listening === index
-          ? <CaptureCap key="capture" />
-          : (
-            <span
-              key={binding}
-              className={cn(
-                "group/cap inline-flex h-6 items-stretch overflow-hidden rounded-full text-caption leading-none tabular-nums",
-                props.conflicts.has(binding) ? "bg-destructive/15 text-destructive" : "bg-muted text-foreground"
-              )}
-              title={props.conflicts.has(binding) ? "Also bound to another action" : undefined}
-            >
-              <button
-                type="button"
-                className="flex cursor-pointer items-center justify-center px-2.5 transition-colors duration-150 ease-out hover:bg-foreground/10"
-                onClick={() => props.onListen(index)}
-                aria-label={`Rebind ${label} (${formatBinding(binding)})`}
-              >
-                <span className={CAP_TEXT}>{formatBinding(binding)}</span>
-              </button>
-              <button
-                type="button"
-                className="flex w-0 items-center justify-center overflow-hidden text-fg-secondary transition-[width,background-color,color] duration-150 ease-out group-focus-within/cap:w-5 group-hover/cap:w-5 hover:bg-destructive/15 hover:text-destructive"
-                onClick={() => props.onRemove(index)}
-                aria-label={`Unbind ${formatBinding(binding)} from ${label}`}
-              >
-                <IconX className="size-3 shrink-0" />
-              </button>
-            </span>
-          )
-      )}
-      {props.listening === props.bindings.length
-        ? <CaptureCap />
-        : (
-          <>
-            {props.bindings.length === 0 && <span className="px-1 text-caption text-fg-tertiary">Unbound</span>}
-            <button
-              type="button"
-              className="inline-flex size-6 items-center justify-center rounded-full bg-muted text-fg-secondary transition-colors duration-150 ease-out hover:bg-foreground/10 hover:text-foreground"
-              onClick={() => props.onListen(props.bindings.length)}
-              aria-label={props.bindings.length === 0 ? `Bind ${label}` : `Add a binding for ${label}`}
-            >
-              <IconPlus className="size-3" />
-            </button>
-          </>
-        )}
-    </div>
-  )
-}
-
-/** Trims the line box to the glyphs' cap height (Chrome 133+); older engines fall back to leading-none. */
-const CAP_TEXT = "leading-none [text-box:trim-both_cap_alphabetic]"
-
-/** Shown in place of the cap being (re)bound: same shape, the selection's wash, blinking caret. */
-function CaptureCap() {
-  return (
-    <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-primary/12 px-2.5 text-caption text-foreground">
-      <span className="size-1.5 animate-pulse rounded-full bg-primary" aria-hidden />
-      <span className={CAP_TEXT}>Press a key</span>
-    </span>
-  )
-}
-
-/**
- * A press that fills a slot ends the capture, and its listeners with it, before the button comes up. What's left of the
- * press mustn't act on what's under the pointer: on the backdrop, its click would close the dialog.
- */
-const swallowRestOfPress = () => {
-  const swallow = (e: Event) => {
-    e.preventDefault()
-    e.stopPropagation()
-  }
-  const onUp = (e: Event) => {
-    swallow(e)
-    window.removeEventListener("mouseup", onUp, { capture: true })
-    // Only the main button makes a click, and it comes straight after the mouseup.
-    setTimeout(() => window.removeEventListener("click", swallow, { capture: true }))
-  }
-  window.addEventListener("mouseup", onUp, { capture: true })
-  window.addEventListener("click", swallow, { capture: true })
-}
 
 /** File › Settings…, a modal: category nav on the left, searchable rows on the right. */
 export function SettingsDialog(props: {
@@ -289,7 +135,7 @@ export function SettingsDialog(props: {
   const autoGrid = gridColorsOf({ ...settings.appearance, gridCellColor: null, gridSectionColor: null }, dark)
   const keybinds = useEditor((s) => s.keybinds)
   const defaults = useEditor((s) => s.keybindDefaults)
-  const [listening, setListening] = useState<Listening | null>(null)
+  const capture = useKeybindCapture()
   const hasGame = useEditor((s) => s.capabilities.exportToGame)
   const projects = useEditor((s) => s.capabilities.projects)
   const overridden = overriddenFolders(useEditor((s) => s.gamePaths))
@@ -315,77 +161,7 @@ export function SettingsDialog(props: {
     changes: { modified: !isDefault(section, key), reset: () => resetField(section, key) }
   })
 
-  const setBindings = (action: KeybindAction, bindings: Bindings) =>
-    void saveKeybinds({ ...keybinds, [action]: uniqueBindings(bindings) })
-
-  // Capturing: the next key, mouse button or wheel step fills the slot (Esc cancels).
-  useEffect(() => {
-    if (listening === null) return
-    const { action, index } = listening
-    const assign = (binding: string) => {
-      const next = [...keybinds[action]]
-      next[index] = binding
-      setListening(null)
-      void saveKeybinds({ ...keybinds, [action]: uniqueBindings(next) })
-    }
-    const stop = (e: Event) => {
-      e.preventDefault()
-      e.stopPropagation()
-    }
-    const onKey = (e: KeyboardEvent) => {
-      stop(e)
-      if (e.code === "Escape") setListening(null)
-      else assign(chordOf(e))
-    }
-    const onMouse = (e: MouseEvent) => {
-      stop(e)
-      swallowRestOfPress()
-      assign(mouseChordOf(e))
-    }
-    const onWheel = (e: WheelEvent) => {
-      stop(e)
-      assign(wheelChordOf(e))
-    }
-    const onContextMenu = stop
-    window.addEventListener("keydown", onKey, { capture: true })
-    window.addEventListener("mousedown", onMouse, { capture: true })
-    window.addEventListener("mouseup", stop, { capture: true })
-    window.addEventListener("click", stop, { capture: true })
-    window.addEventListener("contextmenu", onContextMenu, { capture: true })
-    window.addEventListener("wheel", onWheel, { capture: true, passive: false })
-    return () => {
-      window.removeEventListener("keydown", onKey, { capture: true })
-      window.removeEventListener("mousedown", onMouse, { capture: true })
-      window.removeEventListener("mouseup", stop, { capture: true })
-      window.removeEventListener("click", stop, { capture: true })
-      window.removeEventListener("contextmenu", onContextMenu, { capture: true })
-      window.removeEventListener("wheel", onWheel, { capture: true })
-    }
-  }, [listening, keybinds])
-
   const rows = ((): ReadonlyArray<Row> => {
-    // A chord is a conflict when two actions of the same kind share it. A fly key doubling
-    // as a tool shortcut (W: forward + translate, as in the game) is fine: the "movement keys
-    // need the look button" setting decides which one it does. Mouse drags and selection clicks
-    // share a kind: a camera drag chord never reaches click selection.
-    const kinds = new Map<string, Set<string>>()
-    for (const action of keybindActions) {
-      const bindings = keybinds[action]
-      const kind = heldActions.has(action)
-        ? "held"
-        : mouseDragActions.has(action) || mouseClickActions.has(action)
-        ? "mouse"
-        : "oneShot"
-      for (const b of bindings) {
-        const set = kinds.get(`${kind}:${b}`) ?? new Set<string>()
-        set.add(action)
-        kinds.set(`${kind}:${b}`, set)
-      }
-    }
-    const conflicts = new Set(
-      [...kinds].filter(([, actions]) => actions.size > 1).map(([key]) => key.slice(key.indexOf(":") + 1))
-    )
-
     const keybindRows = namedActions(defaults).map(({ action, section, label }): Row => ({
       id: `key-${action}`,
       category: "keybinds",
@@ -395,18 +171,9 @@ export function SettingsDialog(props: {
       tooltip: true,
       changes: {
         modified: !isDefaultBinding(keybinds, defaults.keybinds, action),
-        reset: () => setBindings(action, defaults.keybinds[action])
+        reset: () => capture.setBindings(action, defaults.keybinds[action])
       },
-      control: (
-        <KeybindControl
-          action={action}
-          bindings={keybinds[action]}
-          conflicts={conflicts}
-          listening={listening?.action === action ? listening.index : null}
-          onListen={(index) => setListening({ action, index })}
-          onRemove={(index) => setBindings(action, keybinds[action].filter((_, i) => i !== index))}
-        />
-      )
+      control: capture.controlFor(action)
     }))
 
     const c = settings.camera
@@ -726,7 +493,7 @@ export function SettingsDialog(props: {
       rows={rows}
       onResetCategory={resetCategory}
       footerAction={props.category === "game" && <CheckAgainButton />}
-      busy={listening !== null}
+      busy={capture.capturing}
     />
   )
 }

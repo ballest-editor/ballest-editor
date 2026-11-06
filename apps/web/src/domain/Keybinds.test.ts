@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import {
   actionsFor,
+  conflictingBindings,
   defaultKeybinds,
   formatBinding,
   formatBindings,
@@ -11,6 +12,7 @@ import {
   keybindActionDescriptions,
   keybindActionLabels,
   keybindActions,
+  type Keybinds,
   keybindSections,
   mergeKeybinds,
   MODIFIER_HOLD_MS,
@@ -118,6 +120,7 @@ describe("keybind table", () => {
 
   it("formats bindings for display", () => {
     expect(formatBinding("Ctrl+KeyZ")).toBe("Ctrl + Z")
+    expect(formatBinding("Ctrl+Shift+KeyZ", true)).toBe("⌘ + Shift + Z")
     expect(formatBinding("Alt+Mouse0")).toBe("Alt + LMB")
     expect(formatBinding("Mouse3")).toBe("Mouse 4")
     expect(formatBinding("Numpad7")).toBe("Num 7")
@@ -185,5 +188,18 @@ describe("HeldKeys: Left Ctrl = fly down vs Ctrl chords", () => {
     expect(keys.holds("KeyW", 0)).toBe(true)
     expect(keys.holds("", 0)).toBe(false)
     expect(keys.holdsAny([], 0)).toBe(false)
+  })
+})
+
+/** What `keybinds` adds to the conflicts the defaults already have. */
+const newConflicts = (keybinds: Keybinds) => {
+  const baseline = conflictingBindings(defaultKeybinds)
+  return [...conflictingBindings(keybinds)].filter((chord) => !baseline.has(chord))
+}
+
+describe("conflictingBindings", () => {
+  it("marks a chord two actions of a kind share, and not one shared across kinds", () => {
+    expect(newConflicts({ ...defaultKeybinds, undo: ["Ctrl+KeyJ"], redo: ["Ctrl+KeyJ"] })).toEqual(["Ctrl+KeyJ"])
+    expect(newConflicts({ ...defaultKeybinds, moveForward: ["KeyJ"], translateMode: ["KeyJ"] })).toEqual([])
   })
 })

@@ -490,11 +490,18 @@ const SYMBOLS: Readonly<Record<string, string>> = {
   Equal: "="
 }
 
-/** Display form of one chord, e.g. "Ctrl + Z", "RMB", "←". */
-export const formatBinding = (binding: string): string =>
+/** Whether this is macOS. A browser global, read here and nowhere else. */
+const onMac = /^mac/i.test(navigator.platform)
+
+/** What a chord's `Ctrl` reads as: `chordOf` takes ⌘ and Ctrl alike, and macOS calls it ⌘. The one home of that label. */
+const primaryModifierLabel = (mac: boolean): string => mac ? "⌘" : "Ctrl"
+
+/** Display form of one chord, e.g. "Ctrl + Z", "RMB", "←". `mac` is for tests: the app shows this machine's. */
+export const formatBinding = (binding: string, mac = onMac): string =>
   binding.length === 0 ? "Unbound" : binding
     .split("+")
     .map((part) => {
+      if (part === "Ctrl") return primaryModifierLabel(mac)
       if (part.startsWith("Key")) return part.slice(3)
       if (part.startsWith("Digit")) return part.slice(5)
       if (/^Numpad\d$/.test(part)) return `Num ${part.slice(6)}`
@@ -513,4 +520,26 @@ export const formatBinding = (binding: string): string =>
 
 /** Display form of an action's bindings ("Q / F", or "Unbound"). */
 export const formatBindings = (bindings: Bindings): string =>
-  bindings.length === 0 ? "Unbound" : bindings.map(formatBinding).join(" / ")
+  bindings.length === 0 ? "Unbound" : bindings.map((binding) => formatBinding(binding)).join(" / ")
+
+/**
+ * The chords two actions of the same kind share. A fly key doubling as a tool shortcut (W: forward + translate, as in the
+ * game) is fine: the "movement keys need the look button" setting decides which one it does. Mouse drags and selection
+ * clicks share a kind: a camera drag chord never reaches click selection.
+ */
+export const conflictingBindings = (keybinds: Keybinds): ReadonlySet<string> => {
+  const kinds = new Map<string, Set<string>>()
+  for (const action of keybindActions) {
+    const kind = heldActions.has(action)
+      ? "held"
+      : mouseDragActions.has(action) || mouseClickActions.has(action)
+      ? "mouse"
+      : "oneShot"
+    for (const binding of keybinds[action]) {
+      const set = kinds.get(`${kind}:${binding}`) ?? new Set<string>()
+      set.add(action)
+      kinds.set(`${kind}:${binding}`, set)
+    }
+  }
+  return new Set([...kinds].filter(([, actions]) => actions.size > 1).map(([key]) => key.slice(key.indexOf(":") + 1)))
+}
