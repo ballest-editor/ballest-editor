@@ -1,7 +1,14 @@
 import { assert, describe, it } from "@effect/vitest"
 import * as Fs from "node:fs"
 import * as Path from "node:path"
-import { compareVersions, editOutcomeIn, hostVersionIn, isPluginFileName, parseManifest } from "./pluginManifest"
+import {
+  compareVersions,
+  editOutcomeIn,
+  hostVersionIn,
+  isPluginFileName,
+  loadedPluginVersionIn,
+  parseManifest
+} from "./pluginManifest"
 
 describe("parseManifest", () => {
   it("reads the plugin the app ships", () => {
@@ -42,6 +49,16 @@ describe("hostVersionIn", () => {
       "[12:25:51.840] [info] [host] Ballest plugin host 0.33.2 starting\r\n[12:25:51.846] [info] [host] game build\r\n"
     assert.strictEqual(hostVersionIn(log), "0.33.2")
     assert.isNull(hostVersionIn(""))
+  })
+})
+
+describe("loadedPluginVersionIn", () => {
+  it("reads the version this session loaded, the last one when the host reloaded it", () => {
+    const line = (version: string) =>
+      `[12:25:52.000] [info] [ballest-editor-link] loaded Ballest Editor link ${version}\r\n`
+    assert.strictEqual(loadedPluginVersionIn(line("0.1.0")), "0.1.0")
+    assert.strictEqual(loadedPluginVersionIn(line("0.1.0") + line("0.2.0")), "0.2.0")
+    assert.isNull(loadedPluginVersionIn("[12:25:51.840] [info] [host] Ballest plugin host 0.34.2 starting\r\n"))
   })
 })
 

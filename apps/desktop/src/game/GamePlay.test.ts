@@ -257,6 +257,26 @@ describe("GamePlay.openInGame", () => {
       yield* wroteNothing
     })))
 
+  it.effect("writes nothing while the game still runs the plugin it loaded before an update", () =>
+    runScoped(Effect.gen(function*() {
+      const { fs, path, steam, link, play, wroteNothing } = yield* setup
+      yield* link.installPlugin
+      const log = path.join(path.dirname(steam.maps), "PluginManager", "host.log")
+      yield* fs.makeDirectory(path.dirname(log), { recursive: true })
+      yield* fs.writeFileString(
+        log,
+        "[12:25:51.840] [info] [host] Ballest plugin host 0.34.2 starting\r\n[12:25:52.000] [info] [ballest-editor-link] loaded Ballest Editor link 0.1.0\r\n"
+      )
+      yield* fs.makeDirectory(path.join(steam.host.procDir, "4242"), { recursive: true })
+      yield* fs.writeFileString(
+        path.join(steam.host.procDir, "4242", "cmdline"),
+        "wine\0Z:\\games\\Ballest\\Binaries\\Win64\\Ballest-Win64-Shipping.exe\0"
+      )
+      const result = yield* play.openInGame(payload)
+      assert.isTrue(result._tag === "NeedsPlugin" && result.plugin.runningOlder)
+      yield* wroteNothing
+    })))
+
   it.effect("opens a published map's draft, which Play refuses", () =>
     runScoped(Effect.gen(function*() {
       const { link, play, files } = yield* setup

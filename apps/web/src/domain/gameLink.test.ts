@@ -11,6 +11,7 @@ import {
   type GameLinkRow,
   gameLinkRows,
   MUTABLE_KINDS,
+  openWithoutPluginNotice,
   overriddenFolders,
   pathCrumbs,
   playWithoutPluginNotice,
@@ -36,7 +37,8 @@ const plugin = (status: PluginLookup["status"], installedVersion: string | null 
   folder: `${PLUGINS}/ballest-editor-link`,
   hostVersion: "0.34.2",
   requiredHost: "0.34.0",
-  hostTooOld: false
+  hostTooOld: false,
+  runningOlder: false
 })
 
 const isaac = creatorOf(null, Option.some({ name: "Isaac", source: "steam" }))
@@ -175,6 +177,14 @@ describe("Game link checklist", () => {
     const row = byId(gameLinkRows(everything, old, isaac)).plugin
     assert.deepInclude(row, { state: "missing", title: "Plugin manager needs 0.34.0 (the game has 0.33.2)" })
     assert.deepStrictEqual(row.fixes, [])
+  })
+
+  it("asks for a restart when the game still runs the plugin from before an update", () => {
+    const stale = { ...plugin("current", "0.2.0"), runningOlder: true }
+    assert.strictEqual(
+      openWithoutPluginNotice("Big Loop", stale).title,
+      "Restart the game to open Big Loop in the in-game editor"
+    )
   })
 
   it("prompts for what an update needs next, and for nothing when there is none", () => {

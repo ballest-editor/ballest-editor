@@ -34,6 +34,7 @@ export interface PluginLookup {
   readonly hostVersion: string | null
   readonly requiredHost: string
   readonly hostTooOld: boolean
+  readonly runningOlder: boolean
 }
 
 /** What a launch found, kept until the next one (`GameLinkResult` in @ballest/contracts). */

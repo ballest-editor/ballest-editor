@@ -552,7 +552,9 @@ export const PluginStatus = Schema.Struct({
   /** The oldest plugin manager the app's copy runs on (`info.toml`'s `[meta] min_host`). */
   requiredHost: Schema.String,
   /** The plugin manager is older than `requiredHost`: it wouldn't run the app's copy, so Install is refused. */
-  hostTooOld: Schema.Boolean
+  hostTooOld: Schema.Boolean,
+  /** The game is running a copy older than the one in the folder: it loads a new one only when it starts. */
+  runningOlder: Schema.Boolean
 })
 export type PluginStatus = typeof PluginStatus.Type
 
@@ -607,8 +609,8 @@ export type EditOutcome = typeof EditOutcome.Type
 /**
  * `openInGame`'s result (docs/DESKTOP.md § Play):
  * - `Opening`: exported, sent to the plugin, and started the game unless it was running.
- * - `NeedsPlugin`: nothing written. Only a current plugin on a new enough plugin manager opens maps, and an older one
- *   would race the map instead.
+ * - `NeedsPlugin`: nothing written. Only a current plugin on a new enough plugin manager opens maps, and an older one,
+ *   or a game still running one, would race the map instead.
  * - `Published`, `ChangedInGame`: nothing written, an `ExportRefusal` as Export reports it.
  */
 export const OpenInGameResult = Schema.TaggedUnion({

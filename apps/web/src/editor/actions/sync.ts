@@ -6,7 +6,6 @@
 import { Deferred, Effect, Stream } from "effect"
 import { mapLabelOf } from "../../domain/factory"
 import { syncsFromGame } from "../../domain/linkState"
-import { isNoDiff } from "../../domain/mapDiff"
 import { Platform } from "../../services/Platform"
 import { fileTabOf, tabWithFile, useEditor } from "../store"
 import { writeToGame } from "./gameWrite"
@@ -38,7 +37,7 @@ const settleChange = Effect.fnUntraced(function*(fileName: string) {
   const map = state.projectMaps.find((m) => m.fileName === fileName)
   if (map === undefined) return
   const diff = yield* gameDiffOf(fileName)
-  if (diff !== null && syncsFromGame(map, isNoDiff(diff), { unsaved: fileTabOf(state, fileName)?.dirty === true })) {
+  if (diff !== null && syncsFromGame(map, diff, { unsaved: fileTabOf(state, fileName)?.dirty === true })) {
     return yield* reimportMapEffect(fileName)
   }
   if (diff === null || useEditor.getState().dialog !== null) notifyConflict(fileName)

@@ -10,6 +10,7 @@ import {
   editOutcomeIn,
   hostVersionIn,
   isPluginFileName,
+  loadedPluginVersionIn,
   MANIFEST,
   parseManifest,
   PLUGIN_ID
@@ -61,7 +62,8 @@ interface RaceRequest {
 }
 
 /** Whether `plugin` can open maps: an older one would race them, and an older plugin manager won't run it. */
-export const opensMaps = (plugin: PluginStatus): boolean => plugin.status === "current" && !plugin.hostTooOld
+export const opensMaps = (plugin: PluginStatus): boolean =>
+  plugin.status === "current" && !plugin.hostTooOld && !plugin.runningOlder
 
 /**
  * The editor's side of the plugin handoff (docs/DESKTOP.md § Play): the `ballest-editor-link` plugin the app ships in
@@ -108,20 +110,25 @@ export class GameLink extends Context.Service<GameLink, {
       const hostFolder = Effect.map(paths.get, ({ mapsFolder }) =>
         mapsFolder.path === null ? null : path.join(path.dirname(mapsFolder.path), "PluginManager"))
 
-      const hostVersion = Effect.gen(function*() {
+      /** The log of the session the game last started; empty before it has run. */
+      const hostLog = Effect.gen(function*() {
         const folder = yield* hostFolder
         if (folder === null) {
-          return null
+          return ""
         }
-        const log = yield* fs.readFileString(path.join(folder, "host.log")).pipe(Effect.option)
-        return Option.isSome(log) ? hostVersionIn(log.value) : null
+        return yield* fs.readFileString(path.join(folder, "host.log")).pipe(Effect.orElseSucceed(() =>
+          ""
+        ))
       })
 
       const pluginStatus = Effect.gen(function*() {
         const { version, minHost, files } = yield* bundle
         const { install, pluginsFolder } = yield* paths.get
         const folder = pluginsFolder.path === null ? null : path.join(pluginsFolder.path, PLUGIN_ID)
-        const host = yield* hostVersion
+        const log = yield* hostLog
+        const host = hostVersionIn(log)
+        const loaded = loadedPluginVersionIn(log)
+        const runningOlder = loaded !== null && compareVersions(loaded, version) < 0 && (yield* game.isRunning)
         const result = (status: PluginStatus["status"], installedVersion: string | null = null): PluginStatus => ({
           status,
           bundledVersion: version,
@@ -129,7 +136,8 @@ export class GameLink extends Context.Service<GameLink, {
           folder,
           hostVersion: host,
           requiredHost: minHost,
-          hostTooOld: host !== null && compareVersions(host, minHost) < 0
+          hostTooOld: host !== null && compareVersions(host, minHost) < 0,
+          runningOlder
         })
         if (install.status === "missing" || install.path === null) {
           return result("noGame")
@@ -148,8 +156,7 @@ export class GameLink extends Context.Service<GameLink, {
         if (Option.isNone(installed)) {
           return result("missing")
         }
-        const present = yield* Effect.forEach(files, (file) =>
-          probe.isFile(fs, path.join(folder, file)))
+        const present = yield* Effect.forEach(files, (file) => probe.isFile(fs, path.join(folder, file)))
         const installedVersion = installed.value.version
         if (present.includes(false)) return result("missing", installedVersion)
         return result(compareVersions(installedVersion, version) < 0 ? "outdated" : "current", installedVersion)

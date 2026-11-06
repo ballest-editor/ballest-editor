@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
 import { listSamples, readSample } from "../test/samples"
-import { identityTransform, newMapFile, playerStartItem } from "./factory"
+import { defaultEditorState, identityTransform, newMapFile, playerStartItem } from "./factory"
 import { diffMaps, itemCountOf, mapDiffLabelOf, type MapVersion } from "./mapDiff"
 import { type Item, MapFile } from "./MapFile"
 
@@ -27,7 +27,7 @@ const unkeyed = (items: ReadonlyArray<Item>) => {
   return versionOf(items, items.map((_, index) => `load${loads}-${index}`))
 }
 
-const NOTHING = { added: 0, removed: 0, moved: 0, edited: 0, settings: false }
+const NOTHING = { added: 0, removed: 0, moved: 0, edited: 0, settings: false, pivots: false }
 
 describe("diffMaps", () => {
   it("counts an item's paint or properties apart from its transform", () => {
@@ -59,6 +59,18 @@ describe("diffMaps", () => {
     assert.deepStrictEqual(diffMaps(version, saved), NOTHING)
     const brighter = after({ directionalLight: { ...worldSettings.directionalLight, timeOfDay: 3.5 } })
     assert.deepStrictEqual(diffMaps(version, brighter), { ...NOTHING, settings: true })
+  })
+
+  it("tells pivots the game's version doesn't have: every save there drops them", () => {
+    const version = versionOf([at(0)], ["a"])
+    const pivot = { itemIndex: 0, pivot: { choice: "Center", localPosition: { x: 0, y: 0, z: 50 } } }
+    const withPivot = {
+      ...version,
+      map: { ...version.map, editorState: { ...defaultEditorState(), pivots: [pivot] } }
+    }
+    const { editorState: _dropped, ...saved } = version.map
+    assert.deepStrictEqual(diffMaps(withPivot, { ...version, map: saved }), { ...NOTHING, pivots: true })
+    assert.deepStrictEqual(diffMaps(version, { ...version, map: saved }), NOTHING)
   })
 
   it("doesn't take the last digits a save moves in a rotation for a move", () => {
@@ -152,6 +164,7 @@ describe("mapDiffLabelOf", () => {
     assert.strictEqual(mapDiffLabelOf({ ...NOTHING, added: 1, removed: 0, moved: 0 }), "+1 item")
     assert.strictEqual(mapDiffLabelOf({ ...NOTHING, added: 0, removed: 4, moved: 1 }), "−4 items · 1 moved")
     assert.strictEqual(mapDiffLabelOf({ ...NOTHING, edited: 2, settings: true }), "2 edited · Settings changed")
+    assert.strictEqual(mapDiffLabelOf({ ...NOTHING, pivots: true }), "Pivots changed")
     assert.strictEqual(mapDiffLabelOf(NOTHING), "No items or settings changed")
   })
 })

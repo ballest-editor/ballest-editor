@@ -45,7 +45,8 @@ describe("GameLink.pluginStatus", () => {
         folder: null,
         hostVersion: null,
         requiredHost: "0.34.0",
-        hostTooOld: false
+        hostTooOld: false,
+        runningOlder: false
       })
     })))
 
@@ -62,7 +63,8 @@ describe("GameLink.pluginStatus", () => {
         folder: noDll.folder,
         hostVersion: null,
         requiredHost: "0.34.0",
-        hostTooOld: false
+        hostTooOld: false,
+        runningOlder: false
       })
     })))
 
@@ -129,7 +131,8 @@ describe("GameLink.installPlugin", () => {
           folder,
           hostVersion: null,
           requiredHost: "0.34.0",
-          hostTooOld: false
+          hostTooOld: false,
+          runningOlder: false
         },
         restartGame: false
       })

@@ -2,6 +2,7 @@
  * How a project map stands against its export in the game's maps folder (docs/PROJECTS.md § Sync), and the one status
  * the status bar and the Project panel show for it.
  */
+import { isNoDiff, type MapDiff } from "./mapDiff"
 import { formatAgo, formatDateTime } from "./time"
 
 /** The file a link record points at (`LinkedFile` in @ballest/contracts): its path, its bytes' hash, and when. */
@@ -210,10 +211,11 @@ export const linkStateOf = (map: LinkedMap, check: LinkCheck = {}): LinkState =>
  * Whether the game's version of `map` can replace the project's with nothing to ask (docs/DESKTOP.md § Sync): only the
  * game changed it, and what the game saved grew from the last export. An export written under a running game may be
  * newer than the copy the in-game editor saved, which would then silently undo it, unless the two hold the same
- * (`sameContent`).
+ * (`diff`, the game's version against the project's). Pivots the game dropped would be lost with no copy elsewhere.
  */
-export const syncsFromGame = (map: LinkedMap, sameContent: boolean, check: LinkCheck = {}): boolean =>
-  linkStateOf(map, check) === "changedInGame" && (sameContent || map.link?.exportedWhileRunning !== true)
+export const syncsFromGame = (map: LinkedMap, diff: MapDiff, check: LinkCheck = {}): boolean =>
+  linkStateOf(map, check) === "changedInGame" && !diff.pivots &&
+  (isNoDiff(diff) || map.link?.exportedWhileRunning !== true)
 
 /** `state` in a line with when `map` was last exported, for a tooltip. */
 export const linkStateDetailOf = (map: LinkedMap, state: LinkState, now: number): string => {

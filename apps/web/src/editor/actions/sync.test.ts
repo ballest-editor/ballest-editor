@@ -1,5 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Fiber } from "effect"
+import { defaultEditorState } from "../../domain/factory"
 import { linkStateOf } from "../../domain/linkState"
 import { useEditor } from "../../editor/store"
 import { projectFile, TEST_MAPS_FOLDER, type TestDisk } from "../../test/desktopBridge"
@@ -162,6 +163,24 @@ describe("sync", () => {
       assert.isNull(s().dialog)
       assert.strictEqual(disk.files.get(projectFile(name)), saved)
       assert.strictEqual(stateNow(), "inSync")
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("asks before a save in the game drops the project's pivots, which live nowhere else", () => {
+    const withPivot = JSON.stringify({
+      ...JSON.parse(text),
+      editorState: {
+        ...defaultEditorState(),
+        pivots: [{ itemIndex: 0, pivot: { choice: "Center", localPosition: { x: 0, y: 0, z: 50 } } }]
+      }
+    })
+    const disk = diskWithPlugin({ [projectFile(name)]: withPivot })
+    return Effect.gen(function*() {
+      yield* exported(disk)
+      disk.files.set(inGame, text)
+      yield* checkExportsEffect
+      assert.strictEqual(s().dialog?.id, "syncConflict")
+      assert.strictEqual(disk.files.get(projectFile(name)), withPivot)
     }).pipe(Effect.provide(layerFor(disk)))
   })
 

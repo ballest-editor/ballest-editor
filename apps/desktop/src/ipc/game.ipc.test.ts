@@ -95,7 +95,8 @@ describe("the game over IPC", () => {
           folder,
           hostVersion: null,
           requiredHost: "0.34.0",
-          hostTooOld: false
+          hostTooOld: false,
+          runningOlder: false
         })
         assert.match(
           String((yield* Effect.flip(fake.invoke(InvokeChannels.installPlugin))).cause),
@@ -113,7 +114,8 @@ describe("the game over IPC", () => {
             folder,
             hostVersion: null,
             requiredHost: "0.34.0",
-            hostTooOld: false
+            hostTooOld: false,
+            runningOlder: false
           },
           restartGame: false
         })

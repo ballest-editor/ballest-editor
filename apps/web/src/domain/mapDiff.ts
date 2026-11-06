@@ -13,7 +13,8 @@ export interface MapVersion {
 
 /**
  * `moved` is any change of transform: a turned or scaled item counts too. `edited` is any other change to an item (its
- * paint, its properties), and `settings` any change to the map's own settings.
+ * paint, its properties), `settings` any change to the map's own settings, and `pivots` any change to the items' chosen
+ * pivots, which every save in the game drops (docs/qa/save-roundtrip.md) and which are kept nowhere else.
  */
 export interface MapDiff {
   readonly added: number
@@ -21,6 +22,7 @@ export interface MapDiff {
   readonly moved: number
   readonly edited: number
   readonly settings: boolean
+  readonly pivots: boolean
 }
 
 interface KeyedItem {
@@ -90,6 +92,8 @@ const settingsOf = (map: MapFile) =>
       REWRITTEN_ON_SAVE.has(key) ? undefined : typeof value === "number" ? Number(value.toFixed(3)) : value
   )
 
+const pivotsOf = (map: MapFile) => JSON.stringify(map.editorState?.pivots ?? [])
+
 /**
  * The items `after` gained, lost and moved since `before`. A key whose item changed class is a new item. Without a key,
  * an item that left its place can't be told from one removed and another added, so it counts as those. Unchanged items
@@ -105,23 +109,25 @@ export const diffMaps = (before: MapVersion, after: MapVersion): MapDiff => {
     removed: byPlace.before.length,
     moved: movedIn(byKey.pairs) + movedIn(byPlace.pairs),
     edited: editedIn(paired),
-    settings: settingsOf(before.map) !== settingsOf(after.map)
+    settings: settingsOf(before.map) !== settingsOf(after.map),
+    pivots: pivotsOf(before.map) !== pivotsOf(after.map)
   }
 }
 
 /** Whether a diff found nothing. */
-export const isNoDiff = ({ added, edited, moved, removed, settings }: MapDiff): boolean =>
-  added + removed + moved + edited === 0 && !settings
+export const isNoDiff = ({ added, edited, moved, pivots, removed, settings }: MapDiff): boolean =>
+  added + removed + moved + edited === 0 && !settings && !pivots
 
 /** "12 items", "1 item". */
 export const itemCountOf = (count: number): string => `${count.toLocaleString()} ${count === 1 ? "item" : "items"}`
 
-/** "+2 items · −1 item · 3 moved · 1 edited · Settings changed", leaving out what didn't happen. */
-export const mapDiffLabelOf = ({ added, edited, moved, removed, settings }: MapDiff): string =>
+/** "+2 items · −1 item · 3 moved · 1 edited · Settings changed · Pivots changed", leaving out what didn't happen. */
+export const mapDiffLabelOf = ({ added, edited, moved, pivots, removed, settings }: MapDiff): string =>
   [
     ...(added > 0 ? [`+${itemCountOf(added)}`] : []),
     ...(removed > 0 ? [`−${itemCountOf(removed)}`] : []),
     ...(moved > 0 ? [`${moved.toLocaleString()} moved`] : []),
     ...(edited > 0 ? [`${edited.toLocaleString()} edited`] : []),
-    ...(settings ? ["Settings changed"] : [])
+    ...(settings ? ["Settings changed"] : []),
+    ...(pivots ? ["Pivots changed"] : [])
   ].join(" · ") || "No items or settings changed"

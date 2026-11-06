@@ -224,6 +224,7 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
       hostVersion: "0.34.2",
       requiredHost: "0.34.0",
       hostTooOld: false,
+      runningOlder: false,
       installedVersion: null,
       folder: "/game/Ballest/Binaries/Win64/plugins/ballest-editor-link"
     },

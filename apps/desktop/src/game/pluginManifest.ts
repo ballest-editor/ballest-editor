@@ -64,6 +64,10 @@ export const parseManifest = (text: string): PluginManifest => {
 /** The version in the line a host opens its log with; null when the log has none. */
 export const hostVersionIn = (log: string): string | null => /Ballest plugin host (\S+) starting/.exec(log)?.[1] ?? null
 
+/** The version of the editor plugin the host loaded in the log's session, the last when it reloaded; null for none. */
+export const loadedPluginVersionIn = (log: string): string | null =>
+  [...log.matchAll(/\[ballest-editor-link\] loaded .* (\S+)\s*$/gm)].at(-1)?.[1] ?? null
+
 /** What a plugin's `Storage` file says of the open request `nonce`: the outcome, null before it has answered. */
 export const editOutcomeIn = (storage: string, nonce: number): string | null =>
   new RegExp(`^edited=${nonce} (\\w+)\\s*$`, "m").exec(storage)?.[1] ?? null
