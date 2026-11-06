@@ -1,22 +1,27 @@
 import {
+  IconAlertCircle,
+  IconAlertTriangle,
+  IconChevronRight,
   IconCircleCheck,
-  IconCircleDashed,
   IconClipboard,
   IconCopy,
   IconFolderOpen,
   IconSettings,
-  IconTrash
+  IconTrash,
+  IconUserCircle
 } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/ui/components/collapsible"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
-import { Fragment, type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { Fragment, type ReactNode, useMemo, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
 import type { UeTransform, Vec3 } from "../domain/coords"
+import { creatorChipText, mapCreatorLabel } from "../domain/creator"
 import { editTransform, isDecal } from "../domain/editTransform"
 import { mapLabelOf } from "../domain/factory"
 import { exactSelectedGroup } from "../domain/groupSelection"
@@ -27,6 +32,7 @@ import { classNameOf, isPlayerStart, type Item, objectPathOf } from "../domain/M
 import { assetNameOf } from "../domain/Materials"
 import { pieceNameOf } from "../domain/structure"
 import { createdAtIso, formatAgo, formatDate, formatDateTime } from "../domain/time"
+import { type MapValidation, validateMap } from "../domain/validateMap"
 import {
   deleteSelection,
   duplicateSelection,
@@ -36,7 +42,7 @@ import {
   setSelectionField
 } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
-import { selectedIndices, useEditor, useOpenPrefab } from "../editor/store"
+import { type Doc, gameMapOf, selectedIndices, useCreator, useEditor, useOpenPrefab } from "../editor/store"
 import { useNow } from "../editor/useNow"
 import { glbUrl, visualsOf } from "../editor/visuals"
 import { Disclosure } from "./Disclosure"
@@ -79,28 +85,6 @@ function TipText({ tip, className, children }: {
     <Tooltip>
       <TooltipTrigger render={<span className={className} />}>{children}</TooltipTrigger>
       <TooltipContent side="left" className="flex-col items-start wrap-anywhere">{tip}</TooltipContent>
-    </Tooltip>
-  )
-}
-
-/** Text its width may cut off: the whole of it in a tooltip, and no tooltip when it all fits. Key it by its text. */
-function TruncatedText({ text }: { readonly text: string }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const [truncated, setTruncated] = useState(false)
-  useLayoutEffect(() => {
-    const element = ref.current
-    if (element === null) return
-    const measure = () => setTruncated(element.scrollWidth > element.clientWidth)
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [])
-  return (
-    <Tooltip disabled={!truncated}>
-      <TooltipTrigger render={<span ref={ref} className="max-w-40 min-w-0 truncate" />}>{text}</TooltipTrigger>
-      {/* Above, not to the left, where it would cover the fact's label. */}
-      <TooltipContent className="wrap-anywhere">{text}</TooltipContent>
     </Tooltip>
   )
 }
@@ -151,10 +135,119 @@ function CreatedFact({ createdAt }: { readonly createdAt: string }) {
   )
 }
 
-const VALIDATED_HINT = "Someone finished a validation run of this map in the in-game editor, which set its medal times."
+/** The creator in a pill: the whole name, and where it came from, in the tooltip. */
+function CreatorChip({ name }: { readonly name: string }) {
+  const creator = useCreator()
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={<Badge variant="neutral" className="min-w-0 shrink justify-start pl-0.5 [&>svg]:size-4!" />}
+      >
+        <IconUserCircle />
+        <span className="min-w-0 truncate">{creatorChipText(name)}</span>
+      </TooltipTrigger>
+      {/* Above, not to the left, where it would cover the fact's label. */}
+      <TooltipContent className="flex-col items-start wrap-anywhere">
+        <span>{name}</span>
+        <span>{mapCreatorLabel(name, creator)}</span>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+const VALIDATED_HINT =
+  "Validate checks the file against the game's format. Separately, someone finished a validation run of this map in the in-game editor, which set its medal times."
 
 const NOT_VALIDATED_HINT =
-  "A validation run is a race of the map in the in-game editor. Finishing one validates the map and sets its medal times. Ballest Editor can't run one, so open the map in the game."
+  "Validate checks the file against the game's format. It isn't a validation run, a race of the map in the in-game editor that sets its medal times, and nobody has finished one yet. Ballest Editor can't run one, so open the map in the game."
+
+const counted = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`
+
+/** The row's words for a check: the errors if there are any, as the map isn't valid then. */
+const validationLabel = ({ errors, warnings }: MapValidation): string => {
+  if (errors.length > 0) return counted(errors.length, "error")
+  return warnings.length > 0 ? `Valid · ${counted(warnings.length, "warning")}` : "Valid"
+}
+
+const ErrorIcon = () => <IconAlertCircle className="size-4 shrink-0 text-destructive" />
+const WarningIcon = () => <IconAlertTriangle className="size-4 shrink-0 text-status-warn-foreground" />
+
+function ValidationIcon({ errors, warnings }: MapValidation) {
+  if (errors.length > 0) return <ErrorIcon />
+  return warnings.length > 0
+    ? <WarningIcon />
+    : <IconCircleCheck className="size-4 shrink-0 text-status-ok-foreground" />
+}
+
+function ValidationList({ errors, warnings }: MapValidation) {
+  const rows = [
+    ...errors.map((text) => ({ text, icon: <ErrorIcon /> })),
+    ...warnings.map((text) => ({ text, icon: <WarningIcon /> }))
+  ]
+  return (
+    <ScrollArea className="rounded-surface bg-muted [&_[data-slot=scroll-area-viewport]]:max-h-48">
+      <ul className="flex flex-col gap-1 p-2 text-fg-secondary">
+        {rows.map(({ icon, text }) => (
+          <li key={text} className="flex gap-1.5">
+            <span className="flex h-5 items-center">{icon}</span>
+            <span className="min-w-0 wrap-anywhere">{text}</span>
+          </li>
+        ))}
+      </ul>
+    </ScrollArea>
+  )
+}
+
+/**
+ * The map against the game's format, on request. The result holds for the document it was run on, so any edit puts the
+ * button back.
+ */
+function StatusFact({ validated }: { readonly validated: boolean }) {
+  const doc = useEditor((s) => s.doc)
+  const [checked, setChecked] = useState<{ readonly doc: Doc; readonly result: MapValidation } | null>(null)
+  const hint = <InfoHint>{validated ? VALIDATED_HINT : NOT_VALIDATED_HINT}</InfoHint>
+  if (checked?.doc !== doc) {
+    const validate = () => {
+      const { catalogIndex } = useEditor.getState()
+      setChecked({ doc, result: validateMap(gameMapOf(doc, catalogIndex), catalogIndex) })
+    }
+    return (
+      <Fact label="Status">
+        <Button variant="secondary" size="sm" onClick={validate}>Validate</Button>
+        {hint}
+      </Fact>
+    )
+  }
+  const { result } = checked
+  const label = (
+    <>
+      <ValidationIcon {...result} />
+      <span className="min-w-0 truncate">{validationLabel(result)}</span>
+    </>
+  )
+  if (result.errors.length + result.warnings.length === 0) {
+    return (
+      <Fact label="Status">
+        {label}
+        {hint}
+      </Fact>
+    )
+  }
+  return (
+    <Collapsible className="contents">
+      <Fact label="Status">
+        <CollapsibleTrigger className="group/status -ml-1 flex h-6 min-w-0 cursor-pointer items-center gap-1 rounded-control px-1 outline-none transition-colors hover:bg-foreground/6 focus-visible:ring-2 focus-visible:ring-ring">
+          {label}
+          <IconChevronRight className="size-4 shrink-0 text-fg-secondary transition-transform group-data-[panel-open]/status:rotate-90" />
+        </CollapsibleTrigger>
+        {hint}
+      </Fact>
+      <CollapsibleContent render={<dd />} className="col-span-2">
+        <ValidationList {...result} />
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
 
 function MapSettings() {
   const levelData = useEditor((s) => s.doc.map.worldSettings.levelData)
@@ -189,17 +282,11 @@ function MapSettings() {
                 <InfoHint>Your creator name is set in Settings › General.</InfoHint>
               </>
             )
-            : <TruncatedText key={levelData.creatorName} text={levelData.creatorName} />}
+            : <CreatorChip name={levelData.creatorName} />}
         </Fact>
         <Fact label="Items">{itemCount.toLocaleString()}</Fact>
         <CreatedFact createdAt={levelData.createdAt} />
-        <Fact label="Status">
-          {levelData.bValidated
-            ? <IconCircleCheck className="size-4 shrink-0 text-fg-secondary" />
-            : <IconCircleDashed className="size-4 shrink-0 text-fg-tertiary" />}
-          {levelData.bValidated ? "Validated" : "Not validated"}
-          <InfoHint>{levelData.bValidated ? VALIDATED_HINT : NOT_VALIDATED_HINT}</InfoHint>
-        </Fact>
+        <StatusFact validated={levelData.bValidated} />
         {file === null
           ? (
             <Fact label="File">
