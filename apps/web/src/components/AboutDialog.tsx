@@ -62,21 +62,12 @@ function UpdateRow({ state }: { readonly state: UpdateState }) {
 }
 
 /** A link in the dialog's text. */
-function TextLink({ children, onClick }: { readonly children: string; readonly onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      className="rounded-control underline underline-offset-3 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  )
-}
+const TEXT_LINK =
+  "rounded-control underline underline-offset-3 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
 
 /** A web link in the dialog's text, opened in the default browser. */
 const ExternalLink = ({ children, url }: { readonly children: string; readonly url: string }) => (
-  <TextLink onClick={() => void openExternalLink(url)}>{children}</TextLink>
+  <button type="button" className={TEXT_LINK} onClick={() => void openExternalLink(url)}>{children}</button>
 )
 
 /** The list in the dialog's place, back to the rest with one click. */
@@ -125,7 +116,9 @@ export function AboutDialog({ open, onClose }: { readonly open: boolean; readonl
             <p className="text-fg-tertiary">
               MIT licence, see <ExternalLink url={LICENSE_URL}>LICENSE</ExternalLink>
               {" · "}
-              <TextLink onClick={() => setLicences(true)}>Open-source licences</TextLink>
+              <button type="button" className={TEXT_LINK} onClick={() => setLicences(true)}>
+                Open-source licences
+              </button>
             </p>
           </div>
         )}
