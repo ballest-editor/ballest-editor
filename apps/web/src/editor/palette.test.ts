@@ -18,19 +18,25 @@ const oklchOf = (tokens: ReadonlyMap<string, string>, name: string): Rgb => {
   return [Number(match[1]), Number(match[2]), Number(match[3])]
 }
 
-/** OKLCH to linear sRGB (Ottosson's matrices), clipped as a browser clips it. */
-const linearOf = ([lightness, chroma, hue]: Rgb): Rgb => {
+/** OKLCH to linear sRGB (Ottosson's matrices). A channel outside 0 to 1 is outside sRGB. */
+const unclippedOf = ([lightness, chroma, hue]: Rgb): Rgb => {
   const a = chroma * Math.cos((hue * Math.PI) / 180)
   const b = chroma * Math.sin((hue * Math.PI) / 180)
   const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3
   const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3
   const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3
-  const clip = (channel: number) => Math.min(1, Math.max(0, channel))
   return [
-    clip(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
-    clip(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
-    clip(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s)
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s
   ]
+}
+
+/** Clipped as a browser clips it. */
+const linearOf = (oklch: Rgb): Rgb => {
+  const clip = (channel: number) => Math.min(1, Math.max(0, channel))
+  const [r, g, b] = unclippedOf(oklch)
+  return [clip(r), clip(g), clip(b)]
 }
 
 const encoded = (c: number) => c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055
@@ -54,7 +60,7 @@ const GRAPHIC = 3
 
 /** The steps' contrast on --card, as docs/design/ui-system.md gives them. */
 const STEPS = {
-  dark: { "fg-secondary": 11, "fg-tertiary": 7.5, "fg-disabled": 3.2 },
+  dark: { foreground: 16, "fg-secondary": 11, "fg-tertiary": 7.5, "fg-disabled": 3.2 },
   light: { "fg-secondary": 10.7, "fg-tertiary": 6.3, "fg-disabled": 2.6 }
 }
 
@@ -129,6 +135,13 @@ describe("the palette", () => {
       })
     }
 
+    // bg-foreground/6 on a panel and /8 on a menu: docs/design/ui-system.md § Colour.
+    it(`${theme}: a hover rises further than the surfaces step`, () => {
+      const step = contrast(color("card"), color("popover"))
+      assert.isAbove(contrast(over(color("foreground"), 0.06, color("card")), color("card")), step)
+      assert.isAbove(contrast(over(color("foreground"), 0.08, color("popover")), color("popover")), step)
+    })
+
     it(`${theme}: each surface rises above the last, with no hue to name`, () => {
       const [background, card, popover] = SURFACES.map((name) => oklchOf(tokens, name))
       assert.isBelow(background?.[0] ?? 1, card?.[0] ?? 0)
@@ -138,4 +151,21 @@ describe("the palette", () => {
       }
     })
   }
+
+  const dark = THEMES.dark
+
+  // A track or a key chip sits on --popover in a dialog or a menu, so it can't share that tone.
+  it("dark: the neutral fills rise above --popover", () => {
+    for (const name of ["muted", "accent", "secondary"]) {
+      assert.isAbove(oklchOf(dark, name)[0], oklchOf(dark, "popover")[0])
+    }
+  })
+
+  // Past sRGB a browser clips the accent to a harsher cyan than the value says.
+  it("dark: --primary stays inside sRGB", () => {
+    for (const channel of unclippedOf(oklchOf(dark, "primary"))) {
+      assert.isAtLeast(channel, 0)
+      assert.isAtMost(channel, 1)
+    }
+  })
 })
