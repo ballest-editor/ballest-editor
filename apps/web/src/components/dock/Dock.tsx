@@ -1,6 +1,10 @@
-import { IconArrowsMinimize } from "@tabler/icons-react"
+import { IconArrowsMinimize, IconX } from "@tabler/icons-react"
+import { Button } from "@workspace/ui/components/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { PortalContainerContext } from "@workspace/ui/lib/portal-container"
 import {
+  type DockviewGroupPanelApi,
+  type DockviewPanelApi,
   DockviewReact,
   type DockviewTheme,
   type IDockviewHeaderActionsProps,
@@ -17,31 +21,38 @@ import { ViewportControls } from "../ViewControls"
 import "./dock.css"
 import { attachDock, expandGroup, isCentreGroup, useGroupFold } from "./dockControl"
 import { followDockDrags } from "./dragImage"
-import { GroupMenu, StripButton } from "./GroupMenu"
+import { GroupMenu } from "./GroupMenu"
 import { dockPanels } from "./panels"
+import { StripButton } from "./StripButton"
 
 const dockTheme: DockviewTheme = { name: "ballest", className: "dockview-theme-ballest" }
 
 /** The centre group's panel: the map tabs are in its header (`CentreTabs`), so this is only the viewport. */
 const DocumentsPanel = () => <Viewport controls={ViewportControls} />
 
+/** The window a panel or group is in, and how many times it has come back to the main one. */
+function useDockWindow(api: DockviewPanelApi | DockviewGroupPanelApi) {
+  const [dockWindow, setDockWindow] = useState(() => api.getWindow())
+  const [returns, setReturns] = useState(0)
+  useEffect(() => {
+    const listener = api.onDidLocationChange(() => {
+      const next = api.getWindow()
+      setDockWindow(next)
+      if (next === window) setReturns((count) => count + 1)
+    })
+    return () => listener.dispose()
+  }, [api])
+  return { portalContainer: dockWindow === window ? undefined : dockWindow.document.body, returns }
+}
+
 /**
  * What a panel renders in: it fills its tab, its popups go to the window it's in, and it renders afresh coming back to
  * the main window (`returns`), as its elements belong to the window that went (docs/DESKTOP.md § Dock).
  */
 function PanelFrame({ api, children }: { readonly api: IDockviewPanelProps["api"]; readonly children: ReactNode }) {
-  const [panelWindow, setPanelWindow] = useState(() => api.getWindow())
-  const [returns, setReturns] = useState(0)
-  useEffect(() => {
-    const listener = api.onDidLocationChange(() => {
-      const next = api.getWindow()
-      setPanelWindow(next)
-      if (next === window) setReturns((count) => count + 1)
-    })
-    return () => listener.dispose()
-  }, [api])
+  const { portalContainer, returns } = useDockWindow(api)
   return (
-    <PortalContainerContext value={panelWindow === window ? undefined : panelWindow.document.body}>
+    <PortalContainerContext value={portalContainer}>
       <div key={returns} className="h-full min-w-0 overflow-hidden bg-card">{children}</div>
     </PortalContainerContext>
   )
@@ -58,20 +69,51 @@ const dockComponents = {
   ...Object.fromEntries(dockPanels.map((panel) => [panel.id, inFrame(panel.component)]))
 }
 
-/** A panel's tab. Panels open and close from the View menu and a group's "…", so it has no ×. */
+/**
+ * A panel's tab: its icon, its title while the strip has room for it (dock.css), and a × under the pointer. The tooltip
+ * stands in for a title the strip has hidden, and a rail keeps the title alone.
+ */
 function DockTab({ api, containerApi }: IDockviewPanelHeaderProps) {
+  const { portalContainer } = useDockWindow(api)
+  const [named, setNamed] = useState(false)
+  const title = useRef<HTMLSpanElement>(null)
+  const Icon = dockPanels.find((panel) => panel.id === api.id)?.icon
   const expand = () => {
     const group = containerApi.getPanel(api.id)?.group
     if (group !== undefined) expandGroup(group)
   }
   return (
-    <div
-      className="dock-tab flex h-full min-w-0 items-center px-2.5 text-caption uppercase tracking-wider"
-      onClick={expand}
-      {...closesOnMiddleClick(() => api.close())}
-    >
-      <span className="truncate">{api.title}</span>
-    </div>
+    <PortalContainerContext value={portalContainer}>
+      <Tooltip open={named} onOpenChange={(open) => setNamed(open && title.current?.checkVisibility() === false)}>
+        <TooltipTrigger
+          render={
+            <div
+              className="dock-tab group flex h-full min-w-0 items-center gap-1 px-2 text-body"
+              onClick={expand}
+              {...closesOnMiddleClick(() => api.close())}
+            />
+          }
+        >
+          {Icon !== undefined && <Icon className="dock-tab-icon size-4 shrink-0" />}
+          <span ref={title} className="dock-tab-title truncate">{api.title}</span>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="dock-tab-close -mr-1.5 hidden [.group:hover_&]:inline-flex"
+            aria-label={`Close ${api.title}`}
+            // dockview would make the tab active first, and a click on the tab unfolds its group
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation()
+              api.close()
+            }}
+          >
+            <IconX />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{api.title}</TooltipContent>
+      </Tooltip>
+    </PortalContainerContext>
   )
 }
 
@@ -88,17 +130,20 @@ function CentreTabs({ group }: IDockviewHeaderActionsProps) {
 /** The end of a group's strip: its "…", or in a popped-out window the way back. A rail has neither. */
 function GroupActions({ group, activePanel, location }: IDockviewHeaderActionsProps) {
   const fold = useGroupFold(group)
+  const { portalContainer } = useDockWindow(group.api)
   if (fold === "width") return null
   return (
-    <div className="flex h-full items-center px-1">
-      {location?.type === "popout"
-        ? (
-          <StripButton label="Back to the main window" onClick={() => group.api.getWindow().close()}>
-            <IconArrowsMinimize />
-          </StripButton>
-        )
-        : <GroupMenu group={group} activePanel={activePanel} />}
-    </div>
+    <PortalContainerContext value={portalContainer}>
+      <div className="flex h-full items-center px-1">
+        {location?.type === "popout"
+          ? (
+            <StripButton label="Back to the main window" onClick={() => group.api.getWindow().close()}>
+              <IconArrowsMinimize />
+            </StripButton>
+          )
+          : <GroupMenu group={group} activePanel={activePanel} />}
+      </div>
+    </PortalContainerContext>
   )
 }
 

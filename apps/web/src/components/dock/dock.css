@@ -4,7 +4,7 @@
  */
 .dockview-theme-ballest {
   --dv-tabs-and-actions-container-height: 1.75rem;
-  --dv-tabs-and-actions-container-font-size: var(--text-caption);
+  --dv-tabs-and-actions-container-font-size: var(--text-body);
   --dv-group-view-background-color: var(--card);
   --dv-tabs-and-actions-container-background-color: var(--card);
   --dv-activegroup-visiblepanel-tab-color: var(--foreground);
@@ -16,10 +16,9 @@
   --dv-active-sash-color: color-mix(in oklab, var(--primary) 60%, transparent);
   --dv-active-sash-transition-duration: calc(100ms * var(--motion));
   --dv-active-sash-transition-delay: calc(200ms * var(--motion));
-  --dock-drop-color: color-mix(in oklab, var(--primary) 65%, var(--foreground));
-  --dv-drag-over-background-color: color-mix(in oklab, var(--dock-drop-color) 20%, transparent);
-  --dv-drag-over-border-color: var(--dock-drop-color);
-  --dv-drag-over-border: 1px solid var(--dock-drop-color);
+  --dv-drag-over-background-color: color-mix(in oklab, var(--ring) 20%, transparent);
+  --dv-drag-over-border-color: var(--ring);
+  --dv-drag-over-border: 1px solid var(--ring);
   --dv-tabs-container-scrollbar-color: var(--border);
   --dv-overlay-z-index: 40;
   font-family: var(--font-sans);
@@ -34,7 +33,7 @@
 /* Where a dragged panel would land: a side of a group, its whole, or a place in a strip. */
 .dockview-theme-ballest .dv-drop-target-anchor,
 .dockview-theme-ballest .dv-drop-target-selection {
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-surface);
 }
 
 /* What follows the pointer in a drag (dragImage.ts): the tab or strip it came from, bare on its card. */
@@ -54,11 +53,16 @@
   box-shadow: inset 0 -1px var(--border);
 }
 
-/* The panels' tabs, the active one underlined; `DockTab` styles what's in them. */
+/* The panels' tabs, the active one underlined; `DockTab` styles what's in them. A tab can be dragged, and shows it. */
 .dockview-theme-ballest .dv-tab {
   padding: 0;
   box-shadow: inset 0 -2px transparent;
+  cursor: grab;
   transition: color calc(100ms * var(--motion));
+}
+
+.dockview-theme-ballest .dv-tab:active {
+  cursor: grabbing;
 }
 
 /* A tab behind another lights up under the pointer, as the document tabs do. */
@@ -68,6 +72,56 @@
 
 .dockview-theme-ballest .dv-tab.dv-active-tab {
   box-shadow: inset 0 -2px var(--primary);
+}
+
+/*
+ * A strip too narrow for its tabs' titles keeps the active tab's, and narrower still, only the icons. Each width is what
+ * that many tabs need, the "…" and a hovered tab's × included. A rail's strip runs the other way, so it has no container.
+ */
+.dv-groupview:not([data-dock-rail]) > .dv-tabs-and-actions-container {
+  container: dock-strip / inline-size;
+}
+
+@container dock-strip (width < 232px) {
+  .dv-tabs-container:has(> :nth-child(2)) .dv-inactive-tab .dock-tab-title {
+    display: none;
+  }
+}
+
+@container dock-strip (width < 312px) {
+  .dv-tabs-container:has(> :nth-child(3)) .dv-inactive-tab .dock-tab-title {
+    display: none;
+  }
+}
+
+@container dock-strip (width < 392px) {
+  .dv-tabs-container:has(> :nth-child(4)) .dv-inactive-tab .dock-tab-title {
+    display: none;
+  }
+}
+
+@container dock-strip (width < 480px) {
+  .dv-tabs-container:has(> :nth-child(5)) .dv-inactive-tab .dock-tab-title {
+    display: none;
+  }
+}
+
+@container dock-strip (width < 216px) {
+  .dv-tabs-container:has(> :nth-child(3)) .dock-tab-title {
+    display: none;
+  }
+}
+
+@container dock-strip (width < 248px) {
+  .dv-tabs-container:has(> :nth-child(4)) .dock-tab-title {
+    display: none;
+  }
+}
+
+@container dock-strip (width < 280px) {
+  .dv-tabs-container:has(> :nth-child(5)) .dock-tab-title {
+    display: none;
+  }
 }
 
 /* The map tabs scroll in the strip; the tab standing in for them takes no room. */
@@ -128,6 +182,10 @@
   width: 100%;
   justify-content: center;
   padding: 0;
+}
+
+.dv-groupview[data-dock-rail] :is(.dock-tab-icon, .dock-tab-close) {
+  display: none;
 }
 
 /*

@@ -7,6 +7,7 @@ import type { DockPanel } from "./panels"
 const panel = (id: string, location: DockPanel["location"], rest: Partial<DockPanel> = {}): DockPanel => ({
   id,
   title: id,
+  icon: () => null,
   location,
   component: () => null,
   ...rest

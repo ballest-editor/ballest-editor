@@ -1,4 +1,5 @@
 import { IconBoxMultiple, IconPlus, IconX } from "@tabler/icons-react"
+import { Button } from "@workspace/ui/components/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,6 +9,7 @@ import {
 } from "@workspace/ui/components/dropdown-menu"
 import { cn } from "@workspace/ui/lib/utils"
 import { type DragEvent, type MouseEvent, useEffect, useRef, useState } from "react"
+import type { ViewLayoutKind } from "../domain/viewLayout"
 import {
   closeOtherTabs,
   closeTab,
@@ -17,6 +19,7 @@ import {
   startNewMap
 } from "../editor/actions"
 import { useEditor, useTabSummary } from "../editor/store"
+import { StripButton } from "./dock/StripButton"
 
 /** A tab being dragged along the strip, and the gap it would land in. */
 type TabDrag = { readonly id: string; readonly at: number } | null
@@ -34,7 +37,8 @@ export const closesOnMiddleClick = (close: () => void) => ({
 
 /**
  * The map tabs in the centre group's strip (docs/DESKTOP.md § Document tabs). A tab's dot marks unsaved edits and gives
- * way to the × while the tab is hovered. The + after the last tab stays in view while the tabs scroll.
+ * way to the × while the tab is hovered. The + after the last tab stays in view while the tabs scroll. Not `group-hover`:
+ * that is off under `(hover: none)`, which a window with a mouse can report, and the × would never show.
  */
 export function DocumentTabs() {
   const tabIds = useEditor((s) => s.tabIds)
@@ -66,15 +70,11 @@ export function DocumentTabs() {
       >
         {tabIds.map((id, index) => <DocumentTab key={id} id={id} index={index} drag={drag} onDrag={setDrag} />)}
       </div>
-      <button
-        type="button"
-        aria-label="New map"
-        title="New map"
-        className="flex w-8 shrink-0 items-center justify-center text-fg-secondary outline-none hover:bg-muted/40 hover:text-foreground focus-visible:shadow-[inset_0_0_0_2px_var(--ring)]"
-        onClick={() => void startNewMap()}
-      >
-        <IconPlus className="size-3.5" />
-      </button>
+      <div className="flex shrink-0 items-center px-1">
+        <StripButton label="New map" onClick={() => void startNewMap()}>
+          <IconPlus />
+        </StripButton>
+      </div>
     </div>
   )
 }
@@ -90,6 +90,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
   const several = useEditor((s) => s.tabIds.length > 1)
   const last = useEditor((s) => s.tabIds.at(-1) === id)
   const activateTab = useEditor((s) => s.activateTab)
+  const setViewLayoutKind = useEditor((s) => s.setViewLayoutKind)
   const { label, unsaved, path, fileName, prefabTier } = useTabSummary(id)
   const ref = useRef<HTMLDivElement>(null)
   const menuButton = useRef<HTMLButtonElement>(null)
@@ -98,6 +99,11 @@ function DocumentTab({ id, index, drag, onDrag }: {
     if (active) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }, [active])
 
+  /** A map's view is its tab's, so the split goes to the tab the menu is for. */
+  const split = (kind: ViewLayoutKind) => {
+    activateTab(id)
+    setViewLayoutKind(kind)
+  }
   const onContextMenu = (e: MouseEvent) => {
     e.preventDefault()
     menuButton.current?.click()
@@ -115,7 +121,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
       ref={ref}
       draggable
       className={cn(
-        "group relative flex h-full max-w-56 shrink-0 items-center gap-1 border-r pr-1 pl-2 transition-opacity",
+        "group relative flex h-full max-w-56 shrink-0 cursor-grab items-center gap-1 border-r pr-1 pl-2 transition-opacity active:cursor-grabbing",
         active ? "bg-background text-foreground" : "text-fg-secondary hover:bg-muted/40 hover:text-foreground",
         "has-[button:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring)]",
         drag?.id === id && "opacity-40",
@@ -139,33 +145,34 @@ function DocumentTab({ id, index, drag, onDrag }: {
         type="button"
         role="tab"
         aria-selected={active}
-        className="flex h-full min-w-0 items-center outline-none"
+        className="flex h-full min-w-0 cursor-[inherit] items-center outline-none"
         onClick={() => activateTab(id)}
       >
-        {prefabTier !== null && <IconBoxMultiple className="mr-1 size-3 shrink-0 text-fg-tertiary" />}
+        {prefabTier !== null && <IconBoxMultiple className="mr-1 size-4 shrink-0 text-fg-tertiary" />}
         <span className="truncate">{label}</span>
         {prefabTier !== null && (
           <span className="ml-1 shrink-0 text-caption text-fg-tertiary">{projects ? prefabTier : "session"}</span>
         )}
       </button>
-      <span className="relative flex size-4 shrink-0 items-center justify-center">
+      <span className="relative flex size-6 shrink-0 items-center justify-center">
         {unsaved && (
           <span
-            className="size-1.5 rounded-full bg-foreground/60 group-hover:invisible group-has-[button:focus-visible]:invisible"
+            className="size-1.5 rounded-full bg-foreground/60 group-has-[button:focus-visible]:invisible [.group:hover_&]:invisible"
             aria-label="unsaved"
           />
         )}
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-sm"
           aria-label={`Close ${label}`}
           className={cn(
-            "absolute inset-0 flex items-center justify-center rounded-control opacity-0 outline-none hover:bg-muted focus-visible:opacity-100 group-hover:opacity-100",
+            "absolute inset-0 opacity-0 focus-visible:opacity-100 [.group:hover_&]:opacity-100",
             active && !unsaved && "opacity-100"
           )}
           onClick={() => void closeTab(id)}
         >
-          <IconX className="size-3" />
-        </button>
+          <IconX />
+        </Button>
       </span>
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -178,13 +185,27 @@ function DocumentTab({ id, index, drag, onDrag }: {
           <DropdownMenuItem disabled={last} onClick={() => void closeTabsToRight(id)}>
             Close to the right
           </DropdownMenuItem>
-          {projects && fileName !== null && (
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => split("columns")}>Split right</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => split("rows")}>Split down</DropdownMenuItem>
+          {projects && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => void nameProjectMap(fileName, "rename")}>Rename…</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => void nameProjectMap(fileName, "duplicate")}>Duplicate…</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => void revealProject()}>Reveal</DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={fileName === null}
+                onClick={() => fileName !== null && void nameProjectMap(fileName, "rename")}
+              >
+                Rename…
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={fileName === null}
+                onClick={() => fileName !== null && void nameProjectMap(fileName, "duplicate")}
+              >
+                Duplicate…
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={fileName === null} onClick={() => void revealProject()}>
+                Reveal
+              </DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>

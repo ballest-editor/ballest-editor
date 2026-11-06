@@ -374,3 +374,9 @@ export const usePanelCheck = (id: string) => ({
 
 export const useViewMenuPanels = (): ReadonlyArray<DockPanel> =>
   useSyncExternalStore(followDockChanges, () => dockPanels)
+
+/** The panels a group's "…" can bring back: every one that's open nowhere in the dock. */
+export const useClosedPanels = (): ReadonlyArray<DockPanel> => {
+  const open = useSyncExternalStore(followDockChanges, () => openPanels)
+  return useViewMenuPanels().filter((panel) => !open.has(panel.id))
+}
