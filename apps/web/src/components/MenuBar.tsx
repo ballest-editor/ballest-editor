@@ -138,7 +138,10 @@ function RecentProjectsMenu() {
   return (
     <MenubarSub>
       <DisabledReason reason={recent.length === 0 ? "No recent projects yet." : null}>
-        <MenubarSubTrigger disabled={recent.length === 0}>Recent projects</MenubarSubTrigger>
+        {/* Unlike an item, a disabled submenu title keeps the pointer: it would light up and take focus. */}
+        <MenubarSubTrigger disabled={recent.length === 0} className="data-disabled:pointer-events-none">
+          Recent projects
+        </MenubarSubTrigger>
       </DisabledReason>
       <MenubarSubContent className="w-max max-w-96">
         <MenubarGroup>
