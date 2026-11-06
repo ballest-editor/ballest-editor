@@ -1,10 +1,15 @@
 import { assert, describe, it } from "@effect/vitest"
 import {
+  CHIP_STATUS_LABELS,
+  CHIP_STATUS_TONES,
+  chipStatusOf,
   LINK_STATE_LABELS,
   type LinkedMap,
   type LinkState,
   linkStateDetailOf,
   linkStateOf,
+  SAVED_CHIP_MS,
+  savedChipMsLeft,
   SYNC_STATUS_LABELS,
   SYNC_STATUS_TONES,
   syncDetailOf,
@@ -110,6 +115,41 @@ describe("syncStatusOf", () => {
       ["Changed since export", "warn"],
       ["Published draft", "neutral"]
     ])
+  })
+})
+
+describe("the chip's Saved state", () => {
+  const savedAt = "2026-10-31T12:00:00.000Z"
+  const saved = Date.parse(savedAt)
+
+  it("lasts about two seconds from the save", () => {
+    assert.strictEqual(SAVED_CHIP_MS, 2_000)
+    assert.strictEqual(savedChipMsLeft(savedAt, saved), SAVED_CHIP_MS)
+    assert.strictEqual(savedChipMsLeft(savedAt, saved + 500), 1_500)
+    assert.strictEqual(savedChipMsLeft(savedAt, saved + SAVED_CHIP_MS - 1), 1)
+  })
+
+  it("is over after that, so a map opened long after its save doesn't claim one", () => {
+    assert.strictEqual(savedChipMsLeft(savedAt, saved + SAVED_CHIP_MS), 0)
+    assert.strictEqual(savedChipMsLeft(savedAt, saved + 3_600_000), 0)
+  })
+
+  it("doesn't begin for a save time ahead of the clock", () => {
+    assert.strictEqual(savedChipMsLeft(savedAt, saved - 1), 0)
+  })
+
+  it("stands in for any status but Unsaved, and goes back to the status after", () => {
+    const statuses: ReadonlyArray<SyncStatus> = ["notExported", "inSync", "changedSinceExport", "publishedDraft"]
+    for (const status of statuses) {
+      assert.strictEqual(chipStatusOf(status, true), "saved")
+      assert.strictEqual(chipStatusOf(status, false), status)
+    }
+    assert.strictEqual(chipStatusOf("unsaved", true), "unsaved")
+  })
+
+  it("is labelled, and wears ok", () => {
+    assert.strictEqual(CHIP_STATUS_LABELS.saved, "Saved")
+    assert.strictEqual(CHIP_STATUS_TONES.saved, "ok")
   })
 })
 

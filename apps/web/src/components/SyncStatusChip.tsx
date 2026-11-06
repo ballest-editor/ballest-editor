@@ -1,10 +1,18 @@
-import { IconCircleCheck, IconCircleDashed, IconPencil, IconRefreshAlert, IconWorldUpload } from "@tabler/icons-react"
+import {
+  IconCheck,
+  IconCircleCheck,
+  IconCircleDashed,
+  IconPencil,
+  IconRefreshAlert,
+  IconWorldUpload
+} from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { cn } from "@workspace/ui/lib/utils"
 import type { ComponentProps, ComponentType } from "react"
-import { SYNC_STATUS_LABELS, SYNC_STATUS_TONES, type SyncStatus, type SyncTone } from "../domain/linkState"
+import { CHIP_STATUS_LABELS, CHIP_STATUS_TONES, type ChipStatus, type SyncTone } from "../domain/linkState"
 
-const ICONS: Record<SyncStatus, ComponentType<{ readonly className?: string }>> = {
+const ICONS: Record<ChipStatus, ComponentType<{ readonly className?: string }>> = {
+  saved: IconCheck,
   unsaved: IconPencil,
   notExported: IconCircleDashed,
   inSync: IconCircleCheck,
@@ -40,15 +48,15 @@ export function StatusChip(
  */
 export function SyncStatusChip(
   { status, icon = true, children, ...props }: ComponentProps<typeof Badge> & {
-    readonly status: SyncStatus
+    readonly status: ChipStatus
     readonly icon?: boolean
   }
 ) {
   const Icon = ICONS[status]
   return (
-    <StatusChip tone={SYNC_STATUS_TONES[status]} {...props}>
+    <StatusChip tone={CHIP_STATUS_TONES[status]} {...props}>
       {icon && <Icon />}
-      {SYNC_STATUS_LABELS[status]}
+      {CHIP_STATUS_LABELS[status]}
       {children}
     </StatusChip>
   )

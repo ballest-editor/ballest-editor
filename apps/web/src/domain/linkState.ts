@@ -83,6 +83,26 @@ const LINK_SYNC_STATUS: Record<LinkState, SyncStatus> = {
   publishedDraft: "publishedDraft"
 }
 
+/** What the status bar chip can say: a map's status, or for a moment after a save, that it was saved. */
+export type ChipStatus = SyncStatus | "saved"
+
+export const CHIP_STATUS_LABELS: Record<ChipStatus, string> = { ...SYNC_STATUS_LABELS, saved: "Saved" }
+
+export const CHIP_STATUS_TONES: Record<ChipStatus, SyncTone> = { ...SYNC_STATUS_TONES, saved: "ok" }
+
+/** How long the chip says Saved. */
+export const SAVED_CHIP_MS = 2_000
+
+/** How much longer the chip says Saved at `now`, for a map last saved at `savedAt`. 0 once it is over, or never begun. */
+export const savedChipMsLeft = (savedAt: string, now: number): number => {
+  const age = now - Date.parse(savedAt)
+  return age >= 0 && age < SAVED_CHIP_MS ? SAVED_CHIP_MS - age : 0
+}
+
+/** What the chip says for a map in `status`. Unsaved outranks Saved: an edit right after a save has to show. */
+export const chipStatusOf = (status: SyncStatus, justSaved: boolean): ChipStatus =>
+  justSaved && status !== "unsaved" ? "saved" : status
+
 /** The status of a map in `state`. `unsaved` (its tab has unsaved edits) outranks every link state. */
 export const syncStatusOf = (state: LinkState, unsaved: boolean): SyncStatus =>
   unsaved ? "unsaved" : LINK_SYNC_STATUS[state]

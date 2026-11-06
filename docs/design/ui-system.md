@@ -127,7 +127,7 @@ Status is semantic and quiet: a filled tint with its own text, only on badges, c
 
 | Fill                | Text                             | For                           |
 | ------------------- | -------------------------------- | ----------------------------- |
-| `bg-status-ok`      | `text-status-ok-foreground`      | In sync                       |
+| `bg-status-ok`      | `text-status-ok-foreground`      | In sync, Saved                |
 | `bg-status-warn`    | `text-status-warn-foreground`    | Unsaved, Changed since export |
 | `bg-status-neutral` | `text-status-neutral-foreground` | Not exported, Published draft |
 
