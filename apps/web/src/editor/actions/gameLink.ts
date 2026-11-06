@@ -1,6 +1,6 @@
 /**
  * The Game link (docs/DESKTOP.md § Renderer): the game's folders, the creator name, the plugin manager and the
- * editor's plugin, looked up at startup and on request; the notifications for what changed; Launch game.
+ * editor's plugin, looked up at startup and on request; the notifications for what changed; Open game (Steam).
  */
 import { Effect, Option } from "effect"
 import { creatorOf } from "../../domain/creator"

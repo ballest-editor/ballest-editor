@@ -296,7 +296,7 @@ export const gameLinkRows = (
 /** Whether everything is there, the optional plugin manager included. */
 export const allFound = (rows: ReadonlyArray<GameLinkRow>): boolean => rows.every((r) => r.state === "ok")
 
-/** Whether anything is missing that Export, Launch game or Play need; the optional plugin manager doesn't count. */
+/** Whether anything is missing that Export, Open game or Play need; the optional plugin manager doesn't count. */
 export const anythingMissing = (rows: ReadonlyArray<GameLinkRow>): boolean => rows.some((r) => r.state === "missing")
 
 /** Whether the folders Export needs, the game's install and its maps folder, are both there. */
@@ -346,7 +346,7 @@ const gameLost: GameLinkNotice = {
   kind: GAME_NOT_FOUND,
   level: "error",
   title: "Couldn't find Ballest of Them All",
-  body: "It was there last time. Export to game, Launch game and Play need it: choose its folder if it moved.",
+  body: "It was there last time. Export to game, Open game and Play need it: choose its folder if it moved.",
   persistent: true,
   actions: [{ label: "Choose folder…", command: { _tag: "ChooseGamePath", which: "install" } }]
 }

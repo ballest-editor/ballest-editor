@@ -146,8 +146,8 @@ export function useGameLinkSummary(): string {
   const looking = useEditor((s) => s.gamePaths === null || s.pluginStatus === null)
   if (looking) return "Looking for the game…"
   return anythingMissing(rows)
-    ? "Export, Launch game and Play need these."
-    : "Everything Export and Launch game need is here."
+    ? "Export, Open game and Play need these."
+    : "Everything Export and Open game need is here."
 }
 
 const KEYWORDS =
@@ -184,7 +184,7 @@ export function useGameLinkSettings(): ReadonlyArray<SettingsRow<SettingsCategor
   })
 }
 
-/** The rows that are missing, each with what is wrong. Empty when File › Game link… opens with everything found. */
+/** The rows that are missing, each with what is wrong. Empty when the dialog opens with everything found. */
 export function MissingGameLinkRows() {
   const missing = useGameLinkRows().filter((row) => row.state === "missing")
   if (missing.length === 0) return null
