@@ -13,7 +13,7 @@ import type { MapPrefs } from "../../domain/MapPrefs"
 import { MapCodec } from "../../services/MapCodec"
 import { MapExporter } from "../../services/MapExporter"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
-import { Platform } from "../../services/Platform"
+import { Platform, PlatformError } from "../../services/Platform"
 import { tabLabels, type TabTarget, tabWithFile, useEditor } from "../store"
 import { notifyFailure, run } from "./run"
 import { fileOf, loadProjectMapFile, prefsOf, refreshProject, saveTabPrefs, showMap, writeProjectMap } from "./shared"
@@ -207,6 +207,15 @@ export const pickProjectFolder = () =>
 /** Shows one of the project's folders in the file manager: its `maps/` unless asked otherwise. */
 export const revealProject = (which: ProjectFolder = "maps") =>
   run(Effect.flatMap(Effect.service(Platform), (platform) => platform.revealProject(which)))
+
+/** Puts `text` on the system clipboard; true once it is there. */
+export const copyText = (text: string) =>
+  run(
+    Effect.tryPromise({
+      try: () => navigator.clipboard.writeText(text),
+      catch: () => new PlatformError({ message: "Couldn't copy to the clipboard." })
+    }).pipe(Effect.as(true))
+  )
 
 /** Project settings › General: the project's name, in its file; the folder keeps its name. */
 export const renameProject = (name: string) =>

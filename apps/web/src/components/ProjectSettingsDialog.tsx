@@ -2,12 +2,11 @@ import {
   IconAlertTriangleFilled,
   IconCheck,
   IconCopy,
-  IconFile,
   IconFolder,
   IconFolderOpen,
   IconFolderSearch,
   IconMap,
-  IconPencil
+  IconWorld
 } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
@@ -23,7 +22,7 @@ import { usableCreatorName } from "../domain/creator"
 import { setLevelData as setMapLevelData, withLevelNames } from "../domain/edits"
 import { isValidName, mapFileNameOf, mapLabelOf, NAME_RULE_SENTENCE } from "../domain/factory"
 import { floorHeightOf } from "../domain/level"
-import { type LevelData, SYSTEM_LEVEL_NAME } from "../domain/MapFile"
+import type { LevelData } from "../domain/MapFile"
 import type { MapPrefs } from "../domain/MapPrefs"
 import {
   DIFFICULTIES,
@@ -40,8 +39,8 @@ import {
 import { isProjectName } from "../domain/project"
 import {
   chooseProject,
+  copyText,
   nameProject,
-  nameProjectMap,
   patchProjectMap,
   type ProjectMapSettings,
   readProjectMapSettings,
@@ -53,16 +52,25 @@ import {
   setGridHeight,
   setLevelData
 } from "../editor/actions"
-import { tabLabelOf, tabStateOf, tabsWithoutFile, tabWithFile, useCreator, useEditor } from "../editor/store"
+import {
+  type ProjectMap,
+  tabLabelOf,
+  tabStateOf,
+  tabsWithoutFile,
+  tabWithFile,
+  useCreator,
+  useEditor
+} from "../editor/store"
 import { NumberField } from "./NumberField"
-import { PathAction, PathField, PathText } from "./PathText"
+import { PathAction } from "./PathText"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
 /**
  * The dialog's pages (docs/PROJECTS.md § Shell): the project, then one entry per map. `map:<file name>` is a map in
  * the project; `map:open` the open map while it has no file yet; `map:tab:<tab id>` another tab's map while it has none.
+ * The map whose rows are showing has a second page, `workshop:` in place of `map:`.
  */
-type Category = "project" | `map:${string}`
+type Category = "project" | `map:${string}` | `workshop:${string}`
 type Row = SettingsRow<Category>
 
 const OPEN_UNSAVED: Category = "map:open"
@@ -70,6 +78,11 @@ const UNSAVED_TAB = "map:tab:"
 const unsavedTabEntry = (tabId: string): Category => `map:tab:${tabId}`
 const unsavedLabelOf = (name: string) => `${name} (unsaved)`
 const entryOf = (fileName: string): Category => `map:${fileName}`
+const WORKSHOP = "workshop:"
+const workshopPageOf = (entry: Category): Category => `${WORKSHOP}${entry.slice("map:".length)}`
+/** The map entry a page belongs to. */
+const entryOfPage = (page: Category): Category =>
+  page.startsWith(WORKSHOP) ? `map:${page.slice(WORKSHOP.length)}` : page
 
 const TAG_DESCRIPTIONS: Readonly<Record<TagGroup, string>> = {
   Gameplay: "What playing the map is like.",
@@ -90,18 +103,18 @@ function DifficultyIcon({ difficulty }: { readonly difficulty: Difficulty }) {
   if (difficulty === "baller") return <IconAlertTriangleFilled className="size-4 text-yellow-400" />
   const filled = DIFFICULTIES.findIndex((d) => d.tag === difficulty) + 1
   return (
-    <span className="flex gap-0.5" aria-hidden>
+    <span className="flex gap-px" aria-hidden>
       {[1, 2, 3, 4].map((bar) => (
         <span
           key={bar}
-          className={cn("h-3.5 w-1.5 rounded-[2px]", bar <= filled ? BAR_COLORS[difficulty] : "bg-fg-tertiary/30")}
+          className={cn("h-3 w-1 rounded-[1px]", bar <= filled ? BAR_COLORS[difficulty] : "bg-fg-tertiary/30")}
         />
       ))}
     </span>
   )
 }
 
-/** The game's five difficulty icons; picking the chosen one again keeps it. */
+/** The game's five difficulties, each with its icon and name; picking the chosen one again keeps it. */
 function DifficultyPicker(
   { value, onChange }: { readonly value: Difficulty | undefined; readonly onChange: (d: Difficulty) => void }
 ) {
@@ -115,21 +128,15 @@ function DifficultyPicker(
       spacing={1}
     >
       {DIFFICULTIES.map((d) => (
-        <Tooltip key={d.tag}>
-          <TooltipTrigger
-            render={
-              <ToggleGroupItem
-                value={d.tag}
-                variant="outline"
-                aria-label={d.level}
-                className="h-8 w-12 aria-pressed:border-primary aria-pressed:bg-primary/15"
-              />
-            }
-          >
-            <DifficultyIcon difficulty={d.tag} />
-          </TooltipTrigger>
-          <TooltipContent>{d.level}</TooltipContent>
-        </Tooltip>
+        <ToggleGroupItem
+          key={d.tag}
+          value={d.tag}
+          variant="outline"
+          className="gap-1.5 aria-pressed:border-primary aria-pressed:bg-primary/15"
+        >
+          <DifficultyIcon difficulty={d.tag} />
+          {d.level}
+        </ToggleGroupItem>
       ))}
     </ToggleGroup>
   )
@@ -164,18 +171,28 @@ function TagChips(
   )
 }
 
-/** Commits on Enter or blur when the name is valid; Escape or an invalid name puts the map's back. */
-function NameInput({ value, onCommit }: { readonly value: string; readonly onCommit: (name: string) => void }) {
+/** Commits on Enter or blur when the name can be used; Escape or a name that can't puts the map's back. */
+function NameInput(
+  { value, problemWith, onCommit }: {
+    readonly value: string
+    /** What's wrong with a name, or null when it can be used. */
+    readonly problemWith: (name: string) => string | null
+    readonly onCommit: (name: string) => void
+  }
+) {
   const [draft, setDraft] = useState<string | null>(null)
   const text = draft ?? value
+  const problem = text === value ? null : problemWith(text)
   return (
     <Input
       className="w-56"
       value={text}
-      aria-invalid={!isValidName(text)}
+      aria-label="Map name"
+      aria-invalid={problem !== null}
+      title={problem ?? undefined}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
-        if (draft !== null && draft !== value && isValidName(draft)) onCommit(draft)
+        if (draft !== null && draft !== value && problemWith(draft) === null) onCommit(draft)
         setDraft(null)
       }}
       onKeyDown={(e) => {
@@ -188,6 +205,40 @@ function NameInput({ value, onCommit }: { readonly value: string; readonly onCom
     />
   )
 }
+
+/** A place as a row shows it: its name, with the whole path on hover. */
+function PlaceName({ name, path }: { readonly name: string; readonly path: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className="max-w-56 truncate text-body text-fg-secondary" />}>
+        {name}
+      </TooltipTrigger>
+      <TooltipContent className="break-all">{path}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** Copies a path; the icon says it worked for a moment. */
+function CopyPathAction({ path }: { readonly path: string }) {
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(false), 1500)
+    return () => clearTimeout(timer)
+  }, [copied])
+  return (
+    <PathAction
+      label={copied ? "Copied" : "Copy path"}
+      icon={copied ? IconCheck : IconCopy}
+      onClick={() => void copyText(path).then((done) => setCopied(done === true))}
+    />
+  )
+}
+
+const REVEAL = "Reveal in folder"
+
+/** A path's last segment: the folder a location row names. */
+const lastSegmentOf = (path: string) => path.split(/[\\/]/).findLast((segment) => segment !== "") ?? path
 
 /**
  * A map entry's values and how its edits are applied: the open map's through the editor (undo steps, its prefs), any
@@ -202,8 +253,6 @@ interface MapEntry {
   readonly floorHeight: number
   readonly startHeight: number
   readonly exportOnSave: boolean
-  /** Whether the name can be typed in place: the open map's can; a file's name changes through Rename…. */
-  readonly renameInline: boolean
   readonly setLevelData: (levelData: LevelData) => void
   readonly setGridHeight: (height: number) => void
   readonly setExportOnSave: (on: boolean) => void
@@ -224,7 +273,6 @@ const useOpenMapEntry = (): MapEntry => {
     floorHeight,
     startHeight,
     exportOnSave,
-    renameInline: true,
     setLevelData: (next) => void setLevelData(next),
     setGridHeight: (height) => void setGridHeight(height),
     setExportOnSave: (on) => void setExportOnSave(on)
@@ -244,7 +292,6 @@ const useTabMapEntry = (tabId: string | null): MapEntry | null => {
     floorHeight: tab.floorHeight,
     startHeight: floorHeightOf(tab.doc.map),
     exportOnSave: tab.exportOnSave,
-    renameInline: true,
     setLevelData: (next) => void setLevelData(next, tabId),
     setGridHeight: (height) => void setGridHeight(height, tabId),
     setExportOnSave: (on) => void setExportOnSave(on, tabId)
@@ -253,12 +300,18 @@ const useTabMapEntry = (tabId: string | null): MapEntry | null => {
 
 /**
  * A map that isn't open, read from its file when its entry shows (and again after each write); null until read. Edits
- * go through the save path, so the file moves when the name changes and the old one goes to the backups.
+ * go through the save path, so the file moves when the name changes and the old one goes to the backups; the map's
+ * prefs go with it, and `onMoved` gets the new file name.
  */
-const useDiskMapEntry = (fileName: string | null, modifiedAt: string | undefined): MapEntry | null => {
+const useDiskMapEntry = (
+  fileName: string | null,
+  modifiedAt: string | undefined,
+  onMoved: (fileName: string) => void
+): MapEntry | null => {
   const [read, setRead] = useState<{ readonly fileName: string; readonly settings: ProjectMapSettings } | null>(null)
-  // read again when the file changes on disk (`modifiedAt`), not only when another entry shows
-  const version = fileName === null ? null : `${fileName}\n${modifiedAt ?? ""}`
+  // read again when the file changes on disk (`modifiedAt`), not only when another entry shows; a map gone from the
+  // list has no file to read (a rename drops it there just before `onMoved` moves the entry on)
+  const version = fileName === null || modifiedAt === undefined ? null : `${fileName}\n${modifiedAt}`
   useEffect(() => {
     if (version === null) return
     const [name] = version.split("\n")
@@ -287,8 +340,12 @@ const useDiskMapEntry = (fileName: string | null, modifiedAt: string | undefined
     floorHeight: prefs.gridHeight ?? startHeight,
     startHeight,
     exportOnSave: prefs.exportOnSave === true,
-    renameInline: false,
-    setLevelData: (levelData) => void patchProjectMap(fileName, (current) => setMapLevelData(current, levelData)),
+    setLevelData: (levelData) =>
+      void patchProjectMap(fileName, (current) => setMapLevelData(current, levelData)).then((saved) => {
+        if (saved === undefined || saved.fileName === fileName) return
+        void saveProjectMapPrefs(levelData.userLevelName, prefs)
+        onMoved(saved.fileName)
+      }),
     setGridHeight: (height) => {
       const { gridHeight: _previous, ...rest } = prefs
       savePrefs(height === startHeight ? rest : { ...rest, gridHeight: height })
@@ -300,77 +357,75 @@ const useDiskMapEntry = (fileName: string | null, modifiedAt: string | undefined
   }
 }
 
-/** The rows of one map's entry: what the old Map settings dialog edited, plus Rename… and Duplicate…. */
+/**
+ * The rows of one map's entry. Its Map page holds what is the map's in this editor, its Workshop page what publishing
+ * shows. Grid height stays on the Map page: it is kept per map (its prefs), and Settings only has what is the app's.
+ */
 const mapRows = (
   entry: MapEntry,
-  options: { readonly units: "cm" | "m"; readonly savedCreator: string; readonly canExport: boolean },
-  name: (mode: "rename" | "duplicate") => void
+  options: {
+    readonly units: "cm" | "m"
+    readonly savedCreator: string
+    readonly canExport: boolean
+    readonly maps: ReadonlyArray<ProjectMap>
+  }
 ): ReadonlyArray<Row> => {
   const { category, levelData } = entry
-  const { units } = options
+  const { units, maps } = options
   // A map made before a creator was saved has none yet; it gets the saved one, as Export would.
   const creator = levelData.creatorName || options.savedCreator
   const perUnit = units === "m" ? 100 : 1
   const difficulty = difficultyOf(levelData)
   const others = unknownTags(levelData)
-  const fileName = mapFileNameOf(levelData.levelDisplayName, creator || "creator")
+  const path = maps.find((m) => m.fileName === entry.fileName)?.path
+  const workshop = workshopPageOf(category)
+  const problemWith = (name: string) => {
+    if (!isValidName(name)) return `${NAME_RULE_SENTENCE}.`
+    const target = mapFileNameOf(name, creator || "creator")
+    return target !== entry.fileName && maps.some((m) => m.fileName === target)
+      ? "The project already has a map by that name."
+      : null
+  }
   return [
     {
       id: "name",
       category,
-      group: "General",
       label: "Name",
-      description: `${NAME_RULE_SENTENCE}. The file is named after it.`,
-      control: entry.renameInline
-        ? (
-          <NameInput
-            value={levelData.levelDisplayName}
-            onCommit={(next) => entry.setLevelData(withLevelNames(levelData, next, creator))}
-          />
-        )
-        : <span className="text-body">{levelData.levelDisplayName}</span>
-    },
-    {
-      id: "file",
-      category,
-      group: "General",
-      label: "File",
-      description: entry.fileName === null
-        ? "Not saved in the project yet. Save names it."
-        : "Rename moves the file. Duplicate saves a copy and goes on editing it.",
-      wide: true,
-      // no file yet: the description says so, and Save is the way to one
-      control: entry.fileName === null ? null : (
-        <PathField
-          path={fileName}
-          icon={IconFile}
-          actions={
-            <>
-              <PathAction label="Rename…" icon={IconPencil} onClick={() => name("rename")} />
-              <PathAction label="Duplicate…" icon={IconCopy} onClick={() => name("duplicate")} />
-            </>
-          }
+      description: "The file is named after it.",
+      control: (
+        <NameInput
+          value={levelData.levelDisplayName}
+          problemWith={problemWith}
+          onCommit={(next) => entry.setLevelData(withLevelNames(levelData, next, creator))}
         />
       )
     },
     {
-      id: "level",
+      id: "file",
       category,
-      group: "General",
-      label: "Level",
-      description: "The game level every custom map is spawned into.",
-      control: <span className="text-body text-fg-secondary">{SYSTEM_LEVEL_NAME}</span>
+      label: "File",
+      // no file yet: the description says so, and Save is the way to one
+      ...(entry.fileName === null && { description: "Not saved yet." }),
+      control: entry.fileName === null
+        ? null
+        : path === undefined
+        ? <span className="text-body text-fg-secondary">{mapLabelOf(entry.fileName)}</span>
+        : (
+          <>
+            <PlaceName name={mapLabelOf(entry.fileName)} path={path} />
+            <PathAction label={REVEAL} icon={IconFolderOpen} onClick={() => void revealProject("maps")} />
+            <CopyPathAction path={path} />
+          </>
+        )
     },
     {
       id: "gridHeight",
       category,
-      group: "General",
       label: `Grid height (${units})`,
-      description: "Where the grid sits and new pieces land. Starts at the player start's height.",
+      description: "Where the grid sits and new pieces land.",
       action: (
         <Button
           variant="outline"
-          size="sm"
           disabled={entry.floorHeight === entry.startHeight}
           onClick={() => entry.setGridHeight(entry.startHeight)}
         >
@@ -393,7 +448,6 @@ const mapRows = (
         {
           id: "exportOnSave",
           category,
-          group: "General",
           label: "Export on save",
           description: "Every Save of this map also exports it to the game.",
           control: <Switch checked={entry.exportOnSave} onCheckedChange={(on) => entry.setExportOnSave(on)} />
@@ -402,13 +456,11 @@ const mapRows = (
       : []),
     {
       id: "difficulty",
-      category,
-      group: "Workshop",
+      category: workshop,
+      group: entry.label,
       label: "Difficulty",
-      description: difficulty === undefined
-        ? "Not set."
-        : `${DIFFICULTIES.find((d) => d.tag === difficulty)?.level ?? difficulty}.`,
       keywords: DIFFICULTIES.map((d) => d.level).join(" "),
+      wide: true,
       control: (
         <DifficultyPicker
           value={difficulty}
@@ -420,8 +472,8 @@ const mapRows = (
       const names = group.tags.map((tag) => tagNameOf(group.group, tag))
       return {
         id: `tags-${group.group}`,
-        category,
-        group: "Workshop",
+        category: workshop,
+        group: entry.label,
         label: `${group.group} tags`,
         description: TAG_DESCRIPTIONS[group.group],
         keywords: group.tags.join(" "),
@@ -442,15 +494,15 @@ const mapRows = (
     ...(others.length === 0 ? [] : [
       {
         id: "tags-other",
-        category,
-        group: "Workshop",
+        category: workshop,
+        group: entry.label,
         label: "Other tags",
         description: "Tags this editor doesn't know, such as the old ungrouped ones. They are kept as they are.",
         keywords: others.join(" "),
         wide: true,
         control: (
           <div className="flex flex-wrap gap-1">
-            {others.map((tag) => <Badge key={tag} variant="outline" className="font-mono">{tag}</Badge>)}
+            {others.map((tag) => <Badge key={tag} variant="outline">{tag}</Badge>)}
           </div>
         )
       } satisfies Row
@@ -492,10 +544,10 @@ function ProjectNameField({ name }: { readonly name: string | null }) {
 
 /**
  * Project settings (docs/PROJECTS.md § Shell), one dialog in IntelliJ's Project Structure shape: the project (name,
- * folder, creator, export target), then an entry per map holding what Map settings used to edit (name, level, grid
- * height, Export on save, difficulty, tags) plus Rename… and Duplicate…. Edits apply as they are made: the open map's
- * as undo steps in the editor, any other map's to its file. Project › Project settings… opens on the project
- * (`page` "project"); the open map's settings open on its entry ("openMap").
+ * folders), then an entry per map (name, file, grid height, Export on save), and for the map showing a Workshop page
+ * (difficulty, tags). Edits apply as they are made: the open map's as undo steps in the editor, any other map's to its
+ * file. Project › Project settings… opens on the project (`page` "project"); the open map's settings open on its entry
+ * ("openMap").
  */
 export function ProjectSettingsDialog(
   { open, page, onClose }: {
@@ -513,7 +565,6 @@ export function ProjectSettingsDialog(
   const creator = useCreator()
   const gameMapsFolder = useEditor((s) => s.gamePaths?.mapsFolder.path ?? null)
   const savedCreator = usableCreatorName(creator)
-  const openDialog = useEditor((s) => s.openDialog)
   const openMap = useOpenMapEntry()
   const inPrefab = useEditor((s) => s.document.kind === "prefab")
 
@@ -527,17 +578,19 @@ export function ProjectSettingsDialog(
   }
 
   // the shown entry's map, when it isn't the open one, is read from its file
-  const shownUnsaved = category.startsWith(UNSAVED_TAB) ? category.slice(UNSAVED_TAB.length) : null
-  const shownFile = shownUnsaved === null && category.startsWith("map:") && category !== openMap.category &&
-      category !== OPEN_UNSAVED
-    ? category.slice("map:".length)
+  const shown = entryOfPage(category)
+  const shownUnsaved = shown.startsWith(UNSAVED_TAB) ? shown.slice(UNSAVED_TAB.length) : null
+  const shownFile = shownUnsaved === null && shown.startsWith("map:") && shown !== openMap.category &&
+      shown !== OPEN_UNSAVED
+    ? shown.slice("map:".length)
     : null
   const shownTab = useEditor((s) => shownUnsaved ?? (shownFile === null ? undefined : tabWithFile(s, shownFile))) ??
     null
   const tabMap = useTabMapEntry(shownTab)
   const diskMap = useDiskMapEntry(
     shownTab === null ? shownFile : null,
-    maps.find((m) => m.fileName === shownFile)?.modifiedAt
+    maps.find((m) => m.fileName === shownFile)?.modifiedAt,
+    (fileName) => setCategory(entryOf(fileName))
   )
   const entry = shownFile === null && shownUnsaved === null ? openMap : tabMap ?? diskMap
 
@@ -550,8 +603,7 @@ export function ProjectSettingsDialog(
       return tab === undefined ? "Untitled" : tabLabelOf(tab)
     })
   ))
-  const categories: ReadonlyArray<SettingsCategoryInfo<Category>> = [
-    ...(projects ? [{ id: "project" as const, label: "General", icon: IconFolder, section: "Project" }] : []),
+  const mapCategories: ReadonlyArray<SettingsCategoryInfo<Category>> = [
     ...(!inPrefab && (openMap.fileName === null || !projects)
       ? [{ id: openMap.category, label: openMap.label, icon: IconMap, section: "Maps" }]
       : []),
@@ -570,49 +622,51 @@ export function ProjectSettingsDialog(
       }))
       : [])
   ]
-
-  const name = (fileName: string | null, mode: "rename" | "duplicate") => {
-    onClose()
-    if (fileName === null || fileName === openMap.fileName) openDialog({ id: mode })
-    else void nameProjectMap(fileName, mode)
-  }
+  const categories: ReadonlyArray<SettingsCategoryInfo<Category>> = [
+    ...(projects ? [{ id: "project" as const, label: "General", icon: IconFolder, section: "Project" }] : []),
+    // only the map showing lists its Workshop page, so a long project doesn't double its list
+    ...mapCategories.flatMap((info) =>
+      info.id === entry?.category
+        ? [info, { id: workshopPageOf(info.id), label: "Workshop", icon: IconWorld, section: "Maps" }]
+        : [info]
+    )
+  ]
 
   const folderRow = (
     id: string,
     label: string,
-    description: string,
+    description: string | undefined,
     path: string | null,
     reveal: () => void,
-    extra?: ReactNode,
-    missing = "Not found"
+    extra?: ReactNode
   ): Row => ({
     id,
     category: "project",
     label,
-    description,
-    wide: true,
+    ...(description !== undefined && { description }),
     group: "Locations",
     control: (
-      <PathField
-        path={path}
-        missing={missing}
-        actions={
-          <>
-            <PathAction
-              label="Reveal in file manager"
-              icon={IconFolderOpen}
-              disabled={path === null}
-              onClick={reveal}
-            />
-            {extra}
-          </>
-        }
-      />
+      <>
+        {path === null
+          ? <span className="text-body text-fg-tertiary">Not found</span>
+          : <PlaceName name={lastSegmentOf(path)} path={path} />}
+        <PathAction label={REVEAL} icon={IconFolderOpen} disabled={path === null} onClick={reveal} />
+        {extra}
+      </>
     )
   })
 
-  // Untitled Project has no folder yet: its rows say so, and naming it makes one
-  const unnamed = "Made when the project is named"
+  const openAnotherProject = (
+    <PathAction
+      label="Open another project…"
+      icon={IconFolderSearch}
+      onClick={() => {
+        onClose()
+        void chooseProject()
+      }}
+    />
+  )
+
   const projectRows: ReadonlyArray<Row> = !projects ? [] : [
     {
       id: "projectName",
@@ -620,53 +674,54 @@ export function ProjectSettingsDialog(
       group: "General",
       label: "Name",
       description: project === null
-        ? (
-          <>
-            Naming the project makes its folder in <PathText block>{projectsFolder}</PathText>
-            The map is saved there from then on.
-          </>
-        )
-        : "Shown in the title bar and in Recent projects. The folder keeps its name.",
+        ? "Naming the project makes its folder."
+        : "Shown in the title bar and Recent projects.",
       control: <ProjectNameField name={project?.name ?? null} />
     },
-    folderRow(
-      "folder",
-      "Project folder",
-      "Holds ballest-project.json, the maps and the backups.",
-      project?.path ?? null,
-      () => void revealProject("project"),
-      <PathAction
-        label="Open another project…"
-        icon={IconFolderSearch}
-        onClick={() => {
-          onClose()
-          void chooseProject()
-        }}
-      />,
-      unnamed
-    ),
-    folderRow(
-      "mapsFolder",
-      "Maps",
-      "The project's maps, one .balledit each.",
-      project === null ? null : `${project.path}/maps`,
-      () => void revealProject("maps"),
-      undefined,
-      unnamed
-    ),
-    folderRow(
-      "backupsFolder",
-      "Backups",
-      "Previous versions of the maps, from before Save, Rename or Re-import wrote over them.",
-      project === null ? null : `${project.path}/.ballest/backups`,
-      () => void revealProject("backups"),
-      undefined,
-      unnamed
-    ),
+    // Untitled Project has no folders yet: one line says so, and naming it makes them
+    ...(project === null
+      ? [
+        {
+          id: "folder",
+          category: "project",
+          group: "Locations",
+          label: "Project folder",
+          keywords: "maps backups",
+          control: (
+            <>
+              <Tooltip>
+                <TooltipTrigger render={<span className="text-body text-fg-tertiary" />}>
+                  Created when the project is named
+                </TooltipTrigger>
+                <TooltipContent className="break-all">In {projectsFolder}</TooltipContent>
+              </Tooltip>
+              {openAnotherProject}
+            </>
+          )
+        } satisfies Row
+      ]
+      : [
+        folderRow(
+          "folder",
+          "Project folder",
+          undefined,
+          project.path,
+          () => void revealProject("project"),
+          openAnotherProject
+        ),
+        folderRow("mapsFolder", "Maps", undefined, `${project.path}/maps`, () => void revealProject("maps")),
+        folderRow(
+          "backupsFolder",
+          "Backups",
+          "Earlier versions of the maps.",
+          `${project.path}/.ballest/backups`,
+          () => void revealProject("backups")
+        )
+      ]),
     folderRow(
       "exportsFolder",
       "Exports",
-      "The game's maps folder: Export writes here, and the in-game editor lists it.",
+      "The game's maps folder.",
       gameMapsFolder,
       () => void revealGamePath("mapsFolder")
     )
@@ -675,7 +730,7 @@ export function ProjectSettingsDialog(
   // the shown entry's rows (another map's are read from its file when its entry shows), after the project's
   const rows: ReadonlyArray<Row> = [
     ...projectRows,
-    ...(entry === null ? [] : mapRows(entry, { units, savedCreator, canExport }, (mode) => name(entry.fileName, mode)))
+    ...(entry === null ? [] : mapRows(entry, { units, savedCreator, canExport, maps }))
   ]
 
   return (
@@ -683,7 +738,7 @@ export function ProjectSettingsDialog(
       open={open}
       onClose={onClose}
       title="Project settings"
-      description="The project: its name, folder, creator and export target; then each map's name, grid height, difficulty and tags."
+      description="The project's name and folders; then each map's name, file, grid height, difficulty and tags."
       categories={categories}
       category={category}
       onCategoryChange={setCategory}

@@ -50,7 +50,7 @@ Until one is used, the window is **Untitled Project \***: `ProjectState.current`
 - **Export to game** (Project menu) saves unsaved edits, then copies the project file byte for byte into the game's maps folder and records the export's path, hash and time in `link.json`. The page first runs Save's checks on the open map, because an imported file or a map with no edits reaches the game without passing through Save. A file past the game's character limit is refused at this step, on the bytes about to be copied, and nothing is written. A file in that folder whose `levelPublishedFileId` is above 0 is a published map's draft, and the editor asks before replacing it.
 - **Export on save** (Project menu, or the map's entry in Project settings; off by default, kept with the map's prefs) makes every Save of that map export too. Settings › General › Export every save does it for every map. The first Save of a new map doesn't export under either.
 - **Launch game** (Project menu) opens `steam://rungameid/3339810`, or says the game is already running.
-- **Backups.** Every write over a map file keeps the old one first (§ Backups). Recover previous version… in a map's menu in the Project panel lists them.
+- **Backups.** Every write over a map file keeps the old one first (§ Backups). Backups… in a map's menu in the Project panel lists them.
 - **Toasts** name the project or the maps folder and offer Reveal.
 - **Unsaved changes** are asked about before anything would lose them: closing the window, reloading, quitting, closing a map's tab, replacing a map open in a tab (Re-import, Recover, Import's Replace), and leaving a named project ([§ Window](#window) has the rule for switching projects). New map, opening a map and Import open a tab of their own and ask nothing.
 
@@ -142,18 +142,18 @@ Changing projection keeps the point the pane looks at and its size on screen. Nu
 - **Project:** New map, Import map…; Export to game, Export on save, Re-import from game, Play, Launch game; Project settings….
 - **Web review build:** File (New map, Open…, Save, Export…, Close tab, Settings…), Edit, View, and Project (Project settings…, the one map's).
 
-There is no Map or Game menu: the menus act on the active tab's map, and the game is the project's export target. Rename, Duplicate and Recover previous version are per map in the Project panel. The Game link is the user's machine, not the project's, so it sits with Settings under File.
+There is no Map or Game menu: the menus act on the active tab's map, and the game is the project's export target. Rename, Duplicate and Backups are per map in the Project panel. The Game link is the user's machine, not the project's, so it sits with Settings under File.
 
 ### Project panel
 
 `components/ProjectPanel.tsx` is the Project panel (§ Dock). It lists the project and its maps, the way an editor's file explorer shows a workspace.
 
-- Each row shows the map, a dot while it is open in a tab with unsaved edits, and its link state as a glyph. Hovering names the state and says when the map was last edited.
+- Each row shows the map, a dot after its name while it is open in a tab with unsaved edits, and its link state as a chip: the status bar's words, with Edited for Edited since export. Hovering the chip says when the map was last exported, and hovering the name when it was last edited.
 - A click opens the map.
-- Its menu (⋮, or a right-click) holds Open, Rename…, Duplicate…, Recover previous version…, Export to game, Play and Reveal. The ones that act on the open map open it first (`withProjectMapOpen`). Reveal shows the project's maps folder, not the file.
-- The header holds New map, Import map… and Project settings….
-- Every tab whose map has no file yet (a fresh one, any in Untitled Project, what a switch of projects left open) is a row of its own in italics, above the project's maps. A click makes that tab active.
-- In Untitled Project a line above those rows says that saving a map creates a project.
+- Its menu (⋮, or a right-click) holds Open, Rename…, Duplicate…, Backups…, Export to game, Play and Reveal in folder. The ones that act on the open map open it first (`withProjectMapOpen`). Reveal in folder shows the project's maps folder, not the file.
+- The header holds the project's name, with its folder on hover, or an Untitled chip in Untitled Project, then New map, Import map and Project settings. Import map is disabled in Untitled Project, and its tooltip says why.
+- Every tab whose map has no file yet (a fresh one, any in Untitled Project, what a switch of projects left open) is a row of its own with the dot, above the project's maps. A click makes that tab active.
+- A project with no maps has one line and a New map button under those rows. In Untitled Project the line says that saving a map creates a project.
 - No thumbnails yet.
 
 ### Outline
@@ -229,14 +229,14 @@ The dialog opens by itself on the first launch (`gameLink.firstRun`) and when th
 
 ### Project settings
 
-`components/ProjectSettingsDialog.tsx`, in `SettingsShell`'s shape, has _Project › General_ on the left, then _Maps_ with an entry per map. Project › Project settings… opens on the project, and the map's settings button in the Inspector (`openDialog({ id: "mapSettings" })`) opens on the open map's entry. The web review build has only the one map's entry.
+`components/ProjectSettingsDialog.tsx`, in `SettingsShell`'s shape, has _Project › General_ on the left, then _Maps_ with an entry per map. The map showing has a Workshop page under its entry. Project › Project settings… opens on the project, and the map's settings button in the Inspector (`openDialog({ id: "mapSettings" })`) opens on the open map's entry. The web review build has only the one map's entry.
 
 General has the project's name and its places:
 
 - The name is editable and goes into `ballest-project.json` through `renameProject` (IPC `ballest:project:rename`), and the folder keeps its name. In Untitled Project the field is empty, and typing a name names the project (`nameProject`), as the Save dialog does.
-- The places each have a Reveal (`revealProject`, IPC `ballest:project:reveal` with `which`): the project folder, with Open another project… beside it; its `maps/`; its `.ballest/backups/`. In Untitled Project these read "Made when the project is named". The game's maps folder, where exports go, has a Reveal too (`revealGamePath`).
+- The places show their folder's name, with the path on hover, and a Reveal (`revealProject`, IPC `ballest:project:reveal` with `which`): the project folder, with Open another project… beside it; its `maps/`; its `.ballest/backups/`. In Untitled Project one row reads "Created when the project is named" in place of these. The game's maps folder, where exports go, has a Reveal too (`revealGamePath`).
 
-A map entry has the name, file (Rename…, Duplicate…), level, grid height, Export on save, difficulty and tags. The entry of a map open in a tab, active or not, edits that tab's document (undo steps there, saved when the tab is) and its prefs. A map not open anywhere is read from its file when its entry shows and edited on disk through the save path (`patchProjectMapEffect`: read, patch, `saveMap`, or `renameMap` when the name changed, so the old file goes to the backups), along with the prefs kept for it.
+A map's Map page has the name, the file (its name, the path on hover, Reveal and Copy path), grid height and Export on save. Its Workshop page has the difficulty and tags. Grid height is here and not in Settings because it is kept per map. The Name field is how a map is renamed here, and it refuses a name the project has. The entry of a map open in a tab, active or not, edits that tab's document (undo steps there, saved when the tab is) and its prefs. A map not open anywhere is read from its file when its entry shows and edited on disk through the save path (`patchProjectMapEffect`: read, patch, `saveMap`, or `renameMap` when the name changed, so the old file goes to the backups), along with the prefs kept for it, and a rename carries the prefs and the entry to the new file.
 
 ### Status bar
 
@@ -268,7 +268,7 @@ Every write over an existing map file or sidecar goes through one step, `Backups
 - **Prefabs** are kept the same way, the project's in its backups and the game's in `<userData>/backups/`. A Rename and a Delete move the old file there.
 - **Sidecars** are kept beside the maps in `<project>/.ballest/backups/` under their own file names, and Recover lists only the maps. Reading a project backup also gives the sidecar kept for it, which is the oldest one kept since, because a Save backs up the map first and its sidecar right after. A version with no such sidecar, and any of the game's copies, gets the map's sidecar as it is now. The page re-matches a sidecar that wasn't written for those bytes, as on any open.
 - **Retention.** After each write the folder keeps the newest 20 versions of each file and drops any older than 30 days. `desktop-settings.json` can change both: `{ "backups": { "keep": 20, "maxAgeDays": 30 } }` (no UI yet). Git history (#105) is the long-term version history; this is the safety net.
-- **Recover** (the Project panel › a map's menu › Recover previous version…) shows the open map's versions, newest first, and All backups for everything else: other maps, including ones no longer in the project, then User prefabs and Project prefabs, including ones renamed or deleted since. Main lists both folders (`listBackups`, `listPrefabBackups`) and reads a backup by its place or tier and its name (`readBackup`, `describePrefabBackup`), refusing any name it didn't write, so paths stay in main. A map's version shows its time, whose copy it is (Project or Game) and, decoded through `MapFile` as Open would, its item count and map name. A prefab's shows its time and item count.
+- **Recover** (the Project panel › a map's menu › Backups…) shows the open map's versions, newest first, and All backups for everything else: other maps, including ones no longer in the project, then User prefabs and Project prefabs, including ones renamed or deleted since. Main lists both folders (`listBackups`, `listPrefabBackups`) and reads a backup by its place or tier and its name (`readBackup`, `describePrefabBackup`), refusing any name it didn't write, so paths stay in main. A map's version shows its time, whose copy it is (Project or Game) and, decoded through `MapFile` as Open would, its item count and map name. A prefab's shows its time and item count.
 - **Opening a version** shows it in the map's tab when one has it open, asking about that tab's unsaved edits first (§ Window; the prompt's Save goes through the backups like any Save), else in a new tab. It loads as unsaved edits of the project map of that file name, so Save writes it over that map, backing up the current file first. A map no longer in the project opens as a new one, and Save names it.
 - **Restoring a prefab's version** (`restorePrefabBackup`) writes its bytes back under its name in its tier at once, through `Backups.overwrite`, so the current file is kept first and a restore can itself be recovered. It brings back a deleted prefab, and a version that doesn't read as a prefab can't be restored. Then `checkPrefabs` runs as after any write of the app's own (§ Prefabs).
 - **Maps the game changes on its own** (the in-game editor saving into `UserSavedMaps`) are not snapshotted. The editor only loses a game edit when Export writes over it, and that copy is kept. Watching the folder would back up every in-game save, since the game rewrites `editorState` each time, for little gain. Sync detection reports those edits instead.
