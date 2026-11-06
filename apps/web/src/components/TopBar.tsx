@@ -68,7 +68,7 @@ function ProjectTitle() {
     // coming after the menus, cover their no-drag middle (pointer-events doesn't apply to drag regions).
     <span
       className={cn(
-        "absolute inset-x-0 mx-auto w-fit max-w-[40vw] truncate text-xs text-muted-foreground",
+        "absolute inset-x-0 mx-auto w-fit max-w-[40vw] truncate text-body text-fg-secondary",
         project === null && "italic"
       )}
       title={project?.path ?? "Not saved anywhere yet: Save the map to name the project."}
@@ -83,7 +83,7 @@ export function TopBar() {
 
   return (
     <header className={`relative flex h-10 shrink-0 items-center gap-1 border-b bg-card ${TITLE_BAR_CLASSES}`}>
-      <span className="mr-2 px-1 text-sm font-semibold">Ballest Editor</span>
+      <span className="mr-2 px-1 text-body-strong">Ballest Editor</span>
       <MenuBar />
       <ProjectTitle />
       <div className="ml-auto flex shrink-0 items-center gap-2">

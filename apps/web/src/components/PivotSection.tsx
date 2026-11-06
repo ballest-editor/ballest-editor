@@ -40,7 +40,7 @@ export function PivotSection() {
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between">
         <SectionTitle>Pivot</SectionTitle>
-        {mixed && <div className="text-xs text-muted-foreground">Mixed</div>}
+        {mixed && <div className="text-body text-fg-tertiary">Mixed</div>}
       </div>
       <ToggleGroup
         aria-label="Pivot"

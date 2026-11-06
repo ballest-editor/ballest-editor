@@ -60,7 +60,7 @@ function PaneHeader({ slot, projection, disabled, underControls }: {
             type="button"
             aria-label={`Pane view: ${label}`}
             className={cn(
-              "pointer-events-auto absolute top-3 left-3 flex h-7 items-center gap-1 rounded-full pr-1.5 pl-2.5 text-xs font-medium tabular-nums outline-none transition-colors hover:bg-background/80 aria-expanded:bg-background/80 disabled:opacity-50",
+              "pointer-events-auto absolute top-3 left-3 flex h-7 items-center gap-1 rounded-control pr-1.5 pl-2.5 text-body tabular-nums outline-none transition-colors hover:bg-background/80 aria-expanded:bg-background/80 disabled:opacity-50",
               FROSTED,
               underControls && "@max-[28rem]:top-15"
             )}
@@ -69,7 +69,7 @@ function PaneHeader({ slot, projection, disabled, underControls }: {
         }
       >
         {label}
-        <IconChevronDown className="size-3 text-muted-foreground" />
+        <IconChevronDown className="size-3 text-fg-secondary" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-36">
         <DropdownMenuRadioGroup
@@ -226,7 +226,7 @@ export function ViewLayoutControl({ disabled }: { readonly disabled: boolean }) 
               type="button"
               aria-label={`View panes: ${viewLayoutLabels[kind]}`}
               title="View panes"
-              className="flex size-8 items-center justify-center rounded-full outline-none transition-colors hover:bg-muted aria-expanded:bg-muted disabled:opacity-50"
+              className="flex size-8 items-center justify-center rounded-control outline-none transition-colors hover:bg-muted aria-expanded:bg-muted disabled:opacity-50"
               {...noFocus}
             />
           }

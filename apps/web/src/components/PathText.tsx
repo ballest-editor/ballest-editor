@@ -19,7 +19,7 @@ export function PathText({ children, className, block = false }: {
   return (
     <span
       className={cn(
-        "min-w-0 truncate text-left font-mono text-[0.6875rem] leading-none",
+        "min-w-0 truncate text-left font-mono text-caption leading-none",
         block ? "block py-0.5" : "inline-block max-w-full align-bottom",
         className
       )}
@@ -45,10 +45,10 @@ export function PathField({ path, missing = "Not found", icon: FieldIcon = IconF
   readonly actions?: ReactNode
 }) {
   return (
-    <div className="flex h-8 w-full min-w-0 items-center gap-2 rounded-md border bg-muted/40 pr-1 pl-2.5">
-      <FieldIcon className="size-3.5 shrink-0 text-muted-foreground" />
+    <div className="flex h-8 w-full min-w-0 items-center gap-2 rounded-control border bg-muted/40 pr-1 pl-2.5">
+      <FieldIcon className="size-3.5 shrink-0 text-fg-secondary" />
       {path === null
-        ? <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground italic">{missing}</span>
+        ? <span className="min-w-0 flex-1 truncate text-body text-fg-tertiary italic">{missing}</span>
         : (
           // Geist Mono's ink sits a pixel above the line box's centre; a pixel down centres it on the icon
           <PathText className="flex-1 translate-y-px text-foreground/90">{path}</PathText>
@@ -73,7 +73,7 @@ export function PathAction({ label, icon: ActionIcon, onClick, disabled = false 
           <Button
             variant="ghost"
             size="icon-sm"
-            className="size-6 text-muted-foreground"
+            className="text-fg-secondary"
             aria-label={label}
             disabled={disabled}
             onClick={onClick}

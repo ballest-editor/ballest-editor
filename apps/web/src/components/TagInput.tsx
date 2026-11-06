@@ -29,7 +29,7 @@ export function TagInput({ id, inputRef, tags, onChange }: {
                 <button
                   type="button"
                   aria-label={`Remove tag ${tag}`}
-                  className="flex size-4 items-center justify-center rounded-full text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex size-4 items-center justify-center rounded-control text-fg-secondary transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => onChange(tags.filter((t) => t !== tag))}
                 >
                   <IconX className="size-2.5" />

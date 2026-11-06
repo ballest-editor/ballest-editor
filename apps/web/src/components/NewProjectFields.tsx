@@ -52,10 +52,10 @@ export function NewProjectFields({ draft }: { readonly draft: ReturnType<typeof 
           aria-invalid={badName}
           onChange={(e) => setName(e.target.value)}
         />
-        {badName && <span className="text-xs text-muted-foreground">Letters, digits, spaces, - and _ only.</span>}
+        {badName && <span className="text-body text-fg-tertiary">Letters, digits, spaces, - and _ only.</span>}
       </div>
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs text-muted-foreground">Project folder</span>
+        <span className="text-body text-fg-secondary">Project folder</span>
         <PathField
           path={chosen?.path ?? pathInFolder(projectsFolder, trimmed)}
           actions={
@@ -72,7 +72,7 @@ export function NewProjectFields({ draft }: { readonly draft: ReturnType<typeof 
           }
         />
         {chosen?.exists === true && (
-          <span className="text-xs text-destructive">
+          <span className="text-body text-destructive">
             That folder already holds a project. Open it with Open project…, or choose another.
           </span>
         )}

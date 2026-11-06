@@ -28,7 +28,7 @@ export function StripButton({ label, ...props }: { readonly label: string } & Co
     <Button
       variant="ghost"
       size="icon-sm"
-      className="size-6 text-muted-foreground"
+      className="text-fg-secondary"
       aria-label={label}
       title={label}
       {...props}
@@ -76,7 +76,7 @@ export function GroupMenu({ group, activePanel }: GroupMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<StripButton label="Panels and layout" />}>
-        <IconDots className="size-3.5" />
+        <IconDots />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-max min-w-40" finalFocus={(closeType) => closeType === "keyboard"}>
         <GroupMenuItems group={group} activePanel={activePanel} />

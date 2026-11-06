@@ -53,7 +53,7 @@ function ProgressRing({ percent }: { readonly percent: number }) {
   const circumference = 2 * Math.PI * radius
   return (
     <svg viewBox="0 0 14 14" className="size-3.5 -rotate-90" aria-hidden>
-      <circle cx="7" cy="7" r={radius} fill="none" strokeWidth="2" className="stroke-muted-foreground/25" />
+      <circle cx="7" cy="7" r={radius} fill="none" strokeWidth="2" className="stroke-fg-tertiary/25" />
       <circle
         cx="7"
         cy="7"
@@ -92,7 +92,7 @@ function PillFace({ offer, state }: { readonly offer: Offer; readonly state: Upd
       return (
         <>
           <ProgressRing percent={state.downloadPercent ?? 0} />
-          <span className="text-muted-foreground">{percentOf(state)}%</span>
+          <span className="text-fg-tertiary">{percentOf(state)}%</span>
         </>
       )
     case "ready":
@@ -118,7 +118,7 @@ function DownloadProgress({ percent }: { readonly percent: number }) {
       >
         <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${percent}%` }} />
       </div>
-      <span className="w-8 text-right text-muted-foreground tabular-nums">{Math.floor(percent)}%</span>
+      <span className="w-8 text-right text-fg-tertiary tabular-nums">{Math.floor(percent)}%</span>
     </div>
   )
 }
@@ -138,7 +138,7 @@ function Actions({ state, dirty }: { readonly state: UpdateState; readonly dirty
           <Button
             variant="ghost"
             size="sm"
-            className="mr-auto -ml-2 text-muted-foreground"
+            className="mr-auto -ml-2 text-fg-secondary"
             onClick={() => void openExternalLink(releaseUrl)}
           >
             View on GitHub
@@ -188,7 +188,6 @@ function Pill(
     <Popover>
       <Tooltip>
         <TooltipTrigger
-          delay={500}
           render={
             <PopoverTrigger
               render={
@@ -196,7 +195,7 @@ function Pill(
                   variant="ghost"
                   size="xs"
                   className={cn(
-                    "h-5 gap-1 px-1.5 text-xs font-normal tabular-nums",
+                    "h-5 gap-1 px-1.5 text-body font-normal tabular-nums",
                     offer === "ready" &&
                       "bg-primary text-primary-foreground hover:bg-primary/85 hover:text-primary-foreground aria-expanded:bg-primary/85 aria-expanded:text-primary-foreground"
                   )}
@@ -211,7 +210,7 @@ function Pill(
       </Tooltip>
       <PopoverContent side="top" align="end" initialFocus={notes} className="w-96 gap-0 p-0">
         <div className="flex flex-col gap-0.5 px-3 pt-3 pb-2.5">
-          <p className="text-eyebrow text-muted-foreground">What's new</p>
+          <p className="text-caption uppercase tracking-wider text-fg-secondary">What's new</p>
           <PopoverTitle>Ballest Editor {state.availableVersion}</PopoverTitle>
           <PopoverDescription>
             {released === null ? `You have ${state.currentVersion}` : `${released} · You have ${state.currentVersion}`}
@@ -224,7 +223,7 @@ function Pill(
           className="max-h-[min(50vh,22rem)] overflow-y-auto border-t px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-inset dark:scheme-dark"
         >
           {state.releaseNotes === null
-            ? <p className="text-muted-foreground">This release has no notes.</p>
+            ? <p className="text-fg-tertiary">This release has no notes.</p>
             : <ReleaseNotes blocks={state.releaseNotes} />}
         </div>
         <Actions state={state} dirty={dirty} />

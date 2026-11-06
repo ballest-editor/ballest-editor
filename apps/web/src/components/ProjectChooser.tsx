@@ -75,7 +75,7 @@ export function ProjectChooser() {
                   New project
                 </Button>
               </div>
-              <ul className="flex max-h-72 min-h-0 flex-col overflow-y-auto rounded-md ring-1 ring-foreground/10 [scrollbar-width:thin] [scrollbar-color:color-mix(in_oklch,var(--foreground)_25%,transparent)_transparent]">
+              <ul className="flex max-h-72 min-h-0 flex-col overflow-y-auto rounded-control ring-1 ring-foreground/10 [scrollbar-width:thin] [scrollbar-color:color-mix(in_oklch,var(--foreground)_25%,transparent)_transparent]">
                 {recent.map(({ name, path }) => {
                   const elsewhere = openElsewhere.includes(path)
                   return (
@@ -88,14 +88,12 @@ export function ProjectChooser() {
                         onClick={() => void switchProject(path)}
                       >
                         <span className="flex min-w-0 items-baseline gap-2">
-                          <span className={elsewhere ? "truncate text-muted-foreground" : "truncate"}>
+                          <span className={elsewhere ? "truncate text-fg-tertiary" : "truncate"}>
                             {name}
                           </span>
-                          {elsewhere && (
-                            <span className="shrink-0 text-muted-foreground">· Open in another window</span>
-                          )}
+                          {elsewhere && <span className="shrink-0 text-fg-tertiary">· Open in another window</span>}
                         </span>
-                        <PathText block className="text-muted-foreground">{path}</PathText>
+                        <PathText block className="text-fg-tertiary">{path}</PathText>
                       </button>
                     </li>
                   )

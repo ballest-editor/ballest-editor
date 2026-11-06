@@ -1,7 +1,7 @@
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 import { IconChevronRight, IconDots } from "@tabler/icons-react"
-import { cn } from "cn"
+import { cn } from "@workspace/ui/lib/utils"
 import * as React from "react"
 
 function Breadcrumb({ className, ...props }: React.ComponentProps<"nav">) {
@@ -20,7 +20,7 @@ function BreadcrumbList({ className, ...props }: React.ComponentProps<"ol">) {
     <ol
       data-slot="breadcrumb-list"
       className={cn(
-        "flex flex-wrap items-center gap-1.5 text-xs/relaxed wrap-break-word text-muted-foreground",
+        "flex flex-wrap items-center gap-1.5 text-body wrap-break-word text-fg-secondary",
         className
       )}
       {...props}
@@ -65,7 +65,7 @@ function BreadcrumbPage({ className, ...props }: React.ComponentProps<"span">) {
       role="link"
       aria-disabled="true"
       aria-current="page"
-      className={cn("font-normal text-foreground", className)}
+      className={cn("text-foreground", className)}
       {...props}
     />
   )

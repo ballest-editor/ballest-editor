@@ -10,7 +10,7 @@ export function VersionStatus() {
   if (state === null) return <div />
   const status = updateStatusOf(state, checked)
   return (
-    <div className="flex min-w-0 items-center gap-2 px-1 text-muted-foreground">
+    <div className="flex min-w-0 items-center gap-2 px-1 text-fg-tertiary">
       <span className="tabular-nums">v{state.currentVersion}</span>
       {status !== null && <span className="truncate">{status}</span>}
     </div>

@@ -1,4 +1,4 @@
-import { cn } from "cn"
+import { cn } from "@workspace/ui/lib/utils"
 import * as React from "react"
 import { HexColorPicker } from "react-colorful"
 
@@ -67,7 +67,7 @@ function ColorPicker({
     <div
       data-slot="color-picker"
       className={cn(
-        "flex flex-col gap-2 [&_.react-colorful]:h-40 [&_.react-colorful]:w-full [&_.react-colorful]:gap-2 [&_.react-colorful__hue]:h-3 [&_.react-colorful__hue]:rounded-full [&_.react-colorful__last-control]:rounded-full [&_.react-colorful__pointer]:size-4 [&_.react-colorful__pointer]:border-2 [&_.react-colorful__pointer]:shadow-sm [&_.react-colorful__saturation]:rounded-md [&_.react-colorful__saturation]:border-b-0",
+        "flex flex-col gap-2 [&_.react-colorful]:h-40 [&_.react-colorful]:w-full [&_.react-colorful]:gap-2 [&_.react-colorful__hue]:h-3 [&_.react-colorful__hue]:rounded-full [&_.react-colorful__last-control]:rounded-full [&_.react-colorful__pointer]:size-4 [&_.react-colorful__pointer]:border-2 [&_.react-colorful__pointer]:shadow-sm [&_.react-colorful__saturation]:rounded-control [&_.react-colorful__saturation]:border-b-0",
         className
       )}
       onPointerDown={start}
@@ -110,7 +110,7 @@ function ColorSwatch({
     <span
       data-slot="color-swatch"
       className={cn(
-        "inline-block size-4 shrink-0 rounded-sm ring-1 ring-foreground/20 ring-inset",
+        "inline-block size-4 shrink-0 rounded-control ring-1 ring-foreground/20 ring-inset",
         color === null && "bg-[repeating-conic-gradient(var(--muted)_0_25%,var(--background)_0_50%)] bg-size-[8px_8px]",
         className
       )}

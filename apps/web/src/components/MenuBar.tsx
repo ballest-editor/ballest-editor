@@ -112,7 +112,7 @@ function RecentProjectsMenu() {
           >
             <span className="truncate">{project.name}</span>
             {openElsewhere.includes(project.path) && (
-              <span className="shrink-0 pl-4 text-muted-foreground">Open in another window</span>
+              <span className="shrink-0 pl-4 text-fg-tertiary">Open in another window</span>
             )}
           </MenubarItem>
         ))}

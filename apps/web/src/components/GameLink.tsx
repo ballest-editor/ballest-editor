@@ -41,8 +41,8 @@ const ICONS: Record<GameLinkRowState, ComponentType<{ readonly className?: strin
 const TONES: Record<GameLinkRowState, string> = {
   ok: "text-emerald-600 dark:text-emerald-400",
   missing: "text-destructive",
-  optional: "text-muted-foreground",
-  waiting: "text-muted-foreground"
+  optional: "text-fg-tertiary",
+  waiting: "text-fg-tertiary"
 }
 
 function StateIcon({ state, className }: { readonly state: GameLinkRowState; readonly className?: string }) {
@@ -131,12 +131,12 @@ function ChecklistRow({ row, framed }: { readonly row: GameLinkRow; readonly fra
       <div className="flex items-start gap-3">
         <StateIcon state={problem === null ? row.state : "missing"} className="mt-0.5" />
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="font-medium">{row.label}</span>
-          <span className={cn("text-[0.7rem] text-muted-foreground", quiet && "opacity-80")}>
+          <span className="text-body-strong">{row.label}</span>
+          <span className={cn("text-caption text-fg-tertiary", quiet && "opacity-80")}>
             <span className={cn(!quiet && "text-foreground/80")}>{row.title}</span>
             {row.note !== null && `. ${row.note}`}
           </span>
-          {problem !== null && <span className="text-[0.7rem] text-destructive">{problem}</span>}
+          {problem !== null && <span className="text-caption text-destructive">{problem}</span>}
         </div>
         {buttons.length > 0 && (
           <div className="flex shrink-0 items-center gap-1.5">
@@ -204,7 +204,7 @@ export function GameLinkRows({ framed }: { readonly framed: boolean }) {
   const creator = useCreator()
   const rows = gameLinkRows(paths, plugin, creator)
   return (
-    <ul className={cn("flex flex-col divide-y divide-border/50 text-xs", framed && "py-1")}>
+    <ul className={cn("flex flex-col divide-y divide-border/50 text-body", framed && "py-1")}>
       {rows.map((row) => <ChecklistRow key={row.id} row={row} framed={framed} />)}
     </ul>
   )
@@ -213,7 +213,7 @@ export function GameLinkRows({ framed }: { readonly framed: boolean }) {
 /** Looks the folders, the plugin and the creator up again. */
 export function CheckAgainButton({ size = "sm" }: { readonly size?: "xs" | "sm" }) {
   return (
-    <Button variant="ghost" size={size} className="text-muted-foreground" onClick={() => void refreshGameLink()}>
+    <Button variant="ghost" size={size} className="text-fg-secondary" onClick={() => void refreshGameLink()}>
       <IconRefresh data-icon="inline-start" />
       Check again
     </Button>
@@ -223,7 +223,7 @@ export function CheckAgainButton({ size = "sm" }: { readonly size?: "xs" | "sm" 
 /** The checklist in its own box with Check again under it, as File › Game link… shows it. */
 export function GameLinkChecklist() {
   return (
-    <div className="flex min-h-0 flex-col rounded-lg border">
+    <div className="flex min-h-0 flex-col rounded-surface border">
       {/* a column, so its viewport can shrink: the dialog has only a max height, which `size-full` can't resolve */}
       <ScrollArea className="flex min-h-0 flex-1 flex-col">
         <GameLinkRows framed />

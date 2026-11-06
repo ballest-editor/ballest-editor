@@ -71,7 +71,7 @@ export function MapNameDialog(props: {
 }) {
   const { creator } = props
   const fileName = mapFileNameOf(props.name || "name", creator.name || "creator")
-  const help = "text-xs text-muted-foreground"
+  const help = "text-body text-fg-tertiary"
   return (
     <Dialog open={props.open} onOpenChange={(next) => !next && props.onClose()}>
       <DialogContent>

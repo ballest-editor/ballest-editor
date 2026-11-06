@@ -55,11 +55,11 @@ function VersionLine(
   return (
     <li className="flex items-center gap-3 px-3 py-2">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-xs font-medium tabular-nums">
+        <div className="flex items-center gap-2 text-body-strong tabular-nums">
           {formatTime(at)}
           {badge}
         </div>
-        <div className="truncate text-xs text-muted-foreground">{status}</div>
+        <div className="truncate text-body text-fg-tertiary">{status}</div>
       </div>
       <Button size="sm" variant="outline" disabled={action.disabled} onClick={onAct}>
         {action.label}
@@ -175,7 +175,7 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
               label: (
                 <>
                   {mapLabelOf(name)}
-                  {name === fileName && <span className="ml-1.5 text-muted-foreground">(open)</span>}
+                  {name === fileName && <span className="ml-1.5 text-fg-tertiary">(open)</span>}
                 </>
               ),
               shows: { kind: "map", fileName: name } as const
@@ -207,8 +207,8 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
               className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors outline-none hover:bg-muted focus-visible:bg-muted"
               onClick={() => setShown(shows)}
             >
-              <span className="min-w-0 flex-1 truncate text-xs font-medium">{label}</span>
-              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+              <span className="min-w-0 flex-1 truncate text-body-strong">{label}</span>
+              <span className="shrink-0 text-body text-fg-tertiary tabular-nums">
                 {list.length === 1 ? "1 version" : `${list.length} versions`} · {formatTime(list[0]?.at ?? "")}
               </span>
             </button>
@@ -231,16 +231,16 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center justify-between gap-2">
-          <div className="truncate text-xs font-medium">
+          <div className="truncate text-body-strong">
             {shown === null ? "All backups" : shown.kind === "map" ? mapLabelOf(shown.fileName) : shown.name}
           </div>
           {shown !== null && <Button size="sm" variant="ghost" onClick={() => setShown(null)}>All backups</Button>}
         </div>
-        <ScrollArea className="h-72 min-h-0 rounded-md border">
+        <ScrollArea className="h-72 min-h-0 rounded-control border">
           {backups === null
-            ? <p className="p-3 text-xs text-muted-foreground">Reading the backups…</p>
+            ? <p className="p-3 text-body text-fg-tertiary">Reading the backups…</p>
             : shown === null
-            ? sections.length === 0 ? <p className="p-3 text-xs text-muted-foreground">No backups yet.</p> : everything
+            ? sections.length === 0 ? <p className="p-3 text-body text-fg-tertiary">No backups yet.</p> : everything
             : shown.kind === "prefab"
             ? (
               <ul className="divide-y">
@@ -249,7 +249,7 @@ export function RecoverDialog({ open, onClose }: { readonly open: boolean; reado
             )
             : versions.length === 0
             ? (
-              <p className="p-3 text-xs text-muted-foreground">
+              <p className="p-3 text-body text-fg-tertiary">
                 No backups of this map yet. One is made each time Save, Rename, Import or Export writes over its file.
               </p>
             )

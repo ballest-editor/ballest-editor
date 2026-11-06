@@ -135,7 +135,7 @@ export function NameMapDialog(
       creator={creator}
       {...(mode !== "saveAs" && { creatorHint: "The map's creator; Settings › General keeps the one new maps get." })}
       savedCreator={
-        <div className="text-xs text-muted-foreground">
+        <div className="text-body text-fg-tertiary">
           Creator: <span className="text-foreground">{creator.saved}</span>{" "}
           <button
             type="button"
@@ -154,31 +154,31 @@ export function NameMapDialog(
     >
       {namesProject && <NewProjectFields draft={newProject} />}
       {mode === "newDraft" && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-body text-fg-tertiary">
           {levelData.levelDisplayName} is the draft of a Workshop map (item{" "}
           {levelData.levelPublishedFileId}). The plugin manager races only maps never published, so Play races a copy
           under another name, not linked to the Workshop item.
         </p>
       )}
       {replaces && (
-        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+        <p className="rounded-control border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-body text-amber-700 dark:text-amber-300">
           The project already has {name.trim()} by {creator.name}. {mode === "newDraft" ? "Save and play" : "Duplicate"}
           {" "}
           replaces it; the current file goes to the backups.
         </p>
       )}
       {clash && !replaces && (
-        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <p className="rounded-control border border-destructive/40 bg-destructive/10 px-3 py-2 text-body text-destructive">
           The project already has {name.trim()} by {creator.name}.
         </p>
       )}
       {risky.rejected.length > 0 && (
-        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <p className="rounded-control border border-destructive/40 bg-destructive/10 px-3 py-2 text-body text-destructive">
           The game rejects {risky.rejected.join(", ")} and would discard the whole map. Remove them first.
         </p>
       )}
       {risky.unverified.length > 0 && (
-        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+        <p className="rounded-control border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-body text-amber-700 dark:text-amber-300">
           Not yet confirmed to load in-game:{" "}
           {risky.unverified.join(", ")}. If the game rejects one, it discards the whole map. Test with a copy.
         </p>

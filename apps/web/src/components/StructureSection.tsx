@@ -26,7 +26,7 @@ export function GroupSection({ group }: { readonly group: GroupNode }) {
     <div className="flex flex-col gap-2">
       <SectionTitle>Group of {count} item{count === 1 ? "" : "s"}</SectionTitle>
       <div className="flex flex-col gap-1">
-        <Label htmlFor="group-name" className="text-muted-foreground">Name</Label>
+        <Label htmlFor="group-name" className="text-fg-secondary">Name</Label>
         <Input
           id="group-name"
           value={draft ?? group.name}
@@ -39,7 +39,7 @@ export function GroupSection({ group }: { readonly group: GroupNode }) {
         />
       </div>
       <div className="flex flex-col gap-1">
-        <Label htmlFor="group-tags" className="text-muted-foreground">Tags</Label>
+        <Label htmlFor="group-tags" className="text-fg-secondary">Tags</Label>
         <TagInput id="group-tags" tags={group.tags} onChange={(tags) => setTags(group.id, tags)} />
       </div>
     </div>
@@ -62,7 +62,7 @@ export function InstanceSection({ group, link }: { readonly group: GroupNode; re
   return (
     <div className="flex flex-col gap-2">
       <SectionTitle>Instance of {link.name}</SectionTitle>
-      <p className="text-xs text-muted-foreground">{instanceStatusOf(found, current, unmodified)}</p>
+      <p className="text-body text-fg-tertiary">{instanceStatusOf(found, current, unmodified)}</p>
       <div className="flex flex-wrap gap-1">
         <Button
           variant="outline"
@@ -91,7 +91,7 @@ export function ItemTags({ itemKey }: { readonly itemKey: string }) {
   const setTags = useEditor((s) => s.setTags)
   return (
     <div className="flex flex-col gap-1">
-      <Label htmlFor="item-tags" className="text-muted-foreground">Tags</Label>
+      <Label htmlFor="item-tags" className="text-fg-secondary">Tags</Label>
       <TagInput id="item-tags" tags={tags ?? []} onChange={(next) => setTags(itemKey, next)} />
     </div>
   )

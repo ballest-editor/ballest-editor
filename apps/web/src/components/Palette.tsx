@@ -51,16 +51,16 @@ function PieceButton({ piece, onPlace, onHover, unavailable, unverified }: {
       {unavailable === undefined && (
         <PieceThumbnail
           piece={piece}
-          className="size-8 shrink-0 rounded-sm bg-muted object-fill"
-          placeholder={<span className="size-8 shrink-0 rounded-sm bg-muted" />}
+          className="size-8 shrink-0 rounded-control bg-muted object-fill"
+          placeholder={<span className="size-8 shrink-0 rounded-control bg-muted" />}
         />
       )}
       <span className="flex min-w-0 flex-col">
-        <span className="flex items-center gap-1.5 truncate text-xs font-medium">
+        <span className="flex items-center gap-1.5 truncate text-body-strong">
           {pieceLabelOf(piece)}
           {unverified && (
             <span
-              className="rounded-sm border border-amber-500/40 bg-amber-500/15 px-1 text-[0.625rem] font-normal text-amber-700 dark:text-amber-300"
+              className="rounded-control border border-amber-500/40 bg-amber-500/15 px-1 text-caption font-normal text-amber-700 dark:text-amber-300"
               title="Not yet confirmed to load in the in-game editor. A rejected item makes the game discard the whole map."
             >
               unverified
@@ -68,7 +68,7 @@ function PieceButton({ piece, onPlace, onHover, unavailable, unverified }: {
           )}
         </span>
         {!piece.thumbnail && piece.displayName && piece.displayName !== piece.className && (
-          <span className="truncate text-[0.6875rem] text-muted-foreground">{piece.className}</span>
+          <span className="truncate text-caption text-fg-tertiary">{piece.className}</span>
         )}
       </span>
     </Button>
@@ -132,17 +132,17 @@ export function Palette() {
         <Button
           variant="ghost"
           size="icon-sm"
-          className="shrink-0 text-muted-foreground"
+          className="shrink-0 text-fg-secondary"
           aria-label={allCollapsed ? "Expand all groups" : "Collapse all groups"}
           title={allCollapsed ? "Expand all groups" : "Collapse all groups"}
           disabled={terms.length > 0}
           onClick={toggleAll}
         >
-          {allCollapsed ? <IconFoldDown className="size-3.5" /> : <IconFoldUp className="size-3.5" />}
+          {allCollapsed ? <IconFoldDown /> : <IconFoldUp />}
         </Button>
       </div>
       {catalog === null && !booting && (
-        <div className="px-3 py-2 text-xs text-muted-foreground">The piece catalog couldn't be loaded.</div>
+        <div className="px-3 py-2 text-body text-fg-tertiary">The piece catalog couldn't be loaded.</div>
       )}
       {catalog === null && booting ? <PaletteSkeleton /> : (
         <ScrollArea className="min-h-0 flex-1">
@@ -157,7 +157,7 @@ export function Palette() {
                   onOpenChange={(next) => setOpen((o) => ({ ...o, [section.name]: next }))}
                 >
                   <CollapsibleTrigger
-                    className="group flex h-8 w-full items-center gap-1.5 rounded-sm px-1.5 text-eyebrow text-muted-foreground hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60 focus-visible:outline-none"
+                    className="group flex h-8 w-full items-center gap-1.5 rounded-control px-1.5 text-caption uppercase tracking-wider text-fg-secondary hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60 focus-visible:outline-none"
                     onMouseDown={(e) => e.preventDefault()}
                   >
                     <IconChevronRight className="size-3.5 transition-transform duration-200 group-data-[panel-open]:rotate-90" />
@@ -186,7 +186,7 @@ export function Palette() {
               )
             })}
             {catalog !== null && sections.length === 0 && (
-              <div className="px-1.5 py-2 text-xs text-muted-foreground">No pieces match the search.</div>
+              <div className="px-1.5 py-2 text-body text-fg-tertiary">No pieces match the search.</div>
             )}
           </div>
         </ScrollArea>

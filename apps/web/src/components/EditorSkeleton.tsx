@@ -21,11 +21,11 @@ const LABEL_WIDTHS = ["45%", "38%", "52%", "41%", "60%", "35%", "48%", "56%", "4
 export function PaletteSkeleton() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2" aria-hidden>
-      <div className="flex items-center gap-1 px-1 py-1 text-eyebrow">
+      <div className="flex items-center gap-1 px-1 py-1 text-caption uppercase tracking-wider">
         <span className="flex h-[1lh] items-center">
-          <Skeleton className="h-2 w-16 rounded-sm" />
+          <Skeleton className="h-2 w-16 rounded-control" />
         </span>
-        <Skeleton className="ml-auto h-2 w-4 rounded-sm" />
+        <Skeleton className="ml-auto h-2 w-4 rounded-control" />
       </div>
       <div className="flex flex-col gap-0.5">
         {Array.from({ length: 48 }, (_, i) => (
@@ -34,8 +34,8 @@ export function PaletteSkeleton() {
             <div
               className={buttonVariants({ variant: "ghost", className: "h-auto w-full justify-start gap-2 px-2 py-1" })}
             >
-              <Skeleton className="size-8 shrink-0 rounded-sm" />
-              <Skeleton className="h-2.5 rounded-sm" style={{ width: LABEL_WIDTHS[i % LABEL_WIDTHS.length] }} />
+              <Skeleton className="size-8 shrink-0 rounded-control" />
+              <Skeleton className="h-2.5 rounded-control" style={{ width: LABEL_WIDTHS[i % LABEL_WIDTHS.length] }} />
             </div>
           </div>
         ))}
@@ -59,7 +59,7 @@ export function EditorSkeletonPanels({ className }: { readonly className?: strin
         className="shrink-0 overflow-hidden bg-card shadow-[inset_-1px_0_0_var(--border)]"
         style={{ width: dockSide("left", 260) }}
       >
-        <div className="h-8 border-b" />
+        <div className="h-7 border-b" />
         <div className="flex h-full flex-col">
           <div className="flex h-9 shrink-0 items-center px-2">
             <Input type="search" placeholder="Search pieces…" disabled />
@@ -81,16 +81,16 @@ export function EditorSkeletonPanels({ className }: { readonly className?: strin
         className="shrink-0 overflow-hidden bg-card shadow-[inset_1px_0_0_var(--border)]"
         style={{ width: dockSide("right", 300) }}
       >
-        <div className="h-8 border-b" />
+        <div className="h-7 border-b" />
         <div className="flex flex-col gap-3 p-3">
-          <div className="text-eyebrow text-muted-foreground">Map</div>
+          <div className="text-caption uppercase tracking-wider text-fg-secondary">Map</div>
           <div className="flex flex-col gap-1">
-            <Skeleton className="h-3 w-10 rounded-sm" />
+            <Skeleton className="h-3 w-10 rounded-control" />
             <Skeleton className="h-7 w-full" />
           </div>
           <div className="flex flex-col gap-1">
             {LABEL_WIDTHS.slice(0, 5).map((w) => (
-              <Skeleton key={w} className="my-0.5 h-3 rounded-sm" style={{ width: w }} />
+              <Skeleton key={w} className="my-0.5 h-3 rounded-control" style={{ width: w }} />
             ))}
           </div>
         </div>

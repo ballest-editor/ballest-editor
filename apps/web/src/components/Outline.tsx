@@ -127,7 +127,7 @@ function TagsPopover({ target, onClose }: {
           initialFocus={input}
           anchor={{ getBoundingClientRect: () => target.anchor }}
         >
-          <div className="truncate font-medium">Tags of {target.name}</div>
+          <div className="truncate text-body-strong">Tags of {target.name}</div>
           <TagInput inputRef={input} tags={tags ?? []} onChange={(next) => setTags(target.id, next)} />
         </PopoverContent>
       )}
@@ -410,7 +410,7 @@ export function Outline() {
             })}
             {drag !== null && <DropLine drag={drag} />}
             {rows.length === 0 && (
-              <div className="p-3 text-xs text-muted-foreground">
+              <div className="p-3 text-body text-fg-tertiary">
                 {filtering
                   ? "Nothing matches the filter."
                   : "Nothing placed yet. Click a piece in Pieces to add it to the map."}

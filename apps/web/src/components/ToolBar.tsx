@@ -34,7 +34,7 @@ export function ToolBar({ disabled }: { readonly disabled: boolean }) {
         }}
         spacing={1}
         disabled={disabled}
-        className={`pointer-events-auto rounded-full p-1 ${FROSTED}`}
+        className={`pointer-events-auto rounded-control p-1 ${FROSTED}`}
       >
         {TOOLS.map(({ tool: t, action, icon: Icon }) => (
           <Tooltip key={t}>
@@ -43,7 +43,7 @@ export function ToolBar({ disabled }: { readonly disabled: boolean }) {
                 <ToggleGroupItem
                   value={t}
                   aria-label={keybindActionLabels[action]}
-                  className="size-8 rounded-full data-[pressed]:bg-primary data-[pressed]:text-primary-foreground"
+                  className="size-8 rounded-control data-[pressed]:bg-primary data-[pressed]:text-primary-foreground"
                   {...noFocus}
                 />
               }

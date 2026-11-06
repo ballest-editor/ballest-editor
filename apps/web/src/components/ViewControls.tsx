@@ -44,7 +44,7 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
                   onPressedChange={toggleGizmoSpace}
                   disabled={disabled}
                   aria-label={label}
-                  className="size-8 rounded-full aria-pressed:bg-transparent aria-pressed:hover:bg-muted"
+                  className="size-8 rounded-control aria-pressed:bg-transparent aria-pressed:hover:bg-muted"
                   {...noFocus}
                 />
               }
@@ -119,7 +119,7 @@ function SnapGroup<V extends number>(props: {
               onPressedChange={props.onToggle}
               disabled={disabled}
               aria-label={props.label}
-              className="size-8 rounded-full data-[pressed]:bg-primary data-[pressed]:text-primary-foreground"
+              className="size-8 rounded-control data-[pressed]:bg-primary data-[pressed]:text-primary-foreground"
               {...noFocus}
             />
           }
@@ -147,8 +147,8 @@ function SnapGroup<V extends number>(props: {
                 aria-label={props.valueLabel}
                 size="sm"
                 tabIndex={-1}
-                className={`min-w-8 justify-center rounded-full border-none bg-transparent px-1.5 tabular-nums dark:bg-transparent [&>svg]:hidden ${
-                  enabled ? "" : "text-muted-foreground"
+                className={`min-w-8 justify-center rounded-control border-none bg-transparent px-1.5 tabular-nums dark:bg-transparent [&>svg]:hidden ${
+                  enabled ? "" : "text-fg-tertiary"
                 }`}
               />
             }

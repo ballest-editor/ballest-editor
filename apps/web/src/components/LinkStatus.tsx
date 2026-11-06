@@ -26,9 +26,9 @@ export function LinkStatus() {
   const canPlay = useEditor((s) => s.capabilities.play)
   const prefab = useOpenPrefab()
   const now = useNow()
-  if (prefab !== null) return <span className="text-muted-foreground">Prefab {prefab.name}</span>
+  if (prefab !== null) return <span className="text-fg-tertiary">Prefab {prefab.name}</span>
   if (!canExport) return null
-  if (open === null) return <span className="text-muted-foreground">Not saved in the project yet</span>
+  if (open === null) return <span className="text-fg-tertiary">Not saved in the project yet</span>
 
   const { state, map } = open
   const exported = map.link?.export ?? null
@@ -36,11 +36,11 @@ export function LinkStatus() {
   return (
     <Popover>
       <PopoverTrigger
-        render={<Button variant="ghost" size="xs" className="h-5 gap-1.5 px-1.5 text-xs font-normal" />}
+        render={<Button variant="ghost" size="xs" className="h-5 gap-1.5 px-1.5 text-body font-normal" />}
       >
         <LinkStateBadge state={state} />
         {exported !== null && (
-          <span className="flex items-center gap-1.5 text-muted-foreground">
+          <span className="flex items-center gap-1.5 text-fg-tertiary">
             <span aria-hidden>·</span>
             exported {formatAgo(exported.at, now)}
           </span>
@@ -53,11 +53,11 @@ export function LinkStatus() {
         </PopoverHeader>
         {exported !== null && (
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-            <dt className="text-muted-foreground">Export</dt>
+            <dt className="text-fg-secondary">Export</dt>
             <dd className="min-w-0">
               <PathText block>{exported.path}</PathText>
             </dd>
-            <dt className="text-muted-foreground">Last export</dt>
+            <dt className="text-fg-secondary">Last export</dt>
             <dd>
               {formatDateTime(exported.at)} ({formatAgo(exported.at, now)})
             </dd>

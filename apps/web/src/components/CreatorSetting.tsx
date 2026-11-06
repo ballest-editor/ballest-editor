@@ -63,7 +63,7 @@ export const creatorSettingsRow = (props: {
           aria-invalid={Option.isSome(problem)}
           onChange={(e) => onChange(e.target.value)}
         />
-        {Option.isSome(problem) && <span className="text-[0.7rem] text-destructive">{problem.value}</span>}
+        {Option.isSome(problem) && <span className="text-caption text-destructive">{problem.value}</span>}
       </div>
     )
   }

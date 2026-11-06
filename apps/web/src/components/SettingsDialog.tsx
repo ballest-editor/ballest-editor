@@ -115,7 +115,7 @@ function SliderControl({ value, disabled = false, onChange, children, ...range }
           if (next !== undefined) onChange(next)
         }}
       />
-      <span className={cn("w-20 text-right font-mono text-xs tabular-nums", disabled && "text-muted-foreground/60")}>
+      <span className={cn("w-20 text-right font-mono text-body tabular-nums", disabled && "text-fg-disabled")}>
         {children}
       </span>
     </>
@@ -138,10 +138,10 @@ function ColorSetting(props: {
     <Popover>
       <PopoverTrigger
         aria-label={`${props.label}: ${props.value ?? `automatic (${props.auto})`}`}
-        className="flex h-7 w-36 cursor-pointer items-center gap-2 rounded-md border border-input px-2 text-xs transition-colors hover:border-ring/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+        className="flex h-7 w-36 cursor-pointer items-center gap-2 rounded-control border border-input px-2 text-body transition-colors hover:border-ring/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
       >
         <ColorSwatch color={shown} />
-        <span className={cn("font-mono", props.value === null && "text-muted-foreground")}>
+        <span className={cn("font-mono", props.value === null && "text-fg-tertiary")}>
           {props.value ?? "Automatic"}
         </span>
       </PopoverTrigger>
@@ -186,7 +186,7 @@ function KeybindControl(props: {
             <span
               key={binding}
               className={cn(
-                "group/cap inline-flex h-6 items-stretch overflow-hidden rounded-md border bg-muted font-mono text-[11px] leading-none text-foreground tabular-nums",
+                "group/cap inline-flex h-6 items-stretch overflow-hidden rounded-control border bg-muted font-mono text-caption leading-none text-foreground tabular-nums",
                 props.conflicts.has(binding) ? "border-destructive text-destructive" : "border-border"
               )}
               title={props.conflicts.has(binding) ? "Also bound to another action" : undefined}
@@ -201,7 +201,7 @@ function KeybindControl(props: {
               </button>
               <button
                 type="button"
-                className="flex w-0 items-center justify-center overflow-hidden text-muted-foreground transition-[width] duration-150 group-hover/cap:w-5 group-hover/cap:border-l group-hover/cap:border-border hover:bg-destructive/15 hover:text-destructive focus-visible:w-5"
+                className="flex w-0 items-center justify-center overflow-hidden text-fg-secondary transition-[width] duration-150 group-hover/cap:w-5 group-hover/cap:border-l group-hover/cap:border-border hover:bg-destructive/15 hover:text-destructive focus-visible:w-5"
                 onClick={() => props.onRemove(index)}
                 aria-label={`Unbind ${formatBinding(binding)} from ${label}`}
                 tabIndex={-1}
@@ -216,7 +216,7 @@ function KeybindControl(props: {
         : (
           <button
             type="button"
-            className="inline-flex h-6 min-w-6 items-center justify-center gap-1 rounded-md border border-dashed border-border px-1.5 font-mono text-[11px] text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+            className="inline-flex h-6 min-w-6 items-center justify-center gap-1 rounded-control border border-dashed border-border px-1.5 font-mono text-caption text-fg-secondary hover:border-foreground/40 hover:text-foreground"
             onClick={() => props.onListen(props.bindings.length)}
             aria-label={props.bindings.length === 0 ? `Bind ${label}` : `Add a binding for ${label}`}
           >
@@ -234,7 +234,7 @@ const CAP_TEXT = "leading-none [text-box:trim-both_cap_alphabetic]"
 
 function CaptureCap() {
   return (
-    <span className="inline-flex h-6 items-center gap-1.5 rounded-md border border-primary/40 bg-primary/15 px-2 font-mono text-[11px] font-medium text-[color-mix(in_oklch,var(--primary),var(--foreground)_45%)]">
+    <span className="inline-flex h-6 items-center gap-1.5 rounded-control border border-primary/40 bg-primary/15 px-2 font-mono text-caption font-medium text-[color-mix(in_oklch,var(--primary),var(--foreground)_45%)]">
       <span className="size-1.5 animate-pulse rounded-full bg-primary" aria-hidden />
       <span className={CAP_TEXT}>Press a key</span>
     </span>

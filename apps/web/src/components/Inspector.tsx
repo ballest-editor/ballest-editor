@@ -52,10 +52,10 @@ const axes: ReadonlyArray<Axis> = ["x", "y", "z"]
 
 function Facts({ facts }: { readonly facts: ReadonlyArray<readonly [string, string]> }) {
   return (
-    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body">
       {facts.map(([k, v]) => (
         <div key={k} className="contents">
-          <dt className="text-muted-foreground">{k}</dt>
+          <dt className="text-fg-secondary">{k}</dt>
           <dd className="min-w-0">{k === "File" ? <PathText block>{v}</PathText> : v}</dd>
         </div>
       ))}
@@ -108,7 +108,7 @@ function MapSettings() {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="text-muted-foreground"
+                className="text-fg-secondary"
                 aria-label="Map settings"
                 onClick={() => openDialog({ id: "mapSettings" })}
               />
@@ -120,7 +120,7 @@ function MapSettings() {
         </Tooltip>
       </div>
       <div className="flex flex-col gap-1">
-        <Label htmlFor="map-name" className="text-muted-foreground">Name</Label>
+        <Label htmlFor="map-name" className="text-fg-secondary">Name</Label>
         <Input id="map-name" value={name} onChange={(e) => setDraft(e.target.value)} onBlur={commit} />
       </div>
       <Facts facts={facts} />
@@ -235,7 +235,6 @@ function TransformRow(props: {
       >
         <Tooltip>
           <TooltipTrigger
-            delay={500}
             render={
               <PopoverTrigger
                 render={
@@ -259,7 +258,7 @@ function TransformRow(props: {
             <row.icon />
           </TooltipTrigger>
           <TooltipContent side="left" sideOffset={8} className="flex flex-col items-start py-2 pr-3 pl-2.5">
-            <div className="font-medium">{row.title}</div>
+            <div className="text-body-strong">{row.title}</div>
             <div className="mt-1.5 grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-1 opacity-80">
               <span>Copy</span>
               <ShiftClick button="right" />
@@ -269,7 +268,7 @@ function TransformRow(props: {
           </TooltipContent>
         </Tooltip>
         <PopoverContent side="left" align="start" className="w-auto gap-1 p-1">
-          <div className="px-2 py-1 text-xs text-muted-foreground">{row.title}</div>
+          <div className="px-2 py-1 text-body text-fg-secondary">{row.title}</div>
           <Button
             variant="ghost"
             size="sm"
@@ -355,17 +354,17 @@ function SelectionHeader(
       <SectionTitle>{only === undefined ? `${items.length} items selected` : `Item #${only.index}`}</SectionTitle>
       {only === undefined
         ? (
-          <ul className="flex flex-col gap-0.5 text-xs break-all">
+          <ul className="flex flex-col gap-0.5 text-body break-all">
             {[...counts].map(([name, n]) => (
               <li key={name}>
-                <span className="font-semibold">{name}</span>
-                <span className="ml-1 text-muted-foreground">× {n}</span>
+                <span className="text-body-strong">{name}</span>
+                <span className="ml-1 text-fg-tertiary">× {n}</span>
               </li>
             ))}
           </ul>
         )
         : (
-          <div className="text-sm font-semibold break-all" title={only.item.actorToSpawn}>
+          <div className="text-title break-all" title={only.item.actorToSpawn}>
             {classNameOf(only.item.actorToSpawn)}
           </div>
         )}
@@ -389,13 +388,13 @@ function Meshes({ item }: { readonly item: Item }) {
       <SectionTitle>Meshes</SectionTitle>
       {item.meshComponents.map((mesh, i) => (
         // oxlint-disable-next-line react/no-array-index-key -- mesh components have no id; the slot index is their identity
-        <div key={i} className="flex flex-col gap-1 text-xs break-all">
+        <div key={i} className="flex flex-col gap-1 text-body break-all">
           <div className="font-mono" title={mesh.meshAssetPath}>
             {mesh.meshAssetPath === undefined || mesh.meshAssetPath === ""
               ? "(no main mesh)"
               : mesh.meshAssetPath.split("/").at(-1)}
           </div>
-          <ul className="flex flex-col gap-0.5 pl-2 font-mono text-muted-foreground">
+          <ul className="flex flex-col gap-0.5 pl-2 font-mono text-fg-tertiary">
             {mesh.materials.map((m) => (
               <li key={m.materialIndex} title={m.material}>
                 {m.materialIndex}: {objectPathOf(m.material).split(".").at(-1)}

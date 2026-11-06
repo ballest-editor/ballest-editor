@@ -43,7 +43,7 @@ export function NewProjectForm({ actions, onCreate }: {
           aria-invalid={trimmed !== "" && (!valid || taken)}
           onChange={(e) => setName(e.target.value)}
         />
-        <div className="text-xs text-muted-foreground">
+        <div className="text-body text-fg-tertiary">
           {taken
             ? "A recent project has that name already."
             : trimmed !== "" && !valid

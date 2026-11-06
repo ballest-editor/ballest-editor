@@ -48,7 +48,7 @@ export function DocumentTabs() {
 
   return (
     <div
-      className="flex h-8 shrink-0 items-stretch bg-card text-xs shadow-[inset_0_-1px_var(--border)]"
+      className="flex h-8 shrink-0 items-stretch bg-card text-body shadow-[inset_0_-1px_var(--border)]"
       onDragOver={(e) => {
         if (drag === null) return
         e.preventDefault()
@@ -70,7 +70,7 @@ export function DocumentTabs() {
         type="button"
         aria-label="New map"
         title="New map"
-        className="flex w-8 shrink-0 items-center justify-center text-muted-foreground outline-none hover:bg-muted/40 hover:text-foreground focus-visible:shadow-[inset_0_0_0_2px_var(--ring)]"
+        className="flex w-8 shrink-0 items-center justify-center text-fg-secondary outline-none hover:bg-muted/40 hover:text-foreground focus-visible:shadow-[inset_0_0_0_2px_var(--ring)]"
         onClick={() => void startNewMap()}
       >
         <IconPlus className="size-3.5" />
@@ -116,7 +116,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
       draggable
       className={cn(
         "group relative flex h-full max-w-56 shrink-0 items-center gap-1 border-r pr-1 pl-2 transition-opacity",
-        active ? "bg-background text-foreground" : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+        active ? "bg-background text-foreground" : "text-fg-secondary hover:bg-muted/40 hover:text-foreground",
         "has-[button:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring)]",
         drag?.id === id && "opacity-40",
         // where a dragged tab would land
@@ -142,10 +142,10 @@ function DocumentTab({ id, index, drag, onDrag }: {
         className="flex h-full min-w-0 items-center outline-none"
         onClick={() => activateTab(id)}
       >
-        {prefabTier !== null && <IconBoxMultiple className="mr-1 size-3 shrink-0 text-muted-foreground" />}
+        {prefabTier !== null && <IconBoxMultiple className="mr-1 size-3 shrink-0 text-fg-tertiary" />}
         <span className="truncate">{label}</span>
         {prefabTier !== null && (
-          <span className="ml-1 shrink-0 text-[0.6rem] text-muted-foreground">{projects ? prefabTier : "session"}</span>
+          <span className="ml-1 shrink-0 text-caption text-fg-tertiary">{projects ? prefabTier : "session"}</span>
         )}
       </button>
       <span className="relative flex size-4 shrink-0 items-center justify-center">
@@ -159,7 +159,7 @@ function DocumentTab({ id, index, drag, onDrag }: {
           type="button"
           aria-label={`Close ${label}`}
           className={cn(
-            "absolute inset-0 flex items-center justify-center rounded-sm opacity-0 outline-none hover:bg-muted focus-visible:opacity-100 group-hover:opacity-100",
+            "absolute inset-0 flex items-center justify-center rounded-control opacity-0 outline-none hover:bg-muted focus-visible:opacity-100 group-hover:opacity-100",
             active && !unsaved && "opacity-100"
           )}
           onClick={() => void closeTab(id)}

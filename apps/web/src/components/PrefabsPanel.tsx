@@ -26,15 +26,15 @@ function PrefabThumbnail({ prefab }: { readonly prefab: PrefabInfo }) {
   )
   return piece === undefined
     ? (
-      <span className="grid size-8 shrink-0 place-items-center rounded-sm bg-muted text-muted-foreground">
+      <span className="grid size-8 shrink-0 place-items-center rounded-control bg-muted text-fg-secondary">
         <IconBoxMultiple className="size-4" />
       </span>
     )
     : (
       <PieceThumbnail
         piece={piece}
-        className="size-8 shrink-0 rounded-sm bg-muted object-fill"
-        placeholder={<span className="size-8 shrink-0 rounded-sm bg-muted" />}
+        className="size-8 shrink-0 rounded-control bg-muted object-fill"
+        placeholder={<span className="size-8 shrink-0 rounded-control bg-muted" />}
       />
     )
 }
@@ -62,7 +62,7 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
   }
   return (
     <li
-      className="group flex min-w-0 items-center gap-1 rounded-sm pr-1 hover:bg-muted/60"
+      className="group flex min-w-0 items-center gap-1 rounded-control pr-1 hover:bg-muted/60"
       onContextMenu={onContextMenu}
     >
       <button
@@ -76,8 +76,8 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
       >
         <PrefabThumbnail prefab={prefab} />
         <span className="flex min-w-0 flex-col">
-          <span className="truncate text-xs font-medium">{name}</span>
-          <span className="truncate text-[0.65rem] text-muted-foreground">
+          <span className="truncate text-body-strong">{name}</span>
+          <span className="truncate text-caption text-fg-tertiary">
             {readable ? `${prefab.itemCount} item${prefab.itemCount === 1 ? "" : "s"}` : "Can't be read as a prefab"}
           </span>
         </span>
@@ -89,12 +89,12 @@ function PrefabRow({ prefab }: { readonly prefab: PrefabInfo }) {
             <Button
               variant="ghost"
               size="icon-sm"
-              className="size-6 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100"
+              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100"
               aria-label={`More for ${name}`}
             />
           }
         >
-          <IconDotsVertical className="size-3.5" />
+          <IconDotsVertical />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem disabled={!readable} onClick={() => void placePrefab(ref)}>Place</DropdownMenuItem>
@@ -164,7 +164,7 @@ export function PrefabsPanel() {
               <SectionTitle>{title}</SectionTitle>
               {inTier(tier).length === 0
                 ? (
-                  <p className="px-2 text-xs text-muted-foreground">
+                  <p className="px-2 text-body text-fg-tertiary">
                     {terms.length > 0 ? "Nothing matches the filter." : empty}
                   </p>
                 )

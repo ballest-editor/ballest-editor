@@ -65,7 +65,7 @@ function Swatch(
       aria-pressed={active}
       onClick={onPick}
       className={cn(
-        "size-5 rounded-sm ring-1 ring-foreground/20 transition-shadow outline-none hover:ring-2 hover:ring-foreground/60 focus-visible:ring-2 focus-visible:ring-ring",
+        "size-5 rounded-control ring-1 ring-foreground/20 transition-shadow outline-none hover:ring-2 hover:ring-foreground/60 focus-visible:ring-2 focus-visible:ring-ring",
         active && "ring-2 ring-primary ring-offset-1 ring-offset-card hover:ring-primary"
       )}
       style={{ background: cssColor(swatchColor(lookupMaterial(table, color.material), color.displayColor)) }}
@@ -121,7 +121,7 @@ function SlotPaintRow(
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs">{slotName}</span>
+        <span className="text-body">{slotName}</span>
         <Select
           value={finish?.name ?? null}
           items={Object.fromEntries(paint.map((f) => [f.name, f.name]))}
@@ -148,7 +148,7 @@ function SlotPaintRow(
           ))}
         </div>
       )}
-      <div className="truncate font-mono text-[0.65rem] text-muted-foreground" title={current ?? undefined}>
+      <div className="truncate font-mono text-caption text-fg-tertiary" title={current ?? undefined}>
         {caption}
       </div>
     </div>
@@ -159,7 +159,7 @@ const OFF_PANEL_HINT =
   "The game's paint panel doesn't offer this slot, but it draws and keeps paint set here, and the map still validates."
 
 function Note({ children }: { readonly children: string }) {
-  return <div className="text-xs text-muted-foreground">{children}</div>
+  return <div className="text-body text-fg-tertiary">{children}</div>
 }
 
 function PaintGroup(
@@ -174,14 +174,14 @@ function PaintGroup(
   return (
     <div className="flex flex-col gap-3">
       {showName && (
-        <div className="text-xs font-semibold">
+        <div className="text-body-strong">
           {name}
-          <span className="ml-1 font-normal text-muted-foreground">× {members.length}</span>
+          <span className="ml-1 text-body text-fg-tertiary">× {members.length}</span>
         </div>
       )}
       {offPanel !== undefined && (
         // Every slot listed for such a piece is off-panel, so it's said once for the group.
-        <div className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+        <div className="flex items-start gap-2 text-body leading-5 text-fg-tertiary">
           <Badge variant="outline" title={OFF_PANEL_HINT}>Off-panel</Badge>
           <span>Not in the game's panel, but paint set here draws.</span>
         </div>

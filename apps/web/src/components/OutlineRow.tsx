@@ -33,7 +33,7 @@ function RenameField({ name, onDone }: {
       ref={ref}
       defaultValue={name}
       aria-label="Name"
-      className="h-5 min-w-0 flex-1 rounded-sm px-1 py-0 text-xs md:text-xs"
+      className="h-5 min-w-0 flex-1 rounded-control px-1 py-0 text-body md:text-body"
       onBlur={(e) => finish(e.target.value)}
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
@@ -53,24 +53,26 @@ function TagChips({ tags }: { readonly tags: ReadonlyArray<string> }) {
   return (
     <span className="flex shrink-0 items-center gap-0.5" title={tags.join(", ")}>
       {shown.map((tag) => (
-        <Badge key={tag} variant="secondary" className="h-4 max-w-16 px-1 text-[0.6rem]">
+        <Badge key={tag} variant="secondary" className="h-4 max-w-16 px-1 text-caption">
           <span className="truncate">{tag}</span>
         </Badge>
       ))}
       {tags.length > shown.length && (
-        <span className="text-[0.6rem] text-muted-foreground">+{tags.length - shown.length}</span>
+        <span className="text-caption text-fg-tertiary">+{tags.length - shown.length}</span>
       )}
     </span>
   )
 }
 
-const pieceGlyph = <IconBox className="size-4 shrink-0 text-muted-foreground" />
+const pieceGlyph = <IconBox className="size-4 shrink-0 text-fg-secondary" />
 
 /** An item's icon: its piece's, as the Pieces panel shows it, else a generic one. */
 function ItemIcon({ actorClass }: { readonly actorClass: string }) {
   const piece = useEditor((s) => s.catalogIndex?.pieceByClass.get(actorClass))
   if (piece === undefined) return pieceGlyph
-  return <PieceThumbnail piece={piece} className="size-4 shrink-0 rounded-xs object-fill" placeholder={pieceGlyph} />
+  return (
+    <PieceThumbnail piece={piece} className="size-4 shrink-0 rounded-control object-fill" placeholder={pieceGlyph} />
+  )
 }
 
 export const OutlineRowView = memo(function OutlineRowView(props: {
@@ -101,7 +103,7 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
       {...(isGroup && { "aria-expanded": !row.collapsed })}
       data-row-index={rowIndex}
       className={cn(
-        "absolute inset-x-0 flex items-center gap-1 pr-2 text-xs hover:bg-muted/60",
+        "absolute inset-x-0 flex items-center gap-1 pr-2 text-body hover:bg-muted/60",
         selected && "bg-primary/20 hover:bg-primary/25",
         partial && !selected && "bg-primary/5",
         entered && "shadow-[inset_2px_0_0_var(--primary)]",
@@ -121,7 +123,7 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
             type="button"
             aria-label={row.collapsed ? `Expand ${row.name}` : `Collapse ${row.name}`}
             disabled={filtering}
-            className="grid size-4 shrink-0 place-items-center rounded-sm text-muted-foreground hover:text-foreground disabled:opacity-40"
+            className="grid size-4 shrink-0 place-items-center rounded-control text-fg-secondary hover:text-foreground disabled:opacity-40"
             onClick={(e) => {
               e.stopPropagation()
               setGroupCollapsed(row.id, !row.collapsed)
@@ -134,14 +136,14 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
         )
         : <span className="size-4 shrink-0" />}
       {isGroup
-        ? <FolderIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        ? <FolderIcon className="size-3.5 shrink-0 text-fg-secondary" />
         : <ItemIcon actorClass={row.actorClass} />}
       {renaming
         ? <RenameField name={row.name} onDone={(value) => onRenamed(row, value)} />
         : (
           <>
             <span
-              className={cn("min-w-0 truncate", isGroup && "font-medium")}
+              className={cn("min-w-0 truncate", isGroup && "text-body-strong")}
               {...(row.className !== "" && { title: row.className })}
             >
               {row.name}
@@ -151,7 +153,7 @@ export const OutlineRowView = memo(function OutlineRowView(props: {
             {row.tags.length > 0 && <TagChips tags={row.tags} />}
             {isGroup && (
               <span
-                className="shrink-0 text-[0.65rem] text-muted-foreground tabular-nums"
+                className="shrink-0 text-caption text-fg-tertiary tabular-nums"
                 title={`${row.itemCount} items`}
               >
                 {row.childCount}

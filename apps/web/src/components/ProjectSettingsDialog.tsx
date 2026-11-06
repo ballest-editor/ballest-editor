@@ -94,7 +94,7 @@ function DifficultyIcon({ difficulty }: { readonly difficulty: Difficulty }) {
       {[1, 2, 3, 4].map((bar) => (
         <span
           key={bar}
-          className={cn("h-3.5 w-1.5 rounded-[2px]", bar <= filled ? BAR_COLORS[difficulty] : "bg-muted-foreground/30")}
+          className={cn("h-3.5 w-1.5 rounded-[2px]", bar <= filled ? BAR_COLORS[difficulty] : "bg-fg-tertiary/30")}
         />
       ))}
     </span>
@@ -153,7 +153,7 @@ function TagChips(
             variant="outline"
             pressed={on}
             onPressedChange={(next) => onChange(withTag(levelData, name, next))}
-            className="rounded-full px-3 aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/90 aria-pressed:hover:text-primary-foreground"
+            className="rounded-control px-3 aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/90 aria-pressed:hover:text-primary-foreground"
           >
             {on && <IconCheck data-icon="inline-start" />}
             {tag}
@@ -328,7 +328,7 @@ const mapRows = (
             onCommit={(next) => entry.setLevelData(withLevelNames(levelData, next, creator))}
           />
         )
-        : <span className="text-xs">{levelData.levelDisplayName}</span>
+        : <span className="text-body">{levelData.levelDisplayName}</span>
     },
     {
       id: "file",
@@ -359,7 +359,7 @@ const mapRows = (
       group: "General",
       label: "Level",
       description: "The game level every custom map is spawned into.",
-      control: <span className="text-xs text-muted-foreground">{SYSTEM_LEVEL_NAME}</span>
+      control: <span className="text-body text-fg-secondary">{SYSTEM_LEVEL_NAME}</span>
     },
     {
       id: "gridHeight",
@@ -430,7 +430,7 @@ const mapRows = (
           <Button
             variant="ghost"
             size="xs"
-            className="text-muted-foreground"
+            className="text-fg-secondary"
             onClick={() => entry.setLevelData(names.reduce((l, tag) => withTag(l, tag, false), levelData))}
           >
             Clear

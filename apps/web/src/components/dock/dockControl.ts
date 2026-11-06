@@ -18,8 +18,8 @@ import { useEditor } from "../../editor/store"
 import type { DockPanel } from "./panels"
 import { adoptPopoutWindow } from "./popoutWindow"
 
-/** A column by the viewport folds to the rail dock.css draws, a group in a stack to its strip (`h-8`, as the map tabs). */
-const FOLDED_SIZE = { width: 28, height: 32 }
+/** A column by the viewport folds to the rail dock.css draws, a group in a stack to its strip (dock.css). */
+const FOLDED_SIZE = { width: 28, height: 28 }
 const SIDE_SIZES: Record<DockLocation, number> = { left: 260, right: 300, bottom: 240 }
 const MIN_VIEWPORT = { width: 320, height: 200 }
 const MIN_GROUP = { width: 180, height: 120 }

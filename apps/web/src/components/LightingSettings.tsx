@@ -45,7 +45,7 @@ export function LightingSettings() {
         return (
           <div key={key} className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between gap-2">
-              <Label className="text-muted-foreground" title={title}>{label}</Label>
+              <Label className="text-fg-secondary" title={title}>{label}</Label>
               <div className="w-24">
                 <NumberField
                   label={label}
@@ -75,7 +75,7 @@ export function LightingSettings() {
         )
       })}
       {!mapLighting && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-body text-fg-tertiary">
           The viewport is using studio lights. Turn on View › Map lighting to see these.
         </p>
       )}

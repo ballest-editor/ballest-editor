@@ -3,14 +3,14 @@
  * own sets what's left out here, so an unset tab background or sash is transparent.
  */
 .dockview-theme-ballest {
-  --dv-tabs-and-actions-container-height: 2rem;
-  --dv-tabs-and-actions-container-font-size: 0.75rem;
+  --dv-tabs-and-actions-container-height: 1.75rem;
+  --dv-tabs-and-actions-container-font-size: var(--text-caption);
   --dv-group-view-background-color: var(--card);
   --dv-tabs-and-actions-container-background-color: var(--card);
   --dv-activegroup-visiblepanel-tab-color: var(--foreground);
   --dv-inactivegroup-visiblepanel-tab-color: var(--foreground);
-  --dv-activegroup-hiddenpanel-tab-color: var(--muted-foreground);
-  --dv-inactivegroup-hiddenpanel-tab-color: var(--muted-foreground);
+  --dv-activegroup-hiddenpanel-tab-color: var(--fg-secondary);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--fg-secondary);
   --dv-tab-divider-color: transparent;
   --dv-separator-border: var(--border);
   --dv-active-sash-color: color-mix(in oklab, var(--primary) 60%, transparent);
@@ -34,7 +34,7 @@
 /* Where a dragged panel would land: a side of a group, its whole, or a place in a strip. */
 .dockview-theme-ballest .dv-drop-target-anchor,
 .dockview-theme-ballest .dv-drop-target-selection {
-  border-radius: calc(var(--radius) * 0.75);
+  border-radius: var(--radius-control);
 }
 
 /* What follows the pointer in a drag (dragImage.ts): the tab or strip it came from, bare on its card. */
@@ -73,6 +73,11 @@
 /* The map tabs scroll in the strip; the tab standing in for them takes no room. */
 .dockview-theme-ballest .dv-tab:has([data-dock-hidden-tab]) {
   display: none;
+}
+
+/* The map tabs' strip stands taller than a panel strip: it picks a document, not a panel. */
+.dv-groupview:has([data-dock-hidden-tab]) {
+  --dv-tabs-and-actions-container-height: 2rem;
 }
 
 .dv-groupview:has([data-dock-hidden-tab]) .dv-pre-actions-container {
@@ -125,7 +130,14 @@
   padding: 0;
 }
 
-/* A popped-out group's strip is the desktop window's title bar: it drags the window, and clears the window controls. */
+/*
+ * A popped-out group's strip is the desktop window's title bar: it drags the window, clears the window controls, and is
+ * as tall as they are (`popoutOverlay`).
+ */
+.dv-popout-window .dv-groupview {
+  --dv-tabs-and-actions-container-height: 2rem;
+}
+
 .dv-popout-window .dv-void-container {
   -webkit-app-region: drag;
 }

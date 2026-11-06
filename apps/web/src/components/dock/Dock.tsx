@@ -66,7 +66,7 @@ function DockTab({ api, containerApi }: IDockviewPanelHeaderProps) {
   }
   return (
     <div
-      className="dock-tab flex h-full min-w-0 items-center px-2.5 text-eyebrow"
+      className="dock-tab flex h-full min-w-0 items-center px-2.5 text-caption uppercase tracking-wider"
       onClick={expand}
       {...closesOnMiddleClick(() => api.close())}
     >
@@ -94,7 +94,7 @@ function GroupActions({ group, activePanel, location }: IDockviewHeaderActionsPr
       {location?.type === "popout"
         ? (
           <StripButton label="Back to the main window" onClick={() => group.api.getWindow().close()}>
-            <IconArrowsMinimize className="size-3.5" />
+            <IconArrowsMinimize />
           </StripButton>
         )
         : <GroupMenu group={group} activePanel={activePanel} />}

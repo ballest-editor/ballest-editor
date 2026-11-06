@@ -1,7 +1,7 @@
 "use client"
 
 import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area"
-import { cn } from "cn"
+import { cn } from "@workspace/ui/lib/utils"
 import type * as React from "react"
 
 function ScrollArea({
@@ -47,7 +47,7 @@ function ScrollBar({
     >
       <ScrollAreaPrimitive.Thumb
         data-slot="scroll-area-thumb"
-        className="relative flex-1 rounded-full bg-muted-foreground/30 transition-colors hover:bg-muted-foreground/50"
+        className="relative flex-1 rounded-full bg-fg-tertiary/30 transition-colors hover:bg-fg-tertiary/50"
       />
     </ScrollAreaPrimitive.Scrollbar>
   )

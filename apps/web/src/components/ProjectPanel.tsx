@@ -88,7 +88,7 @@ function RowDetails(
 ) {
   return (
     <div className="flex max-w-xs flex-col gap-0.5">
-      <span className="font-medium">{name}</span>
+      <span className="text-body-strong">{name}</span>
       {path !== null && <PathText block className="opacity-80">{path}</PathText>}
       {unsaved && <span className="opacity-80">{path === null ? "Not saved yet" : "Unsaved edits"}</span>}
       {edited !== null && <span className="opacity-80">edited {edited}</span>}
@@ -97,7 +97,7 @@ function RowDetails(
 }
 
 const ROW_CLASSES =
-  "group flex h-7 min-w-0 items-center gap-1.5 rounded-sm pr-1 pl-2 text-xs hover:bg-muted/60 has-[button:focus-visible]:bg-muted/60"
+  "group flex h-7 min-w-0 items-center gap-1.5 rounded-control pr-1 pl-2 text-body hover:bg-muted/60 has-[button:focus-visible]:bg-muted/60"
 
 /** The map in the active tab: tinted, with a bar at its left, so it reads at a glance. */
 const ACTIVE_ROW_CLASSES = "bg-primary/15 text-foreground shadow-[inset_2px_0_0_0] shadow-primary hover:bg-primary/20"
@@ -131,8 +131,8 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
             />
           }
         >
-          <IconMap className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className={cn("truncate", isOpen && "font-medium")}>{label}</span>
+          <IconMap className="size-3.5 shrink-0 text-fg-secondary" />
+          <span className={cn("truncate", isOpen && "text-body-strong")}>{label}</span>
           {unsaved && <UnsavedDot />}
         </TooltipTrigger>
         <TooltipContent side="right" align="start">
@@ -152,12 +152,12 @@ function MapRow({ map, now }: { readonly map: ProjectMap; readonly now: number }
             <Button
               variant="ghost"
               size="icon-sm"
-              className="size-6 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100"
+              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100"
               aria-label={`More for ${label}`}
             />
           }
         >
-          <IconDotsVertical className="size-3.5" />
+          <IconDotsVertical />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem disabled={isOpen} onClick={() => void openProjectMap(map.fileName)}>Open</DropdownMenuItem>
@@ -206,9 +206,9 @@ function UnsavedRow({ tabId }: { readonly tabId: string }) {
             />
           }
         >
-          <IconMap className="size-3.5 shrink-0 text-muted-foreground" />
+          <IconMap className="size-3.5 shrink-0 text-fg-secondary" />
           {/* an italic's last letter leans past its box, and `truncate` would clip it without the padding */}
-          <span className={cn("truncate pr-0.5 italic", isActive && "font-medium")}>{label}</span>
+          <span className={cn("truncate pr-0.5 italic", isActive && "text-body-strong")}>{label}</span>
           <UnsavedDot />
         </TooltipTrigger>
         <TooltipContent side="right" align="start">
@@ -234,7 +234,7 @@ function HeaderButton(
           <Button
             variant="ghost"
             size="icon-sm"
-            className="size-6 text-muted-foreground"
+            className="text-fg-secondary"
             aria-label={label}
             disabled={disabled}
             onClick={onClick}
@@ -267,8 +267,8 @@ export function ProjectPanel() {
       <div className="flex h-9 shrink-0 items-center gap-1 px-2">
         <span
           className={cn(
-            "min-w-0 flex-1 truncate px-1 text-xs font-medium",
-            untitled && "italic text-muted-foreground"
+            "min-w-0 flex-1 truncate px-1 text-body-strong",
+            untitled && "italic text-fg-tertiary"
           )}
           title={project?.path ?? (untitled ? "Not saved anywhere yet: saving a map creates the project." : undefined)}
         >
@@ -288,7 +288,7 @@ export function ProjectPanel() {
       </div>
       <ScrollArea className="min-h-0 flex-1">
         {untitled && (
-          <p className="px-3 pb-2 text-xs text-muted-foreground">
+          <p className="px-3 pb-2 text-body text-fg-tertiary">
             No project yet. Saving a map creates one, and these maps can then be saved in it.
           </p>
         )}
@@ -301,7 +301,7 @@ export function ProjectPanel() {
           {maps.map((map) => <MapRow key={map.fileName} map={map} now={now} />)}
         </ul>
         {!projects && unsavedTabs.length === 0 && (
-          <p className="px-3 py-2 text-[0.6875rem] text-muted-foreground">
+          <p className="px-3 py-2 text-caption text-fg-tertiary">
             This browser has no project: maps live in their tabs, and Save downloads the file. The desktop app keeps
             them in a project folder.
           </p>

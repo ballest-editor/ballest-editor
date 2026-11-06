@@ -21,7 +21,7 @@ export function EnteredGroupStatus() {
   if (names.length === 0) return null
   return (
     <div
-      className="flex min-w-0 items-center gap-1 text-muted-foreground"
+      className="flex min-w-0 items-center gap-1 text-fg-secondary"
       title={names.map(numberedNameText).join(" › ")}
     >
       <span className="truncate">
@@ -36,7 +36,7 @@ export function EnteredGroupStatus() {
       </span>
       <Button
         variant="ghost"
-        size="icon-xs"
+        size="icon-sm"
         aria-label="Leave the group"
         title="Leave the group"
         onClick={() => enterGroup(null)}

@@ -95,7 +95,7 @@ function PropertyValue({ property, id, handleClassName }: {
       return (
         <div className="flex h-7 items-center gap-2">
           <Switch id={id} checked={value === true} onCheckedChange={(checked) => set(checked)} />
-          {value === undefined && <span className="text-xs text-muted-foreground">Mixed</span>}
+          {value === undefined && <span className="text-body text-fg-tertiary">Mixed</span>}
         </div>
       )
     case "intProperties":
@@ -145,7 +145,7 @@ function PropertyValue({ property, id, handleClassName }: {
     }
     default:
       // No sample or class has text/name/string properties, so their value shape is unknown: shown, not edited.
-      return <div className="truncate font-mono text-xs text-muted-foreground">{formatValue(value)}</div>
+      return <div className="truncate font-mono text-body text-fg-tertiary">{formatValue(value)}</div>
   }
 }
 
@@ -178,8 +178,8 @@ function ColorValue({ color, id }: { readonly color: ColorProperty; readonly id:
         id={id}
         title={mixed ? "Mixed" : hex}
         aria-label={mixed ? `${color.label}: mixed` : `${color.label}: ${hex}`}
-        className="flex h-7 w-full min-w-0 cursor-pointer items-center justify-center overflow-hidden rounded-md text-xs text-muted-foreground transition-shadow hover:ring-foreground/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        render={<ColorSwatch color={mixed ? null : hex} className="rounded-md" />}
+        className="flex h-7 w-full min-w-0 cursor-pointer items-center justify-center overflow-hidden rounded-control text-body text-fg-tertiary transition-shadow hover:ring-foreground/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        render={<ColorSwatch color={mixed ? null : hex} className="rounded-control" />}
       >
         {mixed && "Mixed"}
       </PopoverTrigger>
@@ -188,12 +188,12 @@ function ColorValue({ color, id }: { readonly color: ColorProperty; readonly id:
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1">
           {color.channels.map((channel, i) => (
             <div key={channel.name} className="contents">
-              <span title={channel.name} className="text-muted-foreground">{"RGB"[i]}</span>
+              <span title={channel.name} className="text-fg-secondary">{"RGB"[i]}</span>
               <PropertyValue property={channel} handleClassName={CHANNEL_HANDLES[i]} />
             </div>
           ))}
         </div>
-        <p className="text-muted-foreground">
+        <p className="text-fg-tertiary">
           Linear values, as the map file stores them.
           {linear.some((c) => c > 1) && " Above 1 is brighter than the swatch shows."}
         </p>
@@ -218,7 +218,7 @@ function Row(props: {
       <Label
         htmlFor={id}
         title={props.details.join("\n")}
-        className="min-w-0 text-xs leading-tight break-words text-muted-foreground"
+        className="min-w-0 text-body leading-tight break-words text-fg-tertiary"
       >
         {props.label}
       </Label>

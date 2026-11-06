@@ -58,14 +58,14 @@ function ResetButton({ modified, reset }: NonNullable<SettingsRow<string>["chang
           <Button
             variant="ghost"
             size="icon-sm"
-            className={cn("size-6 text-muted-foreground", !modified && "invisible")}
+            className={cn("text-fg-secondary", !modified && "invisible")}
             onClick={reset}
             aria-label="Reset to default"
             tabIndex={modified ? 0 : -1}
           />
         }
       >
-        <IconRestore className="size-3.5" />
+        <IconRestore />
       </TooltipTrigger>
       <TooltipContent side="left">Reset to default</TooltipContent>
     </Tooltip>
@@ -74,7 +74,7 @@ function ResetButton({ modified, reset }: NonNullable<SettingsRow<string>["chang
 
 function RowView({ row }: { readonly row: SettingsRow<string> }) {
   const label = (
-    <span className={cn("text-xs font-medium", row.disabled && "text-muted-foreground")}>
+    <span className={cn("text-body-strong", row.disabled && "text-fg-disabled")}>
       {row.label}
     </span>
   )
@@ -85,7 +85,7 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
           <Tooltip>
             <TooltipTrigger
               render={
-                <span className="w-fit cursor-help underline decoration-dotted decoration-muted-foreground/50 underline-offset-4" />
+                <span className="w-fit cursor-help underline decoration-dotted decoration-fg-tertiary/50 underline-offset-4" />
               }
             >
               {label}
@@ -95,7 +95,7 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
         )
         : label}
       {!row.tooltip && row.description !== undefined && (
-        <span className={cn("text-[0.6875rem] text-muted-foreground", row.disabled && "opacity-60")}>
+        <span className={cn("text-caption text-fg-tertiary", row.disabled && "text-fg-disabled")}>
           {row.description}
         </span>
       )}
@@ -211,7 +211,7 @@ export function SettingsShell<C extends string>(props: {
       <DialogContent className="flex h-[min(80vh,720px)] w-full gap-0 overflow-hidden p-0 sm:max-w-4xl" showCloseButton>
         <nav className="flex w-56 shrink-0 flex-col border-r bg-muted/30 p-3">
           <div className="relative mb-2">
-            <IconSearch className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <IconSearch className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-fg-secondary" />
             <Input
               className="pl-7"
               placeholder="Search settings"
@@ -233,7 +233,7 @@ export function SettingsShell<C extends string>(props: {
                   onClick={() => setScope(null)}
                 >
                   <span>All results</span>
-                  <span className="text-[0.625rem] text-muted-foreground tabular-nums">{matched.length}</span>
+                  <span className="text-caption text-fg-tertiary tabular-nums">{matched.length}</span>
                 </Button>
               )}
               {props.categories.map(({ id, label, icon: CategoryIcon, section }, i) => {
@@ -242,10 +242,14 @@ export function SettingsShell<C extends string>(props: {
                 const heading = section !== undefined && section !== props.categories[i - 1]?.section
                 return (
                   <Fragment key={id}>
-                    {heading && <div className="mt-2 px-2 pb-0.5 text-eyebrow text-muted-foreground">{section}</div>}
+                    {heading && (
+                      <div className="mt-2 px-2 pb-0.5 text-caption uppercase tracking-wider text-fg-secondary">
+                        {section}
+                      </div>
+                    )}
                     <Button
                       variant={active ? "secondary" : "ghost"}
-                      className={cn("justify-start", searching && hits === 0 && "text-muted-foreground/50")}
+                      className="justify-start"
                       disabled={searching && hits === 0}
                       onClick={() => {
                         if (searching) setScope(id)
@@ -257,7 +261,7 @@ export function SettingsShell<C extends string>(props: {
                       <span className="min-w-0 flex-1 truncate text-left">{label}</span>
                       {searching
                         ? hits > 0 && (
-                          <span className="rounded-full bg-primary/15 px-1.5 text-[0.625rem] text-primary tabular-nums">
+                          <span className="rounded-control bg-primary/15 px-1.5 text-caption text-primary tabular-nums">
                             {hits}
                           </span>
                         )
@@ -272,11 +276,11 @@ export function SettingsShell<C extends string>(props: {
           </ScrollArea>
         </nav>
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="border-b px-5 py-3">
+          <div className="border-b px-dialog py-3">
             <Breadcrumb>
-              <BreadcrumbList className="text-sm">
+              <BreadcrumbList className="text-title">
                 <BreadcrumbItem>
-                  <DialogTitle className="font-normal text-muted-foreground">{props.title}</DialogTitle>
+                  <DialogTitle className="text-fg-secondary">{props.title}</DialogTitle>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 {searching && (
@@ -286,7 +290,7 @@ export function SettingsShell<C extends string>(props: {
                   </>
                 )}
                 <BreadcrumbItem className="min-w-0">
-                  <BreadcrumbPage className="truncate font-medium">
+                  <BreadcrumbPage className="truncate">
                     {searching ? `“${query.trim()}”` : labelOf(props.category)}
                   </BreadcrumbPage>
                 </BreadcrumbItem>
@@ -295,22 +299,25 @@ export function SettingsShell<C extends string>(props: {
             <DialogDescription className="sr-only">{props.description}</DialogDescription>
           </div>
           <ScrollArea className="min-h-0 flex-1">
-            <div className="flex flex-col gap-5 px-5 py-3">
+            <div className="flex flex-col gap-5 px-dialog py-3">
               {groups.map((group) => (
                 <section key={group.key} className="flex flex-col">
                   {group.title !== undefined && group.title !== "" && (
-                    <h3 className="mb-1 text-eyebrow text-muted-foreground">{group.title}</h3>
+                    <h3 className="mb-1 text-caption uppercase tracking-wider text-fg-secondary">{group.title}</h3>
                   )}
                   <div className="flex flex-col divide-y divide-border/50">
                     {group.rows.map((row) => <RowView key={row.id} row={row} />)}
                   </div>
                 </section>
               ))}
-              {groups.length === 0 && <p className="text-xs text-muted-foreground">No settings match.</p>}
+              {groups.length === 0 && <p className="text-body text-fg-tertiary">No settings match.</p>}
             </div>
           </ScrollArea>
           <div
-            className={cn("flex border-t px-5 py-3", onResetCategory === undefined ? "justify-end" : "justify-between")}
+            className={cn(
+              "flex border-t px-dialog py-3",
+              onResetCategory === undefined ? "justify-end" : "justify-between"
+            )}
           >
             {onResetCategory !== undefined && (
               <Button

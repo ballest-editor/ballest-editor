@@ -14,25 +14,25 @@ function NotificationItem({ notice }: { readonly notice: NotificationRecord }) {
   const Icon = notice.level === "error" ? IconAlertCircle : IconInfoCircle
   const mutable = MUTABLE_KINDS.has(notice.kind)
   return (
-    <li className={cn("flex gap-2.5 rounded-md px-3 py-2", !notice.read && "bg-muted/60")}>
+    <li className={cn("flex gap-2.5 rounded-control px-3 py-2", !notice.read && "bg-muted/60")}>
       <Icon
         className={cn(
           "mt-0.5 size-3.5 shrink-0",
-          notice.level === "error" ? "text-destructive" : "text-muted-foreground"
+          notice.level === "error" ? "text-destructive" : "text-fg-secondary"
         )}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-start gap-2">
-          <p className={cn("min-w-0 flex-1 break-words", !notice.read && "font-medium")}>{notice.title}</p>
+          <p className={cn("min-w-0 flex-1 break-words", !notice.read && "text-body-strong")}>{notice.title}</p>
           <time
-            className="shrink-0 text-muted-foreground tabular-nums"
+            className="shrink-0 text-fg-tertiary tabular-nums"
             dateTime={notice.at}
             title={formatDateTime(notice.at)}
           >
             {formatClock(notice.at)}
           </time>
         </div>
-        {notice.body !== null && <p className="break-words text-muted-foreground">{notice.body}</p>}
+        {notice.body !== null && <p className="break-words text-fg-tertiary">{notice.body}</p>}
         {(notice.actions.length > 0 || mutable) && (
           <div className="flex flex-wrap gap-1">
             {notice.actions.map((action) => (
@@ -66,7 +66,7 @@ function Section(
 ) {
   return (
     <section className="flex flex-col gap-1">
-      <h3 className="flex items-center gap-1 px-3 pt-1 text-eyebrow text-muted-foreground">
+      <h3 className="flex items-center gap-1 px-3 pt-1 text-caption uppercase tracking-wider text-fg-secondary">
         {pinned && <IconPin className="size-3" />}
         {title}
       </h3>
@@ -97,7 +97,7 @@ export function NotificationCenter() {
           <Button
             variant="ghost"
             size="xs"
-            className="relative h-5 gap-1 px-1.5 text-xs font-normal"
+            className="relative h-5 gap-1 px-1.5 text-body font-normal"
             aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
           />
         }
@@ -123,8 +123,8 @@ export function NotificationCenter() {
           <div className="flex flex-col gap-3 py-1 pr-3 pl-1">
             {notifications.length === 0 && (
               <div className="flex flex-col items-center gap-1 px-2 py-6 text-center">
-                <p className="font-medium">No notifications</p>
-                <p className="text-muted-foreground">Exports, updates and problems with the game link land here.</p>
+                <p className="text-body-strong">No notifications</p>
+                <p className="text-fg-tertiary">Exports, updates and problems with the game link land here.</p>
               </div>
             )}
             {pinned.length > 0 && <Section title="Pinned" pinned notices={pinned} />}

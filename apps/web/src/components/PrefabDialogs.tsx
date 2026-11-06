@@ -45,7 +45,7 @@ function PrefabNameForm({ canSubmit, children, invalid, name, onChange, onClose,
           aria-invalid={invalid}
           onChange={(e) => onChange(e.target.value)}
         />
-        <span className="text-xs text-muted-foreground">{PREFAB_NAME_RULE}</span>
+        <span className="text-body text-fg-tertiary">{PREFAB_NAME_RULE}</span>
       </div>
       {children}
       <DialogFooter>
@@ -130,7 +130,7 @@ function RenameForm({ from, onClose, tier }: {
         if (name !== from) void renamePrefab({ tier, name: from }, name)
       }}
     >
-      {taken && <p className="text-xs text-destructive">There is already a prefab called {name}.</p>}
+      {taken && <p className="text-body text-destructive">There is already a prefab called {name}.</p>}
     </PrefabNameForm>
   )
 }

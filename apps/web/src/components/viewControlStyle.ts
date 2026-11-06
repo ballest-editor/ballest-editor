@@ -6,8 +6,11 @@ import type { KeyboardEvent, MouseEvent } from "react"
  */
 export const FROSTED = "border border-border/60 bg-background/60 shadow-lg backdrop-blur-md"
 
-/** One frosted button group; each control gets its own, like the game's. */
-export const GROUP = `pointer-events-auto flex items-center gap-1 rounded-full p-1 ${FROSTED}`
+/**
+ * One frosted button group; each control gets its own, like the game's. Everything floating over the viewport is this
+ * one shape: a rounded rect at the control radius, the group and the buttons in it alike. No circles, no stadiums.
+ */
+export const GROUP = `pointer-events-auto flex items-center gap-1 rounded-control p-1 ${FROSTED}`
 
 /** Popups clear a group's padding and border, plus the usual 4px: `button` from a 32px button, `size` from a 24px picker. */
 export const POPUP_OFFSET = { button: 9, size: 13 } as const
