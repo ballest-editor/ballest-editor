@@ -1,6 +1,7 @@
 "use client"
 
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
+import { usePortalContainer } from "@workspace/ui/lib/portal-container"
 import { cn } from "cn"
 
 function TooltipProvider({
@@ -40,7 +41,7 @@ function TooltipContent({
   >)
 {
   return (
-    <TooltipPrimitive.Portal>
+    <TooltipPrimitive.Portal container={usePortalContainer()}>
       <TooltipPrimitive.Positioner
         align={align}
         alignOffset={alignOffset}

@@ -6,12 +6,15 @@
  */
 import { Option, Predicate, Schema } from "effect"
 import type { MapFile } from "./MapFile"
+import { ViewLayout } from "./viewLayout"
 
 export const MapPrefs = Schema.Struct({
   /** The grid's height in UE cm; absent: the player start's height on load. */
   gridHeight: Schema.optionalKey(Schema.Finite),
   /** Save also exports the map to the game (desktop); absent: off. */
-  exportOnSave: Schema.optionalKey(Schema.Boolean)
+  exportOnSave: Schema.optionalKey(Schema.Boolean),
+  /** How the map's tab divides its view; absent: `defaultViewLayout`. */
+  viewLayout: Schema.optionalKey(ViewLayout)
 })
 export type MapPrefs = typeof MapPrefs.Type
 

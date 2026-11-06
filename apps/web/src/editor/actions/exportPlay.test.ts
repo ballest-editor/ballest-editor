@@ -16,14 +16,15 @@ import {
   noticesWhile,
   playSample,
   reset,
-  s
+  s,
+  submitSaveMap
 } from "../../test/editorActions"
 import { readSample } from "../../test/samples"
 import { exportToGameEffect, playEffect } from "./exportPlay"
 import { installPluginEffect } from "./gameLink"
 import { replacePublishedDraftEffect } from "./gameWrite"
 import { openProjectMapFile } from "./maps"
-import { duplicateMapEffect, saveMapAsEffect, saveMapFile } from "./save"
+import { duplicateMapEffect, saveMapFile } from "./save"
 
 describe("Export to game", () => {
   it.effect("won't send the game an imported file it would refuse, though nothing went through Save", () => {
@@ -225,14 +226,11 @@ describe("Play", () => {
     return Effect.gen(function*() {
       yield* reset
       yield* playEffect
-      const afterSave = afterSaveOf(s().dialog)
-      assert.isDefined(afterSave)
+      assert.isDefined(afterSaveOf(s().dialog))
       assert.deepStrictEqual(disk.game.races, [])
 
-      // the Save map dialog takes what comes next and closes itself, then saves; Play goes on with the file it wrote
-      s().closeDialog()
-      yield* saveMapAsEffect(afterSave)
-      const saved = s().file?.name ?? ""
+      // Play goes on with the file the Save map dialog wrote
+      const saved = yield* submitSaveMap("Big Loop")
       assert.isTrue(disk.files.has(projectFile(saved)))
       assert.deepStrictEqual(disk.game.races, [saved])
       assert.isNull(s().dialog)
@@ -244,11 +242,8 @@ describe("Play", () => {
     return Effect.gen(function*() {
       yield* reset
       yield* exportToGameEffect
-      const afterSave = afterSaveOf(s().dialog)
-      assert.isDefined(afterSave)
-      s().closeDialog()
-      yield* saveMapAsEffect(afterSave)
-      const saved = s().file?.name ?? ""
+      assert.isDefined(afterSaveOf(s().dialog))
+      const saved = yield* submitSaveMap("Big Loop")
       assert.isTrue(disk.files.has(projectFile(saved)))
       assert.strictEqual(disk.files.get(`${TEST_MAPS_FOLDER}/${saved}`), disk.files.get(projectFile(saved)))
     }).pipe(Effect.provide(layerFor(disk)))

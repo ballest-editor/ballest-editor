@@ -6,6 +6,7 @@
 import type { CatalogIndex, CatalogPiece } from "./Catalog"
 import { classNameOf, type EditorGroup, type Item, type MapFile, PropertyList } from "./MapFile"
 import { sourceMeshOf } from "./mirror"
+import type { PrefabFile, PrefabItem, Triple } from "./PrefabFile"
 
 /** UE's THRESH_QUAT_NORMALIZED: |1 - |q|^2| must be below this. */
 const QUAT_NORMALIZED_THRESHOLD = 0.01
@@ -46,6 +47,22 @@ const PIVOT_CHOICES = new Set([
 
 /** An empty group name is fine; any other has to be this. */
 const GROUP_NAME = /^[A-Za-z0-9]{1,64}$/
+
+/** How many items a prefab file holds, and what `saveprefab` takes from a selection. */
+export const PREFAB_ITEMS = { min: 2, max: 4096 } as const
+
+const PLAYER_START = "MP_PlayerStart"
+
+/** The game's own words for a prefab it won't spawn. */
+export const PREFAB_REFUSALS = {
+  document:
+    `Expected a BallestPrefab version 1 document with a valid group and ${PREFAB_ITEMS.min} to ${PREFAB_ITEMS.max} items.`,
+  selection: `Select ${PREFAB_ITEMS.min} to ${PREFAB_ITEMS.max} items before saving a prefab.`,
+  playerStart: "MP_PlayerStart is forbidden in prefabs.",
+  groupName: "A prefab group name must contain 1 to 64 letters A-Z or digits 0-9.",
+  itemClass: "A prefab item must reference a concrete level-editor item class.",
+  item: (index: number) => `Item ${index} has an invalid transform, unknown property, or incorrect property value type.`
+} as const
 
 /** Baked mirror meshes: the catalog pairs most of them, not all, and they are the game's own. */
 const MIRROR_MESHES = "/Game/LevelEditor/Mirror/"
@@ -186,6 +203,10 @@ const groupProblems = ({ frame, name }: EditorGroup, index: number): Array<strin
       out.push(`Group ${index}'s frame has a non-normalized rotation.`)
     }
   }
+  const scale = isRecord(frame) ? frame["scale3D"] : undefined
+  if (isRecord(scale) && [scale["x"], scale["y"], scale["z"]].includes(0)) {
+    out.push(`Group ${index}'s frame has a scale of 0 on an axis, which makes the game open a blank map.`)
+  }
   return out
 }
 
@@ -218,4 +239,51 @@ export const gameRuleProblems = (map: MapFile, catalog: CatalogIndex | null): Re
   })
   out.push(...editorStateProblems(map))
   return out
+}
+
+const hasZero = (scale: Triple) => scale.includes(0)
+
+const prefabItemProblems = (item: PrefabItem, index: number, piece: CatalogPiece | undefined): Array<string> => {
+  const name = classNameOf(item.class)
+  if (name === PLAYER_START) return [PREFAB_REFUSALS.playerStart]
+  const wrongProperty = piece?.properties !== undefined && Object.entries(item.properties).some(([property, value]) => {
+    const list = piece.properties?.find((known) => known.name === property)?.list
+    return list === undefined || (list !== null && !validPrefabValue(list, value))
+  })
+  return hasZero(item.transform.scale) || wrongProperty ? [PREFAB_REFUSALS.item(index)] : []
+}
+
+/** A flat `properties` value of the type its list holds. */
+const validPrefabValue = (list: PropertyList, value: unknown): boolean => {
+  switch (list) {
+    case "boolProperties":
+      return typeof value === "boolean"
+    case "floatProperties":
+      return typeof value === "number"
+    case "intProperties":
+      return Number.isInteger(value)
+    default:
+      return typeof value === "string"
+  }
+}
+
+/**
+ * What the game refuses in a prefab file that decodes, as it says so (docs/qa/groups-prefabs.md § Hand-written prefabs).
+ * Each stops `spawnprefab` with nothing changed. Rules about classes and properties need a catalog.
+ */
+export const prefabProblems = (prefab: PrefabFile, catalog: CatalogIndex | null): ReadonlyArray<string> => {
+  const { group, items } = prefab
+  const out: Array<string> = []
+  if (items.length < PREFAB_ITEMS.min || items.length > PREFAB_ITEMS.max || hasZero(group.scale)) {
+    out.push(PREFAB_REFUSALS.document)
+  }
+  if (group.name !== undefined && !GROUP_NAME.test(group.name)) out.push(PREFAB_REFUSALS.groupName)
+  const byName = new Map([...catalog?.pieceByClass.values() ?? []].map((p) => [p.className, p]))
+  items.forEach((item, index) => {
+    const name = classNameOf(item.class)
+    const piece = byName.get(name)
+    if (catalog !== null && piece === undefined && name !== PLAYER_START) out.push(PREFAB_REFUSALS.itemClass)
+    else out.push(...prefabItemProblems(item, index, piece))
+  })
+  return [...new Set(out)]
 }

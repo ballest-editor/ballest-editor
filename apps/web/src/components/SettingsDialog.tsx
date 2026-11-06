@@ -13,11 +13,11 @@ import { Button } from "@workspace/ui/components/button"
 import { ColorPicker, ColorSwatch } from "@workspace/ui/components/color-picker"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
-import { Slider } from "@workspace/ui/components/slider"
+import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
 import { cn } from "@workspace/ui/lib/utils"
 import { Struct } from "effect"
-import { useEffect, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { movementLookModes } from "../domain/flyKeys"
 import { namedActions } from "../domain/GameKeybinds"
 import { overriddenFolders } from "../domain/gameLink"
@@ -73,9 +73,54 @@ const GAME_CATEGORY: SettingsCategoryInfo<SettingsCategory> = { id: "game", labe
 
 type Row = SettingsRow<SettingsCategory>
 
-/** base-ui sliders report a number, or an array for range sliders. */
-const sliderValue = (value: number | ReadonlyArray<number>): number | undefined =>
-  typeof value === "number" ? value : value[0]
+/** A setting picked from a short list: `items` is each value's label, in order. */
+function Choice<V extends string>({ value, items, onChange, className = "w-40" }: {
+  readonly value: V
+  readonly items: Readonly<Record<V, string>>
+  readonly onChange: (value: V) => void
+  readonly className?: string
+}) {
+  return (
+    <Select value={value} items={items} onValueChange={(v: V | null) => v !== null && onChange(v)}>
+      <SelectTrigger className={className}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {Object.entries<string>(items).map(([id, label]) => <SelectItem key={id} value={id}>{label}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  )
+}
+
+/** A setting on a slider, with its value (`children`) written out beside it. */
+function SliderControl({ value, disabled = false, onChange, children, ...range }: {
+  readonly min: number
+  readonly max: number
+  readonly step: number
+  readonly largeStep?: number
+  readonly value: number
+  readonly disabled?: boolean
+  readonly onChange: (value: number) => void
+  readonly children: ReactNode
+}) {
+  return (
+    <>
+      <Slider
+        className="w-48"
+        {...range}
+        value={value}
+        disabled={disabled}
+        onValueChange={(v) => {
+          const next = sliderValue(v)
+          if (next !== undefined) onChange(next)
+        }}
+      />
+      <span className={cn("w-20 text-right font-mono text-xs tabular-nums", disabled && "text-muted-foreground/60")}>
+        {children}
+      </span>
+    </>
+  )
+}
 
 /**
  * A colour setting that can be automatic (null): a swatch of the colour in use, opening the
@@ -196,7 +241,26 @@ function CaptureCap() {
   )
 }
 
-/** Desktop-style settings: category nav on the left, searchable rows on the right. */
+/**
+ * A press that fills a slot ends the capture, and its listeners with it, before the button comes up. What's left of the
+ * press mustn't act on what's under the pointer: on the backdrop, its click would close the dialog.
+ */
+const swallowRestOfPress = () => {
+  const swallow = (e: Event) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+  const onUp = (e: Event) => {
+    swallow(e)
+    window.removeEventListener("mouseup", onUp, { capture: true })
+    // Only the main button makes a click, and it comes straight after the mouseup.
+    setTimeout(() => window.removeEventListener("click", swallow, { capture: true }))
+  }
+  window.addEventListener("mouseup", onUp, { capture: true })
+  window.addEventListener("click", swallow, { capture: true })
+}
+
+/** File › Settings…, a modal: category nav on the left, searchable rows on the right. */
 export function SettingsDialog(props: {
   readonly open: boolean
   readonly category: SettingsCategory
@@ -210,6 +274,7 @@ export function SettingsDialog(props: {
   const defaults = useEditor((s) => s.keybindDefaults)
   const [listening, setListening] = useState<Listening | null>(null)
   const hasGame = useEditor((s) => s.capabilities.exportToGame)
+  const projects = useEditor((s) => s.capabilities.projects)
   const overridden = overriddenFolders(useEditor((s) => s.gamePaths))
   const gameLinkSummary = useGameLinkSummary()
   const updateCheck = useUpdateCheck()
@@ -258,6 +323,7 @@ export function SettingsDialog(props: {
     }
     const onMouse = (e: MouseEvent) => {
       stop(e)
+      swallowRestOfPress()
       assign(mouseChordOf(e))
     }
     const onWheel = (e: WheelEvent) => {
@@ -343,19 +409,11 @@ export function SettingsDialog(props: {
         label: "Units",
         description: "How positions are shown in the inspector. Map files always store centimetres.",
         control: (
-          <Select
+          <Choice
             value={settings.general.units}
             items={{ cm: "Centimetres", m: "Metres" }}
-            onValueChange={(v) => v !== null && update("general", { units: v })}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="cm">Centimetres</SelectItem>
-              <SelectItem value="m">Metres</SelectItem>
-            </SelectContent>
-          </Select>
+            onChange={(v) => update("general", { units: v })}
+          />
         )
       },
       creatorSettingsRow({
@@ -394,6 +452,23 @@ export function SettingsDialog(props: {
           } satisfies Row
         ]
         : []),
+      ...(projects
+        ? [
+          {
+            id: "projectOpensIn",
+            ...setting("general", "projectOpensIn"),
+            label: "Open projects in",
+            description: "Where New project, Open project and Recent projects open a project.",
+            control: (
+              <Choice
+                value={settings.general.projectOpensIn}
+                items={{ ask: "Ask each time", thisWindow: "This window", newWindow: "A new window" }}
+                onChange={(v) => update("general", { projectOpensIn: v })}
+              />
+            )
+          } satisfies Row
+        ]
+        : []),
       ...(updateCheck === null
         ? []
         : [
@@ -423,23 +498,16 @@ export function SettingsDialog(props: {
         description:
           "How far from the camera a new piece lands when the floor is out of reach. Wider pieces go further.",
         control: (
-          <>
-            <Slider
-              className="w-48"
-              min={500}
-              max={10000}
-              step={100}
-              largeStep={1000}
-              value={settings.editor.placeDistance}
-              onValueChange={(v) => {
-                const placeDistance = sliderValue(v)
-                if (placeDistance !== undefined) update("editor", { placeDistance })
-              }}
-            />
-            <span className="w-20 text-right font-mono text-xs tabular-nums">
-              {(settings.editor.placeDistance / 100).toFixed(0)} m
-            </span>
-          </>
+          <SliderControl
+            min={500}
+            max={10000}
+            step={100}
+            largeStep={1000}
+            value={settings.editor.placeDistance}
+            onChange={(placeDistance) => update("editor", { placeDistance })}
+          >
+            {(settings.editor.placeDistance / 100).toFixed(0)} m
+          </SliderControl>
         )
       },
       {
@@ -461,18 +529,12 @@ export function SettingsDialog(props: {
         description:
           "The game's camera presets (from its camera settings). Only the field of view applies to the editor.",
         control: (
-          <Select
+          <Choice
+            className="w-56"
             value={c.fovPreset}
             items={presetItems}
-            onValueChange={(v) => update("camera", { fovPreset: String(v) })}
-          >
-            <SelectTrigger className="w-56">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(presetItems).map(([id, label]) => <SelectItem key={id} value={id}>{label}</SelectItem>)}
-            </SelectContent>
-          </Select>
+            onChange={(fovPreset) => update("camera", { fovPreset })}
+          />
         )
       },
       {
@@ -484,28 +546,16 @@ export function SettingsDialog(props: {
           : "Horizontal degrees, used by the Custom preset (like the game).",
         disabled: customFovOff,
         control: (
-          <>
-            <Slider
-              className="w-48"
-              min={30}
-              max={140}
-              step={1}
-              value={c.customFov}
-              disabled={customFovOff}
-              onValueChange={(v) => {
-                const customFov = sliderValue(v)
-                if (customFov !== undefined) update("camera", { customFov })
-              }}
-            />
-            <span
-              className={cn(
-                "w-20 text-right font-mono text-xs tabular-nums",
-                customFovOff && "text-muted-foreground/60"
-              )}
-            >
-              {c.customFov}°
-            </span>
-          </>
+          <SliderControl
+            min={30}
+            max={140}
+            step={1}
+            value={c.customFov}
+            disabled={customFovOff}
+            onChange={(customFov) => update("camera", { customFov })}
+          >
+            {c.customFov}°
+          </SliderControl>
         )
       },
       {
@@ -514,20 +564,15 @@ export function SettingsDialog(props: {
         label: "Fly speed",
         description: "Base camera speed. Camera speed up/down multiply it.",
         control: (
-          <>
-            <Slider
-              className="w-48"
-              min={100}
-              max={20000}
-              step={100}
-              value={c.flySpeed}
-              onValueChange={(v) => {
-                const flySpeed = sliderValue(v)
-                if (flySpeed !== undefined) update("camera", { flySpeed })
-              }}
-            />
-            <span className="w-20 text-right font-mono text-xs tabular-nums">{(c.flySpeed / 100).toFixed(0)} m/s</span>
-          </>
+          <SliderControl
+            min={100}
+            max={20000}
+            step={100}
+            value={c.flySpeed}
+            onChange={(flySpeed) => update("camera", { flySpeed })}
+          >
+            {(c.flySpeed / 100).toFixed(0)} m/s
+          </SliderControl>
         )
       },
       {
@@ -535,20 +580,15 @@ export function SettingsDialog(props: {
         ...setting("camera", "lookSensitivity"),
         label: "Look sensitivity",
         control: (
-          <>
-            <Slider
-              className="w-48"
-              min={0.1}
-              max={5}
-              step={0.1}
-              value={c.lookSensitivity}
-              onValueChange={(v) => {
-                const lookSensitivity = sliderValue(v)
-                if (lookSensitivity !== undefined) update("camera", { lookSensitivity })
-              }}
-            />
-            <span className="w-20 text-right font-mono text-xs tabular-nums">×{c.lookSensitivity.toFixed(1)}</span>
-          </>
+          <SliderControl
+            min={0.1}
+            max={5}
+            step={0.1}
+            value={c.lookSensitivity}
+            onChange={(lookSensitivity) => update("camera", { lookSensitivity })}
+          >
+            ×{c.lookSensitivity.toFixed(1)}
+          </SliderControl>
         )
       },
       {
@@ -570,20 +610,11 @@ export function SettingsDialog(props: {
         description:
           "Hide the cursor and keep it in place while dragging the camera. Browsers show a notice on every lock, and Firefox on Linux turns slow diagonal looks into steps.",
         control: (
-          <Select
+          <Choice
             value={c.lockPointer}
             items={{ desktop: "Desktop app only", always: "Always", never: "Never" }}
-            onValueChange={(v) => v !== null && update("camera", { lockPointer: v })}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="desktop">Desktop app only</SelectItem>
-              <SelectItem value="always">Always</SelectItem>
-              <SelectItem value="never">Never</SelectItem>
-            </SelectContent>
-          </Select>
+            onChange={(v) => update("camera", { lockPointer: v })}
+          />
         )
       },
       {
@@ -619,20 +650,11 @@ export function SettingsDialog(props: {
         ...setting("appearance", "theme"),
         label: "Theme",
         control: (
-          <Select
+          <Choice
             value={a.theme}
             items={{ dark: "Dark", light: "Light", system: "System" }}
-            onValueChange={(v) => v !== null && update("appearance", { theme: v })}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="dark">Dark</SelectItem>
-              <SelectItem value="light">Light</SelectItem>
-              <SelectItem value="system">System</SelectItem>
-            </SelectContent>
-          </Select>
+            onChange={(v) => update("appearance", { theme: v })}
+          />
         )
       },
       {
@@ -641,21 +663,11 @@ export function SettingsDialog(props: {
         label: "Animation speed",
         description: "How fast panels, menus and tabs animate. Off skips every animation.",
         control: (
-          <Select
+          <Choice
             value={a.motion}
             items={{ off: "Off", fast: "Fast", normal: "Normal", slow: "Slow" }}
-            onValueChange={(v) => v !== null && update("appearance", { motion: v })}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="off">Off</SelectItem>
-              <SelectItem value="fast">Fast</SelectItem>
-              <SelectItem value="normal">Normal</SelectItem>
-              <SelectItem value="slow">Slow</SelectItem>
-            </SelectContent>
-          </Select>
+            onChange={(v) => update("appearance", { motion: v })}
+          />
         )
       },
       {

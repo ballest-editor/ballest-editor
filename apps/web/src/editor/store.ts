@@ -1,10 +1,12 @@
 /**
- * Editor document + UI state. The document is a MapFile (schema-typed) plus a parallel
- * array of stable ids for React keys and selection. All edits go through domain/edits.
+ * Editor document + UI state. The document is a MapFile (schema-typed), a parallel array of each item's stable key (the
+ * item's one identity: React keys, selection, the sidecar) and the map's structure (domain/structure). All edits go
+ * through domain/edits and domain/structure.
  */
-import { NOTIFICATION_LIMIT, type UpdateState } from "@ballest/contracts"
+import { NOTIFICATION_LIMIT, type PrefabInfos, type PrefabRef, type UpdateState } from "@ballest/contracts"
 import { type Effect, Option } from "effect"
 import { create } from "zustand"
+import { useShallow } from "zustand/react/shallow"
 import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { type Creator, creatorOf, type FoundCreator } from "../domain/creator"
@@ -26,22 +28,68 @@ import {
 } from "../domain/edits"
 import { editTransform, fitEditTransform } from "../domain/editTransform"
 import { itemFromPiece, mapLabelOf, newMapFile } from "../domain/factory"
+import { withGameGroups } from "../domain/gameGroups"
 import { type DerivedKeybinds, deriveKeybinds } from "../domain/GameKeybinds"
 import type { GameLinkResult } from "../domain/gameLink"
+import {
+  canGroupSelection,
+  clickLevelOf,
+  enteredLevelOf,
+  groupPathOf,
+  nodeKeys,
+  selectedGroupIds,
+  selectionNodeIds
+} from "../domain/groupSelection"
+import { placedBoxOf } from "../domain/itemBounds"
 import { type PropertyChange, withFlip } from "../domain/itemProperties"
 import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
 import { LIMITS } from "../domain/limits"
 import { type LinkState, linkStateOf } from "../domain/linkState"
-import { isPlayerStart, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
+import { isPlayerStart, type Item, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
+import type { PrefabLink } from "../domain/MapSidecar"
 import type { MaterialTable } from "../domain/Materials"
 import { type FlipAxis, withMirrorMesh } from "../domain/mirror"
 import { addNotice, clearNotices, dropNotices, markRead, mergeNotices, resolveNotices } from "../domain/notifications"
 import type { PaintPicker } from "../domain/Paint"
 import { type Pivot, pivotAt } from "../domain/pivot"
+import { isSamePrefab, type PrefabSource } from "../domain/prefab"
+import type { PrefabFile } from "../domain/PrefabFile"
+import { type PrefabDefinition, withUpdatedInstance } from "../domain/prefabInstance"
 import { defaultSettings, type Settings } from "../domain/Settings"
+import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
+import {
+  copyStructure,
+  type Doc,
+  findGroup,
+  freshKey,
+  freshKeys,
+  groupNames,
+  itemNames,
+  type NumberedName,
+  sameStrings,
+  type Structure,
+  withGroup,
+  withGroupName,
+  withItemName,
+  withMovedNodes,
+  withNewItems,
+  withoutGroups,
+  withoutKeys,
+  withPasted,
+  withPrefabLink,
+  withTags
+} from "../domain/structure"
 import { type Lighting, lightingOf } from "../domain/sunlight"
 import type { Surfaces } from "../domain/surface"
+import {
+  clampSplit,
+  defaultViewLayout,
+  paneCountOf,
+  type ViewLayout,
+  type ViewLayoutKind,
+  type ViewProjection
+} from "../domain/viewLayout"
 import type { LoadedCatalog } from "../services/CatalogLoader"
 import type {
   GamePathKind,
@@ -58,6 +106,7 @@ import type {
 import type { GizmoSpace } from "./gizmo/handles"
 
 /** The game folder types, for components (which reach services only through editor/). */
+export type { Doc } from "../domain/structure"
 export type {
   GamePathKind,
   GamePaths,
@@ -66,9 +115,14 @@ export type {
   PluginStatus,
   ProjectMap
 } from "../services/Platform"
-export interface Doc {
-  readonly map: MapFile
-  readonly ids: ReadonlyArray<string>
+
+/** What a sidecar gives a document on top of its map. */
+type DocStructure = Pick<LoadedStructure, "ids" | "structure">
+
+/** Copied items, and what the document held of them beyond the map: their keys (one per item) and structure. */
+export interface DocClip extends Clip {
+  readonly keys: ReadonlyArray<string>
+  readonly structure: Structure
 }
 
 /**
@@ -97,7 +151,6 @@ export interface Snapshot {
 export type SlotPaint = Omit<SlotMaterial, "index"> & { readonly id: string }
 
 export type Tool = "select" | "translate" | "rotate" | "scale"
-export type LeftTab = "pieces" | "project"
 export type SettingsCategory = "general" | "editor" | "camera" | "keybinds" | "appearance" | "lighting" | "game"
 
 const HISTORY_LIMIT = 200
@@ -111,6 +164,24 @@ export interface OpenFile {
   readonly name: string
   readonly path: string | null
 }
+
+/**
+ * A definition open in a tab (docs/DESKTOP.md § Prefabs): which prefab, and the file as it was last read or saved, which
+ * Save writes the tab's items back into.
+ */
+export interface PrefabDocument extends PrefabRef {
+  readonly kind: "prefab"
+  readonly file: PrefabFile
+  readonly hash: string
+  /** What each item, by stable key, was in that file. */
+  readonly sources: ReadonlyMap<string, PrefabSource>
+}
+
+/** What a tab holds: a map, or a prefab's definition in a map-like document. Save, Export and Play ask this first. */
+export type TabDocument = { readonly kind: "map" } | PrefabDocument
+
+/** Why a definition's tab can't Export or Play. */
+export const PREFAB_TAB_STAYS_HERE = "A prefab isn't a map: place it in one to export or play it."
 
 /**
  * A file in the game's maps folder that is the draft of a published map (`levelPublishedFileId` > 0), found by Export
@@ -156,11 +227,11 @@ export interface ImportClash {
  * - `projectSettings` opens Project settings on the project's page, `mapSettings` on the open map's entry in it.
  * - `replacePublished`, `overwriteChanged` and `importClash` ask about what Export, Play or Import found.
  * - `whereToOpen` asks whether `target` (shown as `name`) takes over this window or opens in a new one.
+ * - `savePrefab` names a prefab made from the selection; `renamePrefab` and `deletePrefab` are the Prefabs panel's.
  */
 export type DialogState =
   | {
     readonly id:
-      | "new"
       | "rename"
       | "duplicate"
       | "projectSettings"
@@ -176,6 +247,8 @@ export type DialogState =
   | { readonly id: "overwriteChanged" } & ChangedExport
   | { readonly id: "importClash" } & ImportClash
   | { readonly id: "whereToOpen"; readonly target: ProjectTarget; readonly name: string }
+  | { readonly id: "savePrefab" }
+  | { readonly id: "renamePrefab" | "deletePrefab"; readonly prefab: PrefabRef }
 export type Dialog = DialogState["id"]
 
 /** What `notify` records besides the level and title (docs/PROJECTS.md § Shell). */
@@ -193,10 +266,11 @@ export interface NotifyOptions {
   readonly actions?: ReadonlyArray<NotificationAction>
 }
 
-let nextId = 0
-const freshId = () => `item-${++nextId}`
-const freshIds = (n: number) => Array.from({ length: n }, freshId)
-const docOf = (map: MapFile): Doc => ({ map, ids: freshIds(map.items.length) })
+const docOf = (map: MapFile, loaded: DocStructure = structureOfMap(map)): Doc => ({
+  map,
+  ids: loaded.ids,
+  structure: loaded.structure
+})
 
 let nextTabId = 0
 const freshTabId = () => `tab-${++nextTabId}`
@@ -209,6 +283,8 @@ export const initialMap = () => newMapFile({ displayName: "Untitled", creatorNam
  */
 export interface TabState {
   readonly doc: Doc
+  /** What `doc` is the document of. */
+  readonly document: TabDocument
   /**
    * The height (UE cm) the grid is drawn at and palette pieces land on: by default the player
    * start's, taken when the map loads so it stays put while the start is moved. Project settings
@@ -226,15 +302,33 @@ export interface TabState {
   /** The map's "Export on save" (desktop, off by default; kept with the map's prefs). */
   readonly exportOnSave: boolean
   readonly selectedIds: Selection
-  /** Opened as the fresh map the app starts on (or closing the last tab leaves): see `isBlankTab`. */
+  /** Opened as a fresh map: the one the app starts on, New map's, the one closing the last tab leaves. See `isBlankTab`. */
   readonly fresh: boolean
+  /** The group a double-click entered: viewport clicks reach its children (docs/DESKTOP.md § Groups and selection). */
+  readonly enteredGroupId: string | null
+  /** The groups the Outline shows closed. Outside the document and its history, so undo doesn't touch them. */
+  readonly collapsedGroups: ReadonlySet<string>
+  /** How the tab divides its view into panes; kept per map in MapPrefsStore. */
+  readonly viewLayout: ViewLayout
+  /** The slot of the active pane: what the fly keys, Focus selection and Frame all act on. */
+  readonly activePane: number
 }
 
 /**
  * Where `loadMap` puts a map: over the active tab's, over another tab's (`tabId`), or in a new tab after the active
  * one (`newTab`), which takes the active tab's place instead while that is blank (`isBlankTab`).
  */
-export type TabTarget = "active" | "newTab" | { readonly tabId: string }
+export type TabTarget = "active" | "newTab" | "addedTab" | { readonly tabId: string }
+
+/** How a tab opens: what it holds beside its map, and what it starts on other than the defaults. */
+interface TabOptions {
+  readonly exportOnSave?: boolean
+  readonly dirty?: boolean
+  readonly fresh?: boolean
+  readonly loaded?: DocStructure | undefined
+  readonly viewLayout?: ViewLayout | undefined
+  readonly document?: TabDocument
+}
 
 export interface EditorState extends TabState {
   /** The document tabs, in order. */
@@ -247,6 +341,8 @@ export interface EditorState extends TabState {
   readonly project: ProjectState | null
   /** The project's maps, most recently changed first (desktop). */
   readonly projectMaps: ReadonlyArray<ProjectMap>
+  /** Every prefab of both tiers, as last listed. */
+  readonly prefabs: PrefabInfos
   /** What the platform (browser or desktop app) offers; the browser's until the startup load says otherwise. */
   readonly capabilities: PlatformCapabilities
   /** The game's folders as last looked up (desktop; null until the startup check or the Game link asks). */
@@ -273,8 +369,6 @@ export interface EditorState extends TabState {
   readonly tool: Tool
   /** Whether the gizmo follows the selected item's axes or the world's. */
   readonly gizmoSpace: GizmoSpace
-  /** The left dock's tab: the piece palette, or the project's maps (docs/PROJECTS.md § Shell). */
-  readonly leftTab: LeftTab
   /** The open modal dialog; editor keybinds are suspended while one is open. */
   readonly dialog: DialogState | null
   /** The Settings dialog's page, kept between openings. */
@@ -301,7 +395,7 @@ export interface EditorState extends TabState {
    * The last copied items (Ctrl+C), as they were when copied. Not part of the document or
    * its history, so it survives undo and loading another map.
    */
-  readonly clipboard: Clip | null
+  readonly clipboard: DocClip | null
   /**
    * Live transforms of the items under a continuous interaction (gizmo drag, number-field
    * scrub), by id. Not in the document until the interaction commits, as one undo step;
@@ -312,25 +406,23 @@ export interface EditorState extends TabState {
   readonly lightingPreview: Lighting | null
   /** Multiplier on the fly speed, changed by speedFaster/speedSlower. */
   readonly cameraSpeed: number
-  /** Bumped to ask the camera to frame the selection / the whole map. */
+  /** Bumped to frame the selection in the active pane. */
   readonly focusRequest: number
+  /** Bumped to frame the whole map in the active pane. */
   readonly frameAllRequest: number
+  /** Bumped when a map is put into the active tab: every pane of the tab frames it. */
+  readonly mapShownRequest: number
 
   /**
    * Shows `map` in a tab (`into`, the active one by default) with a fresh history; a new tab becomes the active one.
    * `floorHeight` defaults to the map's player start height. `dirty` opens it as unsaved edits of `file` (a recovered
-   * version), so the next Save writes it there.
+   * version), so the next Save writes it there. `loaded` is what its sidecar gave; without one the map stands alone.
    */
   readonly loadMap: (
     map: MapFile,
     file: OpenFile | null,
     floorHeight?: number,
-    options?: {
-      readonly exportOnSave?: boolean
-      readonly dirty?: boolean
-      readonly fresh?: boolean
-      readonly into?: TabTarget
-    }
+    options?: TabOptions & { readonly into?: TabTarget | undefined }
   ) => void
   /** Makes `tabId` the active tab; nothing while a drag or scrub is under way. */
   readonly activateTab: (tabId: string) => void
@@ -341,8 +433,10 @@ export interface EditorState extends TabState {
    * nothing when `patch` returns the same map.
    */
   readonly editTabMap: (tabId: string, patch: (map: MapFile) => MapFile) => void
-  readonly setTabFloorHeight: (tabId: string, floorHeight: number) => void
-  readonly setTabExportOnSave: (tabId: string, exportOnSave: boolean) => void
+  /** Edits tab `tabId`'s document as one undo step of that tab; nothing when `edit` answers undefined. */
+  readonly editTabDoc: (tabId: string, edit: (doc: Doc) => Doc | undefined) => void
+  /** Changes what tab `tabId` keeps of its own without touching its history: its floor, Export on save, document, file. */
+  readonly patchTab: (tabId: string, patch: Partial<TabState>) => void
   /**
    * Closes `tabId` without asking (editor/actions asks about its unsaved edits first); the tab after it, else the one
    * before, becomes active in its place. The last tab stays: there is always a map.
@@ -354,13 +448,15 @@ export interface EditorState extends TabState {
    * meanwhile, only the file is remembered.
    */
   readonly markSaved: (tabId: string, from: Doc, map: MapFile, file: OpenFile) => void
+  /** Tab `tabId`'s definition was saved from `from`, as `document`: the tab is clean while its document is still `from`. */
+  readonly markPrefabSaved: (tabId: string, from: Doc, document: PrefabDocument, file: OpenFile) => void
+  readonly setPrefabs: (prefabs: PrefabInfos) => void
   readonly setProject: (project: ProjectState, maps: ReadonlyArray<ProjectMap>) => void
   /**
    * The open maps no longer have files: they stay open with their edits as unsaved, and the next Save names each into
    * the project in use (after switching to another project).
    */
   readonly detachFiles: () => void
-  readonly setExportOnSave: (exportOnSave: boolean) => void
   readonly setCapabilities: (capabilities: PlatformCapabilities) => void
   readonly setGamePaths: (gamePaths: GamePaths) => void
   readonly setFoundCreator: (foundCreator: Option.Option<FoundCreator>) => void
@@ -370,6 +466,18 @@ export interface EditorState extends TabState {
   readonly setUpdate: (update: UpdateState) => void
   readonly setUpdateChecked: (updateChecked: boolean) => void
   readonly placePiece: (piece: CatalogPiece, transform: ItemTransform) => void
+  /**
+   * Adds `items` as one new group called `name`, selected, as one undo step: a prefab placed, as an instance when `link`
+   * says of what. Answers the group's id; undefined (with a notice) when the map has no room for them.
+   */
+  readonly placeGroup: (items: ReadonlyArray<Item>, name: string, link?: PrefabLink) => string | undefined
+  /** Replaces the instances `groupIds` of tab `tabId` with `definition`, where they stand, as one undo step. */
+  readonly updateInstances: (tabId: string, groupIds: ReadonlyArray<string>, definition: PrefabDefinition) => void
+  /** Gives groups of tab `tabId` the links paired with them, as one undo step; undefined makes a plain group. */
+  readonly relinkInstances: (
+    tabId: string,
+    links: ReadonlyArray<readonly [groupId: string, link: PrefabLink | undefined]>
+  ) => void
   /**
    * Replaces the transforms of several items as one undo step; false (with a notice, and
    * nothing changed) when the game would reject any of them.
@@ -417,15 +525,37 @@ export interface EditorState extends TabState {
   readonly setLighting: (lighting: Lighting) => void
   /** Replaces `worldSettings.levelData` as one undo step (none when nothing changes). */
   readonly setLevelData: (levelData: LevelData) => void
-  readonly setFloorHeight: (floorHeight: number) => void
+  readonly renameItem: (key: string, name: string | null) => void
+  readonly renameGroup: (id: string, name: string) => void
+  readonly setTags: (target: string, tags: ReadonlyArray<string>) => void
+  /** `withGroup` as one undo step; answers the group's id, or undefined when none of `keys` is in the tree. */
+  readonly groupItems: (keys: ReadonlyArray<string>, name?: string) => string | undefined
+  /** Groups what's selected as one undo step, whole groups staying whole inside the new one. */
+  readonly groupSelection: () => void
+  /** Dissolves every group whole in the selection as one undo step; the items stay selected. */
+  readonly ungroupSelection: () => void
+  /** `withMovedNodes` as one undo step. */
+  readonly moveNodes: (nodeIds: ReadonlyArray<string>, parentGroupId: string | null, index: number) => void
   /** Restores the previous snapshot, including its selection. */
   readonly undo: () => void
   readonly redo: () => void
   /** Changes the selection; its own undo step when settings.editor.undoSelection is on. */
   readonly select: (ids: Selection) => void
+  /**
+   * A viewport click on item `key` (null: empty space): selects what it reaches at the click level (`clickLevelOf`). A
+   * plain click outside the entered group leaves it.
+   */
+  readonly clickItem: (key: string | null, mode: SelectMode) => void
+  /** A viewport double-click on item `key`: enters the group a click reaches, and selects the next level down. */
+  readonly doubleClickItem: (key: string) => void
+  /** Sets the entered group (null: none), keeping the selection. */
+  readonly enterGroup: (groupId: string | null) => void
+  /** Steps out of the entered group, selecting it; with none entered, clears the selection. */
+  readonly deselect: () => void
+  readonly setGroupCollapsed: (groupId: string, collapsed: boolean) => void
+  readonly expandGroups: (groupIds: ReadonlyArray<string>) => void
   readonly setTool: (tool: Tool) => void
   readonly toggleGizmoSpace: () => void
-  readonly setLeftTab: (tab: LeftTab) => void
   /** Opens `dialog` in place of the open one (and its payload). */
   readonly openDialog: (dialog: DialogState) => void
   readonly closeDialog: () => void
@@ -454,6 +584,13 @@ export interface EditorState extends TabState {
   readonly changeSpeed: (direction: 1 | -1) => void
   readonly requestFocus: () => void
   readonly requestFrameAll: () => void
+  /** Divides the active tab's view; the active pane stays when the new layout still shows it. */
+  readonly setViewLayoutKind: (kind: ViewLayoutKind) => void
+  /** Moves the dividers, as shares of the viewport; each is held off the edges (`clampSplit`). */
+  readonly setPaneSplit: (split: { readonly x?: number; readonly y?: number }) => void
+  /** What the pane in `slot` looks along. */
+  readonly setPaneProjection: (slot: number, projection: ViewProjection) => void
+  readonly setActivePane: (slot: number) => void
 }
 
 /** A tab's state for `map`, opened with no history and nothing selected. */
@@ -461,9 +598,10 @@ const freshTabState = (
   map: MapFile,
   file: OpenFile | null,
   floorHeight?: number,
-  options?: { readonly exportOnSave?: boolean; readonly dirty?: boolean; readonly fresh?: boolean }
+  options?: TabOptions
 ): TabState => ({
-  doc: docOf(map),
+  doc: docOf(map, options?.loaded),
+  document: options?.document ?? { kind: "map" },
   floorHeight: floorHeight ?? floorHeightOf(map),
   past: [],
   future: [],
@@ -471,12 +609,17 @@ const freshTabState = (
   file,
   exportOnSave: options?.exportOnSave ?? false,
   selectedIds: [],
-  fresh: options?.fresh ?? false
+  fresh: options?.fresh ?? false,
+  enteredGroupId: null,
+  collapsedGroups: new Set(),
+  viewLayout: options?.viewLayout ?? defaultViewLayout,
+  activePane: 0
 })
 
 /** The active tab's state, out of the store. */
 const activeTabOf = (s: EditorState): TabState => ({
   doc: s.doc,
+  document: s.document,
   floorHeight: s.floorHeight,
   past: s.past,
   future: s.future,
@@ -484,8 +627,20 @@ const activeTabOf = (s: EditorState): TabState => ({
   file: s.file,
   exportOnSave: s.exportOnSave,
   selectedIds: s.selectedIds,
-  fresh: s.fresh
+  fresh: s.fresh,
+  enteredGroupId: s.enteredGroupId,
+  collapsedGroups: s.collapsedGroups,
+  viewLayout: s.viewLayout,
+  activePane: s.activePane
 })
+
+/** A step of history on top of `past`, away from `doc` and `selectedIds` to `otherSelectedIds`; it clears the redo stack. */
+const stepFrom = (
+  past: TabState["past"],
+  { doc, selectedIds }: DocState,
+  otherSelectedIds: Selection,
+  selectionOnly = false
+) => ({ past: [...past, { doc, selectedIds, otherSelectedIds, selectionOnly }].slice(-HISTORY_LIMIT), future: [] })
 
 export const useEditor = create<EditorState>()((set, get) => {
   /**
@@ -496,13 +651,8 @@ export const useEditor = create<EditorState>()((set, get) => {
     set((s) => ({
       ...extra,
       doc,
-      past: [...s.past, {
-        doc: before?.doc ?? s.doc,
-        selectedIds: before?.selectedIds ?? s.selectedIds,
-        otherSelectedIds: extra.selectedIds ?? s.selectedIds,
-        selectionOnly: false
-      }].slice(-HISTORY_LIMIT),
-      future: [],
+      enteredGroupId: keptEnteredGroup(doc, s.enteredGroupId),
+      ...stepFrom(s.past, before ?? s, extra.selectedIds ?? s.selectedIds),
       dirty: true
     }))
 
@@ -521,15 +671,32 @@ export const useEditor = create<EditorState>()((set, get) => {
     return indices
   }
 
-  /** The doc with the clip's items added and their fresh ids; undefined (with a notice) when there's no room. */
-  const withClip = (s: EditorState, clip: Clip): (Doc & { readonly added: ReadonlyArray<string> }) | undefined => {
-    if (clip.items.length === 0) return undefined
-    if (s.doc.map.items.length + clip.items.length > LIMITS.itemsPerLevel) {
-      s.notify("error", `The game allows at most ${LIMITS.itemsPerLevel.toLocaleString()} items in a map.`)
-      return undefined
+  /** Whether `count` more items fit in the map; says so when they don't. */
+  const hasRoomFor = ({ doc, notify }: EditorState, count: number) => {
+    const fits = doc.map.items.length + count <= LIMITS.itemsPerLevel
+    if (!fits) notify("error", `The game allows at most ${LIMITS.itemsPerLevel.toLocaleString()} items in a map.`)
+    return fits
+  }
+
+  /** The doc with the clip's items added, their fresh keys and each source key's copy; undefined when there's no room. */
+  const withClip = (s: EditorState, clip: DocClip) => {
+    if (clip.items.length === 0 || !hasRoomFor(s, clip.items.length)) return undefined
+    const added = freshKeys(clip.items.length)
+    const keyOf = new Map(clip.keys.flatMap((key, n) => {
+      const copy = added[n]
+      return copy === undefined ? [] : [[key, copy] as const]
+    }))
+    const doc: Doc = {
+      map: pasteItems(s.doc.map, clip),
+      ids: [...s.doc.ids, ...added],
+      structure: withPasted(s.doc.structure, clip.structure, keyOf)
     }
-    const added = freshIds(clip.items.length)
-    return { map: pasteItems(s.doc.map, clip), ids: [...s.doc.ids, ...added], added }
+    return { doc, added, keyOf }
+  }
+
+  /** One undo step for a change to the map's structure; nothing when `structure` says nothing changed. */
+  const commitStructure = (structure: Structure | undefined) => {
+    if (structure !== undefined) commit({ ...get().doc, structure })
   }
 
   /** Where an Alt+drag duplicate started, while one is in progress. */
@@ -543,6 +710,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       doc,
       dirty: snapshot.selectionOnly ? s.dirty : true,
       selectedIds: snapshot.selectedIds.filter((id) => existing.has(id)),
+      enteredGroupId: keptEnteredGroup(doc, s.enteredGroupId),
       // the side being left, for the opposite stack
       current: {
         doc: s.doc,
@@ -579,6 +747,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     parkedTabs: new Map(),
     project: null,
     projectMaps: [],
+    prefabs: [],
     capabilities: { projects: false, exportToGame: false, launchGame: false, play: false, updates: false },
     gamePaths: null,
     foundCreator: Option.none(),
@@ -591,7 +760,6 @@ export const useEditor = create<EditorState>()((set, get) => {
     mutedNotificationKinds: new Set(),
     tool: "translate",
     gizmoSpace: "world",
-    leftTab: "pieces",
     dialog: null,
     settingsCategory: "general",
     cheatSheet: false,
@@ -611,6 +779,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     cameraSpeed: 1,
     focusRequest: 0,
     frameAllRequest: 0,
+    mapShownRequest: 0,
 
     loadMap: (map, file, floorHeight, options) => {
       const tab = freshTabState(map, file, floorHeight, options)
@@ -620,17 +789,16 @@ export const useEditor = create<EditorState>()((set, get) => {
         return
       }
       set((s) => {
-        const replace = into !== "newTab" || isBlankTab(s)
-        if (replace) return { ...tab, ...leftBehind, frameAllRequest: s.frameAllRequest + 1 }
+        if (into === "addedTab" && (interacting(s) || duplicateDragBase !== null)) return s
+        const shown = { ...tab, ...leftBehind, mapShownRequest: s.mapShownRequest + 1 }
+        if (into === "newTab" ? isBlankTab(s) : into !== "addedTab") return shown
         const tabId = freshTabId()
         const at = s.tabIds.indexOf(s.tabId) + 1
         return {
-          ...tab,
-          ...leftBehind,
+          ...shown,
           tabId,
           tabIds: [...s.tabIds.slice(0, at), tabId, ...s.tabIds.slice(at)],
-          parkedTabs: new Map(s.parkedTabs).set(s.tabId, activeTabOf(s)),
-          frameAllRequest: s.frameAllRequest + 1
+          parkedTabs: new Map(s.parkedTabs).set(s.tabId, activeTabOf(s))
         }
       })
     },
@@ -654,23 +822,25 @@ export const useEditor = create<EditorState>()((set, get) => {
       }),
 
     editTabMap: (tabId, patch) =>
+      get().editTabDoc(tabId, (doc) => {
+        const map = patch(doc.map)
+        return map === doc.map ? undefined : { ...doc, map }
+      }),
+    editTabDoc: (tabId, edit) =>
       updateTab(tabId, (tab) => {
-        const map = patch(tab.doc.map)
-        if (map === tab.doc.map) return {}
+        const doc = edit(tab.doc)
+        if (doc === undefined) return {}
+        const kept = new Set(doc.ids)
+        const selectedIds = tab.selectedIds.filter((id) => kept.has(id))
         return {
-          doc: { map, ids: tab.doc.ids },
-          past: [...tab.past, {
-            doc: tab.doc,
-            selectedIds: tab.selectedIds,
-            otherSelectedIds: tab.selectedIds,
-            selectionOnly: false
-          }].slice(-HISTORY_LIMIT),
-          future: [],
+          doc,
+          selectedIds,
+          enteredGroupId: keptEnteredGroup(doc, tab.enteredGroupId),
+          ...stepFrom(tab.past, tab, selectedIds),
           dirty: true
         }
       }),
-    setTabFloorHeight: (tabId, floorHeight) => updateTab(tabId, () => ({ floorHeight })),
-    setTabExportOnSave: (tabId, exportOnSave) => updateTab(tabId, () => ({ exportOnSave })),
+    patchTab: (tabId, patch) => updateTab(tabId, () => patch),
 
     closeTab: (tabId) => {
       const { tabIds, tabId: active } = get()
@@ -688,16 +858,22 @@ export const useEditor = create<EditorState>()((set, get) => {
 
     markSaved: (tabId, from, map, file) =>
       updateTab(tabId, (tab) => tab.doc === from ? { doc: { ...tab.doc, map }, dirty: false, file } : { file }),
+    markPrefabSaved: (tabId, from, document, file) =>
+      updateTab(tabId, (tab) => tab.doc === from ? { document, dirty: false, file } : { document, file }),
+    setPrefabs: (prefabs) => set({ prefabs }),
     setProject: (project, projectMaps) => set({ project, projectMaps }),
     detachFiles: () =>
       set((s) => {
-        const detach = (tab: TabState): TabState => tab.file === null ? tab : { ...tab, file: null, dirty: true }
+        // a user prefab belongs to the game, whichever project is in use
+        const detach = (tab: TabState): TabState =>
+          tab.file === null || (tab.document.kind === "prefab" && tab.document.tier === "user")
+            ? tab
+            : { ...tab, file: null, dirty: true }
         return {
           ...detach(activeTabOf(s)),
           parkedTabs: new Map([...s.parkedTabs].map(([id, tab]) => [id, detach(tab)]))
         }
       }),
-    setExportOnSave: (exportOnSave) => set({ exportOnSave }),
     setCapabilities: (capabilities) => set({ capabilities }),
     setGamePaths: (gamePaths) => set({ gamePaths }),
     setFoundCreator: (foundCreator) => set({ foundCreator }),
@@ -714,18 +890,53 @@ export const useEditor = create<EditorState>()((set, get) => {
         return
       }
       const { doc } = get()
-      const id = freshId()
-      commit({ map: addItem(doc.map, item.value), ids: [...doc.ids, id] }, { selectedIds: [id] })
+      const id = freshKey()
+      commit({
+        map: addItem(doc.map, item.value),
+        ids: [...doc.ids, id],
+        structure: withNewItems(doc.structure, [id])
+      }, { selectedIds: [id] })
     },
+
+    placeGroup: (items, name, link) => {
+      const s = get()
+      const { doc } = s
+      if (!hasRoomFor(s, items.length)) return undefined
+      const keys = freshKeys(items.length)
+      const id = freshKey()
+      const grouped = withGroup(withNewItems(doc.structure, keys), keys, id, name)
+      if (grouped === undefined) return undefined
+      commit({
+        map: { ...doc.map, items: [...doc.map.items, ...items] },
+        ids: [...doc.ids, ...keys],
+        structure: withPrefabLink(grouped, id, link) ?? grouped
+      }, { selectedIds: keys })
+      return id
+    },
+
+    updateInstances: (tabId, groupIds, definition) =>
+      get().editTabDoc(tabId, (doc) => {
+        const next = groupIds.reduce<Doc>((current, id) => withUpdatedInstance(current, id, definition) ?? current, doc)
+        return next === doc ? undefined : next
+      }),
+
+    relinkInstances: (tabId, links) =>
+      get().editTabDoc(tabId, (doc) => {
+        const structure = links.reduce<Structure>(
+          (current, [id, link]) => withPrefabLink(current, id, link) ?? current,
+          doc.structure
+        )
+        return structure === doc.structure ? undefined : { ...doc, structure }
+      }),
 
     transformItems: (transforms) => {
       const { doc } = get()
-      const entries = [...transforms].map(([id, t]) => [doc.ids.indexOf(id), t] as const)
+      const entries = [...transforms].map(([id, t]) => [indexOfKey(doc.ids, id), t] as const)
       const next = setTransforms(doc.map, entries)
       if (Option.isSome(next)) {
         // a drag that ends where it started leaves no step
         if (!entries.every(([index]) => sameItemTransform(doc.map, next.value, index))) {
-          commit({ map: next.value, ids: doc.ids })
+          commit({ ...doc, map: next.value })
         }
         return true
       }
@@ -740,7 +951,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         get().notify("error", "Those items no longer have that material slot.")
         return false
       }
-      if (next.value !== doc.map) commit({ map: next.value, ids: doc.ids })
+      if (next.value !== doc.map) commit({ ...doc, map: next.value })
       return true
     },
 
@@ -758,13 +969,13 @@ export const useEditor = create<EditorState>()((set, get) => {
           s.doc.map.items[i]?.[property.list].some((p) => p.propertyName === property.name && p.currentValue === value)
         )
       )
-      if (!unchanged) commit({ map: next.value, ids: s.doc.ids })
+      if (!unchanged) commit({ ...s.doc, map: next.value })
       return true
     },
 
     flipSelection: (axis) => {
       const s = get()
-      const { map, ids } = s.doc
+      const { map } = s.doc
       const selected = new Set(selectedIndices(s))
       const items = map.items.map((item, i) => {
         if (!selected.has(i)) return item
@@ -772,7 +983,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         // A flip also swaps the mesh (and some materials) for the game's baked mirror, in the same step.
         return flipped === item ? item : withMirrorMesh(flipped, s.catalogIndex)
       })
-      if (items.some((item, i) => item !== map.items[i])) commit({ map: { ...map, items }, ids })
+      if (items.some((item, i) => item !== map.items[i])) commit({ ...s.doc, map: { ...map, items } })
     },
 
     setItemPivots: (pivots) => {
@@ -781,7 +992,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         const index = doc.ids.indexOf(id)
         return index < 0 || samePivot(pivotAt(doc.map, index), pivot) ? [] : [[index, pivot] as const]
       })
-      if (entries.length > 0) commit({ map: setPivots(doc.map, entries), ids: doc.ids })
+      if (entries.length > 0) commit({ ...doc, map: setPivots(doc.map, entries) })
     },
 
     deleteSelection: () => {
@@ -793,13 +1004,13 @@ export const useEditor = create<EditorState>()((set, get) => {
 
     duplicateSelection: () => {
       const s = get()
-      const next = withClip(s, copyItems(s.doc.map, copyableIndices(s)))
-      if (next !== undefined) commit(next, { selectedIds: next.added })
+      const next = withClip(s, clipOf(s.doc, copyableIndices(s)))
+      if (next !== undefined) commit(next.doc, { selectedIds: next.added })
     },
 
     copySelection: () => {
       const s = get()
-      const clip = copyItems(s.doc.map, copyableIndices(s))
+      const clip = clipOf(s.doc, copyableIndices(s))
       if (clip.items.length > 0) set({ clipboard: clip })
     },
 
@@ -808,29 +1019,23 @@ export const useEditor = create<EditorState>()((set, get) => {
       // only what was copied goes: cutting never removes the player start
       const indices = copyableIndices(s)
       if (indices.length === 0) return
-      commit(withoutItems(s.doc, indices), { selectedIds: [], clipboard: copyItems(s.doc.map, indices) })
+      commit(withoutItems(s.doc, indices), { selectedIds: [], clipboard: clipOf(s.doc, indices) })
     },
 
     paste: () => {
       const s = get()
       const next = s.clipboard === null ? undefined : withClip(s, s.clipboard)
-      if (next !== undefined) commit(next, { selectedIds: next.added })
+      if (next !== undefined) commit(next.doc, { selectedIds: next.added })
     },
 
     beginDuplicateDrag: () => {
       const s = get()
       if (duplicateDragBase !== null) return undefined
-      const indices = copyableIndices(s)
-      const next = withClip(s, copyItems(s.doc.map, indices))
+      const next = withClip(s, clipOf(s.doc, copyableIndices(s)))
       if (next === undefined) return undefined
       duplicateDragBase = { doc: s.doc, selectedIds: s.selectedIds }
-      set({ doc: next, selectedIds: next.added })
-      // every index is in range, so copyItems keeps them all and the copies line up with them
-      return new Map(indices.flatMap((index, n) => {
-        const id = s.doc.ids[index]
-        const copy = next.added[n]
-        return id === undefined || copy === undefined ? [] : [[id, copy] as const]
-      }))
+      set({ doc: next.doc, selectedIds: next.added })
+      return next.keyOf
     },
 
     endDuplicateDrag: (transforms) => {
@@ -846,7 +1051,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         if (transforms !== null) get().notify("error", INVALID_TRANSFORM)
         return false
       }
-      commit({ map: next.value, ids: doc.ids }, {}, before)
+      commit({ ...doc, map: next.value }, {}, before)
       return true
     },
 
@@ -854,23 +1059,43 @@ export const useEditor = create<EditorState>()((set, get) => {
       const { doc } = get()
       const { levelDisplayName, creatorName: currentCreator } = doc.map.worldSettings.levelData
       if (displayName === levelDisplayName && creatorName === currentCreator) return
-      commit({ map: setLevelNames(doc.map, displayName, creatorName), ids: doc.ids })
+      commit({ ...doc, map: setLevelNames(doc.map, displayName, creatorName) })
     },
 
     setLighting: (lighting) => {
       const { doc } = get()
       const next = setLighting(doc.map, lighting)
       if (Option.isNone(next) || sameLighting(lightingOf(doc.map.worldSettings), lighting)) return
-      commit({ map: next.value, ids: doc.ids })
+      commit({ ...doc, map: next.value })
     },
 
     setLevelData: (levelData) => {
       const { doc } = get()
       if (JSON.stringify(levelData) === JSON.stringify(doc.map.worldSettings.levelData)) return
-      commit({ map: setLevelData(doc.map, levelData), ids: doc.ids })
+      commit({ ...doc, map: setLevelData(doc.map, levelData) })
     },
 
-    setFloorHeight: (floorHeight) => set({ floorHeight }),
+    renameItem: (key, name) => commitStructure(withItemName(get().doc.structure, key, name)),
+    renameGroup: (id, name) => commitStructure(withGroupName(get().doc.structure, id, name)),
+    setTags: (target, tags) => commitStructure(withTags(get().doc.structure, target, tags)),
+    groupItems: (keys, name) => {
+      const id = freshKey()
+      const next = withGroup(get().doc.structure, keys, id, name)
+      commitStructure(next)
+      return next === undefined ? undefined : id
+    },
+    groupSelection: () => {
+      const { doc, selectedIds, groupItems } = get()
+      if (canGroupSelection(doc.structure.tree, selectedIds)) {
+        groupItems(selectionNodeIds(doc.structure.tree, selectedIds))
+      }
+    },
+    ungroupSelection: () => {
+      const { doc, selectedIds } = get()
+      commitStructure(withoutGroups(doc.structure, selectedGroupIds(doc.structure.tree, selectedIds)))
+    },
+    moveNodes: (nodeIds, parentGroupId, index) =>
+      commitStructure(withMovedNodes(get().doc.structure, nodeIds, parentGroupId, index)),
 
     undo: () =>
       set((s) => {
@@ -891,19 +1116,54 @@ export const useEditor = create<EditorState>()((set, get) => {
     select: (ids) =>
       set((s) => {
         const selectedIds = [...new Set(ids)]
-        if (sameSelection(selectedIds, s.selectedIds)) return s
+        if (sameStrings(selectedIds, s.selectedIds)) return s
         if (!s.settings.editor.undoSelection) return { selectedIds }
-        const step: Snapshot = {
-          doc: s.doc,
-          selectedIds: s.selectedIds,
-          otherSelectedIds: selectedIds,
-          selectionOnly: true
-        }
-        return { selectedIds, past: [...s.past, step].slice(-HISTORY_LIMIT), future: [] }
+        return { selectedIds, ...stepFrom(s.past, s, selectedIds, true) }
+      }),
+    clickItem: (key, mode) => {
+      const { doc, selectedIds, enteredGroupId, select } = get()
+      const { tree } = doc.structure
+      const level = key === null ? undefined : clickLevelOf(tree, key, enteredGroupId)
+      // the clicked item is the active one, so the gizmo sits where the click was
+      const reached = level === undefined ? [] : nodeKeys(tree, level.nodeId).filter((id) => id !== key)
+      select(nextSelection(selectedIds, key === null ? [] : [...reached, key], mode))
+      if (mode === "replace") set({ enteredGroupId: level?.enteredGroupId ?? null })
+    },
+    doubleClickItem: (key) => {
+      const { doc, enteredGroupId, select } = get()
+      const { tree } = doc.structure
+      const level = enteredLevelOf(tree, key, enteredGroupId)
+      if (level === undefined) return
+      select(nodeKeys(tree, level.nodeId))
+      set({ enteredGroupId: level.enteredGroupId })
+    },
+    enterGroup: (enteredGroupId) => set({ enteredGroupId }),
+    deselect: () => {
+      const { doc, enteredGroupId, select } = get()
+      if (enteredGroupId === null) {
+        select([])
+        return
+      }
+      const { tree } = doc.structure
+      select(nodeKeys(tree, enteredGroupId))
+      set({ enteredGroupId: groupPathOf(tree, enteredGroupId).at(-1) ?? null })
+    },
+    setGroupCollapsed: (groupId, collapsed) =>
+      set((s) => {
+        if (s.collapsedGroups.has(groupId) === collapsed) return s
+        const collapsedGroups = new Set(s.collapsedGroups)
+        if (collapsed) collapsedGroups.add(groupId)
+        else collapsedGroups.delete(groupId)
+        return { collapsedGroups }
+      }),
+    expandGroups: (groupIds) =>
+      set((s) => {
+        if (!groupIds.some((id) => s.collapsedGroups.has(id))) return s
+        const open = new Set(groupIds)
+        return { collapsedGroups: new Set([...s.collapsedGroups].filter((id) => !open.has(id))) }
       }),
     setTool: (tool) => set({ tool }),
     toggleGizmoSpace: () => set((s) => ({ gizmoSpace: s.gizmoSpace === "world" ? "local" : "world" })),
-    setLeftTab: (leftTab) => set({ leftTab }),
     // The required chooser stays on top of everything: what would open behind it (the Game link's) waits for a launch.
     openDialog: (dialog) =>
       set((s) =>
@@ -962,7 +1222,27 @@ export const useEditor = create<EditorState>()((set, get) => {
         return { cameraSpeed: next ?? s.cameraSpeed }
       }),
     requestFocus: () => set((s) => ({ focusRequest: s.focusRequest + 1 })),
-    requestFrameAll: () => set((s) => ({ frameAllRequest: s.frameAllRequest + 1 }))
+    requestFrameAll: () => set((s) => ({ frameAllRequest: s.frameAllRequest + 1 })),
+    setViewLayoutKind: (kind) =>
+      set((s) => ({
+        viewLayout: { ...s.viewLayout, kind },
+        activePane: Math.min(s.activePane, paneCountOf(kind) - 1)
+      })),
+    setPaneSplit: ({ x, y }) =>
+      set((s) => ({
+        viewLayout: {
+          ...s.viewLayout,
+          splitX: x === undefined ? s.viewLayout.splitX : clampSplit(x),
+          splitY: y === undefined ? s.viewLayout.splitY : clampSplit(y)
+        }
+      })),
+    setPaneProjection: (slot, projection) =>
+      set((s) => {
+        const [a, b, c, d] = s.viewLayout.projections
+        const at = (i: number, current: ViewProjection) => i === slot ? projection : current
+        return { viewLayout: { ...s.viewLayout, projections: [at(0, a), at(1, b), at(2, c), at(3, d)] } }
+      }),
+    setActivePane: (slot) => set((s) => s.activePane === slot ? s : { activePane: slot })
   }
 })
 
@@ -970,26 +1250,35 @@ export const useEditor = create<EditorState>()((set, get) => {
 export const tabStateOf = (s: EditorState, tabId: string): TabState | undefined =>
   tabId === s.tabId ? activeTabOf(s) : s.parkedTabs.get(tabId)
 
+/** The tabs `test` picks, in tab order. */
+const tabsWhere = (s: EditorState, test: (tab: TabState) => boolean): ReadonlyArray<string> =>
+  s.tabIds.filter((id) => {
+    const tab = tabStateOf(s, id)
+    return tab !== undefined && test(tab)
+  })
+
 /** The tab that has the project map `fileName` open, if one does. */
 export const tabWithFile = (s: EditorState, fileName: string): string | undefined =>
-  s.tabIds.find((id) => tabStateOf(s, id)?.file?.name === fileName)
+  tabsWhere(s, (tab) => tab.file?.name === fileName)[0]
 
-/** The tabs with unsaved edits, in tab order. */
-export const dirtyTabs = (s: EditorState): ReadonlyArray<string> => s.tabIds.filter((id) => tabStateOf(s, id)?.dirty)
+export const dirtyTabs = (s: EditorState): ReadonlyArray<string> => tabsWhere(s, (tab) => tab.dirty)
 
 /**
  * The tabs whose map has no file yet, in tab order: the fresh map, every map in Untitled Project, what a switch of
  * projects left open. The project's file list can't show them, so the Project panel gives each a row of its own.
  */
 export const tabsWithoutFile = (s: EditorState): ReadonlyArray<string> =>
-  s.tabIds.filter((id) => tabStateOf(s, id)?.file === null)
+  tabsWhere(s, (tab) => tab.file === null && tab.document.kind === "map")
 
 /**
- * A tab nobody has used: the fresh map the app starts on (or closing the last tab leaves), never saved, with no edits
- * and no history. A map opened into a new tab takes its place.
+ * A tab nobody has used: a fresh map (the one the app starts on, New map's, the one closing the last tab leaves), never
+ * saved, with no edits and no history. It holds nothing to lose: closing it asks nothing, a map opened into a new tab
+ * takes its place, and a switch of projects drops it.
  */
 export const isBlankTab = (tab: TabState): boolean =>
   tab.fresh && tab.file === null && !tab.dirty && tab.past.length === 0
+
+export const blankTabs = (s: EditorState): ReadonlyArray<string> => tabsWhere(s, isBlankTab)
 
 /** Whether this window must pick a project before anything else (docs/DESKTOP.md § Other windows). */
 export const isChooserRequired = (s: Pick<EditorState, "project">): boolean => s.project?.chooserRequired === true
@@ -998,18 +1287,26 @@ export const isChooserRequired = (s: Pick<EditorState, "project">): boolean => s
 export const isModalOpen = (s: Pick<EditorState, "dialog" | "project">): boolean =>
   s.dialog !== null || isChooserRequired(s)
 
-/**
- * Whether opening a project would take anything over here, so it asks where it opens. Untitled Project with only its
- * untouched map has nothing to lose, and neither has the required chooser, whose pick is always this window.
- */
-export const hasWindowToTakeOver = (s: EditorState): boolean =>
-  !isChooserRequired(s) && (s.project?.current != null || s.tabIds.length > 1 || !isBlankTab(s))
+/** The window's title on desktop: the project, starred while it is Untitled Project; null without a project state. */
+export const projectTitleOf = (s: Pick<EditorState, "project">): string | null =>
+  s.project === null ? null : s.project.current?.name ?? "Untitled Project *"
+
+export const tabLabels = (s: EditorState): ReadonlyArray<string> =>
+  s.tabIds.flatMap((id) => {
+    const tab = tabStateOf(s, id)
+    return tab === undefined ? [] : [tabLabelOf(tab)]
+  })
 
 /** A map's name as its tab and the title bar show it: its file's, else the name inside it. */
-export const tabLabelOf = (tab: TabState): string =>
-  tab.file === null
+export const tabLabelOf = (tab: TabState): string => {
+  if (tab.document.kind === "prefab") return tab.document.name
+  return tab.file === null
     ? tab.doc.map.worldSettings.levelData.levelDisplayName.trim() || "Untitled"
     : mapLabelOf(tab.file.name)
+}
+
+export const tabWithPrefab = (s: EditorState, ref: PrefabRef): string | undefined =>
+  tabsWhere(s, ({ document }) => document.kind === "prefab" && isSamePrefab(document, ref))[0]
 
 /** A document and the selection that goes with it. */
 interface DocState {
@@ -1020,8 +1317,26 @@ interface DocState {
 /** The doc without the items at `indices`. */
 const withoutItems = (doc: Doc, indices: ReadonlyArray<number>): Doc => {
   const removed = new Set(indices)
-  return { map: removeItems(doc.map, indices), ids: doc.ids.filter((_, i) => !removed.has(i)) }
+  return {
+    map: removeItems(doc.map, indices),
+    ids: doc.ids.filter((_, i) => !removed.has(i)),
+    structure: withoutKeys(doc.structure, new Set(indices.flatMap((i) => doc.ids[i] ?? [])))
+  }
 }
+
+/** The items at `indices`, in that order, with what the doc holds of them. */
+const clipOf = (doc: Doc, indices: ReadonlyArray<number>): DocClip => {
+  const keys = indices.flatMap((i) => doc.ids[i] ?? [])
+  return { ...copyItems(doc.map, indices), keys, structure: copyStructure(doc.structure, new Set(keys)) }
+}
+
+/** The entered group, while it is still in `doc`'s tree. */
+const keptEnteredGroup = (doc: Doc, id: string | null): string | null =>
+  id !== null && findGroup(doc.structure.tree, id) !== undefined ? id : null
+
+/** A doc's map as the game gets it: its groups are the projection of the structure (docs/FORMAT.md § Groups). */
+export const gameMapOf = (doc: Doc, catalog: CatalogIndex | null): MapFile =>
+  withGameGroups(doc.map, doc.ids, doc.structure.tree, catalog)
 
 const INVALID_TRANSFORM = "That transform isn't valid for the game (non-finite or zero rotation)."
 
@@ -1048,23 +1363,56 @@ const interacting = (s: EditorState) => s.preview !== null || s.lightingPreview 
 const sameLighting = (a: Lighting, b: Lighting) =>
   a.timeOfDay === b.timeOfDay && a.brightness === b.brightness && a.angle === b.angle
 
-const sameSelection = (a: Selection, b: Selection) => a.length === b.length && a.every((id, i) => id === b[i])
-
 /**
- * The selection after clicking `id` (null: empty space). A plain click selects just that
- * item, or clears; adding keeps the rest and makes the item active; toggling adds or
- * removes it. Clicking empty space with a modifier leaves the selection alone.
+ * The selection after clicking the items `ids` (none: empty space). A plain click selects just those, or clears; adding
+ * keeps the rest and makes them the active end; toggling removes them when all are selected, else adds them. Clicking
+ * empty space with a modifier leaves the selection alone.
  */
-export const nextSelection = (current: Selection, id: string | null, mode: SelectMode): Selection => {
-  if (mode === "replace") return id === null ? [] : [id]
-  if (id === null) return current
-  const rest = current.filter((x) => x !== id)
-  return mode === "toggle" && rest.length < current.length ? rest : [...rest, id]
+export const nextSelection = (current: Selection, ids: ReadonlyArray<string>, mode: SelectMode): Selection => {
+  if (mode === "replace") return ids
+  if (ids.length === 0) return current
+  const clicked = new Set(ids)
+  const rest = current.filter((x) => !clicked.has(x))
+  return mode === "toggle" && rest.length === current.length - clicked.size ? rest : [...rest, ...ids]
 }
+
+/** Each key's place in `ids`, kept per array: a group's selection can be thousands of items. */
+const keyIndices = new WeakMap<ReadonlyArray<string>, ReadonlyMap<string, number>>()
+
+const keyIndicesOf = (ids: ReadonlyArray<string>): ReadonlyMap<string, number> => {
+  const known = keyIndices.get(ids)
+  if (known !== undefined) return known
+  const indices = new Map(ids.map((id, i) => [id, i] as const))
+  keyIndices.set(ids, indices)
+  return indices
+}
+
+/** An item's place in `ids`; -1 for a key that isn't there. */
+const indexOfKey = (ids: ReadonlyArray<string>, key: string): number => keyIndicesOf(ids).get(key) ?? -1
+
+/** The box around the items at `keys` where they show, which is ahead of the document during a continuous edit. */
+export const groupBoxOf = (
+  { catalogIndex, doc, preview }: Pick<EditorState, "catalogIndex" | "doc" | "preview">,
+  keys: ReadonlyArray<string>
+) =>
+  placedBoxOf(
+    keys.flatMap((key) => {
+      const item = doc.map.items[indexOfKey(doc.ids, key)]
+      return item === undefined ? [] : [{ item, transform: preview?.get(key) ?? editTransform(item) }]
+    }),
+    catalogIndex
+  )
 
 /** Document indices of the selected items, in selection order. */
 export const selectedIndices = (s: EditorState): Array<number> =>
-  s.selectedIds.map((id) => s.doc.ids.indexOf(id)).filter((i) => i >= 0)
+  s.selectedIds.map((id) => indexOfKey(s.doc.ids, id)).filter((i) => i >= 0)
+
+/** The names of the map's items and groups, by key and id, with their ordinals apart so they can be styled. */
+export const nodeNamesOf = (s: Pick<EditorState, "doc" | "catalogIndex">): ReadonlyMap<string, NumberedName> =>
+  new Map([
+    ...itemNames(s.doc.map, s.doc.ids, s.doc.structure.items, s.catalogIndex),
+    ...groupNames(s.doc.structure.tree)
+  ])
 
 /** The active (last selected) item's id, if any. */
 export const activeId = (s: EditorState): string | undefined => s.selectedIds.at(-1)
@@ -1073,13 +1421,13 @@ export const activeId = (s: EditorState): string | undefined => s.selectedIds.at
 export const shownLighting = (s: EditorState): Lighting => s.lightingPreview ?? lightingOf(s.doc.map.worldSettings)
 
 /** An item's pivot (Default when it has none, or isn't in the document). */
-export const pivotOf = (s: EditorState, id: string): Pivot => pivotAt(s.doc.map, s.doc.ids.indexOf(id))
+export const pivotOf = (s: EditorState, id: string): Pivot => pivotAt(s.doc.map, indexOfKey(s.doc.ids, id))
 
 /** An item's edit transform (see domain/editTransform.ts) as shown: the live preview, else the document. */
 export const shownTransform = (s: EditorState, id: string): UeTransform | undefined => {
   const preview = s.preview?.get(id)
   if (preview !== undefined) return preview
-  const item = s.doc.map.items[s.doc.ids.indexOf(id)]
+  const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
   return item === undefined ? undefined : editTransform(item)
 }
 
@@ -1089,7 +1437,7 @@ export const fitTransforms = (
   transforms: ReadonlyMap<string, UeTransform>
 ): ReadonlyMap<string, UeTransform> =>
   new Map([...transforms].map(([id, t]) => {
-    const item = s.doc.map.items[s.doc.ids.indexOf(id)]
+    const item = s.doc.map.items[indexOfKey(s.doc.ids, id)]
     return [id, item === undefined ? t : fitEditTransform(item, t, pivotOf(s, id).localPosition)] as const
   }))
 
@@ -1119,19 +1467,22 @@ export const useOpenProjectMap = (): { readonly map: ProjectMap; readonly state:
 export const useOpenMapLabel = (): string => useEditor((s) => tabLabelOf(s))
 
 /** Tab `tabId`'s name, whether it has unsaved edits (or was never saved) and its file (name and path), for its tab. */
-export const useTabSummary = (tabId: string) => {
-  const label = useEditor((s) => {
+export const useTabSummary = (tabId: string) =>
+  useEditor(useShallow((s) => {
     const tab = tabStateOf(s, tabId)
-    return tab === undefined ? "" : tabLabelOf(tab)
-  })
-  const unsaved = useEditor((s) => {
-    const tab = tabStateOf(s, tabId)
-    return tab !== undefined && (tab.dirty || tab.file === null)
-  })
-  const path = useEditor((s) => tabStateOf(s, tabId)?.file?.path ?? null)
-  const fileName = useEditor((s) => tabStateOf(s, tabId)?.file?.name ?? null)
-  return { label, unsaved, path, fileName }
-}
+    return {
+      label: tab === undefined ? "" : tabLabelOf(tab),
+      unsaved: tab !== undefined && (tab.dirty || tab.file === null),
+      path: tab?.file?.path ?? null,
+      // the name of a map's file, which the tab's menu acts on; a definition's is the Prefabs panel's
+      fileName: tab?.document.kind === "map" ? tab.file?.name ?? null : null,
+      prefabTier: tab?.document.kind === "prefab" ? tab.document.tier : null
+    }
+  }))
+
+/** The definition in the active tab, if that's what it holds: what Export and Play are off for. */
+export const useOpenPrefab = (): PrefabDocument | null =>
+  useEditor((s) => s.document.kind === "prefab" ? s.document : null)
 
 /** Whether the project map `fileName` is open in a tab with unsaved edits. */
 export const useHasUnsavedEdits = (fileName: string): boolean =>

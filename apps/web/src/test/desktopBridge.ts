@@ -10,6 +10,10 @@ import type {
   OpenedMapFile,
   PlaySessionEnded,
   PluginStatus,
+  PrefabBackup,
+  PrefabBackupRef,
+  PrefabInfo,
+  PrefabTier,
   ProjectInfo,
   ProjectMap,
   ProjectTarget,
@@ -17,6 +21,13 @@ import type {
   UnsavedChoice,
   UnsavedPrompt,
   UpdateState
+} from "@ballest/contracts"
+import {
+  isMapFileName,
+  prefabFileNameOf,
+  prefabNameOfFile,
+  prefabSummaryOf,
+  sidecarFileNameOf
 } from "@ballest/contracts"
 import { Option, Schema } from "effect"
 
@@ -50,6 +61,8 @@ export interface TestDisk {
    * the game's maps folder's (Export). Like main, nothing is kept when the bytes don't change.
    */
   readonly backups: Array<MapBackupFile>
+  /** What main kept of the prefabs it wrote over, renamed or deleted, oldest first. */
+  readonly prefabBackups: Array<PrefabBackup & { readonly text: string }>
   /** How many times the page asked main to check the exports (`checkExports`). */
   exportChecks: number
   /** What `notifications.json` holds. */
@@ -100,11 +113,23 @@ export interface TestDisk {
 }
 
 export const TEST_MAPS_FOLDER = "/game/UserSavedMaps"
+export const TEST_PREFABS_FOLDER = "/game/SaveGames/Prefabs"
 export const TEST_PROJECTS_FOLDER = "/home/me/Documents/Ballest Editor"
 export const TEST_PROJECT = `${TEST_PROJECTS_FOLDER}/My maps`
 
 /** Where a project map is: `<project>/maps/<file name>`. */
 export const projectFile = (fileName: string, project = TEST_PROJECT) => `${project}/maps/${fileName}`
+
+/** Where a project map's sidecar is. */
+export const sidecarFile = (fileName: string, project = TEST_PROJECT) =>
+  projectFile(sidecarFileNameOf(fileName), project)
+
+/** Where a project prefab is: `<project>/prefabs/<name>.json`. */
+export const projectPrefabFile = (name: string, project = TEST_PROJECT) =>
+  `${project}/prefabs/${prefabFileNameOf(name)}`
+
+/** Where a user prefab is: the game's own prefabs folder. */
+export const userPrefabFile = (name: string) => `${TEST_PREFABS_FOLDER}/${prefabFileNameOf(name)}`
 
 /** What an install folder must hold for `chooseGamePath` to take it, as main checks. */
 export const GAME_EXE = "Ballest/Binaries/Win64/Ballest-Win64-Shipping.exe"
@@ -156,6 +181,7 @@ export const makeTestDisk = (files: Record<string, string> = {}): TestDisk => ({
   playSessions: makeTestPush<PlaySessionEnded>(),
   links: new Map(),
   backups: [],
+  prefabBackups: [],
   exportChecks: 0,
   notifications: [],
   gameLink: { last: null, muted: [] },
@@ -257,7 +283,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
   const newProjectPath = (name: string) => `${TEST_PROJECTS_FOLDER}/${name.trim()}`
   /** Refuses `target` as main does; the folder it means otherwise. */
   const folderOf = (target: ProjectTarget) => {
-    const path = target._tag === "New" ? newProjectPath(target.name) : target.path
+    const path = target._tag === "New" ? target.folder ?? newProjectPath(target.name) : target.path
     const refusal = target._tag === "New" && info(path).exists ? `${path} already holds a project.` : refusalOf(path)
     return refusal === null ? Promise.resolve(path) : fail(refusal)
   }
@@ -278,7 +304,15 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     const old = disk.files.get(path)
     if (old === undefined || old === next) return
     const fileName = nameOf(path)
-    disk.backups.unshift({ place, id: `${disk.backups.length} ${fileName}`, fileName, at: TIME, text: old })
+    disk.backups.unshift({
+      place,
+      id: `${disk.backups.length} ${fileName}`,
+      fileName,
+      at: TIME,
+      text: old,
+      hash: testHash(old),
+      sidecar: disk.files.get(sidecarFile(fileName, current())) ?? null
+    })
   }
   const write = (fileName: string, text: string) => {
     const path = projectFile(fileName, current())
@@ -286,11 +320,39 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     disk.files.set(path, text)
     return Promise.resolve(mapOf(fileName))
   }
+  const sidecarOf = (fileName: string) => disk.files.get(sidecarFile(fileName, current())) ?? null
   const ask = (kind: TestDisk["dialogs"][number]["kind"]) => {
     disk.dialogs.push({ kind })
     return disk.answers.shift() ?? null
   }
   const exists = (fileName: string) => fail(`The project already has a map called ${fileName}.`)
+  const prefabFolder = (tier: PrefabTier) =>
+    tier === "user" ? TEST_PREFABS_FOLDER : disk.project.current === null ? null : `${disk.project.current}/prefabs`
+  const prefabPath = (tier: PrefabTier, name: string) => {
+    const folder = prefabFolder(tier)
+    return folder === null ? null : `${folder}/${prefabFileNameOf(name)}`
+  }
+  const prefabInfo = (tier: PrefabTier, name: string, path: string, text: string): PrefabInfo => ({
+    tier,
+    name,
+    path,
+    modifiedAt: TIME,
+    hash: testHash(text),
+    ...prefabSummaryOf(text)
+  })
+  const prefabText = (tier: PrefabTier, name: string) => {
+    const path = prefabPath(tier, name)
+    const text = path === null ? undefined : disk.files.get(path)
+    return path === null || text === undefined ? undefined : { path, text }
+  }
+  /** What is written over goes to the backups, like main. */
+  const keepPrefab = (tier: PrefabTier, name: string, path: string) => {
+    const text = disk.files.get(path)
+    const id = `${disk.prefabBackups.length} ${prefabFileNameOf(name)}`
+    if (text !== undefined) disk.prefabBackups.unshift({ tier, id, name, at: TIME, text })
+  }
+  const prefabBackupOf = ({ id, tier }: PrefabBackupRef) =>
+    disk.prefabBackups.find((backup) => backup.id === id && backup.tier === tier)
 
   const bridge: DesktopBridge = {
     versions: { electron: "test", chrome: "test", node: "test" },
@@ -311,7 +373,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       disk.project.windows.push(path)
     },
     switchProject: ({ path }) => select(path),
-    createProject: async ({ name }) => select(await folderOf({ _tag: "New", name })),
+    createProject: async (project) => select(await folderOf({ _tag: "New", ...project })),
     revealProject: ({ which }) => {
       const project = disk.project.current
       if (project === null || !info(project).exists) return Promise.resolve(false)
@@ -336,7 +398,9 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     listMaps: () => {
       const prefix = `${current()}/maps/`
       return Promise.resolve(
-        [...disk.files.keys()].filter((file) => file.startsWith(prefix)).map((file) => mapOf(nameOf(file)))
+        [...disk.files.keys()]
+          .filter((file) => file.startsWith(prefix) && isMapFileName(nameOf(file)))
+          .map((file) => mapOf(nameOf(file)))
       )
     },
     readMap: ({ fileName }) => {
@@ -344,9 +408,13 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       const text = disk.files.get(projectFile(fileName, current()))
       return text === undefined
         ? fail(`${projectFile(fileName, current())} doesn't exist any more.`)
-        : Promise.resolve({ ...mapOf(fileName), text })
+        : Promise.resolve({ ...mapOf(fileName), text, sidecar: sidecarOf(fileName) })
     },
-    createMap: ({ fileName, text }) => has(fileName) ? exists(fileName) : write(fileName, text),
+    createMap: ({ fileName, text }) => {
+      if (has(fileName)) return exists(fileName)
+      disk.files.delete(sidecarFile(fileName, current()))
+      return write(fileName, text)
+    },
     saveMap: ({ fileName, text }) => write(fileName, text),
     renameMap: ({ from, to, text }) => {
       if (disk.project.current === null) return fail(NO_PROJECT)
@@ -358,7 +426,62 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       const moved = links.get(from)
       links.delete(from)
       if (moved !== undefined) links.set(to, moved)
+      const sidecar = sidecarOf(from)
+      disk.files.delete(sidecarFile(from, current()))
+      if (sidecar !== null) disk.files.set(sidecarFile(to, current()), sidecar)
       return write(to, text)
+    },
+    writeSidecar: ({ fileName, text }) => {
+      disk.files.set(sidecarFile(fileName, current()), text)
+      return Promise.resolve()
+    },
+    listPrefabs: ({ tier }) => {
+      const folder = prefabFolder(tier)
+      const entries = [...disk.files].flatMap(([path, text]) => {
+        const name = folder !== null && path.startsWith(`${folder}/`)
+          ? prefabNameOfFile(path.slice(folder.length + 1))
+          : undefined
+        return name === undefined ? [] : [prefabInfo(tier, name, path, text)]
+      })
+      return Promise.resolve(entries.sort((a, b) => a.name.localeCompare(b.name)))
+    },
+    readPrefab: ({ name, tier }) => {
+      const file = prefabText(tier, name)
+      return file === undefined
+        ? fail(`${name} doesn't exist any more.`)
+        : Promise.resolve({ ...prefabInfo(tier, name, file.path, file.text), text: file.text })
+    },
+    writePrefab: ({ name, replace, text, tier }) => {
+      const path = prefabPath(tier, name)
+      if (path === null) return fail(NO_PROJECT)
+      if (!replace && disk.files.has(path)) return fail(`There is already a prefab called ${name}.`)
+      if (disk.files.get(path) !== text) keepPrefab(tier, name, path)
+      disk.files.set(path, text)
+      return Promise.resolve(prefabInfo(tier, name, path, text))
+    },
+    deletePrefab: ({ name, tier }) => {
+      const path = prefabPath(tier, name)
+      if (path !== null) {
+        keepPrefab(tier, name, path)
+        disk.files.delete(path)
+      }
+      return Promise.resolve()
+    },
+    renamePrefab: ({ from, tier, to }) => {
+      const file = prefabText(tier, from)
+      const next = prefabPath(tier, to)
+      if (file === undefined || next === null) return fail(`${from} doesn't exist any more.`)
+      if (disk.files.has(next)) return fail(`There is already a prefab called ${to}.`)
+      keepPrefab(tier, from, file.path)
+      disk.files.delete(file.path)
+      disk.files.set(next, file.text)
+      return Promise.resolve(prefabInfo(tier, to, next, file.text))
+    },
+    revealPrefabs: ({ tier }) => {
+      const folder = prefabFolder(tier)
+      if (folder === null) return Promise.resolve(false)
+      disk.external.push(folder)
+      return Promise.resolve(true)
     },
     pickImport: () => {
       const path = ask("import")
@@ -369,9 +492,11 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
     },
     importMap: async ({ source, fileName, text, replace }) => {
       if (disk.project.current === null) return fail(NO_PROJECT)
+      if (source === projectFile(fileName, current())) return { _tag: "Imported", map: mapOf(fileName) } as const
       if (has(fileName) && !replace) return { _tag: "Clash", fileName } as const
       const original = disk.files.get(source) ?? ""
       await write(fileName, text)
+      disk.files.delete(sidecarFile(fileName, current()))
       const origin = { path: source, hash: testHash(original), at: TIME }
       const fromGame = source === `${TEST_MAPS_FOLDER}/${fileName}`
       const links = linksOf(current())
@@ -437,12 +562,28 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       await write(fileName, text)
       const seen = { ...link.export, hash: testHash(text) }
       linksOf(current()).set(fileName, { ...link, export: seen, lastSeenHash: seen.hash })
-      return { ...mapOf(fileName), text }
+      return { ...mapOf(fileName), text, sidecar: sidecarOf(fileName) }
     },
-    listBackups: () => Promise.resolve(disk.backups.map(({ text: _, ...backup }) => backup)),
+    listBackups: () =>
+      Promise.resolve(disk.backups.map(({ hash: _hash, sidecar: _sidecar, text: _, ...backup }) => backup)),
     readBackup: ({ place, id }) => {
       const backup = disk.backups.find((b) => b.place === place && b.id === id)
       return backup === undefined ? fail(`${id} doesn't exist any more.`) : Promise.resolve(backup)
+    },
+    listPrefabBackups: () => Promise.resolve(disk.prefabBackups.map(({ text: _, ...backup }) => backup)),
+    describePrefabBackup: (ref) => {
+      const backup = prefabBackupOf(ref)
+      return backup === undefined
+        ? fail(`${ref.id} doesn't exist any more.`)
+        : Promise.resolve(prefabSummaryOf(backup.text))
+    },
+    restorePrefabBackup: (ref) => {
+      const backup = prefabBackupOf(ref)
+      const path = backup === undefined ? null : prefabPath(ref.tier, backup.name)
+      if (backup === undefined || path === null) return fail(`${ref.id} doesn't exist any more.`)
+      if (disk.files.get(path) !== backup.text) keepPrefab(ref.tier, backup.name, path)
+      disk.files.set(path, backup.text)
+      return Promise.resolve(prefabInfo(ref.tier, backup.name, path, backup.text))
     },
     setWindowTheme: () => Promise.resolve(),
     confirmUnsaved: (prompt) => {

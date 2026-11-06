@@ -15,19 +15,26 @@ import {
 } from "react"
 import * as THREE from "three"
 import { toTuple3, ueToThreeVector } from "../domain/coords"
+import { groupBoxTargets } from "../domain/groupSelection"
 import { isBound, mouseChordOf } from "../domain/Keybinds"
 import { WATER } from "../domain/level"
 import { gridColorsOf } from "../domain/Settings"
+import { placePrefab } from "./actions"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
+import { GroupBox } from "./groupBox"
 import { ItemObject } from "./ItemObject"
 import { advanceGameTime } from "./materials"
-import { SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
+import { OrthoGrid } from "./OrthoGrid"
+import { panePointer, perspectiveOnly } from "./paneCameras"
+import { drawEveryPane, PaneRenderer, useBeforePaneDraw } from "./PaneRenderer"
+import { droppedPrefab, isPrefabDrag } from "./prefabDrag"
+import { GROUP_BOX_COLORS, SCENE_COLORS, sceneBackgroundClass } from "./sceneColors"
 import { SceneLights } from "./SceneLights"
 import { sceneRegistry } from "./sceneRegistry"
 import { SelectionOutline } from "./selectionOutline"
 import { SKY_DOME_RADIUS } from "./sky"
-import { nextSelection, type SelectMode, useEditor } from "./store"
+import { groupBoxOf, type SelectMode, useEditor } from "./store"
 import { useDarkTheme } from "./theme"
 import { glbUrl, visualsOf } from "./visuals"
 import { waterTopMaterial, waterUnderMaterial } from "./water"
@@ -45,7 +52,7 @@ function MapItems() {
     sceneRegistry.itemsRoot = root.current
   }, [])
   return (
-    <group ref={root}>
+    <group ref={root} matrixAutoUpdate={false}>
       {(index !== null || !booting) &&
         doc.map.items.map((item, i) => {
           const id = doc.ids[i]
@@ -114,7 +121,7 @@ function StartingMapMeshes({ onSettled }: { readonly onSettled: () => void }) {
  * How a left click selects, from its chord: the add/toggle selection bindings, else a
  * plain click. Null when the chord drives the camera instead (Alt+LMB orbit).
  */
-const selectModeOf = (e: PointerEvent): SelectMode | null => {
+const selectModeOf = (e: MouseEvent): SelectMode | null => {
   if (e.button !== 0) return null
   const chord = mouseChordOf(e)
   const { keybinds } = useEditor.getState()
@@ -125,43 +132,50 @@ const selectModeOf = (e: PointerEvent): SelectMode | null => {
 
 /**
  * Left-click selection, with the add/toggle modifiers, via a manual raycast on click only
- * (cheap for maps with thousands of items).
+ * (cheap for maps with thousands of items). A click reaches the store's click level; a plain
+ * double-click on the same spot enters a group.
  */
 function ClickSelect() {
-  const camera = useThree((s) => s.camera)
   const gl = useThree((s) => s.gl)
   useEffect(() => {
     const el = gl.domElement
     const raycaster = new THREE.Raycaster()
-    let down: { x: number; y: number; mode: SelectMode } | null = null
+    let down: { x: number; y: number; mode: SelectMode; slot: number } | null = null
+    let clicked = false
+    const itemAt = (e: MouseEvent, slot?: number): string | null => {
+      const { ndc, pane } = panePointer(el, e, slot)
+      raycaster.setFromCamera(ndc, pane.camera)
+      const root = sceneRegistry.itemsRoot
+      return hitItemId(root === null ? [] : raycaster.intersectObject(root, true))
+    }
     const onDown = (e: PointerEvent) => {
       const mode = selectModeOf(e)
-      down = mode !== null && !sceneRegistry.gizmoActive() ? { x: e.clientX, y: e.clientY, mode } : null
+      down = mode !== null && !sceneRegistry.gizmoActive()
+        ? { x: e.clientX, y: e.clientY, mode, slot: panePointer(el, e).slot }
+        : null
+      clicked = false
     }
     const onUp = (e: PointerEvent) => {
       if (down === null || e.button !== 0) return
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y)
-      const { mode } = down
+      const { mode, slot } = down
       down = null
       if (moved > CLICK_SLOP_PX || sceneRegistry.gizmoActive()) return
-      const rect = el.getBoundingClientRect()
-      const ndc = new THREE.Vector2(
-        ((e.clientX - rect.left) / rect.width) * 2 - 1,
-        -((e.clientY - rect.top) / rect.height) * 2 + 1
-      )
-      raycaster.setFromCamera(ndc, camera)
-      const root = sceneRegistry.itemsRoot
-      const hits = root === null ? [] : raycaster.intersectObject(root, true)
-      const { selectedIds, select } = useEditor.getState()
-      select(nextSelection(selectedIds, hitItemId(hits), mode))
+      clicked = mode === "replace"
+      useEditor.getState().clickItem(itemAt(e, slot), mode)
     }
-    el.addEventListener("pointerdown", onDown)
-    el.addEventListener("pointerup", onUp)
-    return () => {
-      el.removeEventListener("pointerdown", onDown)
-      el.removeEventListener("pointerup", onUp)
+    const onDoubleClick = (e: MouseEvent) => {
+      if (!clicked) return
+      const key = itemAt(e)
+      if (key !== null) useEditor.getState().doubleClickItem(key)
     }
-  }, [camera, gl])
+    const listening = new AbortController()
+    const { signal } = listening
+    el.addEventListener("pointerdown", onDown, { signal })
+    el.addEventListener("pointerup", onUp, { signal })
+    el.addEventListener("dblclick", onDoubleClick, { signal })
+    return () => listening.abort()
+  }, [gl])
   return null
 }
 
@@ -203,7 +217,7 @@ function SmoothResize() {
     // Whoever changes the size (us or R3F's own measuring), redraw at once: a resized
     // canvas is blank until the next render.
     const unsubscribe = store.subscribe((state, prev) => {
-      if (state.size !== prev.size) state.gl.render(state.scene, state.camera)
+      if (state.size !== prev.size) drawEveryPane(state)
     })
     return () => {
       observer.disconnect()
@@ -213,23 +227,11 @@ function SmoothResize() {
   return null
 }
 
-/**
- * Clear colour follows the theme: dark slate, or a light grey in light mode. The container
- * behind the canvas has the same colour (sceneBackgroundClass).
- */
+/** The clear colour follows the theme, as does the container behind the canvas (sceneBackgroundClass). */
 function ViewportBackground() {
   const gl = useThree((s) => s.gl)
-  const theme = useEditor((s) => s.settings.appearance.theme)
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)")
-    const apply = () => {
-      const dark = theme === "dark" || (theme === "system" && media.matches)
-      gl.setClearColor(dark ? SCENE_COLORS.dark : SCENE_COLORS.light)
-    }
-    apply()
-    media.addEventListener("change", apply)
-    return () => media.removeEventListener("change", apply)
-  }, [gl, theme])
+  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
+  useEffect(() => gl.setClearColor(dark ? SCENE_COLORS.dark : SCENE_COLORS.light), [gl, dark])
   return null
 }
 
@@ -242,9 +244,20 @@ function ViewportGrid() {
   const floorHeight = useEditor((s) => s.floorHeight)
   const dark = useDarkTheme(appearance.theme)
   const colors = gridColorsOf(appearance, dark)
+  const grid = useRef<THREE.Mesh>(null)
+  // drei fades the grid from R3F's camera, and each pane has its own.
+  useBeforePaneDraw(({ perspective: { position } }) => {
+    const material = grid.current?.material
+    if (!(material instanceof THREE.ShaderMaterial)) return
+    const fadeFrom: unknown = material.uniforms["worldCamProjPosition"]?.value
+    if (fadeFrom instanceof THREE.Vector3) fadeFrom.set(position.x, floorHeight, position.z)
+    material.uniformsNeedUpdate = true
+  })
   if (!appearance.gridVisible) return null
   return (
     <Grid
+      ref={grid}
+      layers={perspectiveOnly}
       position={[0, floorHeight, 0]}
       side={THREE.DoubleSide} // drei's default (BackSide) hides it from below
       infiniteGrid
@@ -302,11 +315,33 @@ function SelectedOutlines() {
   return selectedIds.map((id) => <SelectedOutline key={id} id={id} active={id === active} />)
 }
 
+/** A whole group's box (see groupBox.ts), following its items. */
+function GroupBoxView({ keys, entered }: { readonly keys: ReadonlyArray<string>; readonly entered: boolean }) {
+  const box = useMemo(() => new GroupBox(), [])
+  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
+  useEffect(() => box.setLook(dark ? GROUP_BOX_COLORS.dark : GROUP_BOX_COLORS.light, entered), [box, dark, entered])
+  useEffect(() => () => box.dispose(), [box])
+  const doc = useEditor((s) => s.doc)
+  const preview = useEditor((s) => s.preview)
+  const catalogIndex = useEditor((s) => s.catalogIndex)
+  const bounds = useMemo(() => groupBoxOf({ doc, preview, catalogIndex }, keys), [doc, preview, catalogIndex, keys])
+  useFrame(({ camera, size }) => box.update(bounds, camera, size.height))
+  return <primitive object={box} />
+}
+
+function GroupBoxes() {
+  const tree = useEditor((s) => s.doc.structure.tree)
+  const selectedIds = useEditor((s) => s.selectedIds)
+  const enteredGroupId = useEditor((s) => s.enteredGroupId)
+  const targets = useMemo(() => groupBoxTargets(tree, selectedIds, enteredGroupId), [tree, selectedIds, enteredGroupId])
+  return targets.map(({ id, keys, entered }) => <GroupBoxView key={id} keys={keys} entered={entered} />)
+}
+
 function Overlay() {
   const missing = useEditor((s) => s.missingGlbs)
   const speed = useEditor((s) => s.cameraSpeed)
   return (
-    <div className="pointer-events-none absolute inset-2 flex flex-col items-start gap-1.5">
+    <div className="pointer-events-none absolute inset-x-2 top-10 bottom-2 flex flex-col items-start gap-1.5">
       {missing.size > 0 && (
         <Badge variant="destructive" className="pointer-events-auto" title={[...missing].join("\n")}>
           {missing.size} mesh file{missing.size === 1 ? "" : "s"} failed to load
@@ -318,9 +353,7 @@ function Overlay() {
 }
 
 /** `controls` (tool bar, view controls) floats over the scene; it is disabled until the first scene shows. */
-export function Viewport(
-  { controls: Controls }: { readonly controls?: ComponentType<{ readonly disabled?: boolean }> }
-) {
+export function Viewport({ controls: Controls }: { readonly controls: ComponentType<{ readonly disabled: boolean }> }) {
   const [revealed, setRevealed] = useState(false)
   const reveal = useCallback(() => setRevealed(true), [])
   return (
@@ -331,28 +364,43 @@ export function Viewport(
       tabIndex={-1}
       data-viewport
       onPointerDown={(e) => e.currentTarget.focus({ preventScroll: true })}
+      onDragOver={(e) => {
+        if (!isPrefabDrag(e.dataTransfer)) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = "copy"
+      }}
+      onDrop={(e) => {
+        const prefab = droppedPrefab(e.dataTransfer)
+        if (prefab === undefined) return
+        e.preventDefault()
+        e.currentTarget.focus({ preventScroll: true })
+        void placePrefab(prefab)
+      }}
     >
       <Canvas
         // Hidden until the first scene is ready, then a quick fade up from translucent.
         className={revealed ? "animate-in fade-in-30 duration-300 ease-out" : "opacity-0"}
-        camera={{ fov: 60, near: 5, far: 2_000_000, position: [1500, 1200, 1500] }}
-        gl={{ antialias: true, logarithmicDepthBuffer: true }}
+        // A pane that isn't drawn this frame keeps its pixels (see PaneRenderer).
+        gl={{ antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: true }}
       >
         <ViewportBackground />
         <SmoothResize />
         <GameClock />
         <SceneLights />
         <ViewportGrid />
+        <OrthoGrid />
         <Water />
         <MapItems />
         <SelectedOutlines />
+        <GroupBoxes />
         <GizmoController />
         <ClickSelect />
         <FlyCamera />
+        <PaneRenderer />
         {!revealed && <InitialMeshes onSettled={reveal} />}
       </Canvas>
       <Overlay />
-      {Controls && <Controls disabled={!revealed} />}
+      <Controls disabled={!revealed} />
     </div>
   )
 }

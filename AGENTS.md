@@ -24,7 +24,15 @@ Use one name per thing, in code comments and docs alike.
 | game driver        | `tools/driver`, the MCP server that runs sandboxed copies of the game.                                                                                     |
 | in-game editor     | The game's own map editor (not "track editor" or "level editor").                                                                                          |
 | game's maps folder | `UserSavedMaps`.                                                                                                                                           |
+| dock, centre group | The dockview shell between the top bar and status bar; the centre group is its group of map tabs and the viewport.                                         |
+| popped-out panel   | A dock panel in a window of its own. Not "floating": that's dockview's in-window group, which is off.                                                      |
+| pane, active pane  | One camera's view inside the viewport; the active pane is the last hovered or clicked, what the fly keys and Frame all act on. Not a dock panel.           |
 | piece, item        | A piece is a kind of thing in the catalog; an item is one placed in a map.                                                                                 |
+| definition         | A prefab's file. A prefab in a tab is that definition, open.                                                                                               |
+| instance           | A placed prefab: a group with a `prefab` link in the sidecar.                                                                                              |
+| user, project tier | Where prefabs live: the game's own prefabs folder, and `<project>/prefabs/`.                                                                               |
+| sidecar            | `maps/<file name>.editor.json`, what a map holds that the game's format can't.                                                                             |
+| stable key         | An item's one identity in the editor: `Doc.ids` in the store, the keys in the sidecar.                                                                     |
 
 ## Layout
 

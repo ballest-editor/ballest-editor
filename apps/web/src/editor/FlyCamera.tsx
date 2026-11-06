@@ -1,7 +1,7 @@
 import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useRef } from "react"
 import * as THREE from "three"
-import { threeToUeVector, ueToThreeVector } from "../domain/coords"
+import { threeToUeVector } from "../domain/coords"
 import { flyingActions, formsChord, type MovementAction } from "../domain/flyKeys"
 import {
   type Bindings,
@@ -14,29 +14,28 @@ import {
   mouseChordOf,
   wheelChordOf
 } from "../domain/Keybinds"
+import { wheelZoomFactor } from "../domain/orthoView"
 import { placeDistanceFor, placementPoint } from "../domain/placement"
-import { editorVerticalFov } from "../domain/Settings"
+import { isEditorKeyEvent } from "./keyTargets"
+import {
+  activePaneCamera,
+  FOCUS_SPAN,
+  forgetClosedTabs,
+  mapBox,
+  type PaneCamera,
+  paneCamerasOf,
+  panePointer
+} from "./paneCameras"
 import { sceneRegistry } from "./sceneRegistry"
-import { isModalOpen, useEditor } from "./store"
+import { useEditor } from "./store"
 
 const FAST_MULTIPLIER = 4
 const LOOK_SENSITIVITY = 0.0025 // radians per pixel at sensitivity 1
 const KEY_LOOK_SPEED = 1.6 // radians per second for the arrow-key look actions
-const ORBIT_DISTANCE = 1500 // orbit pivot ahead of the camera when the old one is behind it
+const ORTHO_KEY_ZOOM = 1.5 // e-foldings per second for the forward and reverse keys in an orthographic pane
 const LOCK_SETTLE_MS = 50 // moves dropped after a pointer lock is asked for, taken or lost
-
-export const isTypingTarget = (target: EventTarget | null): boolean =>
-  target instanceof HTMLElement &&
-  (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
-
-/**
- * Keyboard events that belong to a text field, an open dialog or a menu (the menu bar's
- * arrow keys, Escape and type-ahead) never drive the editor.
- */
-export const isEditorKeyEvent = (e: KeyboardEvent): boolean =>
-  !isTypingTarget(e.target) &&
-  !isModalOpen(useEditor.getState()) &&
-  !(e.target instanceof Element && e.target.closest("[role=dialog], [role=menu], [role=menubar]") !== null)
+const CHORD_MODIFIERS = ["ControlLeft", "ControlRight", "MetaLeft", "MetaRight", "AltLeft", "AltRight"]
+const clampPitch = (pitch: number) => THREE.MathUtils.clamp(pitch, -Math.PI / 2 + 0.001, Math.PI / 2 - 0.001)
 
 type DragMode = "look" | "orbit" | "pan"
 
@@ -50,31 +49,35 @@ const flyingNow = (keybinds: Keybinds, keys: HeldKeys, looking: boolean, now: nu
   )
 
 /**
- * Free-fly camera: hold the look button and drag to look, movement keys to fly, orbit and
- * pan drags, and the wheel (camera speed by default, dolly when the wheel is unbound).
- * Every binding comes from the keybind store.
+ * Free-fly camera for the panes (docs/DESKTOP.md § View panes): drags and the wheel drive the pane under the pointer, the
+ * keys the active pane, every binding from the keybind store. The wheel is camera speed by default, dolly when unbound.
  */
 export function FlyCamera() {
-  const camera = useThree((s) => s.camera)
   const gl = useThree((s) => s.gl)
   const keybinds = useEditor((s) => s.keybinds)
   const cameraSettings = useEditor((s) => s.settings.camera)
-  const cameraPresets = useEditor((s) => s.keybindDefaults.cameraPresets)
   const focusRequest = useEditor((s) => s.focusRequest)
 
   const pressed = useRef(new HeldKeys())
   const drag = useRef<DragMode | null>(null)
-  const target = useRef(new THREE.Vector3())
+  /** The pane a drag started in, which it stays with. */
+  const dragPane = useRef<PaneCamera | null>(null)
   const euler = useRef(new THREE.Euler(0, 0, 0, "YXZ"))
 
-  // Placement point: on the screen-centre ray, at the floor or a cap that fits the piece.
   useEffect(() => {
-    sceneRegistry.camera = camera
+    sceneRegistry.toggledProjection = () => {
+      const pane = activePaneCamera()
+      return pane.view === undefined ? pane.nearestView() : "perspective"
+    }
+    // Placement point: an orthographic pane's centre; else on the screen-centre ray, at the floor or a cap that fits the piece.
     sceneRegistry.placementPoint = (footprint) => {
       const { floorHeight, settings } = useEditor.getState()
-      const vertical = camera instanceof THREE.PerspectiveCamera ? THREE.MathUtils.degToRad(camera.fov) : Math.PI / 3
-      const aspect = camera instanceof THREE.PerspectiveCamera ? camera.aspect : 1
-      const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * aspect)
+      const pane = activePaneCamera()
+      const centre = pane.orthographicPlacement(floorHeight)
+      if (centre !== undefined) return centre
+      const camera = pane.perspective
+      const vertical = THREE.MathUtils.degToRad(camera.fov)
+      const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * camera.aspect)
       return placementPoint(
         threeToUeVector(camera.position),
         threeToUeVector(camera.getWorldDirection(new THREE.Vector3())),
@@ -82,7 +85,14 @@ export function FlyCamera() {
         placeDistanceFor(footprint, Math.min(vertical, horizontal), settings.editor.placeDistance)
       )
     }
-  }, [camera])
+    // What a prefab spawns in front of. An orthographic pane has no distance to speak of, so it looks from the view's centre.
+    sceneRegistry.viewRay = () => {
+      const pane = activePaneCamera()
+      const direction = threeToUeVector(pane.camera.getWorldDirection(new THREE.Vector3()))
+      const centre = pane.orthographicPlacement(useEditor.getState().floorHeight)
+      return { origin: centre ?? threeToUeVector(pane.perspective.position), direction }
+    }
+  }, [])
 
   useEffect(() => {
     const el = gl.domElement
@@ -101,8 +111,6 @@ export function FlyCamera() {
         pressed.current.press(e.code, performance.now(), formsChord(keybinds, chordOf(e)))
       }
     }
-    const onKeyUp = (e: KeyboardEvent) => pressed.current.release(e.code)
-    const onBlur = () => pressed.current.clear()
 
     // Pointer lock (the "lock pointer" setting) hides the cursor and keeps it in place while
     // dragging, so a long look never hits the edge of the screen. Locking releases the pointer
@@ -140,20 +148,18 @@ export function FlyCamera() {
     }
 
     const onPointerDown = (e: PointerEvent) => {
+      const { pane, slot } = panePointer(el, e)
+      useEditor.getState().setActivePane(slot)
       // No gizmo check: the gizmo stops the left presses it takes, other buttons fall through.
       const chord = mouseChordOf(e)
       // Ctrl+click and the like: the held modifier is the click's, not "down".
       if (isBoundChord(keybinds, chord)) pressed.current.suppressModifiers()
       const mode = dragModes.find(([bindings]) => bindings.includes(chord))?.[1]
       if (mode === undefined) return
-      drag.current = mode
-      if (mode === "orbit") {
-        // keep the pivot if it's in front of us, otherwise orbit around a point ahead
-        const forward = camera.getWorldDirection(new THREE.Vector3())
-        if (target.current.clone().sub(camera.position).dot(forward) <= 0) {
-          target.current.copy(camera.position).addScaledVector(forward, ORBIT_DISTANCE)
-        }
-      }
+      drag.current = pane.view === undefined ? mode : "pan"
+      dragPane.current = pane
+      const camera = pane.perspective
+      if (drag.current === "orbit") pane.keepPivotAhead()
       dragPointer = e.pointerId
       el.setPointerCapture(e.pointerId)
       if (wantsLock()) lock()
@@ -161,92 +167,86 @@ export function FlyCamera() {
       e.preventDefault()
     }
     const onPointerMove = (e: PointerEvent) => {
-      if (drag.current === null) return
+      const pane = dragPane.current
+      if (drag.current === null || pane === null) {
+        if (e.buttons === 0) useEditor.getState().setActivePane(panePointer(el, e).slot)
+        return
+      }
       if (performance.now() < settleUntil) return
+      if (pane.view !== undefined) {
+        // the point under the pointer stays under it
+        pane.slide(-e.movementX * pane.cmPerPixel, e.movementY * pane.cmPerPixel)
+        return
+      }
+      const camera = pane.perspective
+      const { target } = pane
       if (drag.current === "pan") {
-        const scale = Math.max(1, camera.position.distanceTo(target.current) * 0.0015)
+        const scale = Math.max(1, camera.position.distanceTo(target) * 0.0015)
         const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion)
         const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion)
         const step = right.multiplyScalar(-e.movementX * scale).add(up.multiplyScalar(e.movementY * scale))
         camera.position.add(step)
-        target.current.add(step)
+        target.add(step)
         return
       }
       const eul = euler.current
       const { lookSensitivity, invertLookX, invertLookY } = useEditor.getState().settings.camera
       const k = LOOK_SENSITIVITY * lookSensitivity
       eul.y -= e.movementX * k * (invertLookX ? -1 : 1)
-      eul.x = THREE.MathUtils.clamp(
-        eul.x - e.movementY * k * (invertLookY ? -1 : 1),
-        -Math.PI / 2 + 0.001,
-        Math.PI / 2 - 0.001
-      )
+      eul.x = clampPitch(eul.x - e.movementY * k * (invertLookY ? -1 : 1))
       eul.z = 0
+      const distance = camera.position.distanceTo(target)
+      camera.quaternion.setFromEuler(eul)
       if (drag.current === "orbit") {
-        const distance = camera.position.distanceTo(target.current)
-        camera.quaternion.setFromEuler(eul)
         const back = new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion)
-        camera.position.copy(target.current).addScaledVector(back, distance)
-      } else {
-        camera.quaternion.setFromEuler(eul)
+        camera.position.copy(target).addScaledVector(back, distance)
       }
     }
     const onPointerUp = (e: PointerEvent) => {
       if (drag.current === null) return
       drag.current = null
+      dragPane.current = null
       dragPointer = null
       if (locked()) document.exitPointerLock()
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
     }
-    const onContextMenu = (e: Event) => e.preventDefault()
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
+      const { pane, px } = panePointer(el, e)
+      if (pane.view !== undefined) {
+        pane.zoomOrthographic(wheelZoomFactor(e.deltaY), px)
+        return
+      }
       const chord = wheelChordOf(e)
-      const state = useEditor.getState()
-      if (isBound(keybinds, "speedFaster", chord)) {
-        state.changeSpeed(1)
+      const speedStep = isBound(keybinds, "speedFaster", chord) ? 1 : isBound(keybinds, "speedSlower", chord) ? -1 : 0
+      if (speedStep !== 0) {
+        useEditor.getState().changeSpeed(speedStep)
         return
       }
-      if (isBound(keybinds, "speedSlower", chord)) {
-        state.changeSpeed(-1)
-        return
-      }
+      const camera = pane.perspective
       const forward = camera.getWorldDirection(new THREE.Vector3())
-      const step = -Math.sign(e.deltaY) * Math.max(50, camera.position.distanceTo(target.current) * 0.1)
+      const step = -Math.sign(e.deltaY) * Math.max(50, camera.position.distanceTo(pane.target) * 0.1)
       camera.position.addScaledVector(forward, step)
     }
 
-    window.addEventListener("keydown", onKeyDown)
-    window.addEventListener("keyup", onKeyUp)
-    window.addEventListener("blur", onBlur)
-    el.addEventListener("pointerdown", onPointerDown)
-    el.addEventListener("pointermove", onPointerMove)
-    el.addEventListener("pointerup", onPointerUp)
-    el.addEventListener("contextmenu", onContextMenu)
-    el.addEventListener("wheel", onWheel, { passive: false })
-    document.addEventListener("pointerlockchange", onLockChange)
+    const listening = new AbortController()
+    const { signal } = listening
+    window.addEventListener("keydown", onKeyDown, { signal })
+    window.addEventListener("keyup", (e) => pressed.current.release(e.code), { signal })
+    window.addEventListener("blur", () => pressed.current.clear(), { signal })
+    el.addEventListener("pointerdown", onPointerDown, { signal })
+    el.addEventListener("pointermove", onPointerMove, { signal })
+    el.addEventListener("pointerup", onPointerUp, { signal })
+    el.addEventListener("contextmenu", (e) => e.preventDefault(), { signal })
+    el.addEventListener("wheel", onWheel, { passive: false, signal })
+    document.addEventListener("pointerlockchange", onLockChange, { signal })
     return () => {
-      window.removeEventListener("keydown", onKeyDown)
-      window.removeEventListener("keyup", onKeyUp)
-      window.removeEventListener("blur", onBlur)
-      el.removeEventListener("pointerdown", onPointerDown)
-      el.removeEventListener("pointermove", onPointerMove)
-      el.removeEventListener("pointerup", onPointerUp)
-      el.removeEventListener("contextmenu", onContextMenu)
-      el.removeEventListener("wheel", onWheel)
-      document.removeEventListener("pointerlockchange", onLockChange)
+      listening.abort()
       if (locked()) document.exitPointerLock()
     }
-  }, [camera, gl, keybinds])
+  }, [gl, keybinds])
 
-  // Field of view: constant vertical FOV (see editorVerticalFov), independent of viewport size.
-  useEffect(() => {
-    if (!(camera instanceof THREE.PerspectiveCamera)) return
-    camera.fov = editorVerticalFov(cameraSettings, cameraPresets)
-    camera.updateProjectionMatrix()
-  }, [camera, cameraSettings, cameraPresets])
-
-  // Focus selection
+  // Focus selection, in the active pane
   useEffect(() => {
     if (focusRequest === 0) return
     const box = new THREE.Box3()
@@ -254,54 +254,19 @@ export function FlyCamera() {
       const object = sceneRegistry.objects.get(id)
       if (object !== undefined) box.expandByObject(object)
     }
-    if (box.isEmpty()) return
-    const sphere = box.getBoundingSphere(new THREE.Sphere())
-    const forward = camera.getWorldDirection(new THREE.Vector3())
-    target.current.copy(sphere.center)
-    camera.position.copy(sphere.center).addScaledVector(forward, -Math.max(sphere.radius * 2.5, 300))
-  }, [focusRequest, camera])
+    if (!box.isEmpty()) activePaneCamera().frame(box, FOCUS_SPAN)
+  }, [focusRequest])
 
-  // Frame the whole map on load and on request. Uses item translations so it works before meshes load. Each tab keeps
-  // its view: leaving a tab remembers it, coming back restores it (a tab not seen yet is framed).
-  useEffect(() => {
-    const views = new Map<string, { position: THREE.Vector3; quaternion: THREE.Quaternion; target: THREE.Vector3 }>()
-    const frameAll = () => {
-      const { items } = useEditor.getState().doc.map
-      const box = new THREE.Box3()
-      for (const item of items) {
-        const p = ueToThreeVector(item.itemTransform.translation)
-        box.expandByPoint(new THREE.Vector3(p.x, p.y, p.z))
+  // Frame all acts on the active pane; a map put into the tab frames in all of them. Each tab keeps its panes' views,
+  // and a tab not seen yet gets new ones, framed as they show.
+  useEffect(() =>
+    useEditor.subscribe((s, prev) => {
+      if (s.tabIds !== prev.tabIds) forgetClosedTabs(s.tabIds)
+      if (s.frameAllRequest !== prev.frameAllRequest) activePaneCamera().frameMap(mapBox())
+      if (s.mapShownRequest !== prev.mapShownRequest) {
+        for (const pane of paneCamerasOf(s.tabId)) pane.needsFraming = true
       }
-      if (box.isEmpty()) {
-        const floor = useEditor.getState().floorHeight
-        box.set(new THREE.Vector3(-500, floor, -500), new THREE.Vector3(500, floor, 500))
-      }
-      const sphere = box.getBoundingSphere(new THREE.Sphere())
-      const radius = Math.max(sphere.radius, 1000)
-      target.current.copy(sphere.center)
-      camera.position.copy(sphere.center).add(new THREE.Vector3(-1, 0.8, 1).normalize().multiplyScalar(radius * 1.6))
-      camera.lookAt(sphere.center)
-    }
-    frameAll()
-    return useEditor.subscribe((s, prev) => {
-      if (s.tabId !== prev.tabId) {
-        views.set(prev.tabId, {
-          position: camera.position.clone(),
-          quaternion: camera.quaternion.clone(),
-          target: target.current.clone()
-        })
-        for (const id of views.keys()) if (!s.tabIds.includes(id)) views.delete(id)
-        const view = views.get(s.tabId)
-        if (view === undefined) {
-          frameAll()
-          return
-        }
-        camera.position.copy(view.position)
-        camera.quaternion.copy(view.quaternion)
-        target.current.copy(view.target)
-      } else if (s.frameAllRequest !== prev.frameAllRequest) frameAll()
-    })
-  }, [camera])
+    }), [])
 
   useFrame((_, delta) => {
     const keys = pressed.current
@@ -312,15 +277,17 @@ export function FlyCamera() {
     const held = (bindings: Bindings) =>
       bindings.some((binding) => keys.holds(binding, now) && (looking || !isOneShotChord(keybinds, binding)))
     const dt = Math.min(delta, 0.1)
+    const pane = activePaneCamera()
+    const camera = pane.perspective
 
-    // Arrow-key look (the game's "look right/left/up/down").
+    // Arrow-key look (the game's "look right/left/up/down"); an orthographic pane has only the one way to look.
     const yaw = (held(keybinds.lookLeft) ? 1 : 0) - (held(keybinds.lookRight) ? 1 : 0)
     const pitch = (held(keybinds.lookUp) ? 1 : 0) - (held(keybinds.lookDown) ? 1 : 0)
-    if ((yaw !== 0 || pitch !== 0) && drag.current === null) {
+    if ((yaw !== 0 || pitch !== 0) && drag.current === null && pane.view === undefined) {
       const eul = euler.current.setFromQuaternion(camera.quaternion, "YXZ")
       const rate = KEY_LOOK_SPEED * cameraSettings.lookSensitivity * dt
       eul.y += yaw * rate
-      eul.x = THREE.MathUtils.clamp(eul.x + pitch * rate, -Math.PI / 2 + 0.001, Math.PI / 2 - 0.001)
+      eul.x = clampPitch(eul.x + pitch * rate)
       eul.z = 0
       camera.quaternion.setFromEuler(eul)
     }
@@ -335,16 +302,20 @@ export function FlyCamera() {
     )
     if (move.lengthSq() === 0) return
     // Keys held together with Ctrl/Alt are chords (Ctrl+S...), not movement.
-    const chordModifier = keys.has("ControlLeft") || keys.has("ControlRight") || keys.has("MetaLeft") ||
-      keys.has("MetaRight") ||
-      keys.has("AltLeft") || keys.has("AltRight")
-    if (chordModifier && move.y === 0) return
+    if (CHORD_MODIFIERS.some((code) => keys.has(code)) && move.y === 0) return
     const { cameraSpeed } = useEditor.getState()
     const speed = cameraSettings.flySpeed * cameraSpeed * (held(keybinds.fastMove) ? FAST_MULTIPLIER : 1) * dt
+    if (pane.view !== undefined) {
+      pane.slide(move.x * speed, move.y * speed)
+      if (move.z !== 0) {
+        pane.zoomOrthographic(Math.exp(move.z * ORTHO_KEY_ZOOM * dt), { x: pane.width / 2, y: pane.height / 2 })
+      }
+      return
+    }
     const horizontal = new THREE.Vector3(move.x, 0, move.z).applyQuaternion(camera.quaternion)
     const step = horizontal.add(new THREE.Vector3(0, move.y, 0)).normalize().multiplyScalar(speed)
     camera.position.add(step)
-    target.current.add(step)
+    pane.target.add(step)
   })
 
   return null

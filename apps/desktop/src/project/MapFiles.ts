@@ -11,14 +11,15 @@ import {
   type OpenedMapFile,
   type ProjectMap,
   type ProjectMapFile,
-  type ProjectMaps
+  type ProjectMaps,
+  sidecarFileNameOf
 } from "@ballest/contracts"
 import { Context, DateTime, Effect, FileSystem, Option, Path, Schema } from "effect"
 import { GamePaths } from "../game/GamePaths"
 import { type Backup, type BackupError, Backups, parseBackupId } from "./Backups"
 import { isSamePath, MAX_MAP_BYTES, sha256, writeAtomic } from "./files"
 import { emptyLink, type MapLinkError, MapLinks } from "./MapLinks"
-import { backupsFolderIn, mapsFolderIn, type ProjectError, projectError, Projects } from "./Projects"
+import { backupsFolderIn, mapsFolderIn, type ProjectError, projectError, Projects, readError } from "./Projects"
 
 /** Only the field Export looks at in a map file; everything else is ignored. */
 export const PublishedId = Schema.fromJsonString(Schema.Struct({
@@ -44,7 +45,8 @@ type MapFilesEffect<A> = Effect.Effect<A, ProjectError | MapLinkError | BackupEr
  * The maps in the project in use (docs/PROJECTS.md § The files): its `maps/` folder, the files picked in the Import
  * dialog (read only), and the backups, the project's and the exports' (`<userData>/backups/`). Maps are named by file
  * name, never by path. Every write over a map goes through `Backups.overwrite`. What a map's bytes say is cached by
- * the file's time, size and inode.
+ * the file's time, size and inode. A map's sidecar is the page's text to main: it is kept beside the map, goes where the
+ * map goes, and is backed up the way the map is.
  */
 export class MapFiles extends Context.Service<MapFiles, {
   readonly list: Effect.Effect<ProjectMaps, ProjectError>
@@ -53,8 +55,12 @@ export class MapFiles extends Context.Service<MapFiles, {
   readonly create: (fileName: string, text: string) => MapFilesEffect<ProjectMap>
   /** Writes over a map (or writes it, if it has gone); the old file goes to the project's backups. */
   readonly save: (fileName: string, text: string) => MapFilesEffect<ProjectMap>
-  /** Writes `to`, moves `from` to the backups and its link to `to`. Fails when `to` exists. */
+  /** Writes `to`, moves `from` to the backups and its link and sidecar to `to`. Fails when `to` exists. */
   readonly rename: (from: string, to: string, text: string) => MapFilesEffect<ProjectMap>
+  /** Writes over a map's sidecar (or writes it); the old one goes to the project's backups. */
+  readonly writeSidecar: (fileName: string, text: string) => MapFilesEffect<void>
+  /** The text of a map's sidecar in `project`; null when it has none, or that can't be read (it is logged). */
+  readonly sidecarOf: (project: string, fileName: string) => Effect.Effect<string | null, ProjectError>
   /** Reads a file the user picked in the Import dialog; it may be imported from now on. */
   readonly pick: (file: string) => Effect.Effect<OpenedMapFile, ProjectError>
   readonly importMap: (payload: ImportMapPayload) => MapFilesEffect<ImportMapResult>
@@ -147,19 +153,36 @@ export class MapFiles extends Context.Service<MapFiles, {
       fs.stat(file).pipe(
         Effect.filterOrFail((stat) => Number(stat.size) <= MAX_MAP_BYTES, () => projectError("tooLarge", file)()),
         Effect.andThen(read),
-        Effect.catchTag(
-          "PlatformError",
-          (cause) => Effect.fail(projectError(cause.reason._tag === "NotFound" ? "notFound" : "read", file)(cause))
-        )
+        Effect.catchTag("PlatformError", (cause) => Effect.fail(readError(file)(cause)))
       )
 
     const readBytes = (file: string) => readMapFile(file, fs.readFile(file))
     const readText = (file: string) => readMapFile(file, fs.readFileString(file))
 
+    const sidecarFileIn = (project: string, fileName: string) =>
+      Effect.map(fileOf(project, fileName), (file) => path.join(path.dirname(file), sidecarFileNameOf(fileName)))
+
+    /** What a sidecar holds; a file that can't be read costs only what it held, so it never stops a map opening. */
+    const readSidecarAt = (file: string) =>
+      readText(file).pipe(
+        Effect.catch((error) =>
+          error.reason === "notFound"
+            ? Effect.succeed(null)
+            : Effect.logWarning(`Couldn't read ${file}`, error).pipe(Effect.as(null))
+        )
+      )
+
+    const sidecarOf = (project: string, fileName: string) =>
+      Effect.flatMap(sidecarFileIn(project, fileName), readSidecarAt)
+
     const read = Effect.fn("MapFiles.read")(function*(fileName: string) {
       const project = yield* projects.inUse
       const text = yield* readText(yield* fileOf(project, fileName))
-      return { ...(yield* info(project, fileName)), text } satisfies ProjectMapFile
+      return {
+        ...(yield* info(project, fileName)),
+        text,
+        sidecar: yield* sidecarOf(project, fileName)
+      } satisfies ProjectMapFile
     })
 
     const write = (file: string, data: string | Uint8Array) =>
@@ -167,11 +190,17 @@ export class MapFiles extends Context.Service<MapFiles, {
 
     const exists = (file: string) => fs.exists(file).pipe(Effect.mapError(projectError("read", file)))
 
+    /** A sidecar left without its map (the map was replaced, or removed by hand) goes to the backups. */
+    const retireSidecar = Effect.fnUntraced(function*(project: string, fileName: string) {
+      yield* backupStore.retire(backupsFolderIn(path, project), yield* sidecarFileIn(project, fileName))
+    })
+
     const create = Effect.fn("MapFiles.create")(function*(fileName: string, text: string) {
       const project = yield* projects.ensure
       const file = yield* fileOf(project, fileName)
       if (yield* exists(file)) return yield* projectError("exists", fileName)()
       yield* write(file, text)
+      yield* retireSidecar(project, fileName)
       return yield* info(project, fileName)
     })
 
@@ -189,8 +218,17 @@ export class MapFiles extends Context.Service<MapFiles, {
       if (yield* exists(next)) return yield* projectError("exists", to)()
       yield* write(next, text)
       yield* backupStore.retire(backupsFolderIn(path, project), old)
+      const sidecar = yield* sidecarOf(project, from)
+      yield* retireSidecar(project, to)
+      if (sidecar !== null) yield* write(yield* sidecarFileIn(project, to), sidecar)
+      yield* retireSidecar(project, from)
       yield* links.rename(project, from, to)
       return yield* info(project, to)
+    })
+
+    const writeSidecar = Effect.fn("MapFiles.writeSidecar")(function*(fileName: string, text: string) {
+      const project = yield* projects.ensure
+      yield* backupStore.overwrite(backupsFolderIn(path, project), yield* sidecarFileIn(project, fileName), text)
     })
 
     const pick = Effect.fn("MapFiles.pick")(function*(raw: string) {
@@ -214,6 +252,8 @@ export class MapFiles extends Context.Service<MapFiles, {
         if (!replace && (yield* exists(file))) return { _tag: "Clash", fileName } as const
         const bytes = yield* fs.readFile(source).pipe(Effect.mapError(projectError("read", source)))
         yield* backupStore.overwrite(backupsFolderIn(path, project), file, text)
+        // the map it replaced takes its sidecar along; an import's own structure comes from its file
+        yield* retireSidecar(project, fileName)
 
         const origin = { path: source, hash: sha256(bytes), at: DateTime.formatIso(yield* DateTime.now) }
         // A map imported from the game's maps folder under its own name is that file's export from the start.
@@ -235,21 +275,52 @@ export class MapFiles extends Context.Service<MapFiles, {
       at
     })
 
+    /** The maps' backups in `folder`, which also keeps the sidecars' and the prefabs'. */
+    const mapBackupsIn = (folder: string, place: BackupRef["place"]) =>
+      backupStore.list(folder).pipe(
+        Effect.map((all) => all.filter((backup) => isMapFileName(backup.fileName)).map(backupOf(place)))
+      )
+
     const backups = Effect.gen(function*() {
       const project = Option.getOrNull(yield* projects.current)
-      const inProject = project === null
-        ? []
-        : (yield* backupStore.list(backupsFolderIn(path, project))).map(backupOf("project"))
-      const exported = (yield* backupStore.list(exportBackups)).map(backupOf("export"))
+      const inProject = project === null ? [] : yield* mapBackupsIn(backupsFolderIn(path, project), "project")
+      const exported = yield* mapBackupsIn(exportBackups, "export")
       return [...inProject, ...exported].sort((a, b) => b.at.localeCompare(a.at))
     }).pipe(Effect.withSpan("MapFiles.backups"))
+
+    /**
+     * The sidecar for a map's backup. A Save or Rename keeps the map first and its sidecar right after, so in the
+     * project's backups it is the oldest one kept since. The game's copies have none of their own, and neither has a
+     * version from before the map had one: they get the map's sidecar as it is now. It need not be an exact fit, since
+     * the page re-matches a sidecar whose `mapHash` isn't the backup's.
+     */
+    const sidecarBackupOf = Effect.fnUntraced(function*(project: string, place: BackupRef["place"], backup: Backup) {
+      const dir = backupsFolderIn(path, project)
+      const sidecarName = sidecarFileNameOf(backup.fileName)
+      const kept = place === "project"
+        ? (yield* backupStore.list(dir)).findLast((other) =>
+          other.fileName === sidecarName && other.millis >= backup.millis
+        )
+        : undefined
+      return kept === undefined
+        ? yield* sidecarOf(project, backup.fileName)
+        : yield* readSidecarAt(path.join(dir, kept.id))
+    })
 
     const readBackup = Effect.fn("MapFiles.readBackup")(function*({ place, id }: BackupRef) {
       const project = yield* projects.inUse
       const file = path.join(place === "project" ? backupsFolderIn(path, project) : exportBackups, id)
       const backup = parseBackupId(id)
-      if (Option.isNone(backup)) return yield* projectError("notFound", file)()
-      return { ...backupOf(place)(backup.value), text: yield* readText(file) } satisfies MapBackupFile
+      if (Option.isNone(backup) || !isMapFileName(backup.value.fileName)) {
+        return yield* projectError("notFound", file)()
+      }
+      const bytes = yield* readBytes(file)
+      return {
+        ...backupOf(place)(backup.value),
+        text: new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes),
+        hash: sha256(bytes),
+        sidecar: yield* sidecarBackupOf(project, place, backup.value)
+      } satisfies MapBackupFile
     })
 
     return MapFiles.of({
@@ -258,6 +329,8 @@ export class MapFiles extends Context.Service<MapFiles, {
       create,
       save,
       rename,
+      writeSidecar,
+      sidecarOf,
       pick,
       importMap,
       backups,

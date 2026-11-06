@@ -2,12 +2,11 @@ import { assert, describe, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { lightingOf } from "../../domain/sunlight"
 import { MapCodec } from "../../services/MapCodec"
-import { makeTestDisk, projectFile, TEST_MAPS_FOLDER, testBridge } from "../../test/desktopBridge"
-import { layerFor, reset, s } from "../../test/editorActions"
+import { makeTestDisk, projectFile, TEST_MAPS_FOLDER, testBridge, testHash } from "../../test/desktopBridge"
+import { createNewMap, layerFor, reset, s } from "../../test/editorActions"
 import { listSamples, readSample } from "../../test/samples"
 import { describeBackupEffect, recoverBackupEffect } from "./backups"
 import { exportToGameEffect } from "./exportPlay"
-import { createNewMap } from "./maps"
 import { duplicateMapEffect, saveMapFile } from "./save"
 import { unlessCancelledFor } from "./unsaved"
 
@@ -85,7 +84,15 @@ describe("backup actions", () => {
       const fileName = "Map_LevelEditorMain&Gone_me.balledit"
       const text = readSample(sample)
       const disk = makeTestDisk()
-      disk.backups.push({ place: "export", id: `0 ${fileName}`, fileName, at: "2026-10-31T12:00:00.000Z", text })
+      disk.backups.push({
+        place: "export",
+        id: `0 ${fileName}`,
+        fileName,
+        at: "2026-10-31T12:00:00.000Z",
+        text,
+        hash: testHash(text),
+        sidecar: null
+      })
       return Effect.gen(function*() {
         yield* reset
         const decoded = yield* MapCodec.use((codec) => codec.decode(text))
@@ -103,7 +110,15 @@ describe("backup actions", () => {
   it.effect("a backup that doesn't decode is described as such", () => {
     const fileName = "Map_LevelEditorMain&Broken_me.balledit"
     const disk = makeTestDisk()
-    disk.backups.push({ place: "project", id: `0 ${fileName}`, fileName, at: "2026-10-31T12:00:00.000Z", text: "{" })
+    disk.backups.push({
+      place: "project",
+      id: `0 ${fileName}`,
+      fileName,
+      at: "2026-10-31T12:00:00.000Z",
+      text: "{",
+      hash: testHash("{"),
+      sidecar: null
+    })
     return Effect.gen(function*() {
       const summary = yield* describeBackupEffect(disk.backups[0]!)
       assert.strictEqual(summary._tag, "Unreadable")

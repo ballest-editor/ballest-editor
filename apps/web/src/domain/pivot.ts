@@ -13,6 +13,7 @@
 import { type Bounds, type CatalogIndex, type CatalogPiece, visibleExtras } from "./Catalog"
 import type { UeTransform, Vec3 } from "./coords"
 import type { Item, ItemPivot, MapFile } from "./MapFile"
+import { mirrorScaleOf } from "./mirror"
 import { rotateVec } from "./ueMath"
 
 /** In the order the game's inspector lays them out. */
@@ -95,11 +96,8 @@ const visibleExtrasBounds = (piece: CatalogPiece, index: CatalogIndex): Bounds |
   return { min: along(Math.min), max: along(Math.max) }
 }
 
-/**
- * The local bounds a pivot is measured on: the measured box, else the class's Main mesh, else
- * its visible components, else the item's first mesh.
- */
-export const pivotBoundsOf = (item: Item, index: CatalogIndex | null): Bounds | undefined => {
+/** The class's bounds, unflipped: the measured box, else its Main mesh, else its visible components, else the item's first mesh. */
+const unflippedBoundsOf = (item: Item, index: CatalogIndex | null): Bounds | undefined => {
   const piece = index?.pieceByClass.get(item.actorToSpawn)
   if (piece !== undefined && index !== null) {
     const bounds = MEASURED_BOUNDS[piece.className] ?? piece.bounds ?? visibleExtrasBounds(piece, index)
@@ -107,6 +105,20 @@ export const pivotBoundsOf = (item: Item, index: CatalogIndex | null): Bounds | 
   }
   const path = item.meshComponents[0]?.meshAssetPath
   return path === undefined ? undefined : index?.meshes.get(path)?.bounds
+}
+
+/** The local bounds a pivot and a group's frame are measured on, which a Flip X or Flip Y flips with the mesh. */
+export const pivotBoundsOf = (item: Item, index: CatalogIndex | null): Bounds | undefined => {
+  const bounds = unflippedBoundsOf(item, index)
+  const flip = mirrorScaleOf(item, index)
+  if (bounds === undefined || flip === undefined) return bounds
+  const [x0, y0, z0] = bounds.min
+  const [x1, y1, z1] = bounds.max
+  const [fx, fy] = flip
+  return {
+    min: [fx < 0 ? -x1 : x0, fy < 0 ? -y1 : y0, z0],
+    max: [fx < 0 ? -x0 : x1, fy < 0 ? -y0 : y1, z1]
+  }
 }
 
 /** The pivot `choice` for `item`; undefined when its bounds are unknown (only Default works then). */

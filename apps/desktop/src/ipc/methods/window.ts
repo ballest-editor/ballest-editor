@@ -2,7 +2,7 @@ import type { UnsavedChoice } from "@ballest/contracts"
 import { Effect } from "effect"
 import { ElectronDialog } from "../../electron/ElectronDialog"
 import { ElectronWindow } from "../../electron/ElectronWindow"
-import { titleBarOverlay, windowBackground } from "../../window/chrome"
+import { popoutOverlay, titleBarOverlay, windowBackground } from "../../window/chrome"
 import type { DesktopIpcHandlers } from "../DesktopIpc"
 
 /** The buttons in the order they are drawn, each with the answer it gives; Cancel is also Escape. */
@@ -17,6 +17,7 @@ export const windowHandlers = {
   setWindowTheme: Effect.fn("ipc.setWindowTheme")(function*({ dark }, event) {
     yield* (yield* ElectronWindow).setColors(event.sender.id, {
       overlay: titleBarOverlay(dark),
+      popoutOverlay: popoutOverlay(titleBarOverlay(dark)),
       background: windowBackground(dark)
     })
   }),

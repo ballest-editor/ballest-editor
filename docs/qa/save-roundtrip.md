@@ -175,7 +175,7 @@ game:  "boolProperties": [{ "currentValue": false, "propertyName": "bMirror", ..
 ## What I could not verify
 
 - **Whether the sandbox causes difference 3.** Every save here ran in a sandboxed slot. I can't test the player's real game, and shouldn't. The evidence against the sandbox is thin but real: `new pieces probe`, the one real 0.4.1 save we have, also has no `editorState`, but I don't know whether any pivot was set in it. One in-game test would settle it: set a pivot in the real game, save, and read the file.
-- **What the game writes for a group.** It never wrote one, so the `{ members, name, frame }` shape comes from `SKGMLEEditorGroupSave` and from what the game accepted. `frame` is typed `Unknown` for that reason. I don't know what its values mean, and I made mine up.
+- **What the game writes for a group.** It never wrote one, so the `{ members, name, frame }` shape comes from `SKGMLEEditorGroupSave` and from what the game accepted. `frame` is typed `Unknown` for that reason. What its values mean is now measured in [groups-prefabs.md](groups-prefabs.md): `frame` is the group's gizmo.
 - **Whether a Default pivot entry gets dropped.** No pivot survives a save, so this can't be observed. A file with one opens fine, and the game reported nothing wrong.
 - **`bHasCamera` and the saved camera.** Never written, same cause.
 - **Races from a published `.ballmap`.** All race readings used `Tracks::OpenLocal` on a `.balledit`, the route our Play button uses.

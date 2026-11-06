@@ -16,6 +16,17 @@ export const isMapFileName = (name: string): boolean =>
   // oxlint-disable-next-line eslint/no-control-regex -- control characters are exactly what is refused here
   !/[<>:"/\\|?*\u0000-\u001f]/.test(name) && !name.startsWith(".") && !name.endsWith(" ")
 
+const MAP_EXTENSION = ".balledit"
+const SIDECAR_EXTENSION = ".editor.json"
+
+/** The sidecar of the map `fileName`, beside it in `maps/` (docs/PROJECTS.md § The files). */
+export const sidecarFileNameOf = (fileName: string): string =>
+  `${fileName.slice(0, -MAP_EXTENSION.length)}${SIDECAR_EXTENSION}`
+
+/** Whether `name` is the sidecar of a map, by the same rules as `isMapFileName`. */
+export const isSidecarFileName = (name: string): boolean =>
+  name.endsWith(SIDECAR_EXTENSION) && isMapFileName(`${name.slice(0, -SIDECAR_EXTENSION.length)}${MAP_EXTENSION}`)
+
 /**
  * Map and creator names: letters, digits and spaces only. The game joins them with `_` into `userLevelName` and the
  * file name, so `_` (and anything Windows rejects in a file name) is out.
@@ -35,6 +46,20 @@ export const mapFileNameOf = (displayName: string, creatorName: string): string 
  * starting with a dot or a space, at most 64 characters, so every OS accepts it.
  */
 export const isProjectName = (name: string): boolean => /^[\p{L}\p{N}_-][\p{L}\p{N} _-]{0,63}$/u.test(name)
+
+/** A prefab's name, as `saveprefab` takes it: its file is `<name>.json`. */
+export const isPrefabName = (name: string): boolean => /^[A-Za-z0-9_-]{1,64}$/.test(name)
+export const PREFAB_NAME_RULE = "1 to 64 letters, digits, _ and -"
+
+const PREFAB_EXTENSION = ".json"
+
+export const prefabFileNameOf = (name: string): string => `${name}${PREFAB_EXTENSION}`
+
+/** The prefab a file in a prefabs folder holds; undefined for a file that isn't one's. */
+export const prefabNameOfFile = (fileName: string): string | undefined => {
+  const name = fileName.slice(0, -PREFAB_EXTENSION.length)
+  return fileName.endsWith(PREFAB_EXTENSION) && isPrefabName(name) ? name : undefined
+}
 
 /** Whether a map was never published (`levelPublishedFileId` -1): the plugin manager races no other kind. */
 export const isNeverPublished = (publishedFileId: number): boolean => publishedFileId < 0

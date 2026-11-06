@@ -6,7 +6,7 @@ import { Effect } from "effect"
 import { isNeverPublished } from "../../domain/edits"
 import { gameLoadProblems } from "../../domain/limits"
 import { ExportValidationError } from "../../services/errors"
-import { useEditor } from "../store"
+import { gameMapOf, PREFAB_TAB_STAYS_HERE, useEditor } from "../store"
 import { ASK_FIRST, type ExportIntent, writeToGame } from "./gameWrite"
 import { withProjectMapOpen } from "./project"
 import { run } from "./run"
@@ -21,8 +21,9 @@ import { duplicateMapEffect, withSavedOpenMap } from "./save"
  */
 const writeOpenMapToGame = (intent: ExportIntent) =>
   Effect.suspend(() => {
-    const { catalogIndex, doc, openDialog } = useEditor.getState()
-    const problems = gameLoadProblems(doc.map, catalogIndex)
+    const { catalogIndex, doc, document, openDialog } = useEditor.getState()
+    if (document.kind === "prefab") return Effect.fail(new ExportValidationError({ message: PREFAB_TAB_STAYS_HERE }))
+    const problems = gameLoadProblems(gameMapOf(doc, catalogIndex), catalogIndex)
     if (problems.length > 0) return Effect.fail(new ExportValidationError({ message: problems.slice(0, 3).join(" ") }))
     return intent === "play" && !isNeverPublished(doc.map.worldSettings.levelData.levelPublishedFileId)
       ? Effect.sync(() => openDialog({ id: "newDraft" }))

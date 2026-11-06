@@ -4,7 +4,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import { repoRoot } from "../test/samples"
 import { deriveKeybinds, GameKeybindsFile, mappingDirection, namedActions, UE_KEY_TO_CODE } from "./GameKeybinds"
-import { defaultKeybinds } from "./Keybinds"
+import { actionsFor, defaultKeybinds, keybindSections } from "./Keybinds"
 
 const negate = { type: "InputModifierNegate", settings: { bX: true, bY: true, bZ: true } }
 const swizzle = { type: "InputModifierSwizzleAxis", settings: { Order: "EInputAxisSwizzle::YXZ" } }
@@ -123,6 +123,31 @@ describe("GameKeybinds", () => {
   })
 
   const real = path.join(repoRoot, "assets", "keybinds.json")
+  it.skipIf(!fs.existsSync(real))("leaves the view keys to the editor: the game binds none of them", () => {
+    const file = Schema.decodeUnknownSync(GameKeybindsFile)(JSON.parse(fs.readFileSync(real, "utf8")))
+    const codes = new Set(
+      file.contexts.flatMap((context) => context.mappings.flatMap((mapping) => UE_KEY_TO_CODE[mapping.key ?? ""] ?? []))
+    )
+    const { keybinds, fromGame } = deriveKeybinds(file)
+    const view = keybindSections.find((section) => section.name === "view")?.actions ?? []
+    assert.isAbove(view.length, 0)
+    for (const action of view) {
+      assert.isFalse(fromGame.has(action), action)
+      assert.isAbove(keybinds[action].length, 0, action)
+      // a chord on a key the game uses is still its own, but a bare key is a collision
+      for (const binding of keybinds[action]) if (!binding.includes("+")) assert.isFalse(codes.has(binding), binding)
+    }
+  })
+
+  it("gives every view key to one action", () => {
+    const view = keybindSections.find((section) => section.name === "view")?.actions ?? []
+    for (const action of view) {
+      for (const binding of defaultKeybinds[action]) {
+        assert.deepStrictEqual(actionsFor(defaultKeybinds, binding), [action])
+      }
+    }
+  })
+
   it.skipIf(!fs.existsSync(real))("decodes assets/keybinds.json", () => {
     const file = Schema.decodeUnknownSync(GameKeybindsFile)(JSON.parse(fs.readFileSync(real, "utf8")))
     const { keybinds, fromGame } = deriveKeybinds(file)

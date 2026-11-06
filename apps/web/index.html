@@ -6,17 +6,11 @@
     <title>Ballest Editor</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script>
-      // Expose the saved panel widths (SidePanel's localStorage keys) as --panel-<id> on <html> before first
-      // paint, so the loading skeleton lays out like the editor will.
+      // The room the saved layout leaves around the centre group (the key is domain/dockLayout.ts's) as --dock-<side>
+      // on <html> before first paint, so the loading skeleton lays out like the dock will.
       try {
-        for (var i = 0; i < localStorage.length; i++) {
-          var key = localStorage.key(i)
-          var prefix = "ballest-editor.panel."
-          if (key && key.indexOf(prefix) === 0) {
-            var width = Number(localStorage.getItem(key))
-            if (width > 0) document.documentElement.style.setProperty("--panel-" + key.slice(prefix.length), width + "px")
-          }
-        }
+        var hint = JSON.parse(localStorage.getItem("ballest-editor.dock.v1")).hint
+        for (var side in hint) document.documentElement.style.setProperty("--dock-" + side, hint[side] + "px")
       } catch (e) {}
     </script>
   </head>

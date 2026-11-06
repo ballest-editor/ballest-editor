@@ -1,5 +1,6 @@
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 import { IconCheck, IconChevronRight } from "@tabler/icons-react"
+import { usePortalContainer } from "@workspace/ui/lib/portal-container"
 import { cn } from "cn"
 import * as React from "react"
 
@@ -30,7 +31,7 @@ function DropdownMenuContent({
   >)
 {
   return (
-    <MenuPrimitive.Portal>
+    <MenuPrimitive.Portal container={usePortalContainer()}>
       <MenuPrimitive.Positioner
         className="isolate z-50 outline-none"
         align={align}

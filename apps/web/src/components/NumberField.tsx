@@ -66,13 +66,15 @@ function useScrub(options: {
         k.stopImmediatePropagation() // don't also deselect
         end(false)
       }
-      window.addEventListener("keydown", onKeyDown, { capture: true })
+      // the window the field is in: a panel popped out has one of its own
+      const fieldWindow = e.currentTarget.ownerDocument.defaultView ?? window
+      fieldWindow.addEventListener("keydown", onKeyDown, { capture: true })
       scrub.current = {
         pointerId: e.pointerId,
         startX: e.clientX,
         startValue: latest.current.value,
         value: null,
-        stop: () => window.removeEventListener("keydown", onKeyDown, { capture: true })
+        stop: () => fieldWindow.removeEventListener("keydown", onKeyDown, { capture: true })
       }
       scrubbed.current = false
       try {

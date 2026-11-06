@@ -7,6 +7,7 @@ import {
   libraryOfInstall,
   mapsFolderIn,
   pluginsFolderOf,
+  prefabsFolderBeside,
   regQueryValue,
   savedFolderCandidates,
   steamRootCandidates
@@ -101,5 +102,14 @@ describe("game locations", () => {
         "/home/player/.local/share/Steam/steamapps/compatdata/3339810/pfx/drive_c/users/steamuser/AppData/Local/Ballest/Saved/UserSavedMaps"
       ]
     )
+  })
+
+  it("puts the game's prefabs beside its maps, on both layouts", () => {
+    assert.strictEqual(
+      prefabsFolderBeside("C:\\Users\\me\\AppData\\Local\\Ballest\\Saved\\UserSavedMaps", win),
+      "C:\\Users\\me\\AppData\\Local\\Ballest\\Saved\\SaveGames\\Prefabs"
+    )
+    const saved = "/lib/steamapps/compatdata/3339810/pfx/drive_c/users/steamuser/AppData/Local/Ballest/Saved"
+    assert.strictEqual(prefabsFolderBeside(`${saved}/UserSavedMaps`, posix), `${saved}/SaveGames/Prefabs`)
   })
 })

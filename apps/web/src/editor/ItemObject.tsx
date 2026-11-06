@@ -1,5 +1,16 @@
 import { useGLTF } from "@react-three/drei"
-import { Component, memo, type ReactNode, Suspense, useEffect, useLayoutEffect, useMemo, useRef } from "react"
+import type { ThreeElements } from "@react-three/fiber"
+import {
+  Component,
+  memo,
+  type ReactNode,
+  type RefObject,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef
+} from "react"
 import * as THREE from "three"
 import { type Bounds, type CatalogIndex, DEFAULT_BOUNDS, type MeshInfo } from "../domain/Catalog"
 import {
@@ -22,6 +33,21 @@ import { glbUrl, type Visual, visualsOf } from "./visuals"
 import { fixSceneWinding } from "./winding"
 
 const ueToThree = new THREE.Matrix4().set(...UE_TO_THREE_MATRIX)
+
+/**
+ * Items sit still, and a map of thousands has tens of thousands of objects: left to three, each works out its matrix
+ * again every frame, which costs a third of a large map's frame. So everything an item is made of works its matrix out
+ * when it changes, and so does everything above it: one object updating its matrix updates all that's under it. The
+ * gizmo moves an item ahead of React (`applyToObject`) and does the same.
+ */
+function FixedGroup(
+  { ref, ...props }: Omit<ThreeElements["group"], "ref"> & { readonly ref?: RefObject<THREE.Group | null> }
+) {
+  const own = useRef<THREE.Group>(null)
+  const group = ref ?? own
+  useLayoutEffect(() => group.current?.updateMatrix())
+  return <group ref={group} matrixAutoUpdate={false} {...props} />
+}
 
 /** Box dimensions for a bounds size: never flat, so the stand-in stays visible. */
 const solid = (n: number) => Math.max(Math.abs(n), 1)
@@ -69,8 +95,14 @@ function GlbMesh(
     const root = new THREE.Group()
     root.matrixAutoUpdate = false
     root.matrix.copy(ueToThree)
+    root.matrixWorldNeedsUpdate = true
     fixSceneWinding(gltf.scene) // once per cached glb; clones share the geometry
-    root.add(gltf.scene.clone(true))
+    const scene = gltf.scene.clone(true)
+    scene.traverse((node) => {
+      node.updateMatrix()
+      node.matrixAutoUpdate = false
+    })
+    root.add(scene)
     return root
   }, [gltf])
   useLayoutEffect(() => applySlotMaterials(object, table, slotMaterials), [object, table, slotMaterials])
@@ -147,18 +179,18 @@ export const ItemObject = memo(function ItemObjectView(props: {
   const beam = index?.pieceByClass.get(item.actorToSpawn)?.beam
 
   return (
-    <group
+    <FixedGroup
       ref={ref}
       userData={{ itemId: id }}
       position={transform.position}
       quaternion={transform.quaternion}
       scale={transform.scale}
     >
-      <group {...(visualScale === undefined ? {} : { scale: visualScale })}>
+      <FixedGroup {...(visualScale === undefined ? {} : { scale: visualScale })}>
         <ItemVisuals visuals={visuals} />
         {beam !== undefined && <LaserBeam beam={beam} itemId={id} />}
-      </group>
-    </group>
+      </FixedGroup>
+    </FixedGroup>
   )
 })
 
@@ -170,14 +202,14 @@ function ItemVisuals({ visuals }: { readonly visuals: ReadonlyArray<Visual> }) {
         v.relative === undefined
           ? <MeshVisual key={v.key} mesh={v.mesh} slotMaterials={v.slotMaterials} />
           : (
-            <group
+            <FixedGroup
               key={v.key}
               position={v.relative.position}
               quaternion={v.relative.quaternion}
               scale={v.relative.scale}
             >
               <MeshVisual mesh={v.mesh} slotMaterials={v.slotMaterials} />
-            </group>
+            </FixedGroup>
           )
       )}
     </>

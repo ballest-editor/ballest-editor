@@ -23,6 +23,7 @@ Numbers are issues. The [milestones](https://github.com/ballest-editor/ballest-e
 ### Built
 
 - **Camera.** Free-fly and orbit with configurable keybinds, focus on the selection, a 1 m floor grid with 10 m sections at the map's floor height.
+- **Split views.** One, two or four panes on a map, each perspective or an orthographic top, bottom, front, back, left or right view with a world grid in cm that matches the snapping grid (#80, [DESKTOP.md](DESKTOP.md#view-panes)).
 - **Gizmos.** Separate translate, rotate and scale gizmos in the Blender style, with per-handle hover highlight and axes coloured in game coordinates (X red, Y green, Z blue = up). Local or world axes.
 - **Placement and transform.** A piece palette using the exact meshes the in-game editor uses, numeric entry for position, rotation and scale, uniform scale, the game's pivot choices (`editorState.pivots`).
 - **Selection.** Shift or Ctrl+click multi-select. Copy, cut, paste, duplicate, and Alt+drag to duplicate.
@@ -38,6 +39,7 @@ Numbers are issues. The [milestones](https://github.com/ballest-editor/ballest-e
 - **Grid snapping** covers position and rotation, on fixed steps. Still to come: scale snapping, and user-defined origins, spacing and angle steps (#84).
 - **Mirroring** is the game's per-item Flip X and Flip Y. Still to come: flipping the selection or the map across a chosen plane in world, grid or selection space (#87).
 - **Linting** stops a save on the first problems it finds. Still to come: a lint view and the checks the game doesn't make itself, such as a missing goal and pieces outside the palette (#98).
+- **Prefabs** read and write the game's `BallestPrefab` files in a user and a project tier, and place as instances that follow their definition ([DESKTOP.md](DESKTOP.md#prefabs)). Still to come: the ballestrecords library (#102).
 - **Importing from the Workshop cache** works through the file dialog. Still to come: finding maps there for study and remix (#103).
 - **Menus** are missing Select, Tools and Help.
 
@@ -48,7 +50,6 @@ Roughly in the order we expect to tackle them.
 Navigation and view:
 
 - View cube in the Fusion 360 style, top right, to snap to orthographic faces, edges and corners and reorient the perspective (#79).
-- Orthographic views with a world grid in cm, matching the game (#80).
 - Hide, isolate and lock pieces (#81).
 
 Gizmos and transform:
@@ -68,7 +69,6 @@ Organisation:
 
 - Groups, as the game's Ctrl+G and Shift+G (#78; the format already has `editorState.groups`), and nested groups.
 - Layers with visibility and lock, not persisted by the game but kept in a sidecar so that a round trip through the in-game editor doesn't lose them (#111, #112).
-- Prefabs: import and export the game's `BallestPrefab` JSON (#102).
 
 Materials:
 

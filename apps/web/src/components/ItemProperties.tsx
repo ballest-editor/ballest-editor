@@ -5,7 +5,7 @@ import { Label } from "@workspace/ui/components/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Separator } from "@workspace/ui/components/separator"
-import { Slider } from "@workspace/ui/components/slider"
+import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
 import { Option } from "effect"
 import { type ReactNode, useId, useState } from "react"
@@ -45,9 +45,6 @@ const scrubStep = (reference: number): number => {
   const magnitude = Math.abs(reference)
   return magnitude === 0 ? 0.01 : Math.max(0.001, 10 ** (Math.floor(Math.log10(magnitude)) - 2))
 }
-
-const sliderValue = (value: number | ReadonlyArray<number>): number | undefined =>
-  typeof value === "number" ? value : value[0]
 
 /**
  * Decimals a ranged float shows: enough to tell its slider's positions apart (a density runs 0 to 0.01), few
@@ -126,7 +123,7 @@ function PropertyValue({ property, id, handleClassName }: {
       const position = Math.min(Math.max(scrub ?? shown ?? range.min, range.min), range.max)
       return (
         // The field keeps room for its widest value; where the slider would be left too short, it goes under the field.
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(4.5rem,1fr)] items-center gap-1.5 @max-[15rem]:grid-cols-1">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(4.5rem,1fr)] items-center gap-2 @max-[15rem]:grid-cols-1">
           <Slider
             aria-label={propertyLabel(property)}
             className="@max-[15rem]:order-last"
@@ -297,7 +294,7 @@ export function ItemProperties({ properties }: { readonly properties: ReadonlyAr
     <>
       <Separator />
       <SectionTitle>Properties</SectionTitle>
-      <div className="grid @container grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_1.5rem] items-center gap-x-1.5 gap-y-1.5">
+      <div className="grid @container grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_1.5rem] items-center gap-x-2 gap-y-1">
         {propertyRows(properties).map((row) => {
           const first = row._tag === "Color" ? row.color.channels[0] : row.property
           return <PropertyRowView key={`${first.list}/${first.name}`} row={row} />

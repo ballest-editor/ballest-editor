@@ -102,9 +102,6 @@ export const followUnloadRequests = (): () => void => {
   return () => void runtime.runFork(Fiber.interrupt(fiber))
 }
 
-/** New map: the New map dialog (name and creator); the map opens in a tab of its own. */
-export const startNewMap = () => useEditor.getState().openDialog({ id: "new" })
-
 /**
  * Closes a tab, asking about its unsaved edits first (it is made the active tab to ask). Closing the last tab shows a
  * fresh, unsaved map in its place: there is always a map.

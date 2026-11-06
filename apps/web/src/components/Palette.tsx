@@ -3,7 +3,7 @@ import { Button } from "@workspace/ui/components/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/ui/components/collapsible"
 import { Input } from "@workspace/ui/components/input"
 import { ScrollArea } from "@workspace/ui/components/scroll-area"
-import { type MouseEvent, useEffect, useMemo, useState } from "react"
+import { type MouseEvent, useMemo, useState } from "react"
 import {
   type CatalogPiece,
   paletteSections,
@@ -17,40 +17,14 @@ import { pieceFootprint } from "../domain/placement"
 import { preloadPiece } from "../editor/preload"
 import { sceneRegistry } from "../editor/sceneRegistry"
 import { useEditor } from "../editor/store"
-import { thumbnailFor } from "../editor/thumbnails"
 import { focusViewport } from "../editor/Viewport"
 import { PaletteSkeleton } from "./EditorSkeleton"
+import { PieceThumbnail } from "./PieceThumbnail"
 
 const matches = (piece: CatalogPiece, terms: ReadonlyArray<string>) => {
   const haystack = `${pieceLabelOf(piece)} ${piece.className} ${piece.meshAssetPath ?? ""} ${piece.category ?? ""}`
     .toLowerCase()
   return terms.every((t) => haystack.includes(t))
-}
-
-/**
- * The in-game render when the catalog has one; otherwise one rendered here from the piece's
- * meshes (see editor/thumbnails.ts), with a blank tile while it's in the queue.
- */
-function Thumbnail({ piece }: { readonly piece: CatalogPiece }) {
-  const index = useEditor((s) => s.catalogIndex)
-  const table = useEditor((s) => s.materialTable)
-  const [rendered, setRendered] = useState<string | undefined>(undefined)
-  const shipped = piece.thumbnail ?? undefined
-  useEffect(() => {
-    if (shipped !== undefined || index === null || table === null) return
-    let cancelled = false
-    void thumbnailFor(piece, index, table).then((url) => {
-      if (!cancelled) setRendered(url)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [piece, shipped, index, table])
-  const src = shipped !== undefined ? `/assets/${shipped}` : rendered
-  const className = "size-8 shrink-0 rounded-sm bg-muted object-fill"
-  return src === undefined
-    ? <span className={className} />
-    : <img src={src} alt="" className={className} loading="lazy" />
 }
 
 function PieceButton({ piece, onPlace, onHover, unavailable, unverified }: {
@@ -74,13 +48,19 @@ function PieceButton({ piece, onPlace, onHover, unavailable, unverified }: {
         if (e.key === " " || e.key === "Enter") e.preventDefault()
       }}
     >
-      {unavailable === undefined && <Thumbnail piece={piece} />}
+      {unavailable === undefined && (
+        <PieceThumbnail
+          piece={piece}
+          className="size-8 shrink-0 rounded-sm bg-muted object-fill"
+          placeholder={<span className="size-8 shrink-0 rounded-sm bg-muted" />}
+        />
+      )}
       <span className="flex min-w-0 flex-col">
         <span className="flex items-center gap-1.5 truncate text-xs font-medium">
           {pieceLabelOf(piece)}
           {unverified && (
             <span
-              className="rounded-sm border border-amber-500/40 bg-amber-500/15 px-1 text-[0.6rem] font-normal text-amber-700 dark:text-amber-300"
+              className="rounded-sm border border-amber-500/40 bg-amber-500/15 px-1 text-[0.625rem] font-normal text-amber-700 dark:text-amber-300"
               title="Not yet confirmed to load in the in-game editor. A rejected item makes the game discard the whole map."
             >
               unverified
@@ -88,7 +68,7 @@ function PieceButton({ piece, onPlace, onHover, unavailable, unverified }: {
           )}
         </span>
         {!piece.thumbnail && piece.displayName && piece.displayName !== piece.className && (
-          <span className="truncate text-[0.65rem] text-muted-foreground">{piece.className}</span>
+          <span className="truncate text-[0.6875rem] text-muted-foreground">{piece.className}</span>
         )}
       </span>
     </Button>
@@ -140,8 +120,8 @@ export function Palette() {
   }
 
   return (
-    <aside className="flex h-full min-w-0 flex-col gap-2 bg-card p-2">
-      <div className="flex items-center gap-1">
+    <aside className="flex h-full min-w-0 flex-col bg-card">
+      <div className="flex h-9 shrink-0 items-center gap-1 px-2">
         <Input
           type="search"
           placeholder="Search pieces…"
@@ -158,15 +138,15 @@ export function Palette() {
           disabled={terms.length > 0}
           onClick={toggleAll}
         >
-          {allCollapsed ? <IconFoldDown className="size-4" /> : <IconFoldUp className="size-4" />}
+          {allCollapsed ? <IconFoldDown className="size-3.5" /> : <IconFoldUp className="size-3.5" />}
         </Button>
       </div>
       {catalog === null && !booting && (
-        <div className="px-1 text-xs text-muted-foreground">The piece catalog couldn't be loaded.</div>
+        <div className="px-3 py-2 text-xs text-muted-foreground">The piece catalog couldn't be loaded.</div>
       )}
       {catalog === null && booting ? <PaletteSkeleton /> : (
         <ScrollArea className="min-h-0 flex-1">
-          <div className="flex flex-col gap-1 pr-2">
+          <div className="flex flex-col gap-1 px-2 pb-2">
             {sections.map((section) => {
               // Searching opens every section with matches; otherwise hidden starts collapsed.
               const isOpen = terms.length > 0 || (open[section.name] ?? !section.hidden)
@@ -177,7 +157,7 @@ export function Palette() {
                   onOpenChange={(next) => setOpen((o) => ({ ...o, [section.name]: next }))}
                 >
                   <CollapsibleTrigger
-                    className="group flex h-8 w-full items-center gap-1.5 rounded-sm px-1.5 text-[0.7rem] font-semibold tracking-wider text-muted-foreground uppercase hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60 focus-visible:outline-none"
+                    className="group flex h-8 w-full items-center gap-1.5 rounded-sm px-1.5 text-eyebrow text-muted-foreground hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60 focus-visible:outline-none"
                     onMouseDown={(e) => e.preventDefault()}
                   >
                     <IconChevronRight className="size-3.5 transition-transform duration-200 group-data-[panel-open]:rotate-90" />
@@ -206,7 +186,7 @@ export function Palette() {
               )
             })}
             {catalog !== null && sections.length === 0 && (
-              <div className="px-1 text-xs text-muted-foreground">No pieces match.</div>
+              <div className="px-1.5 py-2 text-xs text-muted-foreground">No pieces match the search.</div>
             )}
           </div>
         </ScrollArea>

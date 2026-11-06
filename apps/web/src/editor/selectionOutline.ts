@@ -29,6 +29,9 @@ const WELD = 1e-4
  */
 const DEPTH_PULL = 0.002
 
+/** The same in an orthographic pane, in cm: its camera stands far off, and depth there is even all the way along. */
+const ORTHO_DEPTH_PULL = 4
+
 const crease = Math.cos(THREE.MathUtils.degToRad(CREASE_DEG))
 const coplanar = Math.cos(THREE.MathUtils.degToRad(COPLANAR_DEG))
 
@@ -118,7 +121,7 @@ ${
       vec3 toEye = perspective ? -mvPosition.xyz : vec3(0.0, 0.0, 1.0);
       // both ends lie on both faces' planes, so both see the same signs: the segment is kept or dropped whole
       bool silhouette = dot(normalMatrix * faceNormalA, toEye) * dot(normalMatrix * faceNormalB, toEye) <= 0.0;
-      mvPosition.xyz += (perspective ? toEye : vec3(0.0, 0.0, length(mvPosition.xyz))) * ${DEPTH_PULL};
+      mvPosition.xyz += perspective ? toEye * ${DEPTH_PULL} : vec3(0.0, 0.0, ${ORTHO_DEPTH_PULL.toFixed(1)});
       gl_Position = silhouette ? projectionMatrix * mvPosition : vec4(0.0, 0.0, 2.0, 1.0); // dropped: beyond the far plane`
     )
   }`

@@ -17,6 +17,11 @@
       "allow": [
         {
           "from": "file",
+          "path": "src/domain/PrefabFile.ts",
+          "name": ["PrefabItem", "PrefabFile", "PrefabGroup"]
+        },
+        {
+          "from": "file",
           "path": "src/domain/MapFile.ts",
           "name": [
             "Vector3",
@@ -31,6 +36,11 @@
             "EditorState",
             "MapFile"
           ]
+        },
+        {
+          "from": "file",
+          "path": "src/domain/MapSidecar.ts",
+          "name": ["SidecarItem", "MapSidecar"]
         },
         {
           "from": "file",

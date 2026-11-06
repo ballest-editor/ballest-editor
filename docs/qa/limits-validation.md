@@ -131,6 +131,7 @@ The first two decide how big a map can be, and they land far below 100,000 items
 | Member twice, shared by two groups, an empty group, or no frame       | Blank map                   | Blocks it      |
 | Name of 65 characters, or with a space                                | Blank map                   | Blocks it      |
 | Frame with a non-normalised rotation                                  | Blank map                   | Blocks it      |
+| Frame with a scale axis of 0 ([groups-prefabs.md](groups-prefabs.md)) | Blank map                   | Blocks it      |
 | An entry that isn't an object                                         | Blank map                   | Refuses import |
 
 ### `worldSettings` and the file's shape

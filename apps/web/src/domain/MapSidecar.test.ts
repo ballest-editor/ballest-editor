@@ -1,0 +1,45 @@
+import { assert, describe, it } from "@effect/vitest"
+import { Option, Schema } from "effect"
+import { MapSidecar } from "./MapSidecar"
+
+const Codec = Schema.fromJsonString(MapSidecar)
+
+const sidecar = {
+  formatVersion: 1,
+  mapHash: "a".repeat(64),
+  items: {
+    "k-1": { index: 0, fingerprint: "BP_Prim_Cube|0,0,0|0,0,0,1|1,1,1" },
+    k_2: { index: 1, fingerprint: "BP_Prim_Cube|1,0,0|0,0,0,1|1,1,1", name: "Left ramp", tags: ["start", "hard"] },
+    k3: { index: 2, fingerprint: "BP_Prim_Cube|2,0,0|0,0,0,1|1,1,1" }
+  },
+  tree: [
+    { kind: "item", key: "k-1" },
+    {
+      kind: "group",
+      id: "g1",
+      name: "Outer",
+      tags: ["a"],
+      children: [
+        { kind: "group", id: "g2", name: "Inner", tags: [], children: [{ kind: "item", key: "k_2" }] },
+        { kind: "item", key: "k3" }
+      ]
+    }
+  ]
+}
+
+describe("MapSidecar", () => {
+  it("round-trips nested groups, names and tags", () => {
+    const text = JSON.stringify(sidecar)
+    const decoded = Schema.decodeSync(Codec)(text)
+    assert.deepStrictEqual(JSON.parse(Schema.encodeSync(Codec)(decoded)), sidecar)
+  })
+
+  it("refuses a sidecar of another format version, or a key that isn't URL-safe", () => {
+    const decodes = (value: unknown) => Option.isSome(Schema.decodeUnknownOption(MapSidecar)(value))
+    assert.isTrue(decodes(sidecar))
+    assert.isFalse(decodes({ ...sidecar, formatVersion: 2 }))
+    assert.isFalse(decodes({ ...sidecar, mapHash: "abc" }))
+    assert.isFalse(decodes({ ...sidecar, tree: [{ kind: "item", key: "not a key" }] }))
+    assert.isFalse(decodes({ ...sidecar, items: { k: { index: -1, fingerprint: "" } } }))
+  })
+})

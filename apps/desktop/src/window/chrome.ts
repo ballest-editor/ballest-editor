@@ -13,6 +13,43 @@ export const titleBarOverlay = (dark: boolean): Electron.TitleBarOverlayOptions 
   height: TITLE_BAR_HEIGHT
 })
 
+/** Same scheme and host as the app; `URL.origin` is "null" for every custom scheme, so it can't be compared. */
+export const isAppUrl = (target: string, app: URL): boolean => {
+  const url = URL.parse(target)
+  return url !== null && url.protocol === app.protocol && url.host === app.host
+}
+
+/** The page a panel pops out into (`apps/web/public/popout.html`), the only window the page may open itself. */
+export const isPopoutUrl = (target: string, app: URL): boolean =>
+  isAppUrl(target, app) && URL.parse(target)?.pathname === "/popout.html"
+
+/** A popped-out panel's tab strip (`h-8`, `components/dock/dock.css`): its window's title bar. */
+const POPOUT_TITLE_BAR_HEIGHT = 32
+
+/**
+ * The window a panel pops out into: the main window's look, with the panel's tab strip as its title bar, floating over
+ * the main window and closing with it. Dockview gives the size and position; the page reports the theme once it's in
+ * (`setWindowTheme`), so it starts on the main window's background.
+ */
+export const popoutWindowOptions = (
+  parent: Electron.BrowserWindow,
+  iconPath: string
+): Electron.BrowserWindowConstructorOptions => ({
+  parent,
+  icon: iconPath,
+  minWidth: 320,
+  minHeight: 240,
+  titleBarStyle: "hidden",
+  titleBarOverlay: popoutOverlay(titleBarOverlay(true)),
+  backgroundColor: parent.getBackgroundColor()
+})
+
+/** `overlay`, the main window's title bar overlay, for a popped-out panel's window. */
+export const popoutOverlay = (overlay: Electron.TitleBarOverlayOptions): Electron.TitleBarOverlayOptions => ({
+  ...overlay,
+  height: POPOUT_TITLE_BAR_HEIGHT
+})
+
 /** The page's `--background`, so a resize never flashes the other theme's colour. */
 export const windowBackground = (dark: boolean): string => dark ? "#09090b" : "#ffffff"
 

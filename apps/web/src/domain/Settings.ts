@@ -22,7 +22,9 @@ export const GeneralSettings = Schema.Struct({
   /** Whether Alt+dragging a translate handle moves a copy and leaves the selection in place, like the game. */
   altDragDuplicates: Schema.Boolean,
   /** Whether every Save also exports the map to the game (desktop), whatever the map's own Export on save says. */
-  exportOnSave: Schema.Boolean
+  exportOnSave: Schema.Boolean,
+  /** Where a project opens (desktop): `ask` shows the whereToOpen dialog; its Always do this stores the answer here. */
+  projectOpensIn: Schema.Literals(["ask", "thisWindow", "newWindow"])
 })
 
 export const EditorSettings = Schema.Struct({
@@ -78,7 +80,7 @@ export const LightingSettings = Schema.Struct({
   skyVisible: Schema.Boolean
 })
 
-/** Changed from the tool bar rather than the settings dialog, but persisted with the rest. */
+/** Changed from the tool bar rather than the Settings dialog, but persisted with the rest. */
 export const SnappingSettings = Schema.Struct({
   /** Whether gizmo translation lands on the world grid. */
   enabled: Schema.Boolean,
@@ -101,7 +103,7 @@ export const Settings = Schema.Struct({
 export type Settings = typeof Settings.Type
 
 export const defaultSettings: Settings = {
-  general: { units: "cm", creatorName: null, altDragDuplicates: true, exportOnSave: false },
+  general: { units: "cm", creatorName: null, altDragDuplicates: true, exportOnSave: false, projectOpensIn: "ask" },
   editor: { placeDistance: PLACE_DISTANCE, undoSelection: false },
   camera: {
     flySpeed: 2000,

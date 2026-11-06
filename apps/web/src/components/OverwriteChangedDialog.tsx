@@ -21,7 +21,7 @@ export function OverwriteChangedDialog({ open, onClose }: { readonly open: boole
   const label = changed === null ? "" : mapLabelOf(changed.name)
   return (
     <Dialog open={open && changed !== null} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent>
+      <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{label} was changed in the game</DialogTitle>
           <DialogDescription>
@@ -32,8 +32,8 @@ export function OverwriteChangedDialog({ open, onClose }: { readonly open: boole
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
+          <Button variant="outline" className="sm:mr-auto" onClick={() => void reimportFirst()}>Re-import first</Button>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button variant="outline" onClick={() => void reimportFirst()}>Re-import first</Button>
           <Button variant="destructive" onClick={() => void overwriteChangedExport()}>Back up and overwrite</Button>
         </DialogFooter>
       </DialogContent>

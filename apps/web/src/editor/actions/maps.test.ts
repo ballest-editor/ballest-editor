@@ -1,15 +1,96 @@
-import { assert, describe, it } from "@effect/vitest"
+import { assert, describe, it, vi } from "@effect/vitest"
 import { Effect } from "effect"
 import { setLevelData, setLevelNames } from "../../domain/edits"
 import type { MapFile } from "../../domain/MapFile"
+import { mapPrefsKeyOf } from "../../domain/MapPrefs"
 import { type Difficulty, difficultyOf, withDifficulty } from "../../domain/mapTags"
 import { MapCodec } from "../../services/MapCodec"
+import { MapPrefsStore } from "../../services/MapPrefsStore"
 import { makeTestDisk, projectFile, TEST_PROJECT } from "../../test/desktopBridge"
 import { balledits, edit, fileNameOf, layerFor, noticesWhile, reset, s } from "../../test/editorActions"
 import { readSample } from "../../test/samples"
 import { followOpenMapEffect, freshMapEffect, openProjectMapFile, openStartingMap, patchProjectMapEffect } from "./maps"
 import { openProjectMap } from "./project"
-import { refreshProject } from "./shared"
+import { refreshProject, saveTabPrefs } from "./shared"
+import { followViewLayouts } from "./viewLayouts"
+
+describe("view layouts", () => {
+  const disk = () => {
+    const first = fileNameOf(balledits[0]!)
+    const second = fileNameOf(balledits[1]!)
+    return {
+      first,
+      second,
+      disk: makeTestDisk({
+        [projectFile(first)]: readSample(balledits[0]!),
+        [projectFile(second)]: readSample(balledits[1]!)
+      })
+    }
+  }
+
+  it.effect("a map opens on the layout it was left with, and another map on its own", () => {
+    const { first, second, disk: files } = disk()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(first)
+      assert.strictEqual(s().viewLayout.kind, "single")
+      s().setViewLayoutKind("quad")
+      s().setPaneProjection(0, "left")
+      s().setPaneSplit({ x: 0.3 })
+      yield* saveTabPrefs()
+      const left = s().viewLayout
+
+      yield* reset
+      yield* openProjectMapFile(second)
+      assert.strictEqual(s().viewLayout.kind, "single")
+
+      yield* reset
+      yield* openProjectMapFile(first)
+      assert.deepStrictEqual(s().viewLayout, left)
+    }).pipe(Effect.provide(layerFor(files)))
+  })
+
+  it.effect("a map back on the default layout keeps no entry for it", () => {
+    const { first, disk: files } = disk()
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(first)
+      s().setViewLayoutKind("rows")
+      yield* saveTabPrefs()
+      s().setViewLayoutKind("single")
+      yield* saveTabPrefs()
+      const prefs = yield* MapPrefsStore.use((store) => store.load(mapPrefsKeyOf(s().doc.map)))
+      assert.isUndefined(prefs.viewLayout)
+    }).pipe(Effect.provide(layerFor(files)))
+  })
+
+  it("saves a changed layout once it settles, and nothing else", () => {
+    vi.useFakeTimers()
+    const saved: Array<string> = []
+    const stop = followViewLayouts((tabId) => saved.push(tabId))
+    try {
+      // a map coming in brings its layout: not a change
+      s().loadMap(s().doc.map, null, undefined, { viewLayout: { ...s().viewLayout, kind: "rows" } })
+      vi.advanceTimersByTime(1000)
+      assert.deepStrictEqual(saved, [])
+      // a dragged divider writes once
+      for (const x of [0.2, 0.3, 0.4]) {
+        s().setPaneSplit({ x })
+        vi.advanceTimersByTime(50)
+      }
+      assert.deepStrictEqual(saved, [])
+      vi.advanceTimersByTime(1000)
+      assert.deepStrictEqual(saved, [s().tabId])
+      // hover moves the active pane all the time: not a change
+      s().setActivePane(1)
+      vi.advanceTimersByTime(1000)
+      assert.strictEqual(saved.length, 1)
+    } finally {
+      stop()
+      vi.useRealTimers()
+    }
+  })
+})
 
 describe("map actions", () => {
   /** A project with the first two sample maps in it. */

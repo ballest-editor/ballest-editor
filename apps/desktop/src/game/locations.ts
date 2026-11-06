@@ -117,3 +117,7 @@ export const savedFolderCandidates = (
 }
 
 export const mapsFolderIn = (saved: string, path: PathRules): string => path.join(saved, "UserSavedMaps")
+
+/** The game's prefabs folder, in the same `Saved` folder as the maps folder (docs/FORMAT.md § Where files live). */
+export const prefabsFolderBeside = (mapsFolder: string, path: PathRules): string =>
+  path.join(path.dirname(mapsFolder), "SaveGames", "Prefabs")

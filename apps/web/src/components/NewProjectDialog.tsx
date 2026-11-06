@@ -1,12 +1,5 @@
 import { Button } from "@workspace/ui/components/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from "@workspace/ui/components/dialog"
+import { DialogFooter } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { type ReactNode, useState } from "react"
@@ -15,6 +8,7 @@ import { isProjectName } from "../domain/project"
 import { newProject } from "../editor/actions"
 import { useEditor } from "../editor/store"
 import { PathText } from "./PathText"
+import { TitledDialog } from "./TitledDialog"
 
 /**
  * The name a new project goes by, and where that puts it under `projectsFolder` (`Documents/Ballest Editor`).
@@ -66,23 +60,21 @@ export function NewProjectForm({ actions, onCreate }: {
 }
 
 /**
- * File › New project… (desktop): the folder's name is all it asks, and where it opens comes next (`newProject`). The
- * dialog stays up until that's settled, so a name main refuses can be changed. Open project… is the way to use a folder
- * elsewhere.
+ * File › New project… (desktop): the folder's name is all it asks, and where it opens comes next (`newProject`). A name
+ * main refuses leaves the dialog up, so it can be changed. Open project… is the way to use a folder elsewhere.
  */
 export function NewProjectDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>New project</DialogTitle>
-          <DialogDescription>A folder of maps, exported to the game one by one.</DialogDescription>
-        </DialogHeader>
-        <NewProjectForm
-          actions={<Button type="button" variant="outline" onClick={onClose}>Cancel</Button>}
-          onCreate={(name) => void newProject(name)}
-        />
-      </DialogContent>
-    </Dialog>
+    <TitledDialog
+      open={open}
+      onClose={onClose}
+      title="New project"
+      description="A folder of maps, exported to the game one by one."
+    >
+      <NewProjectForm
+        actions={<Button type="button" variant="outline" onClick={onClose}>Cancel</Button>}
+        onCreate={(name) => void newProject(name)}
+      />
+    </TitledDialog>
   )
 }

@@ -2,8 +2,10 @@
 import { DateTime, Effect, Layer } from "effect"
 import { mapLabelOf } from "../domain/factory"
 import { lightingOf } from "../domain/sunlight"
-import { refreshProject } from "../editor/actions/shared"
-import { type DialogState, useEditor } from "../editor/store"
+import { freshMapEffect, newMapEffect } from "../editor/actions/maps"
+import { saveMapAsEffect } from "../editor/actions/save"
+import { hasProject, refreshProject } from "../editor/actions/shared"
+import { type DialogState, isBlankTab, useEditor } from "../editor/store"
 import { MapCodec } from "../services/MapCodec"
 import { MapExporter } from "../services/MapExporter"
 import { MapPrefsStore } from "../services/MapPrefsStore"
@@ -36,10 +38,32 @@ export const edit = () => {
 /** A clean editor over the disk's project, as the app has after its startup load: one tab, with a fresh map. */
 export const reset = Effect.gen(function*() {
   useEditor.setState({ tabIds: [s().tabId], parkedTabs: new Map() })
-  s().loadMap(s().doc.map, null, undefined, { fresh: true })
+  yield* freshMapEffect
   s().closeDialog()
   yield* refreshProject
 })
+
+/**
+ * A map called `displayName` the way a user gets one: New map (the blank tab serves as the first, so tests count only
+ * the maps they make), its name, and in a project its first Save. In Untitled Project it stays unsaved, with its edit.
+ */
+export const createNewMap = Effect.fnUntraced(function*(displayName: string, creatorName: string) {
+  if (!isBlankTab(s())) yield* newMapEffect
+  s().renameLevel(displayName, creatorName)
+  if (hasProject()) yield* saveMapAsEffect()
+})
+
+/**
+ * The Save map dialog's Submit: it takes what comes next, closes itself, names the map and saves. Its file name after.
+ */
+export const submitSaveMap = (displayName: string) =>
+  Effect.gen(function*() {
+    const afterSave = afterSaveOf(s().dialog)
+    s().closeDialog()
+    s().renameLevel(displayName, "Isaac")
+    yield* saveMapAsEffect(afterSave)
+    return s().file?.name ?? ""
+  })
 
 /** Collects what the store would toast, for the rest of the effect. */
 export const noticesWhile = <A, E, R>(body: (notices: Array<string>) => Effect.Effect<A, E, R>) =>

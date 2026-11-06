@@ -10,7 +10,14 @@ import {
   type ElectronWindowLoadError
 } from "../electron/ElectronWindow"
 import { DesktopSettings, type WindowState } from "../settings/DesktopSettings"
-import { titleBarOverlay, windowBackground, windowShortcutOf } from "./chrome"
+import {
+  isAppUrl,
+  isPopoutUrl,
+  popoutWindowOptions,
+  titleBarOverlay,
+  windowBackground,
+  windowShortcutOf
+} from "./chrome"
 
 const DEFAULT_SIZE = { width: 1440, height: 900 }
 /** The editor's panels and viewport need about this much room. */
@@ -26,12 +33,6 @@ const isOnScreen = (state: WindowState, workAreas: ReadonlyArray<Electron.Rectan
 const windowState = (window: Electron.BrowserWindow): WindowState => {
   const bounds = window.isMaximized() || window.isFullScreen() ? window.getNormalBounds() : window.getBounds()
   return { ...bounds, maximized: window.isMaximized() }
-}
-
-/** Same scheme and host as the app; `URL.origin` is "null" for every custom scheme, so it can't be compared. */
-const isAppUrl = (target: string, app: URL) => {
-  const url = URL.parse(target)
-  return url !== null && url.protocol === app.protocol && url.host === app.host
 }
 
 export class DesktopWindow extends Context.Service<DesktopWindow, {
@@ -105,13 +106,16 @@ export class DesktopWindow extends Context.Service<DesktopWindow, {
 
         // A menu bar never shows. Unpackaged builds keep a menu only for its reload and DevTools keys (devMenuTemplate).
         window.setMenuBarVisibility(false)
-        window.webContents.on("before-input-event", (event, input) => {
-          const shortcut = windowShortcutOf(input)
-          if (shortcut === undefined) return
-          event.preventDefault()
-          if (shortcut === "quit") window.close()
-          else window.setFullScreen(!window.isFullScreen())
-        })
+        // Quit is the editor window's close, from a panel's window too: that's where the unsaved-changes prompt is.
+        const handleShortcuts = (target: Electron.BrowserWindow) =>
+          target.webContents.on("before-input-event", (event, input) => {
+            const shortcut = windowShortcutOf(input)
+            if (shortcut === undefined) return
+            event.preventDefault()
+            if (shortcut === "quit") window.close()
+            else target.setFullScreen(!target.isFullScreen())
+          })
+        handleShortcuts(window)
 
         window.once("ready-to-show", () => {
           if (Option.isSome(restored) && restored.value.maximized) window.maximize()
@@ -119,16 +123,31 @@ export class DesktopWindow extends Context.Service<DesktopWindow, {
         })
 
         // A window never opens another in this process (a new window is a new copy, WindowLauncher) or navigates away from
-        // itself: links go to the browser.
+        // itself: links go to the browser. The one exception is a panel popped out into a window of its own, which stays
+        // part of this page: the page reaches into it directly, so it must be a same-origin child, in this process.
         const runFork = Effect.runForkWith(yield* Effect.context())
-        window.webContents.setWindowOpenHandler(({ url: target }) => {
-          runFork(shell.openExternal(target))
-          return { action: "deny" }
-        })
-        window.webContents.on("will-navigate", (event, target) => {
-          if (isAppUrl(target, appUrl)) return
-          event.preventDefault()
-          runFork(shell.openExternal(target))
+        const keepLinksOut = (target: Electron.BrowserWindow) => {
+          target.webContents.setWindowOpenHandler(({ url: opened }) => {
+            if (target === window && isPopoutUrl(opened, appUrl)) {
+              return {
+                action: "allow",
+                overrideBrowserWindowOptions: popoutWindowOptions(window, environment.iconPath)
+              }
+            }
+            runFork(shell.openExternal(opened))
+            return { action: "deny" }
+          })
+          target.webContents.on("will-navigate", (event, opened) => {
+            if (isAppUrl(opened, appUrl)) return
+            event.preventDefault()
+            runFork(shell.openExternal(opened))
+          })
+        }
+        keepLinksOut(window)
+        window.webContents.on("did-create-window", (popout) => {
+          popout.setMenuBarVisibility(false)
+          handleShortcuts(popout)
+          keepLinksOut(popout)
         })
 
         yield* electronWindow.load(window, url)

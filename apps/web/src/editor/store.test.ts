@@ -5,11 +5,24 @@ import { Catalog } from "../domain/Catalog"
 import type { UeTransform, Vec3 } from "../domain/coords"
 import { setLevelNames, withLevelNames } from "../domain/edits"
 import { placementTransform } from "../domain/factory"
+import { nodeKeys } from "../domain/groupSelection"
 import { isPlayerStart } from "../domain/MapFile"
 import { withDifficulty } from "../domain/mapTags"
 import { mirrorFlagsOf } from "../domain/mirror"
 import { defaultSettings } from "../domain/Settings"
-import { initialMap, nextSelection, pivotOf, shownLighting, shownTransform, useEditor } from "./store"
+import { loadStructure, sidecarOf, structureOfMap } from "../domain/sidecar"
+import { treeKeys } from "../domain/structure"
+import { defaultViewLayout } from "../domain/viewLayout"
+import {
+  gameMapOf,
+  initialMap,
+  nextSelection,
+  nodeNamesOf,
+  pivotOf,
+  shownLighting,
+  shownTransform,
+  useEditor
+} from "./store"
 
 const cube = Schema.decodeUnknownSync(Catalog)(fixture).pieces.find((p) => p.className === "BP_Prim_Cube")!
 
@@ -70,7 +83,7 @@ describe("editor store", () => {
     const s = () => useEditor.getState()
     s().loadMap(initialMap(), null, 1200)
     assert.strictEqual(s().floorHeight, 1200)
-    s().setFloorHeight(-50)
+    s().patchTab(s().tabId, { floorHeight: -50 })
     assert.strictEqual(s().floorHeight, -50)
     assert.strictEqual(s().past.length, 0)
   })
@@ -337,15 +350,15 @@ describe("editor store", () => {
     }
 
     it("selects with replace, add and toggle clicks", () => {
-      assert.deepStrictEqual(nextSelection(["a", "b"], "c", "replace"), ["c"])
-      assert.deepStrictEqual(nextSelection(["a", "b"], null, "replace"), [])
-      assert.deepStrictEqual(nextSelection(["a", "b"], "c", "add"), ["a", "b", "c"])
-      assert.deepStrictEqual(nextSelection(["a", "b"], "a", "add"), ["b", "a"]) // re-adding makes it active
-      assert.deepStrictEqual(nextSelection(["a", "b"], "a", "toggle"), ["b"])
-      assert.deepStrictEqual(nextSelection(["a", "b"], "c", "toggle"), ["a", "b", "c"])
+      assert.deepStrictEqual(nextSelection(["a", "b"], ["c"], "replace"), ["c"])
+      assert.deepStrictEqual(nextSelection(["a", "b"], [], "replace"), [])
+      assert.deepStrictEqual(nextSelection(["a", "b"], ["c"], "add"), ["a", "b", "c"])
+      assert.deepStrictEqual(nextSelection(["a", "b"], ["a"], "add"), ["b", "a"]) // re-adding makes it active
+      assert.deepStrictEqual(nextSelection(["a", "b"], ["a"], "toggle"), ["b"])
+      assert.deepStrictEqual(nextSelection(["a", "b"], ["c"], "toggle"), ["a", "b", "c"])
       // a modifier click on empty space keeps the selection
-      assert.deepStrictEqual(nextSelection(["a", "b"], null, "add"), ["a", "b"])
-      assert.deepStrictEqual(nextSelection(["a", "b"], null, "toggle"), ["a", "b"])
+      assert.deepStrictEqual(nextSelection(["a", "b"], [], "add"), ["a", "b"])
+      assert.deepStrictEqual(nextSelection(["a", "b"], [], "toggle"), ["a", "b"])
     })
 
     it("keeps the selection a set", () => {
@@ -553,6 +566,7 @@ describe("editor store", () => {
     s().openDialog({ id: "settings" })
     assert.strictEqual(s().settingsCategory, "camera") // the last page shown when no category is given
     s().openDialog({ id: "saveAs" })
+    assert.strictEqual(s().dialog?.id, "saveAs")
     assert.strictEqual(s().settingsCategory, "camera")
     s().closeDialog()
     assert.isNull(s().dialog)
@@ -728,5 +742,517 @@ describe("document tabs", () => {
     state().setLightingPreview(null)
     state().activateTab(first)
     assert.strictEqual(state().tabId, first)
+  })
+})
+
+describe("document structure", () => {
+  const structure = () => state().doc.structure
+  const tree = () => structure().tree
+  /** The tree as nested lists: an item's key, or a group's name and children. */
+  const shape = (nodes = tree()): ReadonlyArray<unknown> =>
+    nodes.map((node) => node.kind === "item" ? node.key : [node.name, shape(node.children)])
+  /** The store's one rule: `ids` and the tree hold the same items, each in one place. */
+  const assertConsistent = () => {
+    const placed = treeKeys(tree())
+    assert.lengthOf(placed, state().doc.ids.length)
+    assert.sameMembers([...placed], [...state().doc.ids])
+  }
+  /** A map of the player start and three cubes, and their keys. */
+  const threeCubes = () => {
+    mapWithCubes(0, 100, 200)
+    const [start = "", a = "", b = "", c = ""] = state().doc.ids
+    return { start, a, b, c }
+  }
+  /** Those cubes as `Outer` holding `Inner` (the first two cubes) and the third. */
+  const nestedGroups = () => {
+    const cubes = threeCubes()
+    const inner = state().groupItems([cubes.a, cubes.b], "Inner")!
+    const outer = state().groupItems([cubes.c], "Outer")!
+    state().moveNodes([inner], outer, 0)
+    return { ...cubes, inner }
+  }
+  /** `action` as one undo step: undo goes back to the shape before it, redo to the shape after. */
+  const assertUndoable = (action: () => void) => {
+    const before = state().doc
+    const steps = state().past.length
+    action()
+    assertConsistent()
+    assert.strictEqual(state().past.length, steps + 1)
+    assert.isTrue(state().dirty)
+    const after = state().doc
+    state().undo()
+    assert.strictEqual(state().doc, before)
+    state().redo()
+    assert.strictEqual(state().doc, after)
+  }
+
+  it("gives every item a key when it enters the document, one identity with the selection", () => {
+    const { a } = threeCubes()
+    assert.match(a, /^[\w-]{12}$/)
+    assert.deepStrictEqual(state().selectedIds, state().doc.ids.slice(3))
+    assertConsistent()
+  })
+
+  it("renames an item, and clears the name with null", () => {
+    const { a } = threeCubes()
+    assertUndoable(() => state().renameItem(a, "Left ramp"))
+    assert.deepStrictEqual(structure().items.get(a), { name: "Left ramp" })
+    assert.deepStrictEqual(nodeNamesOf(state()).get(a), { name: "Left ramp", ordinal: undefined })
+    assertUndoable(() => state().renameItem(a, null))
+    assert.isFalse(structure().items.has(a))
+    const steps = state().past.length
+    state().renameItem(a, null)
+    state().renameItem("gone", "x")
+    assert.strictEqual(state().past.length, steps)
+  })
+
+  it("groups items where the first key was, and answers the group's id", () => {
+    const { a, b, c, start } = threeCubes()
+    let id: string | undefined
+    assertUndoable(() => {
+      id = state().groupItems([b, c])
+    })
+    assert.deepStrictEqual(shape(), [start, a, ["Group", [b, c]]])
+    const group = tree().find((node) => node.kind === "group")
+    assert.strictEqual(group?.kind === "group" ? group.id : undefined, id)
+    assert.isUndefined(state().groupItems(["gone"]))
+  })
+
+  it("pulls a selection that spans groups out of them, and a group left empty goes", () => {
+    const { a, b, c, start } = threeCubes()
+    state().groupItems([a, b], "One")
+    state().groupItems([c], "Two")
+    assertUndoable(() => state().groupItems([a, c], "Three"))
+    assert.deepStrictEqual(shape(), [start, ["One", [["Three", [a, c]], b]]])
+  })
+
+  it("renames and tags a group, and tags an item", () => {
+    const { a, b } = threeCubes()
+    const id = state().groupItems([a, b])!
+    assertUndoable(() => state().renameGroup(id, "Bridge"))
+    assertUndoable(() => state().setTags(id, ["start", "start ", "fast"]))
+    assertUndoable(() => state().setTags(a, ["fast"]))
+    const group = tree().find((node) => node.kind === "group")
+    assert.deepInclude(group, { name: "Bridge", tags: ["start", "fast"] })
+    assert.deepStrictEqual(structure().items.get(a), { tags: ["fast"] })
+    const steps = state().past.length
+    state().renameGroup(id, " ")
+    state().setTags(a, ["fast"])
+    assert.strictEqual(state().past.length, steps)
+  })
+
+  it("ungroups into the parent, where the group was", () => {
+    const { a, b, c, start } = nestedGroups()
+    assert.deepStrictEqual(shape(), [start, ["Outer", [["Inner", [a, b]], c]]])
+    state().select([a, b])
+    assertUndoable(() => state().ungroupSelection())
+    assert.deepStrictEqual(shape(), [start, ["Outer", [a, b, c]]])
+  })
+
+  it("moves nodes, refusing a group into itself", () => {
+    const { a, b, c, start } = threeCubes()
+    const id = state().groupItems([a, b], "G")!
+    assertUndoable(() => state().moveNodes([c], id, 1))
+    assert.deepStrictEqual(shape(), [start, ["G", [a, c, b]]])
+    assertUndoable(() => state().moveNodes([id], null, 0))
+    assert.deepStrictEqual(shape(), [["G", [a, c, b]], start])
+    const steps = state().past.length
+    state().moveNodes([id], id, 0)
+    assert.strictEqual(state().past.length, steps)
+  })
+
+  it("places a new item loose at the end", () => {
+    const { a, b, c, start } = threeCubes()
+    state().groupItems([a, b], "G")
+    assertUndoable(() => state().placePiece(cube, placementTransform(cube, { x: 300, y: 0, z: 0 })))
+    assert.deepStrictEqual(shape(), [start, ["G", [a, b]], c, state().doc.ids[4]])
+  })
+
+  it("takes deleted items out of the tree with their data, and undo brings them back", () => {
+    const { a, b, c, start } = threeCubes()
+    state().groupItems([a, b], "G")
+    state().renameItem(a, "Named")
+    state().select([a, b])
+    assertUndoable(() => state().deleteSelection())
+    assert.deepStrictEqual(shape(), [start, c])
+    assert.isFalse(structure().items.has(a))
+    state().undo()
+    assert.deepStrictEqual(shape(), [start, ["G", [a, b]], c])
+    assert.deepStrictEqual(structure().items.get(a), { name: "Named" })
+  })
+
+  it("duplicates a whole group as a new group beside it, keeping names and tags", () => {
+    const { a, b, c, start } = threeCubes()
+    state().groupItems([a, b], "G")
+    state().renameItem(a, "Named")
+    state().setTags(b, ["t"])
+    state().select([a, b])
+    assertUndoable(() => state().duplicateSelection())
+    const [copyA = "", copyB = ""] = state().selectedIds
+    assert.deepStrictEqual(shape(), [start, ["G", [a, b]], ["G", [copyA, copyB]], c])
+    assert.deepStrictEqual(structure().items.get(copyA), { name: "Named" })
+    assert.deepStrictEqual(structure().items.get(copyB), { tags: ["t"] })
+    const groups = tree().flatMap((node) => node.kind === "group" ? [node.id] : [])
+    assert.strictEqual(new Set(groups).size, 2)
+  })
+
+  it("duplicates nested groups with their shape", () => {
+    const { a, b, c, start } = nestedGroups()
+    state().select([a, b, c])
+    state().duplicateSelection()
+    const [copyA, copyB, copyC] = state().selectedIds
+    assert.deepStrictEqual(shape(), [
+      start,
+      ["Outer", [["Inner", [a, b]], c]],
+      ["Outer", [["Inner", [copyA, copyB]], copyC]]
+    ])
+    assertConsistent()
+  })
+
+  it("keeps a copy of part of a group in that group", () => {
+    const { a, b, c, start } = threeCubes()
+    state().groupItems([a, b], "G")
+    state().select([a])
+    state().duplicateSelection()
+    assert.deepStrictEqual(shape(), [start, ["G", [a, state().selectedIds[0], b]], c])
+  })
+
+  it("cuts and pastes a group with its structure", () => {
+    const { a, b, c, start } = threeCubes()
+    state().groupItems([a, b], "G")
+    state().select([a, b])
+    assertUndoable(() => state().cutSelection())
+    assert.deepStrictEqual(shape(), [start, c])
+    assertUndoable(() => state().paste())
+    const [copyA, copyB] = state().selectedIds
+    assert.deepStrictEqual(shape(), [start, c, ["G", [copyA, copyB]]])
+  })
+
+  it("pastes into another tab's map, where the sources don't exist", () => {
+    const { a, b } = threeCubes()
+    state().groupItems([a, b], "G")
+    state().select([a, b])
+    state().copySelection()
+    state().loadMap(startOnlyMap(), null, undefined, { into: "newTab" })
+    state().paste()
+    assertConsistent()
+    assert.deepStrictEqual(shape(), [state().doc.ids[0], ["G", [...state().selectedIds]]])
+  })
+
+  it("keeps the tree through an Alt+drag duplicate, committed or cancelled", () => {
+    const { a, b, c, start } = threeCubes()
+    state().groupItems([a, b], "G")
+    state().select([a, b])
+    const before = state().doc
+    state().beginDuplicateDrag()
+    assertConsistent()
+    assert.strictEqual(state().endDuplicateDrag(null), false)
+    assert.strictEqual(state().doc, before)
+
+    const copies = state().beginDuplicateDrag()!
+    const [copyA = "", copyB = ""] = [...copies.values()]
+    const moved = new Map(
+      [...copies.values()].map((id) => [id, { ...transformOf(id), translation: { x: 1, y: 2, z: 3 } }])
+    )
+    assert.isTrue(state().endDuplicateDrag(moved))
+    assertConsistent()
+    assert.deepStrictEqual(shape(), [start, ["G", [a, b]], ["G", [copyA, copyB]], c])
+    state().undo()
+    assert.strictEqual(state().doc, before)
+  })
+
+  it("loads what a sidecar gives, keeping keys and structure", () => {
+    const { a, b } = threeCubes()
+    state().groupItems([a, b], "G")
+    state().renameItem(a, "Named")
+    const { doc } = state()
+    const hash = "a".repeat(64)
+    const sidecar = sidecarOf(doc.map, doc.ids, doc.structure, hash)
+    state().loadMap(doc.map, null, undefined, { loaded: loadStructure(doc.map, hash, sidecar) })
+    assert.deepStrictEqual(state().doc.ids, doc.ids)
+    assert.deepStrictEqual(state().doc.structure.tree, doc.structure.tree)
+    assert.deepStrictEqual(structure().items.get(a), { name: "Named" })
+  })
+
+  it("makes a tree of the game groups of a map that has no sidecar", () => {
+    const map = startOnlyMap()
+    const { ids } = structureOfMap(map)
+    assert.lengthOf(ids, 1)
+    state().loadMap(map, null)
+    assertConsistent()
+  })
+
+  it("projects its groups into the map the game gets, and the document's own map isn't touched", () => {
+    const { a, b } = threeCubes()
+    state().groupItems([a, b], "G 1")
+    const { doc } = state()
+    assert.deepStrictEqual(gameMapOf(doc, null).editorState?.groups.map((g) => [g.members, g.name]), [[[1, 2], "G1"]])
+    assert.deepStrictEqual(doc.map.editorState?.groups, [])
+  })
+})
+
+describe("groups and the selection", () => {
+  /** A new map with four cubes: inner > (a, b) and outer > (inner, c), then d loose; nothing selected. */
+  const nestedMap = () => {
+    mapWithCubes(0, 100, 200, 300)
+    const [, a, b, c, d] = state().doc.ids
+    const inner = state().groupItems([a!, b!], "Inner")!
+    const outer = state().groupItems([inner, c!], "Outer")!
+    state().select([])
+    return { a: a!, b: b!, c: c!, d: d!, inner, outer }
+  }
+  const selected = () => [...state().selectedIds].sort()
+  const sorted = (...keys: ReadonlyArray<string>) => [...keys].sort()
+
+  it("selects the outermost group on a click, with the clicked item active", () => {
+    const { a, b, c } = nestedMap()
+    state().clickItem(b, "replace")
+    assert.deepStrictEqual(selected(), sorted(a, b, c))
+    assert.strictEqual(state().selectedIds.at(-1), b)
+  })
+
+  it("adds and toggles a whole group", () => {
+    const { a, b, c, d } = nestedMap()
+    state().clickItem(d, "replace")
+    state().clickItem(a, "add")
+    assert.deepStrictEqual(selected(), sorted(a, b, c, d))
+    state().clickItem(b, "toggle")
+    assert.deepStrictEqual(selected(), [d])
+    state().clickItem(null, "toggle")
+    assert.deepStrictEqual(selected(), [d])
+  })
+
+  it("enters a level per double-click", () => {
+    const { a, b, inner, outer } = nestedMap()
+    state().doubleClickItem(a)
+    assert.strictEqual(state().enteredGroupId, outer)
+    assert.deepStrictEqual(selected(), sorted(a, b))
+    state().doubleClickItem(a)
+    assert.strictEqual(state().enteredGroupId, inner)
+    assert.deepStrictEqual(selected(), [a])
+    state().doubleClickItem(a)
+    assert.strictEqual(state().enteredGroupId, inner)
+  })
+
+  it("clicks at the entered level", () => {
+    const { a, b, c, outer } = nestedMap()
+    state().doubleClickItem(a)
+    state().clickItem(c, "replace")
+    assert.deepStrictEqual(selected(), [c])
+    state().clickItem(b, "replace")
+    assert.deepStrictEqual(selected(), sorted(a, b))
+    assert.strictEqual(state().enteredGroupId, outer)
+  })
+
+  it("leaves on a click on empty space or outside the group", () => {
+    const { a, d } = nestedMap()
+    state().doubleClickItem(a)
+    state().clickItem(null, "add")
+    assert.isNotNull(state().enteredGroupId)
+    state().clickItem(null, "replace")
+    assert.isNull(state().enteredGroupId)
+    assert.deepStrictEqual(selected(), [])
+    state().doubleClickItem(a)
+    state().clickItem(d, "replace")
+    assert.isNull(state().enteredGroupId)
+    assert.deepStrictEqual(selected(), [d])
+  })
+
+  it("steps out one level on deselect, then clears", () => {
+    const { a, b, c, outer } = nestedMap()
+    state().doubleClickItem(a)
+    state().doubleClickItem(a)
+    state().deselect()
+    assert.strictEqual(state().enteredGroupId, outer)
+    assert.deepStrictEqual(selected(), sorted(a, b))
+    state().deselect()
+    assert.isNull(state().enteredGroupId)
+    assert.deepStrictEqual(selected(), sorted(a, b, c))
+    state().deselect()
+    assert.deepStrictEqual(selected(), [])
+  })
+
+  it("forgets an entered group that goes, and one undo brings back", () => {
+    const { a, inner } = nestedMap()
+    state().select(nodeKeys(state().doc.structure.tree, inner))
+    state().enterGroup(inner)
+    state().ungroupSelection()
+    assert.isNull(state().enteredGroupId)
+    state().enterGroup("gone")
+    state().undo()
+    assert.isNull(state().enteredGroupId)
+    state().doubleClickItem(a)
+    assert.isNotNull(state().enteredGroupId)
+  })
+
+  it("keeps the entered group and the collapsed groups per tab", () => {
+    const { inner, outer } = nestedMap()
+    state().enterGroup(inner)
+    state().setGroupCollapsed(outer, true)
+    const first = state().tabId
+    state().loadMap(startOnlyMap(), null, undefined, { into: "newTab" })
+    assert.isNull(state().enteredGroupId)
+    assert.strictEqual(state().collapsedGroups.size, 0)
+    state().activateTab(first)
+    assert.strictEqual(state().enteredGroupId, inner)
+    assert.isTrue(state().collapsedGroups.has(outer))
+  })
+
+  it("keeps collapsed groups out of the history", () => {
+    const { a, outer } = nestedMap()
+    const steps = state().past.length
+    state().setGroupCollapsed(outer, true)
+    assert.strictEqual(state().past.length, steps)
+    state().renameItem(a, "Named")
+    state().undo()
+    assert.isTrue(state().collapsedGroups.has(outer))
+    state().expandGroups([outer])
+    assert.isFalse(state().collapsedGroups.has(outer))
+  })
+
+  it("groups the selection, whole groups staying whole", () => {
+    const { a, b, c, d, outer } = nestedMap()
+    state().select([a, b, c, d])
+    state().groupSelection()
+    const top = state().doc.structure.tree.find((node) => node.kind === "group")
+    assert.deepStrictEqual(top?.kind === "group" ? top.children.map((n) => n.kind === "group" ? n.id : n.key) : [], [
+      outer,
+      d
+    ])
+    assert.deepStrictEqual(selected(), sorted(a, b, c, d))
+    state().undo()
+    assert.strictEqual(state().doc.structure.tree.filter((node) => node.kind === "group").length, 1)
+  })
+
+  it("won't wrap one whole group in another", () => {
+    const { a, b, c } = nestedMap()
+    state().select([a, b, c])
+    const steps = state().past.length
+    state().groupSelection()
+    assert.strictEqual(state().past.length, steps)
+  })
+
+  it("ungroups every whole group in the selection as one step", () => {
+    const { a, b, c, d } = nestedMap()
+    state().select([d])
+    state().groupSelection()
+    state().select([a, b, c, d])
+    const steps = state().past.length
+    state().ungroupSelection()
+    assert.strictEqual(state().past.length, steps + 1)
+    assert.deepStrictEqual(selected(), sorted(a, b, c, d))
+  })
+
+  it("moves several nodes as one undo step", () => {
+    const { a, c, d, inner } = nestedMap()
+    const steps = state().past.length
+    state().moveNodes([c, d], inner, 0)
+    assert.strictEqual(state().past.length, steps + 1)
+    assert.deepStrictEqual(treeKeys(state().doc.structure.tree).slice(1, 4), [c, d, a])
+    state().undo()
+    assert.strictEqual(state().past.length, steps)
+  })
+
+  it("deletes and duplicates a group through the expanded selection", () => {
+    const { a, c } = nestedMap()
+    const groups = () => state().doc.structure.tree.filter((node) => node.kind === "group").length
+    state().clickItem(a, "replace")
+    state().duplicateSelection()
+    assert.strictEqual(groups(), 2)
+    assert.strictEqual(state().selectedIds.length, 3)
+    state().deleteSelection()
+    assert.strictEqual(groups(), 1)
+    state().clickItem(c, "replace")
+    state().deleteSelection()
+    assert.strictEqual(groups(), 0)
+  })
+})
+
+describe("view panes", () => {
+  const twoTabs = () => {
+    const first = useEditor.getState().tabId
+    useEditor.getState().loadMap(initialMap(), null, undefined, { into: "newTab" })
+    return { first, second: useEditor.getState().tabId }
+  }
+  /** One tab on a map of its own, whatever came before. */
+  const resetStore = () => {
+    useEditor.setState({ tabIds: [state().tabId], parkedTabs: new Map() })
+    state().loadMap(initialMap(), null)
+  }
+
+  it("keeps each tab's layout and active pane as it was left", () => {
+    resetStore()
+    const { first, second } = twoTabs()
+    state().setViewLayoutKind("quad")
+    state().setActivePane(3)
+    state().setPaneProjection(3, "bottom")
+    state().activateTab(first)
+    assert.strictEqual(state().viewLayout.kind, "single")
+    assert.strictEqual(state().activePane, 0)
+    state().activateTab(second)
+    assert.strictEqual(state().viewLayout.kind, "quad")
+    assert.strictEqual(state().activePane, 3)
+    assert.strictEqual(state().viewLayout.projections[3], "bottom")
+  })
+
+  it("opens a map on the layout remembered for it, or the default", () => {
+    resetStore()
+    const viewLayout = { ...defaultViewLayout, kind: "rows" as const }
+    state().loadMap(initialMap(), null, undefined, { viewLayout })
+    assert.deepStrictEqual(state().viewLayout, viewLayout)
+    state().loadMap(initialMap(), null)
+    assert.deepStrictEqual(state().viewLayout, defaultViewLayout)
+  })
+
+  it("moves the active pane when a smaller layout no longer shows it", () => {
+    resetStore()
+    state().setViewLayoutKind("quad")
+    state().setActivePane(3)
+    state().setViewLayoutKind("columns")
+    assert.strictEqual(state().activePane, 1)
+    state().setViewLayoutKind("single")
+    assert.strictEqual(state().activePane, 0)
+  })
+
+  it("keeps what a hidden slot looks along", () => {
+    resetStore()
+    state().setViewLayoutKind("quad")
+    state().setPaneProjection(2, "back")
+    state().setViewLayoutKind("single")
+    state().setViewLayoutKind("quad")
+    assert.deepStrictEqual(state().viewLayout.projections, ["perspective", "top", "back", "right"])
+  })
+
+  it("holds the dividers off the edges and moves them one at a time", () => {
+    resetStore()
+    state().setPaneSplit({ x: 0.01 })
+    assert.strictEqual(state().viewLayout.splitX, 0.1)
+    assert.strictEqual(state().viewLayout.splitY, 0.5)
+    state().setPaneSplit({ y: 2 })
+    assert.strictEqual(state().viewLayout.splitX, 0.1)
+    assert.strictEqual(state().viewLayout.splitY, 0.9)
+  })
+
+  it("doesn't touch the map, its history or the dirty flag", () => {
+    resetStore()
+    const { doc, past } = state()
+    state().setViewLayoutKind("quad")
+    state().setPaneProjection(0, "top")
+    state().setPaneSplit({ x: 0.3 })
+    state().setActivePane(1)
+    assert.strictEqual(state().doc, doc)
+    assert.strictEqual(state().past, past)
+    assert.isFalse(state().dirty)
+  })
+
+  it("frames the whole map in every pane when one is loaded, and only the active pane on request", () => {
+    resetStore()
+    const { frameAllRequest, mapShownRequest } = state()
+    state().requestFrameAll()
+    assert.strictEqual(state().frameAllRequest, frameAllRequest + 1)
+    assert.strictEqual(state().mapShownRequest, mapShownRequest)
+    state().loadMap(initialMap(), null)
+    assert.strictEqual(state().frameAllRequest, frameAllRequest + 1)
+    assert.strictEqual(state().mapShownRequest, mapShownRequest + 1)
   })
 })

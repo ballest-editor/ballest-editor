@@ -3,6 +3,7 @@
  * the same action, so the two can't drift apart.
  */
 import type { KeybindAction } from "../domain/Keybinds"
+import type { ViewProjection } from "../domain/viewLayout"
 import {
   closeActiveTab,
   cycleTab,
@@ -13,7 +14,13 @@ import {
   saveMap,
   startNewMap
 } from "./actions"
+import { sceneRegistry } from "./sceneRegistry"
 import { useEditor } from "./store"
+
+const lookAlong = (projection: ViewProjection) => {
+  const { activePane, setPaneProjection } = useEditor.getState()
+  setPaneProjection(activePane, projection)
+}
 
 /**
  * The command for each one-shot action. Held keys and mouse drags aren't here (FlyCamera
@@ -28,7 +35,9 @@ export const actionCommands = {
   cutSelection: () => useEditor.getState().cutSelection(),
   paste: () => useEditor.getState().paste(),
   focusSelection: () => useEditor.getState().requestFocus(),
-  deselect: () => useEditor.getState().select([]),
+  deselect: () => useEditor.getState().deselect(),
+  groupSelection: () => useEditor.getState().groupSelection(),
+  ungroupSelection: () => useEditor.getState().ungroupSelection(),
   selectMode: () => useEditor.getState().setTool("select"),
   translateMode: () => useEditor.getState().setTool("translate"),
   rotateMode: () => useEditor.getState().setTool("rotate"),
@@ -36,14 +45,23 @@ export const actionCommands = {
   toggleGizmoSpace: () => useEditor.getState().toggleGizmoSpace(),
   speedFaster: () => useEditor.getState().changeSpeed(1),
   speedSlower: () => useEditor.getState().changeSpeed(-1),
-  newMap: startNewMap,
+  viewTop: () => lookAlong("top"),
+  viewBottom: () => lookAlong("bottom"),
+  viewFront: () => lookAlong("front"),
+  viewBack: () => lookAlong("back"),
+  viewRight: () => lookAlong("right"),
+  viewLeft: () => lookAlong("left"),
+  toggleOrthographic: () => lookAlong(sceneRegistry.toggledProjection()),
+  frameAll: () => useEditor.getState().requestFrameAll(),
+  newMap: () => void startNewMap(),
   /** Import… on desktop, Open… in a browser. */
   openMap: () => void importMap(),
   saveMap: () => void saveMap(),
   /** Duplicate… on desktop (Save as is gone: the location is the project), Export… (a download) in a browser. */
   saveMapAs: () => {
-    const { capabilities, openDialog } = useEditor.getState()
-    openDialog({ id: capabilities.projects ? "duplicate" : "saveAs" })
+    const { capabilities, document, openDialog } = useEditor.getState()
+    // a definition's copies are the Prefabs panel's
+    if (document.kind === "map") openDialog({ id: capabilities.projects ? "duplicate" : "saveAs" })
   },
   closeTab: () => void closeActiveTab(),
   nextTab: () => cycleTab(1),

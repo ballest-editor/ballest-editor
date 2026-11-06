@@ -4,11 +4,11 @@
  */
 import { Deferred, Effect, Stream } from "effect"
 import { mapLabelOf } from "../../domain/factory"
-import { MapCodec } from "../../services/MapCodec"
 import { Platform } from "../../services/Platform"
 import { useEditor } from "../store"
+import { checkPrefabs } from "./prefabs"
 import { notifyFailure, run, runUntilCleanup } from "./run"
-import { fileOf, refreshProject, showMap } from "./shared"
+import { fileOf, loadProjectMapFile, refreshProject, showMap } from "./shared"
 import { unlessCancelledFor } from "./unsaved"
 
 /** Tells that the game changed a map's export, with Re-import and Ignore. */
@@ -59,15 +59,16 @@ export const checkExports = () => run(checkExportsEffect)
 
 /**
  * Re-import: the game's version of a map replaces the project's (which goes to the project's backups), and the link
- * records it as in sync. A tab that has the map open is made active and reloaded from it, after asking about its
- * unsaved edits.
+ * records it as in sync. Its sidecar is re-matched against it, as on any open. A tab that has the map open is made
+ * active and reloaded from it, after asking about its unsaved edits.
  */
 export const reimportMapEffect = (fileName: string) =>
   unlessCancelledFor(fileName, "reimport", (open) =>
     Effect.gen(function*() {
       const file = yield* (yield* Platform).reimportMap(fileName)
-      if (open) yield* showMap(yield* MapCodec.use((codec) => codec.decode(file.text)), fileOf(file))
       yield* refreshProject
+      const { loaded, map } = yield* loadProjectMapFile(file)
+      if (open) yield* showMap(map, fileOf(file), { loaded })
       useEditor.getState().notify("info", `Re-imported ${mapLabelOf(fileName)} from the game`, {
         kind: "mapReimported",
         body: "The project's previous version is in the backups (Project › Recover previous version…).",
@@ -88,9 +89,9 @@ export const reimportFirst = () => run(reimportFirstEffect)
 
 /**
  * A game session Play started or joined has ended: the game may have changed the export (the in-game editor saves
- * over it), so the exports are checked.
+ * over it) or a prefab (`saveprefab`), so both are checked.
  */
-const playSessionEnded = Effect.suspend(() => checkExportsEffect)
+const playSessionEnded = Effect.suspend(() => checkExportsEffect.pipe(Effect.andThen(checkPrefabs)))
 
 /** Runs `playSessionEnded` at the end of each game session Play started, until interrupted. */
 export const followPlaySessionsEffect = Effect.gen(function*() {

@@ -4,11 +4,12 @@ import { Backups } from "./Backups"
 import { MapExports } from "./MapExports"
 import { MapFiles } from "./MapFiles"
 import { MapLinks } from "./MapLinks"
+import { Prefabs } from "./Prefabs"
 import { Projects } from "./Projects"
 
 /**
- * `Projects`, `MapFiles` and `MapExports` over the given folders (`exportBackups` keeps what Export wrote over), and
- * over one `MapLinks` and one `Backups`: each runs its writes one at a time, so the three must share them.
+ * `Projects`, `MapFiles`, `Prefabs` and `MapExports` over the given folders (`exportBackups` keeps what Export wrote
+ * over), and over one `MapLinks` and one `Backups`: each runs its writes one at a time, so they must share them.
  * `launchProject` is the `--project` the window was started with.
  */
 export const layerProjectsAt = (
@@ -19,6 +20,7 @@ export const layerProjectsAt = (
 ) =>
   Layer.effect(MapExports, MapExports.make(platform, exportBackups)).pipe(
     Layer.provideMerge(Layer.effect(MapFiles, MapFiles.make(platform, exportBackups))),
+    Layer.provideMerge(Layer.effect(Prefabs, Prefabs.make(exportBackups))),
     Layer.provideMerge(Layer.effect(Projects, Projects.make(projectsFolder, platform, launchProject))),
     Layer.provide(Layer.mergeAll(MapLinks.layer, Backups.layer))
   )

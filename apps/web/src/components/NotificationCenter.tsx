@@ -39,14 +39,14 @@ function NotificationItem({ notice }: { readonly notice: NotificationRecord }) {
               <Button
                 key={action.label}
                 variant="outline"
-                size="xs"
+                size="sm"
                 onClick={() => runNotificationAction(notice, action)}
               >
                 {action.label}
               </Button>
             ))}
             {mutable && (
-              <Button variant="ghost" size="xs" onClick={() => void muteNotificationKind(notice.kind)}>
+              <Button variant="ghost" size="sm" onClick={() => void muteNotificationKind(notice.kind)}>
                 Don't show again
               </Button>
             )}
@@ -66,7 +66,7 @@ function Section(
 ) {
   return (
     <section className="flex flex-col gap-1">
-      <h3 className="flex items-center gap-1 px-3 pt-1 text-[0.6875rem] font-medium text-muted-foreground uppercase">
+      <h3 className="flex items-center gap-1 px-3 pt-1 text-eyebrow text-muted-foreground">
         {pinned && <IconPin className="size-3" />}
         {title}
       </h3>
@@ -108,10 +108,10 @@ export function NotificationCenter() {
       <PopoverContent side="top" align="end" className="w-[26rem] gap-1 p-2">
         <div className="flex items-center gap-1 px-2 pt-1 pb-1">
           <PopoverTitle className="flex-1">Notifications</PopoverTitle>
-          <Button variant="ghost" size="xs" disabled={unread === 0} onClick={() => markRead()}>Mark all read</Button>
+          <Button variant="ghost" size="sm" disabled={unread === 0} onClick={() => markRead()}>Mark all read</Button>
           <Button
             variant="ghost"
-            size="xs"
+            size="sm"
             disabled={notifications.length === pinned.length}
             onClick={clear}
           >
@@ -122,9 +122,10 @@ export function NotificationCenter() {
         <ScrollArea className="[&_[data-slot=scroll-area-viewport]]:max-h-[min(60vh,32rem)]">
           <div className="flex flex-col gap-3 py-1 pr-3 pl-1">
             {notifications.length === 0 && (
-              <p className="px-2 py-6 text-center text-muted-foreground">
-                No notifications
-              </p>
+              <div className="flex flex-col items-center gap-1 px-2 py-6 text-center">
+                <p className="font-medium">No notifications</p>
+                <p className="text-muted-foreground">Exports, updates and problems with the game link land here.</p>
+              </div>
             )}
             {pinned.length > 0 && <Section title="Pinned" pinned notices={pinned} />}
             {days.map(({ day, notices }) => <Section key={day} title={day} notices={notices} />)}

@@ -6,8 +6,8 @@
 import { buttonVariants } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Skeleton } from "@workspace/ui/components/skeleton"
+import { cn } from "@workspace/ui/lib/utils"
 import { sceneBackgroundClass } from "../editor/sceneColors"
-import { panelWidthVar } from "./SidePanel"
 import { TopBar } from "./TopBar"
 import { ViewportControls } from "./ViewControls"
 
@@ -20,8 +20,8 @@ const LABEL_WIDTHS = ["45%", "38%", "52%", "41%", "60%", "35%", "48%", "56%", "4
  */
 export function PaletteSkeleton() {
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden pr-2" aria-hidden>
-      <div className="flex items-center gap-1 px-1 py-1 text-[0.65rem]">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2" aria-hidden>
+      <div className="flex items-center gap-1 px-1 py-1 text-eyebrow">
         <span className="flex h-[1lh] items-center">
           <Skeleton className="h-2 w-16 rounded-sm" />
         </span>
@@ -44,34 +44,46 @@ export function PaletteSkeleton() {
   )
 }
 
+/** How much of the window a side of the dock takes: index.html sets these from the saved layout before first paint. */
+const dockSide = (side: "left" | "right" | "bottom", fallback: number): string => `var(--dock-${side}, ${fallback}px)`
+
 /**
- * The editor's layout with placeholder content, shown while the editor's code loads. Panel
- * widths come from the CSS variables index.html sets from localStorage, so they match the
- * saved widths the real panels will use.
+ * The dock with placeholder content, sized by the saved layout. Shown while the editor's code loads and over the dock
+ * until its layout is in, so the panels don't jump. A side's content is a stand-in: the saved layout may hold another
+ * panel there, or none.
  */
-export function EditorSkeleton() {
+export function EditorSkeletonPanels({ className }: { readonly className?: string }) {
   return (
-    <div className="flex h-svh flex-col bg-background text-foreground" aria-busy>
-      <TopBar />
-      <div className="flex min-h-0 flex-1">
-        <div
-          className="flex shrink-0 flex-col gap-2 overflow-hidden bg-card p-2"
-          style={{ width: panelWidthVar("palette", 260) }}
-        >
-          <div className="px-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">Pieces</div>
-          <Input type="search" placeholder="Search pieces…" disabled />
+    <div className={cn("flex min-h-0 flex-1 bg-background", className)}>
+      <div
+        className="shrink-0 overflow-hidden bg-card shadow-[inset_-1px_0_0_var(--border)]"
+        style={{ width: dockSide("left", 260) }}
+      >
+        <div className="h-8 border-b" />
+        <div className="flex h-full flex-col">
+          <div className="flex h-9 shrink-0 items-center px-2">
+            <Input type="search" placeholder="Search pieces…" disabled />
+          </div>
           <PaletteSkeleton />
         </div>
-        <div className="w-px shrink-0 bg-border" />
-        <div className={`relative min-w-0 flex-1 ${sceneBackgroundClass}`}>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="h-8 shrink-0 border-b bg-card" />
+        <div className={`relative min-h-0 flex-1 ${sceneBackgroundClass}`}>
           <ViewportControls disabled />
         </div>
-        <div className="w-px shrink-0 bg-border" />
         <div
-          className="flex shrink-0 flex-col gap-3 overflow-hidden bg-card p-3"
-          style={{ width: panelWidthVar("inspector", 300) }}
-        >
-          <div className="text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">Map</div>
+          className="shrink-0 bg-card shadow-[inset_0_1px_0_var(--border)]"
+          style={{ height: dockSide("bottom", 0) }}
+        />
+      </div>
+      <div
+        className="shrink-0 overflow-hidden bg-card shadow-[inset_1px_0_0_var(--border)]"
+        style={{ width: dockSide("right", 300) }}
+      >
+        <div className="h-8 border-b" />
+        <div className="flex flex-col gap-3 p-3">
+          <div className="text-eyebrow text-muted-foreground">Map</div>
           <div className="flex flex-col gap-1">
             <Skeleton className="h-3 w-10 rounded-sm" />
             <Skeleton className="h-7 w-full" />
@@ -83,6 +95,16 @@ export function EditorSkeleton() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** The editor's layout with placeholder content, shown while the editor's code loads. */
+export function EditorSkeleton() {
+  return (
+    <div className="flex h-svh flex-col bg-background text-foreground" aria-busy>
+      <TopBar />
+      <EditorSkeletonPanels />
     </div>
   )
 }

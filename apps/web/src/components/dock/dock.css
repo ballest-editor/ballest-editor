@@ -1,0 +1,136 @@
+/*
+ * The dock in the app's tokens: light and dark come from them, and every duration from `--motion`. A theme of dockview's
+ * own sets what's left out here, so an unset tab background or sash is transparent.
+ */
+.dockview-theme-ballest {
+  --dv-tabs-and-actions-container-height: 2rem;
+  --dv-tabs-and-actions-container-font-size: 0.75rem;
+  --dv-group-view-background-color: var(--card);
+  --dv-tabs-and-actions-container-background-color: var(--card);
+  --dv-activegroup-visiblepanel-tab-color: var(--foreground);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--foreground);
+  --dv-activegroup-hiddenpanel-tab-color: var(--muted-foreground);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--muted-foreground);
+  --dv-tab-divider-color: transparent;
+  --dv-separator-border: var(--border);
+  --dv-active-sash-color: color-mix(in oklab, var(--primary) 60%, transparent);
+  --dv-active-sash-transition-duration: calc(100ms * var(--motion));
+  --dv-active-sash-transition-delay: calc(200ms * var(--motion));
+  --dock-drop-color: color-mix(in oklab, var(--primary) 65%, var(--foreground));
+  --dv-drag-over-background-color: color-mix(in oklab, var(--dock-drop-color) 20%, transparent);
+  --dv-drag-over-border-color: var(--dock-drop-color);
+  --dv-drag-over-border: 1px solid var(--dock-drop-color);
+  --dv-tabs-container-scrollbar-color: var(--border);
+  --dv-overlay-z-index: 40;
+  font-family: var(--font-sans);
+  color: var(--foreground);
+}
+
+.dockview-theme-ballest .dv-drop-target-container,
+.dockview-theme-ballest .dv-drop-target {
+  --dv-transition-duration: calc(70ms * var(--motion));
+}
+
+/* Where a dragged panel would land: a side of a group, its whole, or a place in a strip. */
+.dockview-theme-ballest .dv-drop-target-anchor,
+.dockview-theme-ballest .dv-drop-target-selection {
+  border-radius: calc(var(--radius) * 0.75);
+}
+
+/* What follows the pointer in a drag (dragImage.ts): the tab or strip it came from, bare on its card. */
+.dock-drag-image .dv-tabs-container {
+  display: flex;
+  overflow: visible;
+}
+
+.dockview-theme-ballest .dock-drag-image .dv-tab.dv-tab {
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+/* A line under the whole strip, tabs or not, as the document tabs draw under themselves. */
+.dockview-theme-ballest .dv-tabs-and-actions-container {
+  box-shadow: inset 0 -1px var(--border);
+}
+
+/* The panels' tabs, the active one underlined; `DockTab` styles what's in them. */
+.dockview-theme-ballest .dv-tab {
+  padding: 0;
+  box-shadow: inset 0 -2px transparent;
+  transition: color calc(100ms * var(--motion));
+}
+
+/* A tab behind another lights up under the pointer, as the document tabs do. */
+.dockview-theme-ballest .dv-tab:not(.dv-active-tab):hover {
+  color: var(--foreground);
+}
+
+.dockview-theme-ballest .dv-tab.dv-active-tab {
+  box-shadow: inset 0 -2px var(--primary);
+}
+
+/* The map tabs scroll in the strip; the tab standing in for them takes no room. */
+.dockview-theme-ballest .dv-tab:has([data-dock-hidden-tab]) {
+  display: none;
+}
+
+.dv-groupview:has([data-dock-hidden-tab]) .dv-pre-actions-container {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+}
+
+.dv-groupview:has([data-dock-hidden-tab]) .dv-scrollable {
+  flex: none;
+}
+
+/* A column folded by the viewport: the titles down a slim strip, each one bringing the group back with that panel. */
+.dockview-theme-ballest .dv-groupview[data-dock-rail] {
+  --dv-tabs-and-actions-container-height: 100%;
+}
+
+.dv-groupview[data-dock-rail] > .dv-content-container {
+  display: none;
+}
+
+.dockview-theme-ballest .dv-groupview[data-dock-rail] > .dv-tabs-and-actions-container {
+  box-shadow: none;
+}
+
+/* Physical sides from here: a vertical strip's writing mode turns the logical ones. */
+.dv-groupview[data-dock-rail] .dv-tabs-container {
+  gap: 0.25rem;
+  padding: 0.25rem 0;
+}
+
+.dockview-theme-ballest .dv-groupview[data-dock-rail] .dv-tabs-container .dv-tab {
+  padding: 0.625rem 0;
+  box-shadow: inset 2px 0 transparent;
+  transition: background-color calc(100ms * var(--motion)), color calc(100ms * var(--motion));
+}
+
+.dockview-theme-ballest .dv-groupview[data-dock-rail] .dv-tabs-container .dv-tab:hover {
+  background-color: var(--muted);
+  color: var(--foreground);
+}
+
+.dockview-theme-ballest .dv-groupview[data-dock-rail] .dv-tabs-container .dv-tab.dv-active-tab {
+  box-shadow: inset 2px 0 var(--primary);
+}
+
+.dv-groupview[data-dock-rail] .dock-tab {
+  width: 100%;
+  justify-content: center;
+  padding: 0;
+}
+
+/* A popped-out group's strip is the desktop window's title bar: it drags the window, and clears the window controls. */
+.dv-popout-window .dv-void-container {
+  -webkit-app-region: drag;
+}
+
+.dv-popout-window .dv-tabs-and-actions-container {
+  padding-left: env(titlebar-area-x, 0px);
+  padding-right: calc(100vw - env(titlebar-area-width, 100vw) - env(titlebar-area-x, 0px));
+}

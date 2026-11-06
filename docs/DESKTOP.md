@@ -33,61 +33,181 @@ The renderer never imports `electron`. It gets a `Platform` service (`apps/web/s
 | Open external link | `window.open`       | `shell.openExternal`                                         |
 | Updates            | none                | electron-updater state stream                                |
 
-`Platform.layer` is picked at module load: `window.ballest !== undefined` means desktop. The preload runs before any page script, so that test is reliable. Components still reach it through `editor/actions`. Settings, keybinds and map prefs stay in `localStorage`, which Electron persists under `userData`.
+`Platform.layer` is picked at module load: `window.ballest !== undefined` means desktop. The preload runs before any page script, so that test is reliable. Components still reach it through `editor/actions`. Settings, keybinds, map prefs and the dock's layout stay in `localStorage`, which Electron persists under `userData`.
 
-The web review build has no project. Its maps live in tabs in memory: Open is the file input, and Save and Export download the file.
+The web review build has no project. Its maps live in tabs in memory, each with its structure and no sidecar file: Open is the file input, and Save and Export download the `.balledit`.
 
 ### Projects and maps
 
-On desktop the maps live in a project folder ([PROJECTS.md](PROJECTS.md)). File › New project… or the first Save makes one at `Documents/Ballest Editor/<name>` (`Projects.createNew`, IPC `ballest:project:create`). File › Open project… chooses any folder, and the recent ones are under File › Recent projects. All three ask where the project opens first (§ Other windows). The first Save doesn't: it names this window's project.
+On desktop the maps live in a project folder ([PROJECTS.md](PROJECTS.md)). File › New project… makes one at `Documents/Ballest Editor/<name>`, and the first Save in an untitled window makes one where its dialog says (`Projects.createNew`, IPC `ballest:project:create`). File › Open project… chooses any folder, and the recent ones are under File › Recent projects. New project…, Open project… and Recent projects ask where the project opens first (§ Other windows). The first Save doesn't: this window becomes the project it makes.
 
-Until one is used, the window is **Untitled Project \***: `ProjectState.current` is null, nothing is on disk, main refuses to write a map (`noProject`), and the Save dialog asks the project's name first. The game's maps folder, or a folder inside it, is refused with the reason: the game scans its subfolders and rewrites what it finds.
+Until one is used, the window is **Untitled Project \***: `ProjectState.current` is null, nothing is on disk, and main refuses to write a map (`noProject`). The title stays that until the first Save, and the Project panel says that saving a map creates a project. The game's maps folder, or a folder inside it, is refused with the reason: the game scans its subfolders and rewrites what it finds.
 
-- **New map** asks for the name and, when there's no usable creator, the creator. It saves the map into the project at once; in Untitled Project it stays in memory. The dialog shows the file name it exports as.
-- **Save** (Ctrl+S) writes the project file and asks nothing. A map that has no file yet is named first. After the name or creator changed, Save moves the file to the new name and the old one goes to `<project>/.ballest/backups/`.
-- **Rename** and **Duplicate** (a map's menu in the Project panel) replace Save as. Rename changes the name or creator and moves the file. Duplicate saves a copy under a new name, and editing goes on in the copy. Rename refuses a name the project has; Duplicate offers to replace that map, which then goes to backups.
-- **Import** (Project › Import map…, Ctrl+O) replaces Open. A `.balledit`, `.ballmap` or `.json` from anywhere is copied into `maps/` under the game's file name for it and opened from there: a `.balledit` byte for byte, a `.ballmap` as the `.balledit` the game would make of it. Its origin goes into `.ballest/link.json`, and a file imported from the game's maps folder under its own name is linked as that file's export from the start. A name the project already has asks: Replace (the project's copy goes to backups) or Import as copy (`<name> 2`). Import is off in Untitled Project.
+- **New map** (File, Project, the + on the tab strip, the Project panel's header, Alt+N) adds a tab, in any window, with no dialog and nothing written. The map goes by Untitled, Untitled 2, Untitled 3… (the lowest number the open tabs leave free) until its first Save, and it never names or replaces the map beside it. Its creator comes from Settings › General or Steam, and with neither the first Save asks.
+- **Save** (Ctrl+S) writes the project file, then its sidecar (`ballest:project:writeSidecar`, [PROJECTS.md § The files](PROJECTS.md#the-files)), and asks nothing. A map that has no file yet is named first, in the Save map dialog (`components/NameMapDialog.tsx`), which shows the file name it exports as. In Untitled Project that dialog also asks for the project: its name (My Maps, numbered past the recent projects) and its folder (`Documents/Ballest Editor/<project name>`, or Choose…, the folder dialog Open project… uses). Save makes the project, this window becomes it, and the map goes in it. The other tabs stay open, unsaved, and each is named by its own first Save. Cancel leaves nothing on disk, and a project main refuses leaves the dialog up with the reason. After the name or creator changed, Save moves the file to the new name and the old one goes to `<project>/.ballest/backups/`.
+- **Rename** and **Duplicate** (a map's menu in the Project panel) replace Save as. Rename changes the name or creator and moves the file and its sidecar. Duplicate saves a copy under a new name with a sidecar of its own, and editing goes on in the copy. Rename refuses a name the project has; Duplicate offers to replace that map, which then goes to backups.
+- **Import** (Project › Import map…, Ctrl+O) replaces Open. A `.balledit`, `.ballmap` or `.json` from anywhere is copied into `maps/` under the game's file name for it and opened from there: a `.balledit` byte for byte, a `.ballmap` as the `.balledit` the game would make of it. Its origin goes into `.ballest/link.json`, and a file imported from the game's maps folder under its own name is linked as that file's export from the start. A name the project already has asks: Replace (the project's copy and its sidecar go to backups) or Import as copy (`<name> 2`). Import is off in Untitled Project.
 - **Export to game** (Project menu) saves unsaved edits, then copies the project file byte for byte into the game's maps folder and records the export's path, hash and time in `link.json`. The page first runs Save's checks on the open map, because an imported file or a map with no edits reaches the game without passing through Save. A file past the game's character limit is refused at this step, on the bytes about to be copied, and nothing is written. A file in that folder whose `levelPublishedFileId` is above 0 is a published map's draft, and the editor asks before replacing it.
 - **Export on save** (Project menu, or the map's entry in Project settings; off by default, kept with the map's prefs) makes every Save of that map export too. Settings › General › Export every save does it for every map. The first Save of a new map doesn't export under either.
 - **Launch game** (Project menu) opens `steam://rungameid/3339810`, or says the game is already running.
 - **Backups.** Every write over a map file keeps the old one first (§ Backups). Recover previous version… in a map's menu in the Project panel lists them.
 - **Toasts** name the project or the maps folder and offer Reveal.
-- **Unsaved changes** are asked about before anything would lose them: closing the window, reloading, quitting, closing a map's tab, replacing a map open in a tab (Re-import, Recover, Import's Replace), and switching projects (New project…, Open project… or Recent projects, answered This window). Untitled Project doesn't ask when it becomes a project: its maps stay open and Save puts them in that project. New map, opening a map and Import open a tab of their own and ask nothing. See § Window.
+- **Unsaved changes** are asked about before anything would lose them: closing the window, reloading, quitting, closing a map's tab, replacing a map open in a tab (Re-import, Recover, Import's Replace), and leaving a named project ([§ Window](#window) has the rule for switching projects). New map, opening a map and Import open a tab of their own and ask nothing.
 
 ### Document tabs
 
 `components/DocumentTabs.tsx` puts a tab over the viewport for each open map, each with its own history, selection, grid height and camera view. The web review build has tabs too, for maps in memory.
 
-- Opening a map (the Project panel, a notification's Open) makes its tab active, or opens it in a new tab after the active one. New map, Import and Recover of a map that isn't open do the same. The fresh map the app starts on gives way to the first map opened while it is untouched. Opening a map shows no toast.
+- Opening a map (the Project panel, a notification's Open) makes its tab active, or opens it in a new tab after the active one. Import and Recover of a map that isn't open do the same. New map always adds a tab after the active one. Opening a map shows no toast.
+- A **blank tab** is a fresh map nobody has touched: what the app starts on, what New map adds, what closing the last tab leaves (`isBlankTab`). It holds nothing to lose, so closing it asks nothing, a map opened while it is the active tab takes its place, and a switch of projects drops it (§ Window). New map is the one thing that never reuses it.
 - The store keeps the active tab's state where every edit works and parks the others (`TabState`, `parkedTabs`). A save lands in the tab it started from.
 - There is always a map, never a Start tab or an empty editor, even behind the required chooser (§ Other windows). On launch the app opens the map that was open when it last ran, else the project's most recently edited map, else a fresh unsaved map (what New map starts, named Untitled, nothing written; its first Save names it into the project).
 - The active tab's map is kept per project in `desktop-settings.json` (`project.lastOpenMap`, by project folder; `ProjectState.lastOpenMap`, IPC `ballest:project:rememberOpenMap`), written whenever the active tab's file changes after the startup load. The other tabs aren't reopened yet.
 - A tab shows the map's name without the creator (`mapLabelOf`), its tooltip is the file's path or "Not saved yet", and tabs can be dragged into another order.
 - A tab's ×, a middle click or Ctrl+F4 closes it after the unsaved-changes prompt (§ Window). Closing the last one shows a fresh map the same way.
 - A right-click opens the tab's menu: Close, Close others, Close to the right, and on desktop Rename…, Duplicate… and Reveal.
+- A tab can hold a prefab's definition instead of a map (§ Prefabs). `TabState.document` says which, and it is one tab model: Save, the prompts and the menus ask it.
 - Ctrl+Tab and Ctrl+Shift+Tab, or Ctrl+PageDown and PageUp, cycle the tabs.
+
+### Dock
+
+`components/dock/` is everything between the top bar and the status bar, built on [dockview](https://dockview.dev/) (`dockview-react`): the **centre group** with the panels around it, each of which can be dragged to any side of the centre, stacked as tabs, split, resized, collapsed, closed or popped out.
+
+**The centre group** holds the map tabs and the one viewport, which divides into panes of its own (§ View panes). Its only permanent panel is `documents`, whose dockview tab is hidden: `DocumentTabs` stands in for it, in the group's header. It can't be closed, dragged or popped out. The viewport keeps its own `renderer: "onlyWhenVisible"`, so it sits in the page's flow and resizes in the same frame as the window. A panel can be dropped on the centre's sides, but can't join it as a tab. Dropped there, a panel takes its side's usual size, not dockview's half of the viewport.
+
+**Panels** are entries in `components/dock/panels.tsx`: an id, a title, a component and a default location (`left`, `right`, `bottom`). That entry is all a panel needs for a tab, a View menu item, a place in the default layout, and a place in layouts saved before it existed. `dockControl.ts` is what the rest of the app calls (`togglePanel`, `resetDockLayout`). It's in the page's first chunk, because the menu bar is, so the registry reaches it from `Dock.tsx` and keeps the panels, and WebGL, out of that chunk.
+
+- **Pieces**, **Prefabs** and **Project** start stacked on the left, with Pieces in front, and **Inspector** on the right. A panel `always` rendered (Pieces) stays in the page behind another tab, so a long list keeps its scroll position.
+- View lists every panel, checked while it's open, and Reset layout. Reset closes everything around the centre group and lays out the default again, and the viewport stays mounted.
+- **Each group's "…"** (`GroupMenu.tsx`), at the end of its strip, holds View's panel checks, then Pop out, Collapse and Reset layout.
+- **Collapse** folds a group: a column by the viewport to a rail, a group in a stack to its header. A group can't fold if its neighbours have nothing left to give, so Collapse is off there. A panel arriving unfolds it, and so does a click on a tab, with that panel in front.
+- **The rail** is 28 px of the panels' titles, read downwards, and nothing else. It's the group's own strip with its header turned to the side, marked `data-dock-rail` and drawn by `dock.css`.
+
+**Sizes.** A window resize goes to the viewport and the panels keep theirs, like closing a group: dockview would even out the group's neighbours. Neither has an option in dockview, so `dockControl.ts` sets the centre group's `priority` and wraps `gridview.remove`. A dockview upgrade should be checked for these.
+
+**The layout** is saved in `localStorage` under `ballest-editor.dock.v1`, a moment after each change and when the page goes away: dockview's `toJSON`, the panel ids it was saved with (`known`), the room around the centre (`hint`) and the collapsed groups' sizes. `domain/dockLayout.ts` holds the rules for reading it back.
+
+- A panel in `known` but not in the layout was closed by the user, and stays closed. One not in `known` is new and gets its default place.
+- A panel in the layout that the app no longer has is dropped (`onlyPanels`), and a group left empty gives its room to the viewport.
+- A layout that doesn't decode, has a size that isn't a number, has no centre or that `fromJSON` refuses is dropped for the default.
+- The first paint is the saved layout: index.html sets `hint` as `--dock-<side>` on `<html>`, and `EditorSkeleton` lays out to them, first while the editor's chunk loads and then over the dock until its layout is in.
+
+**Popout** (Pop out in a group's "…") moves the active panel to a window of its own. Closing that window, or the button in its strip, puts it back where it was. Dockview's popout is a `window.open` of `public/popout.html` whose document the main page fills itself, so the panel stays in the same React tree and store. In-window floating groups are turned off.
+
+- **Desktop.** `DesktopWindow` lets the page open that one URL (`isPopoutUrl`) and nothing else, as a same-origin child: sandboxed like the main window, floating over it and closing with it. It has no native title bar: its tab strip is the title bar, as the top bar is for the main window, and main recolours it with the main window (`setColors`). F11 is that window's, and Ctrl+Q closes the main window, where unsaved changes ask.
+- **Web review build.** The same `window.open`. A blocked pop-up leaves the panel where it was, with a notification.
+- **A window doesn't come back on launch.** A browser would block it and dockview would lose the panel. Closing or reloading the main window docks the panels first, and `dockedPopouts` does it for a layout saved popped out, after a crash. An unload that's being held for unsaved changes leaves them alone, in case it's cancelled.
+- **The second window has a realm of its own.** Popups in a panel portal to the panel's window through `PortalContainerContext` (`packages/ui`), or they'd open in the main window: a new popup component reads `usePortalContainer`. `instanceof Element` and `instanceof MouseEvent` don't hold for what's in it, hence `elementOf` and `isMouseEvent`. Listeners and animation frames in a panel use the window the panel is in, since the main window's frames may not run while the other has the focus. A panel coming back renders afresh, losing local state such as a search, because its elements belong to a window that's gone. Dialogs open in the main window, which takes the focus.
+- **An `always` panel leaves its overlay behind.** Dockview takes the overlay down when a whole group moves to another window, but not one panel of several, and the empty overlay would swallow the clicks of the group it left. `dockControl.ts` takes it down on `onDidMovePanel`. A dockview upgrade should be checked for this too.
+- `popoutWindow.ts` adopts each window: the main window's `class` and `style` on `<html>` (theme, `--motion`) are mirrored to it, and it gives keys it doesn't use to the main window, where the keybinds listen.
+
+**Keys.** The rules are `isEditorKeyEvent`'s (`editor/keyTargets.ts`): a text field, a dialog or a menu keeps its keys, and everything else drives the editor. Chrome hands focus back after a click (`blurChromeAfterClick`), so the keys work again straight away. A dialog leaves the focus on the page when it closes, however it was closed and whatever opened it (`DialogContent`'s `finalFocus`).
+
+Dockview is themed in `components/dock/dock.css` with the tokens from `packages/ui`, so it follows light and dark and `--motion`. Its strips are `h-8`, like the document tabs. A drag shows a copy of the tab on a card, or of the whole strip when it's a group's (`dragImage.ts`), over dockview's image, which has no option for it. A dockview upgrade should be checked for this too.
+
+### View panes
+
+The viewport is one canvas divided into **panes**, each its own camera on the same map. Selection and the document are shared; only cameras differ. The dock knows nothing of this: to it the viewport is still one panel in the centre group, under the map tabs.
+
+**Layouts.** One pane, two side by side, two stacked, or four, picked from the control at the viewport's top right or View › Panes. `domain/viewLayout.ts` holds a layout: its kind, where the dividers sit, and what each of the four slots looks along. A slot keeps its view while a smaller layout hides it. A divider drags, stays a tenth of the viewport from the edge, and goes back to the middle on a double click.
+
+A layout is per tab (`TabState.viewLayout`), and remembered per map in `MapPrefs` in `localStorage`, not the sidecar: it's how this machine looks at the map, not part of the map. `followViewLayouts` writes it a moment after a change. Cameras aren't remembered: a map opens framed.
+
+**Projections.** Each pane is Perspective, Top, Bottom, Front, Back, Left or Right, from the menu on its label, View › Active pane or the numpad keys. `domain/orthoView.ts` defines them in game space: Front stands on the +X side (the game's forward) looking back at the map, Right on the +Y side, and Top keeps X up the screen and Y to the right. `coords.ts` takes that to the renderer's frame. The label shows the name and scale, `Top · 1 px = 2 cm`, and an orthographic pane has its axes in a corner.
+
+Changing projection keeps the point the pane looks at and its size on screen. Numpad 5 goes to the orthographic view nearest where the pane looks, or back to perspective from the same direction.
+
+**The active pane** is the last one hovered or clicked, outlined when there are several. It is what the fly keys, Focus selection, Frame all and the numpad keys act on, and where a palette piece lands. A pointer drag or the wheel acts on the pane under the pointer, and a drag stays with the pane it started in. Camera speed is global.
+
+**Navigation in an orthographic pane.** The view has one way to look, so look, orbit and pan drags all pan, one to one with the pointer. The wheel zooms to the pointer, whatever it is bound to in perspective. The left, right, up and down keys slide the view, forward and reverse zoom it, and the arrow keys do nothing. Resizing a pane shows more or less of the map at the same zoom.
+
+**The world grid** (`editor/OrthoGrid.tsx`) is a shader over each orthographic pane, drawn over the map at a low opacity so it can be read against a floor that fills the view. It has lines on multiples of their size from the world's origin, which is where snapping puts things: 1 m lines and 10 m sections like the perspective floor grid, fading in 10 cm and 1 cm lines closer in and leaving only the coarser ones further out (`gridLevels`). With snapping on, a step that isn't a power of ten (25 cm) gets lines of its own. The X, Y and Z axes through the origin are in the game's colours. Show grid hides both grids. An orthographic pane has no sky or floor grid: they sit on a layer only perspective cameras see.
+
+**Editing** works the same in every pane: clicks, the gizmos and Alt+drag all sort the pointer by pane and measure it against that pane's camera. The gizmo is placed for each pane just before it draws, so it keeps its size and faces each camera. An axis handle pointing at the camera, and a plane handle or ring seen edge-on, are hidden and can't be grabbed (`handleFacesCamera`), as in Blender. Hover shows only in the pane under the pointer.
+
+**One scene, one context.** `editor/PaneRenderer.tsx` takes over R3F's render and draws each pane into the one `WebGLRenderer` with a viewport and scissor. `editor/paneCameras.ts` holds the cameras, per tab and slot, outside React because they change on every pointer move. The store says what a pane looks along and the cameras follow. Anything that has to face the camera hooks in with `useBeforePaneDraw`.
+
+**Frame cost.** On a large map the CPU's draw calls set the frame time, and four panes drawn every frame would cost four times that. So they aren't:
+
+- The active pane does. The others keep their pixels (`preserveDrawingBuffer`) and take turns, one at a time and at most every 80 ms (`panesToDraw`), which also keeps moving materials moving. During a gizmo drag the other panes follow at that rate.
+- Every pane draws when its pixels are gone or in the wrong place: a resize, a moved divider, a changed layout or projection, another tab. Dragging a divider on a large map is therefore the slow case.
+- `scene.updateMatrixWorld` runs once a frame, not once a pane, and skips the items: an item's objects work out their matrices when they change (`FixedGroup` in `ItemObject.tsx`). An object that updates its own matrix forces everything under it to update too, so the scene and the items' root keep theirs fixed as well. Code that moves an item outside React has to call `updateMatrix`, as the gizmo does.
 
 ### Menus
 
 `components/MenuBar.tsx` holds the menus. Every item calls the entry point its keybind or button uses.
 
-- **File:** New project… (`components/NewProjectDialog.tsx`, a name that becomes `Documents/Ballest Editor/<name>` through `createProject`), Open project…, Recent projects, Save, Close tab, Settings…, Game link…, and Quit, which closes the window the way its × does, so unsaved edits ask.
-- **Edit** and **View.**
-- **Project:** New map…, Import map…; Export to game, Export on save, Re-import from game, Play, Launch game; Project settings….
-- **Web review build:** File (New map…, Open…, Save, Export…, Close tab, Settings…), Edit, View, and Project (Project settings…, the one map's).
+- **File:** New map, New project… (`components/NewProjectDialog.tsx`, a name that becomes `Documents/Ballest Editor/<name>`, shown as it is typed), Open project…, Recent projects, Save, Close tab, Settings… (`components/SettingsDialog.tsx`, a modal in `SettingsShell`'s shape that looks the game up again each time it opens, and is meant to become a window of its own later), Game link…, and Quit, which closes the window the way its × does, so unsaved edits ask.
+- **Edit:** Undo, Redo, Cut, Copy, Paste, Duplicate, Delete, Deselect, Group, Ungroup and Save selection as prefab….
+- **View:** Focus selection, Frame all, the view's panes and the active pane's projection (§ View panes), the dock's panels and Reset layout (§ Dock), and the display toggles (the grid, sky, water and theme).
+- **Project:** New map, Import map…; Export to game, Export on save, Re-import from game, Play, Launch game; Project settings….
+- **Web review build:** File (New map, Open…, Save, Export…, Close tab, Settings…), Edit, View, and Project (Project settings…, the one map's).
 
 There is no Map or Game menu: the menus act on the active tab's map, and the game is the project's export target. Rename, Duplicate and Recover previous version are per map in the Project panel. The Game link is the user's machine, not the project's, so it sits with Settings under File.
 
 ### Project panel
 
-`components/ProjectPanel.tsx` is the left dock's Project tab beside Pieces (`components/LeftDock.tsx`; View › Project). It lists the project and its maps, the way an editor's file explorer shows a workspace.
+`components/ProjectPanel.tsx` is the Project panel (§ Dock). It lists the project and its maps, the way an editor's file explorer shows a workspace.
 
 - Each row shows the map, a dot while it is open in a tab with unsaved edits, and its link state as a glyph. Hovering names the state and says when the map was last edited.
 - A click opens the map.
 - Its menu (⋮, or a right-click) holds Open, Rename…, Duplicate…, Recover previous version…, Export to game, Play and Reveal. The ones that act on the open map open it first (`withProjectMapOpen`). Reveal shows the project's maps folder, not the file.
-- The header holds New map…, Import map… and Project settings….
+- The header holds New map, Import map… and Project settings….
 - Every tab whose map has no file yet (a fresh one, any in Untitled Project, what a switch of projects left open) is a row of its own in italics, above the project's maps. A click makes that tab active.
+- In Untitled Project a line above those rows says that saving a map creates a project.
 - No thumbnails yet.
+
+### Outline
+
+`components/Outline.tsx` is the map's tree of groups and items, a dock panel that starts on the left (View › Outline, § Dock). It fills whatever it is mounted in and scrolls by itself. `domain/outline.ts` holds its rows, filter, drop targets and scroll window.
+
+- A row shows its icon, the name, tag chips and, at its right edge, a group's child count (its tooltip gives the items under it). Only the rows in view are drawn.
+- An item's icon is what the Pieces panel shows for its piece, else a generic glyph, and a tooltip on its name gives the class.
+- An item's name is the user's, else its piece's: the catalog's display name, or the class written out where the catalog has none (`MP_PlayerStart` is Player Start; the game places it itself and has no name for it).
+- A name used more than once gets an ordinal, muted, right after it: items among themselves in document order, groups in tree order. A name nothing else has shows none. The ordinal isn't part of the name, so renaming starts from the name alone. The status bar shows a group the same way.
+- A click selects, as `toggleSelection`'s chord toggles and `addToSelection`'s chord selects the range from the last row clicked. A group row stands for every item under it, and it lights up when all of them are selected. A click on empty space clears the selection.
+- A selection made anywhere else scrolls its active row into view once, as far as it takes, and opens the groups around it.
+- Double-click or F2 renames in place: Enter commits, Escape cancels, and an empty name puts an item back on its default name. A group always has a name, so an empty one changes nothing.
+- A drag moves the selection, or just the row when it isn't selected, as one undo step. A line shows a drop before or after a row, and the row lights up for a drop into a group. A group's top and bottom quarters drop beside it, and the gap under an open group is its first child's. Below the last row is the end of the root.
+- Right-click selects the row if it isn't selected, then offers Group, Ungroup, Save selection as prefab…, Rename, Duplicate, Delete, Focus and Edit tags…, with Update from prefab and Detach from prefab on an instance. An instance's row has an icon of its own.
+- The filter matches names, classes and tags, needing every word. It shows matching rows with the groups around them, whatever is collapsed. A group's items show only if they match too.
+- Which groups are collapsed is kept per tab in the store, outside the sidecar and the history, so undo leaves it alone.
+
+### Groups and selection
+
+The groups are the sidecar's ([PROJECTS.md § The files](PROJECTS.md#the-files)), and the game gets what it can hold of them ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)). `domain/groupSelection.ts` holds the rules below. The selection stays a list of item keys, so the gizmo, the Inspector, Copy and the rest act on a group's items with no group logic of their own. The item clicked is the active one, so the gizmo sits where the click was.
+
+- **Group** (Ctrl+G) puts the selected items in a new group called Group where the first one was, and a group whole in the selection goes in whole, nested. **Ungroup** (Shift+G) dissolves every group whole in the selection, and the items stay selected. Both are in the Edit menu, the Outline's menu and the keybind settings.
+- **A click** on a grouped item in the viewport selects its outermost group, as the game does. The add and toggle chords add or take away that whole group.
+- **A double-click** enters the group, and the next click level is its children, an item or a nested group. Another double-click goes one deeper. The status bar names the entered group, with × to leave it, and the Outline marks its row and dims what is outside it. The entered group is kept per tab in the store.
+- **Leaving:** Escape steps out one level and selects the group it left. A click on empty space leaves altogether. A click outside the group lands in the nearest parent group that holds what was clicked, or at the root.
+- **The box.** Each group whole in the selection has a dashed box around its items in the viewport, in a colour of its own (`editor/groupBox.ts`, `GROUP_BOX_COLORS`), as well as its items' outlines. The entered group keeps a thinner, fainter box while something inside it is selected. The box is drawn over everything. It is the one whose centre a group's frame takes ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)), following an edit as it happens, so it goes by the items' bounds and not by the meshes drawn.
+- **The Inspector** shows the group's name and tags above the item properties when the selection is exactly one group, and a single selected item's tags under its actions. Tags are free strings: Enter or a comma adds one, Backspace in the empty field removes the last.
+- **Delete** removes the group's items, and the group goes with them. **Duplicate** copies a whole group as a new group of the same name and shape.
+
+### Prefabs
+
+A prefab is a reusable assembly, kept as a file in the game's format ([FORMAT.md § Prefab file](FORMAT.md#prefab-file)). The file is its **definition**, and each placed copy is an **instance**: a group with a link to the definition in the sidecar ([PROJECTS.md § The files](PROJECTS.md#the-files)). `domain/prefab.ts` holds the conversions, `domain/prefabInstance.ts` the instances, `editor/actions/prefabs.ts` and `prefabFollow.ts` the flows, and `project/Prefabs.ts` the files in main.
+
+**Tiers.** User prefabs are the game's own `Saved/SaveGames/Prefabs/`, beside its maps folder, so the in-game editor's `listprefabs` and `spawnprefab` see them and the other way round. Project prefabs are `<project>/prefabs/`. Main writes atomically and only in those two folders. A write over a prefab, a Rename and a Delete keep the old file, and Recover brings a version back (§ Backups). Untitled Project has no project tier. The web review build has one tier, "This session", kept in memory until the page closes.
+
+**The panel** (`components/PrefabsPanel.tsx`) lists each tier with a filter box. A row shows the name, the item count and the first piece's thumbnail, or a glyph. A click, or a drag onto the viewport, places the prefab. Its menu (⋮, or a right-click) holds Place, Open, Rename…, Duplicate, Copy to project or Copy to user, Delete… and, on desktop, Reveal, which shows the tier's folder. A file that doesn't read as a prefab is listed, and can only be renamed, copied, deleted or revealed.
+
+**Placing** does what `spawnprefab` does (`spawnFrameOf`): the frame goes on the line through the active pane's camera, far enough along that the items' box starts 500 cm ahead. An orthographic pane has no distance, so the line starts at the middle of its view. The items land selected, as one group named after the prefab, in one undo step. A prefab the game would refuse is refused here with the game's words (`prefabProblems`).
+
+**Save selection as prefab…** (Edit menu, the Outline's menu) asks a name and a tier and writes the selected items in selection order, measured from the centre of their turned bounds with no turn or scale, as the game's frame. A selection that is exactly one group gives the file that group's name. It changes nothing in the map, and a name the tier already has turns Save into Replace.
+
+**Instances.** The Outline marks one, and the Inspector shows "Instance of <name>" with how it stands, Update, Detach and Open definition. An instance is **unmodified** while its items match what was placed, allowing for its own placement (`checkInstance`): moving, turning or scaling the whole group, by the editor's scale or the game's, doesn't count. Renaming the group, tagging it and reordering its rows don't either. Changing an item's own transform, properties or materials, or adding or removing one, does. Double-clicking into an instance to edit it is allowed, and makes it modified.
+
+**Following.** Whenever a definition's file changes, every open map follows it: the tab that saved it, or the game, or anything else writing the file. Files are looked at on launch, on focus, after a Play session and after the app's own writes, not by watching the folders (`checkPrefabs`). A map that opens later catches up then.
+
+- An unmodified instance updates in place, as one undo step of its tab, and the tab has unsaved edits. Undoing that isn't taken back by the next look, since only a file that changed sets it off. Items of the same class keep their keys, so names and tags survive.
+- A modified instance stays as it is and goes in the notification centre, once per change, with Update, which replaces it where most of its items stand, and Detach, which keeps the group and drops the link. The Inspector offers the same.
+- Rename moves the links in open maps. A map opened later finds the definition by its hash, if the file hasn't changed since. A definition that is gone leaves its instances standing, and they say so.
+
+**Definitions open in a tab** (Open, Open definition), with the same viewport, Outline and Inspector. The tab holds a map-like document of the prefab's items, around the default start so it sits above the water, and shows the name and tier. Save writes the file, and instances follow. Unsaved edits ask like a map's. Export and Play are off, with a tooltip. The file has no place for structure, so groups made in the tab aren't saved, and a prefab placed in the tab is a plain group. Untouched items are written back as they came, and an edited item keeps its `paint` until its materials change. A file that changes behind a tab with no edits is read again; with edits, the tab says so and Save writes over it.
+
+**Export.** An instance reaches the game as its items and one group named after the prefab ([FORMAT.md § Groups](FORMAT.md#groups-editorstategroups)). Nothing about prefabs goes in the map's file.
 
 ### Game link
 
@@ -132,7 +252,7 @@ The link states are Not exported, In sync, Edited since export, Changed in game,
 
 The store's `notify(level, title, { kind, body, persistent, actions })` records a `NotificationRecord` (`@ballest/contracts`), and `showToasts` toasts each new one, with its first action as the toast's button.
 
-- Actions are data (`NotificationCommand`: `RevealProject`, `RevealGamePath`, `ChooseGamePath`, `OpenMap`, `OpenExternal`, `InstallPlugin`, `ReimportMap`, `Dismiss`), so they still work after a restart. `runNotificationCommand` runs them.
+- Actions are data (`NotificationCommand`: `RevealProject`, `RevealGamePath`, `ChooseGamePath`, `OpenMap`, `OpenExternal`, `InstallPlugin`, `ReimportMap`, `UpdatePrefabInstances`, `DetachPrefabInstances`, `Dismiss`), so they still work after a restart. `runNotificationCommand` runs them.
 - The bell lists them newest first, grouped by day, the unread ones counted. A `persistent` one is pinned to the top until `resolveNotifications(kind)`, and a newer one of its kind replaces it. Mark all read; Clear keeps only the pinned.
 - The last 100 are kept in `<userData>/notifications.json` (`NotificationLog` in main, `loadNotifications` / `saveNotifications` over IPC). One entry that doesn't decode is dropped, not the file. A browser keeps them in memory.
 
@@ -142,13 +262,16 @@ The first launch notifies nothing, since the checklist is in front of the user. 
 
 ### Backups
 
-Every write over an existing map file goes through one step, `Backups.overwrite` (`apps/desktop/src/project/Backups.ts`): the old bytes are kept in a backups folder, the new ones are written atomically, and that folder is pruned. Save, Duplicate over a map, Import replacing a map, Export to game, Play's export, Re-import and the Export confirm's Back up and overwrite (§ Sync) all use it. Rename moves the old file into the backups instead (`Backups.retire`).
+Every write over an existing map file or sidecar goes through one step, `Backups.overwrite` (`apps/desktop/src/project/Backups.ts`): the old bytes are kept in a backups folder, the new ones are written atomically, and that folder is pruned. Save, Duplicate over a map, Import replacing a map, Export to game, Play's export, Re-import and the Export confirm's Back up and overwrite (§ Sync) all use it. Rename moves the old file into the backups instead (`Backups.retire`), and so does anything that leaves a sidecar without its map.
 
 - **Where.** The project's own files go to `<project>/.ballest/backups/`. The files Export writes over in the game's maps folder go to `<userData>/backups/`, which is the app's: a project can be shared, but the game's copy of a map is this machine's. Both folders are flat: `<time> <file name>`, the time in ISO 8601 UTC with `-` for `:` and `.` (`2026-10-31T12-00-00-000Z Map_LevelEditorMain&Big Loop_Isaac.balledit`). Two backups of a file in the same millisecond get consecutive times, so names never collide and their order holds.
 - **Skipped** when the new bytes are the old ones (nothing is written either), or when the newest backup of that file already holds the old bytes. A backup that fails stops the write, so the old file is never lost to a failed copy.
+- **Prefabs** are kept the same way, the project's in its backups and the game's in `<userData>/backups/`. A Rename and a Delete move the old file there.
+- **Sidecars** are kept beside the maps in `<project>/.ballest/backups/` under their own file names, and Recover lists only the maps. Reading a project backup also gives the sidecar kept for it, which is the oldest one kept since, because a Save backs up the map first and its sidecar right after. A version with no such sidecar, and any of the game's copies, gets the map's sidecar as it is now. The page re-matches a sidecar that wasn't written for those bytes, as on any open.
 - **Retention.** After each write the folder keeps the newest 20 versions of each file and drops any older than 30 days. `desktop-settings.json` can change both: `{ "backups": { "keep": 20, "maxAgeDays": 30 } }` (no UI yet). Git history (#105) is the long-term version history; this is the safety net.
-- **Recover** (the Project panel › a map's menu › Recover previous version…) shows the open map's versions, newest first, and All backed-up maps for the others, including maps no longer in the project. Main lists both folders (`listBackups`) and reads a backup by its place and name (`readBackup`), refusing any name it didn't write, so paths stay in main. Each version shows its time, whose copy it is (Project or Game) and, decoded through `MapFile` as Open would, its item count and map name.
+- **Recover** (the Project panel › a map's menu › Recover previous version…) shows the open map's versions, newest first, and All backups for everything else: other maps, including ones no longer in the project, then User prefabs and Project prefabs, including ones renamed or deleted since. Main lists both folders (`listBackups`, `listPrefabBackups`) and reads a backup by its place or tier and its name (`readBackup`, `describePrefabBackup`), refusing any name it didn't write, so paths stay in main. A map's version shows its time, whose copy it is (Project or Game) and, decoded through `MapFile` as Open would, its item count and map name. A prefab's shows its time and item count.
 - **Opening a version** shows it in the map's tab when one has it open, asking about that tab's unsaved edits first (§ Window; the prompt's Save goes through the backups like any Save), else in a new tab. It loads as unsaved edits of the project map of that file name, so Save writes it over that map, backing up the current file first. A map no longer in the project opens as a new one, and Save names it.
+- **Restoring a prefab's version** (`restorePrefabBackup`) writes its bytes back under its name in its tier at once, through `Backups.overwrite`, so the current file is kept first and a restore can itself be recovered. It brings back a deleted prefab, and a version that doesn't read as a prefab can't be restored. Then `checkPrefabs` runs as after any write of the app's own (§ Prefabs).
 - **Maps the game changes on its own** (the in-game editor saving into `UserSavedMaps`) are not snapshotted. The editor only loses a game edit when Export writes over it, and that copy is kept. Watching the folder would back up every in-game save, since the game rewrites `editorState` each time, for little gain. Sync detection reports those edits instead.
 
 ### Sync
@@ -165,7 +288,7 @@ The in-game editor can save over an export at any time ([PROJECTS.md § Sync](PR
   - Each update is made against the link as it is when written, under `MapLinks`' lock, and checks run one at a time (a semaphore), so two never report one change.
 - **What the page does.** It lists the maps again, so the status bar and the Project panel show Changed in game or Both changed, and notifies each `changed` map once: "Big Loop was changed in the game" (kind `changedInGame`, not pinned) with Re-import (`ReimportMap`) and Ignore (`Dismiss`). Ignore only marks it read. The state stays until a Re-import or an Export settles it.
 - **Export confirm.** `exportMap` and `play` take `overwriteChanged` beside `replacePublished`. Without it, main compares the game's file with the link's export first and answers `ChangedInGame`, writing nothing, when the game changed it and it isn't the bytes about to be written. It marks that version seen, so the next focus doesn't report it again. The page shows the overwriteChanged dialog (`OverwriteChangedDialog`): Back up and overwrite runs Export or Play again with `overwriteChanged`, so the game's version goes to `<userData>/backups/`; Re-import first re-imports and exports nothing; Cancel. Export on save asks the same. A published map's draft is asked about first, and its answer is kept for the second question.
-- **Re-import** (`MapExports.reimportMap`, IPC `ballest:project:reimportMap`; from the notification, the status bar popover, or Project › Re-import from game). When the map is open in a tab, that tab is made active, and with unsaved edits the unsaved-changes prompt asks first ("…before re-importing it from the game?"). Main reads the export (only the map's own file in the game's maps folder; a map without one is refused), writes its bytes over the project map through `Backups.overwrite`, which sends the project's version to `<project>/.ballest/backups/`, and records it as the export and as seen, so the map is In sync. The page reloads the map in its tab if it is open, and the notification says where the previous version went. There's nothing to re-match yet, because the sidecar (#112) doesn't exist.
+- **Re-import** (`MapExports.reimportMap`, IPC `ballest:project:reimportMap`; from the notification, the status bar popover, or Project › Re-import from game). When the map is open in a tab, that tab is made active, and with unsaved edits the unsaved-changes prompt asks first ("…before re-importing it from the game?"). Main reads the export (only the map's own file in the game's maps folder; a map without one is refused), writes its bytes over the project map through `Backups.overwrite`, which sends the project's version to `<project>/.ballest/backups/`, and records it as the export and as seen, so the map is In sync. The sidecar stays where it is, and the page re-matches it against the new bytes and writes it back whether or not the map is open ([PROJECTS.md § The files](PROJECTS.md#the-files)). It reloads the map in its tab if it is open, and the notification says where the previous version went.
 
 Main touches map files only inside the project's `maps/` and `.ballest/` folders, in the game's maps folder and in `<userData>/backups/`, named by file name, never by path. Import reads a file the user picked in its open dialog.
 
@@ -175,7 +298,16 @@ The page's top bar is the window's title bar. The window has `titleBarStyle: "hi
 
 The window and taskbar icon is `dist-electron/icon.png`, which apps/desktop's build renders from `resources/icon.svg` (256 px, with `@resvg/resvg-js`) and `DesktopEnvironment.iconPath` points at; the window's `icon` option sets it. Linux takes it from there (X11's `_NET_WM_ICON`); Windows shows the exe's icon, which tools/release renders from the same SVG. `productName` ("Ballest Editor") is set in the packaged app's `package.json` (tools/release `config.ts`); unpackaged runs keep the workspace name, so they keep a profile of their own.
 
-**Unsaved changes.** One prompt per map, Save / Don't save / Cancel, guards everything that would lose a map's edits. The page words it ("Save the changes to Big Loop before closing?", `domain/unsaved.ts`) and `Platform.confirmUnsaved` shows it: on desktop a native message box modal to the window (IPC `ballest:window:confirmUnsaved`, `ElectronDialog.showMessageBox`; Escape is Cancel), in a browser a `confirm` whose OK is Don't save. `editor/actions`' `unlessCancelled(action, next)` asks about the active tab only while its map is dirty: Save runs the editor's Save and goes on once it has written the file (a map with no file yet opens the Save map dialog first, and goes on when that saves; its Cancel, or a failed save, stops there), Don't save goes on, Cancel stops. Closing a tab, and replacing a map open in a tab (`unlessCancelledFor`: Re-import, Recover, Import's Replace), make that tab active and ask about it. Closing the window, reloading and switching projects ask about every tab with unsaved edits in turn (`unlessAnyCancelled`), making each active to ask; the first Cancel stops there. Switching projects keeps the open maps open, unsaved, in the new project, so there Save writes each into the project being left.
+**Unsaved changes.** One prompt per map, Save / Don't save / Cancel, guards everything that would lose a map's edits. The page words it ("Save the changes to Big Loop before closing?", `domain/unsaved.ts`) and `Platform.confirmUnsaved` shows it: on desktop a native message box modal to the window (IPC `ballest:window:confirmUnsaved`, `ElectronDialog.showMessageBox`; Escape is Cancel), in a browser a `confirm` whose OK is Don't save. `editor/actions`' `unlessCancelled(action, next)` asks about the active tab only while its map is dirty: Save runs the editor's Save and goes on once it has written the file (a map with no file yet opens the Save map dialog first, and goes on when that saves; its Cancel, or a failed save, stops there), Don't save goes on, Cancel stops. Closing a tab, and replacing a map open in a tab (`unlessCancelledFor`: Re-import, Recover, Import's Replace), make that tab active and ask about it. Closing the window, reloading and leaving a named project ask about every tab with unsaved edits in turn (`unlessAnyCancelled`), making each active to ask; the first Cancel stops there.
+
+**Switching projects** in a window (New project…, Open project… or Recent projects, answered This window) prompts only when a map with unsaved edits would be lost:
+
+| The window is    | It asks                                                                                   | The open maps                                                                                                        |
+| ---------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Untitled Project | nothing, ever: no map is left behind                                                      | stay open as unsaved tabs, and Save puts them in the project                                                         |
+| a named project  | Save / Don't save / Cancel for each tab with unsaved edits, and nothing when none has any | stay open, unsaved, in the new project. The prompt's Save writes each into the project being left, before the switch |
+
+Either way a blank tab (§ Document tabs) is dropped without a word, and when only blank tabs are open the window starts on the project as a launch does.
 
 Closing and reloading go through the page's `beforeunload`, which cancels the unload while any tab has unsaved edits. A browser then shows its own leave-page dialog. In the desktop app the window stays open: main sees `will-prevent-unload` and sends `ballest:window:unloadRequest` with `"close"` (when the window's `close` event came first: the close button, Alt+F4, Ctrl+Q, quitting) or `"reload"` (Ctrl+R in an unpackaged build, a Vite full reload in dev). The page asks, and unless the user cancels it stops holding the unload and closes (`window.close()`) or reloads itself. Restarting from the update pill doesn't ask again: the pill already says unsaved changes are lost.
 
@@ -183,7 +315,7 @@ Installed builds have no application menu (`Menu.setApplicationMenu(null)`): the
 
 ### Other windows
 
-Each window is a running copy of the app, a process of its own. There is no single-instance lock and no second window inside a process, because `Projects` and the other services hold one window's state. The rule is one project per window, and one window per project.
+Each editor window is a running copy of the app, a process of its own. There is no single-instance lock and no second editor window inside a process, because `Projects` and the other services hold one window's state. A panel popped out into a window of its own (§ Dock) is part of its editor window. The rule is one project per window, and one window per project.
 
 **The registry.** `WindowRegistry` (`apps/desktop/src/project/WindowRegistry.ts`) keeps a file per running copy, `<userData>/windows/<pid>.json`: `{ "pid", "project", "choosing" }`. `project` is the folder, or null for Untitled Project. `choosing` is true while the required chooser is up, which holds no project and isn't Untitled Project. A copy writes its file at start and on every project change, and removes it on quit.
 
@@ -207,13 +339,13 @@ Two copies started in the same moment can each look before the other has written
 
 It has no close button, and Escape and a click outside do nothing. Quit this window is the way out, and the window's own close button works as usual. `ProjectState.current` stays null meanwhile, so main refuses to write a map. Behind it is the fresh map every window has. The store opens no other dialog while it's up, so a Game link check that would open one does nothing, and the editor's keys are off (`isModalOpen`). The list updates whenever the window gets the focus (§ Sync's check lists the project again).
 
-**Opening a project.** New project… (once it has a name), Open project… (once a folder is picked) and a recent project go through `openProjectEffect` in `editor/actions`:
+**Opening a project.** New project… (once it has a name), Open project… (once a folder is picked) and a recent project go through `openProjectEffect` in `editor/actions`, whatever the window holds:
 
 1. Main checks the project first (`Projects.check`, IPC `ballest:project:check`) and nothing is written. A project open in another window is refused with `openElsewhere`, which says to close it there first. `Projects.use` refuses it again, so the check can't be got round. The game's maps folder and a name already taken are refused here too. A refusal lists the project again, so a stale row updates. Recent projects marks a project open elsewhere, and picking it shows the refusal.
-2. When this window has something to take over (`hasWindowToTakeOver`), the whereToOpen dialog asks: This window, New window, Cancel. A named project always has. Untitled Project has unless its only map is the untouched fresh one, and then it becomes the project at once. The required chooser never asks.
-3. **This window** is `changeProject`: the unsaved-changes prompt in a named project (§ Window), then the switch. In Untitled Project the maps stay open and Save puts them in the project. **Cancel** does nothing.
+2. The whereToOpen dialog asks: This window, New window, Cancel. An untitled window with nothing but a blank map asks too, because the user may well mean a second window. Only the required chooser never asks: its pick is this window's start. Always do this keeps the answer in `general.projectOpensIn`, and Settings › General › Open projects in puts it back to Ask each time.
+3. **This window** is `changeProject`: [§ Window](#window) says what it prompts and what becomes of the open maps. **New window** starts a copy (below) and leaves this window as it is. **Cancel** does nothing.
 
-A new project's folder is made only after This window or New window, and after the unsaved-changes prompt, so Cancel at any of those leaves nothing on disk.
+A new project's folder is made only after This window or New window, and after any unsaved-changes prompt, so Cancel at any of those leaves nothing on disk.
 
 **New window** (`WindowLauncher`, `apps/desktop/src/window/WindowLauncher.ts`; IPC `ballest:project:openWindow`). Main makes a new project's folder, then starts a detached copy with `--project=<path>`, and this window stays exactly as it is. The new copy adds the project to the recent ones when it starts.
 

@@ -4,6 +4,7 @@ import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-gr
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { formatBinding, type KeybindAction, keybindActionLabels } from "../domain/Keybinds"
 import { type Tool, useEditor } from "../editor/store"
+import { FROSTED, noFocus } from "./viewControlStyle"
 
 /** Icons chosen to match the game's own tool bar (pointer, cross arrows, circular arrows, diagonal arrows). */
 const TOOLS: ReadonlyArray<{
@@ -17,18 +18,14 @@ const TOOLS: ReadonlyArray<{
   { tool: "scale", action: "scaleMode", icon: IconArrowsMaximize }
 ]
 
-/**
- * Floating tool switcher, bottom-centre of the viewport. Pointer-only: items never take
- * focus (mousedown is prevented, tabIndex -1) and ignore Space/Enter, so keyboard focus
- * and keybinds stay with the viewport. `disabled` greys it out while the scene is loading.
- */
-export function ToolBar({ disabled = false }: { readonly disabled?: boolean }) {
+/** Floating tool switcher, bottom-centre of the viewport. Pointer-only, so keybinds stay with the viewport. */
+export function ToolBar({ disabled }: { readonly disabled: boolean }) {
   const tool = useEditor((s) => s.tool)
   const setTool = useEditor((s) => s.setTool)
   const keybinds = useEditor((s) => s.keybinds)
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+    <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
       <ToggleGroup
         value={[tool]}
         onValueChange={(value) => {
@@ -37,7 +34,7 @@ export function ToolBar({ disabled = false }: { readonly disabled?: boolean }) {
         }}
         spacing={1}
         disabled={disabled}
-        className="pointer-events-auto rounded-full border border-border/60 bg-background/60 p-1 shadow-lg backdrop-blur-md"
+        className={`pointer-events-auto rounded-full p-1 ${FROSTED}`}
       >
         {TOOLS.map(({ tool: t, action, icon: Icon }) => (
           <Tooltip key={t}>
@@ -46,12 +43,8 @@ export function ToolBar({ disabled = false }: { readonly disabled?: boolean }) {
                 <ToggleGroupItem
                   value={t}
                   aria-label={keybindActionLabels[action]}
-                  tabIndex={-1}
                   className="size-8 rounded-full data-[pressed]:bg-primary data-[pressed]:text-primary-foreground"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onKeyDown={(e) => {
-                    if (e.key === " " || e.key === "Enter") e.preventDefault()
-                  }}
+                  {...noFocus}
                 />
               }
             >

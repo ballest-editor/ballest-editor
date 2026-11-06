@@ -185,7 +185,7 @@ const creatorRow = (creator: Creator): GameLinkRow => {
     title: creator.name === "" ? "No creator name" : `Can't use "${creator.name}"`,
     note: Option.getOrElse(
       creatorProblem(creator),
-      () => "Neither Steam nor the maps folder names one. New map asks for it; or set it in Settings › General."
+      () => "Neither Steam nor the maps folder names one. The first Save asks for it; or set it in Settings › General."
     ),
     fixes: [edit]
   })
