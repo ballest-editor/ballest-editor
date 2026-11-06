@@ -193,8 +193,21 @@ describe("MapExports over IPC", () => {
         yield* fake.invoke(InvokeChannels.createMap, { fileName, text: "{\"v\":1}" })
         yield* fake.invoke(InvokeChannels.exportMap, { fileName, replacePublished: false, overwriteChanged: false })
         yield* fs.writeFileString(inGame, "{\"v\":2}")
-        const kept = "{\"v\":2,\"editorState\":{}}"
-        const file = yield* fake.invokeAs(ProjectMapFile, InvokeChannels.reimportMap, { fileName, text: kept })
+        const text = "{\"v\":2,\"editorState\":{}}"
+        const kept = text
+        // the game saved again after the page read it: that save isn't written over
+        const stale = { text, gameHash: sha256(new TextEncoder().encode("{\"v\":1}")) }
+        const refused = yield* Effect.flip(fake.invoke(InvokeChannels.reimportMap, { fileName, kept: stale }))
+        assert.match(String(refused.cause), /changed in the game/)
+        assert.strictEqual(yield* fs.readFileString(inGame), "{\"v\":2}")
+        assert.strictEqual(yield* fs.readFileString(path.join(project, "maps", fileName)), "{\"v\":1}")
+
+        const read = yield* fake.invokeAs(ProjectMapFile, InvokeChannels.readExport, { fileName })
+        assert.strictEqual(read.hash, sha256(new TextEncoder().encode("{\"v\":2}")))
+        const file = yield* fake.invokeAs(ProjectMapFile, InvokeChannels.reimportMap, {
+          fileName,
+          kept: { text, gameHash: read.hash }
+        })
         assert.strictEqual(file.text, kept)
         assert.strictEqual(yield* fs.readFileString(path.join(project, "maps", fileName)), kept)
         assert.strictEqual(yield* fs.readFileString(inGame), kept)

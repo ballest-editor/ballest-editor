@@ -93,6 +93,33 @@ describe("diffMaps", () => {
     assert.strictEqual(withPivotsOf(before, before), before)
   })
 
+  it("gives two items of one fingerprint a pivot each, in order", () => {
+    const pivotOn = (itemIndex: number, choice: string) => ({
+      itemIndex,
+      pivot: { choice, localPosition: { x: 0, y: 0, z: 0 } }
+    })
+    const twins = versionOf([at(0), at(0)], ["a", "b"])
+    const from = {
+      ...twins,
+      map: { ...twins.map, editorState: { ...defaultEditorState(), pivots: [pivotOn(0, "Top"), pivotOn(1, "Bottom")] } }
+    }
+    const carried = withPivotsOf(from, unkeyed([at(0), at(0)]))
+    assert.deepStrictEqual(carried.map.editorState?.pivots, [pivotOn(0, "Top"), pivotOn(1, "Bottom")])
+  })
+
+  it("doesn't count a pivot that only followed its item to another index", () => {
+    const pivotOn = (itemIndex: number) => ({
+      itemIndex,
+      pivot: { choice: "Center", localPosition: { x: 0, y: 0, z: 0 } }
+    })
+    const before = versionOf([at(0), at(100)], ["a", "b"])
+    const from = { ...before, map: { ...before.map, editorState: { ...defaultEditorState(), pivots: [pivotOn(0)] } } }
+    const moved = versionOf([at(100), at(0)], ["b", "a"])
+    const carried = withPivotsOf(from, moved)
+    assert.deepStrictEqual(carried.map.editorState?.pivots, [pivotOn(1)])
+    assert.deepStrictEqual(diffMaps(from, carried), NOTHING)
+  })
+
   it("doesn't take the last digits a save moves in a rotation for a move", () => {
     const quarter = turned(at(0))
     const { rotation } = quarter.itemTransform

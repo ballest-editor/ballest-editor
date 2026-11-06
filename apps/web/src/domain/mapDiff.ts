@@ -3,7 +3,7 @@
  * its stable key; what no key pairs, as in a map without a sidecar, is the same item by its class and position.
  */
 import { defaultEditorState } from "./factory"
-import { classNameOf, type Item, type MapFile } from "./MapFile"
+import { classNameOf, type Item, type ItemPivot, type MapFile } from "./MapFile"
 import { fingerprintOf } from "./sidecar"
 
 /** A version of a map, with each item's stable key at its place. */
@@ -93,7 +93,51 @@ const settingsOf = (map: MapFile) =>
       REWRITTEN_ON_SAVE.has(key) ? undefined : typeof value === "number" ? Number(value.toFixed(3)) : value
   )
 
-const pivotsOf = (map: MapFile) => JSON.stringify(map.editorState?.pivots ?? [])
+/**
+ * Where each item of `from` is in `to`, one to one: by stable key, then for a map without a sidecar by fingerprint, in
+ * document order, so two items alike each keep their own.
+ */
+const itemsAcross = (from: MapVersion, to: MapVersion): ReadonlyMap<number, number> => {
+  const keys = new Map(to.ids.map((id, index) => [id, index]))
+  const across = new Map<number, number>()
+  from.ids.forEach((id, index) => {
+    const found = keys.get(id)
+    if (found !== undefined) across.set(index, found)
+  })
+  const taken = new Set(across.values())
+  const free = new Map<string, Array<number>>()
+  to.map.items.forEach((item, index) => {
+    if (taken.has(index)) return
+    const print = fingerprintOf(item)
+    free.set(print, [...(free.get(print) ?? []), index])
+  })
+  from.map.items.forEach((item, index) => {
+    const found = across.has(index) ? undefined : free.get(fingerprintOf(item))?.shift()
+    if (found !== undefined) across.set(index, found)
+  })
+  return across
+}
+
+/** `from`'s pivots on the same items in `to`; a pivot whose item isn't there stays behind. */
+const pivotsAcross = (from: MapVersion, to: MapVersion) => {
+  const pivots = from.map.editorState?.pivots ?? []
+  if (pivots.length === 0) return []
+  const across = itemsAcross(from, to)
+  return pivots.flatMap((pivot) => {
+    const itemIndex = across.get(pivot.itemIndex)
+    return itemIndex === undefined ? [] : [{ ...pivot, itemIndex }]
+  })
+}
+
+const sortedPivots = (pivots: ReadonlyArray<ItemPivot>) =>
+  JSON.stringify(pivots.toSorted((a, b) => a.itemIndex - b.itemIndex))
+
+/** Whether a pivot was lost or changed on the way from `before` to `after`; following its item to another index isn't. */
+const pivotsChanged = (before: MapVersion, after: MapVersion) => {
+  const across = pivotsAcross(before, after)
+  return across.length !== (before.map.editorState?.pivots.length ?? 0) ||
+    sortedPivots(across) !== sortedPivots(after.map.editorState?.pivots ?? [])
+}
 
 /**
  * The items `after` gained, lost and moved since `before`. A key whose item changed class is a new item. Without a key,
@@ -111,35 +155,16 @@ export const diffMaps = (before: MapVersion, after: MapVersion): MapDiff => {
     moved: movedIn(byKey.pairs) + movedIn(byPlace.pairs),
     edited: editedIn(paired),
     settings: settingsOf(before.map) !== settingsOf(after.map),
-    pivots: pivotsOf(before.map) !== pivotsOf(after.map)
+    pivots: pivotsChanged(before, after)
   }
 }
 
-/** Where the item at `index` of `from` is in `to`: by its key, or for a map without a sidecar by its fingerprint. */
-const sameItemIn = (to: MapVersion, from: MapVersion, index: number) => {
-  const byKey = to.ids.indexOf(from.ids[index] ?? "")
-  const item = from.map.items[index]
-  if (byKey !== -1 || item === undefined) return byKey
-  const print = fingerprintOf(item)
-  return to.map.items.findIndex((other) => fingerprintOf(other) === print)
-}
-
-/**
- * `to` with `from`'s pivots, on the items of the same stable key: what a version from the game needs, as every save there
- * drops them. A pivot whose item isn't in `to` stays behind, and a version with pivots of its own keeps those.
- */
+/** `to` with `from`'s pivots, for a version from the game: every save there drops them. One with pivots keeps those. */
 export const withPivotsOf = (from: MapVersion, to: MapVersion): MapVersion => {
-  const pivots = from.map.editorState?.pivots ?? []
-  if (pivots.length === 0 || (to.map.editorState?.pivots.length ?? 0) > 0) return to
-  const carried = pivots.flatMap((pivot) => {
-    const itemIndex = sameItemIn(to, from, pivot.itemIndex)
-    return itemIndex === -1 ? [] : [{ ...pivot, itemIndex }]
-  })
-  if (carried.length === 0) return to
-  return {
-    ...to,
-    map: { ...to.map, editorState: { ...(to.map.editorState ?? defaultEditorState()), pivots: carried } }
-  }
+  if ((to.map.editorState?.pivots.length ?? 0) > 0) return to
+  const pivots = pivotsAcross(from, to)
+  if (pivots.length === 0) return to
+  return { ...to, map: { ...to.map, editorState: { ...(to.map.editorState ?? defaultEditorState()), pivots } } }
 }
 
 /** Whether a diff found nothing. */

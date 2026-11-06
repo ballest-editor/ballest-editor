@@ -231,10 +231,15 @@ export type ProjectMapFile = typeof ProjectMapFile.Type
 const MapFileNamePayload = Schema.Struct({ fileName: MapFileName })
 
 /**
- * `reimportMap`: the map, and `text` to take in place of the game's bytes: those bytes with what the game drops put back
- * (docs/DESKTOP.md § Sync). It goes over the game's copy too, so the two stay in sync.
+ * `reimportMap`: the map, and `kept`: the text to take in place of the game's bytes, those bytes with what the game drops
+ * put back (docs/DESKTOP.md § Sync), and `gameHash`, the bytes it was made from. It goes over the game's copy too, so the
+ * two stay in sync, and it is refused when the game has saved since.
  */
-const ReimportMapPayload = Schema.Struct({ fileName: MapFileName, text: Schema.optionalKey(FileText) })
+const ReimportMapPayload = Schema.Struct({
+  fileName: MapFileName,
+  kept: Schema.optionalKey(Schema.Struct({ text: FileText, gameHash: FileHash }))
+})
+export type ReimportMapPayload = typeof ReimportMapPayload.Type
 
 /** `rememberOpenMap`: the map now open in the project, or null for a map that isn't in it. */
 const OpenMapPayload = Schema.Struct({ fileName: Schema.NullOr(MapFileName) })

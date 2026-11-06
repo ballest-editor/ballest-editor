@@ -49,6 +49,7 @@ export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectErr
     "read",
     "write",
     "notExported",
+    "exportChanged",
     "openElsewhere",
     "notFolder"
   ]),
@@ -86,6 +87,8 @@ export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectErr
         return `Couldn't write ${this.path}.`
       case "notExported":
         return `${this.path} has no export in the game's maps folder to re-import.`
+      case "exportChanged":
+        return `${this.path} changed in the game again just now. Try again.`
       case "openElsewhere":
         return `${this.path} is open in another window. A project opens in one window at a time: close it there first, or choose another project.`
       case "notFolder":

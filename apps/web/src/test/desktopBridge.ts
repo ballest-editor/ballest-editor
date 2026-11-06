@@ -600,12 +600,15 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       }
       return Promise.resolve({ changed, missing })
     },
-    reimportMap: async ({ fileName, text: kept }) => {
+    reimportMap: async ({ fileName, kept }) => {
       if (disk.project.current === null) return fail(NO_PROJECT)
       const link = linksOf(current()).get(fileName) ?? emptyLink
       const inGame = link.export === null ? undefined : disk.files.get(link.export.path)
       if (link.export === null || inGame === undefined) return fail(`${fileName} has no export to re-import.`)
-      const text = kept ?? inGame
+      if (kept !== undefined && kept.gameHash !== testHash(inGame)) {
+        return fail(`${fileName} changed in the game again.`)
+      }
+      const text = kept?.text ?? inGame
       await write(fileName, text)
       disk.files.set(link.export.path, text)
       const seen = { ...link.export, hash: testHash(text) }
@@ -621,7 +624,7 @@ export const testBridge = (disk: TestDisk): DesktopBridge => {
       const exported = linksOf(current()).get(fileName)?.export ?? null
       const text = exported === null ? undefined : disk.files.get(exported.path)
       if (text === undefined) return fail(`${fileName} has no export to read.`)
-      return Promise.resolve({ ...mapOf(fileName), text, sidecar: sidecarOf(fileName) })
+      return Promise.resolve({ ...mapOf(fileName), hash: testHash(text), text, sidecar: sidecarOf(fileName) })
     },
     listBackups: () =>
       Promise.resolve(disk.backups.map(({ hash: _hash, sidecar: _sidecar, text: _, ...backup }) => backup)),

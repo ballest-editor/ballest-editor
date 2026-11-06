@@ -5,7 +5,8 @@ import {
   fileTextProblems,
   isMapFileName,
   type MapLink,
-  type ProjectMapFile
+  type ProjectMapFile,
+  type ReimportMapPayload
 } from "@ballest/contracts"
 import { Context, DateTime, Effect, FileSystem, Option, Path, Schema, Semaphore } from "effect"
 import { ElectronWindow } from "../electron/ElectronWindow"
@@ -55,11 +56,12 @@ export class MapExports extends Context.Service<MapExports, {
   readonly checkExports: Effect.Effect<ExportChecks, MapLinkError>
   /**
    * Replaces a project map with its export (the project's file goes to backups) and records the export as in sync.
-   * `text` is the export with what the game drops put back: it goes over the game's copy too (which goes to backups).
+   * `kept` is the export with what the game drops put back: it goes over the game's copy too (which goes to backups),
+   * and is refused (`exportChanged`) when the game's copy isn't the bytes it was made from any more.
    */
   readonly reimportMap: (
     fileName: string,
-    text?: string
+    kept?: ReimportMapPayload["kept"]
   ) => Effect.Effect<ProjectMapFile, ProjectError | MapLinkError | BackupError>
   /** The map's export as it is now, with the project's sidecar, for comparing it with the project's version. */
   readonly readExport: (fileName: string) => Effect.Effect<ProjectMapFile, ProjectError>
@@ -225,6 +227,8 @@ export class MapExports extends Context.Service<MapExports, {
     ) {
       return {
         ...(yield* files.info(project, fileName, link)),
+        // these bytes', so the page matches the sidecar to them by fingerprint and not by the project file's indices
+        hash: sha256(bytes),
         // the game's bytes as they are: a BOM is kept, like everything else
         text: new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes),
         // left as it was: the page re-matches it against these bytes
@@ -232,24 +236,30 @@ export class MapExports extends Context.Service<MapExports, {
       } satisfies ProjectMapFile
     })
 
-    const reimportMap = Effect.fn("MapExports.reimportMap")(function*(fileName: string, text?: string) {
-      const project = yield* projects.inUse
-      const file = yield* files.fileOf(project, fileName)
-      return yield* Effect.gen(function*() {
-        const source = yield* exportOf(project, fileName)
-        const bytes = text === undefined ? yield* files.readBytes(source) : new TextEncoder().encode(text)
-        yield* backupStore.overwrite(backupsFolderIn(path, project), file, bytes)
-        if (text !== undefined) yield* backupStore.overwrite(exportBackups, source, bytes)
-        const seen = { path: source, hash: sha256(bytes), at: DateTime.formatIso(yield* DateTime.now) }
-        const link = yield* links.modify(project, fileName, (previous) => ({
-          ...(previous ?? emptyLink),
-          export: seen,
-          lastSeenHash: seen.hash,
-          exportedWhileRunning: false
-        }))
-        return yield* fileWith(project, fileName, link, bytes)
-      }).pipe(gameFileLock.withPermits(1))
-    })
+    const reimportMap = Effect.fn("MapExports.reimportMap")(
+      function*(fileName: string, kept?: ReimportMapPayload["kept"]) {
+        const project = yield* projects.inUse
+        const file = yield* files.fileOf(project, fileName)
+        return yield* Effect.gen(function*() {
+          const source = yield* exportOf(project, fileName)
+          const inGame = yield* files.readBytes(source)
+          if (kept !== undefined && sha256(inGame) !== kept.gameHash) {
+            return yield* projectError("exportChanged", fileName)()
+          }
+          const bytes = kept === undefined ? inGame : new TextEncoder().encode(kept.text)
+          yield* backupStore.overwrite(backupsFolderIn(path, project), file, bytes)
+          if (kept !== undefined) yield* backupStore.overwrite(exportBackups, source, bytes)
+          const seen = { path: source, hash: sha256(bytes), at: DateTime.formatIso(yield* DateTime.now) }
+          const link = yield* links.modify(project, fileName, (previous) => ({
+            ...(previous ?? emptyLink),
+            export: seen,
+            lastSeenHash: seen.hash,
+            exportedWhileRunning: false
+          }))
+          return yield* fileWith(project, fileName, link, bytes)
+        }).pipe(gameFileLock.withPermits(1))
+      }
+    )
 
     const readExport = Effect.fn("MapExports.readExport")(function*(fileName: string) {
       const project = yield* projects.inUse

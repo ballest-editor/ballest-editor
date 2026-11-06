@@ -65,7 +65,10 @@ type MapFileRead = Pick<ProjectMapFile, "fileName" | "text" | "hash" | "sidecar"
  * `.balledit` changed behind the editor's back. A sidecar that won't decode leaves the map on its own, and says so: the
  * next Save replaces it, and it goes to backups.
  */
-export const loadMapFile = Effect.fn("loadMapFile")(function*({ fileName, hash, sidecar, text }: MapFileRead) {
+export const loadMapFile = Effect.fn("loadMapFile")(function*(
+  { fileName, hash, sidecar, text }: MapFileRead,
+  load: typeof loadStructure = loadStructure
+) {
   const codec = yield* MapCodec
   const map = yield* codec.decode(text)
   const decoded = sidecar === null
@@ -84,7 +87,7 @@ export const loadMapFile = Effect.fn("loadMapFile")(function*({ fileName, hash, 
         })
       )
     )
-  const loaded = loadStructure(map, hash, decoded)
+  const loaded = load(map, hash, decoded)
   const { unmatched } = loaded
   if (unmatched > 0) {
     useEditor.getState().notify(
@@ -104,8 +107,11 @@ export const loadMapFile = Effect.fn("loadMapFile")(function*({ fileName, hash, 
  * A project map, read and put together with its sidecar. A sidecar that was re-matched is written back at once, so what
  * it lost is reported this once and the next open trusts it again.
  */
-export const loadProjectMapFile = Effect.fn("loadProjectMapFile")(function*(file: MapFileRead) {
-  const opened = yield* loadMapFile(file)
+export const loadProjectMapFile = Effect.fn("loadProjectMapFile")(function*(
+  file: MapFileRead,
+  load: typeof loadStructure = loadStructure
+) {
+  const opened = yield* loadMapFile(file, load)
   if (opened.loaded.rematched) {
     const { ids, structure } = opened.loaded
     // the map still opens; the next open matches it again, and the next Save writes it
@@ -182,13 +188,16 @@ export const notifyNotice = ({ level, title, kind, body, persistent, actions }: 
   useEditor.getState().notify(level, title, { kind, persistent, actions, ...(body !== undefined && { body }) })
 
 /** A file's map and each item's key, saying nothing about a sidecar that doesn't fit: the preview only looks. */
-export const versionOfFile = Effect.fnUntraced(function*(file: Pick<ProjectMapFile, "text" | "hash" | "sidecar">) {
+export const versionOfFile = Effect.fnUntraced(function*(
+  file: Pick<ProjectMapFile, "text" | "hash" | "sidecar">,
+  load: typeof loadStructure = loadStructure
+) {
   const codec = yield* MapCodec
   const map = yield* codec.decode(file.text)
   const sidecar = file.sidecar === null
     ? null
     : yield* codec.decodeSidecar(file.sidecar).pipe(Effect.orElseSucceed(() => null))
-  const { ids } = loadStructure(map, file.hash, sidecar)
+  const { ids } = load(map, file.hash, sidecar)
   return { map, ids } satisfies MapVersion
 })
 
@@ -200,7 +209,7 @@ export const currentVersionOf = Effect.fnUntraced(function*(fileName: string) {
   const tab = fileTabOf(useEditor.getState(), fileName)
   if (tab !== undefined) return tab.doc satisfies MapVersion
   return yield* (yield* Platform).readMap(fileName).pipe(
-    Effect.flatMap(versionOfFile),
+    Effect.flatMap((file) => versionOfFile(file)),
     Effect.orElseSucceed(() => null)
   )
 })

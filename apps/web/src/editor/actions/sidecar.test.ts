@@ -181,7 +181,8 @@ describe("the sidecar", () => {
       yield* reimportMapEffect(NAME)
       assert.strictEqual(s().doc.ids[2], a)
       assert.deepStrictEqual(shapeOf()[2], ["Bridge 1", [a, b]])
-      assert.lengthOf(notices("sidecarUnmatched"), 1)
+      // the game keeps items in order, so the cube it moved is still that cube
+      assert.lengthOf(notices("sidecarUnmatched"), 0)
       assert.strictEqual(sidecarOn(disk).mapHash, testHash(stripped))
 
       // a map that isn't open: the sidecar on disk is matched all the same
@@ -191,7 +192,7 @@ describe("the sidecar", () => {
       yield* checkExportsEffect
       yield* reimportMapEffect(NAME)
       assert.strictEqual(sidecarOn(disk).mapHash, testHash(disk.files.get(inGame)!))
-      assert.lengthOf(notices("sidecarUnmatched"), 1)
+      assert.lengthOf(notices("sidecarUnmatched"), 0)
       assert.isNull(s().file)
     }).pipe(Effect.provide(layerFor(disk)))
   })

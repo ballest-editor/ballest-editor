@@ -232,3 +232,21 @@ export const loadStructure = (map: MapFile, mapHash: string, sidecar: MapSidecar
     rematched: byIndex === undefined
   }
 }
+
+/** Whether `map` holds the items `sidecar` was written for, in their order: the same class at every place. */
+const sameItemsInOrder = (map: MapFile, sidecar: MapSidecar) => {
+  const entries = Object.values(sidecar.items)
+  return entries.length === map.items.length && entries.every(({ fingerprint, index }) => {
+    const item = map.items[index]
+    return item !== undefined && fingerprintOf(item).split("|")[0] === fingerprint.split("|")[0]
+  })
+}
+
+/**
+ * `loadStructure` for a version the game saved. The game keeps items in their order, so the same items in the same order
+ * are those items wherever they moved to, and they keep their keys, names and groups. Otherwise it is any rewritten file.
+ */
+export const loadGameStructure = (map: MapFile, mapHash: string, sidecar: MapSidecar | null): LoadedStructure =>
+  sidecar !== null && sameItemsInOrder(map, sidecar)
+    ? { ...loadStructure(map, sidecar.mapHash, sidecar), rematched: true }
+    : loadStructure(map, mapHash, sidecar)

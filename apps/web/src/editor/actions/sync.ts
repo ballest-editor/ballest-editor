@@ -6,6 +6,7 @@
 import { Deferred, Effect, Stream } from "effect"
 import { mapLabelOf } from "../../domain/factory"
 import { syncsFromGame } from "../../domain/linkState"
+import { loadGameStructure } from "../../domain/sidecar"
 import { Platform } from "../../services/Platform"
 import { fileTabOf, tabWithFile, useEditor } from "../store"
 import { writeToGame } from "./gameWrite"
@@ -97,7 +98,7 @@ export const reimportMapEffect = (fileName: string) =>
     Effect.gen(function*() {
       const file = yield* (yield* Platform).reimportMap(fileName, yield* textKeepingPivots(fileName))
       yield* refreshProject
-      const { loaded, map } = yield* loadProjectMapFile(file)
+      const { loaded, map } = yield* loadProjectMapFile(file, loadGameStructure)
       if (open) yield* showMap(map, fileOf(file), { loaded })
       useEditor.getState().notify("info", `Re-imported ${mapLabelOf(fileName)} from the game`, {
         kind: "mapReimported",

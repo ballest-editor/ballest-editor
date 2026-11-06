@@ -4,7 +4,7 @@ import { listSamples, readSample } from "../test/samples"
 import { defaultEditorState, identityTransform, newMapFile, playerStartItem } from "./factory"
 import { type Item, MapFile } from "./MapFile"
 import type { MapSidecar } from "./MapSidecar"
-import { fingerprintOf, loadStructure, sidecarOf, structureOfMap } from "./sidecar"
+import { fingerprintOf, loadGameStructure, loadStructure, sidecarOf, structureOfMap } from "./sidecar"
 import { type Structure, treeKeys, withGroup, withItemName, withTags } from "./structure"
 
 const decodeMap = Schema.decodeUnknownSync(Schema.fromJsonString(MapFile))
@@ -112,6 +112,32 @@ describe("loadStructure", () => {
     assert.deepStrictEqual(loaded.ids, Object.values(keys))
     assert.strictEqual(loaded.unmatched, 0)
     assert.isTrue(loaded.rematched)
+  })
+
+  it("keeps every item of a game save in the same order, however far it moved", () => {
+    const { keys, map, sidecar, structure } = authored()
+    const moved = mapOf(map.items.map((item, index) => index === 1 ? nudged(item, 5000) : item))
+    const loaded = loadGameStructure(moved, OTHER_HASH, sidecar)
+    assert.deepStrictEqual(loaded.ids, Object.values(keys))
+    assert.strictEqual(loaded.unmatched, 0)
+    assert.deepStrictEqual(loaded.structure.tree, structure.tree)
+    assert.deepStrictEqual(loaded.structure.items.get(keys.k1), { name: "Named" })
+  })
+
+  it("re-matches a game save without the same items in the same order, as any rewritten file", () => {
+    const { keys, map, sidecar } = authored()
+    const [first, , , fourth, fifth] = map.items
+    const loaded = loadGameStructure(mapOf([first!, fourth!, fifth!]), OTHER_HASH, sidecar)
+    assert.strictEqual(loaded.unmatched, 2)
+    assert.deepStrictEqual(loaded.ids, [keys.k0, keys.k3, keys.k4])
+    const other: Item = { ...at(100), actorToSpawn: "/Script/Engine.Blueprint'/Game/BP_Other.BP_Other_C'" }
+    const swapped = loadGameStructure(
+      mapOf(map.items.map((item, index) => index === 1 ? other : item)),
+      OTHER_HASH,
+      sidecar
+    )
+    assert.strictEqual(swapped.unmatched, 1)
+    assert.isNull(loadGameStructure(map, OTHER_HASH, null).structure.items.get("") ?? null)
   })
 
   it("gives each of two close entries its nearest item", () => {

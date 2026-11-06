@@ -1,6 +1,7 @@
 /** The syncConflict dialog (docs/DESKTOP.md § Sync): how a map's two versions differ, and asking which to keep. */
 import { Effect } from "effect"
 import { diffMaps, type MapDiff, withPivotsOf } from "../../domain/mapDiff"
+import { loadGameStructure } from "../../domain/sidecar"
 import { MapCodec } from "../../services/MapCodec"
 import { Platform } from "../../services/Platform"
 import { type SyncConflict, useEditor } from "../store"
@@ -11,9 +12,10 @@ import { currentVersionOf, versionOfFile } from "./shared"
  * Re-import takes it: every save in the game drops them, and the map file is their only home.
  */
 const versionsOf = Effect.fnUntraced(function*(fileName: string) {
-  const game = yield* (yield* Platform).readExport(fileName).pipe(Effect.flatMap(versionOfFile))
+  const file = yield* (yield* Platform).readExport(fileName)
+  const game = yield* versionOfFile(file, loadGameStructure)
   const current = yield* currentVersionOf(fileName)
-  return { current, game, kept: current === null ? game : withPivotsOf(current, game) }
+  return { current, file, game, kept: current === null ? game : withPivotsOf(current, game) }
 })
 
 /** How the game's version of `fileName` differs from the project's; null when one won't read. */
@@ -24,10 +26,11 @@ export const gameDiffOf = (fileName: string): Effect.Effect<MapDiff | null, neve
   )
 
 /** What Re-import takes in place of the game's bytes: them with the project's pivots, when it has any to carry. */
-export const textKeepingPivots = (fileName: string): Effect.Effect<string | undefined, never, Platform | MapCodec> =>
+export const textKeepingPivots = (fileName: string) =>
   Effect.gen(function*() {
-    const { game, kept } = yield* versionsOf(fileName)
-    return kept === game ? undefined : yield* MapCodec.use((codec) => codec.encode(kept.map))
+    const { file, game, kept } = yield* versionsOf(fileName)
+    if (kept === game) return undefined
+    return { text: yield* MapCodec.use((codec) => codec.encode(kept.map)), gameHash: file.hash }
   }).pipe(Effect.orElseSucceed(() => undefined))
 
 /** Opens the dialog about `fileName`. */
