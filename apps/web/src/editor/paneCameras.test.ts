@@ -6,6 +6,7 @@ import {
   changePanes,
   floorGridOnly,
   forgetClosedTabs,
+  mapBox,
   orthographicOnly,
   PaneCamera,
   paneCamerasOf,
@@ -195,6 +196,42 @@ describe("changing a pane's projection", () => {
     pane.setProjection("right")
     assert.deepStrictEqual(pane.target.toArray(), [10, 20, 30])
     assert.strictEqual(pane.cmPerPixel, cmPerPixel)
+  })
+
+  describe("following the store", () => {
+    const framedOn = (view: OrthoView) => {
+      const pane = paneOn(view)
+      pane.frameMap(mapBox())
+      return pane
+    }
+
+    it("frames the map on arriving from perspective, as a pane first shown there does", () => {
+      const pane = paneOn("perspective")
+      pane.needsFraming = false
+      pane.perspective.position.set(40, 30, 40)
+      pane.perspective.lookAt(0, 0, 0)
+      pane.perspective.updateMatrixWorld()
+      pane.followProjection("right")
+      const first = framedOn("right")
+      assert.closeTo(pane.cmPerPixel, first.cmPerPixel, 1e-9)
+      assert.deepStrictEqual(pane.target.toArray(), first.target.toArray())
+    })
+
+    it("keeps the zoom between orthographic views", () => {
+      const pane = framedOn("top")
+      pane.zoomOrthographic(0.5, { x: WIDTH / 2, y: HEIGHT / 2 })
+      const { cmPerPixel } = pane
+      pane.followProjection("right")
+      assert.strictEqual(pane.cmPerPixel, cmPerPixel)
+    })
+
+    it("does nothing while the view stays", () => {
+      const pane = framedOn("top")
+      pane.zoomOrthographic(0.5, { x: WIDTH / 2, y: HEIGHT / 2 })
+      const { cmPerPixel } = pane
+      pane.followProjection("top")
+      assert.strictEqual(pane.cmPerPixel, cmPerPixel)
+    })
   })
 
   it("finds the nearest view from where it looks", () => {

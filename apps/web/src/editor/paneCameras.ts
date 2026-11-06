@@ -163,6 +163,17 @@ export class PaneCamera {
   }
 
   /**
+   * Takes the store's view for the pane. Arriving at an orthographic view from perspective frames the map, as a pane
+   * first shown there does, because a perspective pane's zoom is only how far off its pivot happens to be. Between
+   * orthographic views the zoom stays. The picture eases to all of it.
+   */
+  followProjection(next: ViewProjection): void {
+    const framing = this.view === undefined && isOrthoView(next)
+    this.setProjection(next)
+    if (framing) this.frameMap(mapBox())
+  }
+
+  /**
    * Moves the picture along its way to the view, `durationMs` from when it first steps; a change of view eases out like
    * the chrome does (docs/design/ui-system.md § Motion). It heads for where the pane is now, so a drag or a wheel notch
    * on the way isn't lost.
