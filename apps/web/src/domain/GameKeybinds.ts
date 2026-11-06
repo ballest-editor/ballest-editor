@@ -2,7 +2,7 @@
  * The game's own default bindings (assets/keybinds.json from tools/extract, parsed
  * Enhanced Input contexts) mapped onto editor actions.
  *
- * In the cooked game IMC_LevelEditor / IMC_ModeEditor are empty: the level editor's own
+ * In the cooked game IMC_LevelEditor / IMC_ModeEditor are empty: the in-game editor's own
  * hotkeys (gizmo modes, delete, undo...) are compiled into the SKG C++ plugin. So the
  * camera comes from IMC_FreeCam, Escape from IMC_Universal, and everything else uses
  * `defaultKeybinds` (reported as fallbacks). Modifier subobjects with `settings: null`
@@ -34,7 +34,7 @@ export const GameMapping = open({
   modifierSettings: Schema.optionalKey(Schema.Array(SubobjectSettings)),
   triggerSettings: Schema.optionalKey(Schema.Array(SubobjectSettings)),
   ignored: Schema.optionalKey(Schema.Boolean),
-  /** Name and section from the game's settings screen, when the extractor provides them. */
+  /** Name and section from the game's settings screen, when the extractor provides them; the section tells gamepad rows. */
   label: Schema.optionalKey(Schema.NullOr(Schema.String)),
   section: Schema.optionalKey(Schema.NullOr(Schema.String))
 })
@@ -42,14 +42,11 @@ export type GameMapping = typeof GameMapping.Type
 
 export const GameContext = open({ name: Schema.String, mappings: Schema.Array(GameMapping) })
 
-export const GameSection = open({ name: Schema.String })
 export const GameCameraPreset = open({ row: Schema.String, label: Schema.String, fov: Schema.Finite })
 
 export const GameKeybindsFile = open({
   contexts: Schema.Array(GameContext),
   actions: Schema.optionalKey(Schema.Array(Schema.Unknown)),
-  /** The game's settings-screen sections, in UI order. */
-  sections: Schema.optionalKey(Schema.Array(GameSection)),
   /** DT_CameraSettingsPresets rows (fov is horizontal, degrees). */
   cameraPresets: Schema.optionalKey(Schema.Array(GameCameraPreset))
 })
@@ -240,19 +237,12 @@ const chordFromMapping = (mapping: GameMapping, codeOverride: string | undefined
   return [...mods, code].join("+")
 }
 
-export interface ActionNaming {
-  readonly label?: string
-  readonly section?: string
-}
-
 export interface DerivedKeybinds {
   readonly keybinds: Keybinds
-  /** Labels/sections from keybinds.json (override the built-in table when present). */
-  readonly naming: ReadonlyMap<KeybindAction, ActionNaming>
+  /** Labels from keybinds.json (override the built-in table when present). */
+  readonly labels: ReadonlyMap<KeybindAction, string>
   readonly fromGame: ReadonlyMap<KeybindAction, { readonly context: string; readonly action: string }>
   readonly fellBack: ReadonlyArray<KeybindAction>
-  /** The game's section names in its settings-screen order (gamepad sections excluded). */
-  readonly sectionOrder: ReadonlyArray<string>
   readonly cameraPresets: ReadonlyArray<CameraPreset>
 }
 
@@ -274,7 +264,7 @@ export const FALLBACK_CAMERA_PRESETS: ReadonlyArray<CameraPreset> = [
 export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybinds => {
   const out: Record<KeybindAction, Bindings> = { ...defaultKeybinds }
   const fromGame = new Map<KeybindAction, { context: string; action: string }>()
-  const naming = new Map<KeybindAction, ActionNaming>()
+  const labels = new Map<KeybindAction, string>()
   for (const name of EDITOR_CONTEXTS) {
     const context = file?.contexts.find((c) => c.name === name)
     for (const mapping of context?.mappings ?? []) {
@@ -289,7 +279,7 @@ export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybi
         // A bare modifier key only works for held actions (e.g. LeftControl = fly down).
         if (MODIFIER_PREFIX[base] !== undefined && !heldActions.has(action)) continue
         // The first game mapping replaces the editor default; later ones become secondary
-        // bindings. Level-editor overlay hotkeys stay primary.
+        // bindings. In-game editor overlay hotkeys stay primary.
         const first = !fromGame.has(action)
         const keep = first && !editorOverlayActions.has(action) ? [] : out[action]
         out[action] = uniqueBindings([...keep, chord])
@@ -306,25 +296,21 @@ export const deriveKeybinds = (file: GameKeybindsFile | undefined): DerivedKeybi
   ]
   for (const context of namingContexts) {
     for (const mapping of context?.mappings ?? []) {
-      if (mapping.action === null || !(mapping.label || mapping.section)) continue
+      if (mapping.action === null || !mapping.label) continue
       // Gamepad rows name gamepad controls; the editor is mouse and keyboard.
       if ((mapping.key ?? "").startsWith("Gamepad") || /gamepad/i.test(mapping.section ?? "")) continue
       const resolver = GAME_ACTIONS[mapping.action.replace(/^IA_/, "").toLowerCase()]
       for (const { action } of resolver?.(mapping) ?? []) {
-        if (naming.has(action) || editorOverlayActions.has(action)) continue
-        naming.set(action, {
-          ...(mapping.label ? { label: mapping.label.toLowerCase() } : {}),
-          ...(mapping.section ? { section: mapping.section } : {})
-        })
+        if (labels.has(action) || editorOverlayActions.has(action)) continue
+        labels.set(action, mapping.label.toLowerCase())
       }
     }
   }
   const fellBack = keybindActions.filter((a) => !fromGame.has(a))
-  const sectionOrder = (file?.sections ?? []).map((s) => s.name).filter((name) => !/gamepad/i.test(name))
   const cameraPresets = file?.cameraPresets !== undefined && file.cameraPresets.length > 0
     ? file.cameraPresets.map((p) => ({ id: p.row, label: p.label, fov: p.fov }))
     : FALLBACK_CAMERA_PRESETS
-  return { keybinds: out, naming, fromGame, fellBack, sectionOrder, cameraPresets }
+  return { keybinds: out, labels, fromGame, fellBack, cameraPresets }
 }
 
 export interface NamedAction {
@@ -333,49 +319,25 @@ export interface NamedAction {
   readonly label: string
 }
 
-/** The sections that all move the camera. The game's two are kept apart in Settings, under the game's own names. */
-const CAMERA_SECTIONS: ReadonlySet<string> = new Set([
-  "mouse and keyboard free camera",
-  "mouse and keyboard bindings",
-  "editor camera"
-])
-
-/** `named` as the keybind cheat sheet groups it: by section, first seen first, with the camera's sections as one. */
+/** `named` as Keyboard shortcuts groups it: by section, in the order they come. */
 export const cheatSheetSections = (
   named: ReadonlyArray<NamedAction>
 ): ReadonlyArray<{ readonly section: string; readonly actions: ReadonlyArray<NamedAction> }> => {
   const sections = new Map<string, Array<NamedAction>>()
   for (const action of named) {
-    const section = CAMERA_SECTIONS.has(action.section) ? "camera" : action.section
-    const actions = sections.get(section)
-    if (actions === undefined) sections.set(section, [action])
+    const actions = sections.get(action.section)
+    if (actions === undefined) sections.set(action.section, [action])
     else actions.push(action)
   }
   return Array.from(sections, ([section, actions]) => ({ section, actions }))
 }
 
-/**
- * Every action with the section and label to show it under (keybinds.json naming when the
- * extractor provides it, else the built-in table), ordered by section: ours first in table
- * order, then the game's in its settings-screen order.
- */
-export const namedActions = (derived: DerivedKeybinds): ReadonlyArray<NamedAction> => {
-  const tableOrder: ReadonlyArray<string> = keybindSections.map((s) => s.name)
-  const sectionRank = (name: string) => {
-    const ours = tableOrder.indexOf(name)
-    if (ours >= 0) return ours
-    const game = derived.sectionOrder.indexOf(name)
-    return tableOrder.length + (game >= 0 ? game : derived.sectionOrder.length)
-  }
-  return keybindSections
-    .flatMap((section) =>
-      section.actions.map((action): NamedAction => ({
-        action,
-        section: derived.naming.get(action)?.section ?? section.name,
-        label: derived.naming.get(action)?.label ?? keybindActionLabels[action]
-      }))
-    )
-    .map((named, i) => ({ named, i }))
-    .sort((x, y) => sectionRank(x.named.section) - sectionRank(y.named.section) || x.i - y.i)
-    .map(({ named }) => named)
-}
+/** Every action, in table order, with its section and the label to show (keybinds.json's when present, else the table's). */
+export const namedActions = (derived: DerivedKeybinds): ReadonlyArray<NamedAction> =>
+  keybindSections.flatMap((section) =>
+    section.actions.map((action): NamedAction => ({
+      action,
+      section: section.name,
+      label: derived.labels.get(action) ?? keybindActionLabels[action]
+    }))
+  )

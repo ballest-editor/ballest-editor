@@ -8,20 +8,20 @@
 import { Schema } from "effect"
 
 /**
- * Sections and names follow the game: the level editor's own hotkey overlay ("focus
- * selection", "delete"...) and its settings screen ("mouse and keyboard free camera":
- * "forward", "reverse"...). The exceptions: the tools get plain "select", "translate",
- * "rotate", "scale" instead of the overlay's "select mode", "move mode"..., and the
- * overlay's edit commands (undo, copy, delete...) get their own "edit" section, in the
- * Edit menu's order. Game actions that mean nothing in the editor (replay controls,
- * nameplates) are omitted; editor-only actions get plain lower-case names in the same
- * style. keybinds.json `label`/`section` fields, when the extractor provides them,
- * override the camera names (see GameKeybinds); level-editor and edit names come from
- * the in-game overlay and are fixed here.
+ * The sections are the editor's own, the same in Settings and Keyboard shortcuts. The names
+ * follow the game: the in-game editor's hotkey overlay ("focus selection", "delete"...) and
+ * its settings screen ("forward", "reverse"...). The exceptions: the tools get plain
+ * "select", "move", "rotate", "scale" instead of the overlay's "select mode", "move
+ * mode"..., and the overlay's edit commands (undo, copy, delete...) get their own "edit"
+ * section, in the Edit menu's order. Game actions that mean nothing in the editor (replay
+ * controls, nameplates) are omitted; editor-only actions get plain lower-case names in the
+ * same style. keybinds.json `label` fields, when the extractor provides them, override the
+ * camera names (see GameKeybinds); editor and edit names come from the in-game overlay and
+ * are fixed here.
  */
 export const keybindSections = [
   {
-    name: "level editor",
+    name: "editor",
     actions: [
       "selectMode",
       "translateMode",
@@ -49,11 +49,26 @@ export const keybindSections = [
     ]
   },
   {
-    name: "mouse and keyboard free camera",
-    actions: ["moveForward", "moveBack", "moveLeft", "moveRight", "look", "moveUp", "moveDown"]
+    name: "camera",
+    actions: [
+      "moveForward",
+      "moveBack",
+      "moveLeft",
+      "moveRight",
+      "look",
+      "moveUp",
+      "moveDown",
+      "lookRight",
+      "lookLeft",
+      "lookUp",
+      "lookDown",
+      "fastMove",
+      "speedFaster",
+      "speedSlower",
+      "orbit",
+      "pan"
+    ]
   },
-  { name: "mouse and keyboard bindings", actions: ["lookRight", "lookLeft", "lookUp", "lookDown"] },
-  { name: "editor camera", actions: ["fastMove", "speedFaster", "speedSlower", "orbit", "pan"] },
   {
     name: "view",
     actions: [
@@ -75,7 +90,7 @@ export const keybindSections = [
 export type KeybindAction = (typeof keybindSections)[number]["actions"][number]
 export const keybindActions: ReadonlyArray<KeybindAction> = keybindSections.flatMap((g) => g.actions)
 
-/** Actions named by the in-game level editor's hotkey overlay (keybinds.json naming doesn't apply). */
+/** Actions named by the in-game editor's hotkey overlay (keybinds.json naming doesn't apply). */
 export const editorOverlayActions: ReadonlySet<KeybindAction> = new Set([
   ...keybindSections[0].actions,
   ...keybindSections[1].actions
@@ -84,7 +99,7 @@ export const editorOverlayActions: ReadonlySet<KeybindAction> = new Set([
 /** The name shown in the settings (the game's wording where the action exists in-game). */
 export const keybindActionLabels: Record<KeybindAction, string> = {
   selectMode: "select",
-  translateMode: "translate",
+  translateMode: "move",
   rotateMode: "rotate",
   scaleMode: "scale",
   toggleGizmoSpace: "local / world axes",
@@ -123,7 +138,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   viewBack: "back view",
   viewRight: "right view",
   viewLeft: "left view",
-  toggleOrthographic: "orthographic / perspective",
+  toggleOrthographic: "perspective view",
   frameAll: "frame all",
   newMap: "new map",
   openMap: "import map",
@@ -133,41 +148,40 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   nextTab: "next tab",
   previousTab: "previous tab",
   playMap: "play",
-  showKeybinds: "keybind cheat sheet"
+  showKeybinds: "keyboard shortcuts"
 }
 
 /** What each action does in the editor (binding tooltips). */
 export const keybindActionDescriptions: Record<KeybindAction, string> = {
-  selectMode: "Select: click to select, no gizmo. Q in the game's level editor.",
+  selectMode: "Select: click to select, no gizmo. Q in the in-game editor.",
   translateMode:
-    "Translate: drag the arrows or plane handles to move the selection. W in the game's level editor. When its key is also a movement key, the \"fly only while looking\" camera setting decides which it does.",
-  rotateMode: "Rotate: drag a ring to rotate the selection. E in the game's level editor.",
+    "Move: drag the arrows or plane handles to move the selection. W in the in-game editor. When its key is also a movement key, the \"fly only while looking\" camera setting decides which it does.",
+  rotateMode: "Rotate: drag a ring to rotate the selection. E in the in-game editor.",
   scaleMode:
-    "Scale: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the game's level editor.",
+    "Scale: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the in-game editor.",
   toggleGizmoSpace:
-    "Switch the translate, rotate and scale gizmos between the selected item's own axes (the last one picked, when several are selected) and the world axes. C in the game's level editor.",
-  focusSelection: "Frame the current selection in the viewport. F in the game's level editor.",
+    "Switch the move, rotate and scale gizmos between the selected item's own axes (the last one picked, when several are selected) and the world axes. C in the in-game editor.",
+  focusSelection: "Frame the current selection in the viewport. F in the in-game editor.",
   addToSelection:
     "Click an item to add it to the selection (it becomes the active item). Shift+click, as in Unreal's editor; the game's key for this isn't recorded.",
   toggleSelection:
-    "Click an item to add it to the selection, or to remove it if it's already selected. Ctrl+click, which the game's level editor uses to deselect.",
-  deleteSelection: "Delete the selected items. Backspace in the game's level editor; Delete also works.",
+    "Click an item to add it to the selection, or to remove it if it's already selected. Ctrl+click, which the in-game editor uses to deselect.",
+  deleteSelection: "Delete the selected items. Backspace in the in-game editor; Delete also works.",
   duplicateSelection:
-    "Copy the selected items in place and select the copies, ready to move. Ctrl+D, as in Unreal's editor; the game has no key for this and duplicates with Alt+drag on the translate gizmo (see General settings).",
+    "Copy the selected items in place and select the copies, ready to move. Ctrl+D, as in Unreal's editor; the game has no key for this and duplicates with Alt+drag on the move gizmo (see General settings).",
   copySelection:
-    "Copy the selected items, with their properties, so paste can add them again. Ctrl+C in the game's level editor.",
+    "Copy the selected items, with their properties, so paste can add them again. Ctrl+C in the in-game editor.",
   cutSelection:
     "Copy the selected items, then delete them (one undo step); paste puts them back where they were. Editor only: the game has copy and paste but no cut.",
   paste:
-    "Add the copied items where they were when copied, and select them. Ctrl+V in the game's level editor, which also pastes in place.",
-  undo:
-    "Undo the last change. Ctrl+Z in the game's level editor; a whole gizmo drag or number-field scrub is one step.",
-  redo: "Redo the last undone change. Ctrl+Y in the game's level editor; Ctrl+Shift+Z also works.",
+    "Add the copied items where they were when copied, and select them. Ctrl+V in the in-game editor, which also pastes in place.",
+  undo: "Undo the last change. Ctrl+Z in the in-game editor; a whole gizmo drag or number-field scrub is one step.",
+  redo: "Redo the last undone change. Ctrl+Y in the in-game editor; Ctrl+Shift+Z also works.",
   deselect:
     "Clear the selection. Inside an entered group it steps out of the group instead, and during a gizmo drag it cancels the drag. (The game uses Ctrl+click.)",
   groupSelection:
-    "Group the selection. Clicking any item of a group then selects the whole group. Ctrl+G in the game's level editor.",
-  ungroupSelection: "Dissolve the selected groups; their items stay selected. Shift+G in the game's level editor.",
+    "Group the selection. Clicking any item of a group then selects the whole group. Ctrl+G in the in-game editor.",
+  ungroupSelection: "Dissolve the selected groups; their items stay selected. Shift+G in the in-game editor.",
   moveForward: "Fly the camera forward while held.",
   moveBack: "Fly the camera backward while held.",
   moveLeft: "Fly the camera left while held.",
