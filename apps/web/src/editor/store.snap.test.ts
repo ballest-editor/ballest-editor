@@ -1,0 +1,271 @@
+import { assert, beforeEach, describe, it } from "@effect/vitest"
+import { Schema } from "effect"
+import { identityTransform } from "../domain/factory"
+import type { RigidDelta } from "../domain/groupTransform"
+import type { GroupPivot } from "../domain/MapSidecar"
+import { PrefabFile } from "../domain/PrefabFile"
+import { defaultSettings } from "../domain/Settings"
+import { defaultSnapConfig } from "../domain/snapConfig"
+import { annotationsOf, findGroup } from "../domain/structure"
+import { rotatorToQuat } from "../domain/ueMath"
+import { PREFAB_TEXT } from "../test/prefabs"
+import { grouped, loadPieces } from "../test/snapFixtures"
+import { snapConfigOf, useEditor } from "./store"
+
+/** Two pieces whose near ends meet, and a third some way off. */
+const load = () => {
+  const [a = "", b = "", c = ""] = loadPieces([{ x: 0, y: 0, z: 0 }, { x: 500, y: 0, z: 0 }, { x: 5000, y: 0, z: 0 }])
+  return { a, b, c }
+}
+
+/** Moves `b` away and back with a connector snap, so its end joins `a`'s. */
+const join = (b: string) => {
+  useEditor.getState().transformItems(new Map([[b, identityTransform({ x: 900, y: 0, z: 0 })]]))
+  useEditor.getState().transformItems(new Map([[b, identityTransform({ x: 500, y: 0, z: 0 })]]), { connected: true })
+}
+
+describe("a map's snap settings", () => {
+  beforeEach(() => void load())
+
+  it("follows the defaults until the map has its own", () => {
+    assert.deepStrictEqual(snapConfigOf(useEditor.getState()), defaultSettings.snapping)
+    useEditor.getState().setTabSnap({ ...defaultSnapConfig, gridSize: 37 })
+    assert.strictEqual(snapConfigOf(useEditor.getState()).gridSize, 37)
+  })
+
+  it("is an unsaved change of the map, and not a step of its history", () => {
+    useEditor.getState().setTabSnap({ ...defaultSnapConfig, gridSize: 37 })
+    const s = useEditor.getState()
+    assert.isTrue(s.dirty)
+    assert.lengthOf(s.past, 0)
+  })
+
+  it("leaves a blank tab blank, which has nothing to lose", () => {
+    useEditor.getState().loadMap(useEditor.getState().doc.map, null, undefined, { fresh: true })
+    useEditor.getState().setTabSnap({ ...defaultSnapConfig, gridSize: 37 })
+    assert.isFalse(useEditor.getState().dirty)
+    assert.strictEqual(snapConfigOf(useEditor.getState()).gridSize, 37)
+  })
+
+  it("stays unsaved through an undo back to the saved document", () => {
+    const { a } = { a: useEditor.getState().doc.ids[0] ?? "" }
+    useEditor.getState().setTabSnap({ ...defaultSnapConfig, gridSize: 37 })
+    useEditor.getState().transformItems(new Map([[a, identityTransform({ x: -100, y: 0, z: 0 })]]))
+    useEditor.getState().undo()
+    assert.isTrue(useEditor.getState().dirty)
+  })
+
+  it("is clean again once saved", () => {
+    useEditor.getState().setTabSnap({ ...defaultSnapConfig, gridSize: 37 })
+    const s = useEditor.getState()
+    s.markSaved(s.tabId, s.doc, s.doc.map, { name: "x.balledit", path: null }, s.snap)
+    assert.isFalse(useEditor.getState().dirty)
+  })
+
+  it("doesn't dirty a definition, which keeps them in the editor's prefs", () => {
+    useEditor.setState({
+      document: {
+        kind: "prefab",
+        tier: "user",
+        name: "P",
+        hash: "",
+        file: Schema.decodeSync(Schema.fromJsonString(PrefabFile))(PREFAB_TEXT),
+        sources: new Map()
+      }
+    })
+    useEditor.getState().setTabSnap({ ...defaultSnapConfig, gridSize: 37 })
+    assert.isFalse(useEditor.getState().dirty)
+  })
+})
+
+describe("joints on commit", () => {
+  it("records what a connector snap joined, as part of the step", () => {
+    const { a, b } = load()
+    const s = useEditor.getState()
+    s.transformItems(new Map([[b, identityTransform({ x: 500, y: 0, z: 0 })]]), { connected: true })
+    // the same place: nothing moved, so no step, and nothing to record
+    assert.lengthOf(annotationsOf(useEditor.getState().doc.structure).joints, 0)
+    join(b)
+    const joints = annotationsOf(useEditor.getState().doc.structure).joints
+    assert.deepStrictEqual(joints, [{ a: { item: b, end: 1 }, b: { item: a, end: 0 } }])
+    useEditor.getState().undo()
+    assert.lengthOf(annotationsOf(useEditor.getState().doc.structure).joints, 0)
+  })
+
+  it("drops a joint when either item moves away", () => {
+    const { b } = load()
+    join(b)
+    useEditor.getState().transformItems(new Map([[b, identityTransform({ x: 800, y: 0, z: 0 })]]))
+    assert.lengthOf(annotationsOf(useEditor.getState().doc.structure).joints, 0)
+  })
+
+  it("drops a joint when either item is deleted", () => {
+    const { b } = load()
+    join(b)
+    useEditor.getState().select([b])
+    useEditor.getState().deleteSelection()
+    assert.lengthOf(annotationsOf(useEditor.getState().doc.structure).joints, 0)
+  })
+})
+
+describe("undo descriptions", () => {
+  it("say what the step did, both ways", () => {
+    const { b } = load()
+    useEditor.getState().transformItems(new Map([[b, identityTransform({ x: 900, y: 0, z: 0 })]]), {
+      description: "Move 1 item to end of Curve M"
+    })
+    assert.strictEqual(useEditor.getState().past.at(-1)?.description, "Move 1 item to end of Curve M")
+    useEditor.getState().undo()
+    assert.strictEqual(useEditor.getState().future[0]?.description, "Move 1 item to end of Curve M")
+  })
+})
+
+describe("tracked points", () => {
+  it("keeps the newest few, and isn't saved or undone", () => {
+    load()
+    const s = useEditor.getState()
+    s.setTabSnap({
+      ...defaultSnapConfig,
+      targets: { ...defaultSnapConfig.targets, tracking: { ...defaultSnapConfig.targets.tracking, keep: 2 } }
+    })
+    for (const x of [1, 2, 3]) s.acquireTracked({ at: { x, y: 0, z: 0 }, label: "Corner" })
+    assert.deepStrictEqual(useEditor.getState().tracked.map(({ at }) => at.x), [2, 3])
+    s.acquireTracked({ at: { x: 3, y: 0, z: 0 }, label: "Corner" })
+    assert.lengthOf(useEditor.getState().tracked, 2)
+    s.clearTracked()
+    assert.lengthOf(useEditor.getState().tracked, 0)
+  })
+})
+
+describe("construction and measurements", () => {
+  const plane = {
+    kind: "plane",
+    id: "p1",
+    name: "Landing",
+    origin: { x: 0, y: 0, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+    xAxis: { x: 1, y: 0, z: 0 },
+    extent: 100,
+    grid: false
+  } as const
+
+  it("adds, renames and removes as undoable edits of the map", () => {
+    load()
+    useEditor.getState().addConstruction(plane)
+    assert.lengthOf(annotationsOf(useEditor.getState().doc.structure).construction, 1)
+    useEditor.getState().renameConstruction("p1", "Roof")
+    assert.strictEqual(annotationsOf(useEditor.getState().doc.structure).construction[0]?.name, "Roof")
+    useEditor.getState().removeConstruction("p1")
+    assert.lengthOf(annotationsOf(useEditor.getState().doc.structure).construction, 0)
+    useEditor.getState().undo()
+    assert.lengthOf(annotationsOf(useEditor.getState().doc.structure).construction, 1)
+  })
+
+  it("keeps a measurement until it is cleared", () => {
+    load()
+    useEditor.getState().addMeasurement({ id: "m1", a: { x: 0, y: 0, z: 0 }, b: { x: 1, y: 0, z: 0 } })
+    useEditor.getState().clearMeasurements()
+    assert.lengthOf(annotationsOf(useEditor.getState().doc.structure).measurements, 0)
+    useEditor.getState().undo()
+    assert.lengthOf(annotationsOf(useEditor.getState().doc.structure).measurements, 1)
+  })
+})
+
+describe("a snapped commit on a group with a Point pivot", () => {
+  const POINT: GroupPivot = { choice: "point", world: { x: 450, y: 0, z: 0 } }
+  const landing: RigidDelta = {
+    kind: "rigid",
+    rotation: rotatorToQuat({ roll: 0, pitch: 0, yaw: 90 }),
+    about: { x: 0, y: 0, z: 0 },
+    offset: { x: 0, y: 0, z: 100 }
+  }
+
+  /** `b` joined to `a`, and `b` and `c` grouped with a Point pivot. */
+  const joinedGroup = () => {
+    const { a, b, c } = load()
+    join(b)
+    const id = grouped([b, c])
+    useEditor.getState().setGroupPivot(id, POINT)
+    return { a, b, c, id }
+  }
+  const pivotOfGroup = (id: string) => findGroup(useEditor.getState().doc.structure.tree, id)?.pivot
+  const jointsNow = () => annotationsOf(useEditor.getState().doc.structure).joints
+
+  it("takes the Point along and works out the joints, in one step that says what it did", () => {
+    const { a, b, c, id } = joinedGroup()
+    const steps = useEditor.getState().past.length
+    useEditor.getState().transformItems(
+      new Map([
+        [b, identityTransform({ x: 500, y: 100, z: 0 })],
+        [c, identityTransform({ x: 5000, y: 100, z: 0 })]
+      ]),
+      { description: "Move 2 items to grid 10 cm" }
+    )
+    assert.deepStrictEqual(pivotOfGroup(id), { choice: "point", world: { x: 450, y: 100, z: 0 } })
+    assert.lengthOf(jointsNow(), 0, "the move took the ends apart")
+    assert.lengthOf(useEditor.getState().past, steps + 1)
+    assert.strictEqual(useEditor.getState().past.at(-1)?.description, "Move 2 items to grid 10 cm")
+    useEditor.getState().undo()
+    assert.deepStrictEqual(pivotOfGroup(id), POINT)
+    assert.deepStrictEqual(jointsNow(), [{ a: { item: b, end: 1 }, b: { item: a, end: 0 } }])
+  })
+
+  it("takes the Point through a landing's turn, and undo brings it and the joints back", () => {
+    const { b, c, id } = joinedGroup()
+    useEditor.getState().transformItems(
+      new Map([
+        [b, identityTransform({ x: 0, y: 500, z: 100 })],
+        [c, identityTransform({ x: 0, y: 5000, z: 100 })]
+      ]),
+      { landing }
+    )
+    const pivot = pivotOfGroup(id)
+    assert.isTrue(pivot?.choice === "point" && Math.abs(pivot.world.y - 450) < 1e-6 && pivot.world.z === 100)
+    useEditor.getState().undo()
+    assert.deepStrictEqual(pivotOfGroup(id), POINT)
+    assert.lengthOf(jointsNow(), 1)
+  })
+
+  /** Two pieces that can be copied, grouped with a Point pivot, and a measurement. */
+  const copyable = () => {
+    const [b = "", c = ""] = loadPieces([{ x: 500, y: 0, z: 0 }, { x: 5000, y: 0, z: 0 }], 1)
+    useEditor.getState().addMeasurement({ id: "m", a: { x: 0, y: 0, z: 0 }, b: { x: 1, y: 0, z: 0 } })
+    const id = grouped([b, c])
+    useEditor.getState().setGroupPivot(id, POINT)
+    return { b, c, id }
+  }
+
+  it("carries a copy's Point on an Alt+drag, and leaves the source's", () => {
+    const { b, c, id } = copyable()
+    const copies = useEditor.getState().beginDuplicateDrag()
+    if (copies === undefined) return assert.fail("nothing was copied")
+    const [copyB = "", copyC = ""] = [copies.get(b), copies.get(c)]
+    const copyGroup = useEditor.getState().doc.structure.tree.findLast((node) => node.kind === "group")
+    if (copyGroup?.kind !== "group" || copyGroup.id === id) return assert.fail("the copy has no group")
+    useEditor.getState().endDuplicateDrag(
+      new Map([
+        [copyB, identityTransform({ x: 500, y: 300, z: 0 })],
+        [copyC, identityTransform({ x: 5000, y: 300, z: 0 })]
+      ]),
+      { description: "Move 2 items to grid 10 cm" }
+    )
+    assert.deepStrictEqual(pivotOfGroup(copyGroup.id), { choice: "point", world: { x: 450, y: 300, z: 0 } })
+    assert.deepStrictEqual(pivotOfGroup(id), POINT)
+    assert.strictEqual(useEditor.getState().past.at(-1)?.description, "Move 2 items to grid 10 cm")
+    useEditor.getState().undo()
+    assert.isUndefined(findGroup(useEditor.getState().doc.structure.tree, copyGroup.id))
+    assert.deepStrictEqual(pivotOfGroup(id), POINT)
+  })
+
+  it("leaves the document as it was when an Alt+drag is cancelled", () => {
+    const { id } = copyable()
+    const { doc, past } = useEditor.getState()
+    assert.isDefined(useEditor.getState().beginDuplicateDrag())
+    assert.notStrictEqual(useEditor.getState().doc, doc)
+    useEditor.getState().endDuplicateDrag(null)
+    assert.strictEqual(useEditor.getState().doc, doc)
+    assert.lengthOf(useEditor.getState().past, past.length)
+    assert.deepStrictEqual(pivotOfGroup(id), POINT)
+    assert.lengthOf(annotationsOf(useEditor.getState().doc.structure).measurements, 1)
+  })
+})

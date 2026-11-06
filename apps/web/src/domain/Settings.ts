@@ -7,7 +7,7 @@ import { Equal, Option, Predicate, Schema, Struct } from "effect"
 import { movementLookModes } from "./flyKeys"
 import { PLACE_DISTANCE } from "./placement"
 import { SCENE_COLORS, shadeOf } from "./sceneGround"
-import { DEFAULT_GRID_SIZE, DEFAULT_ROTATION_STEP, GRID_SIZES, ROTATION_STEPS } from "./snap"
+import { defaultSnapConfig, SnapConfig } from "./snapConfig"
 
 /** "Custom" uses CameraSettings.customFov instead of a preset's. */
 export const CUSTOM_FOV_PRESET = "Custom"
@@ -89,18 +89,6 @@ export const LightingSettings = Schema.Struct({
   skyVisible: Schema.Boolean
 })
 
-/** Changed from the tool bar rather than the Settings dialog, but persisted with the rest. */
-export const SnappingSettings = Schema.Struct({
-  /** Whether gizmo translation lands on the world grid. */
-  enabled: Schema.Boolean,
-  /** Grid step in cm. */
-  gridSize: Schema.Literals(GRID_SIZES),
-  /** Whether gizmo rotation turns in whole steps. */
-  rotationEnabled: Schema.Boolean,
-  /** Rotation step in degrees. */
-  rotationStep: Schema.Literals(ROTATION_STEPS)
-})
-
 /** The Pieces panel's thumbnail sizes, as its header offers them. */
 export const piecesThumbnailSizes = ["s", "m", "l"] as const
 
@@ -133,7 +121,8 @@ export const Settings = Schema.Struct({
   camera: CameraSettings,
   appearance: AppearanceSettings,
   lighting: LightingSettings,
-  snapping: SnappingSettings,
+  /** What a new map starts on (docs/SNAPPING.md § Settings); a map that changes it keeps its own. */
+  snapping: SnapConfig,
   panels: PanelSettings,
   gizmo: GizmoSettings
 })
@@ -162,12 +151,7 @@ export const defaultSettings: Settings = {
     motion: "normal"
   },
   lighting: { mapLighting: true, skyVisible: true },
-  snapping: {
-    enabled: false,
-    gridSize: DEFAULT_GRID_SIZE,
-    rotationEnabled: false,
-    rotationStep: DEFAULT_ROTATION_STEP
-  },
+  snapping: defaultSnapConfig,
   panels: { piecesView: "list", piecesThumbnailSize: "m", recentPieces: [], favouritePieces: [] },
   gizmo: { size: "m", showForGroups: true }
 }

@@ -12,7 +12,7 @@ import { classNameOf, type Item, objectPathOf, PropertyList } from "./MapFile"
 import type { GroupNode, PrefabLink, TreeNode } from "./MapSidecar"
 import { isSamePrefab, itemOfPrefab } from "./prefab"
 import type { PrefabFile } from "./PrefabFile"
-import { type Doc, findGroup, freshKey, freshKeys, itemNode, rewriteTree, treeKeys } from "./structure"
+import { type Doc, findGroup, freshKey, freshKeys, itemNode, rewriteTree, treeKeys, withoutJointsOf } from "./structure"
 import { ORIGIN, quatConjugate, quatMul, quatNormalize, rotateVec, vecAdd, vecSub } from "./ueMath"
 
 /** A definition as an instance takes it: its items in its own frame, and the link they make. */
@@ -310,6 +310,7 @@ export const withUpdatedInstance = (doc: Doc, groupId: string, definition: Prefa
     map: { ...kept, items: [...kept.items, ...added] },
     ids: [...ids.filter((key) => !gone.has(key)), ...addedKeys],
     structure: {
+      ...withoutJointsOf(doc.structure, new Set([...gone, ...swapped.keys()])),
       tree,
       items: new Map([...doc.structure.items].filter(([key]) => !gone.has(key) && !swapped.has(key)))
     }

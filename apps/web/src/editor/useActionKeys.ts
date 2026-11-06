@@ -22,7 +22,7 @@ export function useActionKeys() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!isEditorKeyEvent(e) || e.repeat || sceneRegistry.lookDragActive() || interactionActive()) return
       const chord = chordOf(e)
-      const { keybinds, settings, viewLayout, togglePaneMaximised } = useEditor.getState()
+      const { clearTracked, keybinds, settings, tracked, viewLayout, togglePaneMaximised } = useEditor.getState()
       // A movement key that is also a tool shortcut (W: forward + translate) joins an ongoing
       // flight instead of switching tool, unless no movement key needs look: then it does both.
       if (
@@ -30,6 +30,12 @@ export function useActionKeys() {
         && sceneRegistry.flyKeysActive()
         && !sharedKeysFlyFreely(settings.camera.movementNeedsLook)
       ) return
+      // With no drag, Escape lets go of the tracking points first (docs/SNAPPING.md § Modifiers).
+      if (tracked.length > 0 && keybinds.deselect.includes(chord)) {
+        e.preventDefault()
+        clearTracked()
+        return
+      }
       // A key only: Edit › Deselect still deselects. The selection stays, for the next press.
       const maximised = maximisedSlotOf(viewLayout)
       if (maximised !== undefined && keybinds.deselect.includes(chord)) {

@@ -30,13 +30,22 @@ export type GroupDelta =
   | { readonly kind: "rotate"; readonly rotation: Quat4; readonly frame?: Quat4 }
   /** Scale each item by `factor` about the pivot: along its own `axis`, or uniformly. */
   | { readonly kind: "scale"; readonly factor: number; readonly axis?: Axis }
+  | RigidDelta
+
+/** A turn about `about`, then `offset`: a move that lands on a target and takes its rotation too. */
+export interface RigidDelta {
+  readonly kind: "rigid"
+  readonly rotation: Quat4
+  readonly about: Vec3
+  readonly offset: Vec3
+}
 
 /**
  * `delta` as a unit with axes `rotation` takes it: a move or turn given along the frame's axes becomes the same move or
- * turn along the unit's own. A world-axes delta, or a scale, is the same for every unit.
+ * turn along the unit's own. A world-axes delta, a scale or a rigid landing is the same for every unit.
  */
 export const forUnit = (delta: GroupDelta, rotation: Quat4): GroupDelta => {
-  if (delta.kind === "scale" || delta.frame === undefined) return delta
+  if (delta.kind === "scale" || delta.kind === "rigid" || delta.frame === undefined) return delta
   const toLocal = quatConjugate(delta.frame)
   if (delta.kind === "translate") {
     return { kind: "translate", offset: rotateVec(rotation, rotateVec(toLocal, delta.offset)) }
@@ -78,6 +87,15 @@ export const applyGroupDelta = (t: UeTransform, pivot: Vec3, delta: GroupDelta):
   switch (delta.kind) {
     case "translate":
       return { ...t, translation: vecAdd(t.translation, delta.offset) }
+    case "rigid":
+      return {
+        ...t,
+        translation: vecAdd(
+          vecAdd(delta.about, rotateVec(delta.rotation, vecSub(t.translation, delta.about))),
+          delta.offset
+        ),
+        rotation: quatNormalize(quatMul(delta.rotation, t.rotation))
+      }
     case "rotate":
       return {
         ...t,

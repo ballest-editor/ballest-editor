@@ -11,7 +11,7 @@
 import type { Quat4, UeTransform, Vec3 } from "./coords"
 import { identityTransform } from "./factory"
 import { selectedNodes } from "./groupSelection"
-import { applyGroupDelta, forUnit, type GroupDelta } from "./groupTransform"
+import { applyGroupDelta, forUnit, type GroupDelta, type RigidDelta } from "./groupTransform"
 import type { Box } from "./itemBounds"
 import { boxCentreOf } from "./itemBounds"
 import type { GroupNode, GroupPivot, GroupPivotFace, TreeNode } from "./MapSidecar"
@@ -302,6 +302,31 @@ export const applyUnitEdit = (
   return out
 }
 
+/**
+ * `delta` through `applyUnitEdit`. A rigid landing is one motion of the whole selection whatever the setting: it puts the
+ * active unit's base on a target, and a chain's pass would give the links after it the same motion a second time.
+ */
+export const applyDelta = (
+  selection: SelectionUnits,
+  mode: PivotMode,
+  transforms: ReadonlyMap<string, UeTransform>,
+  delta: GroupDelta
+): ReadonlyMap<string, UeTransform> =>
+  applyUnitEdit(selection, delta.kind === "rigid" ? "together" : mode, transforms, deltaEdit(delta))
+
+/**
+ * The items snapping measures an edit by `mode` on: those that take it as the gizmo shows it. In Together that is every
+ * unit, and in Each only the active one, as the others go along their own axes or about their own pivots. A link carried
+ * along inside an entered chain isn't one of them, since nothing about it was asked for.
+ */
+export const leadingKeys = (selection: SelectionUnits, mode: PivotMode): ReadonlyArray<string> =>
+  effectivePivotMode(mode, selection) === "each" ? selection.active.keys : selection.units.flatMap((unit) => unit.keys)
+
+/** Whether a turn by `mode` runs down a chain, so the active unit can end up turned by more than the angle dragged. */
+export const turnAccumulates = (selection: SelectionUnits, mode: PivotMode): boolean =>
+  effectivePivotMode(mode, selection) === "each" &&
+  (selection.chain !== undefined || selection.active.links !== undefined)
+
 const EPSILON = 1e-6
 const nearVec = (a: Vec3, b: Vec3) =>
   Math.abs(a.x - b.x) < EPSILON && Math.abs(a.y - b.y) < EPSILON && Math.abs(a.z - b.z) < EPSILON
@@ -309,11 +334,6 @@ const sameQuat = (a: Quat4, b: Quat4) =>
   Math.abs(a.x - b.x) < EPSILON && Math.abs(a.y - b.y) < EPSILON && Math.abs(a.z - b.z) < EPSILON &&
   Math.abs(a.w - b.w) < EPSILON
 
-/**
- * A Point pivot moves with its group's own moves and is left alone by turns and scales, since it is what they are
- * about (docs/design/pivot-modes-and-chains.md § Group pivot). `after` is an edit about to be committed, and a group
- * whose every item it moved by one offset, with no turn or scale, takes its Point along. Undefined when no Point moves.
- */
 /**
  * How far an edit moved every one of `keys` from `before` to `after`, when it moved them all by one offset with no turn
  * or scale: the one kind of edit a Point pivot follows. Undefined otherwise, or when nothing moved.
@@ -335,18 +355,35 @@ export const commonMoveOf = (
   return offset === undefined || nearVec(offset, ORIGIN) ? undefined : offset
 }
 
+/**
+ * A Point pivot moves with its group's own moves and is left alone by turns and scales, since it is what they are
+ * about (docs/design/pivot-modes-and-chains.md § Group pivot). `after` is an edit about to be committed, and a group
+ * whose every item it moved by one offset, with no turn or scale, takes its Point along. `landing` says the edit was a
+ * move that took a target's rotation too: every item's turn is the move's and not one about the Point, so a group the
+ * edit took whole goes with it. Undefined when no Point moves.
+ */
 export const withCarriedPoints = (
   structure: Structure,
   before: (key: string) => UeTransform | undefined,
-  after: ReadonlyMap<string, UeTransform>
+  after: ReadonlyMap<string, UeTransform>,
+  landing?: RigidDelta
 ): Structure | undefined => {
   const moved: Array<string> = []
+  const carried = (keys: ReadonlyArray<string>, world: Vec3): Vec3 | undefined => {
+    if (landing !== undefined) {
+      return keys.every((key) => after.has(key))
+        ? applyGroupDelta(identityTransform(world), ORIGIN, landing).translation
+        : undefined
+    }
+    const offset = commonMoveOf(keys, before, (key) => after.get(key))
+    return offset === undefined ? undefined : vecAdd(world, offset)
+  }
   const tree = rewriteTree(structure.tree, (node) => {
     if (node.kind !== "group" || node.pivot?.choice !== "point") return [node]
-    const offset = commonMoveOf(treeKeys([node]), before, (key) => after.get(key))
-    if (offset === undefined) return [node]
+    const world = carried(treeKeys([node]), node.pivot.world)
+    if (world === undefined) return [node]
     moved.push(node.id)
-    return [{ ...node, pivot: { choice: "point", world: vecAdd(node.pivot.world, offset) } }]
+    return [{ ...node, pivot: { choice: "point", world } }]
   })
   return moved.length > 0 ? { ...structure, tree } : undefined
 }

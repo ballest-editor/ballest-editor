@@ -11,6 +11,7 @@ import type { MapVersion } from "../../domain/mapDiff"
 import type { MapFile } from "../../domain/MapFile"
 import { type MapPrefs, mapPrefsKeyOf } from "../../domain/MapPrefs"
 import { type LoadedStructure, loadStructure, sidecarOf } from "../../domain/sidecar"
+import type { SnapConfig } from "../../domain/snapConfig"
 import { isDefaultViewLayout } from "../../domain/viewLayout"
 import { MapCodec } from "../../services/MapCodec"
 import { MapPrefsStore } from "../../services/MapPrefsStore"
@@ -52,8 +53,15 @@ export const hasProject = () => useEditor.getState().project?.current != null
  * Writes the sidecar of `doc` for the project map `fileName` of hash `mapHash`, after the map (docs/PROJECTS.md § The
  * files). A browser has no project, and keeps it in the tab.
  */
-export const writeSidecarOf = Effect.fn("writeSidecarOf")(function*(doc: Doc, fileName: string, mapHash: string) {
-  const text = yield* MapCodec.use((codec) => codec.encodeSidecar(sidecarOf(doc.map, doc.ids, doc.structure, mapHash)))
+export const writeSidecarOf = Effect.fn("writeSidecarOf")(function*(
+  doc: Doc,
+  fileName: string,
+  mapHash: string,
+  snap: SnapConfig | null
+) {
+  const text = yield* MapCodec.use((codec) =>
+    codec.encodeSidecar(sidecarOf(doc.map, doc.ids, doc.structure, mapHash, snap))
+  )
   yield* (yield* Platform).writeSidecar({ fileName, text })
 })
 
@@ -113,9 +121,9 @@ export const loadProjectMapFile = Effect.fn("loadProjectMapFile")(function*(
 ) {
   const opened = yield* loadMapFile(file, load)
   if (opened.loaded.rematched) {
-    const { ids, structure } = opened.loaded
+    const { ids, snap, structure } = opened.loaded
     // the map still opens; the next open matches it again, and the next Save writes it
-    yield* writeSidecarOf({ map: opened.map, ids, structure }, file.fileName, file.hash).pipe(
+    yield* writeSidecarOf({ map: opened.map, ids, structure }, file.fileName, file.hash, snap).pipe(
       Effect.catch((error) => Effect.logWarning(`Couldn't write the sidecar of ${file.fileName}`, error))
     )
   }

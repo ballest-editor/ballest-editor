@@ -7,6 +7,9 @@ import type { KeybindAction } from "../domain/Keybinds"
 import { PROJECTION_ACTIONS } from "../domain/Keybinds"
 import { termsOf } from "../domain/outline"
 import { formatGridSize, GRID_SIZES } from "../domain/snap"
+import { isPreset, SNAP_PRESETS, type SnapConfig } from "../domain/snapConfig"
+import { WORLD_PLANES } from "../domain/snapTools"
+import { annotationsOf } from "../domain/structure"
 import { updateCheckBlockedBy } from "../domain/updates"
 import {
   type ViewLayout,
@@ -17,19 +20,30 @@ import {
   viewProjections
 } from "../domain/viewLayout"
 import {
+  alignSelection,
   checkForUpdates,
   chooseProject,
+  clearMeasurements,
+  distributeSelection,
   exportToGame,
+  gridOriginToSelection,
+  gridYawToSelection,
   launchGame,
+  mirrorAcrossWorld,
   openExternalLink,
   openInGame,
   openRecentInNewWindow,
   quitApp,
   reimportMap,
+  selectConnected,
   selectionPrefabProblem,
+  startFlush,
+  startGridOriginPick,
+  startMeasure,
+  startMirror,
   startSavePrefab,
   switchProject,
-  updateSettings
+  updateSnap
 } from "../editor/actions"
 import { actionCommands, type CommandAction, lookAlong } from "../editor/commands"
 import {
@@ -38,6 +52,7 @@ import {
   NO_TAB_OPEN,
   noTabOpen,
   saveProblemOf,
+  snapConfigOf,
   useCanGroup,
   useEditor,
   useOpenProjectMap,
@@ -50,7 +65,7 @@ const SAVE_PROJECT_FIRST = "Save first: Untitled Project has no folder to import
 const EXPORT_FIRST = "Export this map first: the game has no copy of it yet."
 const NO_RECENT_PROJECTS = "No recent projects yet."
 
-export const MENU_TITLES = ["File", "Edit", "View", "Project", "Help"] as const
+export const MENU_TITLES = ["File", "Edit", "View", "Tools", "Project", "Help"] as const
 export type MenuTitle = (typeof MENU_TITLES)[number]
 
 /** What a row is told about how it was picked: Shift opens a recent project in a new window. */
@@ -149,7 +164,15 @@ export interface MenuState {
   readonly recent: ReadonlyArray<RecentProject>
   readonly openElsewhere: ReadonlyArray<string>
   readonly panels: ReadonlyArray<{ readonly id: string; readonly title: string; readonly open: boolean }>
-  readonly snapping: EditorState["settings"]["snapping"]
+  /** The active tab's snap settings. */
+  readonly snapping: SnapConfig
+  /** What the next undo and redo did, when they say. */
+  readonly undoDescription: string | undefined
+  readonly redoDescription: string | undefined
+  /** How many items are selected, for what needs a few. */
+  readonly selectionCount: number
+  /** How many measurements the map keeps. */
+  readonly measurements: number
   readonly units: "cm" | "m"
   readonly layout: ViewLayout
   /** What the active pane looks along. */
@@ -223,11 +246,15 @@ const fileMenu = (state: MenuState): ReadonlyArray<MenuNode> =>
       settingsItem
     ]
 
+/** Undo or Redo, with what the step did when it says. */
+const stepLabel = (verb: string, description: string | undefined) =>
+  description === undefined ? verb : `${verb} ${description}`
+
 const editMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
   const selectionOff = state.hasSelection ? null : NOTHING_SELECTED
   return [
-    command("undo", "Undo", state.canUndo ? null : "Nothing to undo."),
-    command("redo", "Redo", state.canRedo ? null : "Nothing to redo."),
+    command("undo", stepLabel("Undo", state.undoDescription), state.canUndo ? null : "Nothing to undo."),
+    command("redo", stepLabel("Redo", state.redoDescription), state.canRedo ? null : "Nothing to redo."),
     SEPARATOR,
     command("cutSelection", "Cut", selectionOff),
     command("copySelection", "Copy", selectionOff),
@@ -300,13 +327,29 @@ const viewMenu = (state: MenuState): ReadonlyArray<MenuNode> => [
   SEPARATOR,
   {
     kind: "section",
-    title: "Grid",
+    title: "Snap",
     children: [
       {
         kind: "check",
-        label: "Snap to grid",
+        label: "Snap",
         checked: state.snapping.enabled,
-        run: () => void updateSettings("snapping", { enabled: !state.snapping.enabled })
+        run: () => updateSnap({ enabled: !state.snapping.enabled })
+      },
+      {
+        kind: "choice",
+        title: "Priority",
+        options: [
+          {
+            label: "Grid first",
+            checked: isPreset(state.snapping, "gridFirst"),
+            run: () => updateSnap({ order: SNAP_PRESETS.gridFirst })
+          },
+          {
+            label: "Pieces first",
+            checked: isPreset(state.snapping, "piecesFirst"),
+            run: () => updateSnap({ order: SNAP_PRESETS.piecesFirst })
+          }
+        ]
       },
       {
         kind: "choice",
@@ -314,12 +357,72 @@ const viewMenu = (state: MenuState): ReadonlyArray<MenuNode> => [
         options: GRID_SIZES.map((gridSize) => ({
           label: formatGridSize(gridSize, state.units),
           checked: gridSize === state.snapping.gridSize,
-          run: () => void updateSettings("snapping", { enabled: true, gridSize })
+          run: () => updateSnap({ enabled: true, gridSize })
         }))
-      }
+      },
+      item("Open snap settings", () => useEditor.getState().setSnapPopoverOpen(true))
     ]
   }
 ]
+
+/** The tools built on the targets (docs/SNAPPING.md): each takes its points and faces from the one target picker. */
+const toolsMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
+  const selectionOff = state.hasSelection ? null : NOTHING_SELECTED
+  const off = state.noTabOff
+  const alignOff = selectionOff ?? (state.selectionCount < 2 ? "Select two or more items first." : null)
+  const distributeOff = selectionOff ?? (state.selectionCount < 3 ? "Select three or more items first." : null)
+  const axes = ["x", "y", "z"] as const
+  const sides = [["min", "Min"], ["centre", "Centre"], ["max", "Max"]] as const
+  return [
+    item("Flush and tangent…", startFlush, off),
+    item("Measure…", startMeasure, off),
+    item("Clear measurements", clearMeasurements, off ?? (state.measurements === 0 ? "Nothing measured yet." : null)),
+    SEPARATOR,
+    {
+      kind: "submenu",
+      title: "Align to first selected",
+      description: "Line the selection up on the item selected first.",
+      reason: alignOff,
+      children: axes.flatMap((axis) =>
+        sides.map(([side, word]) => item(`${axis.toUpperCase()} ${word}`, () => alignSelection(axis, side, "first")))
+      )
+    },
+    {
+      kind: "submenu",
+      title: "Align to selection bounds",
+      description: "Line the selection up on the box around it.",
+      reason: alignOff,
+      children: axes.flatMap((axis) =>
+        sides.map(([side, word]) => item(`${axis.toUpperCase()} ${word}`, () => alignSelection(axis, side, "bounds")))
+      )
+    },
+    {
+      kind: "submenu",
+      title: "Distribute",
+      description: "Spread the selection evenly, the outer two staying.",
+      reason: distributeOff,
+      children: axes.flatMap((axis) => [
+        item(`${axis.toUpperCase()}: equal spacing`, () => distributeSelection(axis, "spacing")),
+        item(`${axis.toUpperCase()}: equal gaps`, () => distributeSelection(axis, "gaps"))
+      ])
+    },
+    SEPARATOR,
+    item("Mirror across a face or plane…", startMirror, selectionOff),
+    {
+      kind: "submenu",
+      title: "Mirror across a world plane",
+      description: "A plane through the grid's origin.",
+      reason: selectionOff,
+      children: WORLD_PLANES.map((plane) => item(plane.toUpperCase(), () => mirrorAcrossWorld(plane)))
+    },
+    SEPARATOR,
+    item("Pick grid origin…", startGridOriginPick, off),
+    item("Grid origin to selection", gridOriginToSelection, selectionOff),
+    item("Grid rotation to selection", gridYawToSelection, selectionOff),
+    SEPARATOR,
+    item("Select connected", selectConnected, selectionOff)
+  ]
+}
 
 const projectMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
   const { exportToGame: canExport, launchGame: canLaunchGame, play: canPlay, projects } = state.capabilities
@@ -370,6 +473,7 @@ export const menusOf = (state: MenuState): Menus => ({
   File: fileMenu(state),
   Edit: editMenu(state),
   View: viewMenu(state),
+  Tools: toolsMenu(state),
   Project: projectMenu(state),
   Help: helpMenu(state)
 })
@@ -397,7 +501,12 @@ export const useMenus = (): Menus => {
   const openedInGame = useEditor((s) => s.openedInGame !== null && s.openedInGame === s.file?.name)
   const dockPanels = useViewMenuPanels()
   const openPanels = useOpenPanels()
-  const { snapping, general } = useEditor((s) => s.settings)
+  const { general } = useEditor((s) => s.settings)
+  const snapping = useEditor(snapConfigOf)
+  const undoDescription = useEditor((s) => s.past.at(-1)?.description)
+  const redoDescription = useEditor((s) => s.future[0]?.description)
+  const selectionCount = useEditor((s) => s.selectedIds.length)
+  const measurements = useEditor((s) => annotationsOf(s.doc.structure).measurements.length)
   const layout = useEditor((s) => s.viewLayout)
   const projection = useEditor((s) => s.viewLayout.projections[s.activePane] ?? "perspective")
   const update = useUpdateState()
@@ -421,6 +530,10 @@ export const useMenus = (): Menus => {
     openElsewhere: project?.openElsewhere ?? [],
     panels: dockPanels.map(({ id, title }) => ({ id, title, open: openPanels.has(id) })),
     snapping,
+    undoDescription,
+    redoDescription,
+    selectionCount,
+    measurements,
     units: general.units,
     layout,
     projection,

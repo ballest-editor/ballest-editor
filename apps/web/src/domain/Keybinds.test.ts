@@ -91,18 +91,20 @@ describe("keybind table", () => {
     expect(defaultKeybinds.fastMove).toEqual([])
   })
 
-  it("only shares keys between a fly key and a tool shortcut (W: forward + translate, as in the game)", () => {
+  it("only shares keys between a fly key and a tool shortcut (W: forward + translate, as in the game) or a drag's", () => {
     const seen = new Map<string, Array<string>>()
     for (const [action, bindings] of Object.entries(defaultKeybinds)) {
       for (const b of bindings) seen.set(b, [...(seen.get(b) ?? []), action])
     }
     const shared = [...seen].filter(([, actions]) => actions.length > 1)
-    expect(shared).toEqual([["KeyW", ["translateMode", "moveForward"]]])
+    // Ctrl is snapping's only once a drag has begun, and flying's otherwise
+    expect(shared).toEqual([["ControlLeft", ["snapInvert", "moveDown"]], ["KeyW", ["translateMode", "moveForward"]]])
     expect(isOneShotChord(defaultKeybinds, "KeyW")).toBe(true)
     expect(isOneShotChord(defaultKeybinds, "KeyS")).toBe(false)
     expect(actionsFor(defaultKeybinds, "KeyC")).toEqual(["toggleGizmoSpace"])
     expect(actionsFor(defaultKeybinds, "KeyF")).toEqual(["focusSelection"])
-    expect(actionsFor(defaultKeybinds, "KeyX")).toEqual([])
+    expect(actionsFor(defaultKeybinds, "KeyX")).toEqual(["snapLockX"])
+    expect(isOneShotChord(defaultKeybinds, "KeyX")).toBe(false)
   })
 
   it("merges stored bindings, accepting the old single-string form", () => {

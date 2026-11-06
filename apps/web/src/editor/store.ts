@@ -15,6 +15,8 @@ import { useMemo } from "react"
 import { create } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { type CatalogIndex, type CatalogPiece, indexCatalog } from "../domain/Catalog"
+import { endsOf } from "../domain/connectors"
+import type { WorldEnd } from "../domain/connectors"
 import type { Quat4, UeTransform, Vec3 } from "../domain/coords"
 import { type Creator, creatorOf, type FoundCreator } from "../domain/creator"
 import {
@@ -48,15 +50,17 @@ import {
   selectionNodeIds,
   soleGroupOf
 } from "../domain/groupSelection"
+import type { RigidDelta } from "../domain/groupTransform"
 import { placedBoxOf } from "../domain/itemBounds"
 import { type PropertyChange, withFlip } from "../domain/itemProperties"
+import { jointsAfterMove } from "../domain/joints"
 import type { Keybinds } from "../domain/Keybinds"
 import { floorHeightOf } from "../domain/level"
 import { LIMITS } from "../domain/limits"
 import { type GameWrite, type LinkState, linkStateOf } from "../domain/linkState"
 import type { MapDiff } from "../domain/mapDiff"
 import { isPlayerStart, type Item, type ItemTransform, type LevelData, type MapFile } from "../domain/MapFile"
-import type { GroupPivot, PrefabLink } from "../domain/MapSidecar"
+import type { Annotations, Construction, EndRef, GroupPivot, Measurement, PrefabLink } from "../domain/MapSidecar"
 import type { MaterialTable } from "../domain/Materials"
 import { type FlipAxis, withMirrorMesh } from "../domain/mirror"
 import {
@@ -76,7 +80,11 @@ import { instanceOrigin, type PrefabDefinition, withUpdatedInstance } from "../d
 import type { RecoveredTab } from "../domain/recovery"
 import { defaultSettings, type Settings } from "../domain/Settings"
 import { type LoadedStructure, structureOfMap } from "../domain/sidecar"
+import type { SnapConfig } from "../domain/snapConfig"
+import type { TrackedPoint } from "../domain/snapFrame"
+import type { FaceMeeting } from "../domain/snapTools"
 import {
+  annotationsOf,
   copyStructure,
   type Doc,
   findGroup,
@@ -88,6 +96,7 @@ import {
   sameStrings,
   type Structure,
   treeKeys,
+  withAnnotations,
   withChain,
   withGroup,
   withGroupName,
@@ -161,7 +170,7 @@ export type {
 } from "../services/Platform"
 
 /** What a sidecar gives a document on top of its map. */
-type DocStructure = Pick<LoadedStructure, "ids" | "structure">
+type DocStructure = Pick<LoadedStructure, "ids" | "structure"> & { readonly snap?: SnapConfig | null }
 
 interface DocValidation {
   /** The document it was run on: the result holds for that step of the history and no other. */
@@ -195,6 +204,64 @@ export interface Snapshot {
   readonly selectedIds: Selection
   readonly otherSelectedIds: Selection
   readonly selectionOnly: boolean
+  /** What the step did, when it has more to say than its verb: "Move 3 items to end of Curve M". */
+  readonly description?: string
+}
+
+/** How a transform commits beyond the transforms themselves. */
+export interface TransformOptions {
+  /** A connector snap brought ends together: record them as joints. */
+  readonly connected?: boolean
+  readonly description?: string | undefined
+  /** The move took a target's rotation too, which a Point pivot follows as it wouldn't a turn (`withCarriedPoints`). */
+  readonly landing?: RigidDelta | undefined
+}
+
+/** What a current snap says while a drag is under way, for the pane's label and the status bar. */
+export interface SnapFeedback {
+  /** What snapped: "Corner of Track L". */
+  readonly label: string
+  /** The base in use, in the same words. */
+  readonly base: string
+  /** A chip beside the label, when the ends' profiles differ. */
+  readonly warning?: string
+}
+
+/** What a tool built on the targets is asking for, while the target picker is up. */
+export interface PickerRequest {
+  /** What to click, for the pane's label. */
+  readonly prompt: string
+  /** What the pick can be: a face, a face or an end, or whatever the targets give. */
+  readonly accepts: "face" | "faceOrEnd" | "any"
+  /** The small panel beside the prompt, for a tool that has options. */
+  readonly panel?: "flush"
+  readonly onPick: (picked: PickedTarget) => void
+  /** The picker closing without a pick. */
+  readonly onCancel?: () => void
+}
+
+/** What the target picker gives: the same targets a drag lands on. */
+export interface PickedTarget {
+  readonly point: Vec3
+  /** Out of the face, for a face. */
+  readonly normal?: Vec3
+  /** The axis it lies on, for a line. */
+  readonly direction?: Vec3
+  /** The item it's on. */
+  readonly item?: string
+  /** The end, for a connector. */
+  readonly end?: WorldEnd
+  readonly label: string
+}
+
+/** The last connector snap's offer, in the chip, of the mirrored twin that would fit. */
+export interface FlipOffer {
+  /** The selection to flip. */
+  readonly keys: ReadonlyArray<string>
+  readonly axis: FlipAxis
+  /** The end of the selection, and the one it joined: the flip keeps them together. */
+  readonly own: EndRef
+  readonly other: EndRef
 }
 
 /** A material slot edit on the item with this id (see `SlotMaterial`). */
@@ -375,6 +442,10 @@ export interface TabState {
   readonly fresh: boolean
   /** Restored from a backup as a map of its own; see `isBackupTab`. */
   readonly backup: boolean
+  /** The tab's own snap settings; null follows `settings.snapping`. Outside the history, and saved with the map. */
+  readonly snap: SnapConfig | null
+  /** The settings the file holds, as `savedDoc` does its document. */
+  readonly savedSnap: SnapConfig | null
   /** The group a double-click entered: viewport clicks reach its children (docs/DESKTOP.md § Groups and selection). */
   readonly enteredGroupId: string | null
   /** The groups the Outline shows closed. Outside the document and its history, so undo doesn't touch them. */
@@ -492,6 +563,21 @@ export interface EditorState extends TabState {
   readonly preview: ReadonlyMap<string, UeTransform> | null
   /** Live sun settings while a lighting slider or field is dragged; committed on release. */
   readonly lightingPreview: Lighting | null
+  /** The points tracking has acquired, oldest first. A drag's working set: never saved, and gone with the tab. */
+  readonly tracked: ReadonlyArray<TrackedPoint>
+  /** What the current snap says; null with no drag, or none in range. */
+  readonly snapFeedback: SnapFeedback | null
+  /** Whether the Snap popover is open. */
+  readonly snapPopoverOpen: boolean
+  /** The target picker's request, while a tool waits on a pick. */
+  readonly picker: PickerRequest | null
+  /** The offer the last connector snap left in its chip. */
+  readonly flipOffer: FlipOffer | null
+  /** The item under the pointer, while Show open ends is On hover. */
+  readonly hoveredItem: string | null
+  /** Flush and tangent's panel: which, and how far the faces stand apart in cm. */
+  readonly flushMode: FaceMeeting
+  readonly flushOffset: number
   /** Multiplier on the fly speed, changed by speedFaster/speedSlower. */
   readonly cameraSpeed: number
   /** Bumped to frame the selection in the active pane. */
@@ -534,7 +620,7 @@ export interface EditorState extends TabState {
    * document is still `from`, `map` replaces it without an undo step and the tab is clean; when it was edited
    * meanwhile, the tab stays dirty until the history is back at `from`.
    */
-  readonly markSaved: (tabId: string, from: Doc, map: MapFile, file: OpenFile) => void
+  readonly markSaved: (tabId: string, from: Doc, map: MapFile, file: OpenFile, snap: SnapConfig | null) => void
   /** Tab `tabId`'s definition was saved from `from`, as `document`: the tab is clean while its document is still `from`. */
   readonly markPrefabSaved: (tabId: string, from: Doc, document: PrefabDocument, file: OpenFile) => void
   readonly setPrefabs: (prefabs: PrefabInfos) => void
@@ -555,7 +641,7 @@ export interface EditorState extends TabState {
   readonly setGamePathProblem: (problem: EditorState["gamePathProblem"]) => void
   readonly setUpdate: (update: UpdateState) => void
   readonly setUpdateChecked: (updateChecked: boolean) => void
-  readonly placePiece: (piece: CatalogPiece, transform: ItemTransform) => void
+  readonly placePiece: (piece: CatalogPiece, transform: ItemTransform, options?: TransformOptions) => void
   /**
    * Adds `items` as one new group called `name`, selected, as one undo step: a prefab placed, as an instance when `link`
    * says of what. Answers the group's id; undefined (with a notice) when the map has no room for them.
@@ -572,7 +658,7 @@ export interface EditorState extends TabState {
    * Replaces the transforms of several items as one undo step; false (with a notice, and
    * nothing changed) when the game would reject any of them.
    */
-  readonly transformItems: (transforms: ReadonlyMap<string, UeTransform>) => boolean
+  readonly transformItems: (transforms: ReadonlyMap<string, UeTransform>, options?: TransformOptions) => boolean
   /**
    * Sets material slots on several items as one undo step (none when nothing changes); false
    * (with a notice, and nothing changed) when an item or mesh component doesn't exist.
@@ -609,7 +695,10 @@ export interface EditorState extends TabState {
    * as one undo step; with null (a cancelled drag), or when the game would reject a
    * transform (false), the copies are removed and the selection restored.
    */
-  readonly endDuplicateDrag: (transforms: ReadonlyMap<string, UeTransform> | null) => boolean
+  readonly endDuplicateDrag: (
+    transforms: ReadonlyMap<string, UeTransform> | null,
+    options?: TransformOptions
+  ) => boolean
   readonly renameLevel: (displayName: string, creatorName: string) => void
   /** Sets the sun (time of day, brightness, yaw) as one undo step; non-finite values are ignored. */
   readonly setLighting: (lighting: Lighting) => void
@@ -700,6 +789,30 @@ export interface EditorState extends TabState {
   /** What the pane in `slot` looks along. */
   readonly setPaneProjection: (slot: number, projection: ViewProjection) => void
   readonly setActivePane: (slot: number) => void
+  /** Gives the active tab its own snap settings. A map's are an unsaved change; a definition's go in the editor's prefs. */
+  readonly setTabSnap: (snap: SnapConfig) => void
+  /** Adds a point to the ones tracking keeps, the oldest going past the setting. */
+  readonly acquireTracked: (point: TrackedPoint) => void
+  readonly clearTracked: () => void
+  readonly setSnapFeedback: (feedback: SnapFeedback | null) => void
+  readonly setSnapPopoverOpen: (open: boolean) => void
+  readonly setPicker: (picker: PickerRequest | null) => void
+  readonly setFlipOffer: (offer: FlipOffer | null) => void
+  readonly setHoveredItem: (key: string | null) => void
+  /** One undo step each, as the map's own. */
+  readonly addConstruction: (construction: Construction) => void
+  readonly renameConstruction: (id: string, name: string) => void
+  readonly setConstructionGrid: (id: string, grid: boolean) => void
+  readonly removeConstruction: (id: string) => void
+  readonly addMeasurement: (measurement: Measurement) => void
+  readonly clearMeasurements: () => void
+  /** Replaces transforms and flips items on `axis` as one undo step. False (with a notice) when the game would refuse it. */
+  readonly mirrorItems: (
+    transforms: ReadonlyMap<string, UeTransform>,
+    flip: ReadonlySet<string>,
+    axis: FlipAxis,
+    options: TransformOptions
+  ) => boolean
 }
 
 /** A tab's state for `map`, opened with no history and nothing selected. */
@@ -709,7 +822,7 @@ const freshTabState = (
   floorHeight?: number,
   options?: TabOptions
 ): TabState => {
-  const { ids, structure } = options?.loaded ?? structureOfMap(map)
+  const { ids, snap = null, structure } = options?.loaded ?? structureOfMap(map)
   const doc: Doc = { map, ids, structure }
   const dirty = options?.dirty ?? false
   const viewLayout = options?.viewLayout ?? defaultViewLayout
@@ -727,6 +840,8 @@ const freshTabState = (
     selectedIds: [],
     fresh: options?.fresh ?? false,
     backup: options?.backup ?? false,
+    snap,
+    savedSnap: snap,
     enteredGroupId: null,
     collapsedGroups: new Set(),
     viewLayout,
@@ -756,6 +871,8 @@ const activeTabOf = (s: EditorState): TabState => ({
   selectedIds: s.selectedIds,
   fresh: s.fresh,
   backup: s.backup,
+  snap: s.snap,
+  savedSnap: s.savedSnap,
   enteredGroupId: s.enteredGroupId,
   collapsedGroups: s.collapsedGroups,
   viewLayout: s.viewLayout,
@@ -774,21 +891,75 @@ const stepFrom = (
   past: TabState["past"],
   { doc, selectedIds }: DocState,
   otherSelectedIds: Selection,
-  selectionOnly = false
-) => ({ past: [...past, { doc, selectedIds, otherSelectedIds, selectionOnly }].slice(-HISTORY_LIMIT), future: [] })
+  selectionOnly = false,
+  description?: string
+) => ({
+  past: [
+    ...past,
+    { doc, selectedIds, otherSelectedIds, selectionOnly, ...(description !== undefined && { description }) }
+  ].slice(-HISTORY_LIMIT),
+  future: []
+})
+
+/** `doc` with its joints as they are now that the items `moved` went where it says. */
+const withJointsAfter = (
+  doc: Doc,
+  moved: ReadonlySet<string>,
+  connected: boolean,
+  catalog: CatalogIndex | null
+): Doc => {
+  const annotations = annotationsOf(doc.structure)
+  if (!connected && annotations.joints.length === 0) return doc
+  const ends = doc.map.items.flatMap((item, index) => {
+    const key = doc.ids[index]
+    return key === undefined ? [] : endsOf(key, item, editTransform(item), catalog)
+  })
+  const joints = jointsAfterMove(annotations.joints, ends, moved, connected)
+  return joints.length === annotations.joints.length && joints.every((joint, i) => joint === annotations.joints[i])
+    ? doc
+    : { ...doc, structure: withAnnotations(doc.structure, { ...annotations, joints }) }
+}
+
+/**
+ * `doc` with `map`, an edit that took its items to `transforms`: the Point pivots their moves carry, then its joints as
+ * they stand now.
+ */
+const withMovedItems = (
+  doc: Doc,
+  map: MapFile,
+  transforms: ReadonlyMap<string, UeTransform>,
+  options: TransformOptions | undefined,
+  catalog: CatalogIndex | null
+): Doc => {
+  const structure = withCarriedPoints(
+    doc.structure,
+    (id) => {
+      const item = doc.map.items[indexOfKey(doc.ids, id)]
+      return item === undefined ? undefined : editTransform(item)
+    },
+    transforms,
+    options?.landing
+  )
+  return withJointsAfter(
+    { ...doc, map, structure: structure ?? doc.structure },
+    new Set(transforms.keys()),
+    options?.connected === true,
+    catalog
+  )
+}
 
 export const useEditor = create<EditorState>()((set, get) => {
   /**
    * Push `before` (by default the current doc and selection) onto the undo stack and replace
    * the doc; clears the redo stack.
    */
-  const commit = (doc: Doc, extra: Partial<EditorState> = {}, before?: DocState) =>
+  const commit = (doc: Doc, extra: Partial<EditorState> = {}, before?: DocState, description?: string) =>
     set((s) =>
       noTabOpen(s) ? s : ({
         ...extra,
         doc,
         enteredGroupId: keptEnteredGroup(doc, s.enteredGroupId),
-        ...stepFrom(s.past, before ?? s, extra.selectedIds ?? s.selectedIds),
+        ...stepFrom(s.past, before ?? s, extra.selectedIds ?? s.selectedIds, false, description),
         dirty: true,
         editedAt: new Date().toISOString()
       })
@@ -846,7 +1017,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     const existing = new Set(doc.ids)
     return {
       doc,
-      dirty: doc !== s.savedDoc,
+      dirty: doc !== s.savedDoc || s.snap !== s.savedSnap,
       editedAt: snapshot.selectionOnly ? s.editedAt : new Date().toISOString(),
       selectedIds: snapshot.selectedIds.filter((id) => existing.has(id)),
       enteredGroupId: keptEnteredGroup(doc, s.enteredGroupId),
@@ -855,7 +1026,8 @@ export const useEditor = create<EditorState>()((set, get) => {
         doc: s.doc,
         selectedIds: snapshot.otherSelectedIds,
         otherSelectedIds: snapshot.selectedIds,
-        selectionOnly: snapshot.selectionOnly
+        selectionOnly: snapshot.selectionOnly,
+        ...(snapshot.description !== undefined && { description: snapshot.description })
       }
     }
   }
@@ -892,7 +1064,20 @@ export const useEditor = create<EditorState>()((set, get) => {
     })
 
   /** Interaction state that belongs to the active tab and doesn't survive leaving it. */
-  const leftBehind = { preview: null, lightingPreview: null } as const
+  const leftBehind = {
+    preview: null,
+    lightingPreview: null,
+    tracked: [],
+    snapFeedback: null,
+    picker: null,
+    flipOffer: null
+  } as const
+
+  /** One undo step of the active tab's annotations; `edit` answers what they become. */
+  const commitAnnotations = (edit: (annotations: Annotations) => Annotations) => {
+    const { doc } = get()
+    commit({ ...doc, structure: withAnnotations(doc.structure, edit(annotationsOf(doc.structure))) })
+  }
 
   const firstTabId = freshTabId()
 
@@ -938,6 +1123,14 @@ export const useEditor = create<EditorState>()((set, get) => {
     clipboard: null,
     preview: null,
     lightingPreview: null,
+    tracked: [],
+    snapFeedback: null,
+    snapPopoverOpen: false,
+    picker: null,
+    flipOffer: null,
+    hoveredItem: null,
+    flushMode: "flush",
+    flushOffset: 0,
     cameraSpeed: 1,
     focusRequest: 0,
     frameAllRequest: 0,
@@ -1019,14 +1212,14 @@ export const useEditor = create<EditorState>()((set, get) => {
       })
     },
 
-    markSaved: (tabId, from, map, file) =>
+    markSaved: (tabId, from, map, file, snap) =>
       updateTab(tabId, (tab) => {
         // edited while it saved: the file holds `from`, a step of the history by now
-        if (tab.doc !== from) return { savedDoc: from, file }
+        if (tab.doc !== from) return { savedDoc: from, savedSnap: snap, file }
         const doc = { ...from, map }
         // Save isn't an edit: a result for the document that was saved holds for what it left
         const validation = tab.validation?.doc === from ? { ...tab.validation, doc } : tab.validation
-        return { doc, savedDoc: doc, dirty: false, file, validation }
+        return { doc, savedDoc: doc, savedSnap: snap, dirty: tab.snap !== snap, file, validation }
       }),
     markPrefabSaved: (tabId, from, document, file) =>
       updateTab(tabId, (tab) => ({ document, savedDoc: from, dirty: tab.doc !== from, file })),
@@ -1059,7 +1252,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     setUpdate: (update) => set({ update }),
     setUpdateChecked: (updateChecked) => set({ updateChecked }),
 
-    placePiece: (piece, transform) => {
+    placePiece: (piece, transform, options) => {
       const item = validateItem(itemFromPiece(piece, transform))
       if (Option.isNone(item)) {
         get().notify("error", `Catalog entry ${piece.className} doesn't produce a valid item.`)
@@ -1067,11 +1260,13 @@ export const useEditor = create<EditorState>()((set, get) => {
       }
       const { doc } = get()
       const id = freshKey()
-      commit({
+      const placed = {
         map: addItem(doc.map, item.value),
         ids: [...doc.ids, id],
         structure: withNewItems(doc.structure, [id])
-      }, { selectedIds: [id] })
+      }
+      const next = withJointsAfter(placed, new Set([id]), options?.connected === true, get().catalogIndex)
+      commit(next, { selectedIds: [id] }, undefined, options?.description)
     },
 
     placeGroup: (items, name, link) => {
@@ -1105,18 +1300,19 @@ export const useEditor = create<EditorState>()((set, get) => {
         return structure === doc.structure ? undefined : { ...doc, structure }
       }),
 
-    transformItems: (transforms) => {
-      const { doc } = get()
+    transformItems: (transforms, options) => {
+      const { catalogIndex, doc } = get()
       const entries = [...transforms].map(([id, t]) => [indexOfKey(doc.ids, id), t] as const)
       const next = setTransforms(doc.map, entries)
       if (Option.isSome(next)) {
         // a drag that ends where it started leaves no step
         if (!entries.every(([index]) => sameItemTransform(doc.map, next.value, index))) {
-          const structure = withCarriedPoints(doc.structure, (id) => {
-            const item = doc.map.items[indexOfKey(doc.ids, id)]
-            return item === undefined ? undefined : editTransform(item)
-          }, transforms)
-          commit({ ...doc, map: next.value, structure: structure ?? doc.structure })
+          commit(
+            withMovedItems(doc, next.value, transforms, options, catalogIndex),
+            {},
+            undefined,
+            options?.description
+          )
         }
         return true
       }
@@ -1218,7 +1414,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       return next.keyOf
     },
 
-    endDuplicateDrag: (transforms) => {
+    endDuplicateDrag: (transforms, options) => {
       const before = duplicateDragBase
       duplicateDragBase = null
       if (before === null) return false
@@ -1231,7 +1427,10 @@ export const useEditor = create<EditorState>()((set, get) => {
         if (transforms !== null) get().notify("error", INVALID_TRANSFORM)
         return false
       }
-      commit({ ...doc, map: next.value }, {}, before)
+      const moved = transforms === null
+        ? doc
+        : withMovedItems(doc, next.value, transforms, options, get().catalogIndex)
+      commit(moved, {}, before, options?.description)
       return true
     },
 
@@ -1472,6 +1671,66 @@ export const useEditor = create<EditorState>()((set, get) => {
         const at = (i: number, current: ViewProjection) => i === slot ? projection : current
         return { viewLayout: { ...s.viewLayout, projections: [at(0, a), at(1, b), at(2, c), at(3, d)] } }
       }),
+    setTabSnap: (snap) =>
+      set((s) =>
+        noTabOpen(s) ? s : {
+          snap,
+          // a blank tab has nothing to lose, and stays what the next map can take over
+          dirty: s.document.kind === "map" && !isBlankTab(s) ? s.doc !== s.savedDoc || snap !== s.savedSnap : s.dirty
+        }
+      ),
+    acquireTracked: (point) =>
+      set((s) => {
+        if (s.tracked.some(({ at }) => sameVec(at, point.at))) return s
+        return { tracked: [...s.tracked, point].slice(-snapConfigOf(s).targets.tracking.keep) }
+      }),
+    clearTracked: () => set({ tracked: [] }),
+    setSnapFeedback: (snapFeedback) => set({ snapFeedback }),
+    setSnapPopoverOpen: (snapPopoverOpen) => set({ snapPopoverOpen }),
+    setPicker: (picker) => set({ picker }),
+    setFlipOffer: (flipOffer) => set({ flipOffer }),
+    setHoveredItem: (hoveredItem) => set({ hoveredItem }),
+    addConstruction: (construction) =>
+      commitAnnotations((a) => ({ ...a, construction: [...a.construction, construction] })),
+    renameConstruction: (id, name) =>
+      commitAnnotations((a) => ({
+        ...a,
+        construction: a.construction.map((one) => one.id === id ? { ...one, name } : one)
+      })),
+    setConstructionGrid: (id, grid) =>
+      commitAnnotations((a) => ({
+        ...a,
+        construction: a.construction.map((one) => one.id === id && one.kind === "plane" ? { ...one, grid } : one)
+      })),
+    removeConstruction: (id) =>
+      commitAnnotations((a) => ({ ...a, construction: a.construction.filter((one) => one.id !== id) })),
+    addMeasurement: (measurement) =>
+      commitAnnotations((a) => ({ ...a, measurements: [...a.measurements, measurement] })),
+    clearMeasurements: () => commitAnnotations((a) => ({ ...a, measurements: [] })),
+    mirrorItems: (transforms, flip, axis, options) => {
+      const { catalogIndex, doc } = get()
+      const items = doc.map.items.map((item, index) => {
+        if (!flip.has(doc.ids[index] ?? "")) return item
+        const piece = catalogIndex?.pieceByClass.get(item.actorToSpawn)
+        return withMirrorMesh(withFlip({ item, piece }, axis), catalogIndex)
+      })
+      const next = setTransforms(
+        { ...doc.map, items },
+        [...transforms].map(([id, t]) => [indexOfKey(doc.ids, id), t] as const)
+      )
+      if (Option.isNone(next)) {
+        get().notify("error", INVALID_TRANSFORM)
+        return false
+      }
+      commit(
+        withMovedItems(doc, next.value, transforms, options, catalogIndex),
+        {},
+        undefined,
+        options.description
+      )
+      return true
+    },
+
     setActivePane: (slot) => set((s) => s.activePane === slot ? s : { activePane: slot })
   }
 })
@@ -1705,6 +1964,10 @@ export const nodeNamesOf = (s: Pick<EditorState, "doc" | "catalogIndex">): Reado
     ...groupNames(s.doc.structure.tree)
   ])
 
+/** The snap settings in force: the tab's own, else what a new map starts on. */
+export const snapConfigOf = (s: Pick<TabState, "snap"> & Pick<EditorState, "settings">): SnapConfig =>
+  s.snap ?? s.settings.snapping
+
 /** The sun as shown: the live preview, else the document. */
 export const shownLighting = (s: EditorState): Lighting => s.lightingPreview ?? lightingOf(s.doc.map.worldSettings)
 
@@ -1729,7 +1992,7 @@ export interface SelectionPivot {
   readonly pivot: Vec3
   /** What the gizmo's local axes follow: the active unit's. */
   readonly rotation: Quat4
-  /** The active item's pivot point, which grid snapping lands on. */
+  /** The active item's pivot point, what the game's Location field shows for one piece. */
   readonly activePivot: Vec3
   /**
    * What the Inspector's Transform rows show and edit as one thing: the active item, or for a whole group its frame,

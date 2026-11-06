@@ -3,7 +3,7 @@
  * written back to the map is in game (UE) space. The two meet only through coords.ts.
  */
 import * as THREE from "three"
-import { type Quat4, threeToUeQuat, ueToThreeVector, type Vec3 } from "../../domain/coords"
+import { type Quat4, ueToThreeVector, type Vec3 } from "../../domain/coords"
 import { rotateVec } from "../../domain/ueMath"
 
 export type Axis = "x" | "y" | "z"
@@ -23,12 +23,6 @@ export const gameDirToWorld = (v: Vec3): THREE.Vector3 => toThree(ueToThreeVecto
 export const axisWorldDir = (axis: Axis, localRotation?: Quat4): THREE.Vector3 =>
   gameDirToWorld(localRotation === undefined ? GAME_BASIS[axis] : rotateVec(localRotation, GAME_BASIS[axis]))
     .normalize()
-
-/** A rotation by `angle` (right-handed) about a world axis, expressed as a game quaternion. */
-export const worldAxisAngleToGameQuat = (worldAxis: THREE.Vector3, angle: number): Quat4 => {
-  const q = new THREE.Quaternion().setFromAxisAngle(worldAxis.clone().normalize(), angle)
-  return threeToUeQuat({ x: q.x, y: q.y, z: q.z, w: q.w })
-}
 
 // --- projections ----------------------------------------------------------------------
 

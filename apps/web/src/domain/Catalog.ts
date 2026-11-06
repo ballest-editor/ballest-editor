@@ -104,6 +104,20 @@ export class CatalogProperty extends Schema.Opaque<CatalogProperty>()(open({
   optional: Schema.optionalKey(Schema.Boolean)
 })) {}
 
+/**
+ * One end of a piece, in its local frame: a point, the direction it faces out of, its up, and the cross-section it
+ * presents. Measured in the game (tools/extract/connectors.json, docs/SNAPPING.md § Connector data).
+ */
+export class Connector extends Schema.Opaque<Connector>()(open({
+  position: Vec3Tuple,
+  forward: Vec3Tuple,
+  up: Vec3Tuple,
+  /** The family of cross-sections it belongs to: "Track", "Bevel_F", "Tube F"... */
+  profile: Schema.String,
+  /** Which side a lopsided cross-section leans to, looking out of the end; absent for one that is the same both ways. */
+  hand: Schema.optionalKey(Schema.Literals(["left", "right"]))
+})) {}
+
 export class CatalogPiece extends Schema.Opaque<CatalogPiece>()(open({
   classPath: Schema.String,
   className: Schema.String,
@@ -127,7 +141,9 @@ export class CatalogPiece extends Schema.Opaque<CatalogPiece>()(open({
   inRegistry: Schema.optionalKey(Schema.NullOr(Schema.Boolean)),
   thumbnail: Schema.optionalKey(Schema.NullOr(Schema.String)),
   /** Exposed item properties with their defaults (newer catalogs). */
-  properties: Schema.optionalKey(Schema.Array(CatalogProperty))
+  properties: Schema.optionalKey(Schema.Array(CatalogProperty)),
+  /** The piece's ends, once measured; a piece without any has none for Connectors to use. */
+  connectors: Schema.optionalKey(Schema.Array(Connector))
 })) {}
 
 export class CatalogMesh extends Schema.Opaque<CatalogMesh>()(open({

@@ -6,6 +6,7 @@
  */
 import { Option, Predicate, Schema } from "effect"
 import type { MapFile } from "./MapFile"
+import { SnapConfig } from "./snapConfig"
 import { ViewLayout } from "./viewLayout"
 
 export const MapPrefs = Schema.Struct({
@@ -14,11 +15,17 @@ export const MapPrefs = Schema.Struct({
   /** Save also exports the map to the game (desktop); absent: off. */
   exportOnSave: Schema.optionalKey(Schema.Boolean),
   /** How the map's tab divides its view; absent: `defaultViewLayout`. */
-  viewLayout: Schema.optionalKey(ViewLayout)
+  viewLayout: Schema.optionalKey(ViewLayout),
+  /** A definition's snap settings, as it has no sidecar; a map keeps its own in its sidecar. */
+  snap: Schema.optionalKey(SnapConfig)
 })
 export type MapPrefs = typeof MapPrefs.Type
 
 export const mapPrefsKeyOf = (map: MapFile): string => map.worldSettings.levelData.userLevelName
+
+/** Where a definition's prefs are kept: a tier and name, which no map's `userLevelName` can be. */
+export const prefabSnapKeyOf = ({ name, tier }: { readonly name: string; readonly tier: string }): string =>
+  `prefab:${tier}:${name}`
 
 const decodePrefs = Schema.decodeUnknownOption(MapPrefs)
 

@@ -20,10 +20,18 @@ import type { FlipAxis } from "../../domain/mirror"
 import { type PivotChoice, pivotFor } from "../../domain/pivot"
 import { quatConjugate, quatMul, quatNormalize, vecSub } from "../../domain/ueMath"
 import { applyUnitEdit, pivotUnitOf, type Unit, type UnitEdit } from "../../domain/units"
-import { editedKeys, fitTransforms, pivotOf, selectionPivot, type SlotPaint, useEditor } from "../store"
+import {
+  editedKeys,
+  fitTransforms,
+  pivotOf,
+  selectionPivot,
+  type SlotPaint,
+  type TransformOptions,
+  useEditor
+} from "../store"
 
-export const transformSelection = (transforms: ReadonlyMap<string, UeTransform>): boolean =>
-  useEditor.getState().transformItems(transforms)
+export const transformSelection = (transforms: ReadonlyMap<string, UeTransform>, options?: TransformOptions): boolean =>
+  useEditor.getState().transformItems(transforms, options)
 
 /** Sets material slots (one undo step); see `EditorState.paintSlots`. */
 export const paintSlots = (edits: ReadonlyArray<SlotPaint>): boolean => useEditor.getState().paintSlots(edits)

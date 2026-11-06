@@ -192,7 +192,7 @@ describe("editor store", () => {
 
     describe("dirty", () => {
       const saved = { name: "saved.balledit", path: null }
-      const save = () => s().markSaved(s().tabId, s().doc, s().doc.map, saved)
+      const save = () => s().markSaved(s().tabId, s().doc, s().doc.map, saved, null)
 
       it("clears when undo gets back to the map as it was opened", () => {
         s().loadMap(startOnlyMap(), null)
@@ -243,7 +243,7 @@ describe("editor store", () => {
         place(0)
         const from = s().doc
         place(10)
-        s().markSaved(s().tabId, from, from.map, saved)
+        s().markSaved(s().tabId, from, from.map, saved, null)
         assert.isTrue(s().dirty)
         s().undo()
         assert.isFalse(s().dirty)
@@ -1010,7 +1010,7 @@ describe("document tabs", () => {
     state().placePiece(cube, placementTransform(cube, { x: 0, y: 0, z: 0 }))
     const { doc } = state()
     state().loadMap(named("B"), fileOf("b"), undefined, { into: "newTab" })
-    state().markSaved(first, doc, doc.map, fileOf("a"))
+    state().markSaved(first, doc, doc.map, fileOf("a"), null)
     assert.strictEqual(state().file?.name, "b.balledit")
     assert.include(state().parkedTabs.get(first), { dirty: false })
     assert.deepStrictEqual(state().parkedTabs.get(first)?.file, { name: "a.balledit", path: null })
@@ -1798,7 +1798,7 @@ describe("the Validate result", () => {
   it("outlasts a Save, which edits nothing", () => {
     validated()
     const { doc } = state()
-    state().markSaved(state().tabId, doc, { ...doc.map }, { name: "saved.balledit", path: null })
+    state().markSaved(state().tabId, doc, { ...doc.map }, { name: "saved.balledit", path: null }, null)
     assert.notStrictEqual(state().doc, doc)
     assert.isDefined(shownValidation(state()))
   })

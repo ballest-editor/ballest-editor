@@ -62,3 +62,20 @@ describe("MapSidecar", () => {
     assert.isFalse(decodes({ ...sidecar, items: { k: { index: -1, fingerprint: "" } } }))
   })
 })
+
+describe("snap data", () => {
+  const decode = Schema.decodeUnknownOption(MapSidecar)
+  const bare = { formatVersion: 1, mapHash: "a".repeat(64), items: {}, tree: [] }
+
+  it("reads a sidecar written before snapping had any", () => {
+    assert.isTrue(Option.isSome(decode(bare)))
+  })
+
+  it("reads annotations and turns down a joint that names no item", () => {
+    const joint = { a: { item: "abc", end: 0 }, b: { item: "def", end: 1 } }
+    const annotations = { joints: [joint], construction: [], measurements: [] }
+    assert.isTrue(Option.isSome(decode({ ...bare, annotations })))
+    const broken = { ...annotations, joints: [{ a: { item: "", end: 0 }, b: joint.b }] }
+    assert.isTrue(Option.isNone(decode({ ...bare, annotations: broken })))
+  })
+})

@@ -4,10 +4,23 @@
  * written for.
  */
 import type { CatalogIndex } from "./Catalog"
+import { endsOf } from "./connectors"
+import { editTransform } from "./editTransform"
 import { structureFromGame } from "./gameGroups"
+import { jointsAfterMove } from "./joints"
 import { classNameOf, type Item, type MapFile } from "./MapFile"
-import type { MapSidecar, SidecarItem } from "./MapSidecar"
-import { freshKey, freshKeys, type ItemMeta, itemNode, rewriteTree, type Structure } from "./structure"
+import type { Annotations, MapSidecar, SidecarItem } from "./MapSidecar"
+import type { SnapConfig } from "./snapConfig"
+import {
+  annotationsOf,
+  freshKey,
+  freshKeys,
+  type ItemMeta,
+  itemNode,
+  rewriteTree,
+  type Structure,
+  withAnnotations
+} from "./structure"
 
 /** The rounding in a fingerprint: 0.01 cm, and four places for a rotation or scale. */
 const TRANSLATION_PLACES = 2
@@ -40,12 +53,13 @@ export const fingerprintOf = (item: Item): string => {
   ].join("|")
 }
 
-/** The sidecar of a document, written for the `.balledit` of hash `mapHash`. */
+/** The sidecar of a document, written for the `.balledit` of hash `mapHash`; `snap` is the map's own snap settings. */
 export const sidecarOf = (
   map: MapFile,
   ids: ReadonlyArray<string>,
   structure: Structure,
-  mapHash: string
+  mapHash: string,
+  snap: SnapConfig | null = null
 ): MapSidecar => ({
   formatVersion: 1,
   mapHash,
@@ -53,7 +67,9 @@ export const sidecarOf = (
     const item = map.items[index]
     return item === undefined ? [] : [[key, { index, fingerprint: fingerprintOf(item), ...structure.items.get(key) }]]
   })),
-  tree: structure.tree
+  tree: structure.tree,
+  ...(structure.annotations !== undefined && { annotations: structure.annotations }),
+  ...(snap !== null && { snap })
 })
 
 interface Fingerprint {
@@ -191,6 +207,12 @@ const treeOver = (sidecar: MapSidecar, ids: ReadonlyArray<string>): Structure["t
   return [...tree, ...ids.filter((key) => !placed.has(key)).map(itemNode)]
 }
 
+/** `annotations` over the items that matched: a joint needs both its items, and the rest belongs to the map. */
+const annotationsOver = (annotations: Annotations, matched: ReadonlySet<string>): Annotations => ({
+  ...annotations,
+  joints: annotations.joints.filter(({ a, b }) => matched.has(a.item) && matched.has(b.item))
+})
+
 /** What a sidecar adds to a `.balledit`, once they are put together. */
 export interface LoadedStructure {
   readonly ids: ReadonlyArray<string>
@@ -199,12 +221,14 @@ export interface LoadedStructure {
   readonly unmatched: number
   /** The `.balledit` wasn't the one the sidecar was written for, so it no longer says what is on disk. */
   readonly rematched: boolean
+  /** The map's own snap settings; null while it uses the defaults. */
+  readonly snap: SnapConfig | null
 }
 
 /** A map's structure from nothing but itself: fresh keys, and its game groups as tree groups. */
 export const structureOfMap = (map: MapFile, catalog: CatalogIndex | null = null): LoadedStructure => {
   const ids = freshKeys(map.items.length)
-  return { ids, structure: structureFromGame(map, ids, catalog), unmatched: 0, rematched: false }
+  return { ids, structure: structureFromGame(map, ids, catalog), unmatched: 0, rematched: false, snap: null }
 }
 
 /**
@@ -231,12 +255,34 @@ export const loadStructure = (
     }
     return matched.has(key) && Object.keys(meta).length > 0 ? [[key, meta] as const] : []
   }))
+  const structure: Structure = { tree: treeOver(sidecar, ids), items }
   return {
     ids,
-    structure: { tree: treeOver(sidecar, ids), items },
+    structure: sidecar.annotations === undefined
+      ? structure
+      : withAnnotations(structure, annotationsOver(sidecar.annotations, matched)),
     unmatched: entries.length - matched.size,
-    rematched: byIndex === undefined
+    rematched: byIndex === undefined,
+    snap: sidecar.snap ?? null
   }
+}
+
+/**
+ * `loaded`'s structure without the joints whose ends the game's edits took apart: its items keep their keys wherever they
+ * moved to, so a joint outlives its meeting otherwise. The ends can't be read without the catalog, and those stay.
+ */
+const withStandingJoints = (
+  map: MapFile,
+  { ids, structure }: Pick<LoadedStructure, "ids" | "structure">,
+  catalog: CatalogIndex | null
+): Structure => {
+  const annotations = annotationsOf(structure)
+  if (catalog === null || annotations.joints.length === 0) return structure
+  const ends = map.items.flatMap((item, index) => endsOf(ids[index] ?? "", item, editTransform(item), catalog))
+  return withAnnotations(structure, {
+    ...annotations,
+    joints: jointsAfterMove(annotations.joints, ends, new Set(), false)
+  })
 }
 
 const classOfPrint = (print: string | undefined) => print?.split("|")[0]
@@ -260,7 +306,13 @@ const sameItemsInOrder = (map: MapFile, sidecar: MapSidecar) => {
  * `loadStructure` for a version the game saved. The game keeps items in their order, so the same items in the same order
  * are those items wherever they moved to, and they keep their keys, names and groups. Otherwise it is any rewritten file.
  */
-export const loadGameStructure = (map: MapFile, mapHash: string, sidecar: MapSidecar | null): LoadedStructure =>
-  sidecar !== null && sameItemsInOrder(map, sidecar)
-    ? { ...loadStructure(map, sidecar.mapHash, sidecar), rematched: true }
-    : loadStructure(map, mapHash, sidecar)
+export const loadGameStructure = (
+  map: MapFile,
+  mapHash: string,
+  sidecar: MapSidecar | null,
+  catalog: CatalogIndex | null = null
+): LoadedStructure => {
+  if (sidecar === null || !sameItemsInOrder(map, sidecar)) return loadStructure(map, mapHash, sidecar, catalog)
+  const loaded = loadStructure(map, sidecar.mapHash, sidecar, catalog)
+  return { ...loaded, structure: withStandingJoints(map, loaded, catalog), rematched: true }
+}

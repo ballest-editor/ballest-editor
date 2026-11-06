@@ -7,6 +7,7 @@ import {
   forUnit,
   type GroupDelta,
   readField,
+  type RigidDelta,
   rotatorOffset,
   selectionAxisEdit
 } from "./groupTransform"
@@ -16,12 +17,15 @@ import { localToWorld } from "./pivot"
 import type { Structure } from "./structure"
 import { ORIGIN, quatToRotator, rotateVec, rotatorToQuat } from "./ueMath"
 import {
+  applyDelta,
   applyUnitEdit,
   deltaEdit,
   effectivePivotMode,
+  leadingKeys,
   pivotDotsOf,
   pivotUnitOf,
   selectionUnitsOf,
+  turnAccumulates,
   type UnitContext,
   type UnitEdit,
   withCarriedPoints
@@ -309,6 +313,69 @@ describe("chains", () => {
   })
 })
 
+describe("a snapped drag under the setting", () => {
+  const landing: RigidDelta = { kind: "rigid", rotation: yawed(90), about: ORIGIN, offset: { x: 100, y: 0, z: 0 } }
+  const landed = (t: UeTransform) => applyGroupDelta(t, ORIGIN, landing)
+  /** Two loose cubes, the second turned, and their selection. */
+  const loose = new Map([["a", at(0)], ["b", at(2000, 0, 0, 90)]])
+  const looseSelection = () => selectionUnitsOf(["a", "b"], null, contextOf([item("a"), item("b")], loose))!
+  /** A chain of three links, and a loose cube beside it. */
+  const links = ["l1", "l2", "l3"]
+  const chained = new Map([...links.map((key, i) => [key, at(i * 1000)] as const), ["x", at(9000)] as const])
+  const chainContext = contextOf([group("chain", links.map(item), { chain: true }), item("x")], chained)
+
+  it("is the same landing for every unit, whatever its axes", () => {
+    assert.strictEqual(forUnit(landing, yawed(30)), landing)
+  })
+
+  it("lands the whole selection as one in Each, keeping the units where they were to each other", () => {
+    const out = applyDelta(looseSelection(), "each", loose, landing)
+    assert.deepStrictEqual(out.get("a"), landed(at(0)))
+    assert.deepStrictEqual(out.get("b"), landed(at(2000, 0, 0, 90)))
+  })
+
+  it("gives a chain's links a landing once, where a turn would run down them", () => {
+    const out = applyDelta(selectionUnitsOf([...links, "x"], null, chainContext)!, "each", chained, landing)
+    for (const key of [...links, "x"]) assert.deepStrictEqual(out.get(key), landed(chained.get(key)!), key)
+  })
+
+  it("carries the links after a selected one with a landing, inside an entered chain", () => {
+    const out = applyDelta(selectionUnitsOf(["l2"], "chain", chainContext)!, "each", chained, landing)
+    assert.isUndefined(out.get("l1"))
+    assert.deepStrictEqual(out.get("l3"), landed(at(2000)))
+  })
+
+  it("still puts a plain delta through the setting", () => {
+    const offset = rotateVec(yawed(90), { x: 100, y: 0, z: 0 })
+    const out = applyDelta(looseSelection(), "each", loose, { kind: "translate", offset, frame: yawed(90) })
+    assertVec(out.get("a")!.translation, { x: 100, y: 0, z: 0 }, "a along its own X")
+    assertVec(out.get("b")!.translation, { x: 2000, y: 100, z: 0 }, "b, the active one, along its own")
+  })
+
+  it("is led by every unit in Together, and by the active one alone in Each", () => {
+    const tree = [group("g", [item("a"), item("b")]), item("c")]
+    const transforms = new Map([["a", at(0)], ["b", at(1000)], ["c", at(2000)]])
+    const sel = selectionUnitsOf(["c", "a", "b"], null, contextOf(tree, transforms))!
+    assert.deepStrictEqual(leadingKeys(sel, "together"), ["a", "b", "c"])
+    assert.deepStrictEqual(leadingKeys(sel, "each"), ["a", "b"], "b was selected last, and its group is the unit")
+  })
+
+  it("isn't led by the links a selected one carries", () => {
+    assert.deepStrictEqual(leadingKeys(selectionUnitsOf(["l2"], "chain", chainContext)!, "together"), ["l2"])
+  })
+
+  it("knows when a turn goes past the angle dragged: only as it runs down a chain in Each", () => {
+    const chainActive = selectionUnitsOf(["x", ...links], null, chainContext)!
+    assert.isTrue(turnAccumulates(chainActive, "each"), "the active unit is the chain")
+    assert.isFalse(turnAccumulates(chainActive, "together"))
+    assert.isFalse(
+      turnAccumulates(selectionUnitsOf([...links, "x"], null, chainContext)!, "each"),
+      "the active unit is loose"
+    )
+    assert.isTrue(turnAccumulates(selectionUnitsOf(links, "chain", chainContext)!, "each"), "inside the entered chain")
+  })
+})
+
 describe("pivot dots and Point pivots", () => {
   it("draws one dot in Together and one per unit in Each, dotted inside the unit's box", () => {
     const transforms = new Map([["a", at(0)], ["b", at(2000)]])
@@ -338,6 +405,23 @@ describe("pivot dots and Point pivots", () => {
     const turned = new Map([...before].map(([k, t]) => [k, applyGroupDelta(t, ORIGIN, turn(90))]))
     assert.isUndefined(withCarriedPoints(structure, (k) => before.get(k), turned))
     assert.isUndefined(withCarriedPoints(structure, (k) => before.get(k), new Map([["a", at(10)]])))
+  })
+
+  it("takes a Point along a landing that turns its group too, which it wouldn't a turn alone", () => {
+    const structure: Structure = {
+      tree: [group("g", [item("a"), item("b")], { pivot: { choice: "point", world: { x: 100, y: 0, z: 0 } } })],
+      items: new Map()
+    }
+    const before = new Map([["a", at(0)], ["b", at(2000)]])
+    const landing: RigidDelta = { kind: "rigid", rotation: yawed(90), about: ORIGIN, offset: { x: 0, y: 0, z: 50 } }
+    const after = new Map([...before].map(([k, t]) => [k, applyGroupDelta(t, ORIGIN, landing)]))
+    const landed = withCarriedPoints(structure, (k) => before.get(k), after, landing)
+    const pivot = landed?.tree[0]?.kind === "group" ? landed.tree[0].pivot : undefined
+    assert.strictEqual(pivot?.choice, "point")
+    if (pivot?.choice === "point") assertVec(pivot.world, { x: 0, y: 100, z: 50 }, "the Point lands with the group")
+    assert.isUndefined(withCarriedPoints(structure, (k) => before.get(k), after), "as a turn, it stays")
+    const part = new Map([["a", applyGroupDelta(at(0), ORIGIN, landing)]])
+    assert.isUndefined(withCarriedPoints(structure, (k) => before.get(k), part, landing), "part of its group")
   })
 
   it("reads a rotator offset about a unit's own axis for the Inspector", () => {

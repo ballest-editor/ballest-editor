@@ -1,12 +1,13 @@
 import { assert, describe, it } from "@effect/vitest"
-import { heldActions, keybindActions, mouseClickActions, mouseDragActions } from "../domain/Keybinds"
+import { duringDragActions, heldActions, keybindActions, mouseClickActions, mouseDragActions } from "../domain/Keybinds"
 import { commandFor, runsHere } from "./commands"
 import { initialMap, useEditor } from "./store"
 
 describe("commands", () => {
   it("has a command for every one-shot action, and none for held keys, drags or clicks", () => {
     for (const action of keybindActions) {
-      const oneShot = !heldActions.has(action) && !mouseDragActions.has(action) && !mouseClickActions.has(action)
+      const oneShot = !heldActions.has(action) && !duringDragActions.has(action) && !mouseDragActions.has(action) &&
+        !mouseClickActions.has(action)
       assert.strictEqual(commandFor(action) !== undefined, oneShot, action)
     }
   })
