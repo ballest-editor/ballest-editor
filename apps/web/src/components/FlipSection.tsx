@@ -1,10 +1,10 @@
-import { Toggle } from "@workspace/ui/components/toggle"
+import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import { type PlacedItem, selectionFlip } from "../domain/itemProperties"
 import type { FlipAxis } from "../domain/mirror"
 import { flipSelection } from "../editor/actions"
-import { TOGGLE_STATE_CLASSES } from "./PivotSection"
+import { IN_USE_CLASSES } from "./PivotSection"
 
 /** The game's labels and help text (its strings table: `FlipXLabel`, `FlipXHelp`, ...). */
 const FLIPS: ReadonlyArray<{ readonly axis: FlipAxis; readonly label: string; readonly help: string }> = [
@@ -13,7 +13,7 @@ const FLIPS: ReadonlyArray<{ readonly axis: FlipAxis; readonly label: string; re
 ]
 
 /**
- * The selection's flips, a small pair of toggles under the transform. A click flips each
+ * The selection's flips, a small segmented pair under the transform, either or both on. A click flips each
  * selected item from its own state, so a mixed selection stays mixed. Unlike the game, which
  * shows no state, these show what's flipped. A selection that can't flip at all (the player
  * start, the goal, the checkpoints) has no row, as in the game.
@@ -24,24 +24,30 @@ export function FlipSection({ items }: { readonly items: ReadonlyArray<PlacedIte
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-body text-fg-secondary">Flip</span>
-      <div className="flex gap-1">
+      <ToggleGroup
+        aria-label="Flip"
+        multiple
+        value={flips.filter(({ state }) => state === "on").map(({ axis }) => axis)}
+        onValueChange={(value) => {
+          const changed = flips.find(({ axis, state }) => value.includes(axis) !== (state === "on"))
+          if (changed !== undefined) flipSelection(changed.axis)
+        }}
+      >
         {flips.map(({ axis, label, help, state }) => {
           const unavailable = state === "unavailable"
           return (
             <Tooltip key={axis}>
               {/* The trigger is out here because a disabled button takes no pointer events. */}
-              <TooltipTrigger render={<span />}>
-                <Toggle
-                  variant="outline"
+              <TooltipTrigger render={<span className="inline-flex" />}>
+                <ToggleGroupItem
+                  value={axis}
                   aria-label={label}
-                  pressed={state === "on"}
                   disabled={unavailable}
-                  onPressedChange={() => flipSelection(axis)}
                   data-in-use={state === "mixed" ? "" : undefined}
-                  className={cn("uppercase", TOGGLE_STATE_CLASSES)}
+                  className={cn("uppercase", IN_USE_CLASSES)}
                 >
                   {axis}
-                </Toggle>
+                </ToggleGroupItem>
               </TooltipTrigger>
               <TooltipContent side="left">
                 {unavailable ? `${label} doesn't apply to this selection.` : help}
@@ -49,7 +55,7 @@ export function FlipSection({ items }: { readonly items: ReadonlyArray<PlacedIte
             </Tooltip>
           )
         })}
-      </div>
+      </ToggleGroup>
     </div>
   )
 }

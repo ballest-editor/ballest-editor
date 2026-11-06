@@ -60,6 +60,7 @@ import {
   useCreator,
   useEditor
 } from "../editor/store"
+import { CHIP } from "./chipStyle"
 import { PathAction } from "./PathText"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
 
@@ -108,7 +109,7 @@ function DifficultyIcon({ difficulty }: { readonly difficulty: Difficulty }) {
       {[1, 2, 3, 4].map((bar) => (
         <span
           key={bar}
-          className={cn("h-3 w-1 rounded-[1px]", bar <= filled ? BAR_COLORS[difficulty] : "bg-fg-tertiary/30")}
+          className={cn("h-3 w-1 rounded-full", bar <= filled ? BAR_COLORS[difficulty] : "bg-fg-tertiary/30")}
         />
       ))}
     </span>
@@ -135,18 +136,11 @@ function DifficultyPicker(
         const picked = DIFFICULTIES.find((d) => next.includes(d.tag) && d.tag !== value)
         if (picked !== undefined) onChange(picked.tag)
       }}
-      spacing={1}
     >
       {DIFFICULTIES.map((d) => (
         <Tooltip key={d.tag}>
           <TooltipTrigger
-            render={
-              <ToggleGroupItem
-                value={d.tag}
-                variant="outline"
-                className="gap-1.5 aria-pressed:border-primary aria-pressed:bg-primary/15"
-              />
-            }
+            render={<ToggleGroupItem value={d.tag} className="gap-1.5" />}
           >
             <DifficultyIcon difficulty={d.tag} />
             {d.level}
@@ -173,10 +167,9 @@ function TagChips(
         return (
           <Toggle
             key={tag}
-            variant="outline"
             pressed={on}
             onPressedChange={(next) => onChange(withTag(levelData, name, next))}
-            className="rounded-control px-3 aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/90 aria-pressed:hover:text-primary-foreground"
+            className="rounded-full bg-muted px-3 text-fg-secondary transition-colors duration-150 ease-out hover:bg-foreground/10 aria-pressed:bg-primary/12 aria-pressed:text-foreground aria-pressed:hover:bg-primary/20"
           >
             {on && <IconCheck data-icon="inline-start" />}
             {tag}
@@ -468,7 +461,7 @@ const mapRows = (
         wide: true,
         control: (
           <div className="flex flex-wrap gap-1">
-            {others.map((tag) => <Badge key={tag} variant="outline">{tag}</Badge>)}
+            {others.map((tag) => <Badge key={tag} variant="secondary" className={CHIP}>{tag}</Badge>)}
           </div>
         )
       } satisfies Row

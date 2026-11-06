@@ -78,7 +78,7 @@ export function NotificationCenter() {
       >
         <IconBell />
         {unread > 0 && (
-          <span className="absolute top-0 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-control bg-primary px-0.5 text-caption text-primary-foreground tabular-nums">
+          <span className="absolute top-0 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-status-neutral px-1 text-caption text-status-neutral-foreground tabular-nums">
             {unread}
           </span>
         )}

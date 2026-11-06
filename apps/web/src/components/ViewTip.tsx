@@ -1,8 +1,8 @@
-import { Kbd } from "@workspace/ui/components/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import type { ComponentProps, ReactElement, ReactNode } from "react"
-import { formatBinding, type KeybindAction } from "../domain/Keybinds"
+import type { KeybindAction } from "../domain/Keybinds"
 import { useEditor } from "../editor/store"
+import { KeyChip } from "./KeyChip"
 
 /**
  * A viewport control (`render`) with its tooltip: what it does, and the keys that do the same, if any do. Only the
@@ -25,7 +25,7 @@ export function ViewTip({ label, action, side = "bottom", render, children }: {
       <TooltipTrigger render={render}>{children}</TooltipTrigger>
       <TooltipContent side={side}>
         {label}
-        {action !== undefined && keybinds[action].map((binding) => <Kbd key={binding}>{formatBinding(binding)}</Kbd>)}
+        {action !== undefined && keybinds[action].map((binding) => <KeyChip key={binding} binding={binding} />)}
       </TooltipContent>
     </Tooltip>
   )

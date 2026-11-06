@@ -12,7 +12,7 @@ const MOUSE_BUTTONS: Readonly<Record<string, "left" | "right">> = { Mouse0: "lef
  */
 export function KeyChip({ binding, className }: { readonly binding: string; readonly className?: string }) {
   return (
-    <Kbd className={cn("text-fg-tertiary", className)}>
+    <Kbd className={cn("rounded-full px-1.5 text-fg-tertiary", className)}>
       {binding.split("+").map((part, index) => {
         const button = MOUSE_BUTTONS[part]
         return (

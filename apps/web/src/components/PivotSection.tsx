@@ -7,17 +7,13 @@ import { pivotOf, useEditor } from "../editor/store"
 import { InfoHint } from "./InfoHint"
 import { SectionTitle } from "./SectionTitle"
 
-/**
- * A toggle's look when it's on (pressed), or on for only part of a mixed selection (`data-in-use`): a lighter surface,
- * never the primary colour, which is for the one action a view is asking for.
- */
-export const TOGGLE_STATE_CLASSES =
-  "text-fg-secondary aria-pressed:bg-foreground/15 aria-pressed:text-foreground data-[in-use]:ring-1 data-[in-use]:ring-foreground/40 data-[in-use]:ring-inset"
+/** A toggle that's on for only part of a mixed selection (`data-in-use`): a step lighter than its track, short of pressed. */
+export const IN_USE_CLASSES = "data-[in-use]:bg-foreground/10 data-[in-use]:text-foreground"
 
 /**
  * The selection's pivot: the game's choices as one segmented control, four to a row. A click
  * sets the choice on every selected item. When their pivots differ, nothing is pressed and the
- * choices in use are outlined. Choices other than Default need the piece's bounds, so they're
+ * choices in use are tinted. Choices other than Default need the piece's bounds, so they're
  * off for pieces without them.
  */
 export function PivotSection() {
@@ -44,8 +40,7 @@ export function PivotSection() {
           const next = PIVOT_CHOICES.find((c) => value.includes(c))
           if (next !== undefined) setSelectionPivot(next) // clicking the pressed choice keeps it
         }}
-        spacing={0}
-        className="grid w-full grid-cols-4 gap-px overflow-hidden border border-input bg-input"
+        className="grid w-full grid-cols-4"
       >
         {PIVOT_CHOICES.map((choice) => (
           <ToggleGroupItem
@@ -53,10 +48,7 @@ export function PivotSection() {
             value={choice}
             disabled={choice !== "Default" && !allBounded}
             data-in-use={mixed && used.has(choice) ? "" : undefined}
-            className={cn(
-              "min-w-0 rounded-none! bg-card px-1! focus-visible:ring-2 focus-visible:ring-inset",
-              TOGGLE_STATE_CLASSES
-            )}
+            className={cn("min-w-0 px-1", IN_USE_CLASSES)}
           >
             {choice}
           </ToggleGroupItem>

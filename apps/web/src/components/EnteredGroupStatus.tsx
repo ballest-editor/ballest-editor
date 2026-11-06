@@ -8,13 +8,12 @@ import {
   BreadcrumbSeparator
 } from "@workspace/ui/components/breadcrumb"
 import { Button } from "@workspace/ui/components/button"
-import { Kbd } from "@workspace/ui/components/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/components/tooltip"
 import { Fragment, useMemo } from "react"
 import { groupTrail } from "../domain/groupSelection"
-import { formatBinding } from "../domain/Keybinds"
 import { groupNames, numberedNameText } from "../domain/structure"
 import { useEditor } from "../editor/store"
+import { KeyChip } from "./KeyChip"
 import { Ordinal } from "./Ordinal"
 
 /** The groups from the root down to the entered one, named as the Outline names them; empty when none is entered. */
@@ -55,7 +54,7 @@ export function EnteredGroupBreadcrumb() {
         </TooltipTrigger>
         <TooltipContent>
           Up one level
-          {binding !== undefined && <Kbd>{formatBinding(binding)}</Kbd>}
+          {binding !== undefined && <KeyChip binding={binding} />}
         </TooltipContent>
       </Tooltip>
       <Breadcrumb className="min-w-0 flex-1" title={trail.map(numberedNameText).join(" › ")}>

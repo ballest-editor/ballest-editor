@@ -60,7 +60,7 @@ export function KeybindCheatSheet() {
       </Dialog>
       {held && (
         <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/60 p-8">
-          <div className="max-h-full w-full max-w-5xl overflow-hidden rounded-surface bg-popover/90 p-dialog text-popover-foreground shadow-2xl ring-1 ring-foreground/10 backdrop-blur-md">
+          <div className="max-h-full w-full max-w-5xl overflow-hidden rounded-sheet bg-popover/90 p-dialog text-popover-foreground shadow-2xl backdrop-blur-md">
             <h2 className="mb-4 text-title">{TITLE}</h2>
             <KeybindColumns />
           </div>

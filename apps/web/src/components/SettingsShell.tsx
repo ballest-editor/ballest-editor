@@ -14,6 +14,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@workspace/ui/component
 import { cn } from "@workspace/ui/lib/utils"
 import { Fragment, type ReactNode, useState } from "react"
 
+/** The page or scope that's open in the sidebar: the selection's wash, which a hover doesn't change. */
+const SELECTED = "bg-primary/12 text-foreground hover:bg-primary/12"
+
 /** One searchable setting. `group` is a sub-heading inside the category (keybind sections). */
 export interface SettingsRow<C extends string> {
   readonly id: string
@@ -128,8 +131,8 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
   )
   const trailing = row.action ?? (row.changes && <ResetButton {...row.changes} />)
   return (
-    // The same padding above and below every row, so the dividers sit evenly between them; a wide control (a field, the
-    // tag chips) has an edge of its own, so it gets a little more room before the divider than text does.
+    // The same padding above and below every row, so they sit evenly in their group; a wide control (a field, the tag
+    // chips) has an edge of its own, so it gets a little more room below than text does.
     <div
       className={cn("group/row relative flex flex-col gap-2.5 py-3 pl-3", row.wide && row.control != null && "pb-4")}
     >
@@ -139,7 +142,7 @@ function RowView({ row }: { readonly row: SettingsRow<string> }) {
             render={
               <span
                 className={cn(
-                  "absolute left-0 size-1.5 -translate-y-1/2 rounded-full bg-primary",
+                  "absolute left-1 size-1.5 -translate-y-1/2 rounded-full bg-fg-tertiary",
                   row.wide ? "top-[1.3rem]" : "top-1/2"
                 )}
                 aria-label="Changed from default"
@@ -245,7 +248,7 @@ export function SettingsShell<C extends string>(props: {
   return (
     <Dialog open={props.open} onOpenChange={(next) => !next && props.busy !== true && props.onClose()}>
       <DialogContent className="flex h-[min(80vh,720px)] w-full gap-0 overflow-hidden p-0 sm:max-w-4xl" showCloseButton>
-        <nav className="flex w-56 shrink-0 flex-col border-r bg-muted/30 p-3">
+        <nav className="flex w-56 shrink-0 flex-col bg-muted/30 p-3">
           <div className="relative mb-2">
             <IconSearch className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-fg-secondary" />
             <Input
@@ -264,8 +267,8 @@ export function SettingsShell<C extends string>(props: {
             <div className="flex flex-col gap-1 px-3 pb-px">
               {searching && (
                 <Button
-                  variant={scope === null ? "secondary" : "ghost"}
-                  className="justify-between"
+                  variant="ghost"
+                  className={cn("justify-between", scope === null && SELECTED)}
                   onClick={() => setScope(null)}
                 >
                   <span>All results</span>
@@ -284,8 +287,8 @@ export function SettingsShell<C extends string>(props: {
                       </div>
                     )}
                     <Button
-                      variant={active ? "secondary" : "ghost"}
-                      className="justify-start"
+                      variant="ghost"
+                      className={cn("justify-start", active && SELECTED)}
                       disabled={searching && hits === 0}
                       onClick={() => {
                         if (searching) setScope(id)
@@ -297,12 +300,12 @@ export function SettingsShell<C extends string>(props: {
                       <span className="min-w-0 flex-1 truncate text-left">{label}</span>
                       {searching
                         ? hits > 0 && (
-                          <span className="rounded-control bg-primary/15 px-1.5 text-caption text-foreground tabular-nums">
+                          <span className="rounded-full bg-muted px-1.5 text-caption text-fg-secondary tabular-nums">
                             {hits}
                           </span>
                         )
                         : modifiedIn(id) && (
-                          <span className="size-1.5 rounded-full bg-primary" aria-label="Has changed settings" />
+                          <span className="size-1.5 rounded-full bg-fg-tertiary" aria-label="Has changed settings" />
                         )}
                     </Button>
                   </Fragment>
@@ -312,7 +315,7 @@ export function SettingsShell<C extends string>(props: {
           </ScrollArea>
         </nav>
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="border-b px-dialog py-3">
+          <div className="px-dialog py-3">
             <Breadcrumb>
               <BreadcrumbList className="text-title">
                 <BreadcrumbItem>
@@ -341,7 +344,7 @@ export function SettingsShell<C extends string>(props: {
                   {group.title !== undefined && group.title !== "" && (
                     <h3 className="mb-1 text-caption uppercase tracking-wider text-fg-secondary">{group.title}</h3>
                   )}
-                  <div className="flex flex-col divide-y divide-border/50">
+                  <div className="flex flex-col rounded-surface bg-muted/40 pr-3">
                     {group.rows.map((row) => <RowView key={row.id} row={row} />)}
                   </div>
                 </section>
@@ -349,7 +352,7 @@ export function SettingsShell<C extends string>(props: {
               {groups.length === 0 && <p className="text-body text-fg-tertiary">No settings match.</p>}
             </div>
           </ScrollArea>
-          <div className="flex border-t px-dialog py-3">
+          <div className="flex px-dialog py-3">
             {/* Search results span every category, and a reset names one: it comes back with the page. */}
             {onResetCategory !== undefined && !searching && (
               <Button
