@@ -2,7 +2,6 @@ import { IconArrowsMaximize, IconArrowsMove, IconPointer, IconRefresh } from "@t
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group"
 import { cn } from "@workspace/ui/lib/utils"
 import type { KeybindAction } from "../domain/Keybinds"
-import { toolStripOf } from "../domain/viewLayout"
 import { type Tool, useEditor } from "../editor/store"
 import { GROUP, noFocus, SEGMENT } from "./viewControlStyle"
 import { ViewTip } from "./ViewTip"
@@ -21,24 +20,15 @@ const TOOLS: ReadonlyArray<{
 ]
 
 /**
- * Tool switcher, bottom-centre of the viewport. It belongs to no pane: over one, maximised or not, it floats, and under
- * several it sits in the strip they leave it (`toolStripOf`), so no divider runs through it. Pointer-only, so keybinds
- * stay with the viewport.
+ * Tool switcher, bottom-centre of the viewport. It belongs to no pane and floats over them all: a divider under it passes
+ * behind the pill and drags from either side of it. Pointer-only, so keybinds stay with the viewport.
  */
 export function ToolBar({ disabled }: { readonly disabled: boolean }) {
   const tool = useEditor((s) => s.tool)
   const setTool = useEditor((s) => s.setTool)
-  const strip = useEditor((s) => toolStripOf(s.viewLayout))
 
   return (
-    <div
-      className={cn(
-        "absolute inset-x-0 flex items-center justify-center",
-        strip > 0 ? "pointer-events-auto bottom-0 border-t border-border bg-card" : "pointer-events-none bottom-3"
-      )}
-      style={strip > 0 ? { height: strip } : undefined}
-      data-tool-strip={strip > 0 ? "" : undefined}
-    >
+    <div className="pointer-events-none absolute inset-x-0 bottom-3 flex items-center justify-center">
       <ToggleGroup
         pill="primary"
         value={[tool]}

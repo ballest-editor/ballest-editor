@@ -39,7 +39,7 @@ function AxisEnd({ end, color, onPick, disabled }: {
     <ViewTip
       label={label}
       action={PROJECTION_ACTIONS[view]}
-      side="top"
+      side="right"
       render={
         <button
           type="button"
@@ -137,10 +137,11 @@ export function ViewGizmo({ slot, projection, disabled }: {
   return (
     <div
       className={cn(
-        "pointer-events-auto relative origin-bottom-left rounded-full",
+        "pointer-events-auto relative rounded-full",
         !disabled && "cursor-grab transition-colors hover:bg-hover active:cursor-grabbing active:bg-pressed"
       )}
-      style={{ width: SIZE, height: SIZE, scale }}
+      // `zoom`, not `scale`: the pane's card has to grow with it.
+      style={{ width: SIZE, height: SIZE, zoom: scale }}
       data-view-gizmo
       {...drag}
     >
@@ -173,7 +174,7 @@ export function ViewGizmo({ slot, projection, disabled }: {
       <ViewTip
         label={viewProjectionLabels.perspective}
         action={PROJECTION_ACTIONS.perspective}
-        side="top"
+        side="right"
         render={
           <button
             type="button"

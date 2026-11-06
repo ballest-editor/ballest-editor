@@ -126,28 +126,17 @@ const panesOf = (kind: ViewLayoutKind, width: number, height: number, x: number,
   }
 }
 
-/** The strip kept under several panes (px): the tool bar sits in it, so no pane edge runs under the tool bar. */
-const TOOL_STRIP_HEIGHT = 44
-
-/**
- * How much of the canvas's foot the panes leave to the tool bar. It goes by the panes shown: over one, maximised or not,
- * the tool bar floats, so a maximised pane has the whole canvas.
- */
-export const toolStripOf = (layout: ViewLayout): number => paneCountOf(shownKindOf(layout)) > 1 ? TOOL_STRIP_HEIGHT : 0
-
 /** The panes `layout` shows over this area, with the dividers at `x` and `y`: a maximised pane has all of it. */
 const shownPanes = (layout: ViewLayout, width: number, height: number, x: number, y: number): Panes => {
   const slot = maximisedSlotOf(layout)
   return slot === undefined ? panesOf(layout.kind, width, height, x, y) : [{ slot, x: 0, y: 0, width, height }]
 }
 
-/** The panes of `layout` on a canvas of this size, above its tool strip; the dividers land on whole pixels. */
-export const paneRects = (layout: ViewLayout, width: number, height: number): Panes => {
-  const area = Math.max(height - toolStripOf(layout), 0)
-  return shownPanes(layout, width, area, Math.round(width * layout.splitX), Math.round(area * layout.splitY))
-}
+/** The panes of `layout` on a canvas of this size; the dividers land on whole pixels. */
+export const paneRects = (layout: ViewLayout, width: number, height: number): Panes =>
+  shownPanes(layout, width, height, Math.round(width * layout.splitX), Math.round(height * layout.splitY))
 
-/** The panes of `layout` as shares of the area above the tool strip, for what's laid out over the canvas. */
+/** The panes of `layout` as shares of the canvas, for what's laid out over it. */
 export const paneShares = (layout: ViewLayout): Panes => shownPanes(layout, 1, 1, layout.splitX, layout.splitY)
 
 /** The pane in the top right of `panes`, whose corner the view controls share: the last of the top row. */

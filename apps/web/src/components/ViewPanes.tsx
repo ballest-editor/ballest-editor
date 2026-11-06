@@ -45,7 +45,6 @@ import {
   paneSplitRight,
   paneSwap,
   shownKindOf,
-  toolStripOf,
   type ViewLayoutKind,
   viewLayoutKinds,
   viewLayoutLabelsOf,
@@ -57,7 +56,7 @@ import { changePanes } from "../editor/paneCameras"
 import { useEditor } from "../editor/store"
 import { InstanceBanner } from "./InstanceBanner"
 import { ChordText } from "./KeyChip"
-import { CONTROL_WORD, GROUP, GROUP_DIVIDER, noFocus, SEGMENT, SURFACE } from "./viewControlStyle"
+import { CONTROL_WORD, GROUP, noFocus, SEGMENT, SURFACE } from "./viewControlStyle"
 import { ViewGizmo } from "./ViewGizmo"
 import { ViewTip } from "./ViewTip"
 
@@ -218,18 +217,21 @@ function PaneMenuItems({ slot, kind }: { readonly slot: PaneSlot; readonly kind:
 }
 
 /**
- * The label's word in the pane that shares its corner with the view controls, the last thing to go: they have gone to
- * icons and stacked, and `Perspective` still can't fit beside the top pill. A label never moves out of the way.
+ * When a pane's card gives way to the pane around it, the word first and then the axes; it never moves out of the way.
+ * The view controls take more of the pane in its corner: they have gone to icons and stacked, and the card's width can't
+ * sit beside the second pill. The label stays, so the pane keeps its name and its list of views.
  */
-const CORNER_LABEL_WORD = "@max-[16rem]:hidden"
+const LABEL_WORD = "@max-[11rem]:hidden"
+const CORNER_LABEL_WORD = "@max-[21.5rem]:hidden"
+const AXES_ROOM = "[@container_(height<9rem)]:hidden @max-[6.5rem]:hidden"
+const CORNER_AXES_ROOM = "[@container_(height<9rem)]:hidden @max-[19rem]:hidden"
 
-/** A maximised pane's way back, beside its label: a click, or the key it names (`useActionKeys`). */
+/** A maximised pane's way back, beside its card: a click, or the key it names (`useActionKeys`). */
 function RestoreChip({ slot, disabled }: { readonly slot: PaneSlot; readonly disabled: boolean }) {
   const binding = useEditor((s) => s.keybinds.deselect[0])
   const togglePaneMaximised = useEditor((s) => s.togglePaneMaximised)
   return (
-    <>
-      <span aria-hidden className={GROUP_DIVIDER} />
+    <div className={GROUP}>
       <ViewTip
         label="Restore panes"
         render={
@@ -252,7 +254,7 @@ function RestoreChip({ slot, disabled }: { readonly slot: PaneSlot; readonly dis
           )}
         </span>
       </ViewTip>
-    </>
+    </div>
   )
 }
 
@@ -268,11 +270,13 @@ interface PaneDragHandlers {
 }
 
 /**
- * The pane's name: a click opens the list of views, a drag swaps the pane with the one it's dropped on, a double click
- * maximises it, and a right click splits or closes it. The menu opens on the click, not the press, or every drag would
- * start with it. It isn't modal, so a double click's second press reaches the label: the two clicks open and close it.
+ * A pane's card, in its top left: what it looks along, by name and by axes, on a card of its own so a busy map doesn't
+ * swallow them. The name is the label: a click opens the list of views, a drag swaps the pane with the one it's dropped
+ * on, a double click maximises it. A right click on either splits or closes the pane. The menu opens on the click, not
+ * the press, or every drag would start with it. It isn't modal, so a double click's second press reaches the label: the
+ * two clicks open and close it. The rest of the card lets the pointer through to the canvas.
  */
-function PaneHeader({ pane, projection, disabled, active, inCorner, drag }: {
+function PaneCard({ pane, projection, disabled, active, inCorner, drag }: {
   readonly pane: PaneRect
   readonly projection: ViewProjection
   readonly disabled: boolean
@@ -338,56 +342,40 @@ function PaneHeader({ pane, projection, disabled, active, inCorner, drag }: {
   }
   return (
     <ContextMenu disabled={disabled}>
-      <ContextMenuTrigger className={cn(GROUP, "absolute top-3 left-3", dragging && "opacity-50")}>
-        <ViewPicker
-          value={projection}
-          options={viewProjections}
-          labels={viewProjectionLabels}
-          icons={VIEW_ICONS}
-          onPick={(next) => setPaneProjection(pane.slot, next)}
-          tip="Pane view"
-          action={PROJECTION_ACTIONS[projection]}
-          word={
-            <>
-              {viewProjectionLabels[projection]}
-              {maximised && <span className="@max-[60rem]/viewport:hidden">{" · Maximised"}</span>}
-            </>
-          }
-          wordClass={inCorner ? CORNER_LABEL_WORD : undefined}
-          strong={active}
-          disabled={disabled}
-          root={{ open, onOpenChange: setOpen, modal: false }}
-          trigger={trigger}
-        />
+      <ContextMenuTrigger className={cn("flex items-start gap-2", dragging && "opacity-50")}>
+        <div className={cn("rounded-sheet p-0.5", SURFACE)} data-pane-card>
+          <div className="pointer-events-auto flex h-6.5 w-fit">
+            <ViewPicker
+              value={projection}
+              options={viewProjections}
+              labels={viewProjectionLabels}
+              icons={VIEW_ICONS}
+              onPick={(next) => setPaneProjection(pane.slot, next)}
+              tip="Pane view"
+              action={PROJECTION_ACTIONS[projection]}
+              word={
+                <>
+                  {viewProjectionLabels[projection]}
+                  {maximised && <span className="@max-[60rem]/viewport:hidden">{" · Maximised"}</span>}
+                </>
+              }
+              wordClass={inCorner ? CORNER_LABEL_WORD : LABEL_WORD}
+              strong={active}
+              disabled={disabled}
+              root={{ open, onOpenChange: setOpen, modal: false }}
+              trigger={trigger}
+            />
+          </div>
+          <div className={cn("w-fit p-1", inCorner ? CORNER_AXES_ROOM : AXES_ROOM)}>
+            <ViewGizmo slot={pane.slot} projection={projection} disabled={disabled} />
+          </div>
+        </div>
         {maximised && <RestoreChip slot={pane.slot} disabled={disabled} />}
       </ContextMenuTrigger>
       <ContextMenuContent>
         <PaneMenuItems slot={pane.slot} kind={kind} />
       </ContextMenuContent>
     </ContextMenu>
-  )
-}
-
-/**
- * The bottom left of a pane, 8px above a single pane's tool bar, which it would otherwise meet in a narrow viewport: the
- * axis gizmo, on a card of its own so a busy map doesn't swallow it.
- */
-function PaneCorner({ slot, projection, disabled }: {
-  readonly slot: number
-  readonly projection: ViewProjection
-  readonly disabled: boolean
-}) {
-  const clearsToolBar = useEditor((s) => toolStripOf(s.viewLayout) === 0)
-  return (
-    <div
-      className={cn(
-        "pointer-events-none absolute left-3 rounded-sheet p-1.5",
-        clearsToolBar ? "bottom-14" : "bottom-3",
-        SURFACE
-      )}
-    >
-      <ViewGizmo slot={slot} projection={projection} disabled={disabled} />
-    </div>
   )
 }
 
@@ -452,9 +440,9 @@ function DraggedLabel(
 }
 
 /**
- * What's drawn over the one canvas for its panes (docs/DESKTOP.md § View panes). All click-through but the labels and
- * dividers: the canvas takes the pointer and sorts it by pane. `children`, the view controls, go in a box the size of the
- * top right pane, which is the width they have to share with its label, and under the labels, which stay in reach.
+ * What's drawn over the one canvas for its panes (docs/DESKTOP.md § View panes). All click-through but the panes' cards
+ * and dividers: the canvas takes the pointer and sorts it by pane. `children`, the view controls, go in a box the size of
+ * the top right pane, which is the width they have to share with its card, and under the cards, which stay in reach.
  */
 export function ViewPanes({ disabled, children }: { readonly disabled: boolean; readonly children: ReactNode }) {
   const layout = useEditor((s) => s.viewLayout)
@@ -483,39 +471,36 @@ export function ViewPanes({ disabled, children }: { readonly disabled: boolean; 
     onCancel: cancelPaneDrag
   })
   return (
-    <div
-      ref={overlay}
-      className="pointer-events-none absolute inset-x-0 top-0 @container/viewport"
-      style={{ bottom: toolStripOf(layout) }}
-    >
+    <div ref={overlay} className="pointer-events-none absolute inset-0 @container/viewport">
       <div className="absolute @container/corner" style={paneBox(corner)}>{children}</div>
       {panes.map((pane) => {
         const { slot } = pane
         const projection = layout.projections[slot]
         const active = slot === activePane
         return (
-          <div key={slot} className="absolute @container" style={paneBox(pane)}>
+          <div key={slot} className="absolute [container-type:size]" style={paneBox(pane)}>
             {panes.length > 1 && active && (
               <div className="absolute inset-0 ring-2 ring-ring ring-inset" data-active-pane />
             )}
             {paneDrag?.over === slot && paneDrag.from !== slot && (
               <div className="absolute inset-0 bg-primary/12 ring-2 ring-ring ring-inset" data-pane-drop />
             )}
-            <PaneHeader
-              pane={pane}
-              projection={projection}
-              disabled={disabled}
-              active={active}
-              inCorner={slot === corner.slot}
-              drag={dragHandlers(slot)}
-            />
-            <PaneCorner slot={slot} projection={projection} disabled={disabled} />
+            <div className="absolute top-3 left-3 flex max-w-[calc(100%-1.5rem)] flex-col items-start gap-2">
+              <PaneCard
+                pane={pane}
+                projection={projection}
+                disabled={disabled}
+                active={active}
+                inCorner={slot === corner.slot}
+                drag={dragHandlers(slot)}
+              />
+              {pane === panes[0] && <InstanceBanner />}
+            </div>
           </div>
         )
       })}
       {(shownKind === "columns" || shownKind === "quad") && <PaneDivider axis="x" at={layout.splitX} />}
       {(shownKind === "rows" || shownKind === "quad") && <PaneDivider axis="y" at={layout.splitY} />}
-      <InstanceBanner />
       {paneDrag !== null && (
         <DraggedLabel x={paneDrag.x} y={paneDrag.y} projection={layout.projections[paneDrag.from]} />
       )}
