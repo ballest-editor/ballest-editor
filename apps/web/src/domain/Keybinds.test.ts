@@ -17,7 +17,8 @@ import {
   mergeKeybinds,
   MODIFIER_HOLD_MS,
   PROJECTION_ACTIONS,
-  releasesBinding
+  releasesBinding,
+  wheelSpeedStep
 } from "./Keybinds"
 import { viewProjections } from "./viewLayout"
 
@@ -197,6 +198,40 @@ const newConflicts = (keybinds: Keybinds) => {
   const baseline = conflictingBindings(defaultKeybinds)
   return [...conflictingBindings(keybinds)].filter((chord) => !baseline.has(chord))
 }
+
+describe("wheelSpeedStep", () => {
+  const scroll = (deltaY: number, modifiers: { ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean } = {}) => ({
+    deltaX: 0,
+    deltaY,
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    ...modifiers
+  })
+
+  it("changes speed whatever is held: Ctrl flies down, and the wheel still has to work", () => {
+    for (const modifier of [{}, { ctrlKey: true }, { altKey: true }, { shiftKey: true }]) {
+      expect(wheelSpeedStep(defaultKeybinds, scroll(-120, modifier))).toBe(1)
+      expect(wheelSpeedStep(defaultKeybinds, scroll(120, modifier))).toBe(-1)
+    }
+  })
+
+  it("lets a chord bound with a modifier win over the plain wheel", () => {
+    const keybinds: Keybinds = { ...defaultKeybinds, speedFaster: ["WheelDown"], speedSlower: ["Ctrl+WheelDown"] }
+    expect(wheelSpeedStep(keybinds, scroll(120))).toBe(1)
+    expect(wheelSpeedStep(keybinds, scroll(120, { ctrlKey: true }))).toBe(-1)
+  })
+
+  it("does nothing when the wheel isn't bound", () => {
+    expect(wheelSpeedStep({ ...defaultKeybinds, speedFaster: [], speedSlower: [] }, scroll(-120))).toBe(0)
+  })
+
+  it("takes Shift+scroll turned sideways as the scroll it was, and ignores any other sideways scroll", () => {
+    expect(wheelSpeedStep(defaultKeybinds, { ...scroll(0, { shiftKey: true }), deltaX: -120 })).toBe(1)
+    expect(wheelSpeedStep(defaultKeybinds, { ...scroll(0), deltaX: -120 })).toBe(0)
+  })
+})
 
 describe("conflictingBindings", () => {
   it("marks a chord two actions of a kind share, and not one shared across kinds", () => {

@@ -7,12 +7,11 @@ import {
   type Bindings,
   chordOf,
   HeldKeys,
-  isBound,
   isBoundChord,
   isOneShotChord,
   type Keybinds,
   mouseChordOf,
-  wheelChordOf
+  wheelSpeedStep
 } from "../domain/Keybinds"
 import { wheelZoomFactor } from "../domain/orthoView"
 import { placementPoint } from "../domain/placement"
@@ -51,7 +50,7 @@ const flyingNow = (keybinds: Keybinds, keys: HeldKeys, looking: boolean, now: nu
 
 /**
  * Free-fly camera for the panes (docs/DESKTOP.md § View panes): drags and the wheel drive the pane under the pointer, the
- * keys the active pane, every binding from the keybind store. The wheel is camera speed by default, dolly when unbound.
+ * keys the active pane, every binding from the keybind store. The wheel is camera speed, or zoom in an orthographic pane.
  */
 export function FlyCamera() {
   const gl = useThree((s) => s.gl)
@@ -212,16 +211,8 @@ export function FlyCamera() {
         pane.zoomOrthographic(wheelZoomFactor(e.deltaY), px)
         return
       }
-      const chord = wheelChordOf(e)
-      const speedStep = isBound(keybinds, "speedFaster", chord) ? 1 : isBound(keybinds, "speedSlower", chord) ? -1 : 0
-      if (speedStep !== 0) {
-        useEditor.getState().changeSpeed(speedStep)
-        return
-      }
-      const camera = pane.perspective
-      const forward = camera.getWorldDirection(new THREE.Vector3())
-      const step = -Math.sign(e.deltaY) * Math.max(50, camera.position.distanceTo(pane.target) * 0.1)
-      camera.position.addScaledVector(forward, step)
+      const speedStep = wheelSpeedStep(keybinds, e)
+      if (speedStep !== 0) useEditor.getState().changeSpeed(speedStep)
     }
 
     const listening = new AbortController()

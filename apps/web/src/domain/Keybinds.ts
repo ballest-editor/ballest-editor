@@ -402,8 +402,31 @@ export const chordOf = (e: ModifierState & { readonly code: string }): string =>
 
 export const mouseChordOf = (e: ModifierState & { readonly button: number }): string =>
   withModifiers(e, `Mouse${e.button}`)
-export const wheelChordOf = (e: ModifierState & { readonly deltaY: number }): string =>
-  withModifiers(e, e.deltaY < 0 ? "WheelUp" : "WheelDown")
+
+interface WheelState extends ModifierState {
+  readonly deltaX: number
+  readonly deltaY: number
+}
+
+/** How far up or down a scroll went. Windows turns Shift+scroll sideways; any other sideways scroll is zero. */
+const wheelDelta = (e: WheelState): number => e.deltaY !== 0 ? e.deltaY : e.shiftKey ? e.deltaX : 0
+
+const wheelCodeOf = (e: WheelState): string => wheelDelta(e) < 0 ? "WheelUp" : "WheelDown"
+
+export const wheelChordOf = (e: WheelState): string => withModifiers(e, wheelCodeOf(e))
+
+/**
+ * The camera speed step a scroll asks for. Modifiers don't take the wheel away: Left Ctrl flies down, and
+ * the speed has to change on the way. A chord bound with the modifiers held wins over the plain wheel.
+ */
+export const wheelSpeedStep = (keybinds: Keybinds, e: WheelState): 1 | -1 | 0 => {
+  if (wheelDelta(e) === 0) return 0
+  for (const chord of [wheelChordOf(e), wheelCodeOf(e)]) {
+    if (isBound(keybinds, "speedFaster", chord)) return 1
+    if (isBound(keybinds, "speedSlower", chord)) return -1
+  }
+  return 0
+}
 
 /** The key code a binding waits for, ignoring modifiers (used for held movement keys). */
 export const baseCodeOf = (binding: string): string => binding.slice(binding.lastIndexOf("+") + 1)
