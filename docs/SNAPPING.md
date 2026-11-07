@@ -95,7 +95,7 @@ A flat face counts when it is at least 0.25% of the mesh's surface. Below that i
 
 The selection's own stations (§ Snap base) pair like with like, as Alignment does. A near or far face stops on a face: near on near and far on far lie flush inside, near on far and far on near touch outside. The centre stops on the middle and on no face. So a Track S moved along X through a Track L stops five times: touching, flush, centred, flush, touching.
 
-Nothing hides a station, as it isn't something the pointer picks by sight: a piece moved inside another still stops on its faces. On a plane handle a station stops one axis at a time, and a face of the selection only stops along the axis it is a face of.
+Nothing hides a station, as it isn't something the pointer picks by sight: a piece moved inside another still stops on its faces. On a plane handle a face of the selection only stops along the axis it is a face of, and stations reached on both axes hold together as Alignment's do: the move lands where their planes cross, with no Rotate to face, and leaving one's range frees that axis only.
 
 #### Construction
 

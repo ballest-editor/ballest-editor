@@ -21,7 +21,7 @@ import {
   type SnapHit
 } from "./snapFrame"
 import { gridLanding, gridSpacingPixels } from "./snapGrid"
-import { connectorHits, constructionHits, meshHits, trackingHits } from "./snapTargets"
+import { connectorHits, constructionHits, meshHits, stationsTogether, trackingHits } from "./snapTargets"
 import { vecAdd, vecDot, vecScale, vecSub } from "./ueMath"
 
 /** How many of the nearest points are asked whether something hides them. */
@@ -90,7 +90,7 @@ const hitsOf = (frame: SnapFrame, target: SnapTarget, takes: Takes): ReadonlyArr
     case "connectors":
       return connectorHits(frame).filter(takes)
     case "mesh":
-      return meshHits(frame).filter(takes)
+      return stationsTogether(frame, meshHits(frame).filter(takes))
     case "construction":
       return constructionHits(frame).filter(takes)
     case "tracking":
@@ -102,14 +102,17 @@ const hitsOf = (frame: SnapFrame, target: SnapTarget, takes: Takes): ReadonlyArr
 
 /**
  * Whether a hit is in reach of a line or plane the move is held to: a target sets the value along it, and one the move
- * would have to jump to, such as a wall far behind the handle, isn't near however the pointer lines up with it.
+ * would have to jump to, such as a wall far behind the handle, isn't near however the pointer lines up with it. What
+ * lands on two axes is in reach while each of them is, as the range is along an axis.
  */
 const inReach = (frame: SnapFrame, hit: SnapHit): boolean => {
   if (frame.constraint.kind === "surface") return true
-  const landed = frame.view.project(constrained(frame.constraint, hit.base.start, hit.landing))
-  const free = frame.view.project(freePoint(frame, hit.base))
-  return landed !== undefined && free !== undefined &&
-    pixelDistance(landed, free) <= rangeOf(frame.config, hit.target)
+  return (hit.parts ?? [hit]).every((one) => {
+    const landed = frame.view.project(constrained(frame.constraint, one.base.start, one.landing))
+    const free = frame.view.project(freePoint(frame, one.base))
+    return landed !== undefined && free !== undefined &&
+      pixelDistance(landed, free) <= rangeOf(frame.config, one.target)
+  })
 }
 
 /** How far into the pane a hit lands, to tell apart what shows on one pixel. */

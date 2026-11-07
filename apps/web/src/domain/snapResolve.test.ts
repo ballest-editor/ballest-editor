@@ -1,12 +1,13 @@
 import { assert, describe, it } from "@effect/vitest"
 import { boxAt, cubeAt, endAlongX, meshOfBox, topView } from "../test/snapFixtures"
 import type { Vec3 } from "./coords"
+import type { Box } from "./itemBounds"
 import { defaultSnapConfig, type SnapConfig, type SnapTarget, withPreset, withTargetMoved } from "./snapConfig"
-import type { BasePoint, SnapFrame, SnapHit, TrackedPoint } from "./snapFrame"
+import type { BasePoint, SnapFrame, SnapHit, SnapItem, TrackedPoint } from "./snapFrame"
 import { moveOf, resolveDrag, resolveSnap } from "./snapResolve"
 import { meshHits } from "./snapTargets"
 import { selectionBases } from "./snapTools"
-import { IDENTITY_QUAT, ORIGIN } from "./ueMath"
+import { IDENTITY_QUAT, ORIGIN, vecDot, vecSub } from "./ueMath"
 
 const on = (config: SnapConfig, ...targets: ReadonlyArray<SnapTarget>): SnapConfig => {
   const turned = <T extends { readonly enabled: boolean }>(name: SnapTarget, target: T): T => ({
@@ -467,6 +468,96 @@ describe("the Mesh target under a move's constraint", () => {
         resolveSnap(frameOf(free, { config: noCentres(config), bases, items, constraint: plane }))?.landing.x
       assert.isUndefined(onPlane([near]))
       assert.strictEqual(onPlane([faceBase]), 1500)
+    })
+  })
+
+  describe("on a plane, along both of its axes", () => {
+    const named = (key: string, name: string, box: Box) =>
+      cubeAt(key, ORIGIN, { name, box, mesh: () => meshOfBox(box) })
+    /** Its face across X is at 400, for the far face of a selection moved 350. */
+    const track = named("a", "Track Large", { min: { x: 400, y: -1000, z: -50 }, max: { x: 600, y: 1000, z: 50 } })
+    /** Its face across Y is at 300, for the far face of a selection moved 250. */
+    const curve = named("b", "Curve Large", { min: { x: -1000, y: 300, z: -50 }, max: { x: 1000, y: 500, z: 50 } })
+    const bases = selectionBases(config, { pivot: ORIGIN, box: boxAt(ORIGIN), ends: [] }, plane)
+
+    /** The hits of a drag through `path`, from its first point. */
+    const dragThrough = (
+      path: ReadonlyArray<readonly [number, number]>,
+      items: ReadonlyArray<SnapItem>,
+      over = config
+    ) => {
+      let from: Vec3 = { x: path[0]?.[0] ?? 0, y: path[0]?.[1] ?? 0, z: 0 }
+      let current: ReturnType<typeof resolveDrag>
+      return path.map(([x, y]) => {
+        const offset = { x, y, z: 0 }
+        current = resolveDrag(frameOf(offset, { config: over, bases, items, constraint: plane }), { from, current })
+        from = offset
+        return current
+      })
+    }
+    const moves = (hits: ReadonlyArray<SnapHit | undefined>) =>
+      hits.map((hit) => {
+        if (hit === undefined) return undefined
+        const { x, y } = moveOf(hit).offset
+        return [x, y]
+      })
+    const reachesBoth = [[340, 240], [352, 240], [352, 252]] as const
+
+    it("lands where a face across X and a face across Y cross, showing both", () => {
+      const hit = dragThrough(reachesBoth, [track, curve]).at(-1)
+      assert.deepStrictEqual(hit === undefined ? undefined : moveOf(hit).offset, { x: 350, y: 250, z: 0 })
+      assert.strictEqual(hit?.label, "Face of Track Large and Face of Curve Large")
+      assert.deepStrictEqual(hit?.held, { shape: "point", at: hit?.landing ?? ORIGIN })
+      assert.deepStrictEqual(hit?.marks.map(({ kind }) => kind), ["face", "face"])
+      assert.deepStrictEqual(hit?.parts?.map(({ item }) => item), ["a", "b"])
+      const otherWay = dragThrough([[340, 240], [340, 252], [352, 252]], [track, curve]).at(-1)
+      assert.deepStrictEqual(otherWay?.landing, hit?.landing)
+      assert.strictEqual(otherWay?.label, hit?.label, "whichever axis it reaches first")
+    })
+
+    it("holds both while each is in its own range, and frees only the axis it leaves", () => {
+      const hits = dragThrough([...reachesBoth, [360, 260], [360, 270], [375, 270]], [track, curve])
+      assert.deepStrictEqual(moves(hits), [undefined, [350, 240], [350, 250], [350, 250], [350, 270], undefined])
+      assert.strictEqual(hits[4]?.label, "Face of Track Large")
+      assert.isUndefined(hits[4]?.parts)
+    })
+
+    it("names a face and a middle of one item once, and two faces of it as one", () => {
+      const box = { min: { x: 400, y: -100, z: -50 }, max: { x: 600, y: 100, z: 50 } }
+      // the far face centred on the item is on that face's centre, a point, which beats them with its toggle on
+      const { mesh } = config.targets
+      const elements = { ...mesh.elements, faceCentres: false }
+      const noCentres = { ...config, targets: { ...config.targets, mesh: { ...mesh, elements } } }
+      const middle = dragThrough([[340, -6], [352, -6], [352, 3]], [named("a", "Track Large", box)], noCentres).at(-1)
+      assert.strictEqual(middle?.label, "Face and Middle of Track Large")
+      const corner = dragThrough([[340, 40], [352, 40], [352, 52]], [named("a", "Track Large", box)]).at(-1)
+      assert.strictEqual(corner?.label, "Face of Track Large")
+      assert.lengthOf(corner?.marks ?? [], 2)
+    })
+
+    it("lands on both planes when a face stands a few degrees off the axis", () => {
+      const turn = 3 * Math.PI / 180
+      const normal = { x: -Math.cos(turn), y: Math.sin(turn), z: 0 }
+      const centre = { x: 400, y: 0, z: 0 }
+      const tilted = {
+        ...track,
+        mesh: () => ({ ...meshOfBox(track.box), faces: [{ centre, normal, corners: [] }] })
+      }
+      const hit = dragThrough([[355, 240], [365, 240], [365, 252]], [tilted, curve]).at(-1)
+      const offset = hit === undefined ? ORIGIN : moveOf(hit).offset
+      assert.closeTo(offset.y, 250, 1e-6)
+      assert.closeTo(vecDot(vecSub({ x: 50 + offset.x, y: offset.y, z: 0 }, centre), normal), 0, 1e-6)
+    })
+
+    it("takes no turn, as none faces both, where one face alone takes its own", () => {
+      const { mesh } = config.targets
+      const turning = {
+        ...config,
+        targets: { ...config.targets, mesh: { ...mesh, rotateToFace: "upright" as const } }
+      }
+      const hits = dragThrough(reachesBoth, [track, curve], turning)
+      assert.isDefined(hits[1]?.rotation)
+      assert.isUndefined(hits[2]?.rotation)
     })
   })
 

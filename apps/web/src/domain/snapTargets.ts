@@ -14,6 +14,7 @@ import {
   type BasePoint,
   type Constraint,
   freePoint,
+  type HeldShape,
   lineNearRay,
   pixelDistance,
   rayOnPlane,
@@ -452,6 +453,57 @@ export const meshHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
     ]),
     ...faceHits(frame, one, near)
   ])
+}
+
+/** A hit that holds a plane, as a station does. */
+type Stop = SnapHit & { readonly held: Extract<HeldShape, { readonly shape: "plane" }> }
+
+const isStop = (hit: SnapHit): hit is Stop => hit.held.shape === "plane"
+
+/** Whether two stops set different axes of a plane, by the rule `pairs` has for what's along an axis. */
+const crossing = (a: Stop, b: Stop) => Math.abs(vecDot(a.held.normal, b.held.normal)) < Math.SQRT1_2
+
+/** How far a stop's base stands from its plane, along the plane's normal. */
+const gapTo = ({ base, held: { normal, origin } }: Stop) => vecDot(vecSub(origin, base.start), normal)
+
+/** The move across a plane of `normal` that puts each stop's base on its own plane: three planes meeting at a point. */
+const moveOnto = (normal: Vec3, a: Stop, b: Stop): Vec3 => {
+  const [forA, forB] = [vecCross(b.held.normal, normal), vecCross(normal, a.held.normal)]
+  const sum = vecAdd(vecScale(forA, gapTo(a)), vecScale(forB, gapTo(b)))
+  return vecScale(sum, 1 / vecDot(a.held.normal, forA))
+}
+
+/** "Face of Track and Face of Curve", and on one item "Face and Middle of Track", or "Face of Track" for a corner. */
+const labelOfBoth = (a: SnapHit, b: SnapHit): string => {
+  if (a.item !== b.item) return `${a.label} and ${b.label}`
+  return a.label === b.label ? a.label : `${a.label.replace(/ of .*/u, "")} and ${b.label}`
+}
+
+/**
+ * What a drag has of a plane's stations, with the nearest along each axis as one hit, as Alignment lands (`parts`): a
+ * station sets one axis, so together they land where their planes cross. Each base stays on its own plane, the hit's
+ * being the first's. It takes no turn, as none faces both. `hits` keeps its order from frame to frame, and so do the parts.
+ */
+export const stationsTogether = (frame: SnapFrame, hits: ReadonlyArray<SnapHit>): ReadonlyArray<SnapHit> => {
+  const { constraint } = frame
+  if (constraint.kind !== "plane") return hits
+  const stops = hits.filter(isStop)
+  const nearest = stops.toSorted((a, b) => a.distance - b.distance)
+  const one = nearest[0]
+  const other = one === undefined ? undefined : nearest.find((stop) => crossing(one, stop))
+  const [a, b] = stops.filter((stop) => stop === one || stop === other)
+  if (a === undefined || b === undefined) return hits
+  const { rotation: _none, ...first } = a
+  const landing = vecAdd(a.base.start, moveOnto(constraint.normal, a, b))
+  return [...hits.filter((hit) => !isStop(hit)), {
+    ...first,
+    distance: Math.hypot(a.distance, b.distance),
+    landing,
+    label: labelOfBoth(a, b),
+    marks: [...a.marks, ...b.marks],
+    held: { shape: "point", at: landing },
+    parts: [a, b]
+  }]
 }
 
 /** What an end meeting `other` says: refused under Strict, and a chip's words under Warn. */
