@@ -43,9 +43,16 @@ describe("alignmentHit", () => {
     assert.deepInclude(hit?.marks[0], { kind: "guide", text: "800 cm" })
   })
 
-  it("names the side of the selection that lined up", () => {
-    const near = alignmentHit(frame({ x: 396, y: 0, z: 0 }, [item("a", { x: 300, y: 900, z: 0 })]))
-    const far = alignmentHit(frame({ x: 204, y: 0, z: 0 }, [item("a", { x: 300, y: 900, z: 0 })]))
+  it("names the sides that lined up, the neighbour's too when it isn't the selection's own", () => {
+    const a = item("a", { x: 300, y: 900, z: 0 })
+    const nearToFar = alignmentHit(frame({ x: 396, y: 0, z: 0 }, [a]))
+    const farToNear = alignmentHit(frame({ x: 204, y: 0, z: 0 }, [a]))
+    assert.strictEqual(nearToFar[0]?.label, "Near side level with far side of Cube a on X")
+    assert.strictEqual(farToNear[0]?.label, "Far side level with near side of Cube a on X")
+    // a wider neighbour: the same side, and no centre to say it for them
+    const wide = { ...a, box: boxAt({ x: 300, y: 900, z: 0 }, 150) }
+    const near = alignmentHit(frame({ x: 204, y: 0, z: 0 }, [wide]))
+    const far = alignmentHit(frame({ x: 396, y: 0, z: 0 }, [wide]))
     assert.strictEqual(near[0]?.label, "Near side level with Cube a on X")
     assert.strictEqual(far[0]?.label, "Far side level with Cube a on X")
   })

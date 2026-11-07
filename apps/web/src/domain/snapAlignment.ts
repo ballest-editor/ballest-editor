@@ -64,14 +64,23 @@ type Feature = (typeof FEATURES)[number]
 /** A box's features in words, along the axis as the stations' "Near face" and "Far face" are. */
 const FEATURE_WORDS = { min: "Near side", centre: "Centre", max: "Far side" } as const
 
+/** The neighbour's side when it isn't the selection's own: "Near side level with far side of Track L". */
+const THEIR_WORDS = { min: "near side of", max: "far side of" } as const
+
+/** What lined up, short of the axis: both sides when they differ, as near-to-near and near-to-far are both a stop. */
+const levelWords = (mine: Feature, their: Feature, name: string): string =>
+  mine === their || mine === "centre" || their === "centre"
+    ? `${FEATURE_WORDS[mine]} level with ${name}`
+    : `${FEATURE_WORDS[mine]} level with ${THEIR_WORDS[their]} ${name}`
+
 interface Match {
   /** What to add along the axis, in cm. */
   readonly by: number
   readonly marks: ReadonlyArray<SnapMark>
   /** What it says, short of the axis a plane is on. */
   readonly words: string
-  /** The item and feature a plane lines up: what two axes share to read as one. A gap has none. */
-  readonly level?: { readonly key: string; readonly feature: Feature }
+  /** The item and features a plane lines up: what two axes share to read as one. A gap has none. */
+  readonly level?: { readonly key: string; readonly feature: Feature; readonly their: Feature }
 }
 
 /** Closer than this, in cm, two matches are the same distance away: what's left is rounding, and differs by the frame. */
@@ -108,8 +117,8 @@ const planeMatches = (axis: Vec3, moved: Box, neighbours: ReadonlyArray<SnapItem
         const landed = movedBox(moved, vecScale(axis, by))
         return [{
           by,
-          words: `${FEATURE_WORDS[mine]} level with ${item.name}`,
-          level: { key: item.key, feature: mine },
+          words: levelWords(mine, their, item.name),
+          level: { key: item.key, feature: mine, their },
           marks: [guideBetween(landed, item.box, separation(landed, item.box))]
         }]
       })
@@ -182,7 +191,7 @@ interface AxisHit {
 }
 
 const sameLevel = ({ match: { level: a } }: AxisHit, { match: { level: b } }: AxisHit): boolean =>
-  a !== undefined && a.key === b?.key && a.feature === b.feature
+  a !== undefined && a.key === b?.key && a.feature === b.feature && a.their === b.their
 
 /** Two axes in one label, in the game's order whichever way the plane's axes came out. */
 const jointLabel = (hits: ReadonlyArray<AxisHit>): string => {
