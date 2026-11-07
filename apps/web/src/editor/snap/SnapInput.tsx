@@ -15,7 +15,7 @@ import { sceneRegistry } from "../sceneRegistry"
 import { fitTransforms, type PickerRequest, snapConfigOf, useEditor } from "../store"
 import { type DragKeyState, handleDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
 import { dragKeysOf, endSnapDisplay, flipOfferOf, MoveSession, previewMove } from "./moveSession"
-import { hitUnder, pickedOf } from "./pickTarget"
+import { anchorUnder, hitUnder, pickedOf } from "./pickTarget"
 import { dragTargetOf, selectionSnapStart } from "./selectionStart"
 import { snapMarks } from "./snapMarks"
 import { gameRayOf, toGame } from "./snapView"
@@ -165,11 +165,8 @@ export function SnapInput() {
       hoverTimer = setTimeout(() => {
         const now = useEditor.getState()
         const { pane, px } = panePointer(el, at)
-        const hit = hitUnder(now, pane, px, "anchor", new Set(drag === null ? [] : drag.startTransforms.keys()))
-        // a point to go through, not a face, which is only ever under the pointer
-        if (hit?.rank === 0) {
-          now.acquireTracked({ at: hit.landing, label: hit.label }, hit.item)
-        }
+        const hit = anchorUnder(now, pane, px, new Set(drag === null ? [] : drag.startTransforms.keys()))
+        if (hit !== undefined) now.acquireTracked({ at: hit.landing, label: hit.label }, hit.item)
       }, hoverMs)
     }
 

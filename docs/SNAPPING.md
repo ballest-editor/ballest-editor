@@ -38,7 +38,7 @@ Closest is what makes dropping a piece against another feel right without first 
 
 With the Connectors target on, a piece that has ends uses its nearest end as the base for a move whatever the base setting says. Joining end to end is the point of a piece with ends, and the pivot keeps its meaning for rotation and scale.
 
-Under a handle or a lock the pivot and the selection's stations land too, whatever the setting says: its near face, centre and far face along each axis of the move, from its bounds. The one whose match is nearest is the one meant, as under Closest, and the status bar names it. They only land on targets: the grid and the drawn dot stay with what the setting names.
+Under a handle or a lock the pivot and the selection's stations land too, whatever the setting says: its near face, centre and far face along each axis of the move, from its bounds. The one whose match is nearest is the one meant, as under Closest, and the status bar names it. They only land on targets: the grid and the drawn dot stay with what the setting names. The pivot stops at a Mesh station only when it sits on one of the selection's own (§ Under a constrained move).
 
 ### Snap targets
 
@@ -93,7 +93,9 @@ A move along a handle or a lock wants the places that matter along that axis, no
 
 A flat face counts when it is at least 0.25% of the mesh's surface. Below that it is a facet of something curved: a bent tube has 802 flat faces, and its two caps are the only ones that pass. A piece that is curved all the way round, a sphere, has no stations, and Alignment is what lines it up. Bounds stand in here as they do elsewhere: until its mesh has loaded, a piece offers the faces of its box, their middle and their centres, under the bounds toggles.
 
-With the selection's own stations (§ Snap base), moving a piece along X into another offers its near face on their near face, centre on centre and far face on far face, and the cross combinations. Nothing hides a station, as it isn't something the pointer picks by sight: a piece moved inside another still stops on its faces. On a plane handle a station stops one axis at a time.
+The selection's own stations (§ Snap base) pair like with like, as Alignment does. A near or far face stops on a face: near on near and far on far lie flush inside, near on far and far on near touch outside. The centre stops on the middle and on no face. With Face centres off, a Track S moved along X through a Track L stops five times: touching, flush, centred, flush, touching. A face centre is a point and every base stops on it, so with them on a piece in line with another also stops with its centre on each cap.
+
+Nothing hides a station, as it isn't something the pointer picks by sight: a piece moved inside another still stops on its faces. On a plane handle a station stops one axis at a time, and a face of the selection only stops along the axis it is a face of.
 
 #### Construction
 
@@ -103,9 +105,9 @@ They snap like geometry: the base lands on the plane or the axis, and an axis cr
 
 #### Tracking
 
-The CAD answer to "alignment guides, in 3D". Hovering a vertex, corner, face centre or connector end for a moment acquires it: a small plus mark appears on it, and it stays acquired until a few more are acquired after it (the default keeps 6) or the user clears them (Escape with nothing being dragged, or a button in the popover). An acquired point belongs to its piece: it goes with the piece through a move, a turn, a mirror, an undo or a re-import from the game, and goes away when the piece is deleted or another map takes its place. During a drag it stays where the document has it until the drag lands.
+The CAD answer to "alignment guides, in 3D". Hovering a vertex, corner, face centre or connector end for a moment acquires it: a small plus mark appears on it, and it stays acquired until a few more are acquired after it (the default keeps 6) or the user clears them (Escape with nothing being dragged, or a button in the popover). An acquired point belongs to its piece: it goes with the piece through a move, a turn, a mirror, an undo or a re-import from the game, and goes away when the piece is deleted or another map takes its place. During a drag it stays where the document has it until the drag lands. Nothing is acquired on the selection, and a point on what a drag moves isn't a target for that drag: the piece would only be in line with itself.
 
-While dragging, lines through each acquired point along the world's X, Y and Z axes (or the grid's, when the grid is rotated) are targets: the base stops on one as it crosses it, and appears on it with the line drawn. Where two lines cross, the crossing is a point target. Near an acquired point on the pane's view direction, the line along that direction is offered too, which is how an ortho pane puts something straight above a point.
+While dragging, lines through each acquired point along the world's X, Y and Z axes (or the grid's, when the grid is rotated) are targets: the base stops on one as it crosses it, and appears on it with the line drawn. Where two lines cross, the crossing is a point target. Near an acquired point on the pane's view direction, the line along that direction is offered too, which is how an ortho pane puts something straight above a point. Under a line, a tracking line along the move is left out, as one through a point on the move's own line would be met all the way along it.
 
 This is how a piece is put level with one touched 40 m back, or directly above a landing, without the editor searching the whole map for things that line up.
 
@@ -167,12 +169,14 @@ Snapping measures a drag on the items that take it as the gizmo shows it (`leadi
 Every target but the Grid is a place to get to, and the Grid is a rounding of every position, so it goes on as § Priority says.
 
 - **A line, edge or plane** is reached when the move crosses it, or comes within a pixel of it. Then the selection slides along it.
-- **A point** can't be expected to be crossed exactly in two dimensions, so it is reached when the move passes it within a third of the threshold: the selection moves sideways by at most that, never forwards. On a line the move can only go through it. A point on a line or edge the selection is sliding along is met by the selection, however far off to the side the pointer is.
+- **A point** can't be expected to be crossed exactly in two dimensions, so it is reached when the move passes it within a third of the threshold: the selection moves sideways by at most that, never forwards. A connector end takes its whole Range, since the join turns the piece anyway. On a line the move can only go through it. A point on a line or edge the selection is sliding along is met by the selection, however far off to the side the pointer is.
 - **A face under the pointer** needs no reaching: the selection is on it the moment the pointer is, with nothing to jump across on screen. A handle or a lock doesn't take one: its faces are stations, which are planes.
 
 A drag only arrives at what it was coming up to. It doesn't catch on a target it started on or turned back from, and a sample that goes past a target by more than the threshold has gone through it, which is how a fast move ignores what it passes. A lock starts afresh, as what the pointer means has changed.
 
 A hover or a click has nowhere to come from, so the target picker and a drop from the palette (§ Placement from the palette) take what's within the threshold.
+
+A body drag in an orthographic pane keeps its depth, as a rise along the view wouldn't show. A point, an edge, a line or a face seen edge-on sets the two values across the view, and the base keeps its own along it. A face within 5° of looking straight at the pane isn't offered. A sloped face still sets the height, and a connector end still joins where it is, as a join is the two ends meeting. A pick and a drop have no depth of their own, so they take what they point at.
 
 ### Modifiers
 

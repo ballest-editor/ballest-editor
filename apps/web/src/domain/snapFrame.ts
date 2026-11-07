@@ -46,6 +46,9 @@ export type Constraint =
   | { readonly kind: "plane"; readonly normal: Vec3 }
   | { readonly kind: "surface"; readonly normal: Vec3 }
 
+/** What a base is of the selection along a hard constraint: a face along one of the move's axes, or its centre. */
+export type BaseStop = { readonly kind: "face"; readonly axis: Vec3 } | { readonly kind: "centre" }
+
 /** A point of the selection that can land on a target. */
 export interface BasePoint {
   /** Where it is at the drag's start. */
@@ -56,6 +59,8 @@ export interface BasePoint {
   readonly end?: WorldEnd
   /** Only lands on targets under a hard constraint: the grid and the drawn base stay with what the Base setting names. */
   readonly station?: boolean
+  /** What pairs it with a Mesh station, like with like. Without one it stops at none, though the rest still take it. */
+  readonly stop?: BaseStop
 }
 
 /** What a target is, for sliding along it, and for telling when a drag gets to it. */

@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { boxAt, cubeAt, meshOfBox, topView } from "../test/snapFixtures"
+import { boxAt, cubeAt, endAlongX, meshOfBox, topView } from "../test/snapFixtures"
 import type { Vec3 } from "./coords"
 import { defaultSnapConfig, type SnapConfig, type SnapTarget, withPreset, withTargetMoved } from "./snapConfig"
 import type { BasePoint, SnapFrame, SnapHit, TrackedPoint } from "./snapFrame"
@@ -41,6 +41,9 @@ const wall = (name: string, x: number) => ({
 })
 
 const pivotBase: BasePoint = { start: ORIGIN, label: "Pivot" }
+
+/** A base that stops on faces across X, as a selection's near or far face does. */
+const faceBase: BasePoint = { ...pivotBase, stop: { kind: "face", axis: { x: 1, y: 0, z: 0 } } }
 
 const frameOf = (offset: Vec3, extra: Partial<SnapFrame> = {}): SnapFrame => ({
   config: on(defaultSnapConfig, "grid", "mesh"),
@@ -166,6 +169,7 @@ describe("resolveSnap", () => {
       frameOf({ x: 150, y: 0, z: 0 }, {
         config,
         items,
+        bases: [faceBase],
         constraint: { kind: "line", direction: { x: 1, y: 0, z: 0 } },
         slip: { x: 0, y: 250 }
       })
@@ -181,7 +185,8 @@ describe("resolveSnap", () => {
       return [cubeAt("a", ORIGIN, { box, mesh: () => meshOfBox(box) })]
     }
     const inside = { x: 150, y: 0, z: 0 }
-    const reachedFrom = (from: number) => resolveSnap(frameOf(inside, { config, items: slab(from), constraint: line }))
+    const reachedFrom = (from: number) =>
+      resolveSnap(frameOf(inside, { config, bases: [faceBase], items: slab(from), constraint: line }))
     assert.isUndefined(reachedFrom(-900))
     assert.deepStrictEqual(reachedFrom(155)?.landing, { x: 155, y: 0, z: 0 })
   })
@@ -284,9 +289,12 @@ describe("the Mesh target under a move's constraint", () => {
   const at = { x: 300, y: 0, z: 0 }
   const meshed = cubeAt("a", at, { mesh: () => meshOfBox(boxAt(at)) })
   const unloaded = cubeAt("a", at)
+  /** The bases of a selection with no size, whose faces and centre are one point: it stops at all a station offers. */
+  const noSize = (constraint: SnapFrame["constraint"]) =>
+    selectionBases(config, { pivot: ORIGIN, box: { min: ORIGIN, max: ORIGIN }, ends: [] }, constraint)
   /** What the item offers a base in its middle, in a pane where the whole cube is in range. */
-  const offered = (item: typeof meshed, constraint: SnapFrame["constraint"]) =>
-    meshHits(frameOf(at, { config, view: topView(10), items: [item], constraint }))
+  const offered = (item: typeof meshed, constraint: SnapFrame["constraint"], bases = noSize(constraint)) =>
+    meshHits(frameOf(at, { config, view: topView(10), items: [item], bases, constraint }))
   const labels = (hits: ReadonlyArray<{ readonly label: string }>) =>
     [...new Set(hits.map(({ label }) => label))].sort()
   const planes = (hits: ReadonlyArray<SnapHit>) => hits.flatMap(({ held }) => held.shape === "plane" ? [held] : [])
@@ -301,7 +309,7 @@ describe("the Mesh target under a move's constraint", () => {
       origin: { x: 250, y: 0, z: 0 },
       normal: { x: -1, y: 0, z: 0 }
     })
-    assert.lengthOf(hits.filter(({ rank }) => rank === 0), 6)
+    assert.lengthOf(hits.filter(({ base, rank }) => rank === 0 && base.label === "Pivot"), 6)
   })
 
   it("offers vertices, edges and midpoints to a surface drag, and no stations", () => {
@@ -311,11 +319,13 @@ describe("the Mesh target under a move's constraint", () => {
   })
 
   it("offers the faces along both of a plane's axes, and leaves the other value alone", () => {
-    const hits = planes(offered(meshed, plane))
+    const sized = selectionBases(config, { pivot: ORIGIN, box: boxAt(ORIGIN, 1), ends: [] }, plane)
+    const hits = planes(offered(meshed, plane, sized))
     const normals = hits.map(({ normal }) => [Math.abs(normal.x), Math.abs(normal.y), Math.abs(normal.z)].join())
     assert.deepStrictEqual([...new Set(normals)].sort(), ["0,1,0", "1,0,0"])
     const free = { x: 345, y: 20, z: 0 }
-    const landing = resolveSnap(frameOf(free, { config, items: [meshed], constraint: plane }))?.landing
+    const landing = resolveSnap(frameOf(free, { config, bases: [faceBase], items: [meshed], constraint: plane }))
+      ?.landing
     assert.deepStrictEqual(landing, { x: 350, y: 20, z: 0 })
   })
 
@@ -328,7 +338,13 @@ describe("the Mesh target under a move's constraint", () => {
     })
     const hit = (n: Vec3) =>
       meshHits(
-        frameOf(at, { config, items: [{ ...meshed, mesh: () => tilted(n) }], view: topView(10), constraint: line })
+        frameOf(at, {
+          config,
+          bases: [faceBase],
+          items: [{ ...meshed, mesh: () => tilted(n) }],
+          view: topView(10),
+          constraint: line
+        })
       )
         .find(({ label }) => label === "Face of Cube")
     assert.closeTo(hit(normal)?.landing.x ?? 0, 340 + 100 * Math.tan(turn), 1e-6)
@@ -338,14 +354,21 @@ describe("the Mesh target under a move's constraint", () => {
   it("keeps a face's Offset, and leaves it off the middle", () => {
     const mesh = { ...config.targets.mesh, offset: 7 }
     const offset = { ...config, targets: { ...config.targets, mesh } }
-    const hits = meshHits(frameOf(at, { config: offset, view: topView(10), items: [meshed], constraint: line }))
+    const bases = noSize(line)
+    const hits = meshHits(frameOf(at, { config: offset, view: topView(10), items: [meshed], bases, constraint: line }))
     const stops = hits.filter(({ rank }) => rank === 2).map(({ landing }) => landing.x).toSorted((a, b) => a - b)
     assert.deepStrictEqual(stops, [243, 300, 357])
   })
 
   it("stops at a station something hides, as the move doesn't look at it", () => {
     const hit = resolveSnap(
-      frameOf({ x: 345, y: 0, z: 0 }, { config, items: [meshed], constraint: line, occluded: () => true })
+      frameOf({ x: 345, y: 0, z: 0 }, {
+        config,
+        bases: [faceBase],
+        items: [meshed],
+        constraint: line,
+        occluded: () => true
+      })
     )
     assert.deepStrictEqual(hit?.landing, { x: 350, y: 0, z: 0 })
   })
@@ -369,45 +392,83 @@ describe("the Mesh target under a move's constraint", () => {
       targets: { ...config.targets, mesh: { ...config.targets.mesh, elements: { ...elements, ...off } } }
     })
     const hitsOf = (item: typeof meshed, off: Partial<typeof elements>) =>
-      labels(meshHits(frameOf(at, { config: without(off), view: topView(10), items: [item], constraint: line })))
+      labels(meshHits(frameOf(at, {
+        config: without(off),
+        view: topView(10),
+        items: [item],
+        bases: noSize(line),
+        constraint: line
+      })))
     assert.deepStrictEqual(hitsOf(meshed, { faces: false }), ["Centre of a face of Cube"])
     assert.deepStrictEqual(hitsOf(meshed, { faceCentres: false }), ["Face of Cube", "Middle of Cube"])
     assert.deepStrictEqual(hitsOf(unloaded, { boundsFaces: false }), ["Centre of a face of Cube"])
     assert.deepStrictEqual(hitsOf(unloaded, { boundsFaceCentres: false }), ["Face of Cube", "Middle of Cube"])
   })
 
-  it("lands start on start, centre on centre and end on end, moving a 500 cm piece into a 1000 cm one", () => {
+  describe("moving a 500 cm piece through a 1000 cm one", () => {
     const box = { min: { x: -250, y: -50, z: -50 }, max: { x: 250, y: 50, z: 50 } }
     const long = { min: { x: 1500, y: -50, z: -50 }, max: { x: 2500, y: 50, z: 50 } }
-    const { mesh } = config.targets
-    const centred = {
-      ...config,
-      base: "centre" as const,
-      targets: { ...config.targets, mesh: { ...mesh, elements: { ...mesh.elements, faceCentres: false } } }
-    }
-    const bases = selectionBases(centred, { pivot: { x: 0, y: 0, z: -50 }, box, ends: [] }, line)
     const items = [cubeAt("a", ORIGIN, { box: long, mesh: () => meshOfBox(long) })]
-    let from: Vec3 = ORIGIN
-    let current: ReturnType<typeof resolveDrag>
-    const stops = new Map<number, string>()
-    for (let x = 1200; x < 2800; x += 4) {
-      const offset = { x, y: 0, z: 0 }
-      current = resolveDrag(frameOf(offset, { config: centred, box, bases, items, constraint: line }), {
-        from,
-        current
-      })
-      from = offset
-      if (current !== undefined) stops.set(moveOf(current).offset.x, current.base.label)
+    const noCentres = (from: SnapConfig): SnapConfig => {
+      const { mesh } = from.targets
+      return {
+        ...from,
+        targets: { ...from.targets, mesh: { ...mesh, elements: { ...mesh.elements, faceCentres: false } } }
+      }
     }
-    assert.deepStrictEqual([...stops], [
-      [1250, "Far face"],
-      [1500, "Centre"],
-      [1750, "Near face"],
-      [2000, "Centre"],
-      [2250, "Far face"],
-      [2500, "Centre"],
-      [2750, "Near face"]
-    ])
+    /** Where the move stops along a locked X, with the base that stopped it. */
+    const stopsOf = (over: SnapConfig, bases: ReadonlyArray<BasePoint>) => {
+      let from: Vec3 = ORIGIN
+      let current: ReturnType<typeof resolveDrag>
+      const stops = new Map<number, string>()
+      for (let x = 1200; x < 2800; x += 4) {
+        const offset = { x, y: 0, z: 0 }
+        current = resolveDrag(frameOf(offset, { config: over, box, bases, items, constraint: line }), { from, current })
+        from = offset
+        if (current !== undefined) stops.set(moveOf(current).offset.x, current.base.label)
+      }
+      return [...stops]
+    }
+
+    it("touches, lies flush, centres, lies flush and touches", () => {
+      const centred = { ...noCentres(config), base: "centre" as const }
+      const bases = selectionBases(centred, { pivot: { x: 0, y: 0, z: -50 }, box, ends: [] }, line)
+      assert.deepStrictEqual(stopsOf(centred, bases), [
+        [1250, "Far face"],
+        [1750, "Near face"],
+        [2000, "Centre"],
+        [2250, "Far face"],
+        [2750, "Near face"]
+      ])
+    })
+
+    it("stops the same five times when it moves by its ends", () => {
+      const withEnds = noCentres(on(defaultSnapConfig, "mesh", "connectors"))
+      const onTop = (x: number, facing: 1 | -1) => ({ ...endAlongX("own", 0, x, facing), position: { x, y: 0, z: 50 } })
+      const ends = [onTop(250, 1), onTop(-250, -1)]
+      const bases = selectionBases(withEnds, { pivot: { x: 0, y: 0, z: -50 }, box, ends }, line)
+      assert.deepStrictEqual(stopsOf(withEnds, bases).map(([x]) => x), [1250, 1750, 2000, 2250, 2750])
+    })
+
+    it("doesn't stop the centre on a face, or a face on the middle", () => {
+      const centre: BasePoint = { ...pivotBase, stop: { kind: "centre" } }
+      assert.deepStrictEqual(stopsOf(noCentres(config), [centre]), [[2000, "Pivot"]])
+      assert.deepStrictEqual(stopsOf(noCentres(config), [faceBase]).map(([x]) => x), [1500, 2500])
+    })
+
+    it("doesn't stop the pivot at all", () => {
+      assert.deepStrictEqual(stopsOf(noCentres(config), [pivotBase]), [])
+    })
+
+    it("stops a face on a plane handle only along the axis it's a face of", () => {
+      const across = { x: 0, y: 1, z: 0 }
+      const near: BasePoint = { ...pivotBase, stop: { kind: "face", axis: across } }
+      const free = { x: 1503, y: 0, z: 0 }
+      const onPlane = (bases: ReadonlyArray<BasePoint>) =>
+        resolveSnap(frameOf(free, { config: noCentres(config), bases, items, constraint: plane }))?.landing.x
+      assert.isUndefined(onPlane([near]))
+      assert.strictEqual(onPlane([faceBase]), 1500)
+    })
   })
 
   it("leaves the grid with the base the setting names, however near a station is", () => {
@@ -436,11 +497,11 @@ describe("resolveDrag", () => {
   const only = (...targets: ReadonlyArray<SnapTarget>) => on(defaultSnapConfig, ...targets)
 
   /** The hits of a drag through `xs` along X. */
-  const dragAlong = (xs: ReadonlyArray<number>, extra: Partial<SnapFrame>) => {
-    let from: Vec3 = ORIGIN
+  const dragAlong = (xs: ReadonlyArray<number>, extra: Partial<SnapFrame>, y = 0) => {
+    let from: Vec3 = { x: 0, y, z: 0 }
     let current: ReturnType<typeof resolveDrag>
     return xs.map((x) => {
-      const offset = { x, y: 0, z: 0 }
+      const offset = { x, y, z: 0 }
       current = resolveDrag(frameOf(offset, extra), { from, current })
       from = offset
       return current
@@ -450,7 +511,8 @@ describe("resolveDrag", () => {
   it("takes a face under the base at once, as it has nothing to jump across", () => {
     const surfaceAt = () => ({ point: { x: 300, y: 300, z: 20 }, normal: { x: 0, y: 0, z: 1 }, item: "a", corners: [] })
     const config = only("mesh")
-    const hit = resolveDrag(frameOf({ x: 300, y: 300, z: 0 }, { config, surfaceAt }), {
+    const view = topView(1, { orthographic: false })
+    const hit = resolveDrag(frameOf({ x: 300, y: 300, z: 0 }, { config, view, surfaceAt }), {
       from: ORIGIN,
       current: undefined
     })
@@ -460,7 +522,12 @@ describe("resolveDrag", () => {
   it("stops a locked move at a face in reach only once the move gets there", () => {
     const box = { min: { x: 155, y: -50, z: -50 }, max: { x: 1000, y: 50, z: 50 } }
     const items = [cubeAt("a", ORIGIN, { box, mesh: () => meshOfBox(box) })]
-    const hits = dragAlong([100, 150, 154, 156, 164, 168], { config: only("mesh"), items, constraint: line })
+    const hits = dragAlong([100, 150, 154, 156, 164, 168], {
+      config: only("mesh"),
+      bases: [faceBase],
+      items,
+      constraint: line
+    })
     assert.deepStrictEqual(hits.map((hit) => hit?.landing.x), [undefined, undefined, 155, 155, 155, undefined])
   })
 
@@ -478,6 +545,43 @@ describe("resolveDrag", () => {
     const hits = dragAlong([195, 201, 203, 207], { config, tracked, measurements: measured(206) })
     assert.deepStrictEqual(hits.map((hit) => hit?.landing.x), [undefined, 200, 200, 206])
     assert.strictEqual(hits[3]?.target, "construction")
+  })
+
+  it("drops a tracking line along a locked move, and keeps the lines across it", () => {
+    const config = only("tracking")
+    const tracked = [{ at: { x: 500, y: 0, z: 0 }, label: "End of Track L" }]
+    const hits = dragAlong([100, 200, 300, 495, 503], { config, tracked, constraint: line })
+    assert.deepStrictEqual(hits.map((hit) => hit?.landing.x), [undefined, undefined, undefined, undefined, 500])
+    const turn = 0.5 * Math.PI / 180
+    const nearly = { kind: "line", direction: { x: Math.cos(turn), y: Math.sin(turn), z: 0 } } as const
+    const offset = { x: 300 * nearly.direction.x, y: 300 * nearly.direction.y, z: 0 }
+    assert.isUndefined(
+      resolveDrag(frameOf(offset, { config, tracked, constraint: nearly }), { from: ORIGIN, current: undefined }),
+      "half a degree off is along it"
+    )
+  })
+
+  it("keeps tracking lines along the plane of a plane lock", () => {
+    const config = only("tracking")
+    const tracked = [{ at: { x: 500, y: 0, z: 0 }, label: "End of Track L" }]
+    const constraint = { kind: "plane", normal: { x: 0, y: 0, z: 1 } } as const
+    const hit = resolveDrag(frameOf({ x: 300, y: 1, z: 0 }, { config, tracked, constraint }), {
+      from: { x: 300, y: -6, z: 0 },
+      current: undefined
+    })
+    assert.strictEqual(hit?.label, "In line with End of Track L")
+  })
+
+  it("reaches an end the path passes anywhere in its range, and a vertex only within a third", () => {
+    const end = endAlongX("a", 0, 300, -1)
+    const own: BasePoint = { start: ORIGIN, label: "End", end: endAlongX("own", 0, 0, 1) }
+    const mesh = () => ({ vertices: [end.position], edges: [], faceCentres: [], faces: [] })
+    const items = [cubeAt("a", end.position, { ends: [end], mesh, bounds: undefined })]
+    const path = [280, 296, 304]
+    const passing = (config: SnapConfig, y: number) => dragAlong(path, { config, bases: [own], items }, y)[2]?.landing
+    assert.deepStrictEqual(passing(only("connectors"), 8), end.position)
+    assert.isUndefined(passing(only("mesh"), 8))
+    assert.deepStrictEqual(passing(only("mesh"), 3), end.position)
   })
 
   it("takes a point on the edge it's sliding along", () => {
@@ -523,5 +627,84 @@ describe("resolveDrag", () => {
     const hits = dragAlong([195], { config, construction: [wall("Wall", 300)] })
     assert.strictEqual(hits[0]?.target, "grid")
     assert.strictEqual(hits[0]?.landing.x, 200)
+  })
+})
+
+describe("a body drag in an orthographic pane", () => {
+  const config = on(defaultSnapConfig, "mesh")
+  const high = { x: 300, y: 0, z: 100 }
+  const own: BasePoint = { start: { x: 0, y: 0, z: 40 }, label: "Pivot" }
+  const mesh = () => ({ vertices: [high], edges: [], faceCentres: [], faces: [] })
+  const items = [cubeAt("a", high, { mesh, bounds: undefined })]
+  const facing = (normal: Vec3) => () => ({ point: high, normal, item: "a", corners: [] })
+  const path = { from: { x: 299, y: 0, z: 0 }, current: undefined }
+  const atVertex = { x: 300, y: 0, z: 0 }
+
+  it("takes the two values across the view from a point, and keeps the base's depth", () => {
+    const frame = frameOf(atVertex, { config, items, bases: [own] })
+    const hit = resolveDrag(frame, path)
+    assert.deepStrictEqual(hit?.landing, { x: 300, y: 0, z: 40 })
+    assert.deepStrictEqual(hit === undefined ? undefined : resolveSnap(frame, hit)?.landing, hit?.landing, "held")
+  })
+
+  it("keeps the depth on an edge and on a tracking line", () => {
+    const edge = [{ x: 300, y: -500, z: 100 }, { x: 300, y: 500, z: 100 }] as const
+    const onEdge = [cubeAt("a", high, {
+      box: boxAt(high, 600),
+      bounds: undefined,
+      mesh: () => ({ vertices: [], edges: [edge], faceCentres: [], faces: [] })
+    })]
+    assert.strictEqual(
+      resolveDrag(frameOf({ x: 303, y: 20, z: 0 }, { config, items: onEdge, bases: [own] }), {
+        from: { x: 297, y: 20, z: 0 },
+        current: undefined
+      })?.landing.z,
+      40
+    )
+    const tracked = [{ at: { x: 300, y: 900, z: 100 }, label: "Corner of Kicker" }]
+    assert.strictEqual(
+      resolveDrag(frameOf({ x: 303, y: 20, z: 0 }, { config: on(config, "tracking"), tracked, bases: [own] }), {
+        from: { x: 297, y: 20, z: 0 },
+        current: undefined
+      })?.landing.z,
+      40
+    )
+  })
+
+  it("doesn't offer a face looking at the pane, and offers it in perspective", () => {
+    const up = facing({ x: 0, y: 0, z: 1 })
+    const nearly = facing({ x: Math.sin(0.05), y: 0, z: Math.cos(0.05) })
+    assert.isUndefined(resolveDrag(frameOf(atVertex, { config, surfaceAt: up }), path))
+    assert.isUndefined(resolveDrag(frameOf(atVertex, { config, surfaceAt: nearly }), path))
+    const view = topView(1, { orthographic: false })
+    assert.deepStrictEqual(resolveDrag(frameOf(atVertex, { config, view, surfaceAt: up }), path)?.landing, high)
+  })
+
+  it("slides along a face seen edge-on, at the base's own depth", () => {
+    const surfaceAt = facing({ x: 1, y: 0, z: 0 })
+    const hit = resolveDrag(frameOf(atVertex, { config, surfaceAt, bases: [own] }), path)
+    assert.deepStrictEqual(hit?.landing, { x: 300, y: 0, z: 40 })
+  })
+
+  it("lands on a sloped face at its height, as the slope is what's meant", () => {
+    const surfaceAt = facing({ x: Math.SQRT1_2, y: 0, z: Math.SQRT1_2 })
+    assert.deepStrictEqual(resolveDrag(frameOf(atVertex, { config, surfaceAt, bases: [own] }), path)?.landing, high)
+  })
+
+  it("joins an end at its height, as a join is the ends meeting", () => {
+    const end = { ...endAlongX("a", 0, 300, -1), position: high }
+    const joining: BasePoint = { ...own, end: endAlongX("own", 0, 0, 1) }
+    const frame = frameOf(atVertex, {
+      config: on(defaultSnapConfig, "connectors"),
+      items: [cubeAt("a", high, { ends: [end] })],
+      bases: [joining]
+    })
+    assert.deepStrictEqual(resolveDrag(frame, path)?.landing, high)
+  })
+
+  it("leaves a pick and a drop what they point at, as they have no depth of their own", () => {
+    assert.deepStrictEqual(resolveSnap(frameOf(atVertex, { config, items, bases: [own] }))?.landing, high)
+    const surfaceAt = facing({ x: 0, y: 0, z: 1 })
+    assert.deepStrictEqual(resolveSnap(frameOf(atVertex, { config, surfaceAt, bases: [own] }))?.landing, high)
   })
 })

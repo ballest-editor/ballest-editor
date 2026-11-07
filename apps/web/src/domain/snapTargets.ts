@@ -334,6 +334,8 @@ interface Station {
   readonly label: string
   readonly marks: ReadonlyArray<SnapMark>
   readonly rotation?: Quat4 | undefined
+  /** It is the plane between two faces, and no face itself. */
+  readonly middle?: boolean
 }
 
 /** A face and the way the move crosses it. */
@@ -357,7 +359,8 @@ const middlesOf = (item: SnapItem, faces: ReadonlyArray<FaceAcross>): ReadonlyAr
       normal: along,
       along,
       label: `Middle of ${item.name}`,
-      marks: [{ kind: "guide", from: near.centre, to: far.centre }]
+      marks: [{ kind: "guide", from: near.centre, to: far.centre }],
+      middle: true
     }]
   })
 }
@@ -389,6 +392,12 @@ const stationsOf = (frame: SnapFrame, item: SnapItem) => {
     : []
   return { centres, stations: [...stations, ...middlesOf(item, across)] }
 }
+
+/** Like with like, as in `snapAlignment`: a centre stops on a middle, and a face on a face along the axis it's a face of. */
+const pairs = ({ stop }: BasePoint, { along, middle = false }: Station): boolean =>
+  stop?.kind === "centre"
+    ? middle
+    : stop?.kind === "face" && !middle && Math.abs(vecDot(stop.axis, along)) >= Math.SQRT1_2
 
 /** A base stopping at a station, when the move has it within `range`: it isn't looked at, so nothing can hide it. */
 const stationHit = (
@@ -427,7 +436,9 @@ export const meshHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
     return near.flatMap((item) => {
       const { centres, stations } = stationsOf(frame, item)
       return [
-        ...stations.flatMap((station) => measured.flatMap(({ base }) => stationHit(frame, base, item, station, range))),
+        ...stations.flatMap((station) =>
+          measured.flatMap(({ base }) => pairs(base, station) ? stationHit(frame, base, item, station, range) : [])
+        ),
         ...centres.flatMap((spot) => measured.flatMap((one) => pointHit(frame, "mesh", one, spot, range)))
       ]
     })
@@ -480,17 +491,24 @@ export const connectorHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
 
 const AXIS_NAMES = ["x", "y", "z"] as const
 
+/** How near a tracking line can run to a line the move is held to and say nothing: within a degree. */
+const ALONG_THE_MOVE = Math.cos(Math.PI / 180)
+
 /** Lines through acquired points along the grid's axes, and where they cross. */
 export const trackingHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
   const range = rangeOf(frame.config, "tracking")
   const axes = gridAxes(frame.config)
   const { constraint, tracked } = frame
+  // through a point on the move's own line, such a line is met all the way along it
+  const alongTheMove = (direction: Vec3) =>
+    constraint.kind === "line" && Math.abs(vecDot(direction, constraint.direction)) >= ALONG_THE_MOVE
   return measuredBases(frame).flatMap((one) => {
     const { base, reference } = one
     const ray = frame.view.rayAt(reference)
     const free = freePoint(frame, base)
     const lines = tracked.flatMap((point) =>
       axes.flatMap((direction, i): ReadonlyArray<SnapHit> => {
+        if (alongTheMove(direction)) return []
         const landing = lineNearRay(point.at, direction, ray)
         const shown = landing === undefined ? undefined : frame.view.project(landing)
         if (landing === undefined || shown === undefined) return []
@@ -541,7 +559,7 @@ export const trackingHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
       const direction = frame.view.directionAt(point.at)
       const at = vecAdd(point.at, vecScale(direction, vecDot(vecSub(free, point.at), direction)))
       const shown = frame.view.project(point.at)
-      if (shown === undefined || pixelDistance(shown, reference) > range) return []
+      if (alongTheMove(direction) || shown === undefined || pixelDistance(shown, reference) > range) return []
       return seen(at, `In line with ${point.label}`, [{ kind: "tracking", from: point.at, to: at, axis: "view" }]).map(
         (hit) => ({ ...hit, distance: pixelDistance(shown, reference) })
       )

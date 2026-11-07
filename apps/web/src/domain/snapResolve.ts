@@ -22,10 +22,17 @@ import {
 } from "./snapFrame"
 import { gridLanding, gridSpacingPixels } from "./snapGrid"
 import { connectorHits, constructionHits, meshHits, trackingHits } from "./snapTargets"
-import { vecDot, vecScale, vecSub } from "./ueMath"
+import { vecAdd, vecDot, vecScale, vecSub } from "./ueMath"
 
 /** How many of the nearest points are asked whether something hides them. */
 const OCCLUSION_TRIES = 12
+
+/** How far off the view a plane's normal can be, in degrees, and it still faces the pane, or stands edge-on to it. */
+const VIEW_DEGREES = 5
+
+const FACING_PANE = Math.cos(VIEW_DEGREES * Math.PI / 180)
+
+const EDGE_ON = Math.sin(VIEW_DEGREES * Math.PI / 180)
 
 /** The base the pointer is nearest, of what the Base setting names. */
 export const baseNearPointer = (frame: SnapFrame): BasePoint | undefined => {
@@ -147,16 +154,41 @@ const firstHit = (frame: SnapFrame, takes: Takes): SnapHit | undefined => {
   return base === undefined ? undefined : underConstraint(frame, gridHit(frame, base, 0))
 }
 
+/** Whether a drag moves across an orthographic pane, where what happens along the view doesn't show. */
+const acrossView = ({ constraint, view }: SnapFrame) => constraint.kind === "surface" && view.orthographic
+
+/** How squarely a target faces the pane, from 1 straight on to 0 edge-on: a point, edge or line has no face to show. */
+const facingOf = ({ view }: SnapFrame, { held, landing }: SnapHit) =>
+  held.shape === "plane" ? Math.abs(vecDot(held.normal, view.directionAt(landing))) : 0
+
+/** Whether a drag can land on `hit`: a face looking straight at an orthographic pane would only lift it unseen. */
+const offeredToDrag = (frame: SnapFrame, hit: SnapHit) =>
+  !(acrossView(frame) && hit.target === "mesh" && facingOf(frame, hit) >= FACING_PANE)
+
+/**
+ * `hit` for a drag: across an orthographic pane, a target with nothing to say about depth sets the two values across the
+ * view and the base keeps its own along it. A join is the ends meeting, and a sloped face is a height, so they keep theirs.
+ */
+const keptDepth = (frame: SnapFrame, hit: SnapHit): SnapHit => {
+  if (!acrossView(frame) || hit.target === "connectors" || facingOf(frame, hit) > EDGE_ON) return hit
+  const direction = frame.view.directionAt(hit.landing)
+  const along = vecDot(vecSub(hit.base.start, hit.landing), direction)
+  return { ...hit, landing: vecAdd(hit.landing, vecScale(direction, along)) }
+}
+
 /**
  * What the pointer picks where it is, with everything in range to be had; undefined when it's near nothing. `held` is
- * the target Shift keeps: nothing else takes over while it is given.
+ * the target Shift keeps through a drag: nothing else takes over while it is given.
  */
 export const resolveSnap = (frame: SnapFrame, held?: SnapHit): SnapHit | undefined =>
-  held === undefined ? firstHit(frame, () => true) : stillHeld(frame, held)
+  held === undefined ? firstHit(frame, () => true) : keptDepth(frame, stillHeld(frame, held))
 
 /** What a drag lands on, having come along `path`: what it got to and hasn't left. Undefined when it goes free. */
-export const resolveDrag = (frame: SnapFrame, path: DragPath): SnapHit | undefined =>
-  firstHit(frame, takenBy(frame, path))
+export const resolveDrag = (frame: SnapFrame, path: DragPath): SnapHit | undefined => {
+  const taken = takenBy(frame, path)
+  const hit = firstHit(frame, (one) => offeredToDrag(frame, one) && taken(one))
+  return hit === undefined ? undefined : keptDepth(frame, hit)
+}
 
 /** The move a hit makes of the selection: a turn about its base, if the target asks for one, then the offset. */
 export interface SnappedMove {

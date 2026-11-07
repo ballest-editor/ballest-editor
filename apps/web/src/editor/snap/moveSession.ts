@@ -150,7 +150,7 @@ export class MoveSession {
       box: start.box,
       rotation: start.rotation,
       units: s.settings.general.units,
-      tracked: s.tracked,
+      tracked: s.tracked.filter(({ on }) => on === undefined || !start.keys.has(on.item)),
       construction,
       measurements,
       ...(stepAxes !== undefined && { stepAxes }),

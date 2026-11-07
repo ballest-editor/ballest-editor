@@ -14,6 +14,7 @@ import { PaneCamera } from "../paneCameras"
 import { selectionPivot, shownTransform, useEditor } from "../store"
 import { type DragKeyEvent, handleDragKey, seedDragKeys, syncDragKeys } from "./dragKeys"
 import { dragKeysOf, endSnapDisplay, MoveSession, type MoveStart, previewMove } from "./moveSession"
+import { anchorUnder } from "./pickTarget"
 import { selectionSnapStart } from "./selectionStart"
 import { snapMarks } from "./snapMarks"
 import { snapItemsOf } from "./snapScene"
@@ -110,13 +111,16 @@ const onlyBoundsFaces = (): SnapConfig => {
 }
 
 /** A session moving the first of two items, and the corner of the second it comes up to, along X. */
-const towardsCorner = (config: SnapConfig) => {
+const towardsCorner = (config: SnapConfig, over: Partial<MoveStart> = {}) => {
   const [a = ""] = load(config)
   const [other] = snapItemsOf(useEditor.getState(), new Set([a]), 30)
   const corner = other?.box.min ?? { x: 0, y: 0, z: 0 }
-  const drag = moving(a)
+  const drag = moving(a, ORIGIN, undefined, over)
   return { ...drag, corner, pointPast: (by: number, aside = 0) => drag.pointAt(corner.x + by, corner.y + aside) }
 }
+
+/** A selection with no size: the pivot is its faces and its centre, for a lock to stop on what the pivot comes up to. */
+const noSize = { box: { min: ORIGIN, max: ORIGIN } }
 
 const offsetOf = (delta: GroupDelta | undefined) => delta?.kind === "translate" ? delta.offset : undefined
 
@@ -316,6 +320,41 @@ describe("MoveSession snap-and-go", () => {
     assert.isUndefined(pointAt(230, 150).hit)
   })
 
+  it("leaves out an acquired point on what's moving, and keeps the rest", () => {
+    const config = onlyGrid()
+    const tracking = { ...config.targets.tracking, enabled: true }
+    const [a = "", b = ""] = load({
+      ...config,
+      targets: { ...config.targets, grid: { ...config.targets.grid, enabled: false }, tracking }
+    })
+    const on = (item: string, x: number) => ({
+      at: { x, y: 300, z: 0 },
+      label: "End",
+      on: { item, local: { x, y: 300, z: 0 } }
+    })
+    useEditor.setState({ tracked: [on(a, 200), on(b, 400)] })
+    const { pointAt } = moving(a)
+    pointAt(190, 100)
+    assert.isUndefined(pointAt(205, 100).hit, "the line through the point that moves with it")
+    pointAt(390, 100)
+    assert.closeTo(pointAt(405, 100).hit?.landing.x ?? 0, 400, 1e-6)
+  })
+
+  it("acquires a neighbour's point and none of the selection's", () => {
+    const [a = "", b = ""] = load(null)
+    const pane = topPane()
+    const view = snapViewOf(pane)
+    const endOf = (key: string) =>
+      snapItemsOf(useEditor.getState(), new Set(), 30).find((one) => one.key === key)?.ends[0]
+    const under = (key: string) =>
+      anchorUnder(useEditor.getState(), pane, view.project(endOf(key)?.position ?? ORIGIN) ?? { x: 0, y: 0 }, new Set())
+    useEditor.getState().select([a])
+    assert.isUndefined(under(a))
+    assert.strictEqual(under(b)?.item, b)
+    useEditor.getState().select([])
+    assert.strictEqual(under(a)?.item, a)
+  })
+
   it("lands on the grid on the way up to a target, and on the target once it's there", () => {
     const { corner, pointPast } = towardsCorner(onlyCorners(true))
     const near = pointPast(-7.3)
@@ -355,7 +394,11 @@ describe("MoveSession snap-and-go", () => {
   })
 
   it("starts over when a lock changes what the move can reach", () => {
-    const { session, pointPast } = towardsCorner(onlyBoundsFaces())
+    const config = onlyBoundsFaces()
+    const { mesh } = config.targets
+    const elements = { ...mesh.elements, boundsCorners: true }
+    const withCorners = { ...config, targets: { ...config.targets, mesh: { ...mesh, elements } } }
+    const { session, pointPast } = towardsCorner(withCorners, noSize)
     pointPast(-3)
     assert.isDefined(pointPast(2).hit)
     session.toggleLock({ axis: "x", plane: false })
@@ -367,7 +410,7 @@ describe("MoveSession snap-and-go", () => {
     session.toggleLock({ axis: "x", plane: false })
     pointPast(-3)
     assert.isUndefined(pointPast(2).hit, "only its corners are on")
-    const faces = towardsCorner(onlyBoundsFaces())
+    const faces = towardsCorner(onlyBoundsFaces(), noSize)
     faces.session.toggleLock({ axis: "x", plane: false })
     faces.pointPast(-3)
     assert.match(faces.pointPast(2).hit?.label ?? "", /^Face of /)

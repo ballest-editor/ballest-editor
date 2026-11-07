@@ -251,10 +251,11 @@ const stationBases = ({ max, min }: Box, constraint: Constraint): ReadonlyArray<
   return axesOf(constraint).flatMap(({ x, y, z }): ReadonlyArray<BasePoint> => {
     const axis = { x, y, z }
     const reach = Math.abs(x) * half.x + Math.abs(y) * half.y + Math.abs(z) * half.z
+    const stop = { kind: "face", axis } as const
     return [
-      { start: vecAdd(centre, vecScale(axis, -reach)), label: "Near face", station: true },
-      { start: centre, label: "Centre", station: true },
-      { start: vecAdd(centre, vecScale(axis, reach)), label: "Far face", station: true }
+      { start: vecAdd(centre, vecScale(axis, -reach)), label: "Near face", station: true, stop },
+      { start: centre, label: "Centre", station: true, stop: { kind: "centre" } },
+      { start: vecAdd(centre, vecScale(axis, reach)), label: "Far face", station: true, stop }
     ]
   })
 }
@@ -277,7 +278,8 @@ const chosenBases = (config: SnapConfig, { box, ends, pivot }: BaseSelection): R
 /**
  * The selection's points that can land: its ends when Connectors is on and it has any, whatever the base setting says,
  * since joining end to end is the point of a piece with ends; else what the setting names. Under a line or a plane
- * (`constraint`) the pivot and the selection's stations land too, the nearest match saying which is meant.
+ * (`constraint`) the pivot and the selection's stations land too, the nearest match saying which is meant. A point that
+ * is already one of them stays what it is, and takes the station's `stop`.
  */
 export const selectionBases = (
   config: SnapConfig,
@@ -293,7 +295,12 @@ export const selectionBases = (
       ...stationBases(selection.box, constraint)
     ]
   ) {
-    if (!bases.some(({ start }) => vecDistance(start, base.start) < SAME_BASE_CM)) bases.push(base)
+    const at = bases.findIndex(({ start, stop }) =>
+      vecDistance(start, base.start) < SAME_BASE_CM && (stop === undefined || stop.kind === base.stop?.kind)
+    )
+    const same = bases[at]
+    if (same === undefined) bases.push(base)
+    else if (base.stop !== undefined) bases[at] = { ...same, stop: base.stop }
   }
   return bases
 }
