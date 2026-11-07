@@ -168,6 +168,14 @@ describe.each(Object.entries(dragging))("a drag %s", (_kind, drag) => {
     assert.lengthOf(useEditor.getState().tracked, 0)
   })
 
+  it("keeps them through a click that never became a drag", () => {
+    act(() => scene.frame())
+    const at = _kind === "by a gizmo handle" ? handlePixel() : { x: CENTRE, y: CENTRE }
+    pointer("pointerdown", at.x, at.y, 1)
+    pointer("pointerup", at.x, at.y, 0)
+    assert.lengthOf(useEditor.getState().tracked, 1)
+  })
+
   it("leaves the next idle hover to acquire as ever", () => {
     drag()
     pointer("pointerup", CENTRE, CENTRE, 0)

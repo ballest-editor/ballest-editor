@@ -426,7 +426,8 @@ export function GizmoController() {
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
       endDrag()
       land(active)
-      useEditor.getState().clearTracked()
+      // a click on a handle isn't a drag: what was acquired for the drag to come stays
+      if (active.last !== undefined) useEditor.getState().clearTracked()
     }
 
     /** A key changing with the pointer still takes effect at once. */
