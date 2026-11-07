@@ -217,9 +217,11 @@ export function GizmoController() {
       useEditor.getState().setPreview(null)
       endSnapDisplay()
     }
-    /** Drops the copies of an Alt+drag that is cancelled (Escape, unmount). */
-    const cancelDuplicate = (active: ActiveDrag) => {
+    /** A drag let go of without landing (Escape, unmount): an Alt+drag's copies go, and its tracking points as after a landing. */
+    const cancelDrag = (active: ActiveDrag) => {
+      endDrag()
       if (active.duplicate === "copied") useEditor.getState().endDuplicateDrag(null)
+      useEditor.getState().clearTracked()
     }
 
     const onPointerDown = (e: PointerEvent) => {
@@ -402,12 +404,8 @@ export function GizmoController() {
       previewMove(next, delta)
     }
 
-    const onPointerUp = (e: PointerEvent) => {
-      const active = drag.current
-      if (active === null) return
-      e.stopImmediatePropagation()
-      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
-      endDrag()
+    /** Commits what the drag came to. */
+    const land = (active: ActiveDrag) => {
       const options = active.move?.commitOptions(active.startTransforms.size)
       if (active.duplicate === "copied") {
         // the copy and the move are one undo entry; refused, the copies go
@@ -419,6 +417,16 @@ export function GizmoController() {
       // One undo entry for the whole selection. If the document refuses it, the scene objects
       // go back where they started.
       if (!transformSelection(active.last, options)) applyToObjects(active.startTransforms)
+    }
+
+    const onPointerUp = (e: PointerEvent) => {
+      const active = drag.current
+      if (active === null) return
+      e.stopImmediatePropagation()
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+      endDrag()
+      land(active)
+      useEditor.getState().clearTracked()
     }
 
     /** A key changing with the pointer still takes effect at once. */
@@ -443,8 +451,7 @@ export function GizmoController() {
       e.preventDefault()
       e.stopImmediatePropagation() // don't also deselect
       applyToObjects(active.startTransforms)
-      endDrag()
-      cancelDuplicate(active)
+      cancelDrag(active)
     }
 
     el.addEventListener("pointerdown", onPointerDown, { capture: true })
@@ -459,10 +466,7 @@ export function GizmoController() {
       window.removeEventListener("keydown", onKeyDown, { capture: true })
       window.removeEventListener("keyup", onKeyUp, { capture: true })
       const active = drag.current
-      if (active !== null) {
-        endDrag()
-        cancelDuplicate(active)
-      }
+      if (active !== null) cancelDrag(active)
       hovered.current = null
     }
   }, [gizmo, gl])

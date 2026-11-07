@@ -8,7 +8,7 @@ import type { Ray } from "../../domain/snapFrame"
 import { findGroup } from "../../domain/structure"
 import { ORIGIN, rotatorToQuat } from "../../domain/ueMath"
 import { applyDelta } from "../../domain/units"
-import { grouped, loadPieces } from "../../test/snapFixtures"
+import { grouped, loadPieces, lookDown } from "../../test/snapFixtures"
 import { assertVec } from "../../test/vec"
 import { PaneCamera } from "../paneCameras"
 import { selectionPivot, shownTransform, useEditor } from "../store"
@@ -22,24 +22,7 @@ import { snapViewOf } from "./snapView"
 
 const yawTo = (yaw: number) => rotatorToQuat({ roll: 0, pitch: 0, yaw })
 
-const topPane = () => {
-  const pane = new PaneCamera()
-  pane.projection = "top"
-  pane.width = 1000
-  pane.height = 1000
-  pane.cmPerPixel = 1
-  pane.target.set(0, 0, 0)
-  pane.orthographic.left = -500
-  pane.orthographic.right = 500
-  pane.orthographic.top = 500
-  pane.orthographic.bottom = -500
-  pane.orthographic.position.set(0, 5000, 0)
-  pane.orthographic.up.set(1, 0, 0)
-  pane.orthographic.lookAt(0, 0, 0)
-  pane.orthographic.updateProjectionMatrix()
-  pane.orthographic.updateMatrixWorld(true)
-  return pane
-}
+const topPane = () => lookDown(new PaneCamera())
 
 const load = (config: SnapConfig | null) => {
   const ids = loadPieces([{ x: 0, y: 0, z: 0 }, { x: 300, y: 800, z: 0 }])

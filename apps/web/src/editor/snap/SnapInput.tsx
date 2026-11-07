@@ -89,6 +89,12 @@ export function SnapInput() {
       endSnapDisplay()
     }
 
+    /** A drag let go of without landing. Its tracking points go with it, as they do after a landing. */
+    const cancel = () => {
+      end()
+      useEditor.getState().clearTracked()
+    }
+
     const beginDrag = (from: Pressed): BodyDrag | undefined => {
       const s = useEditor.getState()
       const target = dragTargetOf(s)
@@ -162,7 +168,13 @@ export function SnapInput() {
       clearTimeout(hoverTimer)
       hoverAt = { x: e.clientX, y: e.clientY }
       const at = { clientX: e.clientX, clientY: e.clientY }
+      const dragging = sceneRegistry.gizmoDragActive()
       hoverTimer = setTimeout(() => {
+        // a pause in a drag that has ended since goes with the points that drag let go of
+        if (dragging && !sceneRegistry.gizmoDragActive()) {
+          stopHover()
+          return
+        }
         const now = useEditor.getState()
         const { pane, px } = panePointer(el, at)
         const hit = anchorUnder(now, pane, px, new Set(drag === null ? [] : drag.startTransforms.keys()))
@@ -249,9 +261,11 @@ export function SnapInput() {
       const options = session.commitOptions(startTransforms.size)
       const offer = flipOfferOf(session.current, [...startTransforms.keys()])
       end()
-      if (last === undefined) return
-      useEditor.getState().setFlipOffer(offer)
-      transformSelection(last, options)
+      if (last !== undefined) {
+        useEditor.getState().setFlipOffer(offer)
+        transformSelection(last, options)
+      }
+      useEditor.getState().clearTracked()
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -273,7 +287,7 @@ export function SnapInput() {
       if (e.code !== "Escape" && !s.keybinds.deselect.includes(chordOf(e))) return
       e.preventDefault()
       e.stopImmediatePropagation()
-      end()
+      cancel()
     }
 
     const onKeyUp = (e: KeyboardEvent) => {
@@ -296,7 +310,7 @@ export function SnapInput() {
       stopHover()
       clearTimeout(itemTimer)
       sceneRegistry.bodyDragActive = () => false
-      if (drag !== null) end()
+      if (drag !== null) cancel()
     }
   }, [gl])
   return null
