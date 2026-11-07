@@ -127,3 +127,22 @@ describe("Settings", () => {
       assert.deepStrictEqual(yield* store.load, defaultSettings)
     }).pipe(Effect.provide(SettingsStore.layerTest)))
 })
+
+describe("snapping settings", () => {
+  it("keeps what an older save chose, and fills in what it never had", () => {
+    const merged = mergeSettings({ snapping: { enabled: true, gridSize: 25, rotationEnabled: true, rotationStep: 5 } })
+    assert.strictEqual(merged.snapping.enabled, true)
+    assert.strictEqual(merged.snapping.gridSize, 25)
+    assert.strictEqual(merged.snapping.rotationStep, 5)
+    assert.deepStrictEqual(merged.snapping.targets, defaultSettings.snapping.targets)
+    assert.strictEqual(merged.snapping.scaleStep, defaultSettings.snapping.scaleStep)
+  })
+
+  it("takes a typed step, and turns down one that can't be", () => {
+    assert.strictEqual(mergeSettings({ snapping: { gridSize: 37 } }).snapping.gridSize, 37)
+    assert.strictEqual(
+      mergeSettings({ snapping: { gridSize: -5 } }).snapping.gridSize,
+      defaultSettings.snapping.gridSize
+    )
+  })
+})

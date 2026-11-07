@@ -1,21 +1,40 @@
 import {
   IconCamera,
+  IconChevronRight,
   IconDeviceGamepad2,
   IconKeyboard,
   IconPalette,
   IconPencil,
   IconSettings
 } from "@tabler/icons-react"
+import { Button } from "@workspace/ui/components/button"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@workspace/ui/components/collapsible"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select"
 import { Slider, sliderValue } from "@workspace/ui/components/slider"
 import { Switch } from "@workspace/ui/components/switch"
-import { String as Str, Struct } from "effect"
-import { useEffect } from "react"
+import { Equal, String as Str, Struct } from "effect"
+import { type ComponentProps, useEffect } from "react"
 import { movementLookModes } from "../domain/flyKeys"
 import { namedActions } from "../domain/GameKeybinds"
 import { overriddenFolders } from "../domain/gameLink"
 import { isDefaultBinding, keybindActionDescriptions } from "../domain/Keybinds"
 import { AUTO_GRID_COLORS, CUSTOM_FOV_PRESET, defaultSettings, type Settings } from "../domain/Settings"
+import {
+  formatGridSize,
+  formatRotationStep,
+  formatScaleStep,
+  GRID_SIZES,
+  ROTATION_STEPS,
+  SCALE_STEPS
+} from "../domain/snap"
+import {
+  isPreset,
+  SNAP_PRESETS,
+  SNAP_TARGET_NAMES,
+  SNAP_TARGETS,
+  type SnapTarget,
+  targetSummary
+} from "../domain/snapConfig"
 import {
   refreshGameLink,
   resetGamePaths,
@@ -24,7 +43,7 @@ import {
   updateSettings,
   watchGameLink
 } from "../editor/actions"
-import { type SettingsCategory, useCreator, useEditor } from "../editor/store"
+import { type SettingsCategory, snapConfigOf, useCreator, useEditor } from "../editor/store"
 import { useDarkTheme } from "../editor/theme"
 import { ColorSetting } from "./ColorSetting"
 import { creatorSettingsRow } from "./CreatorSetting"
@@ -32,6 +51,17 @@ import { CheckAgainButton, useGameLinkSettings } from "./GameLink"
 import { useKeybindCapture } from "./KeybindControl"
 import { NumberField } from "./NumberField"
 import { type SettingsCategoryInfo, type SettingsRow, SettingsShell } from "./SettingsShell"
+import { StepField, type UpdateTarget, ValueParameters } from "./SnapParameters"
+
+/** What a search finds each target's parameters by. */
+const SNAP_TARGET_KEYWORDS: Readonly<Record<SnapTarget, string>> = {
+  grid: "snapping origin rotation",
+  connectors: "snapping range match rotation profiles open ends flip to fit",
+  mesh: "snapping elements bounds vertices edges faces sharp angle occlusion rotate to face offset",
+  construction: "snapping planes axes",
+  tracking: "snapping points kept hover time acquire shift",
+  alignment: "snapping gap guides"
+}
 
 /** Each answers the row's label, "Movement keys need the look button". */
 const movementLookItems = {
@@ -166,6 +196,201 @@ export function SettingsDialog(props: {
       reset: () => update(section, Struct.pick(defaultSettings[section], [key]))
     }
   })
+
+  /** What a new map starts on (docs/SNAPPING.md § Settings); a map that changes it keeps its own in its sidecar. */
+  const snapping = settings.snapping
+  const snapDefaults = defaultSettings.snapping
+  const mapSnapping = useEditor(snapConfigOf)
+  const updateSnapping = (patch: Partial<Settings["snapping"]>) => update("snapping", patch)
+  const snapRow = (id: string, label: string, modified: boolean, reset: () => void) => ({
+    id: `snap-${id}`,
+    category: "editor" as const,
+    group: "Snapping",
+    label,
+    changes: { modified, reset }
+  })
+  const updateTarget: UpdateTarget = (target, patch) =>
+    updateSnapping({ targets: { ...snapping.targets, [target]: { ...snapping.targets[target], ...patch } } })
+  const stepControl = (
+    label: string,
+    step: Pick<ComponentProps<typeof StepField>, "value" | "options" | "format" | "unit" | "onChange">,
+    enabled: boolean,
+    onEnabled: (on: boolean) => void
+  ) => (
+    <>
+      <StepField label={label} {...step} />
+      <Switch aria-label={`${label} snaps`} checked={enabled} onCheckedChange={onEnabled} />
+    </>
+  )
+  const snapRows: ReadonlyArray<Row> = [
+    {
+      ...snapRow(
+        "on",
+        "Snap",
+        snapping.enabled !== snapDefaults.enabled,
+        () => updateSnapping({ enabled: snapDefaults.enabled })
+      ),
+      description: "Whether a new map starts with snapping on.",
+      control: (
+        <Switch
+          aria-label="Snap"
+          checked={snapping.enabled}
+          onCheckedChange={(enabled) => updateSnapping({ enabled })}
+        />
+      )
+    },
+    {
+      ...snapRow(
+        "base",
+        "Base",
+        snapping.base !== snapDefaults.base,
+        () => updateSnapping({ base: snapDefaults.base })
+      ),
+      description: "Which point of the selection lands on a target.",
+      control: (
+        <Choice
+          value={snapping.base}
+          items={{ pivot: "Pivot", closest: "Closest", centre: "Centre" }}
+          onChange={(base) => updateSnapping({ base })}
+        />
+      )
+    },
+    {
+      ...snapRow(
+        "preset",
+        "Priority",
+        !isPreset(snapping, "gridFirst"),
+        () => updateSnapping({ order: snapDefaults.order })
+      ),
+      description: "Which targets a new map asks first.",
+      control: (
+        <Choice
+          value={isPreset(snapping, "piecesFirst") ? "piecesFirst" : "gridFirst"}
+          items={{ gridFirst: "Grid first", piecesFirst: "Pieces first" }}
+          onChange={(preset) => updateSnapping({ order: SNAP_PRESETS[preset] })}
+        />
+      )
+    },
+    {
+      ...snapRow(
+        "grid",
+        "Grid step",
+        snapping.gridSize !== snapDefaults.gridSize,
+        () => updateSnapping({ gridSize: snapDefaults.gridSize })
+      ),
+      control: (
+        <StepField
+          label="Grid step"
+          value={snapping.gridSize}
+          options={GRID_SIZES}
+          format={(size) => formatGridSize(size, settings.general.units)}
+          unit="cm"
+          onChange={(gridSize) => updateSnapping({ gridSize })}
+        />
+      )
+    },
+    {
+      ...snapRow(
+        "rotation",
+        "Rotation step",
+        snapping.rotationStep !== snapDefaults.rotationStep ||
+          snapping.rotationEnabled !== snapDefaults.rotationEnabled,
+        () => updateSnapping(Struct.pick(snapDefaults, ["rotationStep", "rotationEnabled"]))
+      ),
+      control: stepControl(
+        "Rotation step",
+        {
+          value: snapping.rotationStep,
+          options: ROTATION_STEPS,
+          format: formatRotationStep,
+          unit: "°",
+          onChange: (rotationStep) => updateSnapping({ rotationStep })
+        },
+        snapping.rotationEnabled,
+        (rotationEnabled) => updateSnapping({ rotationEnabled })
+      )
+    },
+    {
+      ...snapRow(
+        "scale",
+        "Scale step",
+        snapping.scaleStep !== snapDefaults.scaleStep || snapping.scaleEnabled !== snapDefaults.scaleEnabled,
+        () => updateSnapping(Struct.pick(snapDefaults, ["scaleStep", "scaleEnabled"]))
+      ),
+      control: stepControl(
+        "Scale step",
+        {
+          value: snapping.scaleStep,
+          options: SCALE_STEPS,
+          format: formatScaleStep,
+          unit: "%",
+          onChange: (scaleStep) => updateSnapping({ scaleStep })
+        },
+        snapping.scaleEnabled,
+        (scaleEnabled) => updateSnapping({ scaleEnabled })
+      )
+    },
+    {
+      ...snapRow(
+        "threshold",
+        "Threshold",
+        snapping.threshold !== snapDefaults.threshold,
+        () => updateSnapping({ threshold: snapDefaults.threshold })
+      ),
+      description: "How far, in pixels, the pointer goes past a target before the selection is free of it.",
+      control: (
+        <SliderControl
+          label="Threshold"
+          unit="px"
+          min={2}
+          max={40}
+          step={1}
+          largeStep={4}
+          value={snapping.threshold}
+          onChange={(threshold) => updateSnapping({ threshold })}
+        />
+      )
+    },
+    ...SNAP_TARGETS.map((target): Row => ({
+      ...snapRow(
+        `target-${target}`,
+        SNAP_TARGET_NAMES[target],
+        !Equal.equals(snapping.targets[target], snapDefaults.targets[target]),
+        () => updateTarget(target, snapDefaults.targets[target])
+      ),
+      description: targetSummary(snapping, target, settings.general.units),
+      keywords: SNAP_TARGET_KEYWORDS[target],
+      ...(target !== "construction" && {
+        detail: (
+          <Collapsible className="mt-1">
+            <CollapsibleTrigger className="group/more flex cursor-pointer items-center gap-1 rounded-control text-caption text-fg-secondary focus-ring">
+              <IconChevronRight className="size-3.5 transition-transform group-data-[panel-open]/more:rotate-90" />
+              Parameters
+            </CollapsibleTrigger>
+            <CollapsibleContent className="flex max-w-80 flex-col gap-1 py-1 pl-4">
+              <ValueParameters config={snapping} target={target} update={updateTarget} />
+            </CollapsibleContent>
+          </Collapsible>
+        )
+      }),
+      control: (
+        <Switch
+          aria-label={SNAP_TARGET_NAMES[target]}
+          checked={snapping.targets[target].enabled}
+          onCheckedChange={(enabled) => updateTarget(target, { enabled })}
+        />
+      )
+    })),
+    {
+      ...snapRow("fromMap", "Start from this map", false, () => {}),
+      description: "Makes all of this map's snap settings what new maps start on.",
+      control: (
+        <Button variant="outline" onClick={() => void saveSettings({ ...settings, snapping: mapSnapping })}>
+          Use this map's
+        </Button>
+      )
+    }
+  ]
 
   const rows = ((): ReadonlyArray<Row> => {
     const keybindRows = namedActions(defaults).map(({ action, section, label }): Row => ({
@@ -305,6 +530,7 @@ export function SettingsDialog(props: {
           />
         )
       },
+      ...snapRows,
       {
         id: "fov",
         ...setting("camera", "fovPreset"),

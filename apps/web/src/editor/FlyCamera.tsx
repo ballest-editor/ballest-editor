@@ -259,6 +259,8 @@ export function FlyCamera() {
   useFrame((_, delta) => {
     const keys = pressed.current
     const now = performance.now()
+    // Once a drag has begun, Ctrl and Shift are snapping's: docs/SNAPPING.md § Modifiers.
+    if (sceneRegistry.gizmoDragActive()) keys.suppressModifiers()
     // Non-movement held keys (arrow look, fast) that are also tool shortcuts only count while
     // looking; movement keys follow the "movement keys need look" setting (see flyKeys).
     const looking = drag.current !== null

@@ -27,6 +27,10 @@ const state = (over: Partial<MenuState> = {}): MenuState => ({
   openElsewhere: [],
   panels: [{ id: "outline", title: "Outline", open: true }],
   snapping: defaultSettings.snapping,
+  undoDescription: undefined,
+  redoDescription: undefined,
+  selectionCount: 0,
+  measurements: 0,
   units: "cm",
   layout: defaultViewLayout,
   projection: "perspective",
@@ -60,7 +64,7 @@ describe("searching the menus", () => {
   it("reaches into sections and submenus", () => {
     assert.deepStrictEqual(find("outline"), ["View › Panels › Outline"])
     assert.include(find("active top"), "View › Panes › Active pane › Top")
-    assert.include(find("grid size 50"), "View › Grid › Grid size › 50 cm")
+    assert.include(find("grid size 50"), "View › Snap › Grid size › 50 cm")
   })
 
   it("finds nothing for what's in no menu", () => {

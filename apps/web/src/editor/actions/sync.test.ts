@@ -3,8 +3,11 @@ import { Effect, Fiber, Schema } from "effect"
 import { defaultEditorState } from "../../domain/factory"
 import { linkStateOf } from "../../domain/linkState"
 import { MapFile } from "../../domain/MapFile"
-import { useEditor } from "../../editor/store"
-import { projectFile, TEST_MAPS_FOLDER, type TestDisk } from "../../test/desktopBridge"
+import { MapSidecar } from "../../domain/MapSidecar"
+import { defaultSnapConfig } from "../../domain/snapConfig"
+import { annotationsOf } from "../../domain/structure"
+import { snapConfigOf, useEditor } from "../../editor/store"
+import { projectFile, sidecarFile, TEST_MAPS_FOLDER, type TestDisk } from "../../test/desktopBridge"
 import { diskWithPlugin, edit, layerFor, playSample, reset, s, untilTrue } from "../../test/editorActions"
 import { exportToGameEffect, openInGameEffect, playEffect } from "./exportPlay"
 import { replaceInGameEffect } from "./gameWrite"
@@ -66,6 +69,31 @@ describe("sync", () => {
       assert.deepInclude(disk.backups[0], { place: "project", fileName: name, text })
       assert.strictEqual(s().toasts.filter((t) => t.kind === "mapReimported").length, 1)
       assert.lengthOf(reported(), 0)
+    }).pipe(Effect.provide(layerFor(disk)))
+  })
+
+  it.effect("keeps a map's snap settings and annotations through what the game saved, in the tab and the sidecar", () => {
+    const disk = diskWithPlugin({ [projectFile(name)]: text })
+    const measurement = { id: "m", a: { x: 0, y: 0, z: 0 }, b: { x: 100, y: 0, z: 0 } }
+    return Effect.gen(function*() {
+      yield* reset
+      yield* openProjectMapFile(name)
+      s().setTabSnap({ ...defaultSnapConfig, gridSize: 37 })
+      s().addMeasurement(measurement)
+      yield* saveMapFile
+      yield* exportToGameEffect
+      yield* checkExportsEffect
+      disk.files.set(inGame, savedInGame(disk.files.get(inGame) ?? "", 3.5))
+      yield* checkExportsEffect
+      assert.strictEqual(s().doc.map.worldSettings.directionalLight.timeOfDay, 3.5)
+      assert.strictEqual(snapConfigOf(s()).gridSize, 37)
+      assert.deepStrictEqual(annotationsOf(s().doc.structure).measurements, [measurement])
+      assert.isFalse(s().dirty)
+      const sidecar = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(MapSidecar))(
+        disk.files.get(sidecarFile(name))
+      )
+      assert.strictEqual(sidecar.snap?.gridSize, 37)
+      assert.deepStrictEqual(sidecar.annotations?.measurements, [measurement])
     }).pipe(Effect.provide(layerFor(disk)))
   })
 

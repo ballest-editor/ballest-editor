@@ -85,6 +85,19 @@ export const keybindSections = [
       "frameAll"
     ]
   },
+  {
+    name: "snapping",
+    actions: [
+      "snapInvert",
+      "snapHold",
+      "snapLockX",
+      "snapLockY",
+      "snapLockZ",
+      "snapPlaneX",
+      "snapPlaneY",
+      "snapPlaneZ"
+    ]
+  },
   { name: "file", actions: ["newMap", "openMap", "saveMap", "saveMapAs", "closeTab", "nextTab", "previousTab"] },
   { name: "game", actions: ["playMap"] },
   { name: "help", actions: ["showKeybinds"] }
@@ -137,6 +150,14 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   speedSlower: "camera speed down",
   orbit: "orbit",
   pan: "pan",
+  snapInvert: "invert snapping",
+  snapHold: "hold target",
+  snapLockX: "lock to x",
+  snapLockY: "lock to y",
+  snapLockZ: "lock to z",
+  snapPlaneX: "lock to plane across x",
+  snapPlaneY: "lock to plane across y",
+  snapPlaneZ: "lock to plane across z",
   viewTop: "top view",
   viewBottom: "bottom view",
   viewFront: "front view",
@@ -208,6 +229,16 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   speedSlower: "Lower the camera's fly speed one step.",
   orbit: "Hold and drag to orbit around the focus point.",
   pan: "Hold and drag to slide the camera sideways and up/down.",
+  snapInvert:
+    "Hold during a drag: snapping goes off when it is on and on when it is off. Only once a drag has begun, so Ctrl still flies down.",
+  snapHold:
+    "Hold during a drag: the selection stays on the target it found, sliding along it, and nothing else takes over.",
+  snapLockX: "During a drag, lock the move to the X axis (the grid's, when it is turned). Press again to unlock.",
+  snapLockY: "During a drag, lock the move to the Y axis (the grid's, when it is turned). Press again to unlock.",
+  snapLockZ: "During a drag, lock the move to the Z axis. Press again to unlock.",
+  snapPlaneX: "During a drag, lock the move to the plane square to X. Press again to unlock.",
+  snapPlaneY: "During a drag, lock the move to the plane square to Y. Press again to unlock.",
+  snapPlaneZ: "During a drag, lock the move to the plane square to Z. Press again to unlock.",
   viewTop: "Look straight down in the active pane, orthographic. Editor only: the game has no orthographic views.",
   viewBottom: "Look straight up from under the map in the active pane, orthographic.",
   viewFront: "Look at the map from its front (the +X side, the game's forward) in the active pane, orthographic.",
@@ -249,6 +280,17 @@ export const mouseClickActions: ReadonlySet<KeybindAction> = new Set(["addToSele
 
 /** Actions bound to a mouse button held while dragging. */
 export const mouseDragActions: ReadonlySet<KeybindAction> = new Set(["look", "orbit", "pan"])
+/** Actions a drag takes once it has begun (docs/SNAPPING.md § Modifiers): nothing fires them from a key by itself. */
+export const duringDragActions: ReadonlySet<KeybindAction> = new Set([
+  "snapInvert",
+  "snapHold",
+  "snapLockX",
+  "snapLockY",
+  "snapLockZ",
+  "snapPlaneX",
+  "snapPlaneY",
+  "snapPlaneZ"
+])
 /** Actions that are held down rather than fired once. */
 export const heldActions: ReadonlySet<KeybindAction> = new Set([
   "moveForward",
@@ -273,6 +315,14 @@ export type Keybinds = Readonly<Record<KeybindAction, Bindings>>
  * defines on top.
  */
 export const defaultKeybinds: Keybinds = {
+  snapInvert: ["ControlLeft", "ControlRight"],
+  snapHold: ["ShiftLeft", "ShiftRight"],
+  snapLockX: ["KeyX"],
+  snapLockY: ["KeyY"],
+  snapLockZ: ["KeyZ"],
+  snapPlaneX: ["Shift+KeyX"],
+  snapPlaneY: ["Shift+KeyY"],
+  snapPlaneZ: ["Shift+KeyZ"],
   selectMode: ["KeyQ"],
   translateMode: ["KeyW"],
   rotateMode: ["KeyE"],
@@ -447,7 +497,9 @@ export const baseCodeOf = (binding: string): string => binding.slice(binding.las
 
 /** True when `chord` is bound to a one-shot action (anything that isn't held or a drag). */
 export const isOneShotChord = (keybinds: Keybinds, chord: string): boolean =>
-  actionsFor(keybinds, chord).some((action) => !heldActions.has(action) && !mouseDragActions.has(action))
+  actionsFor(keybinds, chord).some((action) =>
+    !heldActions.has(action) && !mouseDragActions.has(action) && !duringDragActions.has(action)
+  )
 
 /** True when `chord` (from chordOf) is bound to a one-shot action with a modifier, e.g. Ctrl+KeyZ. */
 export const isBoundChord = (keybinds: Keybinds, chord: string): boolean =>
@@ -574,6 +626,8 @@ export const conflictingBindings = (keybinds: Keybinds): ReadonlySet<string> => 
   for (const action of keybindActions) {
     const kind = heldActions.has(action)
       ? "held"
+      : duringDragActions.has(action)
+      ? "duringDrag"
       : mouseDragActions.has(action) || mouseClickActions.has(action)
       ? "mouse"
       : "oneShot"

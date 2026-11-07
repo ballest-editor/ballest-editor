@@ -12,7 +12,7 @@ import { pieceNameOf, treeKeys } from "../domain/structure"
 import { vecSub } from "../domain/ueMath"
 import { editSelectionAxis, moveSelectionBy, previewSelectionAxis, setSelectionPivot } from "../editor/actions"
 import { AXIS_BG_CLASSES } from "../editor/axisColors"
-import { pivotOf, shownPivotPoint, useEditor } from "../editor/store"
+import { pivotOf, shownPivotPoint, snapConfigOf, useEditor } from "../editor/store"
 import { InfoHint } from "./InfoHint"
 import { NumberField } from "./NumberField"
 import { RowClipboard } from "./RowClipboard"
@@ -31,7 +31,7 @@ const AXES: ReadonlyArray<Axis> = ["x", "y", "z"]
  */
 function PivotPosition({ point }: { readonly point: Vec3 }) {
   const units = useEditor((s) => s.settings.general.units)
-  const snapping = useEditor((s) => s.settings.snapping)
+  const snapping = useEditor(snapConfigOf)
   // Display units only; the map always stores centimetres.
   const perUnit = units === "m" ? 100 : 1
   const offset = (v: number, from: number) => ({ kind: "offset", by: (v - from) * perUnit }) as const

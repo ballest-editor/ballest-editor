@@ -282,6 +282,9 @@ const offPanelPaint = new Map(
     .flatMap((p) => (p.offPanel === undefined ? [] : [[p.classPath, p.offPanel]]))
 )
 
+// Each piece's ends, measured in game (connectors.json; docs/qa/connectors.md). A piece without any has none.
+const measuredEnds = JSON.parse(readFileSync(join(import.meta.dirname, "connectors.json"), "utf8")).pieces
+
 const pieces = []
 const unresolved = []
 const registry = JSON.parse(readFileSync(join(assets, "registry.json"), "utf8"))
@@ -325,6 +328,9 @@ for (const o of pieceOrder(registry)) {
     paintable: paintableOf(cls, s.className.replace(/_C$/, ""), !!o.category),
     ...(offPanelPaint.has(s.objectPath) ? { offPanelPaint: offPanelPaint.get(s.objectPath) } : {}),
     bounds: mesh?.bounds ?? null,
+    ...(measuredEnds[s.className.replace(/_C$/, "")]
+      ? { connectors: measuredEnds[s.className.replace(/_C$/, "")] }
+      : {}),
     seenInSamples: s.seenInSamples,
     meshSource: main ? "pak" : sampleMesh ? "samples" : null,
     sampleMeshAssetPath: sampleMesh,

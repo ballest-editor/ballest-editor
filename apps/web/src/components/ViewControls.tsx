@@ -18,14 +18,15 @@ import { cn } from "@workspace/ui/lib/utils"
 import type { ReactNode } from "react"
 import { soleGroupOf } from "../domain/groupSelection"
 import { floorHeightOf } from "../domain/level"
-import { AUTO_GRID_COLORS, isDefaultDisplay, type Settings, withDefaultDisplay } from "../domain/Settings"
+import { AUTO_GRID_COLORS, isDefaultDisplay, withDefaultDisplay } from "../domain/Settings"
 import { formatGridSize, formatRotationStep, GRID_SIZES, ROTATION_STEPS } from "../domain/snap"
-import { saveSettings, setGridHeight, updateSettings } from "../editor/actions"
+import { saveSettings, setGridHeight, updateSettings, updateSnap } from "../editor/actions"
 import {
   selectionUnits,
   shownGizmoSpace,
   shownPivotMode,
   shownTransform,
+  snapConfigOf,
   useEditor,
   useOpenPrefab
 } from "../editor/store"
@@ -34,6 +35,7 @@ import { ColorSetting } from "./ColorSetting"
 import { NumberField } from "./NumberField"
 import { SectionTitle } from "./SectionTitle"
 import { SizeToggle } from "./SizeToggle"
+import { SnapPopoverContent } from "./SnapPopover"
 import { ToolBar } from "./ToolBar"
 import { CONTROL_WORD, GROUP, GROUP_DIVIDER, noFocus, releaseFocus, SEGMENT } from "./viewControlStyle"
 import { ViewLayoutControl, ViewPanes } from "./ViewPanes"
@@ -47,10 +49,9 @@ import { ViewTip, ViewTipBoundary } from "./ViewTip"
  * Pointer-only, so keybinds stay with the viewport.
  */
 export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
-  const settings = useEditor((s) => s.settings)
-  const { enabled, gridSize, rotationEnabled, rotationStep } = settings.snapping
-  const units = settings.general.units
-  const update = (snapping: Partial<Settings["snapping"]>) => void updateSettings("snapping", snapping)
+  const units = useEditor((s) => s.settings.general.units)
+  const { enabled, gridSize, rotationEnabled, rotationStep } = useEditor(snapConfigOf)
+  const update = updateSnap
 
   return (
     <ViewTipBoundary>
@@ -68,7 +69,7 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
             <span aria-hidden className={GROUP_DIVIDER} />
             <SnapGroup
               icon={<IconGrid4x4 />}
-              label="Snap to grid"
+              label="Snap"
               enabled={enabled}
               onToggle={(pressed) => update({ enabled: pressed })}
               value={gridSize}
@@ -91,6 +92,8 @@ export function ViewportControls({ disabled }: { readonly disabled: boolean }) {
               format={formatRotationStep}
               disabled={disabled}
             />
+            <span aria-hidden className={GROUP_DIVIDER} />
+            <SnapSettingsControl disabled={disabled} />
           </div>
         </div>
       </ViewPanes>
@@ -351,6 +354,35 @@ function DisplayControl({ disabled }: { readonly disabled: boolean }) {
       </ViewTip>
       <PopoverContent align="end" initialFocus={false} finalFocus={false} className="w-72 gap-0 px-3 py-1">
         <DisplayRows />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/** The chevron that opens the Snap popover; View › Snap › Open snap settings opens it too. */
+function SnapSettingsControl({ disabled }: { readonly disabled: boolean }) {
+  const open = useEditor((s) => s.snapPopoverOpen)
+  const setOpen = useEditor((s) => s.setSnapPopoverOpen)
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <ViewTip
+        label="Snap settings"
+        render={
+          <PopoverTrigger
+            disabled={disabled}
+            render={<button type="button" aria-label="Snap settings" className={SEGMENT} {...noFocus} />}
+          />
+        }
+      >
+        <IconChevronDown className="size-3" />
+      </ViewTip>
+      <PopoverContent
+        align="end"
+        initialFocus={false}
+        finalFocus={false}
+        className="w-[22rem] max-w-[calc(100vw-1rem)] gap-0 overflow-hidden p-0"
+      >
+        <SnapPopoverContent />
       </PopoverContent>
     </Popover>
   )

@@ -24,7 +24,7 @@ import {
 import { withFavouriteToggled, withRecentPiece } from "../../domain/recentPieces"
 import { ORIGIN, sameVec, vecAdd, vecSub } from "../../domain/ueMath"
 import { sceneRegistry } from "../sceneRegistry"
-import { type EditorState, NO_TAB_OPEN, noTabOpen, useEditor } from "../store"
+import { type EditorState, NO_TAB_OPEN, noTabOpen, snapConfigOf, type TransformOptions, useEditor } from "../store"
 import { updateSettings } from "./startup"
 
 /** The run in progress and what the next placement checks it against. */
@@ -58,7 +58,7 @@ const continued = (s: EditorState, last: Placing, point: Vec3, width: number, vi
   if (box === undefined) return undefined
   const first = last.first ?? box
   if (!wouldLandOn(vecAdd(point, last.stepped), width, first, view)) return undefined
-  return { run: nextInRun(last.run, box, width, view, s.settings.snapping.gridSize), first, stepped: last.stepped }
+  return { run: nextInRun(last.run, box, width, view, snapConfigOf(s).gridSize), first, stepped: last.stepped }
 }
 
 /** Every item's box, as the map has it now, but for the item `except`. */
@@ -79,7 +79,7 @@ export const spreadPlacement = (point: Vec3, width: number, view: PlacementView,
     itemBoxes(s),
     width,
     view,
-    s.settings.snapping.gridSize,
+    snapConfigOf(s).gridSize,
     height
   )
   const at = runPoint(run, view)
@@ -88,14 +88,14 @@ export const spreadPlacement = (point: Vec3, width: number, view: PlacementView,
 }
 
 /** Places `piece`, and lists it under Recent if it went in: a catalog entry that makes no valid item doesn't. */
-const place = (piece: CatalogPiece, transform: ItemTransform) => {
+const place = (piece: CatalogPiece, transform: ItemTransform, options?: TransformOptions) => {
   const s = useEditor.getState()
   if (noTabOpen(s)) {
     s.notify("info", NO_TAB_OPEN)
     return
   }
   const { doc, placePiece } = s
-  placePiece(piece, transform)
+  placePiece(piece, transform, options)
   const { doc: after, settings } = useEditor.getState()
   if (after === doc) return
   void updateSettings("panels", { recentPieces: withRecentPiece(settings.panels.recentPieces, pieceIdOf(piece)) })
@@ -124,8 +124,14 @@ export const placeAt = (piece: CatalogPiece, hit: Vec3, view: PlacementView, sur
   placing = undefined
   const frame = box === undefined
     ? hit
-    : frameStanding(box, clearDrop(hit, itemBoxes(s, surface), roomOf(box), view, s.settings.snapping.gridSize))
+    : frameStanding(box, clearDrop(hit, itemBoxes(s, surface), roomOf(box), view, snapConfigOf(s).gridSize))
   place(piece, placementTransform(piece, wholeCm(frame)))
+}
+
+/** A drop that landed on a snap target: `transform` is where, and it ends any run. */
+export const placeSnapped = (piece: CatalogPiece, transform: ItemTransform, options: TransformOptions) => {
+  placing = undefined
+  place(piece, transform, options)
 }
 
 /** Stars `piece`, or takes its star off. */

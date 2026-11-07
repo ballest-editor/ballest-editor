@@ -275,7 +275,7 @@ function HelpMenu() {
   )
 }
 
-const PLAIN_MENUS: ReadonlyArray<MenuTitle> = ["File", "Edit", "View", "Project"]
+const PLAIN_MENUS: ReadonlyArray<MenuTitle> = ["File", "Edit", "View", "Tools", "Project"]
 
 /** File, Edit, View, Project and Help (docs/DESKTOP.md § Menus), drawn from `menuModel`. */
 export function MenuBar() {

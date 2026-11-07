@@ -5,7 +5,7 @@
  */
 import type { CatalogIndex } from "./Catalog"
 import { classNameOf, type Item, type MapFile } from "./MapFile"
-import type { GroupNode, GroupPivot, ItemNode, PrefabLink, TreeNode } from "./MapSidecar"
+import type { Annotations, GroupNode, GroupPivot, ItemNode, PrefabLink, TreeNode } from "./MapSidecar"
 import { pieceLabelOf } from "./pieceName"
 
 /** What an item has beyond the game's data. An item with neither has no entry. */
@@ -17,6 +17,8 @@ export interface ItemMeta {
 export interface Structure {
   readonly tree: ReadonlyArray<TreeNode>
   readonly items: ReadonlyMap<string, ItemMeta>
+  /** Joints, construction geometry and measurements (docs/SNAPPING.md); undoable with the rest. Absent with none. */
+  readonly annotations?: Annotations
 }
 
 /** A document, as the store and the sidecar hold it. */
@@ -33,6 +35,27 @@ export const freshKey = (): string =>
   btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(9)))).replaceAll("+", "-").replaceAll("/", "_")
 
 export const freshKeys = (n: number): ReadonlyArray<string> => Array.from({ length: n }, freshKey)
+
+const NO_ANNOTATIONS: Annotations = { joints: [], construction: [], measurements: [] }
+
+/** A structure's annotations, empty when it has none. */
+export const annotationsOf = (structure: Structure): Annotations => structure.annotations ?? NO_ANNOTATIONS
+
+/** `structure` with `annotations`, or without any when they hold nothing. */
+export const withAnnotations = (structure: Structure, annotations: Annotations): Structure => {
+  const { annotations: _gone, ...rest } = structure
+  const empty = annotations.joints.length + annotations.construction.length + annotations.measurements.length === 0
+  return empty ? rest : { ...rest, annotations }
+}
+
+/** `structure` with no joint that touches `keys`. */
+export const withoutJointsOf = (structure: Structure, keys: ReadonlySet<string>): Structure => {
+  const annotations = annotationsOf(structure)
+  const joints = annotations.joints.filter(({ a, b }) => !keys.has(a.item) && !keys.has(b.item))
+  return joints.length === annotations.joints.length
+    ? structure
+    : withAnnotations(structure, { ...annotations, joints })
+}
 
 export const itemNode = (key: string): ItemNode => ({ kind: "item", key })
 
@@ -96,8 +119,9 @@ export const withNewItems = (structure: Structure, keys: ReadonlyArray<string>):
   tree: [...structure.tree, ...keys.map(itemNode)]
 })
 
-/** Drops items from the tree and their names and tags. */
+/** Drops items from the tree, their names and tags, and the joints they were part of. */
 export const withoutKeys = (structure: Structure, keys: ReadonlySet<string>): Structure => ({
+  ...withoutJointsOf(structure, keys),
   tree: rewriteTree(structure.tree, (node) => node.kind === "item" && keys.has(node.key) ? [] : [node]),
   items: new Map([...structure.items].filter(([key]) => !keys.has(key)))
 })
@@ -354,7 +378,7 @@ export const withPasted = (
     const key = keyOf.get(source)
     if (key !== undefined) items.set(key, meta)
   }
-  return { tree: [...tree, ...[...waiting.values()].flat()], items }
+  return { ...structure, tree: [...tree, ...[...waiting.values()].flat()], items }
 }
 
 /** A name as it's shown: `ordinal` tells apart what shares `name`, and something with a name of its own has none. */

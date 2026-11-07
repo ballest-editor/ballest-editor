@@ -1,11 +1,15 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as THREE from "three"
-import { ueToScene, ueToThreeVector } from "../../domain/coords"
+import { threeToUeVector, ueToScene, ueToThreeVector } from "../../domain/coords"
 import type { Quat4, UeTransform } from "../../domain/coords"
 import { applyGroupDelta } from "../../domain/groupTransform"
-import { rotateVec, rotatorToQuat } from "../../domain/ueMath"
+import { defaultSnapConfig } from "../../domain/snapConfig"
+import { constrained, freeOffset } from "../../domain/snapFrame"
+import { gridLanding } from "../../domain/snapGrid"
+import { snappedTurn } from "../../domain/snapRotate"
+import { quatFromAxisAngle, rotateVec, rotatorToQuat, vecAdd } from "../../domain/ueMath"
 import { sceneAxisColors } from "../axisColors"
-import { dragDelta, type DragStart, type PointerSample } from "./drag"
+import { constraintOf, type DragStart, localFrameOf, type PointerSample, scaleOf, stepAxesOf, turnOf } from "./drag"
 import { GizmoObject, type GizmoSpace, handleFacesCamera, pairOf, SIZE, toolHandles } from "./handles"
 import { axisParamFromRay, axisWorldDir, gameDirToWorld, planeHit, screenAngle } from "./math"
 
@@ -24,6 +28,24 @@ const frame = {
   cameraQuaternion: new THREE.Quaternion(),
   toCamera: v3(0, 0, 1)
 }
+
+describe("a handle's frame", () => {
+  const turned = rotatorToQuat({ roll: 0, pitch: 0, yaw: 30 })
+  const of = (spec: Omit<DragStart["spec"], "id">, space: GizmoSpace) =>
+    localFrameOf({ spec: { id: "handle", ...spec }, space, frameRotation: turned })
+
+  it("is the gizmo's axes along a local move or turn, which each unit takes as its own in Each", () => {
+    expect(of({ kind: "translateAxis", axis: "x" }, "local")).toBe(turned)
+    expect(of({ kind: "translatePlane", axis: "z" }, "local")).toBe(turned)
+    expect(of({ kind: "rotateAxis", axis: "z" }, "local")).toBe(turned)
+  })
+
+  it("isn't there along the game's axes, or for the ring about the view", () => {
+    expect(of({ kind: "translateAxis", axis: "x" }, "world")).toBeUndefined()
+    expect(of({ kind: "rotateAxis", axis: "z" }, "world")).toBeUndefined()
+    expect(of({ kind: "rotateView" }, "local")).toBeUndefined()
+  })
+})
 
 describe("gizmo math", () => {
   it("maps the game basis through coords: Z (blue) is world up", () => {
@@ -215,11 +237,32 @@ describe("gizmo drags (game space)", () => {
 
   /** The drag applied to the start's item (snapped to `gridSize` cm and `rotationStep` degrees when given). */
   const dragTransform = (s: TestDrag, now: PointerSample, gridSize?: number, rotationStep?: number) => {
-    const delta = dragDelta(s, now, {
-      grid: gridSize === undefined ? undefined : { size: gridSize, pivot: s.transform.translation },
-      rotationStep
-    })
-    return delta === undefined ? undefined : applyGroupDelta(s.transform, s.transform.translation, delta)
+    const constraint = constraintOf(s)
+    if (constraint !== undefined) {
+      const ray = ({ rayDir, rayOrigin }: PointerSample) => ({
+        origin: threeToUeVector(rayOrigin),
+        direction: threeToUeVector(rayDir)
+      })
+      const offset = freeOffset(constraint, threeToUeVector(s.originWorld), ray(s.pointer), ray(now))
+      if (offset === undefined) return undefined
+      const from = s.transform.translation
+      const free = vecAdd(from, offset)
+      const config = { ...defaultSnapConfig, gridSize: gridSize ?? 1 }
+      const translation = gridSize === undefined
+        ? free
+        : constrained(constraint, from, gridLanding(config, from, free, stepAxesOf(s)))
+      return { ...s.transform, translation }
+    }
+    const turn = turnOf(s, now)
+    if (turn !== undefined) {
+      const { angle } = snappedTurn({ free: turn.angle, axis: turn.axis, step: rotationStep, flush: [], reach: 0 })
+      const delta = { kind: "rotate", rotation: quatFromAxisAngle(turn.axis, angle) } as const
+      return applyGroupDelta(s.transform, s.transform.translation, delta)
+    }
+    const scale = scaleOf(s, now)
+    return scale === undefined
+      ? undefined
+      : applyGroupDelta(s.transform, s.transform.translation, { kind: "scale", ...scale })
   }
 
   it("translates along game X by the pointer's projection on the axis", () => {

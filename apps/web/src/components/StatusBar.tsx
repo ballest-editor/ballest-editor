@@ -2,6 +2,7 @@ import { EnteredGroupStatus } from "./EnteredGroupStatus"
 import { LastExportStatus, LinkStatus } from "./LinkStatus"
 import { NotificationCenter } from "./NotificationCenter"
 import { SelectionStatus } from "./SelectionStatus"
+import { SnapStatus } from "./SnapStatus"
 import { UpdatePill, UpdateStatus } from "./UpdatePill"
 
 /** Along the bottom of the window (docs/PROJECTS.md § Shell): the selection, the map's sync status, updates, the bell. */
@@ -18,7 +19,8 @@ export function StatusBar() {
       </div>
       <div className="flex min-w-0 items-center gap-1">
         <LastExportStatus />
-        <div className="ml-auto flex shrink-0 items-center gap-1">
+        <div className="ml-auto flex min-w-0 items-center gap-1">
+          <SnapStatus />
           <UpdatePill />
           <NotificationCenter />
         </div>

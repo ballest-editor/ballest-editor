@@ -1,7 +1,6 @@
 import { Schema } from "effect"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 import { assert, describe, it } from "vitest"
+import { readJson } from "./readJson.ts"
 
 const Row = Schema.Struct({
   name: Schema.optionalKey(Schema.String),
@@ -26,11 +25,8 @@ const Catalog = Schema.Struct({
   }))
 })
 
-const read = <A, I>(schema: Schema.Codec<A, I>, ...path: ReadonlyArray<string>): A =>
-  Schema.decodeSync(Schema.fromJsonString(schema))(readFileSync(join(import.meta.dirname, "..", ...path), "utf8"))
-
-const panel = read(Panel, "panel.json")
-const catalog = read(Catalog, "..", "..", "assets", "catalog.json")
+const panel = readJson(Panel, "panel.json")
+const catalog = readJson(Catalog, "..", "..", "assets", "catalog.json")
 
 /** The flags and surface a panel offers with its own controls, not with rows. */
 const CONTROLS = new Set(["bMirror", "bMirrorX", "PhysicsFlip", "SurfaceAssignment"])

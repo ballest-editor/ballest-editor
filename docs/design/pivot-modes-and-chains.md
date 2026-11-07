@@ -125,7 +125,7 @@ The game refuses a pivot on a group (`CanSetSelectionPivot` false) but loads a `
 
 **Should the editor store a frame?** Only as the Point choice, and only when the user asks for it. A frame stored for every group goes stale the moment a member is moved inside the group, and nothing in a re-match after an in-game edit can recover it. Centre stays the default because it follows the members. The gizmo jump after a turn, the known limit from #220, goes away for a group with an Item or Point pivot, and that is the fix I'd offer rather than a hidden frame: "Set pivot here" in the Inspector freezes the current pivot as a Point.
 
-**Moves.** A Point moves with the group's own moves and is left alone by turns and scales, since it is the pivot. A Point on a group whose members are then moved one at a time stays where the user put it.
+**Moves.** A Point moves with the group's own moves and is left alone by turns and scales, since it is the pivot. A snapped landing and a mirror are motions of the whole group rather than turns about the Point, so it goes with them, live during a landing's drag. A Point on a group whose members are then moved one at a time stays where the user put it.
 
 **Prefab instances** don't get the choice. Their pivot is the definition origin, and the Inspector says so where the choice would be. An instance scaled along one axis about any other point stops being a placement of its definition and reads as modified (`checkInstance`), so the one rule that keeps instances intact is to pivot there. In Each, an instance among the units pivots on its origin and stays unmodified. In Together with anything else selected, the shared pivot isn't its origin and a one-axis scale modifies it, as today.
 

@@ -27,3 +27,11 @@ export const DEFAULT_ROTATION_STEP: RotationStep = 15
 
 /** A rotation step for display: "15°", and "2.812°" as the game's menu cuts it short. */
 export const formatRotationStep = (step: number): string => `${Math.trunc(step * 1000) / 1000}°`
+
+/** Scale steps in percent, along an item's own axes as the game scales. */
+export const SCALE_STEPS = [10, 25, 50, 100] as const
+
+export const DEFAULT_SCALE_STEP = 10
+
+/** A scale step for display: "25%". */
+export const formatScaleStep = (step: number): string => `${step}%`

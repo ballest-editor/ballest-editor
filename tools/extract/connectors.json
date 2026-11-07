@@ -1,0 +1,719 @@
+{
+  "game": "0.4.1",
+  "measured": "2026-11-06",
+  "method": "docs/qa/connectors.md",
+  "pieces": {
+    "BP_Track_Short1": [
+      {
+        "position": [
+          -250,
+          0,
+          100
+        ],
+        "forward": [
+          -1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Track"
+      },
+      {
+        "position": [
+          250,
+          0,
+          100
+        ],
+        "forward": [
+          1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Track"
+      }
+    ],
+    "BP_Track_Mid1": [
+      {
+        "position": [
+          -500,
+          0,
+          100
+        ],
+        "forward": [
+          -1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Track"
+      },
+      {
+        "position": [
+          500,
+          0,
+          100
+        ],
+        "forward": [
+          1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Track"
+      }
+    ],
+    "BP_Track_Long1": [
+      {
+        "position": [
+          -500,
+          0,
+          100
+        ],
+        "forward": [
+          -1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Track"
+      },
+      {
+        "position": [
+          500,
+          0,
+          100
+        ],
+        "forward": [
+          1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Track"
+      }
+    ],
+    "BP_Track_Curve_Tiny1": [
+      {
+        "position": [
+          93.231,
+          -225.079,
+          100
+        ],
+        "forward": [
+          0.707107,
+          -0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Track"
+      },
+      {
+        "position": [
+          93.231,
+          225.079,
+          100
+        ],
+        "forward": [
+          0.707107,
+          0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Track"
+      }
+    ],
+    "BP_Track_Curve1": [
+      {
+        "position": [
+          450.158,
+          186.462,
+          100
+        ],
+        "forward": [
+          0.707107,
+          0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Track"
+      },
+      {
+        "position": [
+          -450.158,
+          186.462,
+          100
+        ],
+        "forward": [
+          -0.707107,
+          0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Track"
+      }
+    ],
+    "BP_Track_Curve_Large1": [
+      {
+        "position": [
+          900.316,
+          -372.923,
+          100
+        ],
+        "forward": [
+          0.707107,
+          -0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Track"
+      },
+      {
+        "position": [
+          -900.316,
+          -372.923,
+          100
+        ],
+        "forward": [
+          -0.707107,
+          -0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Track"
+      }
+    ],
+    "Bevel_Full_Straight": [
+      {
+        "position": [
+          500,
+          0,
+          117.5
+        ],
+        "forward": [
+          1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_F"
+      },
+      {
+        "position": [
+          -500,
+          0,
+          117.5
+        ],
+        "forward": [
+          -1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_F"
+      }
+    ],
+    "Bevel_Full_Turn": [
+      {
+        "position": [
+          136.62,
+          511.62,
+          62.5
+        ],
+        "forward": [
+          0.0,
+          1.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_F"
+      },
+      {
+        "position": [
+          -500,
+          -125,
+          62.5
+        ],
+        "forward": [
+          -1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_F"
+      }
+    ],
+    "Bevel_Full_Branch": [
+      {
+        "position": [
+          -449.12,
+          0.06,
+          117.5
+        ],
+        "forward": [
+          -1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_F"
+      },
+      {
+        "position": [
+          199.12,
+          636.56,
+          117.5
+        ],
+        "forward": [
+          0.0,
+          1.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_F"
+      },
+      {
+        "position": [
+          187.5,
+          -636.56,
+          117.5
+        ],
+        "forward": [
+          0.0,
+          -1.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_F"
+      }
+    ],
+    "BP_Bevel_Full_Cap": [
+      {
+        "position": [
+          175,
+          0,
+          62.5
+        ],
+        "forward": [
+          1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_F"
+      }
+    ],
+    "Bevel_Half_Straight": [
+      {
+        "position": [
+          500,
+          0,
+          62.5
+        ],
+        "forward": [
+          1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_H"
+      },
+      {
+        "position": [
+          -500,
+          0,
+          62.5
+        ],
+        "forward": [
+          -1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_H"
+      }
+    ],
+    "Bevel_Half_Turn": [
+      {
+        "position": [
+          450.158,
+          61.462,
+          62.5
+        ],
+        "forward": [
+          0.707107,
+          0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_H"
+      },
+      {
+        "position": [
+          -450.158,
+          61.462,
+          62.5
+        ],
+        "forward": [
+          -0.707107,
+          0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_H"
+      }
+    ],
+    "Bevel_Half_SSurveL": [
+      {
+        "position": [
+          -900.158,
+          0.212,
+          62.5
+        ],
+        "forward": [
+          -0.707107,
+          0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_H"
+      },
+      {
+        "position": [
+          900.158,
+          -0.212,
+          62.5
+        ],
+        "forward": [
+          0.707107,
+          -0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_H"
+      }
+    ],
+    "Bevel_Half_SSurveR": [
+      {
+        "position": [
+          -900.158,
+          -0.212,
+          62.5
+        ],
+        "forward": [
+          -0.707107,
+          -0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_H"
+      },
+      {
+        "position": [
+          900.158,
+          0.212,
+          62.5
+        ],
+        "forward": [
+          0.707107,
+          0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_H"
+      }
+    ],
+    "Bevel_Half_Cap": [
+      {
+        "position": [
+          175,
+          0,
+          62.5
+        ],
+        "forward": [
+          1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_H"
+      }
+    ],
+    "Bevel_Half_CornerStraight": [
+      {
+        "position": [
+          -500,
+          0,
+          62.5
+        ],
+        "forward": [
+          -1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_C",
+        "hand": "right"
+      },
+      {
+        "position": [
+          500,
+          0,
+          62.5
+        ],
+        "forward": [
+          1.0,
+          0.0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_C",
+        "hand": "left"
+      }
+    ],
+    "Bevel_Half_ConcaveCornerCurveFlat": [
+      {
+        "position": [
+          450.158,
+          186.462,
+          62.5
+        ],
+        "forward": [
+          0.707107,
+          0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_C",
+        "hand": "left"
+      },
+      {
+        "position": [
+          -450.158,
+          186.462,
+          62.5
+        ],
+        "forward": [
+          -0.707107,
+          0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_C",
+        "hand": "right"
+      }
+    ],
+    "Bevel_Half_TightConcaveCornerCurveFlat": [
+      {
+        "position": [
+          450.158,
+          186.462,
+          62.5
+        ],
+        "forward": [
+          0.707107,
+          0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_C",
+        "hand": "left"
+      },
+      {
+        "position": [
+          -450.158,
+          186.462,
+          62.5
+        ],
+        "forward": [
+          -0.707107,
+          0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_C",
+        "hand": "right"
+      }
+    ],
+    "Bevel_Half_ConvexCornerCurveFlat": [
+      {
+        "position": [
+          -450.158,
+          -186.462,
+          62.5
+        ],
+        "forward": [
+          -0.707107,
+          -0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_C",
+        "hand": "right"
+      },
+      {
+        "position": [
+          450.158,
+          -186.462,
+          62.5
+        ],
+        "forward": [
+          0.707107,
+          -0.707107,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "profile": "Bevel_C",
+        "hand": "left"
+      }
+    ]
+  }
+}

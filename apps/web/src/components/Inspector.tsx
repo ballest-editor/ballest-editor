@@ -46,6 +46,7 @@ import {
   selectionPivot,
   shownTransform,
   shownValidation,
+  snapConfigOf,
   useCreator,
   useEditor,
   useOpenPrefab
@@ -385,7 +386,7 @@ function TransformRow(props: {
   readonly onPaste: (value: Vec3) => void
   readonly perUnit: number
 }) {
-  const snapping = useEditor((s) => s.settings.snapping)
+  const snapping = useEditor(snapConfigOf)
   const { row, perUnit } = props
   const { field } = row
   // Scrubs follow the tool bar's snapping, in display units: the grid for location, the step for rotation.

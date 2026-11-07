@@ -18,7 +18,7 @@ const SNAPSHOT_PAUSE_MS = 1000
 const SNAPSHOT_MOST_MS = 5000
 
 /** What a tab's snapshot was made from; a tab whose fields are these has nothing new to keep. */
-type Sources = Pick<TabState, "doc" | "document" | "file"> & { readonly project: string | null }
+type Sources = Pick<TabState, "doc" | "document" | "file" | "snap"> & { readonly project: string | null }
 
 /** Tabs with a snapshot, by id: its key, and what it holds once it is written. */
 const kept = new Map<string, { readonly key: string; readonly sources: Sources | null }>()
@@ -45,7 +45,7 @@ const snapshotOf = (tab: TabState, project: string | null): RecoverySnapshot => 
     fresh: tab.fresh,
     backup: tab.backup,
     map: doc.map,
-    sidecar: sidecarOf(doc.map, doc.ids, doc.structure, RECOVERY_MAP_HASH),
+    sidecar: sidecarOf(doc.map, doc.ids, doc.structure, RECOVERY_MAP_HASH, tab.snap),
     prefab: document.kind === "map"
       ? null
       : {
@@ -60,7 +60,7 @@ const snapshotOf = (tab: TabState, project: string | null): RecoverySnapshot => 
 
 const isCurrent = (sources: Sources | null | undefined, tab: TabState, project: string | null) =>
   sources?.doc === tab.doc && sources.document === tab.document && sources.file === tab.file &&
-  sources.project === project
+  sources.snap === tab.snap && sources.project === project
 
 /** Makes the snapshots on disk what the tabs hold now: a tab's goes with its edits, and a changed tab's is rewritten. */
 export const syncRecovery = lock.withPermit(Effect.gen(function*() {
@@ -83,8 +83,8 @@ export const syncRecovery = lock.withPermit(Effect.gen(function*() {
     kept.set(tabId, { key, sources: null })
     const text = yield* MapCodec.use((codec) => codec.encodeRecovery(snapshotOf(tab, project)))
     yield* platform.writeRecovery({ key, text })
-    const { doc, document, file } = tab
-    kept.set(tabId, { key, sources: { doc, document, file, project } })
+    const { doc, document, file, snap } = tab
+    kept.set(tabId, { key, sources: { doc, document, file, snap, project } })
   }
 }))
 
@@ -121,6 +121,7 @@ export const followRecovery = Effect.gen(function*() {
   const unsubscribe = useEditor.subscribe((s, before) => {
     const same = s.doc === before.doc && s.parkedTabs === before.parkedTabs && s.tabIds === before.tabIds &&
       s.file === before.file && s.document === before.document && s.dirty === before.dirty &&
+      s.snap === before.snap &&
       projectOf(s) === projectOf(before)
     if (same) return
     const now = Date.now()
