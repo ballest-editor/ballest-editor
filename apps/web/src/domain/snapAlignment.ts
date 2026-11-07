@@ -57,23 +57,43 @@ const showNear = (frame: SnapFrame, a: Box, b: Box, range: number): boolean => {
   return Math.hypot(gapX, gapY) <= range
 }
 
+const FEATURES = ["min", "centre", "max"] as const
+
+type Feature = (typeof FEATURES)[number]
+
+/** A box's features in words, along the axis as the stations' "Near face" and "Far face" are. */
+const FEATURE_WORDS = { min: "Near side", centre: "Centre", max: "Far side" } as const
+
 interface Match {
   /** What to add along the axis, in cm. */
   readonly by: number
   readonly marks: ReadonlyArray<SnapMark>
-  readonly name: string
-  readonly apart: number
+  /** What it says, short of the axis a plane is on. */
+  readonly words: string
+  /** The item and feature a plane lines up: what two axes share to read as one. A gap has none. */
+  readonly level?: { readonly key: string; readonly feature: Feature }
 }
 
-const FEATURES = ["min", "centre", "max"] as const
+/** Closer than this, in cm, two matches are the same distance away: what's left is rounding, and differs by the frame. */
+const TIE = 1e-6
 
-/** The guide between the selection and a neighbour, with the distance between the pieces on it. */
-const guideBetween = (selection: Box, neighbour: Box, apart: number): SnapMark => ({
-  kind: "guide",
-  from: boxCentreOf(selection),
-  to: boxCentreOf(neighbour),
-  text: `${Math.round(apart)} cm`
-})
+/** The nearest first. Boxes of one size line up on all three features at once, and it's the centres that say so. */
+const nearerFirst = (a: Match, b: Match): number => {
+  const nearer = Math.abs(a.by) - Math.abs(b.by)
+  if (Math.abs(nearer) > TIE) return nearer
+  return Number(b.level?.feature === "centre") - Number(a.level?.feature === "centre")
+}
+
+/** The guide between the selection and a neighbour, with the distance between the pieces on it when there is one. */
+const guideBetween = (selection: Box, neighbour: Box, apart: number): SnapMark => {
+  const cm = Math.round(apart)
+  return {
+    kind: "guide",
+    from: boxCentreOf(selection),
+    to: boxCentreOf(neighbour),
+    ...(cm > 0 && { text: `${cm} cm` })
+  }
+}
 
 const planeMatches = (axis: Vec3, moved: Box, neighbours: ReadonlyArray<SnapItem>, cmRange: number) => {
   const own = spanOf(moved, axis)
@@ -86,8 +106,12 @@ const planeMatches = (axis: Vec3, moved: Box, neighbours: ReadonlyArray<SnapItem
         const by = theirs[their] - own[mine]
         if (Math.abs(by) > cmRange) return []
         const landed = movedBox(moved, vecScale(axis, by))
-        const apart = separation(landed, item.box)
-        return [{ by, name: item.name, apart, marks: [guideBetween(landed, item.box, apart)] }]
+        return [{
+          by,
+          words: `${FEATURE_WORDS[mine]} level with ${item.name}`,
+          level: { key: item.key, feature: mine },
+          marks: [guideBetween(landed, item.box, separation(landed, item.box))]
+        }]
       })
     )
   })
@@ -113,8 +137,7 @@ const gapMatches = (axis: Vec3, moved: Box, neighbours: ReadonlyArray<SnapItem>,
       const landed = movedBox(moved, vecScale(axis, by))
       return [{
         by,
-        name: near.name,
-        apart: gap,
+        words: `Same gap as ${near.name} to ${far.name}, ${Math.round(gap)} cm`,
         marks: [guideBetween(landed, near.box, gap), guideBetween(near.box, far.box, gap)]
       }]
     })
@@ -126,6 +149,15 @@ const gapsOn = (frame: SnapFrame): boolean => {
   return gapGuides === "always" || (gapGuides === "ortho" && frame.view.orthographic)
 }
 
+/** How far along a game axis a direction must run to go by its name: about 40° off it, past which it could be either. */
+const NAMED_AXIS = 0.75
+
+/** What a label calls an axis: the game's X, Y or Z it mostly runs along, which a grid turned a little keeps too. */
+const axisName = ({ x, y, z }: Vec3): string =>
+  ([["X", x], ["Y", y], ["Z", z]] as const).find(([, along]) => Math.abs(along) > NAMED_AXIS)?.[0] ?? "an axis"
+
+const labelOf = ({ level, words }: Match, axes: string): string => level === undefined ? words : `${words} on ${axes}`
+
 /** One axis of the move's alignment. */
 const axisHit = (frame: SnapFrame, base: BasePoint, axis: Vec3, best: Match): SnapHit => {
   const free = freePoint(frame, base)
@@ -136,14 +168,35 @@ const axisHit = (frame: SnapFrame, base: BasePoint, axis: Vec3, best: Match): Sn
     distance: Math.abs(best.by) / frame.view.cmPerPixelAt(free),
     base,
     landing,
-    label: `Level with ${best.name}, ${Math.round(best.apart)} cm`,
+    label: labelOf(best, axisName(axis)),
     marks: best.marks,
     held: { shape: "plane", origin: landing, normal: axis }
   }
 }
 
+/** An axis's hit, with what `together` reads it by. */
+interface AxisHit {
+  readonly hit: SnapHit
+  readonly match: Match
+  readonly axis: string
+}
+
+const sameLevel = ({ match: { level: a } }: AxisHit, { match: { level: b } }: AxisHit): boolean =>
+  a !== undefined && a.key === b?.key && a.feature === b.feature
+
+/** Two axes in one label, in the game's order whichever way the plane's axes came out. */
+const jointLabel = (hits: ReadonlyArray<AxisHit>): string => {
+  const ordered = [...hits].sort((a, b) => a.axis.localeCompare(b.axis))
+  const [first, second] = ordered
+  if (first === undefined || second === undefined || !sameLevel(first, second)) {
+    return ordered.map(({ hit }) => hit.label).join("; ")
+  }
+  return labelOf(first.match, first.axis === second.axis ? "two axes" : `${first.axis} and ${second.axis}`)
+}
+
 /** What a move's axes land on together: on a plane for one, and where the planes meet for two. */
-const together = (frame: SnapFrame, base: BasePoint, hits: ReadonlyArray<SnapHit>): ReadonlyArray<SnapHit> => {
+const together = (frame: SnapFrame, base: BasePoint, axes: ReadonlyArray<AxisHit>): ReadonlyArray<SnapHit> => {
+  const hits = axes.map(({ hit }) => hit)
   const [first] = hits
   if (first === undefined || hits.length === 1) return hits
   const free = freePoint(frame, base)
@@ -152,6 +205,7 @@ const together = (frame: SnapFrame, base: BasePoint, hits: ReadonlyArray<SnapHit
     ...first,
     distance: vecLength(vecSub(landing, free)) / frame.view.cmPerPixelAt(free),
     landing,
+    label: jointLabel(axes),
     marks: hits.flatMap(({ marks }) => marks),
     held: { shape: "point", at: landing },
     parts: hits
@@ -173,13 +227,13 @@ export const alignmentHit = (
     frame.view.inView(box) && (frame.view.orthographic || showNear(frame, moved, box, range))
   )
   if (neighbours.length === 0) return []
-  const hits = axesOf(frame.constraint).flatMap((axis) => {
+  const hits = axesOf(frame.constraint).flatMap((axis): ReadonlyArray<AxisHit> => {
     const found = [
       ...planeMatches(axis, moved, neighbours, cmRange),
       ...(gapsOn(frame) ? gapMatches(axis, moved, neighbours, cmRange) : [])
-    ].sort((a, b) => Math.abs(a.by) - Math.abs(b.by))
+    ].sort(nearerFirst)
     const best = found[0]
-    return best === undefined ? [] : [axisHit(frame, base, axis, best)]
+    return best === undefined ? [] : [{ hit: axisHit(frame, base, axis, best), match: best, axis: axisName(axis) }]
   })
-  return together(frame, base, hits.filter(takes))
+  return together(frame, base, hits.filter(({ hit }) => takes(hit)))
 }
