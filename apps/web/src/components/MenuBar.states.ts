@@ -13,6 +13,7 @@ export default states({
   "menu/file": menu("File", { anchor: true }),
   "menu/edit": menu("Edit"),
   "menu/view": menu("View"),
+  "menu/tools": menu("Tools"),
   "menu/project": menu("Project"),
   "menu/help": menu("Help")
 })
