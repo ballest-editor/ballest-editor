@@ -16,6 +16,18 @@ describe("sky", () => {
     assert.isTrue(Math.max(...midnight!) < Math.min(noon![2], sunrise![0]))
   })
 
+  // Sampled from the game (docs/qa/sky-horizon.md): the renderer's own tone mapping can't get from the curves to these.
+  it("shows the horizon the game shows, through the day and at night", () => {
+    const measured = [[5, "#d18548"], [6, "#d0884b"], [7.2997, "#cc9f8b"], [9, "#abbcce"], [12, "#abbcce"], [
+      18,
+      "#d0884b"
+    ], [22, "#171b31"]] as const
+    for (const [time, hex] of measured) {
+      const expected = Option.getOrThrow(hexToLinear(hex))
+      skyAt(time).shownHorizon.forEach((channel, i) => assert.closeTo(channel, expected[i]!, 0.01, `${time}:00`))
+    }
+  })
+
   it("evaluates UE curves through their keys and holds the ends", () => {
     const keys = [[0, 1, 0, 0], [1, 3, 2, 2], [2, 0, 0, 0]] as const
     assert.closeTo(evalCurve(keys, 0), 1, EPSILON)

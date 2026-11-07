@@ -10,6 +10,7 @@ import { ElectronProtocol, registerSchemePrivileges } from "./electron/ElectronP
 import { ElectronShell } from "./electron/ElectronShell"
 import { ElectronUpdater } from "./electron/ElectronUpdater"
 import { ElectronWindow } from "./electron/ElectronWindow"
+import { layerScriptedDialogs } from "./electron/ScriptedDialogs"
 import { GameCreator } from "./game/GameCreator"
 import { GameHost } from "./game/GameHost"
 import { GameLink } from "./game/GameLink"
@@ -36,9 +37,12 @@ registerSchemePrivileges()
 const userDataDir = process.env["BALLEST_USER_DATA_DIR"]
 if (userDataDir !== undefined) Electron.app.setPath("userData", userDataDir)
 
+// The app driver answers native dialogs from a file (tools/app-driver); a packaged app never does.
+const scriptedDialogs = Electron.app.isPackaged ? undefined : process.env["BALLEST_APP_DRIVER_DIALOGS"]
+
 const layerElectron = Layer.mergeAll(
   ElectronApp.layer,
-  ElectronDialog.layer,
+  scriptedDialogs === undefined ? ElectronDialog.layer : layerScriptedDialogs(scriptedDialogs),
   ElectronMenu.layer,
   ElectronShell.layer,
   ElectronUpdater.layer,

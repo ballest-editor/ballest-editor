@@ -24,7 +24,7 @@ import { dropPoint, pieceFootprint } from "../domain/placement"
 import { ORTHO_GROUND, SCENE_COLORS } from "../domain/sceneGround"
 import { gridColorsOf } from "../domain/Settings"
 import { holdsDrop, placeAt, placePrefab, placeSnapped } from "./actions"
-import { fadeFineLines } from "./floorGrid"
+import { fadeFineLines, gridReach } from "./floorGrid"
 import { FlyCamera } from "./FlyCamera"
 import { GizmoController } from "./gizmo/GizmoController"
 import { GroupBox } from "./groupBox"
@@ -50,7 +50,7 @@ import { groupBoxOf, noTabOpen, type SelectMode, shownPivotDots, snapConfigOf, u
 import { useDarkTheme } from "./theme"
 import { isMesh } from "./threeGuards"
 import { glbUrl, visualsOf } from "./visuals"
-import { setWaterFloor, setWaterTheme, waterTopMaterial, waterUnderMaterial } from "./water"
+import { setWaterShown, setWaterTheme, waterTopMaterial, waterUnderMaterial } from "./water"
 
 const CLICK_SLOP_PX = 4
 
@@ -333,6 +333,8 @@ function ViewportGrid() {
     if (!(material instanceof THREE.ShaderMaterial)) return
     const fadeFrom: unknown = material.uniforms["worldCamProjPosition"]?.value
     if (fadeFrom instanceof THREE.Vector3) fadeFrom.set(position.x, floorHeight, position.z)
+    const fadeDistance = material.uniforms["fadeDistance"]
+    if (fadeDistance !== undefined) fadeDistance.value = gridReach(position.y - floorHeight, SKY_DOME_RADIUS)
     material.uniformsNeedUpdate = true
   })
   return (
@@ -364,8 +366,7 @@ function Water() {
   const appearance = useEditor((s) => s.settings.appearance)
   const dark = useDarkTheme(appearance.theme)
   useEffect(() => setWaterTheme(dark ? "dark" : "light"), [dark])
-  const floorHeight = useEditor((s) => s.floorHeight)
-  useEffect(() => setWaterFloor(floorHeight), [floorHeight])
+  useEffect(() => setWaterShown(appearance.waterVisible), [appearance.waterVisible])
   const geometry = useMemo(() => new THREE.PlaneGeometry(WATER.size, WATER.size), [])
   useEffect(() => () => geometry.dispose(), [geometry])
   if (!appearance.waterVisible) return null

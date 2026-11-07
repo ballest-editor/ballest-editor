@@ -7,6 +7,10 @@ description: Check Ballest Editor in a real browser or the desktop app against t
 
 Logic gets a test, not a browser (AGENTS.md § Verifying). This is for what only a running app shows. It runs once, in the agent that integrates the work; a delegated agent doesn't start a dev server or a browser unless its brief says to.
 
+## Declared states first
+
+To see, measure or compare a view that has a state, use [`pnpm app-driver`](../../../tools/app-driver/README.md) or the `ballest-app-driver` MCP tools, not the steps below. They start the app in isolation, pin what moves, cover desktop surfaces, and return a summary and a contact sheet. A state worth repeating goes in a `*.states.ts` file. The helper here is for a quick look at something no state reaches.
+
 ## Start the app
 
 Run `pnpm dev` in the background and keep hold of it. The port is this checkout's own: read it from the `Local:` line of the output, and before trusting a result make sure that server is this checkout's, not another agent's. Stop what you started by its PID or port. Never `pkill -f` or `pgrep -f` a name or path: your own shell has that text in its command line.

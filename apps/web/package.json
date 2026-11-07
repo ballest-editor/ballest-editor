@@ -27,6 +27,7 @@
     "zustand": "^5.0.16"
   },
   "devDependencies": {
+    "@ballest/app-driver": "workspace:*",
     "@effect/vitest": "^4.0.6",
     "@tanstack/router-plugin": "^1.168.48",
     "@types/node": "^22.20.5",

@@ -125,7 +125,7 @@ interface Patch {
  * (`time - ActivationTime`, 0 until the ball reaches it): at 0 they would draw the flash of the moment it is reached.
  */
 const GAME_TIME_START = 600
-const gameTime: THREE.IUniform<number> = { value: GAME_TIME_START }
+export const gameTime: THREE.IUniform<number> = { value: GAME_TIME_START }
 
 /** Moves the programs' clock on by `seconds`: the air and the glows scroll as they do in the game. */
 export const advanceGameTime = (seconds: number): void => {

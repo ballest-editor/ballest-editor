@@ -7,9 +7,8 @@ import { ARENA_COLOR, ARENA_RIM, luminance, type Sky, skyIrradiance, skyOf } fro
 import { sunOf, viewLightOf } from "../domain/sunlight"
 import { perspectiveOnly } from "./paneCameras"
 import { useBeforePaneDraw } from "./PaneRenderer"
-import { setSky, SKY_DOME_RADIUS, SKY_HAZE_BELOW, type SkyKind, SkyMaterial } from "./sky"
+import { setSky, SKY_DOME_RADIUS, type SkyKind, SkyMaterial } from "./sky"
 import { shownLighting, useEditor } from "./store"
-import { useDarkTheme } from "./theme"
 import { setWaterLight } from "./water"
 
 /** The studio rig: fill lights and a fixed sun. */
@@ -33,7 +32,7 @@ const STUDIO_UPWARD_LIGHT = upwardLight(STUDIO_FILL, STUDIO_SUN_INTENSITY, STUDI
 
 /**
  * The viewport's sky and lights, each its own setting. The sky is the game's, drawn around
- * the camera with the sun disc in it, hazing out over the far floor; each pane says whether it
+ * the camera with the sun disc in it, ending at the horizon; each pane says whether it
  * shows it, and hidden, nothing takes its place and the pane shows the clear colour. Map lighting
  * lights the scene the game's way: the
  * sun as a directional light and the sky light as an environment map captured from that sky (as
@@ -61,8 +60,7 @@ const useMapSun = () => {
 
 function MapSky() {
   const { sky } = useMapSun()
-  const floorHeight = useEditor((s) => s.floorHeight)
-  return <SkyDome sky={sky} clipBelow={floorHeight} />
+  return <SkyDome sky={sky} />
 }
 
 function StudioLights() {
@@ -111,21 +109,14 @@ const useShownSky = (kind: SkyKind, makeGeometry: () => THREE.BufferGeometry, sk
 }
 
 /**
- * The visible sky: a sphere that travels with each pane's camera, drawn before everything else, and
- * hazing out over the far floor so the clear colour shows under the near grid.
- * (The sky light is captured separately, so the fade doesn't change how pieces are lit.)
+ * The visible sky: a sphere that travels with each pane's camera, drawn before everything else, with
+ * the sea on its lower half, so the two meet at the horizon from any height.
+ * (The sky light is captured separately, so none of this changes how pieces are lit.)
  * An orthographic pane has none: a dome means nothing without perspective.
  */
-function SkyDome({ sky, clipBelow }: { readonly sky: Sky; readonly clipBelow: number }) {
+function SkyDome({ sky }: { readonly sky: Sky }) {
   const mesh = useRef<THREE.Mesh>(null)
   const { material, geometry } = useShownSky("dome", domeGeometry, sky)
-  useEffect(() => {
-    material.sky.uClipY.value = clipBelow
-  }, [material, clipBelow])
-  const dark = useDarkTheme(useEditor((s) => s.settings.appearance.theme))
-  useEffect(() => {
-    material.sky.uHazeBelow.value = SKY_HAZE_BELOW[dark ? "dark" : "light"]
-  }, [material, dark])
   const visible = useEditor((s) => s.settings.lighting.skyVisible)
   useBeforePaneDraw(({ perspective }) => {
     if (mesh.current === null) return
