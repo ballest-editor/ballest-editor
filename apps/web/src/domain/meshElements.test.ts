@@ -1,18 +1,24 @@
 import { assert, describe, it } from "@effect/vitest"
 import { assertVec } from "../test/vec"
 import type { Vec3 } from "./coords"
-import { meshElementsOf, placedMesh } from "./meshElements"
-import { ORIGIN } from "./ueMath"
+import { meshElementsOf, placedMesh, runMidpoints } from "./meshElements"
+import { ORIGIN, vecDistance } from "./ueMath"
 
 const quad = (a: Array<number>, b: Array<number>, c: Array<number>, d: Array<number>) => [a, b, c, a, c, d].flat()
 const p = (x: number, y: number, z: number) => [x * 100, y * 100, z * 100]
 
+const fan = (centre: Array<number>, rim: ReadonlyArray<Array<number>>) =>
+  rim.flatMap((at, i) => [centre, at, rim[(i + 1) % rim.length] ?? at].flat())
+
 /** A 100 cm cube of 12 triangles, with its corners repeated per face as a real mesh's are. */
-const cube = (top = quad(p(0, 0, 1), p(1, 0, 1), p(1, 1, 1), p(0, 1, 1))) =>
+const cube = (
+  top = quad(p(0, 0, 1), p(1, 0, 1), p(1, 1, 1), p(0, 1, 1)),
+  front = quad(p(0, 0, 0), p(1, 0, 0), p(1, 0, 1), p(0, 0, 1))
+) =>
   new Float32Array([
     ...quad(p(0, 0, 0), p(0, 1, 0), p(1, 1, 0), p(1, 0, 0)),
     ...top,
-    ...quad(p(0, 0, 0), p(1, 0, 0), p(1, 0, 1), p(0, 0, 1)),
+    ...front,
     ...quad(p(0, 1, 0), p(0, 1, 1), p(1, 1, 1), p(1, 1, 0)),
     ...quad(p(0, 0, 0), p(0, 0, 1), p(0, 1, 1), p(0, 1, 0)),
     ...quad(p(1, 0, 0), p(1, 1, 0), p(1, 1, 1), p(1, 0, 1))
@@ -33,6 +39,17 @@ const bar = (sides: number) => {
   )
 }
 
+/** A flat strip around the origin, 100 cm wide with its outer lip at 1000 cm, of `segments` bends of `degrees` each. */
+const strip = (degrees: number, segments: number) => {
+  const at = (radius: number, i: number) => {
+    const angle = i * degrees * Math.PI / 180
+    return [Math.cos(angle) * radius, Math.sin(angle) * radius, 0]
+  }
+  return new Float32Array(
+    Array.from({ length: segments }, (_, i) => quad(at(900, i), at(1000, i), at(1000, i + 1), at(900, i + 1))).flat()
+  )
+}
+
 describe("meshElementsOf", () => {
   it("welds a mesh's repeated corners, and leaves a flat face's triangulation out of its edges", () => {
     const elements = meshElementsOf(cube(), null, 30)
@@ -42,9 +59,8 @@ describe("meshElementsOf", () => {
   })
 
   it("leaves a vertex in the middle of a flat face out", () => {
-    const rim = [p(0, 0, 1), p(1, 0, 1), p(1, 1, 1), p(0, 1, 1)]
-    const fan = rim.flatMap((at, i) => [p(0.5, 0.5, 1), at, rim[(i + 1) % 4] ?? at].flat())
-    const elements = meshElementsOf(cube(fan), null, 30)
+    const top = fan(p(0.5, 0.5, 1), [p(0, 0, 1), p(1, 0, 1), p(1, 1, 1), p(0, 1, 1)])
+    const elements = meshElementsOf(cube(top), null, 30)
     assert.lengthOf(elements.vertices, 8)
     assert.lengthOf(elements.edges, 12)
     assert.lengthOf(elements.faceCentres, 6)
@@ -62,6 +78,54 @@ describe("meshElementsOf", () => {
   it("counts the rim of an open surface, which has one face", () => {
     const sheet = new Float32Array([0, 0, 0, 100, 0, 0, 100, 100, 0, 0, 0, 0, 100, 100, 0, 0, 100, 0])
     assert.lengthOf(meshElementsOf(sheet, null, 30).edges, 4)
+  })
+
+  it("welds a straight edge the mesh splits into one run, with no vertex or middle at the splits", () => {
+    const [near, far] = [p(1 / 3, 0, 1), p(2 / 3, 0, 1)]
+    const elements = meshElementsOf(
+      cube(
+        fan(p(0.5, 0.5, 1), [p(0, 0, 1), near, far, p(1, 0, 1), p(1, 1, 1), p(0, 1, 1)]),
+        fan(p(0.5, 0, 0.5), [p(0, 0, 0), p(1, 0, 0), p(1, 0, 1), far, near, p(0, 0, 1)])
+      ),
+      null,
+      30
+    )
+    assert.lengthOf(elements.vertices, 8)
+    assert.lengthOf(elements.edges, 14, "every segment stays an edge")
+    assert.lengthOf(elements.runs, 12)
+    assert.lengthOf(elements.runs.filter((run) => run.length === 4), 1)
+    const middles = runMidpoints(elements)
+    assert.lengthOf(middles, 12)
+    assert.isTrue(middles.some(({ x, y, z }) => Math.abs(x - 50) < 1e-3 && y === 0 && z === 100))
+  })
+
+  it("welds a curved lip of gentle bends into one run, with its ends for vertices and one middle", () => {
+    const elements = meshElementsOf(strip(2, 30), null, 30)
+    assert.lengthOf(elements.vertices, 4, "the two ends of each lip")
+    assert.lengthOf(elements.edges, 62)
+    assert.lengthOf(elements.runs, 4, "two lips and two ends")
+    const lips = elements.runs.filter((run) => run.length === 31)
+    assert.lengthOf(lips, 2)
+    const middles = runMidpoints(elements)
+    assert.lengthOf(middles, 4)
+    const arcMiddle = { x: Math.cos(Math.PI / 6) * 1000, y: 500, z: 0 }
+    assert.isTrue(middles.some((middle) => vecDistance(middle, arcMiddle) < 1e-3), "the outer lip's middle")
+  })
+
+  it("ends a run where it bends by the sharp angle or more", () => {
+    const elements = meshElementsOf(strip(90, 2), null, 30)
+    assert.lengthOf(elements.vertices, 6)
+    assert.lengthOf(elements.runs, 6)
+    assert.lengthOf(meshElementsOf(strip(29, 2), null, 30).vertices, 4)
+    assert.lengthOf(meshElementsOf(strip(31, 2), null, 30).vertices, 6)
+  })
+
+  it("gives a closed rim with no corner one run and no vertex", () => {
+    const { edges, runs, vertices } = meshElementsOf(bar(512), null, 30)
+    assert.lengthOf(vertices, 0)
+    assert.lengthOf(edges, 1024)
+    assert.deepStrictEqual(runs.map((run) => run.length), [513, 513])
+    assert.isTrue(runs.every((run) => run[0] === run[512]))
   })
 
   it("reads an index when the mesh has one", () => {
@@ -90,7 +154,7 @@ describe("meshElementsOf", () => {
   it("turns a face's normal with a transform, and flips it along a mirrored axis", () => {
     const [face] = meshElementsOf(new Float32Array([0, 0, 0, 100, 0, 0, 0, 100, 0]), null, 30).faces
     if (face === undefined) return assert.fail("a triangle is a face")
-    const elements = { vertices: [], edges: [], faceCentres: [], faces: [face] }
+    const elements = { vertices: [], edges: [], runs: [], faceCentres: [], faces: [face] }
     const normalUnder = (place: (p: Vec3) => Vec3) => placedMesh(elements, place).faces[0]?.normal ?? ORIGIN
     assertVec(normalUnder(({ x, y, z }) => ({ x: z, y, z: -x })), { x: 1, y: 0, z: 0 }, "a quarter turn")
     assertVec(normalUnder(({ x, y, z }) => ({ x, y, z: -z })), { x: 0, y: 0, z: -1 }, "mirrored along it")
@@ -103,6 +167,22 @@ describe("meshElementsOf", () => {
     const placed = placedMesh(elements, (point) => ({ ...point, z: point.z + 7 }))
     assert.isTrue(placed.vertices.every((v) => v.z === 7))
     assert.isTrue(placed.edges.every(([a, b]) => a.z === 7 && b.z === 7))
+    assert.lengthOf(placed.runs, 3)
+    assert.isTrue(placed.runs.flat().every(({ z }) => z === 7))
     assert.isTrue(placed.faces.every(({ centre, corners }) => [centre, ...corners].every(({ z }) => z === 7)))
+  })
+})
+
+describe("runMidpoints", () => {
+  it("halves a run by its length, not by its points", () => {
+    const run = [{ x: 0, y: 0, z: 0 }, { x: 10, y: 0, z: 0 }, { x: 100, y: 0, z: 0 }]
+    const middles = runMidpoints({ vertices: [], edges: [], runs: [run], faceCentres: [], faces: [] })
+    assert.deepStrictEqual(middles, [{ x: 50, y: 0, z: 0 }])
+  })
+
+  it("takes each edge of a mesh without runs as a run", () => {
+    const edge = [{ x: 0, y: 0, z: 0 }, { x: 100, y: 0, z: 0 }] as const
+    const middles = runMidpoints({ vertices: [], edges: [edge], faceCentres: [], faces: [] })
+    assert.deepStrictEqual(middles, [{ x: 50, y: 0, z: 0 }])
   })
 })

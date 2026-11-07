@@ -1,8 +1,8 @@
 /**
- * What a mesh offers the Mesh target (docs/SNAPPING.md § Mesh): the vertices where its sharp edges meet, those edges,
- * the centres of its flat faces, and those flat faces that are faces of the piece. Worked out from the triangles the
- * renderer has, with a mesh's repeated corners welded, since a corner is repeated once per normal it needs. No renderer
- * here: the editor hands in the arrays.
+ * What a mesh offers the Mesh target (docs/SNAPPING.md § Mesh): the corners where its sharp edges meet, those edges and
+ * the runs they weld into, the centres of its flat faces, and those flat faces that are faces of the piece. Worked out
+ * from the triangles the renderer has, with a mesh's repeated corners welded, since a corner is repeated once per normal
+ * it needs. No renderer here: the editor hands in the arrays.
  */
 import type { Vec3 } from "./coords"
 import {
@@ -10,6 +10,7 @@ import {
   squareTo,
   vecAdd,
   vecCross,
+  vecDistance,
   vecDot,
   vecLength,
   vecLerp,
@@ -28,18 +29,22 @@ export interface MeshFace {
 }
 
 export interface MeshElements {
-  /** The ends of `edges`: a triangulated mesh's other vertices are in the middle of a face. */
+  /** The ends and corners of `runs`. A closed run with no corner, a cylinder's rim, has none. */
   readonly vertices: ReadonlyArray<Vec3>
-  /** Its sharp edges and the rim of any open surface. */
+  /** Its sharp edges and the rim of any open surface, a segment at a time. */
   readonly edges: ReadonlyArray<readonly [Vec3, Vec3]>
+  /** `edges` welded into the edges a user sees, each as its polyline: a closed one ends where it starts. */
+  readonly runs: ReadonlyArray<ReadonlyArray<Vec3>>
   /** The middle of each flat face, however many triangles make it. */
   readonly faceCentres: ReadonlyArray<Vec3>
   /** The flat faces that are at least `FACE_SHARE` of its surface. */
   readonly faces: ReadonlyArray<MeshFace>
 }
 
-/** The same elements in the world. */
-export type WorldMesh = MeshElements
+/** The same elements in the world. One built by hand can leave `runs` out: each of its edges is then a run. */
+export interface WorldMesh extends Omit<MeshElements, "runs"> {
+  readonly runs?: MeshElements["runs"]
+}
 
 /** Two corners closer than this are one. */
 const WELD_CM = 0.01
@@ -182,8 +187,62 @@ const faceOf = (run: ReadonlyArray<Triangle>, vertices: ReadonlyArray<Vec3>): Me
 }
 
 /**
+ * The sharp edges `segments` welded into runs, and the corners that end them. A run carries on through a vertex with two
+ * sharp edges that turn by less than `sharp`, the cosine of the sharp angle, so a straight edge or a curved lip the mesh
+ * tessellates is one run. Whatever is left once every corner's runs are walked is a closed run with no corner.
+ */
+const runsOf = (
+  segments: ReadonlyArray<readonly [number, number]>,
+  pointOf: (vertex: number) => Vec3,
+  sharp: number
+) => {
+  const meeting = new Map<number, Array<number>>()
+  segments.forEach((ends, segment) => {
+    for (const vertex of ends) {
+      const around = meeting.get(vertex)
+      if (around === undefined) meeting.set(vertex, [segment])
+      else around.push(segment)
+    }
+  })
+  const across = (segment: number, vertex: number) => {
+    const [a = vertex, b = vertex] = segments[segment] ?? []
+    return a === vertex ? b : a
+  }
+  const isCorner = (vertex: number) => {
+    const [first, second, ...others] = meeting.get(vertex) ?? []
+    if (first === undefined || second === undefined || others.length > 0) return true
+    const at = pointOf(vertex)
+    const coming = vecNormalize(vecSub(at, pointOf(across(first, vertex))))
+    const going = vecNormalize(vecSub(pointOf(across(second, vertex)), at))
+    return vecDot(coming, going) <= sharp
+  }
+  const corners = new Set([...meeting.keys()].filter(isCorner))
+  const walked = new Set<number>()
+  const walk = (start: number, first: number) => {
+    const run = [start]
+    let vertex = start
+    let segment: number | undefined = first
+    while (segment !== undefined) {
+      walked.add(segment)
+      vertex = across(segment, vertex)
+      run.push(vertex)
+      segment = corners.has(vertex) ? undefined : meeting.get(vertex)?.find((next) => !walked.has(next))
+    }
+    return run
+  }
+  const fromCorners = [...corners].flatMap((corner) =>
+    (meeting.get(corner) ?? []).map((segment) => [corner, segment] as const)
+  )
+  const fromAnywhere = segments.map(([a], segment) => [a, segment] as const)
+  const runs = [...fromCorners, ...fromAnywhere].flatMap(([from, segment]) =>
+    walked.has(segment) ? [] : [walk(from, segment)]
+  )
+  return { corners, runs }
+}
+
+/**
  * The elements of a mesh of `positions` (three numbers a corner), through `index` when it has one. An edge is sharp when
- * its two faces meet at more than `sharpAngle` degrees.
+ * its two faces meet at more than `sharpAngle` degrees, and it bends at a corner when it turns by at least as much.
  */
 export const meshElementsOf = (
   positions: ArrayLike<number>,
@@ -194,24 +253,22 @@ export const meshElementsOf = (
   const triangles = trianglesOf(vertices, welded, index)
   const faces = facesOfEdges(triangles)
   const sharp = Math.cos(sharpAngle * Math.PI / 180)
-  const ends = new Set<number>()
-  const edges = [...faces.values()].flatMap(({ a, b, faces: around }) => {
-    const [from, to] = [vertices[a], vertices[b]]
-    if (from === undefined || to === undefined) return []
+  const segments = [...faces.values()].flatMap(({ a, b, faces: around }) => {
     const [p, q] = [triangles[around[0] ?? 0], triangles[around[1] ?? 0]]
     const isRim = around.length === 1
     const bends = p !== undefined && q !== undefined && vecDot(p.normal, q.normal) < sharp
-    if (!isRim && !bends) return []
-    ends.add(a).add(b)
-    return [[from, to] as const]
+    return isRim || bends ? [[a, b] as const] : []
   })
-  const runs = flatRuns(triangles, faces)
+  const pointOf = (vertex: number) => vertices[vertex] ?? ORIGIN
+  const { corners, runs } = runsOf(segments, pointOf, sharp)
+  const flats = flatRuns(triangles, faces)
   const least = areaOf(triangles) * FACE_SHARE
   return {
-    vertices: vertices.filter((_, i) => ends.has(i)),
-    edges,
-    faceCentres: runs.map(centreOf),
-    faces: runs.filter((run) => areaOf(run) >= least).map((run) => faceOf(run, vertices))
+    vertices: vertices.filter((_, i) => corners.has(i)),
+    edges: segments.map(([a, b]) => [pointOf(a), pointOf(b)] as const),
+    runs: runs.map((run) => run.map(pointOf)),
+    faceCentres: flats.map(centreOf),
+    faces: flats.filter((run) => areaOf(run) >= least).map((run) => faceOf(run, vertices))
   }
 }
 
@@ -225,9 +282,10 @@ const placedNormal = ({ centre, normal }: MeshFace, place: (point: Vec3) => Vec3
 }
 
 /** `elements` under `place`, which takes a point of the mesh to the world. */
-export const placedMesh = (elements: MeshElements, place: (point: Vec3) => Vec3): WorldMesh => ({
+export const placedMesh = (elements: MeshElements, place: (point: Vec3) => Vec3): MeshElements => ({
   vertices: elements.vertices.map(place),
   edges: elements.edges.map(([a, b]) => [place(a), place(b)] as const),
+  runs: elements.runs.map((run) => run.map(place)),
   faceCentres: elements.faceCentres.map(place),
   faces: elements.faces.map((face) => ({
     centre: place(face.centre),
@@ -238,3 +296,18 @@ export const placedMesh = (elements: MeshElements, place: (point: Vec3) => Vec3)
 
 /** Where an edge's middle is. */
 export const midpointOf = ([a, b]: readonly [Vec3, Vec3]): Vec3 => vecLerp(a, b, 0.5)
+
+/** The point halfway along a polyline, by its length. */
+const halfwayAlong = (run: ReadonlyArray<Vec3>): ReadonlyArray<Vec3> => {
+  const segments = run.slice(1).map((to, i) => [run[i] ?? to, to] as const)
+  let left = segments.reduce((sum, [a, b]) => sum + vecDistance(a, b), 0) / 2
+  for (const [a, b] of segments) {
+    const length = vecDistance(a, b)
+    if (left < length) return [vecLerp(a, b, left / length)]
+    left -= length
+  }
+  return []
+}
+
+/** The middle of each whole edge, however many segments the mesh gives it. */
+export const runMidpoints = ({ edges, runs = edges }: WorldMesh): ReadonlyArray<Vec3> => runs.flatMap(halfwayAlong)
