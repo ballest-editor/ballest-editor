@@ -387,7 +387,8 @@ const stationsOf = (frame: SnapFrame, item: SnapItem) => {
     marks: [{ kind: "face", corners }],
     rotation: faceTurn(frame, normal)
   }))
-  const centres = points
+  // a face's centre is a point to land on under a plane handle; under a line it would be one more middle
+  const centres = points && frame.constraint.kind === "plane"
     ? faces.map(({ centre }): Spot => ({ at: centre, label: `Centre of a face of ${item.name}`, item: item.key }))
     : []
   return { centres, stations: [...stations, ...middlesOf(item, across)] }

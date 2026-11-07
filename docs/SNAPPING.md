@@ -89,11 +89,11 @@ A move along a handle or a lock wants the places that matter along that axis, no
 
 - **Its faces across the move**: a flat face whose normal runs along the line, or lies in the plane, within 5°. Faces use the Faces toggle. A plane target, it stops the move wherever the rest of the base is, and the Offset and Rotate to face apply as they do on any face.
 - **The middle** between the two outermost of those along each direction, when they face apart. It uses the Faces toggle too, and shows as a dashed guide between them.
-- **The centres of its faces**, as points, under the Face centres toggle: on a plane handle, this is what lands on the middle of a cap that looks along the plane's normal.
+- **The centres of its faces**, as points, under the Face centres toggle, on a plane handle only: this is what lands on the middle of a cap that looks along the plane's normal. Along a line a face's centre would only be one more middle, so it isn't offered there.
 
 A flat face counts when it is at least 0.25% of the mesh's surface. Below that it is a facet of something curved: a bent tube has 802 flat faces, and its two caps are the only ones that pass. A piece that is curved all the way round, a sphere, has no stations, and Alignment is what lines it up. Bounds stand in here as they do elsewhere: until its mesh has loaded, a piece offers the faces of its box, their middle and their centres, under the bounds toggles.
 
-The selection's own stations (§ Snap base) pair like with like, as Alignment does. A near or far face stops on a face: near on near and far on far lie flush inside, near on far and far on near touch outside. The centre stops on the middle and on no face. With Face centres off, a Track S moved along X through a Track L stops five times: touching, flush, centred, flush, touching. A face centre is a point and every base stops on it, so with them on a piece in line with another also stops with its centre on each cap.
+The selection's own stations (§ Snap base) pair like with like, as Alignment does. A near or far face stops on a face: near on near and far on far lie flush inside, near on far and far on near touch outside. The centre stops on the middle and on no face. So a Track S moved along X through a Track L stops five times: touching, flush, centred, flush, touching.
 
 Nothing hides a station, as it isn't something the pointer picks by sight: a piece moved inside another still stops on its faces. On a plane handle a station stops one axis at a time, and a face of the selection only stops along the axis it is a face of.
 

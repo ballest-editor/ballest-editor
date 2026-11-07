@@ -299,9 +299,10 @@ describe("the Mesh target under a move's constraint", () => {
     [...new Set(hits.map(({ label }) => label))].sort()
   const planes = (hits: ReadonlyArray<SnapHit>) => hits.flatMap(({ held }) => held.shape === "plane" ? [held] : [])
 
-  it("offers the faces along a line, the plane between them and the face centres, and no vertex", () => {
+  it("offers the faces along a line and the plane between them, the face centres only on a plane, and no vertex", () => {
+    assert.deepStrictEqual(labels(offered(meshed, line)), ["Face of Cube", "Middle of Cube"])
+    assert.include(labels(offered(meshed, plane)), "Centre of a face of Cube")
     const hits = offered(meshed, line)
-    assert.deepStrictEqual(labels(hits), ["Centre of a face of Cube", "Face of Cube", "Middle of Cube"])
     const stops = hits.filter(({ rank }) => rank === 2).map(({ landing }) => landing.x).toSorted((a, b) => a - b)
     assert.deepStrictEqual(stops, [250, 300, 350])
     assert.deepStrictEqual(planes(hits)[0], {
@@ -309,7 +310,7 @@ describe("the Mesh target under a move's constraint", () => {
       origin: { x: 250, y: 0, z: 0 },
       normal: { x: -1, y: 0, z: 0 }
     })
-    assert.lengthOf(hits.filter(({ base, rank }) => rank === 0 && base.label === "Pivot"), 6)
+    assert.lengthOf(offered(meshed, plane).filter(({ base, rank }) => rank === 0 && base.label === "Pivot"), 6)
   })
 
   it("offers vertices, edges and midpoints to a surface drag, and no stations", () => {
@@ -378,11 +379,8 @@ describe("the Mesh target under a move's constraint", () => {
     assert.includeMembers(labels(offered(unloaded, surface)), ["Corner of Cube", "Face of Cube"])
     assert.notInclude(labels(offered(meshed, surface)), "Corner of Cube")
     assert.notInclude(labels(offered(meshed, surface)), "Face of Cube")
-    assert.deepStrictEqual(labels(offered(unloaded, line)), [
-      "Centre of a face of Cube",
-      "Face of Cube",
-      "Middle of Cube"
-    ])
+    assert.deepStrictEqual(labels(offered(unloaded, line)), ["Face of Cube", "Middle of Cube"])
+    assert.include(labels(offered(unloaded, plane)), "Centre of a face of Cube")
   })
 
   it("leaves the faces and the centres to their own toggles, by what stands in", () => {
@@ -399,9 +397,10 @@ describe("the Mesh target under a move's constraint", () => {
         bases: noSize(line),
         constraint: line
       })))
-    assert.deepStrictEqual(hitsOf(meshed, { faces: false }), ["Centre of a face of Cube"])
+    // a face's centre is a point for a plane handle; under a line it would only be one more middle
+    assert.deepStrictEqual(hitsOf(meshed, { faces: false }), [])
     assert.deepStrictEqual(hitsOf(meshed, { faceCentres: false }), ["Face of Cube", "Middle of Cube"])
-    assert.deepStrictEqual(hitsOf(unloaded, { boundsFaces: false }), ["Centre of a face of Cube"])
+    assert.deepStrictEqual(hitsOf(unloaded, { boundsFaces: false }), [])
     assert.deepStrictEqual(hitsOf(unloaded, { boundsFaceCentres: false }), ["Face of Cube", "Middle of Cube"])
   })
 
@@ -431,7 +430,7 @@ describe("the Mesh target under a move's constraint", () => {
     }
 
     it("touches, lies flush, centres, lies flush and touches", () => {
-      const centred = { ...noCentres(config), base: "centre" as const }
+      const centred = { ...config, base: "centre" as const }
       const bases = selectionBases(centred, { pivot: { x: 0, y: 0, z: -50 }, box, ends: [] }, line)
       assert.deepStrictEqual(stopsOf(centred, bases), [
         [1250, "Far face"],
@@ -443,7 +442,7 @@ describe("the Mesh target under a move's constraint", () => {
     })
 
     it("stops the same five times when it moves by its ends", () => {
-      const withEnds = noCentres(on(defaultSnapConfig, "mesh", "connectors"))
+      const withEnds = on(defaultSnapConfig, "mesh", "connectors")
       const onTop = (x: number, facing: 1 | -1) => ({ ...endAlongX("own", 0, x, facing), position: { x, y: 0, z: 50 } })
       const ends = [onTop(250, 1), onTop(-250, -1)]
       const bases = selectionBases(withEnds, { pivot: { x: 0, y: 0, z: -50 }, box, ends }, line)
@@ -452,7 +451,7 @@ describe("the Mesh target under a move's constraint", () => {
 
     it("doesn't stop the centre on a face, or a face on the middle", () => {
       const centre: BasePoint = { ...pivotBase, stop: { kind: "centre" } }
-      assert.deepStrictEqual(stopsOf(noCentres(config), [centre]), [[2000, "Pivot"]])
+      assert.deepStrictEqual(stopsOf(config, [centre]), [[2000, "Pivot"]])
       assert.deepStrictEqual(stopsOf(noCentres(config), [faceBase]).map(([x]) => x), [1500, 2500])
     })
 
