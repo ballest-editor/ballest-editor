@@ -281,17 +281,24 @@ const placedNormal = ({ centre, normal }: MeshFace, place: (point: Vec3) => Vec3
   return vecNormalize(vecDot(turned, image(normal)) < 0 ? vecScale(turned, -1) : turned)
 }
 
+/** `faces` under `place`, which takes a point of the mesh to the world. */
+export const placedFaces = (
+  faces: ReadonlyArray<MeshFace>,
+  place: (point: Vec3) => Vec3
+): ReadonlyArray<MeshFace> =>
+  faces.map((face) => ({
+    centre: place(face.centre),
+    normal: placedNormal(face, place),
+    corners: face.corners.map(place)
+  }))
+
 /** `elements` under `place`, which takes a point of the mesh to the world. */
 export const placedMesh = (elements: MeshElements, place: (point: Vec3) => Vec3): MeshElements => ({
   vertices: elements.vertices.map(place),
   edges: elements.edges.map(([a, b]) => [place(a), place(b)] as const),
   runs: elements.runs.map((run) => run.map(place)),
   faceCentres: elements.faceCentres.map(place),
-  faces: elements.faces.map((face) => ({
-    centre: place(face.centre),
-    normal: placedNormal(face, place),
-    corners: face.corners.map(place)
-  }))
+  faces: placedFaces(elements.faces, place)
 })
 
 /** The point halfway along a polyline, by its length. */

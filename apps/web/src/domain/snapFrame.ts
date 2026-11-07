@@ -8,7 +8,7 @@ import type { WorldEnd } from "./connectors"
 import type { Quat4, UeTransform, Vec3 } from "./coords"
 import type { Box } from "./itemBounds"
 import type { Construction, EndRef, Measurement } from "./MapSidecar"
-import type { WorldMesh } from "./meshElements"
+import type { MeshFace, WorldMesh } from "./meshElements"
 import type { SnapConfig, SnapTarget } from "./snapConfig"
 import { vecAdd, vecCross, vecDot, vecLength, vecNormalize, vecScale, vecSub } from "./ueMath"
 
@@ -125,6 +125,8 @@ export interface SnapItem {
   readonly ends: ReadonlyArray<WorldEnd>
   /** Its mesh's elements, worked out when something near asks. */
   readonly mesh: () => WorldMesh | undefined
+  /** Only the flat faces of `mesh`, for what would otherwise place the rest of it for nothing. */
+  readonly faces: () => ReadonlyArray<MeshFace> | undefined
 }
 
 /** A face under the pointer, from the renderer. */

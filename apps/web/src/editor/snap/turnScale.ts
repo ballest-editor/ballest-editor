@@ -1,14 +1,14 @@
 /**
  * What a turn and a scale can meet (docs/SNAPPING.md § Affect), worked out once when the drag starts: nothing else moves
  * until it ends. A turn stops with the base face flush on a neighbour's, or the piece's end facing another; a scale stops
- * the scaled face on a neighbour's box.
+ * the scaled face on a face of a neighbour in its way.
  */
 import type { WorldEnd } from "../../domain/connectors"
 import type { Quat4, UeTransform, Vec3 } from "../../domain/coords"
 import type { Box } from "../../domain/itemBounds"
 import { localToWorld, type PivotChoice } from "../../domain/pivot"
 import type { SnapConfig } from "../../domain/snapConfig"
-import type { SnapItem, SnapMark } from "../../domain/snapFrame"
+import { axesOf, type SnapItem, type SnapMark } from "../../domain/snapFrame"
 import type { FlushPair, ScaleStop } from "../../domain/snapRotate"
 import { rotateVec, vecDistance, vecDot, vecLength, vecNormalize, vecSub } from "../../domain/ueMath"
 
@@ -118,17 +118,34 @@ export const flushPairsOf = (
   return [...meetings, ...faces]
 }
 
+/** Where `box` lies along the unit `axis`, from the origin. */
+const spanOf = ({ max, min }: Box, axis: Vec3): readonly [number, number] => {
+  const along = [min.x, max.x].flatMap((x) =>
+    [min.y, max.y].flatMap((y) => [min.z, max.z].map((z) => vecDot({ x, y, z }, axis)))
+  )
+  return [Math.min(...along), Math.max(...along)]
+}
+
+/** Whether `box` stands in the way of `from` along the unit `axis`, either way. Off the world's axes it can pass by a little. */
+const inWayOf = (from: Box, box: Box, axis: Vec3) =>
+  axesOf({ kind: "plane", normal: axis }).every((across) => {
+    const [[a0, a1], [b0, b1]] = [spanOf(from, across), spanOf(box, across)]
+    return a0 <= b1 && b0 <= a1
+  })
+
 /**
- * The faces of `items`' boxes square to `axis`, as stops at their distance from `pivotPoint`. Boxes, as a stop can be
- * anywhere along the axis, and placing every mesh in the map to find them would stall the drag's start.
+ * The faces square to `axis` of the `items` in the way of `box`, the selection's, as stops at their distance from
+ * `pivotPoint`: a mesh's own, or its box's until it has loaded. A scale can reach anywhere along the axis, so the box test
+ * comes first: placing every mesh in the map would stall the drag's start.
  */
 export const scaleStopsOf = (
   axis: Vec3,
   pivotPoint: Vec3,
+  box: Box,
   items: ReadonlyArray<SnapItem>
 ): ReadonlyArray<ScaleStop> =>
-  items.flatMap((item) =>
-    boundsFacesOf(item).flatMap((face): ReadonlyArray<ScaleStop> =>
+  items.filter((item) => inWayOf(box, item.box, axis)).flatMap((item) =>
+    (item.faces() ?? boundsFacesOf(item)).flatMap((face): ReadonlyArray<ScaleStop> =>
       Math.abs(vecDot(face.normal, axis)) < 0.999
         ? []
         : [{
@@ -142,8 +159,5 @@ export const scaleStopsOf = (
 /** How far `box` reaches from `pivotPoint` along the unit `axis`, on the side that axis points to. */
 export const reachAlong = (box: Box, pivotPoint: Vec3, axis: Vec3): number => {
   const unit = vecNormalize(axis)
-  const corners = [box.min.x, box.max.x].flatMap((x) =>
-    [box.min.y, box.max.y].flatMap((y) => [box.min.z, box.max.z].map((z) => ({ x, y, z })))
-  )
-  return Math.max(...corners.map((corner) => vecDot(vecSub(corner, pivotPoint), unit)))
+  return spanOf(box, unit)[1] - vecDot(pivotPoint, unit)
 }

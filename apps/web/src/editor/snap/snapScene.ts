@@ -1,14 +1,21 @@
 /**
  * The map as targets for one drag: every item but what moves, with its box, ends and mesh, and the raycasts the domain
  * asks for. Built when a drag starts, as nothing else moves until it ends, and a mesh's elements are only worked out for
- * the items a pointer comes near.
+ * the items a drag comes near.
  */
 import * as THREE from "three"
 import { endsOf } from "../../domain/connectors"
 import type { Vec3 } from "../../domain/coords"
 import { editTransform } from "../../domain/editTransform"
 import { placedBoxOf } from "../../domain/itemBounds"
-import { type MeshElements, meshElementsOf, placedMesh, type WorldMesh } from "../../domain/meshElements"
+import {
+  type MeshElements,
+  meshElementsOf,
+  type MeshFace,
+  placedFaces,
+  placedMesh,
+  type WorldMesh
+} from "../../domain/meshElements"
 import { pivotBoundsOf } from "../../domain/pivot"
 import type { SnapItem, SnapView, SurfaceHit } from "../../domain/snapFrame"
 import type { PaneCamera } from "../paneCameras"
@@ -55,13 +62,18 @@ const meshesOf = (key: string): ReadonlyArray<THREE.Mesh> => {
   return out
 }
 
+/** What takes a point of `mesh` to the world. */
+const placeOf = ({ matrixWorld }: THREE.Mesh) => {
+  const point = new THREE.Vector3()
+  return ({ x, y, z }: Vec3) => toGame(point.set(x, y, z).applyMatrix4(matrixWorld))
+}
+
 /** An item's mesh elements where it stands, from what the renderer has; undefined until its mesh has loaded. */
 const worldMeshOf = (key: string, sharpAngle: number): WorldMesh | undefined => {
   const parts = meshesOf(key).flatMap((mesh) => {
     const elements = elementsOf(mesh.geometry, sharpAngle)
     if (elements === undefined) return []
-    const point = new THREE.Vector3()
-    return [placedMesh(elements, ({ x, y, z }) => toGame(point.set(x, y, z).applyMatrix4(mesh.matrixWorld)))]
+    return [placedMesh(elements, placeOf(mesh))]
   })
   if (parts.length === 0) return undefined
   return {
@@ -71,6 +83,15 @@ const worldMeshOf = (key: string, sharpAngle: number): WorldMesh | undefined => 
     faces: parts.flatMap(({ faces }) => faces),
     runs: parts.flatMap(({ runs }) => runs)
   }
+}
+
+/** An item's flat faces where it stands, as `worldMeshOf` has them. */
+const worldFacesOf = (key: string, sharpAngle: number): ReadonlyArray<MeshFace> | undefined => {
+  const parts = meshesOf(key).flatMap((mesh) => {
+    const elements = elementsOf(mesh.geometry, sharpAngle)
+    return elements === undefined ? [] : [placedFaces(elements.faces, placeOf(mesh))]
+  })
+  return parts.length === 0 ? undefined : parts.flat()
 }
 
 /** What's in the map but for `except`, as targets. */
@@ -87,6 +108,7 @@ export const snapItemsOf = (
     const box = placedBoxOf([{ item, transform }], s.catalogIndex)
     if (box === undefined) return []
     let mesh: WorldMesh | undefined
+    let faces: ReadonlyArray<MeshFace> | undefined
     return [{
       key,
       name: names.get(key)?.name ?? "a piece",
@@ -97,6 +119,10 @@ export const snapItemsOf = (
       mesh: () => {
         mesh ??= worldMeshOf(key, sharpAngle)
         return mesh
+      },
+      faces: () => {
+        faces ??= mesh?.faces ?? worldFacesOf(key, sharpAngle)
+        return faces
       }
     }]
   })

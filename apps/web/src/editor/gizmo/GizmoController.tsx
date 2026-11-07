@@ -307,7 +307,7 @@ export function GizmoController() {
               rangeCm
             )
             : [],
-        stops: scaleAxis === undefined ? [] : scaleStopsOf(scaleAxis, target.pivot, items),
+        stops: scaleAxis === undefined ? [] : scaleStopsOf(scaleAxis, target.pivot, selection.box, items),
         reach: scaleAxis === undefined ? 0 : reachAlong(selection.box, target.pivot, scaleAxis),
         scaleFrom: spec.axis === undefined ? target.active.scale3D.x : target.active.scale3D[spec.axis],
         rangeCm,

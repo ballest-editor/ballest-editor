@@ -110,6 +110,7 @@ export const cubeAt = (key: string, at: Vec3, over: Partial<SnapItem> = {}): Sna
   bounds: { min: [-50, -50, -50], max: [50, 50, 50] },
   ends: [],
   mesh: () => undefined,
+  faces: () => undefined,
   ...over
 })
 

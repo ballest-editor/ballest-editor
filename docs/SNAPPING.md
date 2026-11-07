@@ -144,7 +144,7 @@ Which transforms snapping applies to. Move is always on. Rotate and Scale are to
 
 - **Move**: the base lands on a target.
 - **Rotate**: rotation snaps to the step, and with a Mesh face (a face of § Under a constrained move, or of the bounds until the mesh has loaded) or a Connector in range it snaps the base face (the face the pivot is on, or the piece's end) flush to the target, so a quarter turn that would meet a face stops there. Connectors' Match rotation and Mesh's Rotate to face are the per-target parts of this.
-- **Scale**: scale snaps to the step, along the item's own axes. With a face of a neighbour's bounds in range along the scaled axis, the scaled face stops on it, which is how a wall is stretched to meet another. Bounds, here, even where a mesh has loaded: a stop can be anywhere along the axis, and finding one in the mesh would mean placing every mesh in the map when the drag starts.
+- **Scale**: scale snaps to the step, along the item's own axes. With a Mesh face (a face of § Under a constrained move, or of the bounds until the mesh has loaded) of a neighbour in range along the scaled axis, the scaled face stops on it, which is how a wall is stretched to meet another. A neighbour counts when its box stands in the way of the selection's along that axis, either way, so a drag's start only places the meshes in line with it, and an item off to the side offers no stop.
 
 ### Under the pivot setting
 
