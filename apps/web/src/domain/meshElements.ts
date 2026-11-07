@@ -294,9 +294,6 @@ export const placedMesh = (elements: MeshElements, place: (point: Vec3) => Vec3)
   }))
 })
 
-/** Where an edge's middle is. */
-export const midpointOf = ([a, b]: readonly [Vec3, Vec3]): Vec3 => vecLerp(a, b, 0.5)
-
 /** The point halfway along a polyline, by its length. */
 const halfwayAlong = (run: ReadonlyArray<Vec3>): ReadonlyArray<Vec3> => {
   const segments = run.slice(1).map((to, i) => [run[i] ?? to, to] as const)

@@ -6,7 +6,7 @@
 import { endsFit, meetingTurn, type WorldEnd } from "./connectors"
 import type { Quat4, Vec3 } from "./coords"
 import type { ConstructionAxis, ConstructionPlane } from "./MapSidecar"
-import { midpointOf } from "./meshElements"
+import { runMidpoints } from "./meshElements"
 import { localToWorld } from "./pivot"
 import { snapValue } from "./snap"
 import { rangeOf, type SnapConfig, type SnapTarget } from "./snapConfig"
@@ -236,7 +236,7 @@ const meshSpotsOf = (config: SnapConfig, item: SnapItem): ReadonlyArray<Spot> =>
       ? spots(box.faces.map(({ centre }) => centre), "Centre of a face")
       : []),
     ...(elements.vertices && mesh !== undefined ? spots(mesh.vertices, "Vertex") : []),
-    ...(elements.edgeMidpoints && mesh !== undefined ? spots(mesh.edges.map(midpointOf), "Middle of an edge") : []),
+    ...(elements.edgeMidpoints && mesh !== undefined ? spots(runMidpoints(mesh), "Middle of an edge") : []),
     ...(elements.faceCentres && mesh !== undefined ? spots(mesh.faceCentres, "Centre of a face") : [])
   ]
 }

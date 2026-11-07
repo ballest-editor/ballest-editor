@@ -68,7 +68,8 @@ const worldMeshOf = (key: string, sharpAngle: number): WorldMesh | undefined => 
     vertices: parts.flatMap(({ vertices }) => vertices),
     edges: parts.flatMap(({ edges }) => edges),
     faceCentres: parts.flatMap(({ faceCentres }) => faceCentres),
-    faces: parts.flatMap(({ faces }) => faces)
+    faces: parts.flatMap(({ faces }) => faces),
+    runs: parts.flatMap(({ runs }) => runs)
   }
 }
 
