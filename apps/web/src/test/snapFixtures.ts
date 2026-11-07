@@ -9,6 +9,7 @@ import type { Item } from "../domain/MapFile"
 import type { WorldMesh } from "../domain/meshElements"
 import { defaultSettings } from "../domain/Settings"
 import type { SnapItem, SnapView } from "../domain/snapFrame"
+import type { PaneCamera } from "../editor/paneCameras"
 import { useEditor } from "../editor/store"
 
 /** A slab's two ends along X, as Track S's. */
@@ -55,6 +56,29 @@ export const withFlags = (item: Item, ...names: ReadonlyArray<string>): Item => 
   meshComponents: [],
   boolProperties: names.map((propertyName) => ({ propertyName, propertyType: "Bool", currentValue: true }))
 })
+
+/** How wide and high `lookDown` makes a pane, in pixels. */
+export const DOWN_PANE_SIZE = 1000
+
+/** `pane`, looking straight down on the origin at a centimetre to the pixel. */
+export const lookDown = (pane: PaneCamera): PaneCamera => {
+  const half = DOWN_PANE_SIZE / 2
+  pane.projection = "top"
+  pane.width = DOWN_PANE_SIZE
+  pane.height = DOWN_PANE_SIZE
+  pane.cmPerPixel = 1
+  pane.target.set(0, 0, 0)
+  pane.orthographic.left = -half
+  pane.orthographic.right = half
+  pane.orthographic.top = half
+  pane.orthographic.bottom = -half
+  pane.orthographic.position.set(0, 5000, 0)
+  pane.orthographic.up.set(1, 0, 0)
+  pane.orthographic.lookAt(0, 0, 0)
+  pane.orthographic.updateProjectionMatrix()
+  pane.orthographic.updateMatrixWorld(true)
+  return pane
+}
 
 /** Looking straight down, `cmPerPixel` cm to the pixel: the pixel is the point's x and y. */
 export const topView = (cmPerPixel = 1, over: Partial<SnapView> = {}): SnapView => ({
