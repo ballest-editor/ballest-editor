@@ -6,7 +6,7 @@
 //                            the default top view shows world x from about -2900 (bottom) to 1400 (top) at 0.1 px/cm
 //   px <i>                   page pixel of piece i's origin
 //   arrow <i> <x|y|z> [px]   page pixel `px` out from piece i's origin along a world axis on screen (a translate handle)
-//   end <i> <e>              page pixel of piece i's connector end e
+//   end <i> <e>              page pixel of piece i's connector end e\n//   ring <i> <deg> [r]       page pixel on the rotate gizmo's view ring (r px, default 94) at a screen angle
 //   handle <t-x|t-y|t-z|tp-x|tp-y|tp-z>   page pixel of a translate gizmo handle
 //   drag <x> <y> <dx> <dy> [--steps 40] [--lock x|y|z] [--shot file.png] [--hold] [--ms 16]
 //                            a left drag from (x, y) by (dx, dy) page pixels; prints a trace of what snapped
@@ -69,7 +69,7 @@ const evaluate = async (send, expression) => {
 }
 
 // Installed in the page once: the lab's own helpers over the dev build's `__ballest`.
-const LAB_VERSION = 6
+const LAB_VERSION = 8
 const LAB = `(() => {
   if (globalThis.__lab?.v === ${LAB_VERSION}) return "kept"
   const S = () => __ballest.useEditor.getState()
@@ -178,6 +178,12 @@ const LAB = `(() => {
       const [x, y, z] = end.position
       return await project(localToWorld(editTransform(item), { x, y, z }))
     },
+    /** Page pixel on the circle of radius r px around piece i's origin, at screen angle deg (0 = right, 90 = up). */
+    ring(i, deg, r = 94) {
+      const o = lab.px(i)
+      const a = (deg * Math.PI) / 180
+      return { x: Math.round(o.x + Math.cos(a) * r), y: Math.round(o.y - Math.sin(a) * r) }
+    },
     handle(name) {
       let found
       __ballest.sceneRegistry.gizmo?.traverse((o) => { if (o.name === name) found = o })
@@ -206,7 +212,9 @@ const LAB = `(() => {
       const t = s.preview?.get(sel) ?? s.doc.map.items[s.doc.ids.indexOf(sel)]?.itemTransform
       const f = s.snapFeedback
       const r = (v) => Math.round(v * 10) / 10
-      return { label: f?.label ?? null, base: f?.base ?? null, x: r(t?.translation.x ?? NaN), y: r(t?.translation.y ?? NaN), z: r(t?.translation.z ?? NaN), item: i }
+      const q = t?.rotation ?? { x: 0, y: 0, z: 0, w: 1 }
+      const yaw = r((Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)) * 180) / Math.PI)
+      return { label: f?.label ?? null, base: f?.base ?? null, x: r(t?.translation.x ?? NaN), y: r(t?.translation.y ?? NaN), z: r(t?.translation.z ?? NaN), yaw, item: i }
     },
     last() { const s = S(); return { undo: s.past.at(-1)?.description ?? null, joints: (s.doc.structure.annotations?.joints ?? []).length, tracked: s.tracked.length } }
   }
@@ -317,6 +325,11 @@ const commands = {
     withPage(async (send) => {
       await install(send)
       console.log(JSON.stringify(await evaluate(send, `__lab.px(${i})`)))
+    }),
+  ring: (i, deg, r) =>
+    withPage(async (send) => {
+      await install(send)
+      console.log(JSON.stringify(await evaluate(send, `__lab.ring(${i}, ${deg}, ${r ?? 94})`)))
     }),
   arrow: (i, axis, dist) =>
     withPage(async (send) => {
