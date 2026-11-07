@@ -11,7 +11,7 @@ import { resolveSnap } from "../../domain/snapResolve"
 import { annotationsOf } from "../../domain/structure"
 import { ORIGIN, vecAdd, vecScale } from "../../domain/ueMath"
 import type { PaneCamera } from "../paneCameras"
-import { type EditorState, type PickedTarget, type PickerRequest, snapConfigOf } from "../store"
+import { editedKeys, type EditorState, type PickedTarget, type PickerRequest, snapConfigOf } from "../store"
 import { snapCasts, snapItemsOf } from "./snapScene"
 import { snapViewOf } from "./snapView"
 
@@ -103,6 +103,18 @@ export const hitUnder = (
     occluded: casts.occluded
   }
   return resolveSnap(frame)
+}
+
+/** The point a resting pointer acquires, leaving out `moving`: not the selection's, which a drag would only meet itself on. */
+export const anchorUnder = (
+  s: EditorState,
+  pane: PaneCamera,
+  px: ScreenPoint,
+  moving: ReadonlySet<string>
+): SnapHit | undefined => {
+  const hit = hitUnder(s, pane, px, "anchor", moving)
+  // a point to go through, not a face, which is only ever under the pointer
+  return hit?.rank === 0 && (hit.item === undefined || !editedKeys(s).includes(hit.item)) ? hit : undefined
 }
 
 /** A hit as a tool takes it. */

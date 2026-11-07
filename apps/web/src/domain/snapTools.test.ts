@@ -165,17 +165,32 @@ describe("selectionBases", () => {
   })
 
   const line = { kind: "line", direction: { x: 1, y: 0, z: 0 } } as const
+  const face = { kind: "face", axis: line.direction } as const
 
   it("adds the near face, the centre and the far face along a line, whatever the setting", () => {
     const pivot = { x: 1, y: 2, z: 3 }
     assert.deepStrictEqual(selectionBases(defaultSnapConfig, selection, line), [
       { start: pivot, label: "Pivot" },
-      { start: { x: -100, y: 0, z: 100 }, label: "Near face", station: true },
-      { start: { x: 0, y: 0, z: 100 }, label: "Centre", station: true },
-      { start: { x: 100, y: 0, z: 100 }, label: "Far face", station: true }
+      { start: { x: -100, y: 0, z: 100 }, label: "Near face", station: true, stop: face },
+      { start: { x: 0, y: 0, z: 100 }, label: "Centre", station: true, stop: { kind: "centre" } },
+      { start: { x: 100, y: 0, z: 100 }, label: "Far face", station: true, stop: face }
     ])
     const centred = selectionBases({ ...defaultSnapConfig, base: "centre" }, selection, line)
     assert.deepStrictEqual(centred.map(({ label }) => label), ["Centre", "Pivot", "Near face", "Far face"])
+  })
+
+  it("lets a point that is already a station stop as one, under its own name", () => {
+    const onFace = { ...selection, pivot: { x: -100, y: 0, z: 100 } }
+    const [pivot] = selectionBases(defaultSnapConfig, onFace, line)
+    assert.deepStrictEqual(pivot, { start: onFace.pivot, label: "Pivot", stop: face })
+    const [centre] = selectionBases({ ...defaultSnapConfig, base: "centre" }, selection, line)
+    assert.deepStrictEqual(centre?.stop, { kind: "centre" })
+  })
+
+  it("keeps a selection with no depth along the move both a face and a centre", () => {
+    const flat = { ...selection, box: { min: { x: 0, y: -100, z: 0 }, max: { x: 0, y: 100, z: 200 } } }
+    const stops = selectionBases(defaultSnapConfig, flat, line).flatMap(({ stop }) => stop?.kind ?? [])
+    assert.deepStrictEqual(stops, ["face", "centre"])
   })
 
   it("adds them along both of a plane's axes, and none on a surface", () => {
