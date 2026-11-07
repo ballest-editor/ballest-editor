@@ -108,7 +108,7 @@ export interface SnapHit {
   readonly meeting?: EndMeeting
   /** The renderer's own first face under the pixel, or a plane a hard constraint stops at: nothing can hide it. */
   readonly frontmost?: boolean
-  /** The single targets this one lands on together: an alignment along each of the move's axes. */
+  /** The single targets this one lands on together: an alignment or a Mesh station along each of the move's axes. */
   readonly parts?: ReadonlyArray<SnapHit>
 }
 
