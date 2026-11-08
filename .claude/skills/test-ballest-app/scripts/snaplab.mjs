@@ -8,7 +8,8 @@
 //   arrow <i> <x|y|z> [px]   page pixel `px` out from piece i's origin along a world axis on screen (a translate handle)
 //   end <i> <e>              page pixel of piece i's connector end e\n//   ring <i> <deg> [r]       page pixel on the rotate gizmo's view ring (r px, default 94) at a screen angle
 //   handle <t-x|t-y|t-z|tp-x|tp-y|tp-z>   page pixel of a translate gizmo handle
-//   drag <x> <y> <dx> <dy> [--steps 40] [--lock x|y|z] [--shot file.png] [--hold] [--ms 16]
+//   drag <x> <y> <dx> <dy> [--steps 40] [--lock x|y|z] [--key KeyG] [--shot file.png] [--hold] [--ms 16]
+//                            --key holds a key (a KeyboardEvent.code) from past the drag slop until after the shot
 //                            a left drag from (x, y) by (dx, dy) page pixels; prints a trace of what snapped
 //   boot                     waits for the app to boot (run it after browser.mjs start, and restart the browser after a code change:\n//                            the scene keeps a cache of mesh elements that hot reload doesn't clear)\n//   release                  lets go of a `--hold`
 //   trace                    the last drag's trace again, as JSON
@@ -251,6 +252,14 @@ const keyOf = (axis) => ({
   windowsVirtualKeyCode: axis.toUpperCase().charCodeAt(0)
 })
 
+/** A held key by its code: a letter's key and virtual code follow from it. */
+const codeKey = (code) => {
+  const letter = /^Key([A-Z])$/.exec(code)?.[1]
+  return letter === undefined
+    ? { code, key: code }
+    : { code, key: letter.toLowerCase(), windowsVirtualKeyCode: letter.charCodeAt(0) }
+}
+
 /** Steps of equal label folded into runs, for reading; a number in a label ("Level with X, 926 cm") doesn't split a run. */
 const same = (a, b) => (a ?? "").replace(/\d+/g, "#") === (b ?? "").replace(/\d+/g, "#")
 const fold = (samples) => {
@@ -352,6 +361,7 @@ const commands = {
       const steps = Number(flag("steps", 40))
       const ms = Number(flag("ms", 16))
       const lock = flag("lock")
+      const held = flag("key")
       const [ax, ay] = [Number(x), Number(y)]
       await mouse(send, "mouseMoved", ax, ay, { button: "none" })
       await sleep(30)
@@ -362,6 +372,7 @@ const commands = {
         await send("Input.dispatchKeyEvent", { type: "keyDown", ...keyOf(lock) })
         await send("Input.dispatchKeyEvent", { type: "keyUp", ...keyOf(lock) })
       }
+      if (held !== undefined) await send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...codeKey(held) })
       const samples = []
       for (let i = 1; i <= steps; i++) {
         const px = ax + (Number(dx) * i) / steps
@@ -375,6 +386,7 @@ const commands = {
         const { data } = await send("Page.captureScreenshot", { format: "png" })
         writeFileSync(shot, Buffer.from(data, "base64"))
       }
+      if (held !== undefined) await send("Input.dispatchKeyEvent", { type: "keyUp", ...codeKey(held) })
       if (!has("hold")) {
         await mouse(send, "mouseReleased", ax + Number(dx), ay + Number(dy))
         await sleep(50)
@@ -399,7 +411,7 @@ const commands = {
 if (Object.hasOwn(commands, command ?? "")) await commands[command](...rest)
 else {
   console.error(
-    "usage: snaplab.mjs scene <json> | px <i> | handle <name> | drag <x> <y> <dx> <dy> [--steps N] [--lock x|y|z] [--shot f] [--hold] | release | trace"
+    "usage: snaplab.mjs scene <json> | px <i> | handle <name> | drag <x> <y> <dx> <dy> [--steps N] [--lock x|y|z] [--key code] [--shot f] [--hold] | release | trace"
   )
   process.exit(2)
 }
