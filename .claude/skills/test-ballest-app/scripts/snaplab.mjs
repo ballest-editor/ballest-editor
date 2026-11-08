@@ -6,11 +6,18 @@
 //                            the default top view shows world x from about -2900 (bottom) to 1400 (top) at 0.1 px/cm
 //   px <i>                   page pixel of piece i's origin
 //   arrow <i> <x|y|z> [px]   page pixel `px` out from piece i's origin along a world axis on screen (a translate handle)
-//   end <i> <e>              page pixel of piece i's connector end e\n//   ring <i> <deg> [r]       page pixel on the rotate gizmo's view ring (r px, default 94) at a screen angle
+//   end <i> <e>              page pixel of piece i's connector end e
+//   ring <i> <x|y|z|view> [deg]   page pixel on the rotate gizmo's ring for an axis, piece i selected with the rotate
+//                            tool: deg (default 45) round the quarter that can be grabbed, 0 to 90; and the gizmo's centre
 //   handle <t-x|t-y|t-z|tp-x|tp-y|tp-z>   page pixel of a translate gizmo handle
 //   drag <x> <y> <dx> <dy> [--steps 40] [--lock x|y|z] [--shot file.png] [--hold] [--ms 16]
 //                            a left drag from (x, y) by (dx, dy) page pixels; prints a trace of what snapped
-//   boot                     waits for the app to boot (run it after browser.mjs start, and restart the browser after a code change:\n//                            the scene keeps a cache of mesh elements that hot reload doesn't clear)\n//   release                  lets go of a `--hold`
+//   turn <i> <x|y|z|view> <deg> [--from 45] [--steps 60] [--shot file.png] [--hold] [--ms 16]
+//                            grabs that ring at --from and drags round the gizmo's centre by deg degrees on screen
+//                            (counter-clockwise positive), in steps; prints what the turn stopped on and the angle turned
+//   boot                     waits for the app to boot (run it after browser.mjs start, and restart the browser after a
+//                            code change: the scene keeps a cache of mesh elements that hot reload doesn't clear)
+//   release                  lets go of a `--hold`
 //   trace                    the last drag's trace again, as JSON
 import { createHash } from "node:crypto"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
@@ -69,7 +76,7 @@ const evaluate = async (send, expression) => {
 }
 
 // Installed in the page once: the lab's own helpers over the dev build's `__ballest`.
-const LAB_VERSION = 8
+const LAB_VERSION = 9
 const LAB = `(() => {
   if (globalThis.__lab?.v === ${LAB_VERSION}) return "kept"
   const S = () => __ballest.useEditor.getState()
@@ -178,11 +185,50 @@ const LAB = `(() => {
       const [x, y, z] = end.position
       return await project(localToWorld(editTransform(item), { x, y, z }))
     },
-    /** Page pixel on the circle of radius r px around piece i's origin, at screen angle deg (0 = right, 90 = up). */
-    ring(i, deg, r = 94) {
-      const o = lab.px(i)
+    /**
+     * Page pixel on the rotate gizmo's ring for axis ("x", "y", "z" or "view"), deg round the quarter of it that can
+     * be grabbed, and the gizmo's centre. Piece i is selected first, with the rotate tool.
+     */
+    async ring(i, axis, deg = 45) {
+      const s = S()
+      if (s.tool !== "rotate") s.setTool("rotate")
+      if (s.selectedIds.length !== 1 || s.selectedIds[0] !== lab.keys[i]) S().select([lab.keys[i]])
+      await wait(300)
+      const { SIZE } = await import("/src/editor/gizmo/handles.ts")
+      let root
+      __ballest.sceneRegistry.gizmo?.traverse((o) => { if (o.name === "r-" + axis) root = o })
+      if (!root) return undefined
+      const T = root.position.constructor
+      const radius = axis === "view" ? SIZE.viewRing : SIZE.ring
       const a = (deg * Math.PI) / 180
-      return { x: Math.round(o.x + Math.cos(a) * r), y: Math.round(o.y - Math.sin(a) * r) }
+      const toPage = (w) => {
+        const c = document.querySelector("canvas"), r = c.getBoundingClientRect()
+        const v = w.project(__ballest.sceneRegistry.camera)
+        return { x: Math.round(r.left + (v.x + 1) / 2 * r.width), y: Math.round(r.top + (1 - v.y) / 2 * r.height) }
+      }
+      const at = toPage(new T(Math.cos(a) * radius, Math.sin(a) * radius, 0).applyMatrix4(root.matrixWorld))
+      return { ...at, centre: toPage(root.getWorldPosition(new T())) }
+    },
+    /** Remembers the selection's rotation, which turned() measures from. */
+    turnStart() {
+      const s = S(), key = s.selectedIds[0]
+      lab.from = s.preview?.get(key)?.rotation ?? s.doc.map.items[s.doc.ids.indexOf(key)]?.itemTransform.rotation
+    },
+    /** Degrees the selection has turned since turnStart(), signed about the game's axis when it's one of them. */
+    turned(axis) {
+      const s = S(), key = s.selectedIds[0]
+      const q = s.preview?.get(key)?.rotation ?? s.doc.map.items[s.doc.ids.indexOf(key)]?.itemTransform.rotation
+      const p = lab.from
+      // q times p's conjugate: the turn in the world's frame
+      const r = {
+        w: q.w * p.w + q.x * p.x + q.y * p.y + q.z * p.z,
+        x: q.x * p.w - q.w * p.x - q.y * p.z + q.z * p.y,
+        y: q.y * p.w - q.w * p.y - q.z * p.x + q.x * p.z,
+        z: q.z * p.w - q.w * p.z - q.x * p.y + q.y * p.x
+      }
+      const along = axis === "x" ? r.x : axis === "y" ? r.y : axis === "z" ? r.z : Math.hypot(r.x, r.y, r.z)
+      const angle = 2 * Math.atan2(along, r.w) * 180 / Math.PI
+      return Math.round((((angle + 540) % 360) - 180) * 100) / 100
     },
     handle(name) {
       let found
@@ -291,7 +337,7 @@ const flag = (name, fallback) => {
 const has = (name) => args.includes(`--${name}`)
 const FLAGS_WITHOUT_VALUE = new Set(["hold", "synthetic"])
 const positional = args.filter((a, i) =>
-  !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--") && !["hold"].includes(args[i - 1].slice(2)))
+  !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--") && !FLAGS_WITHOUT_VALUE.has(args[i - 1].slice(2)))
 )
 
 const [command, ...rest] = positional
@@ -326,10 +372,10 @@ const commands = {
       await install(send)
       console.log(JSON.stringify(await evaluate(send, `__lab.px(${i})`)))
     }),
-  ring: (i, deg, r) =>
+  ring: (i, axis, deg) =>
     withPage(async (send) => {
       await install(send)
-      console.log(JSON.stringify(await evaluate(send, `__lab.ring(${i}, ${deg}, ${r ?? 94})`)))
+      console.log(JSON.stringify(await evaluate(send, `__lab.ring(${i}, ${JSON.stringify(axis)}, ${deg ?? 45})`)))
     }),
   arrow: (i, axis, dist) =>
     withPage(async (send) => {
@@ -384,6 +430,65 @@ const commands = {
       printRuns(runs)
       if (!has("hold")) console.log(JSON.stringify(await evaluate(send, "__lab.last()")))
     }),
+  turn: (i, axis, degrees) =>
+    withPage(async (send) => {
+      await install(send)
+      const steps = Number(flag("steps", 60))
+      const ms = Number(flag("ms", 16))
+      const grab = await evaluate(send, `__lab.ring(${i}, ${JSON.stringify(axis)}, ${Number(flag("from", 45))})`)
+      if (grab === undefined) {
+        throw new Error(`No ${axis} ring: is the rotate tool on and the ring showing in this view?`)
+      }
+      const { centre } = grab
+      const radius = Math.hypot(grab.x - centre.x, grab.y - centre.y)
+      const from = Math.atan2(-(grab.y - centre.y), grab.x - centre.x)
+      const at = (k) => {
+        const a = from + (Number(degrees) * Math.PI / 180) * k / steps
+        return { x: centre.x + Math.cos(a) * radius, y: centre.y - Math.sin(a) * radius }
+      }
+      await mouse(send, "mouseMoved", grab.x, grab.y, { button: "none" })
+      await sleep(30)
+      await evaluate(send, "__lab.turnStart()")
+      await mouse(send, "mousePressed", grab.x, grab.y)
+      const samples = []
+      for (let k = 1; k <= steps; k++) {
+        const { x, y } = at(k)
+        await mouse(send, "mouseMoved", x, y, { buttons: 1 })
+        await sleep(ms)
+        const sample = await evaluate(send, "__lab.sample()")
+        const turned = await evaluate(send, `__lab.turned(${JSON.stringify(axis)})`)
+        const pointer = Math.round(Number(degrees) * k / steps * 100) / 100
+        samples.push({ step: k, px: Math.round(x), py: Math.round(y), ...sample, pointer, turned })
+      }
+      const shot = flag("shot")
+      if (shot !== undefined) {
+        const { data } = await send("Page.captureScreenshot", { format: "png" })
+        writeFileSync(shot, Buffer.from(data, "base64"))
+      }
+      if (!has("hold")) {
+        const end = at(steps)
+        await mouse(send, "mouseReleased", end.x, end.y)
+        await sleep(50)
+      }
+      const runs = []
+      for (const one of samples) {
+        const last = runs.at(-1)
+        if (last !== undefined && last.label === one.label) Object.assign(last, { to: one.step, end: one })
+        else runs.push({ label: one.label, from: one.step, to: one.step, start: one, end: one })
+      }
+      writeFileSync(traceFile, JSON.stringify({ samples, runs }, null, 1))
+      for (const r of runs) {
+        const span = r.from === r.to ? `${r.from}` : `${r.from}-${r.to}`
+        const pointer = r.start.pointer === r.end.pointer
+          ? `${r.start.pointer}°`
+          : `${r.start.pointer}° → ${r.end.pointer}°`
+        const turned = r.start.turned === r.end.turned ? `${r.start.turned}°` : `${r.start.turned}° → ${r.end.turned}°`
+        console.log(
+          `${span.padStart(7)}  ${(r.label ?? "free").padEnd(40)} pointer ${pointer.padEnd(18)} turned ${turned}`
+        )
+      }
+      if (!has("hold")) console.log(JSON.stringify(await evaluate(send, "__lab.last()")))
+    }),
   release: () =>
     withPage(async (send) => {
       const { samples } = JSON.parse(readFileSync(traceFile, "utf8"))
@@ -399,7 +504,7 @@ const commands = {
 if (Object.hasOwn(commands, command ?? "")) await commands[command](...rest)
 else {
   console.error(
-    "usage: snaplab.mjs scene <json> | px <i> | handle <name> | drag <x> <y> <dx> <dy> [--steps N] [--lock x|y|z] [--shot f] [--hold] | release | trace"
+    "usage: snaplab.mjs boot | scene <json> | px <i> | arrow <i> <axis> [px] | end <i> <e> | ring <i> <axis> [deg] | handle <name> | drag <x> <y> <dx> <dy> [--steps N] [--lock x|y|z] [--shot f] [--hold] | turn <i> <axis> <deg> [--from deg] [--steps N] [--shot f] [--hold] | release | trace"
   )
   process.exit(2)
 }
