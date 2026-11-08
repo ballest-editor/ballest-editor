@@ -474,13 +474,13 @@ export const meshHits = (frame: SnapFrame): ReadonlyArray<SnapHit> => {
   ])
 }
 
-/** A hit that holds a plane, as a station does. */
-type Stop = SnapHit & { readonly held: Extract<HeldShape, { readonly shape: "plane" }> }
+/** A hit that holds a plane, as a station or one axis of an alignment does. */
+export type Stop = SnapHit & { readonly held: Extract<HeldShape, { readonly shape: "plane" }> }
 
-const isStop = (hit: SnapHit): hit is Stop => hit.held.shape === "plane"
+export const isStop = (hit: SnapHit): hit is Stop => hit.held.shape === "plane"
 
 /** Whether two stops set different axes of a plane, by the rule `pairs` has for what's along an axis. */
-const crossing = (a: Stop, b: Stop) => Math.abs(vecDot(a.held.normal, b.held.normal)) < Math.SQRT1_2
+export const crossing = (a: Stop, b: Stop) => Math.abs(vecDot(a.held.normal, b.held.normal)) < Math.SQRT1_2
 
 /** How far a stop's base stands from its plane, along the plane's normal. */
 const gapTo = ({ base, held: { normal, origin } }: Stop) => vecDot(vecSub(origin, base.start), normal)
@@ -499,9 +499,28 @@ const labelOfBoth = (a: SnapHit, b: SnapHit): string => {
 }
 
 /**
- * What a drag has of a plane's stations, with the nearest along each axis as one hit, as Alignment lands (`parts`): a
- * station sets one axis, so together they land where their planes cross. Each base stays on its own plane, the hit's
- * being the first's. It takes no turn, as none faces both. `hits` keeps its order from frame to frame, and so do the parts.
+ * Two stops across a plane move of `normal` as one hit, landing where their planes cross (`parts`): each sets one axis.
+ * Each base stays on its own plane, the hit's being the first's. It takes no turn, as none faces both.
+ */
+export const stopsTogether = (normal: Vec3, a: Stop, b: Stop): SnapHit => {
+  const { rotation: _none, ...first } = a
+  const landing = vecAdd(a.base.start, moveOnto(normal, a, b))
+  return {
+    ...first,
+    distance: Math.hypot(a.distance, b.distance),
+    landing,
+    label: labelOfBoth(a, b),
+    marks: [...a.marks, ...b.marks],
+    // each part's base stays on its own plane, and the move takes both
+    source: a.base === b.base ? a.source : [...a.source, ...b.source],
+    held: { shape: "point", at: landing },
+    parts: [a, b]
+  }
+}
+
+/**
+ * What a drag has of a plane's stations, with the nearest along each axis as one hit, as Alignment lands (`parts`).
+ * `hits` keeps its order from frame to frame, and so do the parts.
  */
 export const stationsTogether = (frame: SnapFrame, hits: ReadonlyArray<SnapHit>): ReadonlyArray<SnapHit> => {
   const { constraint } = frame
@@ -512,19 +531,7 @@ export const stationsTogether = (frame: SnapFrame, hits: ReadonlyArray<SnapHit>)
   const other = one === undefined ? undefined : nearest.find((stop) => crossing(one, stop))
   const [a, b] = stops.filter((stop) => stop === one || stop === other)
   if (a === undefined || b === undefined) return hits
-  const { rotation: _none, ...first } = a
-  const landing = vecAdd(a.base.start, moveOnto(constraint.normal, a, b))
-  return [...hits.filter((hit) => !isStop(hit)), {
-    ...first,
-    distance: Math.hypot(a.distance, b.distance),
-    landing,
-    label: labelOfBoth(a, b),
-    marks: [...a.marks, ...b.marks],
-    // each part's base stays on its own plane, and the move takes both
-    source: a.base === b.base ? a.source : [...a.source, ...b.source],
-    held: { shape: "point", at: landing },
-    parts: [a, b]
-  }]
+  return [...hits.filter((hit) => !isStop(hit)), stopsTogether(constraint.normal, a, b)]
 }
 
 /** What an end meeting `other` says: refused under Strict, and a chip's words under Warn. */

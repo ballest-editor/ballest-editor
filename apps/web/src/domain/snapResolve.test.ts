@@ -582,6 +582,25 @@ describe("the Mesh target under a move's constraint", () => {
       assert.strictEqual(otherWay?.label, hit?.label, "whichever axis it reaches first")
     })
 
+    it("lands on a face across one axis and lines up across the other, the two targets together", () => {
+      // a cube whose centre is level with the selection's once it has moved 250 along Y, beside it and out of Mesh's range
+      const beside = cubeAt("c", { x: 100, y: 250, z: 0 }, { name: "Cube" })
+      const hits = dragThrough(
+        [...reachesBoth, [352, 270]],
+        [track, beside],
+        on(defaultSnapConfig, "mesh", "alignment")
+      )
+      // past the alignment's range the face still holds X, and Y goes free
+      assert.deepStrictEqual(moves(hits.slice(-1)), [[350, 270]])
+      const hit = hits.at(-2)
+      assert.deepStrictEqual(hit === undefined ? undefined : moveOf(hit).offset, { x: 350, y: 250, z: 0 })
+      assert.deepStrictEqual(hit?.parts?.map(({ target }) => target), ["mesh", "alignment"])
+      assert.strictEqual(hit?.label, "Face of Track Large and Centre level with Cube on Y")
+      // both sides of each: the track's face and the cube's centre, each in its box
+      const shown = hit === undefined ? [] : shownMarks(hit).filter((mark) => "role" in mark && mark.role === "target")
+      assert.deepStrictEqual(shown.map(({ kind }) => kind), ["box", "face", "box", "dot"])
+    })
+
     it("holds both while each is in its own range, and frees only the axis it leaves", () => {
       const hits = dragThrough([...reachesBoth, [360, 260], [360, 270], [375, 270]], [track, curve])
       assert.deepStrictEqual(moves(hits), [undefined, [350, 240], [350, 250], [350, 250], [350, 270], undefined])
