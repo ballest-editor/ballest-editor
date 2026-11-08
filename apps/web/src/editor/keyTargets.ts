@@ -28,14 +28,19 @@ const MENU_TITLE_KEYS: ReadonlySet<string> = new Set([
   "Tab"
 ])
 
+/** What Enter presses itself when it has the focus. */
+const PRESSED_BY_ENTER = "button, a[href], summary, [role=button], [role=tab], [role=option], [role=menuitem]"
+
 /**
- * Keyboard events that belong to a text field, an open dialog or a menu never drive the editor. A menu bar title with
- * its menu closed keeps only the keys it uses, so Ctrl+G still groups with focus on one.
+ * Keyboard events that belong to a text field, an open dialog or a menu never drive the editor, nor does Enter on a
+ * button or link. A menu bar title with its menu closed keeps only the keys it uses, so Ctrl+G still groups with focus
+ * on one.
  */
 export const isEditorKeyEvent = (e: KeyboardEvent): boolean => {
   if (isTypingTarget(e.target) || isModalOpen(useEditor.getState())) return false
   const element = elementOf(e.target)
   if (element?.closest("[role=dialog], [role=menu]") != null) return false
+  if (e.key === "Enter" && element?.closest(PRESSED_BY_ENTER) != null) return false
   return element?.closest("[role=menubar]") == null ||
     (element.ariaExpanded !== "true" && !MENU_TITLE_KEYS.has(e.key))
 }

@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { RECENT_PIECES, withFavouriteToggled, withRecentPiece } from "./recentPieces"
+import { RECENT_PIECES, withFavoriteToggled, withRecentPiece } from "./recentPieces"
 import { defaultSettings, mergeSettings } from "./Settings"
 
 describe("withRecentPiece", () => {
@@ -20,13 +20,13 @@ describe("withRecentPiece", () => {
   })
 })
 
-describe("withFavouriteToggled", () => {
+describe("withFavoriteToggled", () => {
   it("stars a piece at the end of the list", () => {
-    assert.deepStrictEqual(withFavouriteToggled(["a"], "b"), ["a", "b"])
+    assert.deepStrictEqual(withFavoriteToggled(["a"], "b"), ["a", "b"])
   })
 
   it("takes a star off", () => {
-    assert.deepStrictEqual(withFavouriteToggled(["a", "b"], "a"), ["b"])
+    assert.deepStrictEqual(withFavoriteToggled(["a", "b"], "a"), ["b"])
   })
 })
 
@@ -52,9 +52,13 @@ describe("the Pieces panel's thumbnail size", () => {
 
 describe("the lists in settings", () => {
   it("come back as saved", () => {
-    const panels = { ...defaultSettings.panels, recentPieces: ["a", "b"], favouritePieces: ["b"] }
+    const panels = { ...defaultSettings.panels, recentPieces: ["a", "b"], favoritePieces: ["b"] }
     const saved: unknown = JSON.parse(JSON.stringify({ ...defaultSettings, panels }))
     assert.deepStrictEqual(mergeSettings(saved).panels, panels)
+  })
+
+  it("keep the favorites of a save that spelled them favouritePieces", () => {
+    assert.deepStrictEqual(mergeSettings({ panels: { favouritePieces: ["a"] } }).panels.favoritePieces, ["a"])
   })
 
   it("are empty in a save from before they existed, or one that doesn't read", () => {
@@ -63,7 +67,7 @@ describe("the lists in settings", () => {
       piecesView: "grid"
     })
     assert.deepStrictEqual(
-      mergeSettings({ panels: { recentPieces: "a", favouritePieces: [1] } }).panels,
+      mergeSettings({ panels: { recentPieces: "a", favoritePieces: [1] } }).panels,
       defaultSettings.panels
     )
   })

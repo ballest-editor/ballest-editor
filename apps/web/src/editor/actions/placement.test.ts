@@ -10,7 +10,7 @@ import { pieceFootprint, PLACEMENT_COLUMNS, PLACEMENT_GAP } from "../../domain/p
 import { defaultSettings } from "../../domain/Settings"
 import { VIEW_DOWN } from "../../test/placementView"
 import { initialMap, useEditor } from "../store"
-import { holdsDrop, placeAt, placeAtCamera, spreadPlacement, toggleFavouritePiece } from "./placement"
+import { holdsDrop, placeAt, placeAtCamera, spreadPlacement, toggleFavoritePiece } from "./placement"
 
 const catalog = Schema.decodeUnknownSync(Catalog)(fixture)
 const pieceOf = (className: string) => catalog.pieces.find((p) => p.className === className)!
@@ -230,7 +230,7 @@ describe("placeAt", () => {
   })
 })
 
-describe("Recent and Favourites", () => {
+describe("Recent and Favorites", () => {
   const recent = () => s().settings.panels.recentPieces
 
   beforeEach(() => {
@@ -253,9 +253,9 @@ describe("Recent and Favourites", () => {
   })
 
   it("stars a piece, and takes the star off", () => {
-    void toggleFavouritePiece(cube)
-    assert.deepStrictEqual(s().settings.panels.favouritePieces, [pieceIdOf(cube)])
-    void toggleFavouritePiece(cube)
-    assert.deepStrictEqual(s().settings.panels.favouritePieces, [])
+    void toggleFavoritePiece(cube)
+    assert.deepStrictEqual(s().settings.panels.favoritePieces, [pieceIdOf(cube)])
+    void toggleFavoritePiece(cube)
+    assert.deepStrictEqual(s().settings.panels.favoritePieces, [])
   })
 })
