@@ -21,7 +21,7 @@ import {
   wholeCm,
   wouldLandOn
 } from "../../domain/placement"
-import { withFavouriteToggled, withRecentPiece } from "../../domain/recentPieces"
+import { withFavoriteToggled, withRecentPiece } from "../../domain/recentPieces"
 import { ORIGIN, sameVec, vecAdd, vecSub } from "../../domain/ueMath"
 import { sceneRegistry } from "../sceneRegistry"
 import { type EditorState, NO_TAB_OPEN, noTabOpen, useEditor } from "../store"
@@ -129,7 +129,7 @@ export const placeAt = (piece: CatalogPiece, hit: Vec3, view: PlacementView, sur
 }
 
 /** Stars `piece`, or takes its star off. */
-export const toggleFavouritePiece = (piece: CatalogPiece) => {
-  const { favouritePieces } = useEditor.getState().settings.panels
-  return updateSettings("panels", { favouritePieces: withFavouriteToggled(favouritePieces, pieceIdOf(piece)) })
+export const toggleFavoritePiece = (piece: CatalogPiece) => {
+  const { favoritePieces } = useEditor.getState().settings.panels
+  return updateSettings("panels", { favoritePieces: withFavoriteToggled(favoritePieces, pieceIdOf(piece)) })
 }

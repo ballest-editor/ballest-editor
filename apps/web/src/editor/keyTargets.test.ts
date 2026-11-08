@@ -40,6 +40,12 @@ describe("isEditorKeyEvent", () => {
     assert.isFalse(isEditorKeyEvent(key(node({ ...element, closest: () => ({}) }))))
   })
 
+  it("leaves Enter to a focused button or link, which it presses", () => {
+    const onButton = node({ ...element, closest: (selector: string) => selector.startsWith("button") ? {} : null })
+    assert.isFalse(isEditorKeyEvent(key(onButton, "Enter")))
+    assert.isTrue(isEditorKeyEvent(key(onButton, "g")))
+  })
+
   describe("on a menu bar title", () => {
     const inBar = { ...element, closest: (selector: string) => selector === "[role=menubar]" ? {} : null }
     const closedTitle = node({ ...inBar, ariaExpanded: "false" })

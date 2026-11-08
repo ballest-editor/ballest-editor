@@ -36,7 +36,7 @@ import {
 import { termsOf } from "../domain/outline"
 import { pieceDisplayName, pieceLabelOf, type PieceSize, pieceTitleOf, sizeScalesOf } from "../domain/pieceName"
 import { piecesThumbnailSizes, type Settings } from "../domain/Settings"
-import { placeAtCamera, toggleFavouritePiece, updateSettings } from "../editor/actions"
+import { placeAtCamera, toggleFavoritePiece, updateSettings } from "../editor/actions"
 import { endPieceDrag, startPieceDrag } from "../editor/pieceDrag"
 import { preloadPiece } from "../editor/preload"
 import { useEditor } from "../editor/store"
@@ -111,7 +111,7 @@ const PLACED_FLASH =
   "relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:bg-primary/40 after:opacity-0 after:transition-opacity after:duration-500 active:after:opacity-100 active:after:duration-0"
 
 /**
- * `value`, as it stood when `held` came on, until it goes off. Recent and Favourites sit above the rows, so a change to
+ * `value`, as it stood when `held` came on, until it goes off. Recent and Favorites sit above the rows, so a change to
  * them while the pointer is in the panel would move the row under it, and the next click would place another piece: they
  * wait for it to leave, as a browser's tabs keep their widths until the pointer leaves the strip.
  */
@@ -124,7 +124,7 @@ function useHeld<A>(value: A, held: boolean): A {
 /** A piece in the palette, with what its row shows wherever it is listed. */
 interface Listing {
   readonly piece: PalettePiece
-  /** The category it belongs to, which Recent and Favourites aren't. */
+  /** The category it belongs to, which Recent and Favorites aren't. */
   readonly category: string
   /** How much of its thumbnail's frame it fills. */
   readonly fill: number
@@ -164,14 +164,14 @@ function SizeTag({ size, disabled, className }: {
   )
 }
 
-/** The star on a row: shows under the pointer or on keyboard focus, and stays on a favourite. */
-function FavouriteStar({ favourite, tileCorner, onToggle }: {
-  readonly favourite: boolean
+/** The star on a row: shows under the pointer or on keyboard focus, and stays on a favorite. */
+function FavoriteStar({ favorite, tileCorner, onToggle }: {
+  readonly favorite: boolean
   /** Where it sits on a grid's tile; a list's row has none. */
   readonly tileCorner: string | undefined
   readonly onToggle: () => void
 }) {
-  const label = favourite ? "Remove from Favourites" : "Add to Favourites"
+  const label = favorite ? "Remove from Favorites" : "Add to Favorites"
   return (
     <Tooltip>
       <TooltipTrigger
@@ -183,18 +183,18 @@ function FavouriteStar({ favourite, tileCorner, onToggle }: {
               "absolute transition-opacity",
               // On the tile's corner in a grid, over a picture, so it takes a surface; a row keeps room for it.
               tileCorner === undefined ? "top-1/2 right-1 -translate-y-1/2" : cn(tileCorner, "rounded-full bg-card"),
-              favourite
+              favorite
                 ? "text-foreground"
                 : "text-fg-secondary opacity-0 group-hover/piece:opacity-100 focus-visible:opacity-100"
             )}
             aria-label={label}
-            aria-pressed={favourite}
+            aria-pressed={favorite}
             onMouseDown={(e) => e.preventDefault()} // leaves focus where it is, for the editor's keys
             onClick={onToggle}
           />
         }
       >
-        {favourite ? <IconStarFilled /> : <IconStar />}
+        {favorite ? <IconStarFilled /> : <IconStar />}
       </TooltipTrigger>
       <TooltipContent side="right">{label}</TooltipContent>
     </Tooltip>
@@ -206,20 +206,20 @@ function PieceButton(
     listing: { category, fill, piece },
     view,
     layout,
-    favourite,
+    favorite,
     onPlace,
     onHover,
-    onToggleFavourite,
+    onToggleFavorite,
     unavailable,
     unverified
   }: {
     readonly listing: Listing
     readonly view: PiecesView
     readonly layout: PieceLayout
-    readonly favourite: boolean
+    readonly favorite: boolean
     readonly onPlace: (e: MouseEvent<HTMLButtonElement>) => void
     readonly onHover: () => void
-    readonly onToggleFavourite: () => void
+    readonly onToggleFavorite: () => void
     /** Set for pieces that can't be placed; shown disabled, with this in the tooltip. */
     readonly unavailable: string | undefined
     /** Hidden piece nobody has loaded in-game yet: placeable, but flagged. */
@@ -315,8 +315,8 @@ function PieceButton(
           <span className="text-caption text-fg-tertiary">{piece.className}</span>
         </TooltipContent>
       </Tooltip>
-      {(!disabled || favourite) && (
-        <FavouriteStar favourite={favourite} tileCorner={layout.star} onToggle={onToggleFavourite} />
+      {(!disabled || favorite) && (
+        <FavoriteStar favorite={favorite} tileCorner={layout.star} onToggle={onToggleFavorite} />
       )}
     </div>
   )
@@ -353,9 +353,9 @@ export function Palette() {
   const view = useEditor((s) => s.settings.panels.piecesView)
   const thumbnailSize = useEditor((s) => s.settings.panels.piecesThumbnailSize)
   const layout = PIECE_LAYOUTS[view][thumbnailSize]
-  const favourites = useEditor((s) => s.settings.panels.favouritePieces)
+  const favorites = useEditor((s) => s.settings.panels.favoritePieces)
   const [pointerInside, setPointerInside] = useState(false)
-  const shownFavourites = useHeld(favourites, pointerInside)
+  const shownFavorites = useHeld(favorites, pointerInside)
   const shownRecent = useHeld(useEditor((s) => s.settings.panels.recentPieces), pointerInside)
   const [query, setQuery] = useState("")
   const [open, setOpen] = useState<Readonly<Record<string, boolean>>>({})
@@ -382,8 +382,8 @@ export function Palette() {
       hidden: false,
       pieces: ids.flatMap((id) => listings.get(id)?.piece ?? [])
     })
-    return [list("Recent", shownRecent), list("Favourites", shownFavourites)].filter(({ pieces }) => pieces.length > 0)
-  }, [listings, shownFavourites, shownRecent, terms])
+    return [list("Recent", shownRecent), list("Favorites", shownFavorites)].filter(({ pieces }) => pieces.length > 0)
+  }, [listings, shownFavorites, shownRecent, terms])
   const shown = [...lists, ...sections]
   // Base UI measures a scroll area when its viewport resizes, not when its content does, so each height of results gets
   // its own: an empty search after the whole list would otherwise keep the list's scrollbar, as would a change of layout.
@@ -504,10 +504,10 @@ export function Palette() {
                               listing={listings.get(id) ?? { piece, category: section.name, fill: 1 }}
                               view={view}
                               layout={layout}
-                              favourite={favourites.includes(id)}
+                              favorite={favorites.includes(id)}
                               onPlace={place(piece, unavailable)}
                               onHover={() => index !== null && preloadPiece(piece, index)}
-                              onToggleFavourite={() => void toggleFavouritePiece(piece)}
+                              onToggleFavorite={() => void toggleFavoritePiece(piece)}
                               unavailable={unavailable}
                               unverified={catalog !== null && verificationOf(piece, catalog.verified) === "unverified"}
                             />

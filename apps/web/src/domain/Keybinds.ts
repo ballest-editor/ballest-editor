@@ -47,6 +47,7 @@ export const keybindSections = [
       "deleteSelection",
       "selectAll",
       "deselect",
+      "enterGroup",
       "groupSelection",
       "ungroupSelection"
     ]
@@ -119,6 +120,7 @@ export const keybindActionLabels: Record<KeybindAction, string> = {
   redo: "redo",
   selectAll: "select all",
   deselect: "deselect",
+  enterGroup: "enter group",
   groupSelection: "group",
   ungroupSelection: "ungroup",
   moveForward: "forward",
@@ -187,6 +189,8 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   selectAll: "Select every item in the map; inside an entered group, every item in that group.",
   deselect:
     "Clear the selection. Inside an entered group it steps out of the group instead, with a pane maximised it restores the panes, and during a gizmo drag it cancels the drag. (The game uses Ctrl+click.)",
+  enterGroup:
+    "Enter the selected group, so a click selects what is inside it. Double-clicking an item of a group does the same. Editor only.",
   groupSelection:
     "Group the selection. Clicking any item of a group then selects the whole group. Ctrl+G in the in-game editor.",
   ungroupSelection: "Dissolve the selected groups; their items stay selected. Shift+G in the in-game editor.",
@@ -291,6 +295,7 @@ export const defaultKeybinds: Keybinds = {
   redo: ["Ctrl+KeyY", "Ctrl+Shift+KeyZ"],
   selectAll: ["Ctrl+KeyA"],
   deselect: ["Escape"],
+  enterGroup: ["Enter", "NumpadEnter"],
   groupSelection: ["Ctrl+KeyG"],
   ungroupSelection: ["Shift+KeyG"],
   moveForward: ["KeyW"],

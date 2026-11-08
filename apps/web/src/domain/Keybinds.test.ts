@@ -71,6 +71,7 @@ describe("keybind table", () => {
       ["delete", ["Backspace", "Delete"]],
       ["select all", ["Ctrl+KeyA"]],
       ["deselect", ["Escape"]],
+      ["enter group", ["Enter", "NumpadEnter"]], // editor only
       ["group", ["Ctrl+KeyG"]],
       ["ungroup", ["Shift+KeyG"]]
     ])

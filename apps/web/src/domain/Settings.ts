@@ -112,8 +112,8 @@ export const PanelSettings = Schema.Struct({
   piecesThumbnailSize: Schema.Literals(piecesThumbnailSizes),
   /** What the Pieces panel's Recent lists, as `pieceIdOf` gives them, newest first (see domain/recentPieces). */
   recentPieces: Schema.Array(Schema.String),
-  /** What its Favourites lists, in the order they were starred. */
-  favouritePieces: Schema.Array(Schema.String)
+  /** What its Favorites lists, in the order they were starred. */
+  favoritePieces: Schema.Array(Schema.String)
 })
 
 /** How much bigger or smaller than medium each gizmo size draws, on screen. */
@@ -168,7 +168,7 @@ export const defaultSettings: Settings = {
     rotationEnabled: false,
     rotationStep: DEFAULT_ROTATION_STEP
   },
-  panels: { piecesView: "list", piecesThumbnailSize: "m", recentPieces: [], favouritePieces: [] },
+  panels: { piecesView: "list", piecesThumbnailSize: "m", recentPieces: [], favoritePieces: [] },
   gizmo: { size: "m", showForGroups: true }
 }
 
@@ -178,7 +178,7 @@ const LEGACY_GRID_COLORS = { gridCellColor: "#3a404a", gridSectionColor: "#58606
 /**
  * Older saves kept `undoSelection` under general (it now lives under editor), stored the
  * old fixed grid colours whether or not they were chosen (they become automatic), and stored
- * an unset creator as "" (now null: use the name found).
+ * an unset creator as "" (now null: use the name found), and spelled the starred pieces `favouritePieces`.
  */
 const migrate = (stored: unknown): unknown => {
   if (!Predicate.isObject(stored)) return stored
@@ -190,6 +190,10 @@ const migrate = (stored: unknown): unknown => {
   }
   if (Predicate.isObject(general) && general["creatorName"] === "") {
     out = { ...out, general: { ...general, creatorName: null } }
+  }
+  const panels = out["panels"]
+  if (Predicate.isObject(panels) && "favouritePieces" in panels && !("favoritePieces" in panels)) {
+    out = { ...out, panels: { ...panels, favoritePieces: panels["favouritePieces"] } }
   }
   const appearance = out["appearance"]
   if (Predicate.isObject(appearance)) {
