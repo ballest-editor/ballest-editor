@@ -10,7 +10,7 @@ The game's in-game editor has a 10 cm grid and rotation steps, and that is what 
 
 ## Still to come
 
-- **Connector data** covers the Track, Bevel_F, Bevel_H and Bevel_C families ([qa/connectors.md](qa/connectors.md)). Round, Bevel_T, the ramps, Tubes, Pipes, the player start and the goal have no ends yet, so Mesh carries them.
+- **Connector data** covers every directional piece, read off the meshes, but only the Track, Bevel_F, Bevel_H and Bevel_C pieces of the first measurement are confirmed in the game ([qa/connectors.md](qa/connectors.md) § Not confirmed in the game). The player start and the goal have no ends yet, so Mesh carries them.
 - **A prefab instance's ends** aren't found (§ Open questions).
 - **A turned grid in a side view** draws the line family nearest the view, spaced as it crosses the view. The other family's lines aren't drawn there.
 
@@ -55,7 +55,7 @@ The grid as today, with #84's additions:
 
 #### Connectors
 
-The ends of track, ramp, tube and pipe pieces. A connector is a point on a piece, a direction it faces out of, an up direction, and a profile (the cross-section it presents: Track, Bevel_F, Bevel_C, Bevel_H, Tube H, Tube F, Pipe half, and so on). The data is per piece and measured once, like `tools/extract/panel.json` (§ Connector data).
+The ends of track, ramp, tube and pipe pieces. A connector is a point on a piece, a direction it faces out of, an up direction, and a profile (the cross-section it presents: Track, Bevel_F, Bevel_C, Tube F, Tube H, Pipe Q and so on). The data is per piece and measured once, like `tools/extract/panel.json` (§ Connector data).
 
 When the selection's end reaches another item's end, it lands on it, facing the opposite way, up matching up. The two pieces meet with no gap and no step.
 
@@ -225,11 +225,12 @@ These are open issues already. What changes is that each takes its points, faces
 
 Connectors need, per piece, the ends: position and the two directions in the piece's local frame, and the profile. The catalog's bounds are not enough, since a curved piece's box corners are nowhere near its ends.
 
-- The data is measured with the game driver, as `tools/extract/panel.json` and `paint-measured.json` were: caps read off the meshes give candidate ends, then pieces joined by those ends are placed in the game, read back and looked at ([qa/connectors.md](qa/connectors.md)). It lives beside them as `tools/extract/connectors.json` and is folded into `assets/catalog.json` by the extract pipeline, never edited by hand in `assets/`.
+- The data is read off the meshes by a survey of their flat caps (`pnpm --filter @ballest/extract connectors`), and a family is confirmed by placing pieces joined by those ends in the game with the game driver, reading them back and looking at them, as `tools/extract/panel.json` and `paint-measured.json` were measured ([qa/connectors.md](qa/connectors.md)). It lives beside them as `tools/extract/connectors.json` and is folded into `assets/catalog.json` by the extract pipeline, never edited by hand in `assets/`.
 - A piece can have any number of ends (a Bevel_F Branch has three; a Cap has one). The player start and the goal have an end each, so a track can begin and finish on a connector.
-- Profiles are named for the families in the catalog's display names (Track, Bevel_F, Bevel_C, Bevel_H, Tube H, Tube F, Pipe) and the family a piece belongs to is part of its connector record, not derived from its name at run time.
+- Profiles are named for the families in the catalog's display names (Track, Bevel_F, Bevel_H, Bevel_C, Bevel_T, Round, Pipe Q, Tube F, Tube H and the rest in [qa/connectors.md](qa/connectors.md) § What is covered) and the family a piece belongs to is part of its connector record, not derived from its name at run time. A cap that differs in area, size or the height of its running surface is a profile of its own, so a half tube's end doesn't fit a full tube's.
 - A piece with no connector data has no ends: Connectors do nothing for it and Mesh and Bounds carry it. That is what every piece is until measured, so the feature grows piece family by piece family and nothing waits on all of it.
-- An end is anchored on the running surface, not the middle of its cap: pieces that join level have caps centred at different heights ([qa/connectors.md](qa/connectors.md)).
+- An end is anchored on the running surface, not the middle of its cap: pieces that join level have caps centred at different heights. A section ridden through, a full tube or a pipe, is anchored on its middle ([qa/connectors.md](qa/connectors.md) § What an end is).
+- Each end carries its cap's shape (a rectangle, polygon, circle or ring, and its size), for choosing other places on it to join.
 - A lopsided cross-section has a hand, the side its top leans to looking out of the end. Two ends fit when their hands differ, and Flip to fit offers the mirrored twin when they don't.
 - Mirroring an item (Flip X, Flip Y) mirrors its ends with its geometry, as it does its bounds ([FORMAT.md](FORMAT.md) § Mirroring).
 

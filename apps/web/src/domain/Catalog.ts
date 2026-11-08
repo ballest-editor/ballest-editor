@@ -104,9 +104,27 @@ export class CatalogProperty extends Schema.Opaque<CatalogProperty>()(open({
   optional: Schema.optionalKey(Schema.Boolean)
 })) {}
 
+/** Where the cap's middle is, in the piece's frame, when it isn't the end's position (a track's end is its cap's top). */
+const capCentre = { centre: Schema.optionalKey(Vec3Tuple) }
+
+/**
+ * The flat cap an end is cut by, in its plane (docs/qa/connectors.md § What an end is). A rectangle or a polygon spans
+ * `width` across the end (along forward × up) and `height` along its up; a circle or a ring has its radii.
+ */
+const ConnectorCap = Schema.Union([
+  Schema.Struct({
+    shape: Schema.Literals(["rect", "polygon"]),
+    width: Schema.Finite,
+    height: Schema.Finite,
+    ...capCentre
+  }),
+  Schema.Struct({ shape: Schema.Literal("circle"), radius: Schema.Finite, ...capCentre }),
+  Schema.Struct({ shape: Schema.Literal("annulus"), radius: Schema.Finite, innerRadius: Schema.Finite, ...capCentre })
+])
+
 /**
  * One end of a piece, in its local frame: a point, the direction it faces out of, its up, and the cross-section it
- * presents. Measured in the game (tools/extract/connectors.json, docs/SNAPPING.md § Connector data).
+ * presents. Read off the meshes, some confirmed in the game (tools/extract/connectors.json, docs/qa/connectors.md).
  */
 export class Connector extends Schema.Opaque<Connector>()(open({
   position: Vec3Tuple,
@@ -115,7 +133,9 @@ export class Connector extends Schema.Opaque<Connector>()(open({
   /** The family of cross-sections it belongs to: "Track", "Bevel_F", "Tube F"... */
   profile: Schema.String,
   /** Which side a lopsided cross-section leans to, looking out of the end; absent for one that is the same both ways. */
-  hand: Schema.optionalKey(Schema.Literals(["left", "right"]))
+  hand: Schema.optionalKey(Schema.Literals(["left", "right"])),
+  /** Its cap's shape; a hand-built end can leave it out. */
+  cap: Schema.optionalKey(ConnectorCap)
 })) {}
 
 export class CatalogPiece extends Schema.Opaque<CatalogPiece>()(open({

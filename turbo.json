@@ -34,6 +34,16 @@
       "passThroughEnv": ["VERCEL_GIT_COMMIT_SHA"],
       "outputs": ["dist/**"]
     },
+    // The connector tests read the piece meshes (tools/extract/src/connectorMeshes.test.ts), so they wait for them.
+    "@ballest/extract#test": {
+      "dependsOn": ["transit", "//#assets"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/.config/tsconfig.base.json",
+        "$TURBO_ROOT$/assets/**",
+        "$TURBO_ROOT$/web-assets/pieces/**"
+      ]
+    },
     // The desktop app packages the renderer build, the assets and the editor-link plugin, so it builds after them.
     "@ballest/desktop#build": {
       "dependsOn": ["^build", "@ballest/web#build", "@ballest/editor-link#build", "//#assets"],

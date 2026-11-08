@@ -1,24 +1,9 @@
-// tools/extract/connectors.json against assets/catalog.json: what was measured in game reaches the catalog unchanged.
+// tools/extract/connectors.json against assets/catalog.json: the ends the survey read off the meshes reach the catalog
+// unchanged. connectorMeshes.test.ts holds them against the meshes.
 import { assert, describe, it } from "@effect/vitest"
 import { Schema } from "effect"
+import { ConnectorsFile, End, type Vector } from "./connectorsFile.ts"
 import { readJson } from "./readJson.ts"
-
-const Vector = Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite])
-
-const End = Schema.Struct({
-  position: Vector,
-  forward: Vector,
-  up: Vector,
-  profile: Schema.String,
-  hand: Schema.optionalKey(Schema.Literals(["left", "right"]))
-})
-
-const Measured = Schema.Struct({
-  game: Schema.String,
-  measured: Schema.String,
-  method: Schema.String,
-  pieces: Schema.Record(Schema.String, Schema.Array(End))
-})
 
 const Catalog = Schema.Struct({
   pieces: Schema.Array(Schema.Struct({
@@ -27,7 +12,7 @@ const Catalog = Schema.Struct({
   }))
 })
 
-const measured = readJson(Measured, "connectors.json")
+const measured = readJson(ConnectorsFile, "connectors.json")
 const catalog = readJson(Catalog, "..", "..", "assets", "catalog.json")
 
 const length = ([x, y, z]: typeof Vector.Type) => Math.hypot(x, y, z)
@@ -50,5 +35,11 @@ describe("connectors.json", () => {
       assert.closeTo(length(end.up), 1, 1e-5)
       assert.closeTo(dot(end.forward, end.up), 0, 1e-5)
     }
+  })
+
+  it("gives a profile's ends a hand on all of them or none", () => {
+    const ends = Object.values(measured.pieces).flat()
+    const handed = new Set(ends.filter((end) => end.hand !== undefined).map((end) => end.profile))
+    assert.deepStrictEqual(ends.filter((end) => handed.has(end.profile) !== (end.hand !== undefined)), [])
   })
 })
