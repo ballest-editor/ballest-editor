@@ -271,7 +271,7 @@ export type SnapKind = (typeof SNAP_KINDS)[number]
 /** What each transform can be narrowed to: a turn and a scale have no grid or alignment, a move has no step. */
 export const SNAP_KINDS_OF = {
   move: ["grid", "connectors", "mesh", "alignment"],
-  turn: ["connectors", "mesh", "step"],
+  turn: ["grid", "connectors", "mesh", "alignment", "step"],
   scale: ["mesh", "step"]
 } as const satisfies Readonly<Record<string, ReadonlyArray<SnapKind>>>
 export type SnapTransform = keyof typeof SNAP_KINDS_OF
@@ -316,13 +316,14 @@ export const narrowedTo = (config: SnapConfig, kinds: ReadonlyArray<SnapKind>): 
 
 /** The targets that can stop a turn (flush faces, ends facing) and a scale (the scaled face on another). */
 const TURN_TARGETS: Readonly<Record<"turn" | "scale", ReadonlyArray<SnapTarget>>> = {
-  turn: ["connectors", "mesh"],
+  turn: ["connectors", "mesh", "alignment", "grid"],
   scale: ["mesh"]
 }
 
 /**
- * How a turn or a scale snaps under `config` with `kinds` held and Ctrl `invert`ing: whether it takes the step, and the
- * targets that can stop it, highest priority first. A target's key leaves the step out, and the step's key keeps it in.
+ * How a turn or a scale snaps under `config` with `kinds` held and Ctrl `invert`ing (docs/SNAPPING.md § Affect): the
+ * targets it can stop on come with snapping as a whole, the step with Rotate's or Scale's own switch, and a held key
+ * narrows the targets to its kind, or (T) to the step alone.
  */
 export const turnSnapOf = (
   config: SnapConfig,
@@ -332,11 +333,12 @@ export const turnSnapOf = (
 ): { readonly step: boolean; readonly targets: ReadonlyArray<SnapTarget> } => {
   const held = kindsFor(transform, kinds)
   const narrowed = narrowedTo(config, held)
-  const on = narrowed.enabled !== invert && (transform === "turn" ? narrowed.rotationEnabled : narrowed.scaleEnabled)
-  if (!on) return { step: false, targets: [] }
+  if (narrowed.enabled === invert) return { step: false, targets: [] }
+  const stepOnly = held.length > 0 && held.every((kind) => kind === "step")
   return {
-    step: held.length === 0 || held.includes("step"),
-    targets: priorityOf(narrowed).filter((target) => TURN_TARGETS[transform].includes(target))
+    step: held.includes("step") ||
+      (held.length === 0 && (transform === "turn" ? config.rotationEnabled : config.scaleEnabled)),
+    targets: stepOnly ? [] : priorityOf(narrowed).filter((target) => TURN_TARGETS[transform].includes(target))
   }
 }
 

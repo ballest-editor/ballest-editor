@@ -94,16 +94,16 @@ const worldFacesOf = (key: string, sharpAngle: number): ReadonlyArray<MeshFace> 
   return parts.length === 0 ? undefined : parts.flat()
 }
 
-/** What's in the map but for `except`, as targets. */
-export const snapItemsOf = (
+/** What's in the map that `keep` keeps, as targets. */
+const snapItemsWhere = (
   s: Pick<EditorState, "doc" | "catalogIndex">,
-  except: ReadonlySet<string>,
+  keep: (key: string) => boolean,
   sharpAngle: number
 ): ReadonlyArray<SnapItem> => {
   const names = nodeNamesOf(s)
   return s.doc.map.items.flatMap((item, index): ReadonlyArray<SnapItem> => {
     const key = s.doc.ids[index]
-    if (key === undefined || except.has(key)) return []
+    if (key === undefined || !keep(key)) return []
     const transform = editTransform(item)
     const box = placedBoxOf([{ item, transform }], s.catalogIndex)
     if (box === undefined) return []
@@ -126,6 +126,23 @@ export const snapItemsOf = (
       }
     }]
   })
+}
+
+/** What's in the map but for `except`, as targets. */
+export const snapItemsOf = (
+  s: Pick<EditorState, "doc" | "catalogIndex">,
+  except: ReadonlySet<string>,
+  sharpAngle: number
+): ReadonlyArray<SnapItem> => snapItemsWhere(s, (key) => !except.has(key), sharpAngle)
+
+/** The items `keys` as `snapItemsOf` has a target, for what measures the selection's own shape. */
+export const ownSnapItemsOf = (
+  s: Pick<EditorState, "doc" | "catalogIndex">,
+  keys: ReadonlyArray<string>,
+  sharpAngle: number
+): ReadonlyArray<SnapItem> => {
+  const own = new Set(keys)
+  return snapItemsWhere(s, (key) => own.has(key), sharpAngle)
 }
 
 const threeBox = ({ box: { max, min } }: SnapItem) => new THREE.Box3().setFromPoints([toThree(min), toThree(max)])

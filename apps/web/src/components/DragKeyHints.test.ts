@@ -47,8 +47,10 @@ describe("the status bar's drag keys", () => {
   it("offers a turn no hold or lock, and a scale only the mesh and the step", () => {
     assert.deepStrictEqual(hintsOf({ transform: "turn", pressed: [], lock: undefined }), [
       "Control invert",
+      "G grid",
       "J connectors",
       "M mesh",
+      "L align",
       "T step"
     ])
     assert.deepStrictEqual(hintsOf({ transform: "scale", pressed: [], lock: undefined }), [

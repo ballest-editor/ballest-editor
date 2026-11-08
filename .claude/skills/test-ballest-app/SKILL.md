@@ -56,7 +56,11 @@ node $L scene '{"pieces":[{"name":"Track L","x":-2000},{"name":"Track S","x":-30
 node $L px 1; node $L end 1 0; node $L arrow 1 x 35            # page pixels: a piece's origin, a connector end, a translate handle
 node $L drag 620 148 0 330 --steps 110 --lock x --shot /tmp/a.png   # a drag by page pixels, with a lock key, a screenshot before release
 node $L drag 620 148 0 330 --key KeyG --hold --shot /tmp/b.png  # with a key held through the drag (a KeyboardEvent.code), still pressed for `release`
+node $L ring 1 z                                                # the Z ring's grabbable quarter with piece 1 selected and the rotate tool, and the gizmo's centre
+node $L turn 1 z 120 --steps 120 --hold --shot /tmp/t.png       # grab that ring and drag round the centre by 120° on screen, a degree a step
 ```
+
+A `turn` prints what it stopped on, the pointer's angle and the angle the piece turned, run by run. `ring` and `turn` take `x`, `y`, `z` or `view`; `--from` is where on the ring's quarter to grab it, 0 to 90° (default 45). Put the scene's `tool` at `rotate` so the ring shows from the start.
 
 Every scene starts from the default snap config plus what `snap` gives (`enabled` is off by default); `view` is a pane projection and `frame: true` frames the map. The default top view shows world x from about -2200 (bottom) to +100 (top), so put pieces there. A `--hold` drag stays pressed for `release`.
 

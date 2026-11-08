@@ -11,6 +11,7 @@ import {
   snapsGrid,
   snapsRotation,
   snapsScale,
+  type SnapTarget,
   targetSummary,
   turnSnapOf,
   withPreset,
@@ -163,28 +164,31 @@ describe("snapConfig", () => {
     assert.strictEqual(narrowed.targets.mesh.sharpAngle, off.targets.mesh.sharpAngle)
   })
 
-  it("gives a turn and a scale the step alone under the step's key, and no step under a target's", () => {
+  it("stops a turn with snapping as a whole, steps it with its own switch, and narrows under a held key", () => {
     const off = { ...defaultSnapConfig, rotationEnabled: false, scaleEnabled: false }
+    const stops: ReadonlyArray<SnapTarget> = ["grid", "connectors", "mesh", "alignment"]
     assert.deepStrictEqual(turnSnapOf(off, "turn", [], false), { step: false, targets: [] })
-    // Ctrl turns the magnet over; the turn's own toggle still has to be on
-    assert.deepStrictEqual(turnSnapOf(off, "turn", [], true), { step: false, targets: [] })
+    // Ctrl turns the magnet over: the stops come on, the step still wants its switch
+    assert.deepStrictEqual(turnSnapOf(off, "turn", [], true), { step: false, targets: stops })
     const rotates = { ...off, rotationEnabled: true }
     assert.deepStrictEqual(turnSnapOf(rotates, "turn", [], false), { step: false, targets: [] })
-    assert.deepStrictEqual(turnSnapOf(rotates, "turn", [], true), { step: true, targets: ["connectors", "mesh"] })
-    assert.deepStrictEqual(turnSnapOf({ ...rotates, enabled: true }, "turn", [], false), {
-      step: true,
-      targets: ["connectors", "mesh"]
+    assert.deepStrictEqual(turnSnapOf(rotates, "turn", [], true), { step: true, targets: stops })
+    assert.deepStrictEqual(turnSnapOf({ ...rotates, enabled: true }, "turn", [], false), { step: true, targets: stops })
+    assert.deepStrictEqual(turnSnapOf({ ...off, enabled: true }, "scale", [], false), {
+      step: false,
+      targets: ["mesh"]
     })
     assert.deepStrictEqual(turnSnapOf(off, "turn", ["step"], false), { step: true, targets: [] })
     assert.deepStrictEqual(turnSnapOf(off, "turn", ["mesh"], false), { step: false, targets: ["mesh"] })
     assert.deepStrictEqual(turnSnapOf(off, "turn", ["mesh", "step"], false), { step: true, targets: ["mesh"] })
+    assert.deepStrictEqual(turnSnapOf(off, "turn", ["grid"], false), { step: false, targets: ["grid"] })
     assert.deepStrictEqual(turnSnapOf(off, "scale", ["mesh"], false), { step: false, targets: ["mesh"] })
     assert.deepStrictEqual(turnSnapOf(off, "turn", ["step"], true), { step: false, targets: [] })
   })
 
-  it("leaves a turn alone under a key that means nothing to it", () => {
+  it("leaves a scale alone under a key that means nothing to it", () => {
     const on = { ...defaultSnapConfig, enabled: true, rotationEnabled: true, scaleEnabled: true }
-    assert.deepStrictEqual(turnSnapOf(on, "turn", ["grid", "alignment"], false), turnSnapOf(on, "turn", [], false))
+    assert.deepStrictEqual(turnSnapOf(on, "scale", ["grid", "alignment"], false), turnSnapOf(on, "scale", [], false))
     assert.deepStrictEqual(turnSnapOf(on, "scale", ["connectors"], false), { step: true, targets: ["mesh"] })
   })
 

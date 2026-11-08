@@ -149,7 +149,14 @@ Within one target the nearest candidate wins, measured in screen pixels in the a
 Which transforms snapping applies to. Move is always on. Rotate and Scale are toggles, as the rotation pill is. All three sit under snapping as a whole, the magnet in the top bar (§ The Snap popover): with it off nothing snaps, whatever each toggle says, and Ctrl turns it over (§ Modifiers).
 
 - **Move**: the base lands on a target.
-- **Rotate**: rotation snaps to the step, and with a Mesh face (a face of § Under a constrained move, or of the bounds until the mesh has loaded) or a Connector in range it snaps the base face (the face the pivot is on, or the piece's end) flush to the target, so a quarter turn that would meet a face stops there. Connectors' Match rotation and Mesh's Rotate to face are the per-target parts of this.
+- **Rotate**: a turn with Snap on stops where the selection meets something, whatever the Rotate toggle says; Rotate is the step, which the turn takes between stops. With Snap off nothing snaps, a turn included, as the magnet gates every transform (§ The Snap popover). Ctrl inverts Snap for the drag, and a held key (§ Modifiers) keeps the stops to one target, or with T the step alone. The stops, from the targets that are on:
+  - **Touching** (Mesh): where the selection first touches a neighbour it reaches, each way round. A corner or edge middle of the selection's mesh, or of its bounds until the mesh has loaded, comes onto one of the neighbour's flat faces, or one of the neighbour's onto one of the selection's, within 1 cm. A neighbour it already touches at the start, where the turn takes it in, is met at once, so that way has no touch.
+  - **Flush** (Mesh): where a face of the selection comes into the plane of a face of a neighbour, within 1 cm, facing it or facing the same way: a door swung shut on a wall, or a side brought level with the side beside it.
+  - **Aligned** (Alignment): where one of the selection's axes comes along one of a neighbour's. "Aligned with Track L on X and Y" names the axes that meet their own, and "Square to Track L" is one laid along another.
+  - **End** (Connectors): where an end of the selection comes facing an end of a neighbour, within the Connectors range of it.
+  - **Square to the grid** (Grid): where one of the selection's axes comes along the grid's, turned with it.
+
+  A neighbour counts when the turn can reach it: its box is within the selection's sweep about the axis, and the threshold. Flush and aligned stops only count as far each way as the first touch with that neighbour, as past it the selection would be inside it, so a curved piece offers a touch each way and its few real faces and axes, not a stop at every facet. At one angle the most particular stop names it, in the order above with End first. A turn gets to a stop as a move gets to a target (§ Getting to a target): it reaches it on crossing it or coming within a pixel, holds there while the pointer goes on as far as the threshold reaches along the ring it was dragged by (12 px on the 78 px ring is 8.8°), and goes free past that; Shift holds it. The label says what it stopped on, the stop's faces, point or axes are marked, and the history says "Turn 1 item touching Track L".
 - **Scale**: scale snaps to the step, along the item's own axes. With a Mesh face (a face of § Under a constrained move, or of the bounds until the mesh has loaded) of a neighbour in range along the scaled axis, the scaled face stops on it, which is how a wall is stretched to meet another. A neighbour counts when its box stands in the way of the selection's along that axis, either way, so a drag's start only places the meshes in line with it, and an item off to the side offers no stop.
 
 ### Under the pivot setting
@@ -161,7 +168,6 @@ Snapping measures a drag on the items that take it as the gizmo shows it (`leadi
 - **A lock** is on the grid's axes, so every unit takes the same offset, whatever the handle's axes were.
 - **A landing that takes a rotation** (Match rotation, Rotate to face, Flush, a join) is one motion of the whole selection in either mode, as it puts the active unit's base on the target. A chain's links take it once, and it doesn't run down them. A group's Point pivot goes with it, though a turn alone leaves a Point where it is.
 - **A turn's stops** assume the active unit ends up turned by the angle dragged. A turn running down a chain in Each goes past that, so it takes the rotation step and nothing else.
-- **A group's base face** is the face its pivot choice names, along the world's axes, or the member's own under an Item pivot. A group on its centre or a Point has no base face.
 
 ## What a drag looks like
 

@@ -1,18 +1,14 @@
 import { assert, beforeEach, describe, it } from "@effect/vitest"
 import * as THREE from "three"
 import { indexCatalog } from "../../domain/Catalog"
-import { editTransform } from "../../domain/editTransform"
 import { identityTransform, itemFromPiece, newMapFile } from "../../domain/factory"
 import { defaultSettings } from "../../domain/Settings"
 import { defaultSnapConfig, type SnapConfig } from "../../domain/snapConfig"
-import { rotatorToQuat } from "../../domain/ueMath"
-import { leadingKeys, pivotUnitOf } from "../../domain/units"
+import { leadingKeys } from "../../domain/units"
 import { catalogWithEnds, grouped, loadPieces } from "../../test/snapFixtures"
-import { assertVec } from "../../test/vec"
-import { setSelectionPivot } from "../actions/selection"
 import { sceneRegistry } from "../sceneRegistry"
 import { useEditor } from "../store"
-import { baseFaceOf, bodyDrags, dragTargetOf, selectionSnapStart } from "./selectionStart"
+import { bodyDrags, dragTargetOf, selectionSnapStart } from "./selectionStart"
 
 const s = () => useEditor.getState()
 
@@ -32,8 +28,6 @@ const target = () => {
   if (found === undefined) return assert.fail("nothing to drag")
   return found
 }
-
-const faceOfActive = () => baseFaceOf(s(), pivotUnitOf(target().selection, s().pivotMode))
 
 describe("what a drag acts on", () => {
   beforeEach(() => sceneRegistry.objects.clear())
@@ -64,45 +58,6 @@ describe("what a drag acts on", () => {
     inScene([a])
     s().select([a, b])
     assert.deepStrictEqual([...target().transforms.keys()], [a])
-  })
-})
-
-describe("the face a turn brings flush", () => {
-  beforeEach(() => sceneRegistry.objects.clear())
-
-  it("is the item's pivot face along its own axes", () => {
-    const [a = ""] = load([0])
-    s().select([a])
-    setSelectionPivot("Top")
-    assertVec(faceOfActive() ?? { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, "out of the top")
-  })
-
-  it("is a group's chosen face along the world's axes, whatever way the active item faces", () => {
-    const [a = "", b = ""] = load([0, 1000])
-    const rotation = rotatorToQuat({ roll: 90, pitch: 0, yaw: 0 })
-    const item = s().doc.map.items[0]
-    if (item === undefined) return assert.fail("the map is empty")
-    s().transformItems(new Map([[a, { ...editTransform(item), rotation }]]))
-    const id = grouped([a, b])
-    s().setGroupPivot(id, { choice: "Top" })
-    assertVec(faceOfActive() ?? { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, "out of the group's top")
-  })
-
-  it("has none on a group that pivots off its faces", () => {
-    const [a = "", b = ""] = load([0, 1000])
-    const id = grouped([a, b])
-    assert.isUndefined(faceOfActive(), "the centre")
-    s().setGroupPivot(id, { choice: "point", world: { x: 1, y: 2, z: 3 } })
-    assert.isUndefined(faceOfActive(), "a frozen point")
-  })
-
-  it("follows a group's Item pivot to that member's own face and axes", () => {
-    const [a = "", b = ""] = load([0, 1000])
-    s().select([a])
-    setSelectionPivot("Top")
-    const id = grouped([a, b])
-    s().setGroupPivot(id, { choice: "item", key: a })
-    assertVec(faceOfActive() ?? { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, "out of the member's top")
   })
 })
 

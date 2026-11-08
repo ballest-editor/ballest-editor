@@ -8,9 +8,10 @@ import { defaultSnapConfig, type SnapConfig } from "../../domain/snapConfig"
 import { reactRootPerTest } from "../../test/reactRoot"
 import { catalogWithEnds, DOWN_PANE_SIZE, loadPieces, lookDown } from "../../test/snapFixtures"
 import { GizmoController } from "../gizmo/GizmoController"
+import { SIZE } from "../gizmo/handles"
 import { paneCameraAt } from "../paneCameras"
 import { sceneRegistry } from "../sceneRegistry"
-import { useEditor } from "../store"
+import { shownTransform, useEditor } from "../store"
 import { landDrop } from "./pieceDrop"
 import { SnapInput } from "./SnapInput"
 
@@ -254,4 +255,97 @@ describe("a palette drop", () => {
       assert.lengthOf(useEditor.getState().tracked, 0)
     }
   )
+})
+
+/** A pointer event at a pixel. */
+const at = (px: { readonly x: number; readonly y: number }, type: string, buttons: number) =>
+  pointer(type, px.x, px.y, buttons)
+
+/** The pixel on the Z ring at `degrees` round the screen from `start`. */
+const onRing = (start: number, degrees: number) => {
+  const a = (start + degrees) * Math.PI / 180
+  return { x: CENTRE + Math.cos(a) * SIZE.ring, y: CENTRE - Math.sin(a) * SIZE.ring }
+}
+
+/** Where on the screen, in degrees, the Z ring's quarter that can be grabbed starts. */
+const grabbable = (): number => {
+  for (let from = 0; from < 360; from += 5) {
+    at(onRing(from, 0), "pointermove", 0)
+    if (sceneRegistry.gizmoActive()) return from
+  }
+  throw new Error("no ring under any pixel tried")
+}
+
+/** The selected item's turn about Z as shown, in degrees to the hundredth, either way. */
+const shownYaw = (key: string) => {
+  const q = shownTransform(useEditor.getState(), key)?.rotation ?? { x: 0, y: 0, z: 0, w: 1 }
+  const yaw = Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)) * 180 / Math.PI
+  return Math.round(Math.abs(yaw) * 100) / 100
+}
+
+describe("a turn by the gizmo's ring", () => {
+  let own = ""
+
+  const setUp = (snap: Partial<SnapConfig>) => {
+    // 1000 cm wide pieces 100 cm apart: a corner 707 cm out swings onto the neighbour at 13.05° either way
+    const [a = "", b = ""] = loadPieces([{ x: 0, y: 0, z: 0 }, { x: 1100, y: 0, z: 0 }])
+    own = a
+    const s = useEditor.getState()
+    s.setTabSnap({ ...defaultSnapConfig, ...snap })
+    s.setTool("rotate")
+    s.select([a])
+    lookDown(paneCameraAt(0))
+    for (const key of [a, b]) sceneRegistry.objects.set(key, new THREE.Object3D())
+    act(() => dom.root.render(createElement(GizmoController)))
+    act(() => scene.frame())
+  }
+
+  /** Drags the ring through `degrees` a degree at a time, answering the turn shown after each. */
+  const turnThrough = (degrees: number) => {
+    const start = grabbable() + 2
+    at(onRing(start, 0), "pointerdown", 1)
+    return Array.from({ length: degrees }, (_, i) => {
+      at(onRing(start, i + 1), "pointermove", 1)
+      return shownYaw(own)
+    })
+  }
+
+  beforeEach(() => {
+    vi.spyOn(scene.canvas, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, DOWN_PANE_SIZE, DOWN_PANE_SIZE))
+    scene.canvas.hasPointerCapture = () => false
+  })
+
+  afterEach(() => {
+    sceneRegistry.objects.clear()
+    vi.restoreAllMocks()
+  })
+
+  it("stops where it touches the neighbour, and goes on once the pointer is a threshold past", () => {
+    setUp({ enabled: true })
+    const shown = turnThrough(30)
+    // free to 12°, on the touch from a pixel short of it until 12 px along the 78 px ring past it, then free again
+    const held = Array.from({ length: 9 }, () => 13.05)
+    assert.deepStrictEqual(shown.slice(10, 24), [11, 12, ...held, 22, 23, 24])
+  })
+
+  it("says in the history what it stopped on", () => {
+    setUp({ enabled: true })
+    turnThrough(16)
+    at(onRing(0, 0), "pointerup", 0)
+    const s = useEditor.getState()
+    assert.strictEqual(shownYaw(own), 13.05)
+    assert.match(s.past.at(-1)?.description ?? "", /^Turn 1 item touching /)
+  })
+
+  it("stops on nothing and takes no step with Snap off, whatever Snap rotation says", () => {
+    setUp({ enabled: false, rotationEnabled: true, rotationStep: 15 })
+    const shown = turnThrough(20)
+    assert.deepStrictEqual(shown.slice(12, 18), [13, 14, 15, 16, 17, 18])
+  })
+
+  it("takes the rotation step between stops with Snap and Snap rotation on", () => {
+    setUp({ enabled: true, rotationEnabled: true, rotationStep: 15 })
+    const shown = turnThrough(7)
+    assert.deepStrictEqual(shown, [0, 0, 0, 0, 0, 0, 0])
+  })
 })
