@@ -349,7 +349,7 @@ const toolsMenu = (state: MenuState): ReadonlyArray<MenuNode> => {
   const alignOff = selectionOff ?? (state.selectionCount < 2 ? "Select two or more items first." : null)
   const distributeOff = selectionOff ?? (state.selectionCount < 3 ? "Select three or more items first." : null)
   const axes = ["x", "y", "z"] as const
-  const sides = [["min", "Min"], ["centre", "Centre"], ["max", "Max"]] as const
+  const sides = [["min", "Min"], ["centre", "Center"], ["max", "Max"]] as const
   return [
     item("Flush and tangent…", startFlush, off),
     item("Measure…", startMeasure, off),

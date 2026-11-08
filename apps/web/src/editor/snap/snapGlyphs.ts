@@ -31,7 +31,7 @@ export const RELATION_NAMES: Readonly<Record<SnapRelation, string>> = {
   coincident: "Coincident",
   onEdge: "On edge",
   midpoint: "Midpoint",
-  centre: "Centre",
+  centre: "Center",
   onFace: "On face",
   flush: "Flush",
   tangent: "Tangent",

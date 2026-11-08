@@ -33,7 +33,7 @@ describe("connector spots", () => {
       "Top",
       "Top right",
       "Left",
-      "Centre",
+      "Center",
       "Right",
       "Bottom left",
       "Bottom",

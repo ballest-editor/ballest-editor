@@ -214,7 +214,7 @@ export function SettingsDialog(props: {
         control: (
           <Choice
             value={settings.general.units}
-            items={{ cm: "Centimetres", m: "Metres" }}
+            items={{ cm: "Centimeters", m: "Meters" }}
             onChange={(v) => update("general", { units: v })}
           />
         )
@@ -473,8 +473,8 @@ export function SettingsDialog(props: {
           />
         )
       },
-      gridColorRow("gridCell", "gridCellColor", "Grid colour (1 m cells)", autoGrid.cell),
-      gridColorRow("gridSection", "gridSectionColor", "Grid colour (10 m sections)", autoGrid.section),
+      gridColorRow("gridCell", "gridCellColor", "Grid color (1 m cells)", autoGrid.cell),
+      gridColorRow("gridSection", "gridSectionColor", "Grid color (10 m sections)", autoGrid.section),
       ...(hasGame ? gameRows : [])
     ]
   })()

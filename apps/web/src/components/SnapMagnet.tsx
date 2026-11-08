@@ -209,7 +209,7 @@ export function SnapMagnet({ disabled }: { readonly disabled: boolean }) {
             onPressedChange={toggleSnapping}
             disabled={disabled}
             aria-label="Snapping"
-            className={cn(SEGMENT, "pr-1 aria-pressed:bg-primary/12 aria-pressed:text-foreground")}
+            className={cn(SEGMENT, "aria-pressed:bg-primary/12 aria-pressed:text-foreground")}
             {...noFocus}
           />
         }

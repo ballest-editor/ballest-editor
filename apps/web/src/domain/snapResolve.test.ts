@@ -354,7 +354,7 @@ describe("the Mesh target under a move's constraint", () => {
 
   it("offers the faces along a line and the plane between them, the face centres only on a plane, and no vertex", () => {
     assert.deepStrictEqual(labels(offered(meshed, line)), ["Face of Cube", "Middle of Cube"])
-    assert.include(labels(offered(meshed, plane)), "Centre of a face of Cube")
+    assert.include(labels(offered(meshed, plane)), "Center of a face of Cube")
     const hits = offered(meshed, line)
     const stops = hits.filter(({ rank }) => rank === 2).map(({ landing }) => landing.x).toSorted((a, b) => a - b)
     assert.deepStrictEqual(stops, [250, 300, 350])
@@ -433,7 +433,7 @@ describe("the Mesh target under a move's constraint", () => {
     assert.notInclude(labels(offered(meshed, surface)), "Corner of Cube")
     assert.notInclude(labels(offered(meshed, surface)), "Face of Cube")
     assert.deepStrictEqual(labels(offered(unloaded, line)), ["Face of Cube", "Middle of Cube"])
-    assert.include(labels(offered(unloaded, plane)), "Centre of a face of Cube")
+    assert.include(labels(offered(unloaded, plane)), "Center of a face of Cube")
   })
 
   it("leaves the faces and the centres to their own toggles, by what stands in", () => {
@@ -488,7 +488,7 @@ describe("the Mesh target under a move's constraint", () => {
       assert.deepStrictEqual(stopsOf(centred, bases), [
         [1250, "Far face"],
         [1750, "Near face"],
-        [2000, "Centre"],
+        [2000, "Center"],
         [2250, "Far face"],
         [2750, "Near face"]
       ])

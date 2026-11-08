@@ -39,7 +39,7 @@ describe("alignmentHit", () => {
   it("stops a centre on a neighbour's along the handle's axis, with how far apart they are on the guide", () => {
     const [hit] = alignmentHit(frame({ x: 396, y: 0, z: 0 }, [item("a", { x: 400, y: 900, z: 0 })]))
     assert.deepStrictEqual(hit?.landing, { x: 400, y: 0, z: 0 })
-    assert.strictEqual(hit?.label, "Centre level with Cube a on X")
+    assert.strictEqual(hit?.label, "Center level with Cube a on X")
     assert.deepInclude(hit?.marks[0], { kind: "guide", text: "800 cm" })
   })
 
@@ -60,7 +60,7 @@ describe("alignmentHit", () => {
   it("says the centre when boxes of one size line up on every feature at once", () => {
     for (const x of [396, 396.1, 396.3, 403.7]) {
       const [hit] = alignmentHit(frame({ x, y: 0, z: 0 }, [item("a", { x: 400, y: 900, z: 0 })]))
-      assert.strictEqual(hit?.label, "Centre level with Cube a on X")
+      assert.strictEqual(hit?.label, "Center level with Cube a on X")
     }
   })
 
@@ -75,18 +75,18 @@ describe("alignmentHit", () => {
       const angle = degrees * Math.PI / 180
       return { x: Math.cos(angle), y: Math.sin(angle), z: 0 }
     }
-    assert.strictEqual(along(Y), "Centre level with Cube a on Y")
-    assert.strictEqual(along(vecScale(Y, -1)), "Centre level with Cube a on Y")
-    assert.strictEqual(along(turned(20)), "Centre level with Cube a on X")
-    assert.strictEqual(along(turned(70)), "Centre level with Cube a on Y")
-    assert.strictEqual(along(turned(45)), "Centre level with Cube a on an axis")
+    assert.strictEqual(along(Y), "Center level with Cube a on Y")
+    assert.strictEqual(along(vecScale(Y, -1)), "Center level with Cube a on Y")
+    assert.strictEqual(along(turned(20)), "Center level with Cube a on X")
+    assert.strictEqual(along(turned(70)), "Center level with Cube a on Y")
+    assert.strictEqual(along(turned(45)), "Center level with Cube a on an axis")
   })
 
   it("keeps its words as the gap to what it lines up with closes", () => {
     const neighbour = [item("a", { x: 1126, y: 3, z: 0 })]
     const at = (x: number) => alignmentHit(frame({ x, y: 0, z: 0 }, neighbour, onGround))[0]
-    assert.strictEqual(at(100)?.label, "Centre level with Cube a on Y")
-    assert.strictEqual(at(526)?.label, "Centre level with Cube a on Y")
+    assert.strictEqual(at(100)?.label, "Center level with Cube a on Y")
+    assert.strictEqual(at(526)?.label, "Center level with Cube a on Y")
     assert.deepInclude(at(100)?.marks[0], { text: "926 cm" })
     assert.deepInclude(at(526)?.marks[0], { text: "500 cm" })
   })
@@ -103,21 +103,21 @@ describe("alignmentHit", () => {
 
   it("reads two axes as one when they line up the same feature of the same item", () => {
     const [hit] = alignmentHit(frame({ x: 396, y: 396, z: 0 }, [item("a", { x: 400, y: 400, z: 0 })], onGround))
-    assert.strictEqual(hit?.label, "Centre level with Cube a on X and Y")
+    assert.strictEqual(hit?.label, "Center level with Cube a on X and Y")
     assert.lengthOf(hit?.parts ?? [], 2)
   })
 
   it("reads two axes as both of their words when they don't", () => {
     const items = [item("a", { x: 400, y: 900, z: 0 }), item("b", { x: 900, y: 400, z: 0 })]
     const [hit] = alignmentHit(frame({ x: 396, y: 396, z: 0 }, items, onGround))
-    assert.strictEqual(hit?.label, "Centre level with Cube a on X; Centre level with Cube b on Y")
+    assert.strictEqual(hit?.label, "Center level with Cube a on X; Center level with Cube b on Y")
   })
 
   it("tells two items of one name apart across two axes", () => {
     const name = { name: "Cube" }
     const items = [cubeAt("a", { x: 400, y: 900, z: 0 }, name), cubeAt("b", { x: 900, y: 400, z: 0 }, name)]
     const [hit] = alignmentHit(frame({ x: 396, y: 396, z: 0 }, items, onGround))
-    assert.strictEqual(hit?.label, "Centre level with Cube on X; Centre level with Cube on Y")
+    assert.strictEqual(hit?.label, "Center level with Cube on X; Center level with Cube on Y")
   })
 
   it("says two axes that run along none of the game's as two axes", () => {
@@ -127,7 +127,7 @@ describe("alignmentHit", () => {
     const [hit] = alignmentHit(frame(at(396), [item("a", at(400))], {
       constraint: { kind: "plane", normal: { x: 0.5, y: 0.5, z: Math.SQRT1_2 } }
     }))
-    assert.strictEqual(hit?.label, "Centre level with Cube a on two axes")
+    assert.strictEqual(hit?.label, "Center level with Cube a on two axes")
   })
 
   it("stops a face plane on a neighbour's", () => {

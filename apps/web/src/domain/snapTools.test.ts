@@ -172,11 +172,11 @@ describe("selectionBases", () => {
     assert.deepStrictEqual(selectionBases(defaultSnapConfig, selection, line), [
       { start: pivot, label: "Pivot" },
       { start: { x: -100, y: 0, z: 100 }, label: "Near face", station: true, stop: face },
-      { start: { x: 0, y: 0, z: 100 }, label: "Centre", station: true, stop: { kind: "centre" } },
+      { start: { x: 0, y: 0, z: 100 }, label: "Center", station: true, stop: { kind: "centre" } },
       { start: { x: 100, y: 0, z: 100 }, label: "Far face", station: true, stop: face }
     ])
     const centred = selectionBases({ ...defaultSnapConfig, base: "centre" }, selection, line)
-    assert.deepStrictEqual(centred.map(({ label }) => label), ["Centre", "Pivot", "Near face", "Far face"])
+    assert.deepStrictEqual(centred.map(({ label }) => label), ["Center", "Pivot", "Near face", "Far face"])
   })
 
   it("lets a point that is already a station stop as one, under its own name", () => {
@@ -218,7 +218,7 @@ describe("selectionBases", () => {
     const bases = selectionBases(defaultSnapConfig, { ...selection, ends: [end] })
     assert.deepStrictEqual(bases.map(({ start }) => start), [end.position])
     const constrained = selectionBases(defaultSnapConfig, { ...selection, ends: [end] }, line)
-    assert.deepStrictEqual(constrained.map(({ label }) => label), ["End", "Pivot", "Near face", "Centre", "Far face"])
+    assert.deepStrictEqual(constrained.map(({ label }) => label), ["End", "Pivot", "Near face", "Center", "Far face"])
     const off = {
       ...defaultSnapConfig,
       targets: { ...defaultSnapConfig.targets, connectors: { ...defaultSnapConfig.targets.connectors, enabled: false } }

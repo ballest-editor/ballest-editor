@@ -78,11 +78,11 @@ function PivotPosition({ point }: { readonly point: Vec3 }) {
 }
 
 /** A group's pivot choices, in the order of a piece's: the centre of its items' box, a face of it, a member, a frozen point. */
-const GROUP_CHOICES = ["Centre", ...GROUP_PIVOT_FACES, "Item", "Point"] as const
+const GROUP_CHOICES = ["Center", ...GROUP_PIVOT_FACES, "Item", "Point"] as const
 type GroupChoice = (typeof GROUP_CHOICES)[number]
 
 const groupChoiceOf = (pivot: GroupPivot | undefined): GroupChoice =>
-  pivot === undefined ? "Centre" : pivot.choice === "item" ? "Item" : pivot.choice === "point" ? "Point" : pivot.choice
+  pivot === undefined ? "Center" : pivot.choice === "item" ? "Item" : pivot.choice === "point" ? "Point" : pivot.choice
 
 /**
  * Where a whole group pivots (docs/design/pivot-modes-and-chains.md § Group pivot): the centre of the box around its
@@ -105,7 +105,7 @@ function GroupPivotSection({ group }: { readonly group: GroupNode }) {
   const point = useEditor(useShallow(shownPivotPoint))
   const choice = groupChoiceOf(group.pivot)
   const pick = (next: GroupChoice) => {
-    if (next === "Centre") setGroupPivot(group.id, undefined)
+    if (next === "Center") setGroupPivot(group.id, undefined)
     else if (next === "Item") {
       setGroupPivot(group.id, {
         choice: "item",

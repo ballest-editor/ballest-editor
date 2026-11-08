@@ -322,7 +322,7 @@ const transformRows = (units: "cm" | "m", of: "item" | "group"): ReadonlyArray<T
     field: "translation",
     label: "Location",
     unit: units,
-    help: `The piece's origin, as the map stores it, in ${units === "m" ? "metres" : "centimetres"}, Z up`,
+    help: `The piece's origin, as the map stores it, in ${units === "m" ? "meters" : "centimeters"}, Z up`,
     axisLabels: AXIS_LABELS,
     step: units === "m" ? 0.01 : 1,
     digits: units === "m" ? 3 : 1

@@ -198,7 +198,7 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
     "Move: drag the arrows or plane handles to move the selection. W in the in-game editor. When its key is also a movement key, the \"fly only while looking\" camera setting decides which it does.",
   rotateMode: "Rotate: drag a ring to rotate the selection. E in the in-game editor.",
   scaleMode:
-    "Scale: drag a cube to scale along one axis, or the centre ring to scale uniformly. R in the in-game editor.",
+    "Scale: drag a cube to scale along one axis, or the center ring to scale uniformly. R in the in-game editor.",
   toggleGizmoSpace:
     "Switch the move and rotate gizmos between the selected item's own axes (the last one picked, when several are selected) and the world axes. Scale always uses each item's own axes. C in the in-game editor.",
   togglePivotMode:
@@ -246,7 +246,7 @@ export const keybindActionDescriptions: Record<KeybindAction, string> = {
   orbit: "Hold and drag to orbit around the focus point.",
   pan: "Hold and drag to slide the camera sideways and up/down.",
   snapToggle:
-    "Turn snapping as a whole on or off: the magnet in the top bar. Grid, rotation, scale and each target keep their own toggles under it. No equivalent in the in-game editor.",
+    "Turn snapping as a whole on or off: the magnet in the view bar. Grid, rotation, scale and each target keep their own toggles under it. No equivalent in the in-game editor.",
   snapInvert:
     "Hold during a drag: snapping goes off when it is on and on when it is off. Only once a drag has begun, so Ctrl still flies down.",
   snapHold:

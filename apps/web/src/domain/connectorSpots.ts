@@ -30,7 +30,7 @@ export const SPOT_NAMES: Readonly<Record<SpotId, string>> = {
   top: "Top",
   topRight: "Top right",
   left: "Left",
-  centre: "Centre",
+  centre: "Center",
   right: "Right",
   bottomLeft: "Bottom left",
   bottom: "Bottom",

@@ -36,7 +36,7 @@ import { NumberField } from "./NumberField"
 import { SectionTitle } from "./SectionTitle"
 import { DISCLOSURE_BODY, DisclosureChevron, Row, Segmented, SwitchRow, ValueParameters } from "./SnapParameters"
 
-const BASE_NAMES = { pivot: "Pivot", closest: "Closest", centre: "Centre" } as const
+const BASE_NAMES = { pivot: "Pivot", closest: "Closest", centre: "Center" } as const
 
 /**
  * The targets as the snap menu names them (docs/SNAPPING.md § The snap menu): Ends, Pieces and Guides are the plain
@@ -83,7 +83,7 @@ function GridParameters({ config }: { readonly config: SnapConfig }) {
     <>
       <Row
         label="Origin"
-        help="Where the grid's lines count from: the world's centre, a point you pick, or the selection."
+        help="Where the grid's lines count from: the world's center, a point you pick, or the selection."
       >
         <Actions>
           <Button variant="outline" disabled={atWorld} onClick={gridOriginToWorld}>World</Button>
@@ -259,7 +259,7 @@ export function SnapAdvanced() {
       <div className="flex flex-col">
         <Row
           label="Snap from"
-          help="Which point of what you drag lands on the target: its pivot, its point nearest the target, or its centre."
+          help="Which point of what you drag lands on the target: its pivot, its point nearest the target, or its center."
         >
           <Segmented
             label="Snap from"

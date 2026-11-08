@@ -254,7 +254,7 @@ const stationBases = ({ max, min }: Box, constraint: Constraint): ReadonlyArray<
     const stop = { kind: "face", axis } as const
     return [
       { start: vecAdd(centre, vecScale(axis, -reach)), label: "Near face", station: true, stop },
-      { start: centre, label: "Centre", station: true, stop: { kind: "centre" } },
+      { start: centre, label: "Center", station: true, stop: { kind: "centre" } },
       { start: vecAdd(centre, vecScale(axis, reach)), label: "Far face", station: true, stop }
     ]
   })
@@ -269,7 +269,7 @@ const chosenBases = (config: SnapConfig, { box, ends, pivot }: BaseSelection): R
     case "pivot":
       return [{ start: pivot, label: "Pivot" }]
     case "centre":
-      return [{ start: boxCentreOf(box), label: "Centre" }]
+      return [{ start: boxCentreOf(box), label: "Center" }]
     case "closest":
       return boxPoints(box)
   }

@@ -244,13 +244,13 @@ const meshSpotsOf = (config: SnapConfig, item: SnapItem): ReadonlyArray<Spot> =>
   return [
     ...(elements.boundsCorners && box !== undefined ? spots(box.corners, "Corner", "coincident") : []),
     ...(elements.boundsFaceCentres && box !== undefined
-      ? spots(box.faces.map(({ centre }) => centre), "Centre of a face", "centre")
+      ? spots(box.faces.map(({ centre }) => centre), "Center of a face", "centre")
       : []),
     ...(elements.vertices && mesh !== undefined ? spots(mesh.vertices, "Vertex", "coincident") : []),
     ...(elements.edgeMidpoints && mesh !== undefined
       ? spots(runMidpoints(mesh), "Middle of an edge", "midpoint")
       : []),
-    ...(elements.faceCentres && mesh !== undefined ? spots(mesh.faceCentres, "Centre of a face", "centre") : [])
+    ...(elements.faceCentres && mesh !== undefined ? spots(mesh.faceCentres, "Center of a face", "centre") : [])
   ]
 }
 
@@ -410,7 +410,7 @@ const stationsOf = (frame: SnapFrame, item: SnapItem) => {
   const centres = points && frame.constraint.kind === "plane"
     ? faces.map(({ centre }): Spot => ({
       at: centre,
-      label: `Centre of a face of ${item.name}`,
+      label: `Center of a face of ${item.name}`,
       relation: "centre",
       item: item.key
     }))

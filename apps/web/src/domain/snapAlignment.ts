@@ -62,7 +62,7 @@ const FEATURES = ["min", "centre", "max"] as const
 type Feature = (typeof FEATURES)[number]
 
 /** A box's features in words, along the axis as the stations' "Near face" and "Far face" are. */
-const FEATURE_WORDS = { min: "Near side", centre: "Centre", max: "Far side" } as const
+const FEATURE_WORDS = { min: "Near side", centre: "Center", max: "Far side" } as const
 
 /** The neighbour's side when it isn't the selection's own: "Near side level with far side of Track L". */
 const THEIR_WORDS = { min: "near side of", max: "far side of" } as const

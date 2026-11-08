@@ -42,12 +42,12 @@ export type MeshElement = (typeof MESH_ELEMENTS)[number]
 
 export const MESH_ELEMENT_NAMES: Readonly<Record<MeshElement, string>> = {
   boundsCorners: "Bounds corners",
-  boundsFaceCentres: "Bounds face centres",
+  boundsFaceCentres: "Bounds face centers",
   boundsFaces: "Bounds faces",
   vertices: "Vertices",
   sharpEdges: "Sharp edges",
   edgeMidpoints: "Edge midpoints",
-  faceCentres: "Face centres",
+  faceCentres: "Face centers",
   faces: "Faces"
 }
 

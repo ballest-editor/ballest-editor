@@ -239,7 +239,7 @@ function GridColorsRow() {
   return (
     <div className="flex flex-col gap-1 pb-2">
       <div className="flex h-6 items-center justify-between">
-        Grid colours
+        Grid colors
         <Button
           variant="ghost"
           size="icon-sm"
@@ -254,14 +254,14 @@ function GridColorsRow() {
         <span>1 m cells</span>
         <span>10 m sections</span>
         <ColorSetting
-          label="Grid colour (1 m cells)"
+          label="Grid color (1 m cells)"
           className="w-full"
           value={gridCellColor}
           auto={auto.cell}
           onChange={(v) => void updateSettings("appearance", { gridCellColor: v })}
         />
         <ColorSetting
-          label="Grid colour (10 m sections)"
+          label="Grid color (10 m sections)"
           className="w-full"
           value={gridSectionColor}
           auto={auto.section}
